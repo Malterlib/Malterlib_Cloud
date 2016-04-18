@@ -1,0 +1,75 @@
+// Copyright © 2015 Hansoft AB 
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+Import "../Core/Lib_Malterlib.MTarget"
+//Import "Malterlib_Cloud.MTarget"
+
+%Group "{Malterlib}/{Lib_Malterlib_Cloud}"
+{
+	%Group Cloud
+	{
+		%Group Include
+		{
+			Compile.Type "C++"
+			{
+				!!DocumentationEnabled true
+			}
+			//%File "Include/Mib/Cloud/^*"
+		}
+		%File "Source/*"
+		%Group Documentation
+		{
+			%File "Documentation/*"
+		}
+	}
+	%Dependency Lib_Malterlib_Web
+	{
+		Dependency.Indirect true
+	}
+}
+
+Property
+{
+	MalterlibLibrary_Cloud true
+	{
+		&
+		{
+			MalterlibLibrary_Cloud ""
+			MalterlibLibrary_All true
+		}
+	}
+	MalterlibSubLibraries "Cloud;@(MalterlibSubLibraries)"
+	{
+		!!MalterlibLibrary_Cloud true
+	}
+	MalterlibLibrarySeparate_Lib_Malterlib_Cloud true
+//	MalterlibSubLibrarySeparate_Lib_Malterlib_Cloud true
+	MalterlibIncludeRoots "@('Include'->MakeAbsolute());@(MalterlibIncludeRoots)"
+	{
+		!!MalterlibLibrary_Cloud true
+	}
+}
+
+%Group "{Test}/{Malterlib_Cloud}"
+{
+	Property
+	{
+		MalterlibLinkWithOpenSSL true
+	}
+	Compile
+	{
+		!!CompileDialect "C"
+		PrefixHeader "@('Test/PCH.h'->MakeAbsolute())"
+	}
+}
+
+Property
+{
+	!!MalterlibEnableInternalTests true
+	
+	MalterlibTests "Malterlib_Cloud;@(MalterlibTests)"
+	MalterlibTestFiles_Malterlib_Cloud "@('Test/*'->MakeAbsolute())"
+	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud"
+	MalterlibTestExtraGroups_Malterlib_Cloud "{Test}/{Malterlib_Cloud}"
+}
+
