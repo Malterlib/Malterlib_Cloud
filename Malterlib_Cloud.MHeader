@@ -14,7 +14,7 @@ Import "../Core/Lib_Malterlib.MTarget"
 			{
 				!!DocumentationEnabled true
 			}
-			//%File "Include/Mib/Cloud/^*"
+			%File "Include/Mib/Cloud/^*"
 		}
 		%File "Source/*"
 		%Group Documentation
