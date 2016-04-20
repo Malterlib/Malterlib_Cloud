@@ -9,5 +9,17 @@ namespace NMib
 {
 	namespace NCloud
 	{
+		CKeyManagerServer::CKeyManagerServer()
+		{
+		}
+		
+		CKeyManagerServer::CKeyManagerServer(CKeyManagerServerConfig const &_Config)
+		{
+		}
+		
+		CKeyManagerServer::~CKeyManagerServer()
+		{
+		}
+
 	}
 }

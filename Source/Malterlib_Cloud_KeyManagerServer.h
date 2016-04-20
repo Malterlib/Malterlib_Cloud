@@ -9,11 +9,22 @@ namespace NMib
 {
 	namespace NCloud
 	{
-		class CKeyManagerServerDatabase : public NConcurrency::CActor
+		class ICKeyManagerServerDatabase : public NConcurrency::CActor
 		{
+		public:
 			struct CDatabase
 			{
-				NContainer::TCMap<NStr::CStrSecure, CSymmetricKey> m_Keys; 
+				struct CClientStore
+				{
+					NContainer::TCMap<NStr::CStrSecure, CSymmetricKey> m_Keys;
+					
+					NStr::CStrSecure const &f_GetID() const
+					{
+						return NContainer::TCMap<NStr::CStrSecure, CClientStore>::fs_GetKey(*this);
+					}
+				};
+				
+				NContainer::TCMap<NStr::CStrSecure, CClientStore> m_Clients;
 			};
 			
 			virtual NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database) pure;
@@ -22,12 +33,15 @@ namespace NMib
 		
 		struct CKeyManagerServerConfig
 		{
-			NConcurrency::TCActor<CKeyManagerServerDatabase> m_DatabaseActor;
+			NConcurrency::TCActor<ICKeyManagerServerDatabase> m_DatabaseActor;
 			NContainer::TCSet<NContainer::TCVector<uint8>> m_PublicKeysForAllKeyManagers;
 		};
 
 		class CKeyManagerServer : public NConcurrency::CActor
 		{
+		public:
+			CKeyManagerServer();
+			~CKeyManagerServer();
 			CKeyManagerServer(CKeyManagerServerConfig const &_Config);
 			
 		private:
