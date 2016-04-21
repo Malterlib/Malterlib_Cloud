@@ -6,6 +6,7 @@ Import "../Core/Lib_Malterlib.MTarget"
 
 %Group "{Malterlib}/{Lib_Malterlib_Cloud}"
 {
+	Property.MalterlibConcurrency_DistributedActors true
 	%Group Cloud
 	{
 		%Group Include
@@ -26,6 +27,10 @@ Import "../Core/Lib_Malterlib.MTarget"
 	{
 		Dependency.Indirect true
 	}
+	%Dependency Lib_Malterlib_Concurrency
+	{
+		Dependency.Indirect true
+	}	
 }
 
 Property
@@ -52,6 +57,7 @@ Property
 
 %Group "{Test}/{Malterlib_Cloud}"
 {
+	Property.MalterlibConcurrency_DistributedActors true
 	Property
 	{
 		MalterlibLinkWithOpenSSL true
