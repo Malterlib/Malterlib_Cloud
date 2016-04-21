@@ -16,15 +16,15 @@ namespace NMib
 			{
 				struct CClientStore
 				{
-					NContainer::TCMap<NStr::CStrSecure, CSymmetricKey> m_Keys;
+					NContainer::TCMap<NStr::CStr, CSymmetricKey> m_Keys;
 					
-					NStr::CStrSecure const &f_GetID() const
+					NStr::CStr const &f_GetID() const
 					{
-						return NContainer::TCMap<NStr::CStrSecure, CClientStore>::fs_GetKey(*this);
+						return NContainer::TCMap<NStr::CStr, CClientStore>::fs_GetKey(*this);
 					}
 				};
 				
-				NContainer::TCMap<NStr::CStrSecure, CClientStore> m_Clients;
+				NContainer::TCMap<NStr::CStr, CClientStore> m_Clients;
 			};
 			
 			virtual NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database) pure;
