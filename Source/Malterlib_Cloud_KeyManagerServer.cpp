@@ -85,8 +85,8 @@ namespace NMib
 						}
 						else
 							Continuation.f_SetResult(*pKey);
-					},
-					[Continuation] (NStr::CStr const &_Error)
+					}
+					, [Continuation] (NStr::CStr const &_Error)
 					{
 						Continuation.f_SetException(DMibErrorInstance(fg_Format("Failed to read database: {}", _Error)));
 					}
