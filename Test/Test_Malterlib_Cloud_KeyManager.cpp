@@ -21,7 +21,6 @@ public:
 		TCContinuation<void> f_WriteDatabase(CDatabase const &_Database)
 		{
 			m_Database = _Database;
-			
 			return TCContinuation<void>::fs_Finished();
 		}
 		
@@ -45,32 +44,30 @@ public:
 			TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config);
 			
 			CDistributedActorTestHelper TestHelper;
-			TestHelper.f_Init();
+			auto HostID1 = TestHelper.f_Init();
 			TestHelper.f_Subscribe("MalterlibCloudKeyManager");
-			auto &ClientCryptograhy = TestHelper.f_GetClientCryptograhySettings();
 			TCDistributedActor<CKeyManager> KeyManager = TestHelper.f_GetRemoteActor<CKeyManager>();
 			
-			CSymmetricKey Key0 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey0").f_CallSync(60.0);
-			CSymmetricKey Key1 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey1").f_CallSync(60.0);
+			CSymmetricKey Key0 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);
+			CSymmetricKey Key1 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey1", 32).f_CallSync(60.0);
 			
 			DMibExpect(Key0, !=, Key1);
-			DMibExpect(Key0, ==, DatabaseImpl.m_Database.m_Clients[ClientCryptograhy.f_GetHostID()].m_Keys["TestKey0"]);
-			DMibExpect(Key1, ==, DatabaseImpl.m_Database.m_Clients[ClientCryptograhy.f_GetHostID()].m_Keys["TestKey1"]);
+			DMibExpect(Key0, ==, DatabaseImpl.m_Database.m_Clients[HostID1].m_Keys["TestKey0"]);
+			DMibExpect(Key1, ==, DatabaseImpl.m_Database.m_Clients[HostID1].m_Keys["TestKey1"]);
 			
 			CDistributedActorTestHelper TestHelper2;
-			TestHelper2.f_InitClient(TestHelper);
+			auto HostID2 = TestHelper2.f_InitClient(TestHelper);
 			TestHelper2.f_Subscribe("MalterlibCloudKeyManager");
-			auto &ClientCryptograhy2 = TestHelper2.f_GetClientCryptograhySettings();
-			TCDistributedActor<CKeyManager> KeyManager2 = TestHelper.f_GetRemoteActor<CKeyManager>();
+			TCDistributedActor<CKeyManager> KeyManager2 = TestHelper2.f_GetRemoteActor<CKeyManager>();
 
-			CSymmetricKey SecondKey0 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey0").f_CallSync(60.0);
-			CSymmetricKey SecondKey1 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey1").f_CallSync(60.0);
+			CSymmetricKey SecondKey0 = DMibCallActor(KeyManager2, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);
+			CSymmetricKey SecondKey1 = DMibCallActor(KeyManager2, CKeyManager::f_RequestKey, "TestKey1", 32).f_CallSync(60.0);
 			
 			DMibExpect(SecondKey0, !=, SecondKey1); 
 			DMibExpect(SecondKey0, !=, Key0); 
 			DMibExpect(SecondKey1, !=, Key1); 
-			DMibExpect(SecondKey0, ==, DatabaseImpl.m_Database.m_Clients[ClientCryptograhy2.f_GetHostID()].m_Keys["TestKey0"]);
-			DMibExpect(SecondKey1, ==, DatabaseImpl.m_Database.m_Clients[ClientCryptograhy2.f_GetHostID()].m_Keys["TestKey1"]);
+			DMibExpect(SecondKey0, ==, DatabaseImpl.m_Database.m_Clients[HostID2].m_Keys["TestKey0"]);
+			DMibExpect(SecondKey1, ==, DatabaseImpl.m_Database.m_Clients[HostID2].m_Keys["TestKey1"]);
 		};		
 	}
 };

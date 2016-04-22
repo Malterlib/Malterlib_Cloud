@@ -9,19 +9,21 @@ namespace NMib
 {
 	namespace NCloud
 	{
-		class CKeyManagerServerInternal;
+		class CKeyManagerServer;
 		
 		class CKeyManager : public NConcurrency::CActor
 		{
+			friend class CKeyManagerServer;
+			
 		public:
-			CKeyManager(NConcurrency::TCActor<CKeyManagerServerInternal> &_InternalActor);
+			CKeyManager(NConcurrency::TCActor<CKeyManagerServer> const &_ServerActor);
 			~CKeyManager();
 			
-			NConcurrency::TCContinuation<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier);
+			NConcurrency::TCContinuation<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize);
 		private:
 			struct CInternal;
 			
-			NIndirection::TCIndirection<CInternal> mp_Internal;
+			NPtr::TCUniquePointer<CInternal> mp_pInternal;
 		};
 	}
 }
