@@ -39,10 +39,16 @@ namespace NMib
 
 		class CKeyManagerServer : public NConcurrency::CActor
 		{
+			friend class CKeyManager;
+			
 		public:
-			CKeyManagerServer();
-			~CKeyManagerServer();
 			CKeyManagerServer(CKeyManagerServerConfig const &_Config);
+			~CKeyManagerServer();
+			
+			void f_Construct() override;
+			
+		protected:
+			NConcurrency::TCContinuation<CSymmetricKey> fp_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize);
 			
 		private:
 			struct CInternal;

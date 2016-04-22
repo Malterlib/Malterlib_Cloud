@@ -1,5 +1,6 @@
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/DistributedActor>
 
 #include "Malterlib_Cloud_KeyManager.h"
 #include "Malterlib_Cloud_KeyManagerServer.h"
@@ -8,8 +9,16 @@
 namespace NMib
 {
 	namespace NCloud
-	{
-		CKeyManager::CKeyManager(NConcurrency::TCActor<CKeyManagerServerInternal> &_InternalActor)
+	{		
+		CKeyManager::CInternal::CInternal(CKeyManager *_pThis, NConcurrency::TCActor<CKeyManagerServer> const &_ServerActor)
+			: m_pThis(_pThis)
+			, m_ServerActor(_ServerActor)
+		{
+			
+		}
+		
+		CKeyManager::CKeyManager(NConcurrency::TCActor<CKeyManagerServer> const &_ServerActor)
+			: mp_pInternal(fg_Construct(this, _ServerActor))
 		{
 		}
 		
@@ -17,9 +26,17 @@ namespace NMib
 		{
 		}
 		
-		NConcurrency::TCContinuation<CSymmetricKey> CKeyManager::f_RequestKey(NStr::CStr const &_Identifier)
+		NConcurrency::TCContinuation<CSymmetricKey> CKeyManager::f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize)
 		{
-			return NConcurrency::TCContinuation<CSymmetricKey>::fs_Finished(CSymmetricKey());
+			auto &Internal = *mp_pInternal;
+			
+			NConcurrency::TCContinuation<CSymmetricKey> Continuation;
+			Internal.m_ServerActor(&CKeyManagerServer::fp_RequestKey, NConcurrency::CActorDistributionManager::fs_GetCallingHostID(), _Identifier, _KeySize) > [Continuation](NConcurrency::TCAsyncResult<CSymmetricKey> &&_Result)
+				{
+					Continuation.f_SetResult(fg_Move(_Result));
+				}
+			;
+			return Continuation;
 		}
 
 	}
