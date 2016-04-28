@@ -3,6 +3,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedActor>
+#include <Mib/Concurrency/WeakActor>
 
 namespace NMib
 {
@@ -31,10 +32,10 @@ namespace NMib
 		
 		struct CKeyManager::CInternal
 		{
-			CInternal(CKeyManager *_pThis, NConcurrency::TCActor<CKeyManagerServer> const &_ServerActor);
+			CInternal(CKeyManager *_pThis, NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
 			
 			CKeyManager *m_pThis;
-			NConcurrency::TCActor<CKeyManagerServer> m_ServerActor;
+			NConcurrency::TCWeakActor<CKeyManagerServer> m_ServerActor;
 		};
 	}
 }
