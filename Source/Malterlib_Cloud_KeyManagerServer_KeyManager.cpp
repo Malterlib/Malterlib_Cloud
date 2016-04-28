@@ -10,14 +10,14 @@ namespace NMib
 {
 	namespace NCloud
 	{		
-		CKeyManager::CInternal::CInternal(CKeyManager *_pThis, NConcurrency::TCActor<CKeyManagerServer> const &_ServerActor)
+		CKeyManager::CInternal::CInternal(CKeyManager *_pThis, NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor)
 			: m_pThis(_pThis)
 			, m_ServerActor(_ServerActor)
 		{
 			
 		}
 		
-		CKeyManager::CKeyManager(NConcurrency::TCActor<CKeyManagerServer> const &_ServerActor)
+		CKeyManager::CKeyManager(NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor)
 			: mp_pInternal(fg_Construct(this, _ServerActor))
 		{
 		}
@@ -30,8 +30,17 @@ namespace NMib
 		{
 			auto &Internal = *mp_pInternal;
 			
+			auto ServerActor = Internal.m_ServerActor.f_Lock();
+
 			NConcurrency::TCContinuation<CSymmetricKey> Continuation;
-			Internal.m_ServerActor(&CKeyManagerServer::fp_RequestKey, NConcurrency::CActorDistributionManager::fs_GetCallingHostID(), _Identifier, _KeySize) > [Continuation](NConcurrency::TCAsyncResult<CSymmetricKey> &&_Result)
+			
+			if (!ServerActor)
+			{
+				Continuation.f_SetException(DMibErrorInstance("Key manager server was deleted"));
+				return Continuation;
+			}
+			
+			ServerActor(&CKeyManagerServer::fp_RequestKey, NConcurrency::CActorDistributionManager::fs_GetCallingHostID(), _Identifier, _KeySize) > [Continuation](NConcurrency::TCAsyncResult<CSymmetricKey> &&_Result)
 				{
 					Continuation.f_SetResult(fg_Move(_Result));
 				}

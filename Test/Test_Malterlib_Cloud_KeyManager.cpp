@@ -34,7 +34,10 @@ public:
 	{
 		DMibTestSuite("General")
 		{
+			CDistributedActorTestHelper TestHelper;
+			TestHelper.f_Init();
 			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabaseImpl>();
+			
 			CKeyManagerServerConfig Config;
 			Config.m_DatabaseActor = DatabaseActor;
 			
@@ -43,21 +46,22 @@ public:
 			
 			TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config);
 			
-			CDistributedActorTestHelper TestHelper;
-			auto HostID1 = TestHelper.f_Init();
 			TestHelper.f_Subscribe("MalterlibCloudKeyManager");
 			TCDistributedActor<CKeyManager> KeyManager = TestHelper.f_GetRemoteActor<CKeyManager>();
 			
 			CSymmetricKey Key0 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);
 			CSymmetricKey Key1 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey1", 32).f_CallSync(60.0);
+			auto HostID1 = TestHelper.f_GetClientHostID();
 			
 			DMibExpect(Key0, !=, Key1);
 			DMibExpect(Key0, ==, DatabaseImpl.m_Database.m_Clients[HostID1].m_Keys["TestKey0"]);
 			DMibExpect(Key1, ==, DatabaseImpl.m_Database.m_Clients[HostID1].m_Keys["TestKey1"]);
 			
 			CDistributedActorTestHelper TestHelper2;
-			auto HostID2 = TestHelper2.f_InitClient(TestHelper);
+			TestHelper2.f_InitClient(TestHelper);
 			TestHelper2.f_Subscribe("MalterlibCloudKeyManager");
+
+			auto HostID2 = TestHelper2.f_GetClientHostID();
 			TCDistributedActor<CKeyManager> KeyManager2 = TestHelper2.f_GetRemoteActor<CKeyManager>();
 
 			CSymmetricKey SecondKey0 = DMibCallActor(KeyManager2, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);

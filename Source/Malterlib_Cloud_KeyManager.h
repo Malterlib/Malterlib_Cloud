@@ -16,7 +16,7 @@ namespace NMib
 			friend class CKeyManagerServer;
 			
 		public:
-			CKeyManager(NConcurrency::TCActor<CKeyManagerServer> const &_ServerActor);
+			CKeyManager(NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
 			~CKeyManager();
 			
 			NConcurrency::TCContinuation<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize);
