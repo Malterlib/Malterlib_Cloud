@@ -62,6 +62,7 @@ namespace NMib
 				}
 			};
 			
+			virtual NConcurrency::TCContinuation<void> f_Initialize() pure;
 			virtual NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database) pure;
 			virtual NConcurrency::TCContinuation<CDatabase> f_ReadDatabase() pure;
 		};

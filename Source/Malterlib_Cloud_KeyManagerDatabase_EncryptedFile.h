@@ -26,11 +26,11 @@ namespace NMib
 			
 			~CKeyManagerServerDatabase_EncryptedFile();
 			
+			NConcurrency::TCContinuation<void> f_Initialize() override;
 			NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database) override;
 			NConcurrency::TCContinuation<CDatabase> f_ReadDatabase() override;
 		
 		private:
-			
 			struct CInternal;
 			NPtr::TCUniquePointer<CInternal> mp_pInternal;
 			

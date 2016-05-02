@@ -6,6 +6,7 @@
 #include <Mib/Cloud/KeyManagerServer>
 #include <Mib/Concurrency/TestHelpers>
 #include <Mib/Cloud/KeyManagerDatabases/EncryptedFile>
+#include <Mib/Test/Exception>
 
 using namespace NMib;
 using namespace NMib::NConcurrency;
@@ -22,6 +23,11 @@ public:
 		static constexpr bool mc_bAllowInternalAccess = true;
 		
 		CDatabase m_Database;
+		
+		TCContinuation<void> f_Initialize()
+		{
+			return TCContinuation<void>::fs_Finished();
+		}
 		
 		TCContinuation<void> f_WriteDatabase(CDatabase const &_Database)
 		{
@@ -44,6 +50,7 @@ public:
 	{
 		CKeyManagerServerConfig Config;
 		Config.m_DatabaseActor = _Database;
+		Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
 		//Config.m_PublicKeysForAllKeyManagers = ; TODO
 		
 		TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config);
@@ -103,6 +110,7 @@ public:
 				CFile::fs_DeleteFile(DatabasePath);
 				
 			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, nullptr);
+			DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
 			auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
 			DMibExpect(Database.m_Clients.f_GetLen(), ==, 0);
 			
@@ -119,6 +127,7 @@ public:
 				DMibTestPath("ExistingKeys");
 				
 				auto DatabaseActor2 = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, nullptr);
+				DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
 				auto Database2 = DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
 				
 				auto fTestDatabase = [&]
@@ -144,6 +153,18 @@ public:
 					DMibTestPath("After running");
 					Database2 = DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
 					fTestDatabase();
+				}
+				
+				{
+					DMibTestPath("Check incorrect password is caught");
+					auto DatabaseActor3 = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, "WrongPassword", nullptr);
+					
+					DMibTest
+						(
+							DMibExpr(NMib::NTest::TCThrowsException<NException::CException>())
+							== DMibLExpr(DatabaseActor3(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0))
+						)
+					;
 				}
 			}
 		};
