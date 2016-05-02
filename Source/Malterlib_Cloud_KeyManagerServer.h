@@ -1,3 +1,6 @@
+// Copyright © 2015 Hansoft AB 
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
 #pragma once
 
 #include <Mib/Core/Core>
@@ -14,6 +17,11 @@ namespace NMib
 		public:
 			struct CDatabase
 			{
+				enum
+				{
+					EVersion = 0x100
+				};
+				
 				struct CClientStore
 				{
 					NContainer::TCMap<NStr::CStr, CSymmetricKey> m_Keys;
@@ -22,9 +30,36 @@ namespace NMib
 					{
 						return NContainer::TCMap<NStr::CStr, CClientStore>::fs_GetKey(*this);
 					}
+					
+					template <typename tf_CStream>
+					void f_Feed(tf_CStream &_Stream) const
+					{
+						_Stream << m_Keys;
+					}
+						
+					template <typename tf_CStream>
+					void f_Consume(tf_CStream &_Stream)
+					{
+						_Stream >> m_Keys;
+					}
 				};
 				
 				NContainer::TCMap<NStr::CStr, CClientStore> m_Clients;
+				
+				template <typename tf_CStream>
+				void f_Feed(tf_CStream &_Stream) const
+				{
+					_Stream << uint32(EVersion);
+					_Stream << m_Clients;
+				}
+					
+				template <typename tf_CStream>
+				void f_Consume(tf_CStream &_Stream)
+				{
+					uint32 Version = 0;
+					_Stream >> Version;
+					_Stream >> m_Clients;
+				}
 			};
 			
 			virtual NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database) pure;
