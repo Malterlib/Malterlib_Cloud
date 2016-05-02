@@ -4,6 +4,7 @@
 #pragma once
 
 #include <Mib/Core/Core>
+#include <Mib/Network/SSL>
 
 #include "Malterlib_Cloud_KeyManagerServer.h"
 
