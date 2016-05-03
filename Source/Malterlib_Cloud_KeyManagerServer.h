@@ -45,12 +45,14 @@ namespace NMib
 				};
 				
 				NContainer::TCMap<NStr::CStr, CClientStore> m_Clients;
+				NContainer::TCMap<uint32, NContainer::TCVector<CSymmetricKey>> m_AvailableKeys;
 				
 				template <typename tf_CStream>
 				void f_Feed(tf_CStream &_Stream) const
 				{
 					_Stream << uint32(EVersion);
 					_Stream << m_Clients;
+					_Stream << m_AvailableKeys;
 				}
 					
 				template <typename tf_CStream>
@@ -59,6 +61,7 @@ namespace NMib
 					uint32 Version = 0;
 					_Stream >> Version;
 					_Stream >> m_Clients;
+					_Stream >> m_AvailableKeys;
 				}
 			};
 			
@@ -82,6 +85,7 @@ namespace NMib
 			~CKeyManagerServer();
 			
 			void f_Construct() override;
+			NConcurrency::TCContinuation<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
 			
 		protected:
 			NConcurrency::TCContinuation<CSymmetricKey> fp_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize);
