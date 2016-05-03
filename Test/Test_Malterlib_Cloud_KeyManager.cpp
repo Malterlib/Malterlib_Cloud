@@ -168,6 +168,72 @@ public:
 				}
 			}
 		};
+		DMibTestSuite("PreCreatedKeys")
+		{
+			CStrSecure Password = "Password";
+			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile";
+			if (CFile::fs_FileExists(DatabasePath))
+				CFile::fs_DeleteFile(DatabasePath);
+			
+			CDistributedActorTestHelper TestHelper;
+			TestHelper.f_Init();
+			
+			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("PreCreatedKeysThread"), DatabasePath, Password, nullptr);
+			
+			CKeyManagerServerConfig Config;
+			Config.m_DatabaseActor = DatabaseActor;
+			Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
+		
+			TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config);
+			KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_CallSync(60.0);
+			
+			CSymmetricKey AvailableKey;
+			CSymmetricKey NextKey;
+			{
+				DMibTestPath("After initial keys pre created");
+				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
+				DMibExpect(Database.m_AvailableKeys[32].f_GetLen(), ==, 2);
+				AvailableKey = Database.m_AvailableKeys[32].f_GetFirst();
+				NextKey = Database.m_AvailableKeys[32].f_GetLast();
+			}
+			
+			TestHelper.f_Subscribe("MalterlibCloudKeyManager");
+			TCDistributedActor<CKeyManager> KeyManager = TestHelper.f_GetRemoteActor<CKeyManager>();
+		
+			CSymmetricKey FirstKey = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);
+			DMibExpect(FirstKey, ==, NextKey);
+			
+			{
+				DMibTestPath("After first key popped");
+				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
+				DMibExpect(Database.m_AvailableKeys[32].f_GetLen(), ==, 1);
+				DMibExpect(Database.m_AvailableKeys[32].f_GetFirst(), ==, AvailableKey);
+			}
+			
+			KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_CallSync(60.0);
+			
+			{
+				DMibTestPath("After second round of keys generated");
+				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
+				DMibExpect(Database.m_AvailableKeys[32].f_GetLen(), ==, 2);
+				DMibExpect(Database.m_AvailableKeys[32].f_GetLast(), ==, AvailableKey);
+			}
+			
+			{
+				DMibTestPath("Request key not pre created");
+				CSymmetricKey NotPreCreatedKey = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey1", 64).f_CallSync(60.0);
+				CSymmetricKey NotPreCreatedKey2 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey2", 64).f_CallSync(60.0);
+				DMibExpect(NotPreCreatedKey, !=, NotPreCreatedKey2);
+				
+				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
+				DMibExpect(Database.m_AvailableKeys[32].f_GetLen(), ==, 2);
+				DMibExpect(Database.m_AvailableKeys[32].f_GetLast(), ==, AvailableKey);
+			}
+		};
 	}
 };
 
