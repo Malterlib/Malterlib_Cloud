@@ -44,8 +44,8 @@ public:
 	void f_TestCloudKeyManager
 		(
 			NMib::NConcurrency::TCActor<ICKeyManagerServerDatabase> const &_Database
-			, CDistributedActorTestHelper &_TestHelper
-			, CDistributedActorTestHelper &_TestHelper2
+			, CDistributedActorTestHelperCombined &_TestHelper
+			, CDistributedActorTestHelperCombined &_TestHelper2
 		)
 	{
 		CKeyManagerServerConfig Config;
@@ -87,10 +87,10 @@ public:
 	{
 		DMibTestSuite("General")
 		{
-			CDistributedActorTestHelper TestHelper;
+			CDistributedActorTestHelperCombined TestHelper;
 			TestHelper.f_Init();
 			
-			CDistributedActorTestHelper TestHelper2;
+			CDistributedActorTestHelperCombined TestHelper2;
 			TestHelper2.f_InitClient(TestHelper);
 			
 			f_TestCloudKeyManager(fg_ConstructActor<CKeyManagerServerDatabaseImpl>(), TestHelper, TestHelper2);
@@ -100,10 +100,10 @@ public:
 			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile";
 			CStrSecure Password = "Password";
 			
-			CDistributedActorTestHelper TestHelper;
+			CDistributedActorTestHelperCombined TestHelper;
 			TestHelper.f_Init();
 			
-			CDistributedActorTestHelper TestHelper2;
+			CDistributedActorTestHelperCombined TestHelper2;
 			TestHelper2.f_InitClient(TestHelper);
 			
 			if (CFile::fs_FileExists(DatabasePath))
@@ -175,7 +175,7 @@ public:
 			if (CFile::fs_FileExists(DatabasePath))
 				CFile::fs_DeleteFile(DatabasePath);
 			
-			CDistributedActorTestHelper TestHelper;
+			CDistributedActorTestHelperCombined TestHelper;
 			TestHelper.f_Init();
 			
 			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("PreCreatedKeysThread"), DatabasePath, Password, nullptr);
