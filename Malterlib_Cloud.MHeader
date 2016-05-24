@@ -2,7 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 Import "../Core/Lib_Malterlib.MTarget"
-//Import "Malterlib_Cloud.MTarget"
+Import "Apps/*/*.MHeader"
 
 %Group "{Malterlib}/{Lib_Malterlib_Cloud}"
 {
@@ -79,3 +79,15 @@ Property
 	MalterlibTestExtraGroups_Malterlib_Cloud "{Test}/{Malterlib_Cloud}"
 }
 
+%Workspace "Apps_Malterlib_Cloud"
+{
+	!!MalterlibEnableInternalWorkspaces true
+	
+	Compile
+	{
+		!!CompileDialect "C"
+		PreprocessorDefines "DMibSysLogSeverities=DMibLogSeverity_Error|DMibLogSeverity_Critical|DMibLogSeverity_Warning|DMibLogSeverity_Info;@(Compile.PreprocessorDefines)"
+	}
+	
+	%Target "@(Malterlib_Cloud_App_Targets)"
+}
