@@ -83,6 +83,8 @@ Property
 {
 	!!MalterlibEnableInternalWorkspaces true
 	
+	Property.MalterlibPostCopyProject "Malterlib_Cloud"
+	
 	Compile
 	{
 		!!CompileDialect "C"

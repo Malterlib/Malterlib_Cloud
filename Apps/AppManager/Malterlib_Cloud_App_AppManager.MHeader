@@ -1,11 +1,11 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-%Target "Malterlib_Cloud_KeyManager"
+%Target "Malterlib_Cloud_AppManager"
 {
 	Property
 	{
-		MalterlibPostCopyProject "Malterlib_Cloud_KeyManager"
+		MalterlibPostCopyProject "Malterlib_Cloud_AppManager"
 		{
 			!!MalterlibPostCopyProject ""
 		}
@@ -15,7 +15,7 @@
 	Target
 	{
 		DebuggerCommandArguments "-RunAsProgram"
-		BaseFileName "KeyManager"
+		BaseFileName "AppManager"
 	}
 	%Group Source
 	{
@@ -25,4 +25,4 @@
 	%Dependency "Lib_Malterlib"
 }
 
-Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_KeyManager;@(Malterlib_Cloud_App_Targets)"
+Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_AppManager;@(Malterlib_Cloud_App_Targets)"
