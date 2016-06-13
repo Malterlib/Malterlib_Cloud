@@ -4,6 +4,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Core/Application>
 #include <Mib/Daemon/Daemon>
+#include <Mib/Concurrency/DistributedDaemon>
 
 #include "Malterlib_Cloud_App_KeyManager.h"
 
@@ -14,34 +15,18 @@ class CKeyManager : public CApplication
 {
 	aint f_Main()
 	{
-		NContainer::TCVector<NMib::NStr::CStr> CommandLineArgs;
-		NSys::fg_Process_GetCommandLineArgs(CommandLineArgs);
-		
-		try
-		{
-			for (auto iCommand = CommandLineArgs.f_GetIterator(); iCommand; ++iCommand)
+		NConcurrency::CDistributedDaemon Daemon
 			{
-				if (*iCommand == "--provide-password")
-					return fg_ProvidePassword();
-				else if (*iCommand == "--generate-trust-ticket")
-					return fg_GenerateTrustTicket();
-			}
-		}
-		catch (NException::CException const &_Exception)
-		{
-			DConErrOut("{}{\n}", _Exception.f_GetErrorStr());
-			return 1;
-		}
-		
-		NService::fg_RunDaemon
-			(
 				"MalterlibCloudKeyManager"
 				, "Malterlib Cloud Key Manager"
-				, ""
-				, &fg_CreateDaemon
-			)
+				, "Manages encrption keys for distributed Malterlib cloud applications"
+				, []
+				{
+					return fg_ConstructActor<CKeyManagerDaemonActor>();
+				}
+			}
 		;
-		return 0;
+		return Daemon.f_Run();
 	}	
 };
 
