@@ -14,7 +14,7 @@
 	}
 	Target
 	{
-		DebuggerCommandArguments "-RunAsProgram"
+		DebuggerCommandArguments "--daemon-run-debug"
 		BaseFileName "AppManager"
 	}
 	%Group Source

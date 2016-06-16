@@ -22,11 +22,10 @@ namespace NMib
 				~CKeyManagerDaemonActor();
 				
 				TCContinuation<CDistributedAppCommandLineResults> f_ProvidePassword(NStr::CStrSecure const &_Password);
-				TCContinuation<void> f_Destroy() override;
 				
 			private:
-				TCContinuation<void> fp_DestroyLocal();
 				TCContinuation<void> fp_StartApp() override;
+				TCContinuation<void> fp_StopApp() override;
 				void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override; 
 				
 				TCContinuation<void> fp_Initialize();
