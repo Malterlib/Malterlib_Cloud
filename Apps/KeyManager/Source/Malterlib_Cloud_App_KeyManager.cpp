@@ -41,8 +41,8 @@ namespace NMib
 				Config.m_DatabaseActor = mp_DatabaseActor;
 				mp_ServerActor = fg_ConstructActor<CKeyManagerServer>(Config);
 			}
-				
-			TCContinuation<void> CKeyManagerDaemonActor::fp_DestroyLocal()
+
+			TCContinuation<void> CKeyManagerDaemonActor::fp_StopApp()
 			{	
 				TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
 				
@@ -89,30 +89,6 @@ namespace NMib
 				}
 
 				return pCanDestroy->m_Continuation;
-			}
-
-			TCContinuation<void> CKeyManagerDaemonActor::f_Destroy()
-			{
-				TCContinuation<void> Continuation;
-				
-				fg_ThisActor(this)(&CKeyManagerDaemonActor::fp_DestroyLocal) > Continuation / [this, Continuation]()
-					{
-						fg_Dispatch
-							(
-								[this]
-								{
-									return CDistributedAppActor::f_Destroy();
-								}
-							)
-							> Continuation / [Continuation]()
-							{
-								Continuation.f_SetResult();
-							}
-						;
-					}
-				;
-				
-				return Continuation;				
 			}
 		}		
 	}
