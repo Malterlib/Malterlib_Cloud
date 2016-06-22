@@ -16,7 +16,7 @@ namespace NMib
 			: m_pThis(_pThis)
 			, m_ServerActor(_ServerActor)
 		{
-			
+			DMibPublishActorFunction(CKeyManager::f_RequestKey);
 		}
 		
 		CKeyManager::CKeyManager(NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor)
@@ -49,6 +49,6 @@ namespace NMib
 			;
 			return Continuation;
 		}
-
+		
 	}
 }

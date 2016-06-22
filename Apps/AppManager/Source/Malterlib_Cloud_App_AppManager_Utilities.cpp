@@ -75,6 +75,199 @@ namespace NMib
 				
 				return StdOut;
 			}
+
+			TCContinuation<CAppManagerActor::CBashScriptOutput> CAppManagerActor::fp_RunBashScript
+				(
+					CStr const &_Script
+					, CStr const &_Description
+					, CStr const &_Home
+					, CStr const &_User
+					, TCMap<CStr, CStr> const &_Environment
+					, TCFunction<void (NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)> const &_fOnStdOutput
+				)
+			{
+				struct CState
+				{
+					TCActor<CProcessLaunchActor> m_LaunchActor;
+					CActorCallback m_LaunchSubscription;
+					TCContinuation<CBashScriptOutput> m_Continuation;
+					CStr m_ErrorOutput;
+					CStr m_StdOutput;
+					
+					CAppManagerActor::CBashScriptOutput m_Output;
+					
+					bool m_bReplied = false;
+					void f_Replied()
+					{
+						m_bReplied = true;
+						m_LaunchActor->f_Destroy();
+					}
+				};
+				
+				TCSharedPointer<CState> pState = fg_Construct();
+				pState->m_LaunchActor = fg_ConstructActor<CProcessLaunchActor>();
+				
+				CStr FileName = fg_Format("{}/TempScripts/Bash_{}.sh", CFile::fs_GetProgramDirectory(), CHash_MD5::fs_DigestFromData(_Script.f_GetStr(), _Script.f_GetLen()).f_GetString());
+			
+				fg_Dispatch
+					(
+						mp_FileActor
+						, [FileName, _Script]
+						{
+							if (!CFile::fs_FileExists(FileName))
+							{
+								CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
+								CFile::fs_WriteStringToFile
+									(
+										FileName
+										, _Script
+										, false
+										, EFileAttrib_UnixAttributesValid | EFileAttrib_UserExecute | EFileAttrib_UserRead | EFileAttrib_UserWrite
+									)
+								;
+							}
+						}
+					)
+					> pState->m_Continuation % fg_Format("[{}] Failed to save temporary script", _Description) 
+					/ [this, FileName, _Description, _Home, _User, _Environment, _fOnStdOutput, pState]
+					{
+						auto fReportError = [pState, _Description](CStr const &_Error)
+							{
+								if (pState->m_bReplied)
+									return;
+								DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "[{}] {}", _Description, _Error);
+								pState->m_Continuation.f_SetException(DMibErrorInstance(_Error));
+								pState->f_Replied();
+							}
+						;
+						
+						CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+							(
+								"bash"
+								, fg_CreateVector<CStr>(FileName)
+								, CFile::fs_GetProgramDirectory()
+								, [this, pState, _Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+								{
+									if (!pState->m_LaunchActor)
+										return;
+									
+									switch (_State.f_GetTypeID())
+									{
+									case NProcess::EProcessLaunchState_Launched:
+										{
+											DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Launched bash script '{}'", _Description);
+										}
+										break;
+									case NProcess::EProcessLaunchState_LaunchFailed:
+										{
+											auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
+											fReportError(fg_Format("Failed to launch bash script: {}", LaunchError));
+										}
+										break;
+									case NProcess::EProcessLaunchState_Exited:
+										{
+											auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
+											pState->m_Output.m_Status = ExitStatus; 
+											if (ExitStatus != 0)
+											{
+												auto ErrorOutput = pState->m_ErrorOutput.f_Trim();
+												if (ErrorOutput.f_IsEmpty())
+													fReportError(fg_Format("Bash script exited with error status: {}", ExitStatus));
+												else
+													fReportError(fg_Format("Bash script exited with error status: {}. Error output:{\n}{}", ExitStatus, ErrorOutput));
+											}
+											else
+											{
+												DMibLogWithCategory
+													(
+														Malterlib/Cloud/AppManager
+														, Info
+														, "[{}] Bash script exited with success"
+														, _Description
+													)
+												;
+												if (!pState->m_bReplied)
+												{
+													pState->m_Continuation.f_SetResult(fg_Move(pState->m_Output));
+													pState->f_Replied();
+												}
+											}
+										}
+										break;
+									}
+								}
+							)
+						;
+						
+						LaunchParams.m_fOnOutput = [this, pState, _Description, _fOnStdOutput](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
+							{
+								if (!pState->m_LaunchActor)
+									return;
+								if (_Output.f_IsEmpty())
+									return;
+								DMibLogCategory(Malterlib/Cloud/AppManager);
+								auto Output = _Output.f_TrimRight("\r\n");
+								NMib::NLog::CSysLogCatScope AppScope(NMib::fg_GetSys()->f_GetLogger(), _Description);
+								if (_OutputType == EProcessLaunchOutputType_StdOut)
+								{
+									pState->m_Output.m_StdOut += _Output;
+									DMibLog(Info, "{}", Output);
+									if (_fOnStdOutput)
+									{
+										pState->m_StdOutput += _Output;
+										while (pState->m_StdOutput.f_FindChars("\r\n") >= 0)
+											_fOnStdOutput(fg_GetStrLineSep(pState->m_StdOutput), pState->m_LaunchActor);
+									}
+								}
+								else
+								{
+									pState->m_Output.m_StdErr += _Output;
+									pState->m_ErrorOutput += _Output;
+									DMibLog(Error, "{}", Output);
+								}
+							}
+						;
+						
+						if (!_User.f_IsEmpty())
+						{
+							LaunchParams.m_RunAsUser = _User;
+							LaunchParams.m_RunAsGroup = _User;
+						}
+						if (!_Home.f_IsEmpty())
+						{
+							LaunchParams.m_Environment["HOME"] = _Home;
+							LaunchParams.m_Environment["TMPDIR"] = _Home + "/.tmp";
+						}
+						
+						LaunchParams.m_Environment += _Environment;
+						LaunchParams.m_bMergeEnvironment = true;
+						
+						LaunchParams.m_bAllowExecutableLocate = true;
+						
+						pState->m_LaunchActor
+							(
+								&CProcessLaunchActor::f_Launch
+								, LaunchParams
+								, EProcessLaunchCloseFlag_StopProcess | EProcessLaunchCloseFlag_BlockOnExit
+								, fg_ThisActor(this)
+							)
+							> [this, pState, _Description, fReportError](TCAsyncResult<CActorCallback> &&_Subscription)
+							{
+								if (!pState->m_LaunchActor)
+									return;
+								if (!_Subscription)
+								{
+									fReportError(fg_Format("[] Failed to launch bash script: {}", _Description, _Subscription.f_GetExceptionStr()));
+									return;
+								}
+								pState->m_LaunchSubscription = fg_Move(*_Subscription);
+							}
+						;
+					}
+				;
+				
+				return pState->m_Continuation;
+			}
 		}
 	}
 }

@@ -155,11 +155,18 @@ namespace NMib
 							;
 						}
 						else
+						{
+							if (pKey->f_GetLen() != _KeySize)
+							{
+								Continuation.f_SetException(DMibErrorInstance(NStr::fg_Format("Saved key has different size {} from requested size {}", pKey->f_GetLen(), _KeySize)));
+								return;
+							}
 							Continuation.f_SetResult(*pKey);
+						}
 					}
 					, [Continuation] (NStr::CStr const &_Error)
 					{
-						Continuation.f_SetException(DMibErrorInstance(fg_Format("Failed to read database: {}", _Error)));
+						Continuation.f_SetException(DMibErrorInstance(NStr::fg_Format("Failed to read database: {}", _Error)));
 					}
 				)
 			;
