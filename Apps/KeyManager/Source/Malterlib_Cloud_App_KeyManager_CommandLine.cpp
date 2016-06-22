@@ -32,7 +32,7 @@ namespace NMib
 							"Names"_= {"--provide-password"}
 							, "Description"_= "Provide a password for the key database to be able to start the key manager."
 						}
-						, [this](const NEncoding::CEJSON &_Parameters, CDistributedAppCommandLineClient &_CommandLineClient) -> uint32
+						, [this](CEJSON const &_Parameters, CDistributedAppCommandLineClient &_CommandLineClient) -> uint32
 						{
 							CBlockingStdInReader StdInReader;
 							CBlockingStdInReader::CPromptParams Params;
@@ -63,7 +63,7 @@ namespace NMib
 								}
 							}
 						}
-						, [this](const NEncoding::CEJSON &_Parameters)
+						, [this](CEJSON const &_Parameters)
 						{
 							return f_ProvidePassword(CStrSecure{_Parameters["Password"].f_String()});
 						}

@@ -37,7 +37,7 @@ namespace NMib
 			CStr CAppManagerActor::fsp_UnpackApplication(CStr const &_Source, CStr const &_Destination, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> &o_Files)
 			{
 				CStr Return;
-				if (CFile::fs_FileExists(_Destination))
+				if (CFile::fs_FileExists(_Destination) && !CFile::fs_FindFiles(_Destination + "/*").f_IsEmpty())
 					DMibError(fg_Format("Application already exists at: '{}'. You have to manually delete it to resue the name", _Destination));
 				
 				if (CFile::fs_FileExists(_Source, EFileAttrib_Directory))
@@ -84,13 +84,12 @@ namespace NMib
 				return Return;
 			}
 			
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_AddApplication(const CEJSON &_Params)
+			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_AddApplication(CEJSON const &_Params)
 			{
-				TCSharedPointer<CApplication> pApplication = fg_Construct(_Params["Name"].f_String());
+				TCSharedPointer<CApplication> pApplication = fg_Construct(_Params["Name"].f_String(), this);
+				bool bForceOverwrite = _Params["ForceOverwrite"].f_Boolean();
 				
 				pApplication->m_EncryptionStorage = _Params["EncryptionStorage"].f_String();
-				if (!pApplication->m_EncryptionStorage.f_IsEmpty())
-					return DMibErrorInstance("Encryption not yet supported");
 				pApplication->m_Executable = _Params["Executable"].f_String();
 				for (auto &Parameter : _Params["ExecutableParameters"].f_Array())
 					pApplication->m_ExecutableParameters.f_Insert(Parameter.f_String());
@@ -128,88 +127,107 @@ namespace NMib
 					}
 				;
 				
-				fg_Dispatch
-					(
-						mp_FileActor
-						, [pApplication, Directory, Package, pResult, fLogInfo]()
-						{
-							if (!pApplication->m_RunAsGroup.f_IsEmpty())
-							{
-								CStr GroupID;
-								if (!NSys::fg_UserManagement_GroupExists(pApplication->m_RunAsGroup, GroupID))
-								{
-									NSys::fg_UserManagement_CreateGroup(pApplication->m_RunAsGroup, GroupID);
-									fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", pApplication->m_RunAsGroup, GroupID));
-								}
-							}
-							if (!pApplication->m_RunAsUser.f_IsEmpty())
-							{
-								CStr UserID;
-								if (!NSys::fg_UserManagement_UserExists(pApplication->m_RunAsUser, UserID))
-								{
-									NSys::fg_UserManagement_CreateUser
-										(
-											pApplication->m_RunAsGroup
-											, pApplication->m_RunAsUser
-											, ""
-											, pApplication->m_RunAsUser
-											, Directory
-											, UserID
-										)
-									;
-									fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", pApplication->m_RunAsUser, UserID));
-								}
-							}
-
-							TCVector<CStr> Files;
-							CStr Output = fsp_UnpackApplication(Package, Directory, pApplication, Files);
-							if (!Output.f_IsEmpty())
-								pResult->f_AddStdOut(Output);
-							
-							return Files;
-						}
-					)
-					> [this, pResult, pApplication, Continuation, fLogInfo, fLogError](TCAsyncResult<TCVector<CStr>> &&_Files)
+				fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Setup, bForceOverwrite) 
+					> [this, fLogError, fLogInfo, pApplication, Directory, Package, pResult, Continuation](TCAsyncResult<void> &&_Result)
 					{
-						if (!_Files)
+						if (!_Result)
 						{
-							fLogError(fg_Format("Failed to unpack application: {}", _Files.f_GetExceptionStr()));
+							fLogError(_Result.f_GetExceptionStr());
 							return;
 						}
-						if (auto *pApplicationsState = mp_StateDatabase.m_Data.f_GetMember("Applications"))
-						{
-							if (pApplicationsState->f_GetMember(pApplication->m_Name))
-							{
-								fLogError(fg_Format("Application with name '{}' already exists", pApplication->m_Name));
-								return;
-							}
-						}
-						
-						pApplication->m_Files = fg_Move(*_Files);
-						auto &ApplicationJSON = mp_StateDatabase.m_Data["Applications"][pApplication->m_Name];
-						ApplicationJSON["Executable"] = pApplication->m_Executable; 
-						ApplicationJSON["RunAsUser"] = pApplication->m_RunAsUser; 
-						ApplicationJSON["RunAsGroup"] = pApplication->m_RunAsGroup;
-						auto &Parameters = ApplicationJSON["Parameters"].f_Array();
-						for (auto &Parameter : pApplication->m_ExecutableParameters)
-							Parameters.f_Insert(Parameter);
-						ApplicationJSON["EncryptionStorage"] = pApplication->m_EncryptionStorage;
-						ApplicationJSON["Files"] = *_Files;
-						
-						mp_Applications[pApplication->m_Name] = pApplication;
-						auto InProgressScope = pApplication->f_SetInProgress();
-
-						fp_LaunchApp(pApplication);
-						
-						mp_StateDatabase.f_Save() > [Continuation, pResult, fLogError, fLogInfo, InProgressScope](TCAsyncResult<void> &&_Result)
-							{
-								if (!_Result)
+						fg_Dispatch
+							(
+								mp_FileActor
+								, [pApplication, Directory, Package, pResult, fLogInfo]()
 								{
-									fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
+									if (!pApplication->m_RunAsGroup.f_IsEmpty())
+									{
+										CStr GroupID;
+										if (!NSys::fg_UserManagement_GroupExists(pApplication->m_RunAsGroup, GroupID))
+										{
+											NSys::fg_UserManagement_CreateGroup(pApplication->m_RunAsGroup, GroupID);
+											fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", pApplication->m_RunAsGroup, GroupID));
+										}
+									}
+									if (!pApplication->m_RunAsUser.f_IsEmpty())
+									{
+										CStr UserID;
+										if (!NSys::fg_UserManagement_UserExists(pApplication->m_RunAsUser, UserID))
+										{
+											NSys::fg_UserManagement_CreateUser
+												(
+													pApplication->m_RunAsGroup
+													, pApplication->m_RunAsUser
+													, ""
+													, pApplication->m_RunAsUser
+													, Directory
+													, UserID
+												)
+											;
+											fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", pApplication->m_RunAsUser, UserID));
+										}
+									}
+
+									TCVector<CStr> Files;
+									CStr Output = fsp_UnpackApplication(Package, Directory, pApplication, Files);
+									if (!Output.f_IsEmpty())
+										pResult->f_AddStdOut(Output);
+									
+									return Files;
+								}
+							)
+							> [this, pResult, pApplication, Continuation, fLogInfo, fLogError](TCAsyncResult<TCVector<CStr>> &&_Files)
+							{
+								if (!_Files)
+								{
+									fLogError(fg_Format("Failed to unpack application: {}", _Files.f_GetExceptionStr()));
 									return;
 								}
-								fLogInfo("Application was successfully added");
-								Continuation.f_SetResult(fg_Move(*pResult));
+								if (auto *pApplicationsState = mp_StateDatabase.m_Data.f_GetMember("Applications"))
+								{
+									if (pApplicationsState->f_GetMember(pApplication->m_Name))
+									{
+										fLogError(fg_Format("Application with name '{}' already exists", pApplication->m_Name));
+										return;
+									}
+								}
+								
+								pApplication->m_Files = fg_Move(*_Files);
+								auto &ApplicationJSON = mp_StateDatabase.m_Data["Applications"][pApplication->m_Name];
+								ApplicationJSON["Executable"] = pApplication->m_Executable; 
+								ApplicationJSON["RunAsUser"] = pApplication->m_RunAsUser; 
+								ApplicationJSON["RunAsGroup"] = pApplication->m_RunAsGroup;
+								auto &Parameters = ApplicationJSON["Parameters"].f_Array();
+								for (auto &Parameter : pApplication->m_ExecutableParameters)
+									Parameters.f_Insert(Parameter);
+								ApplicationJSON["EncryptionStorage"] = pApplication->m_EncryptionStorage;
+								ApplicationJSON["Files"] = *_Files;
+								
+								mp_Applications[pApplication->m_Name] = pApplication;
+								auto InProgressScope = pApplication->f_SetInProgress();
+
+								mp_StateDatabase.f_Save() 
+									> [this, Continuation, pResult, fLogError, fLogInfo, InProgressScope, pApplication](TCAsyncResult<void> &&_Result)
+									{
+										if (!_Result)
+										{
+											fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
+											return;
+										}
+										fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false) 
+											> [fLogError, fLogInfo, Continuation, InProgressScope, pResult](TCAsyncResult<void> &&_Result)
+											{
+												if (!_Result)
+												{
+													fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
+													return;
+												}
+												fLogInfo("Application was successfully added");
+												Continuation.f_SetResult(fg_Move(*pResult));
+											}
+										;
+									}
+								;
 							}
 						;
 					}
@@ -218,7 +236,7 @@ namespace NMib
 				return Continuation;
 			}
 
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RemoveApplication(const CEJSON &_Params)
+			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params)
 			{
 				CStr Name = _Params["Name"].f_String();
 				auto *pApplication = mp_Applications.f_FindEqual(Name);
@@ -231,7 +249,7 @@ namespace NMib
 				auto InProgressScope = Application.f_SetInProgress();
 					
 				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				Application.f_Stop() > [this, Continuation, Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
+				Application.f_Stop(true) > [this, Continuation, Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
 					{
 						CDistributedAppCommandLineResults Results;
 						fp_OutputApplicationStop(_Result, Results, Name);
@@ -268,7 +286,7 @@ namespace NMib
 				return Continuation;
 			}
 			
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_UpdateApplication(const CEJSON &_Params)
+			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON const &_Params)
 			{
 				// 1. Extract new application to temporary directory
 				// 2. Stop old application
@@ -370,7 +388,7 @@ namespace NMib
 						
 						fLogInfo("Stopping old application");
 						// 2. Stop old application
-						pApplication->f_Stop() > [this, pApplication, pResult, fLogInfo, fLogError, Continuation, TemporaryDirectory, InProgressScope, Files, TemporaryDirectoryCleanup]
+						pApplication->f_Stop(false) > [this, pApplication, pResult, fLogInfo, fLogError, Continuation, TemporaryDirectory, InProgressScope, Files, TemporaryDirectoryCleanup]
 							(TCAsyncResult<uint32> &&_ExitStatus)
 							{
 								fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
@@ -446,8 +464,10 @@ namespace NMib
 													CFile::fs_RenameFile(SourcePath, DestinationPath);
 												}
 											}
+											CFile::fs_CreateDirectory(OutputDirectory + "/.home");
+											CFile::fs_CreateDirectory(OutputDirectory + "/.tmp");
+											
 											fsp_UpdateAttributes(OutputDirectory);
-
 										}
 									)
 									> [this, pApplication, InProgressScope, fLogError, fLogInfo, Files, pResult, Continuation](TCAsyncResult<void> &&_Result)
@@ -463,25 +483,35 @@ namespace NMib
 											return;
 										}
 											
-										fLogInfo("Launching updated application");
 										// 5. Re-launch application
 										auto &ApplicationJSON = mp_StateDatabase.m_Data["Applications"][pApplication->m_Name];
 						
 										pApplication->m_Files = Files;
 										ApplicationJSON["Files"] = Files;
 										
-										fp_LaunchApp(pApplication);
-										
 										fLogInfo("Saving application state");
-										mp_StateDatabase.f_Save() > [Continuation, pResult, fLogInfo, fLogError](TCAsyncResult<void> &&_Result)
+										mp_StateDatabase.f_Save() 
+											> [this, Continuation, pResult, pApplication, fLogInfo, fLogError, InProgressScope](TCAsyncResult<void> &&_Result)
 											{
 												if (!_Result)
 												{
 													fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
 													return;
 												}
-												fLogInfo("Application was successfully updated");
-												Continuation.f_SetResult(fg_Move(*pResult));
+												
+												fLogInfo("Launching updated application");
+												fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
+													> [fLogError, fLogInfo, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
+													{
+														if (!_Result)
+														{
+															fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
+															return;
+														}
+														fLogInfo("Application was successfully updated");
+														Continuation.f_SetResult(fg_Move(*pResult));
+													}
+												;
 											}
 										;
 									}
