@@ -67,6 +67,7 @@ namespace NMib
 				}
 				
 				_pApplication->m_bLaunching = true;
+				_pApplication->m_bStopped = false;
 				struct CState
 				{
 					COnScopeExitShared m_pCleanup;

@@ -34,7 +34,7 @@ namespace NMib
 				DefaultSection.f_RegisterCommand
 					(
 						{
-							"Names"_= {"--add-application"}
+							"Names"_= {"--application-add"}
 							, "Description"_= 
 								"Adds an application."
 								"By default the application will run as root."
@@ -98,7 +98,7 @@ namespace NMib
 				DefaultSection.f_RegisterCommand
 					(
 						{
-							"Names"_= {"--enum-applications"}
+							"Names"_= {"--application-list"}
 							, "Description"_= "List applications"
 							, "Options"_=
 							{
@@ -119,7 +119,7 @@ namespace NMib
 				DefaultSection.f_RegisterCommand
 					(
 						{
-							"Names"_= {"--remove-application"}
+							"Names"_= {"--application-remove"}
 							, "Description"_= "Remove the application"
 							, "Parameters"_=
 							{
@@ -139,7 +139,7 @@ namespace NMib
 				DefaultSection.f_RegisterCommand
 					(
 						{
-							"Names"_= {"--update-application"}
+							"Names"_= {"--application-update"}
 							, "Description"_= "Update the application package"
 							, "Options"_= 
 							{
@@ -147,7 +147,7 @@ namespace NMib
 								{
 									"Names"_= {"--name"}
 									,"Type"_= ""
-									, "Description"_= "Uniquely name the application to update."
+									, "Description"_= "Unique name of the application to update."
 								}
 							}
 							, "Parameters"_=
@@ -158,6 +158,46 @@ namespace NMib
 						, [this](CEJSON const &_Params)
 						{
 							return fp_CommandLine_UpdateApplication(_Params);
+						}
+					)
+				;
+				DefaultSection.f_RegisterCommand
+					(
+						{
+							"Names"_= {"--application-stop"}
+							, "Description"_= "Stop the application, keeping any encryption loaded"
+							, "Parameters"_=
+							{
+								"Name"_= 
+								{
+									"Type"_= ""
+									, "Description"_= "Unique name of the application to stop."
+								}
+							}
+						}
+						, [this](CEJSON const &_Params)
+						{
+							return fp_CommandLine_StopApplication(_Params);
+						}
+					)
+				;
+				DefaultSection.f_RegisterCommand
+					(
+						{
+							"Names"_= {"--application-start"}
+							, "Description"_= "Start the application"
+							, "Parameters"_=
+							{
+								"Name"_= 
+								{
+									"Type"_= ""
+									, "Description"_= "Unique name of the application to start."
+								}
+							}
+						}
+						, [this](CEJSON const &_Params)
+						{
+							return fp_CommandLine_StartApplication(_Params);
 						}
 					)
 				;

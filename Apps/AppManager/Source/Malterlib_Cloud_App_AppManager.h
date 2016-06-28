@@ -117,6 +117,8 @@ namespace NMib
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_AddApplication(CEJSON const &_Params);
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_RemoveApplication(CEJSON const &_Params);
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_UpdateApplication(CEJSON const &_Params);
+				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_StartApplication(CEJSON const &_Params);
+				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_StopApplication(CEJSON const &_Params);
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_AddAllowedKeyManager(CEJSON const &_Params);
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_RemoveAllowedKeyManager(CEJSON const &_Params);
 				

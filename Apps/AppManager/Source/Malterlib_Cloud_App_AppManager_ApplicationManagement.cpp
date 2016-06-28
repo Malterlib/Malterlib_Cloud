@@ -50,7 +50,7 @@ namespace NMib
 							CStr::CFormat("[{}] Extracting application") << _pApplication->m_Name
 							, "tar"
 							, _Destination
-							, fg_CreateVector<CStr>("-xf", _Source)
+							, fg_CreateVector<CStr>("--no-same-owner", "-xf", _Source)
 							, ""
 							, ""
 						)
@@ -520,6 +520,92 @@ namespace NMib
 							}
 						;
 
+					}
+				;
+				return Continuation;
+			}
+			
+			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON const &_Params)
+			{
+				CStr Name = _Params["Name"].f_String();
+				auto pOldApplication = mp_Applications.f_FindEqual(Name);
+				if (!pOldApplication)
+					return DMibErrorInstance(fg_Format("No such application '{}'", Name));
+				
+				TCSharedPointer<CApplication> pApplication = *pOldApplication;
+				
+				if (pApplication->m_bOperationInProgress)
+					return DMibErrorInstance("Operation already in progress for application");
+				if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
+					return DMibErrorInstance("Application already stopped");
+
+				auto InProgressScope = pApplication->f_SetInProgress();
+				TCContinuation<CDistributedAppCommandLineResults> Continuation;
+				TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
+				auto fLogError = [pResult, Continuation](CStr const &_Error)
+					{
+						pResult->f_AddStdErr(_Error + DMibNewLine);
+						pResult->m_Status = 1;
+						Continuation.f_SetResult(fg_Move(*pResult));
+					}
+				;
+				
+				pApplication->f_Stop(false) > [this, pApplication, pResult, fLogError, Continuation, InProgressScope]
+					(TCAsyncResult<uint32> &&_ExitStatus)
+					{
+						fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
+						
+						if (!_ExitStatus)
+						{
+							fLogError("Failed to exit old application");
+							return;
+						}
+						
+						if (pApplication->m_bDeleted)
+						{
+							fLogError("Application has been deleted, aborting");
+							return;
+						}
+						Continuation.f_SetResult(fg_Move(*pResult));
+					}
+				;
+				return Continuation;
+			}
+			
+			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON const &_Params)
+			{
+				CStr Name = _Params["Name"].f_String();
+				auto pOldApplication = mp_Applications.f_FindEqual(Name);
+				if (!pOldApplication)
+					return DMibErrorInstance(fg_Format("No such application '{}'", Name));
+				
+				TCSharedPointer<CApplication> pApplication = *pOldApplication;
+				
+				if (pApplication->m_bOperationInProgress)
+					return DMibErrorInstance("Operation already in progress for application");
+				if (pApplication->m_ProcessLaunch)
+					return DMibErrorInstance("Application already started");
+
+				auto InProgressScope = pApplication->f_SetInProgress();
+				TCContinuation<CDistributedAppCommandLineResults> Continuation;
+				TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
+				auto fLogError = [pResult, Continuation](CStr const &_Error)
+					{
+						pResult->f_AddStdErr(_Error + DMibNewLine);
+						pResult->m_Status = 1;
+						Continuation.f_SetResult(fg_Move(*pResult));
+					}
+				;
+				
+				fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, true)
+					> [fLogError, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
+					{
+						if (!_Result)
+						{
+							fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
+							return;
+						}
+						Continuation.f_SetResult(fg_Move(*pResult));
 					}
 				;
 				return Continuation;
