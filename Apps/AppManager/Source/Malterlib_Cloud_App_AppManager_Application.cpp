@@ -50,12 +50,13 @@ namespace NMib
 					(
 						[this, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this)), _bCloseEncryption]() -> TCContinuation<uint32>
 						{
-							if (!pApplication->m_ProcessLaunch)
-								return f_CloseEncryption(0);
-							if (pApplication->m_bStopped)
-								return f_CloseEncryption(0);
-							if (pApplication->m_bDeleted)
-								return f_CloseEncryption(0);
+							if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped || pApplication->m_bDeleted)
+							{
+								if (_bCloseEncryption)
+									return f_CloseEncryption(0);
+								else
+									return fg_Explicit(0);
+							}
 							pApplication->m_bStopped = true;
 							TCContinuation<uint32> Continuation;
 							pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess) > [this, Continuation, pApplication, _bCloseEncryption](TCAsyncResult<uint32> &&_Result)

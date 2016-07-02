@@ -22,6 +22,7 @@ namespace NMib
 				~CKeyManagerDaemonActor();
 				
 				TCContinuation<CDistributedAppCommandLineResults> f_ProvidePassword(NStr::CStrSecure const &_Password);
+				TCContinuation<CDistributedAppCommandLineResults> f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys);
 				
 			private:
 				TCContinuation<void> fp_StartApp() override;

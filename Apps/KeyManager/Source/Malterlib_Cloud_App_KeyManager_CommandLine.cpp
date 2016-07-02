@@ -69,8 +69,50 @@ namespace NMib
 						}
 					)
 				;
+				DefaultSection.f_RegisterCommand
+					(
+						{
+							"Names"_= {"--precreate-keys"}
+							, "Description"_= "Precreate keys of a certain size. Useful to allow backup of future keys not yet sent to a client."
+							, "Options"_=
+							{
+								"KeySize?"_=
+								{
+									"Names"_= {"--key-size"}
+									, "Description"_= "Set size in number of bits for the created keys."
+									, "Default"_= 512
+								}
+								, "NumberOfKeys?"_=
+								{
+									"Names"_= {"--number-of-keys"}
+									, "Description"_= "Precreate this number of keys."
+									, "Default"_= 128
+								}
+							}
+						}
+						, [this](CEJSON const &_Parameters)
+						{
+							return f_PrecreateKeys(_Parameters["KeySize"].f_Integer(), _Parameters["NumberOfKeys"].f_Integer());
+						}
+					)
+				;
 			}
 			
+			TCContinuation<CDistributedAppCommandLineResults> CKeyManagerDaemonActor::f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys)
+			{
+				if (!mp_ServerActor)
+					return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
+				
+				TCContinuation<CDistributedAppCommandLineResults> Continuation;
+				
+				mp_ServerActor(&CKeyManagerServer::f_PreCreateKeys, _KeySize, _nKeys) > Continuation / [Continuation, _nKeys, _KeySize]
+					{
+						Continuation.f_SetResult(fg_Format("The server now has at least {} ({} bit) keys{\n}", _nKeys, _KeySize));
+					}
+				;
+				return Continuation;
+			}
+
 			TCContinuation<CDistributedAppCommandLineResults> CKeyManagerDaemonActor::f_ProvidePassword(NStr::CStrSecure const &_Password)
 			{
 				TCContinuation<CDistributedAppCommandLineResults> Continuation;

@@ -19,6 +19,17 @@ namespace NMib
 					o_Results.f_AddStdErr(fg_Format("Application '{}' exited with non 0 status: {}{\n}", _Name, *_Result));
 			}
 			
+			constexpr static EFileAttrib gc_RootAttributes = 
+						EFileAttrib_UnixAttributesValid  
+						| EFileAttrib_UserRead 
+						| EFileAttrib_UserWrite
+						| EFileAttrib_UserExecute 
+						| EFileAttrib_GroupRead
+						| EFileAttrib_GroupExecute
+						| EFileAttrib_EveryoneRead 
+						| EFileAttrib_EveryoneExecute
+			;
+			
 			void CAppManagerActor::fsp_UpdateAttributes(CStr const &_File)
 			{
 				auto CurrentAttributes = CFile::fs_GetAttributes(_File);
@@ -30,6 +41,9 @@ namespace NMib
 						| (CurrentAttributes & EFileAttrib_UserWrite)
 						| (CurrentAttributes & EFileAttrib_UserExecute) 
 						| (CurrentAttributes & EFileAttrib_GroupRead)
+						| (CurrentAttributes & EFileAttrib_GroupExecute)
+						| (CurrentAttributes & EFileAttrib_EveryoneRead)
+						| (CurrentAttributes & EFileAttrib_EveryoneExecute)
 					)
 				;
 			}
@@ -72,7 +86,7 @@ namespace NMib
 				
 				auto Files = CFile::fs_FindFiles(FindOptions);
 				
-				fsp_UpdateAttributes(_Destination);
+				CFile::fs_SetAttributes(_Destination, gc_RootAttributes);
 				
 				mint PrefixLen = _Destination.f_GetLen() + 1;
 				for (auto &File : Files)
@@ -329,199 +343,211 @@ namespace NMib
 						Continuation.f_SetResult(fg_Move(*pResult));
 					}
 				;
-				
-				CStr TemporaryDirectory = fg_Format("{}/{}", pApplication->f_GetDirectory(), fg_RandomID());
-				
-				auto TemporaryDirectoryCleanup = fg_OnScopeExitShared
-					(
-						[FileActor = mp_FileActor, TemporaryDirectory]
-						{
-							fg_Dispatch
-								(
-									FileActor
-									, [TemporaryDirectory]
-									{
-										try
-										{
-											if (CFile::fs_FileExists(TemporaryDirectory))
-												CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
-										}
-										catch (CExceptionFile const &_Exception)
-										{
-										}
-									}
-								)
-								> fg_DiscardResult()
-							;
-						}
-					)
-				;
-				
-				fg_Dispatch
-					(
-						mp_FileActor
-						, [pApplication, TemporaryDirectory, Package, fLogInfo, InProgressScope, TemporaryDirectoryCleanup]()
-						{
-							// 1. Extract new application to temporary directory
-							fLogInfo("Extracting application to temporary directory");
-							TCVector<CStr> Files;
-							CStr Output = fsp_UnpackApplication(Package, TemporaryDirectory, pApplication, Files);
-							if (!Output.f_IsEmpty())
-								fLogInfo(Output);
-							return Files;
-						}
-					)
-					> [this, pResult, pApplication, Continuation, fLogInfo, fLogError, InProgressScope, TemporaryDirectory, TemporaryDirectoryCleanup](TCAsyncResult<TCVector<CStr>> &&_Files)
-					{
-						if (!_Files)
-						{
-							fLogError(fg_Format("Failed to unpack application: {}", _Files.f_GetExceptionStr()));
-							return;
-						}
-						if (pApplication->m_bDeleted)
-						{
-							fLogError("Application has been deleted, aborting");
-							return;
-						}
 
-						auto Files = fg_Move(*_Files);
+				fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Open, false)
+					> [this, pApplication, Package, fLogInfo, fLogError, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
+					{
+						if (!_Result)
+						{
+							fLogError(fg_Format("Failed to open encryption: {}", _Result.f_GetExceptionStr()));
+							return;
+						}
 						
-						fLogInfo("Stopping old application");
-						// 2. Stop old application
-						pApplication->f_Stop(false) > [this, pApplication, pResult, fLogInfo, fLogError, Continuation, TemporaryDirectory, InProgressScope, Files, TemporaryDirectoryCleanup]
-							(TCAsyncResult<uint32> &&_ExitStatus)
-							{
-								fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
-								
-								if (!_ExitStatus)
+						CStr TemporaryDirectory = fg_Format("{}/{}", pApplication->f_GetDirectory(), fg_RandomID());
+						
+						auto TemporaryDirectoryCleanup = fg_OnScopeExitShared
+							(
+								[FileActor = mp_FileActor, TemporaryDirectory]
 								{
-									fLogError("Failed to exit old application, aborting update");
+									fg_Dispatch
+										(
+											FileActor
+											, [TemporaryDirectory]
+											{
+												try
+												{
+													if (CFile::fs_FileExists(TemporaryDirectory))
+														CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
+												}
+												catch (CExceptionFile const &_Exception)
+												{
+												}
+											}
+										)
+										> fg_DiscardResult()
+									;
+								}
+							)
+						;
+						
+						fg_Dispatch
+							(
+								mp_FileActor
+								, [pApplication, TemporaryDirectory, Package, fLogInfo, InProgressScope, TemporaryDirectoryCleanup]()
+								{
+									// 1. Extract new application to temporary directory
+									fLogInfo("Extracting application to temporary directory");
+									TCVector<CStr> Files;
+									CStr Output = fsp_UnpackApplication(Package, TemporaryDirectory, pApplication, Files);
+									if (!Output.f_IsEmpty())
+										fLogInfo(Output);
+									return Files;
+								}
+							)
+							> [this, pResult, pApplication, Continuation, fLogInfo, fLogError, InProgressScope, TemporaryDirectory, TemporaryDirectoryCleanup](TCAsyncResult<TCVector<CStr>> &&_Files)
+							{
+								if (!_Files)
+								{
+									fLogError(fg_Format("Failed to unpack application: {}", _Files.f_GetExceptionStr()));
 									return;
 								}
-								
 								if (pApplication->m_bDeleted)
 								{
 									fLogError("Application has been deleted, aborting");
 									return;
 								}
+
+								auto Files = fg_Move(*_Files);
 								
-								fLogInfo("Updating application files");
-								fg_Dispatch
-									(
-										mp_FileActor
-										,
-										[
-											pApplication
-											, TemporaryDirectory
-											, OutputDirectory = pApplication->f_GetDirectory()
-											, pResult
-											, Files
-											, OldFiles = pApplication->m_Files
-											, TemporaryDirectoryCleanup
-										]
-										{
-											// 3. Delete old files
-											for (auto &File : OldFiles)
-											{
-												CStr FullPath = fg_Format("{}/{}", OutputDirectory, File); 
-												if (CFile::fs_FileExists(FullPath, EFileAttrib_Directory))
-												{
-													try
-													{
-														// Allow only empty directories to be deleted, ignore error on non-empty ones.
-														CFile::fs_DeleteDirectory(FullPath);
-													}
-													catch (CExceptionFile const &)
-													{
-													}
-												}
-												else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
-													CFile::fs_DeleteFile(FullPath);
-											}
-											
-											// 4. Move files from temporary directory to final destination
-											auto fSetOwners = [&](CStr _Directory)
-												{
-													while (_Directory.f_GetLen() >= OutputDirectory.f_GetLen())
-													{
-														if (!pApplication->m_RunAsGroup.f_IsEmpty())
-															CFile::fs_SetOwner(_Directory, pApplication->m_RunAsUser);
-														if (!pApplication->m_RunAsGroup.f_IsEmpty())
-															CFile::fs_SetGroup(_Directory, pApplication->m_RunAsGroup);
-														_Directory = CFile::fs_GetPath(_Directory);
-													}
-												}
-											;
-											for (auto &File : Files)
-											{
-												CStr SourcePath = fg_Format("{}/{}", TemporaryDirectory, File);
-												CStr DestinationPath = fg_Format("{}/{}", OutputDirectory, File);
-												if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
-												{
-													CStr Directory = CFile::fs_GetPath(DestinationPath);
-													CFile::fs_CreateDirectory(Directory);
-													fSetOwners(Directory);
-													CFile::fs_RenameFile(SourcePath, DestinationPath);
-												}
-											}
-											CFile::fs_CreateDirectory(OutputDirectory + "/.home");
-											CFile::fs_CreateDirectory(OutputDirectory + "/.tmp");
-											
-											fsp_UpdateAttributes(OutputDirectory);
-										}
-									)
-									> [this, pApplication, InProgressScope, fLogError, fLogInfo, Files, pResult, Continuation](TCAsyncResult<void> &&_Result)
+								fLogInfo("Stopping old application");
+								// 2. Stop old application
+								pApplication->f_Stop(false) > [this, pApplication, pResult, fLogInfo, fLogError, Continuation, TemporaryDirectory, InProgressScope, Files, TemporaryDirectoryCleanup]
+									(TCAsyncResult<uint32> &&_ExitStatus)
 									{
-										if (!_Result)
+										fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
+										
+										if (!_ExitStatus)
 										{
-											fLogError(fg_Format("Failed update application files. Please manually fix error and retry: {}", _Result.f_GetExceptionStr()));
+											fLogError("Failed to exit old application, aborting update");
 											return;
 										}
+										
 										if (pApplication->m_bDeleted)
 										{
 											fLogError("Application has been deleted, aborting");
 											return;
 										}
-											
-										// 5. Re-launch application
-										auto &ApplicationJSON = mp_StateDatabase.m_Data["Applications"][pApplication->m_Name];
-						
-										pApplication->m_Files = Files;
-										ApplicationJSON["Files"] = Files;
 										
-										fLogInfo("Saving application state");
-										mp_StateDatabase.f_Save() 
-											> [this, Continuation, pResult, pApplication, fLogInfo, fLogError, InProgressScope](TCAsyncResult<void> &&_Result)
+										fLogInfo("Updating application files");
+										fg_Dispatch
+											(
+												mp_FileActor
+												,
+												[
+													pApplication
+													, TemporaryDirectory
+													, OutputDirectory = pApplication->f_GetDirectory()
+													, pResult
+													, Files
+													, OldFiles = pApplication->m_Files
+													, TemporaryDirectoryCleanup
+												]
+												{
+													// 3. Delete old files
+													for (auto &File : OldFiles)
+													{
+														CStr FullPath = fg_Format("{}/{}", OutputDirectory, File); 
+														if (CFile::fs_FileExists(FullPath, EFileAttrib_Directory))
+														{
+															try
+															{
+																// Allow only empty directories to be deleted, ignore error on non-empty ones.
+																CFile::fs_DeleteDirectory(FullPath);
+															}
+															catch (CExceptionFile const &)
+															{
+															}
+														}
+														else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
+															CFile::fs_DeleteFile(FullPath);
+													}
+													
+													// 4. Move files from temporary directory to final destination
+													auto fSetOwners = [&](CStr _Directory)
+														{
+															while (_Directory.f_GetLen() >= OutputDirectory.f_GetLen())
+															{
+																if (!pApplication->m_RunAsGroup.f_IsEmpty())
+																	CFile::fs_SetOwner(_Directory, pApplication->m_RunAsUser);
+																if (!pApplication->m_RunAsGroup.f_IsEmpty())
+																	CFile::fs_SetGroup(_Directory, pApplication->m_RunAsGroup);
+																_Directory = CFile::fs_GetPath(_Directory);
+															}
+														}
+													;
+													for (auto &File : Files)
+													{
+														CStr SourcePath = fg_Format("{}/{}", TemporaryDirectory, File);
+														CStr DestinationPath = fg_Format("{}/{}", OutputDirectory, File);
+														if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
+														{
+															CStr Directory = CFile::fs_GetPath(DestinationPath);
+															CFile::fs_CreateDirectory(Directory);
+															fSetOwners(Directory);
+															CFile::fs_RenameFile(SourcePath, DestinationPath);
+														}
+													}
+													CFile::fs_CreateDirectory(OutputDirectory + "/.home");
+													CFile::fs_CreateDirectory(OutputDirectory + "/.tmp");
+													
+													CFile::fs_SetAttributes(OutputDirectory, gc_RootAttributes);
+												}
+											)
+											> [this, pApplication, InProgressScope, fLogError, fLogInfo, Files, pResult, Continuation](TCAsyncResult<void> &&_Result)
 											{
 												if (!_Result)
 												{
-													fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
+													fLogError(fg_Format("Failed update application files. Please manually fix error and retry: {}", _Result.f_GetExceptionStr()));
 													return;
 												}
+												if (pApplication->m_bDeleted)
+												{
+													fLogError("Application has been deleted, aborting");
+													return;
+												}
+													
+												// 5. Re-launch application
+												auto &ApplicationJSON = mp_StateDatabase.m_Data["Applications"][pApplication->m_Name];
+								
+												pApplication->m_Files = Files;
+												ApplicationJSON["Files"] = Files;
 												
-												fLogInfo("Launching updated application");
-												fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
-													> [fLogError, fLogInfo, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
+												fLogInfo("Saving application state");
+												mp_StateDatabase.f_Save() 
+													> [this, Continuation, pResult, pApplication, fLogInfo, fLogError, InProgressScope](TCAsyncResult<void> &&_Result)
 													{
 														if (!_Result)
 														{
-															fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
+															fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
 															return;
 														}
-														fLogInfo("Application was successfully updated");
-														Continuation.f_SetResult(fg_Move(*pResult));
+														
+														fLogInfo("Launching updated application");
+														fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
+															> [fLogError, fLogInfo, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
+															{
+																if (!_Result)
+																{
+																	fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
+																	return;
+																}
+																fLogInfo("Application was successfully updated");
+																Continuation.f_SetResult(fg_Move(*pResult));
+															}
+														;
 													}
 												;
 											}
 										;
+										 
 									}
 								;
-								 
+
 							}
 						;
-
 					}
 				;
+				
 				return Continuation;
 			}
 			
