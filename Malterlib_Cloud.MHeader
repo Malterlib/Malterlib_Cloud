@@ -35,6 +35,8 @@ Import "Apps/*/*.MHeader"
 
 Property
 {
+	!PlatformFamily Windows
+
 	MalterlibLibrary_Cloud true
 	{
 		&
@@ -71,7 +73,11 @@ Property
 
 Property
 {
-	!!MalterlibEnableInternalTests true
+	&
+	{
+		MalterlibEnableInternalTests true
+		!PlatformFamily Windows
+	}
 	
 	MalterlibTests "Malterlib_Cloud;@(MalterlibTests)"
 	MalterlibTestFiles_Malterlib_Cloud "@('Test/*'->MakeAbsolute())"
@@ -81,7 +87,11 @@ Property
 
 %Workspace "Apps_Malterlib_Cloud"
 {
-	!!MalterlibEnableInternalWorkspaces true
+	&
+	{
+		MalterlibEnableInternalWorkspaces true
+		!PlatformFamily Windows
+	}
 	
 	Property.MalterlibPostCopyProject "Malterlib_Cloud"
 	
