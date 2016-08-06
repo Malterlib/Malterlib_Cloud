@@ -65,9 +65,9 @@ namespace NMib
 				}
 			};
 			
-			virtual NConcurrency::TCContinuation<void> f_Initialize() pure;
-			virtual NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database) pure;
-			virtual NConcurrency::TCContinuation<CDatabase> f_ReadDatabase() pure;
+			virtual NConcurrency::TCContinuation<void> f_Initialize() = 0;
+			virtual NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database) = 0;
+			virtual NConcurrency::TCContinuation<CDatabase> f_ReadDatabase() = 0;
 		};
 		
 		struct CKeyManagerServerConfig
