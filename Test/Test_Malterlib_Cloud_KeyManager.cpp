@@ -87,23 +87,25 @@ public:
 	{
 		DMibTestSuite("General")
 		{
-			CDistributedActorTestHelperCombined TestHelper;
+			uint16 Port = 31399;
+			CDistributedActorTestHelperCombined TestHelper{Port};
 			TestHelper.f_Init();
 			
-			CDistributedActorTestHelperCombined TestHelper2;
+			CDistributedActorTestHelperCombined TestHelper2{Port};
 			TestHelper2.f_InitClient(TestHelper);
 			
 			f_TestCloudKeyManager(fg_ConstructActor<CKeyManagerServerDatabaseImpl>(), TestHelper, TestHelper2);
 		};
 		DMibTestSuite("EncryptedFile")
 		{
+			uint16 Port = 31400;
 			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile";
 			CStrSecure Password = "Password";
 			
-			CDistributedActorTestHelperCombined TestHelper;
+			CDistributedActorTestHelperCombined TestHelper{Port};
 			TestHelper.f_Init();
 			
-			CDistributedActorTestHelperCombined TestHelper2;
+			CDistributedActorTestHelperCombined TestHelper2{Port};
 			TestHelper2.f_InitClient(TestHelper);
 			
 			if (CFile::fs_FileExists(DatabasePath))
@@ -170,12 +172,13 @@ public:
 		};
 		DMibTestSuite("PreCreatedKeys")
 		{
+			uint16 Port = 31401;
 			CStrSecure Password = "Password";
 			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile";
 			if (CFile::fs_FileExists(DatabasePath))
 				CFile::fs_DeleteFile(DatabasePath);
 			
-			CDistributedActorTestHelperCombined TestHelper;
+			CDistributedActorTestHelperCombined TestHelper{Port};
 			TestHelper.f_Init();
 			
 			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("PreCreatedKeysThread"), DatabasePath, Password, nullptr);
