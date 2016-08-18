@@ -184,6 +184,26 @@ namespace NMib
 				DefaultSection.f_RegisterCommand
 					(
 						{
+							"Names"_= {"--application-restart"}
+							, "Description"_= "Restart the application, keeping any encryption loaded"
+							, "Parameters"_=
+							{
+								"Name"_= 
+								{
+									"Type"_= ""
+									, "Description"_= "Unique name of the application to restart."
+								}
+							}
+						}
+						, [this](CEJSON const &_Params)
+						{
+							return fp_CommandLine_RestartApplication(_Params);
+						}
+					)
+				;
+				DefaultSection.f_RegisterCommand
+					(
+						{
 							"Names"_= {"--application-start"}
 							, "Description"_= "Start the application"
 							, "Parameters"_=
