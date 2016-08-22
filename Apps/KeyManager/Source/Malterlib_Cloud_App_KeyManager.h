@@ -29,8 +29,6 @@ namespace NMib
 				TCContinuation<void> fp_StopApp() override;
 				void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override; 
 				
-				TCContinuation<void> fp_Initialize();
-
 				void fp_DatabaseDecrypted();
 
 				TCActor<CKeyManagerServer> mp_ServerActor;

@@ -60,7 +60,7 @@ namespace NMib
 					CStr m_LastError;
 					
 					TCActor<CProcessLaunchActor> m_ProcessLaunch;
-					CActorCallback m_ProcessLaunchSubscription;
+					CActorSubscription m_ProcessLaunchSubscription;
 					
 					CAppManagerActor *m_pThis;
 				};
@@ -137,7 +137,7 @@ namespace NMib
 				
 				TCSet<CStr> mp_AllowedKeyManagers;
 				
-				CActorCallback mp_KeyManagerSubscription;
+				CActorSubscription mp_KeyManagerSubscription;
 				TCMap<TCDistributedActor<CKeyManager>, CStr> mp_KeyManagerToHost;
 				TCMap<CStr, TCDistributedActor<CKeyManager>> mp_HostToKeyManager;
 				TCSet<TCDistributedActor<CKeyManager>> mp_KeyManagers;

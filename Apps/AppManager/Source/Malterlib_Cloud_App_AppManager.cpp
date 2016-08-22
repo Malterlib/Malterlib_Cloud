@@ -100,7 +100,7 @@ namespace NMib
 									mp_KeyManagers.f_Remove(_RemovedActor);
 								}
 							)
-							> Continuation / [this, Continuation](CActorCallback &&_Callback)
+							> Continuation / [this, Continuation](CActorSubscription &&_Callback)
 							{
 								mp_KeyManagerSubscription = fg_Move(_Callback);
 								Continuation.f_SetResult();

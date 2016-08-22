@@ -227,7 +227,7 @@ namespace NMib
 								, EProcessLaunchCloseFlag_StopProcess | EProcessLaunchCloseFlag_BlockOnExit
 								, fg_ThisActor(this)
 							)
-							> [this, _pApplication, pState, Continuation](TCAsyncResult<CActorCallback> &&_Subscription)
+							> [this, _pApplication, pState, Continuation](TCAsyncResult<CActorSubscription> &&_Subscription)
 							{
 								if (_pApplication->m_bDeleted)
 									return;

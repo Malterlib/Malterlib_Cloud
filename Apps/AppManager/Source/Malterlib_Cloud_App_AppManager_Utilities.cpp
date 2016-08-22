@@ -89,7 +89,7 @@ namespace NMib
 				struct CState
 				{
 					TCActor<CProcessLaunchActor> m_LaunchActor;
-					CActorCallback m_LaunchSubscription;
+					CActorSubscription m_LaunchSubscription;
 					TCContinuation<CBashScriptOutput> m_Continuation;
 					CStr m_ErrorOutput;
 					CStr m_StdOutput;
@@ -251,7 +251,7 @@ namespace NMib
 								, EProcessLaunchCloseFlag_StopProcess | EProcessLaunchCloseFlag_BlockOnExit
 								, fg_ThisActor(this)
 							)
-							> [this, pState, _Description, fReportError](TCAsyncResult<CActorCallback> &&_Subscription)
+							> [this, pState, _Description, fReportError](TCAsyncResult<CActorSubscription> &&_Subscription)
 							{
 								if (!pState->m_LaunchActor)
 									return;
