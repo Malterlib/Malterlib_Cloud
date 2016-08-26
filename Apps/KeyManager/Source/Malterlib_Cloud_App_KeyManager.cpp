@@ -26,7 +26,7 @@ namespace NMib
 			{
 			}
 
-			TCContinuation<void> CKeyManagerDaemonActor::fp_StartApp()
+			TCContinuation<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 			{
 				TCContinuation<void> Continuation;
 				DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Waiting for user to provide password");

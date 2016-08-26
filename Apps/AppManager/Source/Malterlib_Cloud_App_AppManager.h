@@ -104,7 +104,7 @@ namespace NMib
 					)
 				;
 				
-				TCContinuation<void> fp_StartApp() override;
+				TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
 				TCContinuation<void> fp_StopApp() override;
 				TCContinuation<void> fp_ReadState();
 				void fp_LaunchNormalApps();

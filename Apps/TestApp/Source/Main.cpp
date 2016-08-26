@@ -31,7 +31,7 @@ namespace NMib
 					;
 				}
 				
-				TCContinuation<void> fp_StartApp()
+				TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params)
 				{
 					return fg_Explicit();
 				}				

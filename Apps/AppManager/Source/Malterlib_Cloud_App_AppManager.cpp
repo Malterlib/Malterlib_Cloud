@@ -20,7 +20,7 @@ namespace NMib
 			{
 				try
 				{
-					if (auto pApplication = mp_StateDatabase.m_Data.f_GetMember("Applications"))
+					if (auto pApplication = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 					{
 						for (auto &ApplicationEntry : pApplication->f_Object())
 						{
@@ -39,7 +39,7 @@ namespace NMib
 							Application.m_EncryptionStorage = ApplicationJSON["EncryptionStorage"].f_String();
 						}					
 					}
-					if (auto pAllowedKeyManagers = mp_StateDatabase.m_Data.f_GetMember("AllowedKeyManagers"))
+					if (auto pAllowedKeyManagers = mp_State.m_StateDatabase.m_Data.f_GetMember("AllowedKeyManagers"))
 					{
 						for (auto &Allowed : pAllowedKeyManagers->f_Array())
 							mp_AllowedKeyManagers[Allowed.f_String()];
@@ -61,7 +61,7 @@ namespace NMib
 				}
 			}
 
-			TCContinuation<void> CAppManagerActor::fp_StartApp()
+			TCContinuation<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 			{
 				mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations")); 
 				
@@ -69,7 +69,7 @@ namespace NMib
 				fg_ThisActor(this)(&CAppManagerActor::fp_ReadState) > Continuation / [this, Continuation]()
 					{
 						fp_LaunchNormalApps();
-						mp_DistributionManager
+						mp_State.m_DistributionManager
 							(
 								&CActorDistributionManager::f_SubscribeActors
 								, fg_CreateVector<CStr>("MalterlibCloudKeyManager")

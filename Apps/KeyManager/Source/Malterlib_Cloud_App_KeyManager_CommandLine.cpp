@@ -23,6 +23,12 @@ namespace NMib
 			void CKeyManagerDaemonActor::fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine)
 			{
 				CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
+				o_CommandLine.f_SetProgramDescription
+					(
+						"Favro Cloud Key Manager"
+						, "Manages encryption keys for Malterlib cloud apps." 
+					)
+				;
 				
 				auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 

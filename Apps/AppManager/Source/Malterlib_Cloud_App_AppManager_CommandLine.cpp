@@ -36,7 +36,7 @@ namespace NMib
 						{
 							"Names"_= {"--application-add"}
 							, "Description"_= 
-								"Adds an application."
+								"Adds an application.\n"
 								"By default the application will run as root."
 							, "Options"_= 
 							{
@@ -290,11 +290,11 @@ namespace NMib
 				if (mp_AllowedKeyManagers.f_FindEqual(HostID))
 					return DMibErrorInstance("Host ID already allowed");
 
-				auto &Managers = mp_StateDatabase.m_Data["AllowedKeyManagers"].f_Array();
+				auto &Managers = mp_State.m_StateDatabase.m_Data["AllowedKeyManagers"].f_Array();
 				if (Managers.f_Contains(CEJSON(HostID)) < 0)
 					Managers.f_Insert(HostID);
 				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				mp_StateDatabase.f_Save() > Continuation % "Failed to save state" / [Continuation, HostID, this]
+				mp_State.m_StateDatabase.f_Save() > Continuation % "Failed to save state" / [Continuation, HostID, this]
 					{
 						mp_AllowedKeyManagers[HostID];
 
@@ -317,7 +317,7 @@ namespace NMib
 				if (!mp_AllowedKeyManagers.f_FindEqual(HostID))
 					return DMibErrorInstance("Host ID is already disallowed");
 				
-				auto &AllowedKeyManagers = mp_StateDatabase.m_Data["AllowedKeyManagers"].f_Array();
+				auto &AllowedKeyManagers = mp_State.m_StateDatabase.m_Data["AllowedKeyManagers"].f_Array();
 				auto iAllowed = AllowedKeyManagers.f_GetIterator();
 				for (; iAllowed; ++iAllowed)
 				{
@@ -330,7 +330,7 @@ namespace NMib
 				mp_AllowedKeyManagers.f_Remove(HostID);
 				
 				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				mp_StateDatabase.f_Save() > Continuation % "Failed to save state" / [this, Continuation, HostID]
+				mp_State.m_StateDatabase.f_Save() > Continuation % "Failed to save state" / [this, Continuation, HostID]
 					{
 						Continuation.f_SetResult("Success" DMibNewLine);
 						if (auto *pKeyManager = mp_HostToKeyManager.f_FindEqual(HostID))

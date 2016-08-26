@@ -118,7 +118,7 @@ namespace NMib
 				
 				Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
 				
-				if (auto *pApplicationsState = mp_StateDatabase.m_Data.f_GetMember("Applications"))
+				if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 				{
 					if (pApplicationsState->f_GetMember(pApplication->m_Name))
 						return DMibErrorInstance(fg_Format("Application with name '{}' already exists", pApplication->m_Name));
@@ -197,7 +197,7 @@ namespace NMib
 									fLogError(fg_Format("Failed to unpack application: {}", _Files.f_GetExceptionStr()));
 									return;
 								}
-								if (auto *pApplicationsState = mp_StateDatabase.m_Data.f_GetMember("Applications"))
+								if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 								{
 									if (pApplicationsState->f_GetMember(pApplication->m_Name))
 									{
@@ -207,7 +207,7 @@ namespace NMib
 								}
 								
 								pApplication->m_Files = fg_Move(*_Files);
-								auto &ApplicationJSON = mp_StateDatabase.m_Data["Applications"][pApplication->m_Name];
+								auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][pApplication->m_Name];
 								ApplicationJSON["Executable"] = pApplication->m_Executable; 
 								ApplicationJSON["RunAsUser"] = pApplication->m_RunAsUser; 
 								ApplicationJSON["RunAsGroup"] = pApplication->m_RunAsGroup;
@@ -220,7 +220,7 @@ namespace NMib
 								mp_Applications[pApplication->m_Name] = pApplication;
 								auto InProgressScope = pApplication->f_SetInProgress();
 
-								mp_StateDatabase.f_Save() 
+								mp_State.m_StateDatabase.f_Save() 
 									> [this, Continuation, pResult, fLogError, fLogInfo, InProgressScope, pApplication](TCAsyncResult<void> &&_Result)
 									{
 										if (!_Result)
@@ -275,13 +275,13 @@ namespace NMib
 						(*pApplication)->f_Delete();
 						mp_Applications.f_Remove(Name);
 
-						if (auto *pApplicationsState = mp_StateDatabase.m_Data.f_GetMember("Applications"))
+						if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 						{
 							if (pApplicationsState->f_GetMember(Name))
 								pApplicationsState->f_RemoveMember(Name);
 						}
 						
-						mp_StateDatabase.f_Save() > [Results = fg_Move(Results), Continuation, InProgressScope](TCAsyncResult<void> &&_Result) mutable
+						mp_State.m_StateDatabase.f_Save() > [Results = fg_Move(Results), Continuation, InProgressScope](TCAsyncResult<void> &&_Result) mutable
 							{
 								if (!_Result)
 								{
@@ -507,13 +507,13 @@ namespace NMib
 												}
 													
 												// 5. Re-launch application
-												auto &ApplicationJSON = mp_StateDatabase.m_Data["Applications"][pApplication->m_Name];
+												auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][pApplication->m_Name];
 								
 												pApplication->m_Files = Files;
 												ApplicationJSON["Files"] = Files;
 												
 												fLogInfo("Saving application state");
-												mp_StateDatabase.f_Save() 
+												mp_State.m_StateDatabase.f_Save() 
 													> [this, Continuation, pResult, pApplication, fLogInfo, fLogError, InProgressScope](TCAsyncResult<void> &&_Result)
 													{
 														if (!_Result)

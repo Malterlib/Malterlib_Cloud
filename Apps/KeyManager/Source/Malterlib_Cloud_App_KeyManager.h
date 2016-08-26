@@ -25,7 +25,7 @@ namespace NMib
 				TCContinuation<CDistributedAppCommandLineResults> f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys);
 				
 			private:
-				TCContinuation<void> fp_StartApp() override;
+				TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
 				TCContinuation<void> fp_StopApp() override;
 				void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override; 
 				
