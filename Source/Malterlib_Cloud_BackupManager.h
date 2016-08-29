@@ -84,9 +84,24 @@ namespace NMib
 				CBackupKey m_BackupKey;
 			};
 			
+			struct CListBackupSources
+			{
+				struct CResult
+				{
+					void f_Feed(NStream::CBinaryStream &_Stream) const;
+					void f_Consume(NStream::CBinaryStream &_Stream);
+					
+					NContainer::TCVector<NStr::CStr> m_BackupSources;
+				};
+
+				void f_Feed(NStream::CBinaryStream &_Stream) const;
+				void f_Consume(NStream::CBinaryStream &_Stream);
+			};
+			
 			virtual NConcurrency::TCContinuation<CStartBackup::CResult> f_StartBackup(CStartBackup &&_Params) = 0;
 			virtual NConcurrency::TCContinuation<CStopBackup::CResult> f_StopBackup(CStopBackup &&_Params) = 0; // When we have notification support over remote actors, use that instead
 			virtual NConcurrency::TCContinuation<CUploadData::CResult> f_UploadData(CUploadData &&_Params) = 0;
+			virtual NConcurrency::TCContinuation<CListBackupSources::CResult> f_ListBackupSources(CListBackupSources &&_Params) = 0;
 		};
 	}
 }

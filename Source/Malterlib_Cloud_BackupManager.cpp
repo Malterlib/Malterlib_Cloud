@@ -21,6 +21,8 @@ namespace NMib::NCloud
 		_Stream >> m_ID;
 	}
 	
+	// CStartBackup
+	
 	void CBackupManager::CStartBackup::CResult::f_Feed(NStream::CBinaryStream &_Stream) const
 	{
 		_Stream << EProtocolVersion;
@@ -56,6 +58,8 @@ namespace NMib::NCloud
 		_Stream >> m_BackupKey;
 	}
 
+	// CStopBackup
+	
 	void CBackupManager::CStopBackup::CResult::f_Feed(NStream::CBinaryStream &_Stream) const
 	{
 		_Stream << EProtocolVersion;
@@ -84,6 +88,8 @@ namespace NMib::NCloud
 		DMibBinaryStreamVersion(_Stream, Version);
 		_Stream >> m_BackupKey;
 	}
+
+	// CUploadData
 	
 	void CBackupManager::CUploadData::CResult::f_Feed(NStream::CBinaryStream &_Stream) const
 	{
@@ -122,5 +128,36 @@ namespace NMib::NCloud
 		_Stream >> m_Size;
 		_Stream >> m_Flags;
 		_Stream >> m_Data;
+	}
+
+	// CListBackupSources
+	
+	void CBackupManager::CListBackupSources::CResult::f_Feed(NStream::CBinaryStream &_Stream) const
+	{
+		_Stream << EProtocolVersion;
+		_Stream << m_BackupSources;
+	}
+	void CBackupManager::CListBackupSources::CResult::f_Consume(NStream::CBinaryStream &_Stream)
+	{
+		uint32 Version;
+		_Stream >> Version;
+		if (Version > EProtocolVersion)
+			DMibError("Invalid protocol version");
+		DMibBinaryStreamVersion(_Stream, Version);
+		_Stream >> m_BackupSources;
+	}
+	
+	void CBackupManager::CListBackupSources::f_Feed(NStream::CBinaryStream &_Stream) const
+	{
+		_Stream << EProtocolVersion;
+	}
+	
+	void CBackupManager::CListBackupSources::f_Consume(NStream::CBinaryStream &_Stream)
+	{
+		uint32 Version;
+		_Stream >> Version;
+		if (Version > EProtocolVersion)
+			DMibError("Invalid protocol version");
+		DMibBinaryStreamVersion(_Stream, Version);
 	}
 }
