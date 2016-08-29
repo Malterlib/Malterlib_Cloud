@@ -1,0 +1,28 @@
+// Copyright © 2015 Hansoft AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+%Target "Malterlib_Cloud_CloudClient"
+{
+	Property
+	{
+		MalterlibPostCopyProject "Malterlib_Cloud_CloudClient"
+		{
+			!!MalterlibPostCopyProject ""
+		}
+		MalterlibLinkWithOpenSSL true
+		MalterlibConcurrency_DistributedActors true
+		MalterlibTargetNameType "Normal"
+	}
+	Target
+	{
+		BaseFileName "MalterlibCloud"
+	}
+	%Group Source
+	{
+		%File "Source/*"
+	}
+	%Dependency "Lib_Malterlib_Cloud"
+	%Dependency "Lib_Malterlib"
+}
+
+Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_CloudClient;@(Malterlib_Cloud_App_Targets)"
