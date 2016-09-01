@@ -95,11 +95,10 @@ Property
 	
 	Property.MalterlibPostCopyProject "Malterlib_Cloud"
 	
-	Compile
+	Property.MalterlibLog_Severities "Error;Critical;Warning;Info"
 	{
-		!!CompileDialect "C"
-		PreprocessorDefines "DMibSysLogSeverities=DMibLogSeverity_Error|DMibLogSeverity_Critical|DMibLogSeverity_Warning|DMibLogSeverity_Info;@(Compile.PreprocessorDefines)"
+		!MalterlibLog_EnableVerboseDebugLog true
 	}
-	
+
 	%Target "@(Malterlib_Cloud_App_Targets)"
 }
