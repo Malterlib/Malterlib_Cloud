@@ -34,7 +34,7 @@ namespace NMib
 						return fg_Explicit(); 
 				}
 				
-				if (mp_KeyManagers.f_IsEmpty())
+				if (mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
 					return DMibErrorInstance("No key managers are connected, so key cannot be generated");
 				
 				TCContinuation<void> Continuation;
@@ -103,7 +103,7 @@ namespace NMib
 					return Continuation;
 				}
 				
-				auto KeyManager = *mp_KeyManagers.f_FindAny();
+				auto KeyManager = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
 				static const mint c_KeyBits = 512; 
 				DCallActor(KeyManager, CKeyManager::f_RequestKey, _pApplication->m_Name, c_KeyBits / 8)
 					> Continuation / [this, Continuation, _pApplication, _bForceOverwrite, fLaunchScript](CSymmetricKey &&_Key)

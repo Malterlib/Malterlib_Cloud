@@ -38,6 +38,8 @@ namespace NMib
 							}
 						;
 					}
+					else
+						pApplication->m_LaunchState = "Waiting for key manager to become available";
 				}
 			}
 

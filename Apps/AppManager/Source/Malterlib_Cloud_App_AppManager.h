@@ -120,8 +120,6 @@ namespace NMib
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_StartApplication(CEJSON const &_Params);
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_StopApplication(CEJSON const &_Params);
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_RestartApplication(CEJSON const &_Params);
-				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_AddAllowedKeyManager(CEJSON const &_Params);
-				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_RemoveAllowedKeyManager(CEJSON const &_Params);
 				
 				static void fsp_UpdateAttributes(CStr const &_File);
 				static CStr fsp_UnpackApplication(CStr const &_Source, CStr const &_Destination, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> &o_Files);
@@ -130,18 +128,9 @@ namespace NMib
 				void fp_OutputApplicationStop(TCAsyncResult<uint32> const &_Result, CDistributedAppCommandLineResults &o_Results, CStr const &_Name);
 				void fp_KeyManagerAvailable();
 
-				
 				TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
-				
 				TCActor<CSeparateThreadActor> mp_FileActor;
-				
-				TCSet<CStr> mp_AllowedKeyManagers;
-				
-				CActorSubscription mp_KeyManagerSubscription;
-				TCMap<TCDistributedActor<CKeyManager>, CStr> mp_KeyManagerToHost;
-				TCMap<CStr, TCDistributedActor<CKeyManager>> mp_HostToKeyManager;
-				TCSet<TCDistributedActor<CKeyManager>> mp_KeyManagers;
-				
+				TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
 				bool mp_bAppsEncryptedLaunched = false;
 			};
 		}		

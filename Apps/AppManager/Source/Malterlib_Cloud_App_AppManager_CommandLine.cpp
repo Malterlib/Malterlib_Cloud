@@ -221,46 +221,6 @@ namespace NMib
 						}
 					)
 				;
-				DefaultSection.f_RegisterCommand
-					(
-						{
-							"Names"_= {"--add-allowed-key-manager"}
-							, "Description"_= "Add an allowed key manager server"
-							, "Parameters"_=
-							{
-								"HostID"_= 
-								{
-									"Type"_= ""
-									, "Description"_= "The host ID of the key manager to allow. This host ID is returned when you add a connection to the key manager."
-								}
-							}
-						}
-						, [this](CEJSON const &_Params)
-						{
-							return fp_CommandLine_AddAllowedKeyManager(_Params);
-						}
-					)
-				;
-				DefaultSection.f_RegisterCommand
-					(
-						{
-							"Names"_= {"--remove-allowed-key-manager"}
-							, "Description"_= "Remove an allowed key manager server"
-							, "Parameters"_=
-							{
-								"HostID"_= 
-								{
-									"Type"_= ""
-									, "Description"_= "The host ID of the key manager to dis-allow."
-								}
-							}
-						}
-						, [this](CEJSON const &_Params)
-						{
-							return fp_CommandLine_RemoveAllowedKeyManager(_Params);
-						}
-					)
-				;
 			}
 			
 			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON const &_Params)
@@ -282,63 +242,6 @@ namespace NMib
 					}
 				}
 				return fg_Explicit(fg_Move(Results));
-			}
-			
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_AddAllowedKeyManager(CEJSON const &_Params)
-			{
-				CStr HostID = _Params["HostID"].f_String();
-				if (mp_AllowedKeyManagers.f_FindEqual(HostID))
-					return DMibErrorInstance("Host ID already allowed");
-
-				auto &Managers = mp_State.m_StateDatabase.m_Data["AllowedKeyManagers"].f_Array();
-				if (Managers.f_Contains(CEJSON(HostID)) < 0)
-					Managers.f_Insert(HostID);
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				mp_State.m_StateDatabase.f_Save() > Continuation % "Failed to save state" / [Continuation, HostID, this]
-					{
-						mp_AllowedKeyManagers[HostID];
-
-						if (auto *pKeyManager = mp_HostToKeyManager.f_FindEqual(HostID))
-						{
-							mp_KeyManagers[*pKeyManager];
-							fp_KeyManagerAvailable();
-						}
-						
-						Continuation.f_SetResult("Success" DMibNewLine);
-					}
-				;
-				
-				return Continuation;
-			}
-			
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RemoveAllowedKeyManager(CEJSON const &_Params)
-			{
-				CStr HostID = _Params["HostID"].f_String();
-				if (!mp_AllowedKeyManagers.f_FindEqual(HostID))
-					return DMibErrorInstance("Host ID is already disallowed");
-				
-				auto &AllowedKeyManagers = mp_State.m_StateDatabase.m_Data["AllowedKeyManagers"].f_Array();
-				auto iAllowed = AllowedKeyManagers.f_GetIterator();
-				for (; iAllowed; ++iAllowed)
-				{
-					if (iAllowed->f_String() == HostID)
-						break;
-				}
-				if (iAllowed)
-					AllowedKeyManagers.f_Remove(&*iAllowed - AllowedKeyManagers.f_GetArray());
-
-				mp_AllowedKeyManagers.f_Remove(HostID);
-				
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				mp_State.m_StateDatabase.f_Save() > Continuation % "Failed to save state" / [this, Continuation, HostID]
-					{
-						Continuation.f_SetResult("Success" DMibNewLine);
-						if (auto *pKeyManager = mp_HostToKeyManager.f_FindEqual(HostID))
-							mp_KeyManagers.f_Remove(*pKeyManager);
-					}
-				;
-				
-				return Continuation;
 			}
 		}
 	}

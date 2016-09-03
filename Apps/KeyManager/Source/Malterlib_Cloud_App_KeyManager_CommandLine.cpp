@@ -41,14 +41,16 @@ namespace NMib
 						, [this](CEJSON const &_Parameters, CDistributedAppCommandLineClient &_CommandLineClient) -> uint32
 						{
 							CBlockingStdInReader StdInReader;
-							CBlockingStdInReader::CPromptParams Params;
-							Params.m_bPassword = true;
-							Params.m_Prompt = "Type password for key database: ";
+							CBlockingStdInReader::CPromptParams PasswordPrompt;
+							PasswordPrompt.m_bPassword = true;
+							PasswordPrompt.m_Prompt = "Type password for key database: ";
 							NStr::CStr Password;
-							if (!StdInReader.f_ReadPrompt(Params, Password))
+							if (!StdInReader.f_ReadPrompt(PasswordPrompt, Password))
 								return 1;
 							
-							_CommandLineClient.f_RunCommand("--provide-password-direct", {"Password"_= Password});
+							auto Parameters = _Parameters;
+							Parameters["Password"] = Password;
+							_CommandLineClient.f_RunCommand("--provide-password-direct", Parameters);
 							return 0;
 						}
 					)

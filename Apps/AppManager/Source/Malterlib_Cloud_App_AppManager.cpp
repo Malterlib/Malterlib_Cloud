@@ -39,11 +39,6 @@ namespace NMib
 							Application.m_EncryptionStorage = ApplicationJSON["EncryptionStorage"].f_String();
 						}					
 					}
-					if (auto pAllowedKeyManagers = mp_State.m_StateDatabase.m_Data.f_GetMember("AllowedKeyManagers"))
-					{
-						for (auto &Allowed : pAllowedKeyManagers->f_Array())
-							mp_AllowedKeyManagers[Allowed.f_String()];
-					}
 				}
 				catch (NException::CException const &_Exception)
 				{
@@ -69,40 +64,28 @@ namespace NMib
 				fg_ThisActor(this)(&CAppManagerActor::fp_ReadState) > Continuation / [this, Continuation]()
 					{
 						fp_LaunchNormalApps();
-						mp_State.m_DistributionManager
+						mp_State.m_TrustManager
 							(
-								&CActorDistributionManager::f_SubscribeActors
-								, fg_CreateVector<CStr>("MalterlibCloudKeyManager")
+								&CDistributedActorTrustManager::f_SubscribeTrustedActors<CKeyManager>
+								, "MalterlibCloudKeyManager"
 								, fg_ThisActor(this)
-								, [this](CAbstractDistributedActor &&_NewActor)
-								{
-									CStr HostID = _NewActor.f_GetRealHostID();
-									
-									auto Manager = _NewActor.f_GetActor<CKeyManager>();
-									mp_KeyManagerToHost[Manager] = HostID;
-									mp_HostToKeyManager[HostID] = Manager;
-									
-									if (!mp_AllowedKeyManagers.f_FindEqual(HostID))
-									{
-										DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Fraudulent key manager detected: '{}'", HostID);
-										return;
-									}
-									mp_KeyManagers[Manager];
-									fp_KeyManagerAvailable();
-								}
-								, [this](TCWeakDistributedActor<CActor> const &_RemovedActor)
-								{
-									if (auto *pHostID = mp_KeyManagerToHost.f_FindEqual(_RemovedActor))
-									{
-										mp_HostToKeyManager.f_Remove(*pHostID);
-										mp_KeyManagerToHost.f_Remove(pHostID);
-									}
-									mp_KeyManagers.f_Remove(_RemovedActor);
-								}
 							)
-							> Continuation / [this, Continuation](CActorSubscription &&_Callback)
+							> Continuation / [this, Continuation](TCTrustedActorSubscription<CKeyManager> &&_Subscrption)
 							{
-								mp_KeyManagerSubscription = fg_Move(_Callback);
+								mp_KeyManagerSubscription = fg_Move(_Subscrption);
+
+								if (!mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
+									fp_KeyManagerAvailable();
+								
+								mp_KeyManagerSubscription.f_OnNewActor
+									(
+										[this](TCDistributedActor<CKeyManager> const &_KeyManager)
+										{
+											fp_KeyManagerAvailable();
+										}
+									)
+								;
+								
 								Continuation.f_SetResult();
 							}
 						;
