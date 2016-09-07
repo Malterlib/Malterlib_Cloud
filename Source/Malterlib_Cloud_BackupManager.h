@@ -34,14 +34,17 @@ namespace NMib
 					void f_Feed(NStream::CBinaryStream &_Stream) const;
 					void f_Consume(NStream::CBinaryStream &_Stream);
 
+					uint32 m_Version = 0;
 					NStr::CStr m_FriendlyName;
 					uint64 m_BackupSize;
 					uint64 m_OplogSize;
 				};
 
+				CResult f_GetResult() const;
 				void f_Feed(NStream::CBinaryStream &_Stream) const;
 				void f_Consume(NStream::CBinaryStream &_Stream);
 				
+				uint32 m_Version = EProtocolVersion;
 				CBackupKey m_BackupKey;
 			};
 			
@@ -51,6 +54,8 @@ namespace NMib
 				{
 					void f_Feed(NStream::CBinaryStream &_Stream) const;
 					void f_Consume(NStream::CBinaryStream &_Stream);
+
+					uint32 m_Version = 0;
 				};
 				
 				enum EFlag
@@ -59,9 +64,11 @@ namespace NMib
 					, EFlag_Finished = DMibBit(0)
 				};
 
+				CResult f_GetResult() const;
 				void f_Feed(NStream::CBinaryStream &_Stream) const;
 				void f_Consume(NStream::CBinaryStream &_Stream);
 
+				uint32 m_Version = EProtocolVersion;
 				CBackupKey m_BackupKey;
 				NStr::CStr m_File;
 				uint64 m_Position;
@@ -76,11 +83,15 @@ namespace NMib
 				{
 					void f_Feed(NStream::CBinaryStream &_Stream) const;
 					void f_Consume(NStream::CBinaryStream &_Stream);
+
+					uint32 m_Version = 0;
 				};
 
+				CResult f_GetResult() const;
 				void f_Feed(NStream::CBinaryStream &_Stream) const;
 				void f_Consume(NStream::CBinaryStream &_Stream);
 				
+				uint32 m_Version = EProtocolVersion;
 				CBackupKey m_BackupKey;
 			};
 			
@@ -91,11 +102,15 @@ namespace NMib
 					void f_Feed(NStream::CBinaryStream &_Stream) const;
 					void f_Consume(NStream::CBinaryStream &_Stream);
 					
+					uint32 m_Version = 0;
 					NContainer::TCVector<NStr::CStr> m_BackupSources;
 				};
 
+				CResult f_GetResult() const;
 				void f_Feed(NStream::CBinaryStream &_Stream) const;
 				void f_Consume(NStream::CBinaryStream &_Stream);
+
+				uint32 m_Version = EProtocolVersion;
 			};
 
 			struct CListBackups
@@ -117,12 +132,15 @@ namespace NMib
 					void f_Consume(NStream::CBinaryStream &_Stream);
 					void f_Format(NStr::CStrAggregate &o_Str) const;
 					
+					uint32 m_Version = 0;
 					NContainer::TCMap<NStr::CStr, NContainer::TCVector<CBackup>> m_Backups;
 				};
 
+				CResult f_GetResult() const;
 				void f_Feed(NStream::CBinaryStream &_Stream) const;
 				void f_Consume(NStream::CBinaryStream &_Stream);
 
+				uint32 m_Version = EProtocolVersion;
 				NStr::CStr m_ForBackupSource;
 			};
 			
