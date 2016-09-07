@@ -79,7 +79,7 @@ namespace NMib
 								
 								mp_KeyManagerSubscription.f_OnNewActor
 									(
-										[this](TCDistributedActor<CKeyManager> const &_KeyManager)
+										[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
 										{
 											fp_KeyManagerAvailable();
 										}

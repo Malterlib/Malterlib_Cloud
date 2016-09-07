@@ -29,12 +29,11 @@ namespace NMib::NCloud::NCloudClient
 		void fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _BackupManagerSection);
 		TCContinuation<void> fp_BackupManager_SubscribeToBackupServers();
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params);
+		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params);
 		
 		fp64 mp_Timeout = 0.0;
 		
 		// Backup Manager
-		CActorSubscription mp_BackupServerActorsSubscription;
-		TCMap<TCDistributedActor<CBackupManager>, CStr> mp_BackupManagerToHost;
-		TCMap<CStr, TCDistributedActor<CBackupManager>> mp_HostToBackupManager;
+		TCTrustedActorSubscription<CBackupManager> mp_BackupManagers;
 	};
 }

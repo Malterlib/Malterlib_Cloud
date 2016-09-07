@@ -97,11 +97,41 @@ namespace NMib
 				void f_Feed(NStream::CBinaryStream &_Stream) const;
 				void f_Consume(NStream::CBinaryStream &_Stream);
 			};
+
+			struct CListBackups
+			{
+				struct CBackup
+				{
+					void f_Feed(NStream::CBinaryStream &_Stream) const;
+					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Format(NStr::CStrAggregate &o_Str) const;
+					
+					NTime::CTime m_Time;
+					NStr::CStr m_BackupID;
+					
+				};
+				
+				struct CResult
+				{
+					void f_Feed(NStream::CBinaryStream &_Stream) const;
+					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Format(NStr::CStrAggregate &o_Str) const;
+					
+					NContainer::TCMap<NStr::CStr, NContainer::TCVector<CBackup>> m_Backups;
+				};
+
+				void f_Feed(NStream::CBinaryStream &_Stream) const;
+				void f_Consume(NStream::CBinaryStream &_Stream);
+
+				NStr::CStr m_ForBackupSource;
+			};
+			
 			
 			virtual NConcurrency::TCContinuation<CStartBackup::CResult> f_StartBackup(CStartBackup &&_Params) = 0;
 			virtual NConcurrency::TCContinuation<CStopBackup::CResult> f_StopBackup(CStopBackup &&_Params) = 0; // When we have notification support over remote actors, use that instead
 			virtual NConcurrency::TCContinuation<CUploadData::CResult> f_UploadData(CUploadData &&_Params) = 0;
 			virtual NConcurrency::TCContinuation<CListBackupSources::CResult> f_ListBackupSources(CListBackupSources &&_Params) = 0;
+			virtual NConcurrency::TCContinuation<CListBackups::CResult> f_ListBackups(CListBackups &&_Params) = 0;
 		};
 	}
 }

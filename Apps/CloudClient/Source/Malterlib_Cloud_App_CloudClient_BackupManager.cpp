@@ -14,6 +14,18 @@ namespace NMib::NCloud::NCloudClient
 {
 	void CCloudClientAppActor::fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _BackupManagerSection)
 	{
+		_BackupManagerSection.f_RegisterSectionOptions
+			(
+				{
+					"BackupHost?"_=
+					{
+						"Names"_= {"--host"}
+						, "Default"_= ""
+						, "Description"_= "Limit backup query to only specified host ID"
+					}
+				}
+			)
+		;
 		_BackupManagerSection.f_RegisterCommand
 			(
 				{
@@ -26,6 +38,27 @@ namespace NMib::NCloud::NCloudClient
 				}
 			)
 		;
+		_BackupManagerSection.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--backup-manager-list-backups"}
+					, "Description"_= "List backups available on remote backup managers"
+					, "Parameters"_= 
+					{
+						"BackupSource?"_=
+						{
+							"Default"_= ""
+							, "Description"_= "The backup source to list backups for.\n"
+								"If left empty backups will be listed for all sources you have access to.\n"
+						}
+					}
+				}
+				, [this](CEJSON const &_Params)
+				{
+					return fp_CommandLine_BackupManager_ListBackups(_Params);
+				}
+			)
+		;
 	}
 	
 	TCContinuation<void> CCloudClientAppActor::fp_BackupManager_SubscribeToBackupServers()
@@ -34,29 +67,13 @@ namespace NMib::NCloud::NCloudClient
 		
 		TCContinuation<void> Continuation;
 		
-		mp_State.m_DistributionManager
+		mp_State.m_TrustManager
 			(
-				&CActorDistributionManager::f_SubscribeActors
-				, fg_CreateVector<CStr>("MalterlibCloudBackupManager")
+				&CDistributedActorTrustManager::f_SubscribeTrustedActors<NCloud::CBackupManager>
+				, "MalterlibCloudBackupManager"
 				, fg_ThisActor(this)
-				, [this](CAbstractDistributedActor &&_NewActor)
-				{
-					CStr HostID = _NewActor.f_GetRealHostID();
-					
-					auto Manager = _NewActor.f_GetActor<NCloud::CBackupManager>();
-					mp_BackupManagerToHost[Manager] = HostID;
-					mp_HostToBackupManager[HostID] = Manager;
-				}
-				, [this](TCWeakDistributedActor<CActor> const &_RemovedActor)
-				{
-					if (auto *pHostID = mp_BackupManagerToHost.f_FindEqual(_RemovedActor))
-					{
-						mp_HostToBackupManager.f_Remove(*pHostID);
-						mp_BackupManagerToHost.f_Remove(pHostID);
-					}
-				}
 			)
-			> [this, Continuation](TCAsyncResult<CActorSubscription> &&_Subscription)
+			> [this, Continuation](TCAsyncResult<TCTrustedActorSubscription<CBackupManager>> &&_Subscription)
 			{
 				if (!_Subscription)
 				{
@@ -64,31 +81,34 @@ namespace NMib::NCloud::NCloudClient
 					Continuation.f_SetException(_Subscription);
 					return;
 				}
-				mp_BackupServerActorsSubscription = fg_Move(*_Subscription);
+				mp_BackupManagers = fg_Move(*_Subscription);
+				if (mp_BackupManagers.m_Actors.f_IsEmpty())
+				{
+					Continuation.f_SetException(DMibErrorInstance("Not connected to any backup managers, or they are not trusted for 'MalterlibCloudBackupManager' namespace"));
+					return;
+				}
+					
 				Continuation.f_SetResult();
 			}
 		;
 		return Continuation;
 	}
-	
+
 	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params)
 	{
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		CStr BackupHost = _Params["BackupHost"].f_String();
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToBackupServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
-			> Continuation / [this, Continuation]
+			> Continuation / [this, Continuation, BackupHost]
 			{
-				TCActorResultMap<CStr, CBackupManager::CListBackupSources::CResult> BackupSources;
+				TCActorResultMap<CHostInfo, CBackupManager::CListBackupSources::CResult> BackupSources;
 				
-				if (mp_HostToBackupManager.f_IsEmpty())
+				for (auto &BackupManagerInfo : mp_BackupManagers.m_Actors)
 				{
-					Continuation.f_SetException(DMibErrorInstance("Not connected to any backup managers"));
-					return;
-				}
-				
-				for (auto &BackupManager : mp_HostToBackupManager)
-				{
-					CStr HostID = mp_HostToBackupManager.fs_GetKey(BackupManager);
+					if (!BackupHost.f_IsEmpty() && BackupManagerInfo.m_HostInfo.m_HostID != BackupHost)
+						continue;
+					auto &BackupManager = mp_BackupManagers.m_Actors.fs_GetKey(BackupManagerInfo);
 					DMibCallActor
 						(
 							BackupManager
@@ -96,29 +116,89 @@ namespace NMib::NCloud::NCloudClient
 							, CBackupManager::CListBackupSources()
 						)
 						.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
-						> BackupSources.f_AddResult(mp_HostToBackupManager.fs_GetKey(BackupManager))
+						> BackupSources.f_AddResult(BackupManagerInfo.m_HostInfo)
 					;
 				}
 				
-				BackupSources.f_GetResults() > Continuation / [this, Continuation](TCMap<CStr, TCAsyncResult<CBackupManager::CListBackupSources::CResult>> &&_Results)
+				BackupSources.f_GetResults() > Continuation / [this, Continuation](TCMap<CHostInfo, TCAsyncResult<CBackupManager::CListBackupSources::CResult>> &&_Results)
 					{
-						CDistributedAppCommandLineResults Resuts;
+						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
 						{
+							auto &HostInfo = _Results.fs_GetKey(Result);
+							CommandLineResults.f_AddStdOut(fg_Format("{}\n", HostInfo.f_GetDesc()));
 							if (!Result)
 							{
-								Resuts.f_AddStdErr(fg_Format("Failed getting backup sources for host '{}': {}\n", _Results.fs_GetKey(Result), Result.f_GetExceptionStr()));
+								CommandLineResults.f_AddStdErr(fg_Format("    Failed getting backup sources for this host: {}\n", Result.f_GetExceptionStr()));
 								continue;
 							}
 							for (auto &Source : Result->m_BackupSources)
-								Resuts.f_AddStdOut(fg_Format("{}\n", Source));
+								CommandLineResults.f_AddStdOut(fg_Format("    {}\n", Source));
 						}
-						Continuation.f_SetResult(fg_Move(Resuts));
+						Continuation.f_SetResult(fg_Move(CommandLineResults));
 					}
 				;
 			}
 		;
 		
+		return Continuation;
+	}
+	
+	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params)
+	{
+		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		
+		CStr BackupHost = _Params["BackupHost"].f_String();
+		CStr BackupSource = _Params["BackupSource"].f_String();
+		
+		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToBackupServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
+			> Continuation / [this, Continuation, BackupSource, BackupHost]
+			{
+				TCActorResultMap<CHostInfo, CBackupManager::CListBackups::CResult> Backups;
+				
+				for (auto &BackupManagerInfo : mp_BackupManagers.m_Actors)
+				{
+					if (!BackupHost.f_IsEmpty() && BackupManagerInfo.m_HostInfo.m_HostID != BackupHost)
+						continue;
+					auto &BackupManager = mp_BackupManagers.m_Actors.fs_GetKey(BackupManagerInfo);
+					CBackupManager::CListBackups Options;
+					Options.m_ForBackupSource = BackupSource;
+					DMibCallActor
+						(
+							BackupManager
+							, CBackupManager::f_ListBackups
+							, fg_Move(Options)
+						)
+						.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
+						> Backups.f_AddResult(BackupManagerInfo.m_HostInfo)
+					;
+				}
+				
+				Backups.f_GetResults() > Continuation / [this, Continuation](TCMap<CHostInfo, TCAsyncResult<CBackupManager::CListBackups::CResult>> &&_Results)
+					{
+						CDistributedAppCommandLineResults CommandLineResults;
+						for (auto &Result : _Results)
+						{
+							auto &HostInfo = _Results.fs_GetKey(Result);
+							CommandLineResults.f_AddStdOut(fg_Format("{}\n", HostInfo.f_GetDesc()));
+							if (!Result)
+							{
+								CommandLineResults.f_AddStdErr(fg_Format("    Failed getting backups for this host: {}\n", Result.f_GetExceptionStr()));
+								continue;
+							}
+							for (auto &Backups : Result->m_Backups)
+							{
+								auto &BackupSouce = Result->m_Backups.fs_GetKey(Backups);
+								CommandLineResults.f_AddStdOut(fg_Format("    {}\n", BackupSouce));
+								for (auto &Backup : Backups)
+									CommandLineResults.f_AddStdOut(fg_Format("        {}\n", Backup));
+							}
+						}
+						Continuation.f_SetResult(fg_Move(CommandLineResults));
+					}
+				;
+			}
+		;
 		return Continuation;
 	}
 }
