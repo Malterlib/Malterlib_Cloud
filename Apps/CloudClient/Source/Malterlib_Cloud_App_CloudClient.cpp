@@ -32,6 +32,8 @@ namespace NMib::NCloud::NCloudClient
 	{	
 		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
 		
+		mp_DownloadBackupSubscription.f_Clear();
+		
 		return pCanDestroy->m_Continuation;
 	}
 	

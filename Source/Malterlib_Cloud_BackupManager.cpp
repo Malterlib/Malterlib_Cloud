@@ -7,6 +7,144 @@
 
 namespace NMib::NCloud
 {
+	uint32 CBackupManager::f_GetProtocolVersion(uint32 _Version)
+	{
+		return fg_Min(uint32(EProtocolVersion), _Version);
+	}
+
+	bool CBackupManager::fs_IsValidRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error)
+	{
+		if (!NFile::CFile::fs_IsValidFilePath(_String, o_Error))
+			return false;
+		
+		if (_String.f_StartsWith("/")) // Root or similar
+		{
+			o_Error = "be root";
+			return false;
+		}
+		if (_String.f_Find("//") >= 0) // Could mean special things
+		{
+			o_Error = "have //";
+			return false;
+		}
+		if (_String.f_Find("..") >= 0) // Could be relative
+		{
+			o_Error = "have ..";
+			return false;
+		}
+		
+		NStr::CStr Path = _String;
+		while (!Path.f_IsEmpty())
+		{
+			NStr::CStr File = NStr::fg_GetStrSep(Path, "/");
+			if (File == ".")
+			{
+				o_Error = "have /./";
+				return false;
+			}
+		}
+			
+		return true;		
+	}
+
+	bool CBackupManager::fs_IsValidHostname(NStr::CStr const &_String)
+	{
+		if (_String.f_IsEmpty())
+			return false;
+		if (_String.f_GetLen() > 254)
+			return false;
+		ch8 const *pParse = _String.f_GetStr();
+		ch8 LastChar = 0;
+		while (*pParse)
+		{
+			if (*pParse == '-')
+				return false; // Must not start with hyphen
+			if (*pParse == '.')
+				return false; // Empty label allowed?
+			while (*pParse && (NStr::fg_CharIsAnsiAlphabetical(*pParse) || NStr::fg_CharIsNumber(*pParse) || *pParse == '-'))
+			{
+				LastChar = *pParse;
+				++pParse;
+			}
+			if (LastChar == '-')
+				return false; // Must not end with hyphen
+			if (*pParse)
+			{
+				if (*pParse != '.')
+					return false; // Any other character is not allowed
+				++pParse;
+			}
+		}
+		return true;
+	}
+	
+	bool CBackupManager::fs_IsValidBackupSource(NStr::CStr const &_String, NStr::CStr *o_pFriendlyName, NStr::CStr *o_pHostID)
+	{
+		NStr::CStr FriendlyName;
+		NStr::CStr HostID;
+		aint nParsed = 0;
+		aint nCharsParsed = (NStr::CStr::CParse("{} - {}") >> FriendlyName >> HostID).f_Parse(_String, nParsed);
+		if (nCharsParsed != _String.f_GetLen() || nParsed != 2)
+			return false;
+		if (!fs_IsValidHostname(FriendlyName))
+			return false;
+		if (!fs_IsValidHostname(HostID))
+			return false;
+		if (o_pFriendlyName)
+			*o_pFriendlyName = FriendlyName; 
+		if (o_pHostID)
+			*o_pHostID = HostID; 
+		return true;
+	}
+	
+	bool CBackupManager::fs_IsValidBackup(NStr::CStr const &_String, NStr::CStr *o_pBackupID, NTime::CTime *o_pTime)
+	{
+		NStr::CStr Year;
+		NStr::CStr Month;
+		NStr::CStr Day;
+		NStr::CStr Hour;
+		NStr::CStr Minute;
+		NStr::CStr Second;
+		NStr::CStr Millisecond;
+		NStr::CStr BackupID;
+		aint nParsed = 0;
+		aint nCharsParsed = (NStr::CStr::CParse("{}-{}-{} {}.{}.{}.{} - {}") >> Year >> Month >> Day >> Hour >> Minute >> Second >> Millisecond >> BackupID).f_Parse(_String, nParsed);
+		if (nCharsParsed != _String.f_GetLen() || nParsed != 8)
+			return false;
+		if 
+			(
+				!Year.f_IsNumeric() 
+				|| !Month.f_IsNumeric()
+				|| !Day.f_IsNumeric()
+				|| !Hour.f_IsNumeric()
+				|| !Minute.f_IsNumeric()
+				|| !Second.f_IsNumeric()
+				|| !Millisecond.f_IsNumeric()
+			)
+		{
+			return false;
+		}
+		if (!fs_IsValidHostname(BackupID))
+			return false;
+		
+		if (o_pBackupID)
+			*o_pBackupID = BackupID;
+		if (o_pTime)
+		{
+			*o_pTime = NTime::CTimeConvert::fs_CreateTime
+				(
+					fg_Max(Year.f_ToInt(int64(1970)), int64(1970))
+					, fg_Clamp(Month.f_ToInt(uint32(1)), 1u, 12u)
+					, fg_Clamp(Day.f_ToInt(uint32(1)), 1u, 31u)
+					, fg_Clamp(Hour.f_ToInt(uint32(0)), 0u, 23u)
+					, fg_Clamp(Minute.f_ToInt(uint32(0)), 0u, 59u)
+					, fg_Clamp(Second.f_ToInt(uint32(0)), 0u, 59u)
+					, fg_Clamp(("0." + Millisecond).f_ToFloat(fp64(0.0)), 0.0, 0.999)
+				)
+			;
+		}
+		return true;
+	}	
 	
 	void CBackupManager::CBackupKey::f_Feed(NStream::CBinaryStream &_Stream) const
 	{
@@ -207,7 +345,7 @@ namespace NMib::NCloud
 
 	void CBackupManager::CListBackups::CBackup::f_Format(NStr::CStrAggregate &o_Str) const
 	{
-		o_Str += NStr::CStr::CFormat("{} - {}") << m_Time << m_BackupID;
+		o_Str += NStr::CStr::CFormat("{tst.} - {}") << m_Time << m_BackupID;
 	}
 
 	void CBackupManager::CListBackups::CResult::f_Feed(NStream::CBinaryStream &_Stream) const
@@ -253,4 +391,151 @@ namespace NMib::NCloud
 		DMibBinaryStreamVersion(_Stream, m_Version);
 		_Stream >> m_ForBackupSource;
 	}
+	
+	// CStartDownloadBackup
+	void CBackupManager::CStartDownloadBackup::f_Feed(NStream::CBinaryStream &_Stream) const
+	{
+		DMibRequire(m_Version != 0);
+		_Stream << m_Version;
+		_Stream << m_Manifest;
+		_Stream << m_BackupSource;
+		_Stream << m_Time;
+		_Stream << m_BackupID;
+	}
+	
+	void CBackupManager::CStartDownloadBackup::f_Consume(NStream::CBinaryStream &_Stream)
+	{
+		_Stream >> m_Version;
+		if (m_Version > EProtocolVersion)
+			DMibError("Invalid protocol version");
+		DMibBinaryStreamVersion(_Stream, m_Version);
+		_Stream >> m_Manifest;
+		_Stream >> m_BackupSource;
+		_Stream >> m_Time;
+		_Stream >> m_BackupID;
+	}
+	
+	void CBackupManager::CStartDownloadBackup::CFileInfo::f_Feed(NStream::CBinaryStream &_Stream) const
+	{
+		_Stream << m_FileSize;
+	}
+	
+	void CBackupManager::CStartDownloadBackup::CFileInfo::f_Consume(NStream::CBinaryStream &_Stream)
+	{
+		_Stream >> m_FileSize;
+	}
+
+	NStr::CStr const &CBackupManager::CStartDownloadBackup::CFileInfo::f_GetPath() const
+	{
+		return NContainer::TCMap<NStr::CStr, CFileInfo>::fs_GetKey(this);
+	}
+	
+	void CBackupManager::CStartDownloadBackup::CManifest::f_Feed(NStream::CBinaryStream &_Stream) const
+	{
+		_Stream << m_Files;
+	}
+	
+	void CBackupManager::CStartDownloadBackup::CManifest::f_Consume(NStream::CBinaryStream &_Stream)
+	{
+		_Stream >> m_Files;
+	}
+
+
+	// CDownloadSendPart
+	
+	CBackupManager::CDownloadSendPart::CDownloadSendPart(uint32 _Version)
+		: m_Version(_Version)
+	{
+	}
+				
+	void CBackupManager::CDownloadSendPart::CResult::f_Feed(NStream::CBinaryStream &_Stream) const
+	{	
+		DMibRequire(m_Version != 0);
+		_Stream << m_Version;
+	}
+	
+	void CBackupManager::CDownloadSendPart::CResult::f_Consume(NStream::CBinaryStream &_Stream)
+	{
+		_Stream >> m_Version;
+		if (m_Version > EProtocolVersion)
+			DMibError("Invalid protocol version");
+		DMibBinaryStreamVersion(_Stream, m_Version);
+	}
+					
+	auto CBackupManager::CDownloadSendPart::f_GetResult() const -> CResult 
+	{
+		CResult Result;
+		Result.m_Version = m_Version;
+		return Result;
+	}
+	
+	void CBackupManager::CDownloadSendPart::f_Feed(NStream::CBinaryStream &_Stream) const
+	{
+		DMibRequire(m_Version != 0);
+		_Stream << m_Version;
+		_Stream << m_FilePath;
+		_Stream << m_FilePosition;
+		_Stream << m_Data;
+		_Stream << m_bFinished;
+	}
+	
+	void CBackupManager::CDownloadSendPart::f_Consume(NStream::CBinaryStream &_Stream)
+	{
+		_Stream >> m_Version;
+		if (m_Version > EProtocolVersion)
+			DMibError("Invalid protocol version");
+		DMibBinaryStreamVersion(_Stream, m_Version);
+		_Stream >> m_FilePath;
+		_Stream >> m_FilePosition;
+		_Stream >> m_Data;
+		_Stream >> m_bFinished;
+	}
+	
+	// CDownloadStateChange
+	
+	CBackupManager::CDownloadStateChange::CDownloadStateChange(uint32 _Version)
+		: m_Version(_Version)
+	{
+	}
+				
+	void CBackupManager::CDownloadStateChange::CResult::f_Feed(NStream::CBinaryStream &_Stream) const
+	{	
+		DMibRequire(m_Version != 0);
+		_Stream << m_Version;
+	}
+	
+	void CBackupManager::CDownloadStateChange::CResult::f_Consume(NStream::CBinaryStream &_Stream)
+	{
+		_Stream >> m_Version;
+		if (m_Version > EProtocolVersion)
+			DMibError("Invalid protocol version");
+		DMibBinaryStreamVersion(_Stream, m_Version);
+	}
+					
+	auto CBackupManager::CDownloadStateChange::f_GetResult() const -> CResult 
+	{
+		CResult Result;
+		Result.m_Version = m_Version;
+		return Result;
+	}
+	
+	void CBackupManager::CDownloadStateChange::f_Feed(NStream::CBinaryStream &_Stream) const
+	{
+		DMibRequire(m_Version != 0);
+		_Stream << m_Version;
+		_Stream << m_State;
+		_Stream << m_Message;
+	}
+	
+	void CBackupManager::CDownloadStateChange::f_Consume(NStream::CBinaryStream &_Stream)
+	{
+		_Stream >> m_Version;
+		if (m_Version > EProtocolVersion)
+			DMibError("Invalid protocol version");
+		DMibBinaryStreamVersion(_Stream, m_Version);
+		_Stream >> m_State;
+		_Stream >> m_Message;
+	}
+	
+	
 }
