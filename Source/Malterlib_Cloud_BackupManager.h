@@ -192,60 +192,6 @@ namespace NMib
 				NStr::CStr m_BackupID;
 				CFileTransferContext m_TransferContext;
 			};
-
-			struct CDownloadSendPart
-			{
-				CDownloadSendPart() = default;
-				CDownloadSendPart(uint32 _Version);
-				
-				struct CResult
-				{
-					void f_Feed(CDistributedActorWriteStream &_Stream) const;
-					void f_Consume(CDistributedActorReadStream &_Stream);
-					
-					uint32 m_Version = 0;
-				};
-
-				CResult f_GetResult() const;
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
-
-				uint32 m_Version = 0;
-				
-				NStr::CStr m_FilePath;
-				uint64 m_FilePosition;
-				NContainer::TCVector<uint8, NMem::CAllocator_HeapSecure> m_Data;
-				uint8 m_bFinished = false;
-			};
-
-			enum EDownloadState
-			{
-				EDownloadState_None
-				, EDownloadState_Error
-				, EDownloadState_Finished
-			};
-			
-			struct CDownloadStateChange
-			{
-				CDownloadStateChange() = default;
-				CDownloadStateChange(uint32 _Version);
-
-				struct CResult
-				{
-					void f_Feed(CDistributedActorWriteStream &_Stream) const;
-					void f_Consume(CDistributedActorReadStream &_Stream);
-					
-					uint32 m_Version = 0;
-				};
-				
-				CResult f_GetResult() const;
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
-
-				uint32 m_Version = 0;
-				EDownloadState m_State = EDownloadState_None;
-				NStr::CStr m_Message;
-			};
 			
 			uint32 f_GetProtocolVersion(uint32 _Version);
 			virtual NConcurrency::TCContinuation<CStartBackup::CResult> f_StartBackup(CStartBackup &&_Params) = 0;
