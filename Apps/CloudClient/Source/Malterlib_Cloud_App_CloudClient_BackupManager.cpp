@@ -81,7 +81,13 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= {"--source"}
 							, "Type"_= ""
 							, "Description"_= "The backup source to download from."
-						}					
+						}
+						, "BackupQueueSize?"_=
+						{
+							"Names"_= {"--queue-size"}
+							, "Default"_= int64(8*1024*1024)
+							, "Description"_= "The amount of data to keep in flight while downloading."
+						}
 					}
 					, "Parameters"_= 
 					{
@@ -292,6 +298,7 @@ namespace NMib::NCloud::NCloudClient
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		CStr Backup = _Params["Backup"].f_String();
+		uint64 QueueSize = _Params["BackupQueueSize"].f_Integer(); 
 		
 		if (BackupHost.f_IsEmpty())
 			return DMibErrorInstance("Backup host must be specified");
@@ -309,7 +316,7 @@ namespace NMib::NCloud::NCloudClient
 			return DMibErrorInstance("Backup source name format is invalid");
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToBackupServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
-			> Continuation / [this, Continuation, BackupSource, BackupHost, BackupID, BackupTime]
+			> Continuation / [this, Continuation, BackupSource, BackupHost, BackupID, BackupTime, QueueSize]
 			{
 				TCActorResultMap<CHostInfo, CBackupManager::CListBackups::CResult> Backups;
 				
@@ -335,172 +342,64 @@ namespace NMib::NCloud::NCloudClient
 					Continuation.f_SetException(DMibErrorInstance("No suitable backup manager found on this host, or connection failed. Use --log-to-stderr to see more info."));
 					return;
 				}
-				
-				mp_BackupFileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Backup download file access"));
 
-				struct CDownloadState
-				{
-					~CDownloadState()
+				CStr BasePath = fg_Format("{}/{}/{tst.} - {}", CFile::fs_GetProgramDirectory(), BackupSource, BackupTime, BackupID);
+				mp_DownloadBackupReceive = fg_ConstructActor<CFileTransferReceive>(BasePath); 
+
+				mp_DownloadBackupReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize) 
+					> Continuation % "Failed to initialize file transfer context" 
+					/ [this, Version, BackupSource, BackupID, BackupTime, OneBackupManager, Continuation]
+					(CFileTransferContext &&_TransferContext)
 					{
-						if (m_FileCache.f_IsValid())
-						{
-							fg_Dispatch
-								(
-									[File = fg_Move(m_FileCache)]() mutable
-									{
-										File.f_Close();
-									}
-								)
-								> fg_DiscardResult()
-							;
-						}
-					}
-					TCActor<CSeparateThreadActor> m_FileActor;
-					CStr m_BackupSource;
-					CStr m_BackupID;
-					CTime m_BackupTime;
-					CStr m_FileCacheFileName;
-					CFile m_FileCache;
-					CStr m_RootDirectory;
-				};
-				TCSharedPointer<CDownloadState> pState = fg_Construct();
-				auto &State = *pState;
-				State.m_BackupSource = BackupSource;
-				State.m_BackupID = BackupID;
-				State.m_BackupTime = BackupTime;
-				State.m_FileActor = mp_BackupFileActor;
-				
-				fg_Dispatch
-					(
-						mp_BackupFileActor
-						, [pState]() -> CBackupManager::CStartDownloadBackup::CManifest
-						{
-							auto &State = *pState;
-							CBackupManager::CStartDownloadBackup::CManifest Manifest;
-							State.m_RootDirectory = fg_Format("{}/{}/{tst.} - {}", CFile::fs_GetProgramDirectory(), State.m_BackupSource, State.m_BackupTime, State.m_BackupID);
-							
-							if (!CFile::fs_FileExists(State.m_RootDirectory, EFileAttrib_Directory))
-								return Manifest;
-							
-							{
-								CFile::CFindFilesOptions FindOptions(State.m_RootDirectory + "/*", true);
-								FindOptions.m_AttribMask = EFileAttrib_File;
-								auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-								for (auto &File : FoundFiles)
-								{
-									CStr RelativePath = File.m_Path.f_Extract(State.m_RootDirectory.f_GetLen() + 1);
-									auto &OutFile = Manifest.m_Files[RelativePath];
-									OutFile.m_FileSize = CFile::fs_GetFileSize(File.m_Path);
-								}
-							}
-							
-							return Manifest;
-						}
-					)
-					> Continuation % "Failed to extract current manifest" 
-					/ [this, Version, pState, OneBackupManager, Continuation]
-					(CBackupManager::CStartDownloadBackup::CManifest &&_Manifest)
-					{
-						auto &State = *pState;
 						CBackupManager::CStartDownloadBackup StartDownload;
 						StartDownload.m_Version = Version;
-						StartDownload.m_BackupSource = State.m_BackupSource;
-						StartDownload.m_BackupID = State.m_BackupID;
-						StartDownload.m_Time = State.m_BackupTime;
-						StartDownload.m_Manifest = fg_Move(_Manifest);
-						
-						TCSharedPointer<TCContinuation<CDistributedAppCommandLineResults>> pAllDone = fg_Construct();
-						
-						auto fStateChange = [pAllDone](CBackupManager::CDownloadStateChange &&_StateChange) mutable 
-							-> NConcurrency::TCContinuation<CBackupManager::CDownloadStateChange::CResult>  
-							{
-								CBackupManager::CDownloadStateChange::CResult Result = _StateChange.f_GetResult();
-								if (pAllDone->f_IsSet())
-									return fg_Explicit(Result);
-								
-								if (_StateChange.m_State == CBackupManager::EDownloadState_Error)
-									pAllDone->f_SetException(DMibErrorInstance(_StateChange.m_Message));
-								else if (_StateChange.m_State == CBackupManager::EDownloadState_Finished)
-								{
-									CDistributedAppCommandLineResults Results;
-									Results.f_AddStdOut(_StateChange.m_Message + "\n");
-									pAllDone->f_SetResult(fg_Move(Results));
-								}
-								return fg_Explicit(Result);
-							}
-						;
-						
-						auto fReceiveData = [this, pState](CBackupManager::CDownloadSendPart &&_DownloadPart) mutable
-							-> NConcurrency::TCContinuation<CBackupManager::CDownloadSendPart::CResult>
-							{
-								NConcurrency::TCContinuation<CBackupManager::CDownloadSendPart::CResult> Continuation;
-								fg_Dispatch
-									(
-										mp_BackupFileActor
-										, [pState, DownloadPart = fg_Move(_DownloadPart)]() mutable -> CBackupManager::CDownloadSendPart::CResult
-										{
-											auto &State = *pState;
-											CStr Error;
-											if (!CBackupManager::fs_IsValidRelativePath(DownloadPart.m_FilePath, Error))
-												DMibError(fg_Format("File path cann {}"));
-											
-											CStr FilePath = fg_Format("{}/{}", State.m_RootDirectory, DownloadPart.m_FilePath);
-											
-											if (State.m_FileCacheFileName != FilePath)
-											{
-												CFile::fs_CreateDirectory(CFile::fs_GetPath(FilePath));
-												State.m_FileCache.f_Open(FilePath, EFileOpen_Write | EFileOpen_DontTruncate);
-											}
-											
-											State.m_FileCache.f_SetPosition(DownloadPart.m_FilePosition);
-											State.m_FileCache.f_Write(DownloadPart.m_Data.f_GetArray(), DownloadPart.m_Data.f_GetLen());
-											
-											if (DownloadPart.m_bFinished)
-											{
-												State.m_FileCache.f_SetLength(DownloadPart.m_FilePosition + DownloadPart.m_Data.f_GetLen());
-												State.m_FileCacheFileName.f_Clear();
-												State.m_FileCache.f_Close();
-											}
-											
-											CBackupManager::CDownloadSendPart::CResult Result = DownloadPart.f_GetResult();
-											return Result;
-										}
-									)
-									> Continuation
-								;
-								return Continuation;
-							}
-						;
+						StartDownload.m_BackupSource = BackupSource;
+						StartDownload.m_BackupID = BackupID;
+						StartDownload.m_Time = BackupTime;
+						StartDownload.m_TransferContext = fg_Move(_TransferContext);
 						
 						DMibCallActor
 							(
 								OneBackupManager
 								, CBackupManager::f_StartDownloadBackup
 								, fg_Move(StartDownload)
-								, fg_ThisActor(this)
-								, fg_Move(fReceiveData) 							
-								, fg_Move(fStateChange) 
 							)
 							.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
-							> Continuation % "Failed to start backup on remote server" / [this, pAllDone, Continuation](NConcurrency::CActorSubscription &&_Subscription)
+							> Continuation % "Failed to start download on remote server" / [this, Continuation](NConcurrency::CActorSubscription &&_Subscription)
 							{
 								mp_DownloadBackupSubscription = fg_Move(_Subscription);
-								fg_Dispatch
-									(
-										[pAllDone]
-										{
-											return *pAllDone;
-										}
-									)
-									> [this, Continuation](TCAsyncResult<CDistributedAppCommandLineResults> &&_Results)
+								
+								mp_DownloadBackupReceive(&CFileTransferReceive::f_GetResult) > [this, Continuation](TCAsyncResult<CFileTransferResult> &&_Results)
 									{
 										mp_DownloadBackupSubscription.f_Clear();
-										Continuation.f_SetResult(fg_Move(_Results));
+										if (!_Results)
+											Continuation.f_SetException(fg_Move(_Results));
+										else
+										{
+											auto &Results = *_Results;
+											CDistributedAppCommandLineResults CommandLine;
+											
+											if (Results.m_nBytes == 0)
+												CommandLine.f_AddStdOut(fg_Format("All files were already up to date\n"));
+											else
+											{
+												CommandLine.f_AddStdOut
+													(
+														fg_Format
+														(
+															"Download finished transferring: {} bytes at {fe2} MB/s\n"
+															, Results.m_nBytes
+															, Results.f_BytesPerSecond()/1'000'000.0
+														)
+													)
+												;
+											}
+											Continuation.f_SetResult(fg_Move(CommandLine));
+										}
 									}
 								;
 							}
 						;
-						
 					}
 				;
 			}

@@ -5,6 +5,8 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
+#include <Mib/Concurrency/DistributedApp>
+#include "Malterlib_Cloud_FileTransfer.h"
 
 namespace NMib
 {
@@ -12,12 +14,13 @@ namespace NMib
 	{
 		struct CBackupManager : public NConcurrency::CActor
 		{
+			using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
+			using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
 			enum 
 			{
 				EProtocolVersion = 0x101
 			};
 		
-			static bool fs_IsValidRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error);
 			static bool fs_IsValidHostname(NStr::CStr const &_String);
 			static bool fs_IsValidBackupSource(NStr::CStr const &_String, NStr::CStr *o_pFriendlyName, NStr::CStr *o_pHostID);
 			static bool fs_IsValidBackup(NStr::CStr const &_String, NStr::CStr *o_pBackupID, NTime::CTime *o_pTime);
@@ -28,16 +31,16 @@ namespace NMib
 				NTime::CTime m_Time;
 				NStr::CStr m_ID;
 
-				void f_Feed(NStream::CBinaryStream &_Stream) const;
-				void f_Consume(NStream::CBinaryStream &_Stream);
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
 			};
 			
 			struct CStartBackup
 			{
 				struct CResult
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 
 					uint32 m_Version = 0;
 					NStr::CStr m_FriendlyName;
@@ -46,10 +49,10 @@ namespace NMib
 				};
 
 				CResult f_GetResult() const;
-				void f_Feed(NStream::CBinaryStream &_Stream) const;
-				void f_Consume(NStream::CBinaryStream &_Stream);
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
 				
-				uint32 m_Version = EProtocolVersion;
+				uint32 m_Version = 0;
 				CBackupKey m_BackupKey;
 			};
 			
@@ -57,8 +60,8 @@ namespace NMib
 			{
 				struct CResult
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 
 					uint32 m_Version = 0;
 				};
@@ -70,10 +73,10 @@ namespace NMib
 				};
 
 				CResult f_GetResult() const;
-				void f_Feed(NStream::CBinaryStream &_Stream) const;
-				void f_Consume(NStream::CBinaryStream &_Stream);
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
 
-				uint32 m_Version = EProtocolVersion;
+				uint32 m_Version = 0;
 				CBackupKey m_BackupKey;
 				NStr::CStr m_File;
 				uint64 m_Position;
@@ -86,17 +89,17 @@ namespace NMib
 			{
 				struct CResult
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 
 					uint32 m_Version = 0;
 				};
 
 				CResult f_GetResult() const;
-				void f_Feed(NStream::CBinaryStream &_Stream) const;
-				void f_Consume(NStream::CBinaryStream &_Stream);
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
 				
-				uint32 m_Version = EProtocolVersion;
+				uint32 m_Version = 0;
 				CBackupKey m_BackupKey;
 			};
 			
@@ -104,26 +107,26 @@ namespace NMib
 			{
 				struct CResult
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 					
 					uint32 m_Version = 0;
 					NContainer::TCVector<NStr::CStr> m_BackupSources;
 				};
 
 				CResult f_GetResult() const;
-				void f_Feed(NStream::CBinaryStream &_Stream) const;
-				void f_Consume(NStream::CBinaryStream &_Stream);
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
 
-				uint32 m_Version = EProtocolVersion;
+				uint32 m_Version = 0;
 			};
 
 			struct CListBackups
 			{
 				struct CBackup
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 					void f_Format(NStr::CStrAggregate &o_Str) const;
 					
 					NTime::CTime m_Time;
@@ -133,8 +136,8 @@ namespace NMib
 				
 				struct CResult
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 					void f_Format(NStr::CStrAggregate &o_Str) const;
 					
 					uint32 m_Version = 0;
@@ -142,22 +145,22 @@ namespace NMib
 				};
 
 				CResult f_GetResult() const;
-				void f_Feed(NStream::CBinaryStream &_Stream) const;
-				void f_Consume(NStream::CBinaryStream &_Stream);
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
 
-				uint32 m_Version = EProtocolVersion;
+				uint32 m_Version = 0;
 				NStr::CStr m_ForBackupSource;
 			};
 			
 			struct CStartDownloadBackup
 			{
-				void f_Feed(NStream::CBinaryStream &_Stream) const;
-				void f_Consume(NStream::CBinaryStream &_Stream);
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
 				
 				struct CFileInfo
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 
 					NStr::CStr const &f_GetPath() const;
 					uint64 m_FileSize = 0;
@@ -165,8 +168,8 @@ namespace NMib
 				
 				struct CManifest
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 
 					NContainer::TCMap<NStr::CStr, CFileInfo> m_Files;
 				};
@@ -183,11 +186,11 @@ namespace NMib
 					;
 				}
 				
-				CManifest m_Manifest;
+				uint32 m_Version = 0;
 				NStr::CStr m_BackupSource;
 				NTime::CTime m_Time;
 				NStr::CStr m_BackupID;
-				uint32 m_Version = EProtocolVersion;
+				CFileTransferContext m_TransferContext;
 			};
 
 			struct CDownloadSendPart
@@ -197,15 +200,15 @@ namespace NMib
 				
 				struct CResult
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 					
 					uint32 m_Version = 0;
 				};
 
 				CResult f_GetResult() const;
-				void f_Feed(NStream::CBinaryStream &_Stream) const;
-				void f_Consume(NStream::CBinaryStream &_Stream);
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
 
 				uint32 m_Version = 0;
 				
@@ -229,15 +232,15 @@ namespace NMib
 
 				struct CResult
 				{
-					void f_Feed(NStream::CBinaryStream &_Stream) const;
-					void f_Consume(NStream::CBinaryStream &_Stream);
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
 					
 					uint32 m_Version = 0;
 				};
 				
 				CResult f_GetResult() const;
-				void f_Feed(NStream::CBinaryStream &_Stream) const;
-				void f_Consume(NStream::CBinaryStream &_Stream);
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
 
 				uint32 m_Version = 0;
 				EDownloadState m_State = EDownloadState_None;
@@ -250,16 +253,7 @@ namespace NMib
 			virtual NConcurrency::TCContinuation<CUploadData::CResult> f_UploadData(CUploadData &&_Params) = 0;
 			virtual NConcurrency::TCContinuation<CListBackupSources::CResult> f_ListBackupSources(CListBackupSources &&_Params) = 0;
 			virtual NConcurrency::TCContinuation<CListBackups::CResult> f_ListBackups(CListBackups &&_Params) = 0;
-			
-			// Not optimal, but currently it's not supported to put subscriptions, actors and functors inside structs
-			virtual NConcurrency::TCContinuation<NConcurrency::CActorSubscription> f_StartDownloadBackup
-				(
-					CStartDownloadBackup &&_Params
-					, NConcurrency::TCActor<> &&_DispatchActor 
-					, NFunction::TCFunction<NConcurrency::TCContinuation<CDownloadSendPart::CResult> (NFunction::CThisTag &, CDownloadSendPart &&_Part)> &&_fSendBackup
-					, NFunction::TCFunction<NConcurrency::TCContinuation<CDownloadStateChange::CResult> (NFunction::CThisTag &, CDownloadStateChange &&_State)> &&_fStateChange
-				) = 0
-			;
+			virtual NConcurrency::TCContinuation<NConcurrency::CActorSubscription> f_StartDownloadBackup(CStartDownloadBackup &&_Params) = 0;
 		};
 	}
 }
