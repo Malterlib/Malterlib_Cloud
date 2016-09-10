@@ -358,6 +358,13 @@ namespace NMib::NCloud
 	}
 	
 	// CStartDownloadBackup
+	auto CBackupManager::CStartDownloadBackup::f_GetResult() const -> CResult
+	{
+		CResult Result;
+		Result.m_Version = m_Version;
+		return Result;
+	}
+
 	void CBackupManager::CStartDownloadBackup::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		DMibRequire(m_Version != 0);
@@ -380,28 +387,19 @@ namespace NMib::NCloud
 		_Stream >> m_TransferContext;
 	}
 	
-	void CBackupManager::CStartDownloadBackup::CFileInfo::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CBackupManager::CStartDownloadBackup::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		_Stream << m_FileSize;
+		DMibRequire(m_Version != 0);
+		_Stream << m_Version;
+		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
 	}
 	
-	void CBackupManager::CStartDownloadBackup::CFileInfo::f_Consume(CDistributedActorReadStream &_Stream)
+	void CBackupManager::CStartDownloadBackup::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_FileSize;
-	}
-
-	NStr::CStr const &CBackupManager::CStartDownloadBackup::CFileInfo::f_GetPath() const
-	{
-		return NContainer::TCMap<NStr::CStr, CFileInfo>::fs_GetKey(this);
-	}
-	
-	void CBackupManager::CStartDownloadBackup::CManifest::f_Feed(CDistributedActorWriteStream &_Stream) const
-	{
-		_Stream << m_Files;
-	}
-	
-	void CBackupManager::CStartDownloadBackup::CManifest::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_Files;
+		_Stream >> m_Version;
+		if (m_Version < 0x101 || m_Version > EProtocolVersion)
+			DMibError("Invalid protocol version");
+		DMibBinaryStreamVersion(_Stream, m_Version);
+		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
 	}
 }

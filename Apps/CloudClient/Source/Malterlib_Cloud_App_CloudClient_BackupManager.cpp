@@ -357,7 +357,7 @@ namespace NMib::NCloud::NCloudClient
 						StartDownload.m_BackupID = BackupID;
 						StartDownload.m_Time = BackupTime;
 						StartDownload.m_TransferContext = fg_Move(_TransferContext);
-						
+
 						DMibCallActor
 							(
 								OneBackupManager
@@ -365,10 +365,10 @@ namespace NMib::NCloud::NCloudClient
 								, fg_Move(StartDownload)
 							)
 							.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
-							> Continuation % "Failed to start download on remote server" / [this, Continuation](NConcurrency::CActorSubscription &&_Subscription)
+							> Continuation % "Failed to start download on remote server" / [this, Continuation](CBackupManager::CStartDownloadBackup::CResult &&_Result)
 							{
-								mp_DownloadBackupSubscription = fg_Move(_Subscription);
-								
+								mp_DownloadBackupSubscription = fg_Move(_Result.m_Subscription);
+
 								mp_DownloadBackupReceive(&CFileTransferReceive::f_GetResult) > [this, Continuation](TCAsyncResult<CFileTransferResult> &&_Results)
 									{
 										mp_DownloadBackupSubscription.f_Clear();
@@ -378,7 +378,7 @@ namespace NMib::NCloud::NCloudClient
 										{
 											auto &Results = *_Results;
 											CDistributedAppCommandLineResults CommandLine;
-											
+
 											if (Results.m_nBytes == 0)
 												CommandLine.f_AddStdOut(fg_Format("All files were already up to date\n"));
 											else

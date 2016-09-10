@@ -154,26 +154,19 @@ namespace NMib
 			
 			struct CStartDownloadBackup
 			{
+				struct CResult
+				{
+					void f_Feed(CDistributedActorWriteStream &_Stream) const;
+					void f_Consume(CDistributedActorReadStream &_Stream);
+					
+					uint32 m_Version = 0;
+					NConcurrency::CActorSubscription m_Subscription;
+				};
+
+				CResult f_GetResult() const;
 				void f_Feed(CDistributedActorWriteStream &_Stream) const;
 				void f_Consume(CDistributedActorReadStream &_Stream);
 				
-				struct CFileInfo
-				{
-					void f_Feed(CDistributedActorWriteStream &_Stream) const;
-					void f_Consume(CDistributedActorReadStream &_Stream);
-
-					NStr::CStr const &f_GetPath() const;
-					uint64 m_FileSize = 0;
-				};
-				
-				struct CManifest
-				{
-					void f_Feed(CDistributedActorWriteStream &_Stream) const;
-					void f_Consume(CDistributedActorReadStream &_Stream);
-
-					NContainer::TCMap<NStr::CStr, CFileInfo> m_Files;
-				};
-
 				NStr::CStr f_GetDesc() const
 				{
 					return fg_Format
@@ -199,8 +192,7 @@ namespace NMib
 			virtual NConcurrency::TCContinuation<CUploadData::CResult> f_UploadData(CUploadData &&_Params) = 0;
 			virtual NConcurrency::TCContinuation<CListBackupSources::CResult> f_ListBackupSources(CListBackupSources &&_Params) = 0;
 			virtual NConcurrency::TCContinuation<CListBackups::CResult> f_ListBackups(CListBackups &&_Params) = 0;
-			virtual NConcurrency::TCContinuation<NConcurrency::CActorSubscription> f_StartDownloadBackup(CStartDownloadBackup &&_Params) = 0;
+			virtual NConcurrency::TCContinuation<CStartDownloadBackup::CResult> f_StartDownloadBackup(CStartDownloadBackup &&_Params) = 0;
 		};
 	}
 }
-		
