@@ -5,10 +5,7 @@
 
 #include <Mib/Core/Core>
 
-namespace NMib
+namespace NMib::NCloud
 {
-	namespace NCloud
-	{
-		using CSymmetricKey = NContainer::TCVector<uint8, NMem::CAllocator_HeapSecure>;
-	}
+	using CSymmetricKey = NContainer::TCVector<uint8, NMem::CAllocator_HeapSecure>;
 }

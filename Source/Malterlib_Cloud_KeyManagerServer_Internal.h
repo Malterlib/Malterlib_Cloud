@@ -8,38 +8,35 @@
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/WeakActor>
 
-namespace NMib
+namespace NMib::NCloud
 {
-	namespace NCloud
+	class CKeyManagerInternalInterface : public NConcurrency::CActor
 	{
-		class CKeyManagerInternalInterface : public NConcurrency::CActor
-		{
-			// Synchronize databases
-		};
+		// Synchronize databases
+	};
+	
+	struct CKeyManagerServer::CInternal
+	{
+		CInternal(CKeyManagerServer *_pThis, CKeyManagerServerConfig const &_Config);
 		
-		struct CKeyManagerServer::CInternal
-		{
-			CInternal(CKeyManagerServer *_pThis, CKeyManagerServerConfig const &_Config);
-			
-			void f_ReadDatabase(NFunction::TCFunction<void ()> &&_fOnReady, NFunction::TCFunction<void (NStr::CStr const&)> &&_fOnError);
-			NConcurrency::TCContinuation<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
-			NConcurrency::TCContinuation<CSymmetricKey> f_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize);
-			
-			CKeyManagerServer *m_pThis;
-			CKeyManagerServerConfig m_Config;
-			NConcurrency::TCDistributedActor<CKeyManager> m_KeyManagerActor;
-			NConcurrency::CDistributedActorPublication m_KeyManagerPublication;
-			NPtr::TCUniquePointer<ICKeyManagerServerDatabase::CDatabase> m_pDatabase;
-			NContainer::TCLinkedList<NFunction::TCFunction<void ()>> m_OnDatabaseReadyQueue;
-			NContainer::TCLinkedList<NFunction::TCFunction<void (NStr::CStr const&)>> m_OnDatabaseErrorQueue;
-		};
+		void f_ReadDatabase(NFunction::TCFunction<void ()> &&_fOnReady, NFunction::TCFunction<void (NStr::CStr const&)> &&_fOnError);
+		NConcurrency::TCContinuation<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
+		NConcurrency::TCContinuation<CSymmetricKey> f_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize);
 		
-		struct CKeyManager::CInternal
-		{
-			CInternal(CKeyManager *_pThis, NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
-			
-			CKeyManager *m_pThis;
-			NConcurrency::TCWeakActor<CKeyManagerServer> m_ServerActor;
-		};
-	}
+		CKeyManagerServer *m_pThis;
+		CKeyManagerServerConfig m_Config;
+		NConcurrency::TCDistributedActor<CKeyManager> m_KeyManagerActor;
+		NConcurrency::CDistributedActorPublication m_KeyManagerPublication;
+		NPtr::TCUniquePointer<ICKeyManagerServerDatabase::CDatabase> m_pDatabase;
+		NContainer::TCLinkedList<NFunction::TCFunction<void ()>> m_OnDatabaseReadyQueue;
+		NContainer::TCLinkedList<NFunction::TCFunction<void (NStr::CStr const&)>> m_OnDatabaseErrorQueue;
+	};
+	
+	struct CKeyManager::CInternal
+	{
+		CInternal(CKeyManager *_pThis, NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
+		
+		CKeyManager *m_pThis;
+		NConcurrency::TCWeakActor<CKeyManagerServer> m_ServerActor;
+	};
 }
