@@ -107,7 +107,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 	
-	TCContinuation<void> CCloudClientAppActor::fp_BackupManager_SubscribeToBackupServers()
+	TCContinuation<void> CCloudClientAppActor::fp_BackupManager_SubscribeToServers()
 	{
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to backup managers");
 		
@@ -133,42 +133,7 @@ namespace NMib::NCloud::NCloudClient
 					Continuation.f_SetException(DMibErrorInstance("Not connected to any backup managers, or they are not trusted for 'MalterlibCloudBackupManager' namespace"));
 					return;
 				}
-				TCActorResultMap<TCWeakDistributedActor<CBackupManager>, uint32> Versions;
-				for (auto &BackupManagerInfo : mp_BackupManagers.m_Actors)
-				{
-					auto &BackupManager = mp_BackupManagers.m_Actors.fs_GetKey(BackupManagerInfo);
-					BackupManager(&CBackupManager::f_GetProtocolVersion, CBackupManager::EProtocolVersion) > Versions.f_AddResult(BackupManager);
-				}
-				
-				Versions.f_GetResults() > [this, Continuation](TCAsyncResult<TCMap<TCWeakDistributedActor<CBackupManager>, TCAsyncResult<uint32>>> &&_Versions)
-					{
-						if (!_Versions)
-						{
-							DMibLogWithCategory(Malterlib/Cloud/CloudClient, Error, "Failed to query backup manangers version: {}", _Versions.f_GetExceptionStr());
-							Continuation.f_SetException(_Versions);
-							return;
-						}
-						for (auto &Version : *_Versions)
-						{
-							if (!Version)
-							{
-								DMibLogWithCategory(Malterlib/Cloud/CloudClient, Error, "Failed to query backup mananger version: {}", Version.f_GetExceptionStr());
-								continue;
-							}
-							mp_BackupManagerProtocolVersion[_Versions->fs_GetKey(Version)] = *Version;
-						}
-						
-						if (mp_BackupManagerProtocolVersion.f_IsEmpty())
-						{
-							CStr Error = "None of the connected backup managers is reporting a protocol version";
-							DMibLogWithCategory(Malterlib/Cloud/CloudClient, Error, Error);
-							Continuation.f_SetException(DMibErrorInstance(Error));
-							return;
-						}
-						
-						Continuation.f_SetResult();
-					}
-				;
+				Continuation.f_SetResult();
 			}
 		;
 		return Continuation;
@@ -179,21 +144,17 @@ namespace NMib::NCloud::NCloudClient
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		
-		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToBackupServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
+		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
 			> Continuation / [this, Continuation, BackupHost]
 			{
 				TCActorResultMap<CHostInfo, CBackupManager::CListBackupSources::CResult> BackupSources;
 				
-				for (auto &BackupManagerInfo : mp_BackupManagers.m_Actors)
+				for (auto &TrustedBackupManager : mp_BackupManagers.m_Actors)
 				{
-					if (!BackupHost.f_IsEmpty() && BackupManagerInfo.m_HostInfo.m_HostID != BackupHost)
+					if (!BackupHost.f_IsEmpty() && TrustedBackupManager.m_TrustInfo.m_HostInfo.m_HostID != BackupHost)
 						continue;
-					auto &BackupManager = mp_BackupManagers.m_Actors.fs_GetKey(BackupManagerInfo);
-					auto *pVersion = mp_BackupManagerProtocolVersion.f_FindEqual(BackupManager);
-					if (!pVersion)
-						continue;
+					auto &BackupManager = TrustedBackupManager.m_Actor;
 					CBackupManager::CListBackupSources Command;
-					Command.m_Version = *pVersion;
 					DMibCallActor
 						(
 							BackupManager
@@ -201,7 +162,7 @@ namespace NMib::NCloud::NCloudClient
 							, fg_Move(Command)
 						)
 						.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
-						> BackupSources.f_AddResult(BackupManagerInfo.m_HostInfo)
+						> BackupSources.f_AddResult(TrustedBackupManager.m_TrustInfo.m_HostInfo)
 					;
 				}
 				
@@ -236,21 +197,17 @@ namespace NMib::NCloud::NCloudClient
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		
-		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToBackupServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
+		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
 			> Continuation / [this, Continuation, BackupSource, BackupHost]
 			{
 				TCActorResultMap<CHostInfo, CBackupManager::CListBackups::CResult> Backups;
 				
-				for (auto &BackupManagerInfo : mp_BackupManagers.m_Actors)
+				for (auto &TrustedBackupManager : mp_BackupManagers.m_Actors)
 				{
-					if (!BackupHost.f_IsEmpty() && BackupManagerInfo.m_HostInfo.m_HostID != BackupHost)
+					if (!BackupHost.f_IsEmpty() && TrustedBackupManager.m_TrustInfo.m_HostInfo.m_HostID != BackupHost)
 						continue;
-					auto &BackupManager = mp_BackupManagers.m_Actors.fs_GetKey(BackupManagerInfo);
-					auto *pVersion = mp_BackupManagerProtocolVersion.f_FindEqual(BackupManager);
-					if (!pVersion)
-						continue;
+					auto &BackupManager = TrustedBackupManager.m_Actor;
 					CBackupManager::CListBackups Options;
-					Options.m_Version = *pVersion;
 					Options.m_ForBackupSource = BackupSource;
 					DMibCallActor
 						(
@@ -259,7 +216,7 @@ namespace NMib::NCloud::NCloudClient
 							, fg_Move(Options)
 						)
 						.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
-						> Backups.f_AddResult(BackupManagerInfo.m_HostInfo)
+						> Backups.f_AddResult(TrustedBackupManager.m_TrustInfo.m_HostInfo)
 					;
 				}
 				
@@ -315,25 +272,19 @@ namespace NMib::NCloud::NCloudClient
 		if (!CBackupManager::fs_IsValidBackupSource(BackupSource, nullptr, nullptr))
 			return DMibErrorInstance("Backup source name format is invalid");
 		
-		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToBackupServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
+		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
 			> Continuation / [this, Continuation, BackupSource, BackupHost, BackupID, BackupTime, QueueSize]
 			{
 				TCActorResultMap<CHostInfo, CBackupManager::CListBackups::CResult> Backups;
-				
-				uint32 Version = 0;
+
 				TCDistributedActor<CBackupManager> OneBackupManager;
 				CTrustedActorInfo ActorInfo;
-				for (auto &BackupManagerInfo : mp_BackupManagers.m_Actors)
+				for (auto &TrustedBackupManager : mp_BackupManagers.m_Actors)
 				{
-					if (BackupManagerInfo.m_HostInfo.m_HostID != BackupHost)
+					if (TrustedBackupManager.m_TrustInfo.m_HostInfo.m_HostID != BackupHost)
 						continue;
-					auto &BackupManager = mp_BackupManagers.m_Actors.fs_GetKey(BackupManagerInfo);
-					auto *pVersion = mp_BackupManagerProtocolVersion.f_FindEqual(BackupManager);
-					if (!pVersion)
-						continue;
-					ActorInfo = BackupManagerInfo;
-					OneBackupManager = BackupManager;
-					Version = *pVersion;
+					ActorInfo = TrustedBackupManager.m_TrustInfo;
+					OneBackupManager = TrustedBackupManager.m_Actor;
 					break;
 				}
 			
@@ -348,11 +299,10 @@ namespace NMib::NCloud::NCloudClient
 
 				mp_DownloadBackupReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize) 
 					> Continuation % "Failed to initialize file transfer context" 
-					/ [this, Version, BackupSource, BackupID, BackupTime, OneBackupManager, Continuation]
+					/ [this, BackupSource, BackupID, BackupTime, OneBackupManager, Continuation]
 					(CFileTransferContext &&_TransferContext)
 					{
 						CBackupManager::CStartDownloadBackup StartDownload;
-						StartDownload.m_Version = Version;
 						StartDownload.m_BackupSource = BackupSource;
 						StartDownload.m_BackupID = BackupID;
 						StartDownload.m_Time = BackupTime;

@@ -7,11 +7,6 @@
 
 namespace NMib::NCloud
 {
-	uint32 CBackupManager::f_GetProtocolVersion(uint32 _Version)
-	{
-		return fg_Min(uint32(EProtocolVersion), _Version);
-	}
-
 	bool CBackupManager::fs_IsValidHostname(NStr::CStr const &_String)
 	{
 		if (_String.f_IsEmpty())
@@ -110,6 +105,11 @@ namespace NMib::NCloud
 		}
 		return true;
 	}	
+
+	bool CBackupManager::fs_IsValidProtocolVersion(uint32 _Version)
+	{
+		return _Version >= EMinProtocolVersion && _Version <= EProtocolVersion;
+	}
 	
 	void CBackupManager::CBackupKey::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
@@ -126,17 +126,9 @@ namespace NMib::NCloud
 	
 	// CStartBackup
 	
-	auto CBackupManager::CStartBackup::f_GetResult() const -> CResult
-	{
-		CResult Result;
-		Result.m_Version = m_Version;
-		return Result;
-	}
-	
 	void CBackupManager::CStartBackup::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_FriendlyName;
 		_Stream << m_BackupSize;
 		_Stream << m_OplogSize;
@@ -144,10 +136,7 @@ namespace NMib::NCloud
 	
 	void CBackupManager::CStartBackup::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream >> m_FriendlyName;
 		_Stream >> m_BackupSize;
 		_Stream >> m_OplogSize;
@@ -155,85 +144,54 @@ namespace NMib::NCloud
 
 	void CBackupManager::CStartBackup::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_BackupKey;
 	}
 	
 	void CBackupManager::CStartBackup::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream >> m_BackupKey;
 	}
 
 	// CStopBackup
 	
-	auto CBackupManager::CStopBackup::f_GetResult() const -> CResult
-	{
-		CResult Result;
-		Result.m_Version = m_Version;
-		return Result;
-	}
-	
 	void CBackupManager::CStopBackup::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
 	
 	void CBackupManager::CStopBackup::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
 
 	void CBackupManager::CStopBackup::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_BackupKey;
 	}
 	
 	void CBackupManager::CStopBackup::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
 
 	// CUploadData
 	
-	auto CBackupManager::CUploadData::f_GetResult() const -> CResult
-	{
-		CResult Result;
-		Result.m_Version = m_Version;
-		return Result;
-	}
-	
 	void CBackupManager::CUploadData::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
 	
 	void CBackupManager::CUploadData::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
 
 	void CBackupManager::CUploadData::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_BackupKey;
 		_Stream << m_File;
 		_Stream << m_Position;
@@ -244,10 +202,7 @@ namespace NMib::NCloud
 	
 	void CBackupManager::CUploadData::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream >> m_BackupKey;
 		_Stream >> m_File;
 		_Stream >> m_Position;
@@ -258,50 +213,28 @@ namespace NMib::NCloud
 
 	// CListBackupSources
 	
-	auto CBackupManager::CListBackupSources::f_GetResult() const -> CResult
-	{
-		CResult Result;
-		Result.m_Version = m_Version;
-		return Result;
-	}
-	
 	void CBackupManager::CListBackupSources::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_BackupSources;
 	}
 	void CBackupManager::CListBackupSources::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream >> m_BackupSources;
 	}
 	
 	void CBackupManager::CListBackupSources::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
 	
 	void CBackupManager::CListBackupSources::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
 
 	// CListBackups
-	
-	auto CBackupManager::CListBackups::f_GetResult() const -> CResult
-	{
-		CResult Result;
-		Result.m_Version = m_Version;
-		return Result;
-	}
 	
 	void CBackupManager::CListBackups::CResult::f_Format(NStr::CStrAggregate &o_Str) const
 	{
@@ -315,17 +248,13 @@ namespace NMib::NCloud
 
 	void CBackupManager::CListBackups::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_Backups;
 	}
 	
 	void CBackupManager::CListBackups::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream >> m_Backups;
 	}
 
@@ -343,32 +272,21 @@ namespace NMib::NCloud
 	
 	void CBackupManager::CListBackups::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_ForBackupSource;
 	}
 	
 	void CBackupManager::CListBackups::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream >> m_ForBackupSource;
 	}
 	
 	// CStartDownloadBackup
-	auto CBackupManager::CStartDownloadBackup::f_GetResult() const -> CResult
-	{
-		CResult Result;
-		Result.m_Version = m_Version;
-		return Result;
-	}
 
 	void CBackupManager::CStartDownloadBackup::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_BackupSource;
 		_Stream << m_Time;
 		_Stream << m_BackupID;
@@ -377,29 +295,34 @@ namespace NMib::NCloud
 	
 	void CBackupManager::CStartDownloadBackup::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream >> m_BackupSource;
 		_Stream >> m_Time;
 		_Stream >> m_BackupID;
 		_Stream >> m_TransferContext;
 	}
 	
+	NStr::CStr CBackupManager::CStartDownloadBackup::f_GetDesc() const
+	{
+		return fg_Format
+			(
+				"{}/{tst.} - {}"
+				, m_BackupSource
+				, m_Time
+				, m_BackupID
+			)
+		;
+	}
+	
 	void CBackupManager::CStartDownloadBackup::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		DMibRequire(m_Version != 0);
-		_Stream << m_Version;
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
 	}
 	
 	void CBackupManager::CStartDownloadBackup::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
-			DMibError("Invalid protocol version");
-		DMibBinaryStreamVersion(_Stream, m_Version);
+		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
 	}
 }

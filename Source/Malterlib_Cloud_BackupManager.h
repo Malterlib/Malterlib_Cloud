@@ -16,8 +16,11 @@ namespace NMib::NCloud
 		using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
 		enum 
 		{
-			EProtocolVersion = 0x101
+			EMinProtocolVersion = 0x101
+			, EProtocolVersion = 0x101
 		};
+		
+		static bool fs_IsValidProtocolVersion(uint32 _Version);
 	
 		static bool fs_IsValidHostname(NStr::CStr const &_String);
 		static bool fs_IsValidBackupSource(NStr::CStr const &_String, NStr::CStr *o_pFriendlyName, NStr::CStr *o_pHostID);
@@ -40,17 +43,14 @@ namespace NMib::NCloud
 				void f_Feed(CDistributedActorWriteStream &_Stream) const;
 				void f_Consume(CDistributedActorReadStream &_Stream);
 
-				uint32 m_Version = 0;
 				NStr::CStr m_FriendlyName;
 				uint64 m_BackupSize;
 				uint64 m_OplogSize;
 			};
 
-			CResult f_GetResult() const;
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(CDistributedActorReadStream &_Stream);
 			
-			uint32 m_Version = 0;
 			CBackupKey m_BackupKey;
 		};
 		
@@ -70,11 +70,9 @@ namespace NMib::NCloud
 				, EFlag_Finished = DMibBit(0)
 			};
 
-			CResult f_GetResult() const;
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(CDistributedActorReadStream &_Stream);
 
-			uint32 m_Version = 0;
 			CBackupKey m_BackupKey;
 			NStr::CStr m_File;
 			uint64 m_Position;
@@ -89,15 +87,11 @@ namespace NMib::NCloud
 			{
 				void f_Feed(CDistributedActorWriteStream &_Stream) const;
 				void f_Consume(CDistributedActorReadStream &_Stream);
-
-				uint32 m_Version = 0;
 			};
 
-			CResult f_GetResult() const;
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(CDistributedActorReadStream &_Stream);
 			
-			uint32 m_Version = 0;
 			CBackupKey m_BackupKey;
 		};
 		
@@ -108,15 +102,11 @@ namespace NMib::NCloud
 				void f_Feed(CDistributedActorWriteStream &_Stream) const;
 				void f_Consume(CDistributedActorReadStream &_Stream);
 				
-				uint32 m_Version = 0;
 				NContainer::TCVector<NStr::CStr> m_BackupSources;
 			};
 
-			CResult f_GetResult() const;
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(CDistributedActorReadStream &_Stream);
-
-			uint32 m_Version = 0;
 		};
 
 		struct CListBackups
@@ -138,15 +128,12 @@ namespace NMib::NCloud
 				void f_Consume(CDistributedActorReadStream &_Stream);
 				void f_Format(NStr::CStrAggregate &o_Str) const;
 				
-				uint32 m_Version = 0;
 				NContainer::TCMap<NStr::CStr, NContainer::TCVector<CBackup>> m_Backups;
 			};
 
-			CResult f_GetResult() const;
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(CDistributedActorReadStream &_Stream);
 
-			uint32 m_Version = 0;
 			NStr::CStr m_ForBackupSource;
 		};
 		
@@ -157,34 +144,19 @@ namespace NMib::NCloud
 				void f_Feed(CDistributedActorWriteStream &_Stream) const;
 				void f_Consume(CDistributedActorReadStream &_Stream);
 				
-				uint32 m_Version = 0;
 				NConcurrency::CActorSubscription m_Subscription;
 			};
 
-			CResult f_GetResult() const;
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(CDistributedActorReadStream &_Stream);
+			NStr::CStr f_GetDesc() const;
 			
-			NStr::CStr f_GetDesc() const
-			{
-				return fg_Format
-					(
-						"{}/{tst.} - {}"
-						, m_BackupSource
-						, m_Time
-						, m_BackupID
-					)
-				;
-			}
-			
-			uint32 m_Version = 0;
 			NStr::CStr m_BackupSource;
 			NTime::CTime m_Time;
 			NStr::CStr m_BackupID;
 			CFileTransferContext m_TransferContext;
 		};
 		
-		uint32 f_GetProtocolVersion(uint32 _Version);
 		virtual NConcurrency::TCContinuation<CStartBackup::CResult> f_StartBackup(CStartBackup &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CStopBackup::CResult> f_StopBackup(CStopBackup &&_Params) = 0; // When we have notification support over remote actors, use that instead
 		virtual NConcurrency::TCContinuation<CUploadData::CResult> f_UploadData(CUploadData &&_Params) = 0;

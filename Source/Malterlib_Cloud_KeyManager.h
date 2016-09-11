@@ -17,6 +17,13 @@ namespace NMib::NCloud
 		friend class CKeyManagerServer;
 		
 	public:
+		
+		enum 
+		{
+			EMinProtocolVersion = 0x101
+			, EProtocolVersion = 0x101
+		};
+		
 		CKeyManager(NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
 		~CKeyManager();
 		

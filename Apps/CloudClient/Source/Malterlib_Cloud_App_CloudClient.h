@@ -27,16 +27,23 @@ namespace NMib::NCloud::NCloudClient
 		
 		// Backup Manager
 		void fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _BackupManagerSection);
-		TCContinuation<void> fp_BackupManager_SubscribeToBackupServers();
+		TCContinuation<void> fp_BackupManager_SubscribeToServers();
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params);
+
+		// Version Manager
+		void fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _BackupManagerSection);
+		TCContinuation<void> fp_VersionManager_SubscribeToServers();
+		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params);
+		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params);
+		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params);
+		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params);
 		
 		fp64 mp_Timeout = 0.0;
 		
 		// Backup Manager
 		TCTrustedActorSubscription<CBackupManager> mp_BackupManagers;
-		TCMap<TCWeakDistributedActor<CBackupManager>, uint32> mp_BackupManagerProtocolVersion;
 		TCActor<CFileTransferReceive> mp_DownloadBackupReceive;
 		CActorSubscription mp_DownloadBackupSubscription;
 	};
