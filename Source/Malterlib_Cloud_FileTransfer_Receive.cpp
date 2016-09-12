@@ -58,7 +58,7 @@ namespace NMib::NCloud
 			Internal.m_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File transfer receive file access"));
 	}
 	
-	NConcurrency::TCContinuation<CFileTransferContext> CFileTransferReceive::f_ReceiveFiles(uint64 _QueueSize)
+	NConcurrency::TCContinuation<CFileTransferContext> CFileTransferReceive::f_ReceiveFiles(uint64 _QueueSize, bool _bIgnoreExisting)
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_RootDirectory = Internal.m_BasePath;
@@ -71,12 +71,12 @@ namespace NMib::NCloud
 		fg_Dispatch
 			(
 				Internal.m_FileActor
-				, [this]() -> CFileTransferContext::CInternal::CManifest
+				, [this, _bIgnoreExisting]() -> CFileTransferContext::CInternal::CManifest
 				{
 					auto &Internal = *mp_pInternal;
 					CFileTransferContext::CInternal::CManifest Manifest;
 					
-					if (!CFile::fs_FileExists(Internal.m_RootDirectory, EFileAttrib_Directory))
+					if (_bIgnoreExisting || !CFile::fs_FileExists(Internal.m_RootDirectory, EFileAttrib_Directory))
 						return Manifest;
 					
 					{

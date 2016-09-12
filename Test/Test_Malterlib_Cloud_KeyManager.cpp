@@ -55,7 +55,7 @@ public:
 		
 		TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config);
 		
-		auto Subscription = _TestHelper.f_Subscribe("MalterlibCloudKeyManager");
+		auto Subscription = _TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
 		TCDistributedActor<CKeyManager> KeyManager = _TestHelper.f_GetRemoteActor<CKeyManager>(Subscription);
 		
 		CSymmetricKey Key0 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);
@@ -67,7 +67,7 @@ public:
 		DMibExpect(Key0, ==, Database.m_Clients[HostID1].m_Keys["TestKey0"]);
 		DMibExpect(Key1, ==, Database.m_Clients[HostID1].m_Keys["TestKey1"]);
 		
-		CStr Subscription2 = _TestHelper2.f_Subscribe("MalterlibCloudKeyManager");
+		CStr Subscription2 = _TestHelper2.f_Subscribe("com.malterlib/Cloud/KeyManager");
 
 		auto HostID2 = _TestHelper2.f_GetClientHostID();
 		TCDistributedActor<CKeyManager> KeyManager2 = _TestHelper2.f_GetRemoteActor<CKeyManager>(Subscription2);
@@ -201,7 +201,7 @@ public:
 				NextKey = Database.m_AvailableKeys[32].f_GetLast();
 			}
 			
-			CStr Subscription = TestHelper.f_Subscribe("MalterlibCloudKeyManager");
+			CStr Subscription = TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
 			TCDistributedActor<CKeyManager> KeyManager = TestHelper.f_GetRemoteActor<CKeyManager>(Subscription);
 		
 			CSymmetricKey FirstKey = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);

@@ -191,7 +191,7 @@ namespace NMib::NCloud
 			(
 				&CActorDistributionManager::f_PublishActor
 				, Internal.m_KeyManagerActor
-				, "MalterlibCloudKeyManager"
+				, "com.malterlib/Cloud/KeyManager"
 				, NConcurrency::CDistributedActorInheritanceHeirarchyPublish::fs_GetHierarchy<CKeyManager>()
 			)
 			> [this] (TCAsyncResult<CDistributedActorPublication> &&_Publication)

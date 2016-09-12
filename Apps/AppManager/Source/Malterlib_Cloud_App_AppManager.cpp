@@ -67,7 +67,7 @@ namespace NMib
 						mp_State.m_TrustManager
 							(
 								&CDistributedActorTrustManager::f_SubscribeTrustedActors<CKeyManager>
-								, "MalterlibCloudKeyManager"
+								, "com.malterlib/Cloud/KeyManager"
 								, fg_ThisActor(this)
 							)
 							> Continuation / [this, Continuation](TCTrustedActorSubscription<CKeyManager> &&_Subscrption)

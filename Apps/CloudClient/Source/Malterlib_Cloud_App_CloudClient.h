@@ -8,6 +8,7 @@
 #include <Mib/Concurrency/DistributedApp>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Cloud/BackupManager>
+#include <Mib/Cloud/VersionManager>
 
 namespace NMib::NCloud::NCloudClient
 {
@@ -26,14 +27,14 @@ namespace NMib::NCloud::NCloudClient
 		void fp_ParseCommonOptions(NEncoding::CEJSON const &_Params);
 		
 		// Backup Manager
-		void fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _BackupManagerSection);
+		void fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCContinuation<void> fp_BackupManager_SubscribeToServers();
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params);
 
 		// Version Manager
-		void fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _BackupManagerSection);
+		void fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCContinuation<void> fp_VersionManager_SubscribeToServers();
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params);
@@ -46,5 +47,12 @@ namespace NMib::NCloud::NCloudClient
 		TCTrustedActorSubscription<CBackupManager> mp_BackupManagers;
 		TCActor<CFileTransferReceive> mp_DownloadBackupReceive;
 		CActorSubscription mp_DownloadBackupSubscription;
+
+		// Version Manager
+		TCTrustedActorSubscription<CVersionManager> mp_VersionManagers;
+		TCActor<CFileTransferReceive> mp_DownloadVersionReceive;
+		CActorSubscription mp_DownloadVersionSubscription;
+		TCActor<CFileTransferSend> mp_UploadVersionSend;
+		CActorSubscription mp_UploadVersionSubscription;
 	};
 }

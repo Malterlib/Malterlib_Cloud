@@ -12,7 +12,7 @@
 
 namespace NMib::NCloud::NCloudClient
 {
-	void CCloudClientAppActor::fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _BackupManagerSection)
+	void CCloudClientAppActor::fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section)
 	{
 		auto OptionalBackupHost = "BackupHost?"_=
 			{
@@ -21,7 +21,7 @@ namespace NMib::NCloud::NCloudClient
 				, "Description"_= "Limit backup query to only specified host ID"
 			}
 		;
-		_BackupManagerSection.f_RegisterCommand
+		_Section.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--backup-manager-list-sources"}
@@ -37,7 +37,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 			)
 		;
-		_BackupManagerSection.f_RegisterCommand
+		_Section.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--backup-manager-list-backups"}
@@ -62,7 +62,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 			)
 		;
-		_BackupManagerSection.f_RegisterCommand
+		_Section.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--backup-manager-download-backup"}
@@ -116,21 +116,21 @@ namespace NMib::NCloud::NCloudClient
 		mp_State.m_TrustManager
 			(
 				&CDistributedActorTrustManager::f_SubscribeTrustedActors<NCloud::CBackupManager>
-				, "MalterlibCloudBackupManager"
+				, "com.malterlib/Cloud/BackupManager"
 				, fg_ThisActor(this)
 			)
 			> [this, Continuation](TCAsyncResult<TCTrustedActorSubscription<CBackupManager>> &&_Subscription)
 			{
 				if (!_Subscription)
 				{
-					DMibLogWithCategory(Malterlib/Cloud/CloudClient, Error, "Failed to subscripbe to backup managers: {}", _Subscription.f_GetExceptionStr());
+					DMibLogWithCategory(Malterlib/Cloud/CloudClient, Error, "Failed to subscribe to backup managers: {}", _Subscription.f_GetExceptionStr());
 					Continuation.f_SetException(_Subscription);
 					return;
 				}
 				mp_BackupManagers = fg_Move(*_Subscription);
 				if (mp_BackupManagers.m_Actors.f_IsEmpty())
 				{
-					Continuation.f_SetException(DMibErrorInstance("Not connected to any backup managers, or they are not trusted for 'MalterlibCloudBackupManager' namespace"));
+					Continuation.f_SetException(DMibErrorInstance("Not connected to any backup managers, or they are not trusted for 'com.malterlib/Cloud/BackupManager' namespace"));
 					return;
 				}
 				Continuation.f_SetResult();
@@ -186,7 +186,6 @@ namespace NMib::NCloud::NCloudClient
 				;
 			}
 		;
-		
 		return Continuation;
 	}
 	
@@ -255,7 +254,9 @@ namespace NMib::NCloud::NCloudClient
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		CStr Backup = _Params["Backup"].f_String();
-		uint64 QueueSize = _Params["BackupQueueSize"].f_Integer(); 
+		uint64 QueueSize = _Params["BackupQueueSize"].f_Integer();
+		if (QueueSize < 128*1024)
+			QueueSize = 128*1024;
 		
 		if (BackupHost.f_IsEmpty())
 			return DMibErrorInstance("Backup host must be specified");
@@ -297,7 +298,7 @@ namespace NMib::NCloud::NCloudClient
 				CStr BasePath = fg_Format("{}/{}/{tst.} - {}", CFile::fs_GetProgramDirectory(), BackupSource, BackupTime, BackupID);
 				mp_DownloadBackupReceive = fg_ConstructActor<CFileTransferReceive>(BasePath); 
 
-				mp_DownloadBackupReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize) 
+				mp_DownloadBackupReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize, false) 
 					> Continuation % "Failed to initialize file transfer context" 
 					/ [this, BackupSource, BackupID, BackupTime, OneBackupManager, Continuation]
 					(CFileTransferContext &&_TransferContext)

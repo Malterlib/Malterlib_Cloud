@@ -68,7 +68,7 @@ namespace NMib::NCloud
 		CFileTransferReceive(CFileTransferReceive const &_Other) = delete;
 		CFileTransferReceive &operator =(CFileTransferReceive const &_Other) = delete;
 
-		NConcurrency::TCContinuation<CFileTransferContext> f_ReceiveFiles(uint64 _QueueSize);
+		NConcurrency::TCContinuation<CFileTransferContext> f_ReceiveFiles(uint64 _QueueSize, bool _bIgnoreExisting);
 		NConcurrency::TCContinuation<CFileTransferResult> f_GetResult(); 
 		
 	private:
