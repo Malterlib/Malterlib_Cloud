@@ -1,0 +1,28 @@
+// Copyright © 2015 Hansoft AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+%Target "Malterlib_Cloud_VersionManager"
+{
+	Property
+	{
+		MalterlibPostCopyProject "Malterlib_Cloud_VersionManager"
+		{
+			!!MalterlibPostCopyProject ""
+		}
+		MalterlibLinkWithOpenSSL true
+		MalterlibConcurrency_DistributedActors true
+	}
+	Target
+	{
+		DebuggerCommandArguments "--daemon-run-debug"
+		BaseFileName "VersionManager"
+	}
+	%Group Source
+	{
+		%File "Source/*"
+	}
+	%Dependency "Lib_Malterlib_Cloud"
+	%Dependency "Lib_Malterlib"
+}
+
+Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_VersionManager;@(Malterlib_Cloud_App_Targets)"
