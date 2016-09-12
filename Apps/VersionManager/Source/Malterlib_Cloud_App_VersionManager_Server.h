@@ -29,8 +29,24 @@ namespace NMib::NCloud::NVersionManager
 				return TCMap<CStr, CVersionDownload>::fs_GetKey(*this);
 			}
 			
-			uint32 m_Version = 0;
 			TCActor<NCloud::CFileTransferSend> m_FileTransferSend;
+			CStr m_Desc;
+		};
+
+		struct CVersionUpload
+		{
+			CVersionUpload();
+			~CVersionUpload();
+			
+			CStr const &f_GetUploadID() const
+			{
+				return TCMap<CStr, CVersionUpload>::fs_GetKey(*this);
+			}
+			
+			TCActor<CSeparateThreadActor> m_UploadFileAccess;
+			TCActor<NCloud::CFileTransferReceive> m_FileTransferReceive;
+			CActorSubscription m_DownloadSubscription;
+			
 			CStr m_Desc;
 		};
 		
@@ -67,13 +83,16 @@ namespace NMib::NCloud::NVersionManager
 		
 		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
 		
-		TCMap<CStr, CVersionDownload> mp_VersionDownloads;
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
+		
 		TCDistributedActor<CVersionManagerImplementation> mp_ProtocolImplementation;
 		CDistributedActorPublication mp_ProtocolPublication;
 		CDistributedAppState mp_AppState;
 		
 		CTrustedPermissionSubscription mp_Permissions;
+		
+		TCMap<CStr, CVersionDownload> mp_VersionDownloads;
+		TCMap<CStr, CVersionUpload> mp_VersionUploads;
 		
 		TCActor<CSeparateThreadActor> mp_QueryFileActor;
 	};

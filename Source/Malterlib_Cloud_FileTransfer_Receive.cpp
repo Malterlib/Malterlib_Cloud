@@ -58,7 +58,7 @@ namespace NMib::NCloud
 			Internal.m_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File transfer receive file access"));
 	}
 	
-	NConcurrency::TCContinuation<CFileTransferContext> CFileTransferReceive::f_ReceiveFiles(uint64 _QueueSize, bool _bIgnoreExisting)
+	NConcurrency::TCContinuation<CFileTransferContext> CFileTransferReceive::f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags)
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_RootDirectory = Internal.m_BasePath;
@@ -71,12 +71,36 @@ namespace NMib::NCloud
 		fg_Dispatch
 			(
 				Internal.m_FileActor
-				, [this, _bIgnoreExisting]() -> CFileTransferContext::CInternal::CManifest
+				, [this, _Flags]() -> CFileTransferContext::CInternal::CManifest
 				{
 					auto &Internal = *mp_pInternal;
 					CFileTransferContext::CInternal::CManifest Manifest;
+
+					if (CFile::fs_FileExists(Internal.m_RootDirectory, EFileAttrib_File))
+					{
+						if (_Flags & EReceiveFlag_DeleteExisting)
+						{
+							CFile::fs_DeleteDirectoryRecursive(Internal.m_RootDirectory);
+							return Manifest;
+						}
+						DMibError("Destination already exists but is a file");
+					}
 					
-					if (_bIgnoreExisting || !CFile::fs_FileExists(Internal.m_RootDirectory, EFileAttrib_Directory))
+					if (!CFile::fs_FileExists(Internal.m_RootDirectory, EFileAttrib_Directory))
+					{
+						return Manifest;
+					}
+
+					if (_Flags & EReceiveFlag_DeleteExisting)
+					{
+						CFile::fs_DeleteDirectoryRecursive(Internal.m_RootDirectory);
+						return Manifest;
+					}
+					
+					if (_Flags & EReceiveFlag_FailOnExisting)
+						DMibError("Directory already exists");
+
+					if (_Flags & EReceiveFlag_IgnoreExisting)
 						return Manifest;
 					
 					{

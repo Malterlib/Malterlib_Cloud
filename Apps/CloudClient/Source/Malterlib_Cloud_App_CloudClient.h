@@ -54,5 +54,6 @@ namespace NMib::NCloud::NCloudClient
 		CActorSubscription mp_DownloadVersionSubscription;
 		TCActor<CFileTransferSend> mp_UploadVersionSend;
 		CActorSubscription mp_UploadVersionSubscription;
+		TCActor<CSeparateThreadActor> mp_VersionManagerFile;
 	};
 }

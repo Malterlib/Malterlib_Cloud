@@ -111,6 +111,12 @@ namespace NMib::NCloud
 				
 				NConcurrency::CActorSubscription m_Subscription;
 			};
+			
+			enum EFlag
+			{
+				EFlag_None = 0
+				, EFlag_ForceOverwrite = DMibBit(0)
+			};
 
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(CDistributedActorReadStream &_Stream);
@@ -118,6 +124,8 @@ namespace NMib::NCloud
 			NStr::CStr m_Application;
 			CVersionIdentifier m_VersionID;
 			CVersionInformation m_VersionInfo;
+			uint64 m_QueueSize = 8*1024*1024;
+			EFlag m_Flags = EFlag_None;
 			NConcurrency::TCActor<> m_DispatchActor;
 			NFunction::TCFunction<NConcurrency::TCContinuation<CStartUploadTransfer::CResult> (NFunction::CThisTag &, CStartUploadTransfer &&_Params)> m_fStartTransfer;
 		};

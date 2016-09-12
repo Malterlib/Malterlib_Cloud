@@ -75,6 +75,7 @@ namespace NMib::NCloud
 		TCSharedPointer<CFileState> m_pFileState = fg_Construct();
 		
 		NConcurrency::TCContinuation<CFileTransferResult> m_Continuation;
+		bool m_bDelayedFinish = false;
 		bool m_bCalled = false;
 		bool m_bDoneCalled = false;
 	};
@@ -99,6 +100,8 @@ namespace NMib::NCloud
 		StateChange.m_State = CFileTransferContext::CInternal::EState_Error;
 		StateChange.m_Error = _Error;
 		m_StateCallback(fg_Move(StateChange));
+		if (!m_Continuation.f_IsSet() && !m_bDelayedFinish)
+			m_Continuation.f_SetException(DMibErrorInstance(_Error));
 	}
 	
 	void CFileTransferSend::CInternal::fp_ReportFinished()
@@ -106,10 +109,15 @@ namespace NMib::NCloud
 		CFileTransferContext::CInternal::CStateChange StateChange{m_Version};
 		StateChange.m_State = CFileTransferContext::CInternal::EState_Finished;
 		StateChange.m_Finished.m_nBytes = m_TransferStats.m_nTransferredBytes;
-		StateChange.m_Finished.m_nSeconds = m_TransferStats.m_Clock.f_GetTime(); 
-		m_StateCallback(fg_Move(StateChange));
-		if (!m_Continuation.f_IsSet())
-			m_Continuation.f_SetResult(StateChange.m_Finished);
+		StateChange.m_Finished.m_nSeconds = m_TransferStats.m_Clock.f_GetTime();
+		auto Continuation = m_StateCallback.f_Call(fg_TempCopy(StateChange));
+		m_bDelayedFinish = true;
+		fg_Dispatch([Continuation]{ return Continuation; }) > [this, Finished = StateChange.m_Finished](TCAsyncResult<CFileTransferContext::CInternal::CStateChange::CResult> &&_Result)
+			{
+				if (!m_Continuation.f_IsSet())
+					m_Continuation.f_SetResult(Finished);
+			}
+		;
 	}
 	
 	void CFileTransferSend::CInternal::fp_DetermineWhatToSend()
@@ -122,36 +130,51 @@ namespace NMib::NCloud
 					CWorkQueue Queue;
 					
 					CStr RootPath = pFileState->m_RootPath;
+					
+					auto fAddEntry = [&](CStr const &_RelativePath, CStr const &_Path)
+						{
+							uint64 ExpectedSize = CFile::fs_GetFileSize(_Path); 
+							auto *pFile = Manifest.m_Files.f_FindEqual(_RelativePath);
+							if (pFile && pFile->m_FileSize == ExpectedSize)
+								return;
+							
+							auto &Entry = Queue.m_Queue.f_Insert();
+							Entry.m_Size = ExpectedSize;
+							if (!pFile)
+								Entry.m_Position = 0;
+							else if (pFile->m_FileSize > ExpectedSize)
+								Entry.m_Position = ExpectedSize;
+							else
+							{
+								// Re-upload last 128 KiB
+								if (pFile->m_FileSize > 128*1024)
+									Entry.m_Position = pFile->m_FileSize - 128*1024; 
+								else
+									Entry.m_Position = 0; 
+							}
+							Entry.m_FileName = _Path;
+							Entry.m_RelativeFileName = _RelativePath;
+						}
+					;
+
+					if (CFile::fs_FileExists(RootPath, EFileAttrib_File))
+					{
+						CStr RelativePath = CFile::fs_GetFile(RootPath);
+						fAddEntry(RelativePath, RootPath);
+						return Queue;
+					}
+					
 					if (!CFile::fs_FileExists(RootPath, EFileAttrib_Directory))
 						DMibError("Send path does not exist");
-					
+
 					CFile::CFindFilesOptions FindOptions(RootPath + "/*", true);
 					FindOptions.m_AttribMask = EFileAttrib_File;
+					
 					auto FoundFiles = CFile::fs_FindFiles(FindOptions);
 					for (auto &File : FoundFiles)
 					{
 						CStr RelativePath = File.m_Path.f_Extract(RootPath.f_GetLen() + 1);
-						uint64 ExpectedSize = CFile::fs_GetFileSize(File.m_Path); 
-						auto *pFile = Manifest.m_Files.f_FindEqual(RelativePath);
-						if (pFile && pFile->m_FileSize == ExpectedSize)
-							continue;
-						
-						auto &Entry = Queue.m_Queue.f_Insert();
-						Entry.m_Size = ExpectedSize;
-						if (!pFile)
-							Entry.m_Position = 0;
-						else if (pFile->m_FileSize > ExpectedSize)
-							Entry.m_Position = ExpectedSize;
-						else
-						{
-							// Re-upload last 128 KiB
-							if (pFile->m_FileSize > 128*1024)
-								Entry.m_Position = pFile->m_FileSize - 128*1024; 
-							else
-								Entry.m_Position = 0; 
-						}
-						Entry.m_FileName = File.m_Path;
-						Entry.m_RelativeFileName = RelativePath;
+						fAddEntry(RelativePath, File.m_Path);
 					}
 					return Queue;
 				}
@@ -297,7 +320,7 @@ namespace NMib::NCloud
 							,[this]
 							{
 								auto &Internal = *mp_pInternal;
-								if (!Internal.m_Continuation.f_IsSet())
+								if (!Internal.m_Continuation.f_IsSet() && !Internal.m_bDelayedFinish)
 									Internal.m_Continuation.f_SetException(DMibErrorInstance("File transfer aborted"));
 							}
 						)

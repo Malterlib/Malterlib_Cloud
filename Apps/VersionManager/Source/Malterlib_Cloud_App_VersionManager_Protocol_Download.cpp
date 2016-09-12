@@ -94,7 +94,7 @@ namespace NMib::NCloud::NVersionManager
 				Download.m_FileTransferSend(&CFileTransferSend::f_GetResult) > [this, _CallingHostInfo, DownloadID, Desc](TCAsyncResult<CFileTransferResult> &&_Result)
 					{
 						if (!_Result)
-							fsp_LogActivityError(_CallingHostInfo, fg_Format("'{}' Failed to transfer version: {}", Desc, _Result.f_GetExceptionStr()));
+							fsp_LogActivityError(_CallingHostInfo, fg_Format("'{}' Failed to transfer version (download): {}", Desc, _Result.f_GetExceptionStr()));
 						else
 						{
 							auto &Result = *_Result;
@@ -130,7 +130,7 @@ namespace NMib::NCloud::NVersionManager
 		
 		Cleanup.f_Clear();
 		
-		fsp_LogActivityInfo(_CallingHostInfo, fg_Format("'{}' Starting download of Version", Download.m_Desc));
+		fsp_LogActivityInfo(_CallingHostInfo, fg_Format("'{}' Starting download of version", Download.m_Desc));
 		
 		return Continuation;
 	}

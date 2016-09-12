@@ -67,8 +67,16 @@ namespace NMib::NCloud
 		CFileTransferReceive &operator =(CFileTransferReceive &&_Other);
 		CFileTransferReceive(CFileTransferReceive const &_Other) = delete;
 		CFileTransferReceive &operator =(CFileTransferReceive const &_Other) = delete;
+		
+		enum EReceiveFlag
+		{
+			EReceiveFlag_None = 0
+			, EReceiveFlag_IgnoreExisting = DMibBit(0)
+			, EReceiveFlag_FailOnExisting = DMibBit(1)
+			, EReceiveFlag_DeleteExisting = DMibBit(2)
+		};
 
-		NConcurrency::TCContinuation<CFileTransferContext> f_ReceiveFiles(uint64 _QueueSize, bool _bIgnoreExisting);
+		NConcurrency::TCContinuation<CFileTransferContext> f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags);
 		NConcurrency::TCContinuation<CFileTransferResult> f_GetResult(); 
 		
 	private:

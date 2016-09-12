@@ -16,8 +16,8 @@ namespace NMib::NCloud::NVersionManager
 	{
 		auto g_fFindApplications = []() -> TCSet<CStr>
 			{
-				CStr FindPath = CFile::fs_GetProgramDirectory();
-				CFile::CFindFilesOptions FindOptions(FindPath + "/Applications/*", false);
+				CStr FindPath = CFile::fs_GetProgramDirectory() + "/Applications";
+				CFile::CFindFilesOptions FindOptions(FindPath + "/*", false);
 				FindOptions.m_AttribMask = EFileAttrib_Directory;
 				auto FoundFiles = CFile::fs_FindFiles(FindOptions);
 				TCSet<CStr> Applications;

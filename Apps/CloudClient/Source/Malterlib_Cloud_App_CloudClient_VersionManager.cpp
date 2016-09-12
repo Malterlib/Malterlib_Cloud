@@ -77,10 +77,10 @@ namespace NMib::NCloud::NCloudClient
 					, "Description"_= "Upload a version to remote version manager\n"
 					, "Options"_=
 					{
-						"VersionManagerHost"_=
+						"VersionManagerHost?"_=
 						{
 							"Names"_= {"--host"}
-							, "Type"_= ""
+							, "Default"_= ""
 							, "Description"_= "The host ID of the host to upload the version to."
 						}					
 						, "Application"_=
@@ -115,12 +115,25 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_= EJSONType_Object
 							, "Description"_= "EJSON formatted extra information.\n"
 						}
+						, "Force?"_=
+						{
+							"Names"_= {"--force"}
+							, "Default"_= false
+							, "Description"_= "Force upload even if version already exists.\n"
+						}
 						, "TransferQueueSize?"_=
 						{
 							"Names"_= {"--queue-size"}
 							, "Default"_= int64(8*1024*1024)
 							, "Description"_= "The amount of data to keep in flight while uploading."
 						}
+						, "CurrentDirectory?"_=
+						{
+							"Names"_= _[_]
+							, "Default"_= CFile::fs_GetCurrentDirectory()
+							, "Hidden"_= true
+							, "Description"_= "Internal hidden option to forward current directory"
+						}					
 					}
 					, "Parameters"_= 
 					{
@@ -145,10 +158,10 @@ namespace NMib::NCloud::NCloudClient
 					, "Description"_= "Download a version from remote version manager\n"
 					, "Options"_=
 					{
-						"VersionManagerHost"_=
+						"VersionManagerHost?"_=
 						{
 							"Names"_= {"--host"}
-							, "Type"_= ""
+							, "Default"_= ""
 							, "Description"_= "The host ID of the host to download the version from."
 						}					
 						, "Application"_=
@@ -346,16 +359,15 @@ namespace NMib::NCloud::NCloudClient
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		CStr Version = _Params["Version"].f_String();
-		CStr Source = _Params["Source"].f_String();
+		CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
 		CTime Time = _Params["Time"].f_Date();
 		CStr Configuration = _Params["Configuration"].f_String();
 		CEJSON ExtraInfo = _Params["ExtraInfo"];
 		uint64 QueueSize = _Params["TransferQueueSize"].f_Integer();
+		bool bForce = _Params["Force"].f_Boolean();
 		if (QueueSize < 128*1024)
 			QueueSize = 128*1024;
 		
-		if (Host.f_IsEmpty())
-			return DMibErrorInstance("Host must be specified");
 		if (Application.f_IsEmpty())
 			return DMibErrorInstance("Application must be specified");
 		if (Version.f_IsEmpty())
@@ -372,91 +384,126 @@ namespace NMib::NCloud::NCloudClient
 			if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID))
 				return DMibErrorInstance(fg_Format("Version identifier format is invalid: {}", Error));
 		}
-		
-		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
-			> Continuation / [this, Continuation, Application, Host, VersionID, QueueSize, Source, Time, Configuration, ExtraInfo]
+
+		auto fDoCommand = [this, bForce, Continuation, Application, Host, VersionID, QueueSize, Source, Configuration, ExtraInfo](CTime const &_Time)
 			{
-				TCActorResultMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
-
-				TCDistributedActor<CVersionManager> OneVersionManager;
-				CTrustedActorInfo ActorInfo;
-				for (auto &TrustedVersionManager : mp_VersionManagers.m_Actors)
-				{
-					if (TrustedVersionManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
-						continue;
-					ActorInfo = TrustedVersionManager.m_TrustInfo;
-					OneVersionManager = TrustedVersionManager.m_Actor;
-					break;
-				}
-			
-				if (!OneVersionManager)
-				{
-					Continuation.f_SetException(DMibErrorInstance("No suitable version manager found on this host, or connection failed. Use --log-to-stderr to see more info."));
-					return;
-				}
-
-				mp_UploadVersionSend = fg_ConstructActor<CFileTransferSend>(Source);
-				
-				CVersionManager::CStartUploadVersion StartUpload;
-				StartUpload.m_Application = Application;
-				StartUpload.m_VersionID = VersionID;
-				StartUpload.m_VersionInfo.m_Time = Time;
-				StartUpload.m_VersionInfo.m_Configuration = Configuration;
-				StartUpload.m_VersionInfo.m_ExtraInfo = ExtraInfo;
-				StartUpload.m_DispatchActor = fg_ThisActor(this);
-				StartUpload.m_fStartTransfer = [this](CVersionManager::CStartUploadTransfer &&_Params) -> NConcurrency::TCContinuation<CVersionManager::CStartUploadTransfer::CResult>
+				fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
+					> Continuation / [this, bForce, Continuation, Application, Host, VersionID, QueueSize, Source, _Time, Configuration, ExtraInfo]
 					{
-						NConcurrency::TCContinuation<CVersionManager::CStartUploadTransfer::CResult> StartTransferContinuation;
-						mp_UploadVersionSend(&CFileTransferSend::f_SendFiles, fg_Move(_Params.m_TransferContext)) 
-							> StartTransferContinuation / [this, StartTransferContinuation](NConcurrency::CActorSubscription &&_Subscription)
+						TCActorResultMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
+
+						CStr Error;
+						auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
+						if (!pVersionManager)
+						{
+							Continuation.f_SetException(DMibErrorInstance(fg_Format("Error selecting version manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error)));
+							return;
+						}
+
+						mp_UploadVersionSend = fg_ConstructActor<CFileTransferSend>(Source);
+						
+						CVersionManager::CStartUploadVersion StartUpload;
+						StartUpload.m_Application = Application;
+						StartUpload.m_VersionID = VersionID;
+						StartUpload.m_VersionInfo.m_Time = _Time;
+						StartUpload.m_VersionInfo.m_Configuration = Configuration;
+						StartUpload.m_VersionInfo.m_ExtraInfo = ExtraInfo;
+						StartUpload.m_QueueSize = QueueSize;
+						StartUpload.m_DispatchActor = fg_ThisActor(this);
+						if (bForce)
+							StartUpload.m_Flags |= CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite; 
+						StartUpload.m_fStartTransfer = [this](CVersionManager::CStartUploadTransfer &&_Params) -> NConcurrency::TCContinuation<CVersionManager::CStartUploadTransfer::CResult>
 							{
-								CVersionManager::CStartUploadTransfer::CResult Result;
-								Result.m_Subscription = fg_Move(_Subscription);
-								StartTransferContinuation.f_SetResult(fg_Move(Result));
+								NConcurrency::TCContinuation<CVersionManager::CStartUploadTransfer::CResult> StartTransferContinuation;
+								mp_UploadVersionSend(&CFileTransferSend::f_SendFiles, fg_Move(_Params.m_TransferContext)) 
+									> StartTransferContinuation / [this, StartTransferContinuation](NConcurrency::CActorSubscription &&_Subscription)
+									{
+										CVersionManager::CStartUploadTransfer::CResult Result;
+										Result.m_Subscription = fg_Move(_Subscription);
+										StartTransferContinuation.f_SetResult(fg_Move(Result));
+									}
+								;
+								return StartTransferContinuation;
 							}
 						;
-						return StartTransferContinuation;
-					}
-				;
 
-				DMibCallActor
-					(
-						OneVersionManager
-						, CVersionManager::f_UploadVersion
-						, fg_Move(StartUpload)
-					)
-					.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
-					> Continuation % "Failed to start upload on remote server" / [this, Continuation](CVersionManager::CStartUploadVersion::CResult &&_Result)
-					{
-						mp_UploadVersionSubscription = fg_Move(_Result.m_Subscription);
-						mp_UploadVersionSend(&CFileTransferSend::f_GetResult) > [this, Continuation](TCAsyncResult<CFileTransferResult> &&_Results)
+						DMibCallActor
+							(
+								pVersionManager->m_Actor
+								, CVersionManager::f_UploadVersion
+								, fg_Move(StartUpload)
+							)
+							.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
+							> Continuation % "Failed to start upload on remote server" / [this, Continuation](CVersionManager::CStartUploadVersion::CResult &&_Result)
 							{
-								mp_UploadVersionSubscription.f_Clear();
-								if (!_Results)
-									Continuation.f_SetException(fg_Move(_Results));
-								else
-								{
-									auto &Results = *_Results;
-									CDistributedAppCommandLineResults CommandLine;
+								mp_UploadVersionSubscription = fg_Move(_Result.m_Subscription);
+								mp_UploadVersionSend(&CFileTransferSend::f_GetResult) > [this, Continuation](TCAsyncResult<CFileTransferResult> &&_Results)
+									{
+										mp_UploadVersionSubscription.f_Clear();
+										if (!_Results)
+											Continuation.f_SetException(fg_Move(_Results));
+										else
+										{
+											auto &Results = *_Results;
+											CDistributedAppCommandLineResults CommandLine;
 
-									CommandLine.f_AddStdOut
-										(
-											fg_Format
-											(
-												"Download finished transferring: {} bytes at {fe2} MB/s\n"
-												, Results.m_nBytes
-												, Results.f_BytesPerSecond()/1'000'000.0
-											)
-										)
-									;
-									Continuation.f_SetResult(fg_Move(CommandLine));
-								}
+											CommandLine.f_AddStdOut
+												(
+													fg_Format
+													(
+														"Upload finished transferring: {} bytes at {fe2} MB/s\n"
+														, Results.m_nBytes
+														, Results.f_BytesPerSecond()/1'000'000.0
+													)
+												)
+											;
+											Continuation.f_SetResult(fg_Move(CommandLine));
+										}
+									}
+								;
 							}
 						;
 					}
 				;
 			}
 		;
+		
+		if (Time.f_IsValid())
+			fDoCommand(Time);
+		else
+		{
+			if (!mp_VersionManagerFile)
+				mp_VersionManagerFile = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Version file actor"));
+			
+			fg_Dispatch
+				(
+					mp_VersionManagerFile
+					, [Source]() -> CTime
+					{
+						if (!CFile::fs_FileExists(Source))
+							DMibError("Source specified does not exists");
+						if (CFile::fs_FileExists(Source, EFileAttrib_File))
+							return CFile::fs_GetWriteTime(Source);
+						CFile::CFindFilesOptions FindOptions{Source + "/*", true};
+						FindOptions.m_AttribMask = EFileAttrib_File;
+						CTime ReturnTime;
+						for (auto &FoundFile : CFile::fs_FindFiles(FindOptions))
+						{
+							auto FoundTime = CFile::fs_GetWriteTime(FoundFile.m_Path);
+							if (!ReturnTime.f_IsValid() || FoundTime > ReturnTime)
+								ReturnTime = FoundTime;
+						}
+						return ReturnTime;
+					}
+				)
+				> Continuation % "Failed to deduce backup time" / [fDoCommand](CTime const &_Time)
+				{
+					DConOut("Time: {}\n", _Time);
+					fDoCommand(_Time);
+				}
+			;			
+		}
+		
 		return Continuation;
 	}
 	
@@ -472,8 +519,6 @@ namespace NMib::NCloud::NCloudClient
 		if (QueueSize < 128*1024)
 			QueueSize = 128*1024;
 		
-		if (Host.f_IsEmpty())
-			return DMibErrorInstance("Host must be specified");
 		if (Application.f_IsEmpty())
 			return DMibErrorInstance("Application must be specified");
 		if (Version.f_IsEmpty())
@@ -496,28 +541,19 @@ namespace NMib::NCloud::NCloudClient
 			{
 				TCActorResultMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
 
-				TCDistributedActor<CVersionManager> OneVersionManager;
-				CTrustedActorInfo ActorInfo;
-				for (auto &TrustedVersionManager : mp_VersionManagers.m_Actors)
+				CStr Error;
+				auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
+				if (!pVersionManager)
 				{
-					if (TrustedVersionManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
-						continue;
-					ActorInfo = TrustedVersionManager.m_TrustInfo;
-					OneVersionManager = TrustedVersionManager.m_Actor;
-					break;
-				}
-			
-				if (!OneVersionManager)
-				{
-					Continuation.f_SetException(DMibErrorInstance("No suitable version manager found on this host, or connection failed. Use --log-to-stderr to see more info."));
+					Continuation.f_SetException(DMibErrorInstance(fg_Format("Error selecting version manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error)));
 					return;
 				}
-
+				
 				mp_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>(DestinationDirectory); 
 
-				mp_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize, true) 
+				mp_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize, CFileTransferReceive::EReceiveFlag_IgnoreExisting) 
 					> Continuation % "Failed to initialize file transfer context" 
-					/ [this, Application, VersionID, OneVersionManager, Continuation]
+					/ [this, Application, VersionID, OneVersionManager = pVersionManager->m_Actor, Continuation]
 					(CFileTransferContext &&_TransferContext)
 					{
 						CVersionManager::CStartDownloadVersion StartDownload;

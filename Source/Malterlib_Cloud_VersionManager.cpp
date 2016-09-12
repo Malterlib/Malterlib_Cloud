@@ -46,10 +46,10 @@ namespace NMib::NCloud
 		VersionID.m_Branch = _String.f_Left(iBranchEnd);
 		CStr VersionString = _String.f_Extract(iBranchEnd + 1);
 		aint nParsed = 0;
-		aint nChars = (CStr::CParse("{}/{}.{}.{}") >> VersionID.m_Branch >> VersionID.m_Major >> VersionID.m_Minor >> VersionID.m_Revision).f_Parse(VersionString, nParsed);
-		if (nParsed != 4)
+		aint nChars = (CStr::CParse("{}.{}.{}") >> VersionID.m_Major >> VersionID.m_Minor >> VersionID.m_Revision).f_Parse(VersionString, nParsed);
+		if (nParsed != 3)
 		{
-			o_Error = "Not all four parts were found";
+			o_Error = "Did not find all three version parts (Major, Minor and Revision)";
 			return false;
 		}
 		if (nChars != VersionString.f_GetLen())
@@ -232,7 +232,9 @@ namespace NMib::NCloud
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_Application; 
 		_Stream << m_VersionID; 
-		_Stream << m_VersionInfo; 
+		_Stream << m_VersionInfo;
+		_Stream << m_QueueSize;
+		_Stream << m_Flags;
 		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_DispatchActor);
 		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_fStartTransfer);
 	}
@@ -243,6 +245,8 @@ namespace NMib::NCloud
 		_Stream >> m_Application; 
 		_Stream >> m_VersionID; 
 		_Stream >> m_VersionInfo; 
+		_Stream >> m_QueueSize;
+		_Stream >> m_Flags;
 		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_DispatchActor);
 		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fStartTransfer);
 	}

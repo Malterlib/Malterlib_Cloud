@@ -70,10 +70,10 @@ namespace NMib::NCloud::NCloudClient
 						"If a backup already exists the download will be resumed or ammended with the latest changes. Only appended files such as oplogs are supported\n"
 					, "Options"_=
 					{
-						"BackupHost"_=
+						"BackupHost?"_=
 						{
 							"Names"_= {"--host"}
-							, "Type"_= ""
+							, "Default"_= ""
 							, "Description"_= "The host ID of the host to download the backup from."
 						}					
 						, "BackupSource"_=
@@ -258,8 +258,6 @@ namespace NMib::NCloud::NCloudClient
 		if (QueueSize < 128*1024)
 			QueueSize = 128*1024;
 		
-		if (BackupHost.f_IsEmpty())
-			return DMibErrorInstance("Backup host must be specified");
 		if (BackupSource.f_IsEmpty())
 			return DMibErrorInstance("Backup source must be specified");
 		if (Backup.f_IsEmpty())
@@ -276,31 +274,20 @@ namespace NMib::NCloud::NCloudClient
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
 			> Continuation / [this, Continuation, BackupSource, BackupHost, BackupID, BackupTime, QueueSize]
 			{
-				TCActorResultMap<CHostInfo, CBackupManager::CListBackups::CResult> Backups;
-
-				TCDistributedActor<CBackupManager> OneBackupManager;
-				CTrustedActorInfo ActorInfo;
-				for (auto &TrustedBackupManager : mp_BackupManagers.m_Actors)
+				CStr Error;
+				auto *pBackupManager = mp_BackupManagers.f_GetOneActor(BackupHost, Error);
+				if (!pBackupManager)
 				{
-					if (TrustedBackupManager.m_TrustInfo.m_HostInfo.m_HostID != BackupHost)
-						continue;
-					ActorInfo = TrustedBackupManager.m_TrustInfo;
-					OneBackupManager = TrustedBackupManager.m_Actor;
-					break;
-				}
-			
-				if (!OneBackupManager)
-				{
-					Continuation.f_SetException(DMibErrorInstance("No suitable backup manager found on this host, or connection failed. Use --log-to-stderr to see more info."));
+					Continuation.f_SetException(DMibErrorInstance(fg_Format("Error selecting backup manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error)));
 					return;
 				}
 
 				CStr BasePath = fg_Format("{}/{}/{tst.} - {}", CFile::fs_GetProgramDirectory(), BackupSource, BackupTime, BackupID);
 				mp_DownloadBackupReceive = fg_ConstructActor<CFileTransferReceive>(BasePath); 
 
-				mp_DownloadBackupReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize, false) 
+				mp_DownloadBackupReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize, CFileTransferReceive::EReceiveFlag_None) 
 					> Continuation % "Failed to initialize file transfer context" 
-					/ [this, BackupSource, BackupID, BackupTime, OneBackupManager, Continuation]
+					/ [this, BackupSource, BackupID, BackupTime, OneBackupManager = pBackupManager->m_Actor, Continuation]
 					(CFileTransferContext &&_TransferContext)
 					{
 						CBackupManager::CStartDownloadBackup StartDownload;
