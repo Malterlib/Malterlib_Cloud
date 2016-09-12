@@ -31,6 +31,9 @@ namespace NMib::NCloud
 			void f_Consume(CDistributedActorReadStream &_Stream);
 			void f_Format(NStr::CStrAggregate &o_Str) const;
 			
+			NStr::CStr f_EncodeFileName() const;
+			static NStr::CStr fs_DecodeFileName(NStr::CStr const &_FileName);
+			
 			bool operator == (CVersionIdentifier const &_Right) const;
 			bool operator < (CVersionIdentifier const &_Right) const;
 
@@ -51,6 +54,7 @@ namespace NMib::NCloud
 		};
 
 		static bool fs_IsValidVersionIdentifier(NStr::CStr const &_String, NStr::CStr &o_Error, CVersionIdentifier *o_pVersionID);
+		static bool fs_IsValidVersionIdentifier(CVersionIdentifier const &_VersionID, NStr::CStr &o_Error);
 		
 		struct CListApplications
 		{

@@ -14,35 +14,9 @@ namespace NMib::NCloud
 		return fg_Min(uint32(EProtocolVersion), _Version);
 	}
 	
-	bool CVersionManager::fs_IsValidApplicationName(NStr::CStr const &_String)
+	bool CVersionManager::fs_IsValidApplicationName(CStr const &_String)
 	{
-		if (_String.f_IsEmpty())
-			return false;
-		if (_String.f_GetLen() > 254)
-			return false;
-		ch8 const *pParse = _String.f_GetStr();
-		ch8 LastChar = 0;
-		while (*pParse)
-		{
-			if (*pParse == '-')
-				return false; // Must not start with hyphen
-			if (*pParse == '.')
-				return false; // Empty label allowed?
-			while (*pParse && (NStr::fg_CharIsAnsiAlphabetical(*pParse) || NStr::fg_CharIsNumber(*pParse) || *pParse == '-'))
-			{
-				LastChar = *pParse;
-				++pParse;
-			}
-			if (LastChar == '-')
-				return false; // Must not end with hyphen
-			if (*pParse)
-			{
-				if (*pParse != '.')
-					return false; // Any other character is not allowed
-				++pParse;
-			}
-		}
-		return true;
+		return NNet::fg_IsValidHostname(_String);
 	}
 	
 	bool CVersionManager::fs_IsValidProtocolVersion(uint32 _Version)
@@ -50,17 +24,35 @@ namespace NMib::NCloud
 		return _Version >= EMinProtocolVersion && _Version <= EProtocolVersion;
 	}
 	
-	bool CVersionManager::fs_IsValidVersionIdentifier(NStr::CStr const &_String, NStr::CStr &o_Error, CVersionIdentifier *o_pVersionID)
+	bool CVersionManager::fs_IsValidVersionIdentifier(CVersionIdentifier const &_VersionID, CStr &o_Error)
+	{
+		if (!NNet::fg_IsValidHostname(_VersionID.m_Branch, "/"))
+		{
+			o_Error = "Branch is not valid";
+			return false;
+		}
+		return true;
+	}
+	
+	bool CVersionManager::fs_IsValidVersionIdentifier(CStr const &_String, CStr &o_Error, CVersionIdentifier *o_pVersionID)
 	{
 		CVersionIdentifier VersionID;
+		aint iBranchEnd = _String.f_FindCharReverse('/');
+		if (iBranchEnd < 0)
+		{
+			o_Error = "Branch was not found";
+			return false;
+		}
+		VersionID.m_Branch = _String.f_Left(iBranchEnd);
+		CStr VersionString = _String.f_Extract(iBranchEnd + 1);
 		aint nParsed = 0;
-		aint nChars = (CStr::CParse("{}/{}.{}.{}") >> VersionID.m_Branch >> VersionID.m_Major >> VersionID.m_Minor >> VersionID.m_Revision).f_Parse(_String, nParsed);
+		aint nChars = (CStr::CParse("{}/{}.{}.{}") >> VersionID.m_Branch >> VersionID.m_Major >> VersionID.m_Minor >> VersionID.m_Revision).f_Parse(VersionString, nParsed);
 		if (nParsed != 4)
 		{
 			o_Error = "Not all four parts were found";
 			return false;
 		}
-		if (nChars != _String.f_GetLen())
+		if (nChars != VersionString.f_GetLen())
 		{
 			o_Error = "Extra characters after version";
 			return false;
@@ -70,6 +62,8 @@ namespace NMib::NCloud
 			o_Error = "Branch is empty";
 			return false;
 		}
+		if (!fs_IsValidVersionIdentifier(VersionID, o_Error))
+			return false;
 		if (o_pVersionID)
 			*o_pVersionID = VersionID;
 		return true;
@@ -92,8 +86,18 @@ namespace NMib::NCloud
 		_Stream >> m_Minor;
 		_Stream >> m_Revision;
 	}
+
+	CStr CVersionManager::CVersionIdentifier::f_EncodeFileName() const
+	{
+		return fg_Format("{}_{}.{}.{}", m_Branch.f_ReplaceChar('/', '_'), m_Major, m_Minor, m_Revision);
+	}
 	
-	void CVersionManager::CVersionIdentifier::f_Format(NStr::CStrAggregate &o_Str) const
+	CStr CVersionManager::CVersionIdentifier::fs_DecodeFileName(CStr const &_FileName)  
+	{
+		return _FileName.f_ReplaceChar('_', '/');
+	}
+	
+	void CVersionManager::CVersionIdentifier::f_Format(CStrAggregate &o_Str) const
 	{
 		o_Str += CStr::CFormat("{}/{}.{}.{}")
 			<< m_Branch
