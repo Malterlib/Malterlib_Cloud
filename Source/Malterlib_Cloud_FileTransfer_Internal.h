@@ -96,7 +96,7 @@ namespace NMib::NCloud
 		CManifest m_Manifest;
 		uint64 m_QueueSize = 8*1024*1024;
 		NConcurrency::TCActor<> m_DispatchActor; 
-		NFunction::TCFunction<NConcurrency::TCContinuation<CInternal::CSendPart::CResult> (NFunction::CThisTag &, CInternal::CSendPart &&_Part)> m_fSendPart;
-		NFunction::TCFunction<NConcurrency::TCContinuation<CInternal::CStateChange::CResult> (NFunction::CThisTag &, CInternal::CStateChange &&_State)> m_fStateChange;
+		NFunction::TCFunctionMutable<NConcurrency::TCContinuation<CInternal::CSendPart::CResult> (CInternal::CSendPart &&_Part)> m_fSendPart;
+		NFunction::TCFunctionMutable<NConcurrency::TCContinuation<CInternal::CStateChange::CResult> (CInternal::CStateChange &&_State)> m_fStateChange;
 	};
 }
