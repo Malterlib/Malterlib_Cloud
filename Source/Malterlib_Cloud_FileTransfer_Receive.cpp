@@ -45,8 +45,6 @@ namespace NMib::NCloud
 	};
 
 	CFileTransferReceive::~CFileTransferReceive() = default;
-	CFileTransferReceive::CFileTransferReceive(CFileTransferReceive &&_Other) = default;
-	CFileTransferReceive &CFileTransferReceive::operator =(CFileTransferReceive &&_Other) = default;
 	
 	CFileTransferReceive::CFileTransferReceive(NStr::CStr const &_BasePath, TCActor<CActor> const &_FileActor)
 		: mp_pInternal(fg_Construct()) 

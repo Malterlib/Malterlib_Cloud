@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedApp>
+#include <Mib/Concurrency/ActorCallbackManager>
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Daemon/Daemon>
 
@@ -50,6 +51,38 @@ namespace NMib::NCloud::NVersionManager
 			CStr m_Desc;
 		};
 		
+		struct CVersion
+		{
+			CVersionManager::CVersionIdentifier const &f_GetIdentifier() const
+			{
+				return TCMap<CVersionManager::CVersionIdentifier, CVersion>::fs_GetKey(*this);
+			}
+			
+			CVersionManager::CVersionInformation m_VersionInfo;
+			DIntrusiveLink(CVersion, TCAVLLink<>, m_TimeLink);
+			
+			struct CCompareTime
+			{
+				bool operator()(CVersion const &_Left, CVersion const &_Right) const
+				{
+					return NContainer::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetIdentifier()) 
+						< NContainer::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetIdentifier())
+					;
+				}
+			};
+		};
+		
+		struct CApplication
+		{
+			CStr const &f_GetName() const
+			{
+				return TCMap<CStr, CApplication>::fs_GetKey(*this);
+			}
+			
+			TCMap<CVersionManager::CVersionIdentifier, CVersion> m_Versions;
+			TCAVLTree<CVersion::CLinkTraits_m_TimeLink, CVersion::CCompareTime> m_VersionsByTime;
+		};
+		
 		struct CVersionManagerImplementation : public CVersionManager
 		{
 			CVersionManagerImplementation(TCActor<CVersionManagerDaemonActor::CServer> &&_Server);
@@ -58,24 +91,48 @@ namespace NMib::NCloud::NVersionManager
 			TCContinuation<CListVersions::CResult> f_ListVersions(CListVersions &&_Params) override;
 			TCContinuation<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion &&_Params) override;
 			TCContinuation<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) override;
+			TCContinuation<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) override;
 			
 		private:
 			TCWeakActor<CVersionManagerDaemonActor::CServer> mp_Server;
+		};
+		
+		struct CSubscription
+		{
+			CStr const &f_GetSubscriptionID() const
+			{
+				return TCMap<CStr, CSubscription>::fs_GetKey(*this);
+			}
+			uint32 m_nInitial = 0;
+			CStr m_HostID;
+			TCActor<> m_DispatchActor;
+			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<void> ()> m_fOnPermissionsChanged;
+			TCFunctionMutable<NConcurrency::TCContinuation<CVersionManager::CNewVersionNotification::CResult> (CVersionManager::CNewVersionNotification &&_VersionInfo)> 
+				m_fOnNewVersion
+			;
+			
+			void f_SendVersion(CVersionManager::CNewVersionNotification const &_NewVersionNotification) const;
 		};
 		
 	private:
 		void fp_Init();
 		void fp_Publish();
 		TCContinuation<void> fp_SetupPermissions();
+		TCContinuation<void> fp_FindVersions();
 
 		TCContinuation<CVersionManager::CListApplications::CResult> fp_Protocol_ListApplications(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CListApplications &&_Params);
 		TCContinuation<CVersionManager::CListVersions::CResult> fp_Protocol_ListVersions(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CListVersions &&_Params);
 		TCContinuation<CVersionManager::CStartUploadVersion::CResult> fp_Protocol_UploadVersion(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CStartUploadVersion &&_Params);
 		TCContinuation<CVersionManager::CStartDownloadVersion::CResult> fp_Protocol_DownloadVersion(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CStartDownloadVersion &&_Params);
+		TCContinuation<CVersionManager::CSubscribeToUpdates::CResult> fp_Protocol_SubscribeToUpdates(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CSubscribeToUpdates &&_Params);
+		
+		void fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription, bool _bPermissionsChanged);
+		void fp_UpdateSubscriptionsForChangedPermissions(CStr const &_HostID);
 		
 		CException fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description);
 		TCSet<CStr> fp_FilterApplicationsByPermissions(CCallingHostInfo const &_CallingHostInfo, TCSet<CStr> const &_Applications);
 		TCContinuation<TCSet<CStr>> fp_EnumApplications();
+		TCSet<CStr> fp_ApplicationSet();
 		
 		static void fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info);
 		static void fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error);
@@ -95,5 +152,10 @@ namespace NMib::NCloud::NVersionManager
 		TCMap<CStr, CVersionUpload> mp_VersionUploads;
 		
 		TCActor<CSeparateThreadActor> mp_QueryFileActor;
+		
+		TCMap<CStr, CApplication> mp_Applications;
+		
+		TCMap<CStr, CSubscription> mp_GlobalVersionSubscriptions;
+		TCMap<CStr, TCMap<CStr, CSubscription>> mp_VersionSubscriptions; 
 	};
 }

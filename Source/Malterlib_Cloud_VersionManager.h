@@ -36,6 +36,9 @@ namespace NMib::NCloud
 			
 			bool operator == (CVersionIdentifier const &_Right) const;
 			bool operator < (CVersionIdentifier const &_Right) const;
+			
+			NEncoding::CEJSON f_ToJSON() const;
+			static CVersionIdentifier fs_FromJSON(NEncoding::CEJSON const &_JSON);
 
 			NStr::CStr m_Branch;
 			uint32 m_Major = 0;
@@ -127,7 +130,7 @@ namespace NMib::NCloud
 			uint64 m_QueueSize = 8*1024*1024;
 			EFlag m_Flags = EFlag_None;
 			NConcurrency::TCActor<> m_DispatchActor;
-			NFunction::TCFunction<NConcurrency::TCContinuation<CStartUploadTransfer::CResult> (NFunction::CThisTag &, CStartUploadTransfer &&_Params)> m_fStartTransfer;
+			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<CStartUploadTransfer::CResult> (CStartUploadTransfer &&_Params)> m_fStartTransfer;
 		};
 		
 		struct CStartDownloadVersion
@@ -148,10 +151,46 @@ namespace NMib::NCloud
 			CFileTransferContext m_TransferContext;
 		};
 		
-		uint32 f_GetProtocolVersion(uint32 _Version);
+		struct CNewVersionNotification
+		{
+			struct CResult
+			{
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
+			};
+
+			void f_Feed(CDistributedActorWriteStream &_Stream) const;
+			void f_Consume(CDistributedActorReadStream &_Stream);
+			
+			NStr::CStr m_Application;
+			CVersionIdentifier m_VersionID;
+			CVersionInformation m_VersionInfo;
+		};
+
+		struct CSubscribeToUpdates
+		{
+			struct CResult
+			{
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
+				
+				NConcurrency::CActorSubscription m_Subscription;
+			};
+
+			void f_Feed(CDistributedActorWriteStream &_Stream) const;
+			void f_Consume(CDistributedActorReadStream &_Stream);
+			
+			NStr::CStr m_Application; /// Leave empty to subscribe to all applications 
+			NConcurrency::TCActor<> m_DispatchActor;
+			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<void> ()> m_fOnPermissionsChanged; // Will be followed by m_fOnNewVersion being called with the currently accessible versions
+			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<CNewVersionNotification::CResult> (CNewVersionNotification &&_VersionInfo)> m_fOnNewVersion;
+			uint32 m_nInitial = 10;
+		};
+		
 		virtual NConcurrency::TCContinuation<CListApplications::CResult> f_ListApplications(CListApplications &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CListVersions::CResult> f_ListVersions(CListVersions &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) = 0;
+		virtual NConcurrency::TCContinuation<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) = 0;
 	};
 }

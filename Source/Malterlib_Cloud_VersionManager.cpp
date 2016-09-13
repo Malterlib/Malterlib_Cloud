@@ -9,11 +9,6 @@ namespace NMib::NCloud
 {
 	using namespace NStr;
 	
-	uint32 CVersionManager::f_GetProtocolVersion(uint32 _Version)
-	{
-		return fg_Min(uint32(EProtocolVersion), _Version);
-	}
-	
 	bool CVersionManager::fs_IsValidApplicationName(CStr const &_String)
 	{
 		return NNet::fg_IsValidHostname(_String);
@@ -106,7 +101,27 @@ namespace NMib::NCloud
 			<< m_Revision
 		;
 	}
+	
+	NEncoding::CEJSON CVersionManager::CVersionIdentifier::f_ToJSON() const
+	{
+		NEncoding::CEJSON Ret;
+		Ret["Branch"] = m_Branch;
+		Ret["Major"] = m_Major;
+		Ret["Minor"] = m_Minor;
+		Ret["Revision"] = m_Revision;
+		return Ret;
+	}
 
+	auto CVersionManager::CVersionIdentifier::fs_FromJSON(NEncoding::CEJSON const &_JSON) -> CVersionIdentifier
+	{
+		CVersionIdentifier Ret;
+		Ret.m_Branch = _JSON["Branch"].f_String();
+		Ret.m_Major = _JSON["Major"].f_Integer();
+		Ret.m_Minor = _JSON["Minor"].f_Integer();
+		Ret.m_Revision = _JSON["Revision"].f_Integer();
+		return Ret;
+	}
+	
 	bool CVersionManager::CVersionIdentifier::operator == (CVersionIdentifier const &_Right) const
 	{
 		return NContainer::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 
@@ -277,5 +292,59 @@ namespace NMib::NCloud
 		_Stream >> m_Application;
 		_Stream >> m_VersionID;
 		_Stream >> m_TransferContext;
+	}
+	
+	// CNewVersionNotification
+	
+	void CVersionManager::CNewVersionNotification::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+	}
+	
+	void CVersionManager::CNewVersionNotification::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+	}
+	
+	void CVersionManager::CNewVersionNotification::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+		_Stream << m_Application;
+		_Stream << m_VersionID;
+		_Stream << m_VersionInfo;
+	}
+	
+	void CVersionManager::CNewVersionNotification::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+		_Stream >> m_Application;
+		_Stream >> m_VersionID;
+		_Stream >> m_VersionInfo;
+	}
+
+	// CSubscribeToUpdates
+	
+	void CVersionManager::CSubscribeToUpdates::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
+	}
+	
+	void CVersionManager::CSubscribeToUpdates::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
+	}
+
+	void CVersionManager::CSubscribeToUpdates::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+		_Stream << m_Application; 
+		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_DispatchActor);
+		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_fOnPermissionsChanged);
+		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_fOnNewVersion);
+		_Stream << m_nInitial;
+	}
+	
+	void CVersionManager::CSubscribeToUpdates::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+		_Stream >> m_Application; 
+		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_DispatchActor);
+		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fOnPermissionsChanged);
+		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fOnNewVersion);
+		_Stream >> m_nInitial;
 	}
 }

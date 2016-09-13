@@ -81,8 +81,6 @@ namespace NMib::NCloud
 	};
 
 	CFileTransferSend::~CFileTransferSend() = default;
-	CFileTransferSend::CFileTransferSend(CFileTransferSend &&_Other) = default;
-	CFileTransferSend &CFileTransferSend::operator =(CFileTransferSend &&_Other) = default;
 
 	CFileTransferSend::CFileTransferSend(NStr::CStr const &_BasePath, NConcurrency::TCActor<CActor> const &_FileActor)
 		: mp_pInternal(fg_Construct(this)) 

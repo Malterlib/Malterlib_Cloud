@@ -46,10 +46,6 @@ namespace NMib::NCloud
 	{
 		~CFileTransferSend();
 		CFileTransferSend(NStr::CStr const &_BasePath, NConcurrency::TCActor<CActor> const &_FileActor = {});
-		CFileTransferSend(CFileTransferSend &&_Other);
-		CFileTransferSend &operator =(CFileTransferSend &&_Other);
-		CFileTransferSend(CFileTransferSend const &_Other) = delete;
-		CFileTransferSend &operator =(CFileTransferSend const &_Other) = delete;
 		
 		NConcurrency::TCContinuation<NConcurrency::CActorSubscription> f_SendFiles(CFileTransferContext &&_TransferContext);
 		NConcurrency::TCContinuation<CFileTransferResult> f_GetResult(); 
@@ -63,10 +59,6 @@ namespace NMib::NCloud
 	{
 		~CFileTransferReceive();
 		CFileTransferReceive(NStr::CStr const &_BasePath, NConcurrency::TCActor<CActor> const &_FileActor = {});
-		CFileTransferReceive(CFileTransferReceive &&_Other);
-		CFileTransferReceive &operator =(CFileTransferReceive &&_Other);
-		CFileTransferReceive(CFileTransferReceive const &_Other) = delete;
-		CFileTransferReceive &operator =(CFileTransferReceive const &_Other) = delete;
 		
 		enum EReceiveFlag
 		{

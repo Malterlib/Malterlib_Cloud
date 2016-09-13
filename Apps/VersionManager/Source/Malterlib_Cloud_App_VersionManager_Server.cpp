@@ -34,47 +34,204 @@ namespace NMib::NCloud::NVersionManager
 	
 	void CVersionManagerDaemonActor::CServer::fp_Init()
 	{
-		fg_ThisActor(this)(&CVersionManagerDaemonActor::CServer::fp_SetupPermissions) > [this](TCAsyncResult<void> &&_Result)
+		fg_ThisActor(this)(&CVersionManagerDaemonActor::CServer::fp_FindVersions)
+			> [this](TCAsyncResult<void> &&_ResultVersions)
 			{
-				if (!_Result)
+				if (!_ResultVersions)
 				{
-					DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Failed to setup permissions, aborting startup: {}", _Result.f_GetExceptionStr());
+					DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Failed to find versions, aborting startup: {}", _ResultVersions.f_GetExceptionStr());
 					return;
 				}
-				fp_Publish();
+				self(&CVersionManagerDaemonActor::CServer::fp_SetupPermissions) 
+					> [this](TCAsyncResult<void> &&_ResultPermissions)
+					{
+						if (!_ResultPermissions)
+						{
+							DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Failed to setup permissions, aborting startup: {}", _ResultPermissions.f_GetExceptionStr());
+							return;
+						}
+						fp_Publish();
+					}
+				;
 			}
 		;
+	}
+	
+	TCSet<CStr> CVersionManagerDaemonActor::CServer::fp_ApplicationSet()
+	{
+		TCSet<CStr> Return;
+		for (auto &Application : mp_Applications)
+			Return[Application.f_GetName()];
+		return Return;
+	}
+
+
+	TCContinuation<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_EnumApplications()
+	{
+		auto QueryFileActor = fp_GetQueryFileActor();
+		
+		TCContinuation<TCSet<CStr>> Continuation;
+		
+		fg_Dispatch
+			(
+				QueryFileActor
+				, []() -> TCSet<CStr>
+				{
+					CStr FindPath = CFile::fs_GetProgramDirectory() + "/Applications";
+					CFile::CFindFilesOptions FindOptions(FindPath + "/*", false);
+					FindOptions.m_AttribMask = EFileAttrib_Directory;
+					auto FoundFiles = CFile::fs_FindFiles(FindOptions);
+					TCSet<CStr> Applications;
+					for (auto &File : FoundFiles)
+					{
+						CStr Application = File.m_Path.f_Extract(FindPath.f_GetLen() + 1);
+						if (CVersionManager::fs_IsValidApplicationName(Application))
+							Applications[Application];
+					}
+					return Applications;
+				}
+			)
+			> Continuation / [this, Continuation](TCSet<CStr> &&_Result)
+			{
+				Continuation.f_SetResult(fg_Move(_Result));
+			}
+		;
+		return Continuation;
+	}
+	
+	TCContinuation<void> CVersionManagerDaemonActor::CServer::fp_FindVersions()
+	{
+		TCContinuation<void> Continuation;
+
+		self(&CVersionManagerDaemonActor::CServer::fp_EnumApplications) > Continuation / [this, Continuation](TCSet<CStr> &&_Applications)
+			{
+				for (auto &Application : _Applications)
+				{
+					mp_Applications[Application];
+				}
+				auto QueryFileActor = fp_GetQueryFileActor();
+				
+				fg_Dispatch
+					(
+						QueryFileActor
+						, [_Applications]() -> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIdentifier, CVersionManager::CVersionInformation>>
+						{
+							CStr ApplicationDirectory = CFile::fs_GetProgramDirectory() + "/Applications";
+							NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIdentifier, CVersionManager::CVersionInformation>> VersionsPerApplication;
+							for (auto &Application : _Applications)
+							{
+								auto &Versions = VersionsPerApplication[Application];
+								CStr ApplicationPath = fg_Format("{}/{}", ApplicationDirectory, Application);
+								CFile::CFindFilesOptions FindOptions(ApplicationPath + "/*", false);
+								FindOptions.m_AttribMask = EFileAttrib_Directory;
+								auto FoundFiles = CFile::fs_FindFiles(FindOptions);
+								for (auto &File : FoundFiles)
+								{
+									CStr Version = CVersionManager::CVersionIdentifier::fs_DecodeFileName(File.m_Path.f_Extract(ApplicationPath.f_GetLen() + 1));
+									CVersionManager::CVersionIdentifier VersionID;
+									CStr Error;
+									if (CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID))
+									{
+										try
+										{
+											CStr ApplicationInfoPath = fg_Format("{}/{}.json", ApplicationPath, VersionID.f_EncodeFileName());
+											CVersionManager::CVersionInformation OutVersion;
+											if (CFile::fs_FileExists(ApplicationInfoPath))
+											{
+												CEJSON ApplicationInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(ApplicationInfoPath), ApplicationInfoPath);
+												if (auto pValue = ApplicationInfo.f_GetMember("Time", EEJSONType_Date))
+													OutVersion.m_Time = pValue->f_Date();
+												if (auto pValue = ApplicationInfo.f_GetMember("Configuration", EJSONType_String))
+													OutVersion.m_Configuration = pValue->f_String();
+												if (auto pValue = ApplicationInfo.f_GetMember("ExtraInfo", EJSONType_Object))
+													OutVersion.m_ExtraInfo = *pValue;
+											}
+											// Only use versions that has the .json file
+											Versions[VersionID] = fg_Move(OutVersion);
+										}
+										catch (NException::CException const &_Exception)
+										{
+											DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Internal error reading version info: {}", _Exception.f_GetErrorStr());
+										}
+									}
+								}
+							}
+							return VersionsPerApplication;
+						}
+					)
+					> [this, Continuation]
+					(TCAsyncResult<NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIdentifier, CVersionManager::CVersionInformation>>> &&_Result)
+					{
+						if (!_Result)
+						{
+							Continuation.f_SetException(_Result);
+							return;
+						}
+						auto &Result = *_Result;
+						for (auto &ApplicationVersions : Result)
+						{
+							auto &Application = mp_Applications[Result.fs_GetKey(ApplicationVersions)];
+							for (auto &Version : ApplicationVersions)
+							{
+								auto &OutVersion = Application.m_Versions[ApplicationVersions.fs_GetKey(Version)];
+								OutVersion.m_VersionInfo = Version;
+								Application.m_VersionsByTime.f_Insert(OutVersion);
+							}
+						}
+						Continuation.f_SetResult();
+					}
+				;
+			}
+		;
+		
+		return Continuation;
 	}
 	
 	TCContinuation<void> CVersionManagerDaemonActor::CServer::fp_SetupPermissions()
 	{
 		TCContinuation<void> Continuation;
 		
-		fg_ThisActor(this)(&CVersionManagerDaemonActor::CServer::fp_EnumApplications) > Continuation / [this, Continuation](TCSet<CStr> &&_Applications)
-			{
-				TCSet<CStr> Permissions;
-				Permissions["Application/ReadAll"];
-				Permissions["Application/ListAll"];
-				Permissions["Application/WriteAll"];
-				
-				for (auto &Application : _Applications)
-				{
-					Permissions[fg_Format("Application/Read/{}", Application)];
-					Permissions[fg_Format("Application/Write/{}", Application)];
-				}
-				
-				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
-				
-				TCVector<CStr> SubscribePermissions;
-				SubscribePermissions.f_Insert("Application/*");
-			
+		TCSet<CStr> Permissions;
+		Permissions["Application/ReadAll"];
+		Permissions["Application/ListAll"];
+		Permissions["Application/WriteAll"];
+		
+		for (auto &Application : mp_Applications)
+		{
+			Permissions[fg_Format("Application/Read/{}", Application.f_GetName())];
+			Permissions[fg_Format("Application/Write/{}", Application.f_GetName())];
+		}
+		
+		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+		
+		TCVector<CStr> SubscribePermissions;
+		SubscribePermissions.f_Insert("Application/*");
+	
 				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
-					> Continuation / [this, Continuation](CTrustedPermissionSubscription &&_Subscription)
-					{
-						mp_Permissions = fg_Move(_Subscription);
-						Continuation.f_SetResult();
-					}
+			> Continuation / [this, Continuation](CTrustedPermissionSubscription &&_Subscription)
+			{
+				mp_Permissions = fg_Move(_Subscription);
+				
+				
+				mp_Permissions.f_OnPermissionsAdded
+					(
+						[this](CStr const &_HostID, TCSet<CStr> const &_AddedPermissions)
+						{
+							fp_UpdateSubscriptionsForChangedPermissions(_HostID);
+						}
+					)
 				;
+				
+				mp_Permissions.f_OnPermissionsRemoved
+					(
+						[this](CStr const &_HostID, TCSet<CStr> const &_AddedRemoved)
+						{
+							fp_UpdateSubscriptionsForChangedPermissions(_HostID);
+						}
+					)
+				;
+				
+				Continuation.f_SetResult();
 			}
 		;
 		

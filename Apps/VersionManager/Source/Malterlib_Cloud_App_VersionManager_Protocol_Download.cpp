@@ -52,7 +52,7 @@ namespace NMib::NCloud::NVersionManager
 		
 		while (!bFullAccess)
 		{
-			if (mp_Permissions.f_HostHasPermission(_CallingHostInfo.f_GetRealHostID(), fg_Format("Version/Read/{}", _Params.m_Application)))
+			if (mp_Permissions.f_HostHasPermission(_CallingHostInfo.f_GetRealHostID(), fg_Format("Application/Read/{}", _Params.m_Application)))
 				break;
 			
 			return fp_AccessDenied(_CallingHostInfo, "Start download version");

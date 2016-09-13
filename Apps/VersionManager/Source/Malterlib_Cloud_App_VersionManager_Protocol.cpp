@@ -44,6 +44,11 @@ namespace NMib::NCloud::NVersionManager
 	{
 		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_DownloadVersion, fg_GetCallingHostInfo(), fg_Move(_Params));
 	}
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_SubscribeToUpdates(CSubscribeToUpdates &&_Params)
+		-> TCContinuation<CSubscribeToUpdates::CResult> 
+	{
+		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_SubscribeToUpdates, fg_GetCallingHostInfo(), fg_Move(_Params));
+	}
 	
 	void CVersionManagerDaemonActor::CServer::fp_Publish()
 	{
