@@ -171,6 +171,8 @@ namespace NMib::NCloud
 									if (DownloadPart.m_bFinished)
 									{
 										Internal.m_FileCache.f_SetLength(DownloadPart.m_FilePosition + DownloadPart.m_Data.f_GetLen());
+										Internal.m_FileCache.f_SetAttributes(DownloadPart.m_FileAttributes | EFileAttrib_UnixAttributesValid);
+										Internal.m_FileCache.f_SetWriteTime(DownloadPart.m_WriteTime);
 										Internal.m_FileCacheFileName.f_Clear();
 										Internal.m_FileCache.f_Close();
 									}

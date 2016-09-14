@@ -217,10 +217,16 @@ namespace NMib::NCloud::NVersionManager
 						if (!_Result)
 							return;
 						
+						struct CSizeInfo
+						{
+							uint32 m_nFiles = 0;
+							uint64 m_nBytes = 0;
+						};
+						
 						fg_Dispatch
 							(
 								FileAccsess
-								, [VersionInfo, VersionPath]() mutable
+								, [VersionInfo, VersionPath]() mutable -> CSizeInfo
 								{
 									CEJSON VersionJSONInfo;
 									CStr VersionInfoPath = fg_Format("{}.json", VersionPath);
@@ -229,11 +235,19 @@ namespace NMib::NCloud::NVersionManager
 									VersionJSONInfo["Configuration"] = VersionInfo.m_Configuration;
 									VersionJSONInfo["ExtraInfo"] = VersionInfo.m_ExtraInfo;
 									
+									CSizeInfo SizeInfo;
+									auto Files = CFile::fs_FindFiles(VersionPath + "/*", EFileAttrib_File, true);
+									SizeInfo.m_nFiles = Files.f_GetLen(); 
+									for (auto &File : Files)
+										SizeInfo.m_nBytes += CFile::fs_GetFileSize(File);										
+									
 									CFile::fs_CreateDirectory(CFile::fs_GetPath(VersionInfoPath));
 									CFile::fs_WriteStringToFile(VersionInfoPath, VersionJSONInfo.f_ToString());
+									
+									return SizeInfo;
 								}
 							)
-							> [this, VersionID, VersionInfo, _CallingHostInfo, Desc, ApplicationName](TCAsyncResult<void> &&_InfoWriteResult)
+							> [this, VersionID, VersionInfo, _CallingHostInfo, Desc, ApplicationName](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
 							{
 								if (!_InfoWriteResult)
 								{
@@ -253,6 +267,9 @@ namespace NMib::NCloud::NVersionManager
 									}
 									mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
 								}
+
+								VersionInfo.m_nFiles  = _InfoWriteResult->m_nFiles;
+								VersionInfo.m_nBytes = _InfoWriteResult->m_nBytes;
 								
 								auto &Version = Application.m_Versions[VersionID];
 								if (Version.m_TimeLink.f_IsInTree())

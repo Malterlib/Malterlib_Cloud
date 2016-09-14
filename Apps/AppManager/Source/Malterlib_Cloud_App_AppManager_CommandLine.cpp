@@ -23,14 +23,6 @@ namespace NMib
 				
 				auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 				
-				auto PackageParameter = "Package"_=
-					{
-						"Type"_= ""
-						, "Description"_= "The files needed to run the application.\n"
-						"Can be a directory, or a tar.gz file."
-					}
-				;
-				
 				DefaultSection.f_RegisterCommand
 					(
 						{
@@ -52,10 +44,17 @@ namespace NMib
 									, "Default"_= ""
 									, "Description"_= "Select the file or device that should be the storage for encryption."
 								}
+								, "Version?"_= 
+								{
+									"Names"_= {"--version"}
+									,"Default"_= "" 
+									, "Description"_= "The version to install from version manager.\n"
+										"Defaults to the latest version available.\n"
+								}
 								, "Executable"_= 
 								{
 									"Names"_= {"--executable"}
-									,"Type"_= ""
+									,"Default"_= ""
 									, "Description"_= "Start this executable contained in the package."
 								}
 								, "ExecutableParameters?"_= 
@@ -63,7 +62,7 @@ namespace NMib
 									"Names"_= {"--executable-parameters"}
 									, "Default"_= {"--daemon-run"}
 									, "Type"_= _[_]
-									, "Description"_= "Start this executable contained in the package."
+									, "Description"_= "Executable parameters to run the application with."
 								}
 								, "RunAsUser?"_=
 								{
@@ -86,7 +85,13 @@ namespace NMib
 							}
 							, "Parameters"_=
 							{
-								PackageParameter
+								"Package"_=  
+								{
+									"Type"_= ""
+									, "Description"_= "The files needed to run the application.\n"
+									"Can be a version manager application name, a directory, or a tar.gz file. Will look for version manager applications"
+									"first. If not found it will assume that the name is a file and look for it on disk."
+								}
 							}
 						}
 						, [this](CEJSON const &_Params)
@@ -119,6 +124,34 @@ namespace NMib
 				DefaultSection.f_RegisterCommand
 					(
 						{
+							"Names"_= {"--application-list-versions"}
+							, "Description"_= "List versions available to update to."
+							, "Options"_=
+							{
+								"Verbose?"_= 
+								{
+									"Names"_= {"--verbose", "-v"}
+									, "Default"_= false
+									, "Description"_= "Display more extensive information about the versions." 
+								}
+								, "Application?"_= 
+								{
+									"Names"_= {"--application"}
+									, "Default"_= ""
+									, "Description"_= "The application to list versions for.\n"
+										"Leave empty to list all applications.\n" 
+								}
+							}
+						}
+						, [this](CEJSON const &_Params)
+						{
+							return fp_CommandLine_ListAvailableVersions(_Params);
+						}
+					)
+				;
+				DefaultSection.f_RegisterCommand
+					(
+						{
 							"Names"_= {"--application-remove"}
 							, "Description"_= "Remove the application"
 							, "Parameters"_=
@@ -139,8 +172,8 @@ namespace NMib
 				DefaultSection.f_RegisterCommand
 					(
 						{
-							"Names"_= {"--application-update"}
-							, "Description"_= "Update the application package"
+							"Names"_= {"--application-update-from-file"}
+							, "Description"_= "Update the application package from file"
 							, "Options"_= 
 							{
 								"Name"_= 
@@ -152,7 +185,42 @@ namespace NMib
 							}
 							, "Parameters"_=
 							{
-								PackageParameter
+								"Package"_=  
+								{
+									"Type"_= ""
+									, "Description"_= "The files needed to run the application.\n"
+									"Can be a directory, or a tar.gz file."
+								}
+							}
+						}
+						, [this](CEJSON const &_Params)
+						{
+							return fp_CommandLine_UpdateApplication(_Params);
+						}
+					)
+				;
+				DefaultSection.f_RegisterCommand
+					(
+						{
+							"Names"_= {"--application-update"}
+							, "Description"_= "Update the application package from version manager"
+							, "Options"_= 
+							{
+								"Name"_= 
+								{
+									"Names"_= {"--name"}
+									,"Type"_= ""
+									, "Description"_= "Unique name of the application to update."
+								}
+							}
+							, "Parameters"_=
+							{
+								"Version?"_=  
+								{
+									"Default"_= ""
+									, "Description"_= "The version to update to.\n"
+									"Defaults to the latest version in the same branch.\n"
+								}
 							}
 						}
 						, [this](CEJSON const &_Params)
@@ -239,9 +307,111 @@ namespace NMib
 						Results.f_AddStdOut(fg_Format("          Run as group: {}{\n}", Application.m_RunAsGroup));
 						Results.f_AddStdOut(fg_Format("    Encryption storage: {}{\n}", Application.m_EncryptionStorage));
 						Results.f_AddStdOut(fg_Format("                Status: {}{\n}", Application.m_LaunchState));
+						Results.f_AddStdOut(fg_Format("      Application name: {}{\n}", Application.m_VersionManagerApplication));
+						Results.f_AddStdOut(fg_Format("               Version: {}{\n}", Application.m_LastInstalledVersion));
+						Results.f_AddStdOut(fg_Format("          Version time: {}{\n}", Application.m_LastInstalledVersionInfo.m_Time));
+						Results.f_AddStdOut(fg_Format("        Version config: {}{\n}", Application.m_LastInstalledVersionInfo.m_Configuration));
+						Results.f_AddStdOut(fg_Format("          Version size: {}{\n}", Application.m_LastInstalledVersionInfo.m_nBytes));
+						Results.f_AddStdOut(fg_Format("         Version files: {}{\n}", Application.m_LastInstalledVersionInfo.m_nFiles));
+						CStr InfoString = Application.m_LastInstalledVersionInfo.m_ExtraInfo.f_ToString("    ");
+						CStr FirstLine = fg_GetStrLineSep(InfoString);
+						Results.f_AddStdOut(fg_Format("         Version extra: {}{\n}", FirstLine));
+						while (!InfoString.f_IsEmpty())
+							Results.f_AddStdOut(fg_Format("                        {}{\n}", fg_GetStrLineSep(InfoString)));
 					}
 				}
 				return fg_Explicit(fg_Move(Results));
+			}
+			
+			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON const &_Params)
+			{
+				bool bVerbose = _Params["Verbose"].f_Boolean();
+				CStr ApplicationName = _Params["Application"].f_String();
+				CDistributedAppCommandLineResults CommandLineResults;
+
+				mint LongestApplication = fg_StrLen("Application");
+				mint LongestVersion = fg_StrLen("Version");
+				mint LongestConfig = fg_StrLen("Config");
+				mint LongestTime = fg_StrLen("Time");
+				mint LongestSize = fg_StrLen("Size");
+				mint LongestFiles = fg_StrLen("Files");
+				for (auto &Application : mp_VersionManagerApplications)
+				{
+					LongestApplication = fg_Max(LongestApplication, Application.f_GetApplicationName().f_GetLen());
+					for (auto &Version : Application.m_VersionsByTime)
+					{
+						LongestVersion = fg_Max(LongestVersion, fg_Format("{}", Version.f_GetVersionID()).f_GetLen());
+						LongestConfig = fg_Max(LongestConfig, Version.m_VersionInfo.m_Configuration.f_GetLen());
+						LongestTime = fg_Max(LongestTime, fg_Format("{tc6}", Version.m_VersionInfo.m_Time.f_ToLocal()).f_GetLen());
+						LongestSize = fg_Max(LongestSize, fg_Format("{ns }", Version.m_VersionInfo.m_nBytes).f_GetLen());
+						LongestFiles = fg_Max(LongestFiles, fg_Format("{}", Version.m_VersionInfo.m_nFiles).f_GetLen());
+					}
+				}
+				
+				auto fOutputLine = [&]
+					(
+						auto const &_Application
+						, auto const &_Version
+						, auto const &_Config
+						, auto const &_Time
+						, auto const &_Size
+						, auto const &_Files
+					)
+					{
+						CommandLineResults.f_AddStdOut
+							(
+								fg_Format
+								(
+									"{sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*}   {sj*}\n"
+									, _Application
+									, LongestApplication
+									, _Version
+									, LongestVersion
+									, _Config
+									, LongestConfig
+									, _Time
+									, LongestTime
+									, _Size
+									, LongestSize
+									, _Files
+									, LongestFiles
+								)
+							)
+						;
+					}
+				;
+				
+				fOutputLine("Application", "Version", "Config", "Time", "Size", "Files");
+				
+				for (auto &Application : mp_VersionManagerApplications)
+				{
+					if (!ApplicationName.f_IsEmpty() && Application.f_GetApplicationName() != ApplicationName)
+						continue;
+					for (auto &Version : Application.m_VersionsByTime)
+					{
+						fOutputLine
+							(
+								Application.f_GetApplicationName()
+								, Version.f_GetVersionID()
+								, Version.m_VersionInfo.m_Configuration
+								, fg_Format("{tc6}", Version.m_VersionInfo.m_Time.f_ToLocal())
+								, fg_Format("{ns }", Version.m_VersionInfo.m_nBytes)
+								, fg_Format("{}", Version.m_VersionInfo.m_nFiles)
+							)
+						;
+						if (bVerbose && Version.m_VersionInfo.m_ExtraInfo.f_IsObject() && Version.m_VersionInfo.m_ExtraInfo.f_Object().f_OrderedIterator())
+						{
+							CStr JSONString = Version.m_VersionInfo.m_ExtraInfo.f_ToString("    ");
+							while (!JSONString.f_IsEmpty())
+							{
+								CStr Line = fg_GetStrLineSep(JSONString); 
+								CommandLineResults.f_AddStdOut(fg_Format("{}\n", Line));
+							}
+						}
+					}
+				}
+				
+				return fg_Explicit(fg_Move(CommandLineResults));
 			}
 		}
 	}

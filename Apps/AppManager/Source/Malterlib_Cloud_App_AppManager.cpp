@@ -37,6 +37,13 @@ namespace NMib
 							for (auto &File : ApplicationJSON["Files"].f_Array())
 								Application.m_Files.f_Insert(File.f_String());
 							Application.m_EncryptionStorage = ApplicationJSON["EncryptionStorage"].f_String();
+							if (auto pValue = ApplicationJSON.f_GetMember("VersionManagerApplication", EJSONType_String))
+								Application.m_VersionManagerApplication = pValue->f_String();
+							if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersion", EJSONType_Object))
+								Application.m_LastInstalledVersion = CVersionManager::CVersionIdentifier::fs_FromJSON(*pValue);
+							if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfo", EJSONType_Object))
+								Application.m_LastInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+							
 						}					
 					}
 				}
@@ -70,9 +77,15 @@ namespace NMib
 								, "com.malterlib/Cloud/KeyManager"
 								, fg_ThisActor(this)
 							)
-							> Continuation / [this, Continuation](TCTrustedActorSubscription<CKeyManager> &&_Subscrption)
+							+ mp_State.m_TrustManager
+							(
+								&CDistributedActorTrustManager::f_SubscribeTrustedActors<CVersionManager>
+								, "com.malterlib/Cloud/VersionManager"
+								, fg_ThisActor(this)
+							)
+							> Continuation / [this, Continuation](TCTrustedActorSubscription<CKeyManager> &&_KeySubscrption, TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
 							{
-								mp_KeyManagerSubscription = fg_Move(_Subscrption);
+								mp_KeyManagerSubscription = fg_Move(_KeySubscrption);
 
 								if (!mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
 									fp_KeyManagerAvailable();
@@ -82,6 +95,32 @@ namespace NMib
 										[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
 										{
 											fp_KeyManagerAvailable();
+										}
+									)
+								;
+
+								mp_VersionManagerSubscription = fg_Move(_VersionSubscrption);
+
+								if (!mp_VersionManagerSubscription.m_Actors.f_IsEmpty())
+								{
+									for (auto &TrustedActor : mp_VersionManagerSubscription.m_Actors)
+										fp_VersionManagerAdded(TrustedActor.m_Actor, TrustedActor.m_TrustInfo);
+								}
+								
+								mp_VersionManagerSubscription.f_OnNewActor
+									(
+										[this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo)
+										{
+											fp_VersionManagerAdded(_VersionManager, _ActorInfo);
+										}
+									)
+								;
+								
+								mp_VersionManagerSubscription.f_OnRemoveActor
+									(
+										[this](TCWeakDistributedActor<CActor> const &_VersionManagero)
+										{
+											fp_VersionManagerRemoved(_VersionManagero);
 										}
 									)
 								;

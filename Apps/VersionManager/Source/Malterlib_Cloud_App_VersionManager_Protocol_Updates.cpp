@@ -56,6 +56,7 @@ namespace NMib::NCloud::NVersionManager
 					_Subscription.m_DispatchActor
 					, fg_TempCopy(_Subscription.m_fOnPermissionsChanged)
 				)
+				> fg_DiscardResult()
 			;
 		}
 		

@@ -331,7 +331,19 @@ namespace NMib::NCloud::NCloudClient
 								for (auto &Version : Versions)
 								{
 									auto &VersionID = Versions.fs_GetKey(Version);
-									CommandLineResults.f_AddStdOut(fg_Format("        {}   {}   {}\n", VersionID, Version.m_Configuration, Version.m_Time));
+									CommandLineResults.f_AddStdOut
+										(
+											fg_Format
+											(
+												"        {}   {}   {}   {} bytes ({} files)\n"
+												, VersionID
+												, Version.m_Configuration
+												, Version.m_Time.f_ToLocal()
+												, Version.m_nBytes
+												, Version.m_nFiles
+											)
+										)
+									;
 									if (bVerbose && Version.m_ExtraInfo.f_IsObject() && Version.m_ExtraInfo.f_Object().f_OrderedIterator())
 									{
 										CStr JSONString = Version.m_ExtraInfo.f_ToString("    ");
@@ -498,7 +510,6 @@ namespace NMib::NCloud::NCloudClient
 				)
 				> Continuation % "Failed to deduce backup time" / [fDoCommand](CTime const &_Time)
 				{
-					DConOut("Time: {}\n", _Time);
 					fDoCommand(_Time);
 				}
 			;			
@@ -545,7 +556,11 @@ namespace NMib::NCloud::NCloudClient
 				auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
 				if (!pVersionManager)
 				{
-					Continuation.f_SetException(DMibErrorInstance(fg_Format("Error selecting version manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error)));
+					Continuation.f_SetException
+						(
+							DMibErrorInstance(fg_Format("Error selecting version manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
+						)
+					;
 					return;
 				}
 				

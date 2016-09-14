@@ -48,14 +48,44 @@ namespace NMib
 				;
 			}
 
-			CStr CAppManagerActor::fsp_UnpackApplication(CStr const &_Source, CStr const &_Destination, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> &o_Files)
+			CStr CAppManagerActor::fsp_UnpackApplication
+				(
+					CStr const &_Source
+					, CStr const &_Destination
+					, TCSharedPointer<CApplication> const &_pApplication
+					, TCVector<CStr> &o_Files
+					, TCSet<CStr> const &_AllowExist
+				)
 			{
 				CStr Return;
-				if (CFile::fs_FileExists(_Destination) && !CFile::fs_FindFiles(_Destination + "/*").f_IsEmpty())
-					DMibError(fg_Format("Application already exists at: '{}'. You have to manually delete it to resue the name", _Destination));
+				if (CFile::fs_FileExists(_Destination))
+				{
+					auto FoundFiles = CFile::fs_FindFiles(_Destination + "/*");
+					for (auto &File : FoundFiles)
+					{
+						if (!_AllowExist.f_FindEqual(File))
+							DMibError(fg_Format("Application already exists at: '{}'. You have to manually delete it to resue the name", _Destination));
+					}
 				
+				}
 				if (CFile::fs_FileExists(_Source, EFileAttrib_Directory))
-					CFile::fs_DiffCopyFileOrDirectory(_Source, _Destination, nullptr);
+				{
+					CFile::fs_DiffCopyFileOrDirectory
+						(
+							_Source
+							, _Destination
+							, [&](CFile::EDiffCopyChange _Change, NStr::CStr const &_Source, NStr::CStr const &_Destination, NStr::CStr const &_Link) -> CFile::EDiffCopyChangeAction
+							{
+								for (auto &Allow : _AllowExist)
+								{
+									if (_Destination.f_StartsWith(Allow))
+										return CFile::EDiffCopyChangeAction_Skip;
+								}
+								return CFile::EDiffCopyChangeAction_Perform;
+							}
+						)
+					;
+				}
 				else
 				{
 					CFile::fs_CreateDirectory(_Destination);
@@ -109,6 +139,7 @@ namespace NMib
 					pApplication->m_ExecutableParameters.f_Insert(Parameter.f_String());
 				pApplication->m_RunAsUser = _Params["RunAsUser"].f_String(); 
 				pApplication->m_RunAsGroup = _Params["RunAsGroup"].f_String();
+				CStr Version = _Params["Version"].f_String();
 				
 				auto Directory = pApplication->f_GetDirectory();
 				CStr Package = _Params["Package"].f_String();
@@ -116,7 +147,39 @@ namespace NMib
 				if (Package.f_IsEmpty())
 					return DMibErrorInstance("You have to specify a package");
 				
-				Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
+				bool bIsVersionManager = false;
+				
+				auto *pVersionManagerApplication = mp_VersionManagerApplications.f_FindEqual(Package);
+
+				CVersionManager::CVersionIdentifier VersionID;
+				
+				if (pVersionManagerApplication)
+				{
+					bIsVersionManager = true;
+					if (!Version.f_IsEmpty())
+					{
+						CStr Error;
+						if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID))
+							return DMibErrorInstance(fg_Format("Invalid version format: {}", Error)); 
+					}
+					else
+					{
+						auto *pLargest = pVersionManagerApplication->m_VersionsByTime.f_FindLargest();
+						if (!pLargest)
+							return DMibErrorInstance(fg_Format("No newest version found for application: {}", Package));
+						VersionID = pLargest->f_GetVersionID();
+					}
+				}
+				else
+				{
+					if (!Version.f_IsEmpty())
+						return DMibErrorInstance("Package did not refer to any version manager application, so you cannot specify '--version'");
+					
+					Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
+					
+					if (pApplication->m_Executable.f_IsEmpty())
+						return DMibErrorInstance("You must specify an executable to run");
+				}
 				
 				if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 				{
@@ -142,108 +205,185 @@ namespace NMib
 				;
 				
 				fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Setup, bForceOverwrite) 
-					> [this, fLogError, fLogInfo, pApplication, Directory, Package, pResult, Continuation](TCAsyncResult<void> &&_Result)
+					> [this, fLogError, fLogInfo, pApplication, Directory, Package, pResult, bIsVersionManager, VersionID, Continuation](TCAsyncResult<void> &&_Result)
 					{
 						if (!_Result)
 						{
 							fLogError(_Result.f_GetExceptionStr());
 							return;
 						}
-						fg_Dispatch
-							(
-								mp_FileActor
-								, [pApplication, Directory, Package, pResult, fLogInfo]()
-								{
-									if (!pApplication->m_RunAsGroup.f_IsEmpty())
-									{
-										CStr GroupID;
-										if (!NSys::fg_UserManagement_GroupExists(pApplication->m_RunAsGroup, GroupID))
-										{
-											NSys::fg_UserManagement_CreateGroup(pApplication->m_RunAsGroup, GroupID);
-											fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", pApplication->m_RunAsGroup, GroupID));
-										}
-									}
-									if (!pApplication->m_RunAsUser.f_IsEmpty())
-									{
-										CStr UserID;
-										if (!NSys::fg_UserManagement_UserExists(pApplication->m_RunAsUser, UserID))
-										{
-											NSys::fg_UserManagement_CreateUser
-												(
-													pApplication->m_RunAsGroup
-													, pApplication->m_RunAsUser
-													, ""
-													, pApplication->m_RunAsUser
-													, Directory
-													, UserID
-												)
-											;
-											fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", pApplication->m_RunAsUser, UserID));
-										}
-									}
-
-									TCVector<CStr> Files;
-									CStr Output = fsp_UnpackApplication(Package, Directory, pApplication, Files);
-									if (!Output.f_IsEmpty())
-										pResult->f_AddStdOut(Output);
-									
-									return Files;
-								}
-							)
-							> [this, pResult, pApplication, Continuation, fLogInfo, fLogError](TCAsyncResult<TCVector<CStr>> &&_Files)
+						auto fUnpackApp = [this, pResult, pApplication, Continuation, fLogInfo, fLogError, Directory, Package]
+							(CStr const &_SourcePath, CStr const &_DeletePath)
 							{
-								if (!_Files)
-								{
-									fLogError(fg_Format("Failed to unpack application: {}", _Files.f_GetExceptionStr()));
-									return;
-								}
-								if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
-								{
-									if (pApplicationsState->f_GetMember(pApplication->m_Name))
-									{
-										fLogError(fg_Format("Application with name '{}' already exists", pApplication->m_Name));
-										return;
-									}
-								}
-								
-								pApplication->m_Files = fg_Move(*_Files);
-								auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][pApplication->m_Name];
-								ApplicationJSON["Executable"] = pApplication->m_Executable; 
-								ApplicationJSON["RunAsUser"] = pApplication->m_RunAsUser; 
-								ApplicationJSON["RunAsGroup"] = pApplication->m_RunAsGroup;
-								auto &Parameters = ApplicationJSON["Parameters"].f_Array();
-								for (auto &Parameter : pApplication->m_ExecutableParameters)
-									Parameters.f_Insert(Parameter);
-								ApplicationJSON["EncryptionStorage"] = pApplication->m_EncryptionStorage;
-								ApplicationJSON["Files"] = *_Files;
-								
-								mp_Applications[pApplication->m_Name] = pApplication;
-								auto InProgressScope = pApplication->f_SetInProgress();
-
-								mp_State.m_StateDatabase.f_Save() 
-									> [this, Continuation, pResult, fLogError, fLogInfo, InProgressScope, pApplication](TCAsyncResult<void> &&_Result)
-									{
-										if (!_Result)
+								fg_Dispatch
+									(
+										mp_FileActor
+										, [pApplication, Directory, _SourcePath, _DeletePath, pResult, fLogInfo]()
 										{
-											fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
+											if (!pApplication->m_RunAsGroup.f_IsEmpty())
+											{
+												CStr GroupID;
+												if (!NSys::fg_UserManagement_GroupExists(pApplication->m_RunAsGroup, GroupID))
+												{
+													NSys::fg_UserManagement_CreateGroup(pApplication->m_RunAsGroup, GroupID);
+													fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", pApplication->m_RunAsGroup, GroupID));
+												}
+											}
+											if (!pApplication->m_RunAsUser.f_IsEmpty())
+											{
+												CStr UserID;
+												if (!NSys::fg_UserManagement_UserExists(pApplication->m_RunAsUser, UserID))
+												{
+													NSys::fg_UserManagement_CreateUser
+														(
+															pApplication->m_RunAsGroup
+															, pApplication->m_RunAsUser
+															, ""
+															, pApplication->m_RunAsUser
+															, Directory
+															, UserID
+														)
+													;
+													fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", pApplication->m_RunAsUser, UserID));
+												}
+											}
+
+											TCVector<CStr> Files;
+											CStr SourcePath = _SourcePath;
+											if (CFile::fs_FileExists(_SourcePath, EFileAttrib_Directory))
+											{
+												auto Files = CFile::fs_FindFiles(_SourcePath + "/*");
+												if (Files.f_GetLen() == 1 && Files[0].f_Right(7) == ".tar.gz")
+													SourcePath = Files[0];
+											}
+											TCSet<CStr> AllowExist;
+											if (!_DeletePath.f_IsEmpty())
+												AllowExist[_DeletePath];
+											CStr Output = fsp_UnpackApplication(SourcePath, Directory, pApplication, Files, AllowExist);
+											if (!Output.f_IsEmpty())
+												pResult->f_AddStdOut(Output);
+											
+											if (!_DeletePath.f_IsEmpty())
+												CFile::fs_DeleteDirectoryRecursive(_DeletePath);
+											
+											return Files;
+										}
+									)
+									> [this, pResult, pApplication, Continuation, fLogInfo, fLogError](TCAsyncResult<TCVector<CStr>> &&_Files)
+									{
+										if (!_Files)
+										{
+											fLogError(fg_Format("Failed to unpack application: {}", _Files.f_GetExceptionStr()));
 											return;
 										}
-										fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false) 
-											> [fLogError, fLogInfo, Continuation, InProgressScope, pResult](TCAsyncResult<void> &&_Result)
+										if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
+										{
+											if (pApplicationsState->f_GetMember(pApplication->m_Name))
+											{
+												fLogError(fg_Format("Application with name '{}' already exists", pApplication->m_Name));
+												return;
+											}
+										}
+										
+										pApplication->m_Files = fg_Move(*_Files);
+										auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][pApplication->m_Name];
+										ApplicationJSON["Executable"] = pApplication->m_Executable; 
+										ApplicationJSON["RunAsUser"] = pApplication->m_RunAsUser; 
+										ApplicationJSON["RunAsGroup"] = pApplication->m_RunAsGroup;
+										auto &Parameters = ApplicationJSON["Parameters"].f_Array();
+										for (auto &Parameter : pApplication->m_ExecutableParameters)
+											Parameters.f_Insert(Parameter);
+										ApplicationJSON["EncryptionStorage"] = pApplication->m_EncryptionStorage;
+										ApplicationJSON["VersionManagerApplication"] = pApplication->m_VersionManagerApplication;
+										ApplicationJSON["LastInstalledVersion"] = pApplication->m_LastInstalledVersion.f_ToJSON();
+										ApplicationJSON["LastInstalledVersionInfo"] = pApplication->m_LastInstalledVersionInfo.f_ToJSON();
+										
+										ApplicationJSON["Files"] = *_Files;
+										
+										mp_Applications[pApplication->m_Name] = pApplication;
+										auto InProgressScope = pApplication->f_SetInProgress();
+
+										mp_State.m_StateDatabase.f_Save() 
+											> [this, Continuation, pResult, fLogError, fLogInfo, InProgressScope, pApplication](TCAsyncResult<void> &&_Result)
 											{
 												if (!_Result)
 												{
-													fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
+													fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
 													return;
 												}
-												fLogInfo("Application was successfully added");
-												Continuation.f_SetResult(fg_Move(*pResult));
+												fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false) 
+													> [fLogError, fLogInfo, Continuation, InProgressScope, pResult](TCAsyncResult<void> &&_Result)
+													{
+														if (!_Result)
+														{
+															fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
+															return;
+														}
+														fLogInfo("Application was successfully added");
+														Continuation.f_SetResult(fg_Move(*pResult));
+													}
+												;
 											}
 										;
 									}
 								;
 							}
 						;
+						
+						if (!bIsVersionManager)
+							fUnpackApp(Package, CStr());
+						else
+						{
+							CStr DownloadDirectory = Directory + "/TempVersionDownload";
+							self(&CAppManagerActor::fp_DownloadApplication, Package, VersionID, DownloadDirectory) 
+								> Continuation / [Continuation, pApplication, Package, VersionID, fUnpackApp, DownloadDirectory](CVersionManager::CVersionInformation &&_VersionInfo)
+								{
+									auto &ExtraInfo = _VersionInfo.m_ExtraInfo;
+									if (pApplication->m_Executable.f_IsEmpty())
+									{
+										if (auto *pValue = ExtraInfo.f_GetMember("Executable", EJSONType_String))
+											pApplication->m_Executable = pValue->f_String();
+										if (pApplication->m_Executable.f_IsEmpty())
+										{
+											Continuation.f_SetException(DMibErrorInstance("No executable was specified and the downloaded version didn't include a default"));
+											return;
+										}
+									}
+
+									if (pApplication->m_RunAsUser.f_IsEmpty())
+									{
+										if (auto *pValue = ExtraInfo.f_GetMember("RunAsUser", EJSONType_String))
+											pApplication->m_RunAsUser = pValue->f_String();
+									}
+
+									if (pApplication->m_RunAsGroup.f_IsEmpty())
+									{
+										if (auto *pValue = ExtraInfo.f_GetMember("RunAsGroup", EJSONType_String))
+											pApplication->m_RunAsGroup = pValue->f_String();
+									}
+
+									if (pApplication->m_ExecutableParameters.f_IsEmpty())
+									{
+										if (auto *pValue = ExtraInfo.f_GetMember("ExecutableParams", EJSONType_Array))
+										{
+											for (auto &Param : pValue->f_Array())
+											{
+												if (!Param.f_IsString())
+													continue;
+												
+												pApplication->m_ExecutableParameters.f_Insert(Param.f_String());
+											}
+										}
+									}
+
+									pApplication->m_VersionManagerApplication = Package;
+									pApplication->m_LastInstalledVersion = VersionID;
+									pApplication->m_LastInstalledVersionInfo = _VersionInfo;
+
+									fUnpackApp(DownloadDirectory, DownloadDirectory);
+								}
+							;
+						}
 					}
 				;
 				
@@ -388,7 +528,7 @@ namespace NMib
 									// 1. Extract new application to temporary directory
 									fLogInfo("Extracting application to temporary directory");
 									TCVector<CStr> Files;
-									CStr Output = fsp_UnpackApplication(Package, TemporaryDirectory, pApplication, Files);
+									CStr Output = fsp_UnpackApplication(Package, TemporaryDirectory, pApplication, Files, {});
 									if (!Output.f_IsEmpty())
 										fLogInfo(Output);
 									return Files;

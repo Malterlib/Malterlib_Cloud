@@ -137,12 +137,36 @@ namespace NMib::NCloud
 	}
 	
 	// CVersionInformation
+
+	NEncoding::CEJSON CVersionManager::CVersionInformation::f_ToJSON() const
+	{
+		NEncoding::CEJSON Ret;
+		Ret["Time"] = m_Time;
+		Ret["Configuration"] = m_Configuration;
+		Ret["ExtraInfo"] = m_ExtraInfo;
+		Ret["NumFiles"] = m_nFiles;
+		Ret["NumBytes"] = m_nBytes;
+		return Ret;
+	}
+	
+	auto CVersionManager::CVersionInformation::fs_FromJSON(NEncoding::CEJSON const &_JSON) -> CVersionInformation
+	{
+		CVersionInformation Ret;
+		Ret.m_Time = _JSON["Time"].f_Date();
+		Ret.m_Configuration = _JSON["Configuration"].f_String();
+		Ret.m_ExtraInfo = _JSON["ExtraInfo"];
+		Ret.m_nFiles = _JSON["NumFiles"].f_Integer();
+		Ret.m_nBytes = _JSON["NumBytes"].f_Integer();
+		return Ret;
+	}
 	
 	void CVersionManager::CVersionInformation::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		_Stream << m_Time;
 		_Stream << m_Configuration;
 		_Stream << m_ExtraInfo;
+		_Stream << m_nFiles;
+		_Stream << m_nBytes;
 	}
 	
 	void CVersionManager::CVersionInformation::f_Consume(CDistributedActorReadStream &_Stream)
@@ -150,6 +174,8 @@ namespace NMib::NCloud
 		_Stream >> m_Time;
 		_Stream >> m_Configuration;
 		_Stream >> m_ExtraInfo;
+		_Stream >> m_nFiles;
+		_Stream >> m_nBytes;
 	}
 	
 	// CListApplications
@@ -270,12 +296,14 @@ namespace NMib::NCloud
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
+		_Stream << m_VersionInfo;
 	}
 	
 	void CVersionManager::CStartDownloadVersion::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
+		_Stream >> m_VersionInfo;
 	}
 		
 	void CVersionManager::CStartDownloadVersion::f_Feed(CDistributedActorWriteStream &_Stream) const

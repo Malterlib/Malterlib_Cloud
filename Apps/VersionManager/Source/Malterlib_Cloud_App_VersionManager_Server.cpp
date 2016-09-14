@@ -134,11 +134,12 @@ namespace NMib::NCloud::NVersionManager
 									{
 										try
 										{
-											CStr ApplicationInfoPath = fg_Format("{}/{}.json", ApplicationPath, VersionID.f_EncodeFileName());
+											CStr VersionPath = fg_Format("{}/{}", ApplicationPath, VersionID.f_EncodeFileName());
+											CStr VersionInfoPath = fg_Format("{}.json", VersionPath);
 											CVersionManager::CVersionInformation OutVersion;
-											if (CFile::fs_FileExists(ApplicationInfoPath))
+											if (CFile::fs_FileExists(VersionInfoPath))
 											{
-												CEJSON ApplicationInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(ApplicationInfoPath), ApplicationInfoPath);
+												CEJSON ApplicationInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoPath), VersionInfoPath);
 												if (auto pValue = ApplicationInfo.f_GetMember("Time", EEJSONType_Date))
 													OutVersion.m_Time = pValue->f_Date();
 												if (auto pValue = ApplicationInfo.f_GetMember("Configuration", EJSONType_String))
@@ -146,6 +147,13 @@ namespace NMib::NCloud::NVersionManager
 												if (auto pValue = ApplicationInfo.f_GetMember("ExtraInfo", EJSONType_Object))
 													OutVersion.m_ExtraInfo = *pValue;
 											}
+											{
+												auto Files = CFile::fs_FindFiles(VersionPath + "/*", EFileAttrib_File, true);
+												OutVersion.m_nFiles = Files.f_GetLen(); 
+												for (auto &File : Files)
+													OutVersion.m_nBytes += CFile::fs_GetFileSize(File);
+											}
+											
 											// Only use versions that has the .json file
 											Versions[VersionID] = fg_Move(OutVersion);
 										}

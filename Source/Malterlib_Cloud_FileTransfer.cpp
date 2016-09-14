@@ -155,6 +155,11 @@ namespace NMib::NCloud
 		_Stream << m_FilePosition;
 		_Stream << m_Data;
 		_Stream << m_bFinished;
+		if (m_bFinished)
+		{
+			_Stream << m_FileAttributes;
+			_Stream << m_WriteTime;
+		}
 	}
 	
 	void CFileTransferContext::CInternal::CSendPart::f_Consume(CDistributedActorReadStream &_Stream)
@@ -167,6 +172,11 @@ namespace NMib::NCloud
 		_Stream >> m_FilePosition;
 		_Stream >> m_Data;
 		_Stream >> m_bFinished;
+		if (m_bFinished)
+		{
+			_Stream >> m_FileAttributes;
+			_Stream >> m_WriteTime;
+		}
 	}
 	
 	// CTransferResult

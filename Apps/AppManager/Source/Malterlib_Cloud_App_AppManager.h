@@ -8,6 +8,7 @@
 #include <Mib/Concurrency/DistributedDaemon>
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/Cloud/KeyManager>
+#include <Mib/Cloud/VersionManager>
 
 namespace NMib
 {
@@ -46,6 +47,10 @@ namespace NMib
 					CStr m_EncryptionStorage;
 					TCVector<CStr> m_ExecutableParameters;
 					TCVector<CStr> m_Files;
+
+					CStr m_VersionManagerApplication;
+					CVersionManager::CVersionIdentifier m_LastInstalledVersion;
+					CVersionManager::CVersionInformation m_LastInstalledVersionInfo;
 					
 					bool m_bDeleted = false;
 					bool m_bStopped = false;
@@ -72,6 +77,68 @@ namespace NMib
 					uint32 m_Status = 1;
 				};
 
+				
+				struct CVersionManagerApplication;
+				struct CVersionManagerState;
+				
+				struct CVersionManagerVersion
+				{
+					struct CCompareApplicationByTime
+					{
+						bool operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
+					};
+					
+					struct CCompareApplication
+					{
+						bool operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
+						bool operator()(CVersionManager::CVersionIdentifier const &_Left, CVersionManagerVersion const &_Right) const;
+						bool operator()(CVersionManagerVersion const &_Left, CVersionManager::CVersionIdentifier const &_Right) const;
+					};
+
+					CVersionManagerVersion(CVersionManagerState *_pVersionManager);
+					~CVersionManagerVersion();
+					void f_SetApplication(CVersionManagerApplication *_pApplication);
+					CVersionManager::CVersionIdentifier const &f_GetVersionID() const;
+					
+					CVersionManagerState *m_pVersionManager;
+					CVersionManagerApplication *m_pApplication = nullptr;
+					CVersionManager::CVersionInformation m_VersionInfo;
+					DIntrusiveLink(CVersionManagerVersion, TCAVLLink<>, m_ApplicationTimeLink);
+					DIntrusiveLink(CVersionManagerVersion, TCAVLLink<>, m_ApplicationLink);
+				};
+				
+				struct CVersionManagerApplication
+				{
+					CVersionManagerApplication(CAppManagerActor &_This);
+					CStr const &f_GetApplicationName() const
+					{
+						return TCMap<CStr, CVersionManagerApplication>::fs_GetKey(*this);
+					}
+					
+					TCAVLTree<CVersionManagerVersion::CLinkTraits_m_ApplicationTimeLink, CVersionManagerVersion::CCompareApplicationByTime> m_VersionsByTime;
+					TCAVLTree<CVersionManagerVersion::CLinkTraits_m_ApplicationLink, CVersionManagerVersion::CCompareApplication> m_Versions;
+					CAppManagerActor &m_This;
+				};
+				
+				struct CVersionManagerState
+				{
+					TCDistributedActor<CVersionManager> const &f_GetManager() const
+					{
+						return TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState>::fs_GetKey(*this); 
+					}
+					
+					TCMap<CStr, TCMap<CVersionManager::CVersionIdentifier, CVersionManagerVersion>> m_Versions;
+					
+					CTrustedActorInfo m_HostInfo;
+					CActorSubscription m_Subscription;
+				};
+				
+				struct CVersionManagerDownloadState
+				{
+					TCActor<CFileTransferReceive> m_DownloadVersionReceive;
+					CActorSubscription m_Subscription;
+				};
+				
 				enum EEncryptOperation
 				{
 					EEncryptOperation_Setup
@@ -121,17 +188,53 @@ namespace NMib
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_StopApplication(CEJSON const &_Params);
 				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_RestartApplication(CEJSON const &_Params);
 				
+				TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_ListAvailableVersions(CEJSON const &_Params);
+				
 				static void fsp_UpdateAttributes(CStr const &_File);
-				static CStr fsp_UnpackApplication(CStr const &_Source, CStr const &_Destination, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> &o_Files);
+				static CStr fsp_UnpackApplication
+					(
+						CStr const &_Source
+						, CStr const &_Destination
+						, TCSharedPointer<CApplication> const &_pApplication
+						, TCVector<CStr> &o_Files
+						, TCSet<CStr> const &_AllowExist
+					)
+				;
 				TCContinuation<void> fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite);
 				
 				void fp_OutputApplicationStop(TCAsyncResult<uint32> const &_Result, CDistributedAppCommandLineResults &o_Results, CStr const &_Name);
 				void fp_KeyManagerAvailable();
+				
+				void fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info);
+				void fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
+				
+				TCContinuation<CVersionManager::CVersionInformation> fp_DownloadApplicationFromManager
+					(
+						TCDistributedActor<CVersionManager> const &_Manager
+						, CStr const &_ApplicationName
+						, CVersionManager::CVersionIdentifier const &_VersionID
+						, CStr const &_DestinationDir
+					)
+				;
+				
+				TCContinuation<CVersionManager::CVersionInformation> fp_DownloadApplication
+					(
+						CStr const &_ApplicationName
+						, CVersionManager::CVersionIdentifier const &_VersionID
+						, CStr const &_DestinationDir
+					)
+				;
 
 				TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
 				TCActor<CSeparateThreadActor> mp_FileActor;
 				TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
+				TCTrustedActorSubscription<CVersionManager> mp_VersionManagerSubscription;
 				bool mp_bAppsEncryptedLaunched = false;
+				
+				TCLinkedList<CVersionManagerDownloadState> mp_Downloads;
+				
+				TCMap<CStr, CVersionManagerApplication> mp_VersionManagerApplications;
+				TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState> mp_VersionManagers; 
 			};
 		}		
 	}

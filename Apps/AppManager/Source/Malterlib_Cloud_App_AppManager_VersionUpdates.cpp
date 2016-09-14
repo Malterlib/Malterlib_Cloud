@@ -1,0 +1,262 @@
+// Copyright © 2015 Hansoft AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Concurrency/Actor/Timer>
+#include "Malterlib_Cloud_App_AppManager.h"
+
+namespace NMib::NCloud::NAppManager
+{
+	CAppManagerActor::CVersionManagerVersion::CVersionManagerVersion(CVersionManagerState *_pVersionManager)
+		: m_pVersionManager(_pVersionManager) 
+	{
+	}
+
+	CAppManagerActor::CVersionManagerVersion::~CVersionManagerVersion()
+	{
+		f_SetApplication(nullptr);
+	}
+	
+	void CAppManagerActor::CVersionManagerVersion::f_SetApplication(CVersionManagerApplication *_pApplication)
+	{
+		if (m_pApplication)
+		{
+			m_pApplication->m_VersionsByTime.f_Remove(*this);
+			m_pApplication->m_Versions.f_Remove(*this);
+			if (m_pApplication->m_VersionsByTime.f_IsEmpty() & m_pApplication->m_Versions.f_IsEmpty())
+				m_pApplication->m_This.mp_VersionManagerApplications.f_Remove(m_pApplication);
+			m_pApplication = nullptr;
+		}
+		if (!_pApplication)
+			return;
+		_pApplication->m_VersionsByTime.f_Insert(*this);
+		_pApplication->m_Versions.f_Insert(*this);
+		m_pApplication = _pApplication;
+	}
+	
+	CVersionManager::CVersionIdentifier const &CAppManagerActor::CVersionManagerVersion::f_GetVersionID() const
+	{
+		return TCMap<CVersionManager::CVersionIdentifier, CVersionManagerVersion>::fs_GetKey(*this);
+	}
+	
+	bool CAppManagerActor::CVersionManagerVersion::CCompareApplicationByTime::operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const
+	{
+		auto *pLeft = &_Left;
+		auto *pRight = &_Right;
+		return NContainer::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetVersionID(), pLeft)
+			< NContainer::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetVersionID(), pRight)
+		;
+	}
+	
+	bool CAppManagerActor::CVersionManagerVersion::CCompareApplication::operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const
+	{
+		auto *pLeft = &_Left;
+		auto *pRight = &_Right;
+		return NContainer::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetVersionID(), pLeft)
+			< NContainer::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetVersionID(), pRight)
+		;
+	}
+	
+	bool CAppManagerActor::CVersionManagerVersion::CCompareApplication::operator()(CVersionManager::CVersionIdentifier const &_Left, CVersionManagerVersion const &_Right) const
+	{
+		return _Left < _Right.f_GetVersionID();
+	}
+	
+	bool CAppManagerActor::CVersionManagerVersion::CCompareApplication::operator()(CVersionManagerVersion const &_Left, CVersionManager::CVersionIdentifier const &_Right) const
+	{
+		return _Left.f_GetVersionID() < _Right;
+	}
+
+	CAppManagerActor::CVersionManagerApplication::CVersionManagerApplication(CAppManagerActor &_This)
+		: m_This(_This)
+	{
+	}
+	
+	
+	void CAppManagerActor::fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info)
+	{
+		auto &NewManager = mp_VersionManagers[_VersionManager];
+		NewManager.m_HostInfo = _Info;
+		
+		CVersionManager::CSubscribeToUpdates SubscriptionParams;
+		SubscriptionParams.m_Application = CStr(); // All applications we have access to 
+		SubscriptionParams.m_nInitial = 20;
+		SubscriptionParams.m_DispatchActor = self;
+		SubscriptionParams.m_fOnPermissionsChanged = [this, Actor = _VersionManager.f_Weak()]() -> NConcurrency::TCContinuation<void>
+			{
+				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
+				if (!pManager)
+					return DMibErrorInstance("Manager gone");
+				auto &Manager = *pManager;
+				Manager.m_Versions.f_Clear();
+				return fg_Explicit();
+			}
+		;
+		SubscriptionParams.m_fOnNewVersion = [this, Actor = _VersionManager.f_Weak()](CVersionManager::CNewVersionNotification &&_VersionInfo) -> NConcurrency::TCContinuation<CVersionManager::CNewVersionNotification::CResult>
+			{
+				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
+				if (!pManager)
+					return DMibErrorInstance("Manager gone");
+				auto &Manager = *pManager;
+				auto &Version = *(Manager.m_Versions[_VersionInfo.m_Application](_VersionInfo.m_VersionID, &Manager));
+				auto &Application = *mp_VersionManagerApplications(_VersionInfo.m_Application, *this);
+				Version.f_SetApplication(nullptr);
+				Version.m_VersionInfo = fg_Move(_VersionInfo.m_VersionInfo);
+				Version.f_SetApplication(&Application);
+				
+				return fg_Explicit(CVersionManager::CNewVersionNotification::CResult());
+			}
+		;
+		
+		DCallActor(NewManager.f_GetManager(), CVersionManager::f_SubscribeToUpdates, fg_Move(SubscriptionParams))
+			> [this, Actor = _VersionManager.f_Weak()](TCAsyncResult<CVersionManager::CSubscribeToUpdates::CResult> &&_Result)
+			{
+				auto *pManager = mp_VersionManagers.f_FindEqual(Actor); 
+				if (!_Result)
+				{
+					CStr ErrorMessage = fg_Format("Error subscribing to version updates: {}", _Result.f_GetExceptionStr());
+					if (pManager)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "<{}> {}", pManager->m_HostInfo.m_HostInfo, ErrorMessage);
+						mp_VersionManagers.f_Remove(pManager);
+					}
+					else
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "{}", ErrorMessage);
+					return;
+				}
+				auto &Manager = *pManager;
+				Manager.m_Subscription = fg_Move(_Result->m_Subscription);
+			}
+		;
+	}
+	
+	void CAppManagerActor::fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager)
+	{
+		mp_VersionManagers.f_Remove(_VersionManager);
+	}
+	
+	
+	TCContinuation<CVersionManager::CVersionInformation> CAppManagerActor::fp_DownloadApplicationFromManager
+		(
+			TCDistributedActor<CVersionManager> const &_Manager
+			, CStr const &_ApplicationName
+			, CVersionManager::CVersionIdentifier const &_VersionID
+			, CStr const &_DestinationDir
+		)
+	{
+		auto &DownloadState = mp_Downloads.f_Insert();
+		auto pDownloadState = &DownloadState;
+		auto pCleanup = g_OnScopeExitActor > [this, pDownloadState]
+			{
+				mp_Downloads.f_Remove(*pDownloadState);
+			}
+		;
+		TCContinuation<CVersionManager::CVersionInformation> Continuation;
+		
+		DownloadState.m_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>(_DestinationDir); 
+		DownloadState.m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, 16*1024*1024, CFileTransferReceive::EReceiveFlag_DeleteExisting) 
+			> Continuation % "Failed to initialize file transfer context" 
+			/ [this, _ApplicationName, _VersionID, _Manager, Continuation, pDownloadState, pCleanup]
+			(CFileTransferContext &&_TransferContext)
+			{
+				CVersionManager::CStartDownloadVersion StartDownload;
+				StartDownload.m_Application = _ApplicationName;
+				StartDownload.m_VersionID = _VersionID;
+				StartDownload.m_TransferContext = fg_Move(_TransferContext);
+
+				DMibCallActor
+					(
+						_Manager
+						, CVersionManager::f_DownloadVersion
+						, fg_Move(StartDownload)
+					)
+					.f_Timeout(30.0, "Timed out waiting for version manager to reply")
+					> Continuation % "Failed to start download on remote server" / [this, Continuation, pCleanup, pDownloadState]
+					(CVersionManager::CStartDownloadVersion::CResult &&_Result)
+					{
+						pDownloadState->m_Subscription = fg_Move(_Result.m_Subscription);
+						
+						pDownloadState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResult) 
+							> [this, Continuation, pDownloadState, pCleanup, VersionInfo = fg_Move(_Result.m_VersionInfo)]
+							(TCAsyncResult<CFileTransferResult> &&_Results) mutable
+							{
+								pDownloadState->m_Subscription.f_Clear();
+								if (!_Results)
+									Continuation.f_SetException(fg_Move(_Results));
+								else
+									Continuation.f_SetResult(fg_Move(VersionInfo));
+							}
+						;
+					}
+				;
+			}
+		;
+		
+		return Continuation;
+	}
+	
+	TCContinuation<CVersionManager::CVersionInformation> CAppManagerActor::fp_DownloadApplication
+		(
+			CStr const &_ApplicationName
+			, CVersionManager::CVersionIdentifier const &_VersionID
+			, CStr const &_DestinationDir
+		)
+	{
+		auto *pApplication = mp_VersionManagerApplications.f_FindEqual(_ApplicationName);
+		if (!pApplication)
+			return DMibErrorInstance("Application not found");
+		TCSet<TCDistributedActor<CVersionManager>> ManagersToTrySet;
+		struct CState
+		{
+			TCLinkedList<TCDistributedActor<CVersionManager>> m_ManagersToTry;
+			TCFunctionMovable<void (TCSharedPointer<CState> const &_pState)> m_fContinue;
+			CStr m_Errors;
+		};
+		TCSharedPointer<CState> pState = fg_Construct();
+		
+		auto fAddManager = [&](TCDistributedActor<CVersionManager> const &_Manager)
+			{
+				if (!ManagersToTrySet(_Manager).f_WasCreated())
+					return;
+				pState->m_ManagersToTry.f_Insert(_Manager);
+			}
+		;
+		auto *pVersion = pApplication->m_Versions.f_FindEqual(_VersionID);
+		if (pVersion)
+			fAddManager(pVersion->m_pVersionManager->f_GetManager());
+		for (auto &Version : pApplication->m_Versions)
+			fAddManager(Version.m_pVersionManager->f_GetManager());
+		
+		if (ManagersToTrySet.f_IsEmpty())
+			return DMibErrorInstance("Found no version managers with this application on");
+		
+		TCContinuation<CVersionManager::CVersionInformation> Continuation;
+		
+		pState->m_fContinue = [this, Continuation, _ApplicationName, _VersionID, _DestinationDir](TCSharedPointer<CState> const &_pState)
+			{
+				if (_pState->m_ManagersToTry.f_IsEmpty())
+				{
+					Continuation.f_SetException(DMibErrorInstance(fg_Format("Failed to download the application from any manager: {}", _pState->m_Errors)));
+					return;
+				}
+				auto Manager = _pState->m_ManagersToTry.f_Pop();
+				self(&CAppManagerActor::fp_DownloadApplicationFromManager, Manager, _ApplicationName, _VersionID, _DestinationDir) 
+					> [_pState, Continuation](TCAsyncResult<CVersionManager::CVersionInformation> &&_Result)
+					{
+						if (!_Result)
+						{
+							fg_AddStrSep(_pState->m_Errors, _Result.f_GetExceptionStr(), "\n"); 
+							_pState->m_fContinue(_pState);
+							return;
+						}
+						Continuation.f_SetResult(fg_Move(*_Result));
+					}
+				;
+			}
+		;
+		
+		pState->m_fContinue(pState);
+		
+		return Continuation;
+	}
+}

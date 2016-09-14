@@ -19,6 +19,7 @@ namespace NMib::NCloud::NVersionManager
 		DMibPublishActorFunction(CVersionManager::f_ListVersions);
 		DMibPublishActorFunction(CVersionManager::f_UploadVersion);
 		DMibPublishActorFunction(CVersionManager::f_DownloadVersion);
+		DMibPublishActorFunction(CVersionManager::f_SubscribeToUpdates);
 	}
 		
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications &&_Params)

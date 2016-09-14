@@ -247,6 +247,8 @@ namespace NMib::NCloud
 						pFileState->m_File.f_Read(ToSend.m_Data.f_GetArray(), ToSend.m_Data.f_GetLen());
 						if (bFinished)
 						{
+							ToSend.m_FileAttributes = pFileState->m_File.f_GetAttributes();
+							ToSend.m_WriteTime = pFileState->m_File.f_GetWriteTime();
 							pFileState->m_FileName.f_Clear();
 							pFileState->m_File.f_Close();
 						}

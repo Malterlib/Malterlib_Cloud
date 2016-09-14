@@ -51,9 +51,14 @@ namespace NMib::NCloud
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(CDistributedActorReadStream &_Stream);
 
+			NEncoding::CEJSON f_ToJSON() const;
+			static CVersionInformation fs_FromJSON(NEncoding::CEJSON const &_JSON);
+			
 			NTime::CTime m_Time;
 			NStr::CStr m_Configuration;
 			NEncoding::CEJSON m_ExtraInfo;
+			uint32 m_nFiles = 0;
+			uint64 m_nBytes = 0;
 		};
 
 		static bool fs_IsValidVersionIdentifier(NStr::CStr const &_String, NStr::CStr &o_Error, CVersionIdentifier *o_pVersionID);
@@ -141,6 +146,7 @@ namespace NMib::NCloud
 				void f_Consume(CDistributedActorReadStream &_Stream);
 				
 				NConcurrency::CActorSubscription m_Subscription;
+				CVersionInformation m_VersionInfo;
 			};
 
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;

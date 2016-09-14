@@ -58,6 +58,21 @@ namespace NMib::NCloud::NVersionManager
 			return fp_AccessDenied(_CallingHostInfo, "Start download version");
 		}
 		
+		auto *pApplication = mp_Applications.f_FindEqual(_Params.m_Application);
+		if (!pApplication)
+		{
+			CStr Error = fg_Format("No such application: {}", _Params.m_Application);
+			fsp_LogActivityError(_CallingHostInfo, Error);
+			return DMibErrorInstance(Error);
+		}
+		auto *pVersion = pApplication->m_Versions.f_FindEqual(_Params.m_VersionID);
+		if (!pVersion)
+		{
+			CStr Error = fg_Format("No such version: {}", _Params.m_VersionID);
+			fsp_LogActivityError(_CallingHostInfo, Error);
+			return DMibErrorInstance(Error);
+		}
+		
 		NStr::CStr DownloadID = fg_RandomID();
 		
 		auto &Download = mp_VersionDownloads[DownloadID];
@@ -76,7 +91,7 @@ namespace NMib::NCloud::NVersionManager
 		TCContinuation<CVersionManager::CStartDownloadVersion::CResult> Continuation;
 		
 		Download.m_FileTransferSend(&CFileTransferSend::f_SendFiles, fg_Move(_Params.m_TransferContext)) 
-			> [this, _CallingHostInfo, DownloadID, Continuation, Desc = Download.m_Desc](TCAsyncResult<CActorSubscription> &&_Subscription)
+			> [this, _CallingHostInfo, DownloadID, Continuation, Desc = Download.m_Desc, VersionInfo = pVersion->m_VersionInfo](TCAsyncResult<CActorSubscription> &&_Subscription) mutable
 			{
 				if (!_Subscription)
 				{
@@ -86,6 +101,7 @@ namespace NMib::NCloud::NVersionManager
 				}
 				CVersionManager::CStartDownloadVersion::CResult Result;
 				Result.m_Subscription = fg_Move(fg_Move(*_Subscription));
+				Result.m_VersionInfo = fg_Move(VersionInfo);
 				Continuation.f_SetResult(fg_Move(Result));
 				auto *pDownload = mp_VersionDownloads.f_FindEqual(DownloadID);
 				if (!pDownload)
