@@ -26,6 +26,41 @@ namespace NMib::NCloud::NVersionManager
 	{
 	}
 
+	auto CVersionManagerDaemonActor::CServer::fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo) -> TCContinuation<CSizeInfo> 
+	{
+		TCContinuation<CSizeInfo> Continuation;
+		fg_Dispatch
+			(
+				_FileActor
+				, [_VersionInfo, _VersionPath]() mutable -> CSizeInfo
+				{
+					CEJSON VersionJSONInfo;
+					CStr VersionInfoPath = fg_Format("{}.json", _VersionPath);
+					
+					VersionJSONInfo["Time"] = _VersionInfo.m_Time;
+					VersionJSONInfo["Configuration"] = _VersionInfo.m_Configuration;
+					VersionJSONInfo["ExtraInfo"] = _VersionInfo.m_ExtraInfo;
+					auto &TagsArray = VersionJSONInfo["Tags"].f_Array();
+					for (auto &Tag : _VersionInfo.m_Tags)
+						TagsArray.f_Insert(Tag);
+					
+					CSizeInfo SizeInfo;
+					auto Files = CFile::fs_FindFiles(_VersionPath + "/*", EFileAttrib_File, true);
+					SizeInfo.m_nFiles = Files.f_GetLen(); 
+					for (auto &File : Files)
+						SizeInfo.m_nBytes += CFile::fs_GetFileSize(File);										
+					
+					CFile::fs_CreateDirectory(CFile::fs_GetPath(VersionInfoPath));
+					CFile::fs_WriteStringToFile(VersionInfoPath, VersionJSONInfo.f_ToString());
+					
+					return SizeInfo;
+				}
+			)
+			> Continuation
+		;
+		return Continuation;
+	}
+	
 	auto CVersionManagerDaemonActor::CServer::fp_Protocol_UploadVersion(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CStartUploadVersion &&_Params)
 		-> TCContinuation<CVersionManager::CStartUploadVersion::CResult> 
 	{
@@ -58,10 +93,14 @@ namespace NMib::NCloud::NVersionManager
 			
 			return fp_AccessDenied(_CallingHostInfo, "Start upload version");
 		}
+		
+		TCSet<CStr> DeniedTags;
 
 		auto VersionInfo = _Params.m_VersionInfo;
 		
-		NStr::CStr UploadID = fg_RandomID();
+		VersionInfo.m_Tags = fp_FilterTags(_CallingHostInfo.f_GetRealHostID(), VersionInfo.m_Tags, DeniedTags);
+
+		CStr UploadID = fg_RandomID();
 		
 		auto &Upload = mp_VersionUploads[UploadID];
 		Upload.m_Desc = fg_Format("{}", _Params.m_VersionID);
@@ -109,6 +148,7 @@ namespace NMib::NCloud::NVersionManager
 				, VersionPath
 				, VersionID = _Params.m_VersionID
 				, ApplicationName = _Params.m_Application
+				, DeniedTags
 			]
 			(TCAsyncResult<CFileTransferContext> &&_FileTransferContext) mutable
 			{
@@ -137,7 +177,7 @@ namespace NMib::NCloud::NVersionManager
 							return fStartTransfer(fg_Move(StartTransfer));
 						}
 					)
-					> [this, Continuation, Desc, pCleanup, _CallingHostInfo, UploadID]
+					> [this, Continuation, Desc, pCleanup, _CallingHostInfo, UploadID, DeniedTags]
 					(TCAsyncResult<CVersionManager::CStartUploadTransfer::CResult> &&_Result)
 					{
 						if (!_Result)
@@ -154,6 +194,7 @@ namespace NMib::NCloud::NVersionManager
 						
 						Upload.m_DownloadSubscription = fg_Move(_Result->m_Subscription); 
 						CVersionManager::CStartUploadVersion::CResult Result;
+						Result.m_DeniedTags = DeniedTags;
 						Result.m_Subscription = fg_ActorSubscription
 							(
 								fg_ThisActor(this)
@@ -211,42 +252,13 @@ namespace NMib::NCloud::NVersionManager
 							pUpload->m_FileTransferReceive->f_Destroy();
 							pUpload->m_FileTransferReceive.f_Clear();
 						}
-						auto FileAccsess = pUpload->m_UploadFileAccess;
+						auto FileAccess = pUpload->m_UploadFileAccess;
 						mp_VersionUploads.f_Remove(UploadID);
 						
 						if (!_Result)
 							return;
 						
-						struct CSizeInfo
-						{
-							uint32 m_nFiles = 0;
-							uint64 m_nBytes = 0;
-						};
-						
-						fg_Dispatch
-							(
-								FileAccsess
-								, [VersionInfo, VersionPath]() mutable -> CSizeInfo
-								{
-									CEJSON VersionJSONInfo;
-									CStr VersionInfoPath = fg_Format("{}.json", VersionPath);
-									
-									VersionJSONInfo["Time"] = VersionInfo.m_Time;
-									VersionJSONInfo["Configuration"] = VersionInfo.m_Configuration;
-									VersionJSONInfo["ExtraInfo"] = VersionInfo.m_ExtraInfo;
-									
-									CSizeInfo SizeInfo;
-									auto Files = CFile::fs_FindFiles(VersionPath + "/*", EFileAttrib_File, true);
-									SizeInfo.m_nFiles = Files.f_GetLen(); 
-									for (auto &File : Files)
-										SizeInfo.m_nBytes += CFile::fs_GetFileSize(File);										
-									
-									CFile::fs_CreateDirectory(CFile::fs_GetPath(VersionInfoPath));
-									CFile::fs_WriteStringToFile(VersionInfoPath, VersionJSONInfo.f_ToString());
-									
-									return SizeInfo;
-								}
-							)
+						self(&CServer::fp_SaveVersionInfo, FileAccess, VersionPath, VersionInfo)
 							> [this, VersionID, VersionInfo, _CallingHostInfo, Desc, ApplicationName](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
 							{
 								if (!_InfoWriteResult)
@@ -280,6 +292,8 @@ namespace NMib::NCloud::NVersionManager
 								NewVersionNotification.m_Application = ApplicationName;
 								NewVersionNotification.m_VersionID = VersionID;
 								NewVersionNotification.m_VersionInfo = VersionInfo;
+								
+								fp_NewTagsKnown(VersionInfo.m_Tags);
 								
 								TCVector<CStr> Permissions;
 								Permissions.f_Insert("Application/ReadAll");

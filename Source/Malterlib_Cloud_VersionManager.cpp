@@ -14,6 +14,11 @@ namespace NMib::NCloud
 		return NNet::fg_IsValidHostname(_String);
 	}
 	
+	bool CVersionManager::fs_IsValidTag(CStr const &_String)
+	{
+		return NNet::fg_IsValidHostname(_String);
+	}
+	
 	bool CVersionManager::fs_IsValidProtocolVersion(uint32 _Version)
 	{
 		return _Version >= EMinProtocolVersion && _Version <= EProtocolVersion;
@@ -111,6 +116,11 @@ namespace NMib::NCloud
 		Ret["Revision"] = m_Revision;
 		return Ret;
 	}
+	
+	bool CVersionManager::CVersionIdentifier::f_IsValid() const
+	{
+		return !m_Branch.f_IsEmpty();
+	}
 
 	auto CVersionManager::CVersionIdentifier::fs_FromJSON(NEncoding::CEJSON const &_JSON) -> CVersionIdentifier
 	{
@@ -143,6 +153,9 @@ namespace NMib::NCloud
 		NEncoding::CEJSON Ret;
 		Ret["Time"] = m_Time;
 		Ret["Configuration"] = m_Configuration;
+		auto &TagArray = Ret["Tags"].f_Array();
+		for (auto &Tag : m_Tags)
+			TagArray.f_Insert(Tag);
 		Ret["ExtraInfo"] = m_ExtraInfo;
 		Ret["NumFiles"] = m_nFiles;
 		Ret["NumBytes"] = m_nBytes;
@@ -154,6 +167,11 @@ namespace NMib::NCloud
 		CVersionInformation Ret;
 		Ret.m_Time = _JSON["Time"].f_Date();
 		Ret.m_Configuration = _JSON["Configuration"].f_String();
+		if (auto *pValue = _JSON.f_GetMember("Tags", NEncoding::EJSONType_Array))
+		{
+			for (auto &Tag : pValue->f_Array())
+				Ret.m_Tags[Tag.f_String()];
+		}
 		Ret.m_ExtraInfo = _JSON["ExtraInfo"];
 		Ret.m_nFiles = _JSON["NumFiles"].f_Integer();
 		Ret.m_nBytes = _JSON["NumBytes"].f_Integer();
@@ -164,6 +182,7 @@ namespace NMib::NCloud
 	{
 		_Stream << m_Time;
 		_Stream << m_Configuration;
+		_Stream << m_Tags;
 		_Stream << m_ExtraInfo;
 		_Stream << m_nFiles;
 		_Stream << m_nBytes;
@@ -173,6 +192,7 @@ namespace NMib::NCloud
 	{
 		_Stream >> m_Time;
 		_Stream >> m_Configuration;
+		_Stream >> m_Tags;
 		_Stream >> m_ExtraInfo;
 		_Stream >> m_nFiles;
 		_Stream >> m_nBytes;
@@ -260,12 +280,14 @@ namespace NMib::NCloud
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
+		_Stream << m_DeniedTags;
 	}
 	
 	void CVersionManager::CStartUploadVersion::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
+		_Stream >> m_DeniedTags;
 	}
 		
 	void CVersionManager::CStartUploadVersion::f_Feed(CDistributedActorWriteStream &_Stream) const
@@ -374,5 +396,33 @@ namespace NMib::NCloud
 		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fOnPermissionsChanged);
 		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fOnNewVersion);
 		_Stream >> m_nInitial;
+	}
+	
+	// CChangeTags
+	
+	void CVersionManager::CChangeTags::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+		_Stream << m_DeniedTags;
+	}
+	
+	void CVersionManager::CChangeTags::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+		_Stream >> m_DeniedTags;
+	}
+	
+	void CVersionManager::CChangeTags::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+		_Stream << m_Application;
+		_Stream << m_VersionID;
+		_Stream << m_AddTags;
+		_Stream << m_RemoveTags;
+	}
+	
+	void CVersionManager::CChangeTags::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+		_Stream >> m_Application;
+		_Stream >> m_VersionID;
+		_Stream >> m_AddTags;
+		_Stream >> m_RemoveTags;
 	}
 }

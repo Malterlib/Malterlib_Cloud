@@ -146,6 +146,14 @@ namespace NMib::NCloud::NVersionManager
 													OutVersion.m_Configuration = pValue->f_String();
 												if (auto pValue = ApplicationInfo.f_GetMember("ExtraInfo", EJSONType_Object))
 													OutVersion.m_ExtraInfo = *pValue;
+												if (auto pValue = ApplicationInfo.f_GetMember("Tags", EJSONType_Array))
+												{
+													for (auto &Value : pValue->f_Array())
+													{
+														if (Value.f_IsString())
+															OutVersion.m_Tags[Value.f_String()];
+													}
+												}
 											}
 											{
 												auto Files = CFile::fs_FindFiles(VersionPath + "/*", EFileAttrib_File, true);
@@ -184,6 +192,7 @@ namespace NMib::NCloud::NVersionManager
 								auto &OutVersion = Application.m_Versions[ApplicationVersions.fs_GetKey(Version)];
 								OutVersion.m_VersionInfo = Version;
 								Application.m_VersionsByTime.f_Insert(OutVersion);
+								mp_KnownTags += Version.m_Tags;
 							}
 						}
 						Continuation.f_SetResult();
@@ -203,6 +212,7 @@ namespace NMib::NCloud::NVersionManager
 		Permissions["Application/ReadAll"];
 		Permissions["Application/ListAll"];
 		Permissions["Application/WriteAll"];
+		Permissions["Application/TagAll"];
 		
 		for (auto &Application : mp_Applications)
 		{
@@ -210,12 +220,17 @@ namespace NMib::NCloud::NVersionManager
 			Permissions[fg_Format("Application/Write/{}", Application.f_GetName())];
 		}
 		
+		for (auto &Tag : mp_KnownTags)
+		{
+			Permissions[fg_Format("Application/Tag/{}", Tag)];
+		}
+		
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
 		
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("Application/*");
 	
-				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
+		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
 			> Continuation / [this, Continuation](CTrustedPermissionSubscription &&_Subscription)
 			{
 				mp_Permissions = fg_Move(_Subscription);

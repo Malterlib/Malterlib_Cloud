@@ -40,6 +40,7 @@ namespace NMib::NCloud::NCloudClient
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params);
+		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params);
 		
 		fp64 mp_Timeout = 0.0;
 		

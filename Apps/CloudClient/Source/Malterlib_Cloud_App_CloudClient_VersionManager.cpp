@@ -109,6 +109,13 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_= ""
 							, "Description"_= "The configuration for this build. Could be for example Debug or Release.\n"
 						}
+						, "Tags?"_=
+						{
+							"Names"_= {"--tags"}
+							, "Default"_= _[_]
+							, "Type"_= {""}
+							, "Description"_= "The tags to apply to the version.\n"
+						}
 						, "ExtraInfo?"_=
 						{
 							"Names"_= {"--info"}
@@ -150,7 +157,54 @@ namespace NMib::NCloud::NCloudClient
 				}
 			)
 		;
-		
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--version-manager-change-tags"}
+					, "Description"_= "Upload a version to remote version manager\n"
+					, "Options"_=
+					{
+						"VersionManagerHost?"_=
+						{
+							"Names"_= {"--host"}
+							, "Default"_= ""
+							, "Description"_= "The host ID of the host to change tags for."
+						}					
+						, "Application"_=
+						{
+							"Names"_= {"--application"}
+							, "Type"_= ""
+							, "Description"_= "Change tags for this application."
+						}
+						, "Version"_=
+						{
+							"Names"_= {"--version"}
+							, "Type"_= ""
+							, "Description"_= "Change tags for this version.\n"
+								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
+						}
+						, "AddTags?"_=
+						{
+							"Names"_= {"--add"}
+							, "Default"_= _[_]
+							, "Type"_= {""}
+							, "Description"_= "Add these tags.\n"
+						}
+						, "RemoveTags?"_=
+						{
+							"Names"_= {"--remove"}
+							, "Default"_= _[_]
+							, "Type"_= {""}
+							, "Description"_= "Remove these tags.\n"
+						}
+					}
+				}
+				, [this](CEJSON const &_Params)
+				{
+					return fp_CommandLine_VersionManager_ChangeTags(_Params);
+				}
+			)
+		;
 		_Section.f_RegisterCommand
 			(
 				{
@@ -335,10 +389,11 @@ namespace NMib::NCloud::NCloudClient
 										(
 											fg_Format
 											(
-												"        {}   {}   {}   {} bytes ({} files)\n"
+												"        {sl10,a-} {sl10,a-} {tc6,sl24,a-} {vs,sl10,a-} {ns ,sl12} bytes ({} files)\n"
 												, VersionID
 												, Version.m_Configuration
 												, Version.m_Time.f_ToLocal()
+												, Version.m_Tags
 												, Version.m_nBytes
 												, Version.m_nFiles
 											)
@@ -379,6 +434,15 @@ namespace NMib::NCloud::NCloudClient
 		bool bForce = _Params["Force"].f_Boolean();
 		if (QueueSize < 128*1024)
 			QueueSize = 128*1024;
+
+		TCSet<CStr> Tags;
+		for (auto &TagJSON : _Params["Tags"].f_Array())
+		{
+			CStr const &Tag = TagJSON.f_String();
+			if (!CVersionManager::fs_IsValidTag(Tag))
+				return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
+			Tags[Tag];
+		}
 		
 		if (Application.f_IsEmpty())
 			return DMibErrorInstance("Application must be specified");
@@ -397,18 +461,20 @@ namespace NMib::NCloud::NCloudClient
 				return DMibErrorInstance(fg_Format("Version identifier format is invalid: {}", Error));
 		}
 
-		auto fDoCommand = [this, bForce, Continuation, Application, Host, VersionID, QueueSize, Source, Configuration, ExtraInfo](CTime const &_Time)
+		auto fDoCommand = [this, bForce, Continuation, Application, Host, VersionID, QueueSize, Source, Configuration, ExtraInfo, Tags](CTime const &_Time)
 			{
 				fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
-					> Continuation / [this, bForce, Continuation, Application, Host, VersionID, QueueSize, Source, _Time, Configuration, ExtraInfo]
+					> Continuation / [this, bForce, Continuation, Application, Host, VersionID, QueueSize, Source, _Time, Configuration, ExtraInfo, Tags]
 					{
-						TCActorResultMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
-
 						CStr Error;
 						auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
 						if (!pVersionManager)
 						{
-							Continuation.f_SetException(DMibErrorInstance(fg_Format("Error selecting version manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error)));
+							Continuation.f_SetException
+								(
+									DMibErrorInstance(fg_Format("Error selecting version manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
+								)
+							;
 							return;
 						}
 
@@ -420,6 +486,7 @@ namespace NMib::NCloud::NCloudClient
 						StartUpload.m_VersionInfo.m_Time = _Time;
 						StartUpload.m_VersionInfo.m_Configuration = Configuration;
 						StartUpload.m_VersionInfo.m_ExtraInfo = ExtraInfo;
+						StartUpload.m_VersionInfo.m_Tags = Tags; 						
 						StartUpload.m_QueueSize = QueueSize;
 						StartUpload.m_DispatchActor = fg_ThisActor(this);
 						if (bForce)
@@ -449,7 +516,7 @@ namespace NMib::NCloud::NCloudClient
 							> Continuation % "Failed to start upload on remote server" / [this, Continuation](CVersionManager::CStartUploadVersion::CResult &&_Result)
 							{
 								mp_UploadVersionSubscription = fg_Move(_Result.m_Subscription);
-								mp_UploadVersionSend(&CFileTransferSend::f_GetResult) > [this, Continuation](TCAsyncResult<CFileTransferResult> &&_Results)
+								mp_UploadVersionSend(&CFileTransferSend::f_GetResult) > [this, Continuation, DeniedTags = _Result.m_DeniedTags](TCAsyncResult<CFileTransferResult> &&_Results)
 									{
 										mp_UploadVersionSubscription.f_Clear();
 										if (!_Results)
@@ -459,6 +526,9 @@ namespace NMib::NCloud::NCloudClient
 											auto &Results = *_Results;
 											CDistributedAppCommandLineResults CommandLine;
 
+											if (!DeniedTags.f_IsEmpty())
+												CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs}\n", DeniedTags));
+											
 											CommandLine.f_AddStdOut
 												(
 													fg_Format
@@ -550,8 +620,6 @@ namespace NMib::NCloud::NCloudClient
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
 			> Continuation / [this, Continuation, Application, Host, VersionID, QueueSize, DestinationDirectory]
 			{
-				TCActorResultMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
-
 				CStr Error;
 				auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
 				if (!pVersionManager)
@@ -613,6 +681,99 @@ namespace NMib::NCloud::NCloudClient
 								;
 							}
 						;
+					}
+				;
+			}
+		;
+		return Continuation;
+	}
+	
+	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params)
+	{
+		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		
+		CStr Host = _Params["VersionManagerHost"].f_String();
+		CStr Application = _Params["Application"].f_String();
+		CStr Version = _Params["Version"].f_String();
+		
+		if (Application.f_IsEmpty())
+			return DMibErrorInstance("Application must be specified");
+		if (Version.f_IsEmpty())
+			return DMibErrorInstance("Version must be specified");
+		
+		if (!CVersionManager::fs_IsValidApplicationName(Application))
+			return DMibErrorInstance("Application format is invalid");
+		
+		CVersionManager::CVersionIdentifier VersionID;
+		{
+			CStr Error; 
+			if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID))
+				return DMibErrorInstance(fg_Format("Version identifier format is invalid: {}", Error));
+		}
+
+		auto fParseTags = [](CEJSON const &_Tags)
+			{
+				TCSet<CStr> OutTags;
+				for (auto &TagJSON : _Tags.f_Array())
+				{
+					CStr const &Tag = TagJSON.f_String();
+					if (!CVersionManager::fs_IsValidTag(Tag))
+						DMibError(fg_Format("'{}' is not a valid tag", Tag));
+					OutTags[Tag];
+				}
+				return OutTags;
+			}
+		;
+
+		TCSet<CStr> AddTags;
+		TCSet<CStr> RemoveTags;
+		try
+		{
+			AddTags = fParseTags(_Params["AddTags"]);
+			RemoveTags = fParseTags(_Params["RemoveTags"]);
+		}
+		catch (CException const &_Error)
+		{
+			return _Error;
+		}
+		
+		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())
+			return DMibErrorInstance("No changes specified. Specify tags to add and remove with --add and --remove");
+		
+		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
+			> Continuation / [this, Continuation, Application, Host, VersionID, AddTags, RemoveTags]
+			{
+				CStr Error;
+				auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
+				if (!pVersionManager)
+				{
+					Continuation.f_SetException
+						(
+							DMibErrorInstance(fg_Format("Error selecting version manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
+						)
+					;
+					return;
+				}
+
+				CVersionManager::CChangeTags ChangeTags;
+				ChangeTags.m_Application = Application;
+				ChangeTags.m_VersionID = VersionID;
+				ChangeTags.m_AddTags = AddTags;
+				ChangeTags.m_RemoveTags = RemoveTags;
+
+				DMibCallActor
+					(
+						pVersionManager->m_Actor
+						, CVersionManager::f_ChangeTags
+						, fg_Move(ChangeTags)
+					)
+					.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
+					> Continuation % "Failed to change tags" / [this, Continuation](CVersionManager::CChangeTags::CResult &&_Result)
+					{
+						CDistributedAppCommandLineResults CommandLine;
+						if (!_Result.m_DeniedTags.f_IsEmpty())
+							CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs}\n", _Result.m_DeniedTags));
+						Continuation.f_SetResult(fg_Move(CommandLine));
 					}
 				;
 			}

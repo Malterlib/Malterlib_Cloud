@@ -20,6 +20,7 @@ namespace NMib::NCloud::NVersionManager
 		DMibPublishActorFunction(CVersionManager::f_UploadVersion);
 		DMibPublishActorFunction(CVersionManager::f_DownloadVersion);
 		DMibPublishActorFunction(CVersionManager::f_SubscribeToUpdates);
+		DMibPublishActorFunction(CVersionManager::f_ChangeTags);
 	}
 		
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications &&_Params)
@@ -51,6 +52,12 @@ namespace NMib::NCloud::NVersionManager
 		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_SubscribeToUpdates, fg_GetCallingHostInfo(), fg_Move(_Params));
 	}
 	
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags &&_Params)
+		-> TCContinuation<CChangeTags::CResult> 
+	{
+		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_ChangeTags, fg_GetCallingHostInfo(), fg_Move(_Params));
+	}
+	
 	void CVersionManagerDaemonActor::CServer::fp_Publish()
 	{
 		mp_ProtocolImplementation = fg_ConstructDistributedActor<CVersionManagerImplementation>(fg_ThisActor(this));
@@ -70,9 +77,17 @@ namespace NMib::NCloud::NVersionManager
 		;
 	}
 
-	NException::CException CVersionManagerDaemonActor::CServer::fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description)
+	NException::CException CVersionManagerDaemonActor::CServer::fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description, CStr const &_UserDescription)
 	{
-		fsp_LogActivityWarning(_CallingHostInfo, fg_Format("Denied access to: {}", _Description));
-		return DMibErrorInstance("Access denied");
+		if (!_UserDescription.f_IsEmpty())
+		{
+			fsp_LogActivityWarning(_CallingHostInfo, fg_Format("Denied access to: {} '{}'", _Description, _UserDescription));
+			return DMibErrorInstance(_UserDescription);
+		}
+		else
+		{
+			fsp_LogActivityWarning(_CallingHostInfo, fg_Format("Denied access to: {}", _Description));
+			return DMibErrorInstance("Access denied");
+		}
 	}
 }

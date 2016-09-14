@@ -24,6 +24,7 @@ namespace NMib::NCloud
 
 		static bool fs_IsValidApplicationName(NStr::CStr const &_String);
 		static bool fs_IsValidProtocolVersion(uint32 _Version);
+		static bool fs_IsValidTag(NStr::CStr const &_String);
 
 		struct CVersionIdentifier
 		{
@@ -39,6 +40,8 @@ namespace NMib::NCloud
 			
 			NEncoding::CEJSON f_ToJSON() const;
 			static CVersionIdentifier fs_FromJSON(NEncoding::CEJSON const &_JSON);
+			
+			bool f_IsValid() const;
 
 			NStr::CStr m_Branch;
 			uint32 m_Major = 0;
@@ -56,6 +59,7 @@ namespace NMib::NCloud
 			
 			NTime::CTime m_Time;
 			NStr::CStr m_Configuration;
+			NContainer::TCSet<NStr::CStr> m_Tags;
 			NEncoding::CEJSON m_ExtraInfo;
 			uint32 m_nFiles = 0;
 			uint64 m_nBytes = 0;
@@ -118,6 +122,7 @@ namespace NMib::NCloud
 				void f_Consume(CDistributedActorReadStream &_Stream);
 				
 				NConcurrency::CActorSubscription m_Subscription;
+				NContainer::TCSet<NStr::CStr> m_DeniedTags;
 			};
 			
 			enum EFlag
@@ -192,11 +197,31 @@ namespace NMib::NCloud
 			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<CNewVersionNotification::CResult> (CNewVersionNotification &&_VersionInfo)> m_fOnNewVersion;
 			uint32 m_nInitial = 10;
 		};
+
+		struct CChangeTags
+		{
+			struct CResult
+			{
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
+				
+				NContainer::TCSet<NStr::CStr> m_DeniedTags;
+			};
+			
+			void f_Feed(CDistributedActorWriteStream &_Stream) const;
+			void f_Consume(CDistributedActorReadStream &_Stream);
+			
+			NStr::CStr m_Application;
+			CVersionIdentifier m_VersionID;
+			NContainer::TCSet<NStr::CStr> m_AddTags;
+			NContainer::TCSet<NStr::CStr> m_RemoveTags;
+		};
 		
 		virtual NConcurrency::TCContinuation<CListApplications::CResult> f_ListApplications(CListApplications &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CListVersions::CResult> f_ListVersions(CListVersions &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) = 0;
+		virtual NConcurrency::TCContinuation<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) = 0;
 	};
 }

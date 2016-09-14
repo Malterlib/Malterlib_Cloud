@@ -92,6 +92,7 @@ namespace NMib::NCloud::NVersionManager
 			TCContinuation<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion &&_Params) override;
 			TCContinuation<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) override;
 			TCContinuation<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) override;
+			TCContinuation<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) override;
 			
 		private:
 			TCWeakActor<CVersionManagerDaemonActor::CServer> mp_Server;
@@ -114,6 +115,12 @@ namespace NMib::NCloud::NVersionManager
 			void f_SendVersion(CVersionManager::CNewVersionNotification const &_NewVersionNotification) const;
 		};
 		
+		struct CSizeInfo
+		{
+			uint32 m_nFiles = 0;
+			uint64 m_nBytes = 0;
+		};
+		
 	private:
 		void fp_Init();
 		void fp_Publish();
@@ -125,14 +132,18 @@ namespace NMib::NCloud::NVersionManager
 		TCContinuation<CVersionManager::CStartUploadVersion::CResult> fp_Protocol_UploadVersion(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CStartUploadVersion &&_Params);
 		TCContinuation<CVersionManager::CStartDownloadVersion::CResult> fp_Protocol_DownloadVersion(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CStartDownloadVersion &&_Params);
 		TCContinuation<CVersionManager::CSubscribeToUpdates::CResult> fp_Protocol_SubscribeToUpdates(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CSubscribeToUpdates &&_Params);
+		TCContinuation<CVersionManager::CChangeTags::CResult> fp_Protocol_ChangeTags(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CChangeTags &&_Params);
 		
 		void fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription, bool _bPermissionsChanged);
 		void fp_UpdateSubscriptionsForChangedPermissions(CStr const &_HostID);
 		
-		CException fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description);
+		CException fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description, CStr const &_UserDescription = CStr());
 		TCSet<CStr> fp_FilterApplicationsByPermissions(CCallingHostInfo const &_CallingHostInfo, TCSet<CStr> const &_Applications);
 		TCContinuation<TCSet<CStr>> fp_EnumApplications();
 		TCSet<CStr> fp_ApplicationSet();
+		TCSet<CStr> fp_FilterTags(CStr const &_HostID, TCSet<CStr> const &_Tags, TCSet<CStr> &o_DeniedTags);
+		void fp_NewTagsKnown(TCSet<CStr> const &_Tags);
+		TCContinuation<CSizeInfo> fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo); 
 		
 		static void fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info);
 		static void fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error);
@@ -147,6 +158,8 @@ namespace NMib::NCloud::NVersionManager
 		CDistributedAppState mp_AppState;
 		
 		CTrustedPermissionSubscription mp_Permissions;
+		
+		TCSet<CStr> mp_KnownTags;
 		
 		TCMap<CStr, CVersionDownload> mp_VersionDownloads;
 		TCMap<CStr, CVersionUpload> mp_VersionUploads;
