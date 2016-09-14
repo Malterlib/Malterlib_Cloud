@@ -5,764 +5,321 @@
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppManager.h"
 
-namespace NMib
+namespace NMib::NCloud::NAppManager
 {
-	namespace NCloud
+	void CAppManagerActor::fp_OutputApplicationStop(TCAsyncResult<uint32> const &_Result, CDistributedAppCommandLineResults &o_Results, CStr const &_Name)
 	{
-		namespace NAppManager
+		if (!_Result)
+			o_Results.f_AddStdErr(fg_Format("Error stopping application '{}'{\n}", _Result.f_GetExceptionStr()));
+		else if (*_Result)
+			o_Results.f_AddStdErr(fg_Format("Application '{}' exited with non 0 status: {}{\n}", _Name, *_Result));
+	}
+	
+	constexpr static EFileAttrib gc_RootAttributes = 
+				EFileAttrib_UnixAttributesValid  
+				| EFileAttrib_UserRead 
+				| EFileAttrib_UserWrite
+				| EFileAttrib_UserExecute 
+				| EFileAttrib_GroupRead
+				| EFileAttrib_GroupExecute
+				| EFileAttrib_EveryoneRead 
+				| EFileAttrib_EveryoneExecute
+	;
+	
+	void CAppManagerActor::fsp_UpdateAttributes(CStr const &_File)
+	{
+		auto CurrentAttributes = CFile::fs_GetAttributes(_File);
+		CFile::fs_SetAttributes
+			(
+				_File
+				, EFileAttrib_UnixAttributesValid 
+				| (CurrentAttributes & EFileAttrib_UserRead) 
+				| (CurrentAttributes & EFileAttrib_UserWrite)
+				| (CurrentAttributes & EFileAttrib_UserExecute) 
+				| (CurrentAttributes & EFileAttrib_GroupRead)
+				| (CurrentAttributes & EFileAttrib_GroupExecute)
+				| (CurrentAttributes & EFileAttrib_EveryoneRead)
+				| (CurrentAttributes & EFileAttrib_EveryoneExecute)
+			)
+		;
+	}
+
+	CStr CAppManagerActor::fsp_UnpackApplication
+		(
+			CStr const &_Source
+			, CStr const &_Destination
+			, TCSharedPointer<CApplication> const &_pApplication
+			, TCVector<CStr> &o_Files
+			, TCSet<CStr> const &_AllowExist
+		)
+	{
+		CStr Return;
+		if (CFile::fs_FileExists(_Destination))
 		{
-			void CAppManagerActor::fp_OutputApplicationStop(TCAsyncResult<uint32> const &_Result, CDistributedAppCommandLineResults &o_Results, CStr const &_Name)
+			auto FoundFiles = CFile::fs_FindFiles(_Destination + "/*");
+			for (auto &File : FoundFiles)
+			{
+				if (!_AllowExist.f_FindEqual(File))
+					DMibError(fg_Format("Application already exists at: '{}'. You have to manually delete it to resue the name", _Destination));
+			}
+		
+		}
+		if (CFile::fs_FileExists(_Source, EFileAttrib_Directory))
+		{
+			CFile::fs_DiffCopyFileOrDirectory
+				(
+					_Source
+					, _Destination
+					, [&](CFile::EDiffCopyChange _Change, NStr::CStr const &_Source, NStr::CStr const &_Destination, NStr::CStr const &_Link) -> CFile::EDiffCopyChangeAction
+					{
+						for (auto &Allow : _AllowExist)
+						{
+							if (_Destination.f_StartsWith(Allow))
+								return CFile::EDiffCopyChangeAction_Skip;
+						}
+						return CFile::EDiffCopyChangeAction_Perform;
+					}
+				)
+			;
+		}
+		else
+		{
+			CFile::fs_CreateDirectory(_Destination);
+			CStr Output = fsp_RunTool
+				(
+					CStr::CFormat("[{}] Extracting application") << _pApplication->m_Name
+					, "tar"
+					, _Destination
+					, fg_CreateVector<CStr>("--no-same-owner", "-xf", _Source)
+					, ""
+					, ""
+				)
+			;
+			Return = Output;
+		}
+
+		CStr ExcutableFile = fg_Format("{}/{}", _Destination, _pApplication->m_Executable); 
+		if (!CFile::fs_FileExists(ExcutableFile, EFileAttrib_Executable))
+			DMibError(fg_Format("Executable file '{}' does not exist or does not have the executable flag set", ExcutableFile));
+		
+		CFile::CFindFilesOptions FindOptions(_Destination + "/*", true);
+		FindOptions.m_AttribMask = EFileAttrib_Directory | EFileAttrib_File | EFileAttrib_Link | EFileAttrib_FindDirectoryLast;
+		
+		auto Files = CFile::fs_FindFiles(FindOptions);
+		
+		CFile::fs_SetAttributes(_Destination, gc_RootAttributes);
+		
+		mint PrefixLen = _Destination.f_GetLen() + 1;
+		for (auto &File : Files)
+		{
+			bool bFound = false;
+			for (auto &Allow : _AllowExist)
+			{
+				if (File.m_Path.f_StartsWith(Allow))
+				{
+					bFound = true;
+					break;
+				}
+			}
+			if (bFound)
+				continue;
+			
+			if (!_pApplication->m_RunAsUser.f_IsEmpty())
+				CFile::fs_SetOwner(File.m_Path, _pApplication->m_RunAsUser);
+			if (!_pApplication->m_RunAsGroup.f_IsEmpty())
+				CFile::fs_SetGroup(File.m_Path, _pApplication->m_RunAsGroup);
+			
+			fsp_UpdateAttributes(File.m_Path);
+			
+			o_Files.f_Insert(File.m_Path.f_Extract(PrefixLen));
+		}
+		
+		return Return;
+	}
+
+	TCContinuation<void> CAppManagerActor::fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication)
+	{
+		if (_pApplication->m_bDeleted)
+			return DMibErrorInstance("Application has been deleted");
+		auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][_pApplication->m_Name];
+		ApplicationJSON["Executable"] = _pApplication->m_Executable; 
+		ApplicationJSON["RunAsUser"] = _pApplication->m_RunAsUser; 
+		ApplicationJSON["RunAsGroup"] = _pApplication->m_RunAsGroup;
+		auto &Parameters = ApplicationJSON["Parameters"].f_Array();
+		Parameters.f_Clear();
+		for (auto &Parameter : _pApplication->m_ExecutableParameters)
+			Parameters.f_Insert(Parameter);
+		ApplicationJSON["EncryptionStorage"] = _pApplication->m_EncryptionStorage;
+		ApplicationJSON["VersionManagerApplication"] = _pApplication->m_VersionManagerApplication;
+		ApplicationJSON["LastInstalledVersion"] = _pApplication->m_LastInstalledVersion.f_ToJSON();
+		ApplicationJSON["LastInstalledVersionInfo"] = _pApplication->m_LastInstalledVersionInfo.f_ToJSON();
+		ApplicationJSON["Files"] = _pApplication->m_Files;
+	
+		TCContinuation<void> Continuation;
+		mp_State.m_StateDatabase.f_Save() > Continuation;  
+		return Continuation;
+	}
+	
+	void CAppManagerActor::fsp_UpdateApplicationFiles(CStr const &_ApplicationDir, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> const &_Files)
+	{
+		auto fSetOwners = [&](CStr _Directory)
+			{
+				while (_Directory.f_GetLen() >= _ApplicationDir.f_GetLen())
+				{
+					if (!_pApplication->m_RunAsGroup.f_IsEmpty())
+						CFile::fs_SetOwner(_Directory, _pApplication->m_RunAsUser);
+					if (!_pApplication->m_RunAsGroup.f_IsEmpty())
+						CFile::fs_SetGroup(_Directory, _pApplication->m_RunAsGroup);
+					_Directory = CFile::fs_GetPath(_Directory);
+				}
+			}
+		;
+		for (auto &File : _Files)
+		{
+			CStr SourcePath = fg_Format("{}/{}", _ApplicationDir, File);
+			if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
+			{
+				CStr Directory = CFile::fs_GetPath(SourcePath);
+				fSetOwners(Directory);
+			}
+		}
+		CFile::fs_CreateDirectory(_ApplicationDir + "/.home");
+		CFile::fs_CreateDirectory(_ApplicationDir + "/.tmp");
+		fSetOwners(_ApplicationDir + "/.home");
+		fSetOwners(_ApplicationDir + "/.tmp");
+		
+		CFile::fs_SetAttributes(_ApplicationDir, gc_RootAttributes);
+	}
+
+	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON const &_Params)
+	{
+		CStr Name = _Params["Name"].f_String();
+		auto pOldApplication = mp_Applications.f_FindEqual(Name);
+		if (!pOldApplication)
+			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
+		
+		TCSharedPointer<CApplication> pApplication = *pOldApplication;
+		
+		if (pApplication->m_bOperationInProgress)
+			return DMibErrorInstance("Operation already in progress for application");
+		if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
+			return DMibErrorInstance("Application already stopped");
+
+		auto InProgressScope = pApplication->f_SetInProgress();
+		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
+		auto fLogError = [pResult, Continuation](CStr const &_Error)
+			{
+				pResult->f_AddStdErr(_Error + DMibNewLine);
+				pResult->m_Status = 1;
+				Continuation.f_SetResult(fg_Move(*pResult));
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (stop application): {}", _Error);
+			}
+		;
+		
+		pApplication->f_Stop(false) > [this, pApplication, pResult, fLogError, Continuation, InProgressScope]
+			(TCAsyncResult<uint32> &&_ExitStatus)
+			{
+				fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
+				
+				if (!_ExitStatus)
+				{
+					fLogError("Failed to exit old application");
+					return;
+				}
+				
+				if (pApplication->m_bDeleted)
+				{
+					fLogError("Application has been deleted, aborting");
+					return;
+				}
+				Continuation.f_SetResult(fg_Move(*pResult));
+			}
+		;
+		return Continuation;
+	}
+	
+	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON const &_Params)
+	{
+		CStr Name = _Params["Name"].f_String();
+		auto pOldApplication = mp_Applications.f_FindEqual(Name);
+		if (!pOldApplication)
+			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
+		
+		TCSharedPointer<CApplication> pApplication = *pOldApplication;
+		
+		if (pApplication->m_bOperationInProgress)
+			return DMibErrorInstance("Operation already in progress for application");
+		if (pApplication->m_ProcessLaunch)
+			return DMibErrorInstance("Application already started");
+
+		auto InProgressScope = pApplication->f_SetInProgress();
+		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
+		auto fLogError = [pResult, Continuation](CStr const &_Error)
+			{
+				pResult->f_AddStdErr(_Error + DMibNewLine);
+				pResult->m_Status = 1;
+				Continuation.f_SetResult(fg_Move(*pResult));
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (start application): {}", _Error);
+			}
+		;
+		
+		fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, true)
+			> [fLogError, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
-					o_Results.f_AddStdErr(fg_Format("Error stopping application '{}'{\n}", _Result.f_GetExceptionStr()));
-				else if (*_Result)
-					o_Results.f_AddStdErr(fg_Format("Application '{}' exited with non 0 status: {}{\n}", _Name, *_Result));
+				{
+					fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
+					return;
+				}
+				Continuation.f_SetResult(fg_Move(*pResult));
 			}
-			
-			constexpr static EFileAttrib gc_RootAttributes = 
-						EFileAttrib_UnixAttributesValid  
-						| EFileAttrib_UserRead 
-						| EFileAttrib_UserWrite
-						| EFileAttrib_UserExecute 
-						| EFileAttrib_GroupRead
-						| EFileAttrib_GroupExecute
-						| EFileAttrib_EveryoneRead 
-						| EFileAttrib_EveryoneExecute
-			;
-			
-			void CAppManagerActor::fsp_UpdateAttributes(CStr const &_File)
+		;
+		return Continuation;
+	}
+	
+	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSON const &_Params)
+	{
+		CStr Name = _Params["Name"].f_String();
+		auto pOldApplication = mp_Applications.f_FindEqual(Name);
+		if (!pOldApplication)
+			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
+		
+		TCSharedPointer<CApplication> pApplication = *pOldApplication;
+		
+		if (pApplication->m_bOperationInProgress)
+			return DMibErrorInstance("Operation already in progress for application");
+
+		auto InProgressScope = pApplication->f_SetInProgress();
+		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
+		auto fLogError = [pResult, Continuation](CStr const &_Error)
 			{
-				auto CurrentAttributes = CFile::fs_GetAttributes(_File);
-				CFile::fs_SetAttributes
-					(
-						_File
-						, EFileAttrib_UnixAttributesValid 
-						| (CurrentAttributes & EFileAttrib_UserRead) 
-						| (CurrentAttributes & EFileAttrib_UserWrite)
-						| (CurrentAttributes & EFileAttrib_UserExecute) 
-						| (CurrentAttributes & EFileAttrib_GroupRead)
-						| (CurrentAttributes & EFileAttrib_GroupExecute)
-						| (CurrentAttributes & EFileAttrib_EveryoneRead)
-						| (CurrentAttributes & EFileAttrib_EveryoneExecute)
-					)
-				;
+				pResult->f_AddStdErr(_Error + DMibNewLine);
+				pResult->m_Status = 1;
+				Continuation.f_SetResult(fg_Move(*pResult));
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (restart application): {}", _Error);
 			}
-
-			CStr CAppManagerActor::fsp_UnpackApplication
-				(
-					CStr const &_Source
-					, CStr const &_Destination
-					, TCSharedPointer<CApplication> const &_pApplication
-					, TCVector<CStr> &o_Files
-					, TCSet<CStr> const &_AllowExist
-				)
+		;
+		
+		pApplication->f_Stop(false) > [this, pApplication, pResult, fLogError, Continuation, InProgressScope]
+			(TCAsyncResult<uint32> &&_ExitStatus)
 			{
-				CStr Return;
-				if (CFile::fs_FileExists(_Destination))
+				fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
+				
+				if (!_ExitStatus)
 				{
-					auto FoundFiles = CFile::fs_FindFiles(_Destination + "/*");
-					for (auto &File : FoundFiles)
-					{
-						if (!_AllowExist.f_FindEqual(File))
-							DMibError(fg_Format("Application already exists at: '{}'. You have to manually delete it to resue the name", _Destination));
-					}
-				
-				}
-				if (CFile::fs_FileExists(_Source, EFileAttrib_Directory))
-				{
-					CFile::fs_DiffCopyFileOrDirectory
-						(
-							_Source
-							, _Destination
-							, [&](CFile::EDiffCopyChange _Change, NStr::CStr const &_Source, NStr::CStr const &_Destination, NStr::CStr const &_Link) -> CFile::EDiffCopyChangeAction
-							{
-								for (auto &Allow : _AllowExist)
-								{
-									if (_Destination.f_StartsWith(Allow))
-										return CFile::EDiffCopyChangeAction_Skip;
-								}
-								return CFile::EDiffCopyChangeAction_Perform;
-							}
-						)
-					;
-				}
-				else
-				{
-					CFile::fs_CreateDirectory(_Destination);
-					CStr Output = fsp_RunTool
-						(
-							CStr::CFormat("[{}] Extracting application") << _pApplication->m_Name
-							, "tar"
-							, _Destination
-							, fg_CreateVector<CStr>("--no-same-owner", "-xf", _Source)
-							, ""
-							, ""
-						)
-					;
-					Return = Output;
-				}
-
-				if (!_pApplication->m_RunAsUser.f_IsEmpty())
-					CFile::fs_SetOwnerRecursive(_Destination, _pApplication->m_RunAsUser, false);
-				if (!_pApplication->m_RunAsGroup.f_IsEmpty())
-					CFile::fs_SetGroupRecursive(_Destination, _pApplication->m_RunAsGroup, false);
-				
-				CStr ExcutableFile = fg_Format("{}/{}", _Destination, _pApplication->m_Executable); 
-				if (!CFile::fs_FileExists(ExcutableFile, EFileAttrib_Executable))
-					DMibError(fg_Format("Executable file '{}' does not exist or does not have the executable flag set", ExcutableFile));
-				
-				CFile::CFindFilesOptions FindOptions(_Destination + "/*", true);
-				FindOptions.m_AttribMask = EFileAttrib_Directory | EFileAttrib_File | EFileAttrib_Link | EFileAttrib_FindDirectoryLast;
-				
-				auto Files = CFile::fs_FindFiles(FindOptions);
-				
-				CFile::fs_SetAttributes(_Destination, gc_RootAttributes);
-				
-				mint PrefixLen = _Destination.f_GetLen() + 1;
-				for (auto &File : Files)
-				{
-					fsp_UpdateAttributes(File.m_Path);
-					o_Files.f_Insert(File.m_Path.f_Extract(PrefixLen));
+					fLogError("Failed to exit old application");
+					return;
 				}
 				
-				return Return;
-			}
-			
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_AddApplication(CEJSON const &_Params)
-			{
-				TCSharedPointer<CApplication> pApplication = fg_Construct(_Params["Name"].f_String(), this);
-				bool bForceOverwrite = _Params["ForceOverwrite"].f_Boolean();
-				
-				pApplication->m_EncryptionStorage = _Params["EncryptionStorage"].f_String();
-				pApplication->m_Executable = _Params["Executable"].f_String();
-				for (auto &Parameter : _Params["ExecutableParameters"].f_Array())
-					pApplication->m_ExecutableParameters.f_Insert(Parameter.f_String());
-				pApplication->m_RunAsUser = _Params["RunAsUser"].f_String(); 
-				pApplication->m_RunAsGroup = _Params["RunAsGroup"].f_String();
-				CStr Version = _Params["Version"].f_String();
-				
-				auto Directory = pApplication->f_GetDirectory();
-				CStr Package = _Params["Package"].f_String();
-				
-				if (Package.f_IsEmpty())
-					return DMibErrorInstance("You have to specify a package");
-				
-				bool bIsVersionManager = false;
-				
-				auto *pVersionManagerApplication = mp_VersionManagerApplications.f_FindEqual(Package);
-
-				CVersionManager::CVersionIdentifier VersionID;
-				
-				if (pVersionManagerApplication)
+				if (pApplication->m_bDeleted)
 				{
-					bIsVersionManager = true;
-					if (!Version.f_IsEmpty())
-					{
-						CStr Error;
-						if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID))
-							return DMibErrorInstance(fg_Format("Invalid version format: {}", Error)); 
-					}
-					else
-					{
-						auto *pLargest = pVersionManagerApplication->m_VersionsByTime.f_FindLargest();
-						if (!pLargest)
-							return DMibErrorInstance(fg_Format("No newest version found for application: {}", Package));
-						VersionID = pLargest->f_GetVersionID();
-					}
+					fLogError("Application has been deleted, aborting");
+					return;
 				}
-				else
-				{
-					if (!Version.f_IsEmpty())
-						return DMibErrorInstance("Package did not refer to any version manager application, so you cannot specify '--version'");
-					
-					Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
-					
-					if (pApplication->m_Executable.f_IsEmpty())
-						return DMibErrorInstance("You must specify an executable to run");
-				}
-				
-				if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
-				{
-					if (pApplicationsState->f_GetMember(pApplication->m_Name))
-						return DMibErrorInstance(fg_Format("Application with name '{}' already exists", pApplication->m_Name));
-				}
-				
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
-				
-				auto fLogInfo = [pResult](CStr const &_Info)
-					{
-						pResult->f_AddStdOut(_Info + DMibNewLine);
-						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{}", _Info);
-					}
-				;
-				auto fLogError = [pResult, Continuation](CStr const &_Error)
-					{
-						pResult->f_AddStdErr(_Error + DMibNewLine);
-						pResult->m_Status = 1;
-						Continuation.f_SetResult(fg_Move(*pResult));
-					}
-				;
-				
-				fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Setup, bForceOverwrite) 
-					> [this, fLogError, fLogInfo, pApplication, Directory, Package, pResult, bIsVersionManager, VersionID, Continuation](TCAsyncResult<void> &&_Result)
-					{
-						if (!_Result)
-						{
-							fLogError(_Result.f_GetExceptionStr());
-							return;
-						}
-						auto fUnpackApp = [this, pResult, pApplication, Continuation, fLogInfo, fLogError, Directory, Package]
-							(CStr const &_SourcePath, CStr const &_DeletePath)
-							{
-								fg_Dispatch
-									(
-										mp_FileActor
-										, [pApplication, Directory, _SourcePath, _DeletePath, pResult, fLogInfo]()
-										{
-											if (!pApplication->m_RunAsGroup.f_IsEmpty())
-											{
-												CStr GroupID;
-												if (!NSys::fg_UserManagement_GroupExists(pApplication->m_RunAsGroup, GroupID))
-												{
-													NSys::fg_UserManagement_CreateGroup(pApplication->m_RunAsGroup, GroupID);
-													fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", pApplication->m_RunAsGroup, GroupID));
-												}
-											}
-											if (!pApplication->m_RunAsUser.f_IsEmpty())
-											{
-												CStr UserID;
-												if (!NSys::fg_UserManagement_UserExists(pApplication->m_RunAsUser, UserID))
-												{
-													NSys::fg_UserManagement_CreateUser
-														(
-															pApplication->m_RunAsGroup
-															, pApplication->m_RunAsUser
-															, ""
-															, pApplication->m_RunAsUser
-															, Directory
-															, UserID
-														)
-													;
-													fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", pApplication->m_RunAsUser, UserID));
-												}
-											}
 
-											TCVector<CStr> Files;
-											CStr SourcePath = _SourcePath;
-											if (CFile::fs_FileExists(_SourcePath, EFileAttrib_Directory))
-											{
-												auto Files = CFile::fs_FindFiles(_SourcePath + "/*");
-												if (Files.f_GetLen() == 1 && Files[0].f_Right(7) == ".tar.gz")
-													SourcePath = Files[0];
-											}
-											TCSet<CStr> AllowExist;
-											if (!_DeletePath.f_IsEmpty())
-												AllowExist[_DeletePath];
-											CStr Output = fsp_UnpackApplication(SourcePath, Directory, pApplication, Files, AllowExist);
-											if (!Output.f_IsEmpty())
-												pResult->f_AddStdOut(Output);
-											
-											if (!_DeletePath.f_IsEmpty())
-												CFile::fs_DeleteDirectoryRecursive(_DeletePath);
-											
-											return Files;
-										}
-									)
-									> [this, pResult, pApplication, Continuation, fLogInfo, fLogError](TCAsyncResult<TCVector<CStr>> &&_Files)
-									{
-										if (!_Files)
-										{
-											fLogError(fg_Format("Failed to unpack application: {}", _Files.f_GetExceptionStr()));
-											return;
-										}
-										if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
-										{
-											if (pApplicationsState->f_GetMember(pApplication->m_Name))
-											{
-												fLogError(fg_Format("Application with name '{}' already exists", pApplication->m_Name));
-												return;
-											}
-										}
-										
-										pApplication->m_Files = fg_Move(*_Files);
-										auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][pApplication->m_Name];
-										ApplicationJSON["Executable"] = pApplication->m_Executable; 
-										ApplicationJSON["RunAsUser"] = pApplication->m_RunAsUser; 
-										ApplicationJSON["RunAsGroup"] = pApplication->m_RunAsGroup;
-										auto &Parameters = ApplicationJSON["Parameters"].f_Array();
-										for (auto &Parameter : pApplication->m_ExecutableParameters)
-											Parameters.f_Insert(Parameter);
-										ApplicationJSON["EncryptionStorage"] = pApplication->m_EncryptionStorage;
-										ApplicationJSON["VersionManagerApplication"] = pApplication->m_VersionManagerApplication;
-										ApplicationJSON["LastInstalledVersion"] = pApplication->m_LastInstalledVersion.f_ToJSON();
-										ApplicationJSON["LastInstalledVersionInfo"] = pApplication->m_LastInstalledVersionInfo.f_ToJSON();
-										
-										ApplicationJSON["Files"] = *_Files;
-										
-										mp_Applications[pApplication->m_Name] = pApplication;
-										auto InProgressScope = pApplication->f_SetInProgress();
-
-										mp_State.m_StateDatabase.f_Save() 
-											> [this, Continuation, pResult, fLogError, fLogInfo, InProgressScope, pApplication](TCAsyncResult<void> &&_Result)
-											{
-												if (!_Result)
-												{
-													fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
-													return;
-												}
-												fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false) 
-													> [fLogError, fLogInfo, Continuation, InProgressScope, pResult](TCAsyncResult<void> &&_Result)
-													{
-														if (!_Result)
-														{
-															fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
-															return;
-														}
-														fLogInfo("Application was successfully added");
-														Continuation.f_SetResult(fg_Move(*pResult));
-													}
-												;
-											}
-										;
-									}
-								;
-							}
-						;
-						
-						if (!bIsVersionManager)
-							fUnpackApp(Package, CStr());
-						else
-						{
-							CStr DownloadDirectory = Directory + "/TempVersionDownload";
-							self(&CAppManagerActor::fp_DownloadApplication, Package, VersionID, DownloadDirectory) 
-								> Continuation / [Continuation, pApplication, Package, VersionID, fUnpackApp, DownloadDirectory](CVersionManager::CVersionInformation &&_VersionInfo)
-								{
-									auto &ExtraInfo = _VersionInfo.m_ExtraInfo;
-									if (pApplication->m_Executable.f_IsEmpty())
-									{
-										if (auto *pValue = ExtraInfo.f_GetMember("Executable", EJSONType_String))
-											pApplication->m_Executable = pValue->f_String();
-										if (pApplication->m_Executable.f_IsEmpty())
-										{
-											Continuation.f_SetException(DMibErrorInstance("No executable was specified and the downloaded version didn't include a default"));
-											return;
-										}
-									}
-
-									if (pApplication->m_RunAsUser.f_IsEmpty())
-									{
-										if (auto *pValue = ExtraInfo.f_GetMember("RunAsUser", EJSONType_String))
-											pApplication->m_RunAsUser = pValue->f_String();
-									}
-
-									if (pApplication->m_RunAsGroup.f_IsEmpty())
-									{
-										if (auto *pValue = ExtraInfo.f_GetMember("RunAsGroup", EJSONType_String))
-											pApplication->m_RunAsGroup = pValue->f_String();
-									}
-
-									if (pApplication->m_ExecutableParameters.f_IsEmpty())
-									{
-										if (auto *pValue = ExtraInfo.f_GetMember("ExecutableParams", EJSONType_Array))
-										{
-											for (auto &Param : pValue->f_Array())
-											{
-												if (!Param.f_IsString())
-													continue;
-												
-												pApplication->m_ExecutableParameters.f_Insert(Param.f_String());
-											}
-										}
-									}
-
-									pApplication->m_VersionManagerApplication = Package;
-									pApplication->m_LastInstalledVersion = VersionID;
-									pApplication->m_LastInstalledVersionInfo = _VersionInfo;
-
-									fUnpackApp(DownloadDirectory, DownloadDirectory);
-								}
-							;
-						}
-					}
-				;
-				
-				return Continuation;
-			}
-
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params)
-			{
-				CStr Name = _Params["Name"].f_String();
-				auto *pApplication = mp_Applications.f_FindEqual(Name);
-				if (!pApplication)
-					return DMibErrorInstance(fg_Format("No such application '{}'", Name));
-				
-				auto &Application = **pApplication;
-				if (Application.m_bOperationInProgress)
-					return DMibErrorInstance("Operation already in progress for application");
-				auto InProgressScope = Application.f_SetInProgress();
-					
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				Application.f_Stop(true) > [this, Continuation, Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
-					{
-						CDistributedAppCommandLineResults Results;
-						fp_OutputApplicationStop(_Result, Results, Name);
-						
-						auto *pApplication = mp_Applications.f_FindEqual(Name);
-						if (!pApplication)
-							return Continuation.f_SetException(DMibErrorInstance(fg_Format("No such application '{}'", Name)));
-						
-						(*pApplication)->f_Delete();
-						mp_Applications.f_Remove(Name);
-
-						if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
-						{
-							if (pApplicationsState->f_GetMember(Name))
-								pApplicationsState->f_RemoveMember(Name);
-						}
-						
-						mp_State.m_StateDatabase.f_Save() > [Results = fg_Move(Results), Continuation, InProgressScope](TCAsyncResult<void> &&_Result) mutable
-							{
-								if (!_Result)
-								{
-									Results.f_AddStdErr(fg_Format("Failed to save state: {}{\n}", _Result.f_GetExceptionStr()));
-									Results.m_Status = 1;
-									Continuation.f_SetResult(fg_Move(Results));
-									return;
-								}
-								
-								Continuation.f_SetResult(fg_Move(Results));
-							}
-						;
-					}
-				;
-				
-				return Continuation;
-			}
-			
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON const &_Params)
-			{
-				// 1. Extract new application to temporary directory
-				// 2. Stop old application
-				// 3. Delete old files
-				// 4. Move files from temporary directory to final destination
-				// 5. Re-launch application
-				
-				CStr Name = _Params["Name"].f_String();
-				auto pOldApplication = mp_Applications.f_FindEqual(Name);
-				if (!pOldApplication)
-					return DMibErrorInstance(fg_Format("No such application '{}'", Name));
-				
-				TCSharedPointer<CApplication> pApplication = *pOldApplication;
-				
-				if (pApplication->m_bOperationInProgress)
-					return DMibErrorInstance("Operation already in progress for application");
-				auto InProgressScope = pApplication->f_SetInProgress();
-				
-				CStr Package = _Params["Package"].f_String();
-				
-				if (Package.f_IsEmpty())
-					return DMibErrorInstance("You have to specify a package");
-				
-				Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
-				
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				
-				TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
-				
-				auto fLogInfo = [pResult](CStr const &_Info)
-					{
-						pResult->f_AddStdOut(_Info + DMibNewLine);
-						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{}", _Info);
-					}
-				;
-				auto fLogError = [pResult, Continuation](CStr const &_Error)
-					{
-						pResult->f_AddStdErr(_Error + DMibNewLine);
-						pResult->m_Status = 1;
-						Continuation.f_SetResult(fg_Move(*pResult));
-					}
-				;
-
-				fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Open, false)
-					> [this, pApplication, Package, fLogInfo, fLogError, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
-					{
-						if (!_Result)
-						{
-							fLogError(fg_Format("Failed to open encryption: {}", _Result.f_GetExceptionStr()));
-							return;
-						}
-						
-						CStr TemporaryDirectory = fg_Format("{}/{}", pApplication->f_GetDirectory(), fg_RandomID());
-						
-						auto TemporaryDirectoryCleanup = fg_OnScopeExitShared
-							(
-								[FileActor = mp_FileActor, TemporaryDirectory]
-								{
-									fg_Dispatch
-										(
-											FileActor
-											, [TemporaryDirectory]
-											{
-												try
-												{
-													if (CFile::fs_FileExists(TemporaryDirectory))
-														CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
-												}
-												catch (CExceptionFile const &_Exception)
-												{
-												}
-											}
-										)
-										> fg_DiscardResult()
-									;
-								}
-							)
-						;
-						
-						fg_Dispatch
-							(
-								mp_FileActor
-								, [pApplication, TemporaryDirectory, Package, fLogInfo, InProgressScope, TemporaryDirectoryCleanup]()
-								{
-									// 1. Extract new application to temporary directory
-									fLogInfo("Extracting application to temporary directory");
-									TCVector<CStr> Files;
-									CStr Output = fsp_UnpackApplication(Package, TemporaryDirectory, pApplication, Files, {});
-									if (!Output.f_IsEmpty())
-										fLogInfo(Output);
-									return Files;
-								}
-							)
-							> [this, pResult, pApplication, Continuation, fLogInfo, fLogError, InProgressScope, TemporaryDirectory, TemporaryDirectoryCleanup](TCAsyncResult<TCVector<CStr>> &&_Files)
-							{
-								if (!_Files)
-								{
-									fLogError(fg_Format("Failed to unpack application: {}", _Files.f_GetExceptionStr()));
-									return;
-								}
-								if (pApplication->m_bDeleted)
-								{
-									fLogError("Application has been deleted, aborting");
-									return;
-								}
-
-								auto Files = fg_Move(*_Files);
-								
-								fLogInfo("Stopping old application");
-								// 2. Stop old application
-								pApplication->f_Stop(false) > [this, pApplication, pResult, fLogInfo, fLogError, Continuation, TemporaryDirectory, InProgressScope, Files, TemporaryDirectoryCleanup]
-									(TCAsyncResult<uint32> &&_ExitStatus)
-									{
-										fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
-										
-										if (!_ExitStatus)
-										{
-											fLogError("Failed to exit old application, aborting update");
-											return;
-										}
-										
-										if (pApplication->m_bDeleted)
-										{
-											fLogError("Application has been deleted, aborting");
-											return;
-										}
-										
-										fLogInfo("Updating application files");
-										fg_Dispatch
-											(
-												mp_FileActor
-												,
-												[
-													pApplication
-													, TemporaryDirectory
-													, OutputDirectory = pApplication->f_GetDirectory()
-													, pResult
-													, Files
-													, OldFiles = pApplication->m_Files
-													, TemporaryDirectoryCleanup
-												]
-												{
-													// 3. Delete old files
-													for (auto &File : OldFiles)
-													{
-														CStr FullPath = fg_Format("{}/{}", OutputDirectory, File); 
-														if (CFile::fs_FileExists(FullPath, EFileAttrib_Directory))
-														{
-															try
-															{
-																// Allow only empty directories to be deleted, ignore error on non-empty ones.
-																CFile::fs_DeleteDirectory(FullPath);
-															}
-															catch (CExceptionFile const &)
-															{
-															}
-														}
-														else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
-															CFile::fs_DeleteFile(FullPath);
-													}
-													
-													// 4. Move files from temporary directory to final destination
-													auto fSetOwners = [&](CStr _Directory)
-														{
-															while (_Directory.f_GetLen() >= OutputDirectory.f_GetLen())
-															{
-																if (!pApplication->m_RunAsGroup.f_IsEmpty())
-																	CFile::fs_SetOwner(_Directory, pApplication->m_RunAsUser);
-																if (!pApplication->m_RunAsGroup.f_IsEmpty())
-																	CFile::fs_SetGroup(_Directory, pApplication->m_RunAsGroup);
-																_Directory = CFile::fs_GetPath(_Directory);
-															}
-														}
-													;
-													for (auto &File : Files)
-													{
-														CStr SourcePath = fg_Format("{}/{}", TemporaryDirectory, File);
-														CStr DestinationPath = fg_Format("{}/{}", OutputDirectory, File);
-														if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
-														{
-															CStr Directory = CFile::fs_GetPath(DestinationPath);
-															CFile::fs_CreateDirectory(Directory);
-															fSetOwners(Directory);
-															CFile::fs_RenameFile(SourcePath, DestinationPath);
-														}
-													}
-													CFile::fs_CreateDirectory(OutputDirectory + "/.home");
-													CFile::fs_CreateDirectory(OutputDirectory + "/.tmp");
-													
-													CFile::fs_SetAttributes(OutputDirectory, gc_RootAttributes);
-												}
-											)
-											> [this, pApplication, InProgressScope, fLogError, fLogInfo, Files, pResult, Continuation](TCAsyncResult<void> &&_Result)
-											{
-												if (!_Result)
-												{
-													fLogError(fg_Format("Failed update application files. Please manually fix error and retry: {}", _Result.f_GetExceptionStr()));
-													return;
-												}
-												if (pApplication->m_bDeleted)
-												{
-													fLogError("Application has been deleted, aborting");
-													return;
-												}
-													
-												// 5. Re-launch application
-												auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][pApplication->m_Name];
-								
-												pApplication->m_Files = Files;
-												ApplicationJSON["Files"] = Files;
-												
-												fLogInfo("Saving application state");
-												mp_State.m_StateDatabase.f_Save() 
-													> [this, Continuation, pResult, pApplication, fLogInfo, fLogError, InProgressScope](TCAsyncResult<void> &&_Result)
-													{
-														if (!_Result)
-														{
-															fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
-															return;
-														}
-														
-														fLogInfo("Launching updated application");
-														fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
-															> [fLogError, fLogInfo, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
-															{
-																if (!_Result)
-																{
-																	fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
-																	return;
-																}
-																fLogInfo("Application was successfully updated");
-																Continuation.f_SetResult(fg_Move(*pResult));
-															}
-														;
-													}
-												;
-											}
-										;
-										 
-									}
-								;
-
-							}
-						;
-					}
-				;
-				
-				return Continuation;
-			}
-			
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON const &_Params)
-			{
-				CStr Name = _Params["Name"].f_String();
-				auto pOldApplication = mp_Applications.f_FindEqual(Name);
-				if (!pOldApplication)
-					return DMibErrorInstance(fg_Format("No such application '{}'", Name));
-				
-				TCSharedPointer<CApplication> pApplication = *pOldApplication;
-				
-				if (pApplication->m_bOperationInProgress)
-					return DMibErrorInstance("Operation already in progress for application");
-				if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
-					return DMibErrorInstance("Application already stopped");
-
-				auto InProgressScope = pApplication->f_SetInProgress();
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
-				auto fLogError = [pResult, Continuation](CStr const &_Error)
-					{
-						pResult->f_AddStdErr(_Error + DMibNewLine);
-						pResult->m_Status = 1;
-						Continuation.f_SetResult(fg_Move(*pResult));
-					}
-				;
-				
-				pApplication->f_Stop(false) > [this, pApplication, pResult, fLogError, Continuation, InProgressScope]
-					(TCAsyncResult<uint32> &&_ExitStatus)
-					{
-						fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
-						
-						if (!_ExitStatus)
-						{
-							fLogError("Failed to exit old application");
-							return;
-						}
-						
-						if (pApplication->m_bDeleted)
-						{
-							fLogError("Application has been deleted, aborting");
-							return;
-						}
-						Continuation.f_SetResult(fg_Move(*pResult));
-					}
-				;
-				return Continuation;
-			}
-			
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON const &_Params)
-			{
-				CStr Name = _Params["Name"].f_String();
-				auto pOldApplication = mp_Applications.f_FindEqual(Name);
-				if (!pOldApplication)
-					return DMibErrorInstance(fg_Format("No such application '{}'", Name));
-				
-				TCSharedPointer<CApplication> pApplication = *pOldApplication;
-				
-				if (pApplication->m_bOperationInProgress)
-					return DMibErrorInstance("Operation already in progress for application");
-				if (pApplication->m_ProcessLaunch)
-					return DMibErrorInstance("Application already started");
-
-				auto InProgressScope = pApplication->f_SetInProgress();
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
-				auto fLogError = [pResult, Continuation](CStr const &_Error)
-					{
-						pResult->f_AddStdErr(_Error + DMibNewLine);
-						pResult->m_Status = 1;
-						Continuation.f_SetResult(fg_Move(*pResult));
-					}
-				;
-				
 				fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, true)
 					> [fLogError, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
 					{
@@ -774,64 +331,8 @@ namespace NMib
 						Continuation.f_SetResult(fg_Move(*pResult));
 					}
 				;
-				return Continuation;
 			}
-			
-			TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSON const &_Params)
-			{
-				CStr Name = _Params["Name"].f_String();
-				auto pOldApplication = mp_Applications.f_FindEqual(Name);
-				if (!pOldApplication)
-					return DMibErrorInstance(fg_Format("No such application '{}'", Name));
-				
-				TCSharedPointer<CApplication> pApplication = *pOldApplication;
-				
-				if (pApplication->m_bOperationInProgress)
-					return DMibErrorInstance("Operation already in progress for application");
-
-				auto InProgressScope = pApplication->f_SetInProgress();
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
-				auto fLogError = [pResult, Continuation](CStr const &_Error)
-					{
-						pResult->f_AddStdErr(_Error + DMibNewLine);
-						pResult->m_Status = 1;
-						Continuation.f_SetResult(fg_Move(*pResult));
-					}
-				;
-				
-				pApplication->f_Stop(false) > [this, pApplication, pResult, fLogError, Continuation, InProgressScope]
-					(TCAsyncResult<uint32> &&_ExitStatus)
-					{
-						fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
-						
-						if (!_ExitStatus)
-						{
-							fLogError("Failed to exit old application");
-							return;
-						}
-						
-						if (pApplication->m_bDeleted)
-						{
-							fLogError("Application has been deleted, aborting");
-							return;
-						}
-
-						fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, true)
-							> [fLogError, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
-							{
-								if (!_Result)
-								{
-									fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
-									return;
-								}
-								Continuation.f_SetResult(fg_Move(*pResult));
-							}
-						;
-					}
-				;
-				return Continuation;
-			}
-		}
+		;
+		return Continuation;
 	}
 }
