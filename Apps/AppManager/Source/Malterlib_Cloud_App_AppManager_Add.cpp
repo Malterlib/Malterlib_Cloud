@@ -27,6 +27,32 @@ namespace NMib::NCloud::NAppManager
 		CStr Version;
 		if (auto *pValue = _Params.f_GetMember("Version"))
 			Version = pValue->f_String();
+
+		if (auto *pValue = _Params.f_GetMember("AutoUpdateTags"))
+		{
+			if (pValue->f_IsArray())
+			{
+				pApplication->m_bAutoUpdate = true;
+				for (auto &TagJSON : pValue->f_Array())
+				{
+					auto &Tag = TagJSON.f_String();
+					if (!CVersionManager::fs_IsValidTag(Tag))
+						return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
+					pApplication->m_AutoUpdateTags[Tag];
+				}
+			}
+		}
+
+		if (auto *pValue = _Params.f_GetMember("AutoUpdateBranches"))
+		{
+			for (auto &BranchJSON : pValue->f_Array())
+			{
+				auto &Branch = BranchJSON.f_String();
+				if (!CVersionManager::fs_IsValidBranch(Branch))
+					return DMibErrorInstance(fg_Format("'{}' is not a valid branch", Branch));
+				pApplication->m_AutoUpdateBranches[Branch];
+			}
+		}
 		
 		auto Directory = pApplication->f_GetDirectory();
 		CStr Package = _Params["Package"].f_String();
@@ -93,21 +119,21 @@ namespace NMib::NCloud::NAppManager
 		;
 		
 		fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Setup, bForceOverwrite) 
-			> [this, fLogError, fLogInfo, pApplication, Directory, Package, pResult, bIsVersionManager, VersionID, Continuation](TCAsyncResult<void> &&_Result)
+			> [=](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 				{
 					fLogError(_Result.f_GetExceptionStr());
 					return;
 				}
-				auto fUnpackApp = [this, pResult, pApplication, Continuation, fLogInfo, fLogError, Directory, Package]
+				auto fUnpackApp = [=]
 					(CStr const &_SourcePath, CStr const &_DeletePath)
 					{
 						fLogInfo("Unpacking application");
 						fg_Dispatch
 							(
 								mp_FileActor
-								, [pApplication, Directory, _SourcePath, _DeletePath, pResult, fLogInfo]()
+								, [=]()
 								{
 									if (!pApplication->m_RunAsGroup.f_IsEmpty())
 									{
@@ -160,7 +186,7 @@ namespace NMib::NCloud::NAppManager
 									return Files;
 								}
 							)
-							> [this, pResult, pApplication, Continuation, fLogInfo, fLogError](TCAsyncResult<TCVector<CStr>> &&_Files)
+							> [=](TCAsyncResult<TCVector<CStr>> &&_Files)
 							{
 								if (!_Files)
 								{
@@ -182,7 +208,7 @@ namespace NMib::NCloud::NAppManager
 								auto InProgressScope = pApplication->f_SetInProgress();
 
 								self(&CAppManagerActor::fp_UpdateApplicationJSON, pApplication) 
-									> [this, Continuation, pResult, fLogError, fLogInfo, InProgressScope, pApplication](TCAsyncResult<void> &&_Result)
+									> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_Result)
 									{
 										if (!_Result)
 										{
@@ -190,7 +216,7 @@ namespace NMib::NCloud::NAppManager
 											return;
 										}
 										fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false) 
-											> [fLogError, fLogInfo, Continuation, InProgressScope, pResult](TCAsyncResult<void> &&_Result)
+											> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_Result)
 											{
 												if (!_Result)
 												{
@@ -215,7 +241,7 @@ namespace NMib::NCloud::NAppManager
 					CStr DownloadDirectory = Directory + "/TempVersionDownload";
 					fLogInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
 					self(&CAppManagerActor::fp_DownloadApplication, Package, VersionID, DownloadDirectory) 
-						> [Continuation, pApplication, Package, VersionID, fUnpackApp, DownloadDirectory, fLogError](TCAsyncResult<CVersionManager::CVersionInformation> &&_VersionInfo)
+						> [=](TCAsyncResult<CVersionManager::CVersionInformation> &&_VersionInfo)
 						{
 							if (!_VersionInfo)
 							{

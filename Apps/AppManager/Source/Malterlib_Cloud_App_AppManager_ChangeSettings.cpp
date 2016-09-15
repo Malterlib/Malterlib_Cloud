@@ -7,7 +7,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params)
+	namespace
 	{
 		enum EToUpdateFlag
 		{
@@ -17,7 +17,13 @@ namespace NMib::NCloud::NAppManager
 			, EToUpdateFlag_RunAsUser = DBit(2)
 			, EToUpdateFlag_RunAsGroup = DBit(3)
 			, EToUpdateFlag_VersionManagerApplication = DBit(4)
+			, EToUpdateFlag_AutoUpdateTags = DBit(5)
+			, EToUpdateFlag_AutoUpdateBranches = DBit(6)
 		};
+	}
+	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params)
+	{
+		static constexpr auto c_NeedRestartUpdateFlags = EToUpdateFlag_Executable | EToUpdateFlag_ExecutableParameters | EToUpdateFlag_RunAsUser | EToUpdateFlag_RunAsGroup;
 
 		CStr Name = _Params["Name"].f_String();
 		
@@ -100,7 +106,36 @@ namespace NMib::NCloud::NAppManager
 			UpdateFlags |= EToUpdateFlag_VersionManagerApplication;
 			VersionManagerApplication = pValue->f_String();
 		}
-
+		bool bAutoUpdate = false;
+		TCSet<CStr> AutoUpdateTags;
+		TCSet<CStr> AutoUpdateBranches;
+		if (auto *pValue = _Params.f_GetMember("AutoUpdateTags"))
+		{
+			UpdateFlags |= EToUpdateFlag_AutoUpdateTags;
+			if (pValue->f_IsArray())
+			{
+				bAutoUpdate = true;
+				for (auto &TagJSON : pValue->f_Array())
+				{
+					auto &Tag = TagJSON.f_String();
+					if (!CVersionManager::fs_IsValidTag(Tag))
+						return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
+					AutoUpdateTags[Tag];
+				}
+			}
+		}
+		if (auto *pValue = _Params.f_GetMember("AutoUpdateBranches"))
+		{
+			UpdateFlags |= EToUpdateFlag_AutoUpdateBranches;
+			for (auto &BranchJSON : pValue->f_Array())
+			{
+				auto &Branch = BranchJSON.f_String();
+				if (!CVersionManager::fs_IsValidBranch(Branch))
+					return DMibErrorInstance(fg_Format("'{}' is not a valid branch", Branch));
+				AutoUpdateBranches[Branch];
+			}
+		}
+		
 		if (Executable.f_IsEmpty() && (UpdateFlags & EToUpdateFlag_Executable))
 			return DMibErrorInstance("Trying to set executable to empty");
 	
@@ -135,6 +170,10 @@ namespace NMib::NCloud::NAppManager
 			UpdateFlags &= ~EToUpdateFlag_RunAsGroup;
 		if (UpdateFlags & EToUpdateFlag_VersionManagerApplication && Application.m_VersionManagerApplication == VersionManagerApplication)
 			UpdateFlags &= ~EToUpdateFlag_VersionManagerApplication;
+		if (UpdateFlags & EToUpdateFlag_AutoUpdateTags && Application.m_bAutoUpdate == bAutoUpdate && Application.m_AutoUpdateTags == AutoUpdateTags)
+			UpdateFlags &= ~EToUpdateFlag_AutoUpdateTags;
+		if (UpdateFlags & EToUpdateFlag_AutoUpdateBranches && Application.m_AutoUpdateBranches == AutoUpdateBranches)
+			UpdateFlags &= ~EToUpdateFlag_AutoUpdateBranches;
 			
 		if (UpdateFlags == EToUpdateFlag_None && !bForce)
 		{
@@ -142,26 +181,50 @@ namespace NMib::NCloud::NAppManager
 			Continuation.f_SetResult(fg_Move(*pResult));
 			return Continuation;
 		}
+
+		auto fUpdateSettings = [=, pApplication = *pApplication]
+			{
+				if (UpdateFlags & EToUpdateFlag_Executable)
+					pApplication->m_Executable = Executable;
+				if (UpdateFlags & EToUpdateFlag_ExecutableParameters)
+					pApplication->m_ExecutableParameters = ExecutableParameters;
+				if (UpdateFlags & EToUpdateFlag_RunAsUser)
+					pApplication->m_RunAsUser = RunAsUser;
+				if (UpdateFlags & EToUpdateFlag_RunAsGroup)
+					pApplication->m_RunAsGroup = RunAsGroup;
+				if (UpdateFlags & EToUpdateFlag_VersionManagerApplication)
+					pApplication->m_VersionManagerApplication = VersionManagerApplication;
+				if (UpdateFlags & EToUpdateFlag_AutoUpdateTags)
+				{
+					pApplication->m_bAutoUpdate = bAutoUpdate;
+					pApplication->m_AutoUpdateTags = AutoUpdateTags;
+				}
+				if (UpdateFlags & EToUpdateFlag_AutoUpdateBranches)
+					pApplication->m_AutoUpdateBranches = AutoUpdateBranches;
+			}
+		;
 		
+		if (!(UpdateFlags & c_NeedRestartUpdateFlags) && !bForce)
+		{
+			fUpdateSettings();
+			fLogInfo("Saving application state");
+			self(&CAppManagerActor::fp_UpdateApplicationJSON, *pApplication)
+				> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_UpdateJSONResults)
+				{
+					if (!_UpdateJSONResults)
+					{
+						fLogError(fg_Format("Failed to save application state: {}", _UpdateJSONResults.f_GetExceptionStr()));
+						return;
+					}
+					fLogInfo("Application settings were successfully changed");
+					Continuation.f_SetResult(fg_Move(*pResult));
+				}
+			;
+			return Continuation;
+		}
 		
 		fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, *pApplication, EEncryptOperation_Open, false)
-			> 
-			[
-				this
-				, pApplication = *pApplication
-				, UpdateFlags
-				, fLogInfo
-				, fLogError
-				, Continuation
-				, pResult
-				, InProgressScope
-				, Executable
-				, ExecutableParameters
-				, RunAsUser
-				, RunAsGroup
-				, VersionManagerApplication
-			]
-			(TCAsyncResult<void> &&_Result)
+			>[=, pApplication = *pApplication](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 				{
@@ -175,23 +238,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				
 				fLogInfo("Stopping old application");
-				pApplication->f_Stop(false) > 
-					[
-						this
-						, UpdateFlags
-						, pApplication
-						, pResult
-						, fLogInfo
-						, fLogError
-						, Continuation
-						, InProgressScope
-						, Executable
-						, ExecutableParameters
-						, RunAsUser
-						, RunAsGroup
-						, VersionManagerApplication
-					]
-					(TCAsyncResult<uint32> &&_ExitStatus)
+				pApplication->f_Stop(false) > [=](TCAsyncResult<uint32> &&_ExitStatus)
 					{
 						fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
 						
@@ -206,29 +253,20 @@ namespace NMib::NCloud::NAppManager
 							fLogError("Application has been deleted, aborting");
 							return;
 						}
-						
-						if (UpdateFlags & EToUpdateFlag_Executable)
-							pApplication->m_Executable = Executable;
-						if (UpdateFlags & EToUpdateFlag_ExecutableParameters)
-							pApplication->m_ExecutableParameters = ExecutableParameters;
-						if (UpdateFlags & EToUpdateFlag_RunAsUser)
-							pApplication->m_RunAsUser = RunAsUser;
-						if (UpdateFlags & EToUpdateFlag_RunAsGroup)
-							pApplication->m_RunAsGroup = RunAsGroup;
-						if (UpdateFlags & EToUpdateFlag_VersionManagerApplication)
-							pApplication->m_VersionManagerApplication = VersionManagerApplication;
+
+						fUpdateSettings();						
 						
 						fLogInfo("Saving application state and update application files");
 						fg_Dispatch
 							(
 								mp_FileActor
-								, [pApplication, Directory = pApplication->f_GetDirectory(), InProgressScope]()
+								, [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope]()
 								{
 									fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files);
 								}
 							)
 							+ self(&CAppManagerActor::fp_UpdateApplicationJSON, pApplication)
-							> [this, pResult, pApplication, Continuation, fLogInfo, fLogError, InProgressScope](TCAsyncResult<void> &&_Result, TCAsyncResult<void> &&_UpdateJSONResults)
+							> [=](TCAsyncResult<void> &&_Result, TCAsyncResult<void> &&_UpdateJSONResults)
 							{
 								bool bError = false;
 								if (!_Result)
@@ -255,7 +293,7 @@ namespace NMib::NCloud::NAppManager
 									
 								fLogInfo("Launching applicaion with changed settings");
 								fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
-									> [fLogError, fLogInfo, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
+									> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_Result)
 									{
 										if (!_Result)
 										{

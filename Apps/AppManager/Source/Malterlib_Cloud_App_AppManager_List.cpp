@@ -18,11 +18,14 @@ namespace NMib::NCloud::NAppManager
 			if (bVerbose)
 			{
 				Results.f_AddStdOut(fg_Format("            Executable: {}{\n}", Application.m_Executable));
-				Results.f_AddStdOut(fg_Format("            Parameters: {vs}{\n}", Application.m_ExecutableParameters));
+				Results.f_AddStdOut(fg_Format("            Parameters: {vs,vb}{\n}", Application.m_ExecutableParameters));
 				Results.f_AddStdOut(fg_Format("           Run as user: {}{\n}", Application.m_RunAsUser));
 				Results.f_AddStdOut(fg_Format("          Run as group: {}{\n}", Application.m_RunAsGroup));
 				Results.f_AddStdOut(fg_Format("    Encryption storage: {}{\n}", Application.m_EncryptionStorage));
-				Results.f_AddStdOut(fg_Format("                Status: {}{\n}", Application.m_LaunchState));
+				Results.f_AddStdOut(fg_Format("                Status: {}{\n}{\n}", Application.m_LaunchState));
+				Results.f_AddStdOut(fg_Format("           Auto update: {}{\n}", Application.m_bAutoUpdate ? "true" : "false"));
+				Results.f_AddStdOut(fg_Format("      Auto update tags: {vs}{\n}", Application.m_AutoUpdateTags));
+				Results.f_AddStdOut(fg_Format("  Auto update branches: {vs}{\n}{\n}", Application.m_AutoUpdateBranches));
 				Results.f_AddStdOut(fg_Format("      Application name: {}{\n}", Application.m_VersionManagerApplication));
 				Results.f_AddStdOut(fg_Format("               Version: {}{\n}", Application.m_LastInstalledVersion));
 				Results.f_AddStdOut(fg_Format("          Version time: {}{\n}", Application.m_LastInstalledVersionInfo.m_Time));
@@ -51,6 +54,7 @@ namespace NMib::NCloud::NAppManager
 		mint LongestTime = fg_StrLen("Time");
 		mint LongestSize = fg_StrLen("Size");
 		mint LongestFiles = fg_StrLen("Files");
+		mint LongestTags = fg_StrLen("Tags");
 		for (auto &Application : mp_VersionManagerApplications)
 		{
 			LongestApplication = fg_Max(LongestApplication, Application.f_GetApplicationName().f_GetLen());
@@ -61,6 +65,7 @@ namespace NMib::NCloud::NAppManager
 				LongestTime = fg_Max(LongestTime, fg_Format("{tc6}", Version.m_VersionInfo.m_Time.f_ToLocal()).f_GetLen());
 				LongestSize = fg_Max(LongestSize, fg_Format("{ns }", Version.m_VersionInfo.m_nBytes).f_GetLen());
 				LongestFiles = fg_Max(LongestFiles, fg_Format("{}", Version.m_VersionInfo.m_nFiles).f_GetLen());
+				LongestTags = fg_Max(LongestTags, fg_Format("{vs,vb}", Version.m_VersionInfo.m_Tags).f_GetLen());
 			}
 		}
 		
@@ -72,13 +77,14 @@ namespace NMib::NCloud::NAppManager
 				, auto const &_Time
 				, auto const &_Size
 				, auto const &_Files
+				, auto const &_Tags
 			)
 			{
 				CommandLineResults.f_AddStdOut
 					(
 						fg_Format
 						(
-							"{sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*}   {sj*}\n"
+							"{sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*}   {sj*}   {sj*,a-}\n"
 							, _Application
 							, LongestApplication
 							, _Version
@@ -91,13 +97,15 @@ namespace NMib::NCloud::NAppManager
 							, LongestSize
 							, _Files
 							, LongestFiles
+							, _Tags
+							, LongestTags
 						)
 					)
 				;
 			}
 		;
 		
-		fOutputLine("Application", "Version", "Config", "Time", "Size", "Files");
+		fOutputLine("Application", "Version", "Config", "Time", "Size", "Files", "Tags");
 		
 		for (auto &Application : mp_VersionManagerApplications)
 		{
@@ -113,6 +121,7 @@ namespace NMib::NCloud::NAppManager
 						, fg_Format("{tc6}", Version.m_VersionInfo.m_Time.f_ToLocal())
 						, fg_Format("{ns }", Version.m_VersionInfo.m_nBytes)
 						, fg_Format("{}", Version.m_VersionInfo.m_nFiles)
+						, fg_Format("{vs,vb}", Version.m_VersionInfo.m_Tags)
 					)
 				;
 				if (bVerbose && Version.m_VersionInfo.m_ExtraInfo.f_IsObject() && Version.m_VersionInfo.m_ExtraInfo.f_Object().f_OrderedIterator())

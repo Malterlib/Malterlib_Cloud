@@ -86,6 +86,21 @@ namespace NMib::NCloud::NAppManager
 						}
 						, SettingsOption_RunAsUser
 						, SettingsOption_RunAsGroup
+						, "AutoUpdateTags?"_= 
+						{
+							"Names"_= {"--auto-update-tags"}
+							, "Default"_= false
+							, "Type"_= COneOfType{{{""}, COneOf{false}}} 
+							, "Description"_= "Auto update the application when new versions become available that has all these these tags."
+						}
+						, "AutoUpdateBranches?"_= 
+						{
+							"Names"_= {"--auto-update-branches"}
+							, "Default"_= _[_]
+							, "Type"_= {""} 
+							, "Description"_= "Auto update the application only for versions from these branches.\n"
+							"Leave empty to allow any branch\n"
+						}
 					}
 					, "Parameters"_=
 					{
@@ -126,6 +141,19 @@ namespace NMib::NCloud::NAppManager
 						}				
 						, SettingsOption_RunAsUser
 						, SettingsOption_RunAsGroup
+						, "AutoUpdateTags?"_= 
+						{
+							"Names"_= {"--auto-update-tags"}
+							, "Type"_= COneOfType{{{""}, COneOf{false}}} 
+							, "Description"_= "Auto update the application when new versions become available that has all these these tags."
+						}
+						, "AutoUpdateBranches?"_= 
+						{
+							"Names"_= {"--auto-update-branches"}
+							, "Type"_= {""} 
+							, "Description"_= "Auto update the application only for versions from these branches.\n"
+							"Leave empty to allow any branch\n"
+						}
 						, "VersionManagerApplication?"_= 
 						{
 							"Names"_= {"--version-manager-application"}
@@ -248,7 +276,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params)
 				{
-					return fp_CommandLine_UpdateApplication(_Params);
+					return fp_CommandLine_UpdateApplication(_Params, false);
 				}
 			)
 		;
@@ -279,8 +307,7 @@ namespace NMib::NCloud::NAppManager
 						}
 						, "RequiredTags?"_= 
 						{
-							"Names"_= {"--required-tags"}
-							, "Default"_= _[_] 
+							"Names"_= {"--require-tags"}
 							, "Type"_= {""}
 							, "Description"_= "Require these tags for the version to update to."
 						}
@@ -297,7 +324,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params)
 				{
-					return fp_CommandLine_UpdateApplication(_Params);
+					return fp_CommandLine_UpdateApplication(_Params, false);
 				}
 			)
 		;

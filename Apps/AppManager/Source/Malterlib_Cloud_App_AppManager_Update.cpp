@@ -7,7 +7,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON const &_Params)
+	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON const &_Params, bool _bFromAutoUpdate)
 	{
 		// 1. Extract new application to temporary directory
 		// 2. Stop old application
@@ -35,6 +35,8 @@ namespace NMib::NCloud::NAppManager
 		if (auto *pValue = _Params.f_GetMember("Package"))
 		{
 			CStr Package = _Params["Package"].f_String();
+			if (Package.f_IsEmpty())
+				return DMibErrorInstance("You have to specify a package");
 			bDownloadVersion = false;
 			Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
 		}
@@ -43,63 +45,36 @@ namespace NMib::NCloud::NAppManager
 			bDryRun = _Params["DryRun"].f_Boolean();
 			bUpdateSettings = _Params["UpdateSettings"].f_Boolean(); 
 			CStr Version = _Params["Version"].f_String();
+
+			auto RequiredTags = pApplication->m_AutoUpdateTags;
+			auto AllowedBranches = pApplication->m_AutoUpdateBranches;			
 			
-			for (auto &TagJSON : _Params["RequiredTags"].f_Array())
+			if (auto *pValue = _Params.f_GetMember("RequiredTags"))
 			{
-				auto &Tag = TagJSON.f_String();
-				if (!CVersionManager::fs_IsValidTag(Tag))
-					return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
-				RequiredTags[Tag];
+				for (auto &TagJSON : pValue->f_Array())
+				{
+					auto &Tag = TagJSON.f_String();
+					if (!CVersionManager::fs_IsValidTag(Tag))
+						return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
+					RequiredTags[Tag];
+				}
 			}
+			
+			if (AllowedBranches.f_IsEmpty())
+				AllowedBranches = fg_CreateSet(pApplication->m_LastInstalledVersion.m_Branch);
 			
 			if (!Version.f_IsEmpty())
 			{
 				CStr ErrorStr;
-				if (!CVersionManager::fs_IsValidVersionIdentifier(VersionID, ErrorStr))
+				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, ErrorStr, &VersionID))
 					return DMibErrorInstance(fg_Format("Invalid version ID format: {}", ErrorStr));
-				if (Package.f_IsEmpty())
-					return DMibErrorInstance("You have to specify a package");
 			}
 			else
 			{
-				auto *pVersionManagerApp = mp_VersionManagerApplications.f_FindEqual(pApplication->m_VersionManagerApplication);
-				if (!pVersionManagerApp)
-					return DMibErrorInstance(fg_Format("No connected version managers provides versions for: {}", pApplication->m_VersionManagerApplication));
-				decltype(pVersionManagerApp->m_VersionsByTime.f_GetIterator()) iVersion;
-				auto &CurrentVersionID = pApplication->m_LastInstalledVersion;
-				for (iVersion.f_StartBackward(pVersionManagerApp->m_VersionsByTime); iVersion; --iVersion)
-				{
-					auto &RemoteVersion = *iVersion;
-					if (RemoteVersion.f_GetVersionID().m_Branch != CurrentVersionID.m_Branch)
-						continue;
-					bool bFoundAllTags = true;
-					for (auto &RequiredTag : RequiredTags)
-					{
-						if (!RemoteVersion.m_VersionInfo.m_Tags.f_FindEqual(RequiredTag))
-						{
-							bFoundAllTags = false;
-							break;
-						}
-					}
-					if (!bFoundAllTags)
-						continue;
-					VersionID = RemoteVersion.f_GetVersionID();
-					break;
-				}
-				if (RequiredTags.f_IsEmpty())
-				{
-					if (!VersionID.f_IsValid())
-						return DMibErrorInstance("No version in the same branch as the currently installed version was found");
-					if (VersionID <= CurrentVersionID)
-						return DMibErrorInstance("No newer version in the same branch as the currently installed version was found");
-				}
-				else
-				{
-					if (!VersionID.f_IsValid())
-						return DMibErrorInstance("No version with the required tags and in the same branch as the currently installed version was found");
-					if (VersionID <= CurrentVersionID)
-						return DMibErrorInstance("No newer version with the required tags and in the same branch as the currently installed version was found");
-				}
+				CStr Error;
+				VersionID = fp_FindVersionForAutoUpdate(pApplication, RequiredTags, AllowedBranches, Error);
+				if (!VersionID.f_IsValid())
+					return DMibErrorInstance(Error);
 			}
 		}
 		
@@ -110,21 +85,26 @@ namespace NMib::NCloud::NAppManager
 		auto fLogInfo = [pResult](CStr const &_Info)
 			{
 				pResult->f_AddStdOut(_Info + DMibNewLine);
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{}", _Info);
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application: {}", _Info);
 			}
 		;
-		auto fLogError = [pResult, Continuation](CStr const &_Error)
+		auto fLogError = [pResult, Continuation, _bFromAutoUpdate](CStr const &_Error)
 			{
-				pResult->f_AddStdErr(_Error + DMibNewLine);
-				pResult->m_Status = 1;
-				Continuation.f_SetResult(fg_Move(*pResult));
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (update application): {}", _Error);
+				if (_bFromAutoUpdate)
+				{
+					Continuation.f_SetException(DMibErrorInstance(_Error));
+				}
+				else
+				{
+					pResult->f_AddStdErr(_Error + DMibNewLine);
+					pResult->m_Status = 1;
+					Continuation.f_SetResult(fg_Move(*pResult));
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (update application): {}", _Error);
+				}
 			}
 		;
 
-		fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Open, false)
-			> [this, pApplication, Package, fLogInfo, fLogError, Continuation, pResult, InProgressScope, bUpdateSettings, bDownloadVersion, RequiredTags, VersionID, bDryRun]
-			(TCAsyncResult<void> &&_Result)
+		fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Open, false) > [=](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 				{
@@ -132,19 +112,28 @@ namespace NMib::NCloud::NAppManager
 					return;
 				}
 				
-				auto fUnpackApp = 
-					[
-						this
-						, pResult
-						, pApplication
-						, Continuation
-						, fLogInfo
-						, fLogError
-						, InProgressScope
-						, bDryRun
-						, VersionID
-					]
-					(CStr const &_SourcePath, TCSet<CStr> const &_AllowSourceExist)
+				CStr DownloadDirectory = fg_Format("{}/TempVersionDownload", pApplication->f_GetDirectory());
+				
+				auto DownloadDirectoryCleanup = fg_OnScopeExitActor
+					(
+						mp_FileActor
+						,  [DownloadDirectory, bDownloadVersion]
+						{
+							if (!bDownloadVersion)
+								return;
+							try
+							{
+								if (CFile::fs_FileExists(DownloadDirectory))
+									CFile::fs_DeleteDirectoryRecursive(DownloadDirectory);
+							}
+							catch (CExceptionFile const &_Exception)
+							{
+							}
+						}
+					)
+				;
+				
+				auto fUnpackApp = [=](CStr const &_SourcePath, TCSet<CStr> const &_AllowSourceExist)
 					{
 						CStr TemporaryDirectory = fg_Format("{}/TempVersion", pApplication->f_GetDirectory());
 						
@@ -167,7 +156,7 @@ namespace NMib::NCloud::NAppManager
 						fg_Dispatch
 							(
 								mp_FileActor
-								, [pApplication, TemporaryDirectory, _SourcePath, fLogInfo, InProgressScope, TemporaryDirectoryCleanup, VersionID, _AllowSourceExist]()
+								, [=]()
 								{
 									// 1. Extract new application to temporary directory
 									fLogInfo("Extracting application to temporary directory");
@@ -178,7 +167,7 @@ namespace NMib::NCloud::NAppManager
 									return Files;
 								}
 							)
-							> [this, pResult, pApplication, Continuation, fLogInfo, fLogError, VersionID, InProgressScope, TemporaryDirectory, TemporaryDirectoryCleanup, bDryRun]
+							> [=]
 							(TCAsyncResult<TCVector<CStr>> &&_Files)
 							{
 								if (!_Files)
@@ -204,7 +193,7 @@ namespace NMib::NCloud::NAppManager
 								fLogInfo("Stopping old application");
 								// 2. Stop old application
 								pApplication->f_Stop(false) 
-									> [this, pApplication, pResult, VersionID, fLogInfo, fLogError, Continuation, TemporaryDirectory, InProgressScope, Files, TemporaryDirectoryCleanup]
+									> [=]
 									(TCAsyncResult<uint32> &&_ExitStatus)
 									{
 										fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
@@ -233,7 +222,8 @@ namespace NMib::NCloud::NAppManager
 													, pResult
 													, Files
 													, OldFiles = pApplication->m_Files
-													, TemporaryDirectoryCleanup
+													, TemporaryDirectoryCleanup  
+													, DownloadDirectoryCleanup
 												]
 												{
 													// 3. Delete old files
@@ -271,7 +261,7 @@ namespace NMib::NCloud::NAppManager
 													fsp_UpdateApplicationFiles(OutputDirectory, pApplication, Files);
 												}
 											)
-											> [this, pApplication, VersionID, InProgressScope, fLogError, fLogInfo, Files, pResult, Continuation](TCAsyncResult<void> &&_Result)
+											> [=](TCAsyncResult<void> &&_Result)
 											{
 												if (!_Result)
 												{
@@ -286,7 +276,7 @@ namespace NMib::NCloud::NAppManager
 													
 												fLogInfo("Saving application state");
 												self(&CAppManagerActor::fp_UpdateApplicationJSON, pApplication) 
-													> [this, VersionID, Continuation, pResult, pApplication, fLogInfo, fLogError, InProgressScope](TCAsyncResult<void> &&_Result)
+													> [=](TCAsyncResult<void> &&_Result)
 													{
 														if (!_Result)
 														{
@@ -297,7 +287,7 @@ namespace NMib::NCloud::NAppManager
 														// 5. Re-launch application
 														fLogInfo("Launching updated application");
 														fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
-															> [fLogError, fLogInfo, Continuation, VersionID, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
+															> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_Result)
 															{
 																if (!_Result)
 																{
@@ -324,29 +314,9 @@ namespace NMib::NCloud::NAppManager
 				
 				if (bDownloadVersion)
 				{
-					CStr DownloadDirectory = fg_Format("{}/TempVersionDownload", pApplication->f_GetDirectory());
-					
-					auto DownloadDirectoryCleanup = fg_OnScopeExitActor
-						(
-							mp_FileActor
-							,  [DownloadDirectory]
-							{
-								try
-								{
-									if (CFile::fs_FileExists(DownloadDirectory))
-										CFile::fs_DeleteDirectoryRecursive(DownloadDirectory);
-								}
-								catch (CExceptionFile const &_Exception)
-								{
-								}
-							}
-						)
-					;
-					
 					fLogInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
 					self(&CAppManagerActor::fp_DownloadApplication, pApplication->m_VersionManagerApplication, VersionID, DownloadDirectory) 
-						> [Continuation, pApplication, VersionID, fUnpackApp, DownloadDirectory, RequiredTags, DownloadDirectoryCleanup, fLogError, bDryRun, bUpdateSettings]
-						(TCAsyncResult<CVersionManager::CVersionInformation> &&_VersionInfo)
+						> [=](TCAsyncResult<CVersionManager::CVersionInformation> &&_VersionInfo)
 						{
 							if (!_VersionInfo)
 							{
@@ -359,6 +329,8 @@ namespace NMib::NCloud::NAppManager
 								fLogError("Application has been deleted, aborting");
 								return;
 							}
+
+							fLogInfo(fg_Format("Application downloaded, unpacking"));
 							
 							auto &VersionInfo = *_VersionInfo;
 							

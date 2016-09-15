@@ -43,7 +43,18 @@ namespace NMib
 								Application.m_LastInstalledVersion = CVersionManager::CVersionIdentifier::fs_FromJSON(*pValue);
 							if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfo", EJSONType_Object))
 								Application.m_LastInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
-							
+							if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdate", EJSONType_Boolean))
+								Application.m_bAutoUpdate = pValue->f_Boolean();
+							if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdateTags", EJSONType_Array))
+							{
+								for (auto &Tag : pValue->f_Array())
+									Application.m_AutoUpdateTags[Tag.f_String()];
+							}
+							if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdateBranches", EJSONType_Array))
+							{
+								for (auto &Tag : pValue->f_Array())
+									Application.m_AutoUpdateBranches[Tag.f_String()];
+							}
 						}					
 					}
 				}

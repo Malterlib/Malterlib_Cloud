@@ -389,13 +389,13 @@ namespace NMib::NCloud::NCloudClient
 										(
 											fg_Format
 											(
-												"        {sl10,a-} {sl10,a-} {tc6,sl24,a-} {vs,sl10,a-} {ns ,sl12} bytes ({} files)\n"
+												"        {sl10,a-} {sl10,a-} {tc6,sl24,a-} {ns ,sl12} bytes ({sl5} files)   {vs,vb,a-}\n"
 												, VersionID
 												, Version.m_Configuration
 												, Version.m_Time.f_ToLocal()
-												, Version.m_Tags
 												, Version.m_nBytes
 												, Version.m_nFiles
+												, Version.m_Tags
 											)
 										)
 									;
@@ -527,7 +527,7 @@ namespace NMib::NCloud::NCloudClient
 											CDistributedAppCommandLineResults CommandLine;
 
 											if (!DeniedTags.f_IsEmpty())
-												CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs}\n", DeniedTags));
+												CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs,vb}\n", DeniedTags));
 											
 											CommandLine.f_AddStdOut
 												(
@@ -772,7 +772,7 @@ namespace NMib::NCloud::NCloudClient
 					{
 						CDistributedAppCommandLineResults CommandLine;
 						if (!_Result.m_DeniedTags.f_IsEmpty())
-							CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs}\n", _Result.m_DeniedTags));
+							CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs,vb}\n", _Result.m_DeniedTags));
 						Continuation.f_SetResult(fg_Move(CommandLine));
 					}
 				;

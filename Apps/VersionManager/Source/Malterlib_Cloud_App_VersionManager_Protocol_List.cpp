@@ -42,7 +42,7 @@ namespace NMib::NCloud::NVersionManager
 		CVersionManager::CListApplications::CResult Results;
 		Results.m_Applications = fp_FilterApplicationsByPermissions(_CallingHostInfo, fp_ApplicationSet());
 
-		fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Listed applications: {vs}", Results.m_Applications));
+		fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Listed applications: {vs,vb}", Results.m_Applications));
 		
 		Continuation.f_SetResult(fg_Move(Results));
 		return Continuation;
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NVersionManager
 		for (auto &Application : Results.m_Versions)
 			VersionsText[Results.m_Versions.fs_GetKey(Application)] = fg_Format("{} versions", Application.f_GetLen());
 		
-		fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Listed versions: {vs}", VersionsText));
+		fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Listed versions: {vs,vb}", VersionsText));
 		
 		Continuation.f_SetResult(fg_Move(Results));
 

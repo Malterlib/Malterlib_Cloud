@@ -145,14 +145,29 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["Executable"] = _pApplication->m_Executable; 
 		ApplicationJSON["RunAsUser"] = _pApplication->m_RunAsUser; 
 		ApplicationJSON["RunAsGroup"] = _pApplication->m_RunAsGroup;
-		auto &Parameters = ApplicationJSON["Parameters"].f_Array();
-		Parameters.f_Clear();
-		for (auto &Parameter : _pApplication->m_ExecutableParameters)
-			Parameters.f_Insert(Parameter);
+		{
+			auto &Parameters = ApplicationJSON["Parameters"].f_Array();
+			Parameters.f_Clear();
+			for (auto &Parameter : _pApplication->m_ExecutableParameters)
+				Parameters.f_Insert(Parameter);
+		}
 		ApplicationJSON["EncryptionStorage"] = _pApplication->m_EncryptionStorage;
 		ApplicationJSON["VersionManagerApplication"] = _pApplication->m_VersionManagerApplication;
 		ApplicationJSON["LastInstalledVersion"] = _pApplication->m_LastInstalledVersion.f_ToJSON();
 		ApplicationJSON["LastInstalledVersionInfo"] = _pApplication->m_LastInstalledVersionInfo.f_ToJSON();
+		ApplicationJSON["AutoUpdate"] = _pApplication->m_bAutoUpdate;
+		{
+			auto &Array = ApplicationJSON["AutoUpdateTags"].f_Array();
+			Array.f_Clear();
+			for (auto &Tag : _pApplication->m_AutoUpdateTags)
+				Array.f_Insert(Tag);
+		}
+		{
+			auto &Array = ApplicationJSON["AutoUpdateBranches"].f_Array();
+			Array.f_Clear();
+			for (auto &Branch : _pApplication->m_AutoUpdateBranches)
+				Array.f_Insert(Branch);
+		}
 		ApplicationJSON["Files"] = _pApplication->m_Files;
 	
 		TCContinuation<void> Continuation;

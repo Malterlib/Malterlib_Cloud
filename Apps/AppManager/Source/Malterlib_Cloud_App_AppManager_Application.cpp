@@ -32,10 +32,13 @@ namespace NMib::NCloud::NAppManager
 		return fg_OnScopeExitActor
 			(
 				fg_ThisActor(m_pThis)
-				, [pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]
+				, [pThis = m_pThis, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]
 				{
 					DCheck(pApplication->m_bOperationInProgress);
 					pApplication->m_bOperationInProgress = false;
+					
+					if (pThis->mp_bPendingAutoUpdate)
+						pThis->fp_AutoUpdate_Update();
 				}
 			)
 		;

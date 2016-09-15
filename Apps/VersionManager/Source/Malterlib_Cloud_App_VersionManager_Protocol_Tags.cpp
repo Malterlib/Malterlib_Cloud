@@ -71,7 +71,7 @@ namespace NMib::NCloud::NVersionManager
 		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())
 		{
 			if (!DeniedTags.f_IsEmpty())
-				return fp_AccessDenied(_CallingHostInfo, "Change tags", fg_Format("Access denied to all tags specified: {vs}", DeniedTags));
+				return fp_AccessDenied(_CallingHostInfo, "Change tags", fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags));
 			fsp_LogActivityInfo(_CallingHostInfo, "Change tags resulted in no changed tags");
 			CVersionManager::CChangeTags::CResult Result;
 			return fg_Explicit(Result);
@@ -98,7 +98,7 @@ namespace NMib::NCloud::NVersionManager
 		pVersion->m_VersionInfo.m_Tags -= RemoveTags;
 		pVersion->m_VersionInfo.m_Tags += AddTags;
 		
-		fp_NewTagsKnown(AddTags);
+		fp_NewVersion(_Params.m_Application, pVersion->f_GetIdentifier(), pVersion->m_VersionInfo); 
 		
 		TCContinuation<CVersionManager::CChangeTags::CResult> Continuation;
 		
@@ -112,7 +112,7 @@ namespace NMib::NCloud::NVersionManager
 					Continuation.f_SetException(DMibErrorInstance("Failed to save version info. Consult version manager log files for more info."));
 					return;
 				}
-				fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Changed tags for {} {}   Removed {vs}   Added {vs}", ApplicationName, VersionID, AddTags, RemoveTags));
+				fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Changed tags for {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, AddTags, RemoveTags));
 				CVersionManager::CChangeTags::CResult Result;
 				Result.m_DeniedTags = DeniedTags;
 				

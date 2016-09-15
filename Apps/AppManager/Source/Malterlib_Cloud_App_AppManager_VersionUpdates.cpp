@@ -76,7 +76,6 @@ namespace NMib::NCloud::NAppManager
 	{
 	}
 	
-	
 	void CAppManagerActor::fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info)
 	{
 		auto &NewManager = mp_VersionManagers[_VersionManager];
@@ -86,29 +85,38 @@ namespace NMib::NCloud::NAppManager
 		SubscriptionParams.m_Application = CStr(); // All applications we have access to 
 		SubscriptionParams.m_nInitial = 20;
 		SubscriptionParams.m_DispatchActor = self;
-		SubscriptionParams.m_fOnPermissionsChanged = [this, Actor = _VersionManager.f_Weak()]() -> NConcurrency::TCContinuation<void>
+		SubscriptionParams.m_fOnNewVersions = [this, Actor = _VersionManager.f_Weak()](CVersionManager::CNewVersionNotifications &&_NewVersions) 
+			-> NConcurrency::TCContinuation<CVersionManager::CNewVersionNotifications::CResult>
 			{
 				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
 				if (!pManager)
 					return DMibErrorInstance("Manager gone");
 				auto &Manager = *pManager;
-				Manager.m_Versions.f_Clear();
-				return fg_Explicit();
-			}
-		;
-		SubscriptionParams.m_fOnNewVersion = [this, Actor = _VersionManager.f_Weak()](CVersionManager::CNewVersionNotification &&_VersionInfo) -> NConcurrency::TCContinuation<CVersionManager::CNewVersionNotification::CResult>
-			{
-				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
-				if (!pManager)
-					return DMibErrorInstance("Manager gone");
-				auto &Manager = *pManager;
-				auto &Version = *(Manager.m_Versions[_VersionInfo.m_Application](_VersionInfo.m_VersionID, &Manager));
-				auto &Application = *mp_VersionManagerApplications(_VersionInfo.m_Application, *this);
-				Version.f_SetApplication(nullptr);
-				Version.m_VersionInfo = fg_Move(_VersionInfo.m_VersionInfo);
-				Version.f_SetApplication(&Application);
+
+				if (_NewVersions.m_bFullResend)
+					Manager.m_Versions.f_Clear();
 				
-				return fg_Explicit(CVersionManager::CNewVersionNotification::CResult());
+				for (auto &NewVersion : _NewVersions.m_NewVersions)
+				{
+					auto &Version = *(Manager.m_Versions[NewVersion.m_Application](NewVersion.m_VersionID, &Manager));
+					auto &Application = *mp_VersionManagerApplications(NewVersion.m_Application, *this);
+					Version.f_SetApplication(nullptr);
+					Version.m_VersionInfo = fg_Move(NewVersion.m_VersionInfo);
+					Version.f_SetApplication(&Application);
+				}
+				
+				if (_NewVersions.m_bFullResend)
+				{
+					// Wait 5 second for other managers to send their versions 
+					fg_Timeout(5.0) > [this](TCAsyncResult<void> &&)
+						{
+							fp_AutoUpdate_Update();
+						}
+					;
+				}
+				else
+					fp_AutoUpdate_Update();
+				return fg_Explicit(CVersionManager::CNewVersionNotifications::CResult());
 			}
 		;
 		
@@ -156,7 +164,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		TCContinuation<CVersionManager::CVersionInformation> Continuation;
-		
+
 		DownloadState.m_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>(_DestinationDir); 
 		DownloadState.m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, 16*1024*1024, CFileTransferReceive::EReceiveFlag_DeleteExisting) 
 			> Continuation % "Failed to initialize file transfer context" 
@@ -167,7 +175,7 @@ namespace NMib::NCloud::NAppManager
 				StartDownload.m_Application = _ApplicationName;
 				StartDownload.m_VersionID = _VersionID;
 				StartDownload.m_TransferContext = fg_Move(_TransferContext);
-
+				
 				DMibCallActor
 					(
 						_Manager

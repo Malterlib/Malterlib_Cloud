@@ -14,6 +14,11 @@ namespace NMib::NCloud
 		return NNet::fg_IsValidHostname(_String);
 	}
 	
+	bool CVersionManager::fs_IsValidBranch(NStr::CStr const &_String)
+	{
+		return NNet::fg_IsValidHostname(_String, "/");
+	}
+
 	bool CVersionManager::fs_IsValidTag(CStr const &_String)
 	{
 		return NNet::fg_IsValidHostname(_String);
@@ -26,7 +31,7 @@ namespace NMib::NCloud
 	
 	bool CVersionManager::fs_IsValidVersionIdentifier(CVersionIdentifier const &_VersionID, CStr &o_Error)
 	{
-		if (!NNet::fg_IsValidHostname(_VersionID.m_Branch, "/"))
+		if (!fs_IsValidBranch(_VersionID.m_Branch))
 		{
 			o_Error = "Branch is not valid";
 			return false;
@@ -346,11 +351,11 @@ namespace NMib::NCloud
 	
 	// CNewVersionNotification
 	
-	void CVersionManager::CNewVersionNotification::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CVersionManager::CNewVersionNotifications::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 	}
 	
-	void CVersionManager::CNewVersionNotification::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	void CVersionManager::CNewVersionNotifications::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 	}
 	
@@ -366,6 +371,18 @@ namespace NMib::NCloud
 		_Stream >> m_Application;
 		_Stream >> m_VersionID;
 		_Stream >> m_VersionInfo;
+	}
+
+	void CVersionManager::CNewVersionNotifications::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+		_Stream << m_bFullResend;
+		_Stream << m_NewVersions;
+	}
+	
+	void CVersionManager::CNewVersionNotifications::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+		_Stream >> m_bFullResend;
+		_Stream >> m_NewVersions;
 	}
 
 	// CSubscribeToUpdates
@@ -384,8 +401,7 @@ namespace NMib::NCloud
 	{
 		_Stream << m_Application; 
 		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_DispatchActor);
-		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_fOnPermissionsChanged);
-		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_fOnNewVersion);
+		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_fOnNewVersions);
 		_Stream << m_nInitial;
 	}
 	
@@ -393,8 +409,7 @@ namespace NMib::NCloud
 	{
 		_Stream >> m_Application; 
 		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_DispatchActor);
-		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fOnPermissionsChanged);
-		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fOnNewVersion);
+		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fOnNewVersions);
 		_Stream >> m_nInitial;
 	}
 	

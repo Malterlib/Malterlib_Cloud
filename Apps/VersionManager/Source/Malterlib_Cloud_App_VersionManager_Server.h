@@ -111,12 +111,11 @@ namespace NMib::NCloud::NVersionManager
 			uint32 m_nInitial = 0;
 			CStr m_HostID;
 			TCActor<> m_DispatchActor;
-			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<void> ()> m_fOnPermissionsChanged;
-			TCFunctionMutable<NConcurrency::TCContinuation<CVersionManager::CNewVersionNotification::CResult> (CVersionManager::CNewVersionNotification &&_VersionInfo)> 
-				m_fOnNewVersion
+			TCFunctionMutable<NConcurrency::TCContinuation<CVersionManager::CNewVersionNotifications::CResult> (CVersionManager::CNewVersionNotifications &&_VersionInfo)> 
+				m_fOnNewVersions
 			;
 			
-			void f_SendVersion(CVersionManager::CNewVersionNotification const &_NewVersionNotification) const;
+			void f_SendVersions(CVersionManager::CNewVersionNotifications const &_NewVersionNotification) const;
 		};
 		
 		struct CSizeInfo
@@ -147,7 +146,8 @@ namespace NMib::NCloud::NVersionManager
 		TCSet<CStr> fp_ApplicationSet();
 		TCSet<CStr> fp_FilterTags(CStr const &_HostID, TCSet<CStr> const &_Tags, TCSet<CStr> &o_DeniedTags);
 		void fp_NewTagsKnown(TCSet<CStr> const &_Tags);
-		TCContinuation<CSizeInfo> fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo); 
+		void fp_NewVersion(CStr const &_ApplicationName, CVersionManager::CVersionIdentifier const &_VersionID, CVersionManager::CVersionInformation const &_VersionInfo);
+		TCContinuation<CSizeInfo> fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo);
 		
 		static void fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info);
 		static void fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error);

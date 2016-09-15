@@ -25,6 +25,7 @@ namespace NMib::NCloud
 		static bool fs_IsValidApplicationName(NStr::CStr const &_String);
 		static bool fs_IsValidProtocolVersion(uint32 _Version);
 		static bool fs_IsValidTag(NStr::CStr const &_String);
+		static bool fs_IsValidBranch(NStr::CStr const &_String);
 
 		struct CVersionIdentifier
 		{
@@ -164,6 +165,16 @@ namespace NMib::NCloud
 		
 		struct CNewVersionNotification
 		{
+			void f_Feed(CDistributedActorWriteStream &_Stream) const;
+			void f_Consume(CDistributedActorReadStream &_Stream);
+			
+			NStr::CStr m_Application;
+			CVersionIdentifier m_VersionID;
+			CVersionInformation m_VersionInfo;
+		};
+
+		struct CNewVersionNotifications
+		{
 			struct CResult
 			{
 				void f_Feed(CDistributedActorWriteStream &_Stream) const;
@@ -173,11 +184,10 @@ namespace NMib::NCloud
 			void f_Feed(CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(CDistributedActorReadStream &_Stream);
 			
-			NStr::CStr m_Application;
-			CVersionIdentifier m_VersionID;
-			CVersionInformation m_VersionInfo;
+			bool m_bFullResend = false;
+			NContainer::TCVector<CNewVersionNotification> m_NewVersions;
 		};
-
+		
 		struct CSubscribeToUpdates
 		{
 			struct CResult
@@ -193,8 +203,7 @@ namespace NMib::NCloud
 			
 			NStr::CStr m_Application; /// Leave empty to subscribe to all applications 
 			NConcurrency::TCActor<> m_DispatchActor;
-			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<void> ()> m_fOnPermissionsChanged; // Will be followed by m_fOnNewVersion being called with the currently accessible versions
-			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<CNewVersionNotification::CResult> (CNewVersionNotification &&_VersionInfo)> m_fOnNewVersion;
+			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<CNewVersionNotifications::CResult> (CNewVersionNotifications &&_VersionInfo)> m_fOnNewVersions;
 			uint32 m_nInitial = 10;
 		};
 

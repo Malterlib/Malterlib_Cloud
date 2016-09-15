@@ -12,14 +12,51 @@
 
 namespace NMib::NCloud::NVersionManager
 {
-	void CVersionManagerDaemonActor::CServer::CSubscription::f_SendVersion(CVersionManager::CNewVersionNotification const &_NewVersionNotification) const
+	void CVersionManagerDaemonActor::CServer::fp_NewVersion
+		(
+			CStr const &_ApplicationName
+			, CVersionManager::CVersionIdentifier const &_VersionID
+			, CVersionManager::CVersionInformation const &_VersionInfo
+		)
+	{
+		CVersionManager::CNewVersionNotifications NewVersionNotifications;
+		auto &NewVersionNotification = NewVersionNotifications.m_NewVersions.f_Insert();
+		NewVersionNotification.m_Application = _ApplicationName;
+		NewVersionNotification.m_VersionID = _VersionID;
+		NewVersionNotification.m_VersionInfo = _VersionInfo;
+		
+		fp_NewTagsKnown(_VersionInfo.m_Tags);
+		
+		TCVector<CStr> Permissions;
+		Permissions.f_Insert("Application/ReadAll");
+		Permissions.f_Insert("Application/ListAll");
+		Permissions.f_Insert(fg_Format("Application/Read/{}", _ApplicationName));
+		
+		auto fSendToSubscription = [&](CSubscription const &_Subscription)
+			{
+				if (!mp_Permissions.f_HostHasAnyPermission(_Subscription.m_HostID, Permissions))
+					return;
+				_Subscription.f_SendVersions(NewVersionNotifications);
+			}
+		;
+		for (auto &Subscription : mp_GlobalVersionSubscriptions)
+			fSendToSubscription(Subscription);
+		auto *pSubscription = mp_VersionSubscriptions.f_FindEqual(_ApplicationName);
+		if (pSubscription)
+		{
+			for (auto &Subscription : *pSubscription)
+				fSendToSubscription(Subscription);
+		}
+	}
+	
+	void CVersionManagerDaemonActor::CServer::CSubscription::f_SendVersions(CVersionManager::CNewVersionNotifications const &_NewVersionNotifications) const
 	{
 		fg_Dispatch
 			(
 				m_DispatchActor
-				, [fOnNewVersion = m_fOnNewVersion, NewVersionNotification = _NewVersionNotification]() mutable
+				, [fOnNewVersions = m_fOnNewVersions, NewVersionNotifications = _NewVersionNotifications]() mutable
 				{
-					return fOnNewVersion(fg_Move(NewVersionNotification));
+					return fOnNewVersions(fg_Move(NewVersionNotifications));
 				}
 			)
 			> fg_DiscardResult()
@@ -49,16 +86,9 @@ namespace NMib::NCloud::NVersionManager
 		SharedPermissions.f_Insert("Application/ReadAll");
 		SharedPermissions.f_Insert("Application/ListAll");
 
-		if (_bPermissionsChanged)
-		{
-			fg_Dispatch
-				(
-					_Subscription.m_DispatchActor
-					, fg_TempCopy(_Subscription.m_fOnPermissionsChanged)
-				)
-				> fg_DiscardResult()
-			;
-		}
+		CVersionManager::CNewVersionNotifications NewVersionNotifications;
+
+		NewVersionNotifications.m_bFullResend = true; 
 		
 		auto fSendInitialForApplication = [&](CApplication const &_Application)
 			{
@@ -70,18 +100,16 @@ namespace NMib::NCloud::NVersionManager
 				{
 					return;
 				}
-
-				CVersionManager::CNewVersionNotification NewVersionNotification;
-				NewVersionNotification.m_Application = _Application.f_GetName();
 				
 				mint nToSend = _Subscription.m_nInitial;
 				decltype(_Application.m_VersionsByTime.f_GetIterator()) iVersion;
 				for (iVersion.f_StartBackward(_Application.m_VersionsByTime); iVersion && nToSend; --iVersion, --nToSend)
 				{
 					auto &Version = *iVersion;
+					auto &NewVersionNotification = NewVersionNotifications.m_NewVersions.f_Insert();
+					NewVersionNotification.m_Application = _Application.f_GetName();
 					NewVersionNotification.m_VersionID = Version.f_GetIdentifier();
 					NewVersionNotification.m_VersionInfo = Version.m_VersionInfo;
-					_Subscription.f_SendVersion(NewVersionNotification);
 				}
 			}
 		;
@@ -93,6 +121,8 @@ namespace NMib::NCloud::NVersionManager
 		}
 		else if (auto *pApplication = mp_Applications.f_FindEqual(_Application))
 			fSendInitialForApplication(*pApplication);
+		
+		_Subscription.f_SendVersions(NewVersionNotifications);
 	}
 	
 	auto CVersionManagerDaemonActor::CServer::fp_Protocol_SubscribeToUpdates(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CSubscribeToUpdates &&_Params)
@@ -107,8 +137,7 @@ namespace NMib::NCloud::NVersionManager
 			
 		auto &Subscription = *pSubscription;
 		Subscription.m_DispatchActor = fg_Move(_Params.m_DispatchActor);
-		Subscription.m_fOnPermissionsChanged = fg_Move(_Params.m_fOnPermissionsChanged);
-		Subscription.m_fOnNewVersion = fg_Move(_Params.m_fOnNewVersion);
+		Subscription.m_fOnNewVersions = fg_Move(_Params.m_fOnNewVersions);
 		Subscription.m_HostID = _CallingHostInfo.f_GetRealHostID();
 		Subscription.m_nInitial = _Params.m_nInitial;
 			

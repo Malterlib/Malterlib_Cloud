@@ -288,33 +288,8 @@ namespace NMib::NCloud::NVersionManager
 									Application.m_VersionsByTime.f_Remove(Version);
 								Version.m_VersionInfo = VersionInfo;
 								Application.m_VersionsByTime.f_Insert(Version);
-								CVersionManager::CNewVersionNotification NewVersionNotification;
-								NewVersionNotification.m_Application = ApplicationName;
-								NewVersionNotification.m_VersionID = VersionID;
-								NewVersionNotification.m_VersionInfo = VersionInfo;
-								
-								fp_NewTagsKnown(VersionInfo.m_Tags);
-								
-								TCVector<CStr> Permissions;
-								Permissions.f_Insert("Application/ReadAll");
-								Permissions.f_Insert("Application/ListAll");
-								Permissions.f_Insert(fg_Format("Application/Read/{}", ApplicationName));
-								
-								auto fSendToSubscription = [&](CSubscription const &_Subscription)
-									{
-										if (!mp_Permissions.f_HostHasAnyPermission(_Subscription.m_HostID, Permissions))
-											return;
-										_Subscription.f_SendVersion(NewVersionNotification);
-									}
-								;
-								for (auto &Subscription : mp_GlobalVersionSubscriptions)
-									fSendToSubscription(Subscription);
-								auto *pSubscription = mp_VersionSubscriptions.f_FindEqual(ApplicationName);
-								if (pSubscription)
-								{
-									for (auto &Subscription : *pSubscription)
-										fSendToSubscription(Subscription);
-								}
+
+								fp_NewVersion(ApplicationName, VersionID, VersionInfo); 
 							}
 						;
 					}
