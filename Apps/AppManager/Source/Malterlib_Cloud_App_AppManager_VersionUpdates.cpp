@@ -43,6 +43,10 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto *pLeft = &_Left;
 		auto *pRight = &_Right;
+		if (!_Left.m_VersionInfo.m_Time.f_IsValid() && _Right.m_VersionInfo.m_Time.f_IsValid())
+			return true;
+		else if (_Left.m_VersionInfo.m_Time.f_IsValid() && !_Right.m_VersionInfo.m_Time.f_IsValid())
+			return false;
 		return NContainer::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetVersionID(), pLeft)
 			< NContainer::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetVersionID(), pRight)
 		;
@@ -52,8 +56,8 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto *pLeft = &_Left;
 		auto *pRight = &_Right;
-		return NContainer::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetVersionID(), pLeft)
-			< NContainer::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetVersionID(), pRight)
+		return NContainer::fg_TupleReferences(_Left.f_GetVersionID(), pLeft)
+			< NContainer::fg_TupleReferences(_Right.f_GetVersionID(), pRight)
 		;
 	}
 	
