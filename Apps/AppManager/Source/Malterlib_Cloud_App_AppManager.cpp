@@ -55,6 +55,12 @@ namespace NMib
 								for (auto &Tag : pValue->f_Array())
 									Application.m_AutoUpdateBranches[Tag.f_String()];
 							}
+							if (auto pValue = ApplicationJSON.f_GetMember("UpdateScripts", EJSONType_Object))
+							{
+								Application.m_UpdateScripts.m_PreUpdate = (*pValue)["PreUpdate"].f_String();
+								Application.m_UpdateScripts.m_PostUpdate = (*pValue)["PostUpdate"].f_String();
+								Application.m_UpdateScripts.m_PostLaunch = (*pValue)["PostLaunch"].f_String();
+							}
 						}					
 					}
 				}

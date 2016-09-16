@@ -19,6 +19,9 @@ namespace NMib::NCloud::NAppManager
 			, EToUpdateFlag_VersionManagerApplication = DBit(4)
 			, EToUpdateFlag_AutoUpdateTags = DBit(5)
 			, EToUpdateFlag_AutoUpdateBranches = DBit(6)
+			, EToUpdateFlag_UpdateScript_PreUpdate = DBit(7)
+			, EToUpdateFlag_UpdateScript_PostUpdate = DBit(8)
+			, EToUpdateFlag_UpdateScript_PostLaunch = DBit(9)
 		};
 	}
 	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params)
@@ -136,6 +139,23 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 		
+		CUpdateScripts UpdateScripts;
+		if (auto *pValue = _Params.f_GetMember("UpdateScript_PreUpdate"))
+		{
+			UpdateFlags |= EToUpdateFlag_UpdateScript_PreUpdate;
+			UpdateScripts.m_PreUpdate = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostUpdate"))
+		{
+			UpdateFlags |= EToUpdateFlag_UpdateScript_PostUpdate;
+			UpdateScripts.m_PostUpdate = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostLaunch"))
+		{
+			UpdateFlags |= EToUpdateFlag_UpdateScript_PostLaunch;
+			UpdateScripts.m_PostLaunch = pValue->f_String();
+		}
+		
 		if (Executable.f_IsEmpty() && (UpdateFlags & EToUpdateFlag_Executable))
 			return DMibErrorInstance("Trying to set executable to empty");
 	
@@ -174,6 +194,12 @@ namespace NMib::NCloud::NAppManager
 			UpdateFlags &= ~EToUpdateFlag_AutoUpdateTags;
 		if (UpdateFlags & EToUpdateFlag_AutoUpdateBranches && Application.m_AutoUpdateBranches == AutoUpdateBranches)
 			UpdateFlags &= ~EToUpdateFlag_AutoUpdateBranches;
+		if (UpdateFlags & EToUpdateFlag_UpdateScript_PreUpdate && Application.m_UpdateScripts.m_PreUpdate == UpdateScripts.m_PreUpdate)
+			UpdateFlags &= ~EToUpdateFlag_UpdateScript_PreUpdate;
+		if (UpdateFlags & EToUpdateFlag_UpdateScript_PostUpdate && Application.m_UpdateScripts.m_PostUpdate == UpdateScripts.m_PostUpdate)
+			UpdateFlags &= ~EToUpdateFlag_UpdateScript_PostUpdate;
+		if (UpdateFlags & EToUpdateFlag_UpdateScript_PostLaunch && Application.m_UpdateScripts.m_PostLaunch == UpdateScripts.m_PostLaunch)
+			UpdateFlags &= ~EToUpdateFlag_UpdateScript_PostLaunch;
 			
 		if (UpdateFlags == EToUpdateFlag_None && !bForce)
 		{
@@ -184,23 +210,30 @@ namespace NMib::NCloud::NAppManager
 
 		auto fUpdateSettings = [=, pApplication = *pApplication]
 			{
+				auto &Application = *pApplication;
 				if (UpdateFlags & EToUpdateFlag_Executable)
-					pApplication->m_Executable = Executable;
+					Application.m_Executable = Executable;
 				if (UpdateFlags & EToUpdateFlag_ExecutableParameters)
-					pApplication->m_ExecutableParameters = ExecutableParameters;
+					Application.m_ExecutableParameters = ExecutableParameters;
 				if (UpdateFlags & EToUpdateFlag_RunAsUser)
-					pApplication->m_RunAsUser = RunAsUser;
+					Application.m_RunAsUser = RunAsUser;
 				if (UpdateFlags & EToUpdateFlag_RunAsGroup)
-					pApplication->m_RunAsGroup = RunAsGroup;
+					Application.m_RunAsGroup = RunAsGroup;
 				if (UpdateFlags & EToUpdateFlag_VersionManagerApplication)
-					pApplication->m_VersionManagerApplication = VersionManagerApplication;
+					Application.m_VersionManagerApplication = VersionManagerApplication;
 				if (UpdateFlags & EToUpdateFlag_AutoUpdateTags)
 				{
-					pApplication->m_bAutoUpdate = bAutoUpdate;
-					pApplication->m_AutoUpdateTags = AutoUpdateTags;
+					Application.m_bAutoUpdate = bAutoUpdate;
+					Application.m_AutoUpdateTags = AutoUpdateTags;
 				}
 				if (UpdateFlags & EToUpdateFlag_AutoUpdateBranches)
-					pApplication->m_AutoUpdateBranches = AutoUpdateBranches;
+					Application.m_AutoUpdateBranches = AutoUpdateBranches;
+				if (UpdateFlags & EToUpdateFlag_UpdateScript_PreUpdate)
+					Application.m_UpdateScripts.m_PreUpdate = UpdateScripts.m_PreUpdate;
+				if (UpdateFlags & EToUpdateFlag_UpdateScript_PostUpdate)
+					Application.m_UpdateScripts.m_PostUpdate = UpdateScripts.m_PostUpdate;
+				if (UpdateFlags & EToUpdateFlag_UpdateScript_PostLaunch)
+					Application.m_UpdateScripts.m_PostLaunch = UpdateScripts.m_PostLaunch;
 			}
 		;
 		

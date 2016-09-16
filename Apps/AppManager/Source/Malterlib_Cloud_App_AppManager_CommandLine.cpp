@@ -101,6 +101,24 @@ namespace NMib::NCloud::NAppManager
 							, "Description"_= "Auto update the application only for versions from these branches.\n"
 							"Leave empty to allow any branch\n"
 						}
+						, "UpdateScript_PreUpdate?"_= 
+						{
+							"Names"_= {"--update-script-pre-update"}
+							, "Default"_= ""
+							, "Description"_= "Set a script to run pre update.\n"
+						}
+						, "UpdateScript_PostUpdate?"_= 
+						{
+							"Names"_= {"--update-script-post-update"}
+							, "Default"_= ""
+							, "Description"_= "Set a script to run post update.\n"
+						}
+						, "UpdateScript_PostLaunch?"_= 
+						{
+							"Names"_= {"--update-script-post-launch"}
+							, "Default"_= ""
+							, "Description"_= "Set a script to run post launch.\n"
+						}
 					}
 					, "Parameters"_=
 					{
@@ -172,6 +190,24 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_= false 
 							, "Description"_= "Force running the update process even if no settings are changed."
 						}				
+						, "UpdateScript_PreUpdate?"_= 
+						{
+							"Names"_= {"--update-script-pre-update"}
+							, "Type"_= ""
+							, "Description"_= "Set a script to run pre update.\n"
+						}
+						, "UpdateScript_PostUpdate?"_= 
+						{
+							"Names"_= {"--update-script-post-update"}
+							, "Type"_= ""
+							, "Description"_= "Set a script to run post update.\n"
+						}
+						, "UpdateScript_PostLaunch?"_= 
+						{
+							"Names"_= {"--update-script-post-launch"}
+							, "Type"_= ""
+							, "Description"_= "Set a script to run post launch.\n"
+						}
 					}
 				}
 				, [this](CEJSON const &_Params)

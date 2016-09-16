@@ -100,7 +100,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					if (!_Results)
 					{
-						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Auto update of application failed: : {}", _Results.f_GetExceptionStr());
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Auto update of application failed. {}", _Results.f_GetExceptionStr());
 					}
 				}
 			;

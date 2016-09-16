@@ -168,6 +168,12 @@ namespace NMib::NCloud::NAppManager
 			for (auto &Branch : _pApplication->m_AutoUpdateBranches)
 				Array.f_Insert(Branch);
 		}
+		auto &UpdateScripts = ApplicationJSON["UpdateScripts"];
+		UpdateScripts.f_Object();
+		UpdateScripts["PreUpdate"] = _pApplication->m_UpdateScripts.m_PreUpdate; 
+		UpdateScripts["PostUpdate"] = _pApplication->m_UpdateScripts.m_PostUpdate; 
+		UpdateScripts["PostLaunch"] = _pApplication->m_UpdateScripts.m_PostLaunch; 
+		
 		ApplicationJSON["Files"] = _pApplication->m_Files;
 	
 		TCContinuation<void> Continuation;

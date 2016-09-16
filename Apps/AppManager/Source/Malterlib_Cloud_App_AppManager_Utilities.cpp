@@ -257,7 +257,7 @@ namespace NMib
 									return;
 								if (!_Subscription)
 								{
-									fReportError(fg_Format("[] Failed to launch bash script: {}", _Description, _Subscription.f_GetExceptionStr()));
+									fReportError(fg_Format("[{}] Failed to launch bash script: {}", _Description, _Subscription.f_GetExceptionStr()));
 									return;
 								}
 								pState->m_LaunchSubscription = fg_Move(*_Subscription);

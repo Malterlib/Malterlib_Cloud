@@ -17,6 +17,23 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerActor();
 		
 	private:
+		enum EUpdateScript
+		{
+			EUpdateScript_PreUpdate
+			, EUpdateScript_PostUpdate 
+			, EUpdateScript_PostLaunch
+		};
+		
+		struct CUpdateScripts
+		{
+			CStr m_PreUpdate;
+ 			CStr m_PostUpdate;
+ 			CStr m_PostLaunch;
+			
+			CStr const &f_GetScript(EUpdateScript _Script) const;
+			CStr f_GetName(EUpdateScript _Script) const;
+		};
+		
 		struct CApplication : public TCSharedPointerIntrusiveBase<>
 		{
 			CApplication(CStr const &_Name, CAppManagerActor *_pThis)
@@ -52,6 +69,7 @@ namespace NMib::NCloud::NAppManager
 			TCSet<CStr> m_AutoUpdateTags;
 			TCSet<CStr> m_AutoUpdateBranches;
 			bool m_bAutoUpdate = false;
+			CUpdateScripts m_UpdateScripts;
 
 			// Specific version state
 			TCVector<CStr> m_Files;
@@ -188,6 +206,8 @@ namespace NMib::NCloud::NAppManager
 		void fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication);
 		static void fsp_UpdateApplicationFiles(CStr const &_ApplicationDir, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> const &_Files);
 		TCContinuation<void> fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication);
+		TCContinuation<void> fp_RunUpdateScript(TCSharedPointer<CApplication> const &_pApplication, EUpdateScript _Script);
+		
 		
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_EnumApplications(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_AddApplication(CEJSON const &_Params);
