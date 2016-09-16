@@ -22,6 +22,7 @@ namespace NMib::NCloud::NAppManager
 			EUpdateScript_PreUpdate
 			, EUpdateScript_PostUpdate 
 			, EUpdateScript_PostLaunch
+			, EUpdateScript_OnError
 		};
 		
 		struct CUpdateScripts
@@ -29,6 +30,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_PreUpdate;
  			CStr m_PostUpdate;
  			CStr m_PostLaunch;
+			CStr m_OnError;
 			
 			CStr const &f_GetScript(EUpdateScript _Script) const;
 			CStr f_GetName(EUpdateScript _Script) const;
@@ -206,7 +208,7 @@ namespace NMib::NCloud::NAppManager
 		void fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication);
 		static void fsp_UpdateApplicationFiles(CStr const &_ApplicationDir, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> const &_Files);
 		TCContinuation<void> fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication);
-		TCContinuation<void> fp_RunUpdateScript(TCSharedPointer<CApplication> const &_pApplication, EUpdateScript _Script);
+		TCContinuation<void> fp_RunUpdateScript(TCSharedPointer<CApplication> const &_pApplication, EUpdateScript _Script, CStr const &_Param);
 		
 		
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_EnumApplications(CEJSON const &_Params);

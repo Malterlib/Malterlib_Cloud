@@ -173,6 +173,7 @@ namespace NMib::NCloud::NAppManager
 		UpdateScripts["PreUpdate"] = _pApplication->m_UpdateScripts.m_PreUpdate; 
 		UpdateScripts["PostUpdate"] = _pApplication->m_UpdateScripts.m_PostUpdate; 
 		UpdateScripts["PostLaunch"] = _pApplication->m_UpdateScripts.m_PostLaunch; 
+		UpdateScripts["OnError"] = _pApplication->m_UpdateScripts.m_OnError; 
 		
 		ApplicationJSON["Files"] = _pApplication->m_Files;
 	

@@ -17,6 +17,8 @@ namespace NMib::NCloud::NAppManager
 			return m_PostUpdate;
 		case EUpdateScript_PostLaunch:
 			return m_PostLaunch;
+		case EUpdateScript_OnError:
+			return m_OnError;
 		}
 		DMibNeverGetHere;
 		return m_PreUpdate;
@@ -32,12 +34,14 @@ namespace NMib::NCloud::NAppManager
 			return "PostUpdate";
 		case EUpdateScript_PostLaunch:
 			return "PostLaunch";
+		case EUpdateScript_OnError:
+			return "OnError";
 		}
 		DMibNeverGetHere;
 		return "Unknown";
 	}
 
-	TCContinuation<void> CAppManagerActor::fp_RunUpdateScript(TCSharedPointer<CApplication> const &_pApplication, EUpdateScript _Script)
+	TCContinuation<void> CAppManagerActor::fp_RunUpdateScript(TCSharedPointer<CApplication> const &_pApplication, EUpdateScript _Script, CStr const &_Param)
 	{
 		CStr Script = _pApplication->m_UpdateScripts.f_GetScript(_Script);
 		if (Script.f_IsEmpty())
@@ -78,7 +82,7 @@ namespace NMib::NCloud::NAppManager
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 			(
 				"bash"
-				, fg_CreateVector<CStr>(FileName)
+				, fg_CreateVector<CStr>(FileName, _Param)
 				, CFile::fs_GetProgramDirectory()
 				, [this, pState, Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 				{
@@ -266,7 +270,7 @@ namespace NMib::NCloud::NAppManager
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application: {}", _Info);
 			}
 		;
-		auto fLogError = [pResult, Continuation, _bFromAutoUpdate](CStr const &_Error)
+		auto fLogError = [this, pResult, Continuation, _bFromAutoUpdate, pApplication](CStr const &_Error, bool _bUnencrypted = true)
 			{
 				if (_bFromAutoUpdate)
 				{
@@ -279,6 +283,8 @@ namespace NMib::NCloud::NAppManager
 					Continuation.f_SetResult(fg_Move(*pResult));
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (update application): {}", _Error);
 				}
+				if (!pApplication->m_bDeleted && _bUnencrypted)
+					self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_OnError, _Error) > fg_DiscardResult();
 			}
 		;
 
@@ -286,7 +292,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				if (!_Result)
 				{
-					fLogError(fg_Format("Failed to open encryption: {}", _Result.f_GetExceptionStr()));
+					fLogError(fg_Format("Failed to open encryption: {}", _Result.f_GetExceptionStr()), false);
 					return;
 				}
 				
@@ -388,7 +394,7 @@ namespace NMib::NCloud::NAppManager
 											return;
 										}
 										
-										self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_PreUpdate) > [=](TCAsyncResult<void> &&_Result)
+										self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_PreUpdate, CStr{}) > [=](TCAsyncResult<void> &&_Result)
 											{
 												if (!_Result)
 												{
@@ -466,7 +472,7 @@ namespace NMib::NCloud::NAppManager
 																	return;
 																}
 																
-																self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_PostUpdate) > [=](TCAsyncResult<void> &&_Result)
+																self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_PostUpdate, CStr{}) > [=](TCAsyncResult<void> &&_Result)
 																	{
 																		if (!_Result)
 																		{
@@ -496,7 +502,7 @@ namespace NMib::NCloud::NAppManager
 																				else
 																					fLogInfo("Application was successfully updated");
 																				Continuation.f_SetResult(fg_Move(*pResult));
-																				self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_PostLaunch) 
+																				self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_PostLaunch, CStr{}) 
 																					> [=](TCAsyncResult<void> &&_Result)
 																					{
 																						if (!_Result)
@@ -505,7 +511,7 @@ namespace NMib::NCloud::NAppManager
 																								(
 																									Malterlib/Cloud/AppManager
 																									, Warning
-																									, "Post update script failed: {}"
+																									, "Post launch script failed: {}"
 																									, _Result.f_GetExceptionStr()
 																								)
 																							;

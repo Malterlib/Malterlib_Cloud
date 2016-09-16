@@ -60,6 +60,7 @@ namespace NMib
 								Application.m_UpdateScripts.m_PreUpdate = (*pValue)["PreUpdate"].f_String();
 								Application.m_UpdateScripts.m_PostUpdate = (*pValue)["PostUpdate"].f_String();
 								Application.m_UpdateScripts.m_PostLaunch = (*pValue)["PostLaunch"].f_String();
+								Application.m_UpdateScripts.m_OnError = (*pValue)["OnError"].f_String();
 							}
 						}					
 					}

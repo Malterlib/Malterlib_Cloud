@@ -119,6 +119,12 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_= ""
 							, "Description"_= "Set a script to run post launch.\n"
 						}
+						, "UpdateScript_OnError?"_= 
+						{
+							"Names"_= {"--update-script-on-error"}
+							, "Default"_= ""
+							, "Description"_= "Set a script to run when an error occurs during the update process.\n"
+						}
 					}
 					, "Parameters"_=
 					{
@@ -207,6 +213,12 @@ namespace NMib::NCloud::NAppManager
 							"Names"_= {"--update-script-post-launch"}
 							, "Type"_= ""
 							, "Description"_= "Set a script to run post launch.\n"
+						}
+						, "UpdateScript_OnError?"_= 
+						{
+							"Names"_= {"--update-script-on-error"}
+							, "Type"_= ""
+							, "Description"_= "Set a script to run when an error occurs during the update process.\n"
 						}
 					}
 				}

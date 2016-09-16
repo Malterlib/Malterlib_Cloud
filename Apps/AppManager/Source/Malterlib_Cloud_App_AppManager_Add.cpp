@@ -60,6 +60,8 @@ namespace NMib::NCloud::NAppManager
 			pApplication->m_UpdateScripts.m_PostUpdate = pValue->f_String(); 
 		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostLaunch"))
 			pApplication->m_UpdateScripts.m_PostLaunch = pValue->f_String(); 
+		if (auto *pValue = _Params.f_GetMember("UpdateScript_OnError"))
+			pApplication->m_UpdateScripts.m_OnError = pValue->f_String(); 
 		
 		auto Directory = pApplication->f_GetDirectory();
 		CStr Package = _Params["Package"].f_String();

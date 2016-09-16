@@ -31,6 +31,7 @@ namespace NMib::NCloud::NAppManager
 				Results.f_AddStdOut(fg_Format("            Pre update script: {}{\n}", Application.m_UpdateScripts.m_PreUpdate));
 				Results.f_AddStdOut(fg_Format("           Post update script: {}{\n}", Application.m_UpdateScripts.m_PostUpdate));
 				Results.f_AddStdOut(fg_Format("    Post launch update script: {}{\n}{\n}", Application.m_UpdateScripts.m_PostLaunch));
+				Results.f_AddStdOut(fg_Format("       On error update script: {}{\n}", Application.m_UpdateScripts.m_OnError));
 				
 				Results.f_AddStdOut(fg_Format("             Application name: {}{\n}", Application.m_VersionManagerApplication));
 				Results.f_AddStdOut(fg_Format("                      Version: {}{\n}", Application.m_LastInstalledVersion));

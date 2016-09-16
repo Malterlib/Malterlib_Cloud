@@ -22,6 +22,7 @@ namespace NMib::NCloud::NAppManager
 			, EToUpdateFlag_UpdateScript_PreUpdate = DBit(7)
 			, EToUpdateFlag_UpdateScript_PostUpdate = DBit(8)
 			, EToUpdateFlag_UpdateScript_PostLaunch = DBit(9)
+			, EToUpdateFlag_UpdateScript_OnError = DBit(10)
 		};
 	}
 	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params)
@@ -155,6 +156,11 @@ namespace NMib::NCloud::NAppManager
 			UpdateFlags |= EToUpdateFlag_UpdateScript_PostLaunch;
 			UpdateScripts.m_PostLaunch = pValue->f_String();
 		}
+		if (auto *pValue = _Params.f_GetMember("UpdateScript_OnError"))
+		{
+			UpdateFlags |= EToUpdateFlag_UpdateScript_OnError;
+			UpdateScripts.m_OnError = pValue->f_String();
+		}
 		
 		if (Executable.f_IsEmpty() && (UpdateFlags & EToUpdateFlag_Executable))
 			return DMibErrorInstance("Trying to set executable to empty");
@@ -200,6 +206,8 @@ namespace NMib::NCloud::NAppManager
 			UpdateFlags &= ~EToUpdateFlag_UpdateScript_PostUpdate;
 		if (UpdateFlags & EToUpdateFlag_UpdateScript_PostLaunch && Application.m_UpdateScripts.m_PostLaunch == UpdateScripts.m_PostLaunch)
 			UpdateFlags &= ~EToUpdateFlag_UpdateScript_PostLaunch;
+		if (UpdateFlags & EToUpdateFlag_UpdateScript_OnError && Application.m_UpdateScripts.m_OnError == UpdateScripts.m_OnError)
+			UpdateFlags &= ~EToUpdateFlag_UpdateScript_OnError;
 			
 		if (UpdateFlags == EToUpdateFlag_None && !bForce)
 		{
@@ -234,6 +242,8 @@ namespace NMib::NCloud::NAppManager
 					Application.m_UpdateScripts.m_PostUpdate = UpdateScripts.m_PostUpdate;
 				if (UpdateFlags & EToUpdateFlag_UpdateScript_PostLaunch)
 					Application.m_UpdateScripts.m_PostLaunch = UpdateScripts.m_PostLaunch;
+				if (UpdateFlags & EToUpdateFlag_UpdateScript_OnError)
+					Application.m_UpdateScripts.m_OnError = UpdateScripts.m_OnError;
 			}
 		;
 		
