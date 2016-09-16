@@ -104,9 +104,8 @@ namespace NMib
 				}
 				
 				auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
-				auto KeyManager = mp_KeyManagerSubscription.m_Actors.fs_GetKey(KeyManagerInfo);
 				static const mint c_KeyBits = 512; 
-				DCallActor(KeyManager, CKeyManager::f_RequestKey, _pApplication->m_Name, c_KeyBits / 8)
+				DCallActor(KeyManagerInfo.m_Actor, CKeyManager::f_RequestKey, _pApplication->m_Name, c_KeyBits / 8)
 					> Continuation / [this, Continuation, _pApplication, _bForceOverwrite, fLaunchScript](CSymmetricKey &&_Key)
 					{
 						fLaunchScript(fg_Move(_Key));
