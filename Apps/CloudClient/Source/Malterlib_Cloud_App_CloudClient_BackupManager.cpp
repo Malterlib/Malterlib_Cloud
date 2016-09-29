@@ -88,6 +88,20 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_= int64(8*1024*1024)
 							, "Description"_= "The amount of data to keep in flight while downloading."
 						}
+						, "Destination?"_=
+						{
+							"Names"_= {"--destination"}
+							, "Type"_= ""
+							, "Description"_= "The directory to download to.\n"
+							"By default this directory will be the 'name of the source'/'backup time and id'"
+						}
+						, "CurrentDirectory?"_=
+						{
+							"Names"_= _[_]
+							, "Default"_= CFile::fs_GetCurrentDirectory()
+							, "Hidden"_= true
+							, "Description"_= "Internal hidden option to forward current directory"
+						}					
 					}
 					, "Parameters"_= 
 					{
@@ -109,6 +123,9 @@ namespace NMib::NCloud::NCloudClient
 	
 	TCContinuation<void> CCloudClientAppActor::fp_BackupManager_SubscribeToServers()
 	{
+		if (!mp_BackupManagers.f_IsEmpty())
+			return fg_Explicit();
+		
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to backup managers");
 		
 		TCContinuation<void> Continuation;
@@ -254,6 +271,9 @@ namespace NMib::NCloud::NCloudClient
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		CStr Backup = _Params["Backup"].f_String();
+		CStr Destination;
+		if (auto *pValue = _Params.f_GetMember("Destination"))
+			Destination = CFile::fs_GetExpandedPath(pValue->f_String(), _Params["CurrentDirectory"].f_String());
 		uint64 QueueSize = _Params["BackupQueueSize"].f_Integer();
 		if (QueueSize < 128*1024)
 			QueueSize = 128*1024;
@@ -272,7 +292,7 @@ namespace NMib::NCloud::NCloudClient
 			return DMibErrorInstance("Backup source name format is invalid");
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
-			> Continuation / [this, Continuation, BackupSource, BackupHost, BackupID, BackupTime, QueueSize]
+			> Continuation / [this, Continuation, BackupSource, BackupHost, BackupID, BackupTime, QueueSize, Destination]
 			{
 				CStr Error;
 				auto *pBackupManager = mp_BackupManagers.f_GetOneActor(BackupHost, Error);
@@ -282,7 +302,14 @@ namespace NMib::NCloud::NCloudClient
 					return;
 				}
 
-				CStr BasePath = fg_Format("{}/{}/{tst.} - {}", CFile::fs_GetProgramDirectory(), BackupSource, BackupTime, BackupID);
+				CStr BasePath;
+				if (!Destination.f_IsEmpty())
+					BasePath = Destination; 
+				else if (BackupID == "Latest")
+					BasePath = fg_Format("{}/{}/Latest", CFile::fs_GetProgramDirectory(), BackupSource);
+				else
+					BasePath = fg_Format("{}/{}/{tst.} - {}", CFile::fs_GetProgramDirectory(), BackupSource, BackupTime, BackupID);
+				
 				mp_DownloadBackupReceive = fg_ConstructActor<CFileTransferReceive>(BasePath); 
 
 				mp_DownloadBackupReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize, CFileTransferReceive::EReceiveFlag_None) 
@@ -325,7 +352,7 @@ namespace NMib::NCloud::NCloudClient
 													(
 														fg_Format
 														(
-															"Download finished transferring: {} bytes at {fe2} MB/s\n"
+															"Download finished transferring: {ns } bytes at {fe2} MB/s\n"
 															, Results.m_nBytes
 															, Results.f_BytesPerSecond()/1'000'000.0
 														)

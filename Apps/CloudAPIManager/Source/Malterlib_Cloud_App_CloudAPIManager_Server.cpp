@@ -1,0 +1,160 @@
+// Copyright © 2015 Hansoft AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+#include <Mib/Core/Core>
+#include <Mib/Daemon/Daemon>
+#include <Mib/Concurrency/DistributedActor>
+#include <Mib/Concurrency/DistributedActorTrustManager>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+
+#include "Malterlib_Cloud_App_CloudAPIManager.h"
+#include "Malterlib_Cloud_App_CloudAPIManager_Server.h"
+
+namespace NMib::NCloud::NCloudAPIManager
+{
+	CCloudAPIManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState)
+		: mp_AppState(_AppState)
+		, mp_pCanDestroyTracker(fg_Construct())
+	{
+#ifdef DPlatformFamily_OSX
+		CStr Path = NSys::fg_Process_GetEnvironmentVariable(CStr("PATH"));
+		if (Path.f_Find("/opt/local/bin") < 0)
+			NSys::fg_Process_SetEnvironmentVariable(CStr("PATH"), "/opt/local/bin:" + Path);
+#endif
+	}
+	
+	CCloudAPIManagerDaemonActor::CServer::~CServer()
+	{
+	}
+	
+	void CCloudAPIManagerDaemonActor::CServer::f_Construct()
+	{
+		fp_Init();
+	}
+	
+	void CCloudAPIManagerDaemonActor::CServer::fp_Init()
+	{
+		fg_ThisActor(this)(&CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs)
+			> [this](TCAsyncResult<void> &&_ResultCloudContexts)
+			{
+				if (!_ResultCloudContexts)
+				{
+					DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to find cloud contexts, aborting startup: {}", _ResultCloudContexts.f_GetExceptionStr());
+					return;
+				}
+				self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions) 
+					> [this](TCAsyncResult<void> &&_ResultPermissions)
+					{
+						if (!_ResultPermissions)
+						{
+							DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to setup permissions, aborting startup: {}", _ResultPermissions.f_GetExceptionStr());
+							return;
+						}
+						self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge)  
+							> [this](TCAsyncResult<void> &&_ResultSetupDDPBridge)
+							{
+								if (!_ResultSetupDDPBridge)
+								{
+									DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to setup DDP bridge, aborting startup: {}", _ResultSetupDDPBridge.f_GetExceptionStr());
+									return;
+								}
+								fp_Publish();
+							}
+						;
+					}
+				;
+			}
+		;
+	}
+	
+	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions()
+	{
+		TCContinuation<void> Continuation;
+		
+		TCSet<CStr> Permissions;
+		
+		Permissions["ObjectStorage/CreateContainerAll"];
+		
+		for (auto &CloudContext : mp_CloudContexts)
+			Permissions[fg_Format("ObjectStorage/CreateContainer/{}", CloudContext.f_GetName())];
+		
+		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+		
+		TCVector<CStr> SubscribePermissions;
+		SubscribePermissions.f_Insert("ObjectStorage/*");
+	
+		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
+			> Continuation / [this, Continuation](CTrustedPermissionSubscription &&_Subscription)
+			{
+				mp_Permissions = fg_Move(_Subscription);
+				Continuation.f_SetResult();
+			}
+		;
+		
+		return Continuation;
+	}
+	
+	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs()
+	{
+		if (auto *pCloudContexts = mp_AppState.m_StateDatabase.m_Data.f_GetMember("CloudContexts", EJSONType_Object))
+		{
+			for (auto &CloudContextJSON : pCloudContexts->f_Object())
+			{
+				auto &Values = CloudContextJSON.f_Value();
+				auto &CloudContext = mp_CloudContexts[CloudContextJSON.f_Name()];
+				CStr Type = Values["Type"].f_String();
+				if (Type == "OpenStack")
+				{
+					auto &KeystoneInfo = Values["KeystoneInfo"];
+					CloudContext.m_KeystoneInfo.m_Password = KeystoneInfo["Password"].f_String();
+					CloudContext.m_KeystoneInfo.m_Tenant = KeystoneInfo["Tenant"].f_String();
+				}
+				else
+					return DMibErrorInstance(fg_Format("Unknown cloud type: {}", Type));
+			}
+		}
+		
+		return fg_Explicit();
+	}
+	
+	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::f_Destroy()
+	{
+		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
+		mp_ProtocolPublication.f_Clear();
+		if (mp_CURLQueryActor)
+		{
+			mp_CURLQueryActor->f_Destroy
+				(
+					[pCanDestroy](TCAsyncResult<void> &&)
+					{
+					}
+				)
+			;
+		}
+		return pCanDestroy->m_Continuation;
+	}
+	
+	TCActor<CSeparateThreadActor> const &CCloudAPIManagerDaemonActor::CServer::fp_GetCURLQueryActor()
+	{
+		if (mp_CURLQueryActor)
+			return mp_CURLQueryActor;
+		
+		mp_CURLQueryActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Cloud API manager CURL query file actor"));
+		return mp_CURLQueryActor;
+	}
+	
+	void CCloudAPIManagerDaemonActor::CServer::fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error)
+	{
+		DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "({}) {}", _CallingHostInfo.f_GetHostInfo(), _Error);
+	}
+
+	void CCloudAPIManagerDaemonActor::CServer::fsp_LogActivityWarning(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error)
+	{
+		DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Warning, "({}) {}", _CallingHostInfo.f_GetHostInfo(), _Error);
+	}
+
+	void CCloudAPIManagerDaemonActor::CServer::fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info)
+	{
+		DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Info, "({}) {}", _CallingHostInfo.f_GetHostInfo(), _Info);
+	}
+}

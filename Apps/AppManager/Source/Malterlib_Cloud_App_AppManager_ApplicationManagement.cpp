@@ -51,10 +51,11 @@ namespace NMib::NCloud::NAppManager
 			, TCSharedPointer<CApplication> const &_pApplication
 			, TCVector<CStr> &o_Files
 			, TCSet<CStr> const &_AllowExist
+			, bool _bForceInstall
 		)
 	{
 		CStr Return;
-		if (CFile::fs_FileExists(_Destination))
+		if (!_bForceInstall && CFile::fs_FileExists(_Destination))
 		{
 			auto FoundFiles = CFile::fs_FindFiles(_Destination + "/*");
 			for (auto &File : FoundFiles)
@@ -72,6 +73,20 @@ namespace NMib::NCloud::NAppManager
 					, _Destination
 					, [&](CFile::EDiffCopyChange _Change, NStr::CStr const &_Source, NStr::CStr const &_Destination, NStr::CStr const &_Link) -> CFile::EDiffCopyChangeAction
 					{
+						if 
+							(
+								_bForceInstall 
+								&&
+								(
+									_Change == CFile::EDiffCopyChange_DirectoryDeleted 
+									|| _Change == CFile::EDiffCopyChange_FileDeleted 
+									|| _Change == CFile::EDiffCopyChange_LinkDeleted
+								)
+							)
+						{
+							return CFile::EDiffCopyChangeAction_Skip;
+						}
+						
 						for (auto &Allow : _AllowExist)
 						{
 							if (_Destination.f_StartsWith(Allow))
@@ -97,8 +112,10 @@ namespace NMib::NCloud::NAppManager
 			;
 			Return = Output;
 		}
+		
+		auto &Settings = _pApplication->m_Settings;
 
-		CStr ExcutableFile = fg_Format("{}/{}", _Destination, _pApplication->m_Executable); 
+		CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable); 
 		if (!CFile::fs_FileExists(ExcutableFile, EFileAttrib_Executable))
 			DMibError(fg_Format("Executable file '{}' does not exist or does not have the executable flag set", ExcutableFile));
 		
@@ -124,10 +141,10 @@ namespace NMib::NCloud::NAppManager
 			if (bFound)
 				continue;
 			
-			if (!_pApplication->m_RunAsUser.f_IsEmpty())
-				CFile::fs_SetOwner(File.m_Path, _pApplication->m_RunAsUser);
-			if (!_pApplication->m_RunAsGroup.f_IsEmpty())
-				CFile::fs_SetGroup(File.m_Path, _pApplication->m_RunAsGroup);
+			if (!Settings.m_RunAsUser.f_IsEmpty())
+				CFile::fs_SetOwner(File.m_Path, Settings.m_RunAsUser);
+			if (!Settings.m_RunAsGroup.f_IsEmpty())
+				CFile::fs_SetGroup(File.m_Path, Settings.m_RunAsGroup);
 			
 			fsp_UpdateAttributes(File.m_Path);
 			
@@ -141,40 +158,44 @@ namespace NMib::NCloud::NAppManager
 	{
 		if (_pApplication->m_bDeleted)
 			return DMibErrorInstance("Application has been deleted");
+		auto &Settings = _pApplication->m_Settings;
+		
 		auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][_pApplication->m_Name];
-		ApplicationJSON["Executable"] = _pApplication->m_Executable; 
-		ApplicationJSON["RunAsUser"] = _pApplication->m_RunAsUser; 
-		ApplicationJSON["RunAsGroup"] = _pApplication->m_RunAsGroup;
+		ApplicationJSON["Executable"] = Settings.m_Executable; 
+		ApplicationJSON["RunAsUser"] = Settings.m_RunAsUser; 
+		ApplicationJSON["RunAsGroup"] = Settings.m_RunAsGroup;
 		{
 			auto &Parameters = ApplicationJSON["Parameters"].f_Array();
 			Parameters.f_Clear();
-			for (auto &Parameter : _pApplication->m_ExecutableParameters)
+			for (auto &Parameter : Settings.m_ExecutableParameters)
 				Parameters.f_Insert(Parameter);
 		}
-		ApplicationJSON["EncryptionStorage"] = _pApplication->m_EncryptionStorage;
-		ApplicationJSON["VersionManagerApplication"] = _pApplication->m_VersionManagerApplication;
+		ApplicationJSON["EncryptionStorage"] = Settings.m_EncryptionStorage;
+		ApplicationJSON["ParentApplication"] = Settings.m_ParentApplication;
+		ApplicationJSON["VersionManagerApplication"] = Settings.m_VersionManagerApplication;
 		ApplicationJSON["LastInstalledVersion"] = _pApplication->m_LastInstalledVersion.f_ToJSON();
 		ApplicationJSON["LastInstalledVersionInfo"] = _pApplication->m_LastInstalledVersionInfo.f_ToJSON();
-		ApplicationJSON["AutoUpdate"] = _pApplication->m_bAutoUpdate;
+		ApplicationJSON["AutoUpdate"] = Settings.m_bAutoUpdate;
 		{
 			auto &Array = ApplicationJSON["AutoUpdateTags"].f_Array();
 			Array.f_Clear();
-			for (auto &Tag : _pApplication->m_AutoUpdateTags)
+			for (auto &Tag : Settings.m_AutoUpdateTags)
 				Array.f_Insert(Tag);
 		}
 		{
 			auto &Array = ApplicationJSON["AutoUpdateBranches"].f_Array();
 			Array.f_Clear();
-			for (auto &Branch : _pApplication->m_AutoUpdateBranches)
+			for (auto &Branch : Settings.m_AutoUpdateBranches)
 				Array.f_Insert(Branch);
 		}
 		auto &UpdateScripts = ApplicationJSON["UpdateScripts"];
 		UpdateScripts.f_Object();
-		UpdateScripts["PreUpdate"] = _pApplication->m_UpdateScripts.m_PreUpdate; 
-		UpdateScripts["PostUpdate"] = _pApplication->m_UpdateScripts.m_PostUpdate; 
-		UpdateScripts["PostLaunch"] = _pApplication->m_UpdateScripts.m_PostLaunch; 
-		UpdateScripts["OnError"] = _pApplication->m_UpdateScripts.m_OnError; 
+		UpdateScripts["PreUpdate"] = Settings.m_UpdateScripts.m_PreUpdate; 
+		UpdateScripts["PostUpdate"] = Settings.m_UpdateScripts.m_PostUpdate; 
+		UpdateScripts["PostLaunch"] = Settings.m_UpdateScripts.m_PostLaunch; 
+		UpdateScripts["OnError"] = Settings.m_UpdateScripts.m_OnError;
 		
+		ApplicationJSON["SelfUpdateSource"] = Settings.m_bSelfUpdateSource; 
 		ApplicationJSON["Files"] = _pApplication->m_Files;
 	
 		TCContinuation<void> Continuation;
@@ -182,16 +203,50 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 	
+	void CAppManagerActor::fsp_CreateApplicationUserGroup(CApplicationSettings const &_Settings, TCFunction<void (CStr const &_Info)> const &_fLogInfo, CStr const &_HomeDir)
+	{
+		if (!_Settings.m_RunAsGroup.f_IsEmpty())
+		{
+			CStr GroupID;
+			if (!NSys::fg_UserManagement_GroupExists(_Settings.m_RunAsGroup, GroupID))
+			{
+				NSys::fg_UserManagement_CreateGroup(_Settings.m_RunAsGroup, GroupID);
+				if (_fLogInfo)
+					_fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", _Settings.m_RunAsGroup, GroupID));
+			}
+		}
+		if (!_Settings.m_RunAsUser.f_IsEmpty())
+		{
+			CStr UserID;
+			if (!NSys::fg_UserManagement_UserExists(_Settings.m_RunAsUser, UserID))
+			{
+				NSys::fg_UserManagement_CreateUser
+					(
+						_Settings.m_RunAsGroup
+						, _Settings.m_RunAsUser
+						, ""
+						, _Settings.m_RunAsUser
+						, _HomeDir
+						, UserID
+					)
+				;
+				if (_fLogInfo)
+					_fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", _Settings.m_RunAsUser, UserID));
+			}
+		}
+	}
+	
 	void CAppManagerActor::fsp_UpdateApplicationFiles(CStr const &_ApplicationDir, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> const &_Files)
 	{
+		auto &Settings = _pApplication->m_Settings;
 		auto fSetOwners = [&](CStr _Directory)
 			{
 				while (_Directory.f_GetLen() >= _ApplicationDir.f_GetLen())
 				{
-					if (!_pApplication->m_RunAsGroup.f_IsEmpty())
-						CFile::fs_SetOwner(_Directory, _pApplication->m_RunAsUser);
-					if (!_pApplication->m_RunAsGroup.f_IsEmpty())
-						CFile::fs_SetGroup(_Directory, _pApplication->m_RunAsGroup);
+					if (!Settings.m_RunAsGroup.f_IsEmpty())
+						CFile::fs_SetOwner(_Directory, Settings.m_RunAsUser);
+					if (!Settings.m_RunAsGroup.f_IsEmpty())
+						CFile::fs_SetGroup(_Directory, Settings.m_RunAsGroup);
 					_Directory = CFile::fs_GetPath(_Directory);
 				}
 			}
@@ -222,7 +277,7 @@ namespace NMib::NCloud::NAppManager
 		
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 		
-		if (pApplication->m_bOperationInProgress)
+		if (pApplication->f_IsInProgress())
 			return DMibErrorInstance("Operation already in progress for application");
 		if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
 			return DMibErrorInstance("Application already stopped");
@@ -270,7 +325,7 @@ namespace NMib::NCloud::NAppManager
 		
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 		
-		if (pApplication->m_bOperationInProgress)
+		if (pApplication->f_IsInProgress())
 			return DMibErrorInstance("Operation already in progress for application");
 		if (pApplication->m_ProcessLaunch)
 			return DMibErrorInstance("Application already started");
@@ -310,7 +365,7 @@ namespace NMib::NCloud::NAppManager
 		
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 		
-		if (pApplication->m_bOperationInProgress)
+		if (pApplication->f_IsInProgress())
 			return DMibErrorInstance("Operation already in progress for application");
 
 		auto InProgressScope = pApplication->f_SetInProgress();

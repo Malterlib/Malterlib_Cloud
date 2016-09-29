@@ -22,7 +22,18 @@ namespace NMib
 #endif
 			TCContinuation<void> CAppManagerActor::fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite)
 			{
-				if (_pApplication->m_EncryptionStorage.f_IsEmpty())
+				auto pEncryptionApplication = _pApplication;
+				if (pEncryptionApplication->f_IsChildApp())
+				{
+					if (!pEncryptionApplication->m_pParentApplication)
+						return DMibErrorInstance("Cannot change encryption because parent application is missing");
+					if (_Operation == EEncryptOperation_Setup)
+						return fg_Explicit(); // Parent application already set up
+					else if (_Operation == EEncryptOperation_Close)
+						return fg_Explicit(); // Don't close until main application closes
+					pEncryptionApplication = fg_Explicit(pEncryptionApplication->m_pParentApplication);
+				}
+				if (pEncryptionApplication->m_Settings.m_EncryptionStorage.f_IsEmpty())
 					return fg_Explicit();
 				
 #if !defined(DPlatformFamily_Linux)
@@ -30,7 +41,7 @@ namespace NMib
 #else
 				if (_Operation == EEncryptOperation_Open)
 				{
-					if (_pApplication->m_bEncryptionOpened)
+					if (pEncryptionApplication->m_bEncryptionOpened)
 						return fg_Explicit(); 
 				}
 				
@@ -39,13 +50,13 @@ namespace NMib
 				
 				TCContinuation<void> Continuation;
 				
-				auto fLaunchScript = [this, Continuation, _pApplication, _Operation, _bForceOverwrite](CSymmetricKey &&_Key)
+				auto fLaunchScript = [this, Continuation, pEncryptionApplication, _Operation, _bForceOverwrite](CSymmetricKey &&_Key)
 					{
 						TCMap<CStr, CStr> Environment;
-						Environment["MibCloudApp_EncryptionStorage"] = _pApplication->m_EncryptionStorage;
-						Environment["MibCloudApp_DeviceName"] = "enc_" + _pApplication->m_Name.f_LowerCase();
-						Environment["MibCloudApp_ZPoolName"] = "zpool_" + _pApplication->m_Name.f_LowerCase();
-						Environment["MibCloudApp_MountPoint"] = _pApplication->f_GetDirectory();
+						Environment["MibCloudApp_EncryptionStorage"] = pEncryptionApplication->m_Settings.m_EncryptionStorage;
+						Environment["MibCloudApp_DeviceName"] = "enc_" + pEncryptionApplication->m_Name.f_LowerCase();
+						Environment["MibCloudApp_ZPoolName"] = "zpool_" + pEncryptionApplication->m_Name.f_LowerCase();
+						Environment["MibCloudApp_MountPoint"] = pEncryptionApplication->f_GetDirectory();
 						if (_Operation == EEncryptOperation_Setup && _bForceOverwrite)
 							Environment["MibCloudApp_ForceOverwrite"] = "1";
 						
@@ -85,12 +96,12 @@ namespace NMib
 										_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, _Key) > fg_DiscardResult();
 								}
 							)
-							> Continuation % "Failed to change encryption" / [Continuation, _pApplication, _Operation](CBashScriptOutput &&_Output)
+							> Continuation % "Failed to change encryption" / [Continuation, pEncryptionApplication, _Operation](CBashScriptOutput &&_Output)
 							{
 								if (_Operation == EEncryptOperation_Open || _Operation == EEncryptOperation_Setup)
-									_pApplication->m_bEncryptionOpened = true;
+									pEncryptionApplication->m_bEncryptionOpened = true;
 								else if (_Operation == EEncryptOperation_Close)
-									_pApplication->m_bEncryptionOpened = false;
+									pEncryptionApplication->m_bEncryptionOpened = false;
 								Continuation.f_SetResult();
 							}
 						;
@@ -105,8 +116,8 @@ namespace NMib
 				
 				auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
 				static const mint c_KeyBits = 512; 
-				DCallActor(KeyManagerInfo.m_Actor, CKeyManager::f_RequestKey, _pApplication->m_Name, c_KeyBits / 8)
-					> Continuation / [this, Continuation, _pApplication, _bForceOverwrite, fLaunchScript](CSymmetricKey &&_Key)
+				DCallActor(KeyManagerInfo.m_Actor, CKeyManager::f_RequestKey, pEncryptionApplication->m_Name, c_KeyBits / 8)
+					> Continuation / [this, Continuation, pEncryptionApplication, _pApplication, _bForceOverwrite, fLaunchScript](CSymmetricKey &&_Key)
 					{
 						fLaunchScript(fg_Move(_Key));
 					}

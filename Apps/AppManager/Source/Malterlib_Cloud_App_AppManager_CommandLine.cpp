@@ -63,6 +63,13 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_= ""
 							, "Description"_= "Select the file or device that should be the storage for encryption."
 						}
+						, "ParentApplication?"_= 
+						{
+							"Names"_= {"--parent-application"}
+							, "Default"_= ""
+							, "Description"_= "Put this application as a child to another application, sharing the same root directory.\n"
+							"The directory of this application will be: ParentApplicationDir/ApplicationName\n"
+						}
 						, "Version?"_= 
 						{
 							"Names"_= {"--version"}
@@ -70,11 +77,33 @@ namespace NMib::NCloud::NAppManager
 							, "Description"_= "The version to install from version manager.\n"
 								"Defaults to the latest version available.\n"
 						}
+						, "VersionManagerPlatform?"_= 
+						{
+							"Names"_= {"--platform"}
+							, "Type"_= "" 
+							, "Description"_= fg_Format
+							(
+								"Version manager platform used when downloading version. Defaults to the same as this executable: {}"
+								, DMalterlibCloudPlatform
+							)
+						}
 						, "ForceOverwrite?"_= 
 						{
 							"Names"_= {"--force-overwrite"}
 							,"Default"_= false 
 							, "Description"_= "Force zfs to overwrite storage"
+						}
+						, "ForceInstall?"_= 
+						{
+							"Names"_= {"--force-install"}
+							,"Default"_= false 
+							, "Description"_= "Force application install even if application directory already exists"
+						}
+						, "SettingsFromVersionInfo?"_= 
+						{
+							"Names"_= {"--settings-from-version-info"}
+							, "Default"_= true 
+							, "Description"_= "Get settings from version info of the downloaded application."
 						}
 						, SettingsOption_Executable
 						, "ExecutableParameters?"_= 
@@ -125,6 +154,12 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_= ""
 							, "Description"_= "Set a script to run when an error occurs during the update process.\n"
 						}
+						, "SelfUpdateSource?"_= 
+						{
+							"Names"_= {"--self-update-source"}
+							, "Default"_= false
+							, "Description"_= "Set this application as a source for self-updating the app manager.\n"
+						}
 					}
 					, "Parameters"_=
 					{
@@ -133,7 +168,7 @@ namespace NMib::NCloud::NAppManager
 							"Type"_= ""
 							, "Description"_= "The files needed to run the application.\n"
 							"Can be a version manager application name, a directory, or a tar.gz file. Will look for version manager applications"
-							"first. If not found it will assume that the name is a file and look for it on disk."
+							" first. If not found it will assume that the name is a file and look for it on disk."
 						}
 					}
 				}
@@ -181,7 +216,7 @@ namespace NMib::NCloud::NAppManager
 						, "VersionManagerApplication?"_= 
 						{
 							"Names"_= {"--version-manager-application"}
-							, "Type"_= {""} 
+							, "Type"_= "" 
 							, "Description"_= "Get updates from the version manager application with this name."
 						}				
 						, "UpdateFromVersionInfo?"_= 
@@ -219,6 +254,12 @@ namespace NMib::NCloud::NAppManager
 							"Names"_= {"--update-script-on-error"}
 							, "Type"_= ""
 							, "Description"_= "Set a script to run when an error occurs during the update process.\n"
+						}
+						, "SelfUpdateSource?"_= 
+						{
+							"Names"_= {"--self-update-source"}
+							, "Type"_= false
+							, "Description"_= "Set this application as a source for self-updating the app manager.\n"
 						}
 					}
 				}
@@ -358,6 +399,12 @@ namespace NMib::NCloud::NAppManager
 							"Names"_= {"--require-tags"}
 							, "Type"_= {""}
 							, "Description"_= "Require these tags for the version to update to."
+						}
+						, "VersionManagerPlatform?"_= 
+						{
+							"Names"_= {"--platform"}
+							, "Type"_= "" 
+							, "Description"_= "Version manager platform used when downloading version. Defaults to the same as last installed version."
 						}
 					}
 					, "Parameters"_=

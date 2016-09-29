@@ -12,6 +12,7 @@
 		MalterlibPostCopyDestination "TestApp/"
 		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
+		MalterlibTargetNameType "Normal"
 	}
 	Target
 	{

@@ -85,13 +85,21 @@ namespace NMib::NCloud
 					}
 					
 					if (!CFile::fs_FileExists(Internal.m_RootDirectory, EFileAttrib_Directory))
-					{
 						return Manifest;
-					}
 
 					if (_Flags & EReceiveFlag_DeleteExisting)
 					{
-						CFile::fs_DeleteDirectoryRecursive(Internal.m_RootDirectory);
+						try
+						{
+							CFile::fs_DeleteDirectoryRecursive(Internal.m_RootDirectory);
+						}
+						catch (CExceptionFile const &_Exception)
+						{
+							if (!CFile::fs_FileExists(Internal.m_RootDirectory))
+								return Manifest;
+							throw;
+						}
+						
 						return Manifest;
 					}
 					
@@ -115,7 +123,7 @@ namespace NMib::NCloud
 					return Manifest;
 				}
 			)
-			> Continuation % "Failed to extract current manifest" 
+			> Continuation % "Failed to generate current manifest" 
 			/ [this, Continuation, _QueueSize, ThisActor = fg_ThisActor(this)]
 			(CFileTransferContext::CInternal::CManifest &&_Manifest)
 			{

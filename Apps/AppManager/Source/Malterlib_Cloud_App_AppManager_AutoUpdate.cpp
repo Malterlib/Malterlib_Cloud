@@ -7,28 +7,33 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	CVersionManager::CVersionIdentifier CAppManagerActor::fp_FindVersionForAutoUpdate
+	CVersionManager::CVersionIDAndPlatform CAppManagerActor::fp_FindVersionForAutoUpdate
 		(
 			TCSharedPointer<CApplication> const &_pApplication
 			, TCSet<CStr> const &_RequiredTags
 			, TCSet<CStr> const &_AllowedBranches
+			, CStr const &_Platform
 			, CStr &o_Error
 		)
 	{
-		auto *pVersionManagerApp = mp_VersionManagerApplications.f_FindEqual(_pApplication->m_VersionManagerApplication);
+		auto *pVersionManagerApp = mp_VersionManagerApplications.f_FindEqual(_pApplication->m_Settings.m_VersionManagerApplication);
 		if (!pVersionManagerApp)
 		{
-			o_Error = fg_Format("No connected version managers provides versions for: {}", _pApplication->m_VersionManagerApplication); 
+			o_Error = fg_Format("No connected version managers provides versions for: {}", _pApplication->m_Settings.m_VersionManagerApplication); 
 			return {};
 		}
 		decltype(pVersionManagerApp->m_VersionsByTime.f_GetIterator()) iVersion;
 		auto &CurrentVersionID = _pApplication->m_LastInstalledVersion;
-	
-		CVersionManager::CVersionIdentifier VersionID;
+		auto &CurrentVersionInfo = _pApplication->m_LastInstalledVersionInfo;
+		
+		CVersionManager::CVersionIDAndPlatform VersionID;
+		CVersionManager::CVersionInformation VersionInfo;
 		for (iVersion.f_StartBackward(pVersionManagerApp->m_VersionsByTime); iVersion; --iVersion)
 		{
 			auto &RemoteVersion = *iVersion;
-			if (!_AllowedBranches.f_FindEqual(RemoteVersion.f_GetVersionID().m_Branch))
+			if (!_AllowedBranches.f_FindEqual(RemoteVersion.f_GetVersionID().m_VersionID.m_Branch))
+				continue;
+			if (RemoteVersion.f_GetVersionID().m_Platform != _Platform)
 				continue;
 			bool bFoundAllTags = true;
 			for (auto &RequiredTag : _RequiredTags)
@@ -42,6 +47,7 @@ namespace NMib::NCloud::NAppManager
 			if (!bFoundAllTags)
 				continue;
 			VersionID = RemoteVersion.f_GetVersionID();
+			VersionInfo = RemoteVersion.m_VersionInfo; 
 			break;
 		}
 		
@@ -53,12 +59,17 @@ namespace NMib::NCloud::NAppManager
 				o_Error = "No version with the required tags and in the same branch as the currently installed version was found";
 			return {};
 		}
-		if (VersionID <= CurrentVersionID)
+		if (VersionID.m_VersionID.m_Branch == CurrentVersionID.m_VersionID.m_Branch && VersionID <= CurrentVersionID)
 		{
 			if (_RequiredTags.f_IsEmpty())
 				o_Error = "No newer version in the same branch as the currently installed version was found";
 			else
 				o_Error = "No newer version with the required tags and in the same branch as the currently installed version was found";
+			return {};
+		}
+		if (VersionInfo.m_Time < CurrentVersionInfo.m_Time)
+		{
+			o_Error = fg_Format("The selected version {} was older than the currently installed version", VersionID);
 			return {};
 		}
 		return VersionID;
@@ -69,29 +80,36 @@ namespace NMib::NCloud::NAppManager
 		bool bReschedule = false;
 		for (auto &pApplication : mp_Applications)
 		{
-			if (!pApplication->m_bAutoUpdate)
+			if (!pApplication->m_Settings.m_bAutoUpdate)
 				continue;
 
 			CStr Error;
-			auto VersionID = fp_FindVersionForAutoUpdate(pApplication, pApplication->m_AutoUpdateTags, pApplication->m_AutoUpdateBranches, Error);
+			auto AllowedBranches = pApplication->m_Settings.m_AutoUpdateBranches;
+			if (AllowedBranches.f_IsEmpty())
+				AllowedBranches = fg_CreateSet(pApplication->m_LastInstalledVersion.m_VersionID.m_Branch);
+			auto VersionID = fp_FindVersionForAutoUpdate(pApplication, pApplication->m_Settings.m_AutoUpdateTags, AllowedBranches, pApplication->m_LastInstalledVersion.m_Platform, Error);
 			if (!VersionID.f_IsValid())
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Debug, "No new version found: {}", Error);
 				continue;
+			}
 			
-			if (pApplication->m_bOperationInProgress)
+			if (pApplication->f_IsInProgress())
 			{
 				bReschedule = true;
 				continue;
 			}
-			self
+			
+			fp_CommandLine_UpdateApplication
 				(
-					&CAppManagerActor::fp_CommandLine_UpdateApplication
-					, CEJSON
+					CEJSON
 					(
 						{
 							"Name"_= pApplication->m_Name 
 							, "DryRun"_= false
-							, "UpdateSettings"_= false
-							, "Version"_= CStr::fs_ToStr(VersionID)
+							, "UpdateSettings"_= true
+							, "Version"_= CStr::fs_ToStr(VersionID.m_VersionID)
+							, "Platform"_= pApplication->m_LastInstalledVersion.m_Platform
 						}
 					)
 					, true 

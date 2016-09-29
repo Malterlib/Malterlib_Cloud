@@ -20,7 +20,7 @@ namespace NMib::NCloud::NVersionManager
 
 		o_CommandLine.f_SetProgramDescription
 			(
-				"Favro Cloud Version Manager"
+				"Malterlib Cloud Version Manager"
 				, "Manages updates for Malterlib cloud apps." 
 			)
 		;

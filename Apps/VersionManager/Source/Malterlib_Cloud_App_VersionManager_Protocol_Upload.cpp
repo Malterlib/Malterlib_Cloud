@@ -26,7 +26,8 @@ namespace NMib::NCloud::NVersionManager
 	{
 	}
 
-	auto CVersionManagerDaemonActor::CServer::fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo) -> TCContinuation<CSizeInfo> 
+	auto CVersionManagerDaemonActor::CServer::fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo) 
+		-> TCContinuation<CSizeInfo> 
 	{
 		TCContinuation<CSizeInfo> Continuation;
 		fg_Dispatch
@@ -39,7 +40,8 @@ namespace NMib::NCloud::NVersionManager
 					
 					VersionJSONInfo["Time"] = _VersionInfo.m_Time;
 					VersionJSONInfo["Configuration"] = _VersionInfo.m_Configuration;
-					VersionJSONInfo["ExtraInfo"] = _VersionInfo.m_ExtraInfo;
+					if (_VersionInfo.m_ExtraInfo.f_IsObject())
+						VersionJSONInfo["ExtraInfo"] = _VersionInfo.m_ExtraInfo;
 					auto &TagsArray = VersionJSONInfo["Tags"].f_Array();
 					for (auto &Tag : _VersionInfo.m_Tags)
 						TagsArray.f_Insert(Tag);
@@ -70,18 +72,25 @@ namespace NMib::NCloud::NVersionManager
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
 		{
 			CStr Error = "Invalid application format";
-			fsp_LogActivityError(_CallingHostInfo, Error + " (start download version)");
+			fsp_LogActivityError(_CallingHostInfo, Error + " (start upload version)");
 			return DMibErrorInstance(Error);
 		}
 
 		{
 			CStr ErrorStr;
-			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionID, ErrorStr))
+			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionIDAndPlatform.m_VersionID, ErrorStr))
 			{
 				CStr Error = fg_Format("Invalid version ID format: {}", ErrorStr);
-				fsp_LogActivityError(_CallingHostInfo, Error + " (start download version)");
+				fsp_LogActivityError(_CallingHostInfo, Error + " (start upload version)");
 				return DMibErrorInstance(Error);
 			}
+		}
+		
+		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
+		{
+			CStr Error = "Invalid version platform format";
+			fsp_LogActivityError(_CallingHostInfo, Error + " (start upload version)");
+			return DMibErrorInstance(Error);
 		}
 		
 		bool bFullAccess = mp_Permissions.f_HostHasAnyPermission(_CallingHostInfo.f_GetRealHostID(), "Application/WriteAll");
@@ -103,7 +112,7 @@ namespace NMib::NCloud::NVersionManager
 		CStr UploadID = fg_RandomID();
 		
 		auto &Upload = mp_VersionUploads[UploadID];
-		Upload.m_Desc = fg_Format("{}", _Params.m_VersionID);
+		Upload.m_Desc = fg_Format("{}", _Params.m_VersionIDAndPlatform);
 		auto pCleanup = fg_OnScopeExitShared
 			(
 				[this, UploadID, ThisWeak = fg_ThisActor(this).f_Weak(), _CallingHostInfo, Desc = Upload.m_Desc]
@@ -124,7 +133,7 @@ namespace NMib::NCloud::NVersionManager
 		;
 		
 		CStr ApplicationDirectory = fg_Format("{}/Applications", CFile::fs_GetProgramDirectory());
-		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionID.f_EncodeFileName());
+		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionIDAndPlatform.f_EncodeFileName());
 		
 		Upload.m_UploadFileAccess = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Upload version file access"));
 		Upload.m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, Upload.m_UploadFileAccess);
@@ -146,7 +155,7 @@ namespace NMib::NCloud::NVersionManager
 				, Desc = Upload.m_Desc
 				, _Params, VersionInfo
 				, VersionPath
-				, VersionID = _Params.m_VersionID
+				, VersionID = _Params.m_VersionIDAndPlatform
 				, ApplicationName = _Params.m_Application
 				, DeniedTags
 			]
@@ -229,7 +238,7 @@ namespace NMib::NCloud::NVersionManager
 						{
 							auto &Result = *_Result;
 							CStr Message;
-							Message = fg_Format("{} bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
+							Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
 							
 							fsp_LogActivityInfo
 								(
@@ -289,7 +298,7 @@ namespace NMib::NCloud::NVersionManager
 								Version.m_VersionInfo = VersionInfo;
 								Application.m_VersionsByTime.f_Insert(Version);
 
-								fp_NewVersion(ApplicationName, VersionID, VersionInfo); 
+								fp_NewVersion(ApplicationName, Version); 
 							}
 						;
 					}

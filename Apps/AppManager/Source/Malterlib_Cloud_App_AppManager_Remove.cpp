@@ -15,7 +15,7 @@ namespace NMib::NCloud::NAppManager
 			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
 		
 		auto &Application = **pApplication;
-		if (Application.m_bOperationInProgress)
+		if (Application.f_IsInProgress())
 			return DMibErrorInstance("Operation already in progress for application");
 		auto InProgressScope = Application.f_SetInProgress();
 			

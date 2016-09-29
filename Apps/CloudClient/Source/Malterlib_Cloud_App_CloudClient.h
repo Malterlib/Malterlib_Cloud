@@ -18,13 +18,25 @@ namespace NMib::NCloud::NCloudClient
 		~CCloudClientAppActor();
 		
 	private:
+		
+		struct CSelfUpdateVersion
+		{
+			TCDistributedActor<CVersionManager> m_Actor;
+			CVersionManager::CVersionID m_VersionID;
+		};
+		
 		TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
 		TCContinuation<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
+		TCContinuation<CDistributedAppCommandLineResults> fp_PreRunCommandLine(CStr const &_Command, NEncoding::CEJSON const &_Params) override;
+		
+		TCContinuation<CSelfUpdateVersion> fp_GetSelfUpdateVersion();
 		
 		TCContinuation<void> fp_Initialize();
-		
+
 		void fp_ParseCommonOptions(NEncoding::CEJSON const &_Params);
+
+		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_SelfUpdate(CEJSON const &_Params);
 		
 		// Backup Manager
 		void fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
@@ -36,6 +48,16 @@ namespace NMib::NCloud::NCloudClient
 		// Version Manager
 		void fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCContinuation<void> fp_VersionManager_SubscribeToServers();
+		TCContinuation<CFileTransferResult> fp_VersionManager_DownloadVersion
+			(
+				TCDistributedActor<CVersionManager> const &_VersionManager
+				, CStr const &_DestinationDirectory
+				, CStr const &_Application
+				, CVersionManager::CVersionIDAndPlatform const &_VersionID
+				, uint64 _QueueSize = 8*1024*1024
+			)
+		;
+		
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params);

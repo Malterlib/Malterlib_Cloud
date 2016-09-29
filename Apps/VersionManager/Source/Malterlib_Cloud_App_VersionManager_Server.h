@@ -53,9 +53,9 @@ namespace NMib::NCloud::NVersionManager
 		
 		struct CVersion
 		{
-			CVersionManager::CVersionIdentifier const &f_GetIdentifier() const
+			CVersionManager::CVersionIDAndPlatform const &f_GetIdentifier() const
 			{
-				return TCMap<CVersionManager::CVersionIdentifier, CVersion>::fs_GetKey(*this);
+				return TCMap<CVersionManager::CVersionIDAndPlatform, CVersion>::fs_GetKey(*this);
 			}
 			
 			CVersionManager::CVersionInformation m_VersionInfo;
@@ -83,7 +83,7 @@ namespace NMib::NCloud::NVersionManager
 				return TCMap<CStr, CApplication>::fs_GetKey(*this);
 			}
 			
-			TCMap<CVersionManager::CVersionIdentifier, CVersion> m_Versions;
+			TCMap<CVersionManager::CVersionIDAndPlatform, CVersion> m_Versions;
 			TCAVLTree<CVersion::CLinkTraits_m_TimeLink, CVersion::CCompareTime> m_VersionsByTime;
 		};
 		
@@ -110,6 +110,8 @@ namespace NMib::NCloud::NVersionManager
 			}
 			uint32 m_nInitial = 0;
 			CStr m_HostID;
+			TCSet<CStr> m_Platforms;
+			TCSet<CStr> m_Tags;
 			TCActor<> m_DispatchActor;
 			TCFunctionMutable<NConcurrency::TCContinuation<CVersionManager::CNewVersionNotifications::CResult> (CVersionManager::CNewVersionNotifications &&_VersionInfo)> 
 				m_fOnNewVersions
@@ -146,8 +148,9 @@ namespace NMib::NCloud::NVersionManager
 		TCSet<CStr> fp_ApplicationSet();
 		TCSet<CStr> fp_FilterTags(CStr const &_HostID, TCSet<CStr> const &_Tags, TCSet<CStr> &o_DeniedTags);
 		void fp_NewTagsKnown(TCSet<CStr> const &_Tags);
-		void fp_NewVersion(CStr const &_ApplicationName, CVersionManager::CVersionIdentifier const &_VersionID, CVersionManager::CVersionInformation const &_VersionInfo);
+		void fp_NewVersion(CStr const &_ApplicationName, CVersion const &_Version);
 		TCContinuation<CSizeInfo> fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo);
+		bool fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version);
 		
 		static void fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info);
 		static void fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error);

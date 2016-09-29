@@ -40,12 +40,18 @@ namespace NMib::NCloud::NVersionManager
 
 		{
 			CStr ErrorStr;
-			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionID, ErrorStr))
+			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionIDAndPlatform.m_VersionID, ErrorStr))
 			{
 				CStr Error = fg_Format("Invalid version ID format: {}", ErrorStr);
 				fsp_LogActivityError(_CallingHostInfo, Error + " (start download version)");
 				return DMibErrorInstance(Error);
 			}
+		}
+		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
+		{
+			CStr Error = fg_Format("Invalid version platform format");
+			fsp_LogActivityError(_CallingHostInfo, Error + " (start download version)");
+			return DMibErrorInstance(Error);
 		}
 		
 		bool bFullAccess = mp_Permissions.f_HostHasAnyPermission(_CallingHostInfo.f_GetRealHostID(), "Application/ReadAll");
@@ -65,10 +71,10 @@ namespace NMib::NCloud::NVersionManager
 			fsp_LogActivityError(_CallingHostInfo, Error);
 			return DMibErrorInstance(Error);
 		}
-		auto *pVersion = pApplication->m_Versions.f_FindEqual(_Params.m_VersionID);
+		auto *pVersion = pApplication->m_Versions.f_FindEqual(_Params.m_VersionIDAndPlatform);
 		if (!pVersion)
 		{
-			CStr Error = fg_Format("No such version: {}", _Params.m_VersionID);
+			CStr Error = fg_Format("No such version: {}", _Params.m_VersionIDAndPlatform);
 			fsp_LogActivityError(_CallingHostInfo, Error);
 			return DMibErrorInstance(Error);
 		}
@@ -83,10 +89,10 @@ namespace NMib::NCloud::NVersionManager
 		;
 		
 		CStr ApplicationDirectory = fg_Format("{}/Applications", CFile::fs_GetProgramDirectory());
-		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionID.f_EncodeFileName());
+		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionIDAndPlatform.f_EncodeFileName());
 		
 		Download.m_FileTransferSend = fg_ConstructActor<CFileTransferSend>(VersionPath);
-		Download.m_Desc = fg_Format("{}", _Params.m_VersionID);
+		Download.m_Desc = fg_Format("{}", _Params.m_VersionIDAndPlatform);
 		
 		TCContinuation<CVersionManager::CStartDownloadVersion::CResult> Continuation;
 		
@@ -115,7 +121,7 @@ namespace NMib::NCloud::NVersionManager
 						{
 							auto &Result = *_Result;
 							CStr Message;
-							Message = fg_Format("{} bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
+							Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
 							
 							fsp_LogActivityInfo
 								(

@@ -35,6 +35,191 @@ Import "Apps/*/*.MHeader"
 
 Property
 {
+	
+	MalterlibCloudTargetIdentity "@(Target:this.Identity)"
+	
+	MalterlibCloudTargetInDependenciesTemplate_TargetName "@(Builtin.Function->GetProperty('Property', 'MalterlibCloudTargetIdentity', '@(Explodee)'))"
+	{
+	}
+	
+	MalterlibCloudTargetInDependenciesTemplate true
+	{
+		!!MalterlibCloudTargetInDependenciesTemplate_TargetName "Lib_Malterlib_Cloud"
+	}
+	
+	MalterlibCloudTargetInDependencies "@(Builtin.Function->ExplodeList('@(Target.Dependencies)', ';', 'MalterlibCloudTargetInDependenciesTemplate'))"
+	
+	MalterlibCloudTarget true
+	{
+		&
+		{
+			MalterlibCloudTarget ""
+			|
+			{
+				MalterlibCloudTargetInDependencies true
+				MalterlibCloudTargetIdentity "Lib_Malterlib_Cloud"
+			}
+		}
+	}
+	
+	MalterlibCloudVersionInfo_Branch "@(MalterlibBranch)"
+	{
+		!!MalterlibCloudVersionInfo_Branch ""
+	}
+	
+	MalterlibCloudVersionInfo_Version "@(MalterlibCloudVersionInfo_Branch)/@(ProductVersionMajor->FormatInt('{}')).@(ProductVersionMinor->FormatInt('{}')).@(ProductVersionRevision->FormatInt('{}'))"
+	{
+		!!MalterlibCloudVersionInfo_Version ""
+	}
+	MalterlibCloudVersionInfo_Executable "@(Target.FileName)@(Target.Extension)"
+	{
+		!!MalterlibCloudVersionInfo_Executable ""
+	}
+	MalterlibCloudVersionInfo_Application "@(Target.FileName)"
+	{
+		!!MalterlibCloudVersionInfo_Application ""
+	}
+	MalterlibCloudVersionInfo_Configuration "@(FullConfiguration)"
+	{
+		!!MalterlibCloudVersionInfo_Configuration ""
+	}
+}
+
+Property
+{
+	MalterlibCloudVersionInfoFileName "@(GeneratedDirectory)@(Target.FileName)VersionInfo.json"
+	
+	MalterlibCloudVersionInfo	"{\n"\
+								"\t\"Application\": \"@(MalterlibCloudVersionInfo_Application)\"\n"\
+								"\t, \"Version\": \"@(MalterlibCloudVersionInfo_Version)\"\n"\
+								"\t, \"Platform\": \"@(MalterlibCloudPlatform)\"\n"\
+								"\t, \"Configuration\": \"@(MalterlibCloudVersionInfo_Configuration)\"\n"\
+								"\t, \"ExtraInfo\": {\n"\
+								"\t\t\"Dummy\": null\n"
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t, \"Executable\": \"@(MalterlibCloudVersionInfo_Executable)\"\n"
+	{
+		!MalterlibCloudVersionInfo_Executable ""
+	}
+	
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t, \"ExecutableParams\": \"@(MalterlibCloudVersionInfo_ExecutableParams)\"\n"
+	{
+		!MalterlibCloudVersionInfo_ExecutableParams ""
+	}
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t, \"RunAsUser\": \"@(MalterlibCloudVersionInfo_RunAsUser)\"\n"
+	{
+		!MalterlibCloudVersionInfo_RunAsUser ""
+	}
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t, \"RunAsGroup\": \"@(MalterlibCloudVersionInfo_RunAsGroup)\"\n"
+	{
+		!MalterlibCloudVersionInfo_RunAsGroup ""
+	}
+	
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t}\n"\
+								"}\n"
+	
+	MalterlibCloudVersionInfo "@(MalterlibCloudVersionInfo->Replace('\"Dummy\": null\\\n\t\t, ', ''))"
+	MalterlibCloudVersionInfo "@(MalterlibCloudVersionInfo->Replace('\t\t\"Dummy\": null\\\n', ''))"
+
+	MalterlibCloudVersionInfoCppFileName "@(GeneratedDirectory)CloudVersionInfo.h"
+	
+	MalterlibCloudVersionInfoCpp	"#include <Mib/Cloud/VersionInfo>\n"\ 
+									"namespace\n"\
+									"{\n"\
+									"	NMib::NCloud::CCloudVersionInfo fg_GetCloudVersionInfo()\n"\
+									"	{\n"\
+									"		return NMib::NCloud::fg_ParseVersionInfo\n"\
+									"			(\n"\
+									"R\"-----(\n"\
+									"@(MalterlibCloudVersionInfo)"\
+									")-----\"\n"\
+									"			)\n"\
+									"		;\n"\
+									"	}\n"\
+									"}\n"
+}
+
+%Group "~Automatic/Malterlib Cloud"
+{
+	!!TargetIsExecutable true
+	%GenerateFile "@(MalterlibCloudTarget_FileIdentity)"
+	{
+		Property
+		{
+			Name "@(MalterlibCloudVersionInfoFileName)"
+			Contents "@(MalterlibCloudVersionInfo)"
+			Executable false
+			UnixLineEnds true
+			UnicodeBOM false
+			MalterlibCloudTarget_FileIdentity VersionInfoFile
+			{
+				!!MalterlibCloudTarget true
+			}
+		}
+	}
+	%GenerateFile "@(MalterlibCloudTarget_FileIdentityCpp)"
+	{
+		Property
+		{
+			Name "@(MalterlibCloudVersionInfoCppFileName)"
+			Contents "@(MalterlibCloudVersionInfoCpp)"
+			Executable false
+			UnixLineEnds true
+			UnicodeBOM true
+			MalterlibCloudTarget_FileIdentityCpp VersionInfoFileCpp
+			{
+				!!MalterlibCloudTarget true
+			}
+		}
+	}
+}
+
+Target
+{
+	ExtraGroups "~Automatic/Malterlib Cloud;@(Target.ExtraGroups)"
+}
+
+Property
+{
+	MalterlibCloudPlatform "@(Platform->Replace(' ',''))-@(Architecture->Replace(' ',''))"
+	{
+		!!MalterlibCloudPlatform ""
+	}
+	MalterlibBuildServerPutSources "@(MalterlibCloudVersionInfoFileName);@(MalterlibBuildServerPutSources)"
+	{
+		&	
+		{
+			TargetIsExecutable true
+			MalterlibCloudTarget true
+		}
+	}
+	MalterlibPostCopySources "@(MalterlibCloudVersionInfoFileName);@(MalterlibPostCopySources)"
+	{
+		&	
+		{
+			TargetIsExecutable true
+			MalterlibCloudTarget true
+		}
+	}
+}
+
+Compile
+{
+	&
+	{
+		CompileDialect C
+		MalterlibCloudTarget true
+	}
+	
+	PreprocessorDefines "DMalterlibCloudPlatform=\"@(MalterlibCloudPlatform)\";@(Compile.PreprocessorDefines)"
+}
+
+Property
+{
 	!PlatformFamily Windows
 
 	MalterlibLibrary_Cloud true
@@ -94,6 +279,9 @@ Property
 	}
 	
 	Property.MalterlibPostCopyProject "Malterlib_Cloud"
+	{
+		!!TargetIsExecutable true
+	}
 	
 	Property.MalterlibLog_Severities "Error;Critical;Warning;Info"
 	{
@@ -101,4 +289,152 @@ Property
 	}
 
 	%Target "@(Malterlib_Cloud_App_Targets)"
+}
+
+Property
+{
+	MalterlibCloud_CloudClientExecutable "" // User: Configure client executable to test local deploy to version manager
+	{
+		!!MalterlibCloud_CloudClientExecutable ""
+	}
+	MalterlibCloud_VersionUploadVersion "" // User: Allows you to override the version uploaded to version manager for debug purposes
+	{
+		!!MalterlibCloud_VersionUploadVersion ""
+	}
+	MalterlibCloud_VersionUploadForce "" // User: Force uploads to vension manager even if version already exists
+	{
+		!!MalterlibCloud_VersionUploadForce ""
+	}
+	MalterlibCloud_VersionUploadTags "" // User: Set the tags to use when uploading to version managers
+	{
+		!!MalterlibCloud_VersionUploadTags ""
+	}
+	MalterlibCloud_VersionUploadHosts "" // User: Set the hosts to upload version to
+	{
+		!!MalterlibCloud_VersionUploadHosts ""
+	}
+	
+	MalterlibCloud_VersionUploadSources "@(MalterlibBuildServerPutSources);@(MalterlibCloud_VersionUploadSources)"
+	
+	MalterlibCloud_CloudClientCommand "\"@(MalterlibCloud_CloudClientExecutable)\""
+	{
+		!MalterlibCloud_CloudClientExecutable ""
+	}
+	MalterlibCloud_CloudClientCommand "MTool BuildServerTool Tool=@(MalterlibCloud_VersionUploadToolName)"
+	{
+		&
+		{
+			MalterlibBuildServerBuild true
+			!MalterlibCloud_VersionUploadToolName ""
+		}
+	}
+}
+
+// Copy temp
+Property
+{
+	MalterlibCloud_VersionUploadTempPath "@(Target.IntermediateDirectory)VersionUpload"
+ 
+	MalterlibCloud_VersionUploadCopyTempTemplateExpand	"MTool DiffCopy \"@(Expand0)\" \"@(MalterlibCloud_VersionUploadTempPath)@(MalterlibCloud_VersionUploadDestinationDir)@(Expand1)\" \"\" 0\r\n"\
+														"@(CheckErrors)\r\n"
+
+	MalterlibCloud_VersionUploadCopyTempTemplate	"@(Builtin.Function->ExpandList('@(Explodee)', '|', 'MalterlibCloud_VersionUploadCopyTempTemplateExpand'))"
+	{
+		!Explodee ""
+	}
+	
+	MalterlibCloud_VersionUploadCopyTempContents	"@(Builtin.Function->ExplodeList('@(MalterlibCloud_VersionUploadSources)', ';', 'MalterlibCloud_VersionUploadCopyTempTemplate'))"
+}
+
+// Tags
+Property
+{
+	MalterlibCloud_VersionUploadTagsTemplate	", \"@(Explodee)\""
+	{
+		!Explodee ""
+	}
+	MalterlibCloud_VersionUploadTagsContents "$first@(Builtin.Function->ExplodeList('@(MalterlibCloud_VersionUploadTags)', ';', 'MalterlibCloud_VersionUploadTagsTemplate'))"
+	{
+		!MalterlibCloud_VersionUploadTags ""
+	}
+	MalterlibCloud_VersionUploadTagsContents "@(MalterlibCloud_VersionUploadTagsContents->Replace('$first, ', ''))"
+}
+
+// Upload
+Property
+{
+	MalterlibCloud_VersionUploadCloudClientVersionSpecified " --version \"@(MalterlibCloud_VersionUploadVersion)\""
+	{
+		!MalterlibCloud_VersionUploadVersion ""
+	}
+	MalterlibCloud_VersionUploadCloudClientForceSpecified " --force"
+	{
+		!!MalterlibCloud_VersionUploadForce true
+	}
+	MalterlibCloud_VersionUploadCloudClientHostSpecified " --host \"@(Explodee)\""
+	{
+		!MalterlibCloud_VersionUploadHosts ""
+	}
+	
+	MalterlibCloud_VersionUploadCloudClientCommand "@(MalterlibCloud_CloudClientCommand) --no-self-update-check --version-manager-upload-version --settings-file \"@(MalterlibCloudVersionInfoFileName)\" --tags '[@(MalterlibCloud_VersionUploadTagsContents)]'@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified) \"@(MalterlibCloud_VersionUploadTarArchivePath)\"\r\n"\
+													"@(CheckErrors)\r\n"
+	
+	MalterlibCloud_VersionUploadCloudClientTemplate	"@(MalterlibCloud_VersionUploadCloudClientCommand)"
+	{
+		!Explodee ""
+	}
+	
+	MalterlibCloud_VersionUploadCloudClientContents "@(MalterlibCloud_VersionUploadCloudClientCommand)"
+	{
+		!!MalterlibCloud_VersionUploadHosts ""
+	}
+	
+	MalterlibCloud_VersionUploadCloudClientContents "@(Builtin.Function->ExplodeList('@(MalterlibCloud_VersionUploadHosts)', ';', 'MalterlibCloud_VersionUploadCloudClientTemplate'))"
+	{
+		!MalterlibCloud_VersionUploadHosts ""
+	}
+}
+
+Property
+{
+	MalterilbCloud_DoVersionManagerUpload true
+	{
+		&
+		{
+			MalterlibCloud_EnableVersionUpload true
+			|
+			{
+				!MalterlibCloud_CloudClientExecutable ""
+				&
+				{
+					MalterlibBuildServerBuild true
+					!MalterlibCloud_VersionUploadToolName ""
+				}
+			}
+			!MalterlibCloud_VersionUploadSources ""
+			TargetIsExecutable true
+			MalterlibCloudTarget true
+		}
+	}
+	
+	MalterlibBuildServerPutDisabled true
+	{
+		!!MalterilbCloud_DoVersionManagerUpload true
+	}
+	
+	MalterlibCloud_VersionUploadTarArchivePath "@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application).tar.gz"
+	
+	MalterlibPostBuildScript_Last "@(MalterlibPostBuildScript_Last)"\
+					"[ -e \"@(MalterlibCloud_VersionUploadTempPath)\" ] && rm -rf \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
+					"@(MalterlibCloud_VersionUploadCopyTempContents)\r\n"\
+					"pushd \"@(MalterlibCloud_VersionUploadTempPath)\" > /dev/null\r\n"\
+					"@(CheckErrors)\r\n"\
+					"tar -czf \"@(MalterlibCloud_VersionUploadTarArchivePath)\" .\r\n"\
+					"@(CheckErrors)\r\n"\
+					"popd > /dev/null\r\n"\
+					"@(CheckErrors)\r\n"\
+					"@(MalterlibCloud_VersionUploadCloudClientContents)\r\n"
+	{
+		!!MalterilbCloud_DoVersionManagerUpload true
+	}
 }

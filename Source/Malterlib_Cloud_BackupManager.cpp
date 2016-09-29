@@ -33,6 +33,14 @@ namespace NMib::NCloud
 	
 	bool CBackupManager::fs_IsValidBackup(NStr::CStr const &_String, NStr::CStr *o_pBackupID, NTime::CTime *o_pTime)
 	{
+		if (_String == "Latest")
+		{
+			if (o_pBackupID)
+				*o_pBackupID = "Latest";
+			if (o_pTime)
+				*o_pTime = NTime::CTime();
+			return true;
+		}
 		NStr::CStr Year;
 		NStr::CStr Month;
 		NStr::CStr Day;

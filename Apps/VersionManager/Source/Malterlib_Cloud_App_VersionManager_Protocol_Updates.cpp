@@ -12,20 +12,36 @@
 
 namespace NMib::NCloud::NVersionManager
 {
-	void CVersionManagerDaemonActor::CServer::fp_NewVersion
-		(
-			CStr const &_ApplicationName
-			, CVersionManager::CVersionIdentifier const &_VersionID
-			, CVersionManager::CVersionInformation const &_VersionInfo
-		)
+	bool CVersionManagerDaemonActor::CServer::fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version)
+	{
+		if (!_Subscription.m_Platforms.f_IsEmpty() && !_Subscription.m_Platforms.f_FindEqual(_Version.f_GetIdentifier().m_Platform))
+			return false;
+		if (!_Subscription.m_Tags.f_IsEmpty())
+		{
+			bool bAllTagsFound = true;
+			for (auto &Tag : _Subscription.m_Tags)
+			{
+				if (!_Version.m_VersionInfo.m_Tags.f_FindEqual(Tag))
+				{
+					bAllTagsFound = false;
+					break;
+				}
+			}
+			if (!bAllTagsFound)
+				return false;
+		}
+		return true;
+	}
+	
+	void CVersionManagerDaemonActor::CServer::fp_NewVersion(CStr const &_ApplicationName, CVersion const &_Version)
 	{
 		CVersionManager::CNewVersionNotifications NewVersionNotifications;
 		auto &NewVersionNotification = NewVersionNotifications.m_NewVersions.f_Insert();
 		NewVersionNotification.m_Application = _ApplicationName;
-		NewVersionNotification.m_VersionID = _VersionID;
-		NewVersionNotification.m_VersionInfo = _VersionInfo;
+		NewVersionNotification.m_VersionIDAndPlatform = _Version.f_GetIdentifier();
+		NewVersionNotification.m_VersionInfo = _Version.m_VersionInfo;
 		
-		fp_NewTagsKnown(_VersionInfo.m_Tags);
+		fp_NewTagsKnown(_Version.m_VersionInfo.m_Tags);
 		
 		TCVector<CStr> Permissions;
 		Permissions.f_Insert("Application/ReadAll");
@@ -35,6 +51,8 @@ namespace NMib::NCloud::NVersionManager
 		auto fSendToSubscription = [&](CSubscription const &_Subscription)
 			{
 				if (!mp_Permissions.f_HostHasAnyPermission(_Subscription.m_HostID, Permissions))
+					return;
+				if (!fp_VersionMatchesSubscription(_Subscription, _Version))
 					return;
 				_Subscription.f_SendVersions(NewVersionNotifications);
 			}
@@ -102,14 +120,19 @@ namespace NMib::NCloud::NVersionManager
 				}
 				
 				mint nToSend = _Subscription.m_nInitial;
+				mint nVersions = _Application.m_VersionsByTime.f_GetLen();
+				(void)nVersions;
 				decltype(_Application.m_VersionsByTime.f_GetIterator()) iVersion;
-				for (iVersion.f_StartBackward(_Application.m_VersionsByTime); iVersion && nToSend; --iVersion, --nToSend)
+				for (iVersion.f_StartBackward(_Application.m_VersionsByTime); iVersion && nToSend; --iVersion)
 				{
 					auto &Version = *iVersion;
+					if (!fp_VersionMatchesSubscription(_Subscription, Version))
+						continue;
 					auto &NewVersionNotification = NewVersionNotifications.m_NewVersions.f_Insert();
 					NewVersionNotification.m_Application = _Application.f_GetName();
-					NewVersionNotification.m_VersionID = Version.f_GetIdentifier();
+					NewVersionNotification.m_VersionIDAndPlatform = Version.f_GetIdentifier();
 					NewVersionNotification.m_VersionInfo = Version.m_VersionInfo;
+					--nToSend;
 				}
 			}
 		;
@@ -139,6 +162,8 @@ namespace NMib::NCloud::NVersionManager
 		Subscription.m_DispatchActor = fg_Move(_Params.m_DispatchActor);
 		Subscription.m_fOnNewVersions = fg_Move(_Params.m_fOnNewVersions);
 		Subscription.m_HostID = _CallingHostInfo.f_GetRealHostID();
+		Subscription.m_Tags = _Params.m_Tags;
+		Subscription.m_Platforms = _Params.m_Platforms;
 		Subscription.m_nInitial = _Params.m_nInitial;
 			
 		CVersionManager::CSubscribeToUpdates::CResult Result;

@@ -7,168 +7,286 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	namespace
+	bool CAppManagerActor::CApplicationSettings::f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed)
 	{
-		enum EToUpdateFlag
+		if (auto *pValue = _Params.f_GetMember("SelfUpdateSource"))
 		{
-			EToUpdateFlag_None = 0
-			, EToUpdateFlag_Executable = DBit(0)
-			, EToUpdateFlag_ExecutableParameters = DBit(1)
-			, EToUpdateFlag_RunAsUser = DBit(2)
-			, EToUpdateFlag_RunAsGroup = DBit(3)
-			, EToUpdateFlag_VersionManagerApplication = DBit(4)
-			, EToUpdateFlag_AutoUpdateTags = DBit(5)
-			, EToUpdateFlag_AutoUpdateBranches = DBit(6)
-			, EToUpdateFlag_UpdateScript_PreUpdate = DBit(7)
-			, EToUpdateFlag_UpdateScript_PostUpdate = DBit(8)
-			, EToUpdateFlag_UpdateScript_PostLaunch = DBit(9)
-			, EToUpdateFlag_UpdateScript_OnError = DBit(10)
-		};
+			o_ChangedSettings |= EApplicationSetting_SelfUpdateSource;
+			m_bSelfUpdateSource = pValue->f_Boolean();
+		}
+		if (auto *pValue = _Params.f_GetMember("EncryptionStorage"))
+		{
+			o_ChangedSettings |= EApplicationSetting_EncryptionStorage;
+			m_EncryptionStorage = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("ParentApplication"))
+		{
+			o_ChangedSettings |= EApplicationSetting_ParentApplication;
+			m_ParentApplication = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("VersionManagerApplication"))
+		{
+			o_ChangedSettings |= EApplicationSetting_VersionManagerApplication;
+			m_VersionManagerApplication = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("Executable"))
+		{
+			o_ChangedSettings |= EApplicationSetting_Executable;
+			m_Executable = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("ExecutableParameters"))
+		{
+			if (!_bRelaxed || !m_bSelfUpdateSource)
+			{
+				o_ChangedSettings |= EApplicationSetting_ExecutableParameters;
+				m_ExecutableParameters.f_Clear();
+				for (auto &Parameter : pValue->f_Array())
+					m_ExecutableParameters.f_Insert(Parameter.f_String());
+			}
+		}
+		if (auto *pValue = _Params.f_GetMember("RunAsUser"))
+		{
+			o_ChangedSettings |= EApplicationSetting_RunAsUser;
+			m_RunAsUser = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("RunAsGroup"))
+		{
+			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
+			m_RunAsGroup = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("AutoUpdateTags"))
+		{
+			o_ChangedSettings |= EApplicationSetting_AutoUpdateTags;
+			m_bAutoUpdate = false;
+			m_AutoUpdateTags.f_Clear();
+			if (pValue->f_IsArray())
+			{
+				m_bAutoUpdate = true;
+				for (auto &TagJSON : pValue->f_Array())
+				{
+					auto &Tag = TagJSON.f_String();
+					if (!CVersionManager::fs_IsValidTag(Tag))
+					{
+						o_Error = fg_Format("'{}' is not a valid tag", Tag);
+						return false;
+					}
+					m_AutoUpdateTags[Tag];
+				}
+			}
+		}
+		if (auto *pValue = _Params.f_GetMember("AutoUpdateBranches"))
+		{
+			o_ChangedSettings |= EApplicationSetting_AutoUpdateBranches;
+			m_AutoUpdateBranches.f_Clear();
+			for (auto &BranchJSON : pValue->f_Array())
+			{
+				auto &Branch = BranchJSON.f_String();
+				if (!CVersionManager::fs_IsValidBranch(Branch))
+				{
+					o_Error = fg_Format("'{}' is not a valid branch", Branch);
+					return false;
+				}
+				m_AutoUpdateBranches[Branch];
+			}
+		}
+		if (auto *pValue = _Params.f_GetMember("UpdateScript_PreUpdate"))
+		{
+			o_ChangedSettings |= EApplicationSetting_UpdateScript_PreUpdate;
+			m_UpdateScripts.m_PreUpdate = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostUpdate"))
+		{
+			o_ChangedSettings |= EApplicationSetting_UpdateScript_PostUpdate;
+			m_UpdateScripts.m_PostUpdate = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostLaunch"))
+		{
+			o_ChangedSettings |= EApplicationSetting_UpdateScript_PostLaunch;
+			m_UpdateScripts.m_PostLaunch = pValue->f_String();
+		}
+		if (auto *pValue = _Params.f_GetMember("UpdateScript_OnError"))
+		{
+			o_ChangedSettings |= EApplicationSetting_UpdateScript_OnError;
+			m_UpdateScripts.m_OnError = pValue->f_String();
+		}
+		return true;
 	}
+	
+	void CAppManagerActor::CApplicationSettings::f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source)
+	{
+		if (_ChangedSettings & EApplicationSetting_EncryptionStorage)
+			m_EncryptionStorage = _Source.m_EncryptionStorage;
+		if (_ChangedSettings & EApplicationSetting_ParentApplication)
+			m_ParentApplication = _Source.m_ParentApplication;
+		if (_ChangedSettings & EApplicationSetting_Executable)
+			m_Executable = _Source.m_Executable;
+		if (_ChangedSettings & EApplicationSetting_ExecutableParameters)
+			m_ExecutableParameters = _Source.m_ExecutableParameters;
+		if (_ChangedSettings & EApplicationSetting_RunAsUser)
+			m_RunAsUser = _Source.m_RunAsUser;
+		if (_ChangedSettings & EApplicationSetting_RunAsGroup)
+			m_RunAsGroup = _Source.m_RunAsGroup;
+		if (_ChangedSettings & EApplicationSetting_VersionManagerApplication)
+			m_VersionManagerApplication = _Source.m_VersionManagerApplication;
+		if (_ChangedSettings & EApplicationSetting_AutoUpdateTags)
+		{
+			m_bAutoUpdate = _Source.m_bAutoUpdate;
+			m_AutoUpdateTags = _Source.m_AutoUpdateTags;
+		}
+		if (_ChangedSettings & EApplicationSetting_AutoUpdateBranches)
+			m_AutoUpdateBranches = _Source.m_AutoUpdateBranches;
+		if (_ChangedSettings & EApplicationSetting_UpdateScript_PreUpdate)
+			m_UpdateScripts.m_PreUpdate = _Source.m_UpdateScripts.m_PreUpdate;
+		if (_ChangedSettings & EApplicationSetting_UpdateScript_PostUpdate)
+			m_UpdateScripts.m_PostUpdate = _Source.m_UpdateScripts.m_PostUpdate;
+		if (_ChangedSettings & EApplicationSetting_UpdateScript_PostLaunch)
+			m_UpdateScripts.m_PostLaunch = _Source.m_UpdateScripts.m_PostLaunch;
+		if (_ChangedSettings & EApplicationSetting_UpdateScript_OnError)
+			m_UpdateScripts.m_OnError = _Source.m_UpdateScripts.m_OnError;
+		if (_ChangedSettings & EApplicationSetting_SelfUpdateSource)
+			m_bSelfUpdateSource = _Source.m_bSelfUpdateSource;
+	}
+
+	bool CAppManagerActor::CApplicationSettings::f_Validate(CStr &o_Error)
+	{
+		auto fError = [&](CStr const &_Error)
+			{
+				o_Error = _Error;
+				return false;
+			}
+		;
+		if (m_bSelfUpdateSource)
+		{
+			if (!m_EncryptionStorage.f_IsEmpty())
+				return fError("For self update you cannot specify encryption storage");
+			else if (!m_Executable.f_IsEmpty())
+				return fError("For self update you cannot specify executable");
+			else if (!m_ExecutableParameters.f_IsEmpty())
+				return fError("For self update you cannot specify executable parameters");
+			else if (!m_RunAsUser.f_IsEmpty())
+				return fError("For self update you cannot specify run as user");
+ 			else if (!m_RunAsGroup.f_IsEmpty())
+				return fError("For self update you cannot specify run as group");
+		}
+		else
+		{
+			if (!m_ParentApplication.f_IsEmpty())
+			{
+				if (!m_EncryptionStorage.f_IsEmpty())
+					return fError("For child application you cannot specify encryption storage");
+			}
+		}
+		
+		return true;
+	}
+	
+	auto CAppManagerActor::CApplicationSettings::f_ChangedSettings(CApplicationSettings const &_Other) -> EApplicationSetting 
+	{
+		EApplicationSetting ChangedSettings = EApplicationSetting_None;
+		if (m_EncryptionStorage != _Other.m_EncryptionStorage)
+			ChangedSettings |= EApplicationSetting_EncryptionStorage;
+		if (m_ParentApplication != _Other.m_ParentApplication)
+			ChangedSettings |= EApplicationSetting_ParentApplication;
+		if (m_Executable != _Other.m_Executable)
+			ChangedSettings |= EApplicationSetting_Executable;
+		if (m_ExecutableParameters != _Other.m_ExecutableParameters)
+			ChangedSettings |= EApplicationSetting_ExecutableParameters;
+		if (m_RunAsUser != _Other.m_RunAsUser)
+			ChangedSettings |= EApplicationSetting_RunAsUser;
+		if (m_RunAsGroup != _Other.m_RunAsGroup)
+			ChangedSettings |= EApplicationSetting_RunAsGroup;
+		if (m_VersionManagerApplication != _Other.m_VersionManagerApplication)
+			ChangedSettings |= EApplicationSetting_VersionManagerApplication;
+		if (m_bAutoUpdate != _Other.m_bAutoUpdate || m_AutoUpdateTags != _Other.m_AutoUpdateTags)
+			ChangedSettings |= EApplicationSetting_AutoUpdateTags;
+		if (m_AutoUpdateBranches != _Other.m_AutoUpdateBranches)
+			ChangedSettings |= EApplicationSetting_AutoUpdateBranches;
+		if (m_UpdateScripts.m_PreUpdate != _Other.m_UpdateScripts.m_PreUpdate)
+			ChangedSettings |= EApplicationSetting_UpdateScript_PreUpdate;
+		if (m_UpdateScripts.m_PostUpdate != _Other.m_UpdateScripts.m_PostUpdate)
+			ChangedSettings |= EApplicationSetting_UpdateScript_PostUpdate;
+		if (m_UpdateScripts.m_PostLaunch != _Other.m_UpdateScripts.m_PostLaunch)
+			ChangedSettings |= EApplicationSetting_UpdateScript_PostLaunch;
+		if (m_UpdateScripts.m_OnError != _Other.m_UpdateScripts.m_OnError)
+			ChangedSettings |= EApplicationSetting_UpdateScript_OnError;
+		if (m_bSelfUpdateSource != _Other.m_bSelfUpdateSource)
+			ChangedSettings |= EApplicationSetting_SelfUpdateSource;
+		return ChangedSettings;
+	}
+	
+	void CAppManagerActor::CApplicationSettings::f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings)
+	{
+		auto &ExtraInfo = _Info.m_ExtraInfo;
+		if (auto *pValue = ExtraInfo.f_GetMember("Executable", EJSONType_String))
+		{
+			o_ChangedSettings |= EApplicationSetting_Executable;
+			m_Executable = pValue->f_String();
+		}
+
+		if (auto *pValue = ExtraInfo.f_GetMember("RunAsUser", EJSONType_String))
+		{
+			o_ChangedSettings |= EApplicationSetting_RunAsUser;
+			m_RunAsUser = pValue->f_String();
+		}
+
+		if (auto *pValue = ExtraInfo.f_GetMember("RunAsGroup", EJSONType_String))
+		{
+			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
+			m_RunAsGroup = pValue->f_String();
+		}
+
+		if (auto *pValue = ExtraInfo.f_GetMember("ExecutableParams", EJSONType_Array))
+		{
+			o_ChangedSettings |= EApplicationSetting_ExecutableParameters;
+			m_ExecutableParameters.f_Clear();
+			for (auto &Param : pValue->f_Array())
+			{
+				if (!Param.f_IsString())
+					continue;
+				m_ExecutableParameters.f_Insert(Param.f_String());
+			}
+		}
+	}
+	
 	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params)
 	{
-		static constexpr auto c_NeedRestartUpdateFlags = EToUpdateFlag_Executable | EToUpdateFlag_ExecutableParameters | EToUpdateFlag_RunAsUser | EToUpdateFlag_RunAsGroup;
-
 		CStr Name = _Params["Name"].f_String();
 		
 		auto *pApplication = mp_Applications.f_FindEqual(Name);
 		if (!pApplication)
 			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
 		auto &Application = **pApplication;
-		
-		CStr Executable;
-		TCVector<CStr> ExecutableParameters;
-		CStr RunAsUser;
-		CStr RunAsGroup;
-		CStr VersionManagerApplication;
-		
-		EToUpdateFlag UpdateFlags = EToUpdateFlag_None; 
+
+		CApplicationSettings Settings;
+		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		
 		bool bUpdateFromVersionInfo = _Params["UpdateFromVersionInfo"].f_Boolean();
 		bool bForce = _Params["Force"].f_Boolean();
-		
+
 		if (bUpdateFromVersionInfo)
 		{
 			if (!Application.m_LastInstalledVersion.f_IsValid())
 				return DMibErrorInstance("Found no install from last version to get settings from");
-			auto &ExtraInfo = Application.m_LastInstalledVersionInfo.m_ExtraInfo;
-			if (auto *pValue = ExtraInfo.f_GetMember("Executable", EJSONType_String))
-			{
-				UpdateFlags |= EToUpdateFlag_Executable;
-				Executable = pValue->f_String();
-			}
-
-			if (auto *pValue = ExtraInfo.f_GetMember("RunAsUser", EJSONType_String))
-			{
-				UpdateFlags |= EToUpdateFlag_RunAsUser;
-				RunAsUser = pValue->f_String();
-			}
-
-			if (auto *pValue = ExtraInfo.f_GetMember("RunAsGroup", EJSONType_String))
-			{
-				UpdateFlags |= EToUpdateFlag_RunAsGroup;
-				RunAsGroup = pValue->f_String();
-			}
-
-			if (auto *pValue = ExtraInfo.f_GetMember("ExecutableParams", EJSONType_Array))
-			{
-				UpdateFlags |= EToUpdateFlag_ExecutableParameters;
-				ExecutableParameters.f_Clear();
-				for (auto &Param : pValue->f_Array())
-				{
-					if (!Param.f_IsString())
-						continue;
-					ExecutableParameters.f_Insert(Param.f_String());
-				}
-			}
+			Settings.f_FromVersionInfo(Application.m_LastInstalledVersionInfo, ChangedSettings);
 		}
 		
-		if (auto *pValue = _Params.f_GetMember("Executable"))
 		{
-			UpdateFlags |= EToUpdateFlag_Executable;
-			Executable = pValue->f_String();
+			CStr Error;
+			if (!Settings.f_ParseSettings(_Params, ChangedSettings, Error, false))
+				return DMibErrorInstance(Error);
 		}
-		if (auto *pValue = _Params.f_GetMember("ExecutableParameters"))
+
+		auto NewSettings = Application.m_Settings;
+		NewSettings.f_ApplySettings(ChangedSettings, Settings);	
+
 		{
-			UpdateFlags |= EToUpdateFlag_ExecutableParameters;
-			ExecutableParameters.f_Clear();
-			for (auto &Parameter : pValue->f_Array())
-				ExecutableParameters.f_Insert(Parameter.f_String());
-		}
-		if (auto *pValue = _Params.f_GetMember("RunAsUser"))
-		{
-			UpdateFlags |= EToUpdateFlag_RunAsUser;
-			RunAsUser = pValue->f_String();
-		}
-		if (auto *pValue = _Params.f_GetMember("RunAsGroup"))
-		{
-			UpdateFlags |= EToUpdateFlag_RunAsGroup;
-			RunAsGroup = pValue->f_String();
-		}
-		if (auto *pValue = _Params.f_GetMember("VersionManagerApplication"))
-		{
-			UpdateFlags |= EToUpdateFlag_VersionManagerApplication;
-			VersionManagerApplication = pValue->f_String();
-		}
-		bool bAutoUpdate = false;
-		TCSet<CStr> AutoUpdateTags;
-		TCSet<CStr> AutoUpdateBranches;
-		if (auto *pValue = _Params.f_GetMember("AutoUpdateTags"))
-		{
-			UpdateFlags |= EToUpdateFlag_AutoUpdateTags;
-			if (pValue->f_IsArray())
-			{
-				bAutoUpdate = true;
-				for (auto &TagJSON : pValue->f_Array())
-				{
-					auto &Tag = TagJSON.f_String();
-					if (!CVersionManager::fs_IsValidTag(Tag))
-						return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
-					AutoUpdateTags[Tag];
-				}
-			}
-		}
-		if (auto *pValue = _Params.f_GetMember("AutoUpdateBranches"))
-		{
-			UpdateFlags |= EToUpdateFlag_AutoUpdateBranches;
-			for (auto &BranchJSON : pValue->f_Array())
-			{
-				auto &Branch = BranchJSON.f_String();
-				if (!CVersionManager::fs_IsValidBranch(Branch))
-					return DMibErrorInstance(fg_Format("'{}' is not a valid branch", Branch));
-				AutoUpdateBranches[Branch];
-			}
+			CStr Error;
+			if (!NewSettings.f_Validate(Error))
+				return DMibErrorInstance(Error);
 		}
 		
-		CUpdateScripts UpdateScripts;
-		if (auto *pValue = _Params.f_GetMember("UpdateScript_PreUpdate"))
-		{
-			UpdateFlags |= EToUpdateFlag_UpdateScript_PreUpdate;
-			UpdateScripts.m_PreUpdate = pValue->f_String();
-		}
-		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostUpdate"))
-		{
-			UpdateFlags |= EToUpdateFlag_UpdateScript_PostUpdate;
-			UpdateScripts.m_PostUpdate = pValue->f_String();
-		}
-		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostLaunch"))
-		{
-			UpdateFlags |= EToUpdateFlag_UpdateScript_PostLaunch;
-			UpdateScripts.m_PostLaunch = pValue->f_String();
-		}
-		if (auto *pValue = _Params.f_GetMember("UpdateScript_OnError"))
-		{
-			UpdateFlags |= EToUpdateFlag_UpdateScript_OnError;
-			UpdateScripts.m_OnError = pValue->f_String();
-		}
-		
-		if (Executable.f_IsEmpty() && (UpdateFlags & EToUpdateFlag_Executable))
-			return DMibErrorInstance("Trying to set executable to empty");
-	
-		if (Application.m_bOperationInProgress)
-			return DMibErrorInstance("Operation already in progress for application");
-		auto InProgressScope = Application.f_SetInProgress();
-	
+ 		ChangedSettings = Application.m_Settings.f_ChangedSettings(NewSettings);
+
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
 		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
 		
@@ -186,70 +304,32 @@ namespace NMib::NCloud::NAppManager
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (change application settings): {}", _Error);
 			}
 		;
-		if (UpdateFlags & EToUpdateFlag_Executable && Application.m_Executable == Executable)
-			UpdateFlags &= ~EToUpdateFlag_Executable;
-		if (UpdateFlags & EToUpdateFlag_ExecutableParameters && Application.m_ExecutableParameters == ExecutableParameters)
-			UpdateFlags &= ~EToUpdateFlag_ExecutableParameters;
-		if (UpdateFlags & EToUpdateFlag_RunAsUser && Application.m_RunAsUser == RunAsUser)
-			UpdateFlags &= ~EToUpdateFlag_RunAsUser;
-		if (UpdateFlags & EToUpdateFlag_RunAsGroup && Application.m_RunAsGroup == RunAsGroup)
-			UpdateFlags &= ~EToUpdateFlag_RunAsGroup;
-		if (UpdateFlags & EToUpdateFlag_VersionManagerApplication && Application.m_VersionManagerApplication == VersionManagerApplication)
-			UpdateFlags &= ~EToUpdateFlag_VersionManagerApplication;
-		if (UpdateFlags & EToUpdateFlag_AutoUpdateTags && Application.m_bAutoUpdate == bAutoUpdate && Application.m_AutoUpdateTags == AutoUpdateTags)
-			UpdateFlags &= ~EToUpdateFlag_AutoUpdateTags;
-		if (UpdateFlags & EToUpdateFlag_AutoUpdateBranches && Application.m_AutoUpdateBranches == AutoUpdateBranches)
-			UpdateFlags &= ~EToUpdateFlag_AutoUpdateBranches;
-		if (UpdateFlags & EToUpdateFlag_UpdateScript_PreUpdate && Application.m_UpdateScripts.m_PreUpdate == UpdateScripts.m_PreUpdate)
-			UpdateFlags &= ~EToUpdateFlag_UpdateScript_PreUpdate;
-		if (UpdateFlags & EToUpdateFlag_UpdateScript_PostUpdate && Application.m_UpdateScripts.m_PostUpdate == UpdateScripts.m_PostUpdate)
-			UpdateFlags &= ~EToUpdateFlag_UpdateScript_PostUpdate;
-		if (UpdateFlags & EToUpdateFlag_UpdateScript_PostLaunch && Application.m_UpdateScripts.m_PostLaunch == UpdateScripts.m_PostLaunch)
-			UpdateFlags &= ~EToUpdateFlag_UpdateScript_PostLaunch;
-		if (UpdateFlags & EToUpdateFlag_UpdateScript_OnError && Application.m_UpdateScripts.m_OnError == UpdateScripts.m_OnError)
-			UpdateFlags &= ~EToUpdateFlag_UpdateScript_OnError;
-			
-		if (UpdateFlags == EToUpdateFlag_None && !bForce)
+		
+		if (ChangedSettings & EApplicationSetting_EncryptionStorage)
+		{
+			fLogError("Changing encryption storage is not supported");
+			return Continuation;
+		}
+		if (ChangedSettings & EApplicationSetting_ParentApplication)
+		{
+			fLogError("Changing parent application is not supported");
+			return Continuation;
+		}
+		if (ChangedSettings == EApplicationSetting_None && !bForce)
 		{
 			fLogInfo("No settings were changed. To updating of file permissions run with --force");
 			Continuation.f_SetResult(fg_Move(*pResult));
 			return Continuation;
 		}
-
-		auto fUpdateSettings = [=, pApplication = *pApplication]
-			{
-				auto &Application = *pApplication;
-				if (UpdateFlags & EToUpdateFlag_Executable)
-					Application.m_Executable = Executable;
-				if (UpdateFlags & EToUpdateFlag_ExecutableParameters)
-					Application.m_ExecutableParameters = ExecutableParameters;
-				if (UpdateFlags & EToUpdateFlag_RunAsUser)
-					Application.m_RunAsUser = RunAsUser;
-				if (UpdateFlags & EToUpdateFlag_RunAsGroup)
-					Application.m_RunAsGroup = RunAsGroup;
-				if (UpdateFlags & EToUpdateFlag_VersionManagerApplication)
-					Application.m_VersionManagerApplication = VersionManagerApplication;
-				if (UpdateFlags & EToUpdateFlag_AutoUpdateTags)
-				{
-					Application.m_bAutoUpdate = bAutoUpdate;
-					Application.m_AutoUpdateTags = AutoUpdateTags;
-				}
-				if (UpdateFlags & EToUpdateFlag_AutoUpdateBranches)
-					Application.m_AutoUpdateBranches = AutoUpdateBranches;
-				if (UpdateFlags & EToUpdateFlag_UpdateScript_PreUpdate)
-					Application.m_UpdateScripts.m_PreUpdate = UpdateScripts.m_PreUpdate;
-				if (UpdateFlags & EToUpdateFlag_UpdateScript_PostUpdate)
-					Application.m_UpdateScripts.m_PostUpdate = UpdateScripts.m_PostUpdate;
-				if (UpdateFlags & EToUpdateFlag_UpdateScript_PostLaunch)
-					Application.m_UpdateScripts.m_PostLaunch = UpdateScripts.m_PostLaunch;
-				if (UpdateFlags & EToUpdateFlag_UpdateScript_OnError)
-					Application.m_UpdateScripts.m_OnError = UpdateScripts.m_OnError;
-			}
-		;
 		
-		if (!(UpdateFlags & c_NeedRestartUpdateFlags) && !bForce)
+		if (Application.f_IsInProgress())
+			return DMibErrorInstance("Operation already in progress for application");
+
+		auto InProgressScope = Application.f_SetInProgress();
+		
+		if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !bForce)
 		{
-			fUpdateSettings();
+			Application.m_Settings = NewSettings;
 			fLogInfo("Saving application state");
 			self(&CAppManagerActor::fp_UpdateApplicationJSON, *pApplication)
 				> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_UpdateJSONResults)
@@ -297,7 +377,7 @@ namespace NMib::NCloud::NAppManager
 							return;
 						}
 
-						fUpdateSettings();						
+						pApplication->m_Settings = NewSettings;
 						
 						fLogInfo("Saving application state and update application files");
 						fg_Dispatch
@@ -305,6 +385,7 @@ namespace NMib::NCloud::NAppManager
 								mp_FileActor
 								, [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope]()
 								{
+									fsp_CreateApplicationUserGroup(NewSettings, fLogInfo, Directory);
 									fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files);
 								}
 							)

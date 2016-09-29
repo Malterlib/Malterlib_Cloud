@@ -114,10 +114,10 @@ namespace NMib::NCloud::NVersionManager
 				fg_Dispatch
 					(
 						QueryFileActor
-						, [_Applications]() -> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIdentifier, CVersionManager::CVersionInformation>>
+						, [_Applications]() -> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>
 						{
 							CStr ApplicationDirectory = CFile::fs_GetProgramDirectory() + "/Applications";
-							NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIdentifier, CVersionManager::CVersionInformation>> VersionsPerApplication;
+							NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>> VersionsPerApplication;
 							for (auto &Application : _Applications)
 							{
 								auto &Versions = VersionsPerApplication[Application];
@@ -127,11 +127,21 @@ namespace NMib::NCloud::NVersionManager
 								auto FoundFiles = CFile::fs_FindFiles(FindOptions);
 								for (auto &File : FoundFiles)
 								{
-									CStr Version = CVersionManager::CVersionIdentifier::fs_DecodeFileName(File.m_Path.f_Extract(ApplicationPath.f_GetLen() + 1));
-									CVersionManager::CVersionIdentifier VersionID;
+									CStr Version = CVersionManager::CVersionID::fs_DecodeFileName(File.m_Path.f_Extract(ApplicationPath.f_GetLen() + 1));
+									CVersionManager::CVersionIDAndPlatform VersionID;
 									CStr Error;
-									if (CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID))
+									if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
+										continue;
+									CStr VersionIDPath = fg_Format("{}/{}", ApplicationPath, VersionID.m_VersionID.f_EncodeFileName());
+									CFile::CFindFilesOptions FindOptions(VersionIDPath + "/*", false);
+									FindOptions.m_AttribMask = EFileAttrib_Directory;
+									auto FoundFiles = CFile::fs_FindFiles(FindOptions);
+									for (auto &File : FoundFiles)
 									{
+										CStr Platform = File.m_Path.f_Extract(VersionIDPath.f_GetLen() + 1);
+										if (!CVersionManager::fs_IsValidPlatform(Platform))
+											continue;
+										VersionID.m_Platform = Platform;
 										try
 										{
 											CStr VersionPath = fg_Format("{}/{}", ApplicationPath, VersionID.f_EncodeFileName());
@@ -176,7 +186,7 @@ namespace NMib::NCloud::NVersionManager
 						}
 					)
 					> [this, Continuation]
-					(TCAsyncResult<NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIdentifier, CVersionManager::CVersionInformation>>> &&_Result)
+					(TCAsyncResult<NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>> &&_Result)
 					{
 						if (!_Result)
 						{

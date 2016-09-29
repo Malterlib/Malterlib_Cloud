@@ -16,6 +16,40 @@ namespace NMib
 			{
 			}
 			
+			void CAppManagerActor::fp_ApplicationCreated(TCSharedPointer<CApplication> const &_pApplication)
+			{
+				if (_pApplication->f_IsChildApp())
+					return; // Parent cannot have parents
+				auto &NewApplication = *_pApplication;
+				for (auto &pApplication : mp_Applications)
+				{
+					auto &Application = *pApplication;
+					if (Application.m_Settings.m_ParentApplication != NewApplication.m_Name)
+						continue;
+					Application.m_pParentApplication = &NewApplication;
+					NewApplication.m_Children.f_Insert(Application);
+				}
+			}
+			
+			void CAppManagerActor::fp_InitApplications()
+			{
+				for (auto &pApplication : mp_Applications)
+				{
+					auto &Application = *pApplication;
+					if (!Application.m_LastInstalledVersion.m_Platform.f_IsEmpty())
+						mp_KnownPlatforms[Application.m_LastInstalledVersion.m_Platform];
+					if (Application.f_IsChildApp())
+					{
+						auto *pParentApplication = mp_Applications.f_FindEqual(Application.m_Settings.m_ParentApplication);
+						if (pParentApplication && !(*pParentApplication)->f_IsChildApp())
+						{
+							Application.m_pParentApplication = &**pParentApplication;
+							Application.m_pParentApplication->m_Children.f_Insert(Application);
+						}
+					}
+				}
+			}
+
 			TCContinuation<void> CAppManagerActor::fp_ReadState()
 			{
 				try
@@ -29,39 +63,45 @@ namespace NMib
 							
 							auto &Application = *(mp_Applications[Name] = fg_Construct(Name, this));
 							
-							Application.m_Executable = ApplicationJSON["Executable"].f_String(); 
-							Application.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String(); 
-							Application.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String();
+							auto &Settings = Application.m_Settings; 
+							
+							Settings.m_Executable = ApplicationJSON["Executable"].f_String(); 
+							Settings.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String(); 
+							Settings.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String();
 							for (auto &Parameter : ApplicationJSON["Parameters"].f_Array())
-								Application.m_ExecutableParameters.f_Insert(Parameter.f_String());
+								Settings.m_ExecutableParameters.f_Insert(Parameter.f_String());
 							for (auto &File : ApplicationJSON["Files"].f_Array())
 								Application.m_Files.f_Insert(File.f_String());
-							Application.m_EncryptionStorage = ApplicationJSON["EncryptionStorage"].f_String();
+							Settings.m_EncryptionStorage = ApplicationJSON["EncryptionStorage"].f_String();
+							if (auto pValue = ApplicationJSON.f_GetMember("ParentApplication", EJSONType_String))
+								Settings.m_ParentApplication = pValue->f_String();
 							if (auto pValue = ApplicationJSON.f_GetMember("VersionManagerApplication", EJSONType_String))
-								Application.m_VersionManagerApplication = pValue->f_String();
+								Settings.m_VersionManagerApplication = pValue->f_String();
 							if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersion", EJSONType_Object))
-								Application.m_LastInstalledVersion = CVersionManager::CVersionIdentifier::fs_FromJSON(*pValue);
+								Application.m_LastInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
 							if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfo", EJSONType_Object))
 								Application.m_LastInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
 							if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdate", EJSONType_Boolean))
-								Application.m_bAutoUpdate = pValue->f_Boolean();
+								Settings.m_bAutoUpdate = pValue->f_Boolean();
 							if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdateTags", EJSONType_Array))
 							{
 								for (auto &Tag : pValue->f_Array())
-									Application.m_AutoUpdateTags[Tag.f_String()];
+									Settings.m_AutoUpdateTags[Tag.f_String()];
 							}
 							if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdateBranches", EJSONType_Array))
 							{
 								for (auto &Tag : pValue->f_Array())
-									Application.m_AutoUpdateBranches[Tag.f_String()];
+									Settings.m_AutoUpdateBranches[Tag.f_String()];
 							}
 							if (auto pValue = ApplicationJSON.f_GetMember("UpdateScripts", EJSONType_Object))
 							{
-								Application.m_UpdateScripts.m_PreUpdate = (*pValue)["PreUpdate"].f_String();
-								Application.m_UpdateScripts.m_PostUpdate = (*pValue)["PostUpdate"].f_String();
-								Application.m_UpdateScripts.m_PostLaunch = (*pValue)["PostLaunch"].f_String();
-								Application.m_UpdateScripts.m_OnError = (*pValue)["OnError"].f_String();
+								Settings.m_UpdateScripts.m_PreUpdate = (*pValue)["PreUpdate"].f_String();
+								Settings.m_UpdateScripts.m_PostUpdate = (*pValue)["PostUpdate"].f_String();
+								Settings.m_UpdateScripts.m_PostLaunch = (*pValue)["PostLaunch"].f_String();
+								Settings.m_UpdateScripts.m_OnError = (*pValue)["OnError"].f_String();
 							}
+							if (auto pValue = ApplicationJSON.f_GetMember("SelfUpdateSource", EJSONType_Boolean))
+								Settings.m_bSelfUpdateSource = pValue->f_Boolean();
 						}					
 					}
 				}
@@ -83,11 +123,13 @@ namespace NMib
 
 			TCContinuation<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 			{
-				mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations")); 
+				mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations"));
+				mp_KnownPlatforms[DMalterlibCloudPlatform];
 				
 				TCContinuation<void> Continuation;
 				fg_ThisActor(this)(&CAppManagerActor::fp_ReadState) > Continuation / [this, Continuation]()
 					{
+						fp_InitApplications();
 						fp_LaunchNormalApps();
 						mp_State.m_TrustManager
 							(
@@ -157,7 +199,10 @@ namespace NMib
 
 				TCActorResultVector<uint32> ApplicationStops;
 				for (auto &pApplication : mp_Applications)
-					pApplication->f_Stop(true) > ApplicationStops.f_AddResult();
+				{
+					if (!pApplication->f_IsChildApp())
+						pApplication->f_Stop(true) > ApplicationStops.f_AddResult();
+				}
 
 				ApplicationStops.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<uint32>> &&_Results)
 					{
@@ -170,7 +215,7 @@ namespace NMib
 						Continuation.f_SetResult();
 					}
 				;
-
+				
 				return Continuation;
 			}
 		}		

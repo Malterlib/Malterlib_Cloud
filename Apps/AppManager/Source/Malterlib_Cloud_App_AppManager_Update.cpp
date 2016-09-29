@@ -41,19 +41,28 @@ namespace NMib::NCloud::NAppManager
 		return "Unknown";
 	}
 
-	TCContinuation<void> CAppManagerActor::fp_RunUpdateScript(TCSharedPointer<CApplication> const &_pApplication, EUpdateScript _Script, CStr const &_Param)
+	TCContinuation<bool> CAppManagerActor::fp_RunUpdateScript
+		(
+			TCSharedPointer<CApplication> const &_pApplication
+			, EUpdateScript _Script
+			, CStr const &_Param
+			, CVersionManager::CVersionIDAndPlatform const &_VersionID
+			, CVersionManager::CVersionInformation *_pVersionInformation
+			, fp64 _TimeSinceUpdateStart
+		)
 	{
-		CStr Script = _pApplication->m_UpdateScripts.f_GetScript(_Script);
+		CStr Script = _pApplication->m_Settings.m_UpdateScripts.f_GetScript(_Script);
 		if (Script.f_IsEmpty())
-			return fg_Explicit();
+			return fg_Explicit(false);
 		
 		struct CState
 		{
-			TCContinuation<void> m_Continuation;
+			TCContinuation<bool> m_Continuation;
 			TCActor<CProcessLaunchActor> m_LaunchActor;
 			CActorSubscription m_LaunchSubscription;
 			CStr m_ErrorOutput;
 			CStr m_StdOutput;
+			CStr m_AllOutput;
 			
 			bool m_bReplied = false;
 			void f_Replied()
@@ -63,12 +72,12 @@ namespace NMib::NCloud::NAppManager
 			}
 		};
 		
-		CStr Description = fg_Format("{}/{}", _pApplication->m_Name, _pApplication->m_UpdateScripts.f_GetName(_Script));
+		CStr Description = fg_Format("{}/{}", _pApplication->m_Name, _pApplication->m_Settings.m_UpdateScripts.f_GetName(_Script));
 		
 		TCSharedPointer<CState> pState = fg_Construct();
 		pState->m_LaunchActor = fg_ConstructActor<CProcessLaunchActor>();
 		
-		CStr FileName = fg_Format("{}/{}", _pApplication->f_GetDirectory(), Script);
+		CStr FileName = CFile::fs_GetExpandedPath(Script, _pApplication->f_GetDirectory());
 	
 		auto fReportError = [pState, Description](CStr const &_Error)
 			{
@@ -79,11 +88,20 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "[{}] Launch update script"
+				, Description
+			)
+		;
+		
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 			(
 				"bash"
 				, fg_CreateVector<CStr>(FileName, _Param)
-				, CFile::fs_GetProgramDirectory()
+				, _pApplication->f_GetDirectory()
 				, [this, pState, Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 				{
 					if (!pState->m_LaunchActor)
@@ -93,7 +111,14 @@ namespace NMib::NCloud::NAppManager
 					{
 					case NProcess::EProcessLaunchState_Launched:
 						{
-							DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Launched bash script '{}'", Description);
+							DMibLogWithCategory
+								(
+									Malterlib/Cloud/AppManager
+									, Info
+									, "[{}] Launched update script"
+									, Description
+								)
+							;
 						}
 						break;
 					case NProcess::EProcessLaunchState_LaunchFailed:
@@ -107,11 +132,11 @@ namespace NMib::NCloud::NAppManager
 							auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
 							if (ExitStatus != 0)
 							{
-								auto ErrorOutput = pState->m_ErrorOutput.f_Trim();
+								auto ErrorOutput = pState->m_AllOutput.f_Trim();
 								if (ErrorOutput.f_IsEmpty())
-									fReportError(fg_Format("Bash script exited with error status: {}", ExitStatus));
+									fReportError(fg_Format("Exit status: {}", ExitStatus));
 								else
-									fReportError(fg_Format("Bash script exited with error status: {}. Error output:{\n}{}", ExitStatus, ErrorOutput));
+									fReportError(fg_Format("Exit status: {}{\n}{\n}{}", ExitStatus, ErrorOutput));
 							}
 							else
 							{
@@ -125,7 +150,7 @@ namespace NMib::NCloud::NAppManager
 								;
 								if (!pState->m_bReplied)
 								{
-									pState->m_Continuation.f_SetResult();
+									pState->m_Continuation.f_SetResult(true);
 									pState->f_Replied();
 								}
 							}
@@ -149,19 +174,51 @@ namespace NMib::NCloud::NAppManager
 				{
 					DMibLog(Info, "{}", Output);
 					pState->m_StdOutput += _Output;
+					pState->m_AllOutput += _Output;
 				}
 				else
 				{
 					DMibLog(Error, "{}", Output);
 					pState->m_ErrorOutput += _Output;
+					pState->m_AllOutput += _Output;
 				}
 			}
 		;
 		
-		LaunchParams.m_RunAsUser = _pApplication->m_RunAsUser;
-		LaunchParams.m_RunAsGroup = _pApplication->m_RunAsGroup;
+		LaunchParams.m_RunAsUser = _pApplication->m_Settings.m_RunAsUser;
+		LaunchParams.m_RunAsGroup = _pApplication->m_Settings.m_RunAsGroup;
 		LaunchParams.m_Environment["HOME"] = _pApplication->f_GetDirectory() + "/.home";
 		LaunchParams.m_Environment["TMPDIR"] = _pApplication->f_GetDirectory() + "/.tmp";
+		
+		LaunchParams.m_Environment["MalterlibCloud_TimeSinceStart"] = fg_Format("{fe1}", _TimeSinceUpdateStart);
+		LaunchParams.m_Environment["MalterlibCloud_Application"] = _pApplication->m_Name;
+		LaunchParams.m_Environment["MalterlibCloud_VersionApplication"] = _pApplication->m_Settings.m_VersionManagerApplication;
+		if (_VersionID.f_IsValid())
+		{
+			LaunchParams.m_Environment["MalterlibCloud_Version"] = CStr::fs_ToStr(_VersionID);
+			LaunchParams.m_Environment["MalterlibCloud_VersionID"] = CStr::fs_ToStr(_VersionID.m_VersionID);
+			LaunchParams.m_Environment["MalterlibCloud_VersionBranch"] = _VersionID.m_VersionID.m_Branch;
+			LaunchParams.m_Environment["MalterlibCloud_VersionMajor"] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Major);
+			LaunchParams.m_Environment["MalterlibCloud_VersionMinor"] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Minor);
+			LaunchParams.m_Environment["MalterlibCloud_VersionRevision"] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Revision);
+			LaunchParams.m_Environment["MalterlibCloud_VersionPlatform"] = _VersionID.m_Platform;
+		}
+		else
+		{
+			LaunchParams.m_Environment["MalterlibCloud_Version"] = "Unknown";
+			LaunchParams.m_Environment["MalterlibCloud_VersionID"] = "Unknown";
+		}
+		
+		if (_pVersionInformation)
+		{
+			LaunchParams.m_Environment["MalterlibCloud_Time"] = fg_Format("{}", _pVersionInformation->m_Time.f_ToLocal());
+			LaunchParams.m_Environment["MalterlibCloud_Configuration"] = fg_Format("{}", _pVersionInformation->m_Configuration);
+			LaunchParams.m_Environment["MalterlibCloud_Tags"] = fg_Format("{vs,vb}", _pVersionInformation->m_Tags);
+			LaunchParams.m_Environment["MalterlibCloud_ExtraInfo"] = _pVersionInformation->m_ExtraInfo.f_ToString("");
+			LaunchParams.m_Environment["MalterlibCloud_NumFiles"] = fg_Format("{}", _pVersionInformation->m_nFiles);
+			LaunchParams.m_Environment["MalterlibCloud_NumBytes"] = fg_Format("{}", _pVersionInformation->m_nBytes);
+		}
+		
 		LaunchParams.m_bMergeEnvironment = true;
 		LaunchParams.m_bAllowExecutableLocate = true;
 		
@@ -203,7 +260,7 @@ namespace NMib::NCloud::NAppManager
 		
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 		
-		if (pApplication->m_bOperationInProgress)
+		if (pApplication->f_IsInProgress())
 			return DMibErrorInstance("Operation already in progress for application");
 		auto InProgressScope = pApplication->f_SetInProgress();
 		
@@ -211,11 +268,12 @@ namespace NMib::NCloud::NAppManager
 		bool bUpdateSettings = false;
 		bool bDryRun = false;
 		CStr Package;
+		CStr Platform = pApplication->m_LastInstalledVersion.m_Platform;
 		TCSet<CStr> RequiredTags;
-		CVersionManager::CVersionIdentifier VersionID;
+		CVersionManager::CVersionIDAndPlatform VersionID;
 		if (auto *pValue = _Params.f_GetMember("Package"))
 		{
-			CStr Package = _Params["Package"].f_String();
+			Package = _Params["Package"].f_String();
 			if (Package.f_IsEmpty())
 				return DMibErrorInstance("You have to specify a package");
 			bDownloadVersion = false;
@@ -226,9 +284,14 @@ namespace NMib::NCloud::NAppManager
 			bDryRun = _Params["DryRun"].f_Boolean();
 			bUpdateSettings = _Params["UpdateSettings"].f_Boolean(); 
 			CStr Version = _Params["Version"].f_String();
+			if (auto *pValue = _Params.f_GetMember("VersionManagerPlatform"))
+				Platform = pValue->f_String();
 
-			auto RequiredTags = pApplication->m_AutoUpdateTags;
-			auto AllowedBranches = pApplication->m_AutoUpdateBranches;			
+			if (!CVersionManager::fs_IsValidPlatform(Platform))
+				return DMibErrorInstance("Invalid version platform format");
+			
+			auto RequiredTags = pApplication->m_Settings.m_AutoUpdateTags;
+			auto AllowedBranches = pApplication->m_Settings.m_AutoUpdateBranches;			
 			
 			if (auto *pValue = _Params.f_GetMember("RequiredTags"))
 			{
@@ -243,18 +306,19 @@ namespace NMib::NCloud::NAppManager
 			}
 			
 			if (AllowedBranches.f_IsEmpty())
-				AllowedBranches = fg_CreateSet(pApplication->m_LastInstalledVersion.m_Branch);
+				AllowedBranches = fg_CreateSet(pApplication->m_LastInstalledVersion.m_VersionID.m_Branch);
 			
 			if (!Version.f_IsEmpty())
 			{
 				CStr ErrorStr;
-				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, ErrorStr, &VersionID))
+				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, ErrorStr, &VersionID.m_VersionID))
 					return DMibErrorInstance(fg_Format("Invalid version ID format: {}", ErrorStr));
+				VersionID.m_Platform = Platform;
 			}
 			else
 			{
 				CStr Error;
-				VersionID = fp_FindVersionForAutoUpdate(pApplication, RequiredTags, AllowedBranches, Error);
+				VersionID = fp_FindVersionForAutoUpdate(pApplication, RequiredTags, AllowedBranches, Platform, Error);
 				if (!VersionID.f_IsValid())
 					return DMibErrorInstance(Error);
 			}
@@ -263,14 +327,16 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
 		
 		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
+		TCSharedPointer<TCSharedPointer<CVersionManager::CVersionInformation>> pVersionInfo = fg_Construct();
+		TCSharedPointer<NTime::CClock> pClock = fg_Construct(true); 
 		
-		auto fLogInfo = [pResult](CStr const &_Info)
+		auto fLogInfo = [pResult, Name](CStr const &_Info)
 			{
 				pResult->f_AddStdOut(_Info + DMibNewLine);
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application: {}", _Info);
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application '{}': {}", Name, _Info);
 			}
 		;
-		auto fLogError = [this, pResult, Continuation, _bFromAutoUpdate, pApplication](CStr const &_Error, bool _bUnencrypted = true)
+		auto fLogError = [this, Name, pClock, pResult, Continuation, _bFromAutoUpdate, pApplication, VersionID, pVersionInfo](CStr const &_Error, bool _bUnencrypted = true)
 			{
 				if (_bFromAutoUpdate)
 				{
@@ -281,10 +347,48 @@ namespace NMib::NCloud::NAppManager
 					pResult->f_AddStdErr(_Error + DMibNewLine);
 					pResult->m_Status = 1;
 					Continuation.f_SetResult(fg_Move(*pResult));
-					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (update application): {}", _Error);
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (update application '{}'): {}", Name, _Error);
 				}
 				if (!pApplication->m_bDeleted && _bUnencrypted)
-					self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_OnError, _Error) > fg_DiscardResult();
+				{
+					fp_RunUpdateScript(pApplication, EUpdateScript_OnError, _Error, VersionID, pVersionInfo->f_Get(), pClock->f_GetTime()) > [](TCAsyncResult<bool> &&_Result)
+						{
+							if (!_Result)
+							{
+								DMibLogWithCategory
+									(
+										Malterlib/Cloud/AppManager
+										, Warning
+										, "Error script failed: {}"
+										, _Result.f_GetExceptionStr()
+									)
+								;
+							}
+							else if (*_Result)
+							{
+								DMibLogWithCategory
+									(
+										Malterlib/Cloud/AppManager
+										, Info
+										, "Successfully ran error script"
+									)
+								;
+							}
+						}
+					;
+				}
+				else
+				{
+					DMibLogWithCategory
+						(
+							Malterlib/Cloud/AppManager
+							, Info
+							, "Skipped error script: bDeleted {}   bUnencrypted {}"
+							, pApplication->m_bDeleted  
+							, _bUnencrypted  
+						)
+					;
+				}
 			}
 		;
 
@@ -340,12 +444,23 @@ namespace NMib::NCloud::NAppManager
 						fg_Dispatch
 							(
 								mp_FileActor
-								, [=]()
+								, [=, Settings = pApplication->m_Settings, OutputDirectory = pApplication->f_GetDirectory()]()
 								{
 									// 1. Extract new application to temporary directory
+									fsp_CreateApplicationUserGroup(Settings, fLogInfo, OutputDirectory);
+									
 									fLogInfo("Extracting application to temporary directory");
+									
+									CStr SourcePath = _SourcePath;
+									if (CFile::fs_FileExists(_SourcePath, EFileAttrib_Directory))
+									{
+										auto Files = CFile::fs_FindFiles(_SourcePath + "/*");
+										if (Files.f_GetLen() == 1 && Files[0].f_Right(7) == ".tar.gz")
+											SourcePath = Files[0];
+									}
+									
 									TCVector<CStr> Files;
-									CStr Output = fsp_UnpackApplication(_SourcePath, TemporaryDirectory, pApplication, Files, _AllowSourceExist);
+									CStr Output = fsp_UnpackApplication(SourcePath, TemporaryDirectory, pApplication, Files, _AllowSourceExist, false);
 									if (!Output.f_IsEmpty())
 										fLogInfo(Output);
 									return Files;
@@ -394,11 +509,12 @@ namespace NMib::NCloud::NAppManager
 											return;
 										}
 										
-										self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_PreUpdate, CStr{}) > [=](TCAsyncResult<void> &&_Result)
+										fp_RunUpdateScript(pApplication, EUpdateScript_PreUpdate, CStr{}, VersionID, pVersionInfo->f_Get(), pClock->f_GetTime()) 
+											> [=](TCAsyncResult<bool> &&_Result)
 											{
 												if (!_Result)
 												{
-													fLogError(fg_Format("Failed to run pre update script. Please manually fix error and retry: {}", _Result.f_GetExceptionStr()));
+													fLogError(fg_Format("Pre update script failed. {}", _Result.f_GetExceptionStr()));
 													return;
 												}
 												fLogInfo("Updating application files");
@@ -432,7 +548,7 @@ namespace NMib::NCloud::NAppManager
 																else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
 																	CFile::fs_DeleteFile(FullPath);
 															}
-															
+														 	
 															// 4. Move files from temporary directory to final destination
 															for (auto &File : Files)
 															{
@@ -472,7 +588,16 @@ namespace NMib::NCloud::NAppManager
 																	return;
 																}
 																
-																self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_PostUpdate, CStr{}) > [=](TCAsyncResult<void> &&_Result)
+																fp_RunUpdateScript
+																	(
+																		pApplication
+																		, EUpdateScript_PostUpdate
+																		, CStr{}
+																		, VersionID
+																		, pVersionInfo->f_Get()
+																		, pClock->f_GetTime()
+																	)
+																	> [=](TCAsyncResult<bool> &&_Result)
 																	{
 																		if (!_Result)
 																		{
@@ -480,7 +605,7 @@ namespace NMib::NCloud::NAppManager
 																				(
 																					fg_Format
 																					(
-																						"Failed to run post update script. Please manually fix error and retry: {}"
+																						"Post update script failed. {}"
 																						, _Result.f_GetExceptionStr()
 																					)
 																				)
@@ -489,6 +614,7 @@ namespace NMib::NCloud::NAppManager
 																		}
 																		// 5. Re-launch application
 																		fLogInfo("Launching updated application");
+																		pApplication->m_bJustUpdated = true;
 																		fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
 																			> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_Result)
 																			{
@@ -502,8 +628,16 @@ namespace NMib::NCloud::NAppManager
 																				else
 																					fLogInfo("Application was successfully updated");
 																				Continuation.f_SetResult(fg_Move(*pResult));
-																				self(&CAppManagerActor::fp_RunUpdateScript, pApplication, EUpdateScript_PostLaunch, CStr{}) 
-																					> [=](TCAsyncResult<void> &&_Result)
+																				fp_RunUpdateScript
+																					(
+																						pApplication
+																						, EUpdateScript_PostLaunch
+																						, CStr{}
+																						, VersionID
+																						, pVersionInfo->f_Get()
+																						, pClock->f_GetTime()
+																					) 
+																					> [=](TCAsyncResult<bool> &&_Result)
 																					{
 																						if (!_Result)
 																						{
@@ -538,8 +672,8 @@ namespace NMib::NCloud::NAppManager
 				if (bDownloadVersion)
 				{
 					fLogInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
-					self(&CAppManagerActor::fp_DownloadApplication, pApplication->m_VersionManagerApplication, VersionID, DownloadDirectory) 
-						> [=](TCAsyncResult<CVersionManager::CVersionInformation> &&_VersionInfo)
+					self(&CAppManagerActor::fp_DownloadApplication, pApplication->m_Settings.m_VersionManagerApplication, VersionID, DownloadDirectory) 
+						> [=, DownloadDirectoryCleanup=DownloadDirectoryCleanup](TCAsyncResult<CVersionManager::CVersionInformation> &&_VersionInfo)
 						{
 							if (!_VersionInfo)
 							{
@@ -556,6 +690,8 @@ namespace NMib::NCloud::NAppManager
 							fLogInfo(fg_Format("Application downloaded, unpacking"));
 							
 							auto &VersionInfo = *_VersionInfo;
+
+							*pVersionInfo = fg_Construct(VersionInfo);
 							
 							for (auto &Tag : RequiredTags)
 							{
@@ -570,34 +706,18 @@ namespace NMib::NCloud::NAppManager
 							{
 								if (bUpdateSettings)
 								{
-									auto &ExtraInfo = VersionInfo.m_ExtraInfo;
-									if (auto *pValue = ExtraInfo.f_GetMember("Executable", EJSONType_String))
+									CApplicationSettings NewSettings = pApplication->m_Settings;
+									EApplicationSetting NewChangedSettings = EApplicationSetting_None;
+									NewSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
+									
+									CStr Error;
+									if (!NewSettings.f_Validate(Error))
 									{
-										if (pValue->f_String().f_IsEmpty())
-										{
-											fLogError("Version info specifies Executable, but it's empty");
-											return;
-										}
-										pApplication->m_Executable = pValue->f_String();
+										fLogError(fg_Format("Updating settings resulted in invalid settings: {}", Error));
+										Continuation.f_SetException(DMibErrorInstance(Error));
+										return ;
 									}
-
-									if (auto *pValue = ExtraInfo.f_GetMember("RunAsUser", EJSONType_String))
-										pApplication->m_RunAsUser = pValue->f_String();
-
-									if (auto *pValue = ExtraInfo.f_GetMember("RunAsGroup", EJSONType_String))
-										pApplication->m_RunAsGroup = pValue->f_String();
-
-									if (auto *pValue = ExtraInfo.f_GetMember("ExecutableParams", EJSONType_Array))
-									{
-										pApplication->m_ExecutableParameters.f_Clear();
-										for (auto &Param : pValue->f_Array())
-										{
-											if (!Param.f_IsString())
-												continue;
-											
-											pApplication->m_ExecutableParameters.f_Insert(Param.f_String());
-										}
-									}
+									pApplication->m_Settings = NewSettings;
 								}
 								pApplication->m_LastInstalledVersion = VersionID;
 								pApplication->m_LastInstalledVersionInfo = VersionInfo;

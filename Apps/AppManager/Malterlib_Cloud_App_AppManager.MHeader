@@ -11,6 +11,8 @@
 		}
 		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
+		MalterlibTargetNameType "Normal"
+		MalterlibCloudVersionInfo_Executable ""
 	}
 	Target
 	{

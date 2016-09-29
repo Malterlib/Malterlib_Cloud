@@ -11,18 +11,47 @@ namespace NMib
 	{
 		namespace NAppManager
 		{
+			void CAppManagerActor::fp_DoInitialApplicationLaunch(TCSharedPointer<CApplication> const &_pApplication)
+			{
+				if (_pApplication->f_IsChildApp())
+				{
+					if (_pApplication->m_LaunchState.f_IsEmpty())
+						_pApplication->m_LaunchState = "Waiting for parent application to launch";
+					return;
+				}
+				if (_pApplication->f_IsInProgress())
+				{
+					if (_pApplication->m_LaunchState.f_IsEmpty())
+						_pApplication->m_LaunchState = "In progress operation prevented inital launch";
+					return;
+				}
+				auto InProgressScope = _pApplication->f_SetInProgress();
+				fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, _pApplication, true) > [InProgressScope, _pApplication](TCAsyncResult<void> &&_Result)
+					{
+						if (_Result)
+							return;
+						if (_pApplication->m_LaunchState.f_IsEmpty())
+							_pApplication->m_LaunchState = fg_Format("Failed launch: {}", _Result.f_GetExceptionStr());
+						DMibLogWithCategory
+							(
+								Malterlib/Cloud/AppManager
+								, Error
+								, "App '{}' failed initial launch: {}"
+								, _pApplication->m_Name
+								, _Result.f_GetExceptionStr()
+							)
+						;
+					}
+				;
+			}
+			
 			void CAppManagerActor::fp_LaunchEncryptedApps()
 			{
 				for (auto &pApplication : mp_Applications)
 				{
-					if (!pApplication->m_EncryptionStorage.f_IsEmpty() && !pApplication->m_bOperationInProgress)
-					{
-						auto InProgressScope = pApplication->f_SetInProgress();
-						fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, true) > [InProgressScope](TCAsyncResult<void> &&_Result)
-							{
-							}
-						;
-					}
+					if (!pApplication->f_NeedsEncryption())
+						continue;
+					fp_DoInitialApplicationLaunch(pApplication);
 				}
 			}
 
@@ -30,16 +59,13 @@ namespace NMib
 			{
 				for (auto &pApplication : mp_Applications)
 				{
-					if (pApplication->m_EncryptionStorage.f_IsEmpty())
+					if (pApplication->f_NeedsEncryption())
 					{
-						auto InProgressScope = pApplication->f_SetInProgress();
-						fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, true) > [InProgressScope](TCAsyncResult<void> &&_Result)
-							{
-							}
-						;
+						if (pApplication->m_LaunchState.f_IsEmpty())
+							pApplication->m_LaunchState = "Waiting for key manager to become available";
+						continue;
 					}
-					else
-						pApplication->m_LaunchState = "Waiting for key manager to become available";
+					fp_DoInitialApplicationLaunch(pApplication);
 				}
 			}
 
@@ -66,6 +92,10 @@ namespace NMib
 				if (!_pApplication->m_ProcessLaunch.f_IsEmpty())
 				{
 					return DMibErrorInstance("Application is already launched");
+				}
+				if (_pApplication->f_IsChildApp() && !_pApplication->m_pParentApplication)
+				{
+					return DMibErrorInstance("Missing parent application");
 				}
 				
 				_pApplication->m_bLaunching = true;
@@ -95,14 +125,36 @@ namespace NMib
 						TCContinuation<void> Continuation;
 						auto &Application = *_pApplication;
 						
+						if (Application.m_Settings.m_bSelfUpdateSource)
+						{
+							_pApplication->m_LaunchState = "Self update source - waiting for update";
+							if (_pApplication->m_bJustUpdated)
+							{
+								_pApplication->m_bJustUpdated = false;
+								fp_SelfUpdate(_pApplication);
+							}
+							return fg_Explicit();
+						}
+						if (Application.m_Settings.m_Executable.f_IsEmpty())
+						{
+							_pApplication->m_LaunchState = "No executable";
+							return fg_Explicit();
+						}
+						for (auto &ChildApp : Application.m_Children)
+						{
+							// Launch children
+							TCSharedPointer<CApplication> pChildApp = fg_Explicit(&ChildApp);
+							self(&CAppManagerActor::fp_LaunchApp, pChildApp, false) > fg_DiscardResult();							
+						}
+						
 						_pApplication->m_LaunchState = "Launching";
 						
 						CStr ApplicationDirectory = Application.f_GetDirectory();
 						
 						CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 							(
-								fg_Format("{}/{}", ApplicationDirectory, Application.m_Executable)
-								, Application.m_ExecutableParameters
+								fg_Format("{}/{}", ApplicationDirectory, Application.m_Settings.m_Executable)
+								, Application.m_Settings.m_ExecutableParameters
 								, ApplicationDirectory
 								, [this, _pApplication, pState, Continuation](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 								{
@@ -214,8 +266,8 @@ namespace NMib
 							}
 						;
 						
-						LaunchParams.m_RunAsUser = Application.m_RunAsUser;
-						LaunchParams.m_RunAsGroup = Application.m_RunAsGroup;
+						LaunchParams.m_RunAsUser = Application.m_Settings.m_RunAsUser;
+						LaunchParams.m_RunAsGroup = Application.m_Settings.m_RunAsGroup;
 						LaunchParams.m_Environment["HOME"] = ApplicationDirectory + "/.home";
 						LaunchParams.m_Environment["TMPDIR"] = ApplicationDirectory + "/.tmp";
 						LaunchParams.m_bMergeEnvironment = true;

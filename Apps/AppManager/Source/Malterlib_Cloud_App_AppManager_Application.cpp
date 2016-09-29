@@ -23,11 +23,47 @@ namespace NMib::NCloud::NAppManager
 		f_AbortPendingLaunches();
 		f_Clear();
 		m_bDeleted = true;
+		m_pParentApplication = nullptr;
+		m_ChildrenLink.f_Unlink();
+		for (auto &Child : m_Children)
+			Child.m_pParentApplication = nullptr;
+		m_Children.f_Clear();
+	}
+	
+	bool CAppManagerActor::CApplication::f_NeedsEncryption() const
+	{
+		if (!m_Settings.m_EncryptionStorage.f_IsEmpty())
+			return true;
+		if (m_pParentApplication && m_pParentApplication->f_NeedsEncryption())
+			return true;
+		return false;
+	}
+	
+	bool CAppManagerActor::CApplication::f_IsChildApp() const
+	{
+		return !m_Settings.m_ParentApplication.f_IsEmpty();
+	}
+	
+	bool CAppManagerActor::CApplication::f_IsInProgress() const
+	{
+		if (m_bOperationInProgress)
+			return true;
+		
+		if (m_pParentApplication && m_pParentApplication->m_bOperationInProgress)
+			return true;
+		
+		for (auto &Child : m_Children)
+		{
+			if (Child.m_bOperationInProgress)
+				return true;
+		}
+		
+		return false;
 	}
 
 	COnScopeExitShared CAppManagerActor::CApplication::f_SetInProgress()
 	{
-		DRequire(!m_bOperationInProgress);
+		DRequire(!f_IsInProgress());
 		m_bOperationInProgress = true;
 		return fg_OnScopeExitActor
 			(
@@ -36,7 +72,6 @@ namespace NMib::NCloud::NAppManager
 				{
 					DCheck(pApplication->m_bOperationInProgress);
 					pApplication->m_bOperationInProgress = false;
-					
 					if (pThis->mp_bPendingAutoUpdate)
 						pThis->fp_AutoUpdate_Update();
 				}
@@ -48,49 +83,94 @@ namespace NMib::NCloud::NAppManager
 	{
 		return fg_Dispatch
 			(
-				[this, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this)), _bCloseEncryption]() -> TCContinuation<uint32>
+				[this, _bCloseEncryption, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCContinuation<uint32>
 				{
-					if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped || pApplication->m_bDeleted)
-					{
-						if (_bCloseEncryption)
-							return f_CloseEncryption(0);
-						else
-							return fg_Explicit(0);
-					}
-					pApplication->m_bStopped = true;
+					if (pApplication->m_bDeleted)
+						return fg_Explicit(0);
+					
 					TCContinuation<uint32> Continuation;
-					pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess) > [this, Continuation, pApplication, _bCloseEncryption](TCAsyncResult<uint32> &&_Result)
+					
+					TCActorResultVector<uint32> ChildrenCloses;
+					
+					// Stop all children first
+					for (auto &ChildApp : m_Children)
+						ChildApp.f_Stop(false) > ChildrenCloses.f_AddResult();
+					
+					ChildrenCloses.f_GetResults() 
+						> Continuation % "Failed to stop child application" 
+						/ [=]
+						(TCVector<TCAsyncResult<uint32>> &&_ChildrenCloseResults) mutable
 						{
-							if (!_Result)
-								DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", _Result.f_GetExceptionStr());
-							else
+							CStr ChildCloseErrors;
+							for (auto &ChildCloseResult : _ChildrenCloseResults)
 							{
-								if (*_Result)
-									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Application '{}' exited with non 0 status: {}", pApplication->m_Name, *_Result);
-								else
-									DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' exited cleanly", pApplication->m_Name);
-								pApplication->f_Clear();
+								if (!ChildCloseResult)
+									fg_AddStrSep(ChildCloseErrors, ChildCloseResult.f_GetExceptionStr(), "\n");
 							}
-
-							if (_bCloseEncryption)
+							if (!ChildCloseErrors.f_IsEmpty())
 							{
-								if (!_Result)
-								{
-									Continuation.f_SetException(DMibErrorInstance(fg_Format("Error stopping process, cannot close encryption: {}", _Result.f_GetExceptionStr())));
-									return;
-								}
-								f_CloseEncryption(*_Result) > [Continuation](TCAsyncResult<uint32> &&_Result)
-									{
-										if (!_Result)
-											DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", _Result.f_GetExceptionStr());
-										
-										Continuation.f_SetResult(fg_Move(_Result));
-									}
-								;
+								Continuation.f_SetException(DMibErrorInstance(fg_Format("Errors stopping child applications: {}", ChildCloseErrors)));
 								return;
 							}
-							
-							Continuation.f_SetResult(fg_Move(_Result));
+					
+							if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped || pApplication->m_bDeleted)
+							{
+								if (_bCloseEncryption)
+								{
+									fg_Dispatch
+										(
+											[this, pApplication]() -> TCContinuation<uint32>
+											{
+												if (pApplication->m_bDeleted)
+													return fg_Explicit(0);
+												return f_CloseEncryption(0);
+											}
+										) 
+										> Continuation
+									;
+									return;
+								}
+								else
+								{
+									Continuation.f_SetResult(0);
+									return;
+								}
+							}
+							pApplication->m_bStopped = true;
+							pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess) > [this, Continuation, pApplication, _bCloseEncryption](TCAsyncResult<uint32> &&_Result)
+								{
+									if (!_Result)
+										DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", _Result.f_GetExceptionStr());
+									else
+									{
+										if (*_Result)
+											DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Application '{}' exited with non 0 status: {}", pApplication->m_Name, *_Result);
+										else
+											DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' exited cleanly", pApplication->m_Name);
+										pApplication->f_Clear();
+									}
+
+									if (_bCloseEncryption)
+									{
+										if (!_Result)
+										{
+											Continuation.f_SetException(DMibErrorInstance(fg_Format("Error stopping process, cannot close encryption: {}", _Result.f_GetExceptionStr())));
+											return;
+										}
+										f_CloseEncryption(*_Result) > [Continuation](TCAsyncResult<uint32> &&_Result)
+											{
+												if (!_Result)
+													DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", _Result.f_GetExceptionStr());
+												
+												Continuation.f_SetResult(fg_Move(_Result));
+											}
+										;
+										return;
+									}
+									
+									Continuation.f_SetResult(fg_Move(_Result));
+								}
+							;
 						}
 					;
 					
@@ -98,12 +178,14 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		
 	}
 	
 	CStr CAppManagerActor::CApplication::f_GetDirectory()
 	{
-		return fg_Format("{}/App/{}", CFile::fs_GetProgramDirectory(), m_Name);
+		if (f_IsChildApp())
+			return fg_Format("{}/App/{}/{}", CFile::fs_GetProgramDirectory(), m_Settings.m_ParentApplication, m_Name);
+		else
+			return fg_Format("{}/App/{}", CFile::fs_GetProgramDirectory(), m_Name);
 	}
 	
 	TCDispatchedActorCall<uint32> CAppManagerActor::CApplication::f_CloseEncryption(uint32 _Status)
@@ -112,7 +194,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				[this, _Status, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() -> TCContinuation<uint32>
 				{
-					if (m_EncryptionStorage.f_IsEmpty() || !m_bEncryptionOpened)
+					if (m_Settings.m_EncryptionStorage.f_IsEmpty() || !m_bEncryptionOpened)
 						return fg_Explicit(_Status);
 					
 					TCContinuation<uint32> Continuation;

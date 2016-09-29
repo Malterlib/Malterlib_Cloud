@@ -29,7 +29,7 @@ namespace NMib::NCloud
 		return _Version >= EMinProtocolVersion && _Version <= EProtocolVersion;
 	}
 	
-	bool CVersionManager::fs_IsValidVersionIdentifier(CVersionIdentifier const &_VersionID, CStr &o_Error)
+	bool CVersionManager::fs_IsValidVersionIdentifier(CVersionID const &_VersionID, CStr &o_Error)
 	{
 		if (!fs_IsValidBranch(_VersionID.m_Branch))
 		{
@@ -39,9 +39,9 @@ namespace NMib::NCloud
 		return true;
 	}
 	
-	bool CVersionManager::fs_IsValidVersionIdentifier(CStr const &_String, CStr &o_Error, CVersionIdentifier *o_pVersionID)
+	bool CVersionManager::fs_IsValidVersionIdentifier(CStr const &_String, CStr &o_Error, CVersionID *o_pVersionID)
 	{
-		CVersionIdentifier VersionID;
+		CVersionID VersionID;
 		aint iBranchEnd = _String.f_FindCharReverse('/');
 		if (iBranchEnd < 0)
 		{
@@ -72,11 +72,16 @@ namespace NMib::NCloud
 		if (o_pVersionID)
 			*o_pVersionID = VersionID;
 		return true;
-	}	
+	}
+
+	bool CVersionManager::fs_IsValidPlatform(NStr::CStr const &_String)
+	{
+		return NNet::fg_IsValidHostname(_String);
+	}
 	
-	// CVersionIdentifier
+	// CVersionID
 	
-	void CVersionManager::CVersionIdentifier::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CVersionManager::CVersionID::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		_Stream << m_Branch;
 		_Stream << m_Major;
@@ -84,7 +89,7 @@ namespace NMib::NCloud
 		_Stream << m_Revision;
 	}
 	
-	void CVersionManager::CVersionIdentifier::f_Consume(CDistributedActorReadStream &_Stream)
+	void CVersionManager::CVersionID::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Branch;
 		_Stream >> m_Major;
@@ -92,17 +97,17 @@ namespace NMib::NCloud
 		_Stream >> m_Revision;
 	}
 
-	CStr CVersionManager::CVersionIdentifier::f_EncodeFileName() const
+	CStr CVersionManager::CVersionID::f_EncodeFileName() const
 	{
 		return fg_Format("{}_{}.{}.{}", m_Branch.f_ReplaceChar('/', '_'), m_Major, m_Minor, m_Revision);
 	}
 	
-	CStr CVersionManager::CVersionIdentifier::fs_DecodeFileName(CStr const &_FileName)  
+	CStr CVersionManager::CVersionID::fs_DecodeFileName(CStr const &_FileName)  
 	{
 		return _FileName.f_ReplaceChar('_', '/');
 	}
 	
-	void CVersionManager::CVersionIdentifier::f_Format(CStrAggregate &o_Str) const
+	void CVersionManager::CVersionID::f_Format(CStrAggregate &o_Str) const
 	{
 		o_Str += CStr::CFormat("{}/{}.{}.{}")
 			<< m_Branch
@@ -112,7 +117,7 @@ namespace NMib::NCloud
 		;
 	}
 	
-	NEncoding::CEJSON CVersionManager::CVersionIdentifier::f_ToJSON() const
+	NEncoding::CEJSON CVersionManager::CVersionID::f_ToJSON() const
 	{
 		NEncoding::CEJSON Ret;
 		Ret["Branch"] = m_Branch;
@@ -122,14 +127,14 @@ namespace NMib::NCloud
 		return Ret;
 	}
 	
-	bool CVersionManager::CVersionIdentifier::f_IsValid() const
+	bool CVersionManager::CVersionID::f_IsValid() const
 	{
 		return !m_Branch.f_IsEmpty();
 	}
 
-	auto CVersionManager::CVersionIdentifier::fs_FromJSON(NEncoding::CEJSON const &_JSON) -> CVersionIdentifier
+	auto CVersionManager::CVersionID::fs_FromJSON(NEncoding::CEJSON const &_JSON) -> CVersionID
 	{
-		CVersionIdentifier Ret;
+		CVersionID Ret;
 		Ret.m_Branch = _JSON["Branch"].f_String();
 		Ret.m_Major = _JSON["Major"].f_Integer();
 		Ret.m_Minor = _JSON["Minor"].f_Integer();
@@ -137,17 +142,75 @@ namespace NMib::NCloud
 		return Ret;
 	}
 	
-	bool CVersionManager::CVersionIdentifier::operator == (CVersionIdentifier const &_Right) const
+	bool CVersionManager::CVersionID::operator == (CVersionID const &_Right) const
 	{
-		return NContainer::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 
-			== NContainer::fg_TupleReferences(_Right.m_Branch, _Right.m_Major, _Right.m_Minor, _Right.m_Revision)
+		return static_cast<CCloudVersion const &>(*this) == static_cast<CCloudVersion const &>(_Right); 
+	}
+	
+	bool CVersionManager::CVersionID::operator < (CVersionID const &_Right) const
+	{
+		return static_cast<CCloudVersion const &>(*this) < static_cast<CCloudVersion const &>(_Right); 
+	}
+	
+	// CVersionIDAndPlatform
+	
+	void CVersionManager::CVersionIDAndPlatform::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+		_Stream << m_VersionID;
+		_Stream << m_Platform;
+	}
+	
+	void CVersionManager::CVersionIDAndPlatform::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+		_Stream >> m_VersionID;
+		_Stream >> m_Platform;
+	}
+
+	CStr CVersionManager::CVersionIDAndPlatform::f_EncodeFileName() const
+	{
+		return fg_Format("{}/{}", m_VersionID.f_EncodeFileName(), m_Platform);
+	}
+	
+	void CVersionManager::CVersionIDAndPlatform::f_Format(CStrAggregate &o_Str) const
+	{
+		o_Str += CStr::CFormat("{} {}")
+			<< m_VersionID
+			<< m_Platform
 		;
 	}
 	
-	bool CVersionManager::CVersionIdentifier::operator < (CVersionIdentifier const &_Right) const
+	NEncoding::CEJSON CVersionManager::CVersionIDAndPlatform::f_ToJSON() const
 	{
-		return NContainer::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 
-			< NContainer::fg_TupleReferences(_Right.m_Branch, _Right.m_Major, _Right.m_Minor, _Right.m_Revision)
+		NEncoding::CEJSON Ret;
+		Ret["VersionID"] = m_VersionID.f_ToJSON();
+		Ret["Platform"] = m_Platform;
+		return Ret;
+	}
+	
+	bool CVersionManager::CVersionIDAndPlatform::f_IsValid() const
+	{
+		return m_VersionID.f_IsValid() && !m_Platform.f_IsEmpty();
+	}
+
+	auto CVersionManager::CVersionIDAndPlatform::fs_FromJSON(NEncoding::CEJSON const &_JSON) -> CVersionIDAndPlatform
+	{
+		CVersionIDAndPlatform Ret;
+		Ret.m_VersionID = CVersionID::fs_FromJSON(_JSON["VersionID"]);
+		Ret.m_Platform = _JSON["Platform"].f_String();
+		return Ret;
+	}
+	
+	bool CVersionManager::CVersionIDAndPlatform::operator == (CVersionIDAndPlatform const &_Right) const
+	{
+		return NContainer::fg_TupleReferences(m_VersionID, m_Platform) 
+			== NContainer::fg_TupleReferences(_Right.m_VersionID, _Right.m_Platform)
+		;
+	}
+	
+	bool CVersionManager::CVersionIDAndPlatform::operator < (CVersionIDAndPlatform const &_Right) const
+	{
+		return NContainer::fg_TupleReferences(m_VersionID, m_Platform) 
+			< NContainer::fg_TupleReferences(_Right.m_VersionID, _Right.m_Platform)
 		;
 	}
 	
@@ -161,7 +224,8 @@ namespace NMib::NCloud
 		auto &TagArray = Ret["Tags"].f_Array();
 		for (auto &Tag : m_Tags)
 			TagArray.f_Insert(Tag);
-		Ret["ExtraInfo"] = m_ExtraInfo;
+		if (m_ExtraInfo.f_IsObject())
+			Ret["ExtraInfo"] = m_ExtraInfo;
 		Ret["NumFiles"] = m_nFiles;
 		Ret["NumBytes"] = m_nBytes;
 		return Ret;
@@ -177,7 +241,8 @@ namespace NMib::NCloud
 			for (auto &Tag : pValue->f_Array())
 				Ret.m_Tags[Tag.f_String()];
 		}
-		Ret.m_ExtraInfo = _JSON["ExtraInfo"];
+		if (auto *pValue = _JSON.f_GetMember("ExtraInfo", NEncoding::EJSONType_Object))
+			Ret.m_ExtraInfo = *pValue;
 		Ret.m_nFiles = _JSON["NumFiles"].f_Integer();
 		Ret.m_nBytes = _JSON["NumBytes"].f_Integer();
 		return Ret;
@@ -299,7 +364,7 @@ namespace NMib::NCloud
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_Application; 
-		_Stream << m_VersionID; 
+		_Stream << m_VersionIDAndPlatform; 
 		_Stream << m_VersionInfo;
 		_Stream << m_QueueSize;
 		_Stream << m_Flags;
@@ -311,7 +376,7 @@ namespace NMib::NCloud
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream >> m_Application; 
-		_Stream >> m_VersionID; 
+		_Stream >> m_VersionIDAndPlatform; 
 		_Stream >> m_VersionInfo; 
 		_Stream >> m_QueueSize;
 		_Stream >> m_Flags;
@@ -337,7 +402,7 @@ namespace NMib::NCloud
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream << m_Application;
-		_Stream << m_VersionID;
+		_Stream << m_VersionIDAndPlatform;
 		_Stream << m_TransferContext;
 	}
 	
@@ -345,7 +410,7 @@ namespace NMib::NCloud
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream >> m_Application;
-		_Stream >> m_VersionID;
+		_Stream >> m_VersionIDAndPlatform;
 		_Stream >> m_TransferContext;
 	}
 	
@@ -362,14 +427,14 @@ namespace NMib::NCloud
 	void CVersionManager::CNewVersionNotification::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		_Stream << m_Application;
-		_Stream << m_VersionID;
+		_Stream << m_VersionIDAndPlatform;
 		_Stream << m_VersionInfo;
 	}
 	
 	void CVersionManager::CNewVersionNotification::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Application;
-		_Stream >> m_VersionID;
+		_Stream >> m_VersionIDAndPlatform;
 		_Stream >> m_VersionInfo;
 	}
 
@@ -399,18 +464,24 @@ namespace NMib::NCloud
 
 	void CVersionManager::CSubscribeToUpdates::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
-		_Stream << m_Application; 
+		_Stream << m_Application;
+		_Stream << m_Platforms;
 		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_DispatchActor);
 		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_fOnNewVersions);
 		_Stream << m_nInitial;
+		if (_Stream.f_GetVersion() >= 0x104)
+			_Stream << m_Tags;
 	}
 	
 	void CVersionManager::CSubscribeToUpdates::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Application; 
+		_Stream >> m_Platforms;
 		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_DispatchActor);
 		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fOnNewVersions);
 		_Stream >> m_nInitial;
+		if (_Stream.f_GetVersion() >= 0x104)
+			_Stream >> m_Tags;
 	}
 	
 	// CChangeTags
@@ -429,6 +500,7 @@ namespace NMib::NCloud
 	{
 		_Stream << m_Application;
 		_Stream << m_VersionID;
+		_Stream << m_Platform;
 		_Stream << m_AddTags;
 		_Stream << m_RemoveTags;
 	}
@@ -437,6 +509,7 @@ namespace NMib::NCloud
 	{
 		_Stream >> m_Application;
 		_Stream >> m_VersionID;
+		_Stream >> m_Platform;
 		_Stream >> m_AddTags;
 		_Stream >> m_RemoveTags;
 	}

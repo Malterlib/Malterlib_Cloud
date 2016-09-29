@@ -84,42 +84,95 @@ namespace NMib::NCloud::NVersionManager
 			fsp_LogActivityError(_CallingHostInfo, Error);
 			return DMibErrorInstance(Error);
 		}
-		auto *pVersion = pApplication->m_Versions.f_FindEqual(_Params.m_VersionID);
-		if (!pVersion)
+
+		TCActorResultVector<CSizeInfo> VersionResults;
+		
+		auto fTagVersion = [&](CVersion &_Version)
+			{
+				CStr ApplicationDirectory = fg_Format("{}/Applications", CFile::fs_GetProgramDirectory());
+				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Version.f_GetIdentifier().f_EncodeFileName());
+				
+				_Version.m_VersionInfo.m_Tags -= RemoveTags;
+				_Version.m_VersionInfo.m_Tags += AddTags;
+				
+				fp_NewVersion(_Params.m_Application, _Version); 
+				
+				self(&CServer::fp_SaveVersionInfo, fp_GetQueryFileActor(), VersionPath, _Version.m_VersionInfo) > VersionResults.f_AddResult(); 
+			}
+		;
+
+		if (!_Params.m_Platform.f_IsEmpty())
 		{
-			CStr Error = fg_Format("No such version: {}", _Params.m_VersionID);
-			fsp_LogActivityError(_CallingHostInfo, Error);
-			return DMibErrorInstance(Error);
+			CVersionManager::CVersionIDAndPlatform VersionIDAndPlatform;
+			VersionIDAndPlatform.m_VersionID = _Params.m_VersionID;
+			VersionIDAndPlatform.m_Platform = _Params.m_Platform;
+			auto *pVersion = pApplication->m_Versions.f_FindEqual(VersionIDAndPlatform);
+			if (!pVersion)
+			{
+				CStr Error = fg_Format("No such version: {}", VersionIDAndPlatform);
+				fsp_LogActivityError(_CallingHostInfo, Error);
+				return DMibErrorInstance(Error);
+			}
+			fTagVersion(*pVersion);
 		}
-		
-		CStr ApplicationDirectory = fg_Format("{}/Applications", CFile::fs_GetProgramDirectory());
-		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionID.f_EncodeFileName());
-		
-		pVersion->m_VersionInfo.m_Tags -= RemoveTags;
-		pVersion->m_VersionInfo.m_Tags += AddTags;
-		
-		fp_NewVersion(_Params.m_Application, pVersion->f_GetIdentifier(), pVersion->m_VersionInfo); 
+		else
+		{
+			CVersionManager::CVersionIDAndPlatform VersionIDAndPlatform;
+			VersionIDAndPlatform.m_VersionID = _Params.m_VersionID;
+			for (auto iVersion = pApplication->m_Versions.f_GetIterator_SmallestGreaterThanEqual(VersionIDAndPlatform); iVersion; ++iVersion)
+			{
+				if (iVersion.f_GetKey().m_VersionID != _Params.m_VersionID)
+					break;
+				fTagVersion(*iVersion);
+			}
+		}
 		
 		TCContinuation<CVersionManager::CChangeTags::CResult> Continuation;
 		
-		self(&CServer::fp_SaveVersionInfo, fp_GetQueryFileActor(), VersionPath, pVersion->m_VersionInfo) 
-			> [this, Continuation, DeniedTags, ApplicationName = _Params.m_Application, VersionID = _Params.m_VersionID, AddTags, RemoveTags, _CallingHostInfo]
-			(TCAsyncResult<CSizeInfo> &&_Result)
+		VersionResults.f_GetResults() > 
+			[
+				this
+				, Continuation
+				, DeniedTags
+				, ApplicationName = _Params.m_Application
+				, VersionID = _Params.m_VersionID
+				, Platform = _Params.m_Platform
+				, AddTags
+				, RemoveTags
+				, _CallingHostInfo
+			]
+			(TCAsyncResult<TCVector<TCAsyncResult<CSizeInfo>>> &&_Results)
 			{
-				if (!_Result)
+				if (!_Results)
 				{
-					fsp_LogActivityError(_CallingHostInfo, fg_Format("Failed to save version info: {}", _Result.f_GetExceptionStr()));
-					Continuation.f_SetException(DMibErrorInstance("Failed to save version info. Consult version manager log files for more info."));
+					fsp_LogActivityError(_CallingHostInfo, fg_Format("Failed to save version infos: {}", _Results.f_GetExceptionStr()));
+					Continuation.f_SetException(DMibErrorInstance("Failed to save version infos. Consult version manager log files for more info."));
 					return;
 				}
-				fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Changed tags for {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, AddTags, RemoveTags));
+				
+				bool bFailed = false;
+				for (auto &Version : *_Results)
+				{
+					if (!Version)
+					{
+						fsp_LogActivityError(_CallingHostInfo, fg_Format("Failed to save version info: {}", Version.f_GetExceptionStr()));
+						bFailed = true;
+					}
+				}
+
+				fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, Platform, AddTags, RemoveTags));
+				
+				if (bFailed)
+				{
+					Continuation.f_SetException(DMibErrorInstance("Failed to save one or more version infos. Consult version manager log files for more info."));
+					return;
+				}
+					
 				CVersionManager::CChangeTags::CResult Result;
 				Result.m_DeniedTags = DeniedTags;
-				
 				Continuation.f_SetResult(fg_Move(Result));
 			}
 		;
-		
 		return Continuation;
 	}
 }

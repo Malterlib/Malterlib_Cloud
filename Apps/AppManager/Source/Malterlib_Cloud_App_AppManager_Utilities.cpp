@@ -11,21 +11,18 @@ namespace NMib
 	{
 		namespace NAppManager
 		{
-			namespace
+			CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr)
 			{
-				CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr)
-				{
-					if (_StdOut.f_IsEmpty() && _StdErr.f_IsEmpty())
-						return CStr();
-					CStr Ret;
-					CStr StdOut = _StdOut.f_Trim();
-					if (!StdOut.f_IsEmpty())
-						fg_AddStrSep(Ret, StdOut, DMibNewLine);
-					CStr StdErr = _StdErr.f_Trim();
-					if (!StdErr.f_IsEmpty())
-						fg_AddStrSep(Ret, StdErr, DMibNewLine);
-					return DMibNewLine + Ret;
-				}
+				if (_StdOut.f_IsEmpty() && _StdErr.f_IsEmpty())
+					return CStr();
+				CStr Ret;
+				CStr StdOut = _StdOut.f_Trim();
+				if (!StdOut.f_IsEmpty())
+					fg_AddStrSep(Ret, StdOut, DMibNewLine);
+				CStr StdErr = _StdErr.f_Trim();
+				if (!StdErr.f_IsEmpty())
+					fg_AddStrSep(Ret, StdErr, DMibNewLine);
+				return DMibNewLine + Ret;
 			}
 
 			CStr CAppManagerActor::fsp_RunTool
@@ -58,7 +55,7 @@ namespace NMib
 				Params.m_bMergeEnvironment = true;
 				
 				if (!_bQuiet)
-					DMibLog(Info, "{cc}", _Description);
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{cc}", _Description);
 				
 				CStr StdOut;
 				CStr StdErr;
@@ -71,8 +68,7 @@ namespace NMib
 				else
 					DMibError(fg_Format("Failed to launch {} when {}: {}", _Tool, _Description, StdErr));
 				if (!_bQuiet)
-					DMibLog(Info, "{} was successful {}", _Description, fg_ConcatOutput(StdOut, StdErr));
-				
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{} was successful {}", _Description, fg_ConcatOutput(StdOut, StdErr));
 				return StdOut;
 			}
 

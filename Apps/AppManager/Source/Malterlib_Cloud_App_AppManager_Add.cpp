@@ -11,58 +11,19 @@ namespace NMib::NCloud::NAppManager
 	{
 		TCSharedPointer<CApplication> pApplication = fg_Construct(_Params["Name"].f_String(), this);
 		bool bForceOverwrite = _Params["ForceOverwrite"].f_Boolean();
+		bool bForceInstall = _Params["ForceInstall"].f_Boolean();
 		
-		pApplication->m_EncryptionStorage = _Params["EncryptionStorage"].f_String();
-		if (auto *pValue = _Params.f_GetMember("Executable"))
-			pApplication->m_Executable = pValue->f_String();
-		if (auto *pValue = _Params.f_GetMember("ExecutableParameters"))
+		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		{
-			for (auto &Parameter : pValue->f_Array())
-				pApplication->m_ExecutableParameters.f_Insert(Parameter.f_String());
+			CStr Error;
+			if (!pApplication->m_Settings.f_ParseSettings(_Params, ChangedSettings, Error, true))
+				return DMibErrorInstance(Error);
 		}
-		if (auto *pValue = _Params.f_GetMember("RunAsUser"))
-			pApplication->m_RunAsUser = pValue->f_String();
-		if (auto *pValue = _Params.f_GetMember("RunAsGroup"))
-			pApplication->m_RunAsGroup = pValue->f_String();
+
 		CStr Version;
 		if (auto *pValue = _Params.f_GetMember("Version"))
 			Version = pValue->f_String();
 
-		if (auto *pValue = _Params.f_GetMember("AutoUpdateTags"))
-		{
-			if (pValue->f_IsArray())
-			{
-				pApplication->m_bAutoUpdate = true;
-				for (auto &TagJSON : pValue->f_Array())
-				{
-					auto &Tag = TagJSON.f_String();
-					if (!CVersionManager::fs_IsValidTag(Tag))
-						return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
-					pApplication->m_AutoUpdateTags[Tag];
-				}
-			}
-		}
-
-		if (auto *pValue = _Params.f_GetMember("AutoUpdateBranches"))
-		{
-			for (auto &BranchJSON : pValue->f_Array())
-			{
-				auto &Branch = BranchJSON.f_String();
-				if (!CVersionManager::fs_IsValidBranch(Branch))
-					return DMibErrorInstance(fg_Format("'{}' is not a valid branch", Branch));
-				pApplication->m_AutoUpdateBranches[Branch];
-			}
-		}
-		
-		if (auto *pValue = _Params.f_GetMember("UpdateScript_PreUpdate"))
-			pApplication->m_UpdateScripts.m_PreUpdate = pValue->f_String(); 
-		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostUpdate"))
-			pApplication->m_UpdateScripts.m_PostUpdate = pValue->f_String(); 
-		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostLaunch"))
-			pApplication->m_UpdateScripts.m_PostLaunch = pValue->f_String(); 
-		if (auto *pValue = _Params.f_GetMember("UpdateScript_OnError"))
-			pApplication->m_UpdateScripts.m_OnError = pValue->f_String(); 
-		
 		auto Directory = pApplication->f_GetDirectory();
 		CStr Package = _Params["Package"].f_String();
 		
@@ -70,38 +31,79 @@ namespace NMib::NCloud::NAppManager
 			return DMibErrorInstance("You have to specify a package");
 		
 		bool bIsVersionManager = false;
+		bool bSettingsFromVersionInfo = false;
+		
+		CStr Platform;
 		
 		auto *pVersionManagerApplication = mp_VersionManagerApplications.f_FindEqual(Package);
 
-		CVersionManager::CVersionIdentifier VersionID;
+		CVersionManager::CVersionIDAndPlatform VersionID;
 		
-		if (pVersionManagerApplication)
+		if (pVersionManagerApplication || !Version.f_IsEmpty())
 		{
+			Platform = DMalterlibCloudPlatform;
+			if (auto *pValue = _Params.f_GetMember("VersionManagerPlatform"))
+				Platform = pValue->f_String();
+			bSettingsFromVersionInfo = _Params["SettingsFromVersionInfo"].f_Boolean();
 			bIsVersionManager = true;
+			if (!CVersionManager::fs_IsValidPlatform(Platform))
+				return DMibErrorInstance("Invalid platform format"); 
+			
 			if (!Version.f_IsEmpty())
 			{
 				CStr Error;
-				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID))
-					return DMibErrorInstance(fg_Format("Invalid version format: {}", Error)); 
+				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
+					return DMibErrorInstance(fg_Format("Invalid version format: {}", Error));
+				VersionID.m_Platform = Platform;
 			}
 			else
 			{
-				auto *pLargest = pVersionManagerApplication->m_VersionsByTime.f_FindLargest();
-				if (!pLargest)
+				decltype(pVersionManagerApplication->m_VersionsByTime.f_GetIterator()) iVersion;
+				for (iVersion.f_StartBackward(pVersionManagerApplication->m_VersionsByTime); iVersion; --iVersion)
+				{
+					auto &Version = *iVersion;
+					if (Version.f_GetVersionID().m_Platform != Platform)
+						continue;
+					VersionID = Version.f_GetVersionID(); 
+					break;
+				}
+				if (!iVersion)
 					return DMibErrorInstance(fg_Format("No newest version found for application: {}", Package));
-				VersionID = pLargest->f_GetVersionID();
 			}
 		}
 		else
 		{
 			if (!Version.f_IsEmpty())
 				return DMibErrorInstance("Package did not refer to any version manager application, so you cannot specify '--version'");
+			if (!Platform.f_IsEmpty())
+				return DMibErrorInstance("Package did not refer to any version manager application, so you cannot specify '--platform'");
 			
 			Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
-			
-			if (pApplication->m_Executable.f_IsEmpty())
-				return DMibErrorInstance("You must specify an executable to run");
 		}
+
+		if (!bSettingsFromVersionInfo)
+		{
+			CStr Error;
+			if (!pApplication->m_Settings.f_Validate(Error))
+				return DMibErrorInstance(Error);
+		}
+		
+		if (pApplication->f_IsChildApp())
+		{
+			auto *pParentApplication = mp_Applications.f_FindEqual(pApplication->m_Settings.m_ParentApplication);
+			if (!pParentApplication)
+				return DMibErrorInstance(fg_Format("Parent application '{}' not found", pApplication->m_Settings.m_ParentApplication));
+			
+			if ((*pParentApplication)->f_IsChildApp())			
+				return DMibErrorInstance("Parent application is not a root application");
+			pApplication->m_pParentApplication = &**pParentApplication;
+			pApplication->m_pParentApplication->m_Children.f_Insert(*pApplication);
+		}
+		auto pCleanup = g_OnScopeExitActor > [pApplication]
+			{
+				pApplication->f_Delete();
+			}
+		;
 		
 		if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 		{
@@ -144,33 +146,8 @@ namespace NMib::NCloud::NAppManager
 								mp_FileActor
 								, [=]()
 								{
-									if (!pApplication->m_RunAsGroup.f_IsEmpty())
-									{
-										CStr GroupID;
-										if (!NSys::fg_UserManagement_GroupExists(pApplication->m_RunAsGroup, GroupID))
-										{
-											NSys::fg_UserManagement_CreateGroup(pApplication->m_RunAsGroup, GroupID);
-											fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", pApplication->m_RunAsGroup, GroupID));
-										}
-									}
-									if (!pApplication->m_RunAsUser.f_IsEmpty())
-									{
-										CStr UserID;
-										if (!NSys::fg_UserManagement_UserExists(pApplication->m_RunAsUser, UserID))
-										{
-											NSys::fg_UserManagement_CreateUser
-												(
-													pApplication->m_RunAsGroup
-													, pApplication->m_RunAsUser
-													, ""
-													, pApplication->m_RunAsUser
-													, Directory
-													, UserID
-												)
-											;
-											fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", pApplication->m_RunAsUser, UserID));
-										}
-									}
+									auto &Settings = pApplication->m_Settings;
+									fsp_CreateApplicationUserGroup(Settings, fLogInfo, Directory);
 
 									TCVector<CStr> Files;
 									CStr SourcePath = _SourcePath;
@@ -183,7 +160,7 @@ namespace NMib::NCloud::NAppManager
 									TCSet<CStr> AllowExist;
 									if (!_DeletePath.f_IsEmpty())
 										AllowExist[_DeletePath];
-									CStr Output = fsp_UnpackApplication(SourcePath, Directory, pApplication, Files, AllowExist);
+									CStr Output = fsp_UnpackApplication(SourcePath, Directory, pApplication, Files, AllowExist, bForceInstall);
 									if (!Output.f_IsEmpty())
 										pResult->f_AddStdOut(Output);
 									
@@ -210,10 +187,13 @@ namespace NMib::NCloud::NAppManager
 										return;
 									}
 								}
-								
+
 								pApplication->m_Files = fg_Move(*_Files);
 								
 								mp_Applications[pApplication->m_Name] = pApplication;
+								pCleanup->f_Clear();
+								
+								fp_ApplicationCreated(pApplication);
 								auto InProgressScope = pApplication->f_SetInProgress();
 
 								self(&CAppManagerActor::fp_UpdateApplicationJSON, pApplication) 
@@ -258,47 +238,29 @@ namespace NMib::NCloud::NAppManager
 								return;
 							}
 							auto &VersionInfo = *_VersionInfo;
-							auto &ExtraInfo = VersionInfo.m_ExtraInfo;
-							if (pApplication->m_Executable.f_IsEmpty())
+							
+							if (bSettingsFromVersionInfo)
 							{
-								if (auto *pValue = ExtraInfo.f_GetMember("Executable", EJSONType_String))
-									pApplication->m_Executable = pValue->f_String();
-								if (pApplication->m_Executable.f_IsEmpty())
+								CApplicationSettings NewSettings;
+								EApplicationSetting NewChangedSettings = EApplicationSetting_None;
+								NewSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
+								NewSettings.f_ApplySettings(ChangedSettings, pApplication->m_Settings);
+								
+								CStr Error;
+								if (!NewSettings.f_Validate(Error))
 								{
-									Continuation.f_SetException(DMibErrorInstance("No executable was specified and the downloaded version didn't include a default"));
-									return;
+									Continuation.f_SetException(DMibErrorInstance(Error));
+									return ;
 								}
+								pApplication->m_Settings = NewSettings;
 							}
 
-							if (pApplication->m_RunAsUser.f_IsEmpty())
-							{
-								if (auto *pValue = ExtraInfo.f_GetMember("RunAsUser", EJSONType_String))
-									pApplication->m_RunAsUser = pValue->f_String();
-							}
-
-							if (pApplication->m_RunAsGroup.f_IsEmpty())
-							{
-								if (auto *pValue = ExtraInfo.f_GetMember("RunAsGroup", EJSONType_String))
-									pApplication->m_RunAsGroup = pValue->f_String();
-							}
-
-							if (pApplication->m_ExecutableParameters.f_IsEmpty())
-							{
-								if (auto *pValue = ExtraInfo.f_GetMember("ExecutableParams", EJSONType_Array))
-								{
-									for (auto &Param : pValue->f_Array())
-									{
-										if (!Param.f_IsString())
-											continue;
-										
-										pApplication->m_ExecutableParameters.f_Insert(Param.f_String());
-									}
-								}
-							}
-
-							pApplication->m_VersionManagerApplication = Package;
+							pApplication->m_Settings.m_VersionManagerApplication = Package;
+							
 							pApplication->m_LastInstalledVersion = VersionID;
 							pApplication->m_LastInstalledVersionInfo = VersionInfo;
+							if (mp_KnownPlatforms(VersionID.m_Platform).f_WasCreated())
+								fp_VersionManagerResubscribeAll();
 
 							fUnpackApp(DownloadDirectory, DownloadDirectory);
 						}
