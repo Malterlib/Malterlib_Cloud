@@ -73,10 +73,16 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		TCSet<CStr> Permissions;
 		
-		Permissions["ObjectStorage/CreateContainerAll"];
+		Permissions["ObjectStorage/EnsureContainerAll"];
+		Permissions["ObjectStorage/DeleteObjectAll"];
+		Permissions["ObjectStorage/SignTempURLAll"];
 		
 		for (auto &CloudContext : mp_CloudContexts)
-			Permissions[fg_Format("ObjectStorage/CreateContainer/{}", CloudContext.f_GetName())];
+		{
+			Permissions[fg_Format("ObjectStorage/EnsureContainer/{}", CloudContext.f_GetName())];
+			Permissions[fg_Format("ObjectStorage/DeleteObject/{}", CloudContext.f_GetName())];
+			Permissions[fg_Format("ObjectStorage/SignTempURL/{}", CloudContext.f_GetName())];
+		}
 		
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
 		
@@ -96,7 +102,7 @@ namespace NMib::NCloud::NCloudAPIManager
 	
 	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs()
 	{
-		if (auto *pCloudContexts = mp_AppState.m_StateDatabase.m_Data.f_GetMember("CloudContexts", EJSONType_Object))
+		if (auto const *pCloudContexts = mp_AppState.m_ConfigDatabase.m_Data.f_GetMember("CloudContexts", EJSONType_Object))
 		{
 			for (auto &CloudContextJSON : pCloudContexts->f_Object())
 			{
@@ -106,8 +112,12 @@ namespace NMib::NCloud::NCloudAPIManager
 				if (Type == "OpenStack")
 				{
 					auto &KeystoneInfo = Values["KeystoneInfo"];
+					CloudContext.m_KeystoneInfo.m_Username = KeystoneInfo["Username"].f_String();
 					CloudContext.m_KeystoneInfo.m_Password = KeystoneInfo["Password"].f_String();
-					CloudContext.m_KeystoneInfo.m_Tenant = KeystoneInfo["Tenant"].f_String();
+					CloudContext.m_KeystoneInfo.m_IdentityURL = KeystoneInfo["IdentityURL"].f_String();
+					CloudContext.m_KeystoneInfo.m_DomainId = KeystoneInfo["DomainId"].f_String();
+					CloudContext.m_KeystoneInfo.m_RegionName = KeystoneInfo["RegionName"].f_String();
+					CloudContext.m_KeystoneInfo.m_TenantId = KeystoneInfo["TenantId"].f_String();
 				}
 				else
 					return DMibErrorInstance(fg_Format("Unknown cloud type: {}", Type));
@@ -143,9 +153,28 @@ namespace NMib::NCloud::NCloudAPIManager
 		return mp_CURLQueryActor;
 	}
 	
-	void CCloudAPIManagerDaemonActor::CServer::fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error)
+	CException CCloudAPIManagerDaemonActor::CServer::fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error, CExceptionPointer _pException)
 	{
-		DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "({}) {}", _CallingHostInfo.f_GetHostInfo(), _Error);
+		CStr Error = _Error;
+		CStr LogError = _Error;
+
+		try
+		{
+			if (_pException)
+				std::rethrow_exception(_pException);
+		}
+		catch (CExceptionCloudAPI const &_Exception)
+		{
+			LogError = Error = fg_Format("{}: {}", Error, _Exception.f_GetErrorStr());
+		}
+		catch (CException const &_Exception)
+		{
+			LogError = fg_Format("{}: {}", Error, _Exception.f_GetErrorStr());
+		}
+	
+		DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "({}) {}", _CallingHostInfo.f_GetHostInfo(), LogError);
+		
+		return DMibErrorInstance(Error);
 	}
 
 	void CCloudAPIManagerDaemonActor::CServer::fsp_LogActivityWarning(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error)

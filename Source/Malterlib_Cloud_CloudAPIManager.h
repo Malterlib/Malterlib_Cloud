@@ -10,6 +10,14 @@
 
 namespace NMib::NCloud
 {
+	DMibImpErrorClass(CExceptionCloudAPI, NException::CException);
+		
+#	define DMibErrorCloudAPI(_Description) DMibImpError(NMib::NCloud::CExceptionCloudAPI, _Description)
+
+#	ifndef DMibPNoShortCuts
+#		define DErrorCloudAPI(_Description) DMibErrorCloudAPI(_Description)
+#	endif
+	
 	struct CCloudAPIManager : public NConcurrency::CActor
 	{
 		using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
@@ -36,11 +44,51 @@ namespace NMib::NCloud
 			NStr::CStr m_ContainerName;
 			NStr::CStr m_TempURLKey; /// If this is left empty the container is locked 
 		};
+		
+		struct CSignTempURL
+		{
+			struct CResult
+			{
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
+				
+				NStr::CStr m_SignedURL;
+			};
+			
+			void f_Feed(CDistributedActorWriteStream &_Stream) const;
+			void f_Consume(CDistributedActorReadStream &_Stream);
+			
+			NStr::CStr m_CloudContext;
+			NStr::CStr m_Method;
+			NStr::CStr m_ContainerName;
+			NStr::CStr m_ObjectId;
+			NStr::CStr m_TempURLKey;
+		};
+		
+		struct CDeleteObject
+		{
+			struct CResult
+			{
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
+			};
+			
+			void f_Feed(CDistributedActorWriteStream &_Stream) const;
+			void f_Consume(CDistributedActorReadStream &_Stream);
+			
+			NStr::CStr m_CloudContext;
+			NStr::CStr m_ContainerName;
+			NStr::CStr m_ObjectId;
+		};
 
 		static bool fs_IsValidCloudContext(NStr::CStr const &_String);
 		static bool fs_IsValidContainerName(NStr::CStr const &_String);
 		static bool fs_IsValidTempURLKey(NStr::CStr const &_String);
+		static bool fs_IsValidMethod(NStr::CStr const &_String);
+		static bool fs_IsValidObjectId(NStr::CStr const &_String);
 		
 		virtual NConcurrency::TCContinuation<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer &&_Params) = 0;
+		virtual NConcurrency::TCContinuation<CSignTempURL::CResult> f_SignTempURL(CSignTempURL &&_Params) = 0;
+		virtual NConcurrency::TCContinuation<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) = 0;
 	};
 }

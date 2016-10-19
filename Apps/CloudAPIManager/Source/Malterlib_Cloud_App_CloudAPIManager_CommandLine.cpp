@@ -27,20 +27,6 @@ namespace NMib::NCloud::NCloudAPIManager
 		;
 		
 		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
-		
-		DefaultSection.f_RegisterCommand
-			(
-				{
-					"Names"_= {"--cloud-api-test"}
-					, "Description"_= "Test cloud api.\n"
-				}
-				, [this](NEncoding::CEJSON const &_Params) -> TCContinuation<CDistributedAppCommandLineResults>
-				{
-					TCContinuation<CDistributedAppCommandLineResults> Continuation;
-					mp_pServer(&CServer::f_CommandLine_TestCloudAPI, _Params) > Continuation;
-					return Continuation;
-				}
-			)
-		;
+		(void)DefaultSection;
 	}
 }

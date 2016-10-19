@@ -23,6 +23,18 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 		return mp_Server(&CCloudAPIManagerDaemonActor::CServer::fp_Protocol_EnsureContainer, fg_GetCallingHostInfo(), fg_Move(_Params));
 	}
+	
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_SignTempURL(CSignTempURL &&_Params)
+		-> TCContinuation<CSignTempURL::CResult>
+	{
+		return mp_Server(&CCloudAPIManagerDaemonActor::CServer::fp_Protocol_SignTempURL, fg_GetCallingHostInfo(), fg_Move(_Params));
+	}
+	
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_DeleteObject(CDeleteObject &&_Params)
+		-> TCContinuation<CDeleteObject::CResult>
+	{
+		return mp_Server(&CCloudAPIManagerDaemonActor::CServer::fp_Protocol_DeleteObject, fg_GetCallingHostInfo(), fg_Move(_Params));
+	}
 
 	void CCloudAPIManagerDaemonActor::CServer::fp_Publish()
 	{

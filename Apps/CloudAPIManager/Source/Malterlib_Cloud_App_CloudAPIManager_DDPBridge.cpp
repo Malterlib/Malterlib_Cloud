@@ -13,77 +13,12 @@ namespace NMib::NCloud::NCloudAPIManager
 {
 	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge()
 	{
-		CEJSON const *pConfig;
-		if (!(pConfig = mp_AppState.m_ConfigDatabase.m_Data.f_GetMember("DDPBridge", EJSONType_Object)))
-		{
-			DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Warning, "DDP bridge not set up: 'DDPBridge' config missing in '{}'", mp_AppState.m_ConfigDatabase.f_GetFileName());
-			return fg_Explicit();
-		}
-		
-		auto &Config = *pConfig;
-		
-		CEJSON const *pListen;
-		if (!(pListen = Config.f_GetMember("Listen", EJSONType_Array)))
-		{
-			DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Warning, "DDP bridge not set up: 'DDPBridge.Listen' missing in '{}'", mp_AppState.m_ConfigDatabase.f_GetFileName());
-			return fg_Explicit();
-		}
-		
-		auto &Listen = pListen->f_Array();
-		
-		if (Listen.f_IsEmpty())
-		{
-			DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Warning, "DDP bridge not set up: 'DDPBridge.Listen' is empty in '{}'", mp_AppState.m_ConfigDatabase.f_GetFileName());
-			return fg_Explicit();
-		}
-		
-		TCVector<CURL> ListenURLs;
-		
-		for (auto &ListenEntry : Listen)
-		{
-			if (auto *pValue = ListenEntry.f_GetMember("Address", EJSONType_String))
-			{
-				CURL URL;
-				if (!URL.f_Decode(pValue->f_String()))
-				{
-					DLogWithCategory
-						(
-							Malterlib/Cloud/CloudAPIManager
-							, Warning
-							, "Invalid address '{}' in 'DDPBridge.Listen' in '{}'"
-							, pValue->f_String()
-							, mp_AppState.m_ConfigDatabase.f_GetFileName()
-						)
-					;
-					continue;
-				}
-				ListenURLs.f_Insert(URL);
-			}
-			else
-			{
-				DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Warning, "Invalid address in 'DDPBridge.Listen' in '{}'", mp_AppState.m_ConfigDatabase.f_GetFileName());
-			}
-		}
-		
-		if (ListenURLs.f_IsEmpty())
-		{
-			DLogWithCategory
-				(
-					Malterlib/Cloud/CloudAPIManager
-					, Warning
-					, "DDP bridge not set up: No valid addresses in 'DDPBridge.Listen' in '{}'"
-					, mp_AppState.m_ConfigDatabase.f_GetFileName()
-				)
-			;
-			return fg_Explicit();
-		}
-		
-		mp_DDPBridge = fg_ConstructActor<CDistributedTrustDDPBridge>(ListenURLs, mp_AppState.m_TrustManager);
+		mp_DDPBridge = fg_ConstructActor<CDistributedTrustDDPBridge>(mp_AppState.m_TrustManager);
 		
 		TCContinuation<void> Continuation;
-		
-		mp_DDPBridge(&CDistributedTrustDDPBridge::f_RegisterMethods, fg_ThisActor(this).f_Weak(), fp_GetDDPMethods())  > Continuation / [this, Continuation]
+		mp_DDPBridge(&CDistributedTrustDDPBridge::f_RegisterMethods, fg_ThisActor(this).f_Weak(), fp_GetDDPMethods()) > Continuation / [this, Continuation](CActorSubscription &&_ActorSub)
 			{
+				mp_DDPBridgeSubscription = fg_Move(_ActorSub);
 				mp_DDPBridge(&CDistributedTrustDDPBridge::f_Startup) > Continuation;
 			}
 		;		
@@ -95,9 +30,10 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 		return NContainer::fg_CreateVector<CDistributedTrustDDPBridge::CMethod>
 			(
+				CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIEnsureContainer"
-					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON> 
+					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON>
 					{
 						if (_Params.f_GetLen() != 1)
 							return fg_Explicit("Method takes 1 parameter");
@@ -105,6 +41,7 @@ namespace NMib::NCloud::NCloudAPIManager
 						CCloudAPIManager::CEnsureContainer Params;
 						try
 						{
+							NException::CDisableExceptionTraceScope DisableTracing;
 							auto &InputParams = _Params[0];
 							Params.m_CloudContext = InputParams["cloudContext"].f_String(); 
 							Params.m_ContainerName = InputParams["containerName"].f_String();
@@ -116,7 +53,69 @@ namespace NMib::NCloud::NCloudAPIManager
 						}
 						fp_Protocol_EnsureContainer(fg_GetCallingHostInfo(), fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CEnsureContainer::CResult &&_Result)
 							{
-								NEncoding::CEJSON Result = EJSONType_Object;
+								NEncoding::CEJSON Result;
+								Continuation.f_SetResult(Result);
+							}
+						;
+						return Continuation;
+					}
+				}
+				, CDistributedTrustDDPBridge::CMethod
+				{
+					"cloudAPISignTempURL"
+					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON> 
+					{
+						if (_Params.f_GetLen() != 1)
+							return fg_Explicit("Method takes 1 parameter");
+						TCContinuation<NEncoding::CEJSON> Continuation;
+						CCloudAPIManager::CSignTempURL Params;
+						try
+						{
+							NException::CDisableExceptionTraceScope DisableTracing;
+							auto &InputParams = _Params[0];
+							Params.m_CloudContext = InputParams["cloudContext"].f_String();
+							Params.m_Method = InputParams["method"].f_String();
+							Params.m_ContainerName = InputParams["containerName"].f_String();
+							Params.m_ObjectId = InputParams["objectId"].f_String();
+							Params.m_TempURLKey = InputParams["tempURLKey"].f_String();
+						}
+						catch (NException::CException const &_Exception)
+						{
+							return _Exception;
+						}
+						fp_Protocol_SignTempURL(fg_GetCallingHostInfo(), fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CSignTempURL::CResult &&_Result)
+							{
+								NEncoding::CEJSON Result = _Result.m_SignedURL;
+								Continuation.f_SetResult(Result);
+							}
+						;
+						return Continuation;
+					}
+				}
+				, CDistributedTrustDDPBridge::CMethod
+				{
+					"cloudAPIDeleteObject"
+					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON>
+					{
+						if (_Params.f_GetLen() != 1)
+							return fg_Explicit("Method takes 1 parameter");
+						TCContinuation<NEncoding::CEJSON> Continuation;
+						CCloudAPIManager::CDeleteObject Params;
+						try
+						{
+							NException::CDisableExceptionTraceScope DisableTracing;
+							auto &InputParams = _Params[0];
+							Params.m_CloudContext = InputParams["cloudContext"].f_String(); 
+							Params.m_ContainerName = InputParams["containerName"].f_String();
+							Params.m_ObjectId = InputParams["objectId"].f_String();
+						}
+						catch (NException::CException const &_Exception)
+						{
+							return _Exception;
+						}
+						fp_Protocol_DeleteObject(fg_GetCallingHostInfo(), fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CDeleteObject::CResult &&_Result)
+							{
+								NEncoding::CEJSON Result;
 								Continuation.f_SetResult(Result);
 							}
 						;
