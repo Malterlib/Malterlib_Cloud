@@ -278,7 +278,6 @@ namespace NMib
 							(
 								&CProcessLaunchActor::f_Launch
 								, LaunchParams
-								, EProcessLaunchCloseFlag_StopProcess | EProcessLaunchCloseFlag_BlockOnExit
 								, fg_ThisActor(this)
 							)
 							> [this, _pApplication, pState, Continuation](TCAsyncResult<CActorSubscription> &&_Subscription)

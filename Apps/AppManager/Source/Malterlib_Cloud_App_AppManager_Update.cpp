@@ -226,7 +226,6 @@ namespace NMib::NCloud::NAppManager
 			(
 				&CProcessLaunchActor::f_Launch
 				, LaunchParams
-				, EProcessLaunchCloseFlag_StopProcess | EProcessLaunchCloseFlag_BlockOnExit
 				, fg_ThisActor(this)
 			)
 			> [this, pState, Description, fReportError](TCAsyncResult<CActorSubscription> &&_Subscription)
