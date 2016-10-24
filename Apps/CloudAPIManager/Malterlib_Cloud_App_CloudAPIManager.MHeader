@@ -14,6 +14,8 @@ Import "../../../../SDK/curl/Curl.MTarget"
 		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
+		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudCloudAPIManager"
+		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudCloudAPIManager"
 	}
 	Target
 	{
