@@ -50,7 +50,28 @@ namespace NMib::NCloud
 		return false;
 	}
 
+	// CGetSwiftBaseURL
 	
+	void CCloudAPIManager::CGetSwiftBaseURL::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+		_Stream << m_BaseURL;
+	}
+	
+	void CCloudAPIManager::CGetSwiftBaseURL::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+		_Stream >> m_BaseURL;
+	}
+	
+	void CCloudAPIManager::CGetSwiftBaseURL::f_Feed(CDistributedActorWriteStream &_Stream) const
+	{
+		_Stream << m_CloudContext;
+	}
+	
+	void CCloudAPIManager::CGetSwiftBaseURL::f_Consume(CDistributedActorReadStream &_Stream)
+	{
+		_Stream >> m_CloudContext;
+	}
+		
 	// CEnsureContainer
 
 	void CCloudAPIManager::CEnsureContainer::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const

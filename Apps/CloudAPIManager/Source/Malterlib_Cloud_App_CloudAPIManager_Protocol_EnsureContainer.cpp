@@ -38,12 +38,14 @@ namespace NMib::NCloud::NCloudAPIManager
 		if (!pCloudContext)
 			return fsp_LogActivityError(_CallingHostInfo, fg_Format("No such cloud context: {}", _Params.m_CloudContext), nullptr);
 		
-		fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [this, Continuation, _Params, _CallingHostInfo](COpenStackServiceInfo &&_ServiceInfo)
+		CStr StoragePolicy = pCloudContext->m_SwiftStoragePolicy;
+		
+		fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [this, Continuation, _Params, _CallingHostInfo, StoragePolicy](COpenStackServiceInfo &&_ServiceInfo)
 			{
 				fg_Dispatch
 					(
 						fp_GetCURLQueryActor()
-						, [ServiceInfo = fg_Move(_ServiceInfo), _Params]() -> CStr
+						, [ServiceInfo = fg_Move(_ServiceInfo), _Params, StoragePolicy]() -> CStr
 						{
 							NException::CDisableExceptionTraceScope DisableTracing;
 							
@@ -58,6 +60,7 @@ namespace NMib::NCloud::NCloudAPIManager
 							TCMap<CStr, CStr> Headers;
 							
 							Headers["X-Auth-Token"] = ServiceInfo.m_Token;
+							Headers["X-Storage-Policy"] = StoragePolicy;
 							
 							if (_Params.m_TempURLKey.f_IsEmpty())
 							{

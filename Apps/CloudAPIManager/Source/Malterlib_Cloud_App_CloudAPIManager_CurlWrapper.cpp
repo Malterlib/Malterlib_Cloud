@@ -84,7 +84,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			[&](CURLcode _Result) -> void
 			{
 				if (_Result != CURLE_OK)
-					DMibError(fg_Format("libcurl operation failed: {}", CurlErrorBuffer));
+					DMibError(fg_Format("libcurl operation on {} failed: {}", _URL, CurlErrorBuffer));
 			}
 		;
 		

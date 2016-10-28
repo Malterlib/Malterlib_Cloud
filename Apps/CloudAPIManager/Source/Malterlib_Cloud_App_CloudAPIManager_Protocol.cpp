@@ -17,7 +17,13 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 		DMibPublishActorFunction(CCloudAPIManager::f_EnsureContainer);
 	}
-		
+
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params)
+		-> TCContinuation<CGetSwiftBaseURL::CResult>
+	{
+		return mp_Server(&CCloudAPIManagerDaemonActor::CServer::fp_Protocol_GetSwiftBaseURL, fg_GetCallingHostInfo(), fg_Move(_Params));
+	}
+	
 	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_EnsureContainer(CEnsureContainer &&_Params)
 		-> TCContinuation<CEnsureContainer::CResult> 
 	{

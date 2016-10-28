@@ -26,6 +26,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		{
 			CCloudAPIManagerImplementation(TCActor<CCloudAPIManagerDaemonActor::CServer> &&_Server);
 			
+			TCContinuation<CGetSwiftBaseURL::CResult> f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params) override;
 			TCContinuation<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer &&_Params) override;
 			TCContinuation<CSignTempURL::CResult> f_SignTempURL(CSignTempURL &&_Params) override;
 			TCContinuation<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) override;
@@ -58,6 +59,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			}
 			
 			COpenStackKeystoneInfo m_KeystoneInfo;
+			CStr m_SwiftStoragePolicy;
 			
 			TCUniquePointer<TCActorCallOnce<COpenStackServiceInfo>> m_pGetToken;
 			
@@ -77,6 +79,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		TCContinuation<COpenStackServiceInfo> fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext);
 
+		TCContinuation<CCloudAPIManager::CGetSwiftBaseURL::CResult> fp_Protocol_GetSwiftBaseURL(CCallingHostInfo const &_CallingHostInfo, CCloudAPIManager::CGetSwiftBaseURL &&_Params);
 		TCContinuation<CCloudAPIManager::CEnsureContainer::CResult> fp_Protocol_EnsureContainer(CCallingHostInfo const &_CallingHostInfo, CCloudAPIManager::CEnsureContainer &&_Params);
 		TCContinuation<CCloudAPIManager::CSignTempURL::CResult> fp_Protocol_SignTempURL(CCallingHostInfo const &_CallingHostInfo, CCloudAPIManager::CSignTempURL &&_Params);
 		TCContinuation<CCloudAPIManager::CDeleteObject::CResult> fp_Protocol_DeleteObject(CCallingHostInfo const &_CallingHostInfo, CCloudAPIManager::CDeleteObject &&_Params);

@@ -73,12 +73,14 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		TCSet<CStr> Permissions;
 		
+		Permissions["ObjectStorage/GetSwiftBaseURLAll"];
 		Permissions["ObjectStorage/EnsureContainerAll"];
 		Permissions["ObjectStorage/DeleteObjectAll"];
 		Permissions["ObjectStorage/SignTempURLAll"];
 		
 		for (auto &CloudContext : mp_CloudContexts)
 		{
+			Permissions[fg_Format("ObjectStorage/GetSwiftBaseURL/{}", CloudContext.f_GetName())];
 			Permissions[fg_Format("ObjectStorage/EnsureContainer/{}", CloudContext.f_GetName())];
 			Permissions[fg_Format("ObjectStorage/DeleteObject/{}", CloudContext.f_GetName())];
 			Permissions[fg_Format("ObjectStorage/SignTempURL/{}", CloudContext.f_GetName())];
@@ -118,6 +120,12 @@ namespace NMib::NCloud::NCloudAPIManager
 					CloudContext.m_KeystoneInfo.m_DomainId = KeystoneInfo["DomainId"].f_String();
 					CloudContext.m_KeystoneInfo.m_RegionName = KeystoneInfo["RegionName"].f_String();
 					CloudContext.m_KeystoneInfo.m_TenantId = KeystoneInfo["TenantId"].f_String();
+					
+					auto const *pSwiftStoragePolicy = Values.f_GetMember("SwiftStoragePolicy");
+					if (pSwiftStoragePolicy)
+						CloudContext.m_SwiftStoragePolicy = pSwiftStoragePolicy->f_AsString("europe");
+					else
+						CloudContext.m_SwiftStoragePolicy = "europe";
 				}
 				else
 					return DMibErrorInstance(fg_Format("Unknown cloud type: {}", Type));

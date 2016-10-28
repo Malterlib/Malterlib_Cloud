@@ -28,6 +28,22 @@ namespace NMib::NCloud
 			EMinProtocolVersion = 0x101
 			, EProtocolVersion = 0x102
 		};
+		
+		struct CGetSwiftBaseURL
+		{
+			struct CResult
+			{
+				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Consume(CDistributedActorReadStream &_Stream);
+				
+				NStr::CStr m_BaseURL;
+			};
+			
+			void f_Feed(CDistributedActorWriteStream &_Stream) const;
+			void f_Consume(CDistributedActorReadStream &_Stream);
+			
+			NStr::CStr m_CloudContext;
+		};
 
 		struct CEnsureContainer
 		{
@@ -87,6 +103,7 @@ namespace NMib::NCloud
 		static bool fs_IsValidMethod(NStr::CStr const &_String);
 		static bool fs_IsValidObjectId(NStr::CStr const &_String);
 		
+		virtual NConcurrency::TCContinuation<CGetSwiftBaseURL::CResult> f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CSignTempURL::CResult> f_SignTempURL(CSignTempURL &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) = 0;

@@ -30,7 +30,33 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 		return NContainer::fg_CreateVector<CDistributedTrustDDPBridge::CMethod>
 			(
-				CDistributedTrustDDPBridge::CMethod
+			 	CDistributedTrustDDPBridge::CMethod
+				{
+					"getSwiftBaseURL"
+					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON> 
+					{
+						TCContinuation<NEncoding::CEJSON> Continuation;
+						CCloudAPIManager::CGetSwiftBaseURL Params;
+						try
+						{
+							NException::CDisableExceptionTraceScope DisableTracing;
+							auto &InputParams = _Params[0];
+							Params.m_CloudContext = InputParams["cloudContext"].f_String();
+						}
+						catch (NException::CException const &_Exception)
+						{
+							return _Exception;
+						}
+						fp_Protocol_GetSwiftBaseURL(fg_GetCallingHostInfo(), fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CGetSwiftBaseURL::CResult &&_Result)
+							{
+								NEncoding::CEJSON Result = _Result.m_BaseURL;
+								Continuation.f_SetResult(Result);
+							}
+						;
+						return Continuation;
+					}
+				}
+				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIEnsureContainer"
 					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON>

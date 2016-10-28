@@ -56,7 +56,7 @@ namespace NMib::NCloud::NCloudAPIManager
 							Headers["X-Auth-Token"] = ServiceInfo.m_Token;
 							
 							CCurlResult Result = fg_Curl(ECurlMethod_DELETE, URL, Headers, CStr());
-							if (Result.m_StatusCode != 204)
+							if (Result.m_StatusCode != 204 && Result.m_StatusCode != 404)
 								DErrorCloudAPI(fg_Format("Unexpected result {} {}", Result.m_StatusCode, Result.m_StatusMessage));
 							
 							return URL;
