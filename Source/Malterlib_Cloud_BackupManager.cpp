@@ -157,6 +157,7 @@ namespace NMib::NCloud
 	void CBackupManager::CStopBackup::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
+		_Stream >> m_BackupKey;
 	}
 
 	// CUploadData

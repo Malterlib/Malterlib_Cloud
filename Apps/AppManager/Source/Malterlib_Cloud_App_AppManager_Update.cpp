@@ -458,6 +458,10 @@ namespace NMib::NCloud::NAppManager
 											SourcePath = Files[0];
 									}
 									
+									// Cleanup any old crash version
+									if (CFile::fs_FileExists(TemporaryDirectory))
+										CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
+									
 									TCVector<CStr> Files;
 									CStr Output = fsp_UnpackApplication(SourcePath, TemporaryDirectory, pApplication, Files, _AllowSourceExist, false);
 									if (!Output.f_IsEmpty())
