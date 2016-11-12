@@ -14,9 +14,12 @@ namespace NMib::NCloud
 		return NNet::fg_IsValidHostname(_String);
 	}
 	
-	bool CVersionManager::fs_IsValidBranch(NStr::CStr const &_String)
+	bool CVersionManager::fs_IsValidBranch(NStr::CStr const &_String, bool _bAllowWildCards)
 	{
-		return NNet::fg_IsValidHostname(_String, "/");
+		if (_bAllowWildCards)
+			return NNet::fg_IsValidHostname(_String, "/*?");
+		else
+			return NNet::fg_IsValidHostname(_String, "/");
 	}
 
 	bool CVersionManager::fs_IsValidTag(CStr const &_String)

@@ -317,7 +317,7 @@ namespace NMib::NCloud::NAppManager
 			else
 			{
 				CStr Error;
-				VersionID = fp_FindVersionForAutoUpdate(pApplication, RequiredTags, AllowedBranches, Platform, Error);
+				VersionID = fp_FindVersion(pApplication, RequiredTags, AllowedBranches, Platform, Error, EFindVersionFlag_RetryFailed);
 				if (!VersionID.f_IsValid())
 					return DMibErrorInstance(Error);
 			}
@@ -420,7 +420,13 @@ namespace NMib::NCloud::NAppManager
 					)
 				;
 				
-				auto fUnpackApp = [=](CStr const &_SourcePath, TCSet<CStr> const &_AllowSourceExist)
+				auto fUnpackApp = [=]
+					(
+						CStr const &_SourcePath
+						, TCSet<CStr> const &_AllowSourceExist
+						, TCSharedPointer<CApplicationSettings> const &_pNewSettings
+						, TCFunction <void ()> const &_fUpdateVersionInfo
+					)
 					{
 						CStr TemporaryDirectory = fg_Format("{}/TempVersion", pApplication->f_GetDirectory());
 						
@@ -443,7 +449,7 @@ namespace NMib::NCloud::NAppManager
 						fg_Dispatch
 							(
 								mp_FileActor
-								, [=, Settings = pApplication->m_Settings, OutputDirectory = pApplication->f_GetDirectory()]()
+								, [=, Settings = _pNewSettings ? *_pNewSettings : pApplication->m_Settings, OutputDirectory = pApplication->f_GetDirectory()]()
 								{
 									// 1. Extract new application to temporary directory
 									fsp_CreateApplicationUserGroup(Settings, fLogInfo, OutputDirectory);
@@ -463,7 +469,7 @@ namespace NMib::NCloud::NAppManager
 										CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
 									
 									TCVector<CStr> Files;
-									CStr Output = fsp_UnpackApplication(SourcePath, TemporaryDirectory, pApplication, Files, _AllowSourceExist, false);
+									CStr Output = fsp_UnpackApplication(SourcePath, TemporaryDirectory, pApplication->m_Name, Settings, Files, _AllowSourceExist, false);
 									if (!Output.f_IsEmpty())
 										fLogInfo(Output);
 									return Files;
@@ -582,6 +588,10 @@ namespace NMib::NCloud::NAppManager
 														}
 															
 														fLogInfo("Saving application state");
+														if (_pNewSettings)
+															pApplication->m_Settings = *_pNewSettings;
+														if (_fUpdateVersionInfo)
+															_fUpdateVersionInfo();
 														self(&CAppManagerActor::fp_UpdateApplicationJSON, pApplication) 
 															> [=](TCAsyncResult<void> &&_Result)
 															{
@@ -705,6 +715,10 @@ namespace NMib::NCloud::NAppManager
 								}
 							}
 							
+							TCSharedPointer<CApplicationSettings> pNewSettings;
+							
+							TCFunction <void ()> fUpdateVersionInfo;
+							
 							if (!bDryRun)
 							{
 								if (bUpdateSettings)
@@ -720,18 +734,26 @@ namespace NMib::NCloud::NAppManager
 										Continuation.f_SetException(DMibErrorInstance(Error));
 										return ;
 									}
-									pApplication->m_Settings = NewSettings;
+									pNewSettings = fg_Construct(NewSettings);
 								}
-								pApplication->m_LastInstalledVersion = VersionID;
-								pApplication->m_LastInstalledVersionInfo = VersionInfo;
+								
+								pApplication->m_LastTriedInstalledVersion = VersionID;
+								pApplication->m_LastTriedInstalledVersionInfo = VersionInfo;
+								
+								fUpdateVersionInfo = [pApplication, VersionID, VersionInfo]
+									{
+										pApplication->m_LastInstalledVersion = VersionID;
+										pApplication->m_LastInstalledVersionInfo = VersionInfo;
+									}
+								;
 							}
 							
-							fUnpackApp(DownloadDirectory, fg_CreateSet(DownloadDirectory));
+							fUnpackApp(DownloadDirectory, fg_CreateSet(DownloadDirectory), pNewSettings, fUpdateVersionInfo);
 						}
 					;
 				}
 				else
-					fUnpackApp(Package, {});
+					fUnpackApp(Package, {}, {}, {});
 			}
 		;
 		

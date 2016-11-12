@@ -14,26 +14,44 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_SelfUpdateSource;
 			m_bSelfUpdateSource = pValue->f_Boolean();
 		}
+		
+		bool bStorageSpecified = false;
 		if (auto *pValue = _Params.f_GetMember("EncryptionStorage"))
 		{
 			o_ChangedSettings |= EApplicationSetting_EncryptionStorage;
 			m_EncryptionStorage = pValue->f_String();
+			bStorageSpecified = !m_EncryptionStorage.f_IsEmpty(); 
 		}
+		
+		if (auto *pValue = _Params.f_GetMember("EncryptionFileSystem"))
+		{
+			o_ChangedSettings |= EApplicationSetting_EncryptionFileSystem;
+			m_EncryptionFileSystem = pValue->f_String();
+		}
+		else if (bStorageSpecified)
+		{
+			o_ChangedSettings |= EApplicationSetting_EncryptionFileSystem;
+			m_EncryptionFileSystem = "zfs";
+		}
+		
 		if (auto *pValue = _Params.f_GetMember("ParentApplication"))
 		{
 			o_ChangedSettings |= EApplicationSetting_ParentApplication;
 			m_ParentApplication = pValue->f_String();
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("VersionManagerApplication"))
 		{
 			o_ChangedSettings |= EApplicationSetting_VersionManagerApplication;
 			m_VersionManagerApplication = pValue->f_String();
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("Executable"))
 		{
 			o_ChangedSettings |= EApplicationSetting_Executable;
 			m_Executable = pValue->f_String();
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("ExecutableParameters"))
 		{
 			if (!_bRelaxed || !m_bSelfUpdateSource)
@@ -44,16 +62,19 @@ namespace NMib::NCloud::NAppManager
 					m_ExecutableParameters.f_Insert(Parameter.f_String());
 			}
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("RunAsUser"))
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsUser;
 			m_RunAsUser = pValue->f_String();
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("RunAsGroup"))
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 			m_RunAsGroup = pValue->f_String();
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("AutoUpdateTags"))
 		{
 			o_ChangedSettings |= EApplicationSetting_AutoUpdateTags;
@@ -74,6 +95,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			}
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("AutoUpdateBranches"))
 		{
 			o_ChangedSettings |= EApplicationSetting_AutoUpdateBranches;
@@ -81,29 +103,33 @@ namespace NMib::NCloud::NAppManager
 			for (auto &BranchJSON : pValue->f_Array())
 			{
 				auto &Branch = BranchJSON.f_String();
-				if (!CVersionManager::fs_IsValidBranch(Branch))
+				if (!CVersionManager::fs_IsValidBranch(Branch, true))
 				{
-					o_Error = fg_Format("'{}' is not a valid branch", Branch);
+					o_Error = fg_Format("'{}' is not a valid branch or wildcard", Branch);
 					return false;
 				}
 				m_AutoUpdateBranches[Branch];
 			}
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("UpdateScript_PreUpdate"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_PreUpdate;
 			m_UpdateScripts.m_PreUpdate = pValue->f_String();
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostUpdate"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_PostUpdate;
 			m_UpdateScripts.m_PostUpdate = pValue->f_String();
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostLaunch"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_PostLaunch;
 			m_UpdateScripts.m_PostLaunch = pValue->f_String();
 		}
+		
 		if (auto *pValue = _Params.f_GetMember("UpdateScript_OnError"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_OnError;
@@ -116,6 +142,8 @@ namespace NMib::NCloud::NAppManager
 	{
 		if (_ChangedSettings & EApplicationSetting_EncryptionStorage)
 			m_EncryptionStorage = _Source.m_EncryptionStorage;
+		if (_ChangedSettings & EApplicationSetting_EncryptionFileSystem)
+			m_EncryptionFileSystem = _Source.m_EncryptionFileSystem;
 		if (_ChangedSettings & EApplicationSetting_ParentApplication)
 			m_ParentApplication = _Source.m_ParentApplication;
 		if (_ChangedSettings & EApplicationSetting_Executable)
@@ -159,6 +187,8 @@ namespace NMib::NCloud::NAppManager
 		{
 			if (!m_EncryptionStorage.f_IsEmpty())
 				return fError("For self update you cannot specify encryption storage");
+			else if (!m_EncryptionFileSystem.f_IsEmpty())
+				return fError("For self update you cannot specify encryption file system");
 			else if (!m_Executable.f_IsEmpty())
 				return fError("For self update you cannot specify executable");
 			else if (!m_ExecutableParameters.f_IsEmpty())
@@ -174,6 +204,8 @@ namespace NMib::NCloud::NAppManager
 			{
 				if (!m_EncryptionStorage.f_IsEmpty())
 					return fError("For child application you cannot specify encryption storage");
+				else if (!m_EncryptionFileSystem.f_IsEmpty())
+					return fError("For child application you cannot specify encryption file system");
 			}
 		}
 		
@@ -185,6 +217,8 @@ namespace NMib::NCloud::NAppManager
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		if (m_EncryptionStorage != _Other.m_EncryptionStorage)
 			ChangedSettings |= EApplicationSetting_EncryptionStorage;
+		if (m_EncryptionFileSystem != _Other.m_EncryptionFileSystem)
+			ChangedSettings |= EApplicationSetting_EncryptionFileSystem;
 		if (m_ParentApplication != _Other.m_ParentApplication)
 			ChangedSettings |= EApplicationSetting_ParentApplication;
 		if (m_Executable != _Other.m_Executable)
@@ -308,6 +342,11 @@ namespace NMib::NCloud::NAppManager
 		if (ChangedSettings & EApplicationSetting_EncryptionStorage)
 		{
 			fLogError("Changing encryption storage is not supported");
+			return Continuation;
+		}
+		if (ChangedSettings & EApplicationSetting_EncryptionFileSystem)
+		{
+			fLogError("Changing encryption file system is not supported");
 			return Continuation;
 		}
 		if (ChangedSettings & EApplicationSetting_ParentApplication)

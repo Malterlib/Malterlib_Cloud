@@ -73,6 +73,10 @@ namespace NMib
 							for (auto &File : ApplicationJSON["Files"].f_Array())
 								Application.m_Files.f_Insert(File.f_String());
 							Settings.m_EncryptionStorage = ApplicationJSON["EncryptionStorage"].f_String();
+							if (auto pValue = ApplicationJSON.f_GetMember("EncryptionFileSystem", EJSONType_String))
+								Settings.m_EncryptionFileSystem = pValue->f_String();
+							else if (!Settings.m_EncryptionStorage.f_IsEmpty())
+								Settings.m_EncryptionFileSystem = "zfs";
 							if (auto pValue = ApplicationJSON.f_GetMember("ParentApplication", EJSONType_String))
 								Settings.m_ParentApplication = pValue->f_String();
 							if (auto pValue = ApplicationJSON.f_GetMember("VersionManagerApplication", EJSONType_String))

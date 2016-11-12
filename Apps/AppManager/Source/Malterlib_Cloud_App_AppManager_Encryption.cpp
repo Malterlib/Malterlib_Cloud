@@ -11,12 +11,15 @@ namespace NMib
 		{
 #ifdef DPlatformFamily_Linux
 			ch8 const *g_pSetupEncryptionScript =
+#				include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
 #				include "Malterlib_Cloud_App_AppManager_Encryption_SetupLinux.sh"
 			;
 			ch8 const *g_pOpenEncryptionScript =
+#				include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
 #				include "Malterlib_Cloud_App_AppManager_Encryption_OpenLinux.sh"
 			;
 			ch8 const *g_pCloseEncryptionScript =
+#				include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
 #				include "Malterlib_Cloud_App_AppManager_Encryption_CloseLinux.sh"
 			;
 #endif
@@ -54,6 +57,7 @@ namespace NMib
 					{
 						TCMap<CStr, CStr> Environment;
 						Environment["MibCloudApp_EncryptionStorage"] = pEncryptionApplication->m_Settings.m_EncryptionStorage;
+						Environment["MibCloudApp_EncryptionFileSystem"] = pEncryptionApplication->m_Settings.m_EncryptionFileSystem;
 						Environment["MibCloudApp_DeviceName"] = "enc_" + pEncryptionApplication->m_Name.f_LowerCase();
 						Environment["MibCloudApp_ZPoolName"] = "zpool_" + pEncryptionApplication->m_Name.f_LowerCase();
 						Environment["MibCloudApp_MountPoint"] = pEncryptionApplication->f_GetDirectory();

@@ -30,56 +30,72 @@ namespace NMib::NCloud::NAppManager
 		if (Package.f_IsEmpty())
 			return DMibErrorInstance("You have to specify a package");
 		
+		bool bFromFile = _Params["FromFile"].f_Boolean();
+		
 		bool bIsVersionManager = false;
 		bool bSettingsFromVersionInfo = false;
 		
 		CStr Platform;
-		
-		auto *pVersionManagerApplication = mp_VersionManagerApplications.f_FindEqual(Package);
-
 		CVersionManager::CVersionIDAndPlatform VersionID;
 		
-		if (pVersionManagerApplication || !Version.f_IsEmpty())
+		if (!bFromFile)
 		{
-			Platform = DMalterlibCloudPlatform;
-			if (auto *pValue = _Params.f_GetMember("VersionManagerPlatform"))
-				Platform = pValue->f_String();
-			bSettingsFromVersionInfo = _Params["SettingsFromVersionInfo"].f_Boolean();
-			bIsVersionManager = true;
-			if (!CVersionManager::fs_IsValidPlatform(Platform))
-				return DMibErrorInstance("Invalid platform format"); 
-			
-			if (!Version.f_IsEmpty())
+			auto *pVersionManagerApplication = mp_VersionManagerApplications.f_FindEqual(Package);
+
+			if (pVersionManagerApplication || !Version.f_IsEmpty())
 			{
-				CStr Error;
-				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
-					return DMibErrorInstance(fg_Format("Invalid version format: {}", Error));
-				VersionID.m_Platform = Platform;
+				Platform = DMalterlibCloudPlatform;
+				if (auto *pValue = _Params.f_GetMember("VersionManagerPlatform"))
+					Platform = pValue->f_String();
+				bSettingsFromVersionInfo = _Params["SettingsFromVersionInfo"].f_Boolean();
+				bIsVersionManager = true;
+				if (!CVersionManager::fs_IsValidPlatform(Platform))
+					return DMibErrorInstance("Invalid platform format"); 
+
+				pApplication->m_Settings.m_VersionManagerApplication = Package;
+				
+				if (!Version.f_IsEmpty())
+				{
+					CStr Error;
+					if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
+						return DMibErrorInstance(fg_Format("Invalid version format: {}", Error));
+					VersionID.m_Platform = Platform;
+				}
+				else
+				{
+					CStr Error;
+					VersionID = CAppManagerActor::fp_FindVersion
+						(
+							pApplication
+							, pApplication->m_Settings.m_AutoUpdateTags
+							, pApplication->m_Settings.m_AutoUpdateBranches
+							, Platform 
+							, Error
+							, EFindVersionFlag_ForAdd
+						)
+					;
+					
+					if (!VersionID.f_IsValid())
+						return DMibErrorInstance(fg_Format("No suitable version found for application '{}': {}", Package, Error));
+				}
 			}
 			else
 			{
-				decltype(pVersionManagerApplication->m_VersionsByTime.f_GetIterator()) iVersion;
-				for (iVersion.f_StartBackward(pVersionManagerApplication->m_VersionsByTime); iVersion; --iVersion)
-				{
-					auto &Version = *iVersion;
-					if (Version.f_GetVersionID().m_Platform != Platform)
-						continue;
-					VersionID = Version.f_GetVersionID(); 
-					break;
-				}
-				if (!iVersion)
-					return DMibErrorInstance(fg_Format("No newest version found for application: {}", Package));
+				return DMibErrorInstance
+					(
+						fg_Format
+						(
+							"No such application '{}' found for connected version managers with known platforms '{vs,vb}'.\n"
+							"You might have to specify --version and --platform manually if a non-default platform is used."
+							, Package
+							, mp_KnownPlatforms 
+						)
+					)
+				;
 			}
 		}
 		else
-		{
-			if (!Version.f_IsEmpty())
-				return DMibErrorInstance("Package did not refer to any version manager application, so you cannot specify '--version'");
-			if (!Platform.f_IsEmpty())
-				return DMibErrorInstance("Package did not refer to any version manager application, so you cannot specify '--platform'");
-			
 			Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
-		}
 
 		if (!bSettingsFromVersionInfo)
 		{
@@ -158,9 +174,10 @@ namespace NMib::NCloud::NAppManager
 											SourcePath = Files[0];
 									}
 									TCSet<CStr> AllowExist;
+									AllowExist[Directory + "/lost+found"];
 									if (!_DeletePath.f_IsEmpty())
 										AllowExist[_DeletePath];
-									CStr Output = fsp_UnpackApplication(SourcePath, Directory, pApplication, Files, AllowExist, bForceInstall);
+									CStr Output = fsp_UnpackApplication(SourcePath, Directory, pApplication->m_Name, pApplication->m_Settings, Files, AllowExist, bForceInstall);
 									if (!Output.f_IsEmpty())
 										pResult->f_AddStdOut(Output);
 									
@@ -204,6 +221,7 @@ namespace NMib::NCloud::NAppManager
 											fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
 											return;
 										}
+										pApplication->m_bJustUpdated = true;
 										fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false) 
 											> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_Result)
 											{
@@ -255,8 +273,6 @@ namespace NMib::NCloud::NAppManager
 								pApplication->m_Settings = NewSettings;
 							}
 
-							pApplication->m_Settings.m_VersionManagerApplication = Package;
-							
 							pApplication->m_LastInstalledVersion = VersionID;
 							pApplication->m_LastInstalledVersionInfo = VersionInfo;
 							if (mp_KnownPlatforms(VersionID.m_Platform).f_WasCreated())

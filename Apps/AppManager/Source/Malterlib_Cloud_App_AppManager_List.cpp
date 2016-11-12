@@ -20,6 +20,7 @@ namespace NMib::NCloud::NAppManager
 				auto &Settings = Application.m_Settings;
 				Results.f_AddStdOut(fg_Format("                       Status: {}{\n}{\n}", Application.m_LaunchState));
 				Results.f_AddStdOut(fg_Format("           Encryption storage: {}{\n}", Settings.m_EncryptionStorage));
+				Results.f_AddStdOut(fg_Format("       Encryption file system: {}{\n}", Settings.m_EncryptionFileSystem));
 				Results.f_AddStdOut(fg_Format("           Parent application: {}{\n}", Settings.m_ParentApplication));
 				Results.f_AddStdOut(fg_Format("           Self update source: {}{\n}{\n}", Settings.m_bSelfUpdateSource ? "true" : "false"));
 				Results.f_AddStdOut(fg_Format("                   Executable: {}{\n}", Settings.m_Executable));

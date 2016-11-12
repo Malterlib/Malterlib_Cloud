@@ -57,11 +57,24 @@ namespace NMib::NCloud::NAppManager
 							,"Type"_= ""
 							, "Description"_= "Uniquely name the application."
 						}
+						, "FromFile?"_= 
+						{
+							"Names"_= {"--from-file"}
+							, "Default"_= false
+							, "Description"_= "Install the application from a local file or directory instead of downloading from version manager."
+						}
 						, "EncryptionStorage?"_= 
 						{
 							"Names"_= {"--encryption-storage"}
 							, "Default"_= ""
 							, "Description"_= "Select the file or device that should be the storage for encryption."
+						}
+						, "EncryptionFileSystem?"_= 
+						{
+							"Names"_= {"--encryption-file-system"}
+							, "Type"_= ""
+							, "Description"_= "Select the file system to use for encryption.\n"
+							"Currently zfs and ext4 are supported."
 						}
 						, "ParentApplication?"_= 
 						{
@@ -128,7 +141,8 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_= _[_]
 							, "Type"_= {""} 
 							, "Description"_= "Auto update the application only for versions from these branches.\n"
-							"Leave empty to allow any branch\n"
+							"Leave empty to allow any branch.\n"
+							"Branches can be matched with wildcards.\n"
 						}
 						, "UpdateScript_PreUpdate?"_= 
 						{
@@ -168,7 +182,7 @@ namespace NMib::NCloud::NAppManager
 							"Type"_= ""
 							, "Description"_= "The files needed to run the application.\n"
 							"Can be a version manager application name, a directory, or a tar.gz file. Will look for version manager applications"
-							" first. If not found it will assume that the name is a file and look for it on disk."
+							" by default. Specify --from-file to look for the package on disk."
 						}
 					}
 				}

@@ -53,6 +53,7 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_SelfUpdateSource = DBit(11)
 			, EApplicationSetting_EncryptionStorage = DBit(12)
 			, EApplicationSetting_ParentApplication = DBit(13)
+			, EApplicationSetting_EncryptionFileSystem = DBit(14)
 			
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
@@ -67,6 +68,7 @@ namespace NMib::NCloud::NAppManager
 			// Settings that can on never change
 			CStr m_EncryptionStorage;
 			CStr m_ParentApplication;
+			CStr m_EncryptionFileSystem;
 
 			// Settings that can be updated from version information
 			CStr m_Executable; 
@@ -120,6 +122,9 @@ namespace NMib::NCloud::NAppManager
 			TCVector<CStr> m_Files;
 			CVersionManager::CVersionIDAndPlatform m_LastInstalledVersion;
 			CVersionManager::CVersionInformation m_LastInstalledVersionInfo;
+
+			CVersionManager::CVersionIDAndPlatform m_LastTriedInstalledVersion;
+			CVersionManager::CVersionInformation m_LastTriedInstalledVersionInfo;
 			
 			// State
 			bool m_bDeleted = false;
@@ -221,6 +226,13 @@ namespace NMib::NCloud::NAppManager
 			, EEncryptOperation_Open
 			, EEncryptOperation_Close
 		};
+		
+		enum EFindVersionFlag
+		{
+			EFindVersionFlag_None = 0
+			, EFindVersionFlag_RetryFailed = DBit(0)
+			, EFindVersionFlag_ForAdd = DBit(1)
+		};
 
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		
@@ -290,7 +302,8 @@ namespace NMib::NCloud::NAppManager
 			(
 				CStr const &_Source
 				, CStr const &_Destination
-				, TCSharedPointer<CApplication> const &_pApplication
+				, CStr const &_ApplicationName
+				, CApplicationSettings const &_Settings 
 				, TCVector<CStr> &o_Files
 				, TCSet<CStr> const &_AllowExist
 				, bool _bForceInstall
@@ -324,13 +337,14 @@ namespace NMib::NCloud::NAppManager
 		;
 		
 		void fp_AutoUpdate_Update();
-		CVersionManager::CVersionIDAndPlatform fp_FindVersionForAutoUpdate
+		CVersionManager::CVersionIDAndPlatform fp_FindVersion
 			(
 				TCSharedPointer<CApplication> const &_pApplication
 				, TCSet<CStr> const &_RequiredTags
 				, TCSet<CStr> const &_AllowedBranches
 				, CStr const &_Platform 
 				, CStr &o_Error
+				, EFindVersionFlag _Flags
 			)
 		;
 

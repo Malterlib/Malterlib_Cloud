@@ -62,12 +62,16 @@ Property
 		}
 	}
 	
-	MalterlibCloudVersionInfo_Branch "@(MalterlibBranch)"
+	MalterlibCloudVersionInfo_Branch "@(MalterlibFullBranch)"
 	{
 		!!MalterlibCloudVersionInfo_Branch ""
 	}
 	
-	MalterlibCloudVersionInfo_Version "@(MalterlibCloudVersionInfo_Branch)/@(ProductVersionMajor->FormatInt('{}')).@(ProductVersionMinor->FormatInt('{}')).@(ProductVersionRevision->FormatInt('{}'))"
+	MalterlibCloudVersionInfo_BranchForVersion "@(MalterlibCloudVersionInfo_Branch->Replace(' ', ''))"
+	MalterlibCloudVersionInfo_BranchForVersion "@(MalterlibCloudVersionInfo_BranchForVersion->Replace('(', '-'))"
+	MalterlibCloudVersionInfo_BranchForVersion "@(MalterlibCloudVersionInfo_BranchForVersion->Replace(')', ''))"
+	
+	MalterlibCloudVersionInfo_Version "@(MalterlibCloudVersionInfo_BranchForVersion)/@(ProductVersionMajor->FormatInt('{}')).@(ProductVersionMinor->FormatInt('{}')).@(ProductVersionRevision->FormatInt('{}'))"
 	{
 		!!MalterlibCloudVersionInfo_Version ""
 	}

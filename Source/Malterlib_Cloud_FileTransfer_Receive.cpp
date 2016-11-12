@@ -17,28 +17,32 @@ namespace NMib::NCloud
 	
 	struct CFileTransferReceive::CInternal
 	{
-		~CInternal()
+		struct CFileCache
 		{
-			if (m_FileCache.f_IsValid())
+			TCActor<CActor> m_FileActor;
+			CStr m_FileName;
+			CFile m_File;
+			~CFileCache()
 			{
-				fg_Dispatch
-					(
-						m_FileActor
-						, [File = fg_Move(m_FileCache), FileActor = m_FileActor]() mutable
-						{
-							File.f_Close();
-						}
-					)
-					> fg_DiscardResult()
-				;
+				if (m_File.f_IsValid())
+				{
+					fg_Dispatch
+						(
+							m_FileActor
+							, [File = fg_Move(m_File), FileActor = m_FileActor]() mutable
+							{
+								File.f_Close();
+							}
+						)
+						> fg_DiscardResult()
+					;
+				}
 			}
-		}
-		
+		};
+
 		CStr m_BasePath;
-		TCActor<CActor> m_FileActor;
 		TCContinuation<CFileTransferResult> m_DoneContinuation;
-		CStr m_FileCacheFileName;
-		CFile m_FileCache;
+		TCSharedPointer<CFileCache> m_pFileCache = fg_Construct();
 		CStr m_RootDirectory;
 		bool m_bCalled = false;
 		bool m_bDoneCalled = false;
@@ -51,9 +55,10 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_BasePath = _BasePath;
-		Internal.m_FileActor = _FileActor;
-		if (!Internal.m_FileActor)
-			Internal.m_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File transfer receive file access"));
+		auto &Cache = *Internal.m_pFileCache;
+		Cache.m_FileActor = _FileActor;
+		if (!Cache.m_FileActor)
+			Cache.m_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File transfer receive file access"));
 	}
 	
 	NConcurrency::TCContinuation<CFileTransferContext> CFileTransferReceive::f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags)
@@ -66,36 +71,37 @@ namespace NMib::NCloud
 		
 		NConcurrency::TCContinuation<CFileTransferContext> Continuation;
 		
+		auto &Cache = *Internal.m_pFileCache;
+		
 		fg_Dispatch
 			(
-				Internal.m_FileActor
-				, [this, _Flags]() -> CFileTransferContext::CInternal::CManifest
+				Cache.m_FileActor
+				, [RootDirectory = Internal.m_RootDirectory, _Flags]() -> CFileTransferContext::CInternal::CManifest
 				{
-					auto &Internal = *mp_pInternal;
 					CFileTransferContext::CInternal::CManifest Manifest;
 
-					if (CFile::fs_FileExists(Internal.m_RootDirectory, EFileAttrib_File))
+					if (CFile::fs_FileExists(RootDirectory, EFileAttrib_File))
 					{
 						if (_Flags & EReceiveFlag_DeleteExisting)
 						{
-							CFile::fs_DeleteDirectoryRecursive(Internal.m_RootDirectory);
+							CFile::fs_DeleteDirectoryRecursive(RootDirectory);
 							return Manifest;
 						}
 						DMibError("Destination already exists but is a file");
 					}
 					
-					if (!CFile::fs_FileExists(Internal.m_RootDirectory, EFileAttrib_Directory))
+					if (!CFile::fs_FileExists(RootDirectory, EFileAttrib_Directory))
 						return Manifest;
 
 					if (_Flags & EReceiveFlag_DeleteExisting)
 					{
 						try
 						{
-							CFile::fs_DeleteDirectoryRecursive(Internal.m_RootDirectory);
+							CFile::fs_DeleteDirectoryRecursive(RootDirectory);
 						}
 						catch (CExceptionFile const &_Exception)
 						{
-							if (!CFile::fs_FileExists(Internal.m_RootDirectory))
+							if (!CFile::fs_FileExists(RootDirectory))
 								return Manifest;
 							throw;
 						}
@@ -110,12 +116,12 @@ namespace NMib::NCloud
 						return Manifest;
 					
 					{
-						CFile::CFindFilesOptions FindOptions(Internal.m_RootDirectory + "/*", true);
+						CFile::CFindFilesOptions FindOptions(RootDirectory + "/*", true);
 						FindOptions.m_AttribMask = EFileAttrib_File;
 						auto FoundFiles = CFile::fs_FindFiles(FindOptions);
 						for (auto &File : FoundFiles)
 						{
-							CStr RelativePath = File.m_Path.f_Extract(Internal.m_RootDirectory.f_GetLen() + 1);
+							CStr RelativePath = File.m_Path.f_Extract(RootDirectory.f_GetLen() + 1);
 							auto &OutFile = Manifest.m_Files[RelativePath];
 							OutFile.m_FileSize = CFile::fs_GetFileSize(File.m_Path);
 						}
@@ -154,35 +160,38 @@ namespace NMib::NCloud
 					-> NConcurrency::TCContinuation<CFileTransferContext::CInternal::CSendPart::CResult>
 					{
 						auto &Internal = *mp_pInternal;
+						auto &Cache = *Internal.m_pFileCache;
 						NConcurrency::TCContinuation<CFileTransferContext::CInternal::CSendPart::CResult> Continuation;
 						fg_Dispatch
 							(
-								Internal.m_FileActor
-								, [this, DownloadPart = fg_Move(_Part)]() mutable -> CFileTransferContext::CInternal::CSendPart::CResult
+								Cache.m_FileActor
+								, [pCache = Internal.m_pFileCache, RootDirectory = Internal.m_RootDirectory, DownloadPart = fg_Move(_Part)]
+								() mutable -> CFileTransferContext::CInternal::CSendPart::CResult
 								{
-									auto &Internal = *mp_pInternal;
 									CStr Error;
 									if (!CFileTransferContext::fs_IsValidRelativePath(DownloadPart.m_FilePath, Error))
 										DMibError(fg_Format("File path cannot {}", Error));
 									
-									CStr FilePath = fg_Format("{}/{}", Internal.m_RootDirectory, DownloadPart.m_FilePath);
+									CStr FilePath = fg_Format("{}/{}", RootDirectory, DownloadPart.m_FilePath);
 									
-									if (Internal.m_FileCacheFileName != FilePath)
+									auto &Cache = *pCache;
+									
+									if (Cache.m_FileName != FilePath)
 									{
 										CFile::fs_CreateDirectory(CFile::fs_GetPath(FilePath));
-										Internal.m_FileCache.f_Open(FilePath, EFileOpen_Write | EFileOpen_DontTruncate);
+										Cache.m_File.f_Open(FilePath, EFileOpen_Write | EFileOpen_DontTruncate);
 									}
 									
-									Internal.m_FileCache.f_SetPosition(DownloadPart.m_FilePosition);
-									Internal.m_FileCache.f_Write(DownloadPart.m_Data.f_GetArray(), DownloadPart.m_Data.f_GetLen());
+									Cache.m_File.f_SetPosition(DownloadPart.m_FilePosition);
+									Cache.m_File.f_Write(DownloadPart.m_Data.f_GetArray(), DownloadPart.m_Data.f_GetLen());
 									
 									if (DownloadPart.m_bFinished)
 									{
-										Internal.m_FileCache.f_SetLength(DownloadPart.m_FilePosition + DownloadPart.m_Data.f_GetLen());
-										Internal.m_FileCache.f_SetAttributes(DownloadPart.m_FileAttributes | EFileAttrib_UnixAttributesValid);
-										Internal.m_FileCache.f_SetWriteTime(DownloadPart.m_WriteTime);
-										Internal.m_FileCacheFileName.f_Clear();
-										Internal.m_FileCache.f_Close();
+										Cache.m_File.f_SetLength(DownloadPart.m_FilePosition + DownloadPart.m_Data.f_GetLen());
+										Cache.m_File.f_SetAttributes(DownloadPart.m_FileAttributes | EFileAttrib_UnixAttributesValid);
+										Cache.m_File.f_SetWriteTime(DownloadPart.m_WriteTime);
+										Cache.m_FileName.f_Clear();
+										Cache.m_File.f_Close();
 									}
 									
 									return DownloadPart.f_GetResult();

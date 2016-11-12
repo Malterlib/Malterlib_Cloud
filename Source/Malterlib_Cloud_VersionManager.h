@@ -240,7 +240,7 @@ namespace NMib::NCloud
 		static bool fs_IsValidApplicationName(NStr::CStr const &_String);
 		static bool fs_IsValidProtocolVersion(uint32 _Version);
 		static bool fs_IsValidTag(NStr::CStr const &_String);
-		static bool fs_IsValidBranch(NStr::CStr const &_String);
+		static bool fs_IsValidBranch(NStr::CStr const &_String, bool _bAllowWildCards = false);
 		static bool fs_IsValidVersionIdentifier(NStr::CStr const &_String, NStr::CStr &o_Error, CVersionID *o_pVersionID);
 		static bool fs_IsValidVersionIdentifier(CVersionID const &_VersionID, NStr::CStr &o_Error);
 		static bool fs_IsValidPlatform(NStr::CStr const &_String);

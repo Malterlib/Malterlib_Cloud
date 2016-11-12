@@ -7,13 +7,14 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	CVersionManager::CVersionIDAndPlatform CAppManagerActor::fp_FindVersionForAutoUpdate
+	CVersionManager::CVersionIDAndPlatform CAppManagerActor::fp_FindVersion
 		(
 			TCSharedPointer<CApplication> const &_pApplication
 			, TCSet<CStr> const &_RequiredTags
 			, TCSet<CStr> const &_AllowedBranches
 			, CStr const &_Platform
 			, CStr &o_Error
+			, EFindVersionFlag _Flags
 		)
 	{
 		auto *pVersionManagerApp = mp_VersionManagerApplications.f_FindEqual(_pApplication->m_Settings.m_VersionManagerApplication);
@@ -31,8 +32,20 @@ namespace NMib::NCloud::NAppManager
 		for (iVersion.f_StartBackward(pVersionManagerApp->m_VersionsByTime); iVersion; --iVersion)
 		{
 			auto &RemoteVersion = *iVersion;
-			if (!_AllowedBranches.f_FindEqual(RemoteVersion.f_GetVersionID().m_VersionID.m_Branch))
-				continue;
+			if (!_AllowedBranches.f_IsEmpty() && !_AllowedBranches.f_FindEqual(RemoteVersion.f_GetVersionID().m_VersionID.m_Branch))
+			{
+				bool bBranchAllowed = false;
+				for (auto &AllowedBranch : _AllowedBranches)
+				{
+					if (NStr::fg_StrMatchWildcard(RemoteVersion.f_GetVersionID().m_VersionID.m_Branch.f_GetStr(), AllowedBranch.f_GetStr()) == EMatchWildcardResult_WholeStringMatchedAndPatternExhausted)
+					{
+						bBranchAllowed = true;
+						break;
+					}
+				}
+				if (!bBranchAllowed)
+					continue;
+			}
 			if (RemoteVersion.f_GetVersionID().m_Platform != _Platform)
 				continue;
 			bool bFoundAllTags = true;
@@ -53,13 +66,49 @@ namespace NMib::NCloud::NAppManager
 		
 		if (!VersionID.f_IsValid())
 		{
-			if (_RequiredTags.f_IsEmpty())
-				o_Error = "No version in the same branch as the currently installed version was found";
+			if (_Flags & EFindVersionFlag_ForAdd)
+			{
+				if (_AllowedBranches.f_IsEmpty())
+				{
+					if (_RequiredTags.f_IsEmpty())
+						o_Error = "No version found for application";
+					else
+						o_Error = "No version with the required tags found for application";
+				}
+				else
+				{
+					if (_RequiredTags.f_IsEmpty())
+						o_Error = "No version found for application in the allowed branches";
+					else
+						o_Error = "No version with the required tags found for application in the allowed branches";
+				}
+			}
 			else
-				o_Error = "No version with the required tags and in the same branch as the currently installed version was found";
+			{
+				if (_RequiredTags.f_IsEmpty())
+					o_Error = "No version in the same branch as the currently installed version was found";
+				else
+					o_Error = "No version with the required tags and in the same branch as the currently installed version was found";
+			}
 			return {};
 		}
-		if (VersionID.m_VersionID.m_Branch == CurrentVersionID.m_VersionID.m_Branch && VersionID <= CurrentVersionID)
+
+		if (_Flags & EFindVersionFlag_ForAdd)
+			return VersionID;
+		
+		if 
+			(
+				VersionID.m_VersionID.m_Branch == CurrentVersionID.m_VersionID.m_Branch 
+				&& 
+				(
+					VersionID < CurrentVersionID 
+					|| 
+					(
+						VersionID == CurrentVersionID
+						&& VersionInfo.m_Time == CurrentVersionInfo.m_Time
+					)
+				)
+			 )
 		{
 			if (_RequiredTags.f_IsEmpty())
 				o_Error = "No newer version in the same branch as the currently installed version was found";
@@ -67,11 +116,25 @@ namespace NMib::NCloud::NAppManager
 				o_Error = "No newer version with the required tags and in the same branch as the currently installed version was found";
 			return {};
 		}
-		if (VersionInfo.m_Time < CurrentVersionInfo.m_Time)
+		
+		if 
+			(
+				! (_Flags & EFindVersionFlag_RetryFailed)
+				&& _pApplication->m_LastTriedInstalledVersion.f_IsValid() 
+				&& VersionID == _pApplication->m_LastTriedInstalledVersion 
+				&& VersionInfo.m_Time == _pApplication->m_LastTriedInstalledVersionInfo.m_Time
+			)
+		{
+			o_Error = "Already tried and failed to install this version";
+			return {};
+		}
+
+		if (CurrentVersionInfo.m_Time.f_IsValid() && VersionInfo.m_Time < CurrentVersionInfo.m_Time)
 		{
 			o_Error = fg_Format("The selected version {} was older than the currently installed version", VersionID);
 			return {};
 		}
+
 		return VersionID;
 	}
 	
@@ -87,7 +150,18 @@ namespace NMib::NCloud::NAppManager
 			auto AllowedBranches = pApplication->m_Settings.m_AutoUpdateBranches;
 			if (AllowedBranches.f_IsEmpty())
 				AllowedBranches = fg_CreateSet(pApplication->m_LastInstalledVersion.m_VersionID.m_Branch);
-			auto VersionID = fp_FindVersionForAutoUpdate(pApplication, pApplication->m_Settings.m_AutoUpdateTags, AllowedBranches, pApplication->m_LastInstalledVersion.m_Platform, Error);
+
+			auto VersionID = fp_FindVersion
+				(
+					pApplication
+					, pApplication->m_Settings.m_AutoUpdateTags
+					, AllowedBranches
+					, pApplication->m_LastInstalledVersion.m_Platform
+					, Error
+					, EFindVersionFlag_None
+				)
+			;
+			
 			if (!VersionID.f_IsValid())
 			{
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Debug, "No new version found: {}", Error);

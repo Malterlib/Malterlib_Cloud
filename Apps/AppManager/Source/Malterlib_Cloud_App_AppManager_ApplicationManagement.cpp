@@ -48,7 +48,8 @@ namespace NMib::NCloud::NAppManager
 		(
 			CStr const &_Source
 			, CStr const &_Destination
-			, TCSharedPointer<CApplication> const &_pApplication
+			, CStr const &_ApplicationName
+			, CApplicationSettings const &_Settings 
 			, TCVector<CStr> &o_Files
 			, TCSet<CStr> const &_AllowExist
 			, bool _bForceInstall
@@ -102,7 +103,7 @@ namespace NMib::NCloud::NAppManager
 			CFile::fs_CreateDirectory(_Destination);
 			CStr Output = fsp_RunTool
 				(
-					CStr::CFormat("[{}] Extracting application") << _pApplication->m_Name
+					CStr::CFormat("[{}] Extracting application") << _ApplicationName
 					, "tar"
 					, _Destination
 					, fg_CreateVector<CStr>("--no-same-owner", "-xf", _Source)
@@ -113,7 +114,7 @@ namespace NMib::NCloud::NAppManager
 			Return = Output;
 		}
 		
-		auto &Settings = _pApplication->m_Settings;
+		auto &Settings = _Settings;
 
 		CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable); 
 		if (!CFile::fs_FileExists(ExcutableFile, EFileAttrib_Executable))
@@ -171,6 +172,7 @@ namespace NMib::NCloud::NAppManager
 				Parameters.f_Insert(Parameter);
 		}
 		ApplicationJSON["EncryptionStorage"] = Settings.m_EncryptionStorage;
+		ApplicationJSON["EncryptionFileSystem"] = Settings.m_EncryptionFileSystem;
 		ApplicationJSON["ParentApplication"] = Settings.m_ParentApplication;
 		ApplicationJSON["VersionManagerApplication"] = Settings.m_VersionManagerApplication;
 		ApplicationJSON["LastInstalledVersion"] = _pApplication->m_LastInstalledVersion.f_ToJSON();
