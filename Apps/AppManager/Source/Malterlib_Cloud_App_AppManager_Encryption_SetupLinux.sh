@@ -19,8 +19,8 @@ if [[ "$MibCloudApp_EncryptionFileSystem" == "zfs" ]] ; then
 		-O mountpoint=$MibCloudApp_MountPoint \
 		$MibCloudApp_ZPoolName \
 		/dev/mapper/$MibCloudApp_DeviceName
-elif [[ "$MibCloudApp_EncryptionFileSystem" == "ext4" ]] ; then
-	mkfs.ext4 /dev/mapper/$MibCloudApp_DeviceName
+elif [[ "$MibCloudApp_EncryptionFileSystem" == "ext4" || "$MibCloudApp_EncryptionFileSystem" == "xfs" ]] ; then
+	mkfs.$MibCloudApp_EncryptionFileSystem /dev/mapper/$MibCloudApp_DeviceName
 	mkdir -p "$MibCloudApp_MountPoint"
 	mount /dev/mapper/$MibCloudApp_DeviceName "$MibCloudApp_MountPoint"
 else

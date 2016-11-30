@@ -338,8 +338,20 @@ Property
 Property
 {
 	MalterlibCloud_VersionUploadTempPath "@(Target.IntermediateDirectory)VersionUpload"
+	
+	MalterlibCloud_VersionUploadCopyTempTemplateRecursive 0
+	MalterlibCloud_VersionUploadCopyTempTemplateRecursive 1
+	{
+		!"Expand0" "@(Expand0->Replace('^', ''))"
+	}
  
-	MalterlibCloud_VersionUploadCopyTempTemplateExpand	"MTool DiffCopy \"@(Expand0)\" \"@(MalterlibCloud_VersionUploadTempPath)@(MalterlibCloud_VersionUploadDestinationDir)@(Expand1)\" \"\" 0\r\n"\
+	MalterlibCloud_VersionUploadCopyTempTemplateDirectory 0
+	MalterlibCloud_VersionUploadCopyTempTemplateDirectory 1
+	{
+		!"Expand0" "@(Expand0->Replace('~', ''))"
+	}
+ 
+	MalterlibCloud_VersionUploadCopyTempTemplateExpand	"MTool DiffCopy \"@(Expand0->ReplaceChars('~^', ''))\" \"@(MalterlibCloud_VersionUploadTempPath)@(MalterlibCloud_VersionUploadDestinationDir)@(Expand1)\" \"\" @(MalterlibCloud_VersionUploadCopyTempTemplateRecursive) 0 @(MalterlibCloud_VersionUploadCopyTempTemplateDirectory)\r\n"\
 														"@(CheckErrors)\r\n"
 
 	MalterlibCloud_VersionUploadCopyTempTemplate	"@(Builtin.Function->ExpandList('@(Explodee)', '|', 'MalterlibCloud_VersionUploadCopyTempTemplateExpand'))"

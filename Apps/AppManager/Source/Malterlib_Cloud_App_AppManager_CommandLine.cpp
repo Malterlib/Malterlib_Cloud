@@ -74,7 +74,7 @@ namespace NMib::NCloud::NAppManager
 							"Names"_= {"--encryption-file-system"}
 							, "Type"_= ""
 							, "Description"_= "Select the file system to use for encryption.\n"
-							"Currently zfs and ext4 are supported."
+							"Currently zfs, xfs and ext4 are supported."
 						}
 						, "ParentApplication?"_= 
 						{

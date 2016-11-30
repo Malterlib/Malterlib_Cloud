@@ -6,7 +6,7 @@ if [[ "$MibCloudApp_EncryptionFileSystem" == "zfs" ]] ; then
 	if zpool status $MibCloudApp_ZPoolName 2>/dev/null 1>/dev/null ; then
 		zpool export $MibCloudApp_ZPoolName 
 	fi
-elif [[ "$MibCloudApp_EncryptionFileSystem" == "ext4" ]] ; then
+elif [[ "$MibCloudApp_EncryptionFileSystem" == "ext4" || "$MibCloudApp_EncryptionFileSystem" == "xfs" ]] ; then
 	if mountpoint -x -- "/dev/mapper/$MibCloudApp_DeviceName" 2>/dev/null 1>/dev/null ; then
 		umount "/dev/mapper/$MibCloudApp_DeviceName" || true
 	fi

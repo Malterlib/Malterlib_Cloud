@@ -259,10 +259,11 @@ namespace NMib::NCloud::NAppManager
 							
 							if (bSettingsFromVersionInfo)
 							{
-								CApplicationSettings NewSettings;
+								CApplicationSettings NewSettings = pApplication->m_Settings;
+								CApplicationSettings VersionInfoSettings;
 								EApplicationSetting NewChangedSettings = EApplicationSetting_None;
-								NewSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
-								NewSettings.f_ApplySettings(ChangedSettings, pApplication->m_Settings);
+								VersionInfoSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
+								NewSettings.f_ApplySettings(NewChangedSettings, VersionInfoSettings);
 								
 								CStr Error;
 								if (!NewSettings.f_Validate(Error))
