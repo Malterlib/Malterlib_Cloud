@@ -17,25 +17,6 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	namespace
-	{
-		class CCurlInit
-		{
-		public:
-			CCurlInit()
-			{
-				curl_global_init(CURL_GLOBAL_ALL);
-			}
-			
-			~CCurlInit()
-			{
-				curl_global_cleanup();
-			}
-		};
-		
-		TCAggregate<CCurlInit> g_CurlInit = {DAggregateInit};
-	}
-	
 	CCurlResult::CCurlResult(CState const &_State)
 		: m_Body(CStr((ch8 const *)_State.m_Body.f_GetArray(), _State.m_Body.f_GetLen()))
 	{
@@ -58,6 +39,26 @@ namespace NMib::NCloud::NCloudAPIManager
 			CStr Key = fg_GetStrSep(Line, ": ").f_LowerCase();
 			m_Headers[Key] = Line;
 		}
+	}
+
+#ifdef DMalterlibCurlAvailable
+	namespace
+	{
+		class CCurlInit
+		{
+		public:
+			CCurlInit()
+			{
+				curl_global_init(CURL_GLOBAL_ALL);
+			}
+			
+			~CCurlInit()
+			{
+				curl_global_cleanup();
+			}
+		};
+		
+		TCAggregate<CCurlInit> g_CurlInit = {DAggregateInit};
 	}
 	
 	CCurlResult fg_Curl(ECurlMethod _Method, CStr const &_URL, TCMap<CStr, CStr> const &_Headers, CStr const &_Data)
@@ -175,4 +176,10 @@ namespace NMib::NCloud::NCloudAPIManager
 		CCurlResult Result(State);
 		return Result;
 	}
+#else
+	CCurlResult fg_Curl(ECurlMethod _Method, CStr const &_URL, TCMap<CStr, CStr> const &_Headers, CStr const &_Data)
+	{
+		DMibError("Curl not available");
+	}
+#endif
 }
