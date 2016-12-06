@@ -22,7 +22,7 @@ if [[ "$MibCloudApp_EncryptionFileSystem" == "zfs" ]] ; then
 elif [[ "$MibCloudApp_EncryptionFileSystem" == "ext4" || "$MibCloudApp_EncryptionFileSystem" == "xfs" ]] ; then
 	mkfs.$MibCloudApp_EncryptionFileSystem /dev/mapper/$MibCloudApp_DeviceName
 	mkdir -p "$MibCloudApp_MountPoint"
-	mount /dev/mapper/$MibCloudApp_DeviceName "$MibCloudApp_MountPoint"
+	mount /dev/mapper/$MibCloudApp_DeviceName "$MibCloudApp_MountPoint" -o noatime
 else
 	echo Unknown file system $MibCloudApp_EncryptionFileSystem
 	exit 1
