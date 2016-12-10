@@ -35,10 +35,7 @@ Import "Apps/*/*.MHeader"
 
 Property
 {
-	
-	MalterlibCloudTargetIdentity "@(Target:this.Identity)"
-	
-	MalterlibCloudTargetInDependenciesTemplate_TargetName "@(Builtin.Function->GetProperty('Property', 'MalterlibCloudTargetIdentity', '@(Explodee)'))"
+	MalterlibCloudTargetInDependenciesTemplate_TargetName "@(Builtin.Function->GetProperty('Property', 'TargetIdentity', '@(Explodee)'))"
 	{
 	}
 	
@@ -57,7 +54,7 @@ Property
 			|
 			{
 				MalterlibCloudTargetInDependencies true
-				MalterlibCloudTargetIdentity "Lib_Malterlib_Cloud"
+				TargetIdentity "Lib_Malterlib_Cloud"
 			}
 		}
 	}
