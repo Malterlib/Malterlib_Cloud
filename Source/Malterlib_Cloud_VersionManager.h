@@ -111,7 +111,7 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Feed(CDistributedActorWriteStream &_Stream) &&;
 				void f_Consume(CDistributedActorReadStream &_Stream);
 
 				NConcurrency::CActorSubscription m_Subscription;
@@ -127,7 +127,7 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Feed(CDistributedActorWriteStream &_Stream) &&;
 				void f_Consume(CDistributedActorReadStream &_Stream);
 				
 				NConcurrency::CActorSubscription m_Subscription;
@@ -156,7 +156,7 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Feed(CDistributedActorWriteStream &_Stream) &&;
 				void f_Consume(CDistributedActorReadStream &_Stream);
 				
 				NConcurrency::CActorSubscription m_Subscription;
@@ -200,7 +200,7 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
+				void f_Feed(CDistributedActorWriteStream &_Stream) &&;
 				void f_Consume(CDistributedActorReadStream &_Stream);
 				
 				NConcurrency::CActorSubscription m_Subscription;

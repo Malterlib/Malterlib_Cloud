@@ -184,16 +184,10 @@ namespace NMib::NCloud
 	void CKeyManagerServer::f_Construct()
 	{
 		auto &Internal = *mp_pInternal;
-		Internal.m_KeyManagerActor = fg_ConstructDistributedActor<CKeyManager>(fg_ThisActor(this));
-		
 		auto &DistributionManager = NConcurrency::fg_GetDistributionManager();
-		DistributionManager
-			(
-				&CActorDistributionManager::f_PublishActor
-				, Internal.m_KeyManagerActor
-				, "com.malterlib/Cloud/KeyManager"
-				, NConcurrency::CDistributedActorInheritanceHeirarchyPublish::fs_GetHierarchy<CKeyManager>()
-			)
+		Internal.m_KeyManagerActor = DistributionManager->f_ConstructActor<CKeyManager>(fg_ThisActor(this));
+		
+		Internal.m_KeyManagerActor->f_Publish<CKeyManager>("com.malterlib/Cloud/KeyManager")
 			> [this] (TCAsyncResult<CDistributedActorPublication> &&_Publication)
 			{
 				auto &Internal = *mp_pInternal;

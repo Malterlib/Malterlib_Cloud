@@ -323,43 +323,43 @@ namespace NMib::NCloud
 
 	// CStartUploadTransfer
 	
-	void CVersionManager::CStartUploadTransfer::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CVersionManager::CStartUploadTransfer::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
+		_Stream << fg_Move(m_Subscription);
 	}
 	
 	void CVersionManager::CStartUploadTransfer::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
+		_Stream >> m_Subscription;
 	}
 
 	void CVersionManager::CStartUploadTransfer::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_TransferContext);
+		_Stream << m_TransferContext;
 	}
 	
 	void CVersionManager::CStartUploadTransfer::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_TransferContext);
+		_Stream >> m_TransferContext;
 	}
 
 	// CStartUploadVersion
 	
-	void CVersionManager::CStartUploadVersion::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CVersionManager::CStartUploadVersion::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
+		_Stream << fg_Move(m_Subscription);
 		_Stream << m_DeniedTags;
 	}
 	
 	void CVersionManager::CStartUploadVersion::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
+		_Stream >> m_Subscription;
 		_Stream >> m_DeniedTags;
 	}
 		
@@ -371,8 +371,8 @@ namespace NMib::NCloud
 		_Stream << m_VersionInfo;
 		_Stream << m_QueueSize;
 		_Stream << m_Flags;
-		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_DispatchActor);
-		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_fStartTransfer);
+		_Stream << m_DispatchActor;
+		_Stream << m_fStartTransfer;
 	}
 	
 	void CVersionManager::CStartUploadVersion::f_Consume(CDistributedActorReadStream &_Stream)
@@ -383,21 +383,21 @@ namespace NMib::NCloud
 		_Stream >> m_VersionInfo; 
 		_Stream >> m_QueueSize;
 		_Stream >> m_Flags;
-		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_DispatchActor);
-		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fStartTransfer);
+		_Stream >> m_DispatchActor;
+		_Stream >> m_fStartTransfer;
 	}
 	
-	void CVersionManager::CStartDownloadVersion::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CVersionManager::CStartDownloadVersion::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
+		_Stream << fg_Move(m_Subscription);
 		_Stream << m_VersionInfo;
 	}
 	
 	void CVersionManager::CStartDownloadVersion::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
+		_Stream >> m_Subscription;
 		_Stream >> m_VersionInfo;
 	}
 		
@@ -455,22 +455,22 @@ namespace NMib::NCloud
 
 	// CSubscribeToUpdates
 	
-	void CVersionManager::CSubscribeToUpdates::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CVersionManager::CSubscribeToUpdates::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
 	{
-		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
+		_Stream << fg_Move(m_Subscription);
 	}
 	
 	void CVersionManager::CSubscribeToUpdates::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
-		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
+		_Stream >> m_Subscription;
 	}
 
 	void CVersionManager::CSubscribeToUpdates::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		_Stream << m_Application;
 		_Stream << m_Platforms;
-		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_DispatchActor);
-		NConcurrency::fg_DistributedActorParamsFeed(_Stream, m_fOnNewVersions);
+		_Stream << m_DispatchActor;
+		_Stream << m_fOnNewVersions;
 		_Stream << m_nInitial;
 		if (_Stream.f_GetVersion() >= 0x104)
 			_Stream << m_Tags;
@@ -480,8 +480,8 @@ namespace NMib::NCloud
 	{
 		_Stream >> m_Application; 
 		_Stream >> m_Platforms;
-		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_DispatchActor);
-		NConcurrency::fg_DistributedActorParamsConsume(_Stream, m_fOnNewVersions);
+		_Stream >> m_DispatchActor;
+		_Stream >> m_fOnNewVersions;
 		_Stream >> m_nInitial;
 		if (_Stream.f_GetVersion() >= 0x104)
 			_Stream >> m_Tags;

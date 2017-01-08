@@ -297,15 +297,15 @@ namespace NMib::NCloud
 		;
 	}
 	
-	void CBackupManager::CStartDownloadBackup::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CBackupManager::CStartDownloadBackup::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorReturnFeed(_Stream, m_Subscription);
+		_Stream << fg_Move(m_Subscription);
 	}
 	
 	void CBackupManager::CStartDownloadBackup::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		NConcurrency::fg_DistributedActorReturnConsume(_Stream, m_Subscription);
+		_Stream >> m_Subscription;
 	}
 }

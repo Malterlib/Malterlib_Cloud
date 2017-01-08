@@ -72,9 +72,9 @@ namespace NMib::NCloud
 		_Stream << m_Version;
 		_Stream << m_Manifest;
 		_Stream << m_QueueSize;
-		fg_DistributedActorParamsFeed(_Stream, m_DispatchActor);
-		fg_DistributedActorParamsFeed(_Stream, m_fSendPart);
-		fg_DistributedActorParamsFeed(_Stream, m_fStateChange);
+		_Stream << m_DispatchActor;
+		_Stream << m_fSendPart;
+		_Stream << m_fStateChange;
 		// Any version management needs to be additions past this point
 	}
 	
@@ -87,9 +87,9 @@ namespace NMib::NCloud
 		DMibBinaryStreamVersion(_Stream, m_Version);
 		_Stream >> m_Manifest;
 		_Stream >> m_QueueSize;
-		fg_DistributedActorParamsConsume(_Stream, m_DispatchActor);
-		fg_DistributedActorParamsConsume(_Stream, m_fSendPart);
-		fg_DistributedActorParamsConsume(_Stream, m_fStateChange);
+		_Stream >> m_DispatchActor;
+		_Stream >> m_fSendPart;
+		_Stream >> m_fStateChange;
 	}
 	
 	

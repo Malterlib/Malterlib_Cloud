@@ -44,16 +44,9 @@ namespace NMib::NCloud::NCloudAPIManager
 
 	void CCloudAPIManagerDaemonActor::CServer::fp_Publish()
 	{
-		mp_ProtocolImplementation = fg_ConstructDistributedActor<CCloudAPIManagerImplementation>(fg_ThisActor(this));
-		
-		auto &DistributionManager = NConcurrency::fg_GetDistributionManager();
-		DistributionManager
-			(
-				&CActorDistributionManager::f_PublishActor
-				, mp_ProtocolImplementation
-				, "com.malterlib/Cloud/CloudAPIManager"
-				, NConcurrency::CDistributedActorInheritanceHeirarchyPublish::fs_GetHierarchy<CCloudAPIManager>()
-			)
+		mp_ProtocolImplementation = mp_AppState.m_DistributionManager->f_ConstructActor<CCloudAPIManagerImplementation>(fg_ThisActor(this));
+
+		mp_ProtocolImplementation->f_Publish<CCloudAPIManager>("com.malterlib/Cloud/CloudAPIManager")
 			> [this] (TCAsyncResult<CDistributedActorPublication> &&_Publication)
 			{
 				mp_ProtocolPublication = fg_Move(*_Publication);

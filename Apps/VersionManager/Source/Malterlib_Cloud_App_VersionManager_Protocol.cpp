@@ -60,16 +60,9 @@ namespace NMib::NCloud::NVersionManager
 	
 	void CVersionManagerDaemonActor::CServer::fp_Publish()
 	{
-		mp_ProtocolImplementation = fg_ConstructDistributedActor<CVersionManagerImplementation>(fg_ThisActor(this));
+		mp_ProtocolImplementation = mp_AppState.m_DistributionManager->f_ConstructActor<CVersionManagerImplementation>(fg_ThisActor(this));
 		
-		auto &DistributionManager = NConcurrency::fg_GetDistributionManager();
-		DistributionManager
-			(
-				&CActorDistributionManager::f_PublishActor
-				, mp_ProtocolImplementation
-				, "com.malterlib/Cloud/VersionManager"
-				, NConcurrency::CDistributedActorInheritanceHeirarchyPublish::fs_GetHierarchy<CVersionManager>()
-			)
+		mp_ProtocolImplementation->f_Publish<CVersionManager>("com.malterlib/Cloud/VersionManager")
 			> [this] (TCAsyncResult<CDistributedActorPublication> &&_Publication)
 			{
 				mp_ProtocolPublication = fg_Move(*_Publication);
