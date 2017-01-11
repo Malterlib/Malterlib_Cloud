@@ -14,12 +14,12 @@ namespace NMib::NCloud
 		: m_pThis(_pThis)
 		, m_ServerActor(_ServerActor)
 	{
-		DMibPublishActorFunction(CKeyManager::f_RequestKey);
 	}
 	
 	CKeyManager::CKeyManager(NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor)
 		: mp_pInternal(fg_Construct(this, _ServerActor))
 	{
+		DMibPublishActorFunction(CKeyManager::f_RequestKey);
 	}
 	
 	CKeyManager::~CKeyManager()

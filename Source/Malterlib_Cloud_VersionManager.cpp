@@ -8,6 +8,18 @@
 namespace NMib::NCloud
 {
 	using namespace NStr;
+
+	CVersionManager::CVersionManager()
+	{
+		DMibPublishActorFunction(CVersionManager::f_ListApplications);
+		DMibPublishActorFunction(CVersionManager::f_ListVersions);
+		DMibPublishActorFunction(CVersionManager::f_UploadVersion);
+		DMibPublishActorFunction(CVersionManager::f_DownloadVersion);
+		DMibPublishActorFunction(CVersionManager::f_SubscribeToUpdates);
+		DMibPublishActorFunction(CVersionManager::f_ChangeTags);
+	}
+	
+	CVersionManager::~CVersionManager() = default;
 	
 	bool CVersionManager::fs_IsValidApplicationName(CStr const &_String)
 	{

@@ -15,12 +15,6 @@ namespace NMib::NCloud::NVersionManager
 	CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::CVersionManagerImplementation(TCActor<CVersionManagerDaemonActor::CServer> &&_Server)
 		: mp_Server(_Server)
 	{
-		DMibPublishActorFunction(CVersionManager::f_ListApplications);
-		DMibPublishActorFunction(CVersionManager::f_ListVersions);
-		DMibPublishActorFunction(CVersionManager::f_UploadVersion);
-		DMibPublishActorFunction(CVersionManager::f_DownloadVersion);
-		DMibPublishActorFunction(CVersionManager::f_SubscribeToUpdates);
-		DMibPublishActorFunction(CVersionManager::f_ChangeTags);
 	}
 		
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications &&_Params)
