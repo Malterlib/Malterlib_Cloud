@@ -276,7 +276,7 @@ namespace NMib::NCloud::NAppManager
 			if (Package.f_IsEmpty())
 				return DMibErrorInstance("You have to specify a package");
 			bDownloadVersion = false;
-			Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
+			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory()));
 		}
 		else
 		{
@@ -592,7 +592,7 @@ namespace NMib::NCloud::NAppManager
 															pApplication->m_Settings = *_pNewSettings;
 														if (_fUpdateVersionInfo)
 															_fUpdateVersionInfo();
-														self(&CAppManagerActor::fp_UpdateApplicationJSON, pApplication) 
+														fp_UpdateApplicationJSON(pApplication) 
 															> [=](TCAsyncResult<void> &&_Result)
 															{
 																if (!_Result)

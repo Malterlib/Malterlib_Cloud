@@ -9,6 +9,8 @@
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/Cloud/KeyManager>
 #include <Mib/Cloud/VersionManager>
+#include <Mib/Concurrency/DistributedAppInterface>
+#include <Mib/Concurrency/DistributedAppInterfaceLaunch>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -117,6 +119,11 @@ namespace NMib::NCloud::NAppManager
 			CStr const m_Name;
 
 			CApplicationSettings m_Settings;
+			
+			CStr m_AssociatedHostID;
+			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AppInterface;
+			mint m_AppInterfaceAssignSequence = 0;
+			EDistributedAppUpdateType m_UpdateType = EDistributedAppUpdateType_Independent;
 
 			// Specific version state
 			TCVector<CStr> m_Files;
@@ -140,7 +147,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_LastStdErr;
 			CStr m_LastError;
 			
-			TCActor<CProcessLaunchActor> m_ProcessLaunch;
+			TCActor<CDistributedAppInterfaceLaunchActor> m_ProcessLaunch;
 			CActorSubscription m_ProcessLaunchSubscription;
 			
 			CApplication *m_pParentApplication = nullptr;
@@ -218,6 +225,18 @@ namespace NMib::NCloud::NAppManager
 		{
 			TCActor<CFileTransferReceive> m_DownloadVersionReceive;
 			CActorSubscription m_Subscription;
+		};
+		
+		struct CDistributedAppInterfaceServerImplementation : public CDistributedAppInterfaceServer
+		{
+			NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> f_RegisterDistributedApp
+				(
+					NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
+					, EDistributedAppUpdateType _UpdateType
+				) override
+			;
+
+			CAppManagerActor *m_pThis = nullptr;
 		};
 		
 		enum EEncryptOperation
@@ -348,6 +367,8 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		TCContinuation<void> fp_PublishAppInterface();		
+		
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
 		TCActor<CSeparateThreadActor> mp_FileActor;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
@@ -359,7 +380,9 @@ namespace NMib::NCloud::NAppManager
 		TCLinkedList<CVersionManagerDownloadState> mp_Downloads;
 		
 		TCMap<CStr, CVersionManagerApplication> mp_VersionManagerApplications;
-		TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState> mp_VersionManagers; 
+		TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState> mp_VersionManagers;
+		
+		TCDelegatedActorInterface<CDistributedAppInterfaceServerImplementation> mp_AppInterfaceServer;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

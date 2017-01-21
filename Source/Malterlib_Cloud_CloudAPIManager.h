@@ -22,6 +22,8 @@ namespace NMib::NCloud
 	{
 		using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
 		using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
+		
+		CCloudAPIManager();
 
 		enum 
 		{

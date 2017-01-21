@@ -89,8 +89,6 @@ namespace NMib::NCloud::NVersionManager
 		
 		struct CVersionManagerImplementation : public CVersionManager
 		{
-			CVersionManagerImplementation(TCActor<CVersionManagerDaemonActor::CServer> &&_Server);
-			
 			TCContinuation<CListApplications::CResult> f_ListApplications(CListApplications &&_Params) override;
 			TCContinuation<CListVersions::CResult> f_ListVersions(CListVersions &&_Params) override;
 			TCContinuation<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion &&_Params) override;
@@ -98,8 +96,7 @@ namespace NMib::NCloud::NVersionManager
 			TCContinuation<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) override;
 			TCContinuation<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) override;
 			
-		private:
-			TCWeakActor<CVersionManagerDaemonActor::CServer> mp_Server;
+			CServer *m_pThis = nullptr;
 		};
 		
 		struct CSubscription
@@ -132,13 +129,6 @@ namespace NMib::NCloud::NVersionManager
 		TCContinuation<void> fp_SetupPermissions();
 		TCContinuation<void> fp_FindVersions();
 
-		TCContinuation<CVersionManager::CListApplications::CResult> fp_Protocol_ListApplications(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CListApplications &&_Params);
-		TCContinuation<CVersionManager::CListVersions::CResult> fp_Protocol_ListVersions(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CListVersions &&_Params);
-		TCContinuation<CVersionManager::CStartUploadVersion::CResult> fp_Protocol_UploadVersion(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CStartUploadVersion &&_Params);
-		TCContinuation<CVersionManager::CStartDownloadVersion::CResult> fp_Protocol_DownloadVersion(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CStartDownloadVersion &&_Params);
-		TCContinuation<CVersionManager::CSubscribeToUpdates::CResult> fp_Protocol_SubscribeToUpdates(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CSubscribeToUpdates &&_Params);
-		TCContinuation<CVersionManager::CChangeTags::CResult> fp_Protocol_ChangeTags(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CChangeTags &&_Params);
-		
 		void fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription, bool _bPermissionsChanged);
 		void fp_UpdateSubscriptionsForChangedPermissions(CStr const &_HostID);
 		
@@ -159,9 +149,9 @@ namespace NMib::NCloud::NVersionManager
 		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
 		
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
+
+		TCDelegatedActorInterface<CVersionManagerImplementation> mp_ProtocolInterface;
 		
-		TCDistributedActor<CVersionManagerImplementation> mp_ProtocolImplementation;
-		CDistributedActorPublication mp_ProtocolPublication;
 		CDistributedAppState mp_AppState;
 		
 		CTrustedPermissionSubscription mp_Permissions;

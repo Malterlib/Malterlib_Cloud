@@ -47,7 +47,8 @@ namespace NMib::NCloud::NCloudAPIManager
 						{
 							return _Exception;
 						}
-						fp_Protocol_GetSwiftBaseURL(fg_GetCallingHostInfo(), fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CGetSwiftBaseURL::CResult &&_Result)
+						
+						mp_ProtocolInterface.m_pActor->f_GetSwiftBaseURL(fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CGetSwiftBaseURL::CResult &&_Result)
 							{
 								NEncoding::CEJSON Result = _Result.m_BaseURL;
 								Continuation.f_SetResult(Result);
@@ -77,7 +78,7 @@ namespace NMib::NCloud::NCloudAPIManager
 						{
 							return _Exception;
 						}
-						fp_Protocol_EnsureContainer(fg_GetCallingHostInfo(), fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CEnsureContainer::CResult &&_Result)
+						mp_ProtocolInterface.m_pActor->f_EnsureContainer(fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CEnsureContainer::CResult &&_Result)
 							{
 								NEncoding::CEJSON Result;
 								Continuation.f_SetResult(Result);
@@ -109,7 +110,7 @@ namespace NMib::NCloud::NCloudAPIManager
 						{
 							return _Exception;
 						}
-						fp_Protocol_SignTempURL(fg_GetCallingHostInfo(), fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CSignTempURL::CResult &&_Result)
+						mp_ProtocolInterface.m_pActor->f_SignTempURL(fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CSignTempURL::CResult &&_Result)
 							{
 								NEncoding::CEJSON Result = _Result.m_SignedURL;
 								Continuation.f_SetResult(Result);
@@ -139,7 +140,7 @@ namespace NMib::NCloud::NCloudAPIManager
 						{
 							return _Exception;
 						}
-						fp_Protocol_DeleteObject(fg_GetCallingHostInfo(), fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CDeleteObject::CResult &&_Result)
+						mp_ProtocolInterface.m_pActor->f_DeleteObject(fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CDeleteObject::CResult &&_Result)
 							{
 								NEncoding::CEJSON Result;
 								Continuation.f_SetResult(Result);

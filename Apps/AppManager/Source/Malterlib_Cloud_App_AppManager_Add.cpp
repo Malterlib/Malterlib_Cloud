@@ -95,7 +95,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 		else
-			Package = CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory());
+			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory()));
 
 		if (!bSettingsFromVersionInfo)
 		{
@@ -213,7 +213,7 @@ namespace NMib::NCloud::NAppManager
 								fp_ApplicationCreated(pApplication);
 								auto InProgressScope = pApplication->f_SetInProgress();
 
-								self(&CAppManagerActor::fp_UpdateApplicationJSON, pApplication) 
+								fp_UpdateApplicationJSON(pApplication) 
 									> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_Result)
 									{
 										if (!_Result)

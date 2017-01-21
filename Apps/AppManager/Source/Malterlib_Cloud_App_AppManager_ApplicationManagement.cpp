@@ -95,6 +95,7 @@ namespace NMib::NCloud::NAppManager
 						}
 						return CFile::EDiffCopyChangeAction_Perform;
 					}
+					, 0.0
 				)
 			;
 		}
@@ -199,9 +200,11 @@ namespace NMib::NCloud::NAppManager
 		
 		ApplicationJSON["SelfUpdateSource"] = Settings.m_bSelfUpdateSource; 
 		ApplicationJSON["Files"] = _pApplication->m_Files;
+		
+		ApplicationJSON["AssociatedHostID"] = _pApplication->m_AssociatedHostID;
 	
 		TCContinuation<void> Continuation;
-		mp_State.m_StateDatabase.f_Save() > Continuation;  
+		mp_State.m_StateDatabase.f_Save() > Continuation;
 		return Continuation;
 	}
 	

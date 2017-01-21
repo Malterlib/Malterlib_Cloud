@@ -12,46 +12,9 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::CCloudAPIManagerImplementation(TCActor<CCloudAPIManagerDaemonActor::CServer> &&_Server)
-		: mp_Server(_Server)
-	{
-		DMibPublishActorFunction(CCloudAPIManager::f_EnsureContainer);
-	}
-
-	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params)
-		-> TCContinuation<CGetSwiftBaseURL::CResult>
-	{
-		return mp_Server(&CCloudAPIManagerDaemonActor::CServer::fp_Protocol_GetSwiftBaseURL, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-	
-	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_EnsureContainer(CEnsureContainer &&_Params)
-		-> TCContinuation<CEnsureContainer::CResult> 
-	{
-		return mp_Server(&CCloudAPIManagerDaemonActor::CServer::fp_Protocol_EnsureContainer, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-	
-	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_SignTempURL(CSignTempURL &&_Params)
-		-> TCContinuation<CSignTempURL::CResult>
-	{
-		return mp_Server(&CCloudAPIManagerDaemonActor::CServer::fp_Protocol_SignTempURL, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-	
-	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_DeleteObject(CDeleteObject &&_Params)
-		-> TCContinuation<CDeleteObject::CResult>
-	{
-		return mp_Server(&CCloudAPIManagerDaemonActor::CServer::fp_Protocol_DeleteObject, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-
 	void CCloudAPIManagerDaemonActor::CServer::fp_Publish()
 	{
-		mp_ProtocolImplementation = mp_AppState.m_DistributionManager->f_ConstructActor<CCloudAPIManagerImplementation>(fg_ThisActor(this));
-
-		mp_ProtocolImplementation->f_Publish<CCloudAPIManager>("com.malterlib/Cloud/CloudAPIManager")
-			> [this] (TCAsyncResult<CDistributedActorPublication> &&_Publication)
-			{
-				mp_ProtocolPublication = fg_Move(*_Publication);
-			}
-		;
+		mp_ProtocolInterface.f_Publish<CCloudAPIManager>(mp_AppState.m_DistributionManager, this, "com.malterlib/Cloud/CloudAPIManager");
 	}
 
 	NException::CException CCloudAPIManagerDaemonActor::CServer::fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description, CStr const &_UserDescription)

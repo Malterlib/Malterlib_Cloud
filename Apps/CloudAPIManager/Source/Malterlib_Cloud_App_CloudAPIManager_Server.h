@@ -24,14 +24,12 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		struct CCloudAPIManagerImplementation : public CCloudAPIManager
 		{
-			CCloudAPIManagerImplementation(TCActor<CCloudAPIManagerDaemonActor::CServer> &&_Server);
-			
 			TCContinuation<CGetSwiftBaseURL::CResult> f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params) override;
 			TCContinuation<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer &&_Params) override;
 			TCContinuation<CSignTempURL::CResult> f_SignTempURL(CSignTempURL &&_Params) override;
 			TCContinuation<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) override;
-		private:
-			TCWeakActor<CCloudAPIManagerDaemonActor::CServer> mp_Server;
+			
+			CServer *m_pThis;
 		};
 		
 		struct COpenStackKeystoneInfo
@@ -79,11 +77,6 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		TCContinuation<COpenStackServiceInfo> fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext);
 
-		TCContinuation<CCloudAPIManager::CGetSwiftBaseURL::CResult> fp_Protocol_GetSwiftBaseURL(CCallingHostInfo const &_CallingHostInfo, CCloudAPIManager::CGetSwiftBaseURL &&_Params);
-		TCContinuation<CCloudAPIManager::CEnsureContainer::CResult> fp_Protocol_EnsureContainer(CCallingHostInfo const &_CallingHostInfo, CCloudAPIManager::CEnsureContainer &&_Params);
-		TCContinuation<CCloudAPIManager::CSignTempURL::CResult> fp_Protocol_SignTempURL(CCallingHostInfo const &_CallingHostInfo, CCloudAPIManager::CSignTempURL &&_Params);
-		TCContinuation<CCloudAPIManager::CDeleteObject::CResult> fp_Protocol_DeleteObject(CCallingHostInfo const &_CallingHostInfo, CCloudAPIManager::CDeleteObject &&_Params);
-		
 		CException fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description, CStr const &_UserDescription = CStr());
 		
 		static void fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info);
@@ -95,9 +88,9 @@ namespace NMib::NCloud::NCloudAPIManager
 		TCMap<CStr, CCloudContext> mp_CloudContexts;
 		
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
+
+		TCDelegatedActorInterface<CCloudAPIManagerImplementation> mp_ProtocolInterface;
 		
-		TCDistributedActor<CCloudAPIManagerImplementation> mp_ProtocolImplementation;
-		CDistributedActorPublication mp_ProtocolPublication;
 		CDistributedAppState mp_AppState;
 		
 		CTrustedPermissionSubscription mp_Permissions;

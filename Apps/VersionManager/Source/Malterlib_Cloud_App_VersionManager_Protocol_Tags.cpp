@@ -41,16 +41,18 @@ namespace NMib::NCloud::NVersionManager
 		return Tags;
 	}
 
-	auto CVersionManagerDaemonActor::CServer::fp_Protocol_ChangeTags(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CChangeTags &&_Params)
-		-> TCContinuation<CVersionManager::CChangeTags::CResult> 
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags &&_Params) -> TCContinuation<CChangeTags::CResult> 
 	{
-		if (!mp_pCanDestroyTracker)
+		auto &CallingHostInfo = fg_GetCallingHostInfo();
+		auto pThis = m_pThis;
+		
+		if (!pThis->mp_pCanDestroyTracker)
 			return DMibErrorInstance("Shutting down");
 		
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
 		{
 			CStr Error = "Invalid application format";
-			fsp_LogActivityError(_CallingHostInfo, Error + " (change tags)");
+			fsp_LogActivityError(CallingHostInfo, Error + " (change tags)");
 			return DMibErrorInstance(Error);
 		}
 
@@ -59,29 +61,29 @@ namespace NMib::NCloud::NVersionManager
 			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionID, ErrorStr))
 			{
 				CStr Error = fg_Format("Invalid version ID format: {}", ErrorStr);
-				fsp_LogActivityError(_CallingHostInfo, Error + " (change tags)");
+				fsp_LogActivityError(CallingHostInfo, Error + " (change tags)");
 				return DMibErrorInstance(Error);
 			}
 		}
 		
 		TCSet<CStr> DeniedTags;
-		TCSet<CStr> AddTags = fp_FilterTags(_CallingHostInfo.f_GetRealHostID(), _Params.m_AddTags, DeniedTags);
-		TCSet<CStr> RemoveTags = fp_FilterTags(_CallingHostInfo.f_GetRealHostID(), _Params.m_RemoveTags, DeniedTags);
+		TCSet<CStr> AddTags = pThis->fp_FilterTags(CallingHostInfo.f_GetRealHostID(), _Params.m_AddTags, DeniedTags);
+		TCSet<CStr> RemoveTags = pThis->fp_FilterTags(CallingHostInfo.f_GetRealHostID(), _Params.m_RemoveTags, DeniedTags);
 		
 		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())
 		{
 			if (!DeniedTags.f_IsEmpty())
-				return fp_AccessDenied(_CallingHostInfo, "Change tags", fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags));
-			fsp_LogActivityInfo(_CallingHostInfo, "Change tags resulted in no changed tags");
+				return pThis->fp_AccessDenied(CallingHostInfo, "Change tags", fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags));
+			fsp_LogActivityInfo(CallingHostInfo, "Change tags resulted in no changed tags");
 			CVersionManager::CChangeTags::CResult Result;
 			return fg_Explicit(Result);
 		}
 
-		auto *pApplication = mp_Applications.f_FindEqual(_Params.m_Application);
+		auto *pApplication = pThis->mp_Applications.f_FindEqual(_Params.m_Application);
 		if (!pApplication)
 		{
 			CStr Error = fg_Format("No such application: {}", _Params.m_Application);
-			fsp_LogActivityError(_CallingHostInfo, Error);
+			fsp_LogActivityError(CallingHostInfo, Error);
 			return DMibErrorInstance(Error);
 		}
 
@@ -95,9 +97,8 @@ namespace NMib::NCloud::NVersionManager
 				_Version.m_VersionInfo.m_Tags -= RemoveTags;
 				_Version.m_VersionInfo.m_Tags += AddTags;
 				
-				fp_NewVersion(_Params.m_Application, _Version); 
-				
-				self(&CServer::fp_SaveVersionInfo, fp_GetQueryFileActor(), VersionPath, _Version.m_VersionInfo) > VersionResults.f_AddResult(); 
+				pThis->fp_NewVersion(_Params.m_Application, _Version); 
+				pThis->fp_SaveVersionInfo(pThis->fp_GetQueryFileActor(), VersionPath, _Version.m_VersionInfo) > VersionResults.f_AddResult(); 
 			}
 		;
 
@@ -110,7 +111,7 @@ namespace NMib::NCloud::NVersionManager
 			if (!pVersion)
 			{
 				CStr Error = fg_Format("No such version: {}", VersionIDAndPlatform);
-				fsp_LogActivityError(_CallingHostInfo, Error);
+				fsp_LogActivityError(CallingHostInfo, Error);
 				return DMibErrorInstance(Error);
 			}
 			fTagVersion(*pVersion);
@@ -131,21 +132,20 @@ namespace NMib::NCloud::NVersionManager
 		
 		VersionResults.f_GetResults() > 
 			[
-				this
-				, Continuation
+				Continuation
 				, DeniedTags
 				, ApplicationName = _Params.m_Application
 				, VersionID = _Params.m_VersionID
 				, Platform = _Params.m_Platform
 				, AddTags
 				, RemoveTags
-				, _CallingHostInfo
+				, CallingHostInfo
 			]
 			(TCAsyncResult<TCVector<TCAsyncResult<CSizeInfo>>> &&_Results)
 			{
 				if (!_Results)
 				{
-					fsp_LogActivityError(_CallingHostInfo, fg_Format("Failed to save version infos: {}", _Results.f_GetExceptionStr()));
+					fsp_LogActivityError(CallingHostInfo, fg_Format("Failed to save version infos: {}", _Results.f_GetExceptionStr()));
 					Continuation.f_SetException(DMibErrorInstance("Failed to save version infos. Consult version manager log files for more info."));
 					return;
 				}
@@ -155,12 +155,12 @@ namespace NMib::NCloud::NVersionManager
 				{
 					if (!Version)
 					{
-						fsp_LogActivityError(_CallingHostInfo, fg_Format("Failed to save version info: {}", Version.f_GetExceptionStr()));
+						fsp_LogActivityError(CallingHostInfo, fg_Format("Failed to save version info: {}", Version.f_GetExceptionStr()));
 						bFailed = true;
 					}
 				}
 
-				fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, Platform, AddTags, RemoveTags));
+				fsp_LogActivityInfo(CallingHostInfo, fg_Format("Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, Platform, AddTags, RemoveTags));
 				
 				if (bFailed)
 				{

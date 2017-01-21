@@ -86,13 +86,9 @@ namespace NMib::NCloud::NAppManager
 		DCheck(!_pApplication->m_bLaunching);
 
 		if (!_pApplication->m_ProcessLaunch.f_IsEmpty())
-		{
 			return DMibErrorInstance("Application is already launched");
-		}
 		if (_pApplication->f_IsChildApp() && !_pApplication->m_pParentApplication)
-		{
 			return DMibErrorInstance("Missing parent application");
-		}
 		
 		_pApplication->m_bLaunching = true;
 		_pApplication->m_bStopped = false;
@@ -147,7 +143,7 @@ namespace NMib::NCloud::NAppManager
 				
 				CStr ApplicationDirectory = Application.f_GetDirectory();
 				
-				CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+				CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
 					(
 						fg_Format("{}/{}", ApplicationDirectory, Application.m_Settings.m_Executable)
 						, Application.m_Settings.m_ExecutableParameters
@@ -161,7 +157,6 @@ namespace NMib::NCloud::NAppManager
 							{
 							case NProcess::EProcessLaunchState_Launched:
 								{
-									DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Launched app '{}'", _pApplication->m_Name);
 									_pApplication->m_LaunchState = "Launched";
 									pState->m_pCleanup.f_Clear();
 									Continuation.f_SetResult();
@@ -170,15 +165,6 @@ namespace NMib::NCloud::NAppManager
 							case NProcess::EProcessLaunchState_LaunchFailed:
 								{
 									auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
-									DMibLogWithCategory
-										(
-											Malterlib/Cloud/AppManager
-											, Error
-											, "Failed to launch app '{}': {}"
-											, _pApplication->m_Name
-											, LaunchError 
-										)
-									;
 									fp_ScheduleRelaunchApp(_pApplication);
 									
 									_pApplication->m_LaunchState = fg_Format("Failed launch: {}", LaunchError);
@@ -189,34 +175,10 @@ namespace NMib::NCloud::NAppManager
 							case NProcess::EProcessLaunchState_Exited:
 								{
 									auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
-									if (ExitStatus != 0)
-									{
-										DMibLogWithCategory
-											(
-												Malterlib/Cloud/AppManager
-												, Error
-												, "App '{}' exited with status {}"
-												, _pApplication->m_Name
-												, ExitStatus
-											)
-										;
-									}
-									else
-									{
-										DMibLogWithCategory
-											(
-												Malterlib/Cloud/AppManager
-												, Info
-												, "App '{}' exited with status {}"
-												, _pApplication->m_Name
-												, ExitStatus
-											)
-										;
-									}
 
 									CStr RelaunchInfo;
 									if (!_pApplication->m_bStopped)
-										RelaunchInfo = "Waiting to retry launching. ";
+										RelaunchInfo = "Waiting to retry launching.";
 									
 									if (ExitStatus)
 									{
@@ -242,23 +204,19 @@ namespace NMib::NCloud::NAppManager
 					)
 				;
 				
+				Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+				Launch.m_LogName = _pApplication->m_Name;
+				
+				auto &LaunchParams = Launch.m_Params;
+				
 				LaunchParams.m_fOnOutput = [this, _pApplication](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
 					{
 						if (_Output.f_IsEmpty())
 							return;
-						DMibLogCategory(Malterlib/Cloud/AppManager);
-						auto Output = _Output.f_TrimRight("\r\n");
-						NMib::NLog::CSysLogCatScope AppScope(NMib::fg_GetSys()->f_GetLogger(), _pApplication->m_Name);
-						if (_OutputType == EProcessLaunchOutputType_StdOut)
-							DMibLog(Info, "{}", Output);
-						else
-						{
-							if (_OutputType == EProcessLaunchOutputType_StdErr)
-								_pApplication->m_LastStdErr = Output;
-							else
-								_pApplication->m_LastError = Output;
-							DMibLog(Error, "{}", _Output.f_TrimRight("\r\n"));
-						}
+						if (_OutputType == EProcessLaunchOutputType_StdErr)
+							_pApplication->m_LastStdErr = _Output.f_TrimRight();
+						else if (_OutputType != EProcessLaunchOutputType_StdOut)
+							_pApplication->m_LastError = _Output.f_TrimRight();
 					}
 				;
 				
@@ -268,12 +226,47 @@ namespace NMib::NCloud::NAppManager
 				LaunchParams.m_Environment["TMPDIR"] = ApplicationDirectory + "/.tmp";
 				LaunchParams.m_bMergeEnvironment = true;
 				
-				Application.m_ProcessLaunch = fg_ConstructActor<CProcessLaunchActor>();
+				Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
+					(
+						mp_State.m_LocalAddress
+						, mp_State.m_TrustManager
+						, g_ActorFunctor > [_pApplication, this]
+						(CStr const &_HostID, CCallingHostInfo const &_HostInfo, TCVector<uint8> const &_Certificate) -> TCContinuation<void>
+						{
+							if (_pApplication->m_bDeleted)
+								return DMibErrorInstance("Application deleted");
+							
+							_pApplication->m_AssociatedHostID = _HostID;
+							
+							TCContinuation<void> Continuation;
+							fp_UpdateApplicationJSON(_pApplication) > [_pApplication, Continuation](TCAsyncResult<void> &&_Result)
+								{
+									if (!_Result)
+									{
+										DMibLogWithCategory
+											(
+												Malterlib/Cloud/AppManager
+												, Info
+												, "Failed to update application JSON when granting connection ticket for '{}': {}"
+												, _pApplication->m_Name, _Result.f_GetExceptionStr()
+											)
+										;
+										Continuation.f_SetException(DMibErrorInstance("Failed to update application JSON, see AppManager log for details"));
+										return;
+									}
+									Continuation.f_SetResult();
+								}
+							;
+							return Continuation;
+						}
+						, Application.m_Name 
+					)
+				;
 				
 				Application.m_ProcessLaunch
 					(
 						&CProcessLaunchActor::f_Launch
-						, LaunchParams
+						, Launch
 						, fg_ThisActor(this)
 					)
 					> [this, _pApplication, pState, Continuation](TCAsyncResult<CActorSubscription> &&_Subscription)

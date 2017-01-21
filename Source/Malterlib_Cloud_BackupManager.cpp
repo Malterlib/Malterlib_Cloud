@@ -7,6 +7,16 @@
 
 namespace NMib::NCloud
 {
+	CBackupManager::CBackupManager()
+	{
+		DMibPublishActorFunction(CBackupManager::f_StartBackup);
+		DMibPublishActorFunction(CBackupManager::f_StopBackup);
+		DMibPublishActorFunction(CBackupManager::f_UploadData);
+		DMibPublishActorFunction(CBackupManager::f_ListBackupSources);
+		DMibPublishActorFunction(CBackupManager::f_ListBackups);
+		DMibPublishActorFunction(CBackupManager::f_StartDownloadBackup);
+	}
+	
 	bool CBackupManager::fs_IsValidHostname(NStr::CStr const &_String)
 	{
 		return NNet::fg_IsValidHostname(_String);

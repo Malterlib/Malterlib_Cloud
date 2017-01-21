@@ -370,7 +370,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			Application.m_Settings = NewSettings;
 			fLogInfo("Saving application state");
-			self(&CAppManagerActor::fp_UpdateApplicationJSON, *pApplication)
+			fp_UpdateApplicationJSON(*pApplication)
 				> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_UpdateJSONResults)
 				{
 					if (!_UpdateJSONResults)
@@ -428,7 +428,7 @@ namespace NMib::NCloud::NAppManager
 									fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files);
 								}
 							)
-							+ self(&CAppManagerActor::fp_UpdateApplicationJSON, pApplication)
+							+ fp_UpdateApplicationJSON(pApplication)
 							> [=](TCAsyncResult<void> &&_Result, TCAsyncResult<void> &&_UpdateJSONResults)
 							{
 								bool bError = false;

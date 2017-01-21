@@ -102,6 +102,9 @@ namespace NMib::NCloud::NAppManager
 					}
 					if (auto pValue = ApplicationJSON.f_GetMember("SelfUpdateSource", EJSONType_Boolean))
 						Settings.m_bSelfUpdateSource = pValue->f_Boolean();
+
+					if (auto pValue = ApplicationJSON.f_GetMember("AssociatedHostID", EJSONType_String))
+						Application.m_AssociatedHostID = pValue->f_String();
 				}					
 			}
 		}
@@ -129,63 +132,58 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<void> Continuation;
 		fg_ThisActor(this)(&CAppManagerActor::fp_ReadState) > Continuation / [this, Continuation]()
 			{
-				fp_InitApplications();
-				fp_LaunchNormalApps();
-				mp_State.m_TrustManager
-					(
-						&CDistributedActorTrustManager::f_SubscribeTrustedActors<CKeyManager>
-						, "com.malterlib/Cloud/KeyManager"
-						, fg_ThisActor(this)
-					)
-					+ mp_State.m_TrustManager
-					(
-						&CDistributedActorTrustManager::f_SubscribeTrustedActors<CVersionManager>
-						, "com.malterlib/Cloud/VersionManager"
-						, fg_ThisActor(this)
-					)
-					> Continuation / [this, Continuation](TCTrustedActorSubscription<CKeyManager> &&_KeySubscrption, TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
+				fp_PublishAppInterface() > Continuation / [this, Continuation]
 					{
-						mp_KeyManagerSubscription = fg_Move(_KeySubscrption);
-
-						if (!mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
-							fp_KeyManagerAvailable();
-						
-						mp_KeyManagerSubscription.f_OnNewActor
+						fp_InitApplications();
+						fp_LaunchNormalApps();
+						mp_State.m_TrustManager
 							(
-								[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
-								{
-									fp_KeyManagerAvailable();
-								}
+								&CDistributedActorTrustManager::f_SubscribeTrustedActors<CKeyManager>
+								, "com.malterlib/Cloud/KeyManager"
+								, fg_ThisActor(this)
 							)
-						;
-
-						mp_VersionManagerSubscription = fg_Move(_VersionSubscrption);
-
-						if (!mp_VersionManagerSubscription.m_Actors.f_IsEmpty())
-						{
-							for (auto &TrustedActor : mp_VersionManagerSubscription.m_Actors)
-								fp_VersionManagerAdded(TrustedActor.m_Actor, TrustedActor.m_TrustInfo);
-						}
-						
-						mp_VersionManagerSubscription.f_OnNewActor
+							+ mp_State.m_TrustManager
 							(
-								[this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo)
-								{
-									fp_VersionManagerAdded(_VersionManager, _ActorInfo);
-								}
+								&CDistributedActorTrustManager::f_SubscribeTrustedActors<CVersionManager>
+								, "com.malterlib/Cloud/VersionManager"
+								, fg_ThisActor(this)
 							)
+							> Continuation / [this, Continuation](TCTrustedActorSubscription<CKeyManager> &&_KeySubscrption, TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
+							{
+								mp_KeyManagerSubscription = fg_Move(_KeySubscrption);
+
+								mp_KeyManagerSubscription.f_OnActor
+									(
+										[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
+										{
+											fp_KeyManagerAvailable();
+										}
+									)
+								;
+
+								mp_VersionManagerSubscription = fg_Move(_VersionSubscrption);
+								
+								mp_VersionManagerSubscription.f_OnActor
+									(
+										[this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo)
+										{
+											fp_VersionManagerAdded(_VersionManager, _ActorInfo);
+										}
+									)
+								;
+								
+								mp_VersionManagerSubscription.f_OnRemoveActor
+									(
+										[this](TCWeakDistributedActor<CActor> const &_VersionManagero)
+										{
+											fp_VersionManagerRemoved(_VersionManagero);
+										}
+									)
+								;
+								
+								Continuation.f_SetResult();
+							}
 						;
-						
-						mp_VersionManagerSubscription.f_OnRemoveActor
-							(
-								[this](TCWeakDistributedActor<CActor> const &_VersionManagero)
-								{
-									fp_VersionManagerRemoved(_VersionManagero);
-								}
-							)
-						;
-						
-						Continuation.f_SetResult();
 					}
 				;
 			}
@@ -211,8 +209,8 @@ namespace NMib::NCloud::NAppManager
 					pApplication->f_AbortPendingLaunches();
 					pApplication->f_Clear();
 				}
-				
-				Continuation.f_SetResult();
+
+				mp_AppInterfaceServer.f_Destroy() > Continuation;
 			}
 		;
 		

@@ -148,20 +148,22 @@ namespace NMib::NCloud::NVersionManager
 		_Subscription.f_SendVersions(NewVersionNotifications);
 	}
 	
-	auto CVersionManagerDaemonActor::CServer::fp_Protocol_SubscribeToUpdates(CCallingHostInfo const &_CallingHostInfo, CVersionManager::CSubscribeToUpdates &&_Params)
-		-> TCContinuation<CVersionManager::CSubscribeToUpdates::CResult> 
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) -> TCContinuation<CSubscribeToUpdates::CResult> 
 	{
+		auto &CallingHostInfo = fg_GetCallingHostInfo();
+		auto pThis = m_pThis;
+		
 		CStr SubscriptionID = fg_RandomID();
 		CSubscription *pSubscription;
 		if (_Params.m_Application.f_IsEmpty())
-			pSubscription = &mp_GlobalVersionSubscriptions[SubscriptionID];
+			pSubscription = &pThis->mp_GlobalVersionSubscriptions[SubscriptionID];
 		else
-			pSubscription = &mp_VersionSubscriptions[_Params.m_Application][SubscriptionID];
+			pSubscription = &pThis->mp_VersionSubscriptions[_Params.m_Application][SubscriptionID];
 			
 		auto &Subscription = *pSubscription;
 		Subscription.m_DispatchActor = fg_Move(_Params.m_DispatchActor);
 		Subscription.m_fOnNewVersions = fg_Move(_Params.m_fOnNewVersions);
-		Subscription.m_HostID = _CallingHostInfo.f_GetRealHostID();
+		Subscription.m_HostID = CallingHostInfo.f_GetRealHostID();
 		Subscription.m_Tags = _Params.m_Tags;
 		Subscription.m_Platforms = _Params.m_Platforms;
 		Subscription.m_nInitial = _Params.m_nInitial;
@@ -170,19 +172,19 @@ namespace NMib::NCloud::NVersionManager
 		Result.m_Subscription = fg_ActorSubscription
 			(
 				self
-				, [this, ApplicationName = _Params.m_Application, SubscriptionID]
+				, [pThis, ApplicationName = _Params.m_Application, SubscriptionID]
 				{
 					if (ApplicationName.f_IsEmpty())
 					{
-						mp_GlobalVersionSubscriptions.f_Remove(SubscriptionID);
+						pThis->mp_GlobalVersionSubscriptions.f_Remove(SubscriptionID);
 						return;
 					}
-					auto *pSubscription = mp_VersionSubscriptions.f_FindEqual(ApplicationName);
+					auto *pSubscription = pThis->mp_VersionSubscriptions.f_FindEqual(ApplicationName);
 					if (!pSubscription)
 						return;
 					pSubscription->f_Remove(SubscriptionID);
 					if (pSubscription->f_IsEmpty())
-						mp_VersionSubscriptions.f_Remove(pSubscription);
+						pThis->mp_VersionSubscriptions.f_Remove(pSubscription);
 				}
 			)
 		;
@@ -190,7 +192,7 @@ namespace NMib::NCloud::NVersionManager
 		if (!_Params.m_nInitial)
 			return fg_Explicit(fg_Move(Result));
 
-		fp_SendSubscriptionInitial(_Params.m_Application, Subscription, false);
+		pThis->fp_SendSubscriptionInitial(_Params.m_Application, Subscription, false);
 			
 		return fg_Explicit(fg_Move(Result));
 	}

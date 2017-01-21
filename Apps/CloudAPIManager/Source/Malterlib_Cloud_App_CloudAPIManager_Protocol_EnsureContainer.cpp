@@ -13,38 +13,37 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	TCContinuation<CCloudAPIManager::CEnsureContainer::CResult> CCloudAPIManagerDaemonActor::CServer::fp_Protocol_EnsureContainer
-		(
-			CCallingHostInfo const &_CallingHostInfo
-			, CCloudAPIManager::CEnsureContainer &&_Params
-		)
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_EnsureContainer(CEnsureContainer &&_Params) -> TCContinuation<CEnsureContainer::CResult> 
 	{
+		auto &CallingHostInfo = fg_GetCallingHostInfo();
+		auto pThis = m_pThis;
+		
 		TCContinuation<CCloudAPIManager::CEnsureContainer::CResult> Continuation;
 		
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
-			return fsp_LogActivityError(_CallingHostInfo, "Cloud context format not valid", nullptr);
+			return fsp_LogActivityError(CallingHostInfo, "Cloud context format not valid", nullptr);
 		
 		if (!CCloudAPIManager::fs_IsValidContainerName(_Params.m_ContainerName))
-			return fsp_LogActivityError(_CallingHostInfo, "Container name format not valid", nullptr);
+			return fsp_LogActivityError(CallingHostInfo, "Container name format not valid", nullptr);
 		
 		// Empty key locks the container
 		if (!_Params.m_TempURLKey.f_IsEmpty() &&  !CCloudAPIManager::fs_IsValidTempURLKey(_Params.m_TempURLKey))
-			return fsp_LogActivityError(_CallingHostInfo, "Temp URL key format not valid", nullptr);
+			return fsp_LogActivityError(CallingHostInfo, "Temp URL key format not valid", nullptr);
 		
-		if (!mp_Permissions.f_HostHasAnyPermission(_CallingHostInfo.f_GetRealHostID(), "ObjectStorage/EnsureContainerAll", fg_Format("ObjectStorage/EnsureContainer/{}", _Params.m_CloudContext)))
-			return fp_AccessDenied(_CallingHostInfo, "Ensure container");
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostInfo.f_GetRealHostID(), "ObjectStorage/EnsureContainerAll", fg_Format("ObjectStorage/EnsureContainer/{}", _Params.m_CloudContext)))
+			return pThis->fp_AccessDenied(CallingHostInfo, "Ensure container");
 		
-		auto *pCloudContext = mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
+		auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
 		if (!pCloudContext)
-			return fsp_LogActivityError(_CallingHostInfo, fg_Format("No such cloud context: {}", _Params.m_CloudContext), nullptr);
+			return fsp_LogActivityError(CallingHostInfo, fg_Format("No such cloud context: {}", _Params.m_CloudContext), nullptr);
 		
 		CStr StoragePolicy = pCloudContext->m_SwiftStoragePolicy;
 		
-		fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [this, Continuation, _Params, _CallingHostInfo, StoragePolicy](COpenStackServiceInfo &&_ServiceInfo)
+		pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [pThis, Continuation, _Params, CallingHostInfo, StoragePolicy](COpenStackServiceInfo &&_ServiceInfo)
 			{
 				fg_Dispatch
 					(
-						fp_GetCURLQueryActor()
+						pThis->fp_GetCURLQueryActor()
 						, [ServiceInfo = fg_Move(_ServiceInfo), _Params, StoragePolicy]() -> CStr
 						{
 							NException::CDisableExceptionTraceScope DisableTracing;
@@ -82,18 +81,18 @@ namespace NMib::NCloud::NCloudAPIManager
 							return URL;
 						}
 					)
-					> [Continuation, _Params, _CallingHostInfo](TCAsyncResult<CStr> &&_Value)
+					> [Continuation, _Params, CallingHostInfo](TCAsyncResult<CStr> &&_Value)
 					{
 						if (!_Value)
 						{
 							CStr Error = fg_Format("Failed to ensure container {} on {}", _Params.m_ContainerName, _Params.m_CloudContext);
-							Continuation.f_SetException(fsp_LogActivityError(_CallingHostInfo, Error, _Value.f_GetException()));
+							Continuation.f_SetException(fsp_LogActivityError(CallingHostInfo, Error, _Value.f_GetException()));
 							return;
 						}
 						
 						CCloudAPIManager::CEnsureContainer::CResult Result;
 						Continuation.f_SetResult(Result);
-						fsp_LogActivityInfo(_CallingHostInfo, fg_Format("Ensure container {} on {}", _Params.m_ContainerName, _Params.m_CloudContext));
+						fsp_LogActivityInfo(CallingHostInfo, fg_Format("Ensure container {} on {}", _Params.m_ContainerName, _Params.m_CloudContext));
 					}
 				;
 			}

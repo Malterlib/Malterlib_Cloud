@@ -13,25 +13,24 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	TCContinuation<CCloudAPIManager::CGetSwiftBaseURL::CResult> CCloudAPIManagerDaemonActor::CServer::fp_Protocol_GetSwiftBaseURL
-		(
-			CCallingHostInfo const &_CallingHostInfo
-			, CCloudAPIManager::CGetSwiftBaseURL &&_Params
-		)
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params) -> TCContinuation<CGetSwiftBaseURL::CResult>
 	{
+		auto &CallingHostInfo = fg_GetCallingHostInfo();
+		auto pThis = m_pThis;
+		
 		TCContinuation<CCloudAPIManager::CGetSwiftBaseURL::CResult> Continuation;
 		
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
-			return fsp_LogActivityError(_CallingHostInfo, "Cloud context format not valid", nullptr);
+			return fsp_LogActivityError(CallingHostInfo, "Cloud context format not valid", nullptr);
 		
-		if (!mp_Permissions.f_HostHasAnyPermission(_CallingHostInfo.f_GetRealHostID(), "ObjectStorage/GetSwiftBaseURLAll", fg_Format("ObjectStorage/GetSwiftBaseURL/{}", _Params.m_CloudContext)))
-			return fp_AccessDenied(_CallingHostInfo, "Get Swift base URL");
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostInfo.f_GetRealHostID(), "ObjectStorage/GetSwiftBaseURLAll", fg_Format("ObjectStorage/GetSwiftBaseURL/{}", _Params.m_CloudContext)))
+			return pThis->fp_AccessDenied(CallingHostInfo, "Get Swift base URL");
 		
-		auto *pCloudContext = mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
+		auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
 		if (!pCloudContext)
-			return fsp_LogActivityError(_CallingHostInfo,  fg_Format("No such cloud context: {}", _Params.m_CloudContext), nullptr);
+			return fsp_LogActivityError(CallingHostInfo,  fg_Format("No such cloud context: {}", _Params.m_CloudContext), nullptr);
 		
-		fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [this, Continuation, _Params, _CallingHostInfo](COpenStackServiceInfo &&_ServiceInfo)
+		pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [Continuation, _Params](COpenStackServiceInfo &&_ServiceInfo)
 			{
 				if (!_ServiceInfo.m_URLs.f_Exists("swift"))
 				{

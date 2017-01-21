@@ -20,6 +20,8 @@ namespace NMib::NCloud
 			, EProtocolVersion = 0x101
 		};
 		
+		CBackupManager();
+		
 		static bool fs_IsValidProtocolVersion(uint32 _Version);
 	
 		static bool fs_IsValidHostname(NStr::CStr const &_String);

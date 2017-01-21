@@ -4,7 +4,7 @@
 #include <Mib/Network/SSL>
 #include <Mib/Cloud/KeyManager>
 #include <Mib/Cloud/KeyManagerServer>
-#include <Mib/Concurrency/TestHelpers>
+#include <Mib/Concurrency/DistributedActorTestHelpers>
 #include <Mib/Cloud/KeyManagerDatabases/EncryptedFile>
 #include <Mib/Test/Exception>
 

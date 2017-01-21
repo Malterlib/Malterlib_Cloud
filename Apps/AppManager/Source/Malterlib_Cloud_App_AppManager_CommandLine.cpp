@@ -132,7 +132,7 @@ namespace NMib::NCloud::NAppManager
 						{
 							"Names"_= {"--auto-update-tags"}
 							, "Default"_= false
-							, "Type"_= COneOfType{{{""}, COneOf{false}}} 
+							, "Type"_= COneOfType{"", COneOf{false}}
 							, "Description"_= "Auto update the application when new versions become available that has all these these tags."
 						}
 						, "AutoUpdateBranches?"_= 
@@ -217,7 +217,7 @@ namespace NMib::NCloud::NAppManager
 						, "AutoUpdateTags?"_= 
 						{
 							"Names"_= {"--auto-update-tags"}
-							, "Type"_= COneOfType{{{""}, COneOf{false}}} 
+							, "Type"_= COneOfType{"", COneOf{false}} 
 							, "Description"_= "Auto update the application when new versions become available that has all these these tags."
 						}
 						, "AutoUpdateBranches?"_= 

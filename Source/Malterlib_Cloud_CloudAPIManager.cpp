@@ -9,6 +9,14 @@ namespace NMib::NCloud
 {
 	using namespace NStr;
 	
+	CCloudAPIManager::CCloudAPIManager()
+	{
+		DMibPublishActorFunction(CCloudAPIManager::f_GetSwiftBaseURL);
+		DMibPublishActorFunction(CCloudAPIManager::f_EnsureContainer);
+		DMibPublishActorFunction(CCloudAPIManager::f_SignTempURL);
+		DMibPublishActorFunction(CCloudAPIManager::f_DeleteObject);
+	}
+	
 	bool CCloudAPIManager::fs_IsValidCloudContext(CStr const &_String)
 	{
 		return NNet::fg_IsValidHostname(_String);

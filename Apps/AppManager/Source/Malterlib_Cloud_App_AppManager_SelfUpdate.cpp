@@ -26,7 +26,7 @@ namespace NMib::NCloud::NAppManager
 					{
 						CStr RelativePath = File.f_Extract(SourceDir.f_GetLen() + 1);
 						CStr Source = CFile::fs_AppendPath(ProgramDir, RelativePath);
-						if (CFile::fs_DiffCopyFileOrDirectory(File, CFile::fs_AppendPath(ProgramDir, RelativePath), nullptr))
+						if (CFile::fs_DiffCopyFileOrDirectory(File, CFile::fs_AppendPath(ProgramDir, RelativePath), nullptr, 0.0))
 							bUpdatedFiles = true;
 					}
 					

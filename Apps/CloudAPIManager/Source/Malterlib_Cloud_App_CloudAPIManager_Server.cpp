@@ -17,9 +17,9 @@ namespace NMib::NCloud::NCloudAPIManager
 		, mp_pCanDestroyTracker(fg_Construct())
 	{
 #ifdef DPlatformFamily_OSX
-		CStr Path = NSys::fg_Process_GetEnvironmentVariable(CStr("PATH"));
+		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
 		if (Path.f_Find("/opt/local/bin") < 0)
-			NSys::fg_Process_SetEnvironmentVariable(CStr("PATH"), "/opt/local/bin:" + Path);
+			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/opt/local/bin:" + Path);
 #endif
 	}
 	
@@ -138,17 +138,9 @@ namespace NMib::NCloud::NCloudAPIManager
 	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::f_Destroy()
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
-		mp_ProtocolPublication.f_Clear();
+		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
 		if (mp_CURLQueryActor)
-		{
-			mp_CURLQueryActor->f_Destroy
-				(
-					[pCanDestroy](TCAsyncResult<void> &&)
-					{
-					}
-				)
-			;
-		}
+			mp_CURLQueryActor->f_Destroy2() > pCanDestroy->f_Track();
 		return pCanDestroy->m_Continuation;
 	}
 	

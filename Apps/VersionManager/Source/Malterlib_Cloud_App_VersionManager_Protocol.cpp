@@ -12,56 +12,9 @@
 
 namespace NMib::NCloud::NVersionManager
 {
-	CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::CVersionManagerImplementation(TCActor<CVersionManagerDaemonActor::CServer> &&_Server)
-		: mp_Server(_Server)
-	{
-	}
-		
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications &&_Params)
-		-> TCContinuation<CListApplications::CResult> 
-	{
-		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_ListApplications, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-	
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListVersions(CListVersions &&_Params)
-		-> TCContinuation<CListVersions::CResult>
-	{
-		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_ListVersions, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-	
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_UploadVersion(CStartUploadVersion &&_Params)
-		-> TCContinuation<CStartUploadVersion::CResult>
-	{
-		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_UploadVersion, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-	
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_DownloadVersion(CStartDownloadVersion &&_Params)
-		-> TCContinuation<CStartDownloadVersion::CResult>
-	{
-		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_DownloadVersion, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_SubscribeToUpdates(CSubscribeToUpdates &&_Params)
-		-> TCContinuation<CSubscribeToUpdates::CResult> 
-	{
-		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_SubscribeToUpdates, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-	
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags &&_Params)
-		-> TCContinuation<CChangeTags::CResult> 
-	{
-		return mp_Server(&CVersionManagerDaemonActor::CServer::fp_Protocol_ChangeTags, fg_GetCallingHostInfo(), fg_Move(_Params));
-	}
-	
 	void CVersionManagerDaemonActor::CServer::fp_Publish()
 	{
-		mp_ProtocolImplementation = mp_AppState.m_DistributionManager->f_ConstructActor<CVersionManagerImplementation>(fg_ThisActor(this));
-		
-		mp_ProtocolImplementation->f_Publish<CVersionManager>("com.malterlib/Cloud/VersionManager")
-			> [this] (TCAsyncResult<CDistributedActorPublication> &&_Publication)
-			{
-				mp_ProtocolPublication = fg_Move(*_Publication);
-			}
-		;
+		mp_ProtocolInterface.f_Publish<CVersionManager>(mp_AppState.m_DistributionManager, this, "com.malterlib/Cloud/VersionManager");
 	}
 
 	NException::CException CVersionManagerDaemonActor::CServer::fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description, CStr const &_UserDescription)
