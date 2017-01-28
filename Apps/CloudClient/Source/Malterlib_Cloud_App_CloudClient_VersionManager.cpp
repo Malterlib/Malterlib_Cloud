@@ -549,79 +549,54 @@ namespace NMib::NCloud::NCloudClient
 								{
 									Continuation.f_SetException
 										(
-											DMibErrorInstance(fg_Format("Error selecting version manager for host '{}': {}. Connection might have failed. Use --log-to-stderr to see more info.", Host, Error))
+											DMibErrorInstance
+											(
+												fg_Format
+												(
+													"Error selecting version manager for host '{}': {}. Connection might have failed. Use --log-to-stderr to see more info."
+													, Host
+													, Error
+												)
+											)
 										)
 									;
 									return;
 								}
-
-								mp_UploadVersionSend = fg_ConstructActor<CFileTransferSend>(Source);
 								
-								CVersionManager::CStartUploadVersion StartUpload;
-								StartUpload.m_Application = Application;
-								StartUpload.m_VersionIDAndPlatform = VersionID;
-								StartUpload.m_VersionInfo.m_Time = _Time;
-								StartUpload.m_VersionInfo.m_Configuration = Configuration;
-								StartUpload.m_VersionInfo.m_ExtraInfo = ExtraInfo;
-								StartUpload.m_VersionInfo.m_Tags = Tags; 						
-								StartUpload.m_QueueSize = QueueSize;
-								StartUpload.m_DispatchActor = fg_ThisActor(this);
-								if (bForce)
-									StartUpload.m_Flags |= CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite;
-								StartUpload.m_fStartTransfer = [this](CVersionManager::CStartUploadTransfer &&_Params) 
-									-> NConcurrency::TCContinuation<CVersionManager::CStartUploadTransfer::CResult>
-									{
-										NConcurrency::TCContinuation<CVersionManager::CStartUploadTransfer::CResult> StartTransferContinuation;
-										mp_UploadVersionSend(&CFileTransferSend::f_SendFiles, fg_Move(_Params.m_TransferContext)) 
-											> StartTransferContinuation / [this, StartTransferContinuation](NConcurrency::CActorSubscription &&_Subscription)
-											{
-												CVersionManager::CStartUploadTransfer::CResult Result;
-												Result.m_Subscription = fg_Move(_Subscription);
-												StartTransferContinuation.f_SetResult(fg_Move(Result));
-											}
-										;
-										return StartTransferContinuation;
-									}
-								;
+								CVersionManager::CVersionInformation VersionInfo;
+								VersionInfo.m_Time = _Time;
+								VersionInfo.m_Configuration = Configuration;
+								VersionInfo.m_ExtraInfo = ExtraInfo;
+								VersionInfo.m_Tags = Tags; 						
 
-								DMibCallActor
+								mp_VersionManagerHelper.f_Upload
 									(
 										pVersionManager->m_Actor
-										, CVersionManager::f_UploadVersion
-										, fg_Move(StartUpload)
+										, Application
+										, VersionID
+										, VersionInfo
+										, Source
+										, bForce ? CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite : CVersionManager::CStartUploadVersion::EFlag_None
+										, QueueSize
 									)
-									.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
-									> Continuation % "Failed to start upload on remote server" / [this, Continuation](CVersionManager::CStartUploadVersion::CResult &&_Result)
+									> Continuation / [Continuation](CVersionManagerHelper::CUploadResult &&_UploadResult)
 									{
-										mp_UploadVersionSubscription = fg_Move(_Result.m_Subscription);
-										mp_UploadVersionSend(&CFileTransferSend::f_GetResult) 
-											> [this, Continuation, DeniedTags = _Result.m_DeniedTags](TCAsyncResult<CFileTransferResult> &&_Results)
-											{
-												mp_UploadVersionSubscription.f_Clear();
-												if (!_Results)
-													Continuation.f_SetException(fg_Move(_Results));
-												else
-												{
-													auto &Results = *_Results;
-													CDistributedAppCommandLineResults CommandLine;
+										CDistributedAppCommandLineResults CommandLine;
 
-													if (!DeniedTags.f_IsEmpty())
-														CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs,vb}\n", DeniedTags));
-													
-													CommandLine.f_AddStdOut
-														(
-															fg_Format
-															(
-																"Upload finished transferring: {ns } bytes at {fe2} MB/s\n"
-																, Results.m_nBytes
-																, Results.f_BytesPerSecond()/1'000'000.0
-															)
-														)
-													;
-													Continuation.f_SetResult(fg_Move(CommandLine));
-												}
-											}
+										if (!_UploadResult.m_DeniedTags.f_IsEmpty())
+											CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs,vb}\n", _UploadResult.m_DeniedTags));
+										
+										CommandLine.f_AddStdOut
+											(
+												fg_Format
+												(
+													"Upload finished transferring: {ns } bytes at {fe2} MB/s\n"
+													, _UploadResult.m_TransferResult.m_nBytes
+													, _UploadResult.m_TransferResult.f_BytesPerSecond()/1'000'000.0
+												)
+											)
 										;
+										Continuation.f_SetResult(fg_Move(CommandLine));
 									}
 								;
 							}
@@ -633,12 +608,9 @@ namespace NMib::NCloud::NCloudClient
 					fDoCommand(Time);
 				else
 				{
-					if (!mp_VersionManagerFile)
-						mp_VersionManagerFile = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Version file actor"));
-					
 					fg_Dispatch
 						(
-							mp_VersionManagerFile
+							mp_VersionManagerHelper.f_GetFileActor()
 							, [Source]() -> CTime
 							{
 								if (!CFile::fs_FileExists(Source))
@@ -670,11 +642,9 @@ namespace NMib::NCloud::NCloudClient
 		
 		if (!SettingsFile.f_IsEmpty())
 		{
-			if (!mp_VersionManagerFile)
-				mp_VersionManagerFile = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Version file actor"));
 			fg_Dispatch
 				(
-					mp_VersionManagerFile
+					mp_VersionManagerHelper.f_GetFileActor()
 					, [SettingsFile]
 					{
 						return CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
@@ -698,54 +668,6 @@ namespace NMib::NCloud::NCloudClient
 		}
 		else
 			fDoUpload(EJSONType_Object);
-		
-		return Continuation;
-	}
-	
-	TCContinuation<CFileTransferResult> CCloudClientAppActor::fp_VersionManager_DownloadVersion
-		(
-			TCDistributedActor<CVersionManager> const &_VersionManager
-			, CStr const &_DestinationDirectory
-			, CStr const &_Application
-			, CVersionManager::CVersionIDAndPlatform const &_VersionID
-			, uint64 _QueueSize
-		)
-	{
-		mp_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>(_DestinationDirectory);
-		
-		TCContinuation<CFileTransferResult> Continuation;
-
-		mp_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, _QueueSize, CFileTransferReceive::EReceiveFlag_IgnoreExisting) 
-			> Continuation % "Failed to initialize file transfer context" 
-			/ [this, _Application, _VersionID, _VersionManager, Continuation]
-			(CFileTransferContext &&_TransferContext)
-			{
-				CVersionManager::CStartDownloadVersion StartDownload;
-				StartDownload.m_Application = _Application;
-				StartDownload.m_VersionIDAndPlatform = _VersionID;
-				StartDownload.m_TransferContext = fg_Move(_TransferContext);
-
-				DMibCallActor
-					(
-						_VersionManager
-						, CVersionManager::f_DownloadVersion
-						, fg_Move(StartDownload)
-					)
-					.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
-					> Continuation % "Failed to start download on remote server" / [this, Continuation](CVersionManager::CStartDownloadVersion::CResult &&_Result)
-					{
-						mp_DownloadVersionSubscription = fg_Move(_Result.m_Subscription);
-
-						mp_DownloadVersionReceive(&CFileTransferReceive::f_GetResult) > [this, Continuation](TCAsyncResult<CFileTransferResult> &&_Results)
-							{
-								mp_DownloadVersionSubscription.f_Clear();
-								Continuation.f_SetResult(fg_Move(_Results));
-							}
-						;
-					}
-				;
-			}
-		;
 		
 		return Continuation;
 	}
@@ -799,13 +721,7 @@ namespace NMib::NCloud::NCloudClient
 					return;
 				}
 				
-				fp_VersionManager_DownloadVersion
-					(
-						pVersionManager->m_Actor
-						, DestinationDirectory
-						, Application
-						, VersionID
-					)
+				mp_VersionManagerHelper.f_Download(pVersionManager->m_Actor, Application, VersionID, DestinationDirectory, CFileTransferReceive::EReceiveFlag_IgnoreExisting, QueueSize)
 					> Continuation / [Continuation](CFileTransferResult &&_Results)
 					{
 						CDistributedAppCommandLineResults CommandLine;

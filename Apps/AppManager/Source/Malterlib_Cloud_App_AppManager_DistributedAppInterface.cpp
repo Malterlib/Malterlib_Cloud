@@ -11,6 +11,7 @@ namespace NMib::NCloud::NAppManager
 	NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterDistributedApp
 		(
 			NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
+			, NConcurrency::TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> &&_TrustInterface
 			, EDistributedAppUpdateType _UpdateType
 		)
 	{

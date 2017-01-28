@@ -137,20 +137,12 @@ namespace NMib::NCloud::NCloudClient
 				VersionID.m_Platform = DMalterlibCloudPlatform;
 				CStr DestinationDirectory = CFile::fs_GetProgramDirectory() + "/SelfUpdate"; 
 
-				fp_VersionManager_DownloadVersion
-					(
-						Version.m_Actor
-						, DestinationDirectory
-						, "MalterlibCloud"
-						, VersionID
-					)
+				mp_VersionManagerHelper.f_Download(Version.m_Actor, "MalterlibCloud", VersionID, DestinationDirectory)
 					> Continuation / [this, Continuation, Version, DestinationDirectory](CFileTransferResult &&_TransferResult)
 					{
-						if (!mp_VersionManagerFile)
-							mp_VersionManagerFile = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Version file actor"));
 						fg_Dispatch
 							(
-								mp_VersionManagerFile
+								mp_VersionManagerHelper.f_GetFileActor()
 								, [DestinationDirectory]
 								{
 									CStr StdOut;

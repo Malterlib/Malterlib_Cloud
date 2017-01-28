@@ -48,15 +48,6 @@ namespace NMib::NCloud::NCloudClient
 		// Version Manager
 		void fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCContinuation<void> fp_VersionManager_SubscribeToServers();
-		TCContinuation<CFileTransferResult> fp_VersionManager_DownloadVersion
-			(
-				TCDistributedActor<CVersionManager> const &_VersionManager
-				, CStr const &_DestinationDirectory
-				, CStr const &_Application
-				, CVersionManager::CVersionIDAndPlatform const &_VersionID
-				, uint64 _QueueSize = 8*1024*1024
-			)
-		;
 		
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params);
@@ -73,10 +64,6 @@ namespace NMib::NCloud::NCloudClient
 
 		// Version Manager
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagers;
-		TCActor<CFileTransferReceive> mp_DownloadVersionReceive;
-		CActorSubscription mp_DownloadVersionSubscription;
-		TCActor<CFileTransferSend> mp_UploadVersionSend;
-		CActorSubscription mp_UploadVersionSubscription;
-		TCActor<CSeparateThreadActor> mp_VersionManagerFile;
+		CVersionManagerHelper mp_VersionManagerHelper;
 	};
 }

@@ -30,11 +30,14 @@ namespace NMib::NCloud::NCloudClient
 	
 	TCContinuation<void> CCloudClientAppActor::fp_StopApp()
 	{	
-		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
-		
+		TCActorResultVector<void> Destroys;
+
 		mp_DownloadBackupSubscription.f_Clear();
+		mp_VersionManagerHelper.f_AbortAll() > Destroys.f_AddResult();  
 		
-		return pCanDestroy->m_Continuation;
+		TCContinuation<void> Continuation;
+		Destroys.f_GetResults() > Continuation.f_ReceiveAny();
+		return Continuation;
 	}
 	
 	void CCloudClientAppActor::fp_ParseCommonOptions(NEncoding::CEJSON const &_Params)

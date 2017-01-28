@@ -5,11 +5,15 @@
 {
 	Property
 	{
+		MalterlibTestApp true
 		MalterlibPostCopyProject "Malterlib_Cloud_Test"
 		{
 			!!MalterlibPostCopyProject ""
 		}
 		MalterlibPostCopyDestination "TestApp/"
+		{
+			!!MalterlibPostCopyDestination ""
+		}
 		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"

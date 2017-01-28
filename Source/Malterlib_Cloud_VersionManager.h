@@ -12,10 +12,19 @@
 
 namespace NMib::NCloud
 {
+	struct CVersionManagerHelperInternal;
+}
+
+DMibDefineSharedPointerType(NMib::NCloud::CVersionManagerHelperInternal, false, false);
+
+namespace NMib::NCloud
+{
 	struct CVersionManager : public NConcurrency::CActor
 	{
 		using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
 		using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
+
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/VersionManager";
 
 		enum 
 		{
@@ -73,8 +82,8 @@ namespace NMib::NCloud
 			NStr::CStr m_Configuration;
 			NContainer::TCSet<NStr::CStr> m_Tags;
 			NEncoding::CEJSON m_ExtraInfo;
-			uint32 m_nFiles = 0;
-			uint64 m_nBytes = 0;
+			uint32 m_nFiles = 0; /// The version manager set this value. Ignored when uploading
+			uint64 m_nBytes = 0; /// The version manager set this value. Ignored when uploading
 		};
 
 		struct CListApplications
@@ -254,5 +263,65 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCContinuation<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) = 0;
+	};
+
+	struct CVersionManagerHelper
+	{
+		CVersionManagerHelper
+			(
+				NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> const &_FileActor = {}
+				, uint64 _QueueSize = 8*1024*1024
+				, fp64 _Timeout = 30.0
+			)
+		;
+		~CVersionManagerHelper();
+
+		CVersionManagerHelper(CVersionManagerHelper const &);
+		CVersionManagerHelper(CVersionManagerHelper &&);
+		CVersionManagerHelper &operator = (CVersionManagerHelper const &);
+		CVersionManagerHelper &operator = (CVersionManagerHelper &&);
+		
+		struct CUploadResult
+		{
+			NContainer::TCSet<NStr::CStr> m_DeniedTags;
+			CFileTransferResult m_TransferResult;
+		};
+		
+		struct CPackageInfo
+		{
+			CVersionManager::CVersionIDAndPlatform m_VersionID;
+			CVersionManager::CVersionInformation m_VersionInfo;
+		};
+		
+		NConcurrency::TCContinuation<CUploadResult> f_Upload
+			(
+				NConcurrency::TCDistributedActor<CVersionManager> const &_VersionManager
+				, NStr::CStr const &_Application
+				, CVersionManager::CVersionIDAndPlatform const &_VersionID
+				, CVersionManager::CVersionInformation const &_VersionInfo
+				, NStr::CStr const &_SourceTGZFile
+				, CVersionManager::CStartUploadVersion::EFlag _Flags = CVersionManager::CStartUploadVersion::EFlag_None
+				, uint64 _QueueSize = 0
+			) const
+		;
+		
+		NConcurrency::TCContinuation<CFileTransferResult> f_Download
+			(
+				NConcurrency::TCDistributedActor<CVersionManager> const &_VersionManager
+				, NStr::CStr const &_Application
+				, CVersionManager::CVersionIDAndPlatform const &_VersionID
+				, NStr::CStr const &_DestinationDirectory
+				, CFileTransferReceive::EReceiveFlag _ReceiveFlags = CFileTransferReceive::EReceiveFlag_IgnoreExisting
+				, uint64 _QueueSize = 0
+			) const
+		;
+		
+		NConcurrency::TCContinuation<CPackageInfo> f_CreatePackage(NStr::CStr const &_SourceDirectory, NStr::CStr const &_DestinationFileName) const;
+		NConcurrency::TCContinuation<void> f_AbortAll() const;
+		
+		NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> f_GetFileActor() const;
+		
+	private:
+		NPtr::TCSharedPointer<CVersionManagerHelperInternal> mp_pInternal;
 	};
 }

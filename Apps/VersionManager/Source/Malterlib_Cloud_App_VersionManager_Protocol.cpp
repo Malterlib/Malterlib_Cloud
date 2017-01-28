@@ -14,7 +14,7 @@ namespace NMib::NCloud::NVersionManager
 {
 	void CVersionManagerDaemonActor::CServer::fp_Publish()
 	{
-		mp_ProtocolInterface.f_Publish<CVersionManager>(mp_AppState.m_DistributionManager, this, "com.malterlib/Cloud/VersionManager");
+		mp_ProtocolInterface.f_Publish<CVersionManager>(mp_AppState.m_DistributionManager, this, CVersionManager::mc_pDefaultNamespace);
 	}
 
 	NException::CException CVersionManagerDaemonActor::CServer::fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description, CStr const &_UserDescription)
