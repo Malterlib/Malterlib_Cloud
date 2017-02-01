@@ -63,6 +63,6 @@ namespace NMib::NCloud::NAppManager
 	
 	TCContinuation<void> CAppManagerActor::fp_PublishAppInterface()
 	{
-		return mp_AppInterfaceServer.f_Publish<CDistributedAppInterfaceServer>(mp_State.m_DistributionManager, this, "com.malterlib/Concurrency/DistributedAppInterfaceServer");
+		return mp_AppInterfaceServer.f_Publish<CDistributedAppInterfaceServer>(mp_State.m_DistributionManager, this, CDistributedAppInterfaceServer::mc_pDefaultNamespace);
 	}
 }

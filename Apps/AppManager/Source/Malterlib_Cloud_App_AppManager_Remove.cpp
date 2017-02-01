@@ -7,50 +7,67 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params)
+	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Remove(NStr::CStr const &_Name)
 	{
-		CStr Name = _Params["Name"].f_String();
-		auto *pApplication = mp_Applications.f_FindEqual(Name);
+		auto pThis = m_pThis;
+		auto Auditor = pThis->f_Auditor();
+		auto CallingHostID = fg_GetCallingHostID();
+
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationRemove"))
+			return Auditor.f_AccessDenied("(Application remove, command)");
+
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)))
+			return Auditor.f_AccessDenied("(Application remove, app name)");
+		
+		auto *pApplication = pThis->mp_Applications.f_FindEqual(_Name);
 		if (!pApplication)
-			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
+			return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 		
 		auto &Application = **pApplication;
 		if (Application.f_IsInProgress())
-			return DMibErrorInstance("Operation already in progress for application");
+			return Auditor.f_Exception("Operation already in progress for application");
 		auto InProgressScope = Application.f_SetInProgress();
-			
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
-		Application.f_Stop(true) > [this, Continuation, Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
+		
+		TCContinuation<void> Continuation;
+		Application.f_Stop(true) > [pThis, Auditor, Continuation, _Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
 			{
-				CDistributedAppCommandLineResults Results;
-				fp_OutputApplicationStop(_Result, Results, Name);
+				CStr Error = pThis->fp_GetApplicationStopErrors(_Result, _Name);
 				
-				auto *pApplication = mp_Applications.f_FindEqual(Name);
+				if (!Error.f_IsEmpty())
+					Auditor.f_Warning(Error);
+				
+				auto *pApplication = pThis->mp_Applications.f_FindEqual(_Name);
 				if (!pApplication)
-					return Continuation.f_SetException(DMibErrorInstance(fg_Format("No such application '{}'", Name)));
+					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
 				
 				(*pApplication)->f_Delete();
-				mp_Applications.f_Remove(Name);
+				pThis->mp_Applications.f_Remove(_Name);
 
-				if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
+				if (auto *pApplicationsState = pThis->mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 				{
-					if (pApplicationsState->f_GetMember(Name))
-						pApplicationsState->f_RemoveMember(Name);
+					if (pApplicationsState->f_GetMember(_Name))
+						pApplicationsState->f_RemoveMember(_Name);
 				}
 				
-				mp_State.m_StateDatabase.f_Save() > [Results = fg_Move(Results), Continuation, InProgressScope](TCAsyncResult<void> &&_Result) mutable
+				pThis->mp_State.m_StateDatabase.f_Save() > Continuation % "Failed to save state" / [InProgressScope, Continuation, _Name, Auditor]() mutable
 					{
-						if (!_Result)
-						{
-							Results.f_AddStdErr(fg_Format("Failed to save state: {}{\n}", _Result.f_GetExceptionStr()));
-							Results.m_Status = 1;
-							Continuation.f_SetResult(fg_Move(Results));
-							return;
-						}
-						
-						Continuation.f_SetResult(fg_Move(Results));
+						Auditor.f_Info(fg_Format("Removed application '{}'", _Name));
+						Continuation.f_SetResult();
 					}
 				;
+			}
+		;
+	
+		return Continuation;
+	}
+
+	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params)
+	{
+		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		
+		mp_AppManagerInterface.m_pActor->f_Remove(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
+			{
+				Continuation.f_SetResult(_Result);
 			}
 		;
 		

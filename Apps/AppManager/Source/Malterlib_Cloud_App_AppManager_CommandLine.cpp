@@ -379,7 +379,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params)
 				{
-					return fp_CommandLine_UpdateApplication(_Params, false);
+					return fp_CommandLine_UpdateApplication(_Params);
 				}
 			)
 		;
@@ -433,7 +433,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params)
 				{
-					return fp_CommandLine_UpdateApplication(_Params, false);
+					return fp_CommandLine_UpdateApplication(_Params);
 				}
 			)
 		;

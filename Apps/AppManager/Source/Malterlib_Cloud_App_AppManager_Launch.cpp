@@ -305,7 +305,7 @@ namespace NMib::NCloud::NAppManager
 						return;
 					}
 					
-					fg_Dispatch(fLaunch) > Continuation;
+					fLaunch() > Continuation;
 				}
 			;
 			return Continuation;

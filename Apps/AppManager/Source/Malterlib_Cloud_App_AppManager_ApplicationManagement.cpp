@@ -7,23 +7,24 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	void CAppManagerActor::fp_OutputApplicationStop(TCAsyncResult<uint32> const &_Result, CDistributedAppCommandLineResults &o_Results, CStr const &_Name)
+	CStr CAppManagerActor::fp_GetApplicationStopErrors(TCAsyncResult<uint32> const &_Result, CStr const &_Name)
 	{
 		if (!_Result)
-			o_Results.f_AddStdErr(fg_Format("Error stopping application '{}'{\n}", _Result.f_GetExceptionStr()));
+			return fg_Format("Error stopping application '{}'{\n}", _Result.f_GetExceptionStr());
 		else if (*_Result)
-			o_Results.f_AddStdErr(fg_Format("Application '{}' exited with non 0 status: {}{\n}", _Name, *_Result));
+			return fg_Format("Application '{}' exited with non 0 status: {}{\n}", _Name, *_Result);
+		return {};
 	}
 	
 	constexpr static EFileAttrib gc_RootAttributes = 
-				EFileAttrib_UnixAttributesValid  
-				| EFileAttrib_UserRead 
-				| EFileAttrib_UserWrite
-				| EFileAttrib_UserExecute 
-				| EFileAttrib_GroupRead
-				| EFileAttrib_GroupExecute
-				| EFileAttrib_EveryoneRead 
-				| EFileAttrib_EveryoneExecute
+		EFileAttrib_UnixAttributesValid  
+		| EFileAttrib_UserRead 
+		| EFileAttrib_UserWrite
+		| EFileAttrib_UserExecute 
+		| EFileAttrib_GroupRead
+		| EFileAttrib_GroupExecute
+		| EFileAttrib_EveryoneRead 
+		| EFileAttrib_EveryoneExecute
 	;
 	
 	void CAppManagerActor::fsp_UpdateAttributes(CStr const &_File)
@@ -275,47 +276,10 @@ namespace NMib::NCloud::NAppManager
 
 	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON const &_Params)
 	{
-		CStr Name = _Params["Name"].f_String();
-		auto pOldApplication = mp_Applications.f_FindEqual(Name);
-		if (!pOldApplication)
-			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
-		
-		TCSharedPointer<CApplication> pApplication = *pOldApplication;
-		
-		if (pApplication->f_IsInProgress())
-			return DMibErrorInstance("Operation already in progress for application");
-		if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
-			return DMibErrorInstance("Application already stopped");
-
-		auto InProgressScope = pApplication->f_SetInProgress();
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
-		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
-		auto fLogError = [pResult, Continuation](CStr const &_Error)
+		mp_AppManagerInterface.m_pActor->f_Stop(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
 			{
-				pResult->f_AddStdErr(_Error + DMibNewLine);
-				pResult->m_Status = 1;
-				Continuation.f_SetResult(fg_Move(*pResult));
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (stop application): {}", _Error);
-			}
-		;
-		
-		pApplication->f_Stop(false) > [this, pApplication, pResult, fLogError, Continuation, InProgressScope]
-			(TCAsyncResult<uint32> &&_ExitStatus)
-			{
-				fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
-				
-				if (!_ExitStatus)
-				{
-					fLogError("Failed to exit old application");
-					return;
-				}
-				
-				if (pApplication->m_bDeleted)
-				{
-					fLogError("Application has been deleted, aborting");
-					return;
-				}
-				Continuation.f_SetResult(fg_Move(*pResult));
+				Continuation.f_SetResult(_Result);
 			}
 		;
 		return Continuation;
@@ -323,39 +287,10 @@ namespace NMib::NCloud::NAppManager
 	
 	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON const &_Params)
 	{
-		CStr Name = _Params["Name"].f_String();
-		auto pOldApplication = mp_Applications.f_FindEqual(Name);
-		if (!pOldApplication)
-			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
-		
-		TCSharedPointer<CApplication> pApplication = *pOldApplication;
-		
-		if (pApplication->f_IsInProgress())
-			return DMibErrorInstance("Operation already in progress for application");
-		if (pApplication->m_ProcessLaunch)
-			return DMibErrorInstance("Application already started");
-
-		auto InProgressScope = pApplication->f_SetInProgress();
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
-		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
-		auto fLogError = [pResult, Continuation](CStr const &_Error)
+		mp_AppManagerInterface.m_pActor->f_Start(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
 			{
-				pResult->f_AddStdErr(_Error + DMibNewLine);
-				pResult->m_Status = 1;
-				Continuation.f_SetResult(fg_Move(*pResult));
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (start application): {}", _Error);
-			}
-		;
-		
-		fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, true)
-			> [fLogError, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
-			{
-				if (!_Result)
-				{
-					fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
-					return;
-				}
-				Continuation.f_SetResult(fg_Move(*pResult));
+				Continuation.f_SetResult(_Result);
 			}
 		;
 		return Continuation;
@@ -363,54 +298,160 @@ namespace NMib::NCloud::NAppManager
 	
 	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSON const &_Params)
 	{
-		CStr Name = _Params["Name"].f_String();
-		auto pOldApplication = mp_Applications.f_FindEqual(Name);
+		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		mp_AppManagerInterface.m_pActor->f_Restart(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
+			{
+				Continuation.f_SetResult(_Result);
+			}
+		;
+		return Continuation;
+	}
+	
+	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Start(NStr::CStr const &_Name)
+	{
+		auto pThis = m_pThis;
+		auto Auditor = pThis->f_Auditor();
+		auto CallingHostID = fg_GetCallingHostID();
+
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationStart"))
+			return Auditor.f_AccessDenied("(Application start, command)");
+
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)))
+			return Auditor.f_AccessDenied("(Application start, app name)");
+		
+		auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
 		if (!pOldApplication)
-			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
+			return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 		
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 		
 		if (pApplication->f_IsInProgress())
-			return DMibErrorInstance("Operation already in progress for application");
+			return Auditor.f_Exception("Operation already in progress for application");
+		if (pApplication->m_ProcessLaunch)
+			return Auditor.f_Exception("Application already started");
 
 		auto InProgressScope = pApplication->f_SetInProgress();
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
-		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
-		auto fLogError = [pResult, Continuation](CStr const &_Error)
+		TCContinuation<void> Continuation;
+		
+		pThis->fp_LaunchApp(pApplication, true)
+			> [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<void> &&_Result)
 			{
-				pResult->f_AddStdErr(_Error + DMibNewLine);
-				pResult->m_Status = 1;
-				Continuation.f_SetResult(fg_Move(*pResult));
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (restart application): {}", _Error);
+				if (!_Result)
+				{
+					Continuation.f_SetException(Auditor.f_Exception({fg_Format("Failed to launch app. Will retry periodically."), _Result.f_GetExceptionStr()}));
+					return;
+				}
+				Auditor.f_Info(fg_Format("Started '{}'", _Name));
+				Continuation.f_SetResult();
 			}
 		;
+		return Continuation;
+	}
+	
+	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Stop(NStr::CStr const &_Name)
+	{
+		auto pThis = m_pThis;
+		auto Auditor = pThis->f_Auditor();
+		auto CallingHostID = fg_GetCallingHostID();
+
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationStop"))
+			return Auditor.f_AccessDenied("(Application stop, command)");
+
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)))
+			return Auditor.f_AccessDenied("(Application stop, app name)");
 		
-		pApplication->f_Stop(false) > [this, pApplication, pResult, fLogError, Continuation, InProgressScope]
-			(TCAsyncResult<uint32> &&_ExitStatus)
+		auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
+		if (!pOldApplication)
+			return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
+		
+		TCSharedPointer<CApplication> pApplication = *pOldApplication;
+		
+		if (pApplication->f_IsInProgress())
+			return Auditor.f_Exception("Operation already in progress for application");
+		if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
+			return Auditor.f_Exception("Application already stopped");
+
+		auto InProgressScope = pApplication->f_SetInProgress();
+		TCContinuation<void> Continuation;
+		
+		pApplication->f_Stop(false) > [pThis, pApplication, Continuation, InProgressScope, Auditor](TCAsyncResult<uint32> &&_ExitStatus)
 			{
-				fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
+				NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
+				
+				if (!Error.f_IsEmpty())
+					Auditor.f_Warning(Error);
 				
 				if (!_ExitStatus)
 				{
-					fLogError("Failed to exit old application");
+					Continuation.f_SetException(Auditor.f_Exception("Failed to exit old application"));
 					return;
 				}
 				
 				if (pApplication->m_bDeleted)
 				{
-					fLogError("Application has been deleted, aborting");
+					Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
+					return;
+				}
+				
+				Continuation.f_SetResult();
+			}
+		;
+		return Continuation;
+	}
+	
+	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Restart(NStr::CStr const &_Name)
+	{
+		auto pThis = m_pThis;
+		auto Auditor = pThis->f_Auditor();
+		auto CallingHostID = fg_GetCallingHostID();
+
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationRestart"))
+			return Auditor.f_AccessDenied("(Application restart, command)");
+
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)))
+			return Auditor.f_AccessDenied("(Application restart, app name)");
+		
+		auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
+		if (!pOldApplication)
+			return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
+		
+		TCSharedPointer<CApplication> pApplication = *pOldApplication;
+		
+		if (pApplication->f_IsInProgress())
+			return Auditor.f_Exception("Operation already in progress for application");
+
+		auto InProgressScope = pApplication->f_SetInProgress();
+		TCContinuation<void> Continuation;
+		
+		pApplication->f_Stop(false) > [pThis, pApplication, Continuation, InProgressScope, Auditor, _Name]
+			(TCAsyncResult<uint32> &&_ExitStatus)
+			{
+				NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
+				
+				if (!Error.f_IsEmpty())
+					Auditor.f_Warning(Error);
+				
+				if (!_ExitStatus)
+				{
+					Continuation.f_SetException(Auditor.f_Exception("Failed to exit old application"));
+					return;
+				}
+				
+				if (pApplication->m_bDeleted)
+				{
+					Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
 					return;
 				}
 
-				fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, true)
-					> [fLogError, Continuation, pResult, InProgressScope](TCAsyncResult<void> &&_Result)
+				pThis->fp_LaunchApp(pApplication, true) > [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<void> &&_Result)
 					{
 						if (!_Result)
 						{
-							fLogError(fg_Format("Failed to launch app: {}. Will retry periodically.", _Result.f_GetExceptionStr()));
+							Continuation.f_SetException(Auditor.f_Exception({fg_Format("Failed to launch app. Will retry periodically."), _Result.f_GetExceptionStr()}));
 							return;
 						}
-						Continuation.f_SetResult(fg_Move(*pResult));
+						Auditor.f_Info(fg_Format("Restarted '{}'", _Name));
+						Continuation.f_SetResult();
 					}
 				;
 			}

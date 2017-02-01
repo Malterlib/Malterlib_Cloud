@@ -8,6 +8,7 @@
 #include <Mib/Concurrency/DistributedAppInterface>
 #include <Mib/Concurrency/DistributedActorTrustManagerProxy>
 #include <Mib/Cloud/VersionManager>
+#include <Mib/Cloud/AppManager>
 #include <Mib/Cryptography/RandomID>
 
 using namespace NMib;
@@ -111,7 +112,7 @@ namespace
 		
 		void f_Construct() override
 		{
-			m_AppInterfaceServer.f_Publish<CDistributedAppInterfaceServer>(m_Dependencies.m_DistributionManager, this, "com.malterlib/Concurrency/DistributedAppInterfaceServer");
+			m_AppInterfaceServer.f_Publish<CDistributedAppInterfaceServer>(m_Dependencies.m_DistributionManager, this, CDistributedAppInterfaceServer::mc_pDefaultNamespace);
 		}
 		
 		TCContinuation<void> f_Destroy() override

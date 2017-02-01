@@ -8,7 +8,7 @@
 namespace NMib::NCloud::NAppManager
 {
 	CAppManagerActor::CAppManagerActor()
-		: CDistributedAppActor(CDistributedAppActor_Settings("AppManager", false))
+		: CDistributedAppActor(CDistributedAppActor_Settings("AppManager", false).f_AuditCategory("Malterlib/Cloud/AppManager"))
 	{
 	}
 	
@@ -130,12 +130,37 @@ namespace NMib::NCloud::NAppManager
 		mp_KnownPlatforms[DMalterlibCloudPlatform];
 		
 		TCContinuation<void> Continuation;
-		fg_ThisActor(this)(&CAppManagerActor::fp_ReadState) > Continuation / [this, Continuation]()
+		fp_ReadState() > Continuation / [this, Continuation]
 			{
+				if (mp_State.m_bStoppingApp)
+					return;
+				
 				fp_PublishAppInterface() > Continuation / [this, Continuation]
 					{
+						if (mp_State.m_bStoppingApp)
+							return;
+						
 						fp_InitApplications();
 						fp_LaunchNormalApps();
+						fp_SetupAppManagerInterfacePermissions() > [this](TCAsyncResult<void> &&_Result)
+							{
+								if (!_Result)
+								{
+									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to setup permissions: {}", _Result.f_GetExceptionStr());
+									return;
+								}
+								if (mp_State.m_bStoppingApp)
+									return;
+								
+								fp_PublishAppManagerInterface() > [](TCAsyncResult<void> &&_Result)
+									{
+										if (!_Result)
+											DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to publish app manager interface: {}", _Result.f_GetExceptionStr());
+									}
+								;
+							}
+						;
+						
 						mp_State.m_TrustManager
 							(
 								&CDistributedActorTrustManager::f_SubscribeTrustedActors<CKeyManager>
@@ -150,6 +175,9 @@ namespace NMib::NCloud::NAppManager
 							)
 							> Continuation / [this, Continuation](TCTrustedActorSubscription<CKeyManager> &&_KeySubscrption, TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
 							{
+								if (mp_State.m_bStoppingApp)
+									return;
+								
 								mp_KeyManagerSubscription = fg_Move(_KeySubscrption);
 
 								mp_KeyManagerSubscription.f_OnActor
@@ -195,24 +223,29 @@ namespace NMib::NCloud::NAppManager
 	{	
 		TCContinuation<void> Continuation;
 
-		TCActorResultVector<uint32> ApplicationStops;
-		for (auto &pApplication : mp_Applications)
-		{
-			if (!pApplication->f_IsChildApp())
-				pApplication->f_Stop(true) > ApplicationStops.f_AddResult();
-		}
-
-		ApplicationStops.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<uint32>> &&_Results)
+		mp_AppManagerInterface.f_Destroy() > Continuation / [=]
 			{
+				TCActorResultVector<uint32> ApplicationStops;
 				for (auto &pApplication : mp_Applications)
 				{
-					pApplication->f_AbortPendingLaunches();
-					pApplication->f_Clear();
+					if (!pApplication->f_IsChildApp())
+						pApplication->f_Stop(true) > ApplicationStops.f_AddResult();
 				}
+				
+				ApplicationStops.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<uint32>> &&_Results)
+					{
+						for (auto &pApplication : mp_Applications)
+						{
+							pApplication->f_AbortPendingLaunches();
+							pApplication->f_Clear();
+						}
 
-				mp_AppInterfaceServer.f_Destroy() > Continuation;
+						mp_AppInterfaceServer.f_Destroy() > Continuation;
+					}
+				;
 			}
 		;
+
 		
 		return Continuation;
 	}

@@ -243,24 +243,123 @@ namespace NMib::NCloud::NAppManager
 		
 		return pState->m_Continuation;
 	}
+
+	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Update(NStr::CStr const &_Name, CApplicationUpdate const &_Update)
+	{
+		return m_pThis->fp_UpdateApplication
+			(
+				_Name
+				, _Update
+				, {}
+				, [_Name](CStr const &_Info) 
+				{
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application '{}': {}", _Name, _Info);
+				}
+			)
+		;
+	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON const &_Params, bool _bFromAutoUpdate)
+	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON const &_Params)
+	{
+		CStr Name = _Params["Name"].f_String();
+		
+		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		
+		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
+		
+		CStr Package;
+		CAppManagerInterface::CApplicationUpdate Update;
+		
+		if (auto *pValue = _Params.f_GetMember("Package"))
+		{
+			Package = _Params["Package"].f_String();
+			if (Package.f_IsEmpty())
+				return DMibErrorInstance("You have to specify a package");
+			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory()));
+		}
+		else
+		{
+			Update.m_bDryRun = _Params["DryRun"].f_Boolean();
+			Update.m_bUpdateSettings = _Params["UpdateSettings"].f_Boolean();
+			
+			CStr Version = _Params["Version"].f_String();
+			if (auto *pValue = _Params.f_GetMember("VersionManagerPlatform"))
+				Update.m_Platform = pValue->f_String(); 
+
+			if (auto *pValue = _Params.f_GetMember("RequiredTags"))
+			{
+				TCSet<CStr> RequiredTags;
+				for (auto &TagJSON : pValue->f_Array())
+					RequiredTags[TagJSON.f_String()];
+				Update.m_RequireTags = fg_Move(RequiredTags);
+			}
+			
+			if (!Version.f_IsEmpty())
+			{
+				CStr ErrorStr;
+				CVersionManager::CVersionID VersionID;
+				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, ErrorStr, &VersionID))
+					return DMibErrorInstance(fg_Format("Invalid version ID format: {}", ErrorStr));
+				Update.m_Version = VersionID;
+			}
+		}
+		
+		fp_UpdateApplication
+			(
+				Name
+				, Update
+				, Package
+				, [pResult, Name](CStr const &_Info)
+				{
+					pResult->f_AddStdOut(_Info + DMibNewLine);
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application '{}': {}", Name, _Info);
+				}
+			)
+			> [pResult, Continuation, Name](TCAsyncResult<> &&_Result)
+			{
+				pResult->f_AddAsyncResult(_Result);
+				Continuation.f_SetResult(fg_Move(*pResult));
+			}
+		;
+		return Continuation;
+	}
+	
+	TCContinuation<void> CAppManagerActor::fp_UpdateApplication
+		(
+			CStr const &_Name
+			, CAppManagerInterface::CApplicationUpdate const &_Update
+			, CStr const &_FromFileName
+			, TCFunction<void (CStr const &_Info)> &&_fOnInfo
+			, bool _bCheckPermissions
+		)
 	{
 		// 1. Extract new application to temporary directory
 		// 2. Stop old application
 		// 3. Delete old files
 		// 4. Move files from temporary directory to final destination
 		// 5. Re-launch application
+
+		auto Auditor = f_Auditor();
+
+		if (_bCheckPermissions)
+		{
+			auto CallingHostID = fg_GetCallingHostID();
+			if (!mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationUpdate"))
+				return Auditor.f_AccessDenied("(Application update, command)");
+
+			if (!mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)))
+				return Auditor.f_AccessDenied("(Application update, app name)");
+		}
 		
-		CStr Name = _Params["Name"].f_String();
-		auto pOldApplication = mp_Applications.f_FindEqual(Name);
+		auto pOldApplication = mp_Applications.f_FindEqual(_Name);
 		if (!pOldApplication)
-			return DMibErrorInstance(fg_Format("No such application '{}'", Name));
+			return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 		
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 		
 		if (pApplication->f_IsInProgress())
-			return DMibErrorInstance("Operation already in progress for application");
+			return Auditor.f_Exception("Operation already in progress for application");
+
 		auto InProgressScope = pApplication->f_SetInProgress();
 		
 		bool bDownloadVersion = true;
@@ -270,84 +369,61 @@ namespace NMib::NCloud::NAppManager
 		CStr Platform = pApplication->m_LastInstalledVersion.m_Platform;
 		TCSet<CStr> RequiredTags;
 		CVersionManager::CVersionIDAndPlatform VersionID;
-		if (auto *pValue = _Params.f_GetMember("Package"))
-		{
-			Package = _Params["Package"].f_String();
-			if (Package.f_IsEmpty())
-				return DMibErrorInstance("You have to specify a package");
+		if (!_FromFileName.f_IsEmpty())
 			bDownloadVersion = false;
-			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory()));
-		}
 		else
 		{
-			bDryRun = _Params["DryRun"].f_Boolean();
-			bUpdateSettings = _Params["UpdateSettings"].f_Boolean(); 
-			CStr Version = _Params["Version"].f_String();
-			if (auto *pValue = _Params.f_GetMember("VersionManagerPlatform"))
-				Platform = pValue->f_String();
+			bDryRun = _Update.m_bDryRun;
+			bUpdateSettings = _Update.m_bUpdateSettings; 
+			if (_Update.m_Platform)
+				Platform = *_Update.m_Platform;
 
 			if (!CVersionManager::fs_IsValidPlatform(Platform))
-				return DMibErrorInstance("Invalid version platform format");
+				return Auditor.f_Exception("Invalid version platform format");
 			
 			auto RequiredTags = pApplication->m_Settings.m_AutoUpdateTags;
-			auto AllowedBranches = pApplication->m_Settings.m_AutoUpdateBranches;			
+			auto AllowedBranches = pApplication->m_Settings.m_AutoUpdateBranches;
 			
-			if (auto *pValue = _Params.f_GetMember("RequiredTags"))
+			if (_Update.m_RequireTags)
 			{
-				RequiredTags.f_Clear();
-				for (auto &TagJSON : pValue->f_Array())
+				for (auto &Tag : *_Update.m_RequireTags)
 				{
-					auto &Tag = TagJSON.f_String();
 					if (!CVersionManager::fs_IsValidTag(Tag))
-						return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
-					RequiredTags[Tag];
+						return Auditor.f_Exception(fg_Format("'{}' is not a valid tag", Tag));
 				}
+				RequiredTags = *_Update.m_RequireTags;
 			}
 			
 			if (AllowedBranches.f_IsEmpty())
 				AllowedBranches = fg_CreateSet(pApplication->m_LastInstalledVersion.m_VersionID.m_Branch);
 			
-			if (!Version.f_IsEmpty())
+			if (_Update.m_Version)
 			{
 				CStr ErrorStr;
-				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, ErrorStr, &VersionID.m_VersionID))
-					return DMibErrorInstance(fg_Format("Invalid version ID format: {}", ErrorStr));
 				VersionID.m_Platform = Platform;
+				if (!_Update.m_Version->f_IsValid())
+					return Auditor.f_Exception(fg_Format("Invalid version: {}", *_Update.m_Version));
+				VersionID.m_VersionID = *_Update.m_Version; 
 			}
 			else
 			{
 				CStr Error;
 				VersionID = fp_FindVersion(pApplication, RequiredTags, AllowedBranches, Platform, Error, EFindVersionFlag_RetryFailed);
 				if (!VersionID.f_IsValid())
-					return DMibErrorInstance(Error);
+					return Auditor.f_Exception(Error);
 			}
 		}
 		
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<void> Continuation;
 		
 		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
 		TCSharedPointer<TCSharedPointer<CVersionManager::CVersionInformation>> pVersionInfo = fg_Construct();
 		TCSharedPointer<NTime::CClock> pClock = fg_Construct(true); 
 		
-		auto fLogInfo = [pResult, Name](CStr const &_Info)
+		auto fLogError = [this, _Name, pClock, pResult, Continuation, pApplication, VersionID, pVersionInfo, Auditor](CStr const &_Error, bool _bUnencrypted = true)
 			{
-				pResult->f_AddStdOut(_Info + DMibNewLine);
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application '{}': {}", Name, _Info);
-			}
-		;
-		auto fLogError = [this, Name, pClock, pResult, Continuation, _bFromAutoUpdate, pApplication, VersionID, pVersionInfo](CStr const &_Error, bool _bUnencrypted = true)
-			{
-				if (_bFromAutoUpdate)
-				{
-					Continuation.f_SetException(DMibErrorInstance(_Error));
-				}
-				else
-				{
-					pResult->f_AddStdErr(_Error + DMibNewLine);
-					pResult->m_Status = 1;
-					Continuation.f_SetResult(fg_Move(*pResult));
-					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Command line command failed (update application '{}'): {}", Name, _Error);
-				}
+				Continuation.f_SetException(Auditor.f_Exception(_Error));
+				
 				if (!pApplication->m_bDeleted && _bUnencrypted)
 				{
 					fp_RunUpdateScript(pApplication, EUpdateScript_OnError, _Error, VersionID, pVersionInfo->f_Get(), pClock->f_GetTime()) > [](TCAsyncResult<bool> &&_Result)
@@ -446,35 +522,31 @@ namespace NMib::NCloud::NAppManager
 								}
 							)
 						;
-						fg_Dispatch
-							(
-								mp_FileActor
-								, [=, Settings = _pNewSettings ? *_pNewSettings : pApplication->m_Settings, OutputDirectory = pApplication->f_GetDirectory()]()
+						g_Dispatch(mp_FileActor) > [=, Settings = _pNewSettings ? *_pNewSettings : pApplication->m_Settings, OutputDirectory = pApplication->f_GetDirectory()]()
+							{
+								// 1. Extract new application to temporary directory
+								fsp_CreateApplicationUserGroup(Settings, _fOnInfo, OutputDirectory);
+								
+								_fOnInfo("Extracting application to temporary directory");
+								
+								CStr SourcePath = _SourcePath;
+								if (CFile::fs_FileExists(_SourcePath, EFileAttrib_Directory))
 								{
-									// 1. Extract new application to temporary directory
-									fsp_CreateApplicationUserGroup(Settings, fLogInfo, OutputDirectory);
-									
-									fLogInfo("Extracting application to temporary directory");
-									
-									CStr SourcePath = _SourcePath;
-									if (CFile::fs_FileExists(_SourcePath, EFileAttrib_Directory))
-									{
-										auto Files = CFile::fs_FindFiles(_SourcePath + "/*");
-										if (Files.f_GetLen() == 1 && Files[0].f_Right(7) == ".tar.gz")
-											SourcePath = Files[0];
-									}
-									
-									// Cleanup any old crash version
-									if (CFile::fs_FileExists(TemporaryDirectory))
-										CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
-									
-									TCVector<CStr> Files;
-									CStr Output = fsp_UnpackApplication(SourcePath, TemporaryDirectory, pApplication->m_Name, Settings, Files, _AllowSourceExist, false);
-									if (!Output.f_IsEmpty())
-										fLogInfo(Output);
-									return Files;
+									auto Files = CFile::fs_FindFiles(_SourcePath + "/*");
+									if (Files.f_GetLen() == 1 && Files[0].f_Right(7) == ".tar.gz")
+										SourcePath = Files[0];
 								}
-							)
+								
+								// Cleanup any old crash version
+								if (CFile::fs_FileExists(TemporaryDirectory))
+									CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
+								
+								TCVector<CStr> Files;
+								CStr Output = fsp_UnpackApplication(SourcePath, TemporaryDirectory, pApplication->m_Name, Settings, Files, _AllowSourceExist, false);
+								if (!Output.f_IsEmpty())
+									_fOnInfo(Output);
+								return Files;
+							}
 							> [=]
 							(TCAsyncResult<TCVector<CStr>> &&_Files)
 							{
@@ -491,20 +563,24 @@ namespace NMib::NCloud::NAppManager
 								
 								if (bDryRun)
 								{
-									fLogInfo("Skipping stop, update and restart because of dry run");
-									Continuation.f_SetResult(fg_Move(*pResult));
+									_fOnInfo("Skipping stop, update and restart because of dry run");
+									Auditor.f_Info("Update application (dry run)");
+									Continuation.f_SetResult();
 									return;
 								}
 
 								auto Files = fg_Move(*_Files);
 								
-								fLogInfo("Stopping old application");
+								_fOnInfo("Stopping old application");
 								// 2. Stop old application
 								pApplication->f_Stop(false) 
 									> [=]
 									(TCAsyncResult<uint32> &&_ExitStatus)
 									{
-										fp_OutputApplicationStop(_ExitStatus, *pResult, pApplication->m_Name);
+										NStr::CStr Error = fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
+				
+										if (!Error.f_IsEmpty())
+											Auditor.f_Warning(Error);
 										
 										if (!_ExitStatus)
 										{
@@ -526,54 +602,50 @@ namespace NMib::NCloud::NAppManager
 													fLogError(fg_Format("Pre update script failed. {}", _Result.f_GetExceptionStr()));
 													return;
 												}
-												fLogInfo("Updating application files");
-												fg_Dispatch
-													(
-														mp_FileActor
-														,
-														[
-															=
-															, OutputDirectory = pApplication->f_GetDirectory()
-															, OldFiles = pApplication->m_Files
-															, TemporaryDirectoryCleanup = TemporaryDirectoryCleanup 
-															, DownloadDirectoryCleanup = DownloadDirectoryCleanup
-														]
+												_fOnInfo("Updating application files");
+												g_Dispatch(mp_FileActor) >
+													[
+														=
+														, OutputDirectory = pApplication->f_GetDirectory()
+														, OldFiles = pApplication->m_Files
+														, TemporaryDirectoryCleanup = TemporaryDirectoryCleanup 
+														, DownloadDirectoryCleanup = DownloadDirectoryCleanup
+													]
+													{
+														// 3. Delete old files
+														for (auto &File : OldFiles)
 														{
-															// 3. Delete old files
-															for (auto &File : OldFiles)
+															CStr FullPath = fg_Format("{}/{}", OutputDirectory, File); 
+															if (CFile::fs_FileExists(FullPath, EFileAttrib_Directory))
 															{
-																CStr FullPath = fg_Format("{}/{}", OutputDirectory, File); 
-																if (CFile::fs_FileExists(FullPath, EFileAttrib_Directory))
+																try
 																{
-																	try
-																	{
-																		// Allow only empty directories to be deleted, ignore error on non-empty ones.
-																		CFile::fs_DeleteDirectory(FullPath);
-																	}
-																	catch (CExceptionFile const &)
-																	{
-																	}
+																	// Allow only empty directories to be deleted, ignore error on non-empty ones.
+																	CFile::fs_DeleteDirectory(FullPath);
 																}
-																else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
-																	CFile::fs_DeleteFile(FullPath);
-															}
-														 	
-															// 4. Move files from temporary directory to final destination
-															for (auto &File : Files)
-															{
-																CStr SourcePath = fg_Format("{}/{}", TemporaryDirectory, File);
-																CStr DestinationPath = fg_Format("{}/{}", OutputDirectory, File);
-																if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
+																catch (CExceptionFile const &)
 																{
-																	CStr Directory = CFile::fs_GetPath(DestinationPath);
-																	CFile::fs_CreateDirectory(Directory);
-																	CFile::fs_RenameFile(SourcePath, DestinationPath);
 																}
 															}
-
-															fsp_UpdateApplicationFiles(OutputDirectory, pApplication, Files);
+															else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
+																CFile::fs_DeleteFile(FullPath);
 														}
-													)
+														
+														// 4. Move files from temporary directory to final destination
+														for (auto &File : Files)
+														{
+															CStr SourcePath = fg_Format("{}/{}", TemporaryDirectory, File);
+															CStr DestinationPath = fg_Format("{}/{}", OutputDirectory, File);
+															if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
+															{
+																CStr Directory = CFile::fs_GetPath(DestinationPath);
+																CFile::fs_CreateDirectory(Directory);
+																CFile::fs_RenameFile(SourcePath, DestinationPath);
+															}
+														}
+
+														fsp_UpdateApplicationFiles(OutputDirectory, pApplication, Files);
+													}
 													> [=](TCAsyncResult<void> &&_Result)
 													{
 														if (!_Result)
@@ -587,7 +659,7 @@ namespace NMib::NCloud::NAppManager
 															return;
 														}
 															
-														fLogInfo("Saving application state");
+														_fOnInfo("Saving application state");
 														if (_pNewSettings)
 															pApplication->m_Settings = *_pNewSettings;
 														if (_fUpdateVersionInfo)
@@ -626,7 +698,7 @@ namespace NMib::NCloud::NAppManager
 																			return;
 																		}
 																		// 5. Re-launch application
-																		fLogInfo("Launching updated application");
+																		_fOnInfo("Launching updated application");
 																		pApplication->m_bJustUpdated = true;
 																		fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
 																			> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_Result)
@@ -637,10 +709,11 @@ namespace NMib::NCloud::NAppManager
 																					return;
 																				}
 																				if (VersionID.f_IsValid())
-																					fLogInfo(fg_Format("Application was successfully updated to version {}", VersionID));
+																					_fOnInfo(fg_Format("Application was successfully updated to version {}", VersionID));
 																				else
-																					fLogInfo("Application was successfully updated");
-																				Continuation.f_SetResult(fg_Move(*pResult));
+																					_fOnInfo("Application was successfully updated");
+																				Auditor.f_Info("Update application");
+																				Continuation.f_SetResult();
 																				fp_RunUpdateScript
 																					(
 																						pApplication
@@ -684,7 +757,7 @@ namespace NMib::NCloud::NAppManager
 				
 				if (bDownloadVersion)
 				{
-					fLogInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
+					_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
 					self(&CAppManagerActor::fp_DownloadApplication, pApplication->m_Settings.m_VersionManagerApplication, VersionID, DownloadDirectory) 
 						> [=, DownloadDirectoryCleanup=DownloadDirectoryCleanup](TCAsyncResult<CVersionManager::CVersionInformation> &&_VersionInfo)
 						{
@@ -700,7 +773,7 @@ namespace NMib::NCloud::NAppManager
 								return;
 							}
 
-							fLogInfo(fg_Format("Application downloaded, unpacking"));
+							_fOnInfo(fg_Format("Application downloaded, unpacking"));
 							
 							auto &VersionInfo = *_VersionInfo;
 
@@ -731,8 +804,8 @@ namespace NMib::NCloud::NAppManager
 									if (!NewSettings.f_Validate(Error))
 									{
 										fLogError(fg_Format("Updating settings resulted in invalid settings: {}", Error));
-										Continuation.f_SetException(DMibErrorInstance(Error));
-										return ;
+										Continuation.f_SetException(Auditor.f_Exception(Error));
+										return;
 									}
 									pNewSettings = fg_Construct(NewSettings);
 								}
@@ -753,7 +826,7 @@ namespace NMib::NCloud::NAppManager
 					;
 				}
 				else
-					fUnpackApp(Package, {}, {}, {});
+					fUnpackApp(_FromFileName, {}, {}, {});
 			}
 		;
 		

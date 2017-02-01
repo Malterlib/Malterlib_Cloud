@@ -11,10 +11,11 @@
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Concurrency/DistributedAppInterface>
 #include <Mib/Concurrency/DistributedAppInterfaceLaunch>
+#include <Mib/Cloud/AppManager>
 
 namespace NMib::NCloud::NAppManager
 {
-	struct CAppManagerActor : public NConcurrency::CDistributedAppActor
+	struct CAppManagerActor : public CDistributedAppActor
 	{
 		CAppManagerActor();
 		
@@ -89,8 +90,10 @@ namespace NMib::NCloud::NAppManager
 			bool f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
 			void f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source);
 			void f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings);
-			EApplicationSetting f_ChangedSettings(CApplicationSettings const &_Other);
-			bool f_Validate(CStr &o_Error);
+			void f_FromInterfaceSettings(CAppManagerInterface::CApplicationSettings const &_Settings, EApplicationSetting &o_ChangedSettings);
+			void f_FromInterfaceAdd(CAppManagerInterface::CApplicationAdd const &_Settings, EApplicationSetting &o_ChangedSettings);
+			EApplicationSetting f_ChangedSettings(CApplicationSettings const &_Other) const;
+			bool f_Validate(CStr &o_Error) const;
 		};
 		
 		struct CApplication : public TCSharedPointerIntrusiveBase<>
@@ -229,13 +232,39 @@ namespace NMib::NCloud::NAppManager
 		
 		struct CDistributedAppInterfaceServerImplementation : public CDistributedAppInterfaceServer
 		{
-			NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> f_RegisterDistributedApp
+			TCContinuation<TCActorSubscriptionWithID<>> f_RegisterDistributedApp
 				(
-					NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
-					, NConcurrency::TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> &&_TrustInterface
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
+					, TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> &&_TrustInterface
 					, EDistributedAppUpdateType _UpdateType
 				) override
 			;
+
+			CAppManagerActor *m_pThis = nullptr;
+		};
+		
+		struct CAppManagerInterfaceImplementation : public CAppManagerInterface
+		{
+			TCContinuation<CVersionsAvailableForUpdate> f_GetAvailableVersions(CStr const &_Application) override;
+			
+			TCContinuation<void> f_Add(CStr const &_Name, CApplicationAdd const &_Add, CApplicationSettings const &_Settings) override;
+			TCContinuation<void> f_Remove(CStr const &_Name) override;
+
+			TCContinuation<void> f_Update(CStr const &_Name, CApplicationUpdate const &_Update) override;
+			
+			TCContinuation<void> f_Start(CStr const &_Name) override;
+			TCContinuation<void> f_Stop(CStr const &_Name) override;
+			TCContinuation<void> f_Restart(CStr const &_Name) override;
+
+			TCContinuation<void> f_ChangeSettings
+				(
+					CStr const &_Name
+					, CApplicationChangeSettings const &_ChangeSettings
+					, CApplicationSettings const &_Settings
+				) override
+			;
+
+			TCContinuation<TCMap<CStr, CApplicationInfo>> f_GetInstalled() override;
 
 			CAppManagerActor *m_pThis = nullptr;
 		};
@@ -275,7 +304,7 @@ namespace NMib::NCloud::NAppManager
 				, CStr const &_Home
 				, CStr const &_User
 				, TCMap<CStr, CStr> const &_Environment
-				, TCFunction<void (NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)> const &_fOnStdOutput
+				, TCFunction<void (CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)> const &_fOnStdOutput
 			)
 		;
 		
@@ -310,12 +339,47 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_AddApplication(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_RemoveApplication(CEJSON const &_Params);
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_UpdateApplication(CEJSON const &_Params, bool _bFromAutoUpdate);
+		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_UpdateApplication(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_StartApplication(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_StopApplication(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_RestartApplication(CEJSON const &_Params);
 		
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_ListAvailableVersions(CEJSON const &_Params);
+		
+		TCContinuation<void> fp_AddApplication
+			(
+				CStr const &_Name
+				, CApplicationSettings const &_Settings
+				, EApplicationSetting _ChangedSettings
+				, bool _bForceOverwrite
+				, bool _bForceInstall
+				, bool _bSettingsFromVersionInfo
+				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
+				, CStr const &_FromLocalFile
+				, TCOptional<CVersionManager::CVersionIDAndPlatform> const &_Version 
+			)
+		;
+		
+		TCContinuation<void> fp_ChangeApplicationSettings
+			(
+				CStr const &_Name
+				, CApplicationSettings const &_Settings
+				, EApplicationSetting _ChangedSettings
+				, bool _bUpdateFromVersionInfo
+				, bool _bForce
+				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
+			)
+		;
+		
+		TCContinuation<void> fp_UpdateApplication
+			(
+				CStr const &_Name
+				, CAppManagerInterface::CApplicationUpdate const &_Update
+				, CStr const &_FromFileName
+				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
+				, bool _bCheckPermissions = true
+			)
+		;
 		
 		static void fsp_UpdateAttributes(CStr const &_File);
 		static CStr fsp_UnpackApplication
@@ -331,7 +395,7 @@ namespace NMib::NCloud::NAppManager
 		;
 		TCContinuation<void> fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite);
 		
-		void fp_OutputApplicationStop(TCAsyncResult<uint32> const &_Result, CDistributedAppCommandLineResults &o_Results, CStr const &_Name);
+		CStr fp_GetApplicationStopErrors(TCAsyncResult<uint32> const &_Result, CStr const &_Name);
 		void fp_KeyManagerAvailable();
 		
 		void fp_VersionManagerResubscribeAll();
@@ -368,7 +432,14 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		TCContinuation<void> fp_SetupAppManagerInterfacePermissions();
+		TCContinuation<void> fp_SubscribePermissions();
+		TCContinuation<void> fp_RegisterPermissions();		
+		TCContinuation<void> fp_RegisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication);		
+		TCContinuation<void> fp_UnregisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication);
+		
 		TCContinuation<void> fp_PublishAppInterface();		
+		TCContinuation<void> fp_PublishAppManagerInterface();
 		
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
 		TCActor<CSeparateThreadActor> mp_FileActor;
@@ -384,6 +455,9 @@ namespace NMib::NCloud::NAppManager
 		TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState> mp_VersionManagers;
 		
 		TCDelegatedActorInterface<CDistributedAppInterfaceServerImplementation> mp_AppInterfaceServer;
+		TCDelegatedActorInterface<CAppManagerInterfaceImplementation> mp_AppManagerInterface;
+		
+		CTrustedPermissionSubscription mp_Permissions;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

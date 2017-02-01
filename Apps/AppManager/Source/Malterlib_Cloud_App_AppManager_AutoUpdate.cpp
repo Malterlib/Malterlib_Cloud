@@ -174,21 +174,21 @@ namespace NMib::NCloud::NAppManager
 				continue;
 			}
 			
-			fp_CommandLine_UpdateApplication
+			CAppManagerInterface::CApplicationUpdate Update;
+			Update.m_Version = VersionID.m_VersionID;
+			Update.m_Platform = pApplication->m_LastInstalledVersion.m_Platform;
+			fp_UpdateApplication
 				(
-					CEJSON
-					(
-						{
-							"Name"_= pApplication->m_Name 
-							, "DryRun"_= false
-							, "UpdateSettings"_= true
-							, "Version"_= CStr::fs_ToStr(VersionID.m_VersionID)
-							, "Platform"_= pApplication->m_LastInstalledVersion.m_Platform
-						}
-					)
-					, true 
+					pApplication->m_Name
+					, Update
+					, {}
+					, [Name = pApplication->m_Name](CStr const &_Info)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Auto update application '{}': {}", Name, _Info);
+					}
+					, false 
 				)
-				> [this](TCAsyncResult<CDistributedAppCommandLineResults> &&_Results)
+				> [this](TCAsyncResult<> &&_Results)
 				{
 					if (!_Results)
 					{
