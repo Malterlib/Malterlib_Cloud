@@ -15,6 +15,8 @@ namespace NMib::NCloud::NVersionManager
 	struct CVersionManagerDaemonActor::CServer : public CActor
 	{
 	public:
+		using CActorHolder = CDelegatedActorHolder;
+		
 		CServer(CDistributedAppState &_AppState);
 		~CServer();
 		void f_Construct() override;
@@ -132,8 +134,7 @@ namespace NMib::NCloud::NVersionManager
 		void fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription, bool _bPermissionsChanged);
 		void fp_UpdateSubscriptionsForChangedPermissions(CStr const &_HostID);
 		
-		CException fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description, CStr const &_UserDescription = CStr());
-		TCSet<CStr> fp_FilterApplicationsByPermissions(CCallingHostInfo const &_CallingHostInfo, TCSet<CStr> const &_Applications);
+		TCSet<CStr> fp_FilterApplicationsByPermissions(CStr const &_CallingHostID, TCSet<CStr> const &_Applications);
 		TCContinuation<TCSet<CStr>> fp_EnumApplications();
 		TCSet<CStr> fp_ApplicationSet();
 		TCSet<CStr> fp_FilterTags(CStr const &_HostID, TCSet<CStr> const &_Tags, TCSet<CStr> &o_DeniedTags);
@@ -142,17 +143,13 @@ namespace NMib::NCloud::NVersionManager
 		TCContinuation<CSizeInfo> fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo);
 		bool fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version);
 		
-		static void fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info);
-		static void fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error);
-		static void fsp_LogActivityWarning(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error);
-		
 		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
 		
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
 
 		TCDelegatedActorInterface<CVersionManagerImplementation> mp_ProtocolInterface;
 		
-		CDistributedAppState mp_AppState;
+		CDistributedAppState &mp_AppState;
 		
 		CTrustedPermissionSubscription mp_Permissions;
 		

@@ -21,9 +21,6 @@ namespace NMib::NCloud
 {
 	struct CVersionManager : public NConcurrency::CActor
 	{
-		using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
-		using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
-
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/VersionManager";
 
 		enum 
@@ -34,8 +31,9 @@ namespace NMib::NCloud
 
 		struct CVersionID : public CCloudVersion
 		{
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			
 			void f_Format(NStr::CStrAggregate &o_Str) const;
 			
 			bool f_IsValid() const;
@@ -52,8 +50,9 @@ namespace NMib::NCloud
 
 		struct CVersionIDAndPlatform
 		{
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			
 			void f_Format(NStr::CStrAggregate &o_Str) const;
 
 			bool f_IsValid() const;
@@ -72,8 +71,8 @@ namespace NMib::NCloud
 		
 		struct CVersionInformation
 		{
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 
 			NEncoding::CEJSON f_ToJSON() const;
 			static CVersionInformation fs_FromJSON(NEncoding::CEJSON const &_JSON);
@@ -90,28 +89,28 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 				
 				NContainer::TCSet<NStr::CStr> m_Applications;
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 		};
 
 		struct CListVersions
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 
 				NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionIDAndPlatform, CVersionInformation>> m_Versions;
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 
 			NStr::CStr m_ForApplication;
 		};
@@ -120,14 +119,14 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) &&;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 
 				NConcurrency::CActorSubscription m_Subscription;
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 
 			CFileTransferContext m_TransferContext;
 		};
@@ -136,8 +135,8 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) &&;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 				
 				NConcurrency::CActorSubscription m_Subscription;
 				NContainer::TCSet<NStr::CStr> m_DeniedTags;
@@ -149,9 +148,9 @@ namespace NMib::NCloud
 				, EFlag_ForceOverwrite = DMibBit(0)
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
-			
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+		
 			NStr::CStr m_Application;
 			CVersionIDAndPlatform m_VersionIDAndPlatform;
 			CVersionInformation m_VersionInfo;
@@ -165,15 +164,15 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) &&;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 				
 				NConcurrency::CActorSubscription m_Subscription;
 				CVersionInformation m_VersionInfo;
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 			
 			NStr::CStr m_Application;
 			CVersionIDAndPlatform m_VersionIDAndPlatform;
@@ -182,8 +181,8 @@ namespace NMib::NCloud
 		
 		struct CNewVersionNotification
 		{
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 			
 			NStr::CStr m_Application;
 			CVersionIDAndPlatform m_VersionIDAndPlatform;
@@ -194,12 +193,12 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 			
 			bool m_bFullResend = false;
 			NContainer::TCVector<CNewVersionNotification> m_NewVersions;
@@ -209,14 +208,14 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) &&;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 				
 				NConcurrency::CActorSubscription m_Subscription;
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 			
 			NStr::CStr m_Application; /// Leave empty to subscribe to all applications
 			NContainer::TCSet<NStr::CStr> m_Platforms; /// Leave empty to subscribe to all platforms
@@ -230,14 +229,14 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 				
 				NContainer::TCSet<NStr::CStr> m_DeniedTags;
 			};
 			
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 			
 			NStr::CStr m_Application;
 			CVersionID m_VersionID;
@@ -264,7 +263,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCContinuation<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) = 0;
 	};
-
+	
 	struct CVersionManagerHelper
 	{
 		CVersionManagerHelper

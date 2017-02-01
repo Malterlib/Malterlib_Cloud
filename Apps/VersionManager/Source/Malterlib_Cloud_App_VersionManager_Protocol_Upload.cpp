@@ -65,51 +65,40 @@ namespace NMib::NCloud::NVersionManager
 	
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_UploadVersion(CStartUploadVersion &&_Params) -> TCContinuation<CStartUploadVersion::CResult>
 	{
-		auto &CallingHostInfo = fg_GetCallingHostInfo();
 		auto pThis = m_pThis;
 		
 		if (!pThis->mp_pCanDestroyTracker)
 			return DMibErrorInstance("Shutting down");
+			
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+		CStr CallingHostID = fg_GetCallingHostID();
 		
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
-		{
-			CStr Error = "Invalid application format";
-			fsp_LogActivityError(CallingHostInfo, Error + " (start upload version)");
-			return DMibErrorInstance(Error);
-		}
+			return Auditor.f_Exception({"Invalid application format", "(start upload version)"});
 
 		{
 			CStr ErrorStr;
 			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionIDAndPlatform.m_VersionID, ErrorStr))
-			{
-				CStr Error = fg_Format("Invalid version ID format: {}", ErrorStr);
-				fsp_LogActivityError(CallingHostInfo, Error + " (start upload version)");
-				return DMibErrorInstance(Error);
-			}
+				return Auditor.f_Exception({fg_Format("Invalid version ID format: {}", ErrorStr), "(start upload version)"});
 		}
 		
 		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
-		{
-			CStr Error = "Invalid version platform format";
-			fsp_LogActivityError(CallingHostInfo, Error + " (start upload version)");
-			return DMibErrorInstance(Error);
-		}
+			return Auditor.f_Exception({"Invalid version platform format", "(start upload version)"});
 		
-		bool bFullAccess = pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostInfo.f_GetRealHostID(), "Application/WriteAll");
+		bool bFullAccess = pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "Application/WriteAll");
 		
 		while (!bFullAccess)
 		{
-			if (pThis->mp_Permissions.f_HostHasPermission(CallingHostInfo.f_GetRealHostID(), fg_Format("Application/Write/{}", _Params.m_Application)))
+			if (pThis->mp_Permissions.f_HostHasPermission(CallingHostID, fg_Format("Application/Write/{}", _Params.m_Application)))
 				break;
-			
-			return pThis->fp_AccessDenied(CallingHostInfo, "Start upload version");
+			return Auditor.f_AccessDenied("(Start upload version)");
 		}
 		
 		TCSet<CStr> DeniedTags;
 
 		auto VersionInfo = _Params.m_VersionInfo;
 		
-		VersionInfo.m_Tags = pThis->fp_FilterTags(CallingHostInfo.f_GetRealHostID(), VersionInfo.m_Tags, DeniedTags);
+		VersionInfo.m_Tags = pThis->fp_FilterTags(CallingHostID, VersionInfo.m_Tags, DeniedTags);
 
 		CStr UploadID = fg_RandomID();
 		
@@ -117,15 +106,15 @@ namespace NMib::NCloud::NVersionManager
 		Upload.m_Desc = fg_Format("{}", _Params.m_VersionIDAndPlatform);
 		auto pCleanup = fg_OnScopeExitShared
 			(
-				[pThis, UploadID, ThisWeak = fg_ThisActor(pThis).f_Weak(), CallingHostInfo, Desc = Upload.m_Desc]
+				[pThis, UploadID, ThisWeak = fg_ThisActor(pThis).f_Weak(), Desc = Upload.m_Desc, Auditor]
 				{
 					fg_Dispatch
 						(
 							ThisWeak
-							, [pThis, UploadID, CallingHostInfo, Desc]
+							, [pThis, UploadID, Desc, Auditor]
 							{
 								if (pThis->mp_VersionUploads.f_Remove(UploadID))
-									fsp_LogActivityError(CallingHostInfo, fg_Format("'{}' Aborted upload of version", Desc));
+									Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
 							}
 						)
 						> fg_DiscardResult()
@@ -151,7 +140,6 @@ namespace NMib::NCloud::NVersionManager
 			[
 				pCleanup
 				, pThis
-				, CallingHostInfo
 				, UploadID
 				, Continuation
 				, Desc = Upload.m_Desc
@@ -160,17 +148,18 @@ namespace NMib::NCloud::NVersionManager
 				, VersionID = _Params.m_VersionIDAndPlatform
 				, ApplicationName = _Params.m_Application
 				, DeniedTags
+				, Auditor
 			]
 			(TCAsyncResult<CFileTransferContext> &&_FileTransferContext) mutable
 			{
 				if (!_FileTransferContext)
 				{
 					CStr Error = _FileTransferContext.f_GetExceptionStr();
-					fsp_LogActivityError(CallingHostInfo, fg_Format("'{}' Failed to initialize version upload: {}", Desc, Error));
+					Auditor.f_Error(fg_Format("'{}' Failed to initialize version upload: {}", Desc, Error));
 					if (Error == "Failed to extract current manifest: Directory already exists")
 						Continuation.f_SetException(DMibErrorInstance("Version already exists"));
 					else
-						Continuation.f_SetException(DMibErrorInstance("Failed to receive files. Consult version manager log files for more info."));
+						Continuation.f_SetException(DMibErrorInstance("Failed to receive files. See Version Manager log."));
 					return;
 				}
 				auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
@@ -188,13 +177,13 @@ namespace NMib::NCloud::NVersionManager
 							return fStartTransfer(fg_Move(StartTransfer));
 						}
 					)
-					> [pThis, Continuation, Desc, pCleanup, CallingHostInfo, UploadID, DeniedTags]
+					> [pThis, Continuation, Desc, pCleanup, UploadID, DeniedTags, Auditor]
 					(TCAsyncResult<CVersionManager::CStartUploadTransfer::CResult> &&_Result)
 					{
 						if (!_Result)
 						{
-							fsp_LogActivityError(CallingHostInfo, fg_Format("'{}' Failed to start transfer for version upload on remote: {}", Desc, _Result.f_GetExceptionStr()));
-							Continuation.f_SetException(DMibErrorInstance("Failed to start transfer. Consult version manager log files for more info."));
+							CStr Error = Auditor.f_Error({"Failed to start transfer. See Version Manager log.", fg_Format("'{}': {}", Desc, _Result.f_GetExceptionStr())});
+							Continuation.f_SetException(DMibErrorInstance(Error));
 							return;
 						}
 
@@ -209,7 +198,7 @@ namespace NMib::NCloud::NVersionManager
 						Result.m_Subscription = fg_ActorSubscription
 							(
 								fg_ThisActor(pThis)
-								, [pThis, UploadID, Desc, CallingHostInfo]
+								, [pThis, UploadID, Desc, Auditor]
 								{
 									auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
 									if (!pUpload)
@@ -220,9 +209,7 @@ namespace NMib::NCloud::NVersionManager
 										pUpload->m_FileTransferReceive.f_Clear();
 									}
 									if (pThis->mp_VersionUploads.f_Remove(UploadID))
-									{
-										fsp_LogActivityError(CallingHostInfo, fg_Format("'{}' Aborted upload of version", Desc));
-									}
+										Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
 								}
 							)
 						;
@@ -232,20 +219,19 @@ namespace NMib::NCloud::NVersionManager
 				;
 				
 				Upload.m_FileTransferReceive(&CFileTransferReceive::f_GetResult) 
-					> [pThis, CallingHostInfo, UploadID, ApplicationName, VersionID, VersionInfo, VersionPath, Desc](TCAsyncResult<CFileTransferResult> &&_Result)
+					> [pThis, UploadID, ApplicationName, VersionID, VersionInfo, VersionPath, Desc, Auditor](TCAsyncResult<CFileTransferResult> &&_Result)
 					{
 						if (!_Result)
-							fsp_LogActivityError(CallingHostInfo, fg_Format("'{}' Failed to transfer version (upload): {}", Desc, _Result.f_GetExceptionStr()));
+							Auditor.f_Error(fg_Format("'{}' Failed to transfer version (upload): {}", Desc, _Result.f_GetExceptionStr()));
 						else
 						{
 							auto &Result = *_Result;
 							CStr Message;
 							Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
 							
-							fsp_LogActivityInfo
+							Auditor.f_Info
 								(
-									CallingHostInfo
-									, fg_Format
+									fg_Format
 									(
 										"'{}' Version upload finished transferring: {}"
 										, Desc
@@ -270,11 +256,11 @@ namespace NMib::NCloud::NVersionManager
 							return;
 						
 						pThis->fp_SaveVersionInfo(FileAccess, VersionPath, VersionInfo)
-							> [pThis, VersionID, VersionInfo, CallingHostInfo, Desc, ApplicationName](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
+							> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
 							{
 								if (!_InfoWriteResult)
 								{
-									fsp_LogActivityError(CallingHostInfo, fg_Format("'{}' Failed to write version info file: {}", Desc, _InfoWriteResult.f_GetExceptionStr()));
+									Auditor.f_Error(fg_Format("'{}' Failed to write version info file: {}", Desc, _InfoWriteResult.f_GetExceptionStr()));
 									return;
 								}
 								
@@ -308,7 +294,7 @@ namespace NMib::NCloud::NVersionManager
 			}
 		;
 		
-		fsp_LogActivityInfo(CallingHostInfo, fg_Format("'{}' Starting upload of version", Upload.m_Desc));
+		Auditor.f_Info(fg_Format("'{}' Starting upload of version", Upload.m_Desc));
 		
 		return Continuation;
 	}

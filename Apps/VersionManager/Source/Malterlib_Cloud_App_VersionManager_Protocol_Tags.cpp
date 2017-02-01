@@ -43,49 +43,40 @@ namespace NMib::NCloud::NVersionManager
 
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags &&_Params) -> TCContinuation<CChangeTags::CResult> 
 	{
-		auto &CallingHostInfo = fg_GetCallingHostInfo();
 		auto pThis = m_pThis;
 		
 		if (!pThis->mp_pCanDestroyTracker)
 			return DMibErrorInstance("Shutting down");
+			
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+		CStr CallingHostID = fg_GetCallingHostID();
 		
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
-		{
-			CStr Error = "Invalid application format";
-			fsp_LogActivityError(CallingHostInfo, Error + " (change tags)");
-			return DMibErrorInstance(Error);
-		}
+			return Auditor.f_Exception({"Invalid application format", "(change tags)"});
 
 		{
 			CStr ErrorStr;
 			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionID, ErrorStr))
-			{
-				CStr Error = fg_Format("Invalid version ID format: {}", ErrorStr);
-				fsp_LogActivityError(CallingHostInfo, Error + " (change tags)");
-				return DMibErrorInstance(Error);
-			}
+				return Auditor.f_Exception({fg_Format("Invalid version ID format: {}", ErrorStr), "(change tags)"});
 		}
 		
 		TCSet<CStr> DeniedTags;
-		TCSet<CStr> AddTags = pThis->fp_FilterTags(CallingHostInfo.f_GetRealHostID(), _Params.m_AddTags, DeniedTags);
-		TCSet<CStr> RemoveTags = pThis->fp_FilterTags(CallingHostInfo.f_GetRealHostID(), _Params.m_RemoveTags, DeniedTags);
+		TCSet<CStr> AddTags = pThis->fp_FilterTags(CallingHostID, _Params.m_AddTags, DeniedTags);
+		TCSet<CStr> RemoveTags = pThis->fp_FilterTags(CallingHostID, _Params.m_RemoveTags, DeniedTags);
 		
 		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())
 		{
 			if (!DeniedTags.f_IsEmpty())
-				return pThis->fp_AccessDenied(CallingHostInfo, "Change tags", fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags));
-			fsp_LogActivityInfo(CallingHostInfo, "Change tags resulted in no changed tags");
+				return Auditor.f_AccessDenied({fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags), "(Change tags)"});
+				
+			Auditor.f_Info("Change tags resulted in no changed tags");
 			CVersionManager::CChangeTags::CResult Result;
 			return fg_Explicit(Result);
 		}
 
 		auto *pApplication = pThis->mp_Applications.f_FindEqual(_Params.m_Application);
 		if (!pApplication)
-		{
-			CStr Error = fg_Format("No such application: {}", _Params.m_Application);
-			fsp_LogActivityError(CallingHostInfo, Error);
-			return DMibErrorInstance(Error);
-		}
+			return Auditor.f_Exception(fg_Format("No such application: {}", _Params.m_Application));
 
 		TCActorResultVector<CSizeInfo> VersionResults;
 		
@@ -109,11 +100,7 @@ namespace NMib::NCloud::NVersionManager
 			VersionIDAndPlatform.m_Platform = _Params.m_Platform;
 			auto *pVersion = pApplication->m_Versions.f_FindEqual(VersionIDAndPlatform);
 			if (!pVersion)
-			{
-				CStr Error = fg_Format("No such version: {}", VersionIDAndPlatform);
-				fsp_LogActivityError(CallingHostInfo, Error);
-				return DMibErrorInstance(Error);
-			}
+				return Auditor.f_Exception(fg_Format("No such version: {}", VersionIDAndPlatform));
 			fTagVersion(*pVersion);
 		}
 		else
@@ -139,14 +126,14 @@ namespace NMib::NCloud::NVersionManager
 				, Platform = _Params.m_Platform
 				, AddTags
 				, RemoveTags
-				, CallingHostInfo
+				, Auditor
 			]
 			(TCAsyncResult<TCVector<TCAsyncResult<CSizeInfo>>> &&_Results)
 			{
 				if (!_Results)
 				{
-					fsp_LogActivityError(CallingHostInfo, fg_Format("Failed to save version infos: {}", _Results.f_GetExceptionStr()));
-					Continuation.f_SetException(DMibErrorInstance("Failed to save version infos. Consult version manager log files for more info."));
+					CStr Error = Auditor.f_Error({"Failed to save version infos. See Version Manager log.", fg_Format("Error: {}", _Results.f_GetExceptionStr())});
+					Continuation.f_SetException(DMibErrorInstance(Error));
 					return;
 				}
 				
@@ -155,12 +142,12 @@ namespace NMib::NCloud::NVersionManager
 				{
 					if (!Version)
 					{
-						fsp_LogActivityError(CallingHostInfo, fg_Format("Failed to save version info: {}", Version.f_GetExceptionStr()));
+						Auditor.f_Error(fg_Format("Failed to save version info: {}", Version.f_GetExceptionStr()));
 						bFailed = true;
 					}
 				}
 
-				fsp_LogActivityInfo(CallingHostInfo, fg_Format("Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, Platform, AddTags, RemoveTags));
+				Auditor.f_Info(fg_Format("Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, Platform, AddTags, RemoveTags));
 				
 				if (bFailed)
 				{

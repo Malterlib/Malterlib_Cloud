@@ -18,6 +18,27 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CVersionManager::f_SubscribeToUpdates);
 		DMibPublishActorFunction(CVersionManager::f_ChangeTags);
 	}
+
+	DMibDistributedStreamImplement(CVersionManager::CVersionID);
+	DMibDistributedStreamImplement(CVersionManager::CVersionIDAndPlatform);
+	DMibDistributedStreamImplement(CVersionManager::CVersionInformation);
+	DMibDistributedStreamImplement(CVersionManager::CListApplications);
+	DMibDistributedStreamImplement(CVersionManager::CListApplications::CResult);
+	DMibDistributedStreamImplement(CVersionManager::CListVersions);
+	DMibDistributedStreamImplement(CVersionManager::CListVersions::CResult);
+	DMibDistributedStreamImplement(CVersionManager::CStartUploadTransfer);
+	DMibDistributedStreamImplement(CVersionManager::CStartUploadTransfer::CResult);
+	DMibDistributedStreamImplement(CVersionManager::CStartUploadVersion);
+	DMibDistributedStreamImplement(CVersionManager::CStartUploadVersion::CResult);
+	DMibDistributedStreamImplement(CVersionManager::CStartDownloadVersion);
+	DMibDistributedStreamImplement(CVersionManager::CStartDownloadVersion::CResult);
+	DMibDistributedStreamImplement(CVersionManager::CNewVersionNotification);
+	DMibDistributedStreamImplement(CVersionManager::CNewVersionNotifications);
+	DMibDistributedStreamImplement(CVersionManager::CNewVersionNotifications::CResult);
+	DMibDistributedStreamImplement(CVersionManager::CSubscribeToUpdates);
+	DMibDistributedStreamImplement(CVersionManager::CSubscribeToUpdates::CResult);
+	DMibDistributedStreamImplement(CVersionManager::CChangeTags);
+	DMibDistributedStreamImplement(CVersionManager::CChangeTags::CResult);
 	
 	CVersionManager::~CVersionManager() = default;
 	
@@ -96,22 +117,15 @@ namespace NMib::NCloud
 	
 	// CVersionID
 	
-	void CVersionManager::CVersionID::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CVersionManager::CVersionID::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream << m_Branch;
-		_Stream << m_Major;
-		_Stream << m_Minor;
-		_Stream << m_Revision;
+		_Stream % m_Branch;
+		_Stream % m_Major;
+		_Stream % m_Minor;
+		_Stream % m_Revision;
 	}
 	
-	void CVersionManager::CVersionID::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_Branch;
-		_Stream >> m_Major;
-		_Stream >> m_Minor;
-		_Stream >> m_Revision;
-	}
-
 	CStr CVersionManager::CVersionID::f_EncodeFileName() const
 	{
 		return fg_Format("{}_{}.{}.{}", m_Branch.f_ReplaceChar('/', '_'), m_Major, m_Minor, m_Revision);
@@ -168,19 +182,14 @@ namespace NMib::NCloud
 	}
 	
 	// CVersionIDAndPlatform
-	
-	void CVersionManager::CVersionIDAndPlatform::f_Feed(CDistributedActorWriteStream &_Stream) const
-	{
-		_Stream << m_VersionID;
-		_Stream << m_Platform;
-	}
-	
-	void CVersionManager::CVersionIDAndPlatform::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_VersionID;
-		_Stream >> m_Platform;
-	}
 
+	template <typename tf_CStream>
+	void CVersionManager::CVersionIDAndPlatform::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_VersionID;
+		_Stream % m_Platform;
+	}
+	
 	CStr CVersionManager::CVersionIDAndPlatform::f_EncodeFileName() const
 	{
 		return fg_Format("{}/{}", m_VersionID.f_EncodeFileName(), m_Platform);
@@ -263,269 +272,162 @@ namespace NMib::NCloud
 		return Ret;
 	}
 	
-	void CVersionManager::CVersionInformation::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CVersionManager::CVersionInformation::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream << m_Time;
-		_Stream << m_Configuration;
-		_Stream << m_Tags;
-		_Stream << m_ExtraInfo;
-		_Stream << m_nFiles;
-		_Stream << m_nBytes;
-	}
-	
-	void CVersionManager::CVersionInformation::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_Time;
-		_Stream >> m_Configuration;
-		_Stream >> m_Tags;
-		_Stream >> m_ExtraInfo;
-		_Stream >> m_nFiles;
-		_Stream >> m_nBytes;
+		_Stream % m_Time;
+		_Stream % m_Configuration;
+		_Stream % m_Tags;
+		_Stream % m_ExtraInfo;
+		_Stream % m_nFiles;
+		_Stream % m_nBytes;
 	}
 	
 	// CListApplications
 	
-	void CVersionManager::CListApplications::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CVersionManager::CListApplications::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_Applications;
+		_Stream % m_Applications;
 	}
 	
-	void CVersionManager::CListApplications::CResult::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_Applications;
-	}
-	
-	void CVersionManager::CListApplications::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CVersionManager::CListApplications::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
 	
-	void CVersionManager::CListApplications::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-	}
-
 	// CListVersions
 	
-	void CVersionManager::CListVersions::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CVersionManager::CListVersions::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_Versions;
+		_Stream % m_Versions;
 	}
 	
-	void CVersionManager::CListVersions::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	template <typename tf_CStream>
+	void CVersionManager::CListVersions::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_Versions;
+		_Stream % m_ForApplication;
 	}
 	
-	void CVersionManager::CListVersions::f_Feed(CDistributedActorWriteStream &_Stream) const
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_ForApplication;
-	}
-	
-	void CVersionManager::CListVersions::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_ForApplication;
-	}
-
 	// CStartUploadTransfer
 	
-	void CVersionManager::CStartUploadTransfer::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
+	template <typename tf_CStream>
+	void CVersionManager::CStartUploadTransfer::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << fg_Move(m_Subscription);
+		operator % (_Stream, fg_Move(m_Subscription));
+		//_Stream % fg_Move(m_Subscription);
 	}
 	
-	void CVersionManager::CStartUploadTransfer::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	template <typename tf_CStream>
+	void CVersionManager::CStartUploadTransfer::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_Subscription;
-	}
-
-	void CVersionManager::CStartUploadTransfer::f_Feed(CDistributedActorWriteStream &_Stream) const
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_TransferContext;
+		_Stream % m_TransferContext;
 	}
 	
-	void CVersionManager::CStartUploadTransfer::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_TransferContext;
-	}
-
 	// CStartUploadVersion
 	
-	void CVersionManager::CStartUploadVersion::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
+	template <typename tf_CStream>
+	void CVersionManager::CStartUploadVersion::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << fg_Move(m_Subscription);
-		_Stream << m_DeniedTags;
+		_Stream % fg_Move(m_Subscription);
+		_Stream % m_DeniedTags;
 	}
 	
-	void CVersionManager::CStartUploadVersion::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	template <typename tf_CStream>
+	void CVersionManager::CStartUploadVersion::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_Subscription;
-		_Stream >> m_DeniedTags;
-	}
-		
-	void CVersionManager::CStartUploadVersion::f_Feed(CDistributedActorWriteStream &_Stream) const
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_Application; 
-		_Stream << m_VersionIDAndPlatform; 
-		_Stream << m_VersionInfo;
-		_Stream << m_QueueSize;
-		_Stream << m_Flags;
-		_Stream << m_DispatchActor;
-		_Stream << m_fStartTransfer;
+		_Stream % m_Application; 
+		_Stream % m_VersionIDAndPlatform; 
+		_Stream % m_VersionInfo;
+		_Stream % m_QueueSize;
+		_Stream % m_Flags;
+		_Stream % m_DispatchActor;
+		_Stream % m_fStartTransfer;
 	}
 	
-	void CVersionManager::CStartUploadVersion::f_Consume(CDistributedActorReadStream &_Stream)
+	template <typename tf_CStream>
+	void CVersionManager::CStartDownloadVersion::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_Application; 
-		_Stream >> m_VersionIDAndPlatform; 
-		_Stream >> m_VersionInfo; 
-		_Stream >> m_QueueSize;
-		_Stream >> m_Flags;
-		_Stream >> m_DispatchActor;
-		_Stream >> m_fStartTransfer;
+		_Stream % fg_Move(m_Subscription);
+		_Stream % m_VersionInfo;
 	}
 	
-	void CVersionManager::CStartDownloadVersion::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
+	template <typename tf_CStream>
+	void CVersionManager::CStartDownloadVersion::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << fg_Move(m_Subscription);
-		_Stream << m_VersionInfo;
-	}
-	
-	void CVersionManager::CStartDownloadVersion::CResult::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_Subscription;
-		_Stream >> m_VersionInfo;
-	}
-		
-	void CVersionManager::CStartDownloadVersion::f_Feed(CDistributedActorWriteStream &_Stream) const
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_Application;
-		_Stream << m_VersionIDAndPlatform;
-		_Stream << m_TransferContext;
-	}
-	
-	void CVersionManager::CStartDownloadVersion::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_Application;
-		_Stream >> m_VersionIDAndPlatform;
-		_Stream >> m_TransferContext;
+		_Stream % m_Application;
+		_Stream % m_VersionIDAndPlatform;
+		_Stream % m_TransferContext;
 	}
 	
 	// CNewVersionNotification
 	
-	void CVersionManager::CNewVersionNotifications::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CVersionManager::CNewVersionNotifications::CResult::f_Stream(tf_CStream &_Stream)
 	{
 	}
 	
-	void CVersionManager::CNewVersionNotifications::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	template <typename tf_CStream>
+	void CVersionManager::CNewVersionNotification::f_Stream(tf_CStream &_Stream)
 	{
+		_Stream % m_Application;
+		_Stream % m_VersionIDAndPlatform;
+		_Stream % m_VersionInfo;
 	}
 	
-	void CVersionManager::CNewVersionNotification::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CVersionManager::CNewVersionNotifications::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream << m_Application;
-		_Stream << m_VersionIDAndPlatform;
-		_Stream << m_VersionInfo;
+		_Stream % m_bFullResend;
+		_Stream % m_NewVersions;
 	}
 	
-	void CVersionManager::CNewVersionNotification::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_Application;
-		_Stream >> m_VersionIDAndPlatform;
-		_Stream >> m_VersionInfo;
-	}
-
-	void CVersionManager::CNewVersionNotifications::f_Feed(CDistributedActorWriteStream &_Stream) const
-	{
-		_Stream << m_bFullResend;
-		_Stream << m_NewVersions;
-	}
-	
-	void CVersionManager::CNewVersionNotifications::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_bFullResend;
-		_Stream >> m_NewVersions;
-	}
-
 	// CSubscribeToUpdates
 	
-	void CVersionManager::CSubscribeToUpdates::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
+	template <typename tf_CStream>
+	void CVersionManager::CSubscribeToUpdates::CResult::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream << fg_Move(m_Subscription);
+		_Stream % fg_Move(m_Subscription);
 	}
 	
-	void CVersionManager::CSubscribeToUpdates::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	template <typename tf_CStream>
+	void CVersionManager::CSubscribeToUpdates::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream >> m_Subscription;
-	}
-
-	void CVersionManager::CSubscribeToUpdates::f_Feed(CDistributedActorWriteStream &_Stream) const
-	{
-		_Stream << m_Application;
-		_Stream << m_Platforms;
-		_Stream << m_DispatchActor;
-		_Stream << m_fOnNewVersions;
-		_Stream << m_nInitial;
+		_Stream % m_Application;
+		_Stream % m_Platforms;
+		_Stream % m_DispatchActor;
+		_Stream % m_fOnNewVersions;
+		_Stream % m_nInitial;
 		if (_Stream.f_GetVersion() >= 0x104)
-			_Stream << m_Tags;
-	}
-	
-	void CVersionManager::CSubscribeToUpdates::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_Application; 
-		_Stream >> m_Platforms;
-		_Stream >> m_DispatchActor;
-		_Stream >> m_fOnNewVersions;
-		_Stream >> m_nInitial;
-		if (_Stream.f_GetVersion() >= 0x104)
-			_Stream >> m_Tags;
+			_Stream % m_Tags;
 	}
 	
 	// CChangeTags
 	
-	void CVersionManager::CChangeTags::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CVersionManager::CChangeTags::CResult::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream << m_DeniedTags;
+		_Stream % m_DeniedTags;
 	}
 	
-	void CVersionManager::CChangeTags::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	template <typename tf_CStream>
+	void CVersionManager::CChangeTags::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream >> m_DeniedTags;
-	}
-	
-	void CVersionManager::CChangeTags::f_Feed(CDistributedActorWriteStream &_Stream) const
-	{
-		_Stream << m_Application;
-		_Stream << m_VersionID;
-		_Stream << m_Platform;
-		_Stream << m_AddTags;
-		_Stream << m_RemoveTags;
-	}
-	
-	void CVersionManager::CChangeTags::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_Application;
-		_Stream >> m_VersionID;
-		_Stream >> m_Platform;
-		_Stream >> m_AddTags;
-		_Stream >> m_RemoveTags;
+		_Stream % m_Application;
+		_Stream % m_VersionID;
+		_Stream % m_Platform;
+		_Stream % m_AddTags;
+		_Stream % m_RemoveTags;
 	}
 }

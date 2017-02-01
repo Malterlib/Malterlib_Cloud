@@ -288,19 +288,4 @@ namespace NMib::NCloud::NVersionManager
 		mp_QueryFileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Version manager query file actor"));
 		return mp_QueryFileActor;
 	}
-	
-	void CVersionManagerDaemonActor::CServer::fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error)
-	{
-		DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "({}) {}", _CallingHostInfo.f_GetHostInfo(), _Error);
-	}
-
-	void CVersionManagerDaemonActor::CServer::fsp_LogActivityWarning(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error)
-	{
-		DLogWithCategory(Malterlib/Cloud/VersionManager, Warning, "({}) {}", _CallingHostInfo.f_GetHostInfo(), _Error);
-	}
-
-	void CVersionManagerDaemonActor::CServer::fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info)
-	{
-		DLogWithCategory(Malterlib/Cloud/VersionManager, Info, "({}) {}", _CallingHostInfo.f_GetHostInfo(), _Info);
-	}
 }

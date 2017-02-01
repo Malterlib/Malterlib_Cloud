@@ -150,7 +150,6 @@ namespace NMib::NCloud::NVersionManager
 	
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) -> TCContinuation<CSubscribeToUpdates::CResult> 
 	{
-		auto &CallingHostInfo = fg_GetCallingHostInfo();
 		auto pThis = m_pThis;
 		
 		CStr SubscriptionID = fg_RandomID();
@@ -163,7 +162,7 @@ namespace NMib::NCloud::NVersionManager
 		auto &Subscription = *pSubscription;
 		Subscription.m_DispatchActor = fg_Move(_Params.m_DispatchActor);
 		Subscription.m_fOnNewVersions = fg_Move(_Params.m_fOnNewVersions);
-		Subscription.m_HostID = CallingHostInfo.f_GetRealHostID();
+		Subscription.m_HostID = fg_GetCallingHostID();
 		Subscription.m_Tags = _Params.m_Tags;
 		Subscription.m_Platforms = _Params.m_Platforms;
 		Subscription.m_nInitial = _Params.m_nInitial;

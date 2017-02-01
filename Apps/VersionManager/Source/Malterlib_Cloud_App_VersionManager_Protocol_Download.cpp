@@ -27,59 +27,41 @@ namespace NMib::NCloud::NVersionManager
 
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_DownloadVersion(CStartDownloadVersion &&_Params) -> TCContinuation<CStartDownloadVersion::CResult>
 	{
-		auto &CallingHostInfo = fg_GetCallingHostInfo();
 		auto pThis = m_pThis;
 		
 		if (!pThis->mp_pCanDestroyTracker)
 			return DMibErrorInstance("Shutting down");
+			
+		auto Auditor = pThis->mp_AppState.f_Auditor(); 
+		auto CallingHostID = fg_GetCallingHostID();
 		
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
-		{
-			CStr Error = "Invalid application format";
-			fsp_LogActivityError(CallingHostInfo, Error + " (start download version)");
-			return DMibErrorInstance(Error);
-		}
+			return Auditor.f_Exception({"Invalid application format", "(start download version)"});
 
 		{
 			CStr ErrorStr;
 			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionIDAndPlatform.m_VersionID, ErrorStr))
-			{
-				CStr Error = fg_Format("Invalid version ID format: {}", ErrorStr);
-				fsp_LogActivityError(CallingHostInfo, Error + " (start download version)");
-				return DMibErrorInstance(Error);
-			}
+				return Auditor.f_Exception({fg_Format("Invalid version ID format: {}", ErrorStr), "(start download version)"});
 		}
 		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
-		{
-			CStr Error = fg_Format("Invalid version platform format");
-			fsp_LogActivityError(CallingHostInfo, Error + " (start download version)");
-			return DMibErrorInstance(Error);
-		}
+			return Auditor.f_Exception({"Invalid version platform format", "(start download version)"});
 		
-		bool bFullAccess = pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostInfo.f_GetRealHostID(), "Application/ReadAll");
+		bool bFullAccess = pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "Application/ReadAll");
 		
 		while (!bFullAccess)
 		{
-			if (pThis->mp_Permissions.f_HostHasPermission(CallingHostInfo.f_GetRealHostID(), fg_Format("Application/Read/{}", _Params.m_Application)))
+			if (pThis->mp_Permissions.f_HostHasPermission(CallingHostID, fg_Format("Application/Read/{}", _Params.m_Application)))
 				break;
 			
-			return pThis->fp_AccessDenied(CallingHostInfo, "Start download version");
+			return Auditor.f_AccessDenied("(Start download version)");
 		}
 		
 		auto *pApplication = pThis->mp_Applications.f_FindEqual(_Params.m_Application);
 		if (!pApplication)
-		{
-			CStr Error = fg_Format("No such application: {}", _Params.m_Application);
-			fsp_LogActivityError(CallingHostInfo, Error);
-			return DMibErrorInstance(Error);
-		}
+			return Auditor.f_Exception(fg_Format("No such application: {}", _Params.m_Application));
 		auto *pVersion = pApplication->m_Versions.f_FindEqual(_Params.m_VersionIDAndPlatform);
 		if (!pVersion)
-		{
-			CStr Error = fg_Format("No such version: {}", _Params.m_VersionIDAndPlatform);
-			fsp_LogActivityError(CallingHostInfo, Error);
-			return DMibErrorInstance(Error);
-		}
+			return Auditor.f_Exception(fg_Format("No such version: {}", _Params.m_VersionIDAndPlatform));
 		
 		NStr::CStr DownloadID = fg_RandomID();
 		
@@ -99,12 +81,22 @@ namespace NMib::NCloud::NVersionManager
 		TCContinuation<CVersionManager::CStartDownloadVersion::CResult> Continuation;
 		
 		Download.m_FileTransferSend(&CFileTransferSend::f_SendFiles, fg_Move(_Params.m_TransferContext)) 
-			> [pThis, CallingHostInfo, DownloadID, Continuation, Desc = Download.m_Desc, VersionInfo = pVersion->m_VersionInfo](TCAsyncResult<CActorSubscription> &&_Subscription) mutable
+			> [pThis, DownloadID, Continuation, Desc = Download.m_Desc, VersionInfo = pVersion->m_VersionInfo, Auditor]
+			(TCAsyncResult<CActorSubscription> &&_Subscription) mutable
 			{
 				if (!_Subscription)
 				{
-					fsp_LogActivityError(CallingHostInfo, fg_Format("'{}' Failed to initialize version download: {}", Desc, _Subscription.f_GetExceptionStr()));
-					Continuation.f_SetException(DMibErrorInstance("Failed to send files. Consult version manager log files for more info."));
+					Continuation.f_SetException
+						(
+							Auditor.f_Exception
+							(
+								{
+									fg_Format("'{}' Failed to send files. Check Version Manager log for more info.", Desc)
+									, fg_Format("Error: {}", _Subscription.f_GetExceptionStr())
+								}
+							)
+						)
+					;
 					return;
 				}
 				CVersionManager::CStartDownloadVersion::CResult Result;
@@ -115,20 +107,19 @@ namespace NMib::NCloud::NVersionManager
 				if (!pDownload)
 					return;
 				auto &Download = *pDownload;
-				Download.m_FileTransferSend(&CFileTransferSend::f_GetResult) > [pThis, CallingHostInfo, DownloadID, Desc](TCAsyncResult<CFileTransferResult> &&_Result)
+				Download.m_FileTransferSend(&CFileTransferSend::f_GetResult) > [pThis, DownloadID, Desc, Auditor](TCAsyncResult<CFileTransferResult> &&_Result)
 					{
 						if (!_Result)
-							fsp_LogActivityError(CallingHostInfo, fg_Format("'{}' Failed to transfer version (download): {}", Desc, _Result.f_GetExceptionStr()));
+							Auditor.f_Error(fg_Format("'{}' Failed to transfer version (download): {}", Desc, _Result.f_GetExceptionStr()));
 						else
 						{
 							auto &Result = *_Result;
 							CStr Message;
 							Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
 							
-							fsp_LogActivityInfo
+							Auditor.f_Info
 								(
-									CallingHostInfo
-									, fg_Format
+									fg_Format
 									(
 										"'{}' Version download finished transferring: {}"
 										, Desc
@@ -154,7 +145,7 @@ namespace NMib::NCloud::NVersionManager
 		
 		Cleanup.f_Clear();
 		
-		fsp_LogActivityInfo(CallingHostInfo, fg_Format("'{}' Starting download of version", Download.m_Desc));
+		Auditor.f_Info(fg_Format("'{}' Starting download of version", Download.m_Desc));
 		
 		return Continuation;
 	}
