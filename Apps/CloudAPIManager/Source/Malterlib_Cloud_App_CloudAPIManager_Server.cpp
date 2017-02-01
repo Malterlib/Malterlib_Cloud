@@ -152,38 +152,26 @@ namespace NMib::NCloud::NCloudAPIManager
 		mp_CURLQueryActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Cloud API manager CURL query file actor"));
 		return mp_CURLQueryActor;
 	}
-	
-	CException CCloudAPIManagerDaemonActor::CServer::fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error, CExceptionPointer _pException)
-	{
-		CStr Error = _Error;
-		CStr LogError = _Error;
 
+	TCVector<CStr> CCloudAPIManagerDaemonActor::CServer::fsp_AuditMessages(CStr const &_Error, CExceptionPointer _pException)
+	{
+		TCVector<CStr> Messages;
 		try
 		{
 			if (_pException)
 				std::rethrow_exception(_pException);
+			Messages.f_Insert(_Error);
 		}
 		catch (CExceptionCloudAPI const &_Exception)
 		{
-			LogError = Error = fg_Format("{}: {}", Error, _Exception.f_GetErrorStr());
+			Messages.f_Insert(fg_Format("{}: {}", _Error, _Exception.f_GetErrorStr()));
 		}
 		catch (CException const &_Exception)
 		{
-			LogError = fg_Format("{}: {}", Error, _Exception.f_GetErrorStr());
+			Messages.f_Insert(_Error);
+			Messages.f_Insert(fg_Format("Error: ", _Exception.f_GetErrorStr()));
 		}
 	
-		DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "({}) {}", _CallingHostInfo.f_GetHostInfo(), LogError);
-		
-		return DMibErrorInstance(Error);
-	}
-
-	void CCloudAPIManagerDaemonActor::CServer::fsp_LogActivityWarning(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error)
-	{
-		DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Warning, "({}) {}", _CallingHostInfo.f_GetHostInfo(), _Error);
-	}
-
-	void CCloudAPIManagerDaemonActor::CServer::fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info)
-	{
-		DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Info, "({}) {}", _CallingHostInfo.f_GetHostInfo(), _Info);
+		return Messages;
 	}
 }

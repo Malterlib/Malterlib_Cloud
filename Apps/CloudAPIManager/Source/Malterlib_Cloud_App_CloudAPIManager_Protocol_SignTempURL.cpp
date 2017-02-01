@@ -16,31 +16,31 @@ namespace NMib::NCloud::NCloudAPIManager
 {
 	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_SignTempURL(CSignTempURL &&_Params) -> TCContinuation<CSignTempURL::CResult>
 	{
-		auto &CallingHostInfo = fg_GetCallingHostInfo();
 		auto pThis = m_pThis;
+		auto Auditor = pThis->mp_AppState.f_Auditor();
 		
 		TCContinuation<CCloudAPIManager::CSignTempURL::CResult> Continuation;
 		
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
-			return fsp_LogActivityError(CallingHostInfo, "Cloud context format not valid", nullptr);
+			return Auditor.f_Exception("Cloud context format not valid");
 		
 		if (!CCloudAPIManager::fs_IsValidContainerName(_Params.m_ContainerName))
-			return fsp_LogActivityError(CallingHostInfo, "Container name format not valid", nullptr);
+			return Auditor.f_Exception("Container name format not valid");
 		
 		if (!CCloudAPIManager::fs_IsValidObjectId(_Params.m_ObjectId))
-			return fsp_LogActivityError(CallingHostInfo, "Object id format not valid", nullptr);
+			return Auditor.f_Exception("Object id format not valid");
 		
 		if (!CCloudAPIManager::fs_IsValidTempURLKey(_Params.m_TempURLKey))
-			return fsp_LogActivityError(CallingHostInfo, "Temp URL key format not valid", nullptr);
+			return Auditor.f_Exception("Temp URL key format not valid");
 		
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostInfo.f_GetRealHostID(), "ObjectStorage/SignTempURLAll", fg_Format("ObjectStorage/SignTempURL/{}", _Params.m_CloudContext)))
-			return pThis->fp_AccessDenied(CallingHostInfo, "Sign Temp URL");
+		if (!pThis->mp_Permissions.f_HostHasAnyPermission(fg_GetCallingHostID(), "ObjectStorage/SignTempURLAll", fg_Format("ObjectStorage/SignTempURL/{}", _Params.m_CloudContext)))
+			return Auditor.f_AccessDenied("(Sign Temp URL)");
 		
 		auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
 		if (!pCloudContext)
-			return fsp_LogActivityError(CallingHostInfo,  fg_Format("No such cloud context: {}", _Params.m_CloudContext), nullptr);
+			return Auditor.f_Exception(fg_Format("No such cloud context: {}", _Params.m_CloudContext));
 		
-		pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [pThis, Continuation, _Params, CallingHostInfo](COpenStackServiceInfo &&_ServiceInfo)
+		pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [pThis, Continuation, _Params, Auditor](COpenStackServiceInfo &&_ServiceInfo)
 			{
 				fg_Dispatch
 					(
@@ -83,18 +83,18 @@ namespace NMib::NCloud::NCloudAPIManager
 							return SignedURL;
 						}
 					)
-					> [Continuation, _Params, CallingHostInfo](TCAsyncResult<CStr> &&_Value)
+					> [Continuation, _Params, Auditor](TCAsyncResult<CStr> &&_Value)
 					{
 						if (!_Value)
 						{
 							CStr Error = fg_Format("Failed to sign temp URL {}/{} on {}", _Params.m_ContainerName, _Params.m_ObjectId, _Params.m_CloudContext);
-							Continuation.f_SetException(fsp_LogActivityError(CallingHostInfo, Error, _Value.f_GetException()));
+							Continuation.f_SetException(Auditor.f_Exception(fsp_AuditMessages(Error, _Value.f_GetException())));
 							return;
 						}
 						CCloudAPIManager::CSignTempURL::CResult Result;
 						Result.m_SignedURL = *_Value;
 						Continuation.f_SetResult(Result);
-						fsp_LogActivityInfo(CallingHostInfo, fg_Format("Sign temp URL {}/{} on {}", _Params.m_ContainerName, _Params.m_ObjectId, _Params.m_CloudContext));
+						Auditor.f_Info(fg_Format("Sign temp URL {}/{} on {}", _Params.m_ContainerName, _Params.m_ObjectId, _Params.m_CloudContext));
 					}
 				;
 			}

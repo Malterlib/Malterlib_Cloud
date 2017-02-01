@@ -24,7 +24,7 @@ namespace NMib::NCloud::NCloudAPIManager
 	TCContinuation<void> CCloudAPIManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
 		TCContinuation<void> Continuation;
-		mp_pServer = fg_ConstructActor<CServer>(mp_State);
+		mp_pServer = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);
 		Continuation.f_SetResult();
 		return Continuation;				
 	}

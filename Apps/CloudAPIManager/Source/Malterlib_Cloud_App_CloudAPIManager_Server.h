@@ -17,6 +17,8 @@ namespace NMib::NCloud::NCloudAPIManager
 	struct CCloudAPIManagerDaemonActor::CServer : public CActor
 	{
 	public:
+		using CActorHolder = CDelegatedActorHolder;
+		
 		CServer(CDistributedAppState &_AppState);
 		~CServer();
 		void f_Construct() override;
@@ -77,11 +79,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		TCContinuation<COpenStackServiceInfo> fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext);
 
-		CException fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description, CStr const &_UserDescription = CStr());
-		
-		static void fsp_LogActivityInfo(CCallingHostInfo const &_CallingHostInfo, CStr const &_Info);
-		static CException fsp_LogActivityError(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error, CExceptionPointer _pException);
-		static void fsp_LogActivityWarning(CCallingHostInfo const &_CallingHostInfo, CStr const &_Error);
+		static TCVector<CStr> fsp_AuditMessages(CStr const &_Error, CExceptionPointer _pException);
 		
 		TCActor<CSeparateThreadActor> const &fp_GetCURLQueryActor();
 
@@ -91,7 +89,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		TCDelegatedActorInterface<CCloudAPIManagerImplementation> mp_ProtocolInterface;
 		
-		CDistributedAppState mp_AppState;
+		CDistributedAppState &mp_AppState;
 		
 		CTrustedPermissionSubscription mp_Permissions;
 		

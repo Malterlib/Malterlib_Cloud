@@ -16,18 +16,4 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 		mp_ProtocolInterface.f_Publish<CCloudAPIManager>(mp_AppState.m_DistributionManager, this, "com.malterlib/Cloud/CloudAPIManager");
 	}
-
-	NException::CException CCloudAPIManagerDaemonActor::CServer::fp_AccessDenied(CCallingHostInfo const &_CallingHostInfo, CStr const &_Description, CStr const &_UserDescription)
-	{
-		if (!_UserDescription.f_IsEmpty())
-		{
-			fsp_LogActivityWarning(_CallingHostInfo, fg_Format("Denied access to: {} '{}'", _Description, _UserDescription));
-			return DMibErrorInstance(_UserDescription);
-		}
-		else
-		{
-			fsp_LogActivityWarning(_CallingHostInfo, fg_Format("Denied access to: {}", _Description));
-			return DMibErrorInstance("Access denied");
-		}
-	}
 }
