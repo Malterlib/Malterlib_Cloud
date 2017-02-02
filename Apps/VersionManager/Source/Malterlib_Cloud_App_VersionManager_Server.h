@@ -6,7 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedApp>
-#include <Mib/Concurrency/ActorCallbackManager>
+#include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Daemon/Daemon>
 

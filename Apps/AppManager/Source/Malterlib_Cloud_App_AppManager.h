@@ -126,7 +126,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_AssociatedHostID;
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AppInterface;
 			mint m_AppInterfaceAssignSequence = 0;
-			EDistributedAppUpdateType m_UpdateType = EDistributedAppUpdateType_Independent;
+			CDistributedAppInterfaceServer::CRegisterInfo m_RegisterInfo;
 
 			// Specific version state
 			TCVector<CStr> m_Files;
@@ -236,7 +236,7 @@ namespace NMib::NCloud::NAppManager
 				(
 					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
 					, TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> &&_TrustInterface
-					, EDistributedAppUpdateType _UpdateType
+					, CRegisterInfo const &_RegisterInfo
 				) override
 			;
 
@@ -265,8 +265,18 @@ namespace NMib::NCloud::NAppManager
 			;
 
 			TCContinuation<TCMap<CStr, CApplicationInfo>> f_GetInstalled() override;
+			
+			auto f_SubscribeUpdateNotifications(NConcurrency::TCActorFunctorWithID<NConcurrency::TCContinuation<void> (CUpdateNotification const &_Notification)> &&_fOnNotification) 
+				-> NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> override
+			; 
 
 			CAppManagerActor *m_pThis = nullptr;
+		};
+
+		struct CUpdateNotificationSubscription
+		{
+			TCActorFunctor<NConcurrency::TCContinuation<void> (CAppManagerInterface::CUpdateNotification const &_Notification)> m_fOnUpdate;
+			CStr m_CallingHostID;
 		};
 		
 		enum EEncryptOperation
@@ -441,6 +451,8 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<void> fp_PublishAppInterface();		
 		TCContinuation<void> fp_PublishAppManagerInterface();
 		
+		void fp_OnUpdateEvent(CStr const &_Application, CAppManagerInterface::EUpdateStage _Stage, CAppManagerInterface::CVersionIDAndPlatform const &_VersionID, NStr::CStr const &_Message);
+		
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
 		TCActor<CSeparateThreadActor> mp_FileActor;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
@@ -458,6 +470,8 @@ namespace NMib::NCloud::NAppManager
 		TCDelegatedActorInterface<CAppManagerInterfaceImplementation> mp_AppManagerInterface;
 		
 		CTrustedPermissionSubscription mp_Permissions;
+		
+		TCMap<CStr, CUpdateNotificationSubscription> mp_UpdateNotificationSubscriptions;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

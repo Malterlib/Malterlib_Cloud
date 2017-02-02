@@ -6,7 +6,7 @@
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
 #include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
-#include <Mib/Concurrency/ActorCallbackManager>
+#include <Mib/Concurrency/ActorSubscription>
 
 #include "Malterlib_Cloud_App_VersionManager.h"
 #include "Malterlib_Cloud_App_VersionManager_Server.h"

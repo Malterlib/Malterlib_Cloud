@@ -16,6 +16,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CAppManagerInterface::f_Restart);
 		DMibPublishActorFunction(CAppManagerInterface::f_ChangeSettings);
 		DMibPublishActorFunction(CAppManagerInterface::f_GetInstalled);
+		DMibPublishActorFunction(CAppManagerInterface::f_SubscribeUpdateNotifications);
 	}
 
 	DMibDistributedStreamImplement(CAppManagerInterface::CVersionIDAndPlatform);
@@ -27,6 +28,7 @@ namespace NMib::NCloud
 	DMibDistributedStreamImplement(CAppManagerInterface::CApplicationChangeSettings);
 	DMibDistributedStreamImplement(CAppManagerInterface::CApplicationInfo);
 	DMibDistributedStreamImplement(CAppManagerInterface::CApplicationUpdate);
+	DMibDistributedStreamImplement(CAppManagerInterface::CUpdateNotification);
 	
 	CAppManagerInterface::~CAppManagerInterface() = default;
 
@@ -110,6 +112,15 @@ namespace NMib::NCloud
 		_Stream % m_UpdateScriptPostLaunch;
 		_Stream % m_UpdateScriptOnError;
 		_Stream % m_bSelfUpdateSource;
+	}
+	
+	template <typename tf_CStream>
+	void CAppManagerInterface::CUpdateNotification::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Application;
+		_Stream % m_Message;
+		_Stream % m_VersionID;
+		_Stream % m_Stage;
 	}
 	
 	template <typename tf_CStream>

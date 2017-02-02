@@ -24,6 +24,22 @@ namespace NMib::NCloud
 		CAppManagerInterface();
 		~CAppManagerInterface();
 		
+		enum EUpdateStage
+		{
+			EUpdateStage_Failed = 0xf0000000
+			, EUpdateStage_ChangeEncryption = 0
+			, EUpdateStage_DownloadVersion = 1
+			, EUpdateStage_Unpack = 2
+			, EUpdateStage_StopOldApp = 3
+			, EUpdateStage_PreUpdateScript = 4
+			, EUpdateStage_UpdateApplicationFiles = 5
+			, EUpdateStage_SaveApplicationState = 6
+			, EUpdateStage_PostUpdateScript = 7
+			, EUpdateStage_StartNewApp = 8
+			, EUpdateStage_Finished = 9
+			, EUpdateStage_PostLaunchScriptFinished = 10
+		};
+		
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
 		{
 			template <typename tf_CStream>
@@ -116,6 +132,17 @@ namespace NMib::NCloud
 			CVersionInformation m_VersionInfo;
 		};
 		
+		struct CUpdateNotification
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			
+			NStr::CStr m_Application;
+			NStr::CStr m_Message; // Currently only for EUpdateStage_Failed
+			CVersionIDAndPlatform m_VersionID;
+			EUpdateStage m_Stage = EUpdateStage_Failed;
+		};
+		
 		struct CApplicationAdd
 		{
 			template <typename tf_CStream>
@@ -180,5 +207,8 @@ namespace NMib::NCloud
 		;
 
 		virtual NConcurrency::TCContinuation<NContainer::TCMap<NStr::CStr, CApplicationInfo>> f_GetInstalled() = 0;
+		virtual auto f_SubscribeUpdateNotifications(NConcurrency::TCActorFunctorWithID<NConcurrency::TCContinuation<void> (CUpdateNotification const &_Notification)> &&_fOnNotification) 
+			-> NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> = 0
+		; 
 	};
 }

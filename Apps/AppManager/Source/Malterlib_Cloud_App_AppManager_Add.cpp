@@ -18,6 +18,11 @@ namespace NMib::NCloud::NAppManager
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		ApplicationSettings.f_FromInterfaceAdd(_Add, ChangedSettings);
 		ApplicationSettings.f_FromInterfaceSettings(_Settings, ChangedSettings);
+		if (!_Settings.m_ExecutableParameters)
+		{
+			ApplicationSettings.m_ExecutableParameters = {"--daemon-run"};
+			ChangedSettings |= EApplicationSetting_ExecutableParameters;
+		}
 		return m_pThis->fp_AddApplication
 			(
 				_Name
@@ -176,7 +181,7 @@ namespace NMib::NCloud::NAppManager
 				if (!CVersionManager::fs_IsValidPlatform(Platform))
 					return Auditor.f_Exception("Invalid platform format"); 
 
-				if (!_Version || !_Version->m_VersionID.f_IsValid())
+				if (_Version && _Version->m_VersionID.f_IsValid())
 				{
 					VersionID.m_Platform = Platform;
 					VersionID.m_VersionID = _Version->m_VersionID;

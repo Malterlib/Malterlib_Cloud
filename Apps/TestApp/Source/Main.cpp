@@ -4,6 +4,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Core/Application>
 #include <Mib/Concurrency/DistributedDaemon>
+#include <Mib/Encoding/JSONShortcuts>
 
 using namespace NMib;
 
@@ -20,7 +21,7 @@ namespace NMib
 				{
 				}
 				
-				void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine)
+				void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override
 				{
 					CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
 					o_CommandLine.f_SetProgramDescription
@@ -29,14 +30,40 @@ namespace NMib
 							, "Test App." 
 						)
 					;
+					o_CommandLine.f_RegisterGlobalOptions
+						(
+							{
+								"UpdateType?"_=
+								{
+									"Names"_= {"--update-type"}
+									,"Type"_= {COneOf{"Independent", "OneAtATime", "AllAtOnce"}}
+									, "Description"_= "Override the update type for the application"
+								}
+							}
+						)
+					;
 				}
 				
-				TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params)
+				void fp_PopulateAppInterfaceRegisterInfo(CDistributedAppInterfaceServer::CRegisterInfo &o_RegisterInfo, NEncoding::CEJSON const &_Params) override
+				{
+					if (auto pValue = _Params.f_GetMember("UpdateType", EJSONType_String))
+					{
+						CStr UpdateType = pValue->f_String();
+						if (UpdateType == "Independent")
+							o_RegisterInfo.m_UpdateType = EDistributedAppUpdateType_Independent; 
+						else if (UpdateType == "OneAtATime")
+							o_RegisterInfo.m_UpdateType = EDistributedAppUpdateType_OneAtATime; 
+						else if (UpdateType == "AllAtOnce")
+							o_RegisterInfo.m_UpdateType = EDistributedAppUpdateType_AllAtOnce; 
+					}
+				}
+				
+				TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override
 				{
 					return fg_Explicit();
 				}				
 
-				TCContinuation<void> fp_StopApp()
+				TCContinuation<void> fp_StopApp() override
 				{
 					return fg_Explicit();
 				}				

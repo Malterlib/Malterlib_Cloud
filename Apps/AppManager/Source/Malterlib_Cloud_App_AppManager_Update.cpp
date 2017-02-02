@@ -422,6 +422,8 @@ namespace NMib::NCloud::NAppManager
 		
 		auto fLogError = [this, _Name, pClock, pResult, Continuation, pApplication, VersionID, pVersionInfo, Auditor](CStr const &_Error, bool _bUnencrypted = true)
 			{
+				fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_Failed, VersionID, _Error);
+		
 				Continuation.f_SetException(Auditor.f_Exception(_Error));
 				
 				if (!pApplication->m_bDeleted && _bUnencrypted)
@@ -467,6 +469,8 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
+		fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_ChangeEncryption, VersionID, {});
+		
 		fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Open, false) > [=](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
@@ -504,6 +508,8 @@ namespace NMib::NCloud::NAppManager
 						, TCFunction <void ()> const &_fUpdateVersionInfo
 					)
 					{
+						fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_Unpack, VersionID, {});
+						
 						CStr TemporaryDirectory = fg_Format("{}/TempVersion", pApplication->f_GetDirectory());
 						
 						auto TemporaryDirectoryCleanup = fg_OnScopeExitActor
@@ -571,6 +577,7 @@ namespace NMib::NCloud::NAppManager
 
 								auto Files = fg_Move(*_Files);
 								
+								fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_StopOldApp, VersionID, {});
 								_fOnInfo("Stopping old application");
 								// 2. Stop old application
 								pApplication->f_Stop(false) 
@@ -594,6 +601,8 @@ namespace NMib::NCloud::NAppManager
 											return;
 										}
 										
+										fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_PreUpdateScript, VersionID, {});
+										
 										fp_RunUpdateScript(pApplication, EUpdateScript_PreUpdate, CStr{}, VersionID, pVersionInfo->f_Get(), pClock->f_GetTime()) 
 											> [=](TCAsyncResult<bool> &&_Result)
 											{
@@ -602,6 +611,8 @@ namespace NMib::NCloud::NAppManager
 													fLogError(fg_Format("Pre update script failed. {}", _Result.f_GetExceptionStr()));
 													return;
 												}
+												
+												fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_UpdateApplicationFiles, VersionID, {});
 												_fOnInfo("Updating application files");
 												g_Dispatch(mp_FileActor) >
 													[
@@ -659,6 +670,7 @@ namespace NMib::NCloud::NAppManager
 															return;
 														}
 															
+														fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_SaveApplicationState, VersionID, {});
 														_fOnInfo("Saving application state");
 														if (_pNewSettings)
 															pApplication->m_Settings = *_pNewSettings;
@@ -672,6 +684,8 @@ namespace NMib::NCloud::NAppManager
 																	fLogError(fg_Format("Failed to save state: {}", _Result.f_GetExceptionStr()));
 																	return;
 																}
+																
+																fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_PostUpdateScript, VersionID, {});
 																
 																fp_RunUpdateScript
 																	(
@@ -700,6 +714,7 @@ namespace NMib::NCloud::NAppManager
 																		// 5. Re-launch application
 																		_fOnInfo("Launching updated application");
 																		pApplication->m_bJustUpdated = true;
+																		fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_StartNewApp, VersionID, {});
 																		fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
 																			> [=, InProgressScope = InProgressScope](TCAsyncResult<void> &&_Result)
 																			{
@@ -712,6 +727,8 @@ namespace NMib::NCloud::NAppManager
 																					_fOnInfo(fg_Format("Application was successfully updated to version {}", VersionID));
 																				else
 																					_fOnInfo("Application was successfully updated");
+																				
+																				fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_Finished, VersionID, {});
 																				Auditor.f_Info("Update application");
 																				Continuation.f_SetResult();
 																				fp_RunUpdateScript
@@ -725,6 +742,14 @@ namespace NMib::NCloud::NAppManager
 																					) 
 																					> [=](TCAsyncResult<bool> &&_Result)
 																					{
+																						fp_OnUpdateEvent
+																							(
+																								pApplication->m_Name
+																								, CAppManagerInterface::EUpdateStage_PostLaunchScriptFinished
+																								, VersionID
+																								, {}
+																							)
+																						;
 																						if (!_Result)
 																						{
 																							DMibLogWithCategory
@@ -758,6 +783,8 @@ namespace NMib::NCloud::NAppManager
 				if (bDownloadVersion)
 				{
 					_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
+					fp_OnUpdateEvent(pApplication->m_Name, CAppManagerInterface::EUpdateStage_DownloadVersion, VersionID, {});
+		
 					self(&CAppManagerActor::fp_DownloadApplication, pApplication->m_Settings.m_VersionManagerApplication, VersionID, DownloadDirectory) 
 						> [=, DownloadDirectoryCleanup=DownloadDirectoryCleanup](TCAsyncResult<CVersionManager::CVersionInformation> &&_VersionInfo)
 						{

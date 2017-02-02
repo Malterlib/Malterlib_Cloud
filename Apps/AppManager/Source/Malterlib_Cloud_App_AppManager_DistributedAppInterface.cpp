@@ -3,7 +3,7 @@
 
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
-#include <Mib/Concurrency/ActorCallbackManager>
+#include <Mib/Concurrency/ActorSubscription>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -12,7 +12,7 @@ namespace NMib::NCloud::NAppManager
 		(
 			NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
 			, NConcurrency::TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> &&_TrustInterface
-			, EDistributedAppUpdateType _UpdateType
+			, CRegisterInfo const &_RegisterInfo
 		)
 	{
 		auto pThis = m_pThis;
@@ -26,7 +26,7 @@ namespace NMib::NCloud::NAppManager
 			if (Application.m_AssociatedHostID == HostID)
 			{
 				Application.m_AppInterface = fg_Move(_ClientInterface);
-				Application.m_UpdateType = _UpdateType;
+				Application.m_RegisterInfo = _RegisterInfo;
 				
 				DMibLogWithCategory
 					(
@@ -35,7 +35,7 @@ namespace NMib::NCloud::NAppManager
 						, "Application '{}' registered from host '{}' and uses update type '{}'"
 						, Application.m_Name
 						, CallingHostInfo.f_GetHostInfo().f_GetDesc()
-						, _UpdateType
+						, _RegisterInfo.m_UpdateType
 					)
 				;
 				
