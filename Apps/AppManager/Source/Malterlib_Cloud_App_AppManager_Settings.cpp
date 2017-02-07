@@ -13,6 +13,12 @@ namespace NMib::NCloud::NAppManager
 			m_bSelfUpdateSource = pValue->f_Boolean();
 		}
 		
+		if (auto *pValue = _Params.f_GetMember("UpdateGroup"))
+		{
+			o_ChangedSettings |= EApplicationSetting_UpdateGroup;
+			m_UpdateGroup = pValue->f_String();
+		}
+		
 		bool bStorageSpecified = false;
 		if (auto *pValue = _Params.f_GetMember("EncryptionStorage"))
 		{
@@ -71,6 +77,12 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 			m_RunAsGroup = pValue->f_String();
+		}
+
+		if (auto *pValue = _Params.f_GetMember("DistributedApp"))
+		{
+			o_ChangedSettings |= EApplicationSetting_DistributedApp;
+			m_bDistributedApp = pValue->f_Boolean();
 		}
 		
 		if (auto *pValue = _Params.f_GetMember("AutoUpdateTags"))
@@ -152,6 +164,8 @@ namespace NMib::NCloud::NAppManager
 			m_RunAsUser = _Source.m_RunAsUser;
 		if (_ChangedSettings & EApplicationSetting_RunAsGroup)
 			m_RunAsGroup = _Source.m_RunAsGroup;
+		if (_ChangedSettings & EApplicationSetting_DistributedApp)
+			m_bDistributedApp = _Source.m_bDistributedApp;
 		if (_ChangedSettings & EApplicationSetting_VersionManagerApplication)
 			m_VersionManagerApplication = _Source.m_VersionManagerApplication;
 		if (_ChangedSettings & EApplicationSetting_AutoUpdateTags)
@@ -171,6 +185,8 @@ namespace NMib::NCloud::NAppManager
 			m_UpdateScripts.m_OnError = _Source.m_UpdateScripts.m_OnError;
 		if (_ChangedSettings & EApplicationSetting_SelfUpdateSource)
 			m_bSelfUpdateSource = _Source.m_bSelfUpdateSource;
+		if (_ChangedSettings & EApplicationSetting_UpdateGroup)
+			m_UpdateGroup = _Source.m_UpdateGroup;
 	}
 
 	bool CAppManagerActor::CApplicationSettings::f_Validate(CStr &o_Error) const
@@ -195,6 +211,8 @@ namespace NMib::NCloud::NAppManager
 				return fError("For self update you cannot specify run as user");
  			else if (!m_RunAsGroup.f_IsEmpty())
 				return fError("For self update you cannot specify run as group");
+ 			else if (m_bDistributedApp)
+				return fError("For self update you cannot specify distributed app");
 		}
 		else
 		{
@@ -228,6 +246,8 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_RunAsUser;
 		if (m_RunAsGroup != _Other.m_RunAsGroup)
 			ChangedSettings |= EApplicationSetting_RunAsGroup;
+		if (m_bDistributedApp != _Other.m_bDistributedApp)
+			ChangedSettings |= EApplicationSetting_DistributedApp;
 		if (m_VersionManagerApplication != _Other.m_VersionManagerApplication)
 			ChangedSettings |= EApplicationSetting_VersionManagerApplication;
 		if (m_bAutoUpdate != _Other.m_bAutoUpdate || m_AutoUpdateTags != _Other.m_AutoUpdateTags)
@@ -244,6 +264,8 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_UpdateScript_OnError;
 		if (m_bSelfUpdateSource != _Other.m_bSelfUpdateSource)
 			ChangedSettings |= EApplicationSetting_SelfUpdateSource;
+		if (m_UpdateGroup != _Other.m_UpdateGroup)
+			ChangedSettings |= EApplicationSetting_UpdateGroup;
 		return ChangedSettings;
 	}
 
@@ -302,6 +324,11 @@ namespace NMib::NCloud::NAppManager
 			m_RunAsGroup = *_Settings.m_RunAsGroup; 
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 		}
+		if (_Settings.m_bDistributedApp)
+		{
+			m_bDistributedApp = *_Settings.m_bDistributedApp; 
+			o_ChangedSettings |= EApplicationSetting_DistributedApp;
+		}
 		if (_Settings.m_AutoUpdateTags)
 		{
 			m_AutoUpdateTags = *_Settings.m_AutoUpdateTags;
@@ -338,6 +365,11 @@ namespace NMib::NCloud::NAppManager
 			m_bSelfUpdateSource = *_Settings.m_bSelfUpdateSource; 
 			o_ChangedSettings |= EApplicationSetting_SelfUpdateSource;
 		}
+		if (_Settings.m_UpdateGroup)
+		{
+			m_UpdateGroup = *_Settings.m_UpdateGroup; 
+			o_ChangedSettings |= EApplicationSetting_UpdateGroup;
+		}
 	}
 	
 	void CAppManagerActor::CApplicationSettings::f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings)
@@ -371,6 +403,12 @@ namespace NMib::NCloud::NAppManager
 					continue;
 				m_ExecutableParameters.f_Insert(Param.f_String());
 			}
+		}
+		
+		if (auto *pValue = ExtraInfo.f_GetMember("DistributedApp", EJSONType_Boolean))
+		{
+			o_ChangedSettings |= EApplicationSetting_DistributedApp;
+			m_bDistributedApp = pValue->f_Boolean();
 		}
 	}
 }

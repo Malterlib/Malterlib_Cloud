@@ -26,7 +26,12 @@ namespace NMib::NCloud::NAppManager
 			if (Application.m_AssociatedHostID == HostID)
 			{
 				Application.m_AppInterface = fg_Move(_ClientInterface);
-				Application.m_RegisterInfo = _RegisterInfo;
+				if (Application.m_RegisterInfo != _RegisterInfo)
+				{
+					Application.m_RegisterInfo = _RegisterInfo;
+					pThis->fp_RemoteAppInfoChanged(pApplication);
+					pThis->fp_UpdateApplicationJSON(pApplication) > fg_DiscardResult();
+				}
 				
 				DMibLogWithCategory
 					(
@@ -38,6 +43,12 @@ namespace NMib::NCloud::NAppManager
 						, _RegisterInfo.m_UpdateType
 					)
 				;
+				
+				if (Application.m_fOnRegisterDistributedApp)
+				{
+					Application.m_fOnRegisterDistributedApp();
+					Application.m_fOnRegisterDistributedApp.f_Clear();
+				}
 				
 				return fg_Explicit
 					(

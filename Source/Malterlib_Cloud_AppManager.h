@@ -18,7 +18,7 @@ namespace NMib::NCloud
 		enum 
 		{
 			EMinProtocolVersion = 0x101
-			, EProtocolVersion = 0x101
+			, EProtocolVersion = 0x102
 		};
 		
 		CAppManagerInterface();
@@ -27,17 +27,18 @@ namespace NMib::NCloud
 		enum EUpdateStage
 		{
 			EUpdateStage_Failed = 0xf0000000
-			, EUpdateStage_ChangeEncryption = 0
-			, EUpdateStage_DownloadVersion = 1
-			, EUpdateStage_Unpack = 2
-			, EUpdateStage_StopOldApp = 3
-			, EUpdateStage_PreUpdateScript = 4
-			, EUpdateStage_UpdateApplicationFiles = 5
-			, EUpdateStage_SaveApplicationState = 6
-			, EUpdateStage_PostUpdateScript = 7
-			, EUpdateStage_StartNewApp = 8
-			, EUpdateStage_Finished = 9
-			, EUpdateStage_PostLaunchScriptFinished = 10
+			, EUpdateStage_None = 0
+			, EUpdateStage_ChangeEncryption = 1
+			, EUpdateStage_DownloadVersion = 2
+			, EUpdateStage_Unpack = 3
+			, EUpdateStage_StopOldApp = 4
+			, EUpdateStage_PreUpdateScript = 5
+			, EUpdateStage_UpdateApplicationFiles = 6
+			, EUpdateStage_SaveApplicationState = 7
+			, EUpdateStage_PostUpdateScript = 8
+			, EUpdateStage_StartNewApp = 9
+			, EUpdateStage_PostLaunch = 10
+			, EUpdateStage_Finished = 11
 		};
 		
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
@@ -73,17 +74,19 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NStorage::TCOptional<NStr::CStr> m_VersionManagerApplication; // Must be set when adding application
+			NStorage::TCOptional<NStr::CStr> m_UpdateGroup;
 			NStorage::TCOptional<NStr::CStr> m_Executable;
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ExecutableParameters;
 			NStorage::TCOptional<NStr::CStr> m_RunAsUser;
 			NStorage::TCOptional<NStr::CStr> m_RunAsGroup;
+			NStorage::TCOptional<bool> m_bDistributedApp;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_AutoUpdateTags;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_AutoUpdateBranches; // Are wild cards
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPreUpdate;
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPostUpdate;
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPostLaunch;
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptOnError;
-			NStorage::TCOptional<bool> m_bSelfUpdateSource = false;
+			NStorage::TCOptional<bool> m_bSelfUpdateSource;
 		};
 		
 		struct CApplicationInfo
@@ -110,6 +113,7 @@ namespace NMib::NCloud
 			
 			// Changable
 			NStr::CStr m_VersionManagerApplication;
+			NStr::CStr m_UpdateGroup;
 			NStr::CStr m_Executable;
 			NContainer::TCVector<NStr::CStr> m_Parameters;
 			NStr::CStr m_RunAsUser;
@@ -121,6 +125,7 @@ namespace NMib::NCloud
 			NStr::CStr m_UpdateScriptPostLaunch;
 			NStr::CStr m_UpdateScriptOnError;
 			bool m_bSelfUpdateSource = false;
+			bool m_bDistributedApp = false;
 		};
 		
 		struct CApplicationVersion

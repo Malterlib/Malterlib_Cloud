@@ -167,6 +167,7 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["Executable"] = Settings.m_Executable; 
 		ApplicationJSON["RunAsUser"] = Settings.m_RunAsUser; 
 		ApplicationJSON["RunAsGroup"] = Settings.m_RunAsGroup;
+		ApplicationJSON["DistributedApp"] = Settings.m_bDistributedApp;
 		{
 			auto &Parameters = ApplicationJSON["Parameters"].f_Array();
 			Parameters.f_Clear();
@@ -203,6 +204,8 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["Files"] = _pApplication->m_Files;
 		
 		ApplicationJSON["AssociatedHostID"] = _pApplication->m_AssociatedHostID;
+		ApplicationJSON["UpdateGroup"] = Settings.m_UpdateGroup;
+		ApplicationJSON["RegisterInfo"]["UpdateType"] = _pApplication->m_RegisterInfo.m_UpdateType;
 	
 		TCContinuation<void> Continuation;
 		mp_State.m_StateDatabase.f_Save() > Continuation;

@@ -157,8 +157,43 @@ namespace NMib::NCloud::NAppManager
 							{
 							case NProcess::EProcessLaunchState_Launched:
 								{
-									_pApplication->m_LaunchState = "Launched";
+									if (_pApplication->m_Settings.m_bDistributedApp)
+									{
+										_pApplication->m_LaunchState = "Launched (waiting for distributed app register)";
+										_pApplication->m_fOnRegisterDistributedApp = [pState, Continuation, _pApplication]
+											{
+												if (_pApplication->m_bDeleted)
+													return;
+												_pApplication->m_LaunchState = "Launched (waiting for app to fully start)";
+												DCallActor(_pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_GetAppStartResult) 
+													> [pState, Continuation, _pApplication](TCAsyncResult<void> &&_Result)
+													{
+														pState->m_pCleanup.f_Clear();
+														if (_Result)
+															_pApplication->m_LaunchState = "Launched";
+														else
+														{
+															DMibLogWithCategory
+																(
+																	Malterlib/Cloud/AppManager
+																	, Error
+																	, "Launched app '{}' failed to start up: {}"
+																	, _pApplication->m_Name
+																	, _Result.f_GetExceptionStr()
+																)
+															;
+															_pApplication->m_LaunchState = fg_Format("Launched (app startup failed: '{}')", _Result.f_GetExceptionStr());
+														}
+														
+														Continuation.f_SetResult();
+													}
+												;
+											}
+										;
+										return;
+									}
 									pState->m_pCleanup.f_Clear();
+									_pApplication->m_LaunchState = "Launched";
 									Continuation.f_SetResult();
 								}
 								break;
@@ -205,6 +240,8 @@ namespace NMib::NCloud::NAppManager
 				;
 				
 				Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+				if (mp_bLogLaunchesToStdErr)
+					Launch.m_ToLog |= CProcessLaunchActor::ELogFlag_All | CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
 				Launch.m_LogName = _pApplication->m_Name;
 				
 				auto &LaunchParams = Launch.m_Params;
@@ -248,7 +285,8 @@ namespace NMib::NCloud::NAppManager
 												Malterlib/Cloud/AppManager
 												, Info
 												, "Failed to update application JSON when granting connection ticket for '{}': {}"
-												, _pApplication->m_Name, _Result.f_GetExceptionStr()
+												, _pApplication->m_Name
+												, _Result.f_GetExceptionStr()
 											)
 										;
 										Continuation.f_SetException(DMibErrorInstance("Failed to update application JSON, see AppManager log for details"));

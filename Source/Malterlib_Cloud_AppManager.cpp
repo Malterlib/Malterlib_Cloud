@@ -70,6 +70,11 @@ namespace NMib::NCloud
 		_Stream % m_UpdateScriptPostLaunch;
 		_Stream % m_UpdateScriptOnError;
 		_Stream % m_bSelfUpdateSource;
+		if (_Stream.f_GetVersion() >= 0x102)
+		{
+			_Stream % m_UpdateGroup;
+			_Stream % m_bDistributedApp;
+		}
 	}
 	
 	template <typename tf_CStream>
@@ -112,6 +117,11 @@ namespace NMib::NCloud
 		_Stream % m_UpdateScriptPostLaunch;
 		_Stream % m_UpdateScriptOnError;
 		_Stream % m_bSelfUpdateSource;
+		if (_Stream.f_GetVersion() >= 0x102)
+		{
+			_Stream % m_UpdateGroup;
+			_Stream % m_bDistributedApp;
+		}
 	}
 	
 	template <typename tf_CStream>

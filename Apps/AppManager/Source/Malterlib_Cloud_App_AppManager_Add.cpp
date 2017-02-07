@@ -295,7 +295,7 @@ namespace NMib::NCloud::NAppManager
 						mp_Applications[pApplication->m_Name] = pApplication;
 						pCleanup->f_Clear();
 						
-						fp_ApplicationCreated(pApplication);
+						fp_OnApplicationAdded(pApplication);
 						auto InProgressScope = pApplication->f_SetInProgress();
 
 						fp_UpdateApplicationJSON(pApplication) 

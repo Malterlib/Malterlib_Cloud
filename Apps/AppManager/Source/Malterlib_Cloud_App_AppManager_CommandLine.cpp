@@ -17,6 +17,20 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		
+		o_CommandLine.f_RegisterGlobalOptions
+			(
+				{
+					"LogLaunchesToStdErr?"_= 
+					{
+						"Names"_= {"--log-launches-to-stderr"}
+						,"Default"_= false
+						, "Description"_= "Log application launch output to stderr"
+					}
+				}
+			)
+		;
+		
+		
 		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 		
 		auto SettingsOption_Executable = "Executable?"_= 
@@ -39,6 +53,21 @@ namespace NMib::NCloud::NAppManager
 				"Names"_= {"--run-as-group"}
 				, "Type"_= ""
 				, "Description"_= "Run the application as this group."
+			}
+		;
+		auto SettingsOption_DistributedApp = "DistributedApp?"_= 
+			{
+				"Names"_= {"--distributed-app"}
+				, "Type"_= true
+				, "Description"_= "Expect the app to register as a distributed app. This will cause the AppManager to wait for the app to register before"
+					"returning from add, start and update operations."
+			}
+		;
+		auto SettingsOption_UpdateGroup = "UpdateGroup?"_= 
+			{
+				"Names"_= {"--update-group"}
+				, "Type"_= ""
+				, "Description"_= "The group to use for coordinating updates with other AppManagers.\n"
 			}
 		;
 		
@@ -128,6 +157,7 @@ namespace NMib::NCloud::NAppManager
 						}
 						, SettingsOption_RunAsUser
 						, SettingsOption_RunAsGroup
+						, SettingsOption_DistributedApp
 						, "AutoUpdateTags?"_= 
 						{
 							"Names"_= {"--auto-update-tags"}
@@ -174,6 +204,7 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_= false
 							, "Description"_= "Set this application as a source for self-updating the app manager.\n"
 						}
+						, SettingsOption_UpdateGroup
 					}
 					, "Parameters"_=
 					{
@@ -214,6 +245,7 @@ namespace NMib::NCloud::NAppManager
 						}				
 						, SettingsOption_RunAsUser
 						, SettingsOption_RunAsGroup
+						, SettingsOption_DistributedApp
 						, "AutoUpdateTags?"_= 
 						{
 							"Names"_= {"--auto-update-tags"}
@@ -275,6 +307,7 @@ namespace NMib::NCloud::NAppManager
 							, "Type"_= false
 							, "Description"_= "Set this application as a source for self-updating the app manager.\n"
 						}
+						, SettingsOption_UpdateGroup
 					}
 				}
 				, [this](CEJSON const &_Params)
@@ -494,6 +527,41 @@ namespace NMib::NCloud::NAppManager
 				, [this](CEJSON const &_Params)
 				{
 					return fp_CommandLine_StartApplication(_Params);
+				}
+			)
+		;
+		DefaultSection.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--remove-known-host"}
+					, "Description"_= "Remove known host for group and application on this AppManager and any connected remote AppManagers"
+					, "Options"_= 
+					{
+						"Application"_= 
+						{
+							"Names"_= {"--application"}
+							,"Default"_= ""
+							, "Description"_= "The version manager application to to remove the host on. Leave empt to remove from all applications."
+						}
+						, "Group"_= 
+						{
+							"Names"_= {"--group"}
+							,"Default"_= ""
+							, "Description"_= "The update group to to remove the host on. Leave empt to remove from all groups."
+						}
+					}
+					, "Parameters"_=
+					{
+						"HostID"_=  
+						{
+							"Type"_= ""
+							, "Description"_= "The host ID to remove."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params)
+				{
+					return fp_CommandLine_UpdateApplication(_Params);
 				}
 			)
 		;

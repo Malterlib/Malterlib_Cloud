@@ -36,7 +36,7 @@ namespace NMib
 								"UpdateType?"_=
 								{
 									"Names"_= {"--update-type"}
-									,"Type"_= {COneOf{"Independent", "OneAtATime", "AllAtOnce"}}
+									,"Type"_= COneOf{"Independent", "OneAtATime", "AllAtOnce"}
 									, "Description"_= "Override the update type for the application"
 								}
 							}

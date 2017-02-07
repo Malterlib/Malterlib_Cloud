@@ -39,21 +39,30 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	void CAppManagerActor::fp_OnUpdateEvent
+	TCContinuation<void> CAppManagerActor::fp_OnUpdateEvent
 		(
-			CStr const &_Application
+			TCSharedPointer<CApplication> const &_pApplication
 			, CAppManagerInterface::EUpdateStage _Stage
 			, CAppManagerInterface::CVersionIDAndPlatform const &_VersionID
 			, NStr::CStr const &_Message
 		)
 	{
+		auto &Application = *_pApplication;
+		
+		if (_VersionID != Application.m_WantInstallVersion || _Stage != Application.m_UpdateStage)
+		{
+			Application.m_WantInstallVersion = _VersionID;
+			Application.m_UpdateStage = _Stage;
+			fp_RemoteAppInfoChanged(_pApplication);
+		}
+		
 		CAppManagerInterface::CUpdateNotification Notification;
-		Notification.m_Application = _Application;
+		Notification.m_Application = Application.m_Name;
 		Notification.m_Message = _Message;
 		Notification.m_VersionID = _VersionID;
 		Notification.m_Stage = _Stage;
 		
-		CStr AppPermission = fg_Format("AppManager/App/{}", _Application);
+		CStr AppPermission = fg_Format("AppManager/App/{}", Application.m_Name);
 		
 		for (auto &Subscription : mp_UpdateNotificationSubscriptions)
 		{
@@ -62,5 +71,7 @@ namespace NMib::NCloud::NAppManager
 			
 			Subscription.m_fOnUpdate(Notification) > fg_DiscardResult();
 		}
+		
+		return fg_Explicit();
 	}
 }

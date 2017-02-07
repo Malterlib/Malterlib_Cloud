@@ -42,6 +42,7 @@ namespace NMib::NCloud::NAppManager
 				
 				(*pApplication)->f_Delete();
 				pThis->mp_Applications.f_Remove(_Name);
+				pThis->fp_SendRemovedAppToRemoteAppManagers(*pApplication);				
 
 				if (auto *pApplicationsState = pThis->mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 				{
@@ -49,7 +50,7 @@ namespace NMib::NCloud::NAppManager
 						pApplicationsState->f_RemoveMember(_Name);
 				}
 				
-				pThis->mp_State.m_StateDatabase.f_Save() > Continuation % "Failed to save state" / [InProgressScope, Continuation, _Name, Auditor]() mutable
+				pThis->mp_State.m_StateDatabase.f_Save() > Continuation % "Failed to save state" % Auditor / [InProgressScope, Continuation, _Name, Auditor]() mutable
 					{
 						Auditor.f_Info(fg_Format("Removed application '{}'", _Name));
 						Continuation.f_SetResult();

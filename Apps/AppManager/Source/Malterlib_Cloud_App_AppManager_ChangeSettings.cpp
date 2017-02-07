@@ -147,6 +147,8 @@ namespace NMib::NCloud::NAppManager
 		if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !_bForce)
 		{
 			Application.m_Settings = NewSettings;
+			if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
+				fp_RemoteAppInfoChanged(*pApplication);
 			_fOnInfo("Saving application state");
 			fp_UpdateApplicationJSON(*pApplication)
 				> Continuation % "Failed to save application state" % Auditor / [=, InProgressScope = InProgressScope]
@@ -197,6 +199,8 @@ namespace NMib::NCloud::NAppManager
 						}
 
 						pApplication->m_Settings = NewSettings;
+						if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
+							fp_RemoteAppInfoChanged(pApplication);
 						
 						_fOnInfo("Saving application state and update application files");
 						fg_Dispatch

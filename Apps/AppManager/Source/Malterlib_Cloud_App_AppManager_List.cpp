@@ -47,6 +47,8 @@ namespace NMib::NCloud::NAppManager
 			OutApplication.m_UpdateScriptPostLaunch = Settings.m_UpdateScripts.m_PostLaunch;
 			OutApplication.m_UpdateScriptOnError = Settings.m_UpdateScripts.m_OnError;
 			OutApplication.m_bSelfUpdateSource = Settings.m_bSelfUpdateSource;
+			OutApplication.m_UpdateGroup = Settings.m_UpdateGroup;
+			OutApplication.m_bDistributedApp = Settings.m_bDistributedApp;
 		}
 		Auditor.f_Info("Enum applications");
 		return fg_Explicit(fg_Move(OutputApplications));
@@ -106,6 +108,7 @@ namespace NMib::NCloud::NAppManager
 						Results.f_AddStdOut(fg_Format("                   Parameters: {vs,vb}{\n}", Application.m_Parameters));
 						Results.f_AddStdOut(fg_Format("                  Run as user: {}{\n}", Application.m_RunAsUser));
 						Results.f_AddStdOut(fg_Format("                 Run as group: {}{\n}{\n}", Application.m_RunAsGroup));
+						Results.f_AddStdOut(fg_Format("              Distributed app: {}{\n}", Application.m_bDistributedApp));
 
 						Results.f_AddStdOut(fg_Format("                  Auto update: {}{\n}", !Application.m_AutoUpdateTags.f_IsEmpty() ? "true" : "false"));
 						Results.f_AddStdOut(fg_Format("             Auto update tags: {vs}{\n}", Application.m_AutoUpdateTags));
@@ -117,6 +120,7 @@ namespace NMib::NCloud::NAppManager
 						Results.f_AddStdOut(fg_Format("       On error update script: {}{\n}{\n}", Application.m_UpdateScriptOnError));
 
 						Results.f_AddStdOut(fg_Format("     Version application name: {}{\n}", Application.m_VersionManagerApplication));
+						Results.f_AddStdOut(fg_Format("                 Update group: {}{\n}", Application.m_UpdateGroup));
 						Results.f_AddStdOut(fg_Format("                      Version: {}{\n}", Application.m_Version));
 						Results.f_AddStdOut(fg_Format("                 Version time: {}{\n}", Application.m_VersionInfo.m_Time.f_ToLocal()));
 						Results.f_AddStdOut(fg_Format("               Version config: {}{\n}", Application.m_VersionInfo.m_Configuration));

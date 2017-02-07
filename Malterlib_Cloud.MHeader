@@ -84,6 +84,10 @@ Property
 	{
 		!!MalterlibCloudVersionInfo_Configuration ""
 	}
+	MalterlibCloudVersionInfo_DistributedApp true
+	{
+		!!MalterlibCloudVersionInfo_DistributedApp ""
+	}
 }
 
 Property
@@ -117,6 +121,11 @@ Property
 								"\t\t, \"RunAsGroup\": \"@(MalterlibCloudVersionInfo_RunAsGroup)\"\n"
 	{
 		!MalterlibCloudVersionInfo_RunAsGroup ""
+	}
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t, \"DistributedApp\": @(MalterlibCloudVersionInfo_DistributedApp)\n"
+	{
+		!MalterlibCloudVersionInfo_DistributedApp ""
 	}
 	
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\

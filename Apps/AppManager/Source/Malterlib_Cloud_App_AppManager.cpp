@@ -12,8 +12,10 @@ namespace NMib::NCloud::NAppManager
 	{
 	}
 	
-	void CAppManagerActor::fp_ApplicationCreated(TCSharedPointer<CApplication> const &_pApplication)
+	void CAppManagerActor::fp_OnApplicationAdded(TCSharedPointer<CApplication> const &_pApplication)
 	{
+		fp_SendAddedAppToRemoteAppManagers(_pApplication);
+		
 		if (_pApplication->f_IsChildApp())
 			return; // Parent cannot have parents
 		auto &NewApplication = *_pApplication;
@@ -63,7 +65,9 @@ namespace NMib::NCloud::NAppManager
 					
 					Settings.m_Executable = ApplicationJSON["Executable"].f_String(); 
 					Settings.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String(); 
-					Settings.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String();
+					if (auto pValue = ApplicationJSON.f_GetMember("DistributedApp", EJSONType_Boolean))
+						Settings.m_bDistributedApp = pValue->f_Boolean();
+					
 					for (auto &Parameter : ApplicationJSON["Parameters"].f_Array())
 						Settings.m_ExecutableParameters.f_Insert(Parameter.f_String());
 					for (auto &File : ApplicationJSON["Files"].f_Array())
@@ -103,9 +107,34 @@ namespace NMib::NCloud::NAppManager
 					if (auto pValue = ApplicationJSON.f_GetMember("SelfUpdateSource", EJSONType_Boolean))
 						Settings.m_bSelfUpdateSource = pValue->f_Boolean();
 
+					if (auto pValue = ApplicationJSON.f_GetMember("UpdateGroup", EJSONType_String))
+						Settings.m_UpdateGroup = pValue->f_String();
+
+					if (auto pRegisterInfo = ApplicationJSON.f_GetMember("RegisterInfo", EJSONType_Object))
+					{
+						if (auto pValue = pRegisterInfo->f_GetMember("UpdateType", EJSONType_Integer))
+							Application.m_RegisterInfo.m_UpdateType = (EDistributedAppUpdateType)pValue->f_Integer(); 
+					}
 					if (auto pValue = ApplicationJSON.f_GetMember("AssociatedHostID", EJSONType_String))
 						Application.m_AssociatedHostID = pValue->f_String();
 				}					
+			}
+
+			if (auto *pKnownRemoteHosts = mp_State.m_StateDatabase.m_Data.f_GetMember("KnownRemoteApplications"))
+			{
+				for (auto &Group : pKnownRemoteHosts->f_Object())
+				{
+					CRemoteApplicationKey RemoteKey;
+					RemoteKey.m_Group = Group.f_Name();
+
+					for (auto &Application : Group.f_Value().f_Object())
+					{
+						RemoteKey.m_Application = Group.f_Name();
+
+						for (auto &KnownHost : Application.f_Value().f_Object())
+							mp_KnownRemoteApplications[RemoteKey][KnownHost.f_Name()];
+					}
+				}
 			}
 		}
 		catch (NException::CException const &_Exception)
@@ -126,6 +155,8 @@ namespace NMib::NCloud::NAppManager
 
 	TCContinuation<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
+		mp_bLogLaunchesToStdErr = _Params["LogLaunchesToStdErr"].f_Boolean();
+		
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations"));
 		mp_KnownPlatforms[DMalterlibCloudPlatform];
 		
@@ -133,15 +164,27 @@ namespace NMib::NCloud::NAppManager
 		fp_ReadState() > Continuation / [this, Continuation]
 			{
 				if (mp_State.m_bStoppingApp)
-					return;
+					return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
 				
 				fp_PublishAppInterface() > Continuation / [this, Continuation]
 					{
 						if (mp_State.m_bStoppingApp)
-							return;
+							return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
 						
 						fp_InitApplications();
 						fp_LaunchNormalApps();
+						fp_PublishCoordinationInterface() > [](TCAsyncResult<void> &&_Result)
+							{
+								if (!_Result)
+									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to publish coordination interface: {}", _Result.f_GetExceptionStr());
+							}
+						;
+						fp_SubscribeCoordinationInterface() > [](TCAsyncResult<void> &&_Result)
+							{
+								if (!_Result)
+									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to subscribe to coordination interface: {}", _Result.f_GetExceptionStr());
+							}
+						;
 						fp_SetupAppManagerInterfacePermissions() > [this](TCAsyncResult<void> &&_Result)
 							{
 								if (!_Result)
@@ -176,7 +219,7 @@ namespace NMib::NCloud::NAppManager
 							> Continuation / [this, Continuation](TCTrustedActorSubscription<CKeyManager> &&_KeySubscrption, TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
 							{
 								if (mp_State.m_bStoppingApp)
-									return;
+									return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
 								
 								mp_KeyManagerSubscription = fg_Move(_KeySubscrption);
 
@@ -223,7 +266,8 @@ namespace NMib::NCloud::NAppManager
 	{	
 		TCContinuation<void> Continuation;
 
-		mp_AppManagerInterface.f_Destroy() > Continuation / [=]
+		mp_AppManagerInterface.f_Destroy()
+			+ mp_AppManagerCoordinationInterface.f_Destroy() > Continuation / [=]
 			{
 				TCActorResultVector<uint32> ApplicationStops;
 				for (auto &pApplication : mp_Applications)
