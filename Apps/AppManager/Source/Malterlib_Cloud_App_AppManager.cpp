@@ -14,7 +14,12 @@ namespace NMib::NCloud::NAppManager
 	
 	void CAppManagerActor::fp_OnApplicationAdded(TCSharedPointer<CApplication> const &_pApplication)
 	{
-		fp_SendAddedAppToRemoteAppManagers(_pApplication);
+		CRemoteApplicationKey RemoteKey{_pApplication->m_Settings};
+	
+		if (mp_KnownRemoteApplications[RemoteKey](mp_State.m_HostID).f_WasCreated())
+			fp_NewRemoteKnownApplication(RemoteKey, mp_State.m_HostID);
+		
+		fp_SendAppToRemoteAppManagers(_pApplication);
 		
 		if (_pApplication->f_IsChildApp())
 			return; // Parent cannot have parents
@@ -117,6 +122,8 @@ namespace NMib::NCloud::NAppManager
 					}
 					if (auto pValue = ApplicationJSON.f_GetMember("AssociatedHostID", EJSONType_String))
 						Application.m_AssociatedHostID = pValue->f_String();
+					
+					mp_KnownRemoteApplications[CRemoteApplicationKey{Settings}][mp_State.m_HostID];
 				}					
 			}
 
@@ -129,7 +136,7 @@ namespace NMib::NCloud::NAppManager
 
 					for (auto &Application : Group.f_Value().f_Object())
 					{
-						RemoteKey.m_Application = Group.f_Name();
+						RemoteKey.m_VersionManagerApplication = Application.f_Name();
 
 						for (auto &KnownHost : Application.f_Value().f_Object())
 							mp_KnownRemoteApplications[RemoteKey][KnownHost.f_Name()];

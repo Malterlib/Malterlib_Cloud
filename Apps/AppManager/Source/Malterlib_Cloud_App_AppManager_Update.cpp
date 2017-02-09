@@ -7,6 +7,17 @@
 
 namespace NMib::NCloud::NAppManager
 {
+	ch8 const *CAppManagerActor::fsp_UpdateTypeToStr(EDistributedAppUpdateType _UpdateType)
+	{
+		switch (_UpdateType)
+		{
+		case EDistributedAppUpdateType_Independent: return "independent";
+		case EDistributedAppUpdateType_AllAtOnce: return "all at once";
+		case EDistributedAppUpdateType_OneAtATime: return "one at a time";
+		default: DNeverGetHere; return "unknown";
+		}
+	}
+	
 	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Update(NStr::CStr const &_Name, CApplicationUpdate const &_Update)
 	{
 		return m_pThis->fp_UpdateApplication
@@ -186,6 +197,8 @@ namespace NMib::NCloud::NAppManager
 		pState->m_pInProgressScope = pApplication->f_SetInProgress();
 		
 		TCContinuation<void> Continuation;
+		
+		pState->m_fOnInfo(fg_Format("Starting update with type '{}'", fsp_UpdateTypeToStr(pApplication->m_RegisterInfo.m_UpdateType)));
 		
 		fp_UpdateApplicationRunProcess(pState) > [=](TCAsyncResult<void> &&_Result)
 			{

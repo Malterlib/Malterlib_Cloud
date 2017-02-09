@@ -113,6 +113,7 @@ namespace NMib::NCloud::NAppManager
 		}
 		
 		Settings.f_ApplySettings(_ChangedSettings, _Settings);
+		ChangedSettings |= _ChangedSettings;
 		
 		auto NewSettings = Application.m_Settings;
 		NewSettings.f_ApplySettings(ChangedSettings, Settings);	
@@ -133,7 +134,7 @@ namespace NMib::NCloud::NAppManager
 			return Auditor.f_Exception("Changing parent application is not supported");
 		if (ChangedSettings == EApplicationSetting_None && !_bForce)
 		{
-			_fOnInfo("No settings were changed. To updating of file permissions run with --force");
+			_fOnInfo("No settings were changed. To update file permissions run with --force");
 			return fg_Explicit();
 		}
 		
@@ -246,7 +247,7 @@ namespace NMib::NCloud::NAppManager
 									> Continuation % "Failed to launch app. Will retry periodically." % Auditor / [=, InProgressScope = InProgressScope]
 									{
 										_fOnInfo("Application settings were successfully changed");
-										Auditor.f_Info("Updated application settings ");
+										Auditor.f_Info("Updated application settings");
 										Continuation.f_SetResult();
 									}
 								;

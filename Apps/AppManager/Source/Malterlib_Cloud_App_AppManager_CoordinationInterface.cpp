@@ -26,14 +26,16 @@ namespace NMib::NCloud::NAppManager
 		CVersionManager::CVersionIDAndPlatform::f_Stream(_Stream);
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CVersionIDAndPlatform);
-	
+
 	template <typename tf_CStream>
 	void CAppManagerCoordinationInterface::CAppInfo::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Group;
+		_Stream % m_VersionManagerApplication;
 		_Stream % m_VersionID;
 		_Stream % m_WantVersionID;
 		_Stream % m_UpdateStage;
+		_Stream % m_WantUpdateStage;
 		_Stream % m_UpdateType;
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppInfo);
@@ -55,13 +57,13 @@ namespace NMib::NCloud::NAppManager
 	
 	
 	template <typename tf_CStream>
-	void CAppManagerCoordinationInterface::CAppChange_AddKnownKosts::f_Stream(tf_CStream &_Stream)
+	void CAppManagerCoordinationInterface::CAppChange_AddKnownHosts::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Group;
-		_Stream % m_Application;
+		_Stream % m_VersionManagerApplication;
 		_Stream % m_KnownHosts;
 	}
-	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppChange_AddKnownKosts);
+	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppChange_AddKnownHosts);
 	
 	TCContinuation<void> CAppManagerActor::fp_PublishCoordinationInterface()
 	{

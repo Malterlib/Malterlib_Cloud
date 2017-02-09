@@ -11,40 +11,43 @@ namespace NMib::NCloud::NAppManager
 	{
 		TCContinuation<void> Continuation;
 		
-		fp_OnUpdateEvent(_pState->m_pApplication, CAppManagerInterface::EUpdateStage_ChangeEncryption, _pState->m_VersionID, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState->m_pApplication, CAppManagerInterface::EUpdateStage_None, _pState->m_VersionID, {}) > Continuation / [=]
 		{
-			auto &State = *_pState; 
-			if (State.m_pApplication->m_bDeleted)
-				return Continuation.f_SetException(DMibErrorInstance("Application has been deleted, aborting"));
-			
-			fp_ChangeEncryption(_pState->m_pApplication, EEncryptOperation_Open, false) > Continuation % "Failed to open encryption" / [=]
+			fp_OnUpdateEvent(_pState->m_pApplication, CAppManagerInterface::EUpdateStage_ChangeEncryption, _pState->m_VersionID, {}) > Continuation / [=]
 			{
-				_pState->m_bUnencrypted = true;
-				fp_UpdateApplication_DownloadVersion(_pState) > Continuation % "Failed to download version" / [=]
+				auto &State = *_pState; 
+				if (State.m_pApplication->m_bDeleted)
+					return Continuation.f_SetException(DMibErrorInstance("Application has been deleted, aborting"));
+				
+				fp_ChangeEncryption(_pState->m_pApplication, EEncryptOperation_Open, false) > Continuation % "Failed to open encryption" / [=]
 				{
-					fp_UpdateApplication_Unpack(_pState) > Continuation % "Failed to unpack application" / [=]
+					_pState->m_bUnencrypted = true;
+					fp_UpdateApplication_DownloadVersion(_pState) > Continuation % "Failed to download version" / [=]
 					{
-						if (_pState->m_bDryRun)
+						fp_UpdateApplication_Unpack(_pState) > Continuation % "Failed to unpack application" / [=]
 						{
-							_pState->m_fOnInfo("Skipping stop, update and restart because of dry run");
-							Continuation.f_SetResult();
-							return;
-						}
-						fp_UpdateApplication_StopOldApp(_pState) > Continuation % "Failed to stop old app" / [=]
-						{
-							fp_UpdateApplication_PreUpdate(_pState) > Continuation % "Failed pre update app" / [=]
+							if (_pState->m_bDryRun)
 							{
-								fp_UpdateApplication_UpdateApplicationFiles(_pState) > Continuation % "Failed to update application files" / [=]
+								_pState->m_fOnInfo("Skipping stop, update and restart because of dry run");
+								Continuation.f_SetResult();
+								return;
+							}
+							fp_UpdateApplication_StopOldApp(_pState) > Continuation % "Failed to stop old app" / [=]
+							{
+								fp_UpdateApplication_PreUpdate(_pState) > Continuation % "Failed pre update app" / [=]
 								{
-									fp_UpdateApplication_SaveApplicationState(_pState) > Continuation % "Failed to save application state" / [=]
+									fp_UpdateApplication_UpdateApplicationFiles(_pState) > Continuation % "Failed to update application files" / [=]
 									{
-										fp_UpdateApplication_PostUpdate(_pState) > Continuation % "Failed post update" / [=]
+										fp_UpdateApplication_SaveApplicationState(_pState) > Continuation % "Failed to save application state" / [=]
 										{
-											fp_UpdateApplication_StartNewApp(_pState) > Continuation % "Failed to start new app. Will retry periodically" / [=]
+											fp_UpdateApplication_PostUpdate(_pState) > Continuation % "Failed post update" / [=]
 											{
-												fp_UpdateApplication_PostLaunch(_pState) > Continuation % "Failed post launch" / [=]
+												fp_UpdateApplication_StartNewApp(_pState) > Continuation % "Failed to start new app. Will retry periodically" / [=]
 												{
-													Continuation.f_SetResult();
+													fp_UpdateApplication_PostLaunch(_pState) > Continuation % "Failed post launch" / [=]
+													{
+														Continuation.f_SetResult();
+													};
 												};
 											};
 										};

@@ -10,6 +10,7 @@
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cryptography/RandomID>
+#include <Mib/Encoding/JSONShortcuts>
 
 using namespace NMib;
 using namespace NMib::NConcurrency;
@@ -511,8 +512,11 @@ public:
 			struct CUpdateNotificationsState
 			{
 				TCVector<CActorSubscription> m_Subscriptions;
-				TCMap<mint> m_InProgress;
+				TCSet<mint> m_InProgress;
 				mint m_nMaxInProgress = 0;
+				TCMap<mint, CAppManagerInterface::EUpdateStage> m_LastInStage;
+				TCMap<CAppManagerInterface::EUpdateStage, TCSet<mint>> m_InStage;
+				TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStage;
 				TCAtomic<mint> m_nSuccess = 0;
 				TCAtomic<mint> m_nFinished = 0;
 				NThread::CEventAutoReset m_Event;
@@ -520,6 +524,9 @@ public:
 				void f_Clear()
 				{
 					m_InProgress.f_Clear();
+					m_LastInStage.f_Clear();
+					m_InStage.f_Clear();
+					m_MaxInStage.f_Clear();
 					m_nMaxInProgress = 0;
 					m_nSuccess = 0;
 					m_nFinished = 0;
@@ -551,6 +558,13 @@ public:
 							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCContinuation<void> 
 							{
 								auto &State = *pUpdateNotificationsState;
+								
+								if (auto pInStage = State.m_LastInStage.f_FindEqual(iAppManager))
+									State.m_InStage[*pInStage].f_Remove(iAppManager);
+								State.m_InStage[_Notification.m_Stage][iAppManager];
+								State.m_MaxInStage[_Notification.m_Stage] = fg_Max(State.m_MaxInStage[_Notification.m_Stage], State.m_InStage[_Notification.m_Stage].f_GetLen());
+								State.m_LastInStage[iAppManager] = _Notification.m_Stage;
+								
 								if (_Notification.m_Stage == CAppManagerInterface::EUpdateStage_Failed)
 								{
 									State.m_InProgress.f_Remove(iAppManager);
@@ -562,7 +576,7 @@ public:
 									++State.m_nFinished;
 									++State.m_nSuccess;
 								}
-								else
+								else if (_Notification.m_Stage >= CAppManagerInterface::EUpdateStage_StopOldApp)
 								{
 									State.m_InProgress[iAppManager];
 									State.m_nMaxInProgress = fg_Max(State.m_nMaxInProgress, State.m_InProgress.f_GetLen()); 
@@ -600,6 +614,7 @@ public:
 			
 			auto fSetUpdateType = [&](CStr const &_UpdateType)
 				{
+					PackageInfo.m_VersionInfo.m_ExtraInfo["ExecutableParameters"] = {"--update-type", _UpdateType, "--daemon-run"}; 
 					TCActorResultVector<void> AppCommandResults;
 					for (auto &AppManager : AppManagers)
 					{
@@ -607,14 +622,7 @@ public:
 						CAppManagerInterface::CApplicationSettings Settings;
 						Settings.m_ExecutableParameters = {"--update-type", _UpdateType, "--daemon-run"};
 						
-						TCContinuation<void> Continuation;
-						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, "TestApp", ChangeSettings, Settings) > Continuation / [Continuation, AppManager]
-							{
-								DMibCallActor(AppManager, CAppManagerInterface::f_Restart, "TestApp") > Continuation;
-							}
-						;
-						
-						Continuation.f_Dispatch() > AppCommandResults.f_AddResult(); 
+						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, "TestApp", ChangeSettings, Settings) > AppCommandResults.f_AddResult(); 
 					}
 					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
 				}
@@ -623,32 +631,34 @@ public:
 			{
 				DMibTestPath("Update Independent");
 				fSetUpdateType("Independent");
+				UpdateNotificationState.f_Clear();
 				fUpdateTestApp();
 				fWaitForAllUpdated();
 				
 				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
 				DMibExpect(UpdateNotificationState.m_nMaxInProgress, >= , 1);
-				UpdateNotificationState.f_Clear();
 			}
 			{
 				DMibTestPath("Update OneAtATime");
 				fSetUpdateType("OneAtATime");
+				UpdateNotificationState.f_Clear();
 				fUpdateTestApp();
 				fWaitForAllUpdated();
-				
+
 				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
-				DMibExpect(UpdateNotificationState.m_nMaxInProgress, == , 1);
-				UpdateNotificationState.f_Clear();
+				DMibTest(DMibExpr(UpdateNotificationState.m_nMaxInProgress) == DMibExpr(1) || DMibExpr(UpdateNotificationState.m_nMaxInProgress) == DMibExpr(2));
+				DMibExpect(UpdateNotificationState.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], == , 1);
 			}
 			{
 				DMibTestPath("Update AllAtOnce");
-				fSetUpdateType("OneAtATime");
+				fSetUpdateType("AllAtOnce");
+				UpdateNotificationState.f_Clear();
 				fUpdateTestApp();
 				fWaitForAllUpdated();
 				
 				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
 				DMibExpect(UpdateNotificationState.m_nMaxInProgress, == , nAppManagers);
-				UpdateNotificationState.f_Clear();
+				DMibExpect(UpdateNotificationState.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], == , nAppManagers);
 			}
 		};
 	}

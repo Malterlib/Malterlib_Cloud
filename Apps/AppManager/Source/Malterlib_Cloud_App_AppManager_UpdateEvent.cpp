@@ -48,30 +48,77 @@ namespace NMib::NCloud::NAppManager
 		)
 	{
 		auto &Application = *_pApplication;
-		
-		if (_VersionID != Application.m_WantInstallVersion || _Stage != Application.m_UpdateStage)
+				
+		if (_Stage != Application.m_WantUpdateStage)
 		{
-			Application.m_WantInstallVersion = _VersionID;
-			Application.m_UpdateStage = _Stage;
+			Application.m_WantUpdateStage = _Stage;
 			fp_RemoteAppInfoChanged(_pApplication);
 		}
 		
-		CAppManagerInterface::CUpdateNotification Notification;
-		Notification.m_Application = Application.m_Name;
-		Notification.m_Message = _Message;
-		Notification.m_VersionID = _VersionID;
-		Notification.m_Stage = _Stage;
-		
-		CStr AppPermission = fg_Format("AppManager/App/{}", Application.m_Name);
-		
-		for (auto &Subscription : mp_UpdateNotificationSubscriptions)
+		TCContinuation<void> CoordinationContinuation;
+
+		auto UpdateType = Application.m_RegisterInfo.m_UpdateType; 
+		switch (UpdateType)
 		{
-			if (!mp_Permissions.f_HostHasAnyPermission(Subscription.m_CallingHostID, "AppManager/AppAll", AppPermission))
-				continue;
-			
-			Subscription.m_fOnUpdate(Notification) > fg_DiscardResult();
+		case EDistributedAppUpdateType_AllAtOnce:
+		case EDistributedAppUpdateType_OneAtATime:
+			{
+				if (_Stage == CAppManagerInterface::EUpdateStage_None)
+					CoordinationContinuation = fp_Coordination_WaitForAllToReachWantUpdateStage(_pApplication, CAppManagerInterface::EUpdateStage_None, 10.0*60.0, true);
+				else if (_Stage == CAppManagerInterface::EUpdateStage_StopOldApp)
+				{
+					if (UpdateType == EDistributedAppUpdateType_OneAtATime)
+						CoordinationContinuation = fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pApplication);
+					else
+						CoordinationContinuation = fp_Coordination_WaitForAllToReachWantUpdateStage(_pApplication, CAppManagerInterface::EUpdateStage_StopOldApp, 30.0*60.0);
+				}
+				else
+					CoordinationContinuation.f_SetResult();
+				break;
+			}
+		case EDistributedAppUpdateType_Independent:
+			{
+				CoordinationContinuation.f_SetResult();
+				break;
+			}
+		default:
+			{
+				DNeverGetHere;
+				break;
+			}
 		}
 		
-		return fg_Explicit();
+		TCContinuation<void> Continuation;
+		
+		CoordinationContinuation.f_Dispatch() > Continuation / [=]
+			{
+				auto &Application = *_pApplication;
+				
+				if (_Stage != Application.m_UpdateStage)
+				{
+					Application.m_UpdateStage = _Stage;
+					fp_RemoteAppInfoChanged(_pApplication);
+				}
+				
+				CAppManagerInterface::CUpdateNotification Notification;
+				Notification.m_Application = Application.m_Name;
+				Notification.m_Message = _Message;
+				Notification.m_VersionID = _VersionID;
+				Notification.m_Stage = _Stage;
+				
+				CStr AppPermission = fg_Format("AppManager/App/{}", Application.m_Name);
+				
+				for (auto &Subscription : mp_UpdateNotificationSubscriptions)
+				{
+					if (!mp_Permissions.f_HostHasAnyPermission(Subscription.m_CallingHostID, "AppManager/AppAll", AppPermission))
+						continue;
+					
+					Subscription.m_fOnUpdate(Notification) > fg_DiscardResult();
+				}
+				Continuation.f_SetResult();
+			}
+		;
+		
+		return Continuation;
 	}
 }

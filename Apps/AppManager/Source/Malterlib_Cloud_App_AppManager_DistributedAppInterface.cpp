@@ -40,7 +40,7 @@ namespace NMib::NCloud::NAppManager
 						, "Application '{}' registered from host '{}' and uses update type '{}'"
 						, Application.m_Name
 						, CallingHostInfo.f_GetHostInfo().f_GetDesc()
-						, _RegisterInfo.m_UpdateType
+						, fsp_UpdateTypeToStr(_RegisterInfo.m_UpdateType)
 					)
 				;
 				

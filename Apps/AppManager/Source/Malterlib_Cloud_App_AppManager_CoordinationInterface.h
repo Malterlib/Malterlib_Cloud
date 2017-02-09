@@ -45,9 +45,11 @@ namespace NMib::NCloud::NAppManager
 			void f_Stream(tf_CStream &_Stream);
 
 			CStr m_Group;
+			CStr m_VersionManagerApplication;
 			CVersionIDAndPlatform m_VersionID;
 			CVersionIDAndPlatform m_WantVersionID;
 			EUpdateStage m_UpdateStage = CAppManagerInterface::EUpdateStage_None;
+			EUpdateStage m_WantUpdateStage = CAppManagerInterface::EUpdateStage_None;
 			EDistributedAppUpdateType m_UpdateType = EDistributedAppUpdateType_Independent;
 		};
 		
@@ -69,13 +71,13 @@ namespace NMib::NCloud::NAppManager
 			CStr m_Application;
 		};
 
-		struct CAppChange_AddKnownKosts
+		struct CAppChange_AddKnownHosts
 		{
  			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
 			CStr m_Group;
-			CStr m_Application;
+			CStr m_VersionManagerApplication;
 			TCSet<CStr> m_KnownHosts;
 		};
 		
@@ -84,7 +86,7 @@ namespace NMib::NCloud::NAppManager
 				EAppChange
 				, CAppChange_Update, EAppChange_Update
 				, CAppChange_Remove, EAppChange_Remove
-				, CAppChange_AddKnownKosts, EAppChange_AddKnownHosts
+				, CAppChange_AddKnownHosts, EAppChange_AddKnownHosts
 			>
 		;
 		

@@ -26,7 +26,7 @@ namespace NMib::NCloud
 		
 		enum EUpdateStage
 		{
-			EUpdateStage_Failed = 0xf0000000
+			EUpdateStage_Failed = 0x70000000
 			, EUpdateStage_None = 0
 			, EUpdateStage_ChangeEncryption = 1
 			, EUpdateStage_DownloadVersion = 2
