@@ -427,7 +427,7 @@ public:
 						> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 						{
 							auto &AppManagerTrustInner = *pAppManagerTrustInner;
-							DMibCallActor(AppManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout) > Continuation.f_ReceiveAny();
+							DMibCallActor(AppManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Continuation.f_ReceiveAny();
 						}
 					;
 					Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
@@ -457,7 +457,7 @@ public:
 					{
 						auto &AppManagerTrust = *pAppManagerTrust;
 						auto &VersionManagerTrust = *pVersionManagerTrust;
-						DMibCallActor(AppManagerTrust, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout)
+						DMibCallActor(AppManagerTrust, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1)
 							+ DMibCallActor
 							(
 								VersionManagerTrust
