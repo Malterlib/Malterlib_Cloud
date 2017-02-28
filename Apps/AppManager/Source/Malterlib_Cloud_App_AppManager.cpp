@@ -118,7 +118,15 @@ namespace NMib::NCloud::NAppManager
 					if (auto pRegisterInfo = ApplicationJSON.f_GetMember("RegisterInfo", EJSONType_Object))
 					{
 						if (auto pValue = pRegisterInfo->f_GetMember("UpdateType", EJSONType_Integer))
-							Application.m_RegisterInfo.m_UpdateType = (EDistributedAppUpdateType)pValue->f_Integer(); 
+							Application.m_RegisterInfo.m_UpdateType = (EDistributedAppUpdateType)pValue->f_Integer();
+						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesFiles", EJSONType_Integer))
+							Application.m_RegisterInfo.m_Resources_Files = pValue->f_Integer();
+						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesFilesPerProcess", EJSONType_Integer))
+							Application.m_RegisterInfo.m_Resources_FilesPerProcess = pValue->f_Integer();
+						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesThreads", EJSONType_Integer))
+							Application.m_RegisterInfo.m_Resources_Threads = pValue->f_Integer();
+						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesProcesses", EJSONType_Integer))
+							Application.m_RegisterInfo.m_Resources_Processes = pValue->f_Integer();
 					}
 					if (auto pValue = ApplicationJSON.f_GetMember("AssociatedHostID", EJSONType_String))
 						Application.m_AssociatedHostID = pValue->f_String();
@@ -173,7 +181,9 @@ namespace NMib::NCloud::NAppManager
 				if (mp_State.m_bStoppingApp)
 					return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
 				
-				fp_PublishAppInterface() > Continuation / [this, Continuation]
+				fp_PublishAppInterface()
+					+ fp_SetupLimits()
+					> Continuation / [this, Continuation]
 					{
 						if (mp_State.m_bStoppingApp)
 							return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));

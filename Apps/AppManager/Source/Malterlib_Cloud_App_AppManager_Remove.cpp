@@ -40,9 +40,11 @@ namespace NMib::NCloud::NAppManager
 				if (!pApplication)
 					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
 				
+				auto pApplicationPtr = *pApplication;
 				(*pApplication)->f_Delete();
 				pThis->mp_Applications.f_Remove(_Name);
-				pThis->fp_SendRemovedAppToRemoteAppManagers(*pApplication);				
+				pThis->fp_SendRemovedAppToRemoteAppManagers(pApplicationPtr);
+				pThis->fp_UpdateLimits();
 
 				if (auto *pApplicationsState = pThis->mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 				{

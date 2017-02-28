@@ -205,7 +205,31 @@ namespace NMib::NCloud::NAppManager
 		
 		ApplicationJSON["AssociatedHostID"] = _pApplication->m_AssociatedHostID;
 		ApplicationJSON["UpdateGroup"] = Settings.m_UpdateGroup;
-		ApplicationJSON["RegisterInfo"]["UpdateType"] = _pApplication->m_RegisterInfo.m_UpdateType;
+
+		{
+			auto &RegisterInfo = ApplicationJSON["RegisterInfo"];
+			RegisterInfo["UpdateType"] = _pApplication->m_RegisterInfo.m_UpdateType;
+			
+			if (_pApplication->m_RegisterInfo.m_Resources_Files)
+				RegisterInfo["ResourcesFiles"] = *_pApplication->m_RegisterInfo.m_Resources_Files;
+			else
+				RegisterInfo.f_RemoveMember("ResourcesFiles");
+			
+			if (_pApplication->m_RegisterInfo.m_Resources_FilesPerProcess)
+				RegisterInfo["ResourcesFilesPerProcess"] = *_pApplication->m_RegisterInfo.m_Resources_FilesPerProcess;
+			else
+				RegisterInfo.f_RemoveMember("ResourcesFilesPerProcess");
+			
+			if (_pApplication->m_RegisterInfo.m_Resources_Threads)
+				RegisterInfo["ResourcesThreads"] = *_pApplication->m_RegisterInfo.m_Resources_Threads;
+			else
+				RegisterInfo.f_RemoveMember("ResourcesThreads");
+			
+			if (_pApplication->m_RegisterInfo.m_Resources_Processes)
+				RegisterInfo["ResourcesProcesses"] = *_pApplication->m_RegisterInfo.m_Resources_Processes;
+			else
+				RegisterInfo.f_RemoveMember("ResourcesProcesses");
+		}
 	
 		TCContinuation<void> Continuation;
 		mp_State.m_StateDatabase.f_Save() > Continuation;

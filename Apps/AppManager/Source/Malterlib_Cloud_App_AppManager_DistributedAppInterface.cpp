@@ -28,9 +28,12 @@ namespace NMib::NCloud::NAppManager
 				Application.m_AppInterface = fg_Move(_ClientInterface);
 				if (Application.m_RegisterInfo != _RegisterInfo)
 				{
+					bool bUpdateTypeChanged = _RegisterInfo.m_UpdateType != Application.m_RegisterInfo.m_UpdateType;  
 					Application.m_RegisterInfo = _RegisterInfo;
-					pThis->fp_RemoteAppInfoChanged(pApplication);
+					if (bUpdateTypeChanged)
+						pThis->fp_RemoteAppInfoChanged(pApplication);
 					pThis->fp_UpdateApplicationJSON(pApplication) > fg_DiscardResult();
+					pThis->fp_UpdateLimits();
 				}
 				
 				DMibLogWithCategory

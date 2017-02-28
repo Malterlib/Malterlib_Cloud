@@ -150,7 +150,6 @@ namespace NMib::NCloud::NAppManager
 		mp_AppManagerInterface.m_pActor->f_GetAvailableVersions(_Params["Application"].f_String()) 
 			> Continuation / [bVerbose, Continuation](CAppManagerInterface::CVersionsAvailableForUpdate &&_Results)
 			{
-				
 				CDistributedAppCommandLineResults CommandLineResults;
 
 				mint LongestApplication = fg_StrLen("Application");
@@ -246,7 +245,7 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 				
-				return fg_Explicit(fg_Move(CommandLineResults));
+				Continuation.f_SetResult(fg_Move(CommandLineResults));
 			}
 		;
 		

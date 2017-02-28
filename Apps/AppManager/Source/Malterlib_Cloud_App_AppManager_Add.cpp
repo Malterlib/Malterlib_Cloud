@@ -90,6 +90,7 @@ namespace NMib::NCloud::NAppManager
 					return DMibErrorInstance(fg_Format("Invalid version format: {}", Error));
 				VersionID = VersionIDTemp;
 			}
+			Settings.m_VersionManagerApplication = Package;
 		}
 		else
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory()));

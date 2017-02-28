@@ -632,6 +632,9 @@ namespace NMib::NCloud::NAppManager
 		;
 		static ch8 const *fsp_UpdateStageToStr(CAppManagerInterface::EUpdateStage _Stage);
 		static ch8 const *fsp_UpdateTypeToStr(EDistributedAppUpdateType _UpdateType);
+
+		TCContinuation<void> fp_SetupLimits();
+		void fp_UpdateLimits();
 		
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
 		TCActor<CSeparateThreadActor> mp_FileActor;

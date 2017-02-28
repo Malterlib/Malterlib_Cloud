@@ -262,6 +262,7 @@ namespace NMib::NCloud::NAppManager
 				LaunchParams.m_Environment["HOME"] = ApplicationDirectory + "/.home";
 				LaunchParams.m_Environment["TMPDIR"] = ApplicationDirectory + "/.tmp";
 				LaunchParams.m_bMergeEnvironment = true;
+				LaunchParams.m_bCreateNewProcessGroup = true;
 				
 				Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
 					(
