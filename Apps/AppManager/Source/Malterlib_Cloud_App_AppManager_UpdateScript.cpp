@@ -68,7 +68,7 @@ namespace NMib::NCloud::NAppManager
 			void f_Replied()
 			{
 				m_bReplied = true;
-				m_LaunchActor->f_Destroy();
+				m_LaunchActor->f_DestroyNoResult(DMibPFile, DMibPLine);
 			}
 		};
 		

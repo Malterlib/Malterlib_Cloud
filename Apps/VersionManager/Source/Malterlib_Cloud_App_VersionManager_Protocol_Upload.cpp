@@ -17,7 +17,7 @@ namespace NMib::NCloud::NVersionManager
 	{
 		if (m_FileTransferReceive)
 		{
-			m_FileTransferReceive->f_Destroy();
+			m_FileTransferReceive->f_DestroyNoResult(DMibPFile, DMibPLine);
 			m_FileTransferReceive.f_Clear();
 		}
 	}
@@ -206,7 +206,7 @@ namespace NMib::NCloud::NVersionManager
 										return;
 									if (pUpload->m_FileTransferReceive)
 									{
-										pUpload->m_FileTransferReceive->f_Destroy();
+										pUpload->m_FileTransferReceive->f_DestroyNoResult(DMibPFile, DMibPLine);
 										pUpload->m_FileTransferReceive.f_Clear();
 									}
 									if (pThis->mp_VersionUploads.f_Remove(UploadID))
@@ -247,7 +247,7 @@ namespace NMib::NCloud::NVersionManager
 							return;
 						if (pUpload->m_FileTransferReceive)
 						{
-							pUpload->m_FileTransferReceive->f_Destroy();
+							pUpload->m_FileTransferReceive->f_DestroyNoResult(DMibPFile, DMibPLine);
 							pUpload->m_FileTransferReceive.f_Clear();
 						}
 						auto FileAccess = pUpload->m_UploadFileAccess;

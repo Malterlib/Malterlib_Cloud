@@ -16,7 +16,7 @@ namespace NMib::NCloud::NVersionManager
 	{
 		if (m_FileTransferSend)
 		{
-			m_FileTransferSend->f_Destroy();
+			m_FileTransferSend->f_DestroyNoResult(DMibPFile, DMibPLine);
 			m_FileTransferSend.f_Clear();
 		}
 	}
@@ -134,7 +134,7 @@ namespace NMib::NCloud::NVersionManager
 							return;
 						if (pDownload->m_FileTransferSend)
 						{
-							pDownload->m_FileTransferSend->f_Destroy();
+							pDownload->m_FileTransferSend->f_DestroyNoResult(DMibPFile, DMibPLine);
 							pDownload->m_FileTransferSend.f_Clear();
 						}
 						pThis->mp_VersionDownloads.f_Remove(DownloadID);
