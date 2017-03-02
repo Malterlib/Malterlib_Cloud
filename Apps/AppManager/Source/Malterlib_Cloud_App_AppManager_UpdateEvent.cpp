@@ -41,36 +41,48 @@ namespace NMib::NCloud::NAppManager
 
 	TCContinuation<void> CAppManagerActor::fp_OnUpdateEvent
 		(
-			TCSharedPointer<CApplication> const &_pApplication
-			, CAppManagerInterface::EUpdateStage _Stage
-			, CAppManagerInterface::CVersionIDAndPlatform const &_VersionID
+			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+			, EUpdateStage _Stage
 			, NStr::CStr const &_Message
 		)
 	{
-		auto &Application = *_pApplication;
+		auto &Application = *_pState->m_pApplication;
 				
 		if (_Stage != Application.m_WantUpdateStage)
 		{
 			Application.m_WantUpdateStage = _Stage;
-			fp_RemoteAppInfoChanged(_pApplication);
+			if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
+				Application.m_UpdateStartSequence = ++mp_AppStageChangeSequence;
+			fp_OnAppUpdateInfoChange(_pState->m_pApplication);
 		}
 		
 		TCContinuation<void> CoordinationContinuation;
 
-		auto UpdateType = Application.m_RegisterInfo.m_UpdateType; 
+		auto UpdateType = Application.f_GetUpdateType(); 
 		switch (UpdateType)
 		{
 		case EDistributedAppUpdateType_AllAtOnce:
 		case EDistributedAppUpdateType_OneAtATime:
 			{
-				if (_Stage == CAppManagerInterface::EUpdateStage_None)
-					CoordinationContinuation = fp_Coordination_WaitForAllToReachWantUpdateStage(_pApplication, CAppManagerInterface::EUpdateStage_None, 10.0*60.0, true);
-				else if (_Stage == CAppManagerInterface::EUpdateStage_StopOldApp)
+				if (_Stage == EUpdateStage::EUpdateStage_None)
+				{
+					CoordinationContinuation = fp_Coordination_WaitForAllToReachWantUpdateStage
+						(
+							_pState
+							, EUpdateStage::EUpdateStage_None
+							, 10.0*60.0
+							, EWaitStageFlag_IgnoreFailed | EWaitStageFlag_DisallowInProgressStates
+						)
+					;
+				}
+				else if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
+					CoordinationContinuation = fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
+				else if (_Stage == EUpdateStage::EUpdateStage_StopOldApp)
 				{
 					if (UpdateType == EDistributedAppUpdateType_OneAtATime)
-						CoordinationContinuation = fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pApplication);
+						CoordinationContinuation = fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pState);
 					else
-						CoordinationContinuation = fp_Coordination_WaitForAllToReachWantUpdateStage(_pApplication, CAppManagerInterface::EUpdateStage_StopOldApp, 30.0*60.0);
+						CoordinationContinuation = fp_Coordination_WaitForAllToReachWantUpdateStage(_pState, EUpdateStage::EUpdateStage_StopOldApp, 30.0*60.0, EWaitStageFlag_None);
 				}
 				else
 					CoordinationContinuation.f_SetResult();
@@ -92,18 +104,40 @@ namespace NMib::NCloud::NAppManager
 		
 		CoordinationContinuation.f_Dispatch() > Continuation / [=]
 			{
-				auto &Application = *_pApplication;
+				auto &Application = *_pState->m_pApplication;
+		
+				bool bUpdatedAppInfo = false;
 				
 				if (_Stage != Application.m_UpdateStage)
 				{
+					if (_Stage == EUpdateStage::EUpdateStage_Finished)
+					{
+						Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
+						Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo;
+						bUpdatedAppInfo = true;
+					}
+					else if (_Stage == EUpdateStage::EUpdateStage_Failed)
+					{
+						Application.m_LastFailedInstalledVersion = _pState->m_VersionID;
+						Application.m_LastFailedInstalledVersionTime = _pState->m_VersionTime;
+						Application.m_LastFailedInstalledVersionRetrySequence = _pState->m_VersionRetrySequence; 
+						if (!_pState->m_bSetLastTried)
+						{
+							Application.m_LastTriedInstalledVersion = _pState->m_VersionID;
+							Application.m_LastTriedInstalledVersionInfo.m_Time = _pState->m_VersionTime;
+							Application.m_LastTriedInstalledVersionInfo.m_RetrySequence = _pState->m_VersionRetrySequence;
+							bUpdatedAppInfo = true;
+						}
+					}
 					Application.m_UpdateStage = _Stage;
-					fp_RemoteAppInfoChanged(_pApplication);
+					fp_OnAppUpdateInfoChange(_pState->m_pApplication);
 				}
 				
 				CAppManagerInterface::CUpdateNotification Notification;
 				Notification.m_Application = Application.m_Name;
 				Notification.m_Message = _Message;
-				Notification.m_VersionID = _VersionID;
+				Notification.m_VersionID = _pState->m_VersionID;
+				Notification.m_VersionTime = _pState->m_VersionTime;
 				Notification.m_Stage = _Stage;
 				
 				CStr AppPermission = fg_Format("AppManager/App/{}", Application.m_Name);
@@ -115,7 +149,14 @@ namespace NMib::NCloud::NAppManager
 					
 					Subscription.m_fOnUpdate(Notification) > fg_DiscardResult();
 				}
-				Continuation.f_SetResult();
+				
+				if (!bUpdatedAppInfo)
+				{
+					Continuation.f_SetResult();
+					return;
+				}
+				
+				fp_UpdateApplicationJSON(_pState->m_pApplication) > Continuation;
 			}
 		;
 		

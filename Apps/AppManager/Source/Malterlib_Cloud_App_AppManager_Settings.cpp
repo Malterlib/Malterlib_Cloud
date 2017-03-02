@@ -43,6 +43,23 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_ParentApplication;
 			m_ParentApplication = pValue->f_String();
 		}
+
+		if (auto *pValue = _Params.f_GetMember("Dependencies"))
+		{
+			o_ChangedSettings |= EApplicationSetting_Dependencies;
+			m_Dependencies.f_Clear();
+			if (pValue->f_IsArray())
+			{
+				for (auto &Dependency : pValue->f_Array())
+					m_Dependencies[Dependency.f_String()];
+			}
+		}
+
+		if (auto *pValue = _Params.f_GetMember("StopOnDependencyFailure"))
+		{
+			o_ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
+			m_bStopOnDependencyFailure = pValue->f_Boolean();
+		}
 		
 		if (auto *pValue = _Params.f_GetMember("VersionManagerApplication"))
 		{
@@ -187,6 +204,10 @@ namespace NMib::NCloud::NAppManager
 			m_bSelfUpdateSource = _Source.m_bSelfUpdateSource;
 		if (_ChangedSettings & EApplicationSetting_UpdateGroup)
 			m_UpdateGroup = _Source.m_UpdateGroup;
+		if (_ChangedSettings & EApplicationSetting_Dependencies)
+			m_Dependencies = _Source.m_Dependencies;
+		if (_ChangedSettings & EApplicationSetting_StopOnDependencyFailure)
+			m_bStopOnDependencyFailure = _Source.m_bStopOnDependencyFailure;
 	}
 
 	bool CAppManagerActor::CApplicationSettings::f_Validate(CStr &o_Error) const
@@ -211,8 +232,6 @@ namespace NMib::NCloud::NAppManager
 				return fError("For self update you cannot specify run as user");
  			else if (!m_RunAsGroup.f_IsEmpty())
 				return fError("For self update you cannot specify run as group");
- 			else if (m_bDistributedApp)
-				return fError("For self update you cannot specify distributed app");
 		}
 		else
 		{
@@ -266,6 +285,10 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_SelfUpdateSource;
 		if (m_UpdateGroup != _Other.m_UpdateGroup)
 			ChangedSettings |= EApplicationSetting_UpdateGroup;
+		if (m_Dependencies != _Other.m_Dependencies)
+			ChangedSettings |= EApplicationSetting_Dependencies;
+		if (m_bStopOnDependencyFailure != _Other.m_bStopOnDependencyFailure)
+			ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
 		return ChangedSettings;
 	}
 
@@ -370,6 +393,16 @@ namespace NMib::NCloud::NAppManager
 			m_UpdateGroup = *_Settings.m_UpdateGroup; 
 			o_ChangedSettings |= EApplicationSetting_UpdateGroup;
 		}
+		if (_Settings.m_Dependencies)
+		{
+			m_Dependencies = *_Settings.m_Dependencies; 
+			o_ChangedSettings |= EApplicationSetting_Dependencies;
+		}
+		if (_Settings.m_bStopOnDependencyFailure)
+		{
+			m_bStopOnDependencyFailure = *_Settings.m_bStopOnDependencyFailure; 
+			o_ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
+		}
 	}
 	
 	void CAppManagerActor::CApplicationSettings::f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings)
@@ -409,6 +442,23 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EApplicationSetting_DistributedApp;
 			m_bDistributedApp = pValue->f_Boolean();
+		}
+		
+		if (auto *pValue = ExtraInfo.f_GetMember("Dependencies"))
+		{
+			o_ChangedSettings |= EApplicationSetting_Dependencies;
+			m_Dependencies.f_Clear();
+			if (pValue->f_IsArray())
+			{
+				for (auto &Dependency : pValue->f_Array())
+					m_Dependencies[Dependency.f_String()];
+			}
+		}
+
+		if (auto *pValue = ExtraInfo.f_GetMember("StopOnDependencyFailure"))
+		{
+			o_ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
+			m_bStopOnDependencyFailure = pValue->f_Boolean();
 		}
 	}
 }

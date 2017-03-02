@@ -17,8 +17,8 @@ namespace NMib::NCloud::NAppManager
 		
 		enum 
 		{
-			EMinProtocolVersion = 0x101
-			, EProtocolVersion = 0x101
+			EMinProtocolVersion = 0x103
+			, EProtocolVersion = 0x103
 		};
 		
 		enum EAppChange
@@ -47,10 +47,14 @@ namespace NMib::NCloud::NAppManager
 			CStr m_Group;
 			CStr m_VersionManagerApplication;
 			CVersionIDAndPlatform m_VersionID;
-			CVersionIDAndPlatform m_WantVersionID;
-			EUpdateStage m_UpdateStage = CAppManagerInterface::EUpdateStage_None;
-			EUpdateStage m_WantUpdateStage = CAppManagerInterface::EUpdateStage_None;
+			NTime::CTime m_VersionTime;
+			CVersionIDAndPlatform m_FailedVersionID;
+			NTime::CTime m_FailedVersionTime;
+			uint32 m_FailedVersionRetrySequence = 0;
+			EUpdateStage m_UpdateStage = EUpdateStage::EUpdateStage_None;
+			EUpdateStage m_WantUpdateStage = EUpdateStage::EUpdateStage_None;
 			EDistributedAppUpdateType m_UpdateType = EDistributedAppUpdateType_Independent;
+			uint64 m_UpdateStartSequence = TCLimitsInt<uint64>::mc_Max;
 		};
 		
 		struct CAppChange_Update : public CAppInfo

@@ -9,6 +9,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		m_ProcessLaunch.f_Clear();
 		m_ProcessLaunchSubscription.f_Clear();
+		m_bLaunched = false;
 	}
 	
 	void CAppManagerActor::CApplication::f_AbortPendingLaunches()
@@ -45,6 +46,11 @@ namespace NMib::NCloud::NAppManager
 		return !m_Settings.m_ParentApplication.f_IsEmpty();
 	}
 	
+	bool CAppManagerActor::CApplication::f_IsLaunched() const
+	{
+		return m_bLaunching || !m_ProcessLaunch.f_IsEmpty() || m_bLaunched;
+	}
+	
 	bool CAppManagerActor::CApplication::f_IsInProgress() const
 	{
 		if (m_bOperationInProgress)
@@ -73,32 +79,47 @@ namespace NMib::NCloud::NAppManager
 				{
 					DCheck(pApplication->m_bOperationInProgress);
 					pApplication->m_bOperationInProgress = false;
-					if (pThis->mp_bPendingAutoUpdate)
-						pThis->fp_AutoUpdate_Update();
+					pThis->fp_UpdateApplicationDependencies();
 				}
 			)
 		;
 	}
 
-	TCDispatchedActorCall<uint32> CAppManagerActor::CApplication::f_Stop(bool _bCloseEncryption)
+	TCDispatchedActorCall<uint32> CAppManagerActor::CApplication::f_Stop(EStopFlag _Flags)
 	{
-		return g_Dispatch > [this, _bCloseEncryption, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCContinuation<uint32>
+		return g_Dispatch > [this, _Flags, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCContinuation<uint32>
 			{
 				if (pApplication->m_bDeleted)
 					return fg_Explicit(0);
+
+				TCContinuation<void> SaveStateContinuation;
+				
+				if (_Flags & EStopFlag_PreventLaunchUser)
+					pApplication->m_bPreventLaunch_User = true;
+				if (_Flags & EStopFlag_PreventLaunchUpdate)
+					pApplication->m_bPreventLaunch_Update = true;
+				
+				if (_Flags & (EStopFlag_PreventLaunchUser | EStopFlag_PreventLaunchUpdate))
+					SaveStateContinuation = m_pThis->fp_UpdateApplicationJSON(pApplication);
+				else
+					SaveStateContinuation.f_SetResult();
 				
 				TCContinuation<uint32> Continuation;
 				
 				TCActorResultVector<uint32> ChildrenCloses;
 				
-				// Stop all children first
-				for (auto &ChildApp : m_Children)
-					ChildApp.f_Stop(false) > ChildrenCloses.f_AddResult();
+				// Stop all children and dependents first
+				for (auto &pDependent : f_GetDependents())
+					pDependent->f_Stop(EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
 				
-				ChildrenCloses.f_GetResults() 
+				for (auto &ChildApp : m_Children)
+					ChildApp.f_Stop(EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
+				
+				ChildrenCloses.f_GetResults()
+					+ SaveStateContinuation.f_Dispatch()
 					> Continuation % "Failed to stop child application" 
 					/ [=]
-					(TCVector<TCAsyncResult<uint32>> &&_ChildrenCloseResults) mutable
+					(TCVector<TCAsyncResult<uint32>> &&_ChildrenCloseResults, CVoidTag) mutable
 					{
 						CStr ChildCloseErrors;
 						for (auto &ChildCloseResult : _ChildrenCloseResults)
@@ -112,9 +133,15 @@ namespace NMib::NCloud::NAppManager
 							return;
 						}
 				
-						if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped || pApplication->m_bDeleted)
+						bool bWasStopped = pApplication->m_bStopped;
+						pApplication->m_bLaunched = false;
+						pApplication->m_bStopped = true;
+						
+						if (!pApplication->m_ProcessLaunch || bWasStopped || pApplication->m_bDeleted)
 						{
-							if (_bCloseEncryption)
+							pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
+
+							if (_Flags & EStopFlag_CloseEncryption)
 							{
 								g_Dispatch > [this, pApplication]() -> TCContinuation<uint32>
 									{
@@ -124,17 +151,18 @@ namespace NMib::NCloud::NAppManager
 									}
 									> Continuation
 								;
-								return;
 							}
 							else
 							{
 								Continuation.f_SetResult(0);
-								return;
 							}
+							return;
 						}
-						pApplication->m_bStopped = true;
-						pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess) > [this, Continuation, pApplication, _bCloseEncryption](TCAsyncResult<uint32> &&_Result)
+
+						pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess) > [=](TCAsyncResult<uint32> &&_Result)
 							{
+								pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
+
 								if (!_Result)
 									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", _Result.f_GetExceptionStr());
 								else
@@ -146,7 +174,7 @@ namespace NMib::NCloud::NAppManager
 									pApplication->f_Clear();
 								}
 
-								if (_bCloseEncryption)
+								if (_Flags & EStopFlag_CloseEncryption)
 								{
 									if (!_Result)
 									{
@@ -200,5 +228,11 @@ namespace NMib::NCloud::NAppManager
 				return Continuation;
 			}
 		;
+	}
+	
+	void CAppManagerActor::fp_AppLaunchStateChanged(TCSharedPointer<CApplication> const &_pApplication, CStr const &_State)
+	{
+		_pApplication->m_LaunchState = _State;
+		fp_UpdateApplicationDependencies();
 	}
 }

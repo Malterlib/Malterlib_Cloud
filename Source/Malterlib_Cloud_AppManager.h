@@ -17,28 +17,29 @@ namespace NMib::NCloud
 
 		enum 
 		{
-			EMinProtocolVersion = 0x101
-			, EProtocolVersion = 0x102
+			EMinProtocolVersion = 0x105
+			, EProtocolVersion = 0x105
 		};
 		
 		CAppManagerInterface();
 		~CAppManagerInterface();
 		
-		enum EUpdateStage
+		enum EUpdateStage : uint32
 		{
-			EUpdateStage_Failed = 0x70000000
-			, EUpdateStage_None = 0
-			, EUpdateStage_ChangeEncryption = 1
-			, EUpdateStage_DownloadVersion = 2
-			, EUpdateStage_Unpack = 3
-			, EUpdateStage_StopOldApp = 4
-			, EUpdateStage_PreUpdateScript = 5
-			, EUpdateStage_UpdateApplicationFiles = 6
-			, EUpdateStage_SaveApplicationState = 7
-			, EUpdateStage_PostUpdateScript = 8
-			, EUpdateStage_StartNewApp = 9
-			, EUpdateStage_PostLaunch = 10
-			, EUpdateStage_Finished = 11
+			EUpdateStage_Failed						= 0x70000000
+			, EUpdateStage_None						= 0
+			, EUpdateStage_SyncStart				= 0x10000
+			, EUpdateStage_ChangeEncryption			= 0x20000
+			, EUpdateStage_DownloadVersion			= 0x30000
+			, EUpdateStage_Unpack					= 0x40000
+			, EUpdateStage_StopOldApp				= 0x50000
+			, EUpdateStage_PreUpdateScript			= 0x60000
+			, EUpdateStage_UpdateApplicationFiles	= 0x70000
+			, EUpdateStage_SaveApplicationState		= 0x80000
+			, EUpdateStage_PostUpdateScript			= 0x90000
+			, EUpdateStage_StartNewApp				= 0xa0000
+			, EUpdateStage_PostLaunch				= 0xb0000
+			, EUpdateStage_Finished					= 0xc0000
 		};
 		
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
@@ -73,20 +74,24 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NStorage::TCOptional<NStr::CStr> m_VersionManagerApplication; // Must be set when adding application
+			NStorage::TCOptional<NStr::CStr> m_VersionManagerApplication;	/// If left empty when adding an application an null application is added. 
+																			/// Useful for using as encrypted parent application 
 			NStorage::TCOptional<NStr::CStr> m_UpdateGroup;
 			NStorage::TCOptional<NStr::CStr> m_Executable;
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ExecutableParameters;
 			NStorage::TCOptional<NStr::CStr> m_RunAsUser;
 			NStorage::TCOptional<NStr::CStr> m_RunAsGroup;
-			NStorage::TCOptional<bool> m_bDistributedApp;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_AutoUpdateTags;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_AutoUpdateBranches; // Are wild cards
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPreUpdate;
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPostUpdate;
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPostLaunch;
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptOnError;
+			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Dependencies;
+			
+			NStorage::TCOptional<bool> m_bDistributedApp;
 			NStorage::TCOptional<bool> m_bSelfUpdateSource;
+			NStorage::TCOptional<bool> m_bStopOnDependencyFailure;
 		};
 		
 		struct CApplicationInfo
@@ -124,8 +129,11 @@ namespace NMib::NCloud
 			NStr::CStr m_UpdateScriptPostUpdate;
 			NStr::CStr m_UpdateScriptPostLaunch;
 			NStr::CStr m_UpdateScriptOnError;
+			NContainer::TCSet<NStr::CStr> m_Dependencies;
+			
 			bool m_bSelfUpdateSource = false;
 			bool m_bDistributedApp = false;
+			bool m_bStopOnDependencyFailure = true;
 		};
 		
 		struct CApplicationVersion
@@ -145,6 +153,7 @@ namespace NMib::NCloud
 			NStr::CStr m_Application;
 			NStr::CStr m_Message; // Currently only for EUpdateStage_Failed
 			CVersionIDAndPlatform m_VersionID;
+			NTime::CTime m_VersionTime;
 			EUpdateStage m_Stage = EUpdateStage_Failed;
 		};
 		

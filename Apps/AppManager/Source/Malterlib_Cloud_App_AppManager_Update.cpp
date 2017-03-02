@@ -24,6 +24,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				_Name
 				, _Update
+				, {} 
 				, {}
 				, [_Name](CStr const &_Info) 
 				{
@@ -31,6 +32,20 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
+	}
+	
+	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJSON const &_Params)
+	{
+		for (auto &pUpdateWeak : mp_RunningUpdates)
+		{
+			auto pUpdate = pUpdateWeak.f_Lock();
+			if (pUpdate)
+				pUpdate->m_bCancel = true;
+		}
+		
+		fp_OnAppUpdateInfoChange();
+		
+		return fg_Explicit();
 	}
 	
 	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON const &_Params)
@@ -82,6 +97,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				Name
 				, Update
+				, {} 
 				, Package
 				, [pResult, Name](CStr const &_Info)
 				{
@@ -97,11 +113,12 @@ namespace NMib::NCloud::NAppManager
 		;
 		return Continuation;
 	}
-
+	
 	TCContinuation<void> CAppManagerActor::fp_UpdateApplication
 		(
 			CStr const &_Name
 			, CAppManagerInterface::CApplicationUpdate const &_Update
+			, CVersionManager::CVersionInformation const &_VersionInfo
 			, CStr const &_FromFileName
 			, TCFunction<void (CStr const &_Info)> &&_fOnInfo
 			, bool _bCheckPermissions
@@ -135,6 +152,7 @@ namespace NMib::NCloud::NAppManager
 		CStr Platform = pApplication->m_LastInstalledVersion.m_Platform;
 		TCSet<CStr> RequiredTags;
 		CVersionManager::CVersionIDAndPlatform VersionID;
+		CVersionManager::CVersionInformation VersionInfo;
 		if (!_FromFileName.f_IsEmpty())
 			bDownloadVersion = false;
 		else
@@ -169,24 +187,32 @@ namespace NMib::NCloud::NAppManager
 				VersionID.m_Platform = Platform;
 				if (!_Update.m_Version->f_IsValid())
 					return Auditor.f_Exception(fg_Format("Invalid version: {}", *_Update.m_Version));
-				VersionID.m_VersionID = *_Update.m_Version; 
+				VersionID.m_VersionID = *_Update.m_Version;
+				VersionInfo = _VersionInfo;
 			}
 			else
 			{
 				CStr Error;
-				VersionID = fp_FindVersion(pApplication, RequiredTags, AllowedBranches, Platform, Error, EFindVersionFlag_RetryFailed);
+				VersionID = fp_FindVersion(pApplication, RequiredTags, AllowedBranches, Platform, Error, EFindVersionFlag_RetryFailed, VersionInfo);
 				if (!VersionID.f_IsValid())
 					return Auditor.f_Exception(Error);
 			}
 		}
 		
+		if (VersionID.f_IsValid() && !VersionInfo.m_Time.f_IsValid())
+		{
+			if (pApplication->m_LastInstalledVersionFinished == VersionID)
+				return Auditor.f_Exception("This version is already installed");
+		}
 		
 		TCSharedPointer<NTime::CClock> pClock = fg_Construct(true);
 		
-		TCSharedPointer<CUpdateApplicationState> pState = fg_Construct();
+		TCSharedPointerSupportWeak<CUpdateApplicationState> pState = fg_Construct();
 		pState->m_pApplication = pApplication;
 		pState->m_fOnInfo = fg_Move(_fOnInfo);
 		pState->m_VersionID = VersionID;
+		pState->m_VersionTime = VersionInfo.m_Time;
+		pState->m_VersionRetrySequence = VersionInfo.m_RetrySequence;
 		pState->m_RequiredTags = RequiredTags;
 		pState->m_bDryRun = bDryRun;
 		pState->m_Auditor = Auditor;
@@ -196,21 +222,38 @@ namespace NMib::NCloud::NAppManager
 			pState->m_SourcePath = _FromFileName;
 		pState->m_pInProgressScope = pApplication->f_SetInProgress();
 		
-		TCContinuation<void> Continuation;
+		mp_RunningUpdates[pState];
+		pState->m_pCleanupStateMap = g_OnScopeExitActor > [this, pStateWeak = pState.f_Weak()]
+			{
+				mp_RunningUpdates.f_Remove(pStateWeak);
+				if (mp_RunningUpdates.f_IsEmpty() && !mp_CancelRunningUpdatesOnStopAppManagerContinuation.f_IsSet())
+					mp_CancelRunningUpdatesOnStopAppManagerContinuation.f_SetResult();
+			}
+		;
 		
-		pState->m_fOnInfo(fg_Format("Starting update with type '{}'", fsp_UpdateTypeToStr(pApplication->m_RegisterInfo.m_UpdateType)));
+		TCContinuation<void> Continuation;
+
+		pState->m_fOnInfo(fg_Format("Starting update with type '{}'", fsp_UpdateTypeToStr(pApplication->f_GetUpdateType())));
 		
 		fp_UpdateApplicationRunProcess(pState) > [=](TCAsyncResult<void> &&_Result)
 			{
 				if (_Result)
 				{
-					Auditor.f_Info("Update application");
+					Auditor.f_Info(fg_Format("Application '{}' updated successfully", pState->m_pApplication->m_Name));
 					Continuation.f_SetResult();
 					return;
 				}
+
 				CStr Error = _Result.f_GetExceptionStr();
-				fp_OnUpdateEvent(pApplication, CAppManagerInterface::EUpdateStage_Failed, VersionID, Error) > fg_DiscardResult();
-		
+				
+				if (Error.f_Find("AppManager stopped") >= 0 && pState->m_pApplication->m_UpdateStage <= EUpdateStage::EUpdateStage_SyncStart)
+				{
+					Continuation.f_SetException(Auditor.f_Exception("Reschedule update after next restart"));
+					return; // Ignore waiting updates when restarting
+				}
+				else
+					fp_OnUpdateEvent(pState, EUpdateStage::EUpdateStage_Failed, Error) > fg_DiscardResult();
+				
 				Continuation.f_SetException(Auditor.f_Exception(Error));
 				bool bUnencrypted = pState->m_bUnencrypted;
 				
@@ -246,6 +289,27 @@ namespace NMib::NCloud::NAppManager
 				}
 			}
 		;
+		
+		return Continuation;
+	}
+
+	TCContinuation<void> CAppManagerActor::fp_CancelAllApplicationUpdatesOnStopAppManager()
+	{
+		if (mp_RunningUpdates.f_IsEmpty())
+			return fg_Explicit();
+		
+		TCContinuation<void> Continuation;
+		
+		mp_CancelRunningUpdatesOnStopAppManagerContinuation = Continuation;
+		
+		for (auto &pUpdateWeak : mp_RunningUpdates)
+		{
+			auto pUpdate = pUpdateWeak.f_Lock();
+			if (pUpdate)
+				pUpdate->m_bCancelOnAppManagerStop = true;
+		}
+		
+		fp_OnAppUpdateInfoChange();
 		
 		return Continuation;
 	}

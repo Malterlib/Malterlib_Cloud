@@ -38,31 +38,216 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 
-	TCContinuation<void> CAppManagerActor::fp_Coordination_WaitForAllToReachWantUpdateStage
+	static bool fg_IsSameVersion
 		(
-			TCSharedPointer<CApplication> const &_pApplication
-			, CAppManagerInterface::EUpdateStage _Stage
-			, fp64 _Timeout
-			, bool _bIgnoreFailed
+			CVersionManager::CVersionIDAndPlatform const &_Left
+			, CTime const &_LeftTime
+			, CVersionManager::CVersionIDAndPlatform const &_Right
+			, CTime const &_RightTime
 		)
 	{
-		CRemoteApplicationKey RemoteKey{_pApplication->m_Settings};
+		if (_Left.m_VersionID != _Right.m_VersionID)
+			return false;
+		if (!_LeftTime.f_IsValid() || !_RightTime.f_IsValid())
+			return true;
+		return _LeftTime == _RightTime;  
+	}
+
+	struct CAppManagerActor::CFirstApplicationUpdate
+	{
+		CRemoteApplicationKey m_RemoteKey;
+		uint64 m_UpdateStartSequence = TCLimitsInt<uint64>::mc_Max;
+		bool m_bInProgress = false;
+		
+		void f_AddApplication(EUpdateStage _WantUpdateState, uint64 _UpdateStartSequence, CRemoteApplicationKey const &_RemoteKey)
+		{
+			if 
+				(
+					_WantUpdateState >= EUpdateStage::EUpdateStage_SyncStart
+					&& _WantUpdateState != EUpdateStage::EUpdateStage_Failed
+					&& _WantUpdateState != EUpdateStage::EUpdateStage_Finished
+				)
+			{
+				bool bInProgress = _WantUpdateState > EUpdateStage::EUpdateStage_SyncStart;
+				if ((!m_bInProgress && _UpdateStartSequence < m_UpdateStartSequence) || bInProgress)
+				{
+					m_bInProgress = bInProgress;
+					m_RemoteKey = _RemoteKey;
+					m_UpdateStartSequence = _UpdateStartSequence; 
+				}
+			}
+		}
+		
+		bool f_IsValid() const
+		{
+			return m_UpdateStartSequence != TCLimitsInt<uint64>::mc_Max;
+		}
+	};
+
+#define DDebugAppTurnUpdateLogic 0
+
+	TCContinuation<void> CAppManagerActor::fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	{
+		CRemoteApplicationKey OurRemoteKey{_pState->m_pApplication->m_Settings};
+		
+		_pState->m_fOnInfo(fg_Format("Waiting for our apps '{}' turn to update", OurRemoteKey));
+		
+		return fp_Coordination_WaitForAllToReachWantUpdateStage
+			(
+				_pState
+				, EUpdateStage::EUpdateStage_SyncStart
+				, 60.0*60.0
+				, EWaitStageFlag_None
+				, [=]() -> bool
+				{
+					TCMap<CRemoteApplicationKey, zmint> WinningApplications;
+					TCSet<CRemoteApplicationKey> InProgressApplications;
+
+#if DDebugAppTurnUpdateLogic
+					TCVector<CStr> ApplicationInfos;
+#endif
+					{
+						CFirstApplicationUpdate FirstApplication;
+						for (auto &pApplication : mp_Applications)
+						{
+							auto &Application = *pApplication;
+							FirstApplication.f_AddApplication(Application.m_WantUpdateStage, Application.m_UpdateStartSequence, Application.m_Settings);
+#if DDebugAppTurnUpdateLogic
+							ApplicationInfos.f_Insert
+								(
+									fg_Format
+									(
+										"{}:{}:{}:{}"
+										, mp_State.m_HostID
+										, fsp_UpdateStageToStr(Application.m_WantUpdateStage)
+										, Application.m_UpdateStartSequence
+										, CRemoteApplicationKey{Application.m_Settings}
+									)
+								)
+							;
+#endif
+						}
+						
+						if (FirstApplication.f_IsValid())
+						{
+							++WinningApplications[FirstApplication.m_RemoteKey];
+							if (FirstApplication.m_bInProgress)
+								InProgressApplications[FirstApplication.m_RemoteKey];
+						}
+					}
+					
+					for (auto &RemoteAppManager : mp_RemoteAppManagerState)
+					{
+						CFirstApplicationUpdate FirstApplication;
+						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
+						{
+							FirstApplication.f_AddApplication(AppInfo.m_AppInfo.m_WantUpdateStage, AppInfo.m_AppInfo.m_UpdateStartSequence, AppInfo.m_AppInfo);
+#if DDebugAppTurnUpdateLogic
+							ApplicationInfos.f_Insert
+								(
+									fg_Format
+									(
+										"{}:{}:{}:{}"
+										, RemoteAppManager.m_AppInfos.fs_GetKey(AppInfo)
+										, fsp_UpdateStageToStr(AppInfo.m_AppInfo.m_WantUpdateStage)
+										, AppInfo.m_AppInfo.m_UpdateStartSequence
+										, CRemoteApplicationKey{AppInfo.m_AppInfo}
+									)
+								)
+							;
+#endif
+						}
+						
+						if (FirstApplication.f_IsValid())
+						{
+							++WinningApplications[FirstApplication.m_RemoteKey];
+							if (FirstApplication.m_bInProgress)
+								InProgressApplications[FirstApplication.m_RemoteKey];
+						}
+					}
+					
+#if DDebugAppTurnUpdateLogic
+					DLog(Info, "Winning applications: {vs} - {vs} - {vs}", InProgressApplications, WinningApplications, ApplicationInfos);
+#endif
+					
+					if (!InProgressApplications.f_IsEmpty())
+					{
+						for (auto iApplication = WinningApplications.f_GetIterator(); iApplication;)
+						{
+							if (!InProgressApplications.f_FindEqual(iApplication.f_GetKey()))
+							{
+								iApplication.f_Remove();
+								continue;
+							}
+							++iApplication;
+						}
+					}
+					
+					auto *pWinning = WinningApplications.f_FindSmallest();
+					if (!pWinning)
+						return false;
+					
+					if (WinningApplications.fs_GetKey(*pWinning) == OurRemoteKey)
+					{
+						_pState->m_fOnInfo(fg_Format("Our apps '{}' turn to update", OurRemoteKey));
+						return true;
+					}
+					return false;
+				}
+			) 
+		;
+	}
+	
+	TCContinuation<void> CAppManagerActor::fp_Coordination_WaitForAllToReachWantUpdateStage
+		(
+			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+			, EUpdateStage _Stage
+			, fp64 _Timeout
+			, EWaitStageFlag _Flags
+			, TCFunctionMutable<bool ()> &&_fEvalState
+		)
+	{
+		CRemoteApplicationKey RemoteKey{_pState->m_pApplication->m_Settings};
+		
+		if (!_fEvalState)
+			_pState->m_fOnInfo(fg_Format("Waiting for all before starting stage '{}'", fsp_UpdateStageToStr(_Stage)));
 		
 		return fp_Coordination_WaitForState
 			(
-				_pApplication
+				_pState
 				, _Timeout
-				, [=](TCContinuation<void> &o_Continuation) -> bool
+				, [=](TCContinuation<void> &o_Continuation) mutable -> bool
 				{
 					bool bAllInStage = true;
+					
+					auto fCheckStageCondition = [&]
+						(
+							EUpdateStage _CurrentStage
+							, CVersionManager::CVersionIDAndPlatform const &_CurrentVersionID
+							, CTime const &_CurrentVersionTime 
+						)
+						{
+							if (fg_IsSameVersion(_CurrentVersionID, _CurrentVersionTime, _pState->m_VersionID, _pState->m_VersionTime))
+								return true; // Already installed this version
+							
+							if (_Flags & EWaitStageFlag_DisallowInProgressStates)
+							{
+								if (_CurrentStage > EUpdateStage::EUpdateStage_SyncStart)
+									return false;
+							}
+							if (_CurrentStage < _Stage)
+								return false;
+							return true;
+						}
+					;
+					
 					for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 					{
 						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
 						{
 							if (RemoteKey != AppInfo.m_AppInfo)
 								continue;
-							
-							if (AppInfo.m_AppInfo.m_WantUpdateStage < _Stage)
+							if (!fCheckStageCondition(AppInfo.m_AppInfo.m_WantUpdateStage, AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime))
 								bAllInStage = false;
 						}
 					}
@@ -75,11 +260,15 @@ namespace NMib::NCloud::NAppManager
 						if (RemoteKey != Application.m_Settings)
 							continue;
 							
-						if (Application.m_WantUpdateStage < _Stage)
+						if (!fCheckStageCondition(Application.m_WantUpdateStage, Application.m_LastInstalledVersionFinished, Application.m_LastInstalledVersionInfoFinished.m_Time))
 							bAllInStage = false;
 					}
 					if (bAllInStage)
 					{
+						if (_fEvalState && !_fEvalState())
+							return false;
+						if (!_fEvalState)
+							_pState->m_fOnInfo(fg_Format("All ready to start stage '{}'", fsp_UpdateStageToStr(_Stage)));
 						o_Continuation.f_SetResult();
 						return true;
 					}
@@ -87,25 +276,26 @@ namespace NMib::NCloud::NAppManager
 				}
 				, fg_Format("Remote app manager failed before reaching '{}' stage", fsp_UpdateStageToStr(_Stage))
 				, fg_Format("Timed out waiting for other AppManagers to reach '{}' stage", fsp_UpdateStageToStr(_Stage))
-				, fg_Format("Remote app manager disappeared while waiting for other AppManagers to reach '{}' stage", fsp_UpdateStageToStr(_Stage))
-				, _bIgnoreFailed
+				, fg_Format("Timed out wating for remote app manager to connect while waiting for other AppManagers to reach '{}' stage", fsp_UpdateStageToStr(_Stage))
+				, (_Flags & EWaitStageFlag_IgnoreFailed) != 0
 			)
 		;
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointer<CApplication> const &_pApplication)
+	TCContinuation<void> CAppManagerActor::fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		TCContinuation<void> Continuation;
 
-		CRemoteApplicationKey RemoteKey{_pApplication->m_Settings};
+		CRemoteApplicationKey RemoteKey{_pState->m_pApplication->m_Settings};
 		
 		// First wait for all applications to be fully ready for doing update without being dependent on version manager
-		fp_Coordination_WaitForAllToReachWantUpdateStage(_pApplication, CAppManagerInterface::EUpdateStage_StopOldApp, 30.0*60.0) 
-			> Continuation / [this, RemoteKey, _pApplication, Continuation]
+		fp_Coordination_WaitForAllToReachWantUpdateStage(_pState, EUpdateStage::EUpdateStage_StopOldApp, 30.0*60.0, EWaitStageFlag_None) 
+			> Continuation / [this, RemoteKey, Continuation, _pState]
 			{
+				_pState->m_fOnInfo("Waiting for our turn to update");
 				fp_Coordination_WaitForState
 					(
-						_pApplication
+						_pState
 						, 60.0*60.0
 						, [=](TCContinuation<void> &o_Continuation) -> bool
 						{
@@ -117,8 +307,11 @@ namespace NMib::NCloud::NAppManager
 								{
 									if (RemoteKey != AppInfo.m_AppInfo)
 										continue;
+								
+									if (fg_IsSameVersion(AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime, _pState->m_VersionID, _pState->m_VersionTime))
+										continue; // Already installed this version
 									
-									if (AppInfo.m_AppInfo.m_UpdateStage != CAppManagerInterface::EUpdateStage_Finished)
+									if (AppInfo.m_AppInfo.m_UpdateStage != EUpdateStage::EUpdateStage_Finished)
 									{
 										bAllFinished = false;
 										break;
@@ -131,6 +324,7 @@ namespace NMib::NCloud::NAppManager
 							
 							if (SmallestHostID == mp_State.m_HostID)
 							{
+								_pState->m_fOnInfo("Our turn to update");
 								o_Continuation.f_SetResult();
 								return true;
 							}
@@ -138,7 +332,7 @@ namespace NMib::NCloud::NAppManager
 						}
 						, "Remote app manager failed while waiting for our turn to update"
 						, "Timed out waiting for our turn to update"
-						, "Remote app manager disappeared while waiting for our turn to update"
+						, "Timed out wating for remote app manager to connect while waiting for our turn to update"
 					)
 					> Continuation 
 				;
@@ -147,30 +341,31 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 	
-	ch8 const *CAppManagerActor::fsp_UpdateStageToStr(CAppManagerInterface::EUpdateStage _Stage)
+	ch8 const *CAppManagerActor::fsp_UpdateStageToStr(EUpdateStage _Stage)
 	{
 		switch (_Stage)
 		{
-		case CAppManagerInterface::EUpdateStage_Failed: return "failed";
-		case CAppManagerInterface::EUpdateStage_None: return "none";
-		case CAppManagerInterface::EUpdateStage_ChangeEncryption: return "change encryption";
-		case CAppManagerInterface::EUpdateStage_DownloadVersion: return "download version";
-		case CAppManagerInterface::EUpdateStage_Unpack: return "unpack";
-		case CAppManagerInterface::EUpdateStage_StopOldApp: return "stop old app";
-		case CAppManagerInterface::EUpdateStage_PreUpdateScript: return "pre update script";
-		case CAppManagerInterface::EUpdateStage_UpdateApplicationFiles: return "update application files";
-		case CAppManagerInterface::EUpdateStage_SaveApplicationState: return "save application state";
-		case CAppManagerInterface::EUpdateStage_PostUpdateScript: return "post update script";
-		case CAppManagerInterface::EUpdateStage_StartNewApp: return "start new app";
-		case CAppManagerInterface::EUpdateStage_PostLaunch: return "post launch";
-		case CAppManagerInterface::EUpdateStage_Finished: return "finished";
+		case EUpdateStage::EUpdateStage_Failed: return "failed";
+		case EUpdateStage::EUpdateStage_None: return "none";
+		case EUpdateStage::EUpdateStage_SyncStart: return "sync start";
+		case EUpdateStage::EUpdateStage_ChangeEncryption: return "change encryption";
+		case EUpdateStage::EUpdateStage_DownloadVersion: return "download version";
+		case EUpdateStage::EUpdateStage_Unpack: return "unpack";
+		case EUpdateStage::EUpdateStage_StopOldApp: return "stop old app";
+		case EUpdateStage::EUpdateStage_PreUpdateScript: return "pre update script";
+		case EUpdateStage::EUpdateStage_UpdateApplicationFiles: return "update application files";
+		case EUpdateStage::EUpdateStage_SaveApplicationState: return "save application state";
+		case EUpdateStage::EUpdateStage_PostUpdateScript: return "post update script";
+		case EUpdateStage::EUpdateStage_StartNewApp: return "start new app";
+		case EUpdateStage::EUpdateStage_PostLaunch: return "post launch";
+		case EUpdateStage::EUpdateStage_Finished: return "finished";
 		default: DNeverGetHere; return "unknown";
 		}
 	}
 	
 	TCContinuation<void> CAppManagerActor::fp_Coordination_WaitForState
 		(
-			TCSharedPointer<CApplication> const &_pApplication
+			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
 			, fp64 _Timeout
 			, TCFunctionMutable<bool (TCContinuation<void> &_Continuation)> &&_fEvalState
 			, CStr const &_RemoteFailError
@@ -179,95 +374,168 @@ namespace NMib::NCloud::NAppManager
 			, bool _bIgnoreFailed
 		)
 	{
-		CRemoteApplicationKey RemoteKey{_pApplication->m_Settings};
+		CRemoteApplicationKey RemoteKey{_pState->m_pApplication->m_Settings};
 		
-		TCSet<CStr> RemoteKnownHosts;
-		auto *pRemoteKnownHosts = mp_KnownRemoteApplications.f_FindEqual(RemoteKey);
-		if (pRemoteKnownHosts)
-			RemoteKnownHosts = *pRemoteKnownHosts;
-
-		TCSet<CStr> ConnectedRemoteHosts;
-		ConnectedRemoteHosts[mp_State.m_HostID];
+		TCSharedPointerSupportWeak<COnAppUpdateInfoChange> pOnAppUpdateInfoChange = fg_Construct();
+		mp_OnAppUpdateInfoChange[pOnAppUpdateInfoChange];
 		
-		for (auto &RemoteAppManager : mp_RemoteAppManagerState)
+		struct CState
 		{
-			auto *pKnownApplications = RemoteAppManager.m_KnownApplications.f_FindEqual(RemoteKey);
-			if (!RemoteAppManager.m_bInitialStateReceived || !pKnownApplications)
-				continue;
-			if (*pKnownApplications != RemoteKnownHosts)
-				return DMibErrorInstance(fg_Format("AppManagers don't agree on known hosts for application '{vs}' != '{vs}'", *pKnownApplications, RemoteKnownHosts));
-			
-			ConnectedRemoteHosts[mp_RemoteAppManagerState.fs_GetKey(RemoteAppManager)];
-		}
+			CClock m_DisconnectClock;
+			bool m_bWasDisconnected = false;
+		};
 		
-		if (ConnectedRemoteHosts != RemoteKnownHosts)
-			return DMibErrorInstance(fg_Format("Not all known remote AppManagers are connected and up to date '{vs}' != '{vs}'", ConnectedRemoteHosts, RemoteKnownHosts));
-		
-		TCSharedPointer<COnRemoteApplicationInfoChange, CSupportWeakTag> pOnRemoteChange = fg_Construct();
-		
-		mp_OnRemoteApplicationInfoChange[pOnRemoteChange];
-		
+		TCSharedPointer<CState> pState = fg_Construct();
+
 		TCContinuation<void> Continuation;
 		
-		pOnRemoteChange->m_fOnChanged = [=, pOnRemoteChangeWeak = pOnRemoteChange.f_Weak()]() mutable
+		pOnAppUpdateInfoChange->m_fOnChanged = [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() mutable
 			{
-				auto pOnRemoteChange = pOnRemoteChangeWeak.f_Lock();
-				if (!pOnRemoteChange)
+				auto pOnAppUpdateInfoChange = pOnAppUpdateInfoChangeWeak.f_Lock();
+				if (!pOnAppUpdateInfoChange)
 					return;
+
+				if (_pState->f_CheckAbort(Continuation))
+				{
+					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
+					return;
+				}
 				
 				bool bFailed = false;
 				TCSet<CStr> ConnectedRemoteHosts;
 				ConnectedRemoteHosts[mp_State.m_HostID];
 				
+				TCSet<CStr> RemoteKnownHosts;
+				auto *pRemoteKnownHosts = mp_KnownRemoteApplications.f_FindEqual(RemoteKey);
+				if (pRemoteKnownHosts)
+					RemoteKnownHosts = *pRemoteKnownHosts;
+				
 				for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 				{
-					ConnectedRemoteHosts[mp_RemoteAppManagerState.fs_GetKey(RemoteAppManager)];
-					if (!_bIgnoreFailed)
+					auto *pKnownApplications = RemoteAppManager.m_KnownApplications.f_FindEqual(RemoteKey);
+					if (!RemoteAppManager.m_bInitialStateReceived || !pKnownApplications)
+						continue;
+					if (*pKnownApplications != RemoteKnownHosts)
 					{
-						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
+						if (!Continuation.f_IsSet())
 						{
-							if (RemoteKey != AppInfo.m_AppInfo)
-								continue;
-							
-							if (AppInfo.m_AppInfo.m_WantUpdateStage == CAppManagerInterface::EUpdateStage_Failed)
-								bFailed = true;
+							Continuation.f_SetException
+								(
+									DMibErrorInstance(fg_Format("AppManagers don't agree on known hosts for application '{vs}' != '{vs}'", *pKnownApplications, RemoteKnownHosts))
+								)
+							;
+						}
+						mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
+						return;
+					}
+					
+					ConnectedRemoteHosts[mp_RemoteAppManagerState.fs_GetKey(RemoteAppManager)];
+					
+					for (auto &AppInfo : RemoteAppManager.m_AppInfos)
+					{
+						if (RemoteKey != AppInfo.m_AppInfo)
+							continue;
+
+						if (fg_IsSameVersion(AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime, _pState->m_VersionID, _pState->m_VersionTime))
+							continue; // Already installed this version
+						
+						if 
+							(
+								fg_IsSameVersion(AppInfo.m_AppInfo.m_FailedVersionID, AppInfo.m_AppInfo.m_FailedVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
+								&& AppInfo.m_AppInfo.m_FailedVersionRetrySequence == _pState->m_VersionRetrySequence
+							)
+						{
+							bFailed = true;
+							break;
+						}
+					
+						if (AppInfo.m_AppInfo.m_WantUpdateStage == EUpdateStage::EUpdateStage_Failed && !_bIgnoreFailed)
+						{
+							bFailed = true;
+							break;
 						}
 					}
 				}
 				
-				if (!_bIgnoreFailed)
+				// We might have several local applications with the same version manager application, so check locals as well 
+				for (auto &pApplication : mp_Applications)
 				{
-					// We might have several local applications with the same version manager application, so check locals as well 
-					for (auto &pApplication : mp_Applications)
+					auto &Application = *pApplication;
+					if (RemoteKey != Application.m_Settings)
+						continue;
+
+					if (fg_IsSameVersion(Application.m_LastInstalledVersionFinished, Application.m_LastInstalledVersionInfoFinished.m_Time, _pState->m_VersionID, _pState->m_VersionTime))
+						continue; // Already installed this version
+					
+					if 
+						(
+							fg_IsSameVersion(Application.m_LastFailedInstalledVersion, Application.m_LastFailedInstalledVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
+							&& Application.m_LastFailedInstalledVersionRetrySequence == _pState->m_VersionRetrySequence
+						)
 					{
-						auto &Application = *pApplication;
-						if (RemoteKey != Application.m_Settings)
-							continue;
-							
-						if (Application.m_WantUpdateStage == CAppManagerInterface::EUpdateStage_Failed)
-							bFailed = true;
+						bFailed = true;
+						break;
+					}
+					
+					if (Application.m_WantUpdateStage == EUpdateStage::EUpdateStage_Failed && !_bIgnoreFailed)
+					{
+						bFailed = true;
+						break;
 					}
 				}
 				
 				if (bFailed)
 				{
-					Continuation.f_SetException(DErrorInstance(_RemoteFailError));
-					mp_OnRemoteApplicationInfoChange.f_Remove(pOnRemoteChangeWeak);
+					if (!Continuation.f_IsSet())
+						Continuation.f_SetException(DErrorInstance(_RemoteFailError));
+					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					return;
 				}
 				
 				if (ConnectedRemoteHosts != RemoteKnownHosts)
 				{
-					Continuation.f_SetException(DErrorInstance(_DisconnectedError));
-					mp_OnRemoteApplicationInfoChange.f_Remove(pOnRemoteChangeWeak);
-					return;
+					if (!pState->m_bWasDisconnected)
+					{
+						pState->m_bWasDisconnected = true;
+						pState->m_DisconnectClock.f_Start();
+					}
+					return; // Wait for missing to connect
 				}
+				
+				pState->m_bWasDisconnected = false;
 				
 				if (_fEvalState(Continuation))
 				{
-					mp_OnRemoteApplicationInfoChange.f_Remove(pOnRemoteChangeWeak);
+					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					return;
 				}
+			}
+		;
+		
+		fp64 DisconnectTimeout = 5.0*60.0;
+		if (_Timeout <= DisconnectTimeout)
+			DisconnectTimeout = _Timeout / 2.0; 
+
+		fg_RegisterTimer
+			(
+				1.0*60.0
+				, self
+				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]
+				{
+					if (pState->m_bWasDisconnected && pState->m_DisconnectClock.f_GetTime() >= DisconnectTimeout)
+					{
+						if (!Continuation.f_IsSet())
+							Continuation.f_SetException(DErrorInstance(_DisconnectedError));
+						mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
+					}
+				}
+			) 
+			> [this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
+			{
+				auto pOnAppUpdateInfoChange = pOnAppUpdateInfoChangeWeak.f_Lock();
+				if (!pOnAppUpdateInfoChange)
+					return;
+				pOnAppUpdateInfoChange->m_DisconnectTimerSubscription = fg_Move(*_Subscription);
 			}
 		;
 		
@@ -275,23 +543,23 @@ namespace NMib::NCloud::NAppManager
 			(
 				_Timeout
 				, self
-				, [=, pOnRemoteChangeWeak = pOnRemoteChange.f_Weak()]
+				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]
 				{
 					if (!Continuation.f_IsSet())
 						Continuation.f_SetException(DErrorInstance(_TimeoutError));
-					mp_OnRemoteApplicationInfoChange.f_Remove(pOnRemoteChangeWeak);
+					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 				}
 			) 
-			> [this, pOnRemoteChangeWeak = pOnRemoteChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
+			> [this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
 			{
-				auto pOnRemoteChange = pOnRemoteChangeWeak.f_Lock();
-				if (!pOnRemoteChange)
+				auto pOnAppUpdateInfoChange = pOnAppUpdateInfoChangeWeak.f_Lock();
+				if (!pOnAppUpdateInfoChange)
 					return;
-				pOnRemoteChange->m_TimerSubscription = fg_Move(*_Subscription);
+				pOnAppUpdateInfoChange->m_TimerSubscription = fg_Move(*_Subscription);
 			}
 		;
 		
-		pOnRemoteChange->m_fOnChanged();
+		pOnAppUpdateInfoChange->m_fOnChanged();
 		
 		return Continuation;
 	}

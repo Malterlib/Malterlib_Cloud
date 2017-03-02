@@ -31,7 +31,7 @@ namespace NMib::NCloud::NAppManager
 					bool bUpdateTypeChanged = _RegisterInfo.m_UpdateType != Application.m_RegisterInfo.m_UpdateType;  
 					Application.m_RegisterInfo = _RegisterInfo;
 					if (bUpdateTypeChanged)
-						pThis->fp_RemoteAppInfoChanged(pApplication);
+						pThis->fp_OnAppUpdateInfoChange(pApplication);
 					pThis->fp_UpdateApplicationJSON(pApplication) > fg_DiscardResult();
 					pThis->fp_UpdateLimits();
 				}

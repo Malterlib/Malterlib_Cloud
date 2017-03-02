@@ -19,6 +19,13 @@ namespace NMib::NCloud::NAppManager
 #				include "Malterlib_Cloud_App_AppManager_Encryption_CloseLinux.sh"
 	;
 #endif
+	
+	void CAppManagerActor::fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted)
+	{
+		_pApplication->m_bEncryptionOpened = _bEncrypted;
+		fp_UpdateApplicationDependencies();
+	}
+	
 	TCContinuation<void> CAppManagerActor::fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite)
 	{
 		auto pEncryptionApplication = _pApplication;
@@ -99,9 +106,9 @@ namespace NMib::NCloud::NAppManager
 					> Continuation % "Failed to change encryption" / [Continuation, pEncryptionApplication, _Operation](CBashScriptOutput &&_Output)
 					{
 						if (_Operation == EEncryptOperation_Open || _Operation == EEncryptOperation_Setup)
-							pEncryptionApplication->m_bEncryptionOpened = true;
+							fp_AppEncryptionStateChanged(true);
 						else if (_Operation == EEncryptOperation_Close)
-							pEncryptionApplication->m_bEncryptionOpened = false;
+							fp_AppEncryptionStateChanged(false);
 						Continuation.f_SetResult();
 					}
 				;

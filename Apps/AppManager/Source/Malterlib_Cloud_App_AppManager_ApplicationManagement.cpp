@@ -159,11 +159,12 @@ namespace NMib::NCloud::NAppManager
 
 	TCContinuation<void> CAppManagerActor::fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication)
 	{
-		if (_pApplication->m_bDeleted)
+		auto &Application = *_pApplication;
+		if (Application.m_bDeleted)
 			return DMibErrorInstance("Application has been deleted");
-		auto &Settings = _pApplication->m_Settings;
+		auto &Settings = Application.m_Settings;
 		
-		auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][_pApplication->m_Name];
+		auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][Application.m_Name];
 		ApplicationJSON["Executable"] = Settings.m_Executable; 
 		ApplicationJSON["RunAsUser"] = Settings.m_RunAsUser; 
 		ApplicationJSON["RunAsGroup"] = Settings.m_RunAsGroup;
@@ -178,8 +179,12 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["EncryptionFileSystem"] = Settings.m_EncryptionFileSystem;
 		ApplicationJSON["ParentApplication"] = Settings.m_ParentApplication;
 		ApplicationJSON["VersionManagerApplication"] = Settings.m_VersionManagerApplication;
-		ApplicationJSON["LastInstalledVersion"] = _pApplication->m_LastInstalledVersion.f_ToJSON();
-		ApplicationJSON["LastInstalledVersionInfo"] = _pApplication->m_LastInstalledVersionInfo.f_ToJSON();
+		ApplicationJSON["LastInstalledVersion"] = Application.m_LastInstalledVersion.f_ToJSON();
+		ApplicationJSON["LastInstalledVersionInfo"] = Application.m_LastInstalledVersionInfo.f_ToJSON();
+		ApplicationJSON["LastInstalledVersionFinished"] = Application.m_LastInstalledVersionFinished.f_ToJSON();
+		ApplicationJSON["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJSON();
+		ApplicationJSON["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJSON();
+		ApplicationJSON["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJSON();
 		ApplicationJSON["AutoUpdate"] = Settings.m_bAutoUpdate;
 		{
 			auto &Array = ApplicationJSON["AutoUpdateTags"].f_Array();
@@ -201,35 +206,45 @@ namespace NMib::NCloud::NAppManager
 		UpdateScripts["OnError"] = Settings.m_UpdateScripts.m_OnError;
 		
 		ApplicationJSON["SelfUpdateSource"] = Settings.m_bSelfUpdateSource; 
-		ApplicationJSON["Files"] = _pApplication->m_Files;
+		ApplicationJSON["Files"] = Application.m_Files;
 		
-		ApplicationJSON["AssociatedHostID"] = _pApplication->m_AssociatedHostID;
+		ApplicationJSON["AssociatedHostID"] = Application.m_AssociatedHostID;
 		ApplicationJSON["UpdateGroup"] = Settings.m_UpdateGroup;
 
 		{
 			auto &RegisterInfo = ApplicationJSON["RegisterInfo"];
-			RegisterInfo["UpdateType"] = _pApplication->m_RegisterInfo.m_UpdateType;
+			RegisterInfo["UpdateType"] = Application.m_RegisterInfo.m_UpdateType;
 			
-			if (_pApplication->m_RegisterInfo.m_Resources_Files)
-				RegisterInfo["ResourcesFiles"] = *_pApplication->m_RegisterInfo.m_Resources_Files;
+			if (Application.m_RegisterInfo.m_Resources_Files)
+				RegisterInfo["ResourcesFiles"] = *Application.m_RegisterInfo.m_Resources_Files;
 			else
 				RegisterInfo.f_RemoveMember("ResourcesFiles");
 			
-			if (_pApplication->m_RegisterInfo.m_Resources_FilesPerProcess)
-				RegisterInfo["ResourcesFilesPerProcess"] = *_pApplication->m_RegisterInfo.m_Resources_FilesPerProcess;
+			if (Application.m_RegisterInfo.m_Resources_FilesPerProcess)
+				RegisterInfo["ResourcesFilesPerProcess"] = *Application.m_RegisterInfo.m_Resources_FilesPerProcess;
 			else
 				RegisterInfo.f_RemoveMember("ResourcesFilesPerProcess");
 			
-			if (_pApplication->m_RegisterInfo.m_Resources_Threads)
-				RegisterInfo["ResourcesThreads"] = *_pApplication->m_RegisterInfo.m_Resources_Threads;
+			if (Application.m_RegisterInfo.m_Resources_Threads)
+				RegisterInfo["ResourcesThreads"] = *Application.m_RegisterInfo.m_Resources_Threads;
 			else
 				RegisterInfo.f_RemoveMember("ResourcesThreads");
 			
-			if (_pApplication->m_RegisterInfo.m_Resources_Processes)
-				RegisterInfo["ResourcesProcesses"] = *_pApplication->m_RegisterInfo.m_Resources_Processes;
+			if (Application.m_RegisterInfo.m_Resources_Processes)
+				RegisterInfo["ResourcesProcesses"] = *Application.m_RegisterInfo.m_Resources_Processes;
 			else
 				RegisterInfo.f_RemoveMember("ResourcesProcesses");
 		}
+		{
+			auto &Array = ApplicationJSON["Dependencies"].f_Array();
+			Array.f_Clear();
+			for (auto &Dependency : Settings.m_Dependencies)
+				Array.f_Insert(Dependency);
+		}
+		ApplicationJSON["StopOnDependencyFailure"] = Settings.m_bStopOnDependencyFailure;
+		
+		ApplicationJSON["PreventLaunchUser"] = Application.m_bPreventLaunch_User; 
+		ApplicationJSON["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update; 
 	
 		TCContinuation<void> Continuation;
 		mp_State.m_StateDatabase.f_Save() > Continuation;
@@ -334,6 +349,19 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 	
+	TCContinuation<void> CAppManagerActor::fp_ClearPreventLaunch(TCSharedPointer<CApplication> const &_pApplication)
+	{
+		if (!_pApplication->m_bPreventLaunch_User && !_pApplication->m_bPreventLaunch_Update)
+			return fg_Explicit();
+		
+		_pApplication->m_bPreventLaunch_User = false;
+		_pApplication->m_bPreventLaunch_Update = false;
+	
+		TCContinuation<void> Continuation;
+		fp_UpdateApplicationJSON(_pApplication) > Continuation % "Failed to save application state";
+		return Continuation;
+	}
+	
 	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Start(NStr::CStr const &_Name)
 	{
 		auto pThis = m_pThis;
@@ -358,18 +386,23 @@ namespace NMib::NCloud::NAppManager
 			return Auditor.f_Exception("Application already started");
 
 		auto InProgressScope = pApplication->f_SetInProgress();
+
 		TCContinuation<void> Continuation;
 		
-		pThis->fp_LaunchApp(pApplication, true)
-			> [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<void> &&_Result)
+		pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
 			{
-				if (!_Result)
-				{
-					Continuation.f_SetException(Auditor.f_Exception({fg_Format("Failed to launch app. Will retry periodically."), _Result.f_GetExceptionStr()}));
-					return;
-				}
-				Auditor.f_Info(fg_Format("Started '{}'", _Name));
-				Continuation.f_SetResult();
+				pThis->fp_LaunchApp(pApplication, true)
+					> [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<bool> &&_Result)
+					{
+						if (!_Result)
+						{
+							Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
+							return;
+						}
+						Auditor.f_Info(fg_Format("Started '{}'", _Name));
+						Continuation.f_SetResult();
+					}
+				;
 			}
 		;
 		return Continuation;
@@ -401,7 +434,7 @@ namespace NMib::NCloud::NAppManager
 		auto InProgressScope = pApplication->f_SetInProgress();
 		TCContinuation<void> Continuation;
 		
-		pApplication->f_Stop(false) > [pThis, pApplication, Continuation, InProgressScope, Auditor](TCAsyncResult<uint32> &&_ExitStatus)
+		pApplication->f_Stop(EStopFlag_PreventLaunchUser) > [pThis, pApplication, Continuation, InProgressScope, Auditor](TCAsyncResult<uint32> &&_ExitStatus)
 			{
 				NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
 				
@@ -450,7 +483,7 @@ namespace NMib::NCloud::NAppManager
 		auto InProgressScope = pApplication->f_SetInProgress();
 		TCContinuation<void> Continuation;
 		
-		pApplication->f_Stop(false) > [pThis, pApplication, Continuation, InProgressScope, Auditor, _Name]
+		pApplication->f_Stop(EStopFlag_None) > [pThis, pApplication, Continuation, InProgressScope, Auditor, _Name]
 			(TCAsyncResult<uint32> &&_ExitStatus)
 			{
 				NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
@@ -470,15 +503,19 @@ namespace NMib::NCloud::NAppManager
 					return;
 				}
 
-				pThis->fp_LaunchApp(pApplication, true) > [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<void> &&_Result)
+				pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
 					{
-						if (!_Result)
-						{
-							Continuation.f_SetException(Auditor.f_Exception({fg_Format("Failed to launch app. Will retry periodically."), _Result.f_GetExceptionStr()}));
-							return;
-						}
-						Auditor.f_Info(fg_Format("Restarted '{}'", _Name));
-						Continuation.f_SetResult();
+						pThis->fp_LaunchApp(pApplication, true) > [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<bool> &&_Result)
+							{
+								if (!_Result)
+								{
+									Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
+									return;
+								}
+								Auditor.f_Info(fg_Format("Restarted '{}'", _Name));
+								Continuation.f_SetResult();
+							}
+						;
 					}
 				;
 			}

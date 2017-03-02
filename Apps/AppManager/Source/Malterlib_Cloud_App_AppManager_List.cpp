@@ -49,6 +49,8 @@ namespace NMib::NCloud::NAppManager
 			OutApplication.m_bSelfUpdateSource = Settings.m_bSelfUpdateSource;
 			OutApplication.m_UpdateGroup = Settings.m_UpdateGroup;
 			OutApplication.m_bDistributedApp = Settings.m_bDistributedApp;
+			OutApplication.m_Dependencies = Settings.m_Dependencies;
+			OutApplication.m_bStopOnDependencyFailure = Settings.m_bStopOnDependencyFailure;
 		}
 		Auditor.f_Info("Enum applications");
 		return fg_Explicit(fg_Move(OutputApplications));
@@ -89,26 +91,33 @@ namespace NMib::NCloud::NAppManager
 	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON const &_Params)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
+		CStr Name = _Params["Name"].f_String();
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
 		mp_AppManagerInterface.m_pActor->f_GetInstalled() 
-			> Continuation / [bVerbose, Continuation](TCMap<CStr, CAppManagerInterface::CApplicationInfo> &&_ApplicationInfo)
+			> Continuation / [bVerbose, Continuation, Name](TCMap<CStr, CAppManagerInterface::CApplicationInfo> &&_ApplicationInfo)
 			{
 				CDistributedAppCommandLineResults Results;
 				for (auto &Application : _ApplicationInfo)
 				{
-					Results.f_AddStdOut(fg_Format("{}{\n}", _ApplicationInfo.fs_GetKey(Application)));
+					auto &ApplicationName = _ApplicationInfo.fs_GetKey(Application);
+					if (!Name.f_IsEmpty() && ApplicationName != Name)
+						continue;
+					
+					Results.f_AddStdOut(fg_Format("{}{\n}", ApplicationName));
 					if (bVerbose)
 					{
 						Results.f_AddStdOut(fg_Format("                       Status: {}{\n}{\n}", Application.m_Status));
 						Results.f_AddStdOut(fg_Format("           Encryption storage: {}{\n}", Application.m_EncryptionStorage));
 						Results.f_AddStdOut(fg_Format("       Encryption file system: {}{\n}", Application.m_EncryptionFileSystem));
 						Results.f_AddStdOut(fg_Format("           Parent application: {}{\n}", Application.m_ParentApplication));
+						Results.f_AddStdOut(fg_Format("                 Dependencies: {vs}{\n}", Application.m_Dependencies));
+						Results.f_AddStdOut(fg_Format("   Stop on dependency failure: {}{\n}", Application.m_bStopOnDependencyFailure ? "true" : "false"));
 						Results.f_AddStdOut(fg_Format("           Self update source: {}{\n}{\n}", Application.m_bSelfUpdateSource ? "true" : "false"));
 						Results.f_AddStdOut(fg_Format("                   Executable: {}{\n}", Application.m_Executable));
 						Results.f_AddStdOut(fg_Format("                   Parameters: {vs,vb}{\n}", Application.m_Parameters));
 						Results.f_AddStdOut(fg_Format("                  Run as user: {}{\n}", Application.m_RunAsUser));
 						Results.f_AddStdOut(fg_Format("                 Run as group: {}{\n}{\n}", Application.m_RunAsGroup));
-						Results.f_AddStdOut(fg_Format("              Distributed app: {}{\n}", Application.m_bDistributedApp));
+						Results.f_AddStdOut(fg_Format("              Distributed app: {}{\n}", Application.m_bDistributedApp ? "true" : "false"));
 
 						Results.f_AddStdOut(fg_Format("                  Auto update: {}{\n}", !Application.m_AutoUpdateTags.f_IsEmpty() ? "true" : "false"));
 						Results.f_AddStdOut(fg_Format("             Auto update tags: {vs}{\n}", Application.m_AutoUpdateTags));
@@ -126,6 +135,7 @@ namespace NMib::NCloud::NAppManager
 						Results.f_AddStdOut(fg_Format("               Version config: {}{\n}", Application.m_VersionInfo.m_Configuration));
 						Results.f_AddStdOut(fg_Format("                 Version size: {}{\n}", Application.m_VersionInfo.m_nBytes));
 						Results.f_AddStdOut(fg_Format("                Version files: {}{\n}", Application.m_VersionInfo.m_nFiles));
+
 						if (Application.m_VersionInfo.m_ExtraInfo.f_IsObject())
 						{
 							CStr InfoString = Application.m_VersionInfo.m_ExtraInfo.f_ToString("    ");
@@ -160,6 +170,7 @@ namespace NMib::NCloud::NAppManager
 				mint LongestSize = fg_StrLen("Size");
 				mint LongestFiles = fg_StrLen("Files");
 				mint LongestTags = fg_StrLen("Tags");
+				mint LongestRetrySequence = fg_StrLen("RetrySequence");
 				for (auto &Versions : _Results)
 				{
 					LongestApplication = fg_Max(LongestApplication, _Results.fs_GetKey(Versions).f_GetLen());
@@ -172,6 +183,7 @@ namespace NMib::NCloud::NAppManager
 						LongestSize = fg_Max(LongestSize, fg_Format("{ns }", Version.m_VersionInfo.m_nBytes).f_GetLen());
 						LongestFiles = fg_Max(LongestFiles, fg_Format("{}", Version.m_VersionInfo.m_nFiles).f_GetLen());
 						LongestTags = fg_Max(LongestTags, fg_Format("{vs,vb}", Version.m_VersionInfo.m_Tags).f_GetLen());
+						LongestRetrySequence = fg_Max(LongestFiles, fg_Format("{}", Version.m_VersionInfo.m_RetrySequence).f_GetLen());
 					}
 				}
 				
@@ -185,13 +197,14 @@ namespace NMib::NCloud::NAppManager
 						, auto const &_Size
 						, auto const &_Files
 						, auto const &_Tags
+						, auto const &_RetrySequence
 					)
 					{
 						CommandLineResults.f_AddStdOut
 							(
 								fg_Format
 								(
-									"{sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*}   {sj*}   {sj*,a-}\n"
+									"{sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*}   {sj*}   {sj*,a-}   {sj*,a-}\n"
 									, _Application
 									, LongestApplication
 									, _Version
@@ -208,13 +221,15 @@ namespace NMib::NCloud::NAppManager
 									, LongestFiles
 									, _Tags
 									, LongestTags
+									, _RetrySequence
+									, LongestRetrySequence
 								)
 							)
 						;
 					}
 				;
 				
-				fOutputLine("Application", "Version", "Platform", "Config", "Time", "Size", "Files", "Tags");
+				fOutputLine("Application", "Version", "Platform", "Config", "Time", "Size", "Files", "Tags", "RetrySequence");
 				
 				for (auto &Versions : _Results)
 				{
@@ -231,6 +246,7 @@ namespace NMib::NCloud::NAppManager
 								, fg_Format("{ns }", Version.m_VersionInfo.m_nBytes)
 								, fg_Format("{}", Version.m_VersionInfo.m_nFiles)
 								, fg_Format("{vs,vb}", Version.m_VersionInfo.m_Tags)
+								, fg_Format("{}", Version.m_VersionInfo.m_RetrySequence)
 							)
 						;
 						if (bVerbose && Version.m_VersionInfo.m_ExtraInfo.f_IsObject() && Version.m_VersionInfo.m_ExtraInfo.f_Object().f_OrderedIterator())

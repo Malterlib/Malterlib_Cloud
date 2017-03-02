@@ -70,6 +70,20 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_= "The group to use for coordinating updates with other AppManagers.\n"
 			}
 		;
+		auto SettingsOption_Dependencies = "Dependencies?"_= 
+			{
+				"Names"_= {"--dependencies"}
+				, "Type"_= {""}
+				, "Description"_= "The applications this application is dependent on.\n"
+			}
+		;
+		auto SettingsOption_StopOnDependencyFailure = "StopOnDependencyFailure?"_= 
+			{
+				"Names"_= {"--stop-on-dependency-failure"}
+				, "Type"_= true
+				, "Description"_= "If this application should automatically stop if one of it's dependencies unexpectedly exits. Defaults to true.\n"
+			}
+		;
 		
 		DefaultSection.f_RegisterCommand
 			(
@@ -147,6 +161,8 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_= true 
 							, "Description"_= "Get settings from version info of the downloaded application."
 						}
+						, SettingsOption_Dependencies 
+						, SettingsOption_StopOnDependencyFailure
 						, SettingsOption_Executable
 						, "ExecutableParameters?"_= 
 						{
@@ -162,7 +178,7 @@ namespace NMib::NCloud::NAppManager
 						{
 							"Names"_= {"--auto-update-tags"}
 							, "Default"_= false
-							, "Type"_= COneOfType{"", COneOf{false}}
+							, "Type"_= COneOfType{CEJSON{""}, COneOf{false}}
 							, "Description"_= "Auto update the application when new versions become available that has all these these tags."
 						}
 						, "AutoUpdateBranches?"_= 
@@ -210,10 +226,10 @@ namespace NMib::NCloud::NAppManager
 					{
 						"Package"_=  
 						{
-							"Type"_= ""
+							"Type"_= COneOfType{COneOf{nullptr}, ""}
 							, "Description"_= "The files needed to run the application.\n"
-							"Can be a version manager application name, a directory, or a tar.gz file. Will look for version manager applications"
-							" by default. Specify --from-file to look for the package on disk."
+							"Can be a version manager application name, a directory, a tar.gz file or null. Will look for version manager applications"
+							" by default. Specify --from-file to look for the package on disk. Specifying null will add a application with no package. Useful for example when you want to have an encrypted container shared between several applications."
 						}
 					}
 				}
@@ -236,6 +252,8 @@ namespace NMib::NCloud::NAppManager
 							,"Type"_= ""
 							, "Description"_= "Unique name of the application to change settings for."
 						}
+						, SettingsOption_Dependencies 
+						, SettingsOption_StopOnDependencyFailure
 						, SettingsOption_Executable
 						, "ExecutableParameters?"_= 
 						{
@@ -249,7 +267,7 @@ namespace NMib::NCloud::NAppManager
 						, "AutoUpdateTags?"_= 
 						{
 							"Names"_= {"--auto-update-tags"}
-							, "Type"_= COneOfType{"", COneOf{false}} 
+							, "Type"_= COneOfType{CEJSON{""}, COneOf{false}} 
 							, "Description"_= "Auto update the application when new versions become available that has all these these tags."
 						}
 						, "AutoUpdateBranches?"_= 
@@ -329,6 +347,12 @@ namespace NMib::NCloud::NAppManager
 							"Names"_= {"--verbose", "-v"}
 							, "Default"_= false
 							, "Description"_= "Display more extensive information about the applications." 
+						}
+						, "Name?"_= 
+						{
+							"Names"_= {"--name"}
+							, "Default"_= "" 
+							, "Description"_= "Unique name of the application to list. Leave empty to list all applications." 
 						}
 					}
 				}
@@ -562,6 +586,18 @@ namespace NMib::NCloud::NAppManager
 				, [this](CEJSON const &_Params)
 				{
 					return fp_CommandLine_UpdateApplication(_Params);
+				}
+			)
+		;
+		DefaultSection.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--cancel-all-updates"}
+					, "Description"_= "Cancel all running pending updates"
+				}
+				, [this](CEJSON const &_Params)
+				{
+					return fp_CommandLine_CancelAllUpdates(_Params);
 				}
 			)
 		;

@@ -26,7 +26,7 @@ namespace NMib::NCloud
 		enum 
 		{
 			EMinProtocolVersion = 0x103
-			, EProtocolVersion = 0x104
+			, EProtocolVersion = 0x105
 		};
 
 		struct CVersionID : public CCloudVersion
@@ -81,6 +81,7 @@ namespace NMib::NCloud
 			NStr::CStr m_Configuration;
 			NContainer::TCSet<NStr::CStr> m_Tags;
 			NEncoding::CEJSON m_ExtraInfo;
+			uint32 m_RetrySequence = 0;
 			uint32 m_nFiles = 0; /// The version manager set this value. Ignored when uploading
 			uint64 m_nBytes = 0; /// The version manager set this value. Ignored when uploading
 		};
@@ -243,6 +244,7 @@ namespace NMib::NCloud
 			NStr::CStr m_Platform; /// Leave empty to tag all platforms for version
 			NContainer::TCSet<NStr::CStr> m_AddTags;
 			NContainer::TCSet<NStr::CStr> m_RemoveTags;
+			bool m_bIncreaseRetrySequence = false;
 		};
 
 		static bool fs_IsValidApplicationName(NStr::CStr const &_String);

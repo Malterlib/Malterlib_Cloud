@@ -252,6 +252,7 @@ namespace NMib::NCloud
 			Ret["ExtraInfo"] = m_ExtraInfo;
 		Ret["NumFiles"] = m_nFiles;
 		Ret["NumBytes"] = m_nBytes;
+		Ret["RetrySequence"] = m_RetrySequence;
 		return Ret;
 	}
 	
@@ -269,6 +270,8 @@ namespace NMib::NCloud
 			Ret.m_ExtraInfo = *pValue;
 		Ret.m_nFiles = _JSON["NumFiles"].f_Integer();
 		Ret.m_nBytes = _JSON["NumBytes"].f_Integer();
+		if (auto *pValue = _JSON.f_GetMember("RetrySequence", NEncoding::EJSONType_Integer))
+			Ret.m_RetrySequence = pValue->f_Integer();
 		return Ret;
 	}
 	
@@ -281,6 +284,8 @@ namespace NMib::NCloud
 		_Stream % m_ExtraInfo;
 		_Stream % m_nFiles;
 		_Stream % m_nBytes;
+		if (_Stream.f_GetVersion() >= 0x105)
+			_Stream % m_RetrySequence;
 	}
 	
 	// CListApplications
@@ -429,5 +434,7 @@ namespace NMib::NCloud
 		_Stream % m_Platform;
 		_Stream % m_AddTags;
 		_Stream % m_RemoveTags;
+		if (_Stream.f_GetVersion() >= 0x105)
+			_Stream % m_bIncreaseRetrySequence;
 	}
 }

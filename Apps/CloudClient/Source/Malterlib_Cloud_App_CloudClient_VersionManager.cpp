@@ -233,6 +233,12 @@ namespace NMib::NCloud::NCloudClient
 							, "Type"_= {""}
 							, "Description"_= "Remove these tags.\n"
 						}
+						, "RetryUpgrade?"_=
+						{
+							"Names"_= {"--retry-upgrade"}
+							, "Default"_= false
+							, "Description"_= "Increase the retry sequence for this version. AppManagers will retry upgrade if it previously failed.\n"
+						}
 					}
 				}
 				, [this](CEJSON const &_Params)
@@ -433,7 +439,7 @@ namespace NMib::NCloud::NCloudClient
 										(
 											fg_Format
 											(
-												"        {sl20,a-} {sl10,a-} {tc6,sl24,a-} {sl15,a-} {ns ,sl12} bytes ({sl5} files)   {vs,vb,a-}\n"
+												"        {sl20,a-} {sl10,a-} {tc6,sl24,a-} {sl15,a-} {ns ,sl12} bytes ({sl5} files)   {vs,vb,a-}   {}\n"
 												, VersionID.m_VersionID
 												, Version.m_Configuration
 												, Version.m_Time.f_ToLocal()
@@ -441,6 +447,7 @@ namespace NMib::NCloud::NCloudClient
 												, Version.m_nBytes
 												, Version.m_nFiles
 												, Version.m_Tags
+												, Version.m_RetrySequence
 											)
 										)
 									;
@@ -753,6 +760,7 @@ namespace NMib::NCloud::NCloudClient
 		CStr Application = _Params["Application"].f_String();
 		CStr Version = _Params["Version"].f_String();
 		CStr Platform = _Params["Platform"].f_String();
+		bool bRetryUpgrade = _Params["RetryUpgrade"].f_Boolean();
 		
 		if (Application.f_IsEmpty())
 			return DMibErrorInstance("Application must be specified");
@@ -797,11 +805,11 @@ namespace NMib::NCloud::NCloudClient
 			return _Error;
 		}
 		
-		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())
-			return DMibErrorInstance("No changes specified. Specify tags to add and remove with --add and --remove");
+		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty() && !bRetryUpgrade)
+			return DMibErrorInstance("No changes specified. Specify tags to add and remove with --add and --remove, or specify --retry-upgrade");
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
-			> Continuation / [this, Continuation, Application, Host, VersionID, AddTags, RemoveTags, Platform]
+			> Continuation / [this, Continuation, Application, Host, VersionID, AddTags, RemoveTags, Platform, bRetryUpgrade]
 			{
 				CStr Error;
 				auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
@@ -821,6 +829,7 @@ namespace NMib::NCloud::NCloudClient
 				ChangeTags.m_Platform = Platform;
 				ChangeTags.m_AddTags = AddTags;
 				ChangeTags.m_RemoveTags = RemoveTags;
+				ChangeTags.m_bIncreaseRetrySequence = bRetryUpgrade;
 
 				DMibCallActor
 					(

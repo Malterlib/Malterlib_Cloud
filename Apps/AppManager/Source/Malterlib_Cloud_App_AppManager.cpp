@@ -52,11 +52,38 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 	}
+	
+	void CAppManagerActor::fp_InitialStartupFailed(CExceptionPointer const &_pException)
+	{
+		if (mp_InitialStartupResult.f_IsSet())
+			return;
+		
+		mp_InitialStartupResult.f_SetException(_pException);
+	}
 
 	TCContinuation<void> CAppManagerActor::fp_ReadState()
 	{
+		bool bChangedDatabase = false;
 		try
 		{
+			CStr PendingSelfUpdateName; 
+			CVersionManager::CVersionIDAndPlatform PendingSelfUpdateVersionID;
+			CTime PendingSelfUpdateTime;
+			uint32 PendingSelfUpdateSequence = 0;
+			
+			if (auto *pPendingSelfUpdateProcess = mp_State.m_StateDatabase.m_Data.f_GetMember("PendingSelfUpdateProcess"))
+			{
+				auto &Pending = *pPendingSelfUpdateProcess;
+				
+				PendingSelfUpdateName = Pending["Name"].f_String(); 
+				PendingSelfUpdateVersionID = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(Pending["VersionID"]);
+				PendingSelfUpdateTime = Pending["VersionTime"].f_Date();
+				PendingSelfUpdateSequence = Pending["VersionRetrySequence"].f_Integer();
+
+				mp_State.m_StateDatabase.m_Data.f_RemoveMember("PendingSelfUpdateProcess");
+				bChangedDatabase = true;	
+			}
+			
 			if (auto pApplication = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 			{
 				for (auto &ApplicationEntry : pApplication->f_Object())
@@ -72,7 +99,6 @@ namespace NMib::NCloud::NAppManager
 					Settings.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String(); 
 					if (auto pValue = ApplicationJSON.f_GetMember("DistributedApp", EJSONType_Boolean))
 						Settings.m_bDistributedApp = pValue->f_Boolean();
-					
 					for (auto &Parameter : ApplicationJSON["Parameters"].f_Array())
 						Settings.m_ExecutableParameters.f_Insert(Parameter.f_String());
 					for (auto &File : ApplicationJSON["Files"].f_Array())
@@ -90,6 +116,43 @@ namespace NMib::NCloud::NAppManager
 						Application.m_LastInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
 					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfo", EJSONType_Object))
 						Application.m_LastInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+					
+					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionFinished", EJSONType_Object))
+						Application.m_LastInstalledVersionFinished = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+					else
+						Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
+					
+					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfoFinished", EJSONType_Object))
+						Application.m_LastInstalledVersionInfoFinished = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+					else
+						Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo; 
+						
+					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersion", EJSONType_Object))
+						Application.m_LastTriedInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionInfo", EJSONType_Object))
+						Application.m_LastTriedInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+					
+					if 
+						(
+							Application.m_LastTriedInstalledVersion != Application.m_LastInstalledVersionFinished 
+							|| Application.m_LastTriedInstalledVersionInfo.m_Time != Application.m_LastInstalledVersionInfoFinished.m_Time
+							|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != Application.m_LastInstalledVersionInfoFinished.m_RetrySequence
+						)
+					{
+						if 
+							(
+								Name != PendingSelfUpdateName 
+								|| Application.m_LastTriedInstalledVersion != PendingSelfUpdateVersionID 
+								|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdateTime 
+								|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdateSequence
+							)
+						{
+							Application.m_LastFailedInstalledVersion = Application.m_LastTriedInstalledVersion; 
+							Application.m_LastFailedInstalledVersionTime = Application.m_LastTriedInstalledVersionInfo.m_Time;
+							Application.m_LastFailedInstalledVersionRetrySequence = Application.m_LastTriedInstalledVersionInfo.m_RetrySequence;
+						}
+					}
+						
 					if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdate", EJSONType_Boolean))
 						Settings.m_bAutoUpdate = pValue->f_Boolean();
 					if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdateTags", EJSONType_Array))
@@ -111,10 +174,8 @@ namespace NMib::NCloud::NAppManager
 					}
 					if (auto pValue = ApplicationJSON.f_GetMember("SelfUpdateSource", EJSONType_Boolean))
 						Settings.m_bSelfUpdateSource = pValue->f_Boolean();
-
 					if (auto pValue = ApplicationJSON.f_GetMember("UpdateGroup", EJSONType_String))
 						Settings.m_UpdateGroup = pValue->f_String();
-
 					if (auto pRegisterInfo = ApplicationJSON.f_GetMember("RegisterInfo", EJSONType_Object))
 					{
 						if (auto pValue = pRegisterInfo->f_GetMember("UpdateType", EJSONType_Integer))
@@ -130,6 +191,17 @@ namespace NMib::NCloud::NAppManager
 					}
 					if (auto pValue = ApplicationJSON.f_GetMember("AssociatedHostID", EJSONType_String))
 						Application.m_AssociatedHostID = pValue->f_String();
+					if (auto pValue = ApplicationJSON.f_GetMember("Dependencies", EJSONType_Array))
+					{
+						for (auto &Tag : pValue->f_Array())
+							Settings.m_Dependencies[Tag.f_String()];
+					}
+					if (auto pValue = ApplicationJSON.f_GetMember("StopOnDependencyFailure", EJSONType_Boolean))
+						Settings.m_bStopOnDependencyFailure = pValue->f_Boolean();
+					if (auto pValue = ApplicationJSON.f_GetMember("PreventLaunchUser", EJSONType_Boolean))
+						Application.m_bPreventLaunch_User = pValue->f_Boolean();
+					if (auto pValue = ApplicationJSON.f_GetMember("PreventLaunchUpdate", EJSONType_Boolean))
+						Application.m_bPreventLaunch_Update = pValue->f_Boolean();
 					
 					mp_KnownRemoteApplications[CRemoteApplicationKey{Settings}][mp_State.m_HostID];
 				}					
@@ -151,21 +223,24 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 			}
+			
+			if (!PendingSelfUpdateName.f_IsEmpty())
+				fp_StartPendingSelfUpdateReporting(PendingSelfUpdateName, PendingSelfUpdateVersionID, PendingSelfUpdateTime, PendingSelfUpdateSequence);
 		}
 		catch (NException::CException const &_Exception)
 		{
 			return _Exception;
 		}
-		return fg_Explicit();
+		
+		if (bChangedDatabase)
+			return fp_SaveStateDatabase();
+		else
+			return fg_Explicit();
 	}
 	
 	void CAppManagerActor::fp_KeyManagerAvailable()
 	{
-		if (!mp_bAppsEncryptedLaunched)
-		{
-			mp_bAppsEncryptedLaunched = true;
-			fp_LaunchEncryptedApps();
-		}
+		fp_UpdateApplicationDependencies();
 	}
 
 	TCContinuation<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
@@ -189,7 +264,7 @@ namespace NMib::NCloud::NAppManager
 							return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
 						
 						fp_InitApplications();
-						fp_LaunchNormalApps();
+						fp_UpdateApplicationDependencies();
 						fp_PublishCoordinationInterface() > [](TCAsyncResult<void> &&_Result)
 							{
 								if (!_Result)
@@ -276,37 +351,53 @@ namespace NMib::NCloud::NAppManager
 				;
 			}
 		;
-		return Continuation;
+		
+		TCContinuation<void> ReturnContinuation;
+		Continuation.f_Dispatch() > [this, ReturnContinuation](TCAsyncResult<void> &&_Result)
+			{
+				if (!_Result)
+					fp_InitialStartupFailed(_Result.f_GetException());
+				
+				ReturnContinuation.f_SetResult(fg_Move(_Result));
+			}
+		;
+		return ReturnContinuation;
 	}
 	
 	TCContinuation<void> CAppManagerActor::fp_StopApp()
 	{	
 		TCContinuation<void> Continuation;
-
-		mp_AppManagerInterface.f_Destroy()
-			+ mp_AppManagerCoordinationInterface.f_Destroy() > Continuation / [=]
+		
+		auto pCanDestroy = fg_Move(mp_pCanDestroy);
+		
+		pCanDestroy->m_Continuation.f_Dispatch() > Continuation / [=]
 			{
-				TCActorResultVector<uint32> ApplicationStops;
-				for (auto &pApplication : mp_Applications)
-				{
-					if (!pApplication->f_IsChildApp())
-						pApplication->f_Stop(true) > ApplicationStops.f_AddResult();
-				}
-				
-				ApplicationStops.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<uint32>> &&_Results)
+				fp_CancelAllApplicationUpdatesOnStopAppManager() > Continuation / [=]
 					{
-						for (auto &pApplication : mp_Applications)
-						{
-							pApplication->f_AbortPendingLaunches();
-							pApplication->f_Clear();
-						}
+						mp_AppManagerInterface.f_Destroy()
+							+ mp_AppManagerCoordinationInterface.f_Destroy() > Continuation / [=]
+							{
+								TCActorResultVector<uint32> ApplicationStops;
+								for (auto &pApplication : mp_Applications)
+									pApplication->f_Stop(EStopFlag_CloseEncryption) > ApplicationStops.f_AddResult();
+								
+								ApplicationStops.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<uint32>> &&_Results)
+									{
+										for (auto &pApplication : mp_Applications)
+										{
+											pApplication->f_AbortPendingLaunches();
+											pApplication->f_Clear();
+										}
 
-						mp_AppInterfaceServer.f_Destroy() > Continuation;
+										mp_AppInterfaceServer.f_Destroy() > Continuation;
+									}
+								;
+							}
+						;
 					}
 				;
 			}
 		;
-
 		
 		return Continuation;
 	}

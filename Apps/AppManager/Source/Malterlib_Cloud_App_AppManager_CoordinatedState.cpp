@@ -53,10 +53,10 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 
-	void CAppManagerActor::fp_RemoteAppInfoChanged()
+	void CAppManagerActor::fp_OnAppUpdateInfoChange()
 	{
-		TCVector<TCSharedPointer<COnRemoteApplicationInfoChange, CSupportWeakTag>> ToProcess;
-		for (auto &pOnChange : mp_OnRemoteApplicationInfoChange)
+		TCVector<TCSharedPointerSupportWeak<COnAppUpdateInfoChange>> ToProcess;
+		for (auto &pOnChange : mp_OnAppUpdateInfoChange)
 			ToProcess.f_Insert(pOnChange);
 		
 		for (auto &pOnChange : ToProcess)
@@ -116,7 +116,7 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 					
-					fp_RemoteAppInfoChanged();
+					fp_OnAppUpdateInfoChange();
 					return fg_Explicit();
 				}
 			) 
@@ -231,16 +231,28 @@ namespace NMib::NCloud::NAppManager
 		m_AppInfos.f_Clear();
 	}
 	
+	EDistributedAppUpdateType CAppManagerActor::CApplication::f_GetUpdateType() const
+	{
+		if (m_Settings.m_bSelfUpdateSource)
+			return EDistributedAppUpdateType_OneAtATime;
+		
+		return m_RegisterInfo.m_UpdateType;
+	}
+
 	CAppManagerCoordinationInterface::CAppInfo CAppManagerActor::CApplication::f_GetRemoteAppInfo() const
 	{
 		CAppManagerCoordinationInterface::CAppInfo AppInfo;
 		AppInfo.m_Group = m_Settings.m_UpdateGroup;
 		AppInfo.m_VersionManagerApplication = m_Settings.m_VersionManagerApplication;
-		AppInfo.m_VersionID = m_LastInstalledVersion;
-		AppInfo.m_WantVersionID = m_WantInstallVersion;
+		AppInfo.m_VersionID = m_LastInstalledVersionFinished;
+		AppInfo.m_VersionTime = m_LastInstalledVersionInfoFinished.m_Time; 
+		AppInfo.m_FailedVersionID = m_LastFailedInstalledVersion;
+		AppInfo.m_FailedVersionTime = m_LastFailedInstalledVersionTime;
+		AppInfo.m_FailedVersionRetrySequence = m_LastFailedInstalledVersionRetrySequence;
 		AppInfo.m_UpdateStage = m_UpdateStage;
 		AppInfo.m_WantUpdateStage = m_WantUpdateStage;
-		AppInfo.m_UpdateType = m_RegisterInfo.m_UpdateType;
+		AppInfo.m_UpdateType = f_GetUpdateType();
+		AppInfo.m_UpdateStartSequence = m_UpdateStartSequence;
 		return AppInfo;
 	}
 	
@@ -302,9 +314,10 @@ namespace NMib::NCloud::NAppManager
 		fp_BroadcastRemoteAppChange(fg_Move(Change));
 	}
 	
-	void CAppManagerActor::fp_RemoteAppInfoChanged(TCSharedPointer<CApplication> const &_pApplication)
+	void CAppManagerActor::fp_OnAppUpdateInfoChange(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		fp_SendAppToRemoteAppManagers(_pApplication);
+		fp_OnAppUpdateInfoChange(); // Process our own changes		
 	}
 	
 	void CAppManagerActor::fp_SendInitialInfoToRemoteAppManager(CRemoteAppManager &_AppManager)

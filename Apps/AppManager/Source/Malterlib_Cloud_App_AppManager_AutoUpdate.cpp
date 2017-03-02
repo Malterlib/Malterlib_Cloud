@@ -15,6 +15,7 @@ namespace NMib::NCloud::NAppManager
 			, CStr const &_Platform
 			, CStr &o_Error
 			, EFindVersionFlag _Flags
+			, CVersionManager::CVersionInformation &o_VersionInfo
 		)
 	{
 		auto *pVersionManagerApp = mp_VersionManagerApplications.f_FindEqual(_pApplication->m_Settings.m_VersionManagerApplication);
@@ -24,11 +25,10 @@ namespace NMib::NCloud::NAppManager
 			return {};
 		}
 		decltype(pVersionManagerApp->m_VersionsByTime.f_GetIterator()) iVersion;
-		auto &CurrentVersionID = _pApplication->m_LastInstalledVersion;
-		auto &CurrentVersionInfo = _pApplication->m_LastInstalledVersionInfo;
+		auto &CurrentVersionID = _pApplication->m_LastInstalledVersionFinished;
+		auto &CurrentVersionInfo = _pApplication->m_LastInstalledVersionInfoFinished;
 		
 		CVersionManager::CVersionIDAndPlatform VersionID;
-		CVersionManager::CVersionInformation VersionInfo;
 		for (iVersion.f_StartBackward(pVersionManagerApp->m_VersionsByTime); iVersion; --iVersion)
 		{
 			auto &RemoteVersion = *iVersion;
@@ -60,7 +60,7 @@ namespace NMib::NCloud::NAppManager
 			if (!bFoundAllTags)
 				continue;
 			VersionID = RemoteVersion.f_GetVersionID();
-			VersionInfo = RemoteVersion.m_VersionInfo; 
+			o_VersionInfo = RemoteVersion.m_VersionInfo; 
 			break;
 		}
 		
@@ -105,7 +105,7 @@ namespace NMib::NCloud::NAppManager
 					|| 
 					(
 						VersionID == CurrentVersionID
-						&& VersionInfo.m_Time == CurrentVersionInfo.m_Time
+						&& o_VersionInfo.m_Time == CurrentVersionInfo.m_Time
 					)
 				)
 			 )
@@ -122,14 +122,15 @@ namespace NMib::NCloud::NAppManager
 				! (_Flags & EFindVersionFlag_RetryFailed)
 				&& _pApplication->m_LastTriedInstalledVersion.f_IsValid() 
 				&& VersionID == _pApplication->m_LastTriedInstalledVersion 
-				&& VersionInfo.m_Time == _pApplication->m_LastTriedInstalledVersionInfo.m_Time
+				&& o_VersionInfo.m_Time == _pApplication->m_LastTriedInstalledVersionInfo.m_Time
+				&& o_VersionInfo.m_RetrySequence == _pApplication->m_LastTriedInstalledVersionInfo.m_RetrySequence
 			)
 		{
 			o_Error = "Already tried and failed to install this version";
 			return {};
 		}
 
-		if (CurrentVersionInfo.m_Time.f_IsValid() && VersionInfo.m_Time < CurrentVersionInfo.m_Time)
+		if (CurrentVersionInfo.m_Time.f_IsValid() && o_VersionInfo.m_Time < CurrentVersionInfo.m_Time)
 		{
 			o_Error = fg_Format("The selected version {} was older than the currently installed version", VersionID);
 			return {};
@@ -140,6 +141,9 @@ namespace NMib::NCloud::NAppManager
 	
 	void CAppManagerActor::fp_AutoUpdate_Update()
 	{
+		if (mp_bPendingSelfUpdateInProgress || mp_State.m_bStoppingApp)
+			return;
+			
 		bool bReschedule = false;
 		for (auto &pApplication : mp_Applications)
 		{
@@ -151,6 +155,7 @@ namespace NMib::NCloud::NAppManager
 			if (AllowedBranches.f_IsEmpty())
 				AllowedBranches = fg_CreateSet(pApplication->m_LastInstalledVersion.m_VersionID.m_Branch);
 
+			CVersionManager::CVersionInformation VersionInfo;
 			auto VersionID = fp_FindVersion
 				(
 					pApplication
@@ -159,12 +164,13 @@ namespace NMib::NCloud::NAppManager
 					, pApplication->m_LastInstalledVersion.m_Platform
 					, Error
 					, EFindVersionFlag_None
+					, VersionInfo 
 				)
 			;
 			
 			if (!VersionID.f_IsValid())
 			{
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Debug, "No new version found: {}", Error);
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Debug, "No new version found for '{}': {}", pApplication->m_Name, Error);
 				continue;
 			}
 			
@@ -177,10 +183,14 @@ namespace NMib::NCloud::NAppManager
 			CAppManagerInterface::CApplicationUpdate Update;
 			Update.m_Version = VersionID.m_VersionID;
 			Update.m_Platform = pApplication->m_LastInstalledVersion.m_Platform;
+			
+			auto CallingHostInfoScope = fp_PopulateCurrentHostInfoIfMissing("AutoUpdate");
+			
 			fp_UpdateApplication
 				(
 					pApplication->m_Name
 					, Update
+					, VersionInfo
 					, {}
 					, [Name = pApplication->m_Name](CStr const &_Info)
 					{
@@ -188,18 +198,13 @@ namespace NMib::NCloud::NAppManager
 					}
 					, false 
 				)
-				> [this](TCAsyncResult<> &&_Results)
+				> [this](TCAsyncResult<> &&_Results) mutable
 				{
 					if (!_Results)
-					{
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Auto update of application failed. {}", _Results.f_GetExceptionStr());
-					}
 				}
 			;
 		}
-		if (bReschedule)
-			mp_bPendingAutoUpdate = true;
-		else
-			mp_bPendingAutoUpdate = false;
+		mp_bPendingAutoUpdate = bReschedule;
 	}
 }

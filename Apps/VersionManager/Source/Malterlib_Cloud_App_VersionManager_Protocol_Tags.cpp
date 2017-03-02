@@ -69,9 +69,12 @@ namespace NMib::NCloud::NVersionManager
 			if (!DeniedTags.f_IsEmpty())
 				return Auditor.f_AccessDenied({fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags), "(Change tags)"});
 				
-			Auditor.f_Info("Change tags resulted in no changed tags");
-			CVersionManager::CChangeTags::CResult Result;
-			return fg_Explicit(Result);
+			if (!_Params.m_bIncreaseRetrySequence)
+			{
+				Auditor.f_Info("Change tags resulted in no changed tags");
+				CVersionManager::CChangeTags::CResult Result;
+				return fg_Explicit(Result);
+			}
 		}
 
 		auto *pApplication = pThis->mp_Applications.f_FindEqual(_Params.m_Application);
@@ -87,6 +90,8 @@ namespace NMib::NCloud::NVersionManager
 				
 				_Version.m_VersionInfo.m_Tags -= RemoveTags;
 				_Version.m_VersionInfo.m_Tags += AddTags;
+				if (_Params.m_bIncreaseRetrySequence)
+					++_Version.m_VersionInfo.m_RetrySequence;
 				
 				pThis->fp_NewVersion(_Params.m_Application, _Version); 
 				pThis->fp_SaveVersionInfo(pThis->fp_GetQueryFileActor(), VersionPath, _Version.m_VersionInfo) > VersionResults.f_AddResult(); 

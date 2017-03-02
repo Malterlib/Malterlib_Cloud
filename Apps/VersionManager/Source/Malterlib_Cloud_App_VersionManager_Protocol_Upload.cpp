@@ -45,6 +45,7 @@ namespace NMib::NCloud::NVersionManager
 					auto &TagsArray = VersionJSONInfo["Tags"].f_Array();
 					for (auto &Tag : _VersionInfo.m_Tags)
 						TagsArray.f_Insert(Tag);
+					VersionJSONInfo["RetrySequence"] = _VersionInfo.m_RetrySequence;
 					
 					CSizeInfo SizeInfo;
 					auto Files = CFile::fs_FindFiles(_VersionPath + "/*", EFileAttrib_File, true);

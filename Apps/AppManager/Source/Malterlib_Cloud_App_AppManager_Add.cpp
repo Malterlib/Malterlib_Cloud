@@ -62,19 +62,26 @@ namespace NMib::NCloud::NAppManager
 		if (auto *pValue = _Params.f_GetMember("Version"))
 			Version = pValue->f_String();
 
-		CStr Package = _Params["Package"].f_String();
+		bool bNullPackage = _Params["Package"].f_Type() == EJSONType_Null;
 		
-		if (Package.f_IsEmpty())
+		CStr Package;
+		if (!bNullPackage)
+			Package = _Params["Package"].f_String();
+		
+		if (Package.f_IsEmpty() && !bNullPackage)
 			return DMibErrorInstance("You have to specify a package");
 		
 		bool bFromFile = _Params["FromFile"].f_Boolean();
+
+		if (bFromFile && bNullPackage)
+			return DMibErrorInstance("You cannot specify from file when installing will null package");
 		
 		bool bSettingsFromVersionInfo = false;
 		
 		CStr Platform;
 		TCOptional<CVersionManager::CVersionIDAndPlatform> VersionID;
 		
-		if (!bFromFile)
+		if (!bFromFile && !bNullPackage)
 		{
 			bSettingsFromVersionInfo = _Params["SettingsFromVersionInfo"].f_Boolean();
 			CVersionManager::CVersionIDAndPlatform VersionIDTemp;
@@ -92,7 +99,7 @@ namespace NMib::NCloud::NAppManager
 			}
 			Settings.m_VersionManagerApplication = Package;
 		}
-		else
+		else if (!bNullPackage)
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory()));
 
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
@@ -154,8 +161,7 @@ namespace NMib::NCloud::NAppManager
 		
 		TCSharedPointer<CApplication> pApplication = fg_Construct(_Name, this);
 		
-		if (_FromLocalFile.f_IsEmpty() && _Settings.m_VersionManagerApplication.f_IsEmpty())
-			return Auditor.f_Exception("You have to specify version manager application");
+		bool bNullApplication = _FromLocalFile.f_IsEmpty() && _Settings.m_VersionManagerApplication.f_IsEmpty();
 
 		if (!_bSettingsFromVersionInfo)
 		{
@@ -170,7 +176,7 @@ namespace NMib::NCloud::NAppManager
 		
 		CVersionManager::CVersionIDAndPlatform VersionID;
 		
-		if (_FromLocalFile.f_IsEmpty())
+		if (_FromLocalFile.f_IsEmpty() && !bNullApplication)
 		{
 			auto *pVersionManagerApplication = mp_VersionManagerApplications.f_FindEqual(VersionManagerApplication);
 
@@ -190,6 +196,7 @@ namespace NMib::NCloud::NAppManager
 				else
 				{
 					CStr Error;
+					CVersionManager::CVersionInformation VersionInfo;
 					VersionID = CAppManagerActor::fp_FindVersion
 						(
 							pApplication
@@ -198,6 +205,7 @@ namespace NMib::NCloud::NAppManager
 							, Platform 
 							, Error
 							, EFindVersionFlag_ForAdd
+							, VersionInfo 
 						)
 					;
 					
@@ -258,22 +266,26 @@ namespace NMib::NCloud::NAppManager
 						fsp_CreateApplicationUserGroup(Settings, _fOnInfo, Directory);
 
 						TCVector<CStr> Files;
-						CStr SourcePath = _SourcePath;
-						if (CFile::fs_FileExists(_SourcePath, EFileAttrib_Directory))
-						{
-							auto Files = CFile::fs_FindFiles(_SourcePath + "/*");
-							if (Files.f_GetLen() == 1 && Files[0].f_Right(7) == ".tar.gz")
-								SourcePath = Files[0];
-						}
-						TCSet<CStr> AllowExist;
-						AllowExist[Directory + "/lost+found"];
-						if (!_DeletePath.f_IsEmpty())
-							AllowExist[_DeletePath];
-						CStr Output = fsp_UnpackApplication(SourcePath, Directory, pApplication->m_Name, pApplication->m_Settings, Files, AllowExist, _bForceInstall);
-						if (!Output.f_IsEmpty())
-							_fOnInfo(Output.f_TrimRight());
 						
-						fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files);											
+						if (!bNullApplication)
+						{
+							CStr SourcePath = _SourcePath;
+							if (CFile::fs_FileExists(_SourcePath, EFileAttrib_Directory))
+							{
+								auto Files = CFile::fs_FindFiles(_SourcePath + "/*");
+								if (Files.f_GetLen() == 1 && Files[0].f_Right(7) == ".tar.gz")
+									SourcePath = Files[0];
+							}
+							TCSet<CStr> AllowExist;
+							AllowExist[Directory + "/lost+found"];
+							if (!_DeletePath.f_IsEmpty())
+								AllowExist[_DeletePath];
+							CStr Output = fsp_UnpackApplication(SourcePath, Directory, pApplication->m_Name, pApplication->m_Settings, Files, AllowExist, _bForceInstall);
+							if (!Output.f_IsEmpty())
+								_fOnInfo(Output.f_TrimRight());
+						}
+						
+						fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files);
 						
 						if (!_DeletePath.f_IsEmpty())
 							CFile::fs_DeleteDirectoryRecursive(_DeletePath);
@@ -299,12 +311,15 @@ namespace NMib::NCloud::NAppManager
 						fp_OnApplicationAdded(pApplication);
 						auto InProgressScope = pApplication->f_SetInProgress();
 
+						pApplication->m_LastInstalledVersionFinished = pApplication->m_LastInstalledVersion;
+						pApplication->m_LastInstalledVersionInfoFinished = pApplication->m_LastInstalledVersionInfo;
+
 						fp_UpdateApplicationJSON(pApplication) 
 							> Continuation % "Failed to save state" % Auditor / [=]
 							{
 								pApplication->m_bJustUpdated = true;
-								fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false) 
-									> Continuation % "Failed to launch app. Will retry periodically" % Auditor / [=, InProgressScope = InProgressScope]
+								fp_LaunchApp(pApplication, false) 
+									> Continuation % "Failed to launch app. Will retry periodically" % Auditor / [=, InProgressScope = InProgressScope](bool _bQuitManager)
 									{
 										_fOnInfo("Application was successfully added");
 										Auditor.f_Info("Application added");
@@ -321,43 +336,44 @@ namespace NMib::NCloud::NAppManager
 		fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Setup, _bForceOverwrite) 
 			> Continuation % Auditor / [=]
 			{
-				if (!_FromLocalFile.f_IsEmpty())
-					fUnpackAppAndFinish(_FromLocalFile, CStr());
-				else
+				if (!_FromLocalFile.f_IsEmpty() || bNullApplication)
 				{
-					CStr DownloadDirectory = Directory + "/TempVersionDownload";
-					_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
-					self(&CAppManagerActor::fp_DownloadApplication, VersionManagerApplication, VersionID, DownloadDirectory) 
-						> Continuation % "Failed to download application from version manager" % Auditor / [=](CVersionManager::CVersionInformation &&_VersionInfo)
-						{
-							auto &VersionInfo = _VersionInfo;
-							
-							if (_bSettingsFromVersionInfo)
-							{
-								CApplicationSettings NewSettings = pApplication->m_Settings;
-								CApplicationSettings VersionInfoSettings;
-								EApplicationSetting NewChangedSettings = EApplicationSetting_None;
-								VersionInfoSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
-								NewSettings.f_ApplySettings(NewChangedSettings, VersionInfoSettings);
-								
-								CStr Error;
-								if (!NewSettings.f_Validate(Error))
-								{
-									Continuation.f_SetException(Auditor.f_Exception(Error));
-									return ;
-								}
-								pApplication->m_Settings = NewSettings;
-							}
-
-							pApplication->m_LastInstalledVersion = VersionID;
-							pApplication->m_LastInstalledVersionInfo = VersionInfo;
-							if (mp_KnownPlatforms(VersionID.m_Platform).f_WasCreated())
-								fp_VersionManagerResubscribeAll();
-
-							fUnpackAppAndFinish(DownloadDirectory, DownloadDirectory);
-						}
-					;
+					fUnpackAppAndFinish(_FromLocalFile, CStr());
+					return;
 				}
+
+				CStr DownloadDirectory = Directory + "/TempVersionDownload";
+				_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
+				self(&CAppManagerActor::fp_DownloadApplication, VersionManagerApplication, VersionID, DownloadDirectory) 
+					> Continuation % "Failed to download application from version manager" % Auditor / [=](CVersionManager::CVersionInformation &&_VersionInfo)
+					{
+						auto &VersionInfo = _VersionInfo;
+
+						if (_bSettingsFromVersionInfo)
+						{
+							CApplicationSettings NewSettings = pApplication->m_Settings;
+							CApplicationSettings VersionInfoSettings;
+							EApplicationSetting NewChangedSettings = EApplicationSetting_None;
+							VersionInfoSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
+							NewSettings.f_ApplySettings(NewChangedSettings, VersionInfoSettings);
+							
+							CStr Error;
+							if (!NewSettings.f_Validate(Error))
+							{
+								Continuation.f_SetException(Auditor.f_Exception(Error));
+								return ;
+							}
+							pApplication->m_Settings = NewSettings;
+						}
+
+						pApplication->m_LastInstalledVersion = VersionID;
+						pApplication->m_LastInstalledVersionInfo = VersionInfo;
+						if (mp_KnownPlatforms(VersionID.m_Platform).f_WasCreated())
+							fp_VersionManagerResubscribeAll();
+
+						fUnpackAppAndFinish(DownloadDirectory, DownloadDirectory);
+					}
+				;
 			}
 		;
 		

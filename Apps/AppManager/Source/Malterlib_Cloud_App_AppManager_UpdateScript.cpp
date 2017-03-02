@@ -214,6 +214,7 @@ namespace NMib::NCloud::NAppManager
 			LaunchParams.m_Environment["MalterlibCloud_Time"] = fg_Format("{}", _pVersionInformation->m_Time.f_ToLocal());
 			LaunchParams.m_Environment["MalterlibCloud_Configuration"] = fg_Format("{}", _pVersionInformation->m_Configuration);
 			LaunchParams.m_Environment["MalterlibCloud_Tags"] = fg_Format("{vs,vb}", _pVersionInformation->m_Tags);
+			LaunchParams.m_Environment["MalterlibCloud_RetrySequence"] = fg_Format("{vs,vb}", _pVersionInformation->m_RetrySequence);
 			LaunchParams.m_Environment["MalterlibCloud_ExtraInfo"] = _pVersionInformation->m_ExtraInfo.f_ToString("");
 			LaunchParams.m_Environment["MalterlibCloud_NumFiles"] = fg_Format("{}", _pVersionInformation->m_nFiles);
 			LaunchParams.m_Environment["MalterlibCloud_NumBytes"] = fg_Format("{}", _pVersionInformation->m_nBytes);

@@ -8,7 +8,7 @@ if [[ "$3" != "Recursive" ]]; then
 fi
 
 if [[ "$2" == "DaemonDebug" ]]; then
-	sleep 2
+	sleep 5
 	"$1" --daemon-run-debug &
 	disown
 elif [[ "$2" == "Daemon" ]]; then

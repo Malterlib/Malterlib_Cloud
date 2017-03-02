@@ -164,6 +164,8 @@ namespace NMib::NCloud::NVersionManager
 															OutVersion.m_Tags[Value.f_String()];
 													}
 												}
+												if (auto pValue = ApplicationInfo.f_GetMember("RetrySequence", EJSONType_Integer))
+													OutVersion.m_RetrySequence = pValue->f_Integer();
 											}
 											{
 												auto Files = CFile::fs_FindFiles(VersionPath + "/*", EFileAttrib_File, true);

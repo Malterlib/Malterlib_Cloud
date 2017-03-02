@@ -29,7 +29,8 @@ namespace NMib::NCloud::NAppManager
 		auto InProgressScope = Application.f_SetInProgress();
 		
 		TCContinuation<void> Continuation;
-		Application.f_Stop(true) > [pThis, Auditor, Continuation, _Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
+
+		Application.f_Stop(EStopFlag_CloseEncryption) > [pThis, Auditor, Continuation, _Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
 			{
 				CStr Error = pThis->fp_GetApplicationStopErrors(_Result, _Name);
 				

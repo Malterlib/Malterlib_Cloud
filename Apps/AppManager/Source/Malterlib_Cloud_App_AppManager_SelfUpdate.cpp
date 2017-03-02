@@ -11,9 +11,11 @@ namespace NMib::NCloud::NAppManager
 	ch8 const *g_pSelfUpdateScript =
 #		include "Malterlib_Cloud_App_AppManager_SelfUpdate.sh"
 	;
-	void CAppManagerActor::fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication)
+	TCContinuation<bool> CAppManagerActor::fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication)
 	{
-		g_Dispatch(mp_FileActor) > [SourceDir = _pApplication->f_GetDirectory()]
+		TCContinuation<bool> Continuation;
+
+		g_Dispatch(mp_FileActor) > [SourceDir = _pApplication->f_GetDirectory()]() -> bool
 			{
 				CStr ProgramDir = CFile::fs_GetProgramDirectory();
 				CStr ProgramPath = CFile::fs_GetProgramPath();
@@ -28,7 +30,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				
 				if (!bUpdatedFiles)
-					return;
+					return false;
 				
 				CStr Script = g_pSelfUpdateScript;
 				
@@ -96,15 +98,19 @@ namespace NMib::NCloud::NAppManager
 					DMibError(fg_Format("Failed to launch self update script: {}", StdErr));
 
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Self update restart was initiated successfully {}", fg_ConcatOutput(StdOut, StdErr));
+
+				return true;
 			}
-			> [this](TCAsyncResult<void> &&_Result)
+			> [this, Continuation](TCAsyncResult<bool> &&_Result)
 			{
 				if (!_Result)
 				{
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Self update failed: {}", _Result.f_GetExceptionStr());
-					return;
 				}
+				Continuation.f_SetResult(fg_Move(_Result)); 
 			}
 		;
+		
+		return Continuation;
 	}
 }

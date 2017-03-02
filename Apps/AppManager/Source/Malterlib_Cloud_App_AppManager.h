@@ -22,6 +22,9 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerActor();
 		
 	private:
+		using EUpdateStage = CAppManagerInterface::EUpdateStage;
+		struct CFirstApplicationUpdate;
+		
 		enum EUpdateScript
 		{
 			EUpdateScript_PreUpdate
@@ -61,6 +64,8 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_EncryptionFileSystem = DBit(14)
 			, EApplicationSetting_UpdateGroup = DBit(15)
 			, EApplicationSetting_DistributedApp = DBit(16)
+			, EApplicationSetting_Dependencies = DBit(17)
+			, EApplicationSetting_StopOnDependencyFailure = DBit(18)
 			
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
@@ -68,6 +73,15 @@ namespace NMib::NCloud::NAppManager
 			| EApplicationSetting_RunAsUser 
 			| EApplicationSetting_RunAsGroup
 			| EApplicationSetting_SelfUpdateSource
+		};
+
+		enum EStopFlag
+		{
+			EStopFlag_None = 0
+			, EStopFlag_CloseEncryption = DBit(0)
+			, EStopFlag_AutoStart = DBit(1)
+			, EStopFlag_PreventLaunchUser = DBit(2)
+			, EStopFlag_PreventLaunchUpdate = DBit(3)
 		};
 		
 		struct CApplicationSettings
@@ -85,6 +99,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bDistributedApp = false;
 			
 			// Settings that can be updated by app manager (command line or protocol)
+			TCSet<CStr> m_Dependencies;
 			CStr m_VersionManagerApplication;
 			CStr m_UpdateGroup;
 			TCSet<CStr> m_AutoUpdateTags;
@@ -92,6 +107,7 @@ namespace NMib::NCloud::NAppManager
 			CUpdateScripts m_UpdateScripts;
 			bool m_bAutoUpdate = false;
 			bool m_bSelfUpdateSource = false;
+			bool m_bStopOnDependencyFailure = true;
 			
 			bool f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
 			void f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source);
@@ -114,7 +130,7 @@ namespace NMib::NCloud::NAppManager
 			void f_Delete();
 			void f_AbortPendingLaunches();
 			
-			TCDispatchedActorCall<uint32> f_Stop(bool _bCloseEncryption);
+			TCDispatchedActorCall<uint32> f_Stop(EStopFlag _Flags);
 			TCDispatchedActorCall<uint32> f_CloseEncryption(uint32 _Status);
 			
 			CStr f_GetDirectory();
@@ -124,7 +140,12 @@ namespace NMib::NCloud::NAppManager
 			bool f_NeedsEncryption() const;
 			bool f_IsChildApp() const;
 			bool f_IsInProgress() const;
+			bool f_DependenciesSatisfied(CStr &o_State) const;
+			bool f_IsLaunched() const;
 			
+			TCVector<TCSharedPointer<CApplication>> f_GetDependents() const;
+			
+			EDistributedAppUpdateType f_GetUpdateType() const;
 			CAppManagerCoordinationInterface::CAppInfo f_GetRemoteAppInfo() const;
 
 			CStr const m_Name;
@@ -141,19 +162,30 @@ namespace NMib::NCloud::NAppManager
 			CVersionManager::CVersionIDAndPlatform m_LastInstalledVersion;
 			CVersionManager::CVersionInformation m_LastInstalledVersionInfo;
 
+			CVersionManager::CVersionIDAndPlatform m_LastInstalledVersionFinished;
+			CVersionManager::CVersionInformation m_LastInstalledVersionInfoFinished;
+
 			CVersionManager::CVersionIDAndPlatform m_LastTriedInstalledVersion;
 			CVersionManager::CVersionInformation m_LastTriedInstalledVersionInfo;
 
-			CVersionManager::CVersionIDAndPlatform m_WantInstallVersion;
-			CAppManagerInterface::EUpdateStage m_WantUpdateStage = CAppManagerInterface::EUpdateStage_None;
-			CAppManagerInterface::EUpdateStage m_UpdateStage = CAppManagerInterface::EUpdateStage_None;
+			CVersionManager::CVersionIDAndPlatform m_LastFailedInstalledVersion;
+			CTime m_LastFailedInstalledVersionTime;
+			uint32 m_LastFailedInstalledVersionRetrySequence = 0;
+
+			EUpdateStage m_WantUpdateStage = EUpdateStage::EUpdateStage_None;
+			EUpdateStage m_UpdateStage = EUpdateStage::EUpdateStage_None;
+			uint64 m_UpdateStartSequence = TCLimitsInt<uint64>::mc_Max;
 			
 			// State
+			bool m_bPreventLaunch_User = false;
+			bool m_bPreventLaunch_Update = false;
 			bool m_bDeleted = false;
 			bool m_bStopped = false;
+			bool m_bAutoStart = false;
 			bool m_bOperationInProgress = false;
 			bool m_bEncryptionOpened = false;
 			bool m_bLaunching = false;
+			bool m_bLaunched = false;
 			bool m_bJustUpdated = false;
 			
 			TCFunction<void ()> m_fOnRegisterDistributedApp;
@@ -340,17 +372,18 @@ namespace NMib::NCloud::NAppManager
 			
 			bool operator < (CRemoteApplicationKey const &_Right) const
 			{
-				return fg_TupleReferences(m_Group, m_VersionManagerApplication) < fg_TupleReferences(m_Group, m_VersionManagerApplication); 
+				return fg_TupleReferences(m_Group, m_VersionManagerApplication) < fg_TupleReferences(_Right.m_Group, _Right.m_VersionManagerApplication); 
+			}
+
+			bool operator == (CRemoteApplicationKey const &_Right) const
+			{
+				return m_Group == _Right.m_Group && m_VersionManagerApplication == _Right.m_VersionManagerApplication;
 			}
 			
-			bool operator == (CAppManagerCoordinationInterface::CAppInfo const &_AppInfo) const
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const
 			{
-				return m_Group == _AppInfo.m_Group && m_VersionManagerApplication == _AppInfo.m_VersionManagerApplication;
-			}
-			
-			bool operator == (CApplicationSettings const &_Settings) const
-			{
-				return m_Group == _Settings.m_UpdateGroup && m_VersionManagerApplication == _Settings.m_VersionManagerApplication;
+				o_Str += typename tf_CStr::CFormat("{}/{}") << m_Group << m_VersionManagerApplication;
 			}
 
 			CStr m_Group;
@@ -387,11 +420,35 @@ namespace NMib::NCloud::NAppManager
 			TCMap<CRemoteApplicationKey, TCSet<CStr>> m_KnownApplications;
 		};
 		
-		struct CUpdateApplicationState
+		struct CUpdateApplicationState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
 		{
 			CUpdateApplicationState() = default;
 			CUpdateApplicationState(CUpdateApplicationState const &) = delete;
 			CUpdateApplicationState(CUpdateApplicationState &&) = delete;
+			
+			template <typename tf_CType>
+			bool f_CheckAbort(TCContinuation<tf_CType> const &o_Error)
+			{
+				if (m_pApplication->m_bDeleted)
+				{
+					if (!o_Error.f_IsSet())
+						o_Error.f_SetException(DMibErrorInstance("Application has been deleted, aborting"));
+					return true;
+				}
+				if (m_bCancel)
+				{
+					if (!o_Error.f_IsSet())
+						o_Error.f_SetException(DMibErrorInstance("Update was cancelled"));
+					return true;
+				}
+				if (m_bCancelOnAppManagerStop)
+				{
+					if (!o_Error.f_IsSet())
+						o_Error.f_SetException(DMibErrorInstance("AppManager stopped"));
+					return true;
+				}
+				return false;
+			}
 			
 			TCSharedPointer<CApplication> m_pApplication;
 			TCFunction<void (CStr const &_Info)> m_fOnInfo;
@@ -399,10 +456,13 @@ namespace NMib::NCloud::NAppManager
 			COnScopeExitShared m_pDownloadDirectoryCleanup;
 			COnScopeExitShared m_pTemporaryDirectoryCleanup;
 			COnScopeExitShared m_pInProgressScope;
+			COnScopeExitShared m_pCleanupStateMap;
 			CStr m_SourcePath;
 			TCSharedPointer<CApplicationSettings> m_pNewSettings;
 			TCSet<CStr> m_AllowSourceExist;
 			CVersionManager::CVersionIDAndPlatform m_VersionID;
+			CTime m_VersionTime;
+			uint32 m_VersionRetrySequence = 0;
 			TCSet<CStr> m_RequiredTags;
 			TCSharedPointer<CVersionManager::CVersionInformation> m_pVersionInfo;
 			TCSharedPointer<NTime::CClock> m_pClock;
@@ -411,12 +471,23 @@ namespace NMib::NCloud::NAppManager
 			bool m_bDryRun = false;
 			bool m_bUpdateSettings = true;
 			bool m_bUnencrypted = false;
+			bool m_bCancel = false;
+			bool m_bCancelOnAppManagerStop = false;
+			bool m_bSetLastTried = false;
 		};
 
-		struct COnRemoteApplicationInfoChange
+		struct COnAppUpdateInfoChange
 		{
 			CActorSubscription m_TimerSubscription;
+			CActorSubscription m_DisconnectTimerSubscription;
 			TCFunctionMutable<void ()> m_fOnChanged;
+		};
+		
+		enum EWaitStageFlag
+		{
+			EWaitStageFlag_None = 0
+			, EWaitStageFlag_IgnoreFailed = DBit(0)
+			, EWaitStageFlag_DisallowInProgressStates = DBit(1)
 		};
 		
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
@@ -449,12 +520,9 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<void> fp_ReadState();
 		void fp_InitApplications();
 		void fp_OnApplicationAdded(TCSharedPointer<CApplication> const &_pApplication);
-		void fp_DoInitialApplicationLaunch(TCSharedPointer<CApplication> const &_pApplication);
 
-		void fp_LaunchNormalApps();
-		void fp_LaunchEncryptedApps();
-		TCContinuation<void> fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
-		TCContinuation<void> fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
+		TCContinuation<bool> fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
+		TCContinuation<bool> fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
 		void fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication);
 		static void fsp_CreateApplicationUserGroup(CApplicationSettings const &_Settings, TCFunction<void (CStr const &_Info)> const &_fLogInfo, CStr const &_HomeDir);
 		static void fsp_UpdateApplicationFiles(CStr const &_ApplicationDir, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> const &_Files);
@@ -469,7 +537,7 @@ namespace NMib::NCloud::NAppManager
 				, fp64 _TimeSinceUpdateStart 
 			)
 		;
-		void fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication);
+		TCContinuation<bool> fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication);
 		
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_EnumApplications(CEJSON const &_Params);
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_AddApplication(CEJSON const &_Params);
@@ -483,6 +551,8 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_ListAvailableVersions(CEJSON const &_Params);
 
 		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_RemoveKnownHost(CEJSON const &_Params);
+
+		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_CancelAllUpdates(CEJSON const &_Params);
 		
 		TCContinuation<void> fp_AddApplication
 			(
@@ -513,22 +583,28 @@ namespace NMib::NCloud::NAppManager
 			(
 				CStr const &_Name
 				, CAppManagerInterface::CApplicationUpdate const &_Update
+		 		, CVersionManager::CVersionInformation const &_VersionInfo
 				, CStr const &_FromFileName
 				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
 				, bool _bCheckPermissions = true
 			)
 		;
 
-		TCContinuation<void> fp_UpdateApplicationRunProcess(TCSharedPointer<CUpdateApplicationState> const &_pState);
-		TCContinuation<void> fp_UpdateApplication_DownloadVersion(TCSharedPointer<CUpdateApplicationState> const &_pState);
-		TCContinuation<void> fp_UpdateApplication_Unpack(TCSharedPointer<CUpdateApplicationState> const &_pState);
-		TCContinuation<void> fp_UpdateApplication_StopOldApp(TCSharedPointer<CUpdateApplicationState> const &_pState);
-		TCContinuation<void> fp_UpdateApplication_PreUpdate(TCSharedPointer<CUpdateApplicationState> const &_pState);
-		TCContinuation<void> fp_UpdateApplication_UpdateApplicationFiles(TCSharedPointer<CUpdateApplicationState> const &_pState);
-		TCContinuation<void> fp_UpdateApplication_SaveApplicationState(TCSharedPointer<CUpdateApplicationState> const &_pState);
-		TCContinuation<void> fp_UpdateApplication_PostUpdate(TCSharedPointer<CUpdateApplicationState> const &_pState);
-		TCContinuation<void> fp_UpdateApplication_StartNewApp(TCSharedPointer<CUpdateApplicationState> const &_pState);
-		TCContinuation<void> fp_UpdateApplication_PostLaunch(TCSharedPointer<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_UpdateApplicationRunProcess(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_UpdateApplication_DownloadVersion(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_UpdateApplication_Unpack(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_UpdateApplication_StopOldApp(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_UpdateApplication_PreUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_UpdateApplication_UpdateApplicationFiles(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_UpdateApplication_SaveApplicationState(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_UpdateApplication_PostUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<bool> fp_UpdateApplication_StartNewApp(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_UpdateApplication_DeferToNextRestart(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState, TCSharedPointer<CCanDestroyTracker> const &_pCanDestroy);
+		TCContinuation<void> fp_UpdateApplication_PostLaunch(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		
+		TCContinuation<void> fp_CancelAllApplicationUpdatesOnStopAppManager();
+		
+		void fp_StartPendingSelfUpdateReporting(CStr const &_Name, CVersionManager::CVersionIDAndPlatform const &_VersionID, CTime const &_VersionTime, uint32 _VersionRetrySequence);
 		
 		static void fsp_UpdateAttributes(CStr const &_File);
 		static CStr fsp_UnpackApplication
@@ -570,6 +646,7 @@ namespace NMib::NCloud::NAppManager
 		;
 		
 		void fp_AutoUpdate_Update();
+
 		CVersionManager::CVersionIDAndPlatform fp_FindVersion
 			(
 				TCSharedPointer<CApplication> const &_pApplication
@@ -578,6 +655,7 @@ namespace NMib::NCloud::NAppManager
 				, CStr const &_Platform 
 				, CStr &o_Error
 				, EFindVersionFlag _Flags
+				, CVersionManager::CVersionInformation &o_VersionInfo
 			)
 		;
 
@@ -592,9 +670,8 @@ namespace NMib::NCloud::NAppManager
 		
 		TCContinuation<void> fp_OnUpdateEvent
 			(
-				TCSharedPointer<CApplication> const &_pApplication
-				, CAppManagerInterface::EUpdateStage _Stage
-				, CAppManagerInterface::CVersionIDAndPlatform const &_VersionID
+				TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+				, EUpdateStage _Stage
 				, NStr::CStr const &_Message
 			)
 		;
@@ -604,24 +681,29 @@ namespace NMib::NCloud::NAppManager
 		void fp_NewRemoteAppManager(CRemoteAppManager &_AppManager);
 		void fp_NewRemoteKnownApplication(CRemoteApplicationKey const &_RemoteKey, CStr const &_HostID);
 		void fp_SendInitialInfoToRemoteAppManager(CRemoteAppManager &_AppManager);
-		void fp_RemoteAppInfoChanged(TCSharedPointer<CApplication> const &_pApplication);
+		void fp_OnAppUpdateInfoChange(TCSharedPointer<CApplication> const &_pApplication);
+		void fp_OnAppUpdateInfoChange();
 		void fp_SendAppToRemoteAppManagers(TCSharedPointer<CApplication> const &_pApplication);
 		void fp_SendRemovedAppToRemoteAppManagers(TCSharedPointer<CApplication> const &_pApplication);
 		void fp_BroadcastRemoteAppChange(CAppManagerCoordinationInterface::CAppChange &&_Change);
-		void fp_RemoteAppInfoChanged();
-
-		TCContinuation<void> fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointer<CApplication> const &_pApplication);
+		
+		void fp_AppLaunchStateChanged(TCSharedPointer<CApplication> const &_pApplication, CStr const &_State);
+		void fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted);
+		
+		TCContinuation<void> fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCContinuation<void> fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
 		TCContinuation<void> fp_Coordination_WaitForAllToReachWantUpdateStage
 			(
-				TCSharedPointer<CApplication> const &_pApplication
-				, CAppManagerInterface::EUpdateStage _Stage
+				TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+				, EUpdateStage _Stage
 				, fp64 _Timeout
-				, bool _bIgnoreFailed = false
+				, EWaitStageFlag _Flags
+				, TCFunctionMutable<bool ()> &&_fEvalState = {}
 			)
 		;
 		TCContinuation<void> fp_Coordination_WaitForState
 			(
-				TCSharedPointer<CApplication> const &_pApplication
+				TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
 				, fp64 _Timeout
 				, TCFunctionMutable<bool (TCContinuation<void> &_Continuation)> &&_fEvalState
 				, CStr const &_RemoteFailError
@@ -630,20 +712,26 @@ namespace NMib::NCloud::NAppManager
 				, bool _bIgnoreFailed = false
 			)
 		;
-		static ch8 const *fsp_UpdateStageToStr(CAppManagerInterface::EUpdateStage _Stage);
+		static ch8 const *fsp_UpdateStageToStr(EUpdateStage _Stage);
 		static ch8 const *fsp_UpdateTypeToStr(EDistributedAppUpdateType _UpdateType);
 
 		TCContinuation<void> fp_SetupLimits();
 		void fp_UpdateLimits();
 		
+		bool fp_AutoStartApp(TCSharedPointer<CApplication> const &_pApplication);
+		void fp_UpdateApplicationDependencies();
+		
+		void fp_InitialStartupFailed(CExceptionPointer const &_pException);
+		TCContinuation<void> fp_ClearPreventLaunch(TCSharedPointer<CApplication> const &_pApplication);
+
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
 		TCActor<CSeparateThreadActor> mp_FileActor;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagerSubscription;
 		TCSet<CStr> mp_KnownPlatforms;
-		bool mp_bAppsEncryptedLaunched = false;
 		bool mp_bPendingAutoUpdate = false;
 		bool mp_bLogLaunchesToStdErr = false;
+		bool mp_bPendingSelfUpdateInProgress = false;
 		
 		TCLinkedList<CVersionManagerDownloadState> mp_Downloads;
 		
@@ -662,7 +750,18 @@ namespace NMib::NCloud::NAppManager
 		TCMap<CStr, CRemoteAppManager> mp_RemoteAppManagerState;
 		TCAVLTree<CRemoteAppManager::CLinkTraits_m_ByActorLink, CRemoteAppManager::CCompareActor> mp_RemoteAppManagerStateByActor;
 		TCMap<CRemoteApplicationKey, TCSet<CStr>> mp_KnownRemoteApplications;
-		TCSet<TCSharedPointer<COnRemoteApplicationInfoChange, CSupportWeakTag>> mp_OnRemoteApplicationInfoChange;
+		TCSet<TCSharedPointerSupportWeak<COnAppUpdateInfoChange>> mp_OnAppUpdateInfoChange;
+		
+		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroy = fg_Construct();
+		
+		TCContinuation<void> mp_InitialStartupResult;
+		mint mp_PendingAutoLaunches = 0;
+		
+		uint64 mp_AppStageChangeSequence = 0;
+		
+		TCSet<TCWeakPointer<CUpdateApplicationState>> mp_RunningUpdates;
+		
+		TCContinuation<void> mp_CancelRunningUpdatesOnStopAppManagerContinuation;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

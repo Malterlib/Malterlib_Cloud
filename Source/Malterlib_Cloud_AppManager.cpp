@@ -32,26 +32,26 @@ namespace NMib::NCloud
 	
 	CAppManagerInterface::~CAppManagerInterface() = default;
 
-	static_assert(CVersionManager::EMinProtocolVersion <= 0x104, "");
+	static_assert(CVersionManager::EMinProtocolVersion <= 0x105, "");
 	
 	template <typename tf_CStream>
 	void CAppManagerInterface::CVersionIDAndPlatform::f_Stream(tf_CStream &_Stream)
 	{
-		DMibBinaryStreamVersion(_Stream, 0x104);
+		DMibBinaryStreamVersion(_Stream, 0x105);
 		CVersionManager::CVersionIDAndPlatform::f_Stream(_Stream);
 	}
 	
 	template <typename tf_CStream>
 	void CAppManagerInterface::CVersionID::f_Stream(tf_CStream &_Stream)
 	{
-		DMibBinaryStreamVersion(_Stream, 0x104);
+		DMibBinaryStreamVersion(_Stream, 0x105);
 		CVersionManager::CVersionID::f_Stream(_Stream);
 	}
 	
 	template <typename tf_CStream>
 	void CAppManagerInterface::CVersionInformation::f_Stream(tf_CStream &_Stream)
 	{
-		DMibBinaryStreamVersion(_Stream, 0x104);
+		DMibBinaryStreamVersion(_Stream, 0x105);
 		CVersionManager::CVersionInformation::f_Stream(_Stream);
 	}
 		
@@ -70,11 +70,10 @@ namespace NMib::NCloud
 		_Stream % m_UpdateScriptPostLaunch;
 		_Stream % m_UpdateScriptOnError;
 		_Stream % m_bSelfUpdateSource;
-		if (_Stream.f_GetVersion() >= 0x102)
-		{
-			_Stream % m_UpdateGroup;
-			_Stream % m_bDistributedApp;
-		}
+		_Stream % m_UpdateGroup;
+		_Stream % m_bDistributedApp;
+		_Stream % m_Dependencies;
+		_Stream % m_bStopOnDependencyFailure;
 	}
 	
 	template <typename tf_CStream>
@@ -117,11 +116,10 @@ namespace NMib::NCloud
 		_Stream % m_UpdateScriptPostLaunch;
 		_Stream % m_UpdateScriptOnError;
 		_Stream % m_bSelfUpdateSource;
-		if (_Stream.f_GetVersion() >= 0x102)
-		{
-			_Stream % m_UpdateGroup;
-			_Stream % m_bDistributedApp;
-		}
+		_Stream % m_UpdateGroup;
+		_Stream % m_bDistributedApp;
+		_Stream % m_Dependencies;
+		_Stream % m_bStopOnDependencyFailure;
 	}
 	
 	template <typename tf_CStream>
@@ -130,6 +128,7 @@ namespace NMib::NCloud
 		_Stream % m_Application;
 		_Stream % m_Message;
 		_Stream % m_VersionID;
+		_Stream % m_VersionTime;
 		_Stream % m_Stage;
 	}
 	

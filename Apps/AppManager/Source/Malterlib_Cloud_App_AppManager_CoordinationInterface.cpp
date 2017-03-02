@@ -17,12 +17,12 @@ namespace NMib::NCloud::NAppManager
 	{
 	}
 
-	static_assert(CVersionManager::EMinProtocolVersion <= 0x104, "");
+	static_assert(CVersionManager::EMinProtocolVersion <= 0x105, "");
 	
 	template <typename tf_CStream>
 	void CAppManagerCoordinationInterface::CVersionIDAndPlatform::f_Stream(tf_CStream &_Stream)
 	{
-		DMibBinaryStreamVersion(_Stream, 0x104);
+		DMibBinaryStreamVersion(_Stream, 0x105);
 		CVersionManager::CVersionIDAndPlatform::f_Stream(_Stream);
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CVersionIDAndPlatform);
@@ -33,10 +33,14 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_Group;
 		_Stream % m_VersionManagerApplication;
 		_Stream % m_VersionID;
-		_Stream % m_WantVersionID;
+		_Stream % m_VersionTime;	
+		_Stream % m_FailedVersionID;
+		_Stream % m_FailedVersionTime;
+		_Stream % m_FailedVersionRetrySequence;
 		_Stream % m_UpdateStage;
 		_Stream % m_WantUpdateStage;
 		_Stream % m_UpdateType;
+		_Stream % m_UpdateStartSequence;
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppInfo);
 	

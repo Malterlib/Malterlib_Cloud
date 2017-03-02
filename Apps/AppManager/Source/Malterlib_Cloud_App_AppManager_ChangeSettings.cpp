@@ -149,7 +149,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			Application.m_Settings = NewSettings;
 			if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
-				fp_RemoteAppInfoChanged(*pApplication);
+				fp_OnAppUpdateInfoChange(*pApplication);
 			_fOnInfo("Saving application state");
 			fp_UpdateApplicationJSON(*pApplication)
 				> Continuation % "Failed to save application state" % Auditor / [=, InProgressScope = InProgressScope]
@@ -177,7 +177,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				
 				_fOnInfo("Stopping old application");
-				pApplication->f_Stop(false) > [=](TCAsyncResult<uint32> &&_ExitStatus)
+				pApplication->f_Stop(EStopFlag_None) > [=](TCAsyncResult<uint32> &&_ExitStatus)
 					{
 						CStr Error = fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
 						
@@ -201,7 +201,7 @@ namespace NMib::NCloud::NAppManager
 
 						pApplication->m_Settings = NewSettings;
 						if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
-							fp_RemoteAppInfoChanged(pApplication);
+							fp_OnAppUpdateInfoChange(pApplication);
 						
 						_fOnInfo("Saving application state and update application files");
 						fg_Dispatch
@@ -242,9 +242,18 @@ namespace NMib::NCloud::NAppManager
 									return;
 								}
 									
+								CStr DependenciesMessage;
+								if (!pApplication->f_DependenciesSatisfied(DependenciesMessage))
+								{
+									_fOnInfo(fg_Format("Application settings were successfully changed. Launch skipped because of missing dependencies: {}", DependenciesMessage));
+									Auditor.f_Info("Updated application settings");
+									Continuation.f_SetResult();
+									return;
+								}
+								
 								_fOnInfo("Launching applicaion with changed settings");
-								fg_ThisActor(this)(&CAppManagerActor::fp_LaunchApp, pApplication, false)
-									> Continuation % "Failed to launch app. Will retry periodically." % Auditor / [=, InProgressScope = InProgressScope]
+								fp_LaunchApp(pApplication, false)
+									> Continuation % "Failed to launch app. Will retry periodically." % Auditor / [=, InProgressScope = InProgressScope](bool _bQuitManager)
 									{
 										_fOnInfo("Application settings were successfully changed");
 										Auditor.f_Info("Updated application settings");
