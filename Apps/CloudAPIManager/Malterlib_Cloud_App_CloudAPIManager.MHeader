@@ -58,9 +58,16 @@
 	%Dependency "Lib_Malterlib"
 	%Dependency "Lib_Curl"
 	{
-		!!Malterlib_CurlAvailable true
+		&
+		{
+			Malterlib_CurlAvailable true
+			!DocumentationEnabled true
+		}
 	}
 	%Dependency "Lib_zlib"
+	{
+		!DocumentationEnabled true
+	}
 }
 
 Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_CloudAPIManager;@(Malterlib_Cloud_App_Targets)"
