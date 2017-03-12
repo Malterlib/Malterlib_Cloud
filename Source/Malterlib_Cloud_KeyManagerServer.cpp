@@ -174,15 +174,6 @@ namespace NMib::NCloud
 	CKeyManagerServer::CKeyManagerServer(CKeyManagerServerConfig const &_Config)
 		: mp_pInternal(fg_Construct(this, _Config))
 	{
-		
-	}
-	
-	CKeyManagerServer::~CKeyManagerServer()
-	{
-	}
-	
-	void CKeyManagerServer::f_Construct()
-	{
 		auto &Internal = *mp_pInternal;
 		auto &DistributionManager = NConcurrency::fg_GetDistributionManager();
 		Internal.m_KeyManagerActor = DistributionManager->f_ConstructActor<CKeyManager>(fg_ThisActor(this));
@@ -194,6 +185,10 @@ namespace NMib::NCloud
 				Internal.m_KeyManagerPublication = fg_Move(*_Publication);
 			}
 		;
+	}
+	
+	CKeyManagerServer::~CKeyManagerServer()
+	{
 	}
 	
 	NConcurrency::TCContinuation<void> CKeyManagerServer::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys)

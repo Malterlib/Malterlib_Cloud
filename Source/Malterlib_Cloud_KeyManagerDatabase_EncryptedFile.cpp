@@ -41,7 +41,7 @@ namespace NMib::NCloud
 						NContainer::TCVector<uint8, NMem::CAllocator_HeapSecure> PlainTextCheck;
 						m_AESContext.f_Decrypt(FileData.f_GetArray(), FileData.f_GetLen(), PlainTextCheck.f_GetArray(32));
 						
-						if (NMem::fg_MemCmp(PlainTextCheck.f_GetArray(), mc_pPlainTextCheck, 32) != 0)
+						if (NMem::fg_MemCmp(PlainTextCheck.f_GetArray(), (uint8 const *)mc_pPlainTextCheck, 32) != 0)
 							DMibError("Password mismatch");
 					}
 				}
@@ -71,7 +71,7 @@ namespace NMib::NCloud
 					Stream.f_OpenRead(RawDatabase.f_GetArray(), RawDatabase.f_GetLen());
 					Stream.f_ConsumeBytes(PlainTextCheck, 32);
 					
-					if (NMem::fg_MemCmp(PlainTextCheck, mc_pPlainTextCheck, 32) != 0)
+					if (NMem::fg_MemCmp((uint8 const *)PlainTextCheck, (uint8 const *)mc_pPlainTextCheck, 32) != 0)
 						DMibError("Password mismatch");
 					
 					Stream >> Database;

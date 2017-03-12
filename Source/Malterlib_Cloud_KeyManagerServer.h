@@ -82,7 +82,6 @@ namespace NMib::NCloud
 		CKeyManagerServer(CKeyManagerServerConfig const &_Config);
 		~CKeyManagerServer();
 		
-		void f_Construct() override;
 		NConcurrency::TCContinuation<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
 		
 	protected:

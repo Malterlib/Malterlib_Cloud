@@ -19,8 +19,6 @@ namespace NMib::NCloud::NVersionManager
 		
 		CServer(CDistributedAppState &_AppState);
 		~CServer();
-		void f_Construct() override;
-		TCContinuation<void> f_Destroy() override;
 
 		struct CVersionDownload
 		{
@@ -126,6 +124,8 @@ namespace NMib::NCloud::NVersionManager
 		};
 		
 	private:
+		TCContinuation<void> fp_Destroy() override;
+
 		void fp_Init();
 		void fp_Publish();
 		TCContinuation<void> fp_SetupPermissions();

@@ -107,18 +107,14 @@ namespace
 		CLaunchHelper(CLaunchHelperDependencies const &_Dependencies)
 			: m_Dependencies(_Dependencies)
 		{
+			m_AppInterfaceServer.f_Publish<CDistributedAppInterfaceServer>(m_Dependencies.m_DistributionManager, this, CDistributedAppInterfaceServer::mc_pDefaultNamespace);
 		}
 		
 		~CLaunchHelper()
 		{
 		}
 		
-		void f_Construct() override
-		{
-			m_AppInterfaceServer.f_Publish<CDistributedAppInterfaceServer>(m_Dependencies.m_DistributionManager, this, CDistributedAppInterfaceServer::mc_pDefaultNamespace);
-		}
-		
-		TCContinuation<void> f_Destroy() override
+		TCContinuation<void> fp_Destroy() override
 		{
 			TCActorResultVector<void> Destroys;
 			for (auto &Launch : m_Launches)

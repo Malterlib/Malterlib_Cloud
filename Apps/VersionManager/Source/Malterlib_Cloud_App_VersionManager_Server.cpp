@@ -21,15 +21,11 @@ namespace NMib::NCloud::NVersionManager
 		if (Path.f_Find("/opt/local/bin") < 0)
 			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/opt/local/bin:" + Path);
 #endif
+		fp_Init();
 	}
 	
 	CVersionManagerDaemonActor::CServer::~CServer()
 	{
-	}
-	
-	void CVersionManagerDaemonActor::CServer::f_Construct()
-	{
-		fp_Init();
 	}
 	
 	void CVersionManagerDaemonActor::CServer::fp_Init()
@@ -273,7 +269,7 @@ namespace NMib::NCloud::NVersionManager
 		return Continuation;
 	}
 	
-	TCContinuation<void> CVersionManagerDaemonActor::CServer::f_Destroy()
+	TCContinuation<void> CVersionManagerDaemonActor::CServer::fp_Destroy()
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		if (mp_QueryFileActor)
