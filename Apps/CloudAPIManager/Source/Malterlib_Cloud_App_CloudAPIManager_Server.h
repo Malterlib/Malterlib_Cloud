@@ -21,8 +21,6 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		CServer(CDistributedAppState &_AppState);
 		~CServer();
-		void f_Construct() override;
-		TCContinuation<void> f_Destroy() override;
 
 		struct CCloudAPIManagerImplementation : public CCloudAPIManager
 		{
@@ -69,6 +67,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		};
 		
 	private:
+		TCContinuation<void> fp_Destroy() override;
 		void fp_Init();
 		void fp_Publish();
 		

@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-//Import "../../../../SDK/curl/Curl.MTarget"
+Import "../../../../External/curl/Curl.MTarget"
 
 %Target "Malterlib_Cloud_CloudAPIManager"
 {
@@ -42,12 +42,7 @@
 	{
 		!!CompileDialect "C"
 		
-		SearchPath "@(Builtin.BasePath)/SDK/curl/include;@(Compile.SearchPath)"
-		PreprocessorDefines "CURL_STATICLIB;@(Compile.PreprocessorDefines)"
 		PreprocessorDefines "DMalterlibCurlAvailable;@(Compile.PreprocessorDefines)"
-		{
-			!!Malterlib_CurlAvailable true
-		}
 	}
 	
 	%Group Source
@@ -58,11 +53,7 @@
 	%Dependency "Lib_Malterlib"
 	%Dependency "Lib_Curl"
 	{
-		&
-		{
-			Malterlib_CurlAvailable true
-			!DocumentationEnabled true
-		}
+		!DocumentationEnabled true
 	}
 	%Dependency "Lib_zlib"
 	{

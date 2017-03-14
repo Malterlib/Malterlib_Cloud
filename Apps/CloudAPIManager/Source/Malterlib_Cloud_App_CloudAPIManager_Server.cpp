@@ -21,15 +21,11 @@ namespace NMib::NCloud::NCloudAPIManager
 		if (Path.f_Find("/opt/local/bin") < 0)
 			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/opt/local/bin:" + Path);
 #endif
+		fp_Init();
 	}
 	
 	CCloudAPIManagerDaemonActor::CServer::~CServer()
 	{
-	}
-	
-	void CCloudAPIManagerDaemonActor::CServer::f_Construct()
-	{
-		fp_Init();
 	}
 	
 	void CCloudAPIManagerDaemonActor::CServer::fp_Init()
@@ -135,7 +131,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		return fg_Explicit();
 	}
 	
-	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::f_Destroy()
+	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::fp_Destroy()
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
