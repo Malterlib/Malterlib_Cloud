@@ -1,0 +1,32 @@
+// Copyright © 2015 Hansoft AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+%Target "Malterlib_Cloud_LogAggregator"
+{
+	Property
+	{
+		MalterlibTestApp true
+		MalterlibPostCopyProject "Malterlib_Cloud_LogAggregator"
+		{
+			!!MalterlibPostCopyProject ""
+		}
+		MalterlibLinkWithOpenSSL true
+		MalterlibConcurrency_DistributedActors true
+		MalterlibTargetNameType "Normal"
+		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudLogAggregator"
+		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudLogAggregator"
+	}
+	Target
+	{
+		DebuggerCommandArguments "--daemon-run-debug"
+		BaseFileName "LogAggregator"
+	}
+	%Group Source
+	{
+		%File "Source/*"
+	}
+	%Dependency "Lib_Malterlib_Cloud"
+	%Dependency "Lib_Malterlib"
+}
+
+Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_LogAggregator;@(Malterlib_Cloud_App_Targets)"
