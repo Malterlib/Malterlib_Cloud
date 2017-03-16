@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB
+﻿// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
@@ -151,8 +151,8 @@ namespace NMib::NCloud::NAppManager
 		CStr Package;
 		CStr Platform = pApplication->m_LastInstalledVersion.m_Platform;
 		TCSet<CStr> RequiredTags;
-		CVersionManager::CVersionIDAndPlatform VersionID;
-		CVersionManager::CVersionInformation VersionInfo;
+		CAppManagerInterface::CVersionIDAndPlatform VersionID;
+		CAppManagerInterface::CVersionInformation VersionInfo;
 		if (!_FromFileName.f_IsEmpty())
 			bDownloadVersion = false;
 		else

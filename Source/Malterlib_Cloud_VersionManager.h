@@ -23,7 +23,7 @@ namespace NMib::NCloud
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/VersionManager";
 
-		enum 
+		enum : uint32
 		{
 			EMinProtocolVersion = 0x103
 			, EProtocolVersion = 0x105

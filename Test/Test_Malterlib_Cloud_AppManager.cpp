@@ -223,6 +223,7 @@ class CAppManager_Tests : public NMib::NTest::CTest
 public:
 	void f_DoTests()
 	{
+#ifndef DPlatformFamily_Windows
 		DMibTestSuite("General")
 		{
 			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
@@ -657,6 +658,7 @@ public:
 				DMibExpect(UpdateNotificationState.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], == , nAppManagers);
 			}
 		};
+#endif
 	}
 };
 

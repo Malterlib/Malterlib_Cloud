@@ -189,7 +189,7 @@ namespace NMib::NCloud::NAppManager
 								if (CFile::fs_FileExists(DownloadDirectory))
 									CFile::fs_DeleteDirectoryRecursive(DownloadDirectory);
 							}
-							catch (CExceptionFile const &_Exception)
+							catch (CExceptionFile const &)
 							{
 							}
 						}
@@ -292,7 +292,7 @@ namespace NMib::NCloud::NAppManager
 								if (CFile::fs_FileExists(TemporaryDirectory))
 									CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
 							}
-							catch (CExceptionFile const &_Exception)
+							catch (CExceptionFile const &)
 							{
 							}
 						}

@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB
+﻿// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -460,7 +460,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_SourcePath;
 			TCSharedPointer<CApplicationSettings> m_pNewSettings;
 			TCSet<CStr> m_AllowSourceExist;
-			CVersionManager::CVersionIDAndPlatform m_VersionID;
+			CAppManagerInterface::CVersionIDAndPlatform m_VersionID;
 			CTime m_VersionTime;
 			uint32 m_VersionRetrySequence = 0;
 			TCSet<CStr> m_RequiredTags;

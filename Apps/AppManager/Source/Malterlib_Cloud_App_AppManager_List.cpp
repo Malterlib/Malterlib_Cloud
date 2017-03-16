@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB
+﻿// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
@@ -162,15 +162,15 @@ namespace NMib::NCloud::NAppManager
 			{
 				CDistributedAppCommandLineResults CommandLineResults;
 
-				mint LongestApplication = fg_StrLen("Application");
-				mint LongestVersion = fg_StrLen("Version");
-				mint LongestPlatform = fg_StrLen("Platform");
-				mint LongestConfig = fg_StrLen("Config");
-				mint LongestTime = fg_StrLen("Time");
-				mint LongestSize = fg_StrLen("Size");
-				mint LongestFiles = fg_StrLen("Files");
-				mint LongestTags = fg_StrLen("Tags");
-				mint LongestRetrySequence = fg_StrLen("RetrySequence");
+				smint LongestApplication = fg_StrLen("Application");
+				smint LongestVersion = fg_StrLen("Version");
+				smint LongestPlatform = fg_StrLen("Platform");
+				smint LongestConfig = fg_StrLen("Config");
+				smint LongestTime = fg_StrLen("Time");
+				smint LongestSize = fg_StrLen("Size");
+				smint LongestFiles = fg_StrLen("Files");
+				smint LongestTags = fg_StrLen("Tags");
+				smint LongestRetrySequence = fg_StrLen("RetrySequence");
 				for (auto &Versions : _Results)
 				{
 					LongestApplication = fg_Max(LongestApplication, _Results.fs_GetKey(Versions).f_GetLen());

@@ -18,7 +18,7 @@ namespace NMib::NCloud
 		
 	public:
 		
-		enum 
+		enum : uint32
 		{
 			EMinProtocolVersion = 0x101
 			, EProtocolVersion = 0x101

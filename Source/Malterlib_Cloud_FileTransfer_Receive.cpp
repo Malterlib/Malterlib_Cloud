@@ -99,7 +99,7 @@ namespace NMib::NCloud
 						{
 							CFile::fs_DeleteDirectoryRecursive(RootDirectory);
 						}
-						catch (CExceptionFile const &_Exception)
+						catch (CExceptionFile const &)
 						{
 							if (!CFile::fs_FileExists(RootDirectory))
 								return Manifest;

@@ -196,9 +196,9 @@ public:
 				DMibTestPath("After initial keys pre created");
 				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
 				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
-				DMibExpect(Database.m_AvailableKeys[32].f_GetLen(), ==, 2);
-				AvailableKey = Database.m_AvailableKeys[32].f_GetFirst();
-				NextKey = Database.m_AvailableKeys[32].f_GetLast();
+				DMibExpect(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
+				AvailableKey = Database.m_AvailableKeys[32u].f_GetFirst();
+				NextKey = Database.m_AvailableKeys[32u].f_GetLast();
 			}
 			
 			CStr Subscription = TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
@@ -211,8 +211,8 @@ public:
 				DMibTestPath("After first key popped");
 				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
 				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
-				DMibExpect(Database.m_AvailableKeys[32].f_GetLen(), ==, 1);
-				DMibExpect(Database.m_AvailableKeys[32].f_GetFirst(), ==, AvailableKey);
+				DMibExpect(Database.m_AvailableKeys[32u].f_GetLen(), ==, 1);
+				DMibExpect(Database.m_AvailableKeys[32u].f_GetFirst(), ==, AvailableKey);
 			}
 			
 			KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_CallSync(60.0);
@@ -221,8 +221,8 @@ public:
 				DMibTestPath("After second round of keys generated");
 				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
 				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
-				DMibExpect(Database.m_AvailableKeys[32].f_GetLen(), ==, 2);
-				DMibExpect(Database.m_AvailableKeys[32].f_GetLast(), ==, AvailableKey);
+				DMibExpect(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
+				DMibExpect(Database.m_AvailableKeys[32u].f_GetLast(), ==, AvailableKey);
 			}
 			
 			{
@@ -233,8 +233,8 @@ public:
 				
 				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
 				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
-				DMibExpect(Database.m_AvailableKeys[32].f_GetLen(), ==, 2);
-				DMibExpect(Database.m_AvailableKeys[32].f_GetLast(), ==, AvailableKey);
+				DMibExpect(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
+				DMibExpect(Database.m_AvailableKeys[32u].f_GetLast(), ==, AvailableKey);
 			}
 		};
 	}

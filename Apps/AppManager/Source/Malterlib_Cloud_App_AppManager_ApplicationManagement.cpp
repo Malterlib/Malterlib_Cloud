@@ -255,6 +255,9 @@ namespace NMib::NCloud::NAppManager
 	{
 		if (!_Settings.m_RunAsGroup.f_IsEmpty())
 		{
+#ifdef DPlatformFamily_Windows
+			DError("User management not supported on Windows");
+#else
 			CStr GroupID;
 			if (!NSys::fg_UserManagement_GroupExists(_Settings.m_RunAsGroup, GroupID))
 			{
@@ -262,9 +265,13 @@ namespace NMib::NCloud::NAppManager
 				if (_fLogInfo)
 					_fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", _Settings.m_RunAsGroup, GroupID));
 			}
+#endif
 		}
 		if (!_Settings.m_RunAsUser.f_IsEmpty())
 		{
+#ifdef DPlatformFamily_Windows
+			DError("User management not supported on Windows");
+#else
 			CStr UserID;
 			if (!NSys::fg_UserManagement_UserExists(_Settings.m_RunAsUser, UserID))
 			{
@@ -281,6 +288,7 @@ namespace NMib::NCloud::NAppManager
 				if (_fLogInfo)
 					_fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", _Settings.m_RunAsUser, UserID));
 			}
+#endif
 		}
 	}
 	

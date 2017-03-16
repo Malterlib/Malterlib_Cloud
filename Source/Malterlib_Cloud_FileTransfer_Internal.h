@@ -11,7 +11,7 @@ namespace NMib::NCloud
 {
 	struct CFileTransferContext::CInternal
 	{
-		enum 
+		enum : uint32
 		{
 			EProtocolVersion = 0x101
 		};

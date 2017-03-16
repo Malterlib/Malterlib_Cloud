@@ -14,7 +14,7 @@ namespace NMib::NCloud
 	{
 		using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
 		using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
-		enum 
+		enum : uint32
 		{
 			EMinProtocolVersion = 0x101
 			, EProtocolVersion = 0x101

@@ -25,7 +25,7 @@ namespace NMib::NCloud
 		
 		CCloudAPIManager();
 
-		enum 
+		enum : uint32
 		{
 			EMinProtocolVersion = 0x101
 			, EProtocolVersion = 0x102

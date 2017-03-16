@@ -230,8 +230,6 @@ Compile
 
 Property
 {
-	!PlatformFamily Windows
-
 	MalterlibLibrary_Cloud true
 	{
 		&
@@ -271,7 +269,6 @@ Property
 	&
 	{
 		MalterlibEnableInternalTests true
-		!PlatformFamily Windows
 	}
 	
 	MalterlibTests "Malterlib_Cloud;@(MalterlibTests)"
@@ -285,7 +282,6 @@ Property
 	&
 	{
 		MalterlibEnableInternalWorkspaces true
-		!PlatformFamily Windows
 	}
 	
 	Property.MalterlibPostCopyProject "Malterlib_Cloud"
