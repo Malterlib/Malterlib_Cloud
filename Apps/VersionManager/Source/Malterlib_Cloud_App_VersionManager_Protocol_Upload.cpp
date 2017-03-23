@@ -104,7 +104,7 @@ namespace NMib::NCloud::NVersionManager
 		CStr UploadID = fg_RandomID();
 		
 		auto &Upload = pThis->mp_VersionUploads[UploadID];
-		Upload.m_Desc = fg_Format("{}", _Params.m_VersionIDAndPlatform);
+		Upload.m_Desc = fg_Format("{} - {}", _Params.m_Application, _Params.m_VersionIDAndPlatform);
 		auto pCleanup = fg_OnScopeExitShared
 			(
 				[pThis, UploadID, ThisWeak = fg_ThisActor(pThis).f_Weak(), Desc = Upload.m_Desc, Auditor]
