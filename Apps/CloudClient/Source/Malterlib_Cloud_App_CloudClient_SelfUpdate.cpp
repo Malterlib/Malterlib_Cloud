@@ -37,7 +37,9 @@ namespace NMib::NCloud::NCloudClient
 					SubscriptionParams.m_DispatchActor = self;
 					SubscriptionParams.m_Platforms[DMalterlibCloudPlatform];
 					SubscriptionParams.m_Tags["ClientSelfUpdate"];
-					SubscriptionParams.m_fOnNewVersions = [this, pVersions, Actor = Actor.m_Actor](CVersionManager::CNewVersionNotifications &&_NewVersions) 
+					SubscriptionParams.m_fOnNewVersions 
+						= [this, pVersions, Actor = Actor.m_Actor, AllowDestroy = g_AllowWrongThreadDestroy]
+						(CVersionManager::CNewVersionNotifications &&_NewVersions) 
 						-> NConcurrency::TCContinuation<CVersionManager::CNewVersionNotifications::CResult>
 						{
 							(*pVersions)[Actor].f_Insert(fg_Move(_NewVersions.m_NewVersions)); 
