@@ -92,3 +92,7 @@ namespace NMib::NCloud
 		NPtr::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }
+
+#ifndef DMibPNoShortCuts
+using namespace NMib::NCloud;
+#endif

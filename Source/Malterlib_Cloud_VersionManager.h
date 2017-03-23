@@ -326,3 +326,7 @@ namespace NMib::NCloud
 		NPtr::TCSharedPointer<CVersionManagerHelperInternal> mp_pInternal;
 	};
 }
+
+#ifndef DMibPNoShortCuts
+using namespace NMib::NCloud;
+#endif

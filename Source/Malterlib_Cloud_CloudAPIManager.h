@@ -111,3 +111,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCContinuation<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) = 0;
 	};
 }
+
+#ifndef DMibPNoShortCuts
+using namespace NMib::NCloud;
+#endif

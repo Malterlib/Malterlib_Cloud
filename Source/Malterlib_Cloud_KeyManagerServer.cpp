@@ -20,7 +20,7 @@ namespace NMib::NCloud
 		
 	}
 		
-	void CKeyManagerServer::CInternal::CInternal::f_ReadDatabase(NFunction::TCFunction<void ()> &&_fOnReady, NFunction::TCFunction<void (NStr::CStr const&)> &&_fOnError)
+	void CKeyManagerServer::CInternal::f_ReadDatabase(NFunction::TCFunction<void ()> &&_fOnReady, NFunction::TCFunction<void (NStr::CStr const&)> &&_fOnError)
 	{
 		if (m_pDatabase)
 		{
@@ -53,7 +53,7 @@ namespace NMib::NCloud
 		;
 	}
 	
-	NConcurrency::TCContinuation<void> CKeyManagerServer::CInternal::CInternal::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys)
+	NConcurrency::TCContinuation<void> CKeyManagerServer::CInternal::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys)
 	{
 		NConcurrency::TCContinuation<void> Continuation;
 		
@@ -102,7 +102,7 @@ namespace NMib::NCloud
 		return Continuation;
 	}
 		
-	NConcurrency::TCContinuation<CSymmetricKey> CKeyManagerServer::CInternal::CInternal::f_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize)
+	NConcurrency::TCContinuation<CSymmetricKey> CKeyManagerServer::CInternal::f_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize)
 	{
 		NConcurrency::TCContinuation<CSymmetricKey> Continuation;
 		

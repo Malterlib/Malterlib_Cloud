@@ -30,3 +30,7 @@ namespace NMib::NCloud
 	
 	CCloudVersionInfo fg_ParseVersionInfo(NStr::CStr const &_String);
 }
+
+#ifndef DMibPNoShortCuts
+using namespace NMib::NCloud;
+#endif
