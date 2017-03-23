@@ -1,0 +1,17 @@
+// Copyright © 2015 Hansoft AB 
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+#include "Malterlib_Cloud_BackupManagerClient_Internal.h"
+#include "Malterlib_Cloud_BackupManagerClient_BackupInstance.h"
+
+namespace NMib::NCloud
+{
+	CBackupManagerClient::CInternal::CInternal(CBackupManagerClient *_pThis, CConfig const &_Config, TCActor<CDistributedActorTrustManager> const &_TrustManager)
+		: m_pThis(_pThis)
+		, m_Config(_Config)
+		, m_TrustManager(_TrustManager)
+	{
+	}
+	
+	CBackupManagerClient::CInternal::~CInternal() = default;
+}

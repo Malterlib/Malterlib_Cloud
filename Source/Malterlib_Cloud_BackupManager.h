@@ -5,19 +5,96 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Concurrency/DistributedApp>
+#include <Mib/Cryptography/Hashes/SHA>
+#include <Mib/Encoding/EJSON>
+
 #include "Malterlib_Cloud_FileTransfer.h"
 
 namespace NMib::NCloud
 {
+	enum
+	{
+		EBackupManagerMinProtocolVersion = 0x101
+		, EBackupManagerProtocolVersion = 0x102
+	};
+	
+	struct CBackupManagerBackup : public NConcurrency::CActor
+	{
+		enum 
+		{
+			EMinProtocolVersion = EBackupManagerMinProtocolVersion
+			, EProtocolVersion = EBackupManagerProtocolVersion
+		};
+		
+		enum EManifestSyncFlag /// \brief Flag for how to sync specific files
+		{
+			EManifestSyncFlag_None = 0						///< Normal syncing. In this case the rsync is used for syncing changes
+			, EManifestSyncFlag_Append = DMibBit(0)			///< Append syncing. Any changes are assumed to be append only
+			, EManifestSyncFlag_TransactionLog = DMibBit(1) ///< Should be used together with ESyncFlag_Append. This tells the backup manager to sync writes to disk as quickly as possible.
+		};
+		
+		struct CManifestFile
+		{
+			NStr::CStr const &f_GetFileName() const;
+			
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NDataProcessing::CHashDigest_SHA256 m_Digest;
+			uint64 m_Length = 0;
+			NTime::CTime m_WriteTime;
+			NStr::CStr m_SymlinkData;
+			NFile::EFileAttrib m_Attributes = NFile::EFileAttrib_None;
+			NStr::CStr m_Owner;
+			NStr::CStr m_Group;
+			EManifestSyncFlag m_Flags = EManifestSyncFlag_None;
+		};
+		
+		struct CManifest
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			
+			NContainer::TCMap<NStr::CStr, CManifestFile> m_Files;
+		};
+		
+		struct CStartBackupResult
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			
+			NContainer::TCMap<NStr::CStr, uint64> m_FilesNotUpToDate;
+		};
+		
+		CBackupManagerBackup();
+		
+		static EManifestSyncFlag fs_ParseSyncFlags(NEncoding::CEJSON const &_JSON);
+		static NEncoding::CEJSON fs_GenerateSyncFlags(EManifestSyncFlag _Flags);
+		
+		virtual NConcurrency::TCContinuation<CStartBackupResult> f_StartBackup(CManifest const &_Manifest) = 0;
+		virtual NConcurrency::TCContinuation<void> f_FileChanged(NStr::CStr const &_FileName, CManifestFile const &_Manifest) = 0;
+		virtual NConcurrency::TCContinuation<void> f_FileRemoved(NStr::CStr const &_FileName) = 0;
+
+		virtual NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> f_StartRSync
+			(
+				NStr::CStr const &_FileName
+				, NConcurrency::TCActorFunctorWithID<NConcurrency::TCContinuation<NContainer::CSecureByteVector> (NContainer::CSecureByteVector &&_Packet)> &&_fRunProtocol
+			) = 0
+		;
+		
+		virtual NConcurrency::TCContinuation<void> f_UploadData(NStr::CStr const &_FileName, uint64 _Position, NContainer::CSecureByteVector &&_Data) = 0;
+
+		virtual NConcurrency::TCContinuation<void> f_InitialBackupFinished() = 0;
+	};
+	
 	struct CBackupManager : public NConcurrency::CActor
 	{
-		using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
-		using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/BackupManager";
+		
 		enum : uint32
 		{
-			EMinProtocolVersion = 0x101
-			, EProtocolVersion = 0x101
+			EMinProtocolVersion = EBackupManagerMinProtocolVersion
+			, EProtocolVersion = EBackupManagerProtocolVersion
 		};
 		
 		CBackupManager();
@@ -34,24 +111,25 @@ namespace NMib::NCloud
 			NTime::CTime m_Time;
 			NStr::CStr m_ID;
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 		};
 		
+		// Deprecated - Start
 		struct CStartBackup
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 
 				NStr::CStr m_FriendlyName;
 				uint64 m_BackupSize;
 				uint64 m_OplogSize;
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 			
 			CBackupKey m_BackupKey;
 		};
@@ -60,8 +138,8 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 
 				uint32 m_Version = 0;
 			};
@@ -72,51 +150,53 @@ namespace NMib::NCloud
 				, EFlag_Finished = DMibBit(0)
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 
 			CBackupKey m_BackupKey;
 			NStr::CStr m_File;
 			uint64 m_Position;
 			uint64 m_Size;
 			EFlag m_Flags = EFlag_None;
-			NContainer::TCVector<uint8, NMem::CAllocator_HeapSecure> m_Data;
+			NContainer::CSecureByteVector m_Data;
 		};
 		
 		struct CStopBackup
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 			
 			CBackupKey m_BackupKey;
 		};
+		// Deprecated - End
 		
 		struct CListBackupSources
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 				
 				NContainer::TCVector<NStr::CStr> m_BackupSources;
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 		};
 
 		struct CListBackups
 		{
 			struct CBackup
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
+				
 				void f_Format(NStr::CStrAggregate &o_Str) const;
 				
 				NTime::CTime m_Time;
@@ -126,15 +206,16 @@ namespace NMib::NCloud
 			
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) const;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
+				
 				void f_Format(NStr::CStrAggregate &o_Str) const;
 				
 				NContainer::TCMap<NStr::CStr, NContainer::TCVector<CBackup>> m_Backups;
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 
 			NStr::CStr m_ForBackupSource;
 		};
@@ -143,14 +224,15 @@ namespace NMib::NCloud
 		{
 			struct CResult
 			{
-				void f_Feed(CDistributedActorWriteStream &_Stream) &&;
-				void f_Consume(CDistributedActorReadStream &_Stream);
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
 				
 				NConcurrency::CActorSubscription m_Subscription;
 			};
 
-			void f_Feed(CDistributedActorWriteStream &_Stream) const;
-			void f_Consume(CDistributedActorReadStream &_Stream);
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			
 			NStr::CStr f_GetDesc() const;
 			
 			NStr::CStr m_BackupSource;
@@ -159,11 +241,22 @@ namespace NMib::NCloud
 			CFileTransferContext m_TransferContext;
 		};
 		
-		virtual NConcurrency::TCContinuation<CStartBackup::CResult> f_StartBackup(CStartBackup &&_Params) = 0;
-		virtual NConcurrency::TCContinuation<CStopBackup::CResult> f_StopBackup(CStopBackup &&_Params) = 0; // When we have notification support over remote actors, use that instead
-		virtual NConcurrency::TCContinuation<CUploadData::CResult> f_UploadData(CUploadData &&_Params) = 0;
+		// Deprecated - Start
+		virtual NConcurrency::TCContinuation<CStartBackup::CResult> f_StartBackup(CStartBackup &&_Params);
+		virtual NConcurrency::TCContinuation<CStopBackup::CResult> f_StopBackup(CStopBackup &&_Params);
+		virtual NConcurrency::TCContinuation<CUploadData::CResult> f_UploadData(CUploadData &&_Params);
+		// Deprecated - End
+
+		virtual auto f_InitBackup(CBackupKey const &_BackupKey, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
+			-> NConcurrency::TCContinuation<NConcurrency::TCDistributedActorInterfaceWithID<CBackupManagerBackup>> = 0
+		;
+		
 		virtual NConcurrency::TCContinuation<CListBackupSources::CResult> f_ListBackupSources(CListBackupSources &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CListBackups::CResult> f_ListBackups(CListBackups &&_Params) = 0;
 		virtual NConcurrency::TCContinuation<CStartDownloadBackup::CResult> f_StartDownloadBackup(CStartDownloadBackup &&_Params) = 0;
 	};
 }
+
+#ifndef DMibPNoShortCuts
+using namespace NMib::NCloud;
+#endif

@@ -4,3 +4,14 @@
 /**	\namespace NMib::NCloud
 	\brief Cloud namespace
  */
+
+/**
+
+\page p_Malterlib Modules
+- \subpage p_Malterlib_Cloud
+
+\page p_Malterlib_Cloud Cloud
+
+\ref NMib::NCloud "NCloud" namespace
+
+*/

@@ -1,0 +1,13 @@
+// Copyright © 2015 Hansoft AB 
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+/**
+ \struct NMib::NCloud::CBackupManagerClient
+
+ \headerfile Mib/Cloud/BackupManagerClient
+ 
+ This implementations subscribes to file system notifications and automatically updates the backup with the file changes.
+ 
+ Currently the backup manager does not keep a history of file changes, so you should set \ref CConfig::m_NewBackupInterval to a reasobale 
+ value. This allows you to restore to old versions of backups on that basis.
+*/

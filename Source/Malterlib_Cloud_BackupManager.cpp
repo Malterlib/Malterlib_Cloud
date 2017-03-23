@@ -7,14 +7,103 @@
 
 namespace NMib::NCloud
 {
+	CBackupManagerBackup::CBackupManagerBackup()
+	{
+		DMibPublishActorFunction(CBackupManagerBackup::f_StartBackup);
+		DMibPublishActorFunction(CBackupManagerBackup::f_StartRSync);
+		DMibPublishActorFunction(CBackupManagerBackup::f_FileChanged);
+		DMibPublishActorFunction(CBackupManagerBackup::f_FileRemoved);
+		DMibPublishActorFunction(CBackupManagerBackup::f_UploadData);
+		DMibPublishActorFunction(CBackupManagerBackup::f_InitialBackupFinished);
+	}
+	
+	auto CBackupManagerBackup::fs_ParseSyncFlags(NEncoding::CEJSON const &_JSON) -> EManifestSyncFlag 
+	{
+		EManifestSyncFlag Flags = EManifestSyncFlag_None;
+		
+		for (auto &Flag : _JSON.f_Array())
+		{
+			if (Flag.f_String() == "Append")
+				Flags |= EManifestSyncFlag_Append; 
+			else if (Flag.f_String() == "TransactionLog")
+				Flags |= EManifestSyncFlag_TransactionLog;
+			else
+				DMibError(NStr::fg_Format("Unknown sync flag: {}", Flag.f_String()));
+		}
+		
+		return Flags;
+	}
+	
+	NEncoding::CEJSON CBackupManagerBackup::fs_GenerateSyncFlags(EManifestSyncFlag _Flags)
+	{
+		NEncoding::CEJSON Json;
+		Json.f_Array();
+		
+		if (_Flags & EManifestSyncFlag_Append)
+			Json.f_Insert("Append");
+		if (_Flags & EManifestSyncFlag_TransactionLog)
+			Json.f_Insert("TransactionLog");
+		
+		return Json;
+	}
+	
+	NStr::CStr const &CBackupManagerBackup::CManifestFile::f_GetFileName() const
+	{
+		return NContainer::TCMap<NStr::CStr, CManifestFile>::fs_GetKey(*this);
+	}
+	
+	template <typename tf_CStream>
+	void CBackupManagerBackup::CManifestFile::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Digest;
+		_Stream % m_Length;
+		_Stream % m_WriteTime;
+		_Stream % m_SymlinkData;
+		_Stream % m_Attributes;
+		_Stream % m_Owner;
+		_Stream % m_Group;
+		_Stream % m_Flags;
+	}
+	DMibDistributedStreamImplement(CBackupManagerBackup::CManifestFile);
+	
+	template <typename tf_CStream>
+	void CBackupManagerBackup::CManifest::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Files;
+	}
+	DMibDistributedStreamImplement(CBackupManagerBackup::CManifest);
+	
+	template <typename tf_CStream>
+	void CBackupManagerBackup::CStartBackupResult::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_FilesNotUpToDate;
+	}
+	DMibDistributedStreamImplement(CBackupManagerBackup::CStartBackupResult);
+		
 	CBackupManager::CBackupManager()
 	{
 		DMibPublishActorFunction(CBackupManager::f_StartBackup);
 		DMibPublishActorFunction(CBackupManager::f_StopBackup);
 		DMibPublishActorFunction(CBackupManager::f_UploadData);
+		DMibPublishActorFunction(CBackupManager::f_InitBackup);
 		DMibPublishActorFunction(CBackupManager::f_ListBackupSources);
 		DMibPublishActorFunction(CBackupManager::f_ListBackups);
 		DMibPublishActorFunction(CBackupManager::f_StartDownloadBackup);
+	}
+	
+	auto CBackupManager::f_StartBackup(CStartBackup &&_Params) -> NConcurrency::TCContinuation<CStartBackup::CResult> 
+	{
+		return DMibErrorInstance("Deprecated");
+	}
+	
+	auto CBackupManager::f_StopBackup(CStopBackup &&_Params) -> NConcurrency::TCContinuation<CStopBackup::CResult> 
+	{
+		return DMibErrorInstance("Deprecated");
+	}
+	
+	auto CBackupManager::f_UploadData(CUploadData &&_Params) -> NConcurrency::TCContinuation<CUploadData::CResult> 
+	{
+		return DMibErrorInstance("Deprecated");
 	}
 	
 	bool CBackupManager::fs_IsValidHostname(NStr::CStr const &_String)
@@ -27,9 +116,13 @@ namespace NMib::NCloud
 		NStr::CStr FriendlyName;
 		NStr::CStr HostID;
 		aint nParsed = 0;
-		aint nCharsParsed = (NStr::CStr::CParse("{} - {}") >> FriendlyName >> HostID).f_Parse(_String, nParsed);
+		aint nCharsParsed = (NStr::CStr::CParse("{}_{}") >> FriendlyName >> HostID).f_Parse(_String, nParsed);
 		if (nCharsParsed != _String.f_GetLen() || nParsed != 2)
-			return false;
+		{
+			nCharsParsed = (NStr::CStr::CParse("{} - {}") >> FriendlyName >> HostID).f_Parse(_String, nParsed);
+			if (nCharsParsed != _String.f_GetLen() || nParsed != 2)
+				return false;
+		}
 		if (!fs_IsValidHostname(FriendlyName))
 			return false;
 		if (!fs_IsValidHostname(HostID))
@@ -60,9 +153,13 @@ namespace NMib::NCloud
 		NStr::CStr Millisecond;
 		NStr::CStr BackupID;
 		aint nParsed = 0;
-		aint nCharsParsed = (NStr::CStr::CParse("{}-{}-{} {}.{}.{}.{} - {}") >> Year >> Month >> Day >> Hour >> Minute >> Second >> Millisecond >> BackupID).f_Parse(_String, nParsed);
+		aint nCharsParsed = (NStr::CStr::CParse("{}-{}-{}_{}.{}.{}.{}_{}") >> Year >> Month >> Day >> Hour >> Minute >> Second >> Millisecond >> BackupID).f_Parse(_String, nParsed);
 		if (nCharsParsed != _String.f_GetLen() || nParsed != 8)
-			return false;
+		{
+			nCharsParsed = (NStr::CStr::CParse("{}-{}-{} {}.{}.{}.{} - {}") >> Year >> Month >> Day >> Hour >> Minute >> Second >> Millisecond >> BackupID).f_Parse(_String, nParsed);
+			if (nCharsParsed != _String.f_GetLen() || nParsed != 8)
+				return false;
+		}
 		if 
 			(
 				!Year.f_IsNumeric() 
@@ -103,129 +200,90 @@ namespace NMib::NCloud
 		return _Version >= EMinProtocolVersion && _Version <= EProtocolVersion;
 	}
 	
-	void CBackupManager::CBackupKey::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CBackupKey::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream << m_FriendlyName;
-		_Stream << m_Time;
-		_Stream << m_ID;
+		_Stream % m_FriendlyName;
+		_Stream % m_Time;
+		_Stream % m_ID;
 	}
-	void CBackupManager::CBackupKey::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_FriendlyName;
-		_Stream >> m_Time;
-		_Stream >> m_ID;
-	}
+	DMibDistributedStreamImplement(CBackupManager::CBackupKey);
 	
 	// CStartBackup
 	
-	void CBackupManager::CStartBackup::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CStartBackup::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_FriendlyName;
-		_Stream << m_BackupSize;
-		_Stream << m_OplogSize;
+		_Stream % m_FriendlyName;
+		_Stream % m_BackupSize;
+		_Stream % m_OplogSize;
 	}
-	
-	void CBackupManager::CStartBackup::CResult::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_FriendlyName;
-		_Stream >> m_BackupSize;
-		_Stream >> m_OplogSize;
-	}
+	DMibDistributedStreamImplement(CBackupManager::CStartBackup::CResult);
 
-	void CBackupManager::CStartBackup::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CStartBackup::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_BackupKey;
+		_Stream % m_BackupKey;
 	}
-	
-	void CBackupManager::CStartBackup::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_BackupKey;
-	}
+	DMibDistributedStreamImplement(CBackupManager::CStartBackup);
 
 	// CStopBackup
 	
-	void CBackupManager::CStopBackup::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CStopBackup::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
-	
-	void CBackupManager::CStopBackup::CResult::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-	}
+	DMibDistributedStreamImplement(CBackupManager::CStopBackup::CResult);
 
-	void CBackupManager::CStopBackup::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CStopBackup::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_BackupKey;
+		_Stream % m_BackupKey;
 	}
-	
-	void CBackupManager::CStopBackup::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_BackupKey;
-	}
+	DMibDistributedStreamImplement(CBackupManager::CStopBackup);
 
 	// CUploadData
 	
-	void CBackupManager::CUploadData::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CUploadData::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
-	
-	void CBackupManager::CUploadData::CResult::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-	}
+	DMibDistributedStreamImplement(CBackupManager::CUploadData::CResult);
 
-	void CBackupManager::CUploadData::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CUploadData::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_BackupKey;
-		_Stream << m_File;
-		_Stream << m_Position;
-		_Stream << m_Size;
-		_Stream << m_Flags;
-		_Stream << m_Data;
+		_Stream % m_BackupKey;
+		_Stream % m_File;
+		_Stream % m_Position;
+		_Stream % m_Size;
+		_Stream % m_Flags;
+		_Stream % m_Data;
 	}
+	DMibDistributedStreamImplement(CBackupManager::CUploadData);
 	
-	void CBackupManager::CUploadData::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_BackupKey;
-		_Stream >> m_File;
-		_Stream >> m_Position;
-		_Stream >> m_Size;
-		_Stream >> m_Flags;
-		_Stream >> m_Data;
-	}
-
 	// CListBackupSources
 	
-	void CBackupManager::CListBackupSources::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CListBackupSources::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_BackupSources;
+		_Stream % m_BackupSources;
 	}
-	void CBackupManager::CListBackupSources::CResult::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_BackupSources;
-	}
+	DMibDistributedStreamImplement(CBackupManager::CListBackupSources::CResult);
 	
-	void CBackupManager::CListBackupSources::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CListBackupSources::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
-	
-	void CBackupManager::CListBackupSources::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-	}
+	DMibDistributedStreamImplement(CBackupManager::CListBackupSources);
 
 	// CListBackups
 	
@@ -236,70 +294,51 @@ namespace NMib::NCloud
 
 	void CBackupManager::CListBackups::CBackup::f_Format(NStr::CStrAggregate &o_Str) const
 	{
-		o_Str += NStr::CStr::CFormat("{tst.} - {}") << m_Time << m_BackupID;
+		o_Str += NStr::CStr::CFormat("{tst.,tsb_}_{}") << m_Time << m_BackupID;
 	}
 
-	void CBackupManager::CListBackups::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CListBackups::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_Backups;
+		_Stream % m_Backups;
 	}
-	
-	void CBackupManager::CListBackups::CResult::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_Backups;
-	}
+	DMibDistributedStreamImplement(CBackupManager::CListBackups::CResult);
 
-	void CBackupManager::CListBackups::CBackup::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CListBackups::CBackup::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream << m_Time;
-		_Stream << m_BackupID;
+		_Stream % m_Time;
+		_Stream % m_BackupID;
 	}
+	DMibDistributedStreamImplement(CBackupManager::CListBackups::CBackup);
 	
-	void CBackupManager::CListBackups::CBackup::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		_Stream >> m_Time;
-		_Stream >> m_BackupID;
-	}
-	
-	void CBackupManager::CListBackups::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CListBackups::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_ForBackupSource;
+		_Stream % m_ForBackupSource;
 	}
-	
-	void CBackupManager::CListBackups::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_ForBackupSource;
-	}
+	DMibDistributedStreamImplement(CBackupManager::CListBackups);
 	
 	// CStartDownloadBackup
 
-	void CBackupManager::CStartDownloadBackup::f_Feed(CDistributedActorWriteStream &_Stream) const
+	template <typename tf_CStream>
+	void CBackupManager::CStartDownloadBackup::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << m_BackupSource;
-		_Stream << m_Time;
-		_Stream << m_BackupID;
-		_Stream << m_TransferContext;
+		_Stream % m_BackupSource;
+		_Stream % m_Time;
+		_Stream % m_BackupID;
+		_Stream % m_TransferContext;
 	}
-	
-	void CBackupManager::CStartDownloadBackup::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_BackupSource;
-		_Stream >> m_Time;
-		_Stream >> m_BackupID;
-		_Stream >> m_TransferContext;
-	}
+	DMibDistributedStreamImplement(CBackupManager::CStartDownloadBackup);
 	
 	NStr::CStr CBackupManager::CStartDownloadBackup::f_GetDesc() const
 	{
 		return fg_Format
 			(
-				"{}/{tst.} - {}"
+				"{}/{tst.,tsb_}_{}"
 				, m_BackupSource
 				, m_Time
 				, m_BackupID
@@ -307,15 +346,11 @@ namespace NMib::NCloud
 		;
 	}
 	
-	void CBackupManager::CStartDownloadBackup::CResult::f_Feed(CDistributedActorWriteStream &_Stream) &&
+	template <typename tf_CStream>
+	void CBackupManager::CStartDownloadBackup::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream << fg_Move(m_Subscription);
+		_Stream % fg_Move(m_Subscription);
 	}
-	
-	void CBackupManager::CStartDownloadBackup::CResult::f_Consume(CDistributedActorReadStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream >> m_Subscription;
-	}
+	DMibDistributedStreamImplement(CBackupManager::CStartDownloadBackup::CResult);
 }
