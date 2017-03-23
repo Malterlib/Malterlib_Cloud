@@ -308,7 +308,7 @@ namespace NMib::NCloud::NCloudClient
 				else if (BackupID == "Latest")
 					BasePath = fg_Format("{}/{}/Latest", CFile::fs_GetProgramDirectory(), BackupSource);
 				else
-					BasePath = fg_Format("{}/{}/{tst.} - {}", CFile::fs_GetProgramDirectory(), BackupSource, BackupTime, BackupID);
+					BasePath = fg_Format("{}/{}/{tst.,tsb_}_{}", CFile::fs_GetProgramDirectory(), BackupSource, BackupTime, BackupID);
 				
 				mp_DownloadBackupReceive = fg_ConstructActor<CFileTransferReceive>(BasePath); 
 
