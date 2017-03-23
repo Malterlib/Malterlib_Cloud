@@ -15,6 +15,7 @@
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudVersionManager"
 		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudVersionManager"
+		MalterlibCloudVersionInfo_Backup_IncludeWildcards "Applications/^*;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
 	}
 	Target
 	{
