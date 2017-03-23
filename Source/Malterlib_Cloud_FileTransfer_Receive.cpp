@@ -139,7 +139,7 @@ namespace NMib::NCloud
 				StartDownload.m_QueueSize = _QueueSize;
 				StartDownload.m_DispatchActor = ThisActor; 
 				
-				StartDownload.m_fStateChange = [this](CFileTransferContext::CInternal::CStateChange &&_StateChange) mutable 
+				StartDownload.m_fStateChange = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CStateChange &&_StateChange) mutable 
 					-> NConcurrency::TCContinuation<CFileTransferContext::CInternal::CStateChange::CResult>  
 					{
 						CFileTransferContext::CInternal::CStateChange::CResult Result = _StateChange.f_GetResult();
@@ -156,7 +156,7 @@ namespace NMib::NCloud
 					}
 				;
 				
-				StartDownload.m_fSendPart = [this](CFileTransferContext::CInternal::CSendPart &&_Part) mutable
+				StartDownload.m_fSendPart = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CSendPart &&_Part) mutable
 					-> NConcurrency::TCContinuation<CFileTransferContext::CInternal::CSendPart::CResult>
 					{
 						auto &Internal = *mp_pInternal;
