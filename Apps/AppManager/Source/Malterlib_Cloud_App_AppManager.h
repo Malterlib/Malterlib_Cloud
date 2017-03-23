@@ -12,6 +12,7 @@
 #include <Mib/Concurrency/DistributedAppInterface>
 #include <Mib/Concurrency/DistributedAppInterfaceLaunch>
 #include <Mib/Cloud/AppManager>
+#include <Mib/Cloud/BackupManagerClient>
 
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
 
@@ -66,7 +67,13 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_DistributedApp = DBit(16)
 			, EApplicationSetting_Dependencies = DBit(17)
 			, EApplicationSetting_StopOnDependencyFailure = DBit(18)
-			
+			, EApplicationSetting_BackupIncludeWildcards = DBit(19)
+			, EApplicationSetting_BackupExcludeWildcards = DBit(20)
+			, EApplicationSetting_BackupAddSyncFlagsWildcards = DBit(21)
+			, EApplicationSetting_BackupRemoveSyncFlagsWildcards = DBit(22)
+			, EApplicationSetting_BackupNewBackupInterval = DBit(23)
+			, EApplicationSetting_BackupEnabled = DBit(24)
+
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
 			| EApplicationSetting_ExecutableParameters 
@@ -98,6 +105,12 @@ namespace NMib::NCloud::NAppManager
 			TCVector<CStr> m_ExecutableParameters;
 			bool m_bDistributedApp = false;
 			
+			NContainer::TCSet<NStr::CStr> m_Backup_IncludeWildcards;
+			NContainer::TCSet<NStr::CStr> m_Backup_ExcludeWildcards;
+			NContainer::TCMap<NStr::CStr, CBackupManagerBackup::EManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
+			NContainer::TCMap<NStr::CStr, CBackupManagerBackup::EManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
+			NTime::CTimeSpan m_Backup_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);
+			
 			// Settings that can be updated by app manager (command line or protocol)
 			TCSet<CStr> m_Dependencies;
 			CStr m_VersionManagerApplication;
@@ -108,6 +121,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bAutoUpdate = false;
 			bool m_bSelfUpdateSource = false;
 			bool m_bStopOnDependencyFailure = true;
+			bool m_bBackupEnabled = false;
 			
 			bool f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
 			void f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source);
@@ -204,6 +218,8 @@ namespace NMib::NCloud::NAppManager
 			DLinkDS_List(CApplication, m_ChildrenLink) m_Children;
 			
 			CAppManagerActor *m_pThis;
+			
+			TCActor<CBackupManagerClient> m_BackupClient;
 		};
 		
 		struct CBashScriptOutput
@@ -723,6 +739,8 @@ namespace NMib::NCloud::NAppManager
 		
 		void fp_InitialStartupFailed(CExceptionPointer const &_pException);
 		TCContinuation<void> fp_ClearPreventLaunch(TCSharedPointer<CApplication> const &_pApplication);
+		
+		void fp_ApplicationStartBackup(TCSharedPointer<CApplication> const &_pApplication);
 
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
 		TCActor<CSeparateThreadActor> mp_FileActor;

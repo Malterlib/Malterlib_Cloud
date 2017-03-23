@@ -198,42 +198,68 @@ namespace NMib::NCloud::NAppManager
 			for (auto &Branch : Settings.m_AutoUpdateBranches)
 				Array.f_Insert(Branch);
 		}
-		auto &UpdateScripts = ApplicationJSON["UpdateScripts"];
-		UpdateScripts.f_Object();
-		UpdateScripts["PreUpdate"] = Settings.m_UpdateScripts.m_PreUpdate; 
-		UpdateScripts["PostUpdate"] = Settings.m_UpdateScripts.m_PostUpdate; 
-		UpdateScripts["PostLaunch"] = Settings.m_UpdateScripts.m_PostLaunch; 
-		UpdateScripts["OnError"] = Settings.m_UpdateScripts.m_OnError;
+		{
+			auto &UpdateScripts = ApplicationJSON["UpdateScripts"] = CEJSON();
+			UpdateScripts.f_Object();
+			UpdateScripts["PreUpdate"] = Settings.m_UpdateScripts.m_PreUpdate; 
+			UpdateScripts["PostUpdate"] = Settings.m_UpdateScripts.m_PostUpdate; 
+			UpdateScripts["PostLaunch"] = Settings.m_UpdateScripts.m_PostLaunch; 
+			UpdateScripts["OnError"] = Settings.m_UpdateScripts.m_OnError;
+		}
 		
-		ApplicationJSON["SelfUpdateSource"] = Settings.m_bSelfUpdateSource; 
+		ApplicationJSON["SelfUpdateSource"] = Settings.m_bSelfUpdateSource;
 		ApplicationJSON["Files"] = Application.m_Files;
-		
+
 		ApplicationJSON["AssociatedHostID"] = Application.m_AssociatedHostID;
 		ApplicationJSON["UpdateGroup"] = Settings.m_UpdateGroup;
 
 		{
-			auto &RegisterInfo = ApplicationJSON["RegisterInfo"];
+			auto &BackupJSON = ApplicationJSON["Backup"] = CEJSON();
+			BackupJSON.f_Object();
+			{
+				auto &JSON = BackupJSON["IncludeWildcards"];
+				JSON.f_Array().f_Clear();
+				for (auto &Wildcard : Settings.m_Backup_IncludeWildcards)
+					JSON.f_Insert(Wildcard);
+			}
+			{
+				auto &JSON = BackupJSON["ExcludeWildcards"];
+				JSON.f_Array().f_Clear();
+				for (auto &Wildcard : Settings.m_Backup_ExcludeWildcards)
+					JSON.f_Insert(Wildcard);
+			}
+			{
+				auto &JSON = BackupJSON["AddSyncFlagsWildcards"] = CEJSON();
+				JSON.f_Object();
+				for (auto &Flags : Settings.m_Backup_AddSyncFlagsWildcards)
+					JSON[Settings.m_Backup_AddSyncFlagsWildcards.fs_GetKey(Flags)] = CBackupManagerBackup::fs_GenerateSyncFlags(Flags);
+			}
+			{
+				auto &JSON = BackupJSON["RemoveSyncFlagsWildcards"] = CEJSON();
+				JSON.f_Object();
+				for (auto &Flags : Settings.m_Backup_RemoveSyncFlagsWildcards)
+					JSON[Settings.m_Backup_RemoveSyncFlagsWildcards.fs_GetKey(Flags)] = CBackupManagerBackup::fs_GenerateSyncFlags(Flags);
+			}
+			BackupJSON["NewBackupIntervalHours"] = CTimeSpanConvert(Settings.m_Backup_NewBackupInterval).f_GetHoursFloat();
+			BackupJSON["Enabled"] = Settings.m_bBackupEnabled;
+		}
+
+		{
+			auto &RegisterInfo = ApplicationJSON["RegisterInfo"] = CEJSON();
+			RegisterInfo.f_Object();
 			RegisterInfo["UpdateType"] = Application.m_RegisterInfo.m_UpdateType;
 			
 			if (Application.m_RegisterInfo.m_Resources_Files)
 				RegisterInfo["ResourcesFiles"] = *Application.m_RegisterInfo.m_Resources_Files;
-			else
-				RegisterInfo.f_RemoveMember("ResourcesFiles");
 			
 			if (Application.m_RegisterInfo.m_Resources_FilesPerProcess)
 				RegisterInfo["ResourcesFilesPerProcess"] = *Application.m_RegisterInfo.m_Resources_FilesPerProcess;
-			else
-				RegisterInfo.f_RemoveMember("ResourcesFilesPerProcess");
 			
 			if (Application.m_RegisterInfo.m_Resources_Threads)
 				RegisterInfo["ResourcesThreads"] = *Application.m_RegisterInfo.m_Resources_Threads;
-			else
-				RegisterInfo.f_RemoveMember("ResourcesThreads");
 			
 			if (Application.m_RegisterInfo.m_Resources_Processes)
 				RegisterInfo["ResourcesProcesses"] = *Application.m_RegisterInfo.m_Resources_Processes;
-			else
-				RegisterInfo.f_RemoveMember("ResourcesProcesses");
 		}
 		{
 			auto &Array = ApplicationJSON["Dependencies"].f_Array();
@@ -244,8 +270,8 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["StopOnDependencyFailure"] = Settings.m_bStopOnDependencyFailure;
 		
 		ApplicationJSON["PreventLaunchUser"] = Application.m_bPreventLaunch_User; 
-		ApplicationJSON["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update; 
-	
+		ApplicationJSON["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update;
+		
 		TCContinuation<void> Continuation;
 		mp_State.m_StateDatabase.f_Save() > Continuation;
 		return Continuation;

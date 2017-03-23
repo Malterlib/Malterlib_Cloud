@@ -95,6 +95,50 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 			m_RunAsGroup = pValue->f_String();
 		}
+		
+		if (auto *pValue = _Params.f_GetMember("BackupIncludeWildcards"))
+		{
+			o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
+			m_Backup_IncludeWildcards.f_Clear();
+			for (auto &Wildcard : pValue->f_Array())
+				m_Backup_IncludeWildcards[Wildcard.f_String()];
+		}
+
+		if (auto *pValue = _Params.f_GetMember("BackupExcludeWildcards"))
+		{
+			o_ChangedSettings |= EApplicationSetting_BackupExcludeWildcards;
+			m_Backup_ExcludeWildcards.f_Clear();
+			for (auto &Wildcard : pValue->f_Array())
+				m_Backup_ExcludeWildcards[Wildcard.f_String()];
+		}
+
+		if (auto *pValue = _Params.f_GetMember("BackupAddSyncFlagsWildcards"))
+		{
+			o_ChangedSettings |= EApplicationSetting_BackupAddSyncFlagsWildcards;
+			m_Backup_AddSyncFlagsWildcards.f_Clear();
+			for (auto &Wildcard : pValue->f_Object())
+				m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+		}
+
+		if (auto *pValue = _Params.f_GetMember("BackupRemoveSyncFlagsWildcards"))
+		{
+			o_ChangedSettings |= EApplicationSetting_BackupRemoveSyncFlagsWildcards;
+			m_Backup_RemoveSyncFlagsWildcards.f_Clear();
+			for (auto &Wildcard : pValue->f_Object())
+				m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+		}
+		
+		if (auto *pValue = _Params.f_GetMember("BackupNewBackupIntervalHours"))
+		{
+			o_ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
+			m_Backup_NewBackupInterval = CTimeSpanConvert::fs_CreateSpanFromHours(pValue->f_Float());
+		}
+
+		if (auto *pValue = _Params.f_GetMember("BackupEnabled"))
+		{
+			o_ChangedSettings |= EApplicationSetting_BackupEnabled;
+			m_bBackupEnabled = pValue->f_Boolean();
+		}
 
 		if (auto *pValue = _Params.f_GetMember("DistributedApp"))
 		{
@@ -181,6 +225,20 @@ namespace NMib::NCloud::NAppManager
 			m_RunAsUser = _Source.m_RunAsUser;
 		if (_ChangedSettings & EApplicationSetting_RunAsGroup)
 			m_RunAsGroup = _Source.m_RunAsGroup;
+
+		if (_ChangedSettings & EApplicationSetting_BackupIncludeWildcards)
+			m_Backup_IncludeWildcards = _Source.m_Backup_IncludeWildcards;
+		if (_ChangedSettings & EApplicationSetting_BackupExcludeWildcards)
+			m_Backup_ExcludeWildcards = _Source.m_Backup_ExcludeWildcards;
+		if (_ChangedSettings & EApplicationSetting_BackupAddSyncFlagsWildcards)
+			m_Backup_AddSyncFlagsWildcards = _Source.m_Backup_AddSyncFlagsWildcards;
+		if (_ChangedSettings & EApplicationSetting_BackupRemoveSyncFlagsWildcards)
+			m_Backup_RemoveSyncFlagsWildcards = _Source.m_Backup_RemoveSyncFlagsWildcards;
+		if (_ChangedSettings & EApplicationSetting_BackupNewBackupInterval)
+			m_Backup_NewBackupInterval = _Source.m_Backup_NewBackupInterval;
+		if (_ChangedSettings & EApplicationSetting_BackupEnabled)
+			m_bBackupEnabled = _Source.m_bBackupEnabled;
+
 		if (_ChangedSettings & EApplicationSetting_DistributedApp)
 			m_bDistributedApp = _Source.m_bDistributedApp;
 		if (_ChangedSettings & EApplicationSetting_VersionManagerApplication)
@@ -265,6 +323,20 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_RunAsUser;
 		if (m_RunAsGroup != _Other.m_RunAsGroup)
 			ChangedSettings |= EApplicationSetting_RunAsGroup;
+			
+		if (m_Backup_IncludeWildcards != _Other.m_Backup_IncludeWildcards)
+			ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
+		if (m_Backup_ExcludeWildcards != _Other.m_Backup_ExcludeWildcards)
+			ChangedSettings |= EApplicationSetting_BackupExcludeWildcards;
+		if (m_Backup_AddSyncFlagsWildcards != _Other.m_Backup_AddSyncFlagsWildcards)
+			ChangedSettings |= EApplicationSetting_BackupAddSyncFlagsWildcards;
+		if (m_Backup_RemoveSyncFlagsWildcards != _Other.m_Backup_RemoveSyncFlagsWildcards)
+			ChangedSettings |= EApplicationSetting_BackupRemoveSyncFlagsWildcards;
+		if (m_Backup_NewBackupInterval != _Other.m_Backup_NewBackupInterval)
+			ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
+		if (m_bBackupEnabled != _Other.m_bBackupEnabled)
+			ChangedSettings |= EApplicationSetting_BackupEnabled;
+			
 		if (m_bDistributedApp != _Other.m_bDistributedApp)
 			ChangedSettings |= EApplicationSetting_DistributedApp;
 		if (m_VersionManagerApplication != _Other.m_VersionManagerApplication)
@@ -347,6 +419,39 @@ namespace NMib::NCloud::NAppManager
 			m_RunAsGroup = *_Settings.m_RunAsGroup; 
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 		}
+		
+
+		if (_Settings.m_Backup_IncludeWildcards)
+		{
+			m_Backup_IncludeWildcards = *_Settings.m_Backup_IncludeWildcards; 
+			o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
+		}
+		if (_Settings.m_Backup_ExcludeWildcards)
+		{
+			m_Backup_ExcludeWildcards = *_Settings.m_Backup_ExcludeWildcards; 
+			o_ChangedSettings |= EApplicationSetting_BackupExcludeWildcards;
+		}
+		if (_Settings.m_Backup_AddSyncFlagsWildcards)
+		{
+			m_Backup_AddSyncFlagsWildcards = *_Settings.m_Backup_AddSyncFlagsWildcards; 
+			o_ChangedSettings |= EApplicationSetting_BackupAddSyncFlagsWildcards;
+		}
+		if (_Settings.m_Backup_RemoveSyncFlagsWildcards)
+		{
+			m_Backup_RemoveSyncFlagsWildcards = *_Settings.m_Backup_RemoveSyncFlagsWildcards; 
+			o_ChangedSettings |= EApplicationSetting_BackupRemoveSyncFlagsWildcards;
+		}
+		if (_Settings.m_Backup_NewBackupInterval)
+		{
+			m_Backup_NewBackupInterval = *_Settings.m_Backup_NewBackupInterval; 
+			o_ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
+		}
+		if (_Settings.m_bBackupEnabled)
+		{
+			m_bBackupEnabled = *_Settings.m_bBackupEnabled; 
+			o_ChangedSettings |= EApplicationSetting_BackupEnabled;
+		}
+		
 		if (_Settings.m_bDistributedApp)
 		{
 			m_bDistributedApp = *_Settings.m_bDistributedApp; 
@@ -424,6 +529,50 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 			m_RunAsGroup = pValue->f_String();
+		}
+
+		if (auto *pValue = ExtraInfo.f_GetMember("Backup", EJSONType_Object))
+		{
+			auto &BackupJSON = *pValue;
+			
+			if (auto pValue = BackupJSON.f_GetMember("IncludeWildcards", EJSONType_Array))
+			{
+				o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
+				m_Backup_IncludeWildcards.f_Clear();
+				for (auto &Wildcard : pValue->f_Array())
+					m_Backup_IncludeWildcards[Wildcard.f_String()];
+			}
+			if (auto pValue = BackupJSON.f_GetMember("ExcludeWildcards", EJSONType_Array))
+			{
+				o_ChangedSettings |= EApplicationSetting_BackupExcludeWildcards;
+				m_Backup_ExcludeWildcards.f_Clear();
+				for (auto &Wildcard : pValue->f_Array())
+					m_Backup_ExcludeWildcards[Wildcard.f_String()];
+			}
+			if (auto pValue = BackupJSON.f_GetMember("AddSyncFlagsWildcards", EJSONType_Object))
+			{
+				o_ChangedSettings |= EApplicationSetting_BackupAddSyncFlagsWildcards;
+				m_Backup_AddSyncFlagsWildcards.f_Clear();
+				for (auto &Wildcard : pValue->f_Object())
+					m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+			}
+			if (auto pValue = BackupJSON.f_GetMember("RemoveSyncFlagsWildcards", EJSONType_Object))
+			{
+				o_ChangedSettings |= EApplicationSetting_BackupRemoveSyncFlagsWildcards;
+				m_Backup_RemoveSyncFlagsWildcards.f_Clear();
+				for (auto &Wildcard : pValue->f_Object())
+					m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+			}
+			{
+				auto pValue = BackupJSON.f_GetMember("NewBackupInterval", EJSONType_Float);
+				if (!pValue)
+					pValue = BackupJSON.f_GetMember("NewBackupInterval", EJSONType_Integer);
+				if (pValue)
+				{
+					o_ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
+					m_Backup_NewBackupInterval = CTimeSpanConvert::fs_CreateSpanFromHours(pValue->f_AsFloat());
+				}
+			}
 		}
 
 		if (auto *pValue = ExtraInfo.f_GetMember("ExecutableParams", EJSONType_Array))

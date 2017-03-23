@@ -84,6 +84,69 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_= "If this application should automatically stop if one of it's dependencies unexpectedly exits. Defaults to true.\n"
 			}
 		;
+
+		auto SettingsOption_BackupIncludeWildcards = "BackupIncludeWildcards?"_= 
+			{
+				"Names"_= {"--backup-include-wildcards"}
+				, "Type"_= {""}
+				, "Description"_= "The wildcard file searches to include in backups.\n" 
+				"Relative to application root. Only file name can have wildcards.\n"
+				"Use ^ in the beginning of the file path to create a recursive search.\n"
+			}
+		;
+
+		auto SettingsOption_BackupExcludeWildcards = "BackupExcludeWildcards?"_= 
+			{
+				"Names"_= {"--backup-exclude-wildcards"}
+				, "Type"_= {""}
+				, "Description"_= "Whe wildcard for files to exclude from backup."
+				"Relative to application root. Evaluated after include wild cards as a filtering step.\n"
+			}
+		;
+
+		auto SettingsOption_BackupAddSyncFlagsWildcards = "BackupAddSyncFlagsWildcards?"_= 
+			{
+				"Names"_= {"--backup-add-sync-flags-wildcards"}
+				, "Type"_= {"*"_= {""}}
+				, "Description"_= "Specify wildcards mapped to flags to add for files to back up\n" 
+				"Relative to application root. Flags:\n"
+				"@Indent=20\r"
+				"   Append:          Append syncing. Any changes are assumed to be append only.\r"
+				"   TransactionLog:  Should be used together with Append. This tells the backup manager to sync writes to disk as quickly as possible.\r"
+				"\r"
+				"Example: '{\"Logs/^*\": [\"Append\"]}'\n"
+			}
+		;
+
+		auto SettingsOption_BackupRemoveSyncFlagsWildcards = "BackupRemoveSyncFlagsWildcards?"_= 
+			{
+				"Names"_= {"--backup-remove-sync-flags-wildcards"}
+				, "Type"_= {"*"_= {""}}
+				, "Description"_= "Specify wildcards mapped to flags to remove for files to back up\n" 
+				"Relative to application root. Evaluated after add sync flags wildcards. Flags:\n"
+				"@Indent=20\r"
+				"   Append:          Append syncing. Any changes are assumed to be append only.\r"
+				"   TransactionLog:  Should be used together with Append. This tells the backup manager to sync writes to disk as quickly as possible.\r"
+				"\r"
+				"Example: '{\"Logs/*.tmp\": [\"Append\"]}'\n"
+			}
+		;
+		
+		auto SettingsOption_BackupNewBackupIntervalHours = "BackupNewBackupIntervalHours?"_= 
+			{
+				"Names"_= {"--backup-new-backup-interval"}
+				, "Type"_= 0.0
+				, "Description"_= "Number of hours interval for creating new full backup snapshots. Set to 0 to disable. Defaults to 24 hours\n"
+			}
+		;
+
+		auto SettingsOption_BackupEnabled = "BackupEnabled?"_= 
+			{
+				"Names"_= {"--backup-enabled"}
+				, "Type"_= true
+				, "Description"_= "Enable backups for this application.\n"
+			}
+		;
 		
 		DefaultSection.f_RegisterCommand
 			(
@@ -174,6 +237,12 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_RunAsUser
 						, SettingsOption_RunAsGroup
 						, SettingsOption_DistributedApp
+						, SettingsOption_BackupEnabled 
+						, SettingsOption_BackupIncludeWildcards 
+						, SettingsOption_BackupExcludeWildcards 
+						, SettingsOption_BackupAddSyncFlagsWildcards 
+						, SettingsOption_BackupRemoveSyncFlagsWildcards 
+						, SettingsOption_BackupNewBackupIntervalHours 
 						, "AutoUpdateTags?"_= 
 						{
 							"Names"_= {"--auto-update-tags"}
@@ -264,6 +333,12 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_RunAsUser
 						, SettingsOption_RunAsGroup
 						, SettingsOption_DistributedApp
+						, SettingsOption_BackupEnabled 
+						, SettingsOption_BackupIncludeWildcards 
+						, SettingsOption_BackupExcludeWildcards 
+						, SettingsOption_BackupAddSyncFlagsWildcards 
+						, SettingsOption_BackupRemoveSyncFlagsWildcards 
+						, SettingsOption_BackupNewBackupIntervalHours 
 						, "AutoUpdateTags?"_= 
 						{
 							"Names"_= {"--auto-update-tags"}

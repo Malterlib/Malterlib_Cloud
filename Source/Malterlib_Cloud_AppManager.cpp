@@ -63,17 +63,26 @@ namespace NMib::NCloud
 		_Stream % m_ExecutableParameters;
 		_Stream % m_RunAsUser;
 		_Stream % m_RunAsGroup;
+
+		_Stream % m_Backup_IncludeWildcards;
+		_Stream % m_Backup_ExcludeWildcards;
+		_Stream % m_Backup_AddSyncFlagsWildcards;
+		_Stream % m_Backup_RemoveSyncFlagsWildcards;
+		_Stream % m_Backup_NewBackupInterval;
+		
 		_Stream % m_AutoUpdateTags;
 		_Stream % m_AutoUpdateBranches;
 		_Stream % m_UpdateScriptPreUpdate;
 		_Stream % m_UpdateScriptPostUpdate;
 		_Stream % m_UpdateScriptPostLaunch;
 		_Stream % m_UpdateScriptOnError;
-		_Stream % m_bSelfUpdateSource;
 		_Stream % m_UpdateGroup;
-		_Stream % m_bDistributedApp;
 		_Stream % m_Dependencies;
+		
+		_Stream % m_bSelfUpdateSource;
+		_Stream % m_bDistributedApp;
 		_Stream % m_bStopOnDependencyFailure;
+		_Stream % m_bBackupEnabled;
 	}
 	
 	template <typename tf_CStream>
@@ -109,17 +118,26 @@ namespace NMib::NCloud
 		_Stream % m_Parameters;
 		_Stream % m_RunAsUser;
 		_Stream % m_RunAsGroup;
+		
+		_Stream % m_Backup_IncludeWildcards;
+		_Stream % m_Backup_ExcludeWildcards;
+		_Stream % m_Backup_AddSyncFlagsWildcards;
+		_Stream % m_Backup_RemoveSyncFlagsWildcards;
+		_Stream % m_Backup_NewBackupInterval;
+		
 		_Stream % m_AutoUpdateTags;
 		_Stream % m_AutoUpdateBranches;
 		_Stream % m_UpdateScriptPreUpdate;
 		_Stream % m_UpdateScriptPostUpdate;
 		_Stream % m_UpdateScriptPostLaunch;
 		_Stream % m_UpdateScriptOnError;
-		_Stream % m_bSelfUpdateSource;
 		_Stream % m_UpdateGroup;
-		_Stream % m_bDistributedApp;
 		_Stream % m_Dependencies;
+		
+		_Stream % m_bSelfUpdateSource;
+		_Stream % m_bDistributedApp;
 		_Stream % m_bStopOnDependencyFailure;
+		_Stream % m_bBackupEnabled;
 	}
 	
 	template <typename tf_CStream>

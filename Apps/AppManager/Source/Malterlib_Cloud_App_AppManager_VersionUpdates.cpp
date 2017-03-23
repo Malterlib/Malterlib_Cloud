@@ -85,7 +85,9 @@ namespace NMib::NCloud::NAppManager
 		SubscriptionParams.m_nInitial = 20;
 		SubscriptionParams.m_DispatchActor = self;
 		SubscriptionParams.m_Platforms = mp_KnownPlatforms; 
-		SubscriptionParams.m_fOnNewVersions = [this, Actor = _VersionManagerState.f_GetManager().f_Weak()](CVersionManager::CNewVersionNotifications &&_NewVersions) 
+		SubscriptionParams.m_fOnNewVersions
+			= [this, Actor = _VersionManagerState.f_GetManager().f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
+			(CVersionManager::CNewVersionNotifications &&_NewVersions) 
 			-> NConcurrency::TCContinuation<CVersionManager::CNewVersionNotifications::CResult>
 			{
 				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);

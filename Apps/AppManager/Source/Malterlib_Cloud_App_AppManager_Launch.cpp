@@ -87,6 +87,9 @@ namespace NMib::NCloud::NAppManager
 				
 				fp_AppLaunchStateChanged(_pApplication, "Launching");
 				
+				if (Application.m_Settings.m_bBackupEnabled && !Application.m_BackupClient)
+					fp_ApplicationStartBackup(_pApplication);
+				
 				CStr ApplicationDirectory = Application.f_GetDirectory();
 				
 				CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable

@@ -152,11 +152,36 @@ namespace NMib::NCloud::NAppManager
 				fp_OnAppUpdateInfoChange(*pApplication);
 			_fOnInfo("Saving application state");
 			fp_UpdateApplicationJSON(*pApplication)
-				> Continuation % "Failed to save application state" % Auditor / [=, InProgressScope = InProgressScope]
+				> Continuation % "Failed to save application state" % Auditor / [=, pApplication = *pApplication]
 				{
-					_fOnInfo("Application settings were successfully changed");
-					Auditor.f_Info("Updated application settings (No restart required)");
-					Continuation.f_SetResult();
+					TCContinuation<void> ChangeBackupContinuation;
+					if (ChangedSettings & EApplicationSetting_BackupEnabled)
+					{
+						auto &Application = *pApplication;
+						if (Application.m_Settings.m_bBackupEnabled)
+						{
+							fp_ApplicationStartBackup(pApplication);
+							ChangeBackupContinuation.f_SetResult();
+						}
+						else
+						{
+							if (Application.m_BackupClient)
+							{
+								Application.m_BackupClient->f_Destroy2() > ChangeBackupContinuation;
+								Application.m_BackupClient.f_Clear();
+							}
+							else
+								ChangeBackupContinuation.f_SetResult();
+						}
+					}
+
+					ChangeBackupContinuation > Continuation / [=, InProgressScope = InProgressScope]
+						{
+							_fOnInfo("Application settings were successfully changed");
+							Auditor.f_Info("Updated application settings (No restart required)");
+							Continuation.f_SetResult();
+						}
+					;
 				}
 			;
 			return Continuation;

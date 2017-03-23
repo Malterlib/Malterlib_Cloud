@@ -97,6 +97,25 @@ namespace NMib::NCloud::NAppManager
 					
 					Settings.m_Executable = ApplicationJSON["Executable"].f_String(); 
 					Settings.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String(); 
+					Settings.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String(); 
+					
+					if (auto *pValue = ApplicationJSON.f_GetMember("Backup"))
+					{
+						auto &BackupJSON = *pValue;
+						
+						for (auto &Wildcard : BackupJSON["IncludeWildcards"].f_Array())
+							Settings.m_Backup_IncludeWildcards[Wildcard.f_String()];
+						for (auto &Wildcard : BackupJSON["ExcludeWildcards"].f_Array())
+							Settings.m_Backup_ExcludeWildcards[Wildcard.f_String()];
+						for (auto &Wildcard : BackupJSON["AddSyncFlagsWildcards"].f_Object())
+							Settings.m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+						for (auto &Wildcard : BackupJSON["RemoveSyncFlagsWildcards"].f_Object())
+							Settings.m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+						
+						Settings.m_Backup_NewBackupInterval = CTimeSpanConvert::fs_CreateSpanFromHours(BackupJSON["NewBackupIntervalHours"].f_Float());
+						Settings.m_bBackupEnabled = BackupJSON["Enabled"].f_Boolean();
+					}
+					
 					if (auto pValue = ApplicationJSON.f_GetMember("DistributedApp", EJSONType_Boolean))
 						Settings.m_bDistributedApp = pValue->f_Boolean();
 					for (auto &Parameter : ApplicationJSON["Parameters"].f_Array())

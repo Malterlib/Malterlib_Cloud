@@ -40,6 +40,11 @@ namespace NMib::NCloud::NAppManager
 			OutApplication.m_Parameters = Settings.m_ExecutableParameters;
 			OutApplication.m_RunAsUser = Settings.m_RunAsUser;
 			OutApplication.m_RunAsGroup = Settings.m_RunAsGroup;
+			OutApplication.m_Backup_IncludeWildcards = Settings.m_Backup_IncludeWildcards;
+			OutApplication.m_Backup_ExcludeWildcards = Settings.m_Backup_ExcludeWildcards;
+			OutApplication.m_Backup_AddSyncFlagsWildcards = Settings.m_Backup_AddSyncFlagsWildcards;
+			OutApplication.m_Backup_RemoveSyncFlagsWildcards = Settings.m_Backup_RemoveSyncFlagsWildcards;
+			OutApplication.m_Backup_NewBackupInterval = Settings.m_Backup_NewBackupInterval;
 			OutApplication.m_AutoUpdateTags = Settings.m_AutoUpdateTags;
 			OutApplication.m_AutoUpdateBranches = Settings.m_AutoUpdateBranches;
 			OutApplication.m_UpdateScriptPreUpdate = Settings.m_UpdateScripts.m_PreUpdate;
@@ -51,6 +56,7 @@ namespace NMib::NCloud::NAppManager
 			OutApplication.m_bDistributedApp = Settings.m_bDistributedApp;
 			OutApplication.m_Dependencies = Settings.m_Dependencies;
 			OutApplication.m_bStopOnDependencyFailure = Settings.m_bStopOnDependencyFailure;
+			OutApplication.m_bBackupEnabled = Settings.m_bBackupEnabled;
 		}
 		Auditor.f_Info("Enum applications");
 		return fg_Explicit(fg_Move(OutputApplications));
@@ -116,8 +122,15 @@ namespace NMib::NCloud::NAppManager
 						Results.f_AddStdOut(fg_Format("                   Executable: {}{\n}", Application.m_Executable));
 						Results.f_AddStdOut(fg_Format("                   Parameters: {vs,vb}{\n}", Application.m_Parameters));
 						Results.f_AddStdOut(fg_Format("                  Run as user: {}{\n}", Application.m_RunAsUser));
-						Results.f_AddStdOut(fg_Format("                 Run as group: {}{\n}{\n}", Application.m_RunAsGroup));
-						Results.f_AddStdOut(fg_Format("              Distributed app: {}{\n}", Application.m_bDistributedApp ? "true" : "false"));
+						Results.f_AddStdOut(fg_Format("                 Run as group: {}{\n}", Application.m_RunAsGroup));
+						Results.f_AddStdOut(fg_Format("              Distributed app: {}{\n}{\n}", Application.m_bDistributedApp ? "true" : "false"));
+						
+						Results.f_AddStdOut(fg_Format("               Backup enabled: {}{\n}", Application.m_bBackupEnabled ? "true" : "false"));
+						Results.f_AddStdOut(fg_Format("     Backup include wildcards: {vs}{\n}", Application.m_Backup_IncludeWildcards));
+						Results.f_AddStdOut(fg_Format("     Backup exclude wildcards: {vs}{\n}", Application.m_Backup_ExcludeWildcards));
+						Results.f_AddStdOut(fg_Format("        Backup add sync flags: {vs}{\n}", Application.m_Backup_AddSyncFlagsWildcards));
+						Results.f_AddStdOut(fg_Format("     Backup remove sync flags: {vs}{\n}", Application.m_Backup_RemoveSyncFlagsWildcards));
+						Results.f_AddStdOut(fg_Format("        Backup interval hours: {}{\n}{\n}", CTimeSpanConvert(Application.m_Backup_NewBackupInterval).f_GetHoursFloat()));
 
 						Results.f_AddStdOut(fg_Format("                  Auto update: {}{\n}", !Application.m_AutoUpdateTags.f_IsEmpty() ? "true" : "false"));
 						Results.f_AddStdOut(fg_Format("             Auto update tags: {vs}{\n}", Application.m_AutoUpdateTags));

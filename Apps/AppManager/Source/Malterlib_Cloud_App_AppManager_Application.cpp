@@ -161,8 +161,6 @@ namespace NMib::NCloud::NAppManager
 
 						pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess) > [=](TCAsyncResult<uint32> &&_Result)
 							{
-								pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
-
 								if (!_Result)
 									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", _Result.f_GetExceptionStr());
 								else
@@ -174,25 +172,43 @@ namespace NMib::NCloud::NAppManager
 									pApplication->f_Clear();
 								}
 
-								if (_Flags & EStopFlag_CloseEncryption)
+								TCContinuation<void> BackupContinuation;
+								if (pApplication->m_BackupClient)
 								{
-									if (!_Result)
+									pApplication->m_BackupClient->f_Destroy2() > BackupContinuation;
+									pApplication->m_BackupClient.f_Clear();
+								}
+								else
+									BackupContinuation.f_SetResult();
+								
+								BackupContinuation.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult) mutable
 									{
-										Continuation.f_SetException(DMibErrorInstance(fg_Format("Error stopping process, cannot close encryption: {}", _Result.f_GetExceptionStr())));
-										return;
-									}
-									f_CloseEncryption(*_Result) > [Continuation](TCAsyncResult<uint32> &&_Result)
+										if (!_BackupDestroyResult)
+											DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", _BackupDestroyResult.f_GetExceptionStr());
+										
+										pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
+										
+										if (_Flags & EStopFlag_CloseEncryption)
 										{
 											if (!_Result)
-												DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", _Result.f_GetExceptionStr());
-											
-											Continuation.f_SetResult(fg_Move(_Result));
+											{
+												Continuation.f_SetException(DMibErrorInstance(fg_Format("Error stopping process, cannot close encryption: {}", _Result.f_GetExceptionStr())));
+												return;
+											}
+											f_CloseEncryption(*_Result) > [Continuation](TCAsyncResult<uint32> &&_Result)
+												{
+													if (!_Result)
+														DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", _Result.f_GetExceptionStr());
+													
+													Continuation.f_SetResult(fg_Move(_Result));
+												}
+											;
+											return;
 										}
-									;
-									return;
-								}
-								
-								Continuation.f_SetResult(fg_Move(_Result));
+										
+										Continuation.f_SetResult(fg_Move(_Result));
+									}
+								;
 							}
 						;
 					}

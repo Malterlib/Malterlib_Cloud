@@ -7,6 +7,7 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Encoding/EJSON>
 #include <Mib/Storage/Optional>
+#include <Mib/Cloud/BackupManager>
 #include "Malterlib_Cloud_VersionManager.h"
 
 namespace NMib::NCloud
@@ -17,8 +18,8 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EMinProtocolVersion = 0x105
-			, EProtocolVersion = 0x105
+			EMinProtocolVersion = 0x106
+			, EProtocolVersion = 0x106
 		};
 		
 		CAppManagerInterface();
@@ -113,6 +114,13 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ExecutableParameters;
 			NStorage::TCOptional<NStr::CStr> m_RunAsUser;
 			NStorage::TCOptional<NStr::CStr> m_RunAsGroup;
+			
+			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Backup_IncludeWildcards;
+			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Backup_ExcludeWildcards;
+			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, CBackupManagerBackup::EManifestSyncFlag>> m_Backup_AddSyncFlagsWildcards;
+			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, CBackupManagerBackup::EManifestSyncFlag>> m_Backup_RemoveSyncFlagsWildcards;
+			NStorage::TCOptional<NTime::CTimeSpan> m_Backup_NewBackupInterval;
+			
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_AutoUpdateTags;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_AutoUpdateBranches; // Are wild cards
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPreUpdate;
@@ -124,6 +132,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<bool> m_bDistributedApp;
 			NStorage::TCOptional<bool> m_bSelfUpdateSource;
 			NStorage::TCOptional<bool> m_bStopOnDependencyFailure;
+			NStorage::TCOptional<bool> m_bBackupEnabled;
 		};
 		
 		struct CApplicationInfo
@@ -155,6 +164,13 @@ namespace NMib::NCloud
 			NContainer::TCVector<NStr::CStr> m_Parameters;
 			NStr::CStr m_RunAsUser;
 			NStr::CStr m_RunAsGroup;
+			
+			NContainer::TCSet<NStr::CStr> m_Backup_IncludeWildcards;
+			NContainer::TCSet<NStr::CStr> m_Backup_ExcludeWildcards;
+			NContainer::TCMap<NStr::CStr, CBackupManagerBackup::EManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
+			NContainer::TCMap<NStr::CStr, CBackupManagerBackup::EManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
+			NTime::CTimeSpan m_Backup_NewBackupInterval;
+			
 			NContainer::TCSet<NStr::CStr> m_AutoUpdateTags;
 			NContainer::TCSet<NStr::CStr> m_AutoUpdateBranches;
 			NStr::CStr m_UpdateScriptPreUpdate;
@@ -166,6 +182,7 @@ namespace NMib::NCloud
 			bool m_bSelfUpdateSource = false;
 			bool m_bDistributedApp = false;
 			bool m_bStopOnDependencyFailure = true;
+			bool m_bBackupEnabled = false;
 		};
 		
 		struct CApplicationVersion
@@ -258,3 +275,7 @@ namespace NMib::NCloud
 		; 
 	};
 }
+
+#ifndef DMibPNoShortCuts
+using namespace NMib::NCloud;
+#endif
