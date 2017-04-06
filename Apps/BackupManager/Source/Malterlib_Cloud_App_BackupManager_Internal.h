@@ -96,7 +96,7 @@ namespace NMib::NCloud::NBackupManager
 		
 		TCVector<CStr> fp_FilterBackupSourcesByPermissions(CStr const &_CallingHostID, TCVector<CStr> const &_Sources);
 		
-		void fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason);
+		TCContinuation<void> fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason);
 		
 		template <typename tf_CResult>
 		bool fp_CheckBackupKey

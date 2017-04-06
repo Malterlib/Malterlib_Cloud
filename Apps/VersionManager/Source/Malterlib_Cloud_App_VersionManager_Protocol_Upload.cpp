@@ -196,21 +196,28 @@ namespace NMib::NCloud::NVersionManager
 						Upload.m_DownloadSubscription = fg_Move(_Result->m_Subscription); 
 						CVersionManager::CStartUploadVersion::CResult Result;
 						Result.m_DeniedTags = DeniedTags;
-						Result.m_Subscription = fg_ActorSubscription
+						Result.m_Subscription = fg_ActorSubscriptionAsync
 							(
 								fg_ThisActor(pThis)
-								, [pThis, UploadID, Desc, Auditor]
+								, [pThis, UploadID, Desc, Auditor]() -> TCContinuation<void>
 								{
 									auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
 									if (!pUpload)
-										return;
+										return fg_Explicit();
+									
+									TCContinuation<void> Continuation;
 									if (pUpload->m_FileTransferReceive)
 									{
-										pUpload->m_FileTransferReceive->f_DestroyNoResult(DMibPFile, DMibPLine);
+										pUpload->m_FileTransferReceive->f_Destroy2() > Continuation;
 										pUpload->m_FileTransferReceive.f_Clear();
 									}
+									else
+										Continuation.f_SetResult();
+									
 									if (pThis->mp_VersionUploads.f_Remove(UploadID))
 										Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
+									
+									return Continuation;
 								}
 							)
 						;

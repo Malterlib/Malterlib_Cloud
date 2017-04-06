@@ -56,11 +56,11 @@ namespace NMib::NCloud::NBackupManager
 		return true;
 	}		
 	
-	void CBackupManagerServer::fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason)
+	TCContinuation<void> CBackupManagerServer::fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason)
 	{
 		auto *pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
 		if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != _Auditor.f_HostInfo())
-			return;
+			return fg_Explicit();
 		
 		if (!pBackupInstance->m_BackupInstance)
 		{
@@ -70,7 +70,7 @@ namespace NMib::NCloud::NBackupManager
 				for (auto &OnDestroy : OnDestroyed)
 					OnDestroy();
 			}
-			return;
+			return fg_Explicit();
 		}
 
 		CStr Message = fg_Format("Backup '{}' stopped: {}", _Key.f_GetDesc(), _Reason);
@@ -78,15 +78,19 @@ namespace NMib::NCloud::NBackupManager
 			_Auditor.f_Error(Message);
 		else
 			_Auditor.f_Info(Message);
-		
+	
+		TCContinuation<void> Continuation;
 		auto pCanDestroyTracker = mp_pCanDestroyTracker;
 		pBackupInstance->m_bPendingDestroy = true;
-		pBackupInstance->m_BackupInstance->f_Destroy2() > [this, pCanDestroyTracker, _Key, _Auditor](TCAsyncResult<void> &&_Result)
+		pBackupInstance->m_BackupInstance->f_Destroy2() > [this, pCanDestroyTracker, _Key, _Auditor, Continuation](TCAsyncResult<void> &&_Result)
 			{
 				auto *pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
 				DMibCheck(pBackupInstance);
 				if (!pBackupInstance)
+				{
+					Continuation.f_SetResult();
 					return;
+				}
 				pBackupInstance->m_bPendingDestroy = false;
 				pBackupInstance->m_BackupRunningSubscription.f_Clear();
 				auto OnDestroyed = fg_Move(pBackupInstance->m_OnDestroyed);
@@ -94,9 +98,12 @@ namespace NMib::NCloud::NBackupManager
 					mp_BackupInstances.f_Remove(pBackupInstance->f_GetKey());
 				for (auto &OnDestroy : OnDestroyed)
 					OnDestroy();
+				Continuation.f_SetResult();
 			}
 		;
 		pBackupInstance->m_BackupInstance.f_Clear();
+		
+		return Continuation;
 	}
 
 	auto CBackupManagerServer::CBackupManagerImplementation::f_InitBackup(CBackupKey const &_BackupKey, TCActorSubscriptionWithID<> &&_Subscription)
@@ -174,15 +181,15 @@ namespace NMib::NCloud::NBackupManager
 				TCDistributedActorInterfaceWithID<CBackupManagerBackup> BackupInterface
 					{
 						pBackupInstance->m_BackupInstance->f_ShareInterface<CBackupManagerBackup>()
-						, g_ActorSubscription > [pThis, BackupKey, Auditor]
+						, g_ActorSubscription > [pThis, BackupKey, Auditor]() -> TCContinuation<void>
 						{
 							auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
 							if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
-								return;
+								return fg_Explicit();
 
 							auto &Instance = *pBackupInstance;
 							
-							pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Backup stopped remotely");
+							return pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Backup stopped remotely");
 						}
 					}
 				;

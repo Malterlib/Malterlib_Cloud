@@ -56,14 +56,20 @@ namespace NMib::NCloud::NAppManager
 				return fg_Explicit
 					(
 						g_ActorSubscription > [pApplication, AssignSequence = ++Application.m_AppInterfaceAssignSequence, HostInfo = CallingHostInfo.f_GetHostInfo()]
+						() -> TCContinuation<void>
 						{
 							if (pApplication->m_bDeleted || AssignSequence != pApplication->m_AppInterfaceAssignSequence)
-								return;
+								return fg_Explicit();
 							
 							auto &Application = *pApplication;
+
+							TCContinuation<void> Continuation = Application.m_AppInterface.f_Destroy();
+								
 							Application.m_AppInterface.f_Clear();
 							
 							DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application registration lost: {}", HostInfo.f_GetDesc());
+							
+							return Continuation;
 						}
 					)
 				;

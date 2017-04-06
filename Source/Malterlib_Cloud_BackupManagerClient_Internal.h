@@ -36,11 +36,13 @@ namespace NMib::NCloud
 			bool m_bRecursive = false;
 			bool m_bPending = false;
 		};
-
+		
 		struct CUpdateManifestResult
 		{
-			bool m_bExists = false;
 			CBackupManagerBackup::CManifestFile m_ManifestFile;
+			bool m_bExists = false;
+			bool m_bRemoved = false;
+			bool m_bAdded = false;
 		};
 		
 		void f_Construct();
@@ -50,6 +52,7 @@ namespace NMib::NCloud
 		TCContinuation<void> f_SubscribeChanges();
 		TCContinuation<void> f_RetrySubscribeChanges();
 		void f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification);
+		bool f_IsPathInManifest(CStr const &_Path);
 		
 		TCContinuation<CUpdateManifestResult> f_UpdateManifest(CStr const &_FileName);
 		
@@ -61,7 +64,6 @@ namespace NMib::NCloud
 		template <typename tf_CContainer>
 		static bool fs_MatchesAnyWildcard(CStr const &_String, tf_CContainer const &_Container);
 		static CStr fs_ParseWildcard(CStr const &_Wildcard, bool &o_bRecursive);
-
 		
 		CBackupManagerClient *m_pThis = nullptr;
 		CConfig m_Config;

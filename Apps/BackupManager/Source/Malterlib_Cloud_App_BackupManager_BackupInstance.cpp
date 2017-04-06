@@ -137,36 +137,84 @@ namespace NMib::NCloud::NBackupManager
 		;
 	}
 
-	TCContinuation<void> CBackupInstance::f_FileChanged(CStr const &_FileName, CManifestFile const &_Manifest)
-	{ 
-		auto &Internal = *mp_pInternal;
-
-		if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
-			return fg_Move(pException);
-		
-		Internal.m_Manifest.m_Files[_FileName] = _Manifest;
-		
-		return fg_Explicit();
-	}
-	
-	TCContinuation<void> CBackupInstance::f_FileRemoved(CStr const &_FileName)
+	TCContinuation<void> CBackupInstance::f_ManifestChange(CStr const &_FileName, CManifestChange const &_Change)
 	{
 		auto &Internal = *mp_pInternal;
 		
-		CManifestFile *pManifestFile;
-		
-		if (auto pException = Internal.f_CheckFileName(_FileName, &pManifestFile))
-			return fg_Move(pException);
-		
-		Internal.m_Manifest.m_Files.f_Remove(pManifestFile);
-		
-		return TCContinuation<void>::fs_RunProtected<CExceptionFile>()
-			> [&]()
+		switch (_Change.f_GetTypeID())
+		{
+		case EManifestChange_Add:
 			{
-				if (CFile::fs_FileExists(_FileName))
-					CFile::fs_DeleteFile(_FileName);
+				if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
+					return fg_Move(pException);
+				
+				auto &Change = _Change.f_Get<EManifestChange_Add>();
+				
+				Internal.m_Manifest.m_Files[_FileName] = Change.m_ManifestFile;
+				
+				DMibConOut("Add manifest: {}\n", _FileName);
+				
+				return fg_Explicit();
 			}
-		;
+		case EManifestChange_Change:
+			{
+				if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
+					return fg_Move(pException);
+				
+				auto &Change = _Change.f_Get<EManifestChange_Change>();
+
+				Internal.m_Manifest.m_Files[_FileName] = Change.m_ManifestFile;
+				DMibConOut("Change manifest: {}\n", _FileName);
+				
+				return fg_Explicit();
+			}
+		case EManifestChange_Remove:
+			{
+				CManifestFile *pManifestFile;
+				if (auto pException = Internal.f_CheckFileName(_FileName, &pManifestFile))
+					return fg_Move(pException);
+				
+				Internal.m_Manifest.m_Files.f_Remove(pManifestFile);
+
+				CStr AbsolutePath = CFile::fs_AppendPath(Internal.m_BackupDirectory, _FileName);
+
+				DMibConOut("Remove manifest: {}\n", _FileName);
+				
+				return TCContinuation<void>::fs_RunProtected<CExceptionFile>()
+					> [&]()
+					{
+						if (CFile::fs_FileExists(AbsolutePath))
+							CFile::fs_DeleteFile(AbsolutePath);
+					}
+				;
+			}
+		case EManifestChange_Rename:
+			{
+				auto &Change = _Change.f_Get<EManifestChange_Rename>();
+				
+				CManifestFile *pManifestFile;
+				if (auto pException = Internal.f_CheckFileName(Change.m_FromFileName, &pManifestFile))
+					return fg_Move(pException);
+				if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
+					return fg_Move(pException);
+				
+				Internal.m_Manifest.m_Files.f_Remove(pManifestFile);
+				Internal.m_Manifest.m_Files[_FileName] = Change.m_ManifestFile;
+				
+				CStr AbsoluteFrom = CFile::fs_AppendPath(Internal.m_BackupDirectory, Change.m_FromFileName);
+				CStr AbsoluteTo = CFile::fs_AppendPath(Internal.m_BackupDirectory, _FileName);
+				
+				DMibConOut2("Rename manifest: {} -> \n", Change.m_FromFileName, _FileName);
+				
+				return TCContinuation<void>::fs_RunProtected<CExceptionFile>()
+					> [&]()
+					{
+						if (CFile::fs_FileExists(AbsoluteFrom))
+							CFile::fs_RenameFile(AbsoluteFrom, AbsoluteTo);
+					}
+				;
+			}
+		}
 	}
 
 	void CBackupInstance::CInternal::f_RunRSyncProtocol(CRSyncContext &_Context, CSecureByteVector &&_ServerPacket)
@@ -246,9 +294,18 @@ namespace NMib::NCloud::NBackupManager
 		CStr OldFileName = CFile::fs_AppendPath(Internal.m_LatestBackupDirectory, _FileName);
 		CStr TempFileName = fg_Format("{}.{}.tmp", FileName);
 		
-		auto pActorSubscription = g_ActorSubscription > [this, RSyncID, TempFileName]
+		auto pActorSubscription = g_ActorSubscription > [this, RSyncID, TempFileName]() -> TCContinuation<void>
 			{
+				TCContinuation<void> Continuation;
+				
 				auto &Internal = *mp_pInternal;
+				
+				auto pRsyncContext = Internal.m_RSyncContexts.f_FindEqual(RSyncID);
+				if (pRsyncContext)
+					Continuation = pRsyncContext->m_fRunProtocol.f_Destroy();
+				else
+					Continuation.f_SetResult();
+				
 				Internal.m_RSyncContexts.f_Remove(RSyncID);
 				
 				try
@@ -260,6 +317,8 @@ namespace NMib::NCloud::NBackupManager
 				{
 					DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to cleanup tempfile for rsync: {}", _Exception);
 				}
+				
+				return Continuation;
 			}
 		;
 

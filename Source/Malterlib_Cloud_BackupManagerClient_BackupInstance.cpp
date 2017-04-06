@@ -45,6 +45,8 @@ namespace NMib::NCloud::NPrivate
 		
 		mp_PendingFiles.f_Clear();
 		
+		mp_FileManifestSequencer.f_Abort() > pCanDestroyTracker->f_Track();
+		
 		return pCanDestroyTracker->m_Continuation;
 	}
 
@@ -109,6 +111,7 @@ namespace NMib::NCloud::NPrivate
 					if (PendingFile.m_bReschedule)
 					{
 						PendingFile.m_bReschedule = false;
+						PendingFile.m_StartedContinuations.f_Clear();
 						mp_PendingFilesQueue.f_Insert(PendingFile);
 					}
 					else
@@ -168,6 +171,10 @@ namespace NMib::NCloud::NPrivate
 					if (!pPendingFile || pPendingFile->m_SyncSequence != SyncSequence)
 						return;
 					
+					for (auto &Continuatino : pPendingFile->m_StartedContinuations)
+						Continuatino.f_SetResult();
+					pPendingFile->m_StartedContinuations.f_Clear();
+					
 					if (!_Subscription)
 					{
 						fp_ReportBackupFailed(fg_Format("Failed to start rsync: {}", _Subscription.f_GetExceptionStr()));
@@ -220,12 +227,12 @@ namespace NMib::NCloud::NPrivate
 				mp_BackupManager
 				, CBackupManager::f_InitBackup
 				, mp_BackupKey
-				, g_ActorSubscription > [this]
+				, g_ActorSubscription > [this]() -> TCContinuation<void>
 				{
 					if (mp_bDestroyed || !mp_Backup)
-						return;
+						return fg_Explicit();
 		
-					mp_BackupManagerClient(&CBackupManagerClient::fp_OnNotification, mp_ActorInfo.m_HostInfo, CBackupManagerClient::CNotification_BackupAborted()) > fg_DiscardResult();
+					return mp_BackupManagerClient(&CBackupManagerClient::fp_OnNotification, mp_ActorInfo.m_HostInfo, CBackupManagerClient::CNotification_BackupAborted());
 				}
 			)
 			> [this](TCAsyncResult<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> &&_ActorInterface)
@@ -258,9 +265,12 @@ namespace NMib::NCloud::NPrivate
 							fp_NewPendingFile(FileName);
 						}
 						
-						for (auto &Update : mp_PendingManifestUpdates)
-							fp_ProcessManifestChange(mp_PendingManifestUpdates.fs_GetKey(Update), Update);
-						mp_PendingManifestUpdates.f_Clear();
+						for (auto &Changes : mp_PendingManifestChanges)
+						{
+							for (auto &Change : Changes)
+								fp_ProcessManifestChange(mp_PendingManifestChanges.fs_GetKey(Changes), Change);
+						}
+						mp_PendingManifestChanges.f_Clear();
 						
 						mp_bBackupStarted = true;
 						fp_ProcessBackupQueue();
@@ -270,55 +280,152 @@ namespace NMib::NCloud::NPrivate
 		;
 	}
 
-	void CBackupManagerClient_Instance::fp_ProcessManifestChange(CStr const &_FileName, CBackupManagerClient::CInternal::CUpdateManifestResult const &_ManifestUpdate)
+	TCContinuation<void> CBackupManagerClient_Instance::fp_AbortPendingFile(CStr const &_FileName)
 	{
-		if (_ManifestUpdate.m_bExists)
+		TCContinuation<void> Continuation;
+		auto *pPendingFile = mp_PendingFiles.f_FindEqual(_FileName);
+		
+		if (pPendingFile)
 		{
-			DMibCallActor(mp_Backup, CBackupManagerBackup::f_FileChanged, _FileName, _ManifestUpdate.m_ManifestFile) > [this](TCAsyncResult<void> &&_Result)
-				{
-					if (_Result)
-						return;
-					fp_ReportBackupFailed(fg_Format("Failed to send file changed: {}", _Result.f_GetExceptionStr()));
-				}
-			;
-			auto Mapping = mp_PendingFiles(_FileName);
-			auto &PendingFile = *Mapping;
-			if (Mapping.f_WasCreated())
+			if (pPendingFile->m_Link.f_IsInList())
 			{
-				mp_PendingFilesQueue.f_Insert(PendingFile);
-				fp_NewPendingFile(_FileName);
-				fp_ProcessBackupQueue();
+				pPendingFile->m_Link.f_Unlink();
+				Continuation.f_SetResult();
 			}
-			else if (!PendingFile.m_Link.f_IsInList())
-				PendingFile.m_bReschedule = true;
+			else
+			{
+				if (pPendingFile->m_RSyncSubscription.f_IsEmpty())
+				{
+					pPendingFile->m_StartedContinuations.f_Insert() > [Continuation, _FileName, this](TCAsyncResult<void> &&)
+						{
+							auto *pPendingFile = mp_PendingFiles.f_FindEqual(_FileName);
+							if (!pPendingFile || pPendingFile->m_RSyncSubscription.f_IsEmpty())
+							{
+								Continuation.f_SetResult();
+								return;
+							}
+							
+							pPendingFile->m_RSyncSubscription->f_Destroy() > Continuation;
+						}
+					;
+				}
+				else
+					pPendingFile->m_RSyncSubscription->f_Destroy() > Continuation;
+			}
 		}
 		else
-		{
-			DMibCallActor(mp_Backup, CBackupManagerBackup::f_FileRemoved, _FileName) > [this](TCAsyncResult<void> &&_Result)
-				{
-					if (_Result)
-						return;
-					fp_ReportBackupFailed(fg_Format("Failed to send file removed: {}", _Result.f_GetExceptionStr()));
-				}
-			;
-			mp_PendingFiles.f_Remove(_FileName);
-			fp_FileFinished(_FileName);
-		}
+			Continuation.f_SetResult();
+		
+		return Continuation;
+	}
+
+	void CBackupManagerClient_Instance::fp_ProcessManifestChange(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange)
+	{
+		mp_FileManifestSequencer > [=]() -> TCContinuation<void>
+			{
+				TCContinuation<void> PendingAbortContinuation;
+				
+				CStr AbortFileName = _FileName;
+				
+				if (_ManifestChange.f_GetTypeID() == CBackupManagerBackup::EManifestChange_Remove)
+					PendingAbortContinuation = fp_AbortPendingFile(_FileName);
+				else if (_ManifestChange.f_GetTypeID() == CBackupManagerBackup::EManifestChange_Rename)
+					PendingAbortContinuation = fp_AbortPendingFile(_ManifestChange.f_Get<CBackupManagerBackup::EManifestChange_Rename>().m_FromFileName);
+				else
+					PendingAbortContinuation.f_SetResult();
+
+				TCContinuation<void> Continuation;
+				PendingAbortContinuation > [this, Continuation, _ManifestChange, _FileName](TCAsyncResult<void> &&_Result)
+					{
+						if (!_Result)
+						{
+							DMibLogCategoryStr(mp_Config.m_LogCategory);
+ 							DMibLog(Error, "Failed to abort pending file sync: {}", _Result.f_GetExceptionStr());
+						}
+						DMibCallActor(mp_Backup, CBackupManagerBackup::f_ManifestChange, _FileName, _ManifestChange)
+							> [this, _FileName, _ManifestChange](TCAsyncResult<void> &&_Result)
+							{
+								if (!_Result)
+								{
+									fp_ReportBackupFailed(fg_Format("Failed to change manifest on remote: {}", _Result.f_GetExceptionStr()));
+									return;
+								}
+								
+								switch (_ManifestChange.f_GetTypeID())
+								{
+								case CBackupManagerBackup::EManifestChange_Remove:
+									{
+										mp_PendingFiles.f_Remove(_FileName);
+										fp_FileFinished(_FileName);
+										return;
+									}
+								case CBackupManagerBackup::EManifestChange_Rename:
+									{
+										auto &Change = _ManifestChange.f_Get<CBackupManagerBackup::EManifestChange_Rename>();
+										mp_PendingFiles.f_Remove(Change.m_FromFileName);
+										fp_FileFinished(Change.m_FromFileName);
+										break;
+									}
+								}
+								
+								auto Mapping = mp_PendingFiles(_FileName);
+								auto &PendingFile = *Mapping;
+								if (Mapping.f_WasCreated())
+								{
+									mp_PendingFilesQueue.f_Insert(PendingFile);
+									fp_NewPendingFile(_FileName);
+									fp_ProcessBackupQueue();
+								}
+								else if (!PendingFile.m_Link.f_IsInList())
+									PendingFile.m_bReschedule = true;
+							}
+						;
+					}
+				;
+				
+				return Continuation;
+			}
+			> fg_DiscardResult()
+		;
 	}
 	
-	void CBackupManagerClient_Instance::f_ManifestChanged(CStr const &_FileName, CBackupManagerClient::CInternal::CUpdateManifestResult const &_ManifestUpdate)
+	void CBackupManagerClient_Instance::f_ManifestChanged(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange)
 	{
-		if (_ManifestUpdate.m_bExists)
-			mp_Manifest.m_Files[_FileName] = _ManifestUpdate.m_ManifestFile;
-		else
-			mp_Manifest.m_Files.f_Remove(_FileName);
+		switch (_ManifestChange.f_GetTypeID())
+		{
+		case CBackupManagerBackup::EManifestChange_Add:
+			{
+				auto &Change = _ManifestChange.f_Get<CBackupManagerBackup::EManifestChange_Add>();
+				mp_Manifest.m_Files[_FileName] = Change.m_ManifestFile;
+				break;
+			}
+		case CBackupManagerBackup::EManifestChange_Change:
+			{
+				auto &Change = _ManifestChange.f_Get<CBackupManagerBackup::EManifestChange_Change>();
+				mp_Manifest.m_Files[_FileName] = Change.m_ManifestFile;
+				break;
+			}
+		case CBackupManagerBackup::EManifestChange_Remove:
+			{
+				mp_Manifest.m_Files.f_Remove(_FileName);
+				break;
+			}
+		case CBackupManagerBackup::EManifestChange_Rename:
+			{
+				auto &Change = _ManifestChange.f_Get<CBackupManagerBackup::EManifestChange_Rename>();
+				
+				mp_Manifest.m_Files.f_Remove(Change.m_FromFileName);
+				mp_Manifest.m_Files[_FileName] = Change.m_ManifestFile;
+				break;
+			}
+		}
 		
 		if (mp_Backup)
 		{
 			if (mp_bBackupStarted)
-				fp_ProcessManifestChange(_FileName, _ManifestUpdate);
+				fp_ProcessManifestChange(_FileName, _ManifestChange);
 			else if (!mp_bBackupStartFailed)
-				mp_PendingManifestUpdates[_FileName] = _ManifestUpdate;
+				mp_PendingManifestChanges[_FileName].f_Insert(_ManifestChange);
 		}
 	}
 }

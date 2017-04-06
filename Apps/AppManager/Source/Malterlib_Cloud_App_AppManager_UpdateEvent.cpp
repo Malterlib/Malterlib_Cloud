@@ -30,10 +30,19 @@ namespace NMib::NCloud::NAppManager
 
 		return fg_Explicit
 			(	
-				g_ActorSubscription > [pThis, SubscriptionID, Auditor]
+				g_ActorSubscription > [pThis, SubscriptionID, Auditor]() -> TCContinuation<void>
 				{
 					Auditor.f_Info(fg_Format("Unsubscribe from update notifications '{}'", SubscriptionID));
+					
+					auto pUpdateNotificationSubscriptions = pThis->mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
+					if (!pUpdateNotificationSubscriptions)
+						return fg_Explicit();
+					
+					TCContinuation<void> Continuation = pUpdateNotificationSubscriptions->m_fOnUpdate.f_Destroy();
+					
 					pThis->mp_UpdateNotificationSubscriptions.f_Remove(SubscriptionID);
+					
+					return Continuation;
 				}
 			)
 		;

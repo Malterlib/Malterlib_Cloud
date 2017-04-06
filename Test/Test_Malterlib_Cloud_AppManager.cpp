@@ -339,15 +339,30 @@ public:
 			auto VersionManager = Subscriptions.f_Subscribe<CVersionManager>();
 			CVersionManagerHelper VersionManagerHelper;
 			
-			CCurrentActorScope CurrentActor{fg_ConcurrentActor()};
+			auto HelperActor = fg_ConcurrentActor();
+			auto fDispatchOnHelper = [&](auto _fToDispatch)
+				{
+					return
+						(
+							g_Dispatch > [&]
+							{
+								return _fToDispatch();
+							}
+						)
+						.f_CallSync(g_Timeout)
+					;
+				}
+			;
+			
+			CCurrentActorScope CurrentActor{HelperActor};
 
 			// Add initial application to version manager
 			CStr TestAppArchive = ProgramDirectory + "/TestApps/TestApp.tar.gz";
 			
-			auto PackageInfo = VersionManagerHelper.f_CreatePackage(ProgramDirectory + "/TestApps/TestApp", TestAppArchive).f_CallSync(g_Timeout);
+			auto PackageInfo = fDispatchOnHelper([&]{ return VersionManagerHelper.f_CreatePackage(ProgramDirectory + "/TestApps/TestApp", TestAppArchive); });
 
 			PackageInfo.m_VersionInfo.m_Tags["TestTag"];
-			VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive).f_CallSync(g_Timeout);
+			fDispatchOnHelper([&]{return VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);});
 			
 			// Setup trust for AppManagers
 			
@@ -502,7 +517,7 @@ public:
 			auto fUpdateTestApp = [&]
 				{
 					++PackageInfo.m_VersionID.m_VersionID.m_Revision;
-					VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive).f_CallSync(g_Timeout);
+					fDispatchOnHelper([&]{return VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);});
 				}
 			;
 

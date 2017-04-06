@@ -83,9 +83,12 @@ namespace NMib::NCloud
 		
 		return BackupManifest;
 	}
-	
+
 	auto CBackupManagerClient::CInternal::f_UpdateManifest(CStr const &_FileName) -> TCContinuation<CUpdateManifestResult>
 	{
+		if (_FileName.f_IsEmpty())
+			return fg_Explicit(CUpdateManifestResult{});
+			
 		TCContinuation<CUpdateManifestResult> Continuation;
 		
 		g_Dispatch(m_FileActor) > [_FileName, Config = m_Config]() mutable -> CUpdateManifestResult
@@ -93,21 +96,30 @@ namespace NMib::NCloud
 				auto AbsoluteFileName = CFile::fs_AppendPath(Config.m_Root, _FileName);
 				
 				if (!CFile::fs_FileExists(AbsoluteFileName, EFileAttrib_File | EFileAttrib_Link))
-					return {false, {}};
+					return {{}, false};
 				
 				CBackupManagerBackup::CManifestFile ManifestFile;
 				ManifestFile.m_Attributes = CFile::fs_GetAttributes(AbsoluteFileName);
 				
 				fs_GetManifestFileProperties(Config, _FileName, ManifestFile);
 					
-				return {true, fg_Move(ManifestFile)};
+				return {fg_Move(ManifestFile), true};
 			}
 			> Continuation / [this, _FileName, Continuation](CUpdateManifestResult &&_Result)
 			{
 				if (!_Result.m_bExists)
-					m_Manifest.m_Files.f_Remove(_FileName);
+				{
+					if (m_Manifest.m_Files.f_Remove(_FileName))
+						_Result.m_bRemoved = true;
+				}
 				else
-					m_Manifest.m_Files[_FileName] = fg_Move(_Result.m_ManifestFile);
+				{
+					auto Mapped = m_Manifest.m_Files(_FileName);
+					if (Mapped.f_WasCreated())
+						_Result.m_bAdded = true;
+						
+					*Mapped = fg_Move(_Result.m_ManifestFile);
+				}
 				
 				Continuation.f_SetResult(fg_Move(_Result));
 			}

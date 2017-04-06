@@ -11,8 +11,7 @@ namespace NMib::NCloud
 	{
 		DMibPublishActorFunction(CBackupManagerBackup::f_StartBackup);
 		DMibPublishActorFunction(CBackupManagerBackup::f_StartRSync);
-		DMibPublishActorFunction(CBackupManagerBackup::f_FileChanged);
-		DMibPublishActorFunction(CBackupManagerBackup::f_FileRemoved);
+		DMibPublishActorFunction(CBackupManagerBackup::f_ManifestChange);
 		DMibPublishActorFunction(CBackupManagerBackup::f_UploadData);
 		DMibPublishActorFunction(CBackupManagerBackup::f_InitialBackupFinished);
 	}
@@ -79,7 +78,28 @@ namespace NMib::NCloud
 		_Stream % m_FilesNotUpToDate;
 	}
 	DMibDistributedStreamImplement(CBackupManagerBackup::CStartBackupResult);
-		
+
+	template <typename tf_CStream>
+	void CBackupManagerBackup::CManifestChange_Change::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_ManifestFile;
+	}
+	DMibDistributedStreamImplement(CBackupManagerBackup::CManifestChange_Change);
+
+	template <typename tf_CStream>
+	void CBackupManagerBackup::CManifestChange_Remove::f_Stream(tf_CStream &_Stream)
+	{
+	}
+	DMibDistributedStreamImplement(CBackupManagerBackup::CManifestChange_Remove);
+
+	template <typename tf_CStream>
+	void CBackupManagerBackup::CManifestChange_Rename::f_Stream(tf_CStream &_Stream)
+	{
+		CManifestChange_Change::f_Stream(_Stream);
+		_Stream % m_FromFileName;
+	}
+	DMibDistributedStreamImplement(CBackupManagerBackup::CManifestChange_Rename);
+
 	CBackupManager::CBackupManager()
 	{
 		DMibPublishActorFunction(CBackupManager::f_StartBackup);

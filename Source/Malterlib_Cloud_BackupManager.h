@@ -20,7 +20,7 @@ namespace NMib::NCloud
 	
 	struct CBackupManagerBackup : public NConcurrency::CActor
 	{
-		enum 
+		enum : uint32 
 		{
 			EMinProtocolVersion = EBackupManagerMinProtocolVersion
 			, EProtocolVersion = EBackupManagerProtocolVersion
@@ -31,6 +31,14 @@ namespace NMib::NCloud
 			EManifestSyncFlag_None = 0						///< Normal syncing. In this case the rsync is used for syncing changes
 			, EManifestSyncFlag_Append = DMibBit(0)			///< Append syncing. Any changes are assumed to be append only
 			, EManifestSyncFlag_TransactionLog = DMibBit(1) ///< Should be used together with ESyncFlag_Append. This tells the backup manager to sync writes to disk as quickly as possible.
+		};
+		
+		enum EManifestChange
+		{
+			EManifestChange_Change
+			, EManifestChange_Add
+			, EManifestChange_Remove
+			, EManifestChange_Rename
 		};
 		
 		struct CManifestFile
@@ -65,15 +73,51 @@ namespace NMib::NCloud
 			
 			NContainer::TCMap<NStr::CStr, uint64> m_FilesNotUpToDate;
 		};
-		
+
+		struct CManifestChange_Change
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			CManifestFile m_ManifestFile;
+		};
+
+		struct CManifestChange_Add : public CManifestChange_Change
+		{
+		};
+
+		struct CManifestChange_Remove
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+		};
+
+		struct CManifestChange_Rename : public CManifestChange_Change 
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStr m_FromFileName;
+		};
+
+		using CManifestChange = NContainer::TCStreamableVariant
+			<
+				EManifestChange
+				, CManifestChange_Change, EManifestChange_Change
+				, CManifestChange_Add, EManifestChange_Add
+				, CManifestChange_Remove, EManifestChange_Remove
+				, CManifestChange_Rename, EManifestChange_Rename
+			>
+		;		
+
 		CBackupManagerBackup();
 		
 		static EManifestSyncFlag fs_ParseSyncFlags(NEncoding::CEJSON const &_JSON);
 		static NEncoding::CEJSON fs_GenerateSyncFlags(EManifestSyncFlag _Flags);
 		
 		virtual NConcurrency::TCContinuation<CStartBackupResult> f_StartBackup(CManifest const &_Manifest) = 0;
-		virtual NConcurrency::TCContinuation<void> f_FileChanged(NStr::CStr const &_FileName, CManifestFile const &_Manifest) = 0;
-		virtual NConcurrency::TCContinuation<void> f_FileRemoved(NStr::CStr const &_FileName) = 0;
+
+		virtual NConcurrency::TCContinuation<void> f_ManifestChange(NStr::CStr const &_FileName, CManifestChange const &_Change) = 0;
 
 		virtual NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> f_StartRSync
 			(

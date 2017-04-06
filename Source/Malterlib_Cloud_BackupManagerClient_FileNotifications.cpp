@@ -114,6 +114,10 @@ namespace NMib::NCloud
 							{
 								CFileChangeNotification::CNotification Notification = _Notification;
 								Notification.m_Path = CFile::fs_AppendPath(Path, _Notification.m_Path);
+								
+								if (!Notification.m_PathFrom.f_IsEmpty())
+									Notification.m_PathFrom = CFile::fs_AppendPath(Path, _Notification.m_PathFrom);
+								
 								f_OnFileChanged(Notification);
 							}
 							, fg_ThisActor(m_pThis)
@@ -220,13 +224,12 @@ namespace NMib::NCloud
 		return f_RetrySubscribeChanges();
 	}
 	
-	void CBackupManagerClient::CInternal::f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification)
+	bool CBackupManagerClient::CInternal::f_IsPathInManifest(CStr const &_Path)
 	{
 		bool bIsIncluded = false;
 		
-		CStr RelativePath = CFile::fs_MakePathRelative(_Notification.m_Path, m_Config.m_Root);
-		CStr NotificationPath = CFile::fs_GetPath(RelativePath);
-		CStr NotificationFile = CFile::fs_GetFile(RelativePath);
+		CStr NotificationPath = CFile::fs_GetPath(_Path);
+		CStr NotificationFile = CFile::fs_GetFile(_Path);
 		
 		for (auto &Wildcard : m_Config.m_IncludeWildcards)
 		{
@@ -254,22 +257,105 @@ namespace NMib::NCloud
 		}
 		
 		if (!bIsIncluded)
-			return;
+			return false;
 		
-		if (fs_MatchesAnyWildcard(RelativePath, m_Config.m_ExcludeWildcards))
-			return;
+		if (fs_MatchesAnyWildcard(_Path, m_Config.m_ExcludeWildcards))
+			return false;
 		
-		f_UpdateManifest(RelativePath) > [this, _Notification, RelativePath](TCAsyncResult<CUpdateManifestResult> &&_Updated)
+		return true;
+	}
+	
+	void CBackupManagerClient::CInternal::f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification)
+	{
+		CFileChangeNotification::CNotification Notification = _Notification;
+		
+		CStr RelativePath = CFile::fs_MakePathRelative(Notification.m_Path, m_Config.m_Root);
+		CStr RelativePathFrom;
+		
+		if (Notification.m_Notification == EFileChangeNotification_Renamed)
+		{
+			RelativePathFrom = CFile::fs_MakePathRelative(Notification.m_PathFrom, m_Config.m_Root);
+			
+			bool bFromValid = f_IsPathInManifest(RelativePathFrom);
+			bool bToValid = f_IsPathInManifest(RelativePath);
+			if (!bFromValid && !bToValid)
+				return;
+			
+			if (bFromValid && !bToValid)
 			{
-				if (!_Updated)
+				Notification.m_Notification = EFileChangeNotification_Removed;
+				Notification.m_Path = Notification.m_PathFrom;
+				RelativePath = CFile::fs_MakePathRelative(Notification.m_Path, m_Config.m_Root);
+				RelativePathFrom.f_Clear();
+			}
+			else if (!bFromValid && bToValid)
+			{
+				Notification.m_Notification = EFileChangeNotification_Added;
+				RelativePathFrom.f_Clear();
+			}
+		}
+		else if (!f_IsPathInManifest(RelativePath))
+			return;
+		
+		f_UpdateManifest(RelativePath)
+			+ f_UpdateManifest(RelativePathFrom)
+			> [this, Notification, RelativePath, RelativePathFrom](TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
+			{
+				if (!_Change)
 				{
 					DMibLogCategoryStr(m_Config.m_LogCategory);
-					DMibLog(Error, "Failed to update manifest: {}", _Updated.f_GetExceptionStr());
+					DMibLog(Error, "Failed to update manifest: {}", _Change.f_GetExceptionStr());
 					return;
 				}
 				
-				for (auto &RunningInstance : m_RunningBackupInstances)
-					RunningInstance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, RelativePath, *_Updated) > fg_DiscardResult();
+				if (!_ChangeFrom)
+				{
+					DMibLogCategoryStr(m_Config.m_LogCategory);
+					DMibLog(Error, "Failed to update manifest: {}", _ChangeFrom.f_GetExceptionStr());
+					return;
+				}
+				
+				auto fSendManifestChange = [&](CStr const &_Path, CBackupManagerBackup::CManifestChange const &_ManifestChange)
+					{
+						for (auto &RunningInstance : m_RunningBackupInstances)
+							RunningInstance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange) > fg_DiscardResult();
+					}
+				;
+				
+				auto &Change = *_Change;
+				auto &ChangeFrom = *_ChangeFrom;
+				
+				if (Notification.m_Notification == EFileChangeNotification_Renamed)
+				{
+					if (ChangeFrom.m_bRemoved)
+					{
+						if (Change.m_bAdded)
+							fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Rename{fg_Move(Change.m_ManifestFile), RelativePathFrom});
+						else if (Change.m_bRemoved)
+						{
+							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Remove{});
+							if (Change.m_bRemoved)
+								fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Remove{});
+							else if (Change.m_bExists)
+								fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Change{fg_Move(Change.m_ManifestFile)});
+						}
+						return;
+					}
+					else
+					{
+						if (ChangeFrom.m_bAdded)
+							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Add{fg_Move(ChangeFrom.m_ManifestFile)});
+						else if (ChangeFrom.m_bExists)
+							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Change{fg_Move(ChangeFrom.m_ManifestFile)});
+					}
+				}
+				
+				if (Change.m_bAdded)
+					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Add{fg_Move(Change.m_ManifestFile)});
+				else if (Change.m_bRemoved)
+					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Remove{});
+				else if (Change.m_bExists)
+					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Change{fg_Move(Change.m_ManifestFile)});
 			}
 		;
 	}

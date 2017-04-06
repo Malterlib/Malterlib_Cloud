@@ -24,12 +24,10 @@ namespace NMib::NCloud::NBackupManager
 			)
 			override
 		;
-		TCContinuation<void> f_FileChanged(CStr const &_FileName, CManifestFile const &_Manifest) override;
-		TCContinuation<void> f_FileRemoved(CStr const &_FileName) override;
+
+		NConcurrency::TCContinuation<void> f_ManifestChange(NStr::CStr const &_FileName, CManifestChange const &_Change) override;
 		TCContinuation<void> f_UploadData(CStr const &_FileName, uint64 _Position, CSecureByteVector &&_Data) override;
-		
 		TCContinuation<void> f_InitialBackupFinished() override;
-		
 		
 	private:
 		struct CInternal;

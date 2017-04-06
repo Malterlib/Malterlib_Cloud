@@ -6,6 +6,8 @@
 #include <Mib/Cloud/BackupManager>
 #include <Mib/File/RSync>
 
+#include <Mib/Concurrency/ActorSequencer>
+
 #include "Malterlib_Cloud_BackupManagerClient.h"
 #include "Malterlib_Cloud_BackupManagerClient_Internal.h"
 
@@ -35,7 +37,7 @@ namespace NMib::NCloud::NPrivate
 		;
 		~CBackupManagerClient_Instance();
 		
-		void f_ManifestChanged(CStr const &_FileName, CBackupManagerClient::CInternal::CUpdateManifestResult const &_ManifestUpdate);
+		void f_ManifestChanged(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange);
 		
 	private:
 		TCContinuation<void> fp_Destroy() override;
@@ -47,7 +49,8 @@ namespace NMib::NCloud::NPrivate
 
 		void fp_NewPendingFile(CStr const &_FileName);
 		void fp_FileFinished(CStr const &_FileName);
-		void fp_ProcessManifestChange(CStr const &_FileName, CBackupManagerClient::CInternal::CUpdateManifestResult const &_ManifestUpdate);
+		void fp_ProcessManifestChange(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange);
+		TCContinuation<void> fp_AbortPendingFile(CStr const &_FileName);
 		
 		struct CRunningSyncState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
 		{
@@ -72,6 +75,7 @@ namespace NMib::NCloud::NPrivate
 			DMibListLinkDS_Link(CPendingBackupFile, m_Link);
 			
 			TCWeakPointer<CRunningSyncState> m_pRunningState;
+			TCVector<TCContinuation<void>> m_StartedContinuations;
 			
 			CActorSubscription m_RSyncSubscription;
 			mint m_SyncSequence = 0; 
@@ -97,7 +101,9 @@ namespace NMib::NCloud::NPrivate
 		TCMap<CStr, CPendingBackupFile> mp_PendingFiles;
 		DMibListLinkDS_List(CPendingBackupFile, m_Link) mp_PendingFilesQueue;
 
-		TCMap<CStr, CBackupManagerClient::CInternal::CUpdateManifestResult> mp_PendingManifestUpdates;
+		TCMap<CStr, TCVector<CBackupManagerBackup::CManifestChange>> mp_PendingManifestChanges;
+		
+		TCActorSequencer<void> mp_FileManifestSequencer;
 		
 		mint mp_nRunningSyncs = 0;
 		mint mp_nMaxRunningSyncs = 8;
