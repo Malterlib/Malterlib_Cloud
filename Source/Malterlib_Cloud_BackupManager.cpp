@@ -46,6 +46,38 @@ namespace NMib::NCloud
 		return Json;
 	}
 	
+	bool CBackupManagerBackup::CManifestFile::operator == (CManifestFile const &_Right) const
+	{
+		return NContainer::fg_TupleReferences
+			(
+				m_Digest
+				, m_Length
+				, m_WriteTime
+				, m_SymlinkData
+				, m_Attributes
+				, m_Owner
+				, m_Group
+				, m_Flags
+			)
+			== NContainer::fg_TupleReferences
+			(
+				_Right.m_Digest
+				, _Right.m_Length
+				, _Right.m_WriteTime
+				, _Right.m_SymlinkData
+				, _Right.m_Attributes
+				, _Right.m_Owner
+				, _Right.m_Group
+				, _Right.m_Flags
+			)
+		;
+	}
+	
+	bool CBackupManagerBackup::CManifestFile::f_IsDirectory() const
+	{
+		return (m_Attributes & (NFile::EFileAttrib_Directory | NFile::EFileAttrib_Link)) == NFile::EFileAttrib_Directory;
+	}
+	
 	NStr::CStr const &CBackupManagerBackup::CManifestFile::f_GetFileName() const
 	{
 		return NContainer::TCMap<NStr::CStr, CManifestFile>::fs_GetKey(*this);
@@ -373,4 +405,54 @@ namespace NMib::NCloud
 		_Stream % fg_Move(m_Subscription);
 	}
 	DMibDistributedStreamImplement(CBackupManager::CStartDownloadBackup::CResult);
+	
+	NEncoding::CEJSON CBackupManagerBackup::CManifest::f_ToJSON() const
+	{
+		NEncoding::CEJSON JSON;
+		JSON.f_Object();
+
+		for (auto &File : m_Files)
+		{
+			auto &FileName = m_Files.fs_GetKey(File);
+			auto &Entry = JSON[FileName];
+			
+			Entry["Digest"] = NContainer::CByteVector{File.m_Digest.f_GetData(), File.m_Digest.fs_GetSize()};
+			Entry["Length"] = File.m_Length;
+			Entry["WriteTime"] = File.m_WriteTime;
+			Entry["SymlinkData"] = File.m_SymlinkData;
+			Entry["Attributes"] = NFile::CFile::fs_AttribToJSON(File.m_Attributes);
+			Entry["Owner"] = File.m_Owner;
+			Entry["Group"] = File.m_Group;
+			Entry["Flags"] = fs_GenerateSyncFlags(File.m_Flags);
+		}
+		
+		return JSON;
+	}
+
+	CBackupManagerBackup::CManifest CBackupManagerBackup::CManifest::fs_FromJSON(NEncoding::CEJSON const &_JSON)
+	{
+		CBackupManagerBackup::CManifest Manifest;
+		
+		for (auto &File : _JSON.f_Object())
+		{
+			auto &OutFile = Manifest.m_Files[File.f_Name()];
+			auto &ManifestJSON = File.f_Value();
+			
+			{
+				auto Digest = ManifestJSON["Digest"].f_Binary();
+				if (Digest.f_GetLen() != OutFile.m_Digest.fs_GetSize())
+					DMibError("Digest is wrong size");
+				NMem::fg_MemCopy(OutFile.m_Digest.f_GetData(), Digest.f_GetArray(), OutFile.m_Digest.fs_GetSize());
+			}
+			OutFile.m_Length = ManifestJSON["Length"].f_Integer();
+			OutFile.m_WriteTime = ManifestJSON["WriteTime"].f_Date();
+			OutFile.m_SymlinkData = ManifestJSON["SymlinkData"].f_String();
+			OutFile.m_Attributes = NFile::CFile::fs_AttribFromJSON(ManifestJSON["Attributes"]);
+			OutFile.m_Owner = ManifestJSON["Owner"].f_String();
+			OutFile.m_Group = ManifestJSON["Group"].f_String();
+			OutFile.m_Flags = fs_ParseSyncFlags(ManifestJSON["Flags"]);
+		}
+		
+		return Manifest;
+	}
 }

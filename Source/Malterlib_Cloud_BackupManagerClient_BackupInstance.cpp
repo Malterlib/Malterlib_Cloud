@@ -253,12 +253,16 @@ namespace NMib::NCloud::NPrivate
 						{
 							auto &FileName = _StartResult->m_FilesNotUpToDate.fs_GetKey(FileToBackup);
 							
-							if (!mp_Manifest.m_Files.f_FindEqual(FileName))
+							auto *pManifestFile = mp_Manifest.m_Files.f_FindEqual(FileName);
+							if (!pManifestFile)
 							{
 								DMibLogCategoryStr(mp_Config.m_LogCategory);
 								DMibLog(Error, "Unexpected file in reply from backup server: {}", FileName);
 								continue;
 							}
+							
+							if (pManifestFile->f_IsDirectory())
+								continue;
 							
 							auto &PendingFile = mp_PendingFiles[FileName];
 							mp_PendingFilesQueue.f_Insert(PendingFile);
@@ -367,6 +371,13 @@ namespace NMib::NCloud::NPrivate
 										break;
 									}
 								}
+								
+								auto *pManifestFile = mp_Manifest.m_Files.f_FindEqual(_FileName);
+								if (!pManifestFile)
+									return;
+								
+								if (pManifestFile->f_IsDirectory())
+									return;
 								
 								auto Mapping = mp_PendingFiles(_FileName);
 								auto &PendingFile = *Mapping;

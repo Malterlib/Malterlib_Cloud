@@ -37,9 +37,16 @@ namespace NMib::NCloud
 			bool m_bPending = false;
 		};
 		
+		struct CUpdatedDirectory
+		{
+			CBackupManagerBackup::CManifestFile m_ManifestFile;
+			bool m_bAdded = false;
+		};
+		
 		struct CUpdateManifestResult
 		{
 			CBackupManagerBackup::CManifestFile m_ManifestFile;
+			TCMap<CStr, CUpdatedDirectory> m_UpdatedDirectories;
 			bool m_bExists = false;
 			bool m_bRemoved = false;
 			bool m_bAdded = false;

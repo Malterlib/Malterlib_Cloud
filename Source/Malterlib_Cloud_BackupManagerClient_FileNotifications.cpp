@@ -325,6 +325,31 @@ namespace NMib::NCloud
 				auto &Change = *_Change;
 				auto &ChangeFrom = *_ChangeFrom;
 				
+				TCMap<CStr, CUpdatedDirectory> UpdatedDirectories = Change.m_UpdatedDirectories;
+				for (auto &UpdatedDirectory : ChangeFrom.m_UpdatedDirectories)
+				{
+					CStr const &Path = ChangeFrom.m_UpdatedDirectories.fs_GetKey(UpdatedDirectory);
+					
+					auto Mapped = UpdatedDirectories(Path);
+					
+					if (Mapped.f_WasCreated())
+						*Mapped = UpdatedDirectory;
+					else
+					{
+						if (UpdatedDirectory.m_bAdded)
+							(*Mapped).m_bAdded = true;
+					}
+				}
+				
+				for (auto &UpdatedDirectory : UpdatedDirectories)
+				{
+					auto &Path = UpdatedDirectories.fs_GetKey(UpdatedDirectory);
+					if (UpdatedDirectory.m_bAdded)
+						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Add{fg_Move(UpdatedDirectory.m_ManifestFile)});
+					else
+						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Change{fg_Move(UpdatedDirectory.m_ManifestFile)});
+				}
+				
 				if (Notification.m_Notification == EFileChangeNotification_Renamed)
 				{
 					if (ChangeFrom.m_bRemoved)

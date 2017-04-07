@@ -18,6 +18,12 @@ namespace NMib::NCloud
 			o_ManifestFile.m_Owner = CFile::fs_GetOwnerOnLink(FileName);
 			o_ManifestFile.m_Group = CFile::fs_GetGroupOnLink(FileName);
 		}
+		else if (o_ManifestFile.m_Attributes & EFileAttrib_Directory)
+		{
+			o_ManifestFile.m_Owner = CFile::fs_GetOwnerOnLink(FileName);
+			o_ManifestFile.m_Group = CFile::fs_GetGroupOnLink(FileName);
+			o_ManifestFile.m_WriteTime = CFile::fs_GetWriteTime(FileName);
+		}
 		else
 		{
 			CMibFilePos Length;
@@ -52,7 +58,9 @@ namespace NMib::NCloud
 			bool bRecursive = false;
 			auto WildcardParsed = fs_ParseWildcard(Wildcard, bRecursive);
 			
-			for (auto &FoundFile : CFile::fs_FindFilesEx(CFile::fs_AppendPath(_Config.m_Root, WildcardParsed), EFileAttrib_File | EFileAttrib_Link, bRecursive, false))
+			auto FileTypes = EFileAttrib_File | EFileAttrib_Directory | EFileAttrib_Link;
+			
+			for (auto &FoundFile : CFile::fs_FindFilesEx(CFile::fs_AppendPath(_Config.m_Root, WildcardParsed), FileTypes, bRecursive, false))
 			{
 				CStr RelativePath = CFile::fs_MakePathRelative(FoundFile.m_Path, _Config.m_Root);
 				auto Mapping = BackupManifest.m_Files(RelativePath);
@@ -65,6 +73,7 @@ namespace NMib::NCloud
 		}
 		
 		TCSet<CStr> ToRemove;
+		TCSet<CStr> ImplicitDirectories;
 
 		for (auto &ManifestFile : BackupManifest.m_Files)
 		{
@@ -75,11 +84,26 @@ namespace NMib::NCloud
 				continue;
 			}
 			
+			CStr Directory = CFile::fs_GetPath(RelativePath);
+			if (!Directory.f_IsEmpty())
+				ImplicitDirectories[Directory];
+			
 			fs_GetManifestFileProperties(_Config, RelativePath, ManifestFile);
 		}
 		
 		for (auto &File : ToRemove)
 			BackupManifest.m_Files.f_Remove(File);
+		
+		for (auto &File : ImplicitDirectories)
+		{
+			auto Mapping = BackupManifest.m_Files(File);
+			if (!Mapping.f_WasCreated())
+				continue;
+			
+			auto &ManifestFile = *Mapping;
+			ManifestFile.m_Attributes = CFile::fs_GetAttributes(CFile::fs_AppendPath(_Config.m_Root, File));
+			fs_GetManifestFileProperties(_Config, File, ManifestFile);
+		}
 		
 		return BackupManifest;
 	}
@@ -102,8 +126,18 @@ namespace NMib::NCloud
 				ManifestFile.m_Attributes = CFile::fs_GetAttributes(AbsoluteFileName);
 				
 				fs_GetManifestFileProperties(Config, _FileName, ManifestFile);
-					
-				return {fg_Move(ManifestFile), true};
+				
+				CUpdateManifestResult Result = {fg_Move(ManifestFile), true};
+				
+				CStr Directory = CFile::fs_GetPath(_FileName);
+				while (!Directory.f_IsEmpty())
+				{
+					auto &UpdatedDirectory = Result.m_UpdatedDirectories[Directory];
+					UpdatedDirectory.m_ManifestFile.m_Attributes = CFile::fs_GetAttributes(AbsoluteFileName);
+					fs_GetManifestFileProperties(Config, Directory, UpdatedDirectory.m_ManifestFile);
+				}
+				
+				return Result;
 			}
 			> Continuation / [this, _FileName, Continuation](CUpdateManifestResult &&_Result)
 			{
@@ -118,7 +152,31 @@ namespace NMib::NCloud
 					if (Mapped.f_WasCreated())
 						_Result.m_bAdded = true;
 						
-					*Mapped = fg_Move(_Result.m_ManifestFile);
+					*Mapped = _Result.m_ManifestFile;
+
+					for (auto iDirectory = _Result.m_UpdatedDirectories.f_GetIterator(); iDirectory;)
+					{
+						auto &Directory = *iDirectory;
+						auto Mapped = m_Manifest.m_Files(iDirectory.f_GetKey());
+						auto &ManifestFile = *Mapped;
+						
+						if (Mapped.f_WasCreated())
+						{
+							ManifestFile = Directory.m_ManifestFile;
+							Directory.m_bAdded = true;
+							++iDirectory;
+							continue;
+						}
+						
+						if (ManifestFile != Directory.m_ManifestFile)
+						{
+							ManifestFile = Directory.m_ManifestFile;
+							++iDirectory;
+							continue;
+						}
+						
+						iDirectory.f_Remove();
+					}
 				}
 				
 				Continuation.f_SetResult(fg_Move(_Result));

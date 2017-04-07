@@ -42,6 +42,8 @@ namespace NMib::NCloud::NBackupManager
 
 		void f_RunRSyncProtocol(CRSyncContext &_Context, CSecureByteVector &&_ServerPacket);
 		CExceptionPointer f_CheckFileName(CStr const &_FileName, CManifestFile **o_pManifestFile);
+		CStr f_GetCurrentPath(CStr const &_Path);
+		CStr f_GetLatestPath(CStr const &_Path);
 		
 		CStr m_Name;
 		CTime m_StartTime;
@@ -63,6 +65,16 @@ namespace NMib::NCloud::NBackupManager
 	
 	CBackupInstance::~CBackupInstance()
 	{
+	}
+
+	CStr CBackupInstance::CInternal::f_GetCurrentPath(CStr const &_Path)
+	{
+		return CFile::fs_AppendPath(m_BackupDirectory, CFile::fs_AppendPath(CStr("Current"), _Path));
+	}
+	
+	CStr CBackupInstance::CInternal::f_GetLatestPath(CStr const &_Path)
+	{
+		return CFile::fs_AppendPath(m_LatestBackupDirectory, CFile::fs_AppendPath(CStr("Current"), _Path));
 	}
 	
 	CExceptionPointer CBackupInstance::CInternal::f_CheckFileName(CStr const &_FileName, CManifestFile **o_pManifestFile)
@@ -108,8 +120,8 @@ namespace NMib::NCloud::NBackupManager
 				
 				for (auto &File : _Manifest.m_Files)
 				{
-					CStr FileName = CFile::fs_AppendPath(Internal.m_BackupDirectory, File.f_GetFileName());
-					CStr OldFileName = CFile::fs_AppendPath(Internal.m_LatestBackupDirectory, File.f_GetFileName());
+					CStr FileName = Internal.f_GetCurrentPath(File.f_GetFileName());
+					CStr OldFileName = Internal.f_GetCurrentPath(File.f_GetFileName());
 					
 					if (!CFile::fs_FileExists(FileName))
 					{
@@ -131,6 +143,9 @@ namespace NMib::NCloud::NBackupManager
 					
 					BackupResult.m_FilesNotUpToDate[File.f_GetFileName()] = CFile::fs_GetFileSize(FileName);
 				}
+				
+				CFile::fs_CreateDirectory(Internal.m_BackupDirectory);
+				CFile::fs_WriteStringToFile(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.json"), _Manifest.f_ToJSON().f_ToString());
 				
 				return BackupResult;
 			}
@@ -174,11 +189,16 @@ namespace NMib::NCloud::NBackupManager
 				if (auto pException = Internal.f_CheckFileName(_FileName, &pManifestFile))
 					return fg_Move(pException);
 				
+				bool bIsDirectory = pManifestFile->f_IsDirectory();
+				
 				Internal.m_Manifest.m_Files.f_Remove(pManifestFile);
-
-				CStr AbsolutePath = CFile::fs_AppendPath(Internal.m_BackupDirectory, _FileName);
+				
+				CStr AbsolutePath = Internal.f_GetCurrentPath(_FileName);
 
 				DMibConOut("Remove manifest: {}\n", _FileName);
+				
+				if (bIsDirectory)
+					return fg_Explicit();
 				
 				return TCContinuation<void>::fs_RunProtected<CExceptionFile>()
 					> [&]()
@@ -197,20 +217,28 @@ namespace NMib::NCloud::NBackupManager
 					return fg_Move(pException);
 				if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
 					return fg_Move(pException);
+
+				bool bIsDirectory = pManifestFile->f_IsDirectory();
 				
 				Internal.m_Manifest.m_Files.f_Remove(pManifestFile);
 				Internal.m_Manifest.m_Files[_FileName] = Change.m_ManifestFile;
 				
-				CStr AbsoluteFrom = CFile::fs_AppendPath(Internal.m_BackupDirectory, Change.m_FromFileName);
-				CStr AbsoluteTo = CFile::fs_AppendPath(Internal.m_BackupDirectory, _FileName);
+				CStr AbsoluteFrom = Internal.f_GetCurrentPath(Change.m_FromFileName);
+				CStr AbsoluteTo = Internal.f_GetCurrentPath(_FileName);
 				
 				DMibConOut2("Rename manifest: {} -> \n", Change.m_FromFileName, _FileName);
+
+				if (bIsDirectory)
+					return fg_Explicit();
 				
 				return TCContinuation<void>::fs_RunProtected<CExceptionFile>()
 					> [&]()
 					{
 						if (CFile::fs_FileExists(AbsoluteFrom))
+						{
+							CFile::fs_CreateDirectory(CFile::fs_GetPath(AbsoluteTo));
 							CFile::fs_RenameFile(AbsoluteFrom, AbsoluteTo);
+						}
 					}
 				;
 			}
@@ -290,8 +318,8 @@ namespace NMib::NCloud::NBackupManager
 		CStr RSyncID = fg_RandomID();
 		auto &RSyncContext = Internal.m_RSyncContexts[RSyncID];
 		
-		CStr FileName = CFile::fs_AppendPath(Internal.m_BackupDirectory, _FileName);
-		CStr OldFileName = CFile::fs_AppendPath(Internal.m_LatestBackupDirectory, _FileName);
+		CStr FileName = Internal.f_GetCurrentPath(_FileName);
+		CStr OldFileName = Internal.f_GetLatestPath(_FileName);
 		CStr TempFileName = fg_Format("{}.{}.tmp", FileName);
 		
 		auto pActorSubscription = g_ActorSubscription > [this, RSyncID, TempFileName]() -> TCContinuation<void>
@@ -369,7 +397,7 @@ namespace NMib::NCloud::NBackupManager
 				auto &CacheFile = Internal.m_FileCache[_FileName];
 				if (!CacheFile.f_IsValid())
 				{
-					CStr FileName = CFile::fs_AppendPath(Internal.m_BackupDirectory, _FileName);
+					CStr FileName = Internal.f_GetCurrentPath(_FileName);
 					CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
 					CacheFile.f_Open(FileName, EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll | EFileOpen_NoLocalCache);
 				}

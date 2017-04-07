@@ -43,7 +43,10 @@ namespace NMib::NCloud
 		
 		struct CManifestFile
 		{
+			bool operator == (CManifestFile const &_Right) const;
+			
 			NStr::CStr const &f_GetFileName() const;
+			bool f_IsDirectory() const;
 			
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -62,6 +65,8 @@ namespace NMib::NCloud
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
+			NEncoding::CEJSON f_ToJSON() const;
+			static CManifest fs_FromJSON(NEncoding::CEJSON const &_JSON);
 			
 			NContainer::TCMap<NStr::CStr, CManifestFile> m_Files;
 		};
