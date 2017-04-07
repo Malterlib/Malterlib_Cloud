@@ -37,14 +37,11 @@ namespace NMib::NCloud::NCloudAPIManager
 		{
 			DMibLogWithCategory(Mib/Cloud/CloudAPIManager/Daemon, Info, "Shutting down");
 			
-			mp_pServer->f_Destroy
-				(
-					[pCanDestroy](TCAsyncResult<void> &&_Result)
-					{
-						if (!_Result)
-							DMibLogWithCategory(Mib/Cloud/CloudAPIManager/Daemon, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());
-					}
-				)
+			mp_pServer->f_Destroy2() > [pCanDestroy](TCAsyncResult<void> &&_Result)
+				{
+					if (!_Result)
+						DMibLogWithCategory(Mib/Cloud/CloudAPIManager/Daemon, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());
+				}
 			;
 			mp_pServer = nullptr;
 		}
