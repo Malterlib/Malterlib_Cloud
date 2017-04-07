@@ -26,7 +26,7 @@ namespace NMib::NCloud
 		auto &Internal = *mp_pInternal;
 		TCActorResultVector<void> Destroys;
 		for (auto &BackupInstance : Internal.m_RunningBackupInstances)
-			BackupInstance->f_Destroy2() > Destroys.f_AddResult();
+			BackupInstance->f_Destroy() > Destroys.f_AddResult();
 		
 		Internal.m_RunningBackupInstances.f_Clear();
 		

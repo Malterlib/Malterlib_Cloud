@@ -273,7 +273,7 @@ namespace NMib::NCloud::NVersionManager
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		if (mp_QueryFileActor)
-			mp_QueryFileActor->f_Destroy2() > pCanDestroy->f_Track();
+			mp_QueryFileActor->f_Destroy() > pCanDestroy->f_Track();
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
 		return pCanDestroy->m_Continuation;
 	}

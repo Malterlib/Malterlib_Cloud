@@ -44,7 +44,7 @@ namespace NMib::NCloud
 							if (!pActor)
 								return;
 
-							(*pActor)->f_Destroy2() > m_pCanDestroyTracker->f_Track();
+							(*pActor)->f_Destroy() > m_pCanDestroyTracker->f_Track();
 							
 							m_RunningBackupInstances.f_Remove(_Actor);
 						}

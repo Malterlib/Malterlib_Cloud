@@ -175,7 +175,7 @@ namespace NMib::NCloud::NAppManager
 								TCContinuation<void> BackupContinuation;
 								if (pApplication->m_BackupClient)
 								{
-									pApplication->m_BackupClient->f_Destroy2() > BackupContinuation;
+									pApplication->m_BackupClient->f_Destroy() > BackupContinuation;
 									pApplication->m_BackupClient.f_Clear();
 								}
 								else

@@ -40,7 +40,7 @@ namespace NMib::NCloud
 				m_DownloadVersionReceive.f_Clear();
 				m_DownloadVersionSubscription.f_Clear();
 				if (m_DownloadVersionReceive)
-					return m_DownloadVersionReceive->f_Destroy2();
+					return m_DownloadVersionReceive->f_Destroy();
 				return fg_Explicit();
 			}
 		};
@@ -55,7 +55,7 @@ namespace NMib::NCloud
 				m_UploadVersionSend.f_Clear();
 				m_UploadVersionSubscription.f_Clear();
 				if (m_UploadVersionSend)
-					return m_UploadVersionSend->f_Destroy2();
+					return m_UploadVersionSend->f_Destroy();
 				return fg_Explicit();
 			}
 		};
@@ -67,7 +67,7 @@ namespace NMib::NCloud
 			TCContinuation<void> f_Abort()
 			{
 				if (m_Launch)
-					return m_Launch->f_Destroy2();
+					return m_Launch->f_Destroy();
 				return fg_Explicit();
 			}
 		};

@@ -52,13 +52,13 @@ namespace NMib
 				if (mp_ServerActor)
 				{
 					DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server");
-					mp_ServerActor->f_Destroy2() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
+					mp_ServerActor->f_Destroy() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
 						{
 							DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server shut down");
 							if (mp_DatabaseActor)
 							{
 								DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
-								mp_DatabaseActor->f_Destroy2() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
+								mp_DatabaseActor->f_Destroy() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
 									{
 										DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server database shut down");
 									}
@@ -72,7 +72,7 @@ namespace NMib
 				else if (mp_DatabaseActor)
 				{
 					DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
-					mp_DatabaseActor->f_Destroy2() > pCanDestroy->f_Track();
+					mp_DatabaseActor->f_Destroy() > pCanDestroy->f_Track();
 					mp_DatabaseActor = nullptr;
 				}
 

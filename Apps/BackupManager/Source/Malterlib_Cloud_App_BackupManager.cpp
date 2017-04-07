@@ -35,7 +35,7 @@ namespace NMib::NCloud::NBackupManager
 		{
 			DMibLogWithCategory(Mib/Cloud/BackupManager/Daemon, Info, "Shutting down");
 			
-			mp_pServer->f_Destroy2() > [pCanDestroy](TCAsyncResult<void> &&_Result)
+			mp_pServer->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
 				{
 					if (!_Result)
 						DMibLogWithCategory(Mib/Cloud/BackupManager/Daemon, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());

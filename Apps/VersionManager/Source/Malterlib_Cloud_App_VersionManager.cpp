@@ -37,7 +37,7 @@ namespace NMib::NCloud::NVersionManager
 		{
 			DMibLogWithCategory(Mib/Cloud/VersionManager/Daemon, Info, "Shutting down");
 			
-			mp_pServer->f_Destroy2() > [pCanDestroy](TCAsyncResult<void> &&_Result)
+			mp_pServer->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
 				{
 					if (!_Result)
 						DMibLogWithCategory(Mib/Cloud/VersionManager/Daemon, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());

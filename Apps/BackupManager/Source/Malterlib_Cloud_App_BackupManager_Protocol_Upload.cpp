@@ -82,7 +82,7 @@ namespace NMib::NCloud::NBackupManager
 		TCContinuation<void> Continuation;
 		auto pCanDestroyTracker = mp_pCanDestroyTracker;
 		pBackupInstance->m_bPendingDestroy = true;
-		pBackupInstance->m_BackupInstance->f_Destroy2() > [this, pCanDestroyTracker, _Key, _Auditor, Continuation](TCAsyncResult<void> &&_Result)
+		pBackupInstance->m_BackupInstance->f_Destroy() > [this, pCanDestroyTracker, _Key, _Auditor, Continuation](TCAsyncResult<void> &&_Result)
 			{
 				auto *pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
 				DMibCheck(pBackupInstance);

@@ -208,7 +208,7 @@ namespace NMib::NCloud::NVersionManager
 									TCContinuation<void> Continuation;
 									if (pUpload->m_FileTransferReceive)
 									{
-										pUpload->m_FileTransferReceive->f_Destroy2() > Continuation;
+										pUpload->m_FileTransferReceive->f_Destroy() > Continuation;
 										pUpload->m_FileTransferReceive.f_Clear();
 									}
 									else

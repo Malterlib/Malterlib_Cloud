@@ -119,7 +119,7 @@ namespace
 			TCActorResultVector<void> Destroys;
 			for (auto &Launch : m_Launches)
 			{
-				Launch.m_Launch->f_Destroy2() > Destroys.f_AddResult();
+				Launch.m_Launch->f_Destroy() > Destroys.f_AddResult();
 				Launch.f_Abort();
 			}
 
