@@ -120,14 +120,14 @@ namespace NMib::NCloud
 				auto AbsoluteFileName = CFile::fs_AppendPath(Config.m_Root, _FileName);
 				
 				if (!CFile::fs_FileExists(AbsoluteFileName, EFileAttrib_File | EFileAttrib_Link))
-					return {{}, false};
+					return {{}, {}, false};
 				
 				CBackupManagerBackup::CManifestFile ManifestFile;
 				ManifestFile.m_Attributes = CFile::fs_GetAttributes(AbsoluteFileName);
 				
 				fs_GetManifestFileProperties(Config, _FileName, ManifestFile);
 				
-				CUpdateManifestResult Result = {fg_Move(ManifestFile), true};
+				CUpdateManifestResult Result = {fg_Move(ManifestFile), {}, true};
 				
 				CStr Directory = CFile::fs_GetPath(_FileName);
 				while (!Directory.f_IsEmpty())
