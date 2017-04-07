@@ -70,7 +70,7 @@ namespace NMib::NCloud::NBackupManager
 		if (CFile::fs_IsPathAbsolute(_FileName))
 			return fg_ExceptionPointer(DMibErrorInstance("Absolute paths not allowed"));
 
-		if (CFile::fs_GetExpandedPath(_FileName, false) != _FileName)
+		if (CFile::fs_HasRelativeComponents(_FileName))
 			return fg_ExceptionPointer(DMibErrorInstance("Relative path components such as '..' are not allowed"));
 
 		{

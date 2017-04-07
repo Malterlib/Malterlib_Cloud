@@ -104,28 +104,8 @@ namespace NMib::NCloud
 				DMibError("Wildcards can only appear for file part of files searches. Directories cannot be wildcarded.");
 		}
 		
-		ch8 const *pParse = _Wildcard.f_GetStr();
-		ch8 const *pDirStart = pParse;
-		auto fCheckPath = [&]
-			{
-				if (fg_StrCmp(pDirStart, "..", pParse - pDirStart) == 0 || fg_StrCmp(pDirStart, ".", pParse - pDirStart) == 0)
-					DMibError("Wildcards cannot contain relative paths '..' or '.'");
-			}
-		;
-
-		while (*pParse)
-		{
-			if (*pParse == '/')
-			{
-				fCheckPath();
-				++pParse;
-				pDirStart = pParse; 
-				continue;
-			}
-				
-			++pParse;
-		}
-		fCheckPath();
+		if (CFile::fs_HasRelativeComponents(_Wildcard))
+			DMibError("Wildcards cannot contain relative path components '..' or '.'");
 	}
 	
 	CStr CBackupManagerClient::CInternal::fs_ParseWildcard(CStr const &_Wildcard, bool &o_bRecursive)
