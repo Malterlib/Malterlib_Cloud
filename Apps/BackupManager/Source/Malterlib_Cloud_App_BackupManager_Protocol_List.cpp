@@ -41,14 +41,14 @@ namespace NMib::NCloud::NBackupManager
 		return BackupSources;
 	}
 
-	auto CBackupManagerServer::CBackupManagerImplementation::f_ListBackupSources(CListBackupSources &&_Params) -> NConcurrency::TCContinuation<CListBackupSources::CResult> 
+	TCContinuation<TCVector<CStr>> CBackupManagerServer::CBackupManagerImplementation::f_ListBackupSources()
 	{
 		auto pThis = m_pThis;
 		if (pThis->mp_bDestroyed)
 			return DMibErrorInstance("Shutting down");
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		NConcurrency::TCContinuation<CBackupManager::CListBackupSources::CResult> Continuation;
+		NConcurrency::TCContinuation<TCVector<CStr>> Continuation;
 		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		Auditor.f_Info("Listing backup sources");
@@ -60,7 +60,7 @@ namespace NMib::NCloud::NBackupManager
 				QueryFileActor
 				, g_fFindBackupSources
 			)
-			> [pThis, Continuation, Auditor, CallingHostID, _Params](TCAsyncResult<TCVector<CStr>> &&_Result)
+			> [pThis, Continuation, Auditor, CallingHostID](TCAsyncResult<TCVector<CStr>> &&_Result)
 			{
 				if (!_Result)
 				{
@@ -68,18 +68,18 @@ namespace NMib::NCloud::NBackupManager
 					Continuation.f_SetException(Auditor.f_Exception({"File error when running query. Consult logs on backup server to diagnose.", DetailedErrror}));
 					return;
 				}
-				CBackupManager::CListBackupSources::CResult Results;
-				Results.m_BackupSources = pThis->fp_FilterBackupSourcesByPermissions(CallingHostID, *_Result);
+				TCVector<CStr> BackupSources;
+				BackupSources = pThis->fp_FilterBackupSourcesByPermissions(CallingHostID, *_Result);
 
-				Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", Results.m_BackupSources));
+				Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", BackupSources));
 				
-				Continuation.f_SetResult(fg_Move(Results));
+				Continuation.f_SetResult(fg_Move(BackupSources));
 			}
 		;
 		return Continuation;
 	}
-	
-	auto CBackupManagerServer::CBackupManagerImplementation::f_ListBackups(CListBackups &&_Params) -> NConcurrency::TCContinuation<CListBackups::CResult>
+
+	auto CBackupManagerServer::CBackupManagerImplementation::f_ListBackups(CStr const &_ForBackupSource) -> TCContinuation<TCMap<CStr, TCVector<CBackupID>>>
 	{
 		auto pThis = m_pThis;
 		if (pThis->mp_bDestroyed)
@@ -88,22 +88,22 @@ namespace NMib::NCloud::NBackupManager
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		auto CallingHostID = fg_GetCallingHostID();
 			
-		NConcurrency::TCContinuation<CBackupManager::CListBackups::CResult> Continuation;
+		NConcurrency::TCContinuation<TCMap<CStr, TCVector<CBackupID>>> Continuation;
 		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		Auditor.f_Info("Listing backups");
 		
-		auto fListBackups = [pThis, Continuation, Auditor, _Params](TCVector<CStr> const &_BackupSources)
+		auto fListBackups = [pThis, Continuation, Auditor](TCVector<CStr> const &_BackupSources)
 			{
 				auto QueryFileActor = pThis->fp_GetQueryFileActor();
 				
 				fg_Dispatch
 					(
 						QueryFileActor
-						, [_BackupSources]() -> TCMap<CStr, TCVector<CBackupManager::CListBackups::CBackup>>
+						, [_BackupSources]() -> TCMap<CStr, TCVector<CBackupID>>
 						{
 							CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
-							TCMap<CStr, TCVector<CBackupManager::CListBackups::CBackup>> BackupsPerSource;
+							TCMap<CStr, TCVector<CBackupID>> BackupsPerSource;
 							for (auto &BackupSource : _BackupSources)
 							{
 								auto &Backups = BackupsPerSource[BackupSource];
@@ -120,14 +120,14 @@ namespace NMib::NCloud::NBackupManager
 									{
 										auto &OutBackup = Backups.f_Insert();
 										OutBackup.m_Time = Time;
-										OutBackup.m_BackupID = BackupID;
+										OutBackup.m_ID = BackupID;
 									}
 								}
 							}
 							return BackupsPerSource;
 						}
 					)
-					> [pThis, Continuation, Auditor, _Params](TCAsyncResult<TCMap<CStr, TCVector<CBackupManager::CListBackups::CBackup>>> &&_Result)
+					> [pThis, Continuation, Auditor](TCAsyncResult<TCMap<CStr, TCVector<CBackupID>>> &&_Result)
 					{
 						if (!_Result)
 						{
@@ -135,24 +135,21 @@ namespace NMib::NCloud::NBackupManager
 							Continuation.f_SetException(Auditor.f_Exception({"File error when running query. See Backup Server logs.", DetailedError}));
 							return;
 						}
-						CBackupManager::CListBackups::CResult Results;
-						Results.m_Backups = fg_Move(*_Result);
-
-						Auditor.f_Info(fg_Format("Listed backup sources: {}", Results));
+						Auditor.f_Info(fg_Format("Listed backup sources: {}", *_Result));
 						
-						Continuation.f_SetResult(fg_Move(Results));
+						Continuation.f_SetResult(fg_Move(*_Result));
 					}
 				;
 			}
 		;
 		
-		if (!_Params.m_ForBackupSource.f_IsEmpty())
+		if (!_ForBackupSource.f_IsEmpty())
 		{
-			if (!CBackupManager::fs_IsValidBackupSource(_Params.m_ForBackupSource, nullptr, nullptr))
+			if (!CBackupManager::fs_IsValidBackupSource(_ForBackupSource, nullptr, nullptr))
 				return Auditor.f_Exception("Invalid backup source format");
 				
 			TCVector<CStr> BackupSources;
-			BackupSources.f_Insert(_Params.m_ForBackupSource);
+			BackupSources.f_Insert(_ForBackupSource);
 			if (pThis->fp_FilterBackupSourcesByPermissions(CallingHostID, BackupSources).f_IsEmpty())
 				return Auditor.f_AccessDenied("(List backups)");
 			fListBackups(BackupSources);

@@ -11,7 +11,7 @@ namespace NMib::NCloud::NPrivate
 	CBackupManagerClient_Instance::CBackupManagerClient_Instance
 		(
 			TCDistributedActor<CBackupManager> const &_BackupManager
-			, CBackupManagerBackup::CManifest const &_Manifest
+			, CDirectoryManifest const &_Manifest
 			, CBackupManagerClient::CConfig const &_Config
 			, CTrustedActorInfo const &_ActorInfo
 			, TCWeakActor<CBackupManagerClient> const &_BackupManagerClient
@@ -121,7 +121,7 @@ namespace NMib::NCloud::NPrivate
 				}
 			;
 			
-			CStr FullPath = CFile::fs_AppendPath(mp_Config.m_Root, FileName);
+			CStr FullPath = CFile::fs_AppendPath(mp_Config.m_ManifestConfig.m_Root, FileName);
 			
 			try
 			{

@@ -15,7 +15,7 @@ namespace NMib::NCloud::NBackupManager
 		CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID);
 		~CBackupInstance();
 		
-		TCContinuation<CStartBackupResult> f_StartBackup(CManifest const &_Manifest) override;
+		TCContinuation<CStartBackupResult> f_StartBackup(CDirectoryManifest const &_Manifest) override;
 
 		TCContinuation<TCActorSubscriptionWithID<>> f_StartRSync
 			(

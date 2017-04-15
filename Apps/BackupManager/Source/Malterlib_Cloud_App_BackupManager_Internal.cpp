@@ -86,6 +86,9 @@ namespace NMib::NCloud::NBackupManager
 		
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		
+		for (auto &Download : mp_BackupDownloads)
+			Download.f_Destroy() > pCanDestroy->f_Track();
+		
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
 		
 		if (mp_QueryFileActor)

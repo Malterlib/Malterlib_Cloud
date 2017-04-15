@@ -32,7 +32,9 @@ namespace NMib::NCloud::NCloudClient
 	{	
 		TCActorResultVector<void> Destroys;
 
-		mp_DownloadBackupSubscription.f_Clear();
+		if (mp_DownloadBackupSubscription)
+			mp_DownloadBackupSubscription->f_Destroy() > Destroys.f_AddResult();
+		
 		mp_VersionManagerHelper.f_AbortAll() > Destroys.f_AddResult();  
 		
 		TCContinuation<void> Continuation;

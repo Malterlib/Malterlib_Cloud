@@ -107,8 +107,8 @@ namespace NMib::NCloud::NAppManager
 			
 			NContainer::TCSet<NStr::CStr> m_Backup_IncludeWildcards;
 			NContainer::TCSet<NStr::CStr> m_Backup_ExcludeWildcards;
-			NContainer::TCMap<NStr::CStr, CBackupManagerBackup::EManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
-			NContainer::TCMap<NStr::CStr, CBackupManagerBackup::EManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
+			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
+			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
 			NTime::CTimeSpan m_Backup_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);
 			
 			// Settings that can be updated by app manager (command line or protocol)

@@ -6,7 +6,9 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/Actor/Timer>
+#include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Cloud/BackupManagerDownload>
 
 #include "Malterlib_Cloud_App_CloudClient.h"
 
@@ -164,26 +166,24 @@ namespace NMib::NCloud::NCloudClient
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
 			> Continuation / [this, Continuation, BackupHost]
 			{
-				TCActorResultMap<CHostInfo, CBackupManager::CListBackupSources::CResult> BackupSources;
+				TCActorResultMap<CHostInfo, TCVector<CStr>> BackupSources;
 				
 				for (auto &TrustedBackupManager : mp_BackupManagers.m_Actors)
 				{
 					if (!BackupHost.f_IsEmpty() && TrustedBackupManager.m_TrustInfo.m_HostInfo.m_HostID != BackupHost)
 						continue;
 					auto &BackupManager = TrustedBackupManager.m_Actor;
-					CBackupManager::CListBackupSources Command;
 					DMibCallActor
 						(
 							BackupManager
 							, CBackupManager::f_ListBackupSources
-							, fg_Move(Command)
 						)
 						.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
 						> BackupSources.f_AddResult(TrustedBackupManager.m_TrustInfo.m_HostInfo)
 					;
 				}
 				
-				BackupSources.f_GetResults() > Continuation / [this, Continuation](TCMap<CHostInfo, TCAsyncResult<CBackupManager::CListBackupSources::CResult>> &&_Results)
+				BackupSources.f_GetResults() > Continuation / [this, Continuation](TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> &&_Results)
 					{
 						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
@@ -195,7 +195,7 @@ namespace NMib::NCloud::NCloudClient
 								CommandLineResults.f_AddStdErr(fg_Format("    Failed getting backup sources for this host: {}\n", Result.f_GetExceptionStr()));
 								continue;
 							}
-							for (auto &Source : Result->m_BackupSources)
+							for (auto &Source : *Result)
 								CommandLineResults.f_AddStdOut(fg_Format("    {}\n", Source));
 						}
 						Continuation.f_SetResult(fg_Move(CommandLineResults));
@@ -216,27 +216,25 @@ namespace NMib::NCloud::NCloudClient
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
 			> Continuation / [this, Continuation, BackupSource, BackupHost]
 			{
-				TCActorResultMap<CHostInfo, CBackupManager::CListBackups::CResult> Backups;
+				TCActorResultMap<CHostInfo, TCMap<CStr, TCVector<CBackupManager::CBackupID>>> Backups;
 				
 				for (auto &TrustedBackupManager : mp_BackupManagers.m_Actors)
 				{
 					if (!BackupHost.f_IsEmpty() && TrustedBackupManager.m_TrustInfo.m_HostInfo.m_HostID != BackupHost)
 						continue;
 					auto &BackupManager = TrustedBackupManager.m_Actor;
-					CBackupManager::CListBackups Options;
-					Options.m_ForBackupSource = BackupSource;
 					DMibCallActor
 						(
 							BackupManager
 							, CBackupManager::f_ListBackups
-							, fg_Move(Options)
+							, BackupSource
 						)
 						.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
 						> Backups.f_AddResult(TrustedBackupManager.m_TrustInfo.m_HostInfo)
 					;
 				}
 				
-				Backups.f_GetResults() > Continuation / [this, Continuation](TCMap<CHostInfo, TCAsyncResult<CBackupManager::CListBackups::CResult>> &&_Results)
+				Backups.f_GetResults() > Continuation / [this, Continuation](TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, TCVector<CBackupManager::CBackupID>>>> &&_Results)
 					{
 						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
@@ -248,9 +246,9 @@ namespace NMib::NCloud::NCloudClient
 								CommandLineResults.f_AddStdErr(fg_Format("    Failed getting backups for this host: {}\n", Result.f_GetExceptionStr()));
 								continue;
 							}
-							for (auto &Backups : Result->m_Backups)
+							for (auto &Backups : *Result)
 							{
-								auto &BackupSouce = Result->m_Backups.fs_GetKey(Backups);
+								auto &BackupSouce = Result->fs_GetKey(Backups);
 								CommandLineResults.f_AddStdOut(fg_Format("    {}\n", BackupSouce));
 								for (auto &Backup : Backups)
 									CommandLineResults.f_AddStdOut(fg_Format("        {}\n", Backup));
@@ -298,7 +296,11 @@ namespace NMib::NCloud::NCloudClient
 				auto *pBackupManager = mp_BackupManagers.f_GetOneActor(BackupHost, Error);
 				if (!pBackupManager)
 				{
-					Continuation.f_SetException(DMibErrorInstance(fg_Format("Error selecting backup manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error)));
+					Continuation.f_SetException
+						(
+							DMibErrorInstance(fg_Format("Error selecting backup manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
+						)
+					;
 					return;
 				}
 
@@ -309,62 +311,52 @@ namespace NMib::NCloud::NCloudClient
 					BasePath = fg_Format("{}/{}/Latest", CFile::fs_GetProgramDirectory(), BackupSource);
 				else
 					BasePath = fg_Format("{}/{}/{tst.,tsb_}_{}", CFile::fs_GetProgramDirectory(), BackupSource, BackupTime, BackupID);
+
+				CBackupManager::CBackupID DownloadBackupID;
+				DownloadBackupID.m_ID = BackupID;
+				DownloadBackupID.m_Time = BackupTime;
 				
-				mp_DownloadBackupReceive = fg_ConstructActor<CFileTransferReceive>(BasePath); 
-
-				mp_DownloadBackupReceive(&CFileTransferReceive::f_ReceiveFiles, QueueSize, CFileTransferReceive::EReceiveFlag_None) 
-					> Continuation % "Failed to initialize file transfer context" 
-					/ [this, BackupSource, BackupID, BackupTime, OneBackupManager = pBackupManager->m_Actor, Continuation]
-					(CFileTransferContext &&_TransferContext)
+				CDirectorySyncReceive::CConfig Config;
+				Config.m_BasePath = BasePath;
+				Config.m_PreviousBasePath = BasePath;
+				Config.m_QueueSize = QueueSize;
+				Config.m_PreviousManifest = BasePath + ".manifest";
+				Config.m_OutputManifestPath = BasePath + ".manifest";
+				Config.m_ExcessFilesAction = CDirectorySyncReceive::EExcessFilesAction_Ignore;
+				
+				fg_DownloadBackup
+					(
+						pBackupManager->m_Actor
+						, BackupSource
+						, DownloadBackupID
+						, {}
+						, fg_Move(Config)
+						, mp_DownloadBackupSubscription
+					)
+					.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
+					> Continuation % "Failed to download backup" / [Continuation](CDirectorySyncReceive::CSyncResult &&_Result)
 					{
-						CBackupManager::CStartDownloadBackup StartDownload;
-						StartDownload.m_BackupSource = BackupSource;
-						StartDownload.m_BackupID = BackupID;
-						StartDownload.m_Time = BackupTime;
-						StartDownload.m_TransferContext = fg_Move(_TransferContext);
+						CDistributedAppCommandLineResults CommandLine;
 
-						DMibCallActor
-							(
-								OneBackupManager
-								, CBackupManager::f_StartDownloadBackup
-								, fg_Move(StartDownload)
-							)
-							.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
-							> Continuation % "Failed to start download on remote server" / [this, Continuation](CBackupManager::CStartDownloadBackup::CResult &&_Result)
-							{
-								mp_DownloadBackupSubscription = fg_Move(_Result.m_Subscription);
-
-								mp_DownloadBackupReceive(&CFileTransferReceive::f_GetResult) > [this, Continuation](TCAsyncResult<CFileTransferResult> &&_Results)
-									{
-										mp_DownloadBackupSubscription.f_Clear();
-										if (!_Results)
-											Continuation.f_SetException(fg_Move(_Results));
-										else
-										{
-											auto &Results = *_Results;
-											CDistributedAppCommandLineResults CommandLine;
-
-											if (Results.m_nBytes == 0)
-												CommandLine.f_AddStdOut(fg_Format("All files were already up to date\n"));
-											else
-											{
-												CommandLine.f_AddStdOut
-													(
-														fg_Format
-														(
-															"Download finished transferring: {ns } bytes at {fe2} MB/s\n"
-															, Results.m_nBytes
-															, Results.f_BytesPerSecond()/1'000'000.0
-														)
-													)
-												;
-											}
-											Continuation.f_SetResult(fg_Move(CommandLine));
-										}
-									}
-								;
-							}
-						;
+						if (_Result.m_Stats.m_nSyncedFiles == 0)
+							CommandLine.f_AddStdOut(fg_Format("All files were already up to date\n"));
+						else
+						{
+							CommandLine.f_AddStdOut
+								(
+									fg_Format
+									(
+										"Download of {} files finished transferring: {ns } incoming bytes at {fe2} MB/s    {ns } outgoing bytes at {fe2} MB/s\n"
+										, _Result.m_Stats.m_nSyncedFiles
+										, _Result.m_Stats.m_IncomingBytes
+										, _Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+										, _Result.m_Stats.m_OutgoingBytes
+										, _Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
+									)
+								)
+							;
+						}
+						Continuation.f_SetResult(fg_Move(CommandLine));
 					}
 				;
 			}

@@ -21,20 +21,15 @@ namespace NMib::NCloud
 	/// \brief Implements a client that backs up through backup manager interface
 	struct CBackupManagerClient : public NConcurrency::CActor
 	{
-		using EManifestSyncFlag = CBackupManagerBackup::EManifestSyncFlag;
+		using EManifestSyncFlag = EDirectoryManifestSyncFlag;
 		
 		struct CConfig /// \brief Config for backup manager client. \headerfile Mib/Cloud/BackupManagerClient
 		{
 			CConfig const &f_Validate() const; ///< Throws exception if settings are invalid
 			
 			NStr::CStr m_BackupIdentifier;
-			
-			NStr::CStr m_Root;																		///< The root directory of the backup. 
-			NContainer::TCSet<NStr::CStr> m_IncludeWildcards;										///< \brief Relative to m_Root. This is a file search. Only file name can have wildcards.
-																									/// Use ^ in the beginning of the file path to create a recursive search.
-			NContainer::TCSet<NStr::CStr> m_ExcludeWildcards;										///< Relative to m_Root. Evaluated after include wild cards as a filtering step.
-			NContainer::TCMap<NStr::CStr, EManifestSyncFlag> m_AddSyncFlagsWildcards;				///< Relative to m_Root.
-			NContainer::TCMap<NStr::CStr, EManifestSyncFlag> m_RemoveSyncFlagsWildcards;			///< Relative to m_Root. Evaluated after m_AddSyncFlagsWildcards.
+
+			CDirectoryManifestConfig m_ManifestConfig;												///< The config to generate the manifest
 			NTime::CTimeSpan m_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);	///< Interval for creating new full backup snapshots. Set to 0 to disable.
 			NStr::CStr m_LogCategory = "Backup";													///< The category to do logging under.
 		};

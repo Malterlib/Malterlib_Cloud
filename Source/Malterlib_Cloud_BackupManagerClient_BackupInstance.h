@@ -28,7 +28,7 @@ namespace NMib::NCloud::NPrivate
 		CBackupManagerClient_Instance
 			(
 				TCDistributedActor<CBackupManager> const &_BackupManager
-				, CBackupManagerBackup::CManifest const &_Manifest
+				, CDirectoryManifest const &_Manifest
 				, CBackupManagerClient::CConfig const &_Config
 				, CTrustedActorInfo const &_ActorInfo
 				, TCWeakActor<CBackupManagerClient> const &_BackupManagerClient
@@ -91,7 +91,7 @@ namespace NMib::NCloud::NPrivate
 		CBackupManagerClient::CConfig mp_Config;
 		CTrustedActorInfo mp_ActorInfo;
 		
-		CBackupManagerBackup::CManifest mp_Manifest;
+		CDirectoryManifest mp_Manifest;
 		
 		CBackupManager::CBackupKey mp_BackupKey;
 		TCDistributedActorInterface<CBackupManagerBackup> mp_Backup;

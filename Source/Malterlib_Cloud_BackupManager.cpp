@@ -16,120 +16,9 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CBackupManagerBackup::f_InitialBackupFinished);
 	}
 	
-	auto CBackupManagerBackup::fs_ParseSyncFlags(NEncoding::CEJSON const &_JSON) -> EManifestSyncFlag 
-	{
-		EManifestSyncFlag Flags = EManifestSyncFlag_None;
-		
-		for (auto &Flag : _JSON.f_Array())
-		{
-			if (Flag.f_String() == "Append")
-				Flags |= EManifestSyncFlag_Append; 
-			else if (Flag.f_String() == "TransactionLog")
-				Flags |= EManifestSyncFlag_TransactionLog;
-			else
-				DMibError(NStr::fg_Format("Unknown sync flag: {}", Flag.f_String()));
-		}
-		
-		return Flags;
-	}
-	
-	NEncoding::CEJSON CBackupManagerBackup::fs_GenerateSyncFlags(EManifestSyncFlag _Flags)
-	{
-		NEncoding::CEJSON Json;
-		Json.f_Array();
-		
-		if (_Flags & EManifestSyncFlag_Append)
-			Json.f_Insert("Append");
-		if (_Flags & EManifestSyncFlag_TransactionLog)
-			Json.f_Insert("TransactionLog");
-		
-		return Json;
-	}
-	
-	bool CBackupManagerBackup::CManifestFile::operator == (CManifestFile const &_Right) const
-	{
-		return NContainer::fg_TupleReferences
-			(
-				m_Digest
-				, m_Length
-				, m_WriteTime
-				, m_SymlinkData
-				, m_Attributes
-				, m_Owner
-				, m_Group
-				, m_Flags
-			)
-			== NContainer::fg_TupleReferences
-			(
-				_Right.m_Digest
-				, _Right.m_Length
-				, _Right.m_WriteTime
-				, _Right.m_SymlinkData
-				, _Right.m_Attributes
-				, _Right.m_Owner
-				, _Right.m_Group
-				, _Right.m_Flags
-			)
-		;
-	}
-	
-	bool CBackupManagerBackup::CManifestFile::f_IsDirectory() const
-	{
-		return (m_Attributes & (NFile::EFileAttrib_Directory | NFile::EFileAttrib_Link)) == NFile::EFileAttrib_Directory;
-	}
-	
-	NStr::CStr const &CBackupManagerBackup::CManifestFile::f_GetFileName() const
-	{
-		return NContainer::TCMap<NStr::CStr, CManifestFile>::fs_GetKey(*this);
-	}
-	
-	template <typename tf_CStream>
-	void CBackupManagerBackup::CManifestFile::f_Stream(tf_CStream &_Stream)
-	{
-		_Stream % m_Digest;
-		_Stream % m_Length;
-		_Stream % m_WriteTime;
-		_Stream % m_SymlinkData;
-		_Stream % m_Attributes;
-		_Stream % m_Owner;
-		_Stream % m_Group;
-		_Stream % m_Flags;
-	}
-	DMibDistributedStreamImplement(CBackupManagerBackup::CManifestFile);
-	
-	template <typename tf_CStream>
-	void CBackupManagerBackup::CManifest::f_Stream(tf_CStream &_Stream)
-	{
-		_Stream % m_Files;
-	}
-	DMibDistributedStreamImplement(CBackupManagerBackup::CManifest);
-	
-	template <typename tf_CStream>
-	void CBackupManagerBackup::CStartBackupResult::f_Stream(tf_CStream &_Stream)
-	{
-		_Stream % m_FilesNotUpToDate;
-	}
 	DMibDistributedStreamImplement(CBackupManagerBackup::CStartBackupResult);
-
-	template <typename tf_CStream>
-	void CBackupManagerBackup::CManifestChange_Change::f_Stream(tf_CStream &_Stream)
-	{
-		_Stream % m_ManifestFile;
-	}
 	DMibDistributedStreamImplement(CBackupManagerBackup::CManifestChange_Change);
-
-	template <typename tf_CStream>
-	void CBackupManagerBackup::CManifestChange_Remove::f_Stream(tf_CStream &_Stream)
-	{
-	}
 	DMibDistributedStreamImplement(CBackupManagerBackup::CManifestChange_Remove);
-
-	template <typename tf_CStream>
-	void CBackupManagerBackup::CManifestChange_Rename::f_Stream(tf_CStream &_Stream)
-	{
-		CManifestChange_Change::f_Stream(_Stream);
-		_Stream % m_FromFileName;
-	}
 	DMibDistributedStreamImplement(CBackupManagerBackup::CManifestChange_Rename);
 
 	CBackupManager::CBackupManager()
@@ -141,6 +30,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CBackupManager::f_ListBackupSources);
 		DMibPublishActorFunction(CBackupManager::f_ListBackups);
 		DMibPublishActorFunction(CBackupManager::f_StartDownloadBackup);
+		DMibPublishActorFunction(CBackupManager::f_DownloadBackup);
 	}
 	
 	auto CBackupManager::f_StartBackup(CStartBackup &&_Params) -> NConcurrency::TCContinuation<CStartBackup::CResult> 
@@ -154,6 +44,11 @@ namespace NMib::NCloud
 	}
 	
 	auto CBackupManager::f_UploadData(CUploadData &&_Params) -> NConcurrency::TCContinuation<CUploadData::CResult> 
+	{
+		return DMibErrorInstance("Deprecated");
+	}
+	
+	auto CBackupManager::f_StartDownloadBackup(CStartDownloadBackup &&_Params) -> NConcurrency::TCContinuation<CStartDownloadBackup::CResult>
 	{
 		return DMibErrorInstance("Deprecated");
 	}
@@ -252,6 +147,19 @@ namespace NMib::NCloud
 		return _Version >= EMinProtocolVersion && _Version <= EProtocolVersion;
 	}
 	
+	void CBackupManager::CBackupID::f_Format(NStr::CStrAggregate &o_Str) const
+	{
+		o_Str += NStr::CStr::CFormat("{tst.,tsb_}_{}") << m_Time << m_ID;
+	}
+
+	template <typename tf_CStream>
+	void CBackupManager::CBackupID::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Time;
+		_Stream % m_ID;
+	}
+	DMibDistributedStreamImplement(CBackupManager::CBackupID);
+	
 	template <typename tf_CStream>
 	void CBackupManager::CBackupKey::f_Stream(tf_CStream &_Stream)
 	{
@@ -320,59 +228,6 @@ namespace NMib::NCloud
 	}
 	DMibDistributedStreamImplement(CBackupManager::CUploadData);
 	
-	// CListBackupSources
-	
-	template <typename tf_CStream>
-	void CBackupManager::CListBackupSources::CResult::f_Stream(tf_CStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream % m_BackupSources;
-	}
-	DMibDistributedStreamImplement(CBackupManager::CListBackupSources::CResult);
-	
-	template <typename tf_CStream>
-	void CBackupManager::CListBackupSources::f_Stream(tf_CStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-	}
-	DMibDistributedStreamImplement(CBackupManager::CListBackupSources);
-
-	// CListBackups
-	
-	void CBackupManager::CListBackups::CResult::f_Format(NStr::CStrAggregate &o_Str) const
-	{
-		o_Str += NStr::CStr::CFormat("{vs}") << m_Backups;
-	}
-
-	void CBackupManager::CListBackups::CBackup::f_Format(NStr::CStrAggregate &o_Str) const
-	{
-		o_Str += NStr::CStr::CFormat("{tst.,tsb_}_{}") << m_Time << m_BackupID;
-	}
-
-	template <typename tf_CStream>
-	void CBackupManager::CListBackups::CResult::f_Stream(tf_CStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream % m_Backups;
-	}
-	DMibDistributedStreamImplement(CBackupManager::CListBackups::CResult);
-
-	template <typename tf_CStream>
-	void CBackupManager::CListBackups::CBackup::f_Stream(tf_CStream &_Stream)
-	{
-		_Stream % m_Time;
-		_Stream % m_BackupID;
-	}
-	DMibDistributedStreamImplement(CBackupManager::CListBackups::CBackup);
-	
-	template <typename tf_CStream>
-	void CBackupManager::CListBackups::f_Stream(tf_CStream &_Stream)
-	{
-		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream % m_ForBackupSource;
-	}
-	DMibDistributedStreamImplement(CBackupManager::CListBackups);
-	
 	// CStartDownloadBackup
 
 	template <typename tf_CStream>
@@ -380,7 +235,6 @@ namespace NMib::NCloud
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % m_BackupSource;
-		_Stream % m_Time;
 		_Stream % m_BackupID;
 		_Stream % m_TransferContext;
 	}
@@ -390,9 +244,8 @@ namespace NMib::NCloud
 	{
 		return fg_Format
 			(
-				"{}/{tst.,tsb_}_{}"
+				"{}/{}"
 				, m_BackupSource
-				, m_Time
 				, m_BackupID
 			)
 		;
@@ -405,54 +258,4 @@ namespace NMib::NCloud
 		_Stream % fg_Move(m_Subscription);
 	}
 	DMibDistributedStreamImplement(CBackupManager::CStartDownloadBackup::CResult);
-	
-	NEncoding::CEJSON CBackupManagerBackup::CManifest::f_ToJSON() const
-	{
-		NEncoding::CEJSON JSON;
-		JSON.f_Object();
-
-		for (auto &File : m_Files)
-		{
-			auto &FileName = m_Files.fs_GetKey(File);
-			auto &Entry = JSON[FileName];
-			
-			Entry["Digest"] = NContainer::CByteVector{File.m_Digest.f_GetData(), File.m_Digest.fs_GetSize()};
-			Entry["Length"] = File.m_Length;
-			Entry["WriteTime"] = File.m_WriteTime;
-			Entry["SymlinkData"] = File.m_SymlinkData;
-			Entry["Attributes"] = NFile::CFile::fs_AttribToJSON(File.m_Attributes);
-			Entry["Owner"] = File.m_Owner;
-			Entry["Group"] = File.m_Group;
-			Entry["Flags"] = fs_GenerateSyncFlags(File.m_Flags);
-		}
-		
-		return JSON;
-	}
-
-	CBackupManagerBackup::CManifest CBackupManagerBackup::CManifest::fs_FromJSON(NEncoding::CEJSON const &_JSON)
-	{
-		CBackupManagerBackup::CManifest Manifest;
-		
-		for (auto &File : _JSON.f_Object())
-		{
-			auto &OutFile = Manifest.m_Files[File.f_Name()];
-			auto &ManifestJSON = File.f_Value();
-			
-			{
-				auto Digest = ManifestJSON["Digest"].f_Binary();
-				if (Digest.f_GetLen() != OutFile.m_Digest.fs_GetSize())
-					DMibError("Digest is wrong size");
-				NMem::fg_MemCopy(OutFile.m_Digest.f_GetData(), Digest.f_GetArray(), OutFile.m_Digest.fs_GetSize());
-			}
-			OutFile.m_Length = ManifestJSON["Length"].f_Integer();
-			OutFile.m_WriteTime = ManifestJSON["WriteTime"].f_Date();
-			OutFile.m_SymlinkData = ManifestJSON["SymlinkData"].f_String();
-			OutFile.m_Attributes = NFile::CFile::fs_AttribFromJSON(ManifestJSON["Attributes"]);
-			OutFile.m_Owner = ManifestJSON["Owner"].f_String();
-			OutFile.m_Group = ManifestJSON["Group"].f_String();
-			OutFile.m_Flags = fs_ParseSyncFlags(ManifestJSON["Flags"]);
-		}
-		
-		return Manifest;
-	}
 }

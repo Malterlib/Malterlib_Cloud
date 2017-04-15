@@ -201,13 +201,15 @@ namespace NMib::NCloud
 		if (m_pThis->mp_bDestroyed)
 			return DMibErrorInstance("Destroyed");
 		
+		auto &ManifestConfig = m_Config.m_ManifestConfig;
+		
 		TCMap<CStr, zbool> Paths; 
-		for (auto &Wildcard : m_Config.m_IncludeWildcards)
+		for (auto &Wildcard : ManifestConfig.m_IncludeWildcards)
 		{
 			bool bRecursive = false;
-			auto WildcardParsed = fs_ParseWildcard(Wildcard, bRecursive);
+			auto WildcardParsed = CDirectoryManifestConfig::fs_ParseWildcard(Wildcard, bRecursive);
 			
-			auto &bRecursiveForPath = Paths[CFile::fs_GetPath(CFile::fs_AppendPath(m_Config.m_Root, WildcardParsed))];
+			auto &bRecursiveForPath = Paths[CFile::fs_GetPath(CFile::fs_AppendPath(ManifestConfig.m_Root, WildcardParsed))];
 			if (bRecursive)
 				bRecursiveForPath = bRecursive; 
 		}
@@ -231,10 +233,12 @@ namespace NMib::NCloud
 		CStr NotificationPath = CFile::fs_GetPath(_Path);
 		CStr NotificationFile = CFile::fs_GetFile(_Path);
 		
-		for (auto &Wildcard : m_Config.m_IncludeWildcards)
+		auto &ManifestConfig = m_Config.m_ManifestConfig;
+		
+		for (auto &Wildcard : ManifestConfig.m_IncludeWildcards)
 		{
 			bool bRecursive = false;
-			auto WildcardParsed = fs_ParseWildcard(Wildcard, bRecursive);
+			auto WildcardParsed = CDirectoryManifestConfig::fs_ParseWildcard(Wildcard, bRecursive);
 			
 			CStr WildcardPath = CFile::fs_GetPath(WildcardParsed);
 			CStr WildcardFileName = CFile::fs_GetFile(WildcardParsed);
@@ -259,7 +263,7 @@ namespace NMib::NCloud
 		if (!bIsIncluded)
 			return false;
 		
-		if (fs_MatchesAnyWildcard(_Path, m_Config.m_ExcludeWildcards))
+		if (fg_StrMatchesAnyWildcardInMap(_Path, ManifestConfig.m_ExcludeWildcards))
 			return false;
 		
 		return true;
@@ -269,12 +273,14 @@ namespace NMib::NCloud
 	{
 		CFileChangeNotification::CNotification Notification = _Notification;
 		
-		CStr RelativePath = CFile::fs_MakePathRelative(Notification.m_Path, m_Config.m_Root);
+		auto &ManifestConfig = m_Config.m_ManifestConfig;
+		
+		CStr RelativePath = CFile::fs_MakePathRelative(Notification.m_Path, ManifestConfig.m_Root);
 		CStr RelativePathFrom;
 		
 		if (Notification.m_Notification == EFileChangeNotification_Renamed)
 		{
-			RelativePathFrom = CFile::fs_MakePathRelative(Notification.m_PathFrom, m_Config.m_Root);
+			RelativePathFrom = CFile::fs_MakePathRelative(Notification.m_PathFrom, ManifestConfig.m_Root);
 			
 			bool bFromValid = f_IsPathInManifest(RelativePathFrom);
 			bool bToValid = f_IsPathInManifest(RelativePath);
@@ -285,7 +291,7 @@ namespace NMib::NCloud
 			{
 				Notification.m_Notification = EFileChangeNotification_Removed;
 				Notification.m_Path = Notification.m_PathFrom;
-				RelativePath = CFile::fs_MakePathRelative(Notification.m_Path, m_Config.m_Root);
+				RelativePath = CFile::fs_MakePathRelative(Notification.m_Path, ManifestConfig.m_Root);
 				RelativePathFrom.f_Clear();
 			}
 			else if (!bFromValid && bToValid)

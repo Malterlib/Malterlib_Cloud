@@ -59,7 +59,6 @@ namespace NMib::NCloud::NCloudClient
 		
 		// Backup Manager
 		TCTrustedActorSubscription<CBackupManager> mp_BackupManagers;
-		TCActor<CFileTransferReceive> mp_DownloadBackupReceive;
 		CActorSubscription mp_DownloadBackupSubscription;
 
 		// Version Manager

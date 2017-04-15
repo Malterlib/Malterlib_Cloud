@@ -41,7 +41,7 @@ namespace NMib::NCloud::NBackupManager
 		}
 
 		void f_RunRSyncProtocol(CRSyncContext &_Context, CSecureByteVector &&_ServerPacket);
-		CExceptionPointer f_CheckFileName(CStr const &_FileName, CManifestFile **o_pManifestFile);
+		CExceptionPointer f_CheckFileName(CStr const &_FileName, CDirectoryManifestFile **o_pManifestFile);
 		CStr f_GetCurrentPath(CStr const &_Path);
 		CStr f_GetLatestPath(CStr const &_Path);
 		
@@ -52,7 +52,7 @@ namespace NMib::NCloud::NBackupManager
 		CStr m_BackupDirectory;
 		CStr m_LatestBackupDirectory;
 		
-		CManifest m_Manifest;
+		CDirectoryManifest m_Manifest;
 		
 		TCMap<CStr, CFile> m_FileCache;
 		TCMap<CStr, CRSyncContext> m_RSyncContexts;
@@ -77,7 +77,7 @@ namespace NMib::NCloud::NBackupManager
 		return CFile::fs_AppendPath(m_LatestBackupDirectory, CFile::fs_AppendPath(CStr("Current"), _Path));
 	}
 	
-	CExceptionPointer CBackupInstance::CInternal::f_CheckFileName(CStr const &_FileName, CManifestFile **o_pManifestFile)
+	CExceptionPointer CBackupInstance::CInternal::f_CheckFileName(CStr const &_FileName, CDirectoryManifestFile **o_pManifestFile)
 	{
 		if (CFile::fs_IsPathAbsolute(_FileName))
 			return fg_ExceptionPointer(DMibErrorInstance("Absolute paths not allowed"));
@@ -104,7 +104,7 @@ namespace NMib::NCloud::NBackupManager
 		return nullptr;
 	}
 
-	auto CBackupInstance::f_StartBackup(CManifest const &_Manifest) -> TCContinuation<CStartBackupResult>
+	auto CBackupInstance::f_StartBackup(CDirectoryManifest const &_Manifest) -> TCContinuation<CStartBackupResult>
 	{
 		return TCContinuation<CStartBackupResult>::fs_RunProtected<CExceptionFile>()
 			> [&]()
@@ -121,7 +121,7 @@ namespace NMib::NCloud::NBackupManager
 				for (auto &File : _Manifest.m_Files)
 				{
 					CStr FileName = Internal.f_GetCurrentPath(File.f_GetFileName());
-					CStr OldFileName = Internal.f_GetCurrentPath(File.f_GetFileName());
+					CStr OldFileName = Internal.f_GetLatestPath(File.f_GetFileName());
 					
 					if (!CFile::fs_FileExists(FileName))
 					{
@@ -145,7 +145,12 @@ namespace NMib::NCloud::NBackupManager
 				}
 				
 				CFile::fs_CreateDirectory(Internal.m_BackupDirectory);
+#ifdef DMibDebug
 				CFile::fs_WriteStringToFile(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.json"), _Manifest.f_ToJSON().f_ToString());
+#endif
+				TCBinaryStreamFile<> Stream;
+				Stream.f_Open(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin"), EFileOpen_Write | EFileOpen_ShareRead);
+				Stream << _Manifest;
 				
 				return BackupResult;
 			}
@@ -185,7 +190,7 @@ namespace NMib::NCloud::NBackupManager
 			}
 		case EManifestChange_Remove:
 			{
-				CManifestFile *pManifestFile;
+				CDirectoryManifestFile *pManifestFile;
 				if (auto pException = Internal.f_CheckFileName(_FileName, &pManifestFile))
 					return fg_Move(pException);
 				
@@ -212,7 +217,7 @@ namespace NMib::NCloud::NBackupManager
 			{
 				auto &Change = _Change.f_Get<EManifestChange_Rename>();
 				
-				CManifestFile *pManifestFile;
+				CDirectoryManifestFile *pManifestFile;
 				if (auto pException = Internal.f_CheckFileName(Change.m_FromFileName, &pManifestFile))
 					return fg_Move(pException);
 				if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
@@ -310,7 +315,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 		auto &Internal = *mp_pInternal;
 		
-		CManifestFile *pManifestFile;
+		CDirectoryManifestFile *pManifestFile;
 		
 		if (auto pException = Internal.f_CheckFileName(_FileName, &pManifestFile))
 			return fg_Move(pException);
@@ -386,7 +391,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 		auto &Internal = *mp_pInternal;
 		
-		CManifestFile *pManifestFile;
+		CDirectoryManifestFile *pManifestFile;
 		
 		if (auto pException = Internal.f_CheckFileName(_FileName, &pManifestFile))
 			return fg_Move(pException);

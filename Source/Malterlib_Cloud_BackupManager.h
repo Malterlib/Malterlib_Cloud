@@ -7,6 +7,8 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Cryptography/Hashes/SHA>
 #include <Mib/Encoding/EJSON>
+#include <Mib/Cloud/DirectoryManifest>
+#include <Mib/Cloud/DirectorySync>
 
 #include "Malterlib_Cloud_FileTransfer.h"
 
@@ -26,49 +28,12 @@ namespace NMib::NCloud
 			, EProtocolVersion = EBackupManagerProtocolVersion
 		};
 		
-		enum EManifestSyncFlag /// \brief Flag for how to sync specific files
-		{
-			EManifestSyncFlag_None = 0						///< Normal syncing. In this case the rsync is used for syncing changes
-			, EManifestSyncFlag_Append = DMibBit(0)			///< Append syncing. Any changes are assumed to be append only
-			, EManifestSyncFlag_TransactionLog = DMibBit(1) ///< Should be used together with ESyncFlag_Append. This tells the backup manager to sync writes to disk as quickly as possible.
-		};
-		
 		enum EManifestChange
 		{
 			EManifestChange_Change
 			, EManifestChange_Add
 			, EManifestChange_Remove
 			, EManifestChange_Rename
-		};
-		
-		struct CManifestFile
-		{
-			bool operator == (CManifestFile const &_Right) const;
-			
-			NStr::CStr const &f_GetFileName() const;
-			bool f_IsDirectory() const;
-			
-			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream);
-
-			NDataProcessing::CHashDigest_SHA256 m_Digest;
-			uint64 m_Length = 0;
-			NTime::CTime m_WriteTime;
-			NStr::CStr m_SymlinkData;
-			NFile::EFileAttrib m_Attributes = NFile::EFileAttrib_None;
-			NStr::CStr m_Owner;
-			NStr::CStr m_Group;
-			EManifestSyncFlag m_Flags = EManifestSyncFlag_None;
-		};
-		
-		struct CManifest
-		{
-			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream);
-			NEncoding::CEJSON f_ToJSON() const;
-			static CManifest fs_FromJSON(NEncoding::CEJSON const &_JSON);
-			
-			NContainer::TCMap<NStr::CStr, CManifestFile> m_Files;
 		};
 		
 		struct CStartBackupResult
@@ -84,7 +49,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			CManifestFile m_ManifestFile;
+			CDirectoryManifestFile m_ManifestFile;
 		};
 
 		struct CManifestChange_Add : public CManifestChange_Change
@@ -117,10 +82,7 @@ namespace NMib::NCloud
 
 		CBackupManagerBackup();
 		
-		static EManifestSyncFlag fs_ParseSyncFlags(NEncoding::CEJSON const &_JSON);
-		static NEncoding::CEJSON fs_GenerateSyncFlags(EManifestSyncFlag _Flags);
-		
-		virtual NConcurrency::TCContinuation<CStartBackupResult> f_StartBackup(CManifest const &_Manifest) = 0;
+		virtual NConcurrency::TCContinuation<CStartBackupResult> f_StartBackup(CDirectoryManifest const &_Manifest) = 0;
 
 		virtual NConcurrency::TCContinuation<void> f_ManifestChange(NStr::CStr const &_FileName, CManifestChange const &_Change) = 0;
 
@@ -162,6 +124,17 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
+		};
+		
+		struct CBackupID
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			
+			void f_Format(NStr::CStrAggregate &o_Str) const;
+			
+			NTime::CTime m_Time;
+			NStr::CStr m_ID;
 		};
 		
 		// Deprecated - Start
@@ -223,51 +196,6 @@ namespace NMib::NCloud
 			
 			CBackupKey m_BackupKey;
 		};
-		// Deprecated - End
-		
-		struct CListBackupSources
-		{
-			struct CResult
-			{
-				template <typename tf_CStream>
-				void f_Stream(tf_CStream &_Stream);
-				
-				NContainer::TCVector<NStr::CStr> m_BackupSources;
-			};
-
-			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream);
-		};
-
-		struct CListBackups
-		{
-			struct CBackup
-			{
-				template <typename tf_CStream>
-				void f_Stream(tf_CStream &_Stream);
-				
-				void f_Format(NStr::CStrAggregate &o_Str) const;
-				
-				NTime::CTime m_Time;
-				NStr::CStr m_BackupID;
-				
-			};
-			
-			struct CResult
-			{
-				template <typename tf_CStream>
-				void f_Stream(tf_CStream &_Stream);
-				
-				void f_Format(NStr::CStrAggregate &o_Str) const;
-				
-				NContainer::TCMap<NStr::CStr, NContainer::TCVector<CBackup>> m_Backups;
-			};
-
-			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream);
-
-			NStr::CStr m_ForBackupSource;
-		};
 		
 		struct CStartDownloadBackup
 		{
@@ -285,27 +213,35 @@ namespace NMib::NCloud
 			NStr::CStr f_GetDesc() const;
 			
 			NStr::CStr m_BackupSource;
-			NTime::CTime m_Time;
-			NStr::CStr m_BackupID;
+			CBackupID m_BackupID;
 			CFileTransferContext m_TransferContext;
 		};
+		// Deprecated - End
+
 		
 		// Deprecated - Start
 		virtual NConcurrency::TCContinuation<CStartBackup::CResult> f_StartBackup(CStartBackup &&_Params);
 		virtual NConcurrency::TCContinuation<CStopBackup::CResult> f_StopBackup(CStopBackup &&_Params);
 		virtual NConcurrency::TCContinuation<CUploadData::CResult> f_UploadData(CUploadData &&_Params);
+		virtual NConcurrency::TCContinuation<CStartDownloadBackup::CResult> f_StartDownloadBackup(CStartDownloadBackup &&_Params);
 		// Deprecated - End
 
 		virtual auto f_InitBackup(CBackupKey const &_BackupKey, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
 			-> NConcurrency::TCContinuation<NConcurrency::TCDistributedActorInterfaceWithID<CBackupManagerBackup>> = 0
 		;
 		
-		virtual NConcurrency::TCContinuation<CListBackupSources::CResult> f_ListBackupSources(CListBackupSources &&_Params) = 0;
-		virtual NConcurrency::TCContinuation<CListBackups::CResult> f_ListBackups(CListBackups &&_Params) = 0;
-		virtual NConcurrency::TCContinuation<CStartDownloadBackup::CResult> f_StartDownloadBackup(CStartDownloadBackup &&_Params) = 0;
+		virtual NConcurrency::TCContinuation<NContainer::TCVector<NStr::CStr>> f_ListBackupSources() = 0;
+		virtual NConcurrency::TCContinuation<NContainer::TCMap<NStr::CStr, NContainer::TCVector<CBackupID>>> f_ListBackups(NStr::CStr const &_ForBackupSource) = 0;
+		
+		virtual auto f_DownloadBackup(NStr::CStr const &_BackupSource, CBackupID const &_BackupID, NTime::CTime const &_Time, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
+			-> NConcurrency::TCContinuation<NConcurrency::TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
+			= 0
+		;
 	};
 }
 
 #ifndef DMibPNoShortCuts
 using namespace NMib::NCloud;
 #endif
+
+#include "Malterlib_Cloud_BackupManager.hpp"

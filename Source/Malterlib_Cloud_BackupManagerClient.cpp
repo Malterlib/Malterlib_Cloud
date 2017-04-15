@@ -24,6 +24,8 @@ namespace NMib::NCloud
 	NConcurrency::TCContinuation<void> CBackupManagerClient::fp_Destroy()
 	{
 		auto &Internal = *mp_pInternal;
+		*Internal.m_pDestroyed = true;
+		
 		TCActorResultVector<void> Destroys;
 		for (auto &BackupInstance : Internal.m_RunningBackupInstances)
 			BackupInstance->f_Destroy() > Destroys.f_AddResult();
@@ -38,6 +40,12 @@ namespace NMib::NCloud
 		Destroys.f_GetResults() > Continuation.f_ReceiveAny();
 		
 		return Continuation;
+	}
+	
+	void CBackupManagerClient::CInternal::fs_CheckDestroy(TCSharedPointer<NAtomic::TCAtomic<bool>> const &_pDestroyed)
+	{
+		if (_pDestroyed->f_Load(NAtomic::EMemoryOrder_Relaxed))
+			DMibError("Backup client destroyed");
 	}
 	
 	void CBackupManagerClient::CInternal::f_Construct()
@@ -67,11 +75,11 @@ namespace NMib::NCloud
 					DMibLogCategoryStr(m_Config.m_LogCategory);
 					DMibLog(Error, "Failed to subscribe to file notifications: {}", _Result.f_GetExceptionStr());
 				}
-				g_Dispatch(m_FileActor) > [Config = m_Config]
+				g_Dispatch(m_FileActor) > [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]
 					{
-						return fs_GetManifest(Config);
+						return CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); });
 					}
-					> [this](TCAsyncResult<CBackupManagerBackup::CManifest> &&_Manifest)
+					> [this](TCAsyncResult<CDirectoryManifest> &&_Manifest)
 					{
 						if (m_pThis->mp_bDestroyed)
 							return;
@@ -93,44 +101,9 @@ namespace NMib::NCloud
 		;
 	}
 	
-	void CBackupManagerClient::CInternal::fs_ValidateWildcard(NStr::CStr const &_Wildcard, bool _bIsFileSearch)
-	{
-		if (CFile::fs_IsPathAbsolute(_Wildcard))
-			DMibError("Wildcards cannot be absolute paths. They need to be relative to root.");
-		
-		if (_bIsFileSearch)
-		{
-			if (CFile::fs_GetPath(_Wildcard).f_FindChars("%*") >= 0)
-				DMibError("Wildcards can only appear for file part of files searches. Directories cannot be wildcarded.");
-		}
-		
-		if (CFile::fs_HasRelativeComponents(_Wildcard))
-			DMibError("Wildcards cannot contain relative path components '..' or '.'");
-	}
-	
-	CStr CBackupManagerClient::CInternal::fs_ParseWildcard(CStr const &_Wildcard, bool &o_bRecursive)
-	{
-		auto WildcardFile = CFile::fs_GetFile(_Wildcard);
-		o_bRecursive = false;
-		if (WildcardFile.f_StartsWith("^"))
-		{
-			o_bRecursive = true;
-			return CFile::fs_AppendPath(CFile::fs_GetPath(_Wildcard), WildcardFile.f_Extract(1)); 
-		}
-		else
-			return _Wildcard;
-	}
-	
 	auto CBackupManagerClient::CConfig::f_Validate() const -> CConfig const &
 	{
-		if (!NFile::CFile::fs_IsPathAbsolute(m_Root))
-			DMibError("Root path is not absolute");
-		
-		CInternal::fs_ValidateWildcards(m_IncludeWildcards, true);
-		CInternal::fs_ValidateWildcards(m_ExcludeWildcards, false);
-		CInternal::fs_ValidateWildcards(m_AddSyncFlagsWildcards, false);
-		CInternal::fs_ValidateWildcards(m_RemoveSyncFlagsWildcards, false);
-		
+		m_ManifestConfig.f_Validate();
 		return *this;
 	}
 }

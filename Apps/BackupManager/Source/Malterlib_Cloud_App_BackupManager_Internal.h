@@ -69,20 +69,24 @@ namespace NMib::NCloud::NBackupManager
 				return TCMap<CStr, CBackupDownload>::fs_GetKey(*this);
 			}
 			
-			uint32 m_Version = 0;
-			TCActor<NCloud::CFileTransferSend> m_FileTransferSend;
-			CStr m_Desc;
+			TCContinuation<void> f_Destroy();
+			
+			TCDistributedActor<CDirectorySyncSend> m_DirectorySyncSend;
+			CActorSubscription m_Subscription;
 		};
 		
 		struct CBackupManagerImplementation : public CBackupManager
 		{
 			auto f_InitBackup(CBackupKey const &_BackupKey, TCActorSubscriptionWithID<> &&_Subscription)
-				-> NConcurrency::TCContinuation<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> override
+				-> TCContinuation<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> override
 			;
 			
-			TCContinuation<CListBackupSources::CResult> f_ListBackupSources(CListBackupSources &&_Params) override;
-			TCContinuation<CListBackups::CResult> f_ListBackups(CListBackups &&_Params) override;
-			TCContinuation<CStartDownloadBackup::CResult> f_StartDownloadBackup(CStartDownloadBackup &&_Params) override;
+			TCContinuation<TCVector<CStr>> f_ListBackupSources() override;
+			TCContinuation<TCMap<CStr, TCVector<CBackupID>>> f_ListBackups(CStr const &_ForBackupSource) override;
+			auto f_DownloadBackup(CStr const &_BackupSource, CBackupID const &_BackupID, CTime const &_Time, TCActorSubscriptionWithID<> &&_Subscription)
+				-> TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
+				override
+			;
 
 			CBackupManagerServer *m_pThis;
 		};

@@ -232,13 +232,13 @@ namespace NMib::NCloud::NAppManager
 				auto &JSON = BackupJSON["AddSyncFlagsWildcards"] = CEJSON();
 				JSON.f_Object();
 				for (auto &Flags : Settings.m_Backup_AddSyncFlagsWildcards)
-					JSON[Settings.m_Backup_AddSyncFlagsWildcards.fs_GetKey(Flags)] = CBackupManagerBackup::fs_GenerateSyncFlags(Flags);
+					JSON[Settings.m_Backup_AddSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
 			}
 			{
 				auto &JSON = BackupJSON["RemoveSyncFlagsWildcards"] = CEJSON();
 				JSON.f_Object();
 				for (auto &Flags : Settings.m_Backup_RemoveSyncFlagsWildcards)
-					JSON[Settings.m_Backup_RemoveSyncFlagsWildcards.fs_GetKey(Flags)] = CBackupManagerBackup::fs_GenerateSyncFlags(Flags);
+					JSON[Settings.m_Backup_RemoveSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
 			}
 			BackupJSON["NewBackupIntervalHours"] = CTimeSpanConvert(Settings.m_Backup_NewBackupInterval).f_GetHoursFloat();
 			BackupJSON["Enabled"] = Settings.m_bBackupEnabled;

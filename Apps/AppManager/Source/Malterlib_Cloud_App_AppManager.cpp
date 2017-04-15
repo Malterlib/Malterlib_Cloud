@@ -108,9 +108,9 @@ namespace NMib::NCloud::NAppManager
 						for (auto &Wildcard : BackupJSON["ExcludeWildcards"].f_Array())
 							Settings.m_Backup_ExcludeWildcards[Wildcard.f_String()];
 						for (auto &Wildcard : BackupJSON["AddSyncFlagsWildcards"].f_Object())
-							Settings.m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+							Settings.m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 						for (auto &Wildcard : BackupJSON["RemoveSyncFlagsWildcards"].f_Object())
-							Settings.m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+							Settings.m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 						
 						Settings.m_Backup_NewBackupInterval = CTimeSpanConvert::fs_CreateSpanFromHours(BackupJSON["NewBackupIntervalHours"].f_Float());
 						Settings.m_bBackupEnabled = BackupJSON["Enabled"].f_Boolean();

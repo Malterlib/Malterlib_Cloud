@@ -117,7 +117,7 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_BackupAddSyncFlagsWildcards;
 			m_Backup_AddSyncFlagsWildcards.f_Clear();
 			for (auto &Wildcard : pValue->f_Object())
-				m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+				m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 		}
 
 		if (auto *pValue = _Params.f_GetMember("BackupRemoveSyncFlagsWildcards"))
@@ -125,7 +125,7 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_BackupRemoveSyncFlagsWildcards;
 			m_Backup_RemoveSyncFlagsWildcards.f_Clear();
 			for (auto &Wildcard : pValue->f_Object())
-				m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+				m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 		}
 		
 		if (auto *pValue = _Params.f_GetMember("BackupNewBackupIntervalHours"))
@@ -554,14 +554,14 @@ namespace NMib::NCloud::NAppManager
 				o_ChangedSettings |= EApplicationSetting_BackupAddSyncFlagsWildcards;
 				m_Backup_AddSyncFlagsWildcards.f_Clear();
 				for (auto &Wildcard : pValue->f_Object())
-					m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+					m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 			}
 			if (auto pValue = BackupJSON.f_GetMember("RemoveSyncFlagsWildcards", EJSONType_Object))
 			{
 				o_ChangedSettings |= EApplicationSetting_BackupRemoveSyncFlagsWildcards;
 				m_Backup_RemoveSyncFlagsWildcards.f_Clear();
 				for (auto &Wildcard : pValue->f_Object())
-					m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CBackupManagerBackup::fs_ParseSyncFlags(Wildcard.f_Value());
+					m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 			}
 			{
 				auto pValue = BackupJSON.f_GetMember("NewBackupInterval", EJSONType_Float);

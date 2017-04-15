@@ -8,6 +8,7 @@ namespace NMib::NCloud
 {
 	CBackupManagerClient::CInternal::CInternal(CBackupManagerClient *_pThis, CConfig const &_Config, TCActor<CDistributedActorTrustManager> const &_TrustManager)
 		: m_pThis(_pThis)
+		, m_pDestroyed(fg_Construct(false))
 		, m_Config(_Config)
 		, m_TrustManager(_TrustManager)
 	{
