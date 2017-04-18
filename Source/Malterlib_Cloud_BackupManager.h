@@ -81,8 +81,14 @@ namespace NMib::NCloud
 		;		
 
 		CBackupManagerBackup();
-		
-		virtual NConcurrency::TCContinuation<CStartBackupResult> f_StartBackup(CDirectoryManifest const &_Manifest) = 0;
+
+		virtual NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> f_StartManifestRSync
+			(
+				NConcurrency::TCActorFunctorWithID<NConcurrency::TCContinuation<NContainer::CSecureByteVector> (NContainer::CSecureByteVector &&_Packet)> &&_fRunProtocol
+				, uint64 _ManifestSize
+			) = 0
+		;
+		virtual NConcurrency::TCContinuation<CStartBackupResult> f_StartBackup() = 0;
 
 		virtual NConcurrency::TCContinuation<void> f_ManifestChange(NStr::CStr const &_FileName, CManifestChange const &_Change) = 0;
 

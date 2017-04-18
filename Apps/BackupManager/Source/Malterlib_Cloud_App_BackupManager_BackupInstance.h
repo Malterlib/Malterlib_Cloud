@@ -15,7 +15,15 @@ namespace NMib::NCloud::NBackupManager
 		CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID);
 		~CBackupInstance();
 		
-		TCContinuation<CStartBackupResult> f_StartBackup(CDirectoryManifest const &_Manifest) override;
+		TCContinuation<TCActorSubscriptionWithID<>> f_StartManifestRSync
+			(
+				TCActorFunctorWithID<TCContinuation<CSecureByteVector> (CSecureByteVector &&_Packet)> &&_fRunProtocol
+				, uint64 _ManifestSize
+			)
+			override
+		;
+
+		TCContinuation<CStartBackupResult> f_StartBackup() override;
 
 		TCContinuation<TCActorSubscriptionWithID<>> f_StartRSync
 			(
@@ -25,7 +33,7 @@ namespace NMib::NCloud::NBackupManager
 			override
 		;
 
-		NConcurrency::TCContinuation<void> f_ManifestChange(NStr::CStr const &_FileName, CManifestChange const &_Change) override;
+		TCContinuation<void> f_ManifestChange(NStr::CStr const &_FileName, CManifestChange const &_Change) override;
 		TCContinuation<void> f_UploadData(CStr const &_FileName, uint64 _Position, CSecureByteVector &&_Data) override;
 		TCContinuation<void> f_InitialBackupFinished() override;
 		

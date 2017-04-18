@@ -18,6 +18,7 @@ using namespace NMib::NPtr;
 using namespace NMib::NFile; 
 using namespace NMib::NStr; 
 using namespace NMib::NDataProcessing; 
+using namespace NMib::NStream;
 
 namespace NMib::NCloud::NPrivate
 {
@@ -44,6 +45,8 @@ namespace NMib::NCloud::NPrivate
 		void fp_StartBackup();
 		void fp_BackupNotification(CBackupManagerClient::CNotification &&_Notification);
 		void fp_ReportBackupFailed(CStr const &_Error);
+
+		TCContinuation<void> fp_SyncManifest();
 		
 		void fp_ProcessBackupQueue();
 
@@ -61,6 +64,13 @@ namespace NMib::NCloud::NPrivate
 			TCUniquePointer<CRSyncServer> m_pRSyncServer;
 			COnScopeExitShared m_pOnScopeExit;
 			TCSharedPointer<CCanDestroyTracker> m_pCanDestroyTracker;
+		};
+		
+		struct CManifestSyncState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
+		{
+			CBinaryStreamMemory<> m_ManifestStream;
+			TCUniquePointer<CRSyncServer> m_pRSyncServer;
+			CActorSubscription m_RSyncSubscription;
 		};
 		
 		struct CPendingBackupFile
@@ -85,13 +95,15 @@ namespace NMib::NCloud::NPrivate
 		};
 
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
-
-		TCDistributedActor<CBackupManager> mp_BackupManager;		
+		
+		TCDistributedActor<CBackupManager> mp_BackupManager;
 		TCWeakActor<CBackupManagerClient> mp_BackupManagerClient;
 		CBackupManagerClient::CConfig mp_Config;
 		CTrustedActorInfo mp_ActorInfo;
 		
 		CDirectoryManifest mp_Manifest;
+		
+		TCSharedPointer<CManifestSyncState> mp_pManifestSyncState;
 		
 		CBackupManager::CBackupKey mp_BackupKey;
 		TCDistributedActorInterface<CBackupManagerBackup> mp_Backup;

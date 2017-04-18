@@ -28,8 +28,18 @@ namespace NMib::NCloud
 		while (bWantOneMoreProcess)
 		{
 			CSecureByteVector ToSendToServer;
-			if (State.m_pClient->f_ProcessPacket(_ServerPacket, ToSendToServer, bWantOneMoreProcess))
-				bDone = true;
+			try
+			{
+				if (State.m_pClient->f_ProcessPacket(_ServerPacket, ToSendToServer, bWantOneMoreProcess))
+					bDone = true;
+			}
+			catch (NException::CException const &_Exception)
+			{
+				if (!_Continuation.f_IsSet())
+					_Continuation.f_SetException(DMibErrorInstance(fg_Format("Exceptio running RSync protocol: {}", _Exception.f_GetErrorStr())));
+				return;
+			}
+			
 			_ServerPacket.f_Clear();
 			if (!ToSendToServer.f_IsEmpty())
 			{

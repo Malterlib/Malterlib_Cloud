@@ -9,6 +9,7 @@ namespace NMib::NCloud
 {
 	CBackupManagerBackup::CBackupManagerBackup()
 	{
+		DMibPublishActorFunction(CBackupManagerBackup::f_StartManifestRSync);
 		DMibPublishActorFunction(CBackupManagerBackup::f_StartBackup);
 		DMibPublishActorFunction(CBackupManagerBackup::f_StartRSync);
 		DMibPublishActorFunction(CBackupManagerBackup::f_ManifestChange);

@@ -47,6 +47,9 @@ namespace NMib::NCloud::NPrivate
 		
 		mp_FileManifestSequencer.f_Abort() > pCanDestroyTracker->f_Track();
 		
+		if (mp_pManifestSyncState && mp_pManifestSyncState->m_RSyncSubscription)
+			mp_pManifestSyncState->m_RSyncSubscription->f_Destroy() > pCanDestroyTracker->f_Track();
+		
 		return pCanDestroyTracker->m_Continuation;
 	}
 
@@ -220,6 +223,85 @@ namespace NMib::NCloud::NPrivate
 		;
 	}
 	
+	TCContinuation<void> CBackupManagerClient_Instance::fp_SyncManifest()
+	{
+		TCSharedPointer<CManifestSyncState> pState = fg_Construct();
+		pState->m_ManifestStream << mp_Manifest;
+		pState->m_ManifestStream.f_SetPosition(0);
+		mp_pManifestSyncState = pState;
+		
+		
+		try
+		{
+			pState->m_pRSyncServer = fg_Construct(pState->m_ManifestStream, 8*1024*1024);
+		}
+		catch (CExceptionFile const &_Exception)
+		{
+			return DMibErrorInstance(fg_Format("Failed to prepare manifest rsync: {}", _Exception));
+		}
+		
+		TCContinuation<void> Continuation;
+		
+		DMibCallActor
+			(
+				mp_Backup
+				, CBackupManagerBackup::f_StartManifestRSync
+				, g_ActorFunctor
+				(
+					g_ActorSubscription > [this, Continuation]() -> TCContinuation<void>
+					{
+						if (!Continuation.f_IsSet())
+							Continuation.f_SetException(DMibErrorInstance("Manifest rsync aborted"));
+						
+						if (!mp_pManifestSyncState)
+							return fg_Explicit( );
+						
+						auto Subscription = fg_Move(mp_pManifestSyncState->m_RSyncSubscription);
+						mp_pManifestSyncState.f_Clear();
+						if (!Subscription)
+							return fg_Explicit();
+						
+						return Subscription->f_Destroy();
+					}
+				) 
+				> [this, Continuation](CSecureByteVector &&_Packet) mutable -> TCContinuation<CSecureByteVector>
+				{
+					if (!mp_pManifestSyncState)
+						return DMibErrorInstance("Aborted");
+								
+					return TCContinuation<CSecureByteVector>::fs_RunProtected() > [&]() -> CSecureByteVector
+						{
+							NContainer::CSecureByteVector ToSendToClient;
+							if (mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket(_Packet, ToSendToClient))
+							{
+								if (!Continuation.f_IsSet())
+									Continuation.f_SetResult();
+							}
+							
+							return ToSendToClient;
+						}
+					;
+				}
+				, pState->m_ManifestStream.f_GetLength()
+			)
+			> [this, Continuation](TCAsyncResult<TCActorSubscriptionWithID<>> &&_Subscription)
+			{
+				if (!_Subscription)
+				{
+					Continuation.f_SetException(DMibErrorInstance(fg_Format("Manifest start rsync failed: ", _Subscription.f_GetExceptionStr())));
+					return;
+				}
+				
+				if (!mp_pManifestSyncState)
+					return;
+				
+				mp_pManifestSyncState->m_RSyncSubscription = fg_Move(*_Subscription);
+			}
+		;
+		
+		return Continuation;
+	}
+	
 	void CBackupManagerClient_Instance::fp_StartBackup()
 	{
 		DMibCallActor
@@ -242,42 +324,52 @@ namespace NMib::NCloud::NPrivate
 				
 				mp_Backup = fg_Move(*_ActorInterface);
 				
-				DMibCallActor(mp_Backup, CBackupManagerBackup::f_StartBackup, mp_Manifest) > [this](TCAsyncResult<CBackupManagerBackup::CStartBackupResult> &&_StartResult)
+				fp_SyncManifest() > [this](TCAsyncResult<void> &&_Result)
 					{
-						if (!_StartResult)
+						if (!_Result)
 						{
 							mp_bBackupStartFailed = true;
-							return fp_ReportBackupFailed(fg_Format("Failed to start backup: {}", _StartResult.f_GetExceptionStr()));
+							return fp_ReportBackupFailed(fg_Format("Failed to sync manifest for backup: {}", _Result.f_GetExceptionStr()));
 						}
-						for (auto &FileToBackup : _StartResult->m_FilesNotUpToDate)
-						{
-							auto &FileName = _StartResult->m_FilesNotUpToDate.fs_GetKey(FileToBackup);
-							
-							auto *pManifestFile = mp_Manifest.m_Files.f_FindEqual(FileName);
-							if (!pManifestFile)
+
+						DMibCallActor(mp_Backup, CBackupManagerBackup::f_StartBackup) > [this](TCAsyncResult<CBackupManagerBackup::CStartBackupResult> &&_StartResult)
 							{
-								DMibLogCategoryStr(mp_Config.m_LogCategory);
-								DMibLog(Error, "Unexpected file in reply from backup server: {}", FileName);
-								continue;
+								if (!_StartResult)
+								{
+									mp_bBackupStartFailed = true;
+									return fp_ReportBackupFailed(fg_Format("Failed to start backup: {}", _StartResult.f_GetExceptionStr()));
+								}
+								for (auto &FileToBackup : _StartResult->m_FilesNotUpToDate)
+								{
+									auto &FileName = _StartResult->m_FilesNotUpToDate.fs_GetKey(FileToBackup);
+									
+									auto *pManifestFile = mp_Manifest.m_Files.f_FindEqual(FileName);
+									if (!pManifestFile)
+									{
+										DMibLogCategoryStr(mp_Config.m_LogCategory);
+										DMibLog(Error, "Unexpected file in reply from backup server: {}", FileName);
+										continue;
+									}
+									
+									if (pManifestFile->f_IsDirectory())
+										continue;
+									
+									auto &PendingFile = mp_PendingFiles[FileName];
+									mp_PendingFilesQueue.f_Insert(PendingFile);
+									fp_NewPendingFile(FileName);
+								}
+								
+								for (auto &Changes : mp_PendingManifestChanges)
+								{
+									for (auto &Change : Changes)
+										fp_ProcessManifestChange(mp_PendingManifestChanges.fs_GetKey(Changes), Change);
+								}
+								mp_PendingManifestChanges.f_Clear();
+								
+								mp_bBackupStarted = true;
+								fp_ProcessBackupQueue();
 							}
-							
-							if (pManifestFile->f_IsDirectory())
-								continue;
-							
-							auto &PendingFile = mp_PendingFiles[FileName];
-							mp_PendingFilesQueue.f_Insert(PendingFile);
-							fp_NewPendingFile(FileName);
-						}
-						
-						for (auto &Changes : mp_PendingManifestChanges)
-						{
-							for (auto &Change : Changes)
-								fp_ProcessManifestChange(mp_PendingManifestChanges.fs_GetKey(Changes), Change);
-						}
-						mp_PendingManifestChanges.f_Clear();
-						
-						mp_bBackupStarted = true;
-						fp_ProcessBackupQueue();
+						;
 					}
 				;
 			}

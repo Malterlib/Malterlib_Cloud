@@ -27,6 +27,10 @@ namespace NMib::NCloud::NBackupManager
 			
 			TCActorFunctorWithID<TCContinuation<CSecureByteVector> (CSecureByteVector &&_Packet)> m_fRunProtocol;
 			
+			TCVector<CStr> m_TempFileNames;
+			
+			TCFunctionMutable<void ()> m_fOnDone;
+			
 			uint64 m_BytesTransferredIn = 0;
 			uint64 m_BytesTransferredOut = 0;
 		};
@@ -44,6 +48,18 @@ namespace NMib::NCloud::NBackupManager
 		CExceptionPointer f_CheckFileName(CStr const &_FileName, CDirectoryManifestFile **o_pManifestFile);
 		CStr f_GetCurrentPath(CStr const &_Path);
 		CStr f_GetLatestPath(CStr const &_Path);
+		TCContinuation<TCActorSubscriptionWithID<>> f_StartRSync
+			(
+				TCActorFunctorWithID<TCContinuation<CSecureByteVector> (CSecureByteVector &&_Packet)> &&_fRunProtocol
+				, CStr const &_FileName
+				, CStr const &_OldFileName
+				, CStr const &_TempFileName
+				, CStr const &_RelativeFileName
+				, uint64 _FileLength
+				, CStr &o_RSyncID
+				, TCFunctionMutable<void ()> &&_fOnDone
+			)
+		;
 		
 		CStr m_Name;
 		CTime m_StartTime;
@@ -56,6 +72,13 @@ namespace NMib::NCloud::NBackupManager
 		
 		TCMap<CStr, CFile> m_FileCache;
 		TCMap<CStr, CRSyncContext> m_RSyncContexts;
+		
+		CStr m_ManifestRSyncID;
+
+		bool m_bManifestSyncStarted = false;
+		bool m_bManifestSyncDone = false;
+		bool m_bBackupStarted = false;
+		bool m_bManifestRSyncDone = false;
 	};
 	
 	CBackupInstance::CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID)
@@ -104,13 +127,60 @@ namespace NMib::NCloud::NBackupManager
 		return nullptr;
 	}
 
-	auto CBackupInstance::f_StartBackup(CDirectoryManifest const &_Manifest) -> TCContinuation<CStartBackupResult>
+	TCContinuation<TCActorSubscriptionWithID<>> CBackupInstance::f_StartManifestRSync
+		(
+			TCActorFunctorWithID<TCContinuation<CSecureByteVector> (CSecureByteVector &&_Packet)> &&_fRunProtocol
+			, uint64 _ManifestSize
+		)
 	{
+		auto &Internal = *mp_pInternal;
+		if (Internal.m_bManifestSyncStarted)
+			return DMibErrorInstance("Manifest rsync already started");
+		
+		Internal.m_bManifestSyncStarted = true;
+		
+		CStr FileName = CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin");
+		CStr OldFileName = CFile::fs_AppendPath(Internal.m_LatestBackupDirectory, "Manifest.bin");
+		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_RandomID());
+		
+		return Internal.f_StartRSync
+			(
+				fg_Move(_fRunProtocol)
+				, FileName
+				, OldFileName
+				, TempFileName
+				, "../Manifest.bin"
+				, _ManifestSize
+				, Internal.m_ManifestRSyncID
+				, [this]
+				{
+					auto &Internal = *mp_pInternal;
+					Internal.m_bManifestSyncDone = true;
+				}
+			)
+		;
+	}
+	
+	auto CBackupInstance::f_StartBackup() -> TCContinuation<CStartBackupResult>
+	{
+		auto &Internal = *mp_pInternal;
+		
+		if (!Internal.m_bManifestSyncDone)
+			return DMibErrorInstance("You need to rsync manifest with f_StartManifestRSync before starting backup");
+			
+		if (Internal.m_bBackupStarted)
+			return DMibErrorInstance("Backup already started");
+		
+		Internal.m_bBackupStarted = true;
+
 		return TCContinuation<CStartBackupResult>::fs_RunProtected<CExceptionFile>()
 			> [&]()
 			{
 				auto &Internal = *mp_pInternal;
-				Internal.m_Manifest = _Manifest;
+				
+				TCBinaryStreamFile<> Stream;
+				Stream.f_Open(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin"), EFileOpen_Read | EFileOpen_ShareAll);
+				Stream >> Internal.m_Manifest;
 				
 				CStartBackupResult BackupResult;
 				
@@ -118,8 +188,11 @@ namespace NMib::NCloud::NBackupManager
 					&& CFile::fs_ResolveSymbolicLink(Internal.m_LatestBackupDirectory) == CFile::fs_GetFile(Internal.m_BackupDirectory)
 				;
 				
-				for (auto &File : _Manifest.m_Files)
+				for (auto &File : Internal.m_Manifest.m_Files)
 				{
+					if (File.m_Attributes & (EFileAttrib_Directory | EFileAttrib_Link))
+						continue;
+					
 					CStr FileName = Internal.f_GetCurrentPath(File.f_GetFileName());
 					CStr OldFileName = Internal.f_GetLatestPath(File.f_GetFileName());
 					
@@ -146,11 +219,8 @@ namespace NMib::NCloud::NBackupManager
 				
 				CFile::fs_CreateDirectory(Internal.m_BackupDirectory);
 #ifdef DMibDebug
-				CFile::fs_WriteStringToFile(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.json"), _Manifest.f_ToJSON().f_ToString());
+				CFile::fs_WriteStringToFile(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.json"), Internal.m_Manifest.f_ToJSON().f_ToString());
 #endif
-				TCBinaryStreamFile<> Stream;
-				Stream.f_Open(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin"), EFileOpen_Write | EFileOpen_ShareRead);
-				Stream << _Manifest;
 				
 				return BackupResult;
 			}
@@ -259,8 +329,19 @@ namespace NMib::NCloud::NBackupManager
 		while (bWantOneMoreProcess)
 		{
 			CSecureByteVector ToSendToServer;
-			if (_Context.m_pClient->f_ProcessPacket(_ServerPacket, ToSendToServer, bWantOneMoreProcess))
-				bDone = true;
+			
+			try
+			{
+				if (_Context.m_pClient->f_ProcessPacket(_ServerPacket, ToSendToServer, bWantOneMoreProcess))
+					bDone = true;
+			}
+			catch (CException const &_Exception)
+			{
+				DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Exception running RSync protocol: {}", _Exception.f_GetErrorStr());
+				m_RSyncContexts.f_Remove(_Context.f_GetSyncID());
+				return;
+			}
+			
 			_ServerPacket.f_Clear();
 			if (!ToSendToServer.f_IsEmpty())
 			{
@@ -299,14 +380,103 @@ namespace NMib::NCloud::NBackupManager
 					, _Context.m_RelativeFileName
 					, _Context.m_BytesTransferredIn
 					, _Context.m_BytesTransferredOut
-					, fp64(_Context.m_FileLength) / fp64(BytesTransferred)  
+					, fp64(_Context.m_FileLength) / fp64(BytesTransferred)
 				)
 			;
+			
+			if (_Context.m_fOnDone)
+				_Context.m_fOnDone();
 			
 			m_RSyncContexts.f_Remove(&_Context);
 		}
 	}
 	
+	TCContinuation<TCActorSubscriptionWithID<>> CBackupInstance::CInternal::f_StartRSync
+		(
+			TCActorFunctorWithID<TCContinuation<CSecureByteVector> (CSecureByteVector &&_Packet)> &&_fRunProtocol
+			, CStr const &_FileName
+			, CStr const &_OldFileName
+			, CStr const &_TempFileName
+			, CStr const &_RelativeFileName
+			, uint64 _FileLength
+			, CStr &o_RSyncID
+			, TCFunctionMutable<void ()> &&_fOnDone
+		)
+	{
+		CStr RSyncID = fg_RandomID();
+		o_RSyncID = RSyncID;
+		auto &RSyncContext = m_RSyncContexts[RSyncID];
+		RSyncContext.m_fOnDone = fg_Move(_fOnDone);
+		
+		auto pActorSubscription = g_ActorSubscription > [this, RSyncID]() -> TCContinuation<void>
+			{
+				TCContinuation<void> Continuation;
+				
+				TCVector<CStr> TempFiles;
+				
+				auto pRsyncContext = m_RSyncContexts.f_FindEqual(RSyncID);
+				if (pRsyncContext)
+				{
+					TempFiles = fg_Move(pRsyncContext->m_TempFileNames);
+					Continuation = pRsyncContext->m_fRunProtocol.f_Destroy();
+				}
+				else
+					Continuation.f_SetResult();
+				
+				m_RSyncContexts.f_Remove(RSyncID);
+
+				for (auto &TempFileName : TempFiles)
+				{
+					try
+					{
+						if (CFile::fs_FileExists(TempFileName))
+							CFile::fs_DeleteFile(TempFileName);
+					}
+					catch (CExceptionFile const &_Exception)
+					{
+						DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to cleanup tempfile for rsync: {}", _Exception);
+					}
+				}
+				
+				return Continuation;
+			}
+		;
+
+		RSyncContext.m_TempFileNames.f_Insert(_TempFileName);
+
+		CFile::fs_CreateDirectory(CFile::fs_GetPath(_FileName));
+		
+		RSyncContext.m_RelativeFileName = _RelativeFileName;
+		RSyncContext.m_FileLength = _FileLength;
+		if 
+			(
+				CFile::fs_FileExists(_FileName)
+				|| !CFile::fs_FileExists(_OldFileName)
+				|| 
+				(
+					CFile::fs_FileExists(m_LatestBackupDirectory)
+					&& CFile::fs_ResolveSymbolicLink(m_LatestBackupDirectory) == CFile::fs_GetFile(m_BackupDirectory)
+				)
+			)
+		{
+			RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
+			RSyncContext.m_TempFile.f_Open(_TempFileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
+			RSyncContext.m_pClient = fg_Construct(RSyncContext.m_File, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, &RSyncContext.m_TempFile, ERSyncClientFlag_TruncateOutput);
+		}
+		else
+		{
+			RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
+			RSyncContext.m_SourceFile.f_Open(_OldFileName, EFileOpen_Read | EFileOpen_ShareAll);
+			RSyncContext.m_pClient = fg_Construct(RSyncContext.m_SourceFile, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, nullptr, ERSyncClientFlag_TruncateOutput);
+		}
+
+		RSyncContext.m_fRunProtocol = fg_Move(_fRunProtocol);
+		
+		f_RunRSyncProtocol(RSyncContext, {});
+		
+		return fg_Explicit(fg_Move(pActorSubscription));
+	}
+				
 	TCContinuation<TCActorSubscriptionWithID<>> CBackupInstance::f_StartRSync
 		(
 			CStr const &_FileName
@@ -314,77 +484,29 @@ namespace NMib::NCloud::NBackupManager
 		)
 	{
 		auto &Internal = *mp_pInternal;
-		
+
 		CDirectoryManifestFile *pManifestFile;
 		
 		if (auto pException = Internal.f_CheckFileName(_FileName, &pManifestFile))
 			return fg_Move(pException);
-		
-		CStr RSyncID = fg_RandomID();
-		auto &RSyncContext = Internal.m_RSyncContexts[RSyncID];
-		
+	
 		CStr FileName = Internal.f_GetCurrentPath(_FileName);
 		CStr OldFileName = Internal.f_GetLatestPath(_FileName);
-		CStr TempFileName = fg_Format("{}.{}.tmp", FileName);
-		
-		auto pActorSubscription = g_ActorSubscription > [this, RSyncID, TempFileName]() -> TCContinuation<void>
-			{
-				TCContinuation<void> Continuation;
-				
-				auto &Internal = *mp_pInternal;
-				
-				auto pRsyncContext = Internal.m_RSyncContexts.f_FindEqual(RSyncID);
-				if (pRsyncContext)
-					Continuation = pRsyncContext->m_fRunProtocol.f_Destroy();
-				else
-					Continuation.f_SetResult();
-				
-				Internal.m_RSyncContexts.f_Remove(RSyncID);
-				
-				try
-				{
-					if (CFile::fs_FileExists(TempFileName))
-						CFile::fs_DeleteFile(TempFileName);
-				}
-				catch (CExceptionFile const &_Exception)
-				{
-					DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to cleanup tempfile for rsync: {}", _Exception);
-				}
-				
-				return Continuation;
-			}
-		;
-
-		CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
-		
-		RSyncContext.m_RelativeFileName = _FileName;
-		RSyncContext.m_FileLength = pManifestFile->m_Length;
-		if 
+		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_RandomID());
+		CStr RSyncID;
+	
+		return Internal.f_StartRSync
 			(
-				CFile::fs_FileExists(FileName) 
-				|| !CFile::fs_FileExists(OldFileName) 
-				|| 
-				(
-					CFile::fs_FileExists(Internal.m_LatestBackupDirectory) 
-					&& CFile::fs_ResolveSymbolicLink(Internal.m_LatestBackupDirectory) == CFile::fs_GetFile(Internal.m_BackupDirectory)
-				)
+				fg_Move(_fRunProtocol)
+				, FileName
+				, OldFileName
+				, TempFileName
+				, _FileName
+				, pManifestFile->m_Length
+				, RSyncID
+				, {}
 			)
-		{
-			RSyncContext.m_File.f_Open(FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
-			RSyncContext.m_TempFile.f_Open(TempFileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
-			RSyncContext.m_pClient = fg_Construct(RSyncContext.m_File, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, &RSyncContext.m_TempFile, ERSyncClientFlag_TruncateOutput);
-		}
-		else
-		{
-			RSyncContext.m_File.f_Open(FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
-			RSyncContext.m_SourceFile.f_Open(OldFileName, EFileOpen_Read | EFileOpen_ShareAll);
-			RSyncContext.m_pClient = fg_Construct(RSyncContext.m_SourceFile, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, nullptr, ERSyncClientFlag_TruncateOutput);
-		}
-		RSyncContext.m_fRunProtocol = fg_Move(_fRunProtocol);
-		
-		Internal.f_RunRSyncProtocol(RSyncContext, {});
-		
-		return fg_Explicit(fg_Move(pActorSubscription));
+		;
 	}
 	
 	TCContinuation<void> CBackupInstance::f_UploadData(CStr const &_FileName, uint64 _Position, CSecureByteVector &&_Data)
