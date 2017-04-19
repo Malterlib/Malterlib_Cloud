@@ -321,10 +321,10 @@ namespace NMib::NCloud
 					return;
 				}
 				
-				auto fSendManifestChange = [&](CStr const &_Path, CBackupManagerBackup::CManifestChange const &_ManifestChange)
+				auto fSendManifestChange = [&](CStr const &_Path, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty)
 					{
 						for (auto &RunningInstance : m_RunningBackupInstances)
-							RunningInstance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange) > fg_DiscardResult();
+							RunningInstance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty) > fg_DiscardResult();
 					}
 				;
 				
@@ -351,9 +351,9 @@ namespace NMib::NCloud
 				{
 					auto &Path = UpdatedDirectories.fs_GetKey(UpdatedDirectory);
 					if (UpdatedDirectory.m_bAdded)
-						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Add{fg_Move(UpdatedDirectory.m_ManifestFile)});
+						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Add{fg_Move(UpdatedDirectory.m_ManifestFile)}, false);
 					else
-						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Change{fg_Move(UpdatedDirectory.m_ManifestFile)});
+						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Change{fg_Move(UpdatedDirectory.m_ManifestFile)}, false);
 				}
 				
 				if (Notification.m_Notification == EFileChangeNotification_Renamed)
@@ -361,32 +361,32 @@ namespace NMib::NCloud
 					if (ChangeFrom.m_bRemoved)
 					{
 						if (Change.m_bAdded)
-							fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Rename{fg_Move(Change.m_ManifestFile), RelativePathFrom});
+							fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Rename{fg_Move(Change.m_ManifestFile), RelativePathFrom}, Change.m_bIDChanged);
 						else if (Change.m_bRemoved)
 						{
-							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Remove{});
+							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Remove{}, ChangeFrom.m_bIDChanged);
 							if (Change.m_bRemoved)
-								fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Remove{});
+								fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Remove{}, Change.m_bIDChanged);
 							else if (Change.m_bExists)
-								fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Change{fg_Move(Change.m_ManifestFile)});
+								fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Change{fg_Move(Change.m_ManifestFile)}, Change.m_bIDChanged);
 						}
 						return;
 					}
 					else
 					{
 						if (ChangeFrom.m_bAdded)
-							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Add{fg_Move(ChangeFrom.m_ManifestFile)});
+							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Add{fg_Move(ChangeFrom.m_ManifestFile)}, ChangeFrom.m_bIDChanged);
 						else if (ChangeFrom.m_bExists)
-							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Change{fg_Move(ChangeFrom.m_ManifestFile)});
+							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Change{fg_Move(ChangeFrom.m_ManifestFile)}, ChangeFrom.m_bIDChanged);
 					}
 				}
 				
 				if (Change.m_bAdded)
-					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Add{fg_Move(Change.m_ManifestFile)});
+					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Add{fg_Move(Change.m_ManifestFile)}, Change.m_bIDChanged);
 				else if (Change.m_bRemoved)
-					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Remove{});
+					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Remove{}, Change.m_bIDChanged);
 				else if (Change.m_bExists)
-					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Change{fg_Move(Change.m_ManifestFile)});
+					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Change{fg_Move(Change.m_ManifestFile)}, Change.m_bIDChanged);
 			}
 		;
 	}

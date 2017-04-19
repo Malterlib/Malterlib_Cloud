@@ -38,32 +38,22 @@ namespace NMib::NCloud::NPrivate
 		;
 		~CBackupManagerClient_Instance();
 		
-		void f_ManifestChanged(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange);
+		void f_ManifestChanged(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty);
 		
 	private:
-		TCContinuation<void> fp_Destroy() override;
-		void fp_StartBackup();
-		void fp_BackupNotification(CBackupManagerClient::CNotification &&_Notification);
-		void fp_ReportBackupFailed(CStr const &_Error);
-
-		TCContinuation<void> fp_SyncManifest();
-		
-		void fp_ProcessBackupQueue();
-
-		void fp_NewPendingFile(CStr const &_FileName);
-		void fp_FileFinished(CStr const &_FileName);
-		void fp_ProcessManifestChange(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange);
-		TCContinuation<void> fp_AbortPendingFile(CStr const &_FileName);
 		
 		struct CRunningSyncState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
 		{
 			CRunningSyncState();
 			~CRunningSyncState();
-			
+
+			CStr m_FileName;
 			TCBinaryStreamFile<> m_File;
 			TCUniquePointer<CRSyncServer> m_pRSyncServer;
 			COnScopeExitShared m_pOnScopeExit;
 			TCSharedPointer<CCanDestroyTracker> m_pCanDestroyTracker;
+			uint32 m_PendingQueue = 0;
+			bool m_bAborted = false;
 		};
 		
 		struct CManifestSyncState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
@@ -88,12 +78,57 @@ namespace NMib::NCloud::NPrivate
 			TCVector<TCContinuation<void>> m_StartedContinuations;
 			
 			CActorSubscription m_RSyncSubscription;
-			mint m_SyncSequence = 0; 
+			mint m_SyncSequence = 0;
+			
+			EDirectoryManifestSyncFlag m_SyncFlags = EDirectoryManifestSyncFlag_None;
 			
 			bool m_bReschedule = false;
 			bool m_bFinished = false;
 		};
+		
+		struct CManifestChangeAndDirty
+		{
+			CBackupManagerBackup::CManifestChange m_ManifestChange;
+			bool m_bDirty = false;
+		};
+		
+		struct CAppendFileCache
+		{
+			CFile m_File;
+			CUniqueFileIdentifier m_FileID;
+		};
 
+		struct CAppendFileState
+		{
+			uint64 m_Position = 0;
+			bool m_bDirty = true;
+		};
+
+		TCContinuation<void> fp_Destroy() override;
+		void fp_StartBackup();
+		void fp_BackupNotification(CBackupManagerClient::CNotification &&_Notification);
+		void fp_ReportBackupFailed(CStr const &_Error);
+
+		TCContinuation<void> fp_SyncManifest();
+		
+		void fp_ProcessBackupQueue();
+		void fp_RSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, CPendingBackupFile &_PendingFile, mint _SyncSequence);
+		void fp_SendAppendSyncFile
+			(
+				TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState
+				, TCContinuation<bool> const &_Continuation
+				, uint64 _Length
+				, TCSharedPointer<CAppendFileCache> const &_pFile
+			)
+		;
+		void fp_AppendSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, mint _SyncSequence);
+
+		void fp_NewPendingFile(CStr const &_FileName);
+		void fp_FileFinished(CStr const &_FileName);
+		void fp_ProcessManifestChange(CStr const &_FileName, CManifestChangeAndDirty const &_ManifestChange);
+		TCContinuation<void> fp_AbortPendingFile(CStr const &_FileName);
+		TCSharedPointer<CAppendFileCache> fp_GetAppendFileCache(CStr const &_FileName);
+		
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
 		
 		TCDistributedActor<CBackupManager> mp_BackupManager;
@@ -113,7 +148,10 @@ namespace NMib::NCloud::NPrivate
 		TCMap<CStr, CPendingBackupFile> mp_PendingFiles;
 		DMibListLinkDS_List(CPendingBackupFile, m_Link) mp_PendingFilesQueue;
 
-		TCMap<CStr, TCVector<CBackupManagerBackup::CManifestChange>> mp_PendingManifestChanges;
+		TCMap<CStr, TCVector<CManifestChangeAndDirty>> mp_PendingManifestChanges;
+		
+		TCMap<CStr, TCSharedPointer<CAppendFileCache>> mp_AppendFileCache;
+		TCMap<CStr, CAppendFileState> mp_AppendFileState;
 		
 		TCActorSequencer<void> mp_FileManifestSequencer;
 		

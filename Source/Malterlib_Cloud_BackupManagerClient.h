@@ -32,6 +32,7 @@ namespace NMib::NCloud
 			CDirectoryManifestConfig m_ManifestConfig;												///< The config to generate the manifest
 			NTime::CTimeSpan m_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);	///< Interval for creating new full backup snapshots. Set to 0 to disable.
 			NStr::CStr m_LogCategory = "Backup";													///< The category to do logging under.
+			uint32 m_MaxSendQueue = 8*1024*1024;													///< The maximum number of bytes to queue on the network
 		};
 		
 		enum ENotification /// Notification from backup manager client

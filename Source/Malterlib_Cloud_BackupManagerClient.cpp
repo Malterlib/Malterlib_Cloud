@@ -75,11 +75,24 @@ namespace NMib::NCloud
 					DMibLogCategoryStr(m_Config.m_LogCategory);
 					DMibLog(Error, "Failed to subscribe to file notifications: {}", _Result.f_GetExceptionStr());
 				}
-				g_Dispatch(m_FileActor) > [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]
+				g_Dispatch(m_FileActor) > [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]() -> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>>
 					{
-						return CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); });
+						auto Manifest = CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); });
+						TCMap<CStr, CUniqueFileIdentifier> FileIDs;
+
+						for (auto &File : Manifest.m_Files)
+						{
+							if (File.m_Attributes & (EFileAttrib_Link | EFileAttrib_Directory))
+								continue;
+
+							auto &FileName = Manifest.m_Files.fs_GetKey(File);
+
+							FileIDs[Manifest.m_Files.fs_GetKey(File)] = CFile::fs_GetUniqueIdentifier(CFile::fs_AppendPath(Config.m_Root, FileName));
+						}
+
+						return {fg_Move(Manifest), fg_Move(FileIDs)};
 					}
-					> [this](TCAsyncResult<CDirectoryManifest> &&_Manifest)
+					> [this](TCAsyncResult<TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>>> &&_Manifest)
 					{
 						if (m_pThis->mp_bDestroyed)
 							return;
@@ -91,7 +104,8 @@ namespace NMib::NCloud
 							return;
 						}
 						
-						m_Manifest = fg_Move(*_Manifest);
+						m_Manifest = fg_Move(fg_Get<0>(*_Manifest));
+						m_ManifestFileIDs = fg_Move(fg_Get<1>(*_Manifest));
 
 						f_NewBackupKey();
 						f_Subscribe();
@@ -104,6 +118,8 @@ namespace NMib::NCloud
 	auto CBackupManagerClient::CConfig::f_Validate() const -> CConfig const &
 	{
 		m_ManifestConfig.f_Validate();
+		if (m_MaxSendQueue < 16*1024)
+			DMibError("Send queue needs to be at least 16 KiB");
 		return *this;
 	}
 }

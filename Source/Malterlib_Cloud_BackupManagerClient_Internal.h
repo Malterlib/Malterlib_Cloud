@@ -47,9 +47,11 @@ namespace NMib::NCloud
 		{
 			CDirectoryManifestFile m_ManifestFile;
 			TCMap<CStr, CUpdatedDirectory> m_UpdatedDirectories;
+			CUniqueFileIdentifier m_FileID;
 			bool m_bExists = false;
 			bool m_bRemoved = false;
 			bool m_bAdded = false;
+			bool m_bIDChanged = false;
 		};
 		
 		void f_Construct();
@@ -71,6 +73,7 @@ namespace NMib::NCloud
 		
 		TCActor<CSeparateThreadActor> m_FileActor;
 		CDirectoryManifest m_Manifest; // Kept up to date
+		TCMap<CStr, CUniqueFileIdentifier> m_ManifestFileIDs;
 
 		TCActor<CFileChangeNotificationActor> m_FileChangeNotificationsActor;
 		TCMap<CStr, CWatchedPath> m_WatchedPaths;

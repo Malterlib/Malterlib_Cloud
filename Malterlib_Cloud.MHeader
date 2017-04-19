@@ -96,6 +96,8 @@ Property
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards "Log/@(Target:Target.BaseFileName).log;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards "Log/@(Target:Target.BaseFileName)_?.log;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
 	
+	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards "Log/*=Append;@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards)"
+	
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards "*/.tmp;@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards)"
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards "*/.DS_Store;@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards)"
 	{
@@ -114,9 +116,6 @@ Property
 	
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents->Replace('Dummy, ', ''))"
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents->Replace('[Dummy]', '[]'))"
-	{
-		!MalterlibCloudVersionInfo_Backup_IncludeWildcards ""
-	}
 }
 
 Property
@@ -130,9 +129,6 @@ Property
 	
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents->Replace('Dummy, ', ''))"
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents->Replace('[Dummy]', '[]'))"
-	{
-		!MalterlibCloudVersionInfo_Backup_ExcludeWildcards ""
-	}
 }
 	
 Property
@@ -149,13 +145,11 @@ Property
 		!Explodee ""
 	}
 
-	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents "[Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_Template'))]"
+	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents "{Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_Template'))}"
 	
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents->Replace('Dummy, ', ''))"
+	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents->Replace('{Dummy}', '{}'))"
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents->Replace('[Dummy]', '[]'))"
-	{
-		!MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards ""
-	}
 }
 
 Property
@@ -172,13 +166,11 @@ Property
 		!Explodee ""
 	}
 
-	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents "[Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_Template'))]"
+	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents "{Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_Template'))}"
 	
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents->Replace('Dummy, ', ''))"
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents->Replace('[Dummy]', '[]'))"
-	{
-		!MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards ""
-	}
+	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents->Replace('{Dummy}', '{}'))"
 }
 
 Property

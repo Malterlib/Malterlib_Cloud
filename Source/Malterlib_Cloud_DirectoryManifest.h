@@ -23,6 +23,7 @@ namespace NMib::NCloud
 		
 		NStr::CStr const &f_GetFileName() const;
 		bool f_IsDirectory() const;
+		bool f_IsFile() const;
 		
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream, uint32 _Version);

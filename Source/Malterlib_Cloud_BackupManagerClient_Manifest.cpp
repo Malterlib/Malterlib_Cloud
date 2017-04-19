@@ -27,7 +27,13 @@ namespace NMib::NCloud
 				
 				CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, _FileName, ManifestFile);
 				
-				CUpdateManifestResult Result = {fg_Move(ManifestFile), {}, true};
+				CUniqueFileIdentifier FileID;
+				if (ManifestFile.m_Attributes & EFileAttrib_Link)
+					FileID = CFile::fs_GetUniqueIdentifierOnLink(AbsoluteFileName);
+				else
+					FileID = CFile::fs_GetUniqueIdentifier(AbsoluteFileName);
+
+				CUpdateManifestResult Result = {fg_Move(ManifestFile), {}, FileID, true};
 				
 				CStr Directory = CFile::fs_GetPath(_FileName);
 				while (!Directory.f_IsEmpty())
@@ -46,6 +52,8 @@ namespace NMib::NCloud
 				{
 					if (m_Manifest.m_Files.f_Remove(_FileName))
 						_Result.m_bRemoved = true;
+					if (m_ManifestFileIDs.f_Remove(_FileName))
+						_Result.m_bIDChanged = true;
 				}
 				else
 				{
@@ -53,6 +61,21 @@ namespace NMib::NCloud
 					if (Mapped.f_WasCreated())
 						_Result.m_bAdded = true;
 						
+					if (_Result.m_ManifestFile.f_IsFile())
+					{
+						auto FileID = m_ManifestFileIDs[_FileName];
+						if (_Result.m_FileID != FileID)
+						{
+							FileID = _Result.m_FileID;
+							_Result.m_bIDChanged = true;
+						}
+					}
+					else
+					{
+						if (m_ManifestFileIDs.f_Remove(_FileName))
+							_Result.m_bIDChanged = true;
+					}
+
 					*Mapped = _Result.m_ManifestFile;
 
 					for (auto iDirectory = _Result.m_UpdatedDirectories.f_GetIterator(); iDirectory;)

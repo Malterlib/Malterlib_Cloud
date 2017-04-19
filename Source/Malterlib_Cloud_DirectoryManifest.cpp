@@ -73,6 +73,11 @@ namespace NMib::NCloud
 		return (m_Attributes & (NFile::EFileAttrib_Directory | NFile::EFileAttrib_Link)) == NFile::EFileAttrib_Directory;
 	}
 	
+	bool CDirectoryManifestFile::f_IsFile() const
+	{
+		return (m_Attributes & (NFile::EFileAttrib_Directory | NFile::EFileAttrib_Link)) == NFile::EFileAttrib_None;
+	}
+	
 	NStr::CStr const &CDirectoryManifestFile::f_GetFileName() const
 	{
 		return NContainer::TCMap<NStr::CStr, CDirectoryManifestFile>::fs_GetKey(*this);

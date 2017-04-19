@@ -56,6 +56,7 @@ namespace NMib::NCloud::NBackupManager
 				, CStr const &_TempFileName
 				, CStr const &_RelativeFileName
 				, uint64 _FileLength
+				, EDirectoryManifestSyncFlag _SyncFlags
 				, CStr &o_RSyncID
 				, TCFunctionMutable<void ()> &&_fOnDone
 			)
@@ -151,6 +152,7 @@ namespace NMib::NCloud::NBackupManager
 				, TempFileName
 				, "../Manifest.bin"
 				, _ManifestSize
+				, EDirectoryManifestSyncFlag_None
 				, Internal.m_ManifestRSyncID
 				, [this]
 				{
@@ -399,6 +401,7 @@ namespace NMib::NCloud::NBackupManager
 			, CStr const &_TempFileName
 			, CStr const &_RelativeFileName
 			, uint64 _FileLength
+			, EDirectoryManifestSyncFlag _SyncFlags
 			, CStr &o_RSyncID
 			, TCFunctionMutable<void ()> &&_fOnDone
 		)
@@ -441,6 +444,25 @@ namespace NMib::NCloud::NBackupManager
 				return Continuation;
 			}
 		;
+		
+		if (CFile::fs_FileExists(_FileName, EFileAttrib_Directory))
+			CFile::fs_DeleteDirectoryRecursive(_FileName);
+		else if (CFile::fs_FileExists(_FileName, EFileAttrib_Link))
+			CFile::fs_DeleteFile(_FileName);
+
+		ERSyncClientFlag RSyncFlags = ERSyncClientFlag_TruncateOutput;
+
+		if (_SyncFlags & EDirectoryManifestSyncFlag_Append)
+		{
+			RSyncFlags = ERSyncClientFlag_None;
+			
+			if (CFile::fs_FileExists(_FileName) && CFile::fs_GetFileSize(_FileName) != _FileLength)
+			{
+				CFile File;
+				File.f_Open(_FileName, EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
+				File.f_SetLength(_FileLength);
+			}
+		}
 
 		RSyncContext.m_TempFileNames.f_Insert(_TempFileName);
 
@@ -461,13 +483,13 @@ namespace NMib::NCloud::NBackupManager
 		{
 			RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 			RSyncContext.m_TempFile.f_Open(_TempFileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
-			RSyncContext.m_pClient = fg_Construct(RSyncContext.m_File, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, &RSyncContext.m_TempFile, ERSyncClientFlag_TruncateOutput);
+			RSyncContext.m_pClient = fg_Construct(RSyncContext.m_File, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, &RSyncContext.m_TempFile, RSyncFlags);
 		}
 		else
 		{
 			RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 			RSyncContext.m_SourceFile.f_Open(_OldFileName, EFileOpen_Read | EFileOpen_ShareAll);
-			RSyncContext.m_pClient = fg_Construct(RSyncContext.m_SourceFile, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, nullptr, ERSyncClientFlag_TruncateOutput);
+			RSyncContext.m_pClient = fg_Construct(RSyncContext.m_SourceFile, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, nullptr, RSyncFlags);
 		}
 
 		RSyncContext.m_fRunProtocol = fg_Move(_fRunProtocol);
@@ -503,6 +525,7 @@ namespace NMib::NCloud::NBackupManager
 				, TempFileName
 				, _FileName
 				, pManifestFile->m_Length
+				, pManifestFile->m_Flags
 				, RSyncID
 				, {}
 			)
@@ -530,6 +553,17 @@ namespace NMib::NCloud::NBackupManager
 				}
 				CacheFile.f_SetPosition(_Position);
 				CacheFile.f_Write(_Data.f_GetArray(), _Data.f_GetLen());
+				
+				DMibLogWithCategory
+					(
+						Mib/Cloud/BackupManager
+						, DebugVerbose1
+						, "Appending data for file '{}':   at {}   {} bytes"
+						, _FileName
+						, _Position
+						, _Data.f_GetLen()
+					)
+				;
 			}
 		;
 	}
