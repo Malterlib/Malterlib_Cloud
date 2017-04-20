@@ -88,10 +88,11 @@ namespace NMib::NCloud::NAppManager
 		auto SettingsOption_BackupIncludeWildcards = "BackupIncludeWildcards?"_= 
 			{
 				"Names"_= {"--backup-include-wildcards"}
-				, "Type"_= {""}
+				, "Type"_= {"*"_= {COneOfType{CEJSON{""}, COneOf{nullptr}}}}
 				, "Description"_= "The wildcard file searches to include in backups.\n" 
 				"Relative to application root. Only file name can have wildcards.\n"
 				"Use ^ in the beginning of the file path to create a recursive search.\n"
+				"Example: '{\"Logs/^*\": null, \"Files/^*\": \"Files2\"}'\n"
 			}
 		;
 
@@ -114,7 +115,7 @@ namespace NMib::NCloud::NAppManager
 				"   Append:          Append syncing. Any changes are assumed to be append only.\r"
 				"   TransactionLog:  Should be used together with Append. This tells the backup manager to sync writes to disk as quickly as possible.\r"
 				"\r"
-				"Example: '{\"Logs/^*\": [\"Append\"]}'\n"
+				"Example: '{\"Logs/*\": [\"Append\"]}'\n"
 			}
 		;
 

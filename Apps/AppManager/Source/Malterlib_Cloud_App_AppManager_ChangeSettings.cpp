@@ -109,7 +109,14 @@ namespace NMib::NCloud::NAppManager
 		{
 			if (!Application.m_LastInstalledVersion.f_IsValid())
 				return Auditor.f_Exception("Found no install from last version to get settings from");
-			Settings.f_FromVersionInfo(Application.m_LastInstalledVersionInfo, ChangedSettings);
+			try
+			{
+				Settings.f_FromVersionInfo(Application.m_LastInstalledVersionInfo, ChangedSettings);
+			}
+			catch (CException const &_Exception)
+			{
+				return Auditor.f_Exception(fg_Format("Failed to get settings from version info: {}", _Exception));
+			}
 		}
 		
 		Settings.f_ApplySettings(_ChangedSettings, _Settings);

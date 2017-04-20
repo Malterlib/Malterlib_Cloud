@@ -61,10 +61,10 @@ namespace NMib::NCloud
 		TCContinuation<void> f_SubscribeChanges();
 		TCContinuation<void> f_RetrySubscribeChanges();
 		void f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification);
-		bool f_IsPathInManifest(CStr const &_Path);
+		bool f_IsPathInManifest(CStr const &_Path, CStr &o_FileName);
 		static void fs_CheckDestroy(TCSharedPointer<NAtomic::TCAtomic<bool>> const &_pDestroyed);
 		
-		TCContinuation<CUpdateManifestResult> f_UpdateManifest(CStr const &_FileName);
+		TCContinuation<CUpdateManifestResult> f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName);
 		
 		CBackupManagerClient *m_pThis = nullptr;
 		TCSharedPointer<NAtomic::TCAtomic<bool>> m_pDestroyed;

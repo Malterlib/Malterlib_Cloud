@@ -48,6 +48,7 @@ namespace NMib::NCloud::NPrivate
 			~CRunningSyncState();
 
 			CStr m_FileName;
+			CStr m_OriginalFileName;
 			TCBinaryStreamFile<> m_File;
 			TCUniquePointer<CRSyncServer> m_pRSyncServer;
 			COnScopeExitShared m_pOnScopeExit;
@@ -81,6 +82,7 @@ namespace NMib::NCloud::NPrivate
 			mint m_SyncSequence = 0;
 			
 			EDirectoryManifestSyncFlag m_SyncFlags = EDirectoryManifestSyncFlag_None;
+			CStr m_OriginalPath;
 			
 			bool m_bReschedule = false;
 			bool m_bFinished = false;

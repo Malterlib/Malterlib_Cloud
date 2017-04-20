@@ -8,16 +8,16 @@
 
 namespace NMib::NCloud
 {
-	auto CBackupManagerClient::CInternal::f_UpdateManifest(CStr const &_FileName) -> TCContinuation<CUpdateManifestResult>
+	auto CBackupManagerClient::CInternal::f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName) -> TCContinuation<CUpdateManifestResult>
 	{
 		if (_FileName.f_IsEmpty())
 			return fg_Explicit(CUpdateManifestResult{});
 			
 		TCContinuation<CUpdateManifestResult> Continuation;
 		
-		g_Dispatch(m_FileActor) > [_FileName, Config = m_Config]() mutable -> CUpdateManifestResult
+		g_Dispatch(m_FileActor) > [_FileName, _OriginalFileName, Config = m_Config]() mutable -> CUpdateManifestResult
 			{
-				auto AbsoluteFileName = CFile::fs_AppendPath(Config.m_ManifestConfig.m_Root, _FileName);
+				auto AbsoluteFileName = CFile::fs_AppendPath(Config.m_ManifestConfig.m_Root, _OriginalFileName);
 				
 				if (!CFile::fs_FileExists(AbsoluteFileName, EFileAttrib_File | EFileAttrib_Link | EFileAttrib_Directory))
 					return {{}, {}, false};
@@ -25,7 +25,7 @@ namespace NMib::NCloud
 				CDirectoryManifestFile ManifestFile;
 				ManifestFile.m_Attributes = CFile::fs_GetAttributes(AbsoluteFileName);
 				
-				CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, _FileName, ManifestFile);
+				CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, _FileName, ManifestFile, _OriginalFileName);
 				
 				CUniqueFileIdentifier FileID;
 				if (ManifestFile.m_Attributes & EFileAttrib_Link)
@@ -39,8 +39,21 @@ namespace NMib::NCloud
 				while (!Directory.f_IsEmpty())
 				{
 					auto &UpdatedDirectory = Result.m_UpdatedDirectories[Directory];
-					UpdatedDirectory.m_ManifestFile.m_Attributes = CFile::fs_GetAttributes(CFile::fs_AppendPath(Config.m_ManifestConfig.m_Root, Directory));
-					CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, Directory, UpdatedDirectory.m_ManifestFile);
+
+					CStr OriginalFileName;
+					if (_FileName != _OriginalFileName)
+					{
+						if (ManifestFile.f_IsDirectory())
+							OriginalFileName = _OriginalFileName;
+						else
+							OriginalFileName = CFile::fs_GetPath(_OriginalFileName);
+					}
+					else
+						OriginalFileName = Directory;
+
+					UpdatedDirectory.m_ManifestFile.m_Attributes = CFile::fs_GetAttributes(CFile::fs_AppendPath(Config.m_ManifestConfig.m_Root, OriginalFileName));
+						
+					CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, Directory, UpdatedDirectory.m_ManifestFile, OriginalFileName);
 					Directory = CFile::fs_GetPath(Directory);
 				}
 				

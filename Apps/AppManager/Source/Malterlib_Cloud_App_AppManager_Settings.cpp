@@ -100,8 +100,14 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
 			m_Backup_IncludeWildcards.f_Clear();
-			for (auto &Wildcard : pValue->f_Array())
-				m_Backup_IncludeWildcards[Wildcard.f_String()];
+			for (auto &Wildcard : pValue->f_Object())
+			{
+				auto &Destination = m_Backup_IncludeWildcards[Wildcard.f_Name()];
+				if (Wildcard.f_Value().f_IsNull())
+					Destination = CDirectoryManifestConfig::CDestination{};
+				else
+					Destination = Wildcard.f_Value().f_String();
+			}
 		}
 
 		if (auto *pValue = _Params.f_GetMember("BackupExcludeWildcards"))
@@ -420,7 +426,6 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 		}
 		
-
 		if (_Settings.m_Backup_IncludeWildcards)
 		{
 			m_Backup_IncludeWildcards = *_Settings.m_Backup_IncludeWildcards; 
@@ -539,8 +544,14 @@ namespace NMib::NCloud::NAppManager
 			{
 				o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
 				m_Backup_IncludeWildcards.f_Clear();
-				for (auto &Wildcard : pValue->f_Array())
-					m_Backup_IncludeWildcards[Wildcard.f_String()];
+				for (auto &Wildcard : pValue->f_Object())
+				{
+					auto &Destination = m_Backup_IncludeWildcards[Wildcard.f_Name()];
+					if (Wildcard.f_Value().f_IsNull())
+						Destination = CDirectoryManifestConfig::CDestination{};
+					else
+						Destination = Wildcard.f_Value().f_String();
+				}
 			}
 			if (auto pValue = BackupJSON.f_GetMember("ExcludeWildcards", EJSONType_Array))
 			{

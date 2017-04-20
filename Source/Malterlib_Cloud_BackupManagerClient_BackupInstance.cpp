@@ -72,7 +72,7 @@ namespace NMib::NCloud::NPrivate
 	{
 		auto &RunningState = *_pRunningState;
 		
-		CStr FullPath = CFile::fs_AppendPath(mp_Config.m_ManifestConfig.m_Root, RunningState.m_FileName);
+		CStr FullPath = CFile::fs_AppendPath(mp_Config.m_ManifestConfig.m_Root, _PendingFile.m_OriginalPath);
 		try
 		{
 			RunningState.m_File.f_Open(FullPath, EFileOpen_Read | EFileOpen_ShareRead | EFileOpen_ShareWrite);
@@ -253,7 +253,7 @@ namespace NMib::NCloud::NPrivate
 		
 		try
 		{
-			auto pFileCache = fp_GetAppendFileCache(RunningState.m_FileName);
+			auto pFileCache = fp_GetAppendFileCache(RunningState.m_OriginalFileName);
 			
 			fp_SendAppendSyncFile(_pRunningState, Continuation, pFileCache->m_File.f_GetLength(), pFileCache);
 		}
@@ -303,6 +303,7 @@ namespace NMib::NCloud::NPrivate
 			
 			RunningState.m_pCanDestroyTracker = mp_pCanDestroyTracker;
 			RunningState.m_FileName = FileName;
+			RunningState.m_OriginalFileName = PendingFile.m_OriginalPath;
 			
 			++mp_nRunningSyncs;
 			RunningState.m_pOnScopeExit = g_OnScopeExitActor > [this, FileName, SyncSequence]
@@ -518,6 +519,7 @@ namespace NMib::NCloud::NPrivate
 									auto &PendingFile = mp_PendingFiles[FileName];
 									mp_PendingFilesQueue.f_Insert(PendingFile);
 									PendingFile.m_SyncFlags = pManifestFile->m_Flags;
+									PendingFile.m_OriginalPath = pManifestFile->m_OriginalPath;
 									fp_NewPendingFile(FileName);
 								}
 								
@@ -651,6 +653,7 @@ namespace NMib::NCloud::NPrivate
 								if (Mapping.f_WasCreated())
 								{
 									PendingFile.m_SyncFlags = pManifestFile->m_Flags;
+									PendingFile.m_OriginalPath = pManifestFile->m_OriginalPath;
 
 									mp_PendingFilesQueue.f_Insert(PendingFile);
 									fp_NewPendingFile(_FileName);

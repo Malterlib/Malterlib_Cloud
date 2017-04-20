@@ -217,10 +217,17 @@ namespace NMib::NCloud::NAppManager
 			auto &BackupJSON = ApplicationJSON["Backup"] = CEJSON();
 			BackupJSON.f_Object();
 			{
-				auto &JSON = BackupJSON["IncludeWildcards"];
-				JSON.f_Array().f_Clear();
-				for (auto &Wildcard : Settings.m_Backup_IncludeWildcards)
-					JSON.f_Insert(Wildcard);
+				auto &JSON = BackupJSON["IncludeWildcards"] = CEJSON();
+				JSON.f_Object();
+				for (auto &Destination : Settings.m_Backup_IncludeWildcards)
+				{
+					auto &DestinationJSON = JSON[Settings.m_Backup_IncludeWildcards.fs_GetKey(Destination)];
+					
+					if (Destination)
+						DestinationJSON = *Destination;
+					else
+						DestinationJSON = nullptr;
+				}
 			}
 			{
 				auto &JSON = BackupJSON["ExcludeWildcards"];

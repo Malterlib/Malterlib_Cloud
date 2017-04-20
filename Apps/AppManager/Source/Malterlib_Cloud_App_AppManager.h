@@ -105,7 +105,7 @@ namespace NMib::NCloud::NAppManager
 			TCVector<CStr> m_ExecutableParameters;
 			bool m_bDistributedApp = false;
 			
-			NContainer::TCSet<NStr::CStr> m_Backup_IncludeWildcards;
+			NContainer::TCMap<NStr::CStr, CDirectoryManifestConfig::CDestination> m_Backup_IncludeWildcards;
 			NContainer::TCSet<NStr::CStr> m_Backup_ExcludeWildcards;
 			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
 			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;

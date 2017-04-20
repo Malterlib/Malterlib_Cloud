@@ -233,7 +233,16 @@ namespace NMib::NCloud::NAppManager
 						{
 							CApplicationSettings NewSettings = Application.m_Settings;
 							EApplicationSetting NewChangedSettings = EApplicationSetting_None;
-							NewSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
+
+							try
+							{
+								NewSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
+							}
+							catch (CException const &_Exception)
+							{
+								Continuation.f_SetException(DMibErrorInstance(fg_Format("Failed to get settings from version info: {}", _Exception)));
+								return;
+							}
 							
 							CStr Error;
 							if (!NewSettings.f_Validate(Error))

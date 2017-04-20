@@ -7,6 +7,7 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Storage/Variant>
+#include <Mib/Storage/Optional>
 
 #include "Malterlib_Cloud_DirectoryManifest.h"
 
@@ -44,9 +45,12 @@ namespace NMib::NCloud
 	{
 		struct CConfig
 		{
-			NStr::CStr m_BasePath;	///< No checks are done that files not specified in the manifest is downloaded from this directory.
-			NContainer::TCVariant<CDirectoryManifest, CDirectoryManifestConfig, NStr::CStr> m_Manifest;	///< Specify manifest, a config to generate a manifest, or a path to a file
-																										///< with an existing manifest that corresponds to the files available in m_BasePath.
+			NStr::CStr m_BasePath;	///< Care has been taken to make sure that no files outside this directory can be downloaded. Also, only files that are specified in
+									///		the manifst can be downloaded.
+			NContainer::TCVariant<CDirectoryManifest, CDirectoryManifestConfig, NStr::CStr> m_Manifest;	///< Specify manifest, a config to generate a manifest, or a path to a file with
+																										///		an existing manifest that corresponds to the files available in m_BasePath.
+			NStorage::TCOptional<bool> m_bUseOriginalLocation;	///< Use the original location of files in manifest. Defaults to true when m_Manifest is a CDirectoryManifestConfig,
+																///		otherwise false
 		};
 
 		struct CSyncResult

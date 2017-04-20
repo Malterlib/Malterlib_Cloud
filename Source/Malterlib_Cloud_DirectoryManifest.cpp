@@ -133,32 +133,39 @@ namespace NMib::NCloud
 		return Manifest;
 	}
 	
-	void CDirectoryManifest::fs_UpdateManifestFile(CDirectoryManifestConfig const &_Config, NStr::CStr const &_FileName, CDirectoryManifestFile &o_ManifestFile)
+	void CDirectoryManifest::fs_UpdateManifestFile
+		(
+			CDirectoryManifestConfig const &_Config
+			, NStr::CStr const &_FileName
+			, CDirectoryManifestFile &o_ManifestFile
+			, NStr::CStr const &_OriginalPath
+		)
 	{
 		using namespace NFile;
 		using namespace NStr;
 
-		auto FileName = CFile::fs_AppendPath(_Config.m_Root, _FileName);
+		auto OriginalFileName = CFile::fs_AppendPath(_Config.m_Root, _OriginalPath);
+		o_ManifestFile.m_OriginalPath = _OriginalPath;
 		
 		if (o_ManifestFile.m_Attributes & EFileAttrib_Link)
 		{
-			o_ManifestFile.m_SymlinkData = CFile::fs_ResolveSymbolicLink(FileName);
-			o_ManifestFile.m_Owner = CFile::fs_GetOwnerOnLink(FileName);
-			o_ManifestFile.m_Group = CFile::fs_GetGroupOnLink(FileName);
-			o_ManifestFile.m_Attributes = CFile::fs_GetAttributesOnLink(FileName);
-			o_ManifestFile.m_WriteTime = CFile::fs_GetWriteTimeOnLink(FileName);
+			o_ManifestFile.m_SymlinkData = CFile::fs_ResolveSymbolicLink(OriginalFileName);
+			o_ManifestFile.m_Owner = CFile::fs_GetOwnerOnLink(OriginalFileName);
+			o_ManifestFile.m_Group = CFile::fs_GetGroupOnLink(OriginalFileName);
+			o_ManifestFile.m_Attributes = CFile::fs_GetAttributesOnLink(OriginalFileName);
+			o_ManifestFile.m_WriteTime = CFile::fs_GetWriteTimeOnLink(OriginalFileName);
 		}
 		else
 		{
 			if (!(o_ManifestFile.m_Attributes & EFileAttrib_Directory))
 			{
 				CMibFilePos Length;
-				o_ManifestFile.m_Digest = CFile::fs_GetFileChecksum_SHA256(FileName, &Length);
+				o_ManifestFile.m_Digest = CFile::fs_GetFileChecksum_SHA256(OriginalFileName, &Length);
 				o_ManifestFile.m_Length = Length;
 			}
-			o_ManifestFile.m_WriteTime = CFile::fs_GetWriteTime(FileName);
-			o_ManifestFile.m_Owner = CFile::fs_GetOwner(FileName);
-			o_ManifestFile.m_Group = CFile::fs_GetGroup(FileName);
+			o_ManifestFile.m_WriteTime = CFile::fs_GetWriteTime(OriginalFileName);
+			o_ManifestFile.m_Owner = CFile::fs_GetOwner(OriginalFileName);
+			o_ManifestFile.m_Group = CFile::fs_GetGroup(OriginalFileName);
 		}
 		
 		for (auto &Flags : _Config.m_AddSyncFlagsWildcards)
@@ -212,35 +219,79 @@ namespace NMib::NCloud
 			for (auto iWildcard = _Container.f_GetIterator(); iWildcard; ++iWildcard)
 				fg_ValidateWildcard(iWildcard.f_GetKey(), _bIsFileSearch);
 		}
+
+		void fg_ValidateDestination(NStorage::TCOptional<NStr::CStr> const &_Destination)
+		{
+			if (!_Destination)
+				return;
+				
+			if (CFile::fs_IsPathAbsolute(*_Destination))
+				DMibError("Destinations cannot be absolute paths. They need to be relative to root.");
+
+			{
+				CStr Error;
+				if (!CFile::fs_IsValidFilePath(*_Destination, Error))
+					DMibError(fg_Format("Destinations cannot {}.", Error));
+			}
+			
+			if (CFile::fs_HasRelativeComponents(*_Destination))
+				DMibError("Destinations cannot contain relative path components '..' or '.'");
+		}
+		
+		template <typename tf_CContainer>
+		void fg_ValidateDestinations(tf_CContainer const &_Container)
+		{
+			for (auto &Destination : _Container)
+				fg_ValidateDestination(Destination);
+		}
 	}
 	
 	CDirectoryManifest CDirectoryManifest::fs_GetManifest(CDirectoryManifestConfig const &_Config, NFunction::TCFunctionNoAlloc<void ()> const &_fCheckAbort)
 	{
 		CDirectoryManifest BackupManifest;
+
+		TCMap<CStr, CStr> DestinationMapping;
+		TCMap<CStr, CStr> DestinationMappingReverse;
 		
-		for (auto &Wildcard : _Config.m_IncludeWildcards)
+		for (auto &Destination : _Config.m_IncludeWildcards)
 		{
+			auto &Wildcard = _Config.m_IncludeWildcards.fs_GetKey(Destination);
+			
 			bool bRecursive = false;
 			auto WildcardParsed = CDirectoryManifestConfig::fs_ParseWildcard(Wildcard, bRecursive);
 			
 			CFile::CFindFilesOptions Options{CFile::fs_AppendPath(_Config.m_Root, WildcardParsed), bRecursive};
+			CStr FindPath = CFile::fs_GetPath(Options.m_Path);
 			Options.m_AttribMask = EFileAttrib_File | EFileAttrib_Directory | EFileAttrib_Link;
 			Options.m_fCheckAbort = _fCheckAbort;
 			
 			for (auto &FoundFile : CFile::fs_FindFiles(Options))
 			{
-				CStr RelativePath = CFile::fs_MakePathRelative(FoundFile.m_Path, _Config.m_Root);
+				CStr OriginalPath = CFile::fs_MakePathRelative(FoundFile.m_Path, _Config.m_Root);
+				CStr RelativePath;
+				if (Destination)
+					RelativePath = CFile::fs_AppendPath(*Destination, CFile::fs_MakePathRelative(FoundFile.m_Path, FindPath));
+				else
+					RelativePath = OriginalPath;
+				
+				if (*DestinationMapping(RelativePath, FoundFile.m_Path) != FoundFile.m_Path)
+					DMibError("Manifest config maps different files to the same destination");
+				
+				if (*DestinationMappingReverse(FoundFile.m_Path, RelativePath) != RelativePath)
+					DMibError("Manifest config maps same file to different destinations");
+				
 				auto Mapping = BackupManifest.m_Files(RelativePath);
 				if (!Mapping.f_WasCreated())
 					continue;
 				
 				auto &ManifestFile = *Mapping;
 				ManifestFile.m_Attributes = FoundFile.m_Attribs;
+				ManifestFile.m_OriginalPath = OriginalPath;
 			}
 		}
 		
 		TCSet<CStr> ToRemove;
-		TCSet<CStr> ImplicitDirectories;
+		TCMap<CStr, CDirectoryManifestConfig::CDestination> ImplicitDirectories;
 
 		for (auto &ManifestFile : BackupManifest.m_Files)
 		{
@@ -250,26 +301,44 @@ namespace NMib::NCloud
 				ToRemove[RelativePath];
 				continue;
 			}
-			
+
 			CStr Directory = CFile::fs_GetPath(RelativePath);
-			if (!Directory.f_IsEmpty())
-				ImplicitDirectories[Directory];
+			while (!Directory.f_IsEmpty())
+			{
+				if (RelativePath != ManifestFile.m_OriginalPath)
+				{
+					if (ManifestFile.f_IsDirectory())
+						ImplicitDirectories(Directory, ManifestFile.m_OriginalPath);
+					else
+						ImplicitDirectories(Directory, CFile::fs_GetPath(ManifestFile.m_OriginalPath));
+				}
+				else
+					ImplicitDirectories[Directory] = CDirectoryManifestConfig::CDestination{};
+				Directory = CFile::fs_GetPath(Directory);
+			}
 			
-			fs_UpdateManifestFile(_Config, RelativePath, ManifestFile);
+			fs_UpdateManifestFile(_Config, RelativePath, ManifestFile, ManifestFile.m_OriginalPath);
 		}
 		
 		for (auto &File : ToRemove)
 			BackupManifest.m_Files.f_Remove(File);
 		
-		for (auto &File : ImplicitDirectories)
+		for (auto &Destination : ImplicitDirectories)
 		{
+			auto &File = ImplicitDirectories.fs_GetKey(Destination);
 			auto Mapping = BackupManifest.m_Files(File);
 			if (!Mapping.f_WasCreated())
 				continue;
 			
 			auto &ManifestFile = *Mapping;
-			ManifestFile.m_Attributes = CFile::fs_GetAttributes(CFile::fs_AppendPath(_Config.m_Root, File));
-			fs_UpdateManifestFile(_Config, File, ManifestFile);
+			CStr OriginalPath;
+			if (Destination)
+				OriginalPath = *Destination;
+			else
+				OriginalPath = File;
+			
+			ManifestFile.m_Attributes = CFile::fs_GetAttributes(CFile::fs_AppendPath(_Config.m_Root, OriginalPath));
+			fs_UpdateManifestFile(_Config, File, ManifestFile, OriginalPath);
 		}
 		
 		return BackupManifest;
@@ -281,6 +350,7 @@ namespace NMib::NCloud
 			DMibError("Root path is not absolute");
 		
 		fg_ValidateWildcards(m_IncludeWildcards, true);
+		fg_ValidateDestinations(m_IncludeWildcards);
 		fg_ValidateWildcards(m_ExcludeWildcards, false);
 		fg_ValidateWildcards(m_AddSyncFlagsWildcards, false);
 		fg_ValidateWildcards(m_RemoveSyncFlagsWildcards, false);

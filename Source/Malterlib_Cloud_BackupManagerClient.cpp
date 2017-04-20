@@ -87,7 +87,7 @@ namespace NMib::NCloud
 
 							auto &FileName = Manifest.m_Files.fs_GetKey(File);
 
-							FileIDs[Manifest.m_Files.fs_GetKey(File)] = CFile::fs_GetUniqueIdentifier(CFile::fs_AppendPath(Config.m_Root, FileName));
+							FileIDs[FileName] = CFile::fs_GetUniqueIdentifier(CFile::fs_AppendPath(Config.m_Root, File.m_OriginalPath));
 						}
 
 						return {fg_Move(Manifest), fg_Move(FileIDs)};

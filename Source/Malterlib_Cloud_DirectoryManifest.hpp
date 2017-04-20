@@ -8,13 +8,17 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void CDirectoryManifestFile::f_Stream(tf_CStream &_Stream, uint32 _Version)
 	{
+		if (_Version < 0x102 || _Version > CDirectoryManifest::EManifestStreamVersion)
+			DMibError("Invalid directory manifest version");
+		
 		_Stream % m_Digest;
 		_Stream % m_Length;
 		_Stream % m_WriteTime;
+		_Stream % m_OriginalPath;
 		_Stream % m_SymlinkData;
-		_Stream % m_Attributes;
 		_Stream % m_Owner;
 		_Stream % m_Group;
+		_Stream % m_Attributes;
 		_Stream % m_Flags;
 	}
 	
@@ -23,7 +27,7 @@ namespace NMib::NCloud
 	{
 		uint32 Version = EManifestStreamVersion;
 		_Stream % Version;
-		if (Version < 0x101 || Version > EManifestStreamVersion)
+		if (Version < 0x102 || Version > EManifestStreamVersion)
 			DMibError("Invalid directory manifest version");
 		DMibBinaryStreamVersion(_Stream, Version);
 

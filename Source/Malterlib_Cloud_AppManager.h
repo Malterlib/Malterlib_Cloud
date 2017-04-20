@@ -18,8 +18,8 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EMinProtocolVersion = 0x106
-			, EProtocolVersion = 0x106
+			EMinProtocolVersion = 0x107
+			, EProtocolVersion = 0x107
 		};
 		
 		CAppManagerInterface();
@@ -115,7 +115,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_RunAsUser;
 			NStorage::TCOptional<NStr::CStr> m_RunAsGroup;
 			
-			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Backup_IncludeWildcards;
+			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, CDirectoryManifestConfig::CDestination>> m_Backup_IncludeWildcards;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Backup_ExcludeWildcards;
 			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag>> m_Backup_AddSyncFlagsWildcards;
 			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag>> m_Backup_RemoveSyncFlagsWildcards;
@@ -165,7 +165,7 @@ namespace NMib::NCloud
 			NStr::CStr m_RunAsUser;
 			NStr::CStr m_RunAsGroup;
 			
-			NContainer::TCSet<NStr::CStr> m_Backup_IncludeWildcards;
+			NContainer::TCMap<NStr::CStr, CDirectoryManifestConfig::CDestination> m_Backup_IncludeWildcards;
 			NContainer::TCSet<NStr::CStr> m_Backup_ExcludeWildcards;
 			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
 			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;

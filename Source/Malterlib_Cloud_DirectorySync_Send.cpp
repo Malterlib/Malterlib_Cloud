@@ -46,12 +46,14 @@ namespace NMib::NCloud
 
 		CDirectorySyncSend *m_pThis = nullptr;
 		TCSharedPointer<CConfig> m_pConfig;
+		TCSharedPointer<CDirectoryManifest> m_pManifest = fg_Construct();
 		TCActor<CSeparateThreadActor> m_FileActor;
 		TCSharedPointer<TCAtomic<bool>> m_pDestroyed = fg_Construct(false);
 		TCMap<CStr, TCSharedPointerSupportWeak<CRunningSyncState>> m_RSyncStates;
 		CClock m_Clock{true};
 		CDirectorySyncStats m_Stats;
 		bool m_bFinished = false;
+		bool m_bUseOriginalLocation = false;
 	};
 
 	CDirectorySyncSend::CInternal::CInternal(CDirectorySyncSend *_pThis, CConfig &&_Config)
@@ -59,6 +61,10 @@ namespace NMib::NCloud
 		, m_pConfig(fg_Construct(fg_Move(_Config)))
 	{
 		m_FileActor = fg_Construct(fg_Construct(), "Directory sync file access");
+		if (m_pConfig->m_bUseOriginalLocation)
+			m_bUseOriginalLocation = *m_pConfig->m_bUseOriginalLocation;
+		else if (m_pConfig->m_Manifest.f_IsOfType<CDirectoryManifestConfig>())
+			m_bUseOriginalLocation = true;
 	}
 	
 	CDirectorySyncSend::CDirectorySyncSend(CConfig &&_Config)
@@ -234,7 +240,7 @@ namespace NMib::NCloud
 		return Internal.f_StartRSync
 			(
 				fg_Move(_Subscription)
-				, [pConfig = Internal.m_pConfig, pDestroyed = Internal.m_pDestroyed](CInternal::CRunningSyncState &_RSyncState)
+				, [pManifest = Internal.m_pManifest, pConfig = Internal.m_pConfig, pDestroyed = Internal.m_pDestroyed](CInternal::CRunningSyncState &_RSyncState)
 				{
 					auto &Config = *pConfig;
 					
@@ -246,6 +252,7 @@ namespace NMib::NCloud
 							auto &Manifest = Config.m_Manifest.f_Get<0>();
 							_RSyncState.m_FileMemory << Manifest;
 							pBinaryStream = &_RSyncState.m_FileMemory;
+							*pManifest = Manifest;
 							break;
 						}
 					case 1:
@@ -254,12 +261,15 @@ namespace NMib::NCloud
 							auto Manifest = CDirectoryManifest::fs_GetManifest(ManifestConfig, [&]{ CInternal::fs_CheckDestroy(pDestroyed); });
 							_RSyncState.m_FileMemory << Manifest;
 							pBinaryStream = &_RSyncState.m_FileMemory;
+							*pManifest = fg_Move(Manifest);
 							break;
 						}
 					case 2:
 						{
 							auto &ManifestFileName = Config.m_Manifest.f_Get<2>();
 							_RSyncState.m_File.f_Open(ManifestFileName, EFileOpen_Read | EFileOpen_ShareRead);
+							_RSyncState.m_File >> *pManifest;
+							_RSyncState.m_File.f_SetPosition(0);
 							pBinaryStream = &_RSyncState.m_File;
 							break;
 						}
@@ -279,13 +289,28 @@ namespace NMib::NCloud
 		
 		if (auto pException = Internal.f_CheckFileName(_FileName))
 			return pException;
+		
+		auto *pFile = Internal.m_pManifest->m_Files.f_FindEqual(_FileName);
+		
+		if (!pFile)
+			return DMibErrorInstance("File does not exist in manifest");
+
+		if (!pFile->f_IsFile())
+			return DMibErrorInstance("Is not a file in manifest");
+			
+		CStr FilePath;
+		
+		if (Internal.m_bUseOriginalLocation)
+			FilePath = pFile->m_OriginalPath;
+		else
+			FilePath = _FileName;
 
 		return Internal.f_StartRSync
 			(
 				fg_Move(_Subscription)
 				, [=, pConfig = Internal.m_pConfig](CInternal::CRunningSyncState &_RSyncState)
 				{
-					_RSyncState.m_File.f_Open(CFile::fs_AppendPath(pConfig->m_BasePath, _FileName), EFileOpen_Read | EFileOpen_ShareRead);
+					_RSyncState.m_File.f_Open(CFile::fs_AppendPath(pConfig->m_BasePath, FilePath), EFileOpen_Read | EFileOpen_ShareRead);
 					_RSyncState.m_pRSyncServer = fg_Construct(_RSyncState.m_File, 8*1024*1024);
 				}
 			)

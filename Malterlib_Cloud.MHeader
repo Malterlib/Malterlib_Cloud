@@ -107,15 +107,25 @@ Property
 
 Property
 {
-	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_Template ", \"@(Explodee)\""
+	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_ExpandTemplate "\"@(Expand0)\": \"@(Expand1)\""
+	{
+		!Expand1 ""
+	}
+	
+	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_ExpandTemplate "\"@(Expand0)\": null"
+	{
+		!!Expand1 ""
+	}
+	
+	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_Template ", @(Builtin.Function->ExpandList('@(Explodee)', '=', 'MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_ExpandTemplate'))"
 	{
 		!Explodee ""
 	}
 
-	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "[Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_Template'))]"
+	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "{Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_Template'))}"
 	
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents->Replace('Dummy, ', ''))"
-	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents->Replace('[Dummy]', '[]'))"
+	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents->Replace('{Dummy}', '{}'))"
 }
 
 Property

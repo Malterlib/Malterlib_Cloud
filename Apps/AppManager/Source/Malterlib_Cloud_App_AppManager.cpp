@@ -103,8 +103,22 @@ namespace NMib::NCloud::NAppManager
 					{
 						auto &BackupJSON = *pValue;
 						
-						for (auto &Wildcard : BackupJSON["IncludeWildcards"].f_Array())
-							Settings.m_Backup_IncludeWildcards[Wildcard.f_String()];
+						if (BackupJSON["IncludeWildcards"].f_IsArray())
+						{
+							for (auto &Wildcard : BackupJSON["IncludeWildcards"].f_Array())
+								Settings.m_Backup_IncludeWildcards[Wildcard.f_String()];
+						}
+						else
+						{
+							for (auto &Wildcard : BackupJSON["IncludeWildcards"].f_Object())
+							{
+								auto &Destination = Settings.m_Backup_IncludeWildcards[Wildcard.f_Name()];
+								if (Wildcard.f_Value().f_IsNull())
+									Destination = CDirectoryManifestConfig::CDestination{};
+								else
+									Destination = Wildcard.f_Value().f_String();
+							}
+						}
 						for (auto &Wildcard : BackupJSON["ExcludeWildcards"].f_Array())
 							Settings.m_Backup_ExcludeWildcards[Wildcard.f_String()];
 						for (auto &Wildcard : BackupJSON["AddSyncFlagsWildcards"].f_Object())
