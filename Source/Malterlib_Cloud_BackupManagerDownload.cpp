@@ -11,19 +11,19 @@ namespace NMib::NCloud
 	using namespace NStr;
 	using namespace NTime;
 	
-	TCDispatchedActorCall<CDirectorySyncReceive::CSyncResult> fg_DownloadBackup
+	TCDispatchedActorCall<NFile::CDirectorySyncReceive::CSyncResult> fg_DownloadBackup
 		(
 			TCDistributedActor<CBackupManager> const &_BackupManager
 			, CStr const &_BackupSource
 			, CBackupManager::CBackupID const &_DownloadBackupID
 			, CTime const &_PointInTime
-			, CDirectorySyncReceive::CConfig &&_SyncConfig
+			, NFile::CDirectorySyncReceive::CConfig &&_SyncConfig
 			, CActorSubscription &o_Subscription
 		)
 	{
 		struct CState
 		{
-			TCActor<CDirectorySyncReceive> m_DownloadBackupReceive;
+			TCActor<NFile::CDirectorySyncReceive> m_DownloadBackupReceive;
 			bool m_bAborted = false;
 		};
 		
@@ -42,12 +42,12 @@ namespace NMib::NCloud
 			}
 		;
 		
-		return g_Dispatch(ProcessingActor) > [=, Config = fg_Move(_SyncConfig)]() mutable -> TCContinuation<CDirectorySyncReceive::CSyncResult>
+		return g_Dispatch(ProcessingActor) > [=, Config = fg_Move(_SyncConfig)]() mutable -> TCContinuation<NFile::CDirectorySyncReceive::CSyncResult>
 			{
 				if (pState->m_bAborted)
 					return DMibErrorInstance("Aborted");
 				
-				TCContinuation<CDirectorySyncReceive::CSyncResult> Continuation;
+				TCContinuation<NFile::CDirectorySyncReceive::CSyncResult> Continuation;
 				
 				DMibCallActor
 					(
@@ -65,11 +65,11 @@ namespace NMib::NCloud
 						}
 					)
 					> Continuation % "Failed to start download on remote server"
-					/ [=, Config = fg_Move(Config)](TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_SyncClient) mutable
+					/ [=, Config = fg_Move(Config)](TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> &&_SyncClient) mutable
 					{
-						pState->m_DownloadBackupReceive = fg_ConstructActor<CDirectorySyncReceive>(fg_Move(Config), fg_Move(_SyncClient));
+						pState->m_DownloadBackupReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(Config), fg_Move(_SyncClient));
 						
-						pState->m_DownloadBackupReceive(&CDirectorySyncReceive::f_PerformSync)
+						pState->m_DownloadBackupReceive(&NFile::CDirectorySyncReceive::f_PerformSync)
 							> Continuation % "Failed to perform backup sync"
 						;
 					}

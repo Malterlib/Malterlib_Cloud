@@ -17,7 +17,7 @@ namespace NMib::NCloud::NAppManager
 		for (auto &fOnFinished : m_OnLaunchFinished)
 			fOnFinished(true);
 		m_OnLaunchFinished.f_Clear();
-		m_fOnRegisterDistributedApp.f_Clear();
+		m_OnRegisterDistributedApp.f_Clear();
 	}
 
 	void CAppManagerActor::CApplication::f_Delete()

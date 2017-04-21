@@ -9,13 +9,13 @@
 
 namespace NMib::NCloud
 {
-	NConcurrency::TCDispatchedActorCall<CDirectorySyncReceive::CSyncResult> fg_DownloadBackup
+	NConcurrency::TCDispatchedActorCall<NFile::CDirectorySyncReceive::CSyncResult> fg_DownloadBackup
 		(
 			NConcurrency::TCDistributedActor<CBackupManager> const &_BackupManager
 			, NStr::CStr const &_BackupSource
 			, CBackupManager::CBackupID const &_DownloadBackupID
 			, NTime::CTime const &_PointInTime
-			, CDirectorySyncReceive::CConfig &&_SyncConfig
+			, NFile::CDirectorySyncReceive::CConfig &&_SyncConfig
 			, NConcurrency::CActorSubscription &o_Subscription
 		)
 	;

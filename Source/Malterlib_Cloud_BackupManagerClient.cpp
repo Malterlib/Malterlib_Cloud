@@ -10,12 +10,18 @@
 
 namespace NMib::NCloud
 {
-	CBackupManagerClient::CBackupManagerClient(CConfig const &_Config, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager)
-		: mp_pInternal(fg_Construct(this, _Config.f_Validate(), _TrustManager)) 
+	CBackupManagerClient::CBackupManagerClient
+		(
+			CConfig const &_Config
+			, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
+			, TCActorFunctor<TCContinuation<TCActorSubscriptionWithID<>> (TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface)> &&_fOnNewBackup
+			, TCActor<CActorDistributionManager> const &_DistributionManager
+		)
+		: mp_pInternal(fg_Construct(this, _Config.f_Validate(), _TrustManager, fg_Move(_fOnNewBackup)))
 	{
 		auto &Internal = *mp_pInternal;
 		
-		Internal.f_Construct();
+		Internal.f_Construct(_DistributionManager);
 		Internal.f_RunBackup();
 	}
 	
@@ -30,6 +36,8 @@ namespace NMib::NCloud
 		for (auto &BackupInstance : Internal.m_RunningBackupInstances)
 			BackupInstance->f_Destroy() > Destroys.f_AddResult();
 		
+		Internal.m_fOnNewBackup.f_Destroy() > Destroys.f_AddResult();
+		
 		Internal.m_RunningBackupInstances.f_Clear();
 		
 		auto pTracker = fg_Move(Internal.m_pCanDestroyTracker);
@@ -41,19 +49,21 @@ namespace NMib::NCloud
 		
 		return Continuation;
 	}
-	
+
 	void CBackupManagerClient::CInternal::fs_CheckDestroy(TCSharedPointer<NAtomic::TCAtomic<bool>> const &_pDestroyed)
 	{
 		if (_pDestroyed->f_Load(NAtomic::EMemoryOrder_Relaxed))
 			DMibError("Backup client destroyed");
 	}
-	
-	void CBackupManagerClient::CInternal::f_Construct()
+
+	void CBackupManagerClient::CInternal::f_Construct(TCActor<CActorDistributionManager> const &_DistributionManager)
 	{
 		m_FileActor = fg_Construct(fg_Construct(), "BackupManagerClient file actor");
 		m_FileChangeNotificationsActor = fg_Construct();
+		if (_DistributionManager)
+			m_BackupInterface.f_Construct(_DistributionManager, m_pThis);
 	}
-	
+
 	void CBackupManagerClient::CInternal::f_NewBackupKey()
 	{
 		m_BackupKey.m_Time = NTime::CTime::fs_NowUTC();
@@ -63,18 +73,20 @@ namespace NMib::NCloud
 		else
 			m_BackupKey.m_FriendlyName = fg_Format("{}-{}", NProcess::NPlatform::fg_Process_GetComputerName(), m_Config.m_BackupIdentifier);
 	}
-	
+
 	void CBackupManagerClient::CInternal::f_RunBackup()
 	{
 		f_SubscribeChanges() > [this](TCAsyncResult<void> &&_Result)
 			{
 				if (m_pThis->mp_bDestroyed)
 					return;
+
 				if (!_Result)
 				{
 					DMibLogCategoryStr(m_Config.m_LogCategory);
 					DMibLog(Error, "Failed to subscribe to file notifications: {}", _Result.f_GetExceptionStr());
 				}
+
 				g_Dispatch(m_FileActor) > [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]() -> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>>
 					{
 						auto Manifest = CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); });
@@ -96,25 +108,45 @@ namespace NMib::NCloud
 					{
 						if (m_pThis->mp_bDestroyed)
 							return;
-						
+
 						if (!_Manifest)
 						{
 							DMibLogCategoryStr(m_Config.m_LogCategory);
 							DMibLog(Error, "Failed to get manifest: {}", _Manifest.f_GetExceptionStr());
 							return;
 						}
-						
+
 						m_Manifest = fg_Move(fg_Get<0>(*_Manifest));
 						m_ManifestFileIDs = fg_Move(fg_Get<1>(*_Manifest));
 
 						f_NewBackupKey();
+						
+						if (m_fOnNewBackup)
+						{
+							m_fOnNewBackup(m_BackupInterface.m_Actor->f_ShareInterface<CDistributedAppInterfaceBackup>()) > [this](TCAsyncResult<TCActorSubscriptionWithID<>> &&_Result)
+								{
+									if (!_Result)
+									{
+										DMibLogCategoryStr(m_Config.m_LogCategory);
+										DMibLog(Error, "Failed run on new backup: {}", _Result.f_GetExceptionStr());
+									}
+									else
+										m_BackupInterfaceSubscription = fg_Move(*_Result);
+									
+									f_BackupFinishedStarting();
+								}
+							;
+						}
+						else
+							f_BackupFinishedStarting();
+						
 						f_Subscribe();
 					}
 				;
 			}
 		;
 	}
-	
+
 	auto CBackupManagerClient::CConfig::f_Validate() const -> CConfig const &
 	{
 		m_ManifestConfig.f_Validate();

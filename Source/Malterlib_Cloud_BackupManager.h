@@ -7,8 +7,8 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Cryptography/Hashes/SHA>
 #include <Mib/Encoding/EJSON>
-#include <Mib/Cloud/DirectoryManifest>
-#include <Mib/Cloud/DirectorySync>
+#include <Mib/File/DirectoryManifest>
+#include <Mib/File/DirectorySync>
 
 #include "Malterlib_Cloud_FileTransfer.h"
 
@@ -49,7 +49,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			CDirectoryManifestFile m_ManifestFile;
+			NFile::CDirectoryManifestFile m_ManifestFile;
 		};
 
 		struct CManifestChange_Add : public CManifestChange_Change
@@ -240,7 +240,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCContinuation<NContainer::TCMap<NStr::CStr, NContainer::TCVector<CBackupID>>> f_ListBackups(NStr::CStr const &_ForBackupSource) = 0;
 		
 		virtual auto f_DownloadBackup(NStr::CStr const &_BackupSource, CBackupID const &_BackupID, NTime::CTime const &_Time, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
-			-> NConcurrency::TCContinuation<NConcurrency::TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
+			-> NConcurrency::TCContinuation<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>>
 			= 0
 		;
 	};

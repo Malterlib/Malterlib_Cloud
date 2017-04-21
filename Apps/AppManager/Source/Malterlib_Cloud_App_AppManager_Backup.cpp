@@ -3,6 +3,8 @@
 
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
+#include <Mib/Concurrency/ActorSubscription>
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -26,7 +28,37 @@ namespace NMib::NCloud::NAppManager
 		
 		try
 		{
-			Application.m_BackupClient = fg_Construct(BackupConfig, mp_State.m_TrustManager);
+			Application.m_BackupClient = fg_Construct
+				(
+					BackupConfig
+					, mp_State.m_TrustManager
+					, g_ActorFunctor > [_pApplication](TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface) -> TCContinuation<TCActorSubscriptionWithID<>>
+					{
+						if (_pApplication->m_bDeleted)
+							return fg_Explicit();
+						
+						if (!_pApplication->m_Settings.m_bDistributedApp)
+							return fg_Explicit();
+						
+						if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
+							return fg_Explicit();
+						
+						if (_pApplication->m_AppInterface)
+							return DMibCallActor(_pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_StartBackup, fg_Move(_BackupInterface));
+						else
+						{
+							TCContinuation<TCActorSubscriptionWithID<>> Continuation;
+							_pApplication->m_OnRegisterDistributedApp.f_Insert() = [Continuation, _pApplication, _BackupInterface = fg_Move(_BackupInterface)]() mutable
+								{
+									DMibCallActor(_pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_StartBackup, fg_Move(_BackupInterface)) > Continuation;
+								}
+							;
+							return Continuation;
+						}
+					}
+					, mp_State.m_DistributionManager
+				)
+			;
 		}
 		catch (CException const &_Exception)
 		{

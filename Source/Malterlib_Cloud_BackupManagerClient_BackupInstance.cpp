@@ -234,7 +234,7 @@ namespace NMib::NCloud::NPrivate
 			RunningState.m_PendingQueue += ThisTime;
 		}
 		
-		if (RunningState.m_PendingQueue == 0 && Position == _Length)
+		if (RunningState.m_PendingQueue == 0 && Position >= _Length)
 		{
 			if (!_Continuation.f_IsSet())
 				_Continuation.f_SetResult(true);
@@ -362,15 +362,15 @@ namespace NMib::NCloud::NPrivate
 			mp_InitialBackupPending[_FileName];
 	}
 	
-	void CBackupManagerClient_Instance::fp_FileFinished(CStr const &_FileName)
+	void CBackupManagerClient_Instance::fp_CheckInitialBackupFinished()
 	{
-		if (!mp_InitialBackupPending.f_Remove(_FileName))
-			return;
 		if (!mp_InitialBackupPending.f_IsEmpty())
 			return;
+		if (!mp_bFinishedStarting)
+			return;
+		
 		if (mp_bInitialBackupFinished)
 			return;
-
 		mp_bInitialBackupFinished = true;
 
 		DMibCallActor
@@ -384,6 +384,14 @@ namespace NMib::NCloud::NPrivate
 					return fp_ReportBackupFailed(fg_Format("Initial backup finished failed: {}", _Result.f_GetExceptionStr()));
 			}
 		;
+	}
+	
+	void CBackupManagerClient_Instance::fp_FileFinished(CStr const &_FileName)
+	{
+		if (!mp_InitialBackupPending.f_Remove(_FileName))
+			return;
+
+		fp_CheckInitialBackupFinished();
 	}
 	
 	TCContinuation<void> CBackupManagerClient_Instance::fp_SyncManifest()
@@ -412,18 +420,36 @@ namespace NMib::NCloud::NPrivate
 				(
 					g_ActorSubscription > [this, Continuation]() -> TCContinuation<void>
 					{
-						if (!Continuation.f_IsSet())
-							Continuation.f_SetException(DMibErrorInstance("Manifest rsync aborted"));
-						
 						if (!mp_pManifestSyncState)
-							return fg_Explicit( );
-						
-						auto Subscription = fg_Move(mp_pManifestSyncState->m_RSyncSubscription);
-						mp_pManifestSyncState.f_Clear();
-						if (!Subscription)
 							return fg_Explicit();
 						
-						return Subscription->f_Destroy();
+						bool bDone = mp_pManifestSyncState->m_bDone;
+
+						auto Subscription = fg_Move(mp_pManifestSyncState->m_RSyncSubscription);
+						mp_pManifestSyncState.f_Clear();
+						
+						TCContinuation<void> DestroyContinuation;
+						if (!Subscription)
+							DestroyContinuation.f_SetResult();
+						else
+							DestroyContinuation = Subscription->f_Destroy();
+						
+						TCContinuation<void> ContinuationReturn;
+						DestroyContinuation > [this, Continuation, ContinuationReturn, bDone](TCAsyncResult<void> &&_Result)
+							{
+								if (!Continuation.f_IsSet())
+								{
+									if (bDone)
+										Continuation.f_SetResult();
+									else
+										Continuation.f_SetException(DMibErrorInstance("Manifest rsync aborted"));
+								}
+
+								ContinuationReturn.f_SetResult(_Result);
+							}
+						;
+						
+						return ContinuationReturn;
 					}
 				) 
 				> [this, Continuation](CSecureByteVector &&_Packet) mutable -> TCContinuation<CSecureByteVector>
@@ -435,11 +461,8 @@ namespace NMib::NCloud::NPrivate
 						{
 							NContainer::CSecureByteVector ToSendToClient;
 							if (mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket(_Packet, ToSendToClient))
-							{
-								if (!Continuation.f_IsSet())
-									Continuation.f_SetResult();
-							}
-							
+								mp_pManifestSyncState->m_bDone = true;
+
 							return ToSendToClient;
 						}
 					;
@@ -710,5 +733,13 @@ namespace NMib::NCloud::NPrivate
 			else if (!mp_bBackupStartFailed)
 				mp_PendingManifestChanges[_FileName].f_Insert({_ManifestChange, _bDirty});
 		}
+	}
+	
+	void CBackupManagerClient_Instance::f_BackupFinishedStarting()
+	{
+		mp_bFinishedStarting = true;
+	
+		if (mp_Backup)
+			fp_CheckInitialBackupFinished();
 	}
 }

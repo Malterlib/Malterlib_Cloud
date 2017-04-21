@@ -22,7 +22,14 @@ namespace NMib::NCloud
 {
 	struct CBackupManagerClient::CInternal
 	{
-		CInternal(CBackupManagerClient *_pThis, CConfig const &_Config, TCActor<CDistributedActorTrustManager> const &_TrustManager);
+		CInternal
+			(
+				CBackupManagerClient *_pThis
+				, CConfig const &_Config
+				, TCActor<CDistributedActorTrustManager> const &_TrustManager
+				, TCActorFunctor<TCContinuation<TCActorSubscriptionWithID<>> (TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface)> &&_fOnNewBackup
+			)
+		;
 		~CInternal();
 
 		struct CWatchedPath
@@ -53,11 +60,25 @@ namespace NMib::NCloud
 			bool m_bAdded = false;
 			bool m_bIDChanged = false;
 		};
+
+		struct CNotifacitonSubscription
+		{
+			CBackupManagerClient::ENotification m_Notifications;
+			TCActorFunctor<TCContinuation<void> (CHostInfo const &_RemoteHost, CBackupManagerClient::CNotification &&_Notification)> m_fOnNotification;
+		};
 		
-		void f_Construct();
+		struct CDistributedAppInterfaceBackupImplementation : public CDistributedAppInterfaceBackup
+		{
+			TCContinuation<void> f_AppendManifest(NFile::CDirectoryManifestConfig const &_Config) override;
+			
+			CBackupManagerClient *m_pThis = nullptr;
+		};
+		
+		void f_Construct(TCActor<CActorDistributionManager> const &_DistributionManager);
 		void f_NewBackupKey();
 		void f_RunBackup();
 		void f_Subscribe();
+		void f_BackupFinishedStarting();
 		TCContinuation<void> f_SubscribeChanges();
 		TCContinuation<void> f_RetrySubscribeChanges();
 		void f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification);
@@ -90,7 +111,16 @@ namespace NMib::NCloud
 		
 		CBackupManager::CBackupKey m_BackupKey;
 		
+		TCMap<CStr, CNotifacitonSubscription> m_NotificationSubscriptions;
+		
+		TCActorFunctor<TCContinuation<TCActorSubscriptionWithID<>> (TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface)> m_fOnNewBackup;
+		TCDelegatedActorInterface<CDistributedAppInterfaceBackupImplementation> m_BackupInterface;
+		CActorSubscription m_BackupInterfaceSubscription;
+		
+		TCVector<TCContinuation<void>> m_SubscribeChangesContinuations;
+		
 		bool m_bRunningRetrySubscribe = false;
 		bool m_bRerunRetrySubscribe = false;
+		bool m_bBackupFinishedStarting = false;
 	};
 }

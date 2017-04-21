@@ -10,6 +10,7 @@
 #include <Mib/Concurrency/ActorFunctor>
 #include <Mib/Cloud/BackupManager>
 #include <Mib/Concurrency/DistributedActorTrustManager>
+#include <Mib/Concurrency/DistributedApp>
 
 namespace NMib::NCloud
 {
@@ -21,7 +22,7 @@ namespace NMib::NCloud
 	/// \brief Implements a client that backs up through backup manager interface
 	struct CBackupManagerClient : public NConcurrency::CActor
 	{
-		using EManifestSyncFlag = EDirectoryManifestSyncFlag;
+		using EManifestSyncFlag = NFile::EDirectoryManifestSyncFlag;
 		
 		struct CConfig /// \brief Config for backup manager client. \headerfile Mib/Cloud/BackupManagerClient
 		{
@@ -29,7 +30,7 @@ namespace NMib::NCloud
 			
 			NStr::CStr m_BackupIdentifier;
 
-			CDirectoryManifestConfig m_ManifestConfig;												///< The config to generate the manifest
+			NFile::CDirectoryManifestConfig m_ManifestConfig;												///< The config to generate the manifest
 			NTime::CTimeSpan m_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);	///< Interval for creating new full backup snapshots. Set to 0 to disable.
 			NStr::CStr m_LogCategory = "Backup";													///< The category to do logging under.
 			uint32 m_MaxSendQueue = 8*1024*1024;													///< The maximum number of bytes to queue on the network
@@ -43,7 +44,7 @@ namespace NMib::NCloud
 			, ENotification_FileFinished = DMibBit(2)	///< A file finished transferring to backup manager. \sa CNotification_FileFinished
 			, ENotification_Quiescent = DMibBit(3)		///< The backup is quiescent. All currently known files have finished transferring. \sa CNotification_Quiescent
 		};
-		
+
 		struct CNotification_BackupAborted /// \brief Notification info for #ENotification_BackupAborted. \headerfile Mib/Cloud/BackupManagerClient
 		{
 		};
@@ -77,21 +78,30 @@ namespace NMib::NCloud
 			(
 				CConfig const &_Config
 				, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
+				, NConcurrency::TCActorFunctor
+				<
+					NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>>
+					(
+						NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppInterfaceBackup> &&_BackupInterface
+					)
+				>
+				&&_fOnNewBackup = {}
+				, NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager = {}
 			)
 		; ///< \brief Constructor. \sa CConfig for configuring what to backup and how
-		
+
 		~CBackupManagerClient(); ///< \brief Destructor
-		
+
 		NConcurrency::TCContinuation<NConcurrency::CActorSubscription> f_SubscribeNotifications /// \brief Subscribe to notification. \sa ENotification
 			(
 				ENotification _ToSubscribeTo	/// Specify the notifications to subscribe to 
-				, NConcurrency::TCActorFunctor<NConcurrency::TCContinuation<void> (NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification)> &&_fOnFinished
+				, NConcurrency::TCActorFunctor<NConcurrency::TCContinuation<void> (NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification)> &&_fOnNotification
 				/// The actor functor to receive notifications
 			)
 		;
-		
-		void f_StartNewBackup(); ///< Forces a new backup to start outside of the regular scheduling configured through CConfig::m_NewBackupInterval
-		
+
+		NConcurrency::TCContinuation<void> f_StartNewBackup(); ///< Forces a new backup to start outside of the regular scheduling configured through CConfig::m_NewBackupInterval
+
 	protected:
 		struct CInternal;
 		friend struct NPrivate::CBackupManagerClient_Instance;

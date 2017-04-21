@@ -244,7 +244,7 @@ namespace NMib::NCloud::NBackupManager
 				
 				Internal.m_Manifest.m_Files[_FileName] = Change.m_ManifestFile;
 				
-				DMibConOut("Add manifest: {}\n", _FileName);
+				DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "Add manifest: {}", _FileName);
 				
 				return fg_Explicit();
 			}
@@ -256,7 +256,7 @@ namespace NMib::NCloud::NBackupManager
 				auto &Change = _Change.f_Get<EManifestChange_Change>();
 
 				Internal.m_Manifest.m_Files[_FileName] = Change.m_ManifestFile;
-				DMibConOut("Change manifest: {}\n", _FileName);
+				DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "Change manifest: {}", _FileName);
 				
 				return fg_Explicit();
 			}
@@ -272,7 +272,7 @@ namespace NMib::NCloud::NBackupManager
 				
 				CStr AbsolutePath = Internal.f_GetCurrentPath(_FileName);
 
-				DMibConOut("Remove manifest: {}\n", _FileName);
+				DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "Remove manifest: {}", _FileName);
 				
 				if (bIsDirectory)
 					return fg_Explicit();
@@ -303,8 +303,8 @@ namespace NMib::NCloud::NBackupManager
 				CStr AbsoluteFrom = Internal.f_GetCurrentPath(Change.m_FromFileName);
 				CStr AbsoluteTo = Internal.f_GetCurrentPath(_FileName);
 				
-				DMibConOut2("Rename manifest: {} -> \n", Change.m_FromFileName, _FileName);
-
+				DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "Rename manifest: {} -> {}", Change.m_FromFileName, _FileName);
+				
 				if (bIsDirectory)
 					return fg_Explicit();
 				
@@ -370,26 +370,43 @@ namespace NMib::NCloud::NBackupManager
 		
 		if (bDone)
 		{
-			uint64 BytesTransferred = _Context.m_BytesTransferredIn + _Context.m_BytesTransferredOut;
-			if (BytesTransferred == 0)
-				BytesTransferred = 1;
-			
-			DMibLogWithCategory
-				(
-					Mib/Cloud/BackupManager
-					, Debug
-					, "RSync protocol finished for file '{}':   {} incoming bytes   {} outgoing bytes   {fe1} speedup"
-					, _Context.m_RelativeFileName
-					, _Context.m_BytesTransferredIn
-					, _Context.m_BytesTransferredOut
-					, fp64(_Context.m_FileLength) / fp64(BytesTransferred)
-				)
+			_Context.m_fRunProtocol.f_Destroy() >
+				[
+					this
+					, fOnDone = fg_Move(_Context.m_fOnDone)
+					, RelativeFileName = _Context.m_RelativeFileName
+					, BytesTransferredIn = _Context.m_BytesTransferredIn
+					, BytesTransferredOut = _Context.m_BytesTransferredOut
+					, FileLength = _Context.m_FileLength
+				]
+				(TCAsyncResult<void> &&_Result) mutable
+				{
+					if (fOnDone)
+						fOnDone();
+
+					uint64 BytesTransferred = BytesTransferredIn + BytesTransferredOut;
+					if (BytesTransferred == 0)
+						BytesTransferred = 1;
+					
+					DMibLogWithCategory
+						(
+							Mib/Cloud/BackupManager
+							, Debug
+							, "RSync protocol finished for file '{}':   {} incoming bytes   {} outgoing bytes   {fe1} speedup"
+							, RelativeFileName
+							, BytesTransferredIn
+							, BytesTransferredOut
+							, fp64(FileLength) / fp64(BytesTransferred)
+						)
+					;
+					
+					if (!_Result)
+					{
+						DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed destroy RSync protocol: {}", _Result.f_GetExceptionStr());
+						return;
+					}
+				}
 			;
-			
-			if (_Context.m_fOnDone)
-				_Context.m_fOnDone();
-			
-			m_RSyncContexts.f_Remove(&_Context);
 		}
 	}
 	

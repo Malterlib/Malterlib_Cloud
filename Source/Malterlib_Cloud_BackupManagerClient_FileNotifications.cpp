@@ -11,26 +11,36 @@ namespace NMib::NCloud
 {
 	TCContinuation<void> CBackupManagerClient::CInternal::f_RetrySubscribeChanges()
 	{
+		if (m_pThis->mp_bDestroyed)
+			return DMibErrorInstance("Destroyed");
+
+		TCContinuation<void> Continuation;
+		
 		if (m_bRunningRetrySubscribe)
 		{
-			m_bRerunRetrySubscribe = true;
-			return fg_Explicit();
+			TCContinuation<void> FinishedContinuation = m_SubscribeChangesContinuations.f_Insert();
+			FinishedContinuation > Continuation / [this, Continuation]
+				{
+					f_RetrySubscribeChanges() > Continuation;
+				}
+			;
+			return Continuation;
 		}
 		
+		DMibCheck(!m_bRunningRetrySubscribe);
 		m_bRunningRetrySubscribe = true;
+		m_bRerunRetrySubscribe = false;
 		
 		auto Cleanup = g_OnScopeExitActor > [this]
 			{
 				m_bRunningRetrySubscribe = false;
-				if (m_bRerunRetrySubscribe)
-				{
-					m_bRerunRetrySubscribe = false;
-					f_RetrySubscribeChanges();
-				}
+				
+				auto SubscribeChangesContinuations = fg_Move(m_SubscribeChangesContinuations);
+				
+				for (auto &Continuation : SubscribeChangesContinuations)
+					Continuation.f_SetResult();
 			}
 		;
-
-		TCContinuation<void> Continuation;
 		
 		struct CPendingInfo
 		{
@@ -138,7 +148,11 @@ namespace NMib::NCloud
 							, EFileChange_FileName | EFileChange_DirectoryName
 							, [this](CFileChangeNotification::CNotification const &_Notification)
 							{
-								f_RetrySubscribeChanges();
+								if (!m_bRerunRetrySubscribe)
+								{
+									m_bRerunRetrySubscribe = true;
+									f_RetrySubscribeChanges();
+								}
 							}
 							, fg_ThisActor(m_pThis)
 						)
@@ -220,9 +234,21 @@ namespace NMib::NCloud
 		{
 			auto &Path = Paths.fs_GetKey(bRecursive);
 			
-			auto &WatchedPath = m_WatchedPaths[Path];
-			WatchedPath.m_bPending = true;
-			WatchedPath.m_bRecursive = bRecursive;
+			auto Mapping = m_WatchedPaths(Path);
+			auto &WatchedPath = *Mapping;
+			if (Mapping.f_WasCreated())
+			{
+				WatchedPath.m_bPending = true;
+				WatchedPath.m_bRecursive = bRecursive;
+			}
+			else
+			{
+				if (bRecursive && !WatchedPath.m_bRecursive)
+				{
+					WatchedPath.m_bRecursive = true;
+					WatchedPath.m_bPending = true;
+				}
+			}
 		}
 		
 		return f_RetrySubscribeChanges();

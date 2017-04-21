@@ -38,6 +38,7 @@ namespace NMib::NCloud::NPrivate
 		;
 		~CBackupManagerClient_Instance();
 		
+		void f_BackupFinishedStarting();
 		void f_ManifestChanged(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty);
 		
 	private:
@@ -62,6 +63,7 @@ namespace NMib::NCloud::NPrivate
 			CBinaryStreamMemory<> m_ManifestStream;
 			TCUniquePointer<CRSyncServer> m_pRSyncServer;
 			CActorSubscription m_RSyncSubscription;
+			bool m_bDone = false;
 		};
 		
 		struct CPendingBackupFile
@@ -105,7 +107,7 @@ namespace NMib::NCloud::NPrivate
 			uint64 m_Position = 0;
 			bool m_bDirty = true;
 		};
-
+		
 		TCContinuation<void> fp_Destroy() override;
 		void fp_StartBackup();
 		void fp_BackupNotification(CBackupManagerClient::CNotification &&_Notification);
@@ -130,6 +132,7 @@ namespace NMib::NCloud::NPrivate
 		void fp_ProcessManifestChange(CStr const &_FileName, CManifestChangeAndDirty const &_ManifestChange);
 		TCContinuation<void> fp_AbortPendingFile(CStr const &_FileName);
 		TCSharedPointer<CAppendFileCache> fp_GetAppendFileCache(CStr const &_FileName);
+		void fp_CheckInitialBackupFinished();
 		
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
 		
@@ -156,7 +159,7 @@ namespace NMib::NCloud::NPrivate
 		TCMap<CStr, CAppendFileState> mp_AppendFileState;
 		
 		TCActorSequencer<void> mp_FileManifestSequencer;
-		
+
 		mint mp_nRunningSyncs = 0;
 		mint mp_nMaxRunningSyncs = 8;
 		mint mp_SyncSequence = 0;
@@ -164,5 +167,6 @@ namespace NMib::NCloud::NPrivate
 		bool mp_bBackupStarted = false;
 		bool mp_bBackupStartFailed = false;
 		bool mp_bInitialBackupFinished = false;
+		bool mp_bFinishedStarting = true;
 	};
 }

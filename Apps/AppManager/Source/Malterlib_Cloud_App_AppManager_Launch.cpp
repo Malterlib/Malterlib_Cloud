@@ -109,7 +109,7 @@ namespace NMib::NCloud::NAppManager
 									if (_pApplication->m_Settings.m_bDistributedApp)
 									{
 										fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)");
-										_pApplication->m_fOnRegisterDistributedApp = [this, pState, Continuation, _pApplication]
+										_pApplication->m_OnRegisterDistributedApp.f_Insert() = [this, pState, Continuation, _pApplication]
 											{
 												if (_pApplication->m_bDeleted)
 													return;

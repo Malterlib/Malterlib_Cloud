@@ -115,10 +115,10 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_RunAsUser;
 			NStorage::TCOptional<NStr::CStr> m_RunAsGroup;
 			
-			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, CDirectoryManifestConfig::CDestination>> m_Backup_IncludeWildcards;
+			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NFile::CDirectoryManifestConfig::CDestination>> m_Backup_IncludeWildcards;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Backup_ExcludeWildcards;
-			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag>> m_Backup_AddSyncFlagsWildcards;
-			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag>> m_Backup_RemoveSyncFlagsWildcards;
+			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag>> m_Backup_AddSyncFlagsWildcards;
+			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag>> m_Backup_RemoveSyncFlagsWildcards;
 			NStorage::TCOptional<NTime::CTimeSpan> m_Backup_NewBackupInterval;
 			
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_AutoUpdateTags;
@@ -165,10 +165,10 @@ namespace NMib::NCloud
 			NStr::CStr m_RunAsUser;
 			NStr::CStr m_RunAsGroup;
 			
-			NContainer::TCMap<NStr::CStr, CDirectoryManifestConfig::CDestination> m_Backup_IncludeWildcards;
+			NContainer::TCMap<NStr::CStr, NFile::CDirectoryManifestConfig::CDestination> m_Backup_IncludeWildcards;
 			NContainer::TCSet<NStr::CStr> m_Backup_ExcludeWildcards;
-			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
-			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
+			NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
+			NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
 			NTime::CTimeSpan m_Backup_NewBackupInterval;
 			
 			NContainer::TCSet<NStr::CStr> m_AutoUpdateTags;
