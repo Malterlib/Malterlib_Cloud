@@ -47,7 +47,7 @@ namespace NMib::NCloud
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-#ifdef DCompiler_MSVC
+
 			CVersionIDAndPlatform() = default;
 			CVersionIDAndPlatform(CVersionIDAndPlatform const &) = default;
 			CVersionIDAndPlatform(CVersionIDAndPlatform &&) = default;
@@ -56,10 +56,6 @@ namespace NMib::NCloud
 
 			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other) : CVersionManager::CVersionIDAndPlatform(_Other) { }
 			CVersionIDAndPlatform &operator = (CVersionManager::CVersionIDAndPlatform const &_Right) { static_cast<CVersionManager::CVersionIDAndPlatform &>(*this) = _Right; return *this; }
-#else
-			using CVersionManager::CVersionIDAndPlatform::CVersionIDAndPlatform;
-			using CVersionManager::CVersionIDAndPlatform::operator =;
-#endif
 		};
 		
 		struct CVersionID : public CVersionManager::CVersionID
@@ -67,7 +63,6 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 			
-#ifdef DCompiler_MSVC
 			CVersionID() = default;
 			CVersionID(CVersionID const &) = default;
 			CVersionID(CVersionID &&) = default;
@@ -76,10 +71,6 @@ namespace NMib::NCloud
 
 			CVersionID(CVersionManager::CVersionID const &_Other) : CVersionManager::CVersionID(_Other) { }
 			CVersionID &operator = (CVersionManager::CVersionID const &_Right) { static_cast<CVersionManager::CVersionID &>(*this) = _Right; return *this; }
-#else
-			using CVersionManager::CVersionID::CVersionID;
-			using CVersionManager::CVersionID::operator =;
-#endif
 		};
 		
 		struct CVersionInformation : public CVersionManager::CVersionInformation
@@ -87,7 +78,6 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 			
-#ifdef DCompiler_MSVC
 			CVersionInformation() = default;
 			CVersionInformation(CVersionInformation const &) = default;
 			CVersionInformation(CVersionInformation &&) = default;
@@ -96,10 +86,6 @@ namespace NMib::NCloud
 
 			CVersionInformation(CVersionManager::CVersionInformation const &_Other) : CVersionManager::CVersionInformation(_Other) { }
 			CVersionInformation &operator = (CVersionManager::CVersionInformation const &_Right) { static_cast<CVersionManager::CVersionInformation &>(*this) = _Right; return *this; }
-#else
-			using CVersionManager::CVersionInformation::CVersionInformation;
-			using CVersionManager::CVersionInformation::operator =;
-#endif
 		};
 		
 		struct CApplicationSettings

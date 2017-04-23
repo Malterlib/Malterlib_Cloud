@@ -103,12 +103,12 @@ namespace NMib::NCloud::NAppManager
 								_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, _Key) > fg_DiscardResult();
 						}
 					)
-					> Continuation % "Failed to change encryption" / [Continuation, pEncryptionApplication, _Operation](CBashScriptOutput &&_Output)
+					> Continuation % "Failed to change encryption" / [this, Continuation, pEncryptionApplication, _Operation](CBashScriptOutput &&_Output)
 					{
 						if (_Operation == EEncryptOperation_Open || _Operation == EEncryptOperation_Setup)
-							fp_AppEncryptionStateChanged(true);
+							fp_AppEncryptionStateChanged(pEncryptionApplication, true);
 						else if (_Operation == EEncryptOperation_Close)
-							fp_AppEncryptionStateChanged(false);
+							fp_AppEncryptionStateChanged(pEncryptionApplication, false);
 						Continuation.f_SetResult();
 					}
 				;
