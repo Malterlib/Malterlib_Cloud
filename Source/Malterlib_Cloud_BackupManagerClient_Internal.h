@@ -27,7 +27,16 @@ namespace NMib::NCloud
 				CBackupManagerClient *_pThis
 				, CConfig const &_Config
 				, TCActor<CDistributedActorTrustManager> const &_TrustManager
-				, TCActorFunctor<TCContinuation<TCActorSubscriptionWithID<>> (TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface)> &&_fOnNewBackup
+				, TCActorFunctor
+				<
+					TCContinuation<TCActorSubscriptionWithID<>>
+					(
+						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
+						, CActorSubscription &&_ManifestFinished
+						, CStr const &_BackupRoot
+					)
+				>
+				&&_fOnNewBackup
 			)
 		;
 		~CInternal();
@@ -70,6 +79,8 @@ namespace NMib::NCloud
 		struct CDistributedAppInterfaceBackupImplementation : public CDistributedAppInterfaceBackup
 		{
 			TCContinuation<void> f_AppendManifest(NFile::CDirectoryManifestConfig const &_Config) override;
+			TCContinuation<TCActorSubscriptionWithID<>> f_SubscribeInitialFinished(TCActorFunctorWithID<TCContinuation<void> ()> &&_fOnInitialFinished) override;
+			TCContinuation<TCActorSubscriptionWithID<>> f_SubscribeBackupStopped(TCActorFunctorWithID<TCContinuation<void> ()> &&_fOnStopped) override;
 			
 			CBackupManagerClient *m_pThis = nullptr;
 		};
@@ -112,8 +123,20 @@ namespace NMib::NCloud
 		CBackupManager::CBackupKey m_BackupKey;
 		
 		TCMap<CStr, CNotifacitonSubscription> m_NotificationSubscriptions;
+		TCMap<CStr, TCActorFunctorWithID<TCContinuation<void> ()>> m_OnInitialFinishedSubscriptions;
+		TCMap<CStr, TCActorFunctorWithID<TCContinuation<void> ()>> m_OnBackupStoppedSubscriptions;
 		
-		TCActorFunctor<TCContinuation<TCActorSubscriptionWithID<>> (TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface)> m_fOnNewBackup;
+		TCActorFunctor
+			<
+				TCContinuation<TCActorSubscriptionWithID<>>
+				(
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
+					, CActorSubscription &&_ManifestFinished
+					, CStr const &_BackupRoot
+				)
+			>
+			m_fOnNewBackup
+		;
 		TCDelegatedActorInterface<CDistributedAppInterfaceBackupImplementation> m_BackupInterface;
 		CActorSubscription m_BackupInterfaceSubscription;
 		
@@ -122,5 +145,7 @@ namespace NMib::NCloud
 		bool m_bRunningRetrySubscribe = false;
 		bool m_bRerunRetrySubscribe = false;
 		bool m_bBackupFinishedStarting = false;
+		bool m_bInitialFinished = false;
+		bool m_bStopped = false;
 	};
 }

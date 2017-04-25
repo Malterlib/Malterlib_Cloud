@@ -29,7 +29,7 @@ namespace NMib::NCloud
 								return;
 							m_RunningBackupInstances[_Actor] = fg_Construct
 								(
-									fg_Construct(_Actor, m_Manifest, m_Config, _ActorInfo, fg_ThisActor(m_pThis), m_BackupKey)
+									fg_Construct(_Actor, m_Manifest, m_Config, _ActorInfo, fg_ThisActor(m_pThis), m_BackupKey, m_bBackupFinishedStarting)
 									, fg_Format("Backup for '{}'", _ActorInfo.m_HostInfo.f_GetDesc())
 								)
 							;

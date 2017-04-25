@@ -11,7 +11,16 @@ namespace NMib::NCloud
 			CBackupManagerClient *_pThis
 			, CConfig const &_Config
 			, TCActor<CDistributedActorTrustManager> const &_TrustManager
-			, TCActorFunctor<TCContinuation<TCActorSubscriptionWithID<>> (TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface)> &&_fOnNewBackup
+			, TCActorFunctor
+			<
+				TCContinuation<TCActorSubscriptionWithID<>>
+				(
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
+					, CActorSubscription &&_ManifestFinished
+					, CStr const &_BackupRoot
+				)
+			>
+			&&_fOnNewBackup
 		)
 		: m_pThis(_pThis)
 		, m_pDestroyed(fg_Construct(false))

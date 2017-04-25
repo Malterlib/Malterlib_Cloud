@@ -38,11 +38,12 @@ namespace NMib::NCloud
 		
 		enum ENotification /// Notification from backup manager client
 		{
-			ENotification_None = 0						///< Used to specify no notification when subscribing. \sa f_SubscribeNotifications
-			, ENotification_BackupAborted = DMibBit(0)	///< Backup was aborted remotely. \sa CNotification_BackupAborted
-			, ENotification_BackupFailed = DMibBit(1)	///< Backup failed. \sa CNotification_BackupFailed
-			, ENotification_FileFinished = DMibBit(2)	///< A file finished transferring to backup manager. \sa CNotification_FileFinished
-			, ENotification_Quiescent = DMibBit(3)		///< The backup is quiescent. All currently known files have finished transferring. \sa CNotification_Quiescent
+			ENotification_None = 0							///< Used to specify no notification when subscribing. \sa f_SubscribeNotifications
+			, ENotification_BackupAborted = DMibBit(0)		///< Backup was aborted remotely. \sa CNotification_BackupAborted
+			, ENotification_BackupFailed = DMibBit(1)		///< Backup failed. \sa CNotification_BackupFailed
+			, ENotification_FileFinished = DMibBit(2)		///< A file finished transferring to backup manager. \sa CNotification_FileFinished
+			, ENotification_Quiescent = DMibBit(3)			///< The backup is quiescent. All currently known files have finished transferring. \sa CNotification_Quiescent
+			, ENotification_InitialFinished = DMibBit(4)	///< All files in manifest has been backup up at least once. \sa CNotification_InitialFinished
 		};
 
 		struct CNotification_BackupAborted /// \brief Notification info for #ENotification_BackupAborted. \headerfile Mib/Cloud/BackupManagerClient
@@ -63,6 +64,10 @@ namespace NMib::NCloud
 		{
 		};
 		
+		struct CNotification_InitialFinished /// \brief Notification info for #ENotification_InitialFinished. \headerfile Mib/Cloud/BackupManagerClient
+		{
+		};
+		
 		using CNotification
 			= NContainer::TCStreamableVariant
 			<
@@ -71,6 +76,7 @@ namespace NMib::NCloud
 				, CNotification_BackupFailed, ENotification_BackupFailed
 				, CNotification_FileFinished, ENotification_FileFinished
 				, CNotification_Quiescent, ENotification_Quiescent
+				, CNotification_InitialFinished, ENotification_InitialFinished
 			>
 		; ///< \brief Notification variant. \sa ENotification
 
@@ -83,6 +89,8 @@ namespace NMib::NCloud
 					NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>>
 					(
 						NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppInterfaceBackup> &&_BackupInterface
+						, NConcurrency::CActorSubscription &&_ManifestFinished
+						, NStr::CStr const &_BackupRoot
 					)
 				>
 				&&_fOnNewBackup = {}

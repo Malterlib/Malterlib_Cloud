@@ -16,6 +16,7 @@ namespace NMib::NCloud::NPrivate
 			, CTrustedActorInfo const &_ActorInfo
 			, TCWeakActor<CBackupManagerClient> const &_BackupManagerClient
 			, CBackupManager::CBackupKey const &_BackupKey
+			, bool _bFinishedStarting
 		)
 		: mp_BackupManager(_BackupManager)
 		, mp_Manifest(_Manifest)
@@ -23,6 +24,7 @@ namespace NMib::NCloud::NPrivate
 		, mp_ActorInfo(_ActorInfo)
 		, mp_BackupManagerClient(_BackupManagerClient)
 		, mp_BackupKey(_BackupKey)
+		, mp_bFinishedStarting(_bFinishedStarting)
 	{
 		fp_StartBackup();
 	}
@@ -372,6 +374,8 @@ namespace NMib::NCloud::NPrivate
 		if (mp_bInitialBackupFinished)
 			return;
 		mp_bInitialBackupFinished = true;
+		
+		fp_BackupNotification(CBackupManagerClient::CNotification_InitialFinished{});
 
 		DMibCallActor
 			(
@@ -738,6 +742,14 @@ namespace NMib::NCloud::NPrivate
 	void CBackupManagerClient_Instance::f_BackupFinishedStarting()
 	{
 		mp_bFinishedStarting = true;
+		
+		DMibLogWithCategory
+			(
+				Mib/Cloud/BackupClient
+				, Debug
+				, "Finished starting backup"
+			)
+		;
 	
 		if (mp_Backup)
 			fp_CheckInitialBackupFinished();

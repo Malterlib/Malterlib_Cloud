@@ -33,7 +33,8 @@ namespace NMib::NCloud::NPrivate
 				, CBackupManagerClient::CConfig const &_Config
 				, CTrustedActorInfo const &_ActorInfo
 				, TCWeakActor<CBackupManagerClient> const &_BackupManagerClient
-				, CBackupManager::CBackupKey const &_BackupKey 
+				, CBackupManager::CBackupKey const &_BackupKey
+				, bool _bFinishedStarting
 			)
 		;
 		~CBackupManagerClient_Instance();
@@ -167,6 +168,6 @@ namespace NMib::NCloud::NPrivate
 		bool mp_bBackupStarted = false;
 		bool mp_bBackupStartFailed = false;
 		bool mp_bInitialBackupFinished = false;
-		bool mp_bFinishedStarting = true;
+		bool mp_bFinishedStarting = false;
 	};
 }

@@ -32,7 +32,12 @@ namespace NMib::NCloud::NAppManager
 				(
 					BackupConfig
 					, mp_State.m_TrustManager
-					, g_ActorFunctor > [_pApplication](TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface) -> TCContinuation<TCActorSubscriptionWithID<>>
+					, g_ActorFunctor > [_pApplication]
+					(
+						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
+						, NConcurrency::CActorSubscription &&_ManifestFinished
+						, NStr::CStr const &_BackupRoot
+					) -> TCContinuation<TCActorSubscriptionWithID<>>
 					{
 						if (_pApplication->m_bDeleted)
 							return fg_Explicit();
@@ -44,13 +49,32 @@ namespace NMib::NCloud::NAppManager
 							return fg_Explicit();
 						
 						if (_pApplication->m_AppInterface)
-							return DMibCallActor(_pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_StartBackup, fg_Move(_BackupInterface));
+						{
+							return DMibCallActor
+								(
+									_pApplication->m_AppInterface
+									, CDistributedAppInterfaceClient::f_StartBackup
+									, fg_Move(_BackupInterface)
+									, fg_Move(_ManifestFinished)
+									, _BackupRoot
+								)
+							;
+						}
 						else
 						{
 							TCContinuation<TCActorSubscriptionWithID<>> Continuation;
-							_pApplication->m_OnRegisterDistributedApp.f_Insert() = [Continuation, _pApplication, _BackupInterface = fg_Move(_BackupInterface)]() mutable
+							_pApplication->m_OnRegisterDistributedApp.f_Insert() = [=, BackupInterface = fg_Move(_BackupInterface), ManifestFinished = fg_Move(_ManifestFinished)]() mutable
 								{
-									DMibCallActor(_pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_StartBackup, fg_Move(_BackupInterface)) > Continuation;
+									DMibCallActor
+										(
+											_pApplication->m_AppInterface
+											, CDistributedAppInterfaceClient::f_StartBackup
+											, fg_Move(BackupInterface)
+											, fg_Move(ManifestFinished)
+											, _BackupRoot
+										)
+										> Continuation
+									;
 								}
 							;
 							return Continuation;

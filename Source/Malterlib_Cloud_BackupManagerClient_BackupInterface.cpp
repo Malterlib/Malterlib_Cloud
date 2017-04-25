@@ -123,8 +123,32 @@ namespace NMib::NCloud
 							auto *pOldFile = Internal.m_Manifest.m_Files.f_FindEqual(NewFileName);
 							if (pOldFile && pOldFile->m_OriginalPath != NewFile.m_OriginalPath)
 							{
-								Continuation.f_SetException(DMibErrorInstance(fg_Format("Manifest file '{}' changed original path which is not allowed", NewFileName)));
-								return;
+								if (pOldFile->f_IsDirectory() && NewFile.f_IsDirectory())
+								{
+									// Allow remapping of added directories
+									if (pOldFile->m_OriginalPath != NewFileName && NewFile.m_OriginalPath.f_GetLen() < pOldFile->m_OriginalPath.f_GetLen())
+										Internal.m_Manifest.m_Files.f_Remove(NewFileName);
+								}
+								else
+								{
+									Continuation.f_SetException
+										(
+											DMibErrorInstance
+											(
+												fg_Format
+												(
+													"Manifest file '{}' changed original path which is not allowed. '{}' (Dir {}) != '{}' (Dir {})"
+													, NewFileName
+													, pOldFile->m_OriginalPath
+													, pOldFile->f_IsDirectory()
+													, NewFile.m_OriginalPath
+													, NewFile.f_IsDirectory()
+												)
+											)
+										)
+									;
+									return;
+								}
 							}
 						}
 
@@ -146,6 +170,8 @@ namespace NMib::NCloud
 						}
 						
 						Internal.m_ManifestFileIDs += NewManifestFileIDs;
+						
+						Continuation.f_SetResult();
 					}
 				;
 			}

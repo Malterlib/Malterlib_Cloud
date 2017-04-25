@@ -158,57 +158,118 @@ namespace NMib::NCloud::NAppManager
 							}
 							return;
 						}
-
-						pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess) > [=](TCAsyncResult<uint32> &&_Result)
+						
+						TCContinuation<void> PreStopContinuation;
+						
+						bool bRanPreStop = false;
+						
+						if (pApplication->m_AppInterface)
+						{
+							bRanPreStop = true;
+							DMibCallActor(pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_PreStop) > PreStopContinuation;
+						}
+						else
+							PreStopContinuation.f_SetResult();
+						
+						PreStopContinuation.f_Dispatch() > [=](TCAsyncResult<void> &&_Result)
 							{
 								if (!_Result)
-									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", _Result.f_GetExceptionStr());
-								else
-								{
-									if (*_Result)
-										DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Application '{}' exited with non 0 status: {}", pApplication->m_Name, *_Result);
-									else
-										DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' exited cleanly", pApplication->m_Name);
-									pApplication->f_Clear();
-								}
+									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", _Result.f_GetExceptionStr());
+								
+								auto fStopProcess = [=]
+									{
+										pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess) > [=](TCAsyncResult<uint32> &&_Result)
+											{
+												if (!_Result)
+													DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", _Result.f_GetExceptionStr());
+												else
+												{
+													if (*_Result)
+													{
+														DMibLogWithCategory
+															(
+																Malterlib/Cloud/AppManager
+																, Error
+																, "Application '{}' exited with non 0 status: {}"
+																, pApplication->m_Name
+																, *_Result
+															)
+														;
+													}
+													else
+														DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' exited cleanly", pApplication->m_Name);
+													pApplication->f_Clear();
+												}
 
-								TCContinuation<void> BackupContinuation;
-								if (pApplication->m_BackupClient)
+												TCContinuation<void> BackupContinuation;
+												if (pApplication->m_BackupClient)
+												{
+													pApplication->m_BackupClient->f_Destroy() > BackupContinuation;
+													pApplication->m_BackupClient.f_Clear();
+												}
+												else
+													BackupContinuation.f_SetResult();
+												
+												BackupContinuation.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult) mutable
+													{
+														if (!_BackupDestroyResult)
+														{
+															DMibLogWithCategory
+																(
+																	Malterlib/Cloud/AppManager
+																	, Error
+																	, "Error stopping application backup: {}"
+																	, _BackupDestroyResult.f_GetExceptionStr()
+																)
+															;
+														}
+														
+														pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
+														
+														if (_Flags & EStopFlag_CloseEncryption)
+														{
+															if (!_Result)
+															{
+																Continuation.f_SetException
+																	(
+																		DMibErrorInstance(fg_Format("Error stopping process, cannot close encryption: {}", _Result.f_GetExceptionStr()))
+																	)
+																;
+																return;
+															}
+															f_CloseEncryption(*_Result) > [Continuation](TCAsyncResult<uint32> &&_Result)
+																{
+																	if (!_Result)
+																		DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", _Result.f_GetExceptionStr());
+																	
+																	Continuation.f_SetResult(fg_Move(_Result));
+																}
+															;
+															return;
+														}
+														
+														Continuation.f_SetResult(fg_Move(_Result));
+													}
+												;
+											}
+										;
+									}
+								;
+								
+								if (bRanPreStop && pApplication->m_BackupClient && _Result)
 								{
-									pApplication->m_BackupClient->f_Destroy() > BackupContinuation;
+									pApplication->m_BackupClient->f_Destroy() > [=](TCAsyncResult<void> &&_BackupDestroyResult)
+										{
+											if (!_BackupDestroyResult)
+												DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", _BackupDestroyResult.f_GetExceptionStr());
+
+											fStopProcess();
+										}
+									;
 									pApplication->m_BackupClient.f_Clear();
 								}
 								else
-									BackupContinuation.f_SetResult();
-								
-								BackupContinuation.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult) mutable
-									{
-										if (!_BackupDestroyResult)
-											DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", _BackupDestroyResult.f_GetExceptionStr());
-										
-										pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
-										
-										if (_Flags & EStopFlag_CloseEncryption)
-										{
-											if (!_Result)
-											{
-												Continuation.f_SetException(DMibErrorInstance(fg_Format("Error stopping process, cannot close encryption: {}", _Result.f_GetExceptionStr())));
-												return;
-											}
-											f_CloseEncryption(*_Result) > [Continuation](TCAsyncResult<uint32> &&_Result)
-												{
-													if (!_Result)
-														DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", _Result.f_GetExceptionStr());
-													
-													Continuation.f_SetResult(fg_Move(_Result));
-												}
-											;
-											return;
-										}
-										
-										Continuation.f_SetResult(fg_Move(_Result));
-									}
-								;
+									fStopProcess();
 							}
 						;
 					}

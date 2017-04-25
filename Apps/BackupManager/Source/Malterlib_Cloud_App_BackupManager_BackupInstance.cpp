@@ -41,7 +41,16 @@ namespace NMib::NCloud::NBackupManager
 			, m_ID(_ID)
 		{
 			m_BackupDirectory = fg_Format("{}/Backups/{}/{tst.,tsb_}_{}", CFile::fs_GetProgramDirectory(), _Name, _StartTime, _ID);
-			m_LatestBackupDirectory = CFile::fs_AppendPath(CFile::fs_GetPath(m_BackupDirectory), "Latest");
+			g_Dispatch > [this]
+				{
+					f_InitBackupDirectory();
+				}
+				> [](TCAsyncResult<void> &&_Result)
+				{
+					if (!_Result)
+						DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "Failed to init backup directory: {}", _Result.f_GetExceptionStr());
+				}
+			;
 		}
 
 		void f_RunRSyncProtocol(CRSyncContext &_Context, CSecureByteVector &&_ServerPacket);
@@ -61,6 +70,8 @@ namespace NMib::NCloud::NBackupManager
 				, TCFunctionMutable<void ()> &&_fOnDone
 			)
 		;
+		
+		void f_InitBackupDirectory();
 		
 		CStr m_Name;
 		CTime m_StartTime;
@@ -86,9 +97,18 @@ namespace NMib::NCloud::NBackupManager
 		: mp_pInternal(fg_Construct(_Name, _StartTime, _ID))
 	{
 	}
-	
+
 	CBackupInstance::~CBackupInstance()
 	{
+	}
+
+	void CBackupInstance::CInternal::f_InitBackupDirectory()
+	{
+		CStr LatestBackup = CFile::fs_AppendPath(CFile::fs_GetPath(m_BackupDirectory), "Latest");
+		if (CFile::fs_FileExists(LatestBackup))
+			m_LatestBackupDirectory = CFile::fs_AppendPath(CFile::fs_GetPath(m_BackupDirectory), CFile::fs_ResolveSymbolicLink(LatestBackup));
+		if (m_LatestBackupDirectory == m_BackupDirectory)
+			m_LatestBackupDirectory.f_Clear();
 	}
 
 	CStr CBackupInstance::CInternal::f_GetCurrentPath(CStr const &_Path)
@@ -98,6 +118,8 @@ namespace NMib::NCloud::NBackupManager
 	
 	CStr CBackupInstance::CInternal::f_GetLatestPath(CStr const &_Path)
 	{
+		if (m_LatestBackupDirectory.f_IsEmpty())
+			return {};
 		return CFile::fs_AppendPath(m_LatestBackupDirectory, CFile::fs_AppendPath(CStr("Current"), _Path));
 	}
 	
@@ -141,7 +163,11 @@ namespace NMib::NCloud::NBackupManager
 		Internal.m_bManifestSyncStarted = true;
 		
 		CStr FileName = CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin");
-		CStr OldFileName = CFile::fs_AppendPath(Internal.m_LatestBackupDirectory, "Manifest.bin");
+		
+		CStr OldFileName;
+		if (!Internal.m_LatestBackupDirectory.f_IsEmpty())
+			OldFileName = CFile::fs_AppendPath(Internal.m_LatestBackupDirectory, "Manifest.bin");
+		
 		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_RandomID());
 		
 		return Internal.f_StartRSync
@@ -186,8 +212,9 @@ namespace NMib::NCloud::NBackupManager
 				
 				CStartBackupResult BackupResult;
 				
-				bool bIsLatest = CFile::fs_FileExists(Internal.m_LatestBackupDirectory) 
-					&& CFile::fs_ResolveSymbolicLink(Internal.m_LatestBackupDirectory) == CFile::fs_GetFile(Internal.m_BackupDirectory)
+				CStr LatestBackupPath = CFile::fs_AppendPath(CFile::fs_GetPath(Internal.m_BackupDirectory), "Latest");
+				bool bIsLatest = CFile::fs_FileExists(LatestBackupPath)
+					&& CFile::fs_ResolveSymbolicLink(LatestBackupPath) == CFile::fs_GetFile(Internal.m_BackupDirectory)
 				;
 				
 				for (auto &File : Internal.m_Manifest.m_Files)
@@ -200,7 +227,7 @@ namespace NMib::NCloud::NBackupManager
 					
 					if (!CFile::fs_FileExists(FileName))
 					{
-						if (!bIsLatest && CFile::fs_FileExists(OldFileName) && CFile::fs_GetFileChecksum_SHA256(OldFileName) == File.m_Digest)
+						if (!bIsLatest && !OldFileName.f_IsEmpty() && CFile::fs_FileExists(OldFileName) && CFile::fs_GetFileChecksum_SHA256(OldFileName) == File.m_Digest)
 						{
 							CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
 							CFile::fs_CopyFile(OldFileName, FileName);
@@ -487,16 +514,10 @@ namespace NMib::NCloud::NBackupManager
 		
 		RSyncContext.m_RelativeFileName = _RelativeFileName;
 		RSyncContext.m_FileLength = _FileLength;
-		if 
-			(
-				CFile::fs_FileExists(_FileName)
-				|| !CFile::fs_FileExists(_OldFileName)
-				|| 
-				(
-					CFile::fs_FileExists(m_LatestBackupDirectory)
-					&& CFile::fs_ResolveSymbolicLink(m_LatestBackupDirectory) == CFile::fs_GetFile(m_BackupDirectory)
-				)
-			)
+		bool bUseOld = false;
+		bool bNewExists = CFile::fs_FileExists(_FileName);
+		bool bOldExists = !_OldFileName.f_IsEmpty() && CFile::fs_FileExists(_OldFileName);
+		if (bNewExists || !bOldExists)
 		{
 			RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 			RSyncContext.m_TempFile.f_Open(_TempFileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
@@ -504,10 +525,31 @@ namespace NMib::NCloud::NBackupManager
 		}
 		else
 		{
+			bUseOld = true;
 			RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 			RSyncContext.m_SourceFile.f_Open(_OldFileName, EFileOpen_Read | EFileOpen_ShareAll);
 			RSyncContext.m_pClient = fg_Construct(RSyncContext.m_SourceFile, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, nullptr, RSyncFlags);
 		}
+		
+		DMibLogWithCategory
+			(
+				Mib/Cloud/BackupManager
+				, Debug
+				, "Start RSync protocol for file '{}' {}"
+				"\n    FileName: {}"
+				"\n    OldFileName: {}"
+				"\n    UseOld: {}"
+				"\n    bNewExists: {}"
+				"\n    bOldExists: {}"
+				, _RelativeFileName
+				, (_SyncFlags & EDirectoryManifestSyncFlag_Append) != 0 ? "Append" : ""
+				, _FileName
+				, _OldFileName
+				, bUseOld
+				, bNewExists
+				, bOldExists
+			)
+		;
 
 		RSyncContext.m_fRunProtocol = fg_Move(_fRunProtocol);
 		
@@ -592,9 +634,20 @@ namespace NMib::NCloud::NBackupManager
 		return TCContinuation<void>::fs_RunProtected<CExceptionFile>()
 			> [&]()
 			{
-				if (CFile::fs_FileExists(Internal.m_LatestBackupDirectory))
-					CFile::fs_DeleteFile(Internal.m_LatestBackupDirectory);
-				CFile::fs_CreateSymbolicLink(CFile::fs_GetFile(Internal.m_BackupDirectory), Internal.m_LatestBackupDirectory, EFileAttrib_Directory, ESymbolicLinkFlag_Relative);
+				DMibLogWithCategory
+					(
+						Mib/Cloud/BackupManager
+						, Debug
+						, "Marking backup as latest: {}"
+						, CFile::fs_GetFile(Internal.m_BackupDirectory)
+					)
+				;
+				CFile::fs_Touch(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Finished"));
+				CStr LatestBackupPath = CFile::fs_AppendPath(CFile::fs_GetPath(Internal.m_BackupDirectory), "Latest");
+				
+				if (CFile::fs_FileExists(LatestBackupPath))
+					CFile::fs_DeleteFile(LatestBackupPath);
+				CFile::fs_CreateSymbolicLink(CFile::fs_GetFile(Internal.m_BackupDirectory), LatestBackupPath, EFileAttrib_Directory, ESymbolicLinkFlag_Relative);
 			}
 		;
 	}

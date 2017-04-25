@@ -3,6 +3,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Process/Platform>
+#include <Mib/Concurrency/ActorSubscription>
 
 #include "Malterlib_Cloud_BackupManagerClient.h"
 #include "Malterlib_Cloud_BackupManagerClient_Internal.h"
@@ -14,7 +15,16 @@ namespace NMib::NCloud
 		(
 			CConfig const &_Config
 			, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
-			, TCActorFunctor<TCContinuation<TCActorSubscriptionWithID<>> (TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface)> &&_fOnNewBackup
+			, TCActorFunctor
+			<
+				TCContinuation<TCActorSubscriptionWithID<>>
+				(
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
+					, CActorSubscription &&_ManifestFinished
+					, CStr const &_BackupRoot
+				)
+			>
+			&&_fOnNewBackup
 			, TCActor<CActorDistributionManager> const &_DistributionManager
 		)
 		: mp_pInternal(fg_Construct(this, _Config.f_Validate(), _TrustManager, fg_Move(_fOnNewBackup)))
@@ -32,20 +42,40 @@ namespace NMib::NCloud
 		auto &Internal = *mp_pInternal;
 		*Internal.m_pDestroyed = true;
 		
-		TCActorResultVector<void> Destroys;
-		for (auto &BackupInstance : Internal.m_RunningBackupInstances)
-			BackupInstance->f_Destroy() > Destroys.f_AddResult();
+		TCActorResultVector<void> RunningInstancesDestroys;
 		
-		Internal.m_fOnNewBackup.f_Destroy() > Destroys.f_AddResult();
+		for (auto &BackupInstance : Internal.m_RunningBackupInstances)
+			BackupInstance->f_Destroy() > RunningInstancesDestroys.f_AddResult();
 		
 		Internal.m_RunningBackupInstances.f_Clear();
 		
-		auto pTracker = fg_Move(Internal.m_pCanDestroyTracker);
-		
-		pTracker->m_Continuation.f_Dispatch() > Destroys.f_AddResult();  
-		
 		NConcurrency::TCContinuation<void> Continuation;
-		Destroys.f_GetResults() > Continuation.f_ReceiveAny();
+		RunningInstancesDestroys.f_GetResults() > Continuation / [this, Continuation]
+			{
+				auto &Internal = *mp_pInternal;
+				
+				TCActorResultVector<void> StoppedNotifications;
+				
+				for (auto &fOnStopped : Internal.m_OnBackupStoppedSubscriptions)
+					fOnStopped() > StoppedNotifications.f_AddResult();
+				
+				StoppedNotifications.f_GetResults() > Continuation / [this, Continuation]
+					{
+						auto &Internal = *mp_pInternal;
+				
+						TCActorResultVector<void> Destroys;
+						
+						Internal.m_fOnNewBackup.f_Destroy() > Destroys.f_AddResult();
+						
+						auto pTracker = fg_Move(Internal.m_pCanDestroyTracker);
+						
+						pTracker->m_Continuation.f_Dispatch() > Destroys.f_AddResult();  
+						
+						Destroys.f_GetResults() > Continuation.f_ReceiveAny();
+					}
+				;
+			}
+		;
 		
 		return Continuation;
 	}
@@ -123,7 +153,16 @@ namespace NMib::NCloud
 						
 						if (m_fOnNewBackup)
 						{
-							m_fOnNewBackup(m_BackupInterface.m_Actor->f_ShareInterface<CDistributedAppInterfaceBackup>()) > [this](TCAsyncResult<TCActorSubscriptionWithID<>> &&_Result)
+							m_fOnNewBackup
+								(
+									m_BackupInterface.m_Actor->f_ShareInterface<CDistributedAppInterfaceBackup>()
+									, g_ActorSubscription > [this]
+									{
+										f_BackupFinishedStarting();
+									}
+									, m_Config.m_ManifestConfig.m_Root
+								)
+								> [this](TCAsyncResult<TCActorSubscriptionWithID<>> &&_Result)
 								{
 									if (!_Result)
 									{
@@ -132,8 +171,6 @@ namespace NMib::NCloud
 									}
 									else
 										m_BackupInterfaceSubscription = fg_Move(*_Result);
-									
-									f_BackupFinishedStarting();
 								}
 							;
 						}
