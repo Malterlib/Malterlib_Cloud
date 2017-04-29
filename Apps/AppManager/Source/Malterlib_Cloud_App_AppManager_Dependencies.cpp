@@ -32,6 +32,12 @@ namespace NMib::NCloud::NAppManager
 			o_State = "Prevented launch because update previously failed";
 			return false;
 		}
+		
+		if (m_bPreventLaunch_DelayAfterFailure)
+		{
+			o_State = "Prevented launch because of previous failure";
+			return false;
+		}
 
 		if (f_IsChildApp())
 		{
@@ -146,7 +152,7 @@ namespace NMib::NCloud::NAppManager
 					(
 						Malterlib/Cloud/AppManager
 						, Error
-						, "App '{}' failed initial launch: {}"
+						, "App '{}' failed launch: {}"
 						, Application.m_Name
 						, _Result.f_GetExceptionStr()
 					)

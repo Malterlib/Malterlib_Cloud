@@ -370,6 +370,8 @@ namespace NMib::NCloud::NPrivate
 			return;
 		if (!mp_bFinishedStarting)
 			return;
+		if (!mp_bBackupStarted)
+			return;
 		
 		if (mp_bInitialBackupFinished)
 			return;
@@ -558,6 +560,7 @@ namespace NMib::NCloud::NPrivate
 								mp_PendingManifestChanges.f_Clear();
 								
 								mp_bBackupStarted = true;
+								fp_CheckInitialBackupFinished();
 								fp_ProcessBackupQueue();
 							}
 						;
@@ -610,7 +613,7 @@ namespace NMib::NCloud::NPrivate
 		return Continuation;
 	}
 
-	void CBackupManagerClient_Instance::fp_ProcessManifestChange(CStr const &_FileName, CManifestChangeAndDirty const &_ManifestChange)
+	void CBackupManagerClient_Instance::fp_ProcessManifestChange(CStr const &_FileName, CManifestChangeInfo const &_ManifestChange)
 	{
 		mp_FileManifestSequencer > [=]() -> TCContinuation<void>
 			{
@@ -628,7 +631,9 @@ namespace NMib::NCloud::NPrivate
 					PendingAbortContinuation.f_SetResult();
 
 				TCContinuation<void> Continuation;
-				PendingAbortContinuation > [this, Continuation, ManifestChange, _FileName, bDirty = _ManifestChange.m_bDirty](TCAsyncResult<void> &&_Result)
+				PendingAbortContinuation
+					> [this, Continuation, ManifestChange, _FileName, bDirty = _ManifestChange.m_bDirty, ChangeContinuation = _ManifestChange.m_Continuation]
+					(TCAsyncResult<void> &&_Result)
 					{
 						if (!_Result)
 						{
@@ -636,11 +641,13 @@ namespace NMib::NCloud::NPrivate
  							DMibLog(Error, "Failed to abort pending file sync: {}", _Result.f_GetExceptionStr());
 						}
 						DMibCallActor(mp_Backup, CBackupManagerBackup::f_ManifestChange, _FileName, ManifestChange)
-							> [this, _FileName, ManifestChange, bDirty](TCAsyncResult<void> &&_Result)
+							> [this, _FileName, ManifestChange, bDirty, ChangeContinuation, Continuation](TCAsyncResult<void> &&_Result)
 							{
 								if (!_Result)
 								{
 									fp_ReportBackupFailed(fg_Format("Failed to change manifest on remote: {}", _Result.f_GetExceptionStr()));
+									ChangeContinuation.f_SetResult();
+									Continuation.f_SetResult();
 									return;
 								}
 								
@@ -650,6 +657,8 @@ namespace NMib::NCloud::NPrivate
 									{
 										mp_PendingFiles.f_Remove(_FileName);
 										fp_FileFinished(_FileName);
+										ChangeContinuation.f_SetResult();
+										Continuation.f_SetResult();
 										return;
 									}
 								case CBackupManagerBackup::EManifestChange_Rename:
@@ -663,10 +672,18 @@ namespace NMib::NCloud::NPrivate
 								
 								auto *pManifestFile = mp_Manifest.m_Files.f_FindEqual(_FileName);
 								if (!pManifestFile)
+								{
+									ChangeContinuation.f_SetResult();
+									Continuation.f_SetResult();
 									return;
+								}
 								
 								if (pManifestFile->f_IsDirectory())
+								{
+									ChangeContinuation.f_SetResult();
+									Continuation.f_SetResult();
 									return;
+								}
 
 								if (bDirty && (pManifestFile->m_Flags & EDirectoryManifestSyncFlag_Append))
 								{
@@ -688,6 +705,9 @@ namespace NMib::NCloud::NPrivate
 								}
 								else if (!PendingFile.m_Link.f_IsInList())
 									PendingFile.m_bReschedule = true;
+
+								ChangeContinuation.f_SetResult();
+								Continuation.f_SetResult();
 							}
 						;
 					}
@@ -699,7 +719,7 @@ namespace NMib::NCloud::NPrivate
 		;
 	}
 	
-	void CBackupManagerClient_Instance::f_ManifestChanged(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty)
+	TCContinuation<void> CBackupManagerClient_Instance::f_ManifestChanged(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty)
 	{
 		switch (_ManifestChange.f_GetTypeID())
 		{
@@ -729,14 +749,18 @@ namespace NMib::NCloud::NPrivate
 				break;
 			}
 		}
-		
+	
+		TCContinuation<void> Continuation;
+
 		if (mp_Backup)
 		{
 			if (mp_bBackupStarted)
-				fp_ProcessManifestChange(_FileName, {_ManifestChange, _bDirty});
+				fp_ProcessManifestChange(_FileName, {_ManifestChange, Continuation, _bDirty});
 			else if (!mp_bBackupStartFailed)
-				mp_PendingManifestChanges[_FileName].f_Insert({_ManifestChange, _bDirty});
+				mp_PendingManifestChanges[_FileName].f_Insert({_ManifestChange, Continuation, _bDirty});
 		}
+		
+		return Continuation;
 	}
 	
 	void CBackupManagerClient_Instance::f_BackupFinishedStarting()

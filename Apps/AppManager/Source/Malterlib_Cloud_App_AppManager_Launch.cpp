@@ -10,14 +10,14 @@ namespace NMib::NCloud::NAppManager
 	void CAppManagerActor::fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		_pApplication->f_Clear();
+		_pApplication->m_bPreventLaunch_DelayAfterFailure = true;
 		fg_OneshotTimer
 			(
 				10.0
 				, [this, _pApplication]
 				{
-					if (_pApplication->m_bDeleted || _pApplication->m_ProcessLaunch || _pApplication->m_bStopped || _pApplication->m_bOperationInProgress)
-						return;
-					fp_LaunchApp(_pApplication, true) > fg_DiscardResult();
+					_pApplication->m_bPreventLaunch_DelayAfterFailure = false;
+					fp_UpdateApplicationDependencies();
 				}
 			)
 		;
@@ -134,7 +134,8 @@ namespace NMib::NCloud::NAppManager
 															fp_AppLaunchStateChanged(_pApplication, fg_Format("Launched (app startup failed: '{}')", _Result.f_GetExceptionStr()));
 														}
 														
-														Continuation.f_SetResult(false);
+														if (!Continuation.f_IsSet())
+															Continuation.f_SetResult(false);
 													}
 												;
 											}
@@ -143,7 +144,8 @@ namespace NMib::NCloud::NAppManager
 									}
 									pState->m_pCleanup.f_Clear();
 									fp_AppLaunchStateChanged(_pApplication, "Launched");
-									Continuation.f_SetResult(false);
+									if (!Continuation.f_IsSet())
+										Continuation.f_SetResult(false);
 								}
 								break;
 							case NProcess::EProcessLaunchState_LaunchFailed:
@@ -154,7 +156,8 @@ namespace NMib::NCloud::NAppManager
 									
 									fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", LaunchError));
 									pState->m_pCleanup.f_Clear();
-									Continuation.f_SetException(DMibErrorInstance(LaunchError));
+									if (!Continuation.f_IsSet())
+										Continuation.f_SetException(DMibErrorInstance(LaunchError));
 								}
 								break;
 							case NProcess::EProcessLaunchState_Exited:
@@ -183,6 +186,12 @@ namespace NMib::NCloud::NAppManager
 									}
 									else
 										fp_AppLaunchStateChanged(_pApplication, fg_Format("{}Exited with {}", RelaunchInfo, ExitStatus));
+									
+									if (!Continuation.f_IsSet())
+										Continuation.f_SetException(DMibErrorInstance(fg_Format("Launch exited with '{}' before fully launched", ExitStatus)));
+
+									pState->m_pCleanup.f_Clear();
+									_pApplication->m_OnRegisterDistributedApp.f_Clear();
 									
 									if (!_pApplication->m_bStopped)
 										fp_ScheduleRelaunchApp(_pApplication);

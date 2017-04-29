@@ -139,23 +139,39 @@ namespace NMib::NCloud::NAppManager
 						
 						if (!pApplication->m_ProcessLaunch || bWasStopped || pApplication->m_bDeleted)
 						{
-							pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
-
-							if (_Flags & EStopFlag_CloseEncryption)
+							TCContinuation<void> StopBackupContinuation;
+							if (pApplication->m_BackupClient)
 							{
-								g_Dispatch > [this, pApplication]() -> TCContinuation<uint32>
-									{
-										if (pApplication->m_bDeleted)
-											return fg_Explicit(0);
-										return f_CloseEncryption(0);
-									}
-									> Continuation
-								;
+								pApplication->m_BackupClient->f_Destroy() > StopBackupContinuation;
+								pApplication->m_BackupClient.f_Clear();
 							}
 							else
-							{
-								Continuation.f_SetResult(0);
-							}
+								StopBackupContinuation.f_SetResult();
+							
+							StopBackupContinuation.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult)
+								{
+									if (!_BackupDestroyResult)
+										DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", _BackupDestroyResult.f_GetExceptionStr());
+									
+									pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
+
+									if (_Flags & EStopFlag_CloseEncryption)
+									{
+										g_Dispatch > [this, pApplication]() -> TCContinuation<uint32>
+											{
+												if (pApplication->m_bDeleted)
+													return fg_Explicit(0);
+												return f_CloseEncryption(0);
+											}
+											> Continuation
+										;
+									}
+									else
+									{
+										Continuation.f_SetResult(0);
+									}
+								}
+							;
 							return;
 						}
 						

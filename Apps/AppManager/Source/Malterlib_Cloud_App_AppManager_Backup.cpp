@@ -45,11 +45,11 @@ namespace NMib::NCloud::NAppManager
 						if (!_pApplication->m_Settings.m_bDistributedApp)
 							return fg_Explicit();
 						
-						if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
-							return fg_Explicit();
-						
 						if (_pApplication->m_AppInterface)
 						{
+							if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
+								return fg_Explicit();
+						
 							return DMibCallActor
 								(
 									_pApplication->m_AppInterface

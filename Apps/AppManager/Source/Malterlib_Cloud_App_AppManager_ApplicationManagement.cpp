@@ -392,11 +392,12 @@ namespace NMib::NCloud::NAppManager
 	
 	TCContinuation<void> CAppManagerActor::fp_ClearPreventLaunch(TCSharedPointer<CApplication> const &_pApplication)
 	{
-		if (!_pApplication->m_bPreventLaunch_User && !_pApplication->m_bPreventLaunch_Update)
+		if (!_pApplication->m_bPreventLaunch_User && !_pApplication->m_bPreventLaunch_Update && !_pApplication->m_bPreventLaunch_DelayAfterFailure)
 			return fg_Explicit();
 		
 		_pApplication->m_bPreventLaunch_User = false;
 		_pApplication->m_bPreventLaunch_Update = false;
+		_pApplication->m_bPreventLaunch_DelayAfterFailure = false;
 	
 		TCContinuation<void> Continuation;
 		fp_UpdateApplicationJSON(_pApplication) > Continuation % "Failed to save application state";

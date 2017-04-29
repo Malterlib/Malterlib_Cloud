@@ -193,6 +193,7 @@ namespace NMib::NCloud::NAppManager
 			// State
 			bool m_bPreventLaunch_User = false;
 			bool m_bPreventLaunch_Update = false;
+			bool m_bPreventLaunch_DelayAfterFailure = false;
 			bool m_bDeleted = false;
 			bool m_bStopped = false;
 			bool m_bAutoStart = false;

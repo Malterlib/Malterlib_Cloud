@@ -273,7 +273,10 @@ namespace NMib::NCloud::NAppManager
 									Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
 									return;
 								}
-									
+
+								if (pApplication->m_bPreventLaunch_DelayAfterFailure)
+									pApplication->m_bPreventLaunch_DelayAfterFailure = false;
+								
 								CStr DependenciesMessage;
 								if (!pApplication->f_DependenciesSatisfied(DependenciesMessage))
 								{
@@ -284,6 +287,7 @@ namespace NMib::NCloud::NAppManager
 								}
 								
 								_fOnInfo("Launching applicaion with changed settings");
+
 								fp_LaunchApp(pApplication, false)
 									> Continuation % "Failed to launch app. Will retry periodically." % Auditor / [=, InProgressScope = InProgressScope](bool _bQuitManager)
 									{

@@ -40,7 +40,7 @@ namespace NMib::NCloud::NPrivate
 		~CBackupManagerClient_Instance();
 		
 		void f_BackupFinishedStarting();
-		void f_ManifestChanged(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty);
+		TCContinuation<void> f_ManifestChanged(CStr const &_FileName, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty);
 		
 	private:
 		
@@ -91,9 +91,10 @@ namespace NMib::NCloud::NPrivate
 			bool m_bFinished = false;
 		};
 		
-		struct CManifestChangeAndDirty
+		struct CManifestChangeInfo
 		{
 			CBackupManagerBackup::CManifestChange m_ManifestChange;
+			TCContinuation<void> m_Continuation;
 			bool m_bDirty = false;
 		};
 		
@@ -130,7 +131,7 @@ namespace NMib::NCloud::NPrivate
 
 		void fp_NewPendingFile(CStr const &_FileName);
 		void fp_FileFinished(CStr const &_FileName);
-		void fp_ProcessManifestChange(CStr const &_FileName, CManifestChangeAndDirty const &_ManifestChange);
+		void fp_ProcessManifestChange(CStr const &_FileName, CManifestChangeInfo const &_ManifestChange);
 		TCContinuation<void> fp_AbortPendingFile(CStr const &_FileName);
 		TCSharedPointer<CAppendFileCache> fp_GetAppendFileCache(CStr const &_FileName);
 		void fp_CheckInitialBackupFinished();
@@ -154,7 +155,7 @@ namespace NMib::NCloud::NPrivate
 		TCMap<CStr, CPendingBackupFile> mp_PendingFiles;
 		DMibListLinkDS_List(CPendingBackupFile, m_Link) mp_PendingFilesQueue;
 
-		TCMap<CStr, TCVector<CManifestChangeAndDirty>> mp_PendingManifestChanges;
+		TCMap<CStr, TCVector<CManifestChangeInfo>> mp_PendingManifestChanges;
 		
 		TCMap<CStr, TCSharedPointer<CAppendFileCache>> mp_AppendFileCache;
 		TCMap<CStr, CAppendFileState> mp_AppendFileState;

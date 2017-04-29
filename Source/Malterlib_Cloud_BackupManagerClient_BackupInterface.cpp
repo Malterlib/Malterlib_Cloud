@@ -151,11 +151,13 @@ namespace NMib::NCloud
 								}
 							}
 						}
+						
+						TCActorResultVector<void> ManifestChangedResults;
 
 						auto fSendManifestChange = [&](CStr const &_Path, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty)
 							{
 								for (auto &RunningInstance : Internal.m_RunningBackupInstances)
-									RunningInstance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty) > fg_DiscardResult();
+									RunningInstance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty) > ManifestChangedResults.f_AddResult();
 							}
 						;
 						
@@ -171,7 +173,7 @@ namespace NMib::NCloud
 						
 						Internal.m_ManifestFileIDs += NewManifestFileIDs;
 						
-						Continuation.f_SetResult();
+						ManifestChangedResults.f_GetResults() > Continuation.f_ReceiveAny();
 					}
 				;
 			}
