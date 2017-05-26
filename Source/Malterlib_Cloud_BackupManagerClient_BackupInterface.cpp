@@ -65,7 +65,7 @@ namespace NMib::NCloud
 		TCContinuation<void> Continuation;
 		Internal.f_SubscribeChanges() > [Continuation, pThis = m_pThis, NewConfig = fg_Move(NewConfig)](TCAsyncResult<void> &&_Result) mutable
 			{
-				if (pThis->mp_bDestroyed)
+				if (pThis->f_IsDestroyed())
 				{
 					Continuation.f_SetException(DMibErrorInstance("Destroyed"));
 					return;
@@ -98,7 +98,7 @@ namespace NMib::NCloud
 					}
 					> [pThis, Continuation](TCAsyncResult<TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>>> &&_Manifest)
 					{
-						if (pThis->mp_bDestroyed)
+						if (pThis->f_IsDestroyed())
 						{
 							Continuation.f_SetException(DMibErrorInstance("Destroyed"));
 							return;

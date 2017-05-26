@@ -7,6 +7,17 @@
 
 namespace NMib::NCloud
 {
+	CBackupManagerBackup::CManifestChange_Add::CManifestChange_Add(NFile::CDirectoryManifestFile &&_ManifestFile)
+		: CManifestChange_Change{_ManifestFile}
+	{
+	}
+
+	CBackupManagerBackup::CManifestChange_Rename::CManifestChange_Rename(NFile::CDirectoryManifestFile &&_ManifestFile, NStr::CStr const &_FromFileName)
+		: CManifestChange_Change{_ManifestFile}
+		, m_FromFileName{_FromFileName}
+	{
+	}
+
 	CBackupManagerBackup::CBackupManagerBackup()
 	{
 		DMibPublishActorFunction(CBackupManagerBackup::f_StartManifestRSync);

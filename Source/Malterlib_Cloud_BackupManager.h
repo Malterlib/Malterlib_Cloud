@@ -54,6 +54,11 @@ namespace NMib::NCloud
 
 		struct CManifestChange_Add : public CManifestChange_Change
 		{
+			CManifestChange_Add() = default;
+			CManifestChange_Add(CManifestChange_Add &&) = default;
+			CManifestChange_Add(CManifestChange_Add const &) = default;
+
+			CManifestChange_Add(NFile::CDirectoryManifestFile &&_ManifestFile);
 		};
 
 		struct CManifestChange_Remove
@@ -64,6 +69,12 @@ namespace NMib::NCloud
 
 		struct CManifestChange_Rename : public CManifestChange_Change 
 		{
+			CManifestChange_Rename() = default;
+			CManifestChange_Rename(CManifestChange_Rename &&) = default;
+			CManifestChange_Rename(CManifestChange_Rename const &) = default;
+
+			CManifestChange_Rename(NFile::CDirectoryManifestFile &&_ManifestFile, NStr::CStr const &_FromFileName);
+
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
