@@ -347,6 +347,10 @@ namespace NMib::NCloud::NBackupManager
 				;
 			}
 		}
+
+		DNeverGetHere;
+
+		return fg_Explicit();
 	}
 
 	void CBackupInstance::CInternal::f_RunRSyncProtocol(CRSyncContext &_Context, CSecureByteVector &&_ServerPacket)

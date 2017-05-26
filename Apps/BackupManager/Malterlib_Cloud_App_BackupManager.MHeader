@@ -35,9 +35,6 @@
 	%Dependency Lib_Malterlib
 	%Dependency Lib_Malterlib_Concurrency
 	%Dependency Lib_Malterlib_Cloud
-	{
-		!PlatformFamily Windows
-	}
 }
 
 Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_BackupManager;@(Malterlib_Cloud_App_Targets)"

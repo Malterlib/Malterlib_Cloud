@@ -55,7 +55,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 		auto pThis = m_pThis;
 		
-		if (pThis->mp_bDestroyed)
+		if (pThis->f_IsDestroyed())
 			return DMibErrorInstance("Shutting down");
 			
 		if (_Time.f_IsValid())

@@ -44,7 +44,7 @@ namespace NMib::NCloud::NBackupManager
 	TCContinuation<TCVector<CStr>> CBackupManagerServer::CBackupManagerImplementation::f_ListBackupSources()
 	{
 		auto pThis = m_pThis;
-		if (pThis->mp_bDestroyed)
+		if (pThis->f_IsDestroyed())
 			return DMibErrorInstance("Shutting down");
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -82,7 +82,7 @@ namespace NMib::NCloud::NBackupManager
 	auto CBackupManagerServer::CBackupManagerImplementation::f_ListBackups(CStr const &_ForBackupSource) -> TCContinuation<TCMap<CStr, TCVector<CBackupID>>>
 	{
 		auto pThis = m_pThis;
-		if (pThis->mp_bDestroyed)
+		if (pThis->f_IsDestroyed())
 			return DMibErrorInstance("Shutting down");
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();

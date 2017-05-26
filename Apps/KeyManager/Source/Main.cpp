@@ -11,7 +11,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NKeyManager;
 
-class CKeyManager : public CApplication
+class CKeyManagerApp : public CApplication
 {
 	aint f_Main()
 	{
@@ -30,4 +30,4 @@ class CKeyManager : public CApplication
 	}	
 };
 
-DAppImplement(CKeyManager);
+DAppImplement(CKeyManagerApp);

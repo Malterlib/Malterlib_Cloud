@@ -111,7 +111,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 		auto pThis = m_pThis;
 		
-		if (pThis->mp_bDestroyed)
+		if (pThis->f_IsDestroyed())
 			return DMibErrorInstance("Shutting down");
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -156,7 +156,7 @@ namespace NMib::NCloud::NBackupManager
 		auto fInitBackupInstance = 
 			[pThis, BackupKey, Continuation, Auditor, Subscription = fg_Move(_Subscription)]() mutable
 			{
-				if (pThis->mp_bDestroyed)
+				if (pThis->f_IsDestroyed())
 					return Continuation.f_SetException(Auditor.f_Exception("Shutting down"));
 				
 				auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
