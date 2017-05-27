@@ -98,7 +98,7 @@ namespace NMib::NCloud::NCloudClient
 									, "ExtraInfo"_= 
 									{
 										"Executable"_= "ExecutableName"
-										, "ExecutableParams"_= {"--daemon-run", "--debug"}
+										, "ExecutableParams"_= {"--daemon-run-standalone", "--debug"}
 										, "RunAsUser"_= "ApplicationSpecificUser"
 										, "RunAsGroup"_= "ApplicationSpecificGroup"
 										, "DistributedApp"_= true

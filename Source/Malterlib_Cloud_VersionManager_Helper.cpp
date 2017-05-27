@@ -6,6 +6,7 @@
 #include <Mib/Concurrency/Actor/Timer>
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/File/File>
+#include <Mib/Core/PlatformSpecific/WindowsFilePath>
 
 #include "Malterlib_Cloud_VersionManager.h"
 
@@ -315,7 +316,27 @@ namespace NMib::NCloud
 			}
 		;
 		
-		CProcessLaunchActor::CSimpleLaunch Launch{"tar", {"-czf", _DestinationFileName, "."}, _SourceDirectory, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode};
+		CProcessLaunchActor::CSimpleLaunch Launch
+			{
+#ifdef DPlatformFamily_Windows
+				"tar.exe"
+#else
+				"tar"
+#endif
+				, 
+				{
+					"-czf"
+#ifdef DPlatformFamily_Windows
+					, NFile::NPlatform::fg_ConvertToMinGWPath(_DestinationFileName)
+#else
+					, _DestinationFileName
+#endif
+					, "."
+				}
+				, _SourceDirectory
+				, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+			}
+		;
 	
 		TCContinuation<CPackageInfo> Continuation;
 		pState->m_Launch(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))

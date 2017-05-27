@@ -59,6 +59,7 @@ namespace NMib::NCloud::NAppManager
 				
 				bool bDaemon = false;
 				bool bDaemonDebug = false;
+				bool bDaemonStandalone = false;
 				bool bDaemonSupportRestart = CService::fs_SupportsAutoRestart();
 				
 				for (auto &Parameter : CommandLine)
@@ -67,11 +68,15 @@ namespace NMib::NCloud::NAppManager
 						bDaemon = true;
 					else if (Parameter == "--daemon-run-debug")
 						bDaemonDebug = true;
+					else if (Parameter == "--daemon-run-standalone")
+						bDaemonStandalone = true;
 				}
 				
 				CStr Type;
 				if (bDaemonDebug)
 					Type = "DaemonDebug";
+				else if (bDaemonStandalone)
+					Type = "DaemonStandalone";
 				else if (bDaemon)
 					Type = "Daemon";
 				else 

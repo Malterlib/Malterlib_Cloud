@@ -4,6 +4,7 @@
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppManager.h"
+#include <Mib/Core/PlatformSpecific/WindowsFilePath>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -108,7 +109,16 @@ namespace NMib::NCloud::NAppManager
 					CStr::CFormat("[{}] Extracting application") << _ApplicationName
 					, "tar"
 					, _Destination
-					, fg_CreateVector<CStr>("--no-same-owner", "-xf", _Source)
+					, fg_CreateVector<CStr>
+					(
+						"--no-same-owner"
+						, "-xf"
+#ifdef DPlatformFamily_Windows
+						, NFile::NPlatform::fg_ConvertToMinGWPath(_Source)
+#else
+						, _Source
+#endif
+					)
 					, ""
 					, ""
 				)
@@ -119,8 +129,21 @@ namespace NMib::NCloud::NAppManager
 		auto &Settings = _Settings;
 
 		CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable); 
-		if (!CFile::fs_FileExists(ExcutableFile, EFileAttrib_Executable))
+		if 
+			(
+				!CFile::fs_FileExists
+				(
+					ExcutableFile
+#ifdef DPlatformFamily_Windows
+					, EFileAttrib_File
+#else
+					, EFileAttrib_Executable
+#endif
+				)
+			)
+		{
 			DMibError(fg_Format("Executable file '{}' does not exist or does not have the executable flag set", ExcutableFile));
+		}
 		
 		CFile::CFindFilesOptions FindOptions(_Destination + "/*", true);
 		FindOptions.m_AttribMask = EFileAttrib_Directory | EFileAttrib_File | EFileAttrib_Link | EFileAttrib_FindDirectoryLast;

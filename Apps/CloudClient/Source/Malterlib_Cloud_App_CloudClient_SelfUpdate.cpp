@@ -8,6 +8,7 @@
 #include <Mib/Concurrency/Actor/Timer>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Process/ProcessLaunch>
+#include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #include <CloudVersionInfo.h>
 
 #include "Malterlib_Cloud_App_CloudClient.h"
@@ -155,8 +156,21 @@ namespace NMib::NCloud::NCloudClient
 									CStr PackageFile = DestinationDirectory + "/MalterlibCloud.tar.gz";
 									bool bLaunchSuccess = CProcessLaunch::fs_LaunchBlock
 										(
+#ifdef DPlatformFamily_Windows
+											"tar.exe"
+#else
 											"tar"
-											, fg_CreateVector<CStr>("--no-same-owner", "-xf", PackageFile)
+#endif
+											, fg_CreateVector<CStr>
+											(
+												"--no-same-owner"
+												, "-xf"
+#ifdef DPlatformFamily_Windows
+												, NFile::NPlatform::fg_ConvertToMinGWPath(PackageFile)
+#else
+												, PackageFile
+#endif
+											)
 											, StdOut
 											, StdErr
 											, ExitCode

@@ -12,6 +12,10 @@
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Encoding/JSONShortcuts>
 
+#ifdef DPlatformFamily_Windows
+#include <Windows.h>
+#endif
+
 using namespace NMib;
 using namespace NMib::NConcurrency;
 using namespace NMib::NFile;
@@ -153,7 +157,7 @@ namespace
 				)
 			;
 			
-			auto Params = fg_CreateVector<CStr>("--daemon-run");
+			auto Params = fg_CreateVector<CStr>("--daemon-run-standalone");
 			
 #if DTestAppManagerEnableLogging
 			Params.f_Insert("--log-to-stderr");
@@ -201,6 +205,9 @@ namespace
 #if DTestAppManagerEnableLogging || DTestAppManagerEnableOtherOutput
 			Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All | CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
 #endif
+#ifdef DPlatformFamily_Windows
+			Launch.m_Params.m_bCreateNewProcessGroup = true;
+#endif
 			
 			LaunchInfo.m_Launch(&CProcessLaunchActor::f_Launch, Launch, fg_ThisActor(this)) > Continuation / [this, LaunchID](NConcurrency::CActorSubscription &&_Subscription)
 				{
@@ -229,6 +236,15 @@ public:
 	{
 		DMibTestSuite("General")
 		{
+#ifdef DPlatformFamily_Windows
+			AllocConsole();
+			SetConsoleCtrlHandler
+				(
+					nullptr
+					, true
+				)
+			;
+#endif
 			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 			CStr RootDirectory = ProgramDirectory + "/AppManagerTests";
 			TCSet<CStr> VersionManagerPermissionsForTest = fg_CreateSet<CStr>("Application/WriteAll", "Application/ReadAll", "Application/TagAll"); 
@@ -629,13 +645,13 @@ public:
 			
 			auto fSetUpdateType = [&](CStr const &_UpdateType)
 				{
-					PackageInfo.m_VersionInfo.m_ExtraInfo["ExecutableParameters"] = {"--update-type", _UpdateType, "--daemon-run"}; 
+					PackageInfo.m_VersionInfo.m_ExtraInfo["ExecutableParameters"] = {"--update-type", _UpdateType, "--daemon-run-standalone"}; 
 					TCActorResultVector<void> AppCommandResults;
 					for (auto &AppManager : AppManagers)
 					{
 						CAppManagerInterface::CApplicationChangeSettings ChangeSettings;
 						CAppManagerInterface::CApplicationSettings Settings;
-						Settings.m_ExecutableParameters = {"--update-type", _UpdateType, "--daemon-run"};
+						Settings.m_ExecutableParameters = {"--update-type", _UpdateType, "--daemon-run-standalone"};
 						
 						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, "TestApp", ChangeSettings, Settings) > AppCommandResults.f_AddResult(); 
 					}

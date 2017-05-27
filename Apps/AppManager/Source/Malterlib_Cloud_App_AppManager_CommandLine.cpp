@@ -231,7 +231,7 @@ namespace NMib::NCloud::NAppManager
 						, "ExecutableParameters?"_= 
 						{
 							"Names"_= {"--executable-parameters"}
-							, "Default"_= {"--daemon-run"}
+							, "Default"_= {"--daemon-run-standalone"}
 							, "Type"_= {""} 
 							, "Description"_= "Run the application with these executable parameters."
 						}

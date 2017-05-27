@@ -7,7 +7,11 @@ if [[ "$3" != "Recursive" ]]; then
 	exit 0
 fi
 
-if [[ "$2" == "DaemonDebug" ]]; then
+if [[ "$2" == "DaemonStandalone" ]]; then
+	sleep 5
+	"$1" --daemon-run-standalane &
+	disown
+elif [[ "$2" == "DaemonDebug" ]]; then
 	sleep 5
 	"$1" --daemon-run-debug &
 	disown

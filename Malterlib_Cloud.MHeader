@@ -72,7 +72,7 @@ Property
 	{
 		!!MalterlibCloudVersionInfo_Version ""
 	}
-	MalterlibCloudVersionInfo_Executable "@(Target.FileName)@(Target.Extension)"
+	MalterlibCloudVersionInfo_Executable "@(Target.FileName)@(Target.FileExtension)"
 	{
 		!!MalterlibCloudVersionInfo_Executable ""
 	}

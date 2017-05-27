@@ -56,7 +56,11 @@ namespace NMib::NCloud::NAppManager
 		CStr StdOut;
 		CStr StdErr;
 		uint32 ExitCode;
-		if (CProcessLaunch::fs_LaunchBlock(_Tool, _Arguments, StdOut, StdErr, ExitCode, Params))
+		CStr Tool = _Tool;
+#ifdef DPlatformFamily_Windows
+		Tool += ".exe";
+#endif
+		if (CProcessLaunch::fs_LaunchBlock(Tool, _Arguments, StdOut, StdErr, ExitCode, Params))
 		{
 			if (ExitCode)
 				DMibError(fg_Format("{cc} failed with exit code {} and reported: {}", _Description, ExitCode, fg_ConcatOutput(StdOut, StdErr)));

@@ -4,6 +4,10 @@
 #include <Mib/Core/Core>
 #include <Mib/Core/Application>
 
+#ifdef DPlatformFamily_Windows
+#include <Windows.h>
+#endif
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 using namespace NMib;
@@ -13,6 +17,10 @@ class CAppManager : public CApplication
 {
 	aint f_Main()
 	{
+#ifdef DPlatformFamily_Windows
+		AllocConsole();
+#endif
+
 		NConcurrency::CDistributedDaemon Daemon
 			{
 				"MalterlibCloudAppManager"

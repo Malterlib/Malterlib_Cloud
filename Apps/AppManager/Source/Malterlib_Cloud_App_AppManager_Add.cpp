@@ -20,7 +20,7 @@ namespace NMib::NCloud::NAppManager
 		ApplicationSettings.f_FromInterfaceSettings(_Settings, ChangedSettings);
 		if (!_Settings.m_ExecutableParameters)
 		{
-			ApplicationSettings.m_ExecutableParameters = {"--daemon-run"};
+			ApplicationSettings.m_ExecutableParameters = {"--daemon-run-standalone"};
 			ChangedSettings |= EApplicationSetting_ExecutableParameters;
 		}
 		return m_pThis->fp_AddApplication
