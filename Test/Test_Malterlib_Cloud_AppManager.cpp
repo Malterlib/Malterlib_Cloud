@@ -167,7 +167,11 @@ namespace
 				{
 					CProcessLaunchParams::fs_LaunchExecutable
 					(
+#ifdef DPlatformFamily_Windows
+						_Executable + ".exe"
+#else
 						_Executable
+#endif
 						, fg_Move(Params)
 						, CFile::fs_GetPath(_Executable)
 						, [this, Continuation](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
@@ -223,7 +227,6 @@ class CAppManager_Tests : public NMib::NTest::CTest
 public:
 	void f_DoTests()
 	{
-#ifndef DPlatformFamily_Windows
 		DMibTestSuite("General")
 		{
 			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
@@ -673,7 +676,6 @@ public:
 				DMibExpect(UpdateNotificationState.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], == , nAppManagers);
 			}
 		};
-#endif
 	}
 };
 
