@@ -602,6 +602,7 @@ Property
 	
 	MalterlibPostBuildScript_Last "@(MalterlibPostBuildScript_Last)"\
 					"[ -e \"@(MalterlibCloud_VersionUploadTempPath)\" ] && rm -rf \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
+					"mkdir -p \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
 					"@(MalterlibCloud_VersionUploadCopyTempContents)\r\n"\
 					"pushd \"@(MalterlibCloud_VersionUploadTempPath)\" > /dev/null\r\n"\
 					"@(CheckErrors)\r\n"\
@@ -611,6 +612,31 @@ Property
 					"@(CheckErrors)\r\n"\
 					"@(MalterlibCloud_VersionUploadCloudClientContents)\r\n"
 	{
-		!!MalterilbCloud_DoVersionManagerUpload true
+		&
+		{
+			MalterilbCloud_DoVersionManagerUpload true
+			!GeneratorFamily VisualStudio
+		}
 	}
+	
+	MalterlibPostBuildScript_Last "@(MalterlibPostBuildScript_Last)"\
+					"IF EXIST \"@(MalterlibCloud_VersionUploadTempPath)\" rmdir /s /q \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
+					"mkdir \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
+					"@(MalterlibCloud_VersionUploadCopyTempContents)\r\n"\
+					"pushd \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
+					"@(CheckErrors)\r\n"\
+					"pwd\"\r\n"\
+					"tar -czf \"@(MalterlibCloud_VersionUploadTarArchivePathTar)\" .\r\n"\
+					"@(CheckErrors)\r\n"\
+					"popd\r\n"\
+					"@(CheckErrors)\r\n"\
+					"@(MalterlibCloud_VersionUploadCloudClientContents)\r\n"
+	{
+		&
+		{
+			MalterilbCloud_DoVersionManagerUpload true
+			GeneratorFamily VisualStudio
+		}
+	}
+	
 }
