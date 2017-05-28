@@ -4,7 +4,10 @@
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppManager.h"
+
+#ifdef DPlatformFamily_Windows
 #include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#endif
 
 namespace NMib::NCloud::NAppManager
 {

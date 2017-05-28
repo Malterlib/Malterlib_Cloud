@@ -6,7 +6,10 @@
 #include <Mib/Concurrency/Actor/Timer>
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/File/File>
+
+#ifdef DPlatformFamily_Windows
 #include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#endif
 
 #include "Malterlib_Cloud_VersionManager.h"
 

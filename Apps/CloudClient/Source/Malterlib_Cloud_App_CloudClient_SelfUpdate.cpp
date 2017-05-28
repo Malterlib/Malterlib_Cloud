@@ -8,8 +8,11 @@
 #include <Mib/Concurrency/Actor/Timer>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Process/ProcessLaunch>
-#include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #include <CloudVersionInfo.h>
+
+#ifdef DPlatformFamily_Windows
+#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#endif
 
 #include "Malterlib_Cloud_App_CloudClient.h"
 
