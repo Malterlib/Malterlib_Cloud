@@ -622,7 +622,7 @@ namespace NMib::NCloud::NCloudClient
 							, [Source]() -> CTime
 							{
 								if (!CFile::fs_FileExists(Source))
-									DMibError("Source specified does not exists");
+									DMibError(fg_Format("Source specified does not exist: {}", Source));
 								if (CFile::fs_FileExists(Source, EFileAttrib_File))
 									return CFile::fs_GetWriteTime(Source);
 								CFile::CFindFilesOptions FindOptions{Source + "/*", true};

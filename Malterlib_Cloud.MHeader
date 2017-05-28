@@ -501,7 +501,19 @@ Property
 {
 	MalterlibCloud_VersionUploadTagsTemplate	", \"@(Explodee)\""
 	{
-		!Explodee ""
+		&
+		{
+			!Explodee ""
+			!GeneratorFamily VisualStudio
+		}
+	}
+	MalterlibCloud_VersionUploadTagsTemplate	", \"^\"\"@(Explodee)\"^\"\""
+	{
+		&
+		{
+			!Explodee ""
+			GeneratorFamily VisualStudio
+		}
 	}
 	MalterlibCloud_VersionUploadTagsContents "$first@(Builtin.Function->ExplodeList('@(MalterlibCloud_VersionUploadTags)', ';', 'MalterlibCloud_VersionUploadTagsTemplate'))"
 	{
@@ -526,7 +538,16 @@ Property
 		!MalterlibCloud_VersionUploadHosts ""
 	}
 	
-	MalterlibCloud_VersionUploadCloudClientCommand "@(MalterlibCloud_CloudClientCommand) --no-self-update-check --version-manager-upload-version --settings-file \"@(MalterlibCloudVersionInfoFileName)\" --tags '[@(MalterlibCloud_VersionUploadTagsContents)]'@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified) \"@(MalterlibCloud_VersionUploadTarArchivePath)\"\r\n"\
+	MalterlibCloud_VersionUploadCloudClientCommand_Tags "'[@(MalterlibCloud_VersionUploadTagsContents)]'"
+	{
+		!GeneratorFamily VisualStudio
+	}
+	MalterlibCloud_VersionUploadCloudClientCommand_Tags "\"[@(MalterlibCloud_VersionUploadTagsContents)]\""
+	{
+		!!GeneratorFamily VisualStudio
+	}
+	
+	MalterlibCloud_VersionUploadCloudClientCommand "@(MalterlibCloud_CloudClientCommand) --no-self-update-check --version-manager-upload-version --settings-file \"@(MalterlibCloudVersionInfoFileName)\" --tags @(MalterlibCloud_VersionUploadCloudClientCommand_Tags)@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified) \"@(MalterlibCloud_VersionUploadTarArchivePath)\"\r\n"\
 													"@(CheckErrors)\r\n"
 	
 	MalterlibCloud_VersionUploadCloudClientTemplate	"@(MalterlibCloud_VersionUploadCloudClientCommand)"
@@ -573,7 +594,8 @@ Property
 	}
 	
 	MalterlibCloud_VersionUploadTarArchivePath "@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application).tar.gz"
-	MalterlibCloud_VersionUploadTarArchivePath "@(MalterlibCloud_VersionUploadTarArchivePath->ParseFormatString('{}:{}','/{0}/{1}'))"
+	MalterlibCloud_VersionUploadTarArchivePathTar "@(MalterlibCloud_VersionUploadTarArchivePath)"
+	MalterlibCloud_VersionUploadTarArchivePathTar "@(MalterlibCloud_VersionUploadTarArchivePath->ParseFormatString('{}:{}','/{0,cl}{1}'))"
 	{
 		!!PlatformFamily Windows // For MinGW
 	}
@@ -583,7 +605,7 @@ Property
 					"@(MalterlibCloud_VersionUploadCopyTempContents)\r\n"\
 					"pushd \"@(MalterlibCloud_VersionUploadTempPath)\" > /dev/null\r\n"\
 					"@(CheckErrors)\r\n"\
-					"tar -czf \"@(MalterlibCloud_VersionUploadTarArchivePath)\" .\r\n"\
+					"tar -czf \"@(MalterlibCloud_VersionUploadTarArchivePathTar)\" .\r\n"\
 					"@(CheckErrors)\r\n"\
 					"popd > /dev/null\r\n"\
 					"@(CheckErrors)\r\n"\
