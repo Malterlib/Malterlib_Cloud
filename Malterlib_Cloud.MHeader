@@ -573,6 +573,10 @@ Property
 	}
 	
 	MalterlibCloud_VersionUploadTarArchivePath "@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application).tar.gz"
+	MalterlibCloud_VersionUploadTarArchivePath "@(MalterlibCloud_VersionUploadTarArchivePath->ParseFormatString('{}:{}','/{0}/{1}'))"
+	{
+		!!PlatformFamily Windows // For MinGW
+	}
 	
 	MalterlibPostBuildScript_Last "@(MalterlibPostBuildScript_Last)"\
 					"[ -e \"@(MalterlibCloud_VersionUploadTempPath)\" ] && rm -rf \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
