@@ -13,6 +13,9 @@ namespace NMib::NCloud::NAppManager
 
 	TCContinuation<void> CAppManagerActor::fp_SetupLimits()
 	{
+#ifdef DPlatformFamily_Windows
+		return fg_Explicit();
+#else
 		if (NProcess::NPlatform::fg_Process_GetElevation() == EProcessElevation_IsNotElevated)
 		{
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Skipping limits setup because not elevated");
@@ -62,6 +65,7 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		return Continuation;
+#endif
 	}
 	
 	void CAppManagerActor::fp_UpdateLimits()
