@@ -90,10 +90,37 @@ Property
 	}
 	
 	SharedBuildSettingsScriptContents	"@(SharedBuildSettingsScriptContents)"\
+										"\r\n"\
 										"@(ScriptExport) \"MalterlibCloudVersionInfo_Version=@(MalterlibCloudVersionInfo_Version)\"\r\n"\
-										"@(ScriptExport) \"MalterlibCloud_VersionUploadHosts=@(MalterlibCloud_VersionUploadHosts)\"\r\n"\
-										"\r\n"
+										"@(ScriptExport) \"MalterlibCloud_VersionUploadHosts=@(MalterlibCloud_VersionUploadHosts)\"\r\n"
 	{
+	}
+
+	SharedBuildSettingsScriptContents	"@(SharedBuildSettingsScriptContents)"\
+										"\r\n"\
+										"function UploadToVersionManager()\r\n"\
+										"{\r\n"\
+										"	UploadHosts=$(echo $MalterlibCloud_VersionUploadHosts | tr \";\" \"\\n\")\r\n"\
+										"	for Host in $UploadHosts; do\r\n"\
+										"		MTool BuildServerTool Tool=MalterlibCloud --no-self-update-check --version-manager-upload-version --host $Host --settings-file \"$2\" \"$1\"\r\n"\
+										"	done\r\n"\
+										"}\r\n"\
+										"\r\n"\
+										"function UploadToVersionManagerWithInfo()\r\n"\
+										"{\r\n"\
+										"	cat > \"${TempDirectory}TempVersionInfo.json\" << EOF\r\n"\
+										"	{\r\n"\
+										"		\"Application\": \"$2\"\r\n"\
+										"		, \"Version\": \"$MalterlibCloudVersionInfo_Version\"\r\n"\
+										"		, \"Platform\": \"$3\"\r\n"\
+										"		, \"Configuration\": \"Release\"\r\n"\
+										"	}\r\n"\
+										"	EOF\r\n"\
+										"	UploadToVersionManager \"$1\" \"${TempDirectory}TempVersionInfo.json\"\r\n"\
+										"}\r\n"
+	{
+		!HostPlatformFamily Windows
+		!!ScriptWindowsBash true
 	}
 
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards "CommandLineTrustDatabase.@(Target:Target.BaseFileName)/^*;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
@@ -454,7 +481,7 @@ Property
 	{
 		!!MalterlibCloud_VersionUploadTags ""
 	}
-	MalterlibCloud_VersionUploadHosts "" // User: Set the hosts to upload version to
+	MalterlibCloud_VersionUploadHosts "@(MalterlibCloud_VersionUploadHostsDefault)" // User: Set the hosts to upload version to
 	{
 		!!MalterlibCloud_VersionUploadHosts ""
 	}
