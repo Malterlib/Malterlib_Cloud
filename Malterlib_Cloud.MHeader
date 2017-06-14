@@ -102,7 +102,7 @@ Property
 										"{\r\n"\
 										"	UploadHosts=$(echo $MalterlibCloud_VersionUploadHosts | tr \";\" \"\\n\")\r\n"\
 										"	for Host in $UploadHosts; do\r\n"\
-										"		MTool BuildServerTool Tool=MalterlibCloud --no-self-update-check --version-manager-upload-version --host $Host --settings-file \"$2\" \"$1\"\r\n"\
+										"		MTool BuildServerTool Tool=@(MalterlibCloud_VersionUploadToolName) --no-self-update-check --version-manager-upload-version --host $Host --settings-file \"$2\" \"$1\"\r\n"\
 										"	done\r\n"\
 										"}\r\n"\
 										"\r\n"\
@@ -491,6 +491,10 @@ Property
 	MalterlibCloud_CloudClientCommand "\"@(MalterlibCloud_CloudClientExecutable)\""
 	{
 		!MalterlibCloud_CloudClientExecutable ""
+	}
+	MalterlibCloud_VersionUploadToolName "MalterlibCloud"
+	{
+		!!MalterlibCloud_VersionUploadToolName ""
 	}
 	MalterlibCloud_CloudClientCommand "MTool BuildServerTool Tool=@(MalterlibCloud_VersionUploadToolName)"
 	{
