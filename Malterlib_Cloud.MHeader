@@ -88,6 +88,13 @@ Property
 	{
 		!!MalterlibCloudVersionInfo_DistributedApp ""
 	}
+	
+	SharedBuildSettingsScriptContents	"@(SharedBuildSettingsScriptContents)"\
+										"@(ScriptExport) \"MalterlibCloudVersionInfo_Version=@(MalterlibCloudVersionInfo_Version)\"\r\n"\
+										"@(ScriptExport) \"MalterlibCloud_VersionUploadHosts=@(MalterlibCloud_VersionUploadHosts)\"\r\n"\
+										"\r\n"
+	{
+	}
 
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards "CommandLineTrustDatabase.@(Target:Target.BaseFileName)/^*;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards "TrustDatabase.@(Target:Target.BaseFileName)/^*;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
