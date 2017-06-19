@@ -667,7 +667,7 @@ public:
 				fWaitForAllUpdated();
 				
 				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
-				DMibExpect(UpdateNotificationState.m_nMaxInProgress, >= , 1);
+				DMibExpect(UpdateNotificationState.m_nMaxInProgress, >= , 1u);
 			}
 			{
 				DMibTestPath("Update OneAtATime");
