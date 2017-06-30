@@ -179,7 +179,7 @@ namespace NMib::NCloud::NAppManager
 						
 						bool bRanPreStop = false;
 						
-						if (pApplication->m_AppInterface)
+						if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= 0x103)
 						{
 							bRanPreStop = true;
 							DMibCallActor(pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_PreStop) > PreStopContinuation;

@@ -65,6 +65,9 @@ namespace NMib::NCloud::NAppManager
 							TCContinuation<TCActorSubscriptionWithID<>> Continuation;
 							_pApplication->m_OnRegisterDistributedApp.f_Insert() = [=, BackupInterface = fg_Move(_BackupInterface), ManifestFinished = fg_Move(_ManifestFinished)]() mutable
 								{
+									if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
+										return Continuation.f_SetResult();
+
 									DMibCallActor
 										(
 											_pApplication->m_AppInterface
