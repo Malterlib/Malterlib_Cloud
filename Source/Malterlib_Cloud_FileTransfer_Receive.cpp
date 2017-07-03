@@ -179,7 +179,7 @@ namespace NMib::NCloud
 									if (Cache.m_FileName != FilePath)
 									{
 										CFile::fs_CreateDirectory(CFile::fs_GetPath(FilePath));
-										Cache.m_File.f_Open(FilePath, EFileOpen_Write | EFileOpen_DontTruncate);
+										Cache.m_File.f_Open(FilePath, EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareRead);
 									}
 									
 									Cache.m_File.f_SetPosition(DownloadPart.m_FilePosition);

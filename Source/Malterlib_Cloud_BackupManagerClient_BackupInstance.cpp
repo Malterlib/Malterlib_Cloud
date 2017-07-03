@@ -77,11 +77,21 @@ namespace NMib::NCloud::NPrivate
 		CStr FullPath = CFile::fs_AppendPath(mp_Config.m_ManifestConfig.m_Root, _PendingFile.m_OriginalPath);
 		try
 		{
-			RunningState.m_File.f_Open(FullPath, EFileOpen_Read | EFileOpen_ShareRead | EFileOpen_ShareWrite);
+			RunningState.m_File.f_Open(FullPath, EFileOpen_Read | EFileOpen_ShareAll | EFileOpen_NoLocalCache);
 			if (_PendingFile.m_SyncFlags & EDirectoryManifestSyncFlag_Append)
 			{
 				auto &AppendState = mp_AppendFileState[RunningState.m_FileName];
 				AppendState.m_Position = RunningState.m_File.f_GetLength();
+				AppendState.m_DigestState.f_Reset();
+				RunningState.m_File.f_SetPosition(0);
+				uint8 Buffer[16*1024];
+				for (auto Position = 0; Position < AppendState.m_Position;)
+				{
+					mint ThisTime = fg_Min(AppendState.m_Position - Position, 16*1024);
+					RunningState.m_File.f_ConsumeBytes(Buffer, ThisTime);
+					AppendState.m_DigestState.f_AddData(Buffer, ThisTime);
+					Position += ThisTime;
+				}
 				AppendState.m_bDirty = false;
 			}
 			RunningState.m_pRSyncServer = fg_Construct(RunningState.m_File, 8*1024*1024);
@@ -196,10 +206,13 @@ namespace NMib::NCloud::NPrivate
 			CSecureByteVector Data;
 			Data.f_SetLen(ThisTime);
 			
+			NTime::CTime WriteTime;
 			try
 			{
 				_pFile->m_File.f_SetPosition(Position);
 				_pFile->m_File.f_Read(Data.f_GetArray(), Data.f_GetLen());
+				WriteTime = _pFile->m_File.f_GetWriteTime();
+				AppendState.m_DigestState.f_AddData(Data.f_GetArray(), Data.f_GetLen());
 			}
 			catch (NException::CException const &_Exception)
 			{
@@ -208,13 +221,18 @@ namespace NMib::NCloud::NPrivate
 				return;
 			}
 			
+			CBackupManagerBackup::CManifestChange_ChangeAppend Change;
+			Change.m_Digest = AppendState.m_DigestState.f_GetDigest();
+			Change.m_WriteTime = WriteTime;
+			
 			DMibCallActor
 				(
 					mp_Backup
-					, CBackupManagerBackup::f_UploadData
+					, CBackupManagerBackup::f_AppendData
 					, RunningState.m_FileName
 					, Position
 					, fg_Move(Data)
+					, Change
 				)
 				> [this, pRunningState = _pRunningState, ThisTime, _Continuation, _Length, _pFile](TCAsyncResult<void> &&_Result)
 				{

@@ -542,6 +542,7 @@ namespace NMib::NCloud::NBackupManager
 				, "Start RSync protocol for file '{}' {}"
 				"\n    FileName: {}"
 				"\n    OldFileName: {}"
+				"\n    Size: {}"
 				"\n    UseOld: {}"
 				"\n    bNewExists: {}"
 				"\n    bOldExists: {}"
@@ -549,6 +550,7 @@ namespace NMib::NCloud::NBackupManager
 				, (_SyncFlags & EDirectoryManifestSyncFlag_Append) != 0 ? "Append" : ""
 				, _FileName
 				, _OldFileName
+				, _FileLength
 				, bUseOld
 				, bNewExists
 				, bOldExists
@@ -595,7 +597,7 @@ namespace NMib::NCloud::NBackupManager
 		;
 	}
 	
-	TCContinuation<void> CBackupInstance::f_UploadData(CStr const &_FileName, uint64 _Position, CSecureByteVector &&_Data)
+	TCContinuation<void> CBackupInstance::f_AppendData(CStr const &_FileName, uint64 _Position, CSecureByteVector &&_Data, CManifestChange_ChangeAppend const &_ChangeAppend)
 	{
 		auto &Internal = *mp_pInternal;
 		
@@ -607,6 +609,10 @@ namespace NMib::NCloud::NBackupManager
 		return TCContinuation<void>::fs_RunProtected<CExceptionFile>()
 			> [&]()
 			{
+				auto &ManifestFile = Internal.m_Manifest.m_Files[_FileName];
+				ManifestFile.m_Digest = _ChangeAppend.m_Digest;
+				ManifestFile.m_WriteTime = _ChangeAppend.m_WriteTime;
+				
 				auto &CacheFile = Internal.m_FileCache[_FileName];
 				if (!CacheFile.f_IsValid())
 				{

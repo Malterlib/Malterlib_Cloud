@@ -34,7 +34,7 @@ namespace NMib::NCloud::NBackupManager
 		;
 
 		TCContinuation<void> f_ManifestChange(NStr::CStr const &_FileName, CManifestChange const &_Change) override;
-		TCContinuation<void> f_UploadData(CStr const &_FileName, uint64 _Position, CSecureByteVector &&_Data) override;
+		TCContinuation<void> f_AppendData(CStr const &_FileName, uint64 _Position, CSecureByteVector &&_Data, CManifestChange_ChangeAppend const &_ChangeAppend) override;
 		TCContinuation<void> f_InitialBackupFinished() override;
 		
 	private:

@@ -16,6 +16,13 @@ namespace NMib::NCloud
 	}
 	
 	template <typename tf_CStream>
+	void CBackupManagerBackup::CManifestChange_ChangeAppend::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Digest;
+		_Stream % m_WriteTime;
+	}
+	
+	template <typename tf_CStream>
 	void CBackupManagerBackup::CManifestChange_Remove::f_Stream(tf_CStream &_Stream)
 	{
 	}

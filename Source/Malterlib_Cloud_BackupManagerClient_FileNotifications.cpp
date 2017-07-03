@@ -323,6 +323,8 @@ namespace NMib::NCloud
 		CStr OriginalPath = CFile::fs_MakePathRelative(Notification.m_Path, ManifestConfig.m_Root);
 		CStr OriginalPathFrom;
 		
+		bool bDirtyHint = false;
+		
 		if (Notification.m_Notification == EFileChangeNotification_Renamed)
 		{
 			OriginalPathFrom = CFile::fs_MakePathRelative(Notification.m_PathFrom, ManifestConfig.m_Root);
@@ -344,12 +346,15 @@ namespace NMib::NCloud
 				Notification.m_Notification = EFileChangeNotification_Added;
 				RelativePathFrom.f_Clear();
 			}
+			bDirtyHint = true;
 		}
 		else if (!f_IsPathInManifest(OriginalPath, RelativePath))
 			return;
+		else if (Notification.m_Notification == EFileChangeNotification_Added || Notification.m_Notification == EFileChangeNotification_Removed)
+			bDirtyHint = true;
 		
-		f_UpdateManifest(RelativePath, OriginalPath)
-			+ f_UpdateManifest(RelativePathFrom, OriginalPathFrom)
+		f_UpdateManifest(RelativePath, OriginalPath, bDirtyHint)
+			+ f_UpdateManifest(RelativePathFrom, OriginalPathFrom, bDirtyHint)
 			> [=](TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
 			{
 				if (!_Change)

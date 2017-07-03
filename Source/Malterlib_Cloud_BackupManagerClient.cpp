@@ -71,7 +71,21 @@ namespace NMib::NCloud
 						
 						pTracker->m_Continuation.f_Dispatch() > Destroys.f_AddResult();  
 						
-						Destroys.f_GetResults() > Continuation.f_ReceiveAny();
+						Destroys.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<void>> &&_Results)
+							{
+								auto &Internal = *mp_pInternal;
+								g_Dispatch(Internal. m_FileActor) > [AppendStates = fg_Move(Internal.m_AppendStates)]
+									{
+									}
+									> Continuation / [this, Continuation]
+									{
+										auto &Internal = *mp_pInternal;
+										Internal.m_FileActor->f_Destroy() > Continuation;
+									}
+								;
+								
+							}
+						;
 					}
 				;
 			}
@@ -117,11 +131,15 @@ namespace NMib::NCloud
 					DMibLog(Error, "Failed to subscribe to file notifications: {}", _Result.f_GetExceptionStr());
 				}
 
-				g_Dispatch(m_FileActor) > [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]() -> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>>
+				g_Dispatch(m_FileActor) > [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]()
+					-> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
 					{
-						auto Manifest = CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); });
+						TCMap<CStr, CFile::CFileChecksumState_SHA256> SourceAppendStates;
+						
+						auto Manifest = CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); }, &SourceAppendStates);
 						TCMap<CStr, CUniqueFileIdentifier> FileIDs;
-
+						TCMap<CStr, TCSharedPointer<CAppendFileState>> AppendStates;
+						
 						for (auto &File : Manifest.m_Files)
 						{
 							if (File.m_Attributes & (EFileAttrib_Link | EFileAttrib_Directory))
@@ -129,12 +147,20 @@ namespace NMib::NCloud
 
 							auto &FileName = Manifest.m_Files.fs_GetKey(File);
 
-							FileIDs[FileName] = CFile::fs_GetUniqueIdentifier(CFile::fs_AppendPath(Config.m_Root, File.m_OriginalPath));
+							auto AbsolutePath = CFile::fs_AppendPath(Config.m_Root, File.m_OriginalPath);
+							FileIDs[FileName] = CFile::fs_GetUniqueIdentifier(AbsolutePath);
+							
+							if (auto *pSourceAppendState = SourceAppendStates.f_FindEqual(FileName))
+							{
+								auto &AppendState = *(AppendStates[FileName] = fg_Construct());
+								AppendState.m_Hash = pSourceAppendState->m_Hash;
+								AppendState.m_File = fg_Move(*pSourceAppendState->m_pFile);
+							}
 						}
 
-						return {fg_Move(Manifest), fg_Move(FileIDs)};
+						return {fg_Move(Manifest), fg_Move(FileIDs), fg_Move(AppendStates)};
 					}
-					> [this](TCAsyncResult<TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>>> &&_Manifest)
+					> [this](TCAsyncResult<TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>> &&_Manifest)
 					{
 						if (m_pThis->mp_bDestroyed)
 							return;
@@ -148,6 +174,7 @@ namespace NMib::NCloud
 
 						m_Manifest = fg_Move(fg_Get<0>(*_Manifest));
 						m_ManifestFileIDs = fg_Move(fg_Get<1>(*_Manifest));
+						m_AppendStates = fg_Move(fg_Get<2>(*_Manifest));
 
 						f_NewBackupKey();
 						

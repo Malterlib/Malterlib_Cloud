@@ -24,7 +24,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CBackupManagerBackup::f_StartBackup);
 		DMibPublishActorFunction(CBackupManagerBackup::f_StartRSync);
 		DMibPublishActorFunction(CBackupManagerBackup::f_ManifestChange);
-		DMibPublishActorFunction(CBackupManagerBackup::f_UploadData);
+		DMibPublishActorFunction(CBackupManagerBackup::f_AppendData);
 		DMibPublishActorFunction(CBackupManagerBackup::f_InitialBackupFinished);
 	}
 	
@@ -55,7 +55,7 @@ namespace NMib::NCloud
 		return DMibErrorInstance("Deprecated");
 	}
 	
-	auto CBackupManager::f_UploadData(CUploadData &&_Params) -> NConcurrency::TCContinuation<CUploadData::CResult> 
+	auto CBackupManager::f_UploadData(CUploadData &&_Params) -> NConcurrency::TCContinuation<CUploadData::CResult>
 	{
 		return DMibErrorInstance("Deprecated");
 	}

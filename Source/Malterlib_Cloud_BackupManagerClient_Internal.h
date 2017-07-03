@@ -10,6 +10,7 @@
 #include <Mib/Cloud/BackupManager>
 #include <Mib/File/ChangeNotificationActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
+#include <Mib/Cryptography/Hashes/SHA>
 
 using namespace NMib; 
 using namespace NMib::NConcurrency; 
@@ -17,6 +18,7 @@ using namespace NMib::NContainer;
 using namespace NMib::NPtr; 
 using namespace NMib::NFile; 
 using namespace NMib::NStr; 
+using namespace NMib::NDataProcessing;
 
 namespace NMib::NCloud
 {
@@ -68,6 +70,16 @@ namespace NMib::NCloud
 			bool m_bRemoved = false;
 			bool m_bAdded = false;
 			bool m_bIDChanged = false;
+			bool m_Appended = false;
+		};
+		
+		struct CAppendFileState
+		{
+			CFile m_File;
+			CHash_SHA256 m_Hash;
+			CUniqueFileIdentifier m_FileID;
+			CDirectoryManifestFile m_ManifestFile;
+			bool m_bIsLink = false;
 		};
 
 		struct CNotifacitonSubscription
@@ -96,7 +108,7 @@ namespace NMib::NCloud
 		bool f_IsPathInManifest(CStr const &_Path, CStr &o_FileName);
 		static void fs_CheckDestroy(TCSharedPointer<NAtomic::TCAtomic<bool>> const &_pDestroyed);
 		
-		TCContinuation<CUpdateManifestResult> f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName);
+		TCContinuation<CUpdateManifestResult> f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName, bool _bDirtyHint);
 		
 		CBackupManagerClient *m_pThis = nullptr;
 		TCSharedPointer<NAtomic::TCAtomic<bool>> m_pDestroyed;
@@ -106,6 +118,7 @@ namespace NMib::NCloud
 		TCActor<CSeparateThreadActor> m_FileActor;
 		CDirectoryManifest m_Manifest; // Kept up to date
 		TCMap<CStr, CUniqueFileIdentifier> m_ManifestFileIDs;
+		TCMap<CStr, TCSharedPointer<CAppendFileState>> m_AppendStates;
 
 		TCActor<CFileChangeNotificationActor> m_FileChangeNotificationsActor;
 		TCMap<CStr, CWatchedPath> m_WatchedPaths;

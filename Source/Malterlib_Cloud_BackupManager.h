@@ -91,6 +91,15 @@ namespace NMib::NCloud
 			>
 		;		
 
+		struct CManifestChange_ChangeAppend
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NDataProcessing::CHashDigest_SHA256 m_Digest;
+			NTime::CTime m_WriteTime;
+		};
+		
 		CBackupManagerBackup();
 
 		virtual NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> f_StartManifestRSync
@@ -110,7 +119,14 @@ namespace NMib::NCloud
 			) = 0
 		;
 		
-		virtual NConcurrency::TCContinuation<void> f_UploadData(NStr::CStr const &_FileName, uint64 _Position, NContainer::CSecureByteVector &&_Data) = 0;
+		virtual NConcurrency::TCContinuation<void> f_AppendData
+			(
+				NStr::CStr const &_FileName
+				, uint64 _Position
+				, NContainer::CSecureByteVector &&_Data
+				, CManifestChange_ChangeAppend const &_ChangeAppend
+			) = 0
+		;
 
 		virtual NConcurrency::TCContinuation<void> f_InitialBackupFinished() = 0;
 	};

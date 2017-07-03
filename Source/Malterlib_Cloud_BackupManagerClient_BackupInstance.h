@@ -107,6 +107,7 @@ namespace NMib::NCloud::NPrivate
 		struct CAppendFileState
 		{
 			uint64 m_Position = 0;
+			CHash_SHA256 m_DigestState;
 			bool m_bDirty = true;
 		};
 		
