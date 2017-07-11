@@ -120,17 +120,20 @@ namespace NMib::NCloud
 							&CFileChangeNotificationActor::f_RegisterForChanges
 							, Path
 							, Changes
-							, [this, Path](CFileChangeNotification::CNotification const &_Notification)
+							, [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications)
 							{
-								CFileChangeNotification::CNotification Notification = _Notification;
-								Notification.m_Path = CFile::fs_AppendPath(Path, _Notification.m_Path);
-								
-								if (!Notification.m_PathFrom.f_IsEmpty())
-									Notification.m_PathFrom = CFile::fs_AppendPath(Path, _Notification.m_PathFrom);
-								
-								f_OnFileChanged(Notification);
+								for (auto Notification : _Notifications)
+								{
+									Notification.m_Path = CFile::fs_AppendPath(Path, Notification.m_Path);
+									
+									if (!Notification.m_PathFrom.f_IsEmpty())
+										Notification.m_PathFrom = CFile::fs_AppendPath(Path, Notification.m_PathFrom);
+									
+									f_OnFileChanged(Notification);
+								}
 							}
 							, fg_ThisActor(m_pThis)
+							, CFileChangeNotificationActor::CCoalesceSettings{}
 						)
 						> SubscribeResults.f_AddResult(Path)
 					;
@@ -146,7 +149,7 @@ namespace NMib::NCloud
 							&CFileChangeNotificationActor::f_RegisterForChanges
 							, MissingPath
 							, EFileChange_FileName | EFileChange_DirectoryName
-							, [this](CFileChangeNotification::CNotification const &_Notification)
+							, [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications)
 							{
 								if (!m_bRerunRetrySubscribe)
 								{
@@ -155,6 +158,7 @@ namespace NMib::NCloud
 								}
 							}
 							, fg_ThisActor(m_pThis)
+							, CFileChangeNotificationActor::CCoalesceSettings{}
 						)
 						> SubscribeResultsMissing.f_AddResult(MissingPath)
 					;

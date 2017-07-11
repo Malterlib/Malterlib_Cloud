@@ -520,7 +520,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				1.0*60.0
 				, self
-				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]
+				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() -> TCContinuation<void>
 				{
 					if (pState->m_bWasDisconnected && pState->m_DisconnectClock.f_GetTime() >= DisconnectTimeout)
 					{
@@ -528,6 +528,7 @@ namespace NMib::NCloud::NAppManager
 							Continuation.f_SetException(DErrorInstance(_DisconnectedError));
 						mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					}
+					return fg_Explicit();
 				}
 			) 
 			> [this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)

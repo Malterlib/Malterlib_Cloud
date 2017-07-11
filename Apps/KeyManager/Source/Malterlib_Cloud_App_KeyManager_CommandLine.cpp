@@ -160,7 +160,7 @@ namespace NMib
 													{
 														// Delay reply to be same response time every time
 														fg_Timeout(fg_Max(fp64(0.5) - Clock.f_GetTime(), fp64(0.01))) 
-															> [Continuation, Result = fg_Move(_Result)](TCAsyncResult<void> &&_Result)
+															> [Continuation, Result = fg_Move(_Result)]
 															{
 																Continuation.f_SetException
 																	(
