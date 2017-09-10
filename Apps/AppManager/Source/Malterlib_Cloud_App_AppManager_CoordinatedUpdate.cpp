@@ -531,7 +531,7 @@ namespace NMib::NCloud::NAppManager
 					return fg_Explicit();
 				}
 			) 
-			> [this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
+			> [pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
 			{
 				auto pOnAppUpdateInfoChange = pOnAppUpdateInfoChangeWeak.f_Lock();
 				if (!pOnAppUpdateInfoChange)
@@ -551,7 +551,7 @@ namespace NMib::NCloud::NAppManager
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 				}
 			) 
-			> [this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
+			> [pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
 			{
 				auto pOnAppUpdateInfoChange = pOnAppUpdateInfoChangeWeak.f_Lock();
 				if (!pOnAppUpdateInfoChange)

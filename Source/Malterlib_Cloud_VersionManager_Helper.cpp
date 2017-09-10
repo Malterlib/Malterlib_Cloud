@@ -254,7 +254,7 @@ namespace NMib::NCloud
 
 		pState->m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, _QueueSize ? _QueueSize : Internal.m_QueueSize, _ReceiveFlags) 
 			> Continuation % "Failed to initialize file transfer context" 
-			/ [this, _VersionManager, _Application, _VersionID, pInternal = mp_pInternal, Continuation, pState, pStateCleanup]
+			/ [_VersionManager, _Application, _VersionID, pInternal = mp_pInternal, Continuation, pState, pStateCleanup]
 			(CFileTransferContext &&_TransferContext)
 			{
 				auto &Internal = *pInternal;

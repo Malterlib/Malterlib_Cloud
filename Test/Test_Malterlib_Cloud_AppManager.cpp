@@ -178,7 +178,7 @@ namespace
 #endif
 						, fg_Move(Params)
 						, CFile::fs_GetPath(_Executable)
-						, [this, Continuation](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+						, [Continuation](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 						{
 							switch (_State.f_GetTypeID())
 							{

@@ -363,7 +363,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				Applications.f_GetResults() > Continuation / [this, Continuation](TCMap<CHostInfo, TCAsyncResult<CVersionManager::CListApplications::CResult>> &&_Results)
+				Applications.f_GetResults() > Continuation / [Continuation](TCMap<CHostInfo, TCAsyncResult<CVersionManager::CListApplications::CResult>> &&_Results)
 					{
 						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
@@ -416,7 +416,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				Versions.f_GetResults() > Continuation / [this, Continuation, bVerbose](TCMap<CHostInfo, TCAsyncResult<CVersionManager::CListVersions::CResult>> &&_Results)
+				Versions.f_GetResults() > Continuation / [Continuation, bVerbose](TCMap<CHostInfo, TCAsyncResult<CVersionManager::CListVersions::CResult>> &&_Results)
 					{
 						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
@@ -838,7 +838,7 @@ namespace NMib::NCloud::NCloudClient
 						, fg_Move(ChangeTags)
 					)
 					.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
-					> Continuation % "Failed to change tags" / [this, Continuation](CVersionManager::CChangeTags::CResult &&_Result)
+					> Continuation % "Failed to change tags" / [Continuation](CVersionManager::CChangeTags::CResult &&_Result)
 					{
 						CDistributedAppCommandLineResults CommandLine;
 						if (!_Result.m_DeniedTags.f_IsEmpty())

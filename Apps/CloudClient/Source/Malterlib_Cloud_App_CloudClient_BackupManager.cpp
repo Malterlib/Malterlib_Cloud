@@ -183,7 +183,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				BackupSources.f_GetResults() > Continuation / [this, Continuation](TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> &&_Results)
+				BackupSources.f_GetResults() > Continuation / [Continuation](TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> &&_Results)
 					{
 						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
@@ -234,7 +234,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				Backups.f_GetResults() > Continuation / [this, Continuation](TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, TCVector<CBackupManager::CBackupID>>>> &&_Results)
+				Backups.f_GetResults() > Continuation / [Continuation](TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, TCVector<CBackupManager::CBackupID>>>> &&_Results)
 					{
 						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)

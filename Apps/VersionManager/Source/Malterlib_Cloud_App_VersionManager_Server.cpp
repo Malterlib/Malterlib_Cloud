@@ -87,7 +87,7 @@ namespace NMib::NCloud::NVersionManager
 					return Applications;
 				}
 			)
-			> Continuation / [this, Continuation](TCSet<CStr> &&_Result)
+			> Continuation / [Continuation](TCSet<CStr> &&_Result)
 			{
 				Continuation.f_SetResult(fg_Move(_Result));
 			}

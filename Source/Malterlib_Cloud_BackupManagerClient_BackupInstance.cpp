@@ -113,7 +113,7 @@ namespace NMib::NCloud::NPrivate
 				, RunningState.m_FileName
 				, g_ActorFunctor
 				(
-					g_ActorSubscription > [this, pRunningState]
+					g_ActorSubscription > [pRunningState]
 					{
 						pRunningState->m_pOnScopeExit.f_Clear();
 					}
@@ -459,7 +459,7 @@ namespace NMib::NCloud::NPrivate
 							DestroyContinuation = Subscription->f_Destroy();
 						
 						TCContinuation<void> ContinuationReturn;
-						DestroyContinuation > [this, Continuation, ContinuationReturn, bDone](TCAsyncResult<void> &&_Result)
+						DestroyContinuation > [Continuation, ContinuationReturn, bDone](TCAsyncResult<void> &&_Result)
 							{
 								if (!Continuation.f_IsSet())
 								{

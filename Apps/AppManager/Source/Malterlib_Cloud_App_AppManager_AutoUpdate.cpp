@@ -198,7 +198,7 @@ namespace NMib::NCloud::NAppManager
 					}
 					, false 
 				)
-				> [this](TCAsyncResult<> &&_Results) mutable
+				> [](TCAsyncResult<> &&_Results) mutable
 				{
 					if (!_Results)
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Auto update of application failed. {}", _Results.f_GetExceptionStr());

@@ -191,7 +191,7 @@ namespace NMib::NCloud::NAppManager
 		DownloadState.m_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>(_DestinationDir); 
 		DownloadState.m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, 16*1024*1024, CFileTransferReceive::EReceiveFlag_DeleteExisting) 
 			> Continuation % "Failed to initialize file transfer context" 
-			/ [this, _ApplicationName, _VersionID, _Manager, Continuation, pDownloadState, pCleanup]
+			/ [_ApplicationName, _VersionID, _Manager, Continuation, pDownloadState, pCleanup]
 			(CFileTransferContext &&_TransferContext)
 			{
 				CVersionManager::CStartDownloadVersion StartDownload;
@@ -206,13 +206,13 @@ namespace NMib::NCloud::NAppManager
 						, fg_Move(StartDownload)
 					)
 					.f_Timeout(30.0, "Timed out waiting for version manager to reply")
-					> Continuation % "Failed to start download on remote server" / [this, Continuation, pCleanup, pDownloadState]
+					> Continuation % "Failed to start download on remote server" / [Continuation, pCleanup, pDownloadState]
 					(CVersionManager::CStartDownloadVersion::CResult &&_Result)
 					{
 						pDownloadState->m_Subscription = fg_Move(_Result.m_Subscription);
 						
 						pDownloadState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResult) 
-							> [this, Continuation, pDownloadState, pCleanup, VersionInfo = fg_Move(_Result.m_VersionInfo)]
+							> [Continuation, pDownloadState, pCleanup, VersionInfo = fg_Move(_Result.m_VersionInfo)]
 							(TCAsyncResult<CFileTransferResult> &&_Results) mutable
 							{
 								pDownloadState->m_Subscription.f_Clear();

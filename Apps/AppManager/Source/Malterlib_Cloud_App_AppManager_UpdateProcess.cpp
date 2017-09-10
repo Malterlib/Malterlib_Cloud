@@ -257,7 +257,7 @@ namespace NMib::NCloud::NAppManager
 						Application.m_LastTriedInstalledVersion = State.m_VersionID;
 						Application.m_LastTriedInstalledVersionInfo = VersionInfo;
 						
-						State.m_fUpdateVersionInfo = [pApplication = State.m_pApplication, VersionID = State.m_VersionID, VersionInfo, this]
+						State.m_fUpdateVersionInfo = [pApplication = State.m_pApplication, VersionID = State.m_VersionID, VersionInfo]
 							{
 								pApplication->m_LastInstalledVersion = VersionID;
 								pApplication->m_LastInstalledVersionInfo = VersionInfo;

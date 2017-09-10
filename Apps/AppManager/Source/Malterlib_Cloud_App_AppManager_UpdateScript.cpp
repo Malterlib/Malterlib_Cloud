@@ -102,7 +102,7 @@ namespace NMib::NCloud::NAppManager
 				"bash"
 				, fg_CreateVector<CStr>(FileName, _Param)
 				, _pApplication->f_GetDirectory()
-				, [this, pState, Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+				, [pState, Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 				{
 					if (!pState->m_LaunchActor)
 						return;
@@ -161,7 +161,7 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		
-		LaunchParams.m_fOnOutput = [this, pState, Description](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
+		LaunchParams.m_fOnOutput = [pState, Description](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
 			{
 				if (!pState->m_LaunchActor)
 					return;
@@ -229,7 +229,7 @@ namespace NMib::NCloud::NAppManager
 				, LaunchParams
 				, fg_ThisActor(this)
 			)
-			> [this, pState, Description, fReportError](TCAsyncResult<CActorSubscription> &&_Subscription)
+			> [pState, Description, fReportError](TCAsyncResult<CActorSubscription> &&_Subscription)
 			{
 				if (!pState->m_LaunchActor)
 					return;

@@ -42,7 +42,7 @@ namespace NMib::NCloud::NCloudClient
 					SubscriptionParams.m_Platforms[DMalterlibCloudPlatform];
 					SubscriptionParams.m_Tags["ClientSelfUpdate"];
 					SubscriptionParams.m_fOnNewVersions 
-						= [this, pVersions, Actor = Actor.m_Actor, AllowDestroy = g_AllowWrongThreadDestroy]
+						= [pVersions, Actor = Actor.m_Actor, AllowDestroy = g_AllowWrongThreadDestroy]
 						(CVersionManager::CNewVersionNotifications &&_NewVersions) 
 						-> NConcurrency::TCContinuation<CVersionManager::CNewVersionNotifications::CResult>
 						{

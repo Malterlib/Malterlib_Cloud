@@ -106,7 +106,7 @@ namespace NMib::NCloud::NAppManager
 
 				return true;
 			}
-			> [this, Continuation](TCAsyncResult<bool> &&_Result)
+			> [Continuation](TCAsyncResult<bool> &&_Result)
 			{
 				if (!_Result)
 				{

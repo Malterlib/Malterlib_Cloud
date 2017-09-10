@@ -209,7 +209,7 @@ namespace NMib::NCloud::NAppManager
 				
 				auto &LaunchParams = Launch.m_Params;
 				
-				LaunchParams.m_fOnOutput = [this, _pApplication](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
+				LaunchParams.m_fOnOutput = [_pApplication](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
 					{
 						if (_Output.f_IsEmpty())
 							return;
