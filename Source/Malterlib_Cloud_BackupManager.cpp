@@ -161,7 +161,10 @@ namespace NMib::NCloud
 	
 	void CBackupManager::CBackupID::f_Format(NStr::CStrAggregate &o_Str) const
 	{
-		o_Str += NStr::CStr::CFormat("{tst.,tsb_}_{}") << m_Time << m_ID;
+		if (m_Time.f_IsValid())
+			o_Str += NStr::CStr::CFormat("{tst.,tsb_}_{}") << m_Time << m_ID;
+		else
+			o_Str += NStr::CStr::CFormat("{}") << m_ID;
 	}
 
 	template <typename tf_CStream>
