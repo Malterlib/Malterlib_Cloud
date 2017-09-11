@@ -23,7 +23,7 @@ namespace NMib::NCloud::NBackupManager
 		if (m_Subscription)
 		{
 			m_Subscription->f_Destroy().f_Dispatch().f_Timeout(10.0, "Timed out waiting for backup download to destroy")
-				> Continuation / [this, Continuation, DirectorySend = fg_Move(DirectorySend)]
+				> [Continuation, DirectorySend = fg_Move(DirectorySend)](auto &&)
 				{
 					if (DirectorySend)
 						DirectorySend->f_Destroy() > Continuation;

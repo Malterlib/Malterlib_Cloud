@@ -58,7 +58,7 @@ namespace NMib
 							if (mp_DatabaseActor)
 							{
 								DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
-								mp_DatabaseActor->f_Destroy() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
+								mp_DatabaseActor->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
 									{
 										DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server database shut down");
 									}

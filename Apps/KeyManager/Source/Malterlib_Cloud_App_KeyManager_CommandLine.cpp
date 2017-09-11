@@ -38,7 +38,7 @@ namespace NMib
 							"Names"_= {"--provide-password"}
 							, "Description"_= "Provide a password for the key database to be able to start the key manager."
 						}
-						, [this](CEJSON const &_Parameters, CDistributedAppCommandLineClient &_CommandLineClient) -> uint32
+						, [](CEJSON const &_Parameters, CDistributedAppCommandLineClient &_CommandLineClient) -> uint32
 						{
 							CBlockingStdInReader StdInReader;
 							CBlockingStdInReader::CPromptParams PasswordPrompt;

@@ -403,8 +403,7 @@ namespace NMib::NCloud::NBackupManager
 		{
 			_Context.m_fRunProtocol.f_Destroy() >
 				[
-					this
-					, fOnDone = fg_Move(_Context.m_fOnDone)
+					fOnDone = fg_Move(_Context.m_fOnDone)
 					, RelativeFileName = _Context.m_RelativeFileName
 					, BytesTransferredIn = _Context.m_BytesTransferredIn
 					, BytesTransferredOut = _Context.m_BytesTransferredOut

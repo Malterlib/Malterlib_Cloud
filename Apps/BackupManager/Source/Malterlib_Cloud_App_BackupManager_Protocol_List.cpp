@@ -127,7 +127,7 @@ namespace NMib::NCloud::NBackupManager
 							return BackupsPerSource;
 						}
 					)
-					> [pThis, Continuation, Auditor](TCAsyncResult<TCMap<CStr, TCVector<CBackupID>>> &&_Result)
+					> [Continuation, Auditor](TCAsyncResult<TCMap<CStr, TCVector<CBackupID>>> &&_Result)
 					{
 						if (!_Result)
 						{
