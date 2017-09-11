@@ -51,7 +51,7 @@ namespace NMib::NCloud
 						
 						uint8 Buffer[16384];
 						
-						while (AppendState.m_File.f_GetPosition() < AppendState.m_ManifestFile.m_Length)
+						while (uint64(AppendState.m_File.f_GetPosition()) < AppendState.m_ManifestFile.m_Length)
 						{
 							auto ThisTime = fg_Min(AppendState.m_ManifestFile.m_Length - AppendState.m_File.f_GetPosition(), 16384);
 							AppendState.m_File.f_Read(Buffer, ThisTime);
