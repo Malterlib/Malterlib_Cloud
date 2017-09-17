@@ -333,7 +333,6 @@ namespace NMib::NCloud::NCloudClient
 						, fg_Move(Config)
 						, mp_DownloadBackupSubscription
 					)
-					.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
 					> Continuation % "Failed to download backup" / [Continuation](CDirectorySyncReceive::CSyncResult &&_Result)
 					{
 						CDistributedAppCommandLineResults CommandLine;
