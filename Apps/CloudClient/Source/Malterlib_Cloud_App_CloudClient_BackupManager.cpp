@@ -97,6 +97,12 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_= "The directory to download to.\n"
 							"By default this directory will be the 'name of the source'/'backup time and id'"
 						}
+						, "SetOwner?"_=
+						{
+							"Names"_= {"--set-owner"}
+							, "Default"_= false
+							, "Description"_= "Set owner and group on the files downloaded.\n"
+						}
 						, "CurrentDirectory?"_=
 						{
 							"Names"_= _[_]
@@ -276,6 +282,8 @@ namespace NMib::NCloud::NCloudClient
 		if (QueueSize < 128*1024)
 			QueueSize = 128*1024;
 		
+		bool bSetOwner = _Params["SetOwner"].f_Boolean();
+		
 		if (BackupSource.f_IsEmpty())
 			return DMibErrorInstance("Backup source must be specified");
 		if (Backup.f_IsEmpty())
@@ -290,7 +298,7 @@ namespace NMib::NCloud::NCloudClient
 			return DMibErrorInstance("Backup source name format is invalid");
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
-			> Continuation / [this, Continuation, BackupSource, BackupHost, BackupID, BackupTime, QueueSize, Destination]
+			> Continuation / [=]
 			{
 				CStr Error;
 				auto *pBackupManager = mp_BackupManagers.f_GetOneActor(BackupHost, Error);
@@ -323,6 +331,8 @@ namespace NMib::NCloud::NCloudClient
 				Config.m_PreviousManifest = BasePath + ".manifest";
 				Config.m_OutputManifestPath = BasePath + ".manifest";
 				Config.m_ExcessFilesAction = CDirectorySyncReceive::EExcessFilesAction_Ignore;
+				if (!bSetOwner)
+					Config.m_SyncFlags = CDirectorySyncReceive::ESyncFlag_WriteTime | CDirectorySyncReceive::ESyncFlag_Attributes;
 				
 				fg_DownloadBackup
 					(
