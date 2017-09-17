@@ -124,7 +124,7 @@ namespace NMib::NCloud::NAppManager
 		auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
 		static const mint c_KeyBits = 512; 
 		DCallActor(KeyManagerInfo.m_Actor, CKeyManager::f_RequestKey, pEncryptionApplication->m_Name, c_KeyBits / 8)
-			> Continuation / [this, Continuation, pEncryptionApplication, _pApplication, _bForceOverwrite, fLaunchScript](CSymmetricKey &&_Key)
+			> Continuation / [Continuation, pEncryptionApplication, _pApplication, fLaunchScript](CSymmetricKey &&_Key)
 			{
 				fLaunchScript(fg_Move(_Key));
 			}
