@@ -411,10 +411,15 @@ namespace NMib::NCloud::NBackupManager
 				]
 				(TCAsyncResult<void> &&_Result) mutable
 				{
+					(void)RelativeFileName;
+					(void)BytesTransferredIn;
+					(void)BytesTransferredOut;
+					(void)FileLength;
+					
 					if (fOnDone)
 						fOnDone();
 
-					uint64 BytesTransferred = BytesTransferredIn + BytesTransferredOut;
+					[[maybe_unused]] uint64 BytesTransferred = BytesTransferredIn + BytesTransferredOut;
 					if (BytesTransferred == 0)
 						BytesTransferred = 1;
 					
