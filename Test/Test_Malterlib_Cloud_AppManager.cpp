@@ -7,6 +7,7 @@
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/DistributedAppInterface>
 #include <Mib/Concurrency/DistributedActorTrustManagerProxy>
+#include <Mib/Concurrency/DistributedAppTestHelpers>
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cryptography/RandomID>
@@ -27,205 +28,8 @@ using namespace NMib::NCloud;
 using namespace NMib::NPtr;
 using namespace NMib::NAtomic;
 
-//#define DTestAppManagerEnableLogging 1
-//#define DTestAppManagerEnableOtherOutput 1
-
-namespace
-{
-	struct CLaunchHelperDependencies
-	{
-		TCActor<CDistributedActorTrustManager> m_TrustManager;
-		TCActor<CActorDistributionManager> m_DistributionManager;
-		NHTTP::CURL m_Address;
-	};
-
-	struct CLaunchInfo
-	{
-		CLaunchInfo();
-		~CLaunchInfo();
-		
-		CLaunchInfo(CLaunchInfo &&) = default;
-		CLaunchInfo(CLaunchInfo const &_Other) = default;
-		
-		TCActor<CDistributedAppInterfaceLaunchActor> m_Launch;
-		TCSharedPointer<CActorSubscription> m_pLaunchSubscription;
-		CStr m_HostID;
-		CStr m_LaunchID;
-		TCSharedPointer<NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient>> m_pClientInterface;
-		TCSharedPointer<NConcurrency::TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface>> m_pTrustInterface;
-		TCContinuation<CLaunchInfo> m_Continuation;
-		
-		void f_Abort()
-		{
-			m_Launch.f_Clear();
-			if (m_pClientInterface)
-				m_pClientInterface->f_Clear();
-			m_pClientInterface.f_Clear();
-			if (m_pLaunchSubscription)
-				m_pLaunchSubscription->f_Clear();
-			m_pLaunchSubscription.f_Clear();
-			if (!m_Continuation.f_IsSet())
-				m_Continuation.f_SetException(DMibErrorInstance("Aborted"));
-		}
-	};
-	
-	CLaunchInfo::CLaunchInfo() = default;
-	CLaunchInfo::~CLaunchInfo() = default;
-	
-	struct CLaunchHelper : public CActor
-	{
-		struct CDistributedAppInterfaceServerImplementation : public CDistributedAppInterfaceServer
-		{
-			NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> f_RegisterDistributedApp
-				(
-					NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
-					, NConcurrency::TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> &&_TrustInterface
-					, CRegisterInfo const &_RegisterInfo
-				) override
-			{
-				auto *pThis = m_pThis;
-				auto &CallingHostInfo = fg_GetCallingHostInfo();
-				
-				auto &HostID = CallingHostInfo.f_GetRealHostID();
-				
-				for (auto &LaunchInfo : pThis->m_Launches)
-				{
-					if (LaunchInfo.m_HostID != HostID)
-						continue;
-
-					LaunchInfo.m_pClientInterface = fg_Construct(fg_Move(_ClientInterface));
-					if (_TrustInterface)
-						LaunchInfo.m_pTrustInterface = fg_Construct(fg_Move(_TrustInterface));
-					if (!LaunchInfo.m_Continuation.f_IsSet())
-						LaunchInfo.m_Continuation.f_SetResult(LaunchInfo);
-					
-					return fg_Explicit(g_ActorSubscription > []{});
-				}
-				
-				return fg_Explicit(nullptr);
-			}
-
-			CLaunchHelper *m_pThis = nullptr;
-		};
-		
-		CLaunchHelper(CLaunchHelperDependencies const &_Dependencies)
-			: m_Dependencies(_Dependencies)
-		{
-			m_AppInterfaceServer.f_Publish<CDistributedAppInterfaceServer>(m_Dependencies.m_DistributionManager, this, CDistributedAppInterfaceServer::mc_pDefaultNamespace);
-		}
-		
-		~CLaunchHelper()
-		{
-		}
-		
-		TCContinuation<void> fp_Destroy() override
-		{
-			TCActorResultVector<void> Destroys;
-			for (auto &Launch : m_Launches)
-			{
-				Launch.m_Launch->f_Destroy() > Destroys.f_AddResult();
-				Launch.f_Abort();
-			}
-
-			m_AppInterfaceServer.f_Destroy() > Destroys.f_AddResult();
-			
-			TCContinuation<void> Continuation;
-			Destroys.f_GetResults() > Continuation.f_ReceiveAny();
-			return Continuation;
-		}
-		
-		TCContinuation<CLaunchInfo> f_Launch(CStr const &_Description, CStr const &_Executable)
-		{
-			CStr LaunchID = fg_RandomID();
-			auto &LaunchInfo = m_Launches[LaunchID];
-			auto Continuation = LaunchInfo.m_Continuation;
-			LaunchInfo.m_LaunchID = LaunchID;
-			LaunchInfo.m_Launch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
-				(
-					m_Dependencies.m_Address
-					, m_Dependencies.m_TrustManager
-					, g_ActorFunctor 
-					> [this, LaunchID](NStr::CStr const &_HostID, CCallingHostInfo const &_HostInfo, NContainer::TCVector<uint8> const &_CertificateRequest) -> TCContinuation<void>  
-					{
-						auto *pLaunch = m_Launches.f_FindEqual(LaunchID);
-						DMibCheck(pLaunch);
-						pLaunch->m_HostID = _HostID;
-						return fg_Explicit();
-					}
-					, _Description
-					, true
-				)
-			;
-			
-			auto Params = fg_CreateVector<CStr>("--daemon-run-standalone");
-			
-#if DTestAppManagerEnableLogging
-			Params.f_Insert("--log-to-stderr");
-#endif
-#if DTestAppManagerEnableOtherOutput
-			if (CFile::fs_GetFile(_Executable) == "AppManager")
-				Params.f_Insert("--log-launches-to-stderr");
-#endif
-			
-			CProcessLaunchActor::CLaunch Launch
-				{
-					CProcessLaunchParams::fs_LaunchExecutable
-					(
-#ifdef DPlatformFamily_Windows
-						_Executable + ".exe"
-#else
-						_Executable
-#endif
-						, fg_Move(Params)
-						, CFile::fs_GetPath(_Executable)
-						, [Continuation](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
-						{
-							switch (_State.f_GetTypeID())
-							{
-							case EProcessLaunchState_LaunchFailed:
-								{
-									if (!Continuation.f_IsSet())
-										Continuation.f_SetException(DMibErrorInstance(fg_Format("Launch failed: {}", _State.f_Get<EProcessLaunchState_LaunchFailed>())));
-									break;
-								}
-							case EProcessLaunchState_Exited:
-								{
-									if (!Continuation.f_IsSet())
-										Continuation.f_SetException(DMibErrorInstance(fg_Format("Launch exited unexpectedly: {}", _State.f_Get<EProcessLaunchState_Exited>())));
-									break;
-								}
-							case EProcessLaunchState_Launched:
-								break;
-							}
-						}
-					)
-				}
-			;
-			
-#if DTestAppManagerEnableLogging || DTestAppManagerEnableOtherOutput
-			Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All | CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
-#endif
-#ifdef DPlatformFamily_Windows
-			Launch.m_Params.m_bCreateNewProcessGroup = true;
-#endif
-			
-			LaunchInfo.m_Launch(&CProcessLaunchActor::f_Launch, Launch, fg_ThisActor(this)) > Continuation / [this, LaunchID](NConcurrency::CActorSubscription &&_Subscription)
-				{
-					auto *pLaunch = m_Launches.f_FindEqual(LaunchID);
-					if (!pLaunch)
-						return;
-					pLaunch->m_pLaunchSubscription = fg_Construct(fg_Move(_Subscription));
-				}
-			;
-			
-			return Continuation;
-		}
-
-		CLaunchHelperDependencies m_Dependencies;
-		TCMap<CStr, CLaunchInfo> m_Launches;
-		TCDelegatedActorInterface<CDistributedAppInterfaceServerImplementation> m_AppInterfaceServer;
-	};
-}
+#define DTestAppManagerEnableLogging 0
+#define DTestAppManagerEnableOtherOutput 0
 
 static fp64 g_Timeout = 60.0;
 
@@ -265,7 +69,7 @@ public:
 			ServerAddress.m_URL = fg_Format("wss://[UNIX(777):{}/controller.sock]/", RootDirectory);
 			TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
 			
-			CLaunchHelperDependencies Dependencies;
+			CDistributedApp_LaunchHelperDependencies Dependencies;
 			Dependencies.m_Address = ServerAddress.m_URL;
 			Dependencies.m_TrustManager = TrustManager;
 			Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(g_Timeout);
@@ -275,7 +79,9 @@ public:
 			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CAppManagerInterface::mc_pDefaultNamespace);
 			Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(g_Timeout);
 			
-			TCActor<CLaunchHelper> LaunchHelper = fg_ConstructActor<CLaunchHelper>(Dependencies);
+			TCActor<CDistributedApp_LaunchHelper> LaunchHelper
+				= fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestAppManagerEnableLogging || DTestAppManagerEnableOtherOutput)
+			;
 			auto Cleanup = g_OnScopeExit > [&]
 				{
 					LaunchHelper->f_BlockDestroy();
@@ -287,7 +93,7 @@ public:
 			CFile::fs_CreateDirectory(VersionManagerDirectory);
 			CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/VersionManager", VersionManagerDirectory, nullptr);
 			
-			auto VersionManagerLaunch = LaunchHelper(&CLaunchHelper::f_Launch, "VersionManager", VersionManagerDirectory + "/VersionManager").f_CallSync(g_Timeout);
+			auto VersionManagerLaunch = LaunchHelper(&CDistributedApp_LaunchHelper::f_Launch, "VersionManager", VersionManagerDirectory + "/VersionManager").f_CallSync(g_Timeout);
 			
 			DMibExpect(VersionManagerLaunch.m_HostID, !=, "");
 
@@ -318,16 +124,22 @@ public:
 			}
 
 			// Launch AppManagers
-			TCActorResultVector<CLaunchInfo> AppManagerLaunchesResults;
+			TCActorResultVector<CDistributedApp_LaunchInfo> AppManagerLaunchesResults;
 			
 			for (mint i = 0; i < nAppManagers; ++i)
 			{
 				CStr AppManagerName = fg_Format("AppManager{sf0,sl2}", i);
 				CStr AppManagerDirectory = RootDirectory + "/" + AppManagerName;
-				LaunchHelper(&CLaunchHelper::f_Launch, AppManagerName, AppManagerDirectory + "/AppManager") > AppManagerLaunchesResults.f_AddResult();
+				TCVector<CStr> ExtraParams;
+#if DTestAppManagerEnableOtherOutput
+				if (CFile::fs_GetFile(_Executable) == "AppManager")
+					ExtraParams.f_Insert("--log-launches-to-stderr");
+#endif
+				
+				LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, AppManagerName, AppManagerDirectory + "/AppManager", fg_Move(ExtraParams)) > AppManagerLaunchesResults.f_AddResult();
 			}
 			
-			TCVector<CLaunchInfo> AppManagerLaunches;
+			TCVector<CDistributedApp_LaunchInfo> AppManagerLaunches;
 			for (auto &LaunchResult : AppManagerLaunchesResults.f_GetResults().f_CallSync(g_Timeout))
 				AppManagerLaunches.f_Insert(fg_Move(*LaunchResult));
 
