@@ -20,6 +20,29 @@ namespace NMib::NCloud::NSecretsManager
 
 		struct CSecretsManagerImplementation : public CSecretsManager
 		{
+			TCContinuation<TCSet<CSecretID>> f_EnumerateSecrets
+				(
+					TCOptional<CStrSecure const> &_SemanticID
+					, TCSet<CStrSecure> const &_TagsExclusive
+				) override
+			;
+			TCContinuation<void> f_SetSecretProperties(CSecretID &&_ID, CSecretProperties &&_Secret) override;
+			TCContinuation<CSecretProperties> f_GetSecretProperties(CSecretID &&_ID) override;
+			TCContinuation<CSecret> f_GetSecret(CSecretID &&_ID) override;
+			TCContinuation<CSecret> f_GetSecretBySemanticID(CStrSecure const &_SemanticID, TCSet<CStrSecure> const &_TagsExclusive) override;
+			TCContinuation<CActorSubscription> f_DownloadFile(CFileTransferContext &&_TransferContext) override;
+			TCContinuation<void> f_ModifyTags
+				(
+					CSecretID &&_ID
+					, TCSet<CStrSecure> &&_TagsToRemove
+					, TCSet<CStrSecure> &&_TagsToAdd
+				) override
+			;
+			TCContinuation<void> f_SetMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey, CEJSON &&_Metadata) override;
+			TCContinuation<void> f_RemoveMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey) override;
+			auto f_UploadFile(TCActorFunctorWithID<TCContinuation<void> (CFileTransferContext &&_TransferContext)> &&_fOnNotification)
+				-> TCContinuation<TCActorSubscriptionWithID<>> override
+			;
 			CServer *m_pThis;
 		};
 		
