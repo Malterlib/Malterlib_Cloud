@@ -47,3 +47,11 @@ namespace NMib::NCloud::NBackupManager
 		return pCanDestroy->m_Continuation;
 	}
 }
+
+namespace NMib::NCloud
+{
+	TCActor<CDistributedAppActor> fg_ConstructApp_BackupManager()
+	{
+		return fg_Construct<NBackupManager::CBackupManagerApp>();
+	}
+}

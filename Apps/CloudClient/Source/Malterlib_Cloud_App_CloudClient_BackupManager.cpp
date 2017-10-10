@@ -316,9 +316,9 @@ namespace NMib::NCloud::NCloudClient
 				if (!Destination.f_IsEmpty())
 					BasePath = Destination; 
 				else if (BackupID == "Latest")
-					BasePath = fg_Format("{}/{}/Latest", CFile::fs_GetProgramDirectory(), BackupSource);
+					BasePath = fg_Format("{}/{}/Latest", mp_State.m_RootDirectory, BackupSource);
 				else
-					BasePath = fg_Format("{}/{}/{tst.,tsb_}_{}", CFile::fs_GetProgramDirectory(), BackupSource, BackupTime, BackupID);
+					BasePath = fg_Format("{}/{}/{tst.,tsb_}_{}", mp_State.m_RootDirectory, BackupSource, BackupTime, BackupID);
 
 				CBackupManager::CBackupID DownloadBackupID;
 				DownloadBackupID.m_ID = BackupID;

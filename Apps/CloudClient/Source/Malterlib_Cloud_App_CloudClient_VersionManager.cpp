@@ -290,7 +290,7 @@ namespace NMib::NCloud::NCloudClient
 					{
 						"DestinationDirectory?"_=
 						{
-							"Default"_= CFile::fs_GetProgramDirectory()
+							"Default"_= mp_State.m_RootDirectory
 							, "Description"_= "The directory to download the version to."
 						}
 					}

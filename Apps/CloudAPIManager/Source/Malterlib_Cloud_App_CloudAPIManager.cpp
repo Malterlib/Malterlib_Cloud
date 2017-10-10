@@ -49,3 +49,11 @@ namespace NMib::NCloud::NCloudAPIManager
 		return pCanDestroy->m_Continuation;
 	}
 }
+
+namespace NMib::NCloud
+{
+	TCActor<CDistributedAppActor> fg_ConstructApp_CloudAPIManager()
+	{
+		return fg_Construct<NCloudAPIManager::CCloudAPIManagerDaemonActor>();
+	}
+}

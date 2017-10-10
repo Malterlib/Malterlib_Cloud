@@ -71,9 +71,9 @@ namespace NMib::NCloud::NVersionManager
 		fg_Dispatch
 			(
 				QueryFileActor
-				, []() -> TCSet<CStr>
+				, [RootDirectory = mp_AppState.m_RootDirectory]() -> TCSet<CStr>
 				{
-					CStr FindPath = CFile::fs_GetProgramDirectory() + "/Applications";
+					CStr FindPath = RootDirectory + "/Applications";
 					CFile::CFindFilesOptions FindOptions(FindPath + "/*", false);
 					FindOptions.m_AttribMask = EFileAttrib_Directory;
 					auto FoundFiles = CFile::fs_FindFiles(FindOptions);
@@ -110,9 +110,9 @@ namespace NMib::NCloud::NVersionManager
 				fg_Dispatch
 					(
 						QueryFileActor
-						, [_Applications]() -> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>
+						, [_Applications, RootDirectory = mp_AppState.m_RootDirectory]() -> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>
 						{
-							CStr ApplicationDirectory = CFile::fs_GetProgramDirectory() + "/Applications";
+							CStr ApplicationDirectory = RootDirectory + "/Applications";
 							NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>> VersionsPerApplication;
 							for (auto &Application : _Applications)
 							{

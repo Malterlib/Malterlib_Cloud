@@ -85,7 +85,7 @@ namespace NMib::NCloud::NVersionManager
 		
 		auto fTagVersion = [&](CVersion &_Version)
 			{
-				CStr ApplicationDirectory = fg_Format("{}/Applications", CFile::fs_GetProgramDirectory());
+				CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
 				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Version.f_GetIdentifier().f_EncodeFileName());
 				
 				_Version.m_VersionInfo.m_Tags -= RemoveTags;

@@ -14,14 +14,14 @@
 #include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #endif
 
-#include "Malterlib_Cloud_App_CloudClient.h"
+#include "Malterlib_Cloud_AppLocal_CloudClient.h"
 
 namespace NMib::NCloud::NCloudClient
 {
-	auto CCloudClientAppActor::fp_GetSelfUpdateVersion() -> TCContinuation<CSelfUpdateVersion> 
+	auto CCloudClientAppLocalActor::fp_GetSelfUpdateVersion() -> TCContinuation<CSelfUpdateVersion>
 	{
 		TCContinuation<CSelfUpdateVersion> Continuation;
-		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
+		fg_ThisActor(this)(&CCloudClientAppLocalActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers")
 			> [this, Continuation](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
@@ -105,7 +105,7 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_PreRunCommandLine(CStr const &_Command, NEncoding::CEJSON const &_Params)
+	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppLocalActor::fp_PreRunCommandLine(CStr const &_Command, NEncoding::CEJSON const &_Params)
 	{
 		if (!_Params["SelfUpdateCheck"].f_Boolean() || _Command == "--self-update")
 			return fg_Explicit(CDistributedAppCommandLineResults());
@@ -126,8 +126,10 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params)
+	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params)
 	{
+		DMibCheck(mp_State.m_RootDirectory == CFile::fs_GetProgramDirectory());
+
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
 		fp_GetSelfUpdateVersion() > [this, Continuation](TCAsyncResult<CSelfUpdateVersion> &&_Version)
 			{

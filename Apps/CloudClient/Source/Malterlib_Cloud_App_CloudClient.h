@@ -17,26 +17,16 @@ namespace NMib::NCloud::NCloudClient
 		CCloudClientAppActor();
 		~CCloudClientAppActor();
 		
-	private:
-		
-		struct CSelfUpdateVersion
-		{
-			TCDistributedActor<CVersionManager> m_Actor;
-			CVersionManager::CVersionID m_VersionID;
-		};
+	protected:
 		
 		TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
 		TCContinuation<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
-		TCContinuation<CDistributedAppCommandLineResults> fp_PreRunCommandLine(CStr const &_Command, NEncoding::CEJSON const &_Params) override;
-		
-		TCContinuation<CSelfUpdateVersion> fp_GetSelfUpdateVersion();
 		
 		TCContinuation<void> fp_Initialize();
 
 		void fp_ParseCommonOptions(NEncoding::CEJSON const &_Params);
 
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_SelfUpdate(CEJSON const &_Params);
 		
 		// Backup Manager
 		void fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);

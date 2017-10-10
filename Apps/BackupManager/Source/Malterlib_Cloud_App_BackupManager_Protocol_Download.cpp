@@ -98,7 +98,7 @@ namespace NMib::NCloud::NBackupManager
 		
 		TCContinuation<CStr> BackupPathContinuation;
 		
-		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
+		CStr ProgramDirectory = pThis->mp_AppState.m_RootDirectory;
 		
 		if (BackupID == "Latest")
 		{

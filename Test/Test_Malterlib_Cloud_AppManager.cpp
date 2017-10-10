@@ -12,6 +12,7 @@
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Cloud/App/VersionManager>
 
 #ifdef DPlatformFamily_Windows
 #include <Windows.h>
@@ -93,7 +94,7 @@ public:
 			CFile::fs_CreateDirectory(VersionManagerDirectory);
 			CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/VersionManager", VersionManagerDirectory, nullptr);
 			
-			auto VersionManagerLaunch = LaunchHelper(&CDistributedApp_LaunchHelper::f_Launch, "VersionManager", VersionManagerDirectory + "/VersionManager").f_CallSync(g_Timeout);
+			auto VersionManagerLaunch = LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, "VersionManager", VersionManagerDirectory, &fg_ConstructApp_VersionManager).f_CallSync(g_Timeout);
 			
 			DMibExpect(VersionManagerLaunch.m_HostID, !=, "");
 

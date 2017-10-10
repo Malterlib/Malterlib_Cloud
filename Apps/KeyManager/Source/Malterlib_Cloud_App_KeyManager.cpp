@@ -11,73 +11,75 @@
 
 #include "Malterlib_Cloud_App_KeyManager.h"
 
-namespace NMib
+namespace NMib::NCloud::NKeyManager
 {
-	namespace NCloud
+	CKeyManagerDaemonActor::CKeyManagerDaemonActor()
+		: CDistributedAppActor(CDistributedAppActor_Settings{"KeyManager", false})
 	{
-		namespace NKeyManager
+	}
+
+	CKeyManagerDaemonActor::~CKeyManagerDaemonActor()
+	{
+	}
+
+	TCContinuation<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	{
+		TCContinuation<void> Continuation;
+		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Warning, "Waiting for user to provide password");
+		Continuation.f_SetResult();
+		return Continuation;
+	}
+
+	void CKeyManagerDaemonActor::fp_DatabaseDecrypted()
+	{
+		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Password provided, starting up key manager");
+		CKeyManagerServerConfig Config;
+		Config.m_DatabaseActor = mp_DatabaseActor;
+		mp_ServerActor = fg_ConstructActor<CKeyManagerServer>(Config);
+	}
+
+	TCContinuation<void> CKeyManagerDaemonActor::fp_StopApp()
+	{
+		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
+
+		if (mp_ServerActor || mp_DatabaseActor)
+			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down");
+
+		if (mp_ServerActor)
 		{
-			CKeyManagerDaemonActor::CKeyManagerDaemonActor()
-				: CDistributedAppActor(CDistributedAppActor_Settings{"KeyManager", false})
-			{
-			}
-			
-			CKeyManagerDaemonActor::~CKeyManagerDaemonActor()
-			{
-			}
-
-			TCContinuation<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
-			{
-				TCContinuation<void> Continuation;
-				DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Warning, "Waiting for user to provide password");
-				Continuation.f_SetResult();
-				return Continuation;				
-			}
-			
-			void CKeyManagerDaemonActor::fp_DatabaseDecrypted()
-			{
-				DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Password provided, starting up key manager");
-				CKeyManagerServerConfig Config;
-				Config.m_DatabaseActor = mp_DatabaseActor;
-				mp_ServerActor = fg_ConstructActor<CKeyManagerServer>(Config);
-			}
-
-			TCContinuation<void> CKeyManagerDaemonActor::fp_StopApp()
-			{	
-				TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
-				
-				if (mp_ServerActor || mp_DatabaseActor)
-					DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down");
-				
-				if (mp_ServerActor)
+			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server");
+			mp_ServerActor->f_Destroy() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
 				{
-					DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server");
-					mp_ServerActor->f_Destroy() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
-						{
-							DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server shut down");
-							if (mp_DatabaseActor)
+					DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server shut down");
+					if (mp_DatabaseActor)
+					{
+						DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
+						mp_DatabaseActor->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
 							{
-								DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
-								mp_DatabaseActor->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
-									{
-										DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server database shut down");
-									}
-								;
-								mp_DatabaseActor = nullptr;
+								DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server database shut down");
 							}
-						}
-					;
-					mp_ServerActor = nullptr;
+						;
+						mp_DatabaseActor = nullptr;
+					}
 				}
-				else if (mp_DatabaseActor)
-				{
-					DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
-					mp_DatabaseActor->f_Destroy() > pCanDestroy->f_Track();
-					mp_DatabaseActor = nullptr;
-				}
+			;
+			mp_ServerActor = nullptr;
+		}
+		else if (mp_DatabaseActor)
+		{
+			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
+			mp_DatabaseActor->f_Destroy() > pCanDestroy->f_Track();
+			mp_DatabaseActor = nullptr;
+		}
 
-				return pCanDestroy->m_Continuation;
-			}
-		}		
+		return pCanDestroy->m_Continuation;
+	}
+}
+
+namespace NMib::NCloud
+{
+	TCActor<CDistributedAppActor> fg_ConstructApp_KeyManager()
+	{
+		return fg_Construct<NKeyManager::CKeyManagerDaemonActor>();
 	}
 }

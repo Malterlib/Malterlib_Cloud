@@ -435,3 +435,11 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 }
+
+namespace NMib::NCloud
+{
+	TCActor<CDistributedAppActor> fg_ConstructApp_AppManager()
+	{
+		return fg_Construct<NAppManager::CAppManagerActor>();
+	}
+}

@@ -7,9 +7,9 @@ namespace NMib::NCloud::NBackupManager
 {
 	namespace
 	{
-		auto g_fFindBackupSources = []() -> TCVector<CStr>
+		auto g_fFindBackupSources = [](CStr const &_RootDirectory) -> TCVector<CStr>
 			{
-				CStr FindPath = CFile::fs_GetProgramDirectory() + "/Backups";
+				CStr FindPath = _RootDirectory + "/Backups";
 				CFile::CFindFilesOptions FindOptions(FindPath + "/*_*", false);
 				FindOptions.m_AttribMask = EFileAttrib_Directory;
 				auto FoundFiles = CFile::fs_FindFiles(FindOptions);
@@ -58,7 +58,10 @@ namespace NMib::NCloud::NBackupManager
 		fg_Dispatch
 			(
 				QueryFileActor
-				, g_fFindBackupSources
+				, [RootDirectory = pThis->mp_AppState.m_RootDirectory]
+			 	{
+					return g_fFindBackupSources(RootDirectory);
+				}
 			)
 			> [pThis, Continuation, Auditor, CallingHostID](TCAsyncResult<TCVector<CStr>> &&_Result)
 			{
@@ -93,16 +96,16 @@ namespace NMib::NCloud::NBackupManager
 
 		Auditor.f_Info("Listing backups");
 		
-		auto fListBackups = [pThis, Continuation, Auditor](TCVector<CStr> const &_BackupSources)
+		auto fListBackups = [pThis, Continuation, Auditor, RootDirectory = pThis->mp_AppState.m_RootDirectory](TCVector<CStr> const &_BackupSources)
 			{
 				auto QueryFileActor = pThis->fp_GetQueryFileActor();
 				
 				fg_Dispatch
 					(
 						QueryFileActor
-						, [_BackupSources]() -> TCMap<CStr, TCVector<CBackupID>>
+						, [_BackupSources, RootDirectory]() -> TCMap<CStr, TCVector<CBackupID>>
 						{
-							CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
+							CStr ProgramDirectory = RootDirectory;
 							TCMap<CStr, TCVector<CBackupID>> BackupsPerSource;
 							for (auto &BackupSource : _BackupSources)
 							{
@@ -156,7 +159,12 @@ namespace NMib::NCloud::NBackupManager
 		}
 		else
 		{
-			g_Dispatch(QueryFileActor) > g_fFindBackupSources > [pThis, Continuation, Auditor, fListBackups, CallingHostID](TCAsyncResult<TCVector<CStr>> &&_Result)
+			g_Dispatch(QueryFileActor)
+				> [RootDirectory = pThis->mp_AppState.m_RootDirectory]
+			 	{
+					return g_fFindBackupSources(RootDirectory);
+				}
+				> [pThis, Continuation, Auditor, fListBackups, CallingHostID](TCAsyncResult<TCVector<CStr>> &&_Result)
 				{
 					if (!_Result)
 					{

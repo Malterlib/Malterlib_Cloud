@@ -1,0 +1,4 @@
+// Copyright © 2015 Hansoft AB 
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+#include "../../../../Apps/VersionManager/Source/Malterlib_Cloud_App_VersionManagerApp.h"

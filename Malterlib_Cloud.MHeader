@@ -388,7 +388,11 @@ Compile
 	&
 	{
 		CompileDialect C
-		MalterlibCloudTarget true
+		|
+		{
+			MalterlibCloudTarget true
+			MalterlibCloudTargetLibrary true
+		}
 	}
 	
 	PreprocessorDefines "DMalterlibCloudPlatform=\"@(MalterlibCloudPlatform)\";@(Compile.PreprocessorDefines)"
@@ -428,6 +432,7 @@ Property
 		!!CompileDialect "C"
 		PrefixHeader "@('Test/PCH.h'->MakeAbsolute())"
 	}
+	%Dependency "Lib_Malterlib_Cloud_VersionManager"
 }
 
 Property
@@ -460,7 +465,10 @@ Property
 		!!MalterlibLog_EnableVerboseDebugLog false
 	}
 
-	%Target "@(Malterlib_Cloud_App_Targets)"
+	%Group Apps
+	{
+		%Target "@(Malterlib_Cloud_App_Targets)"
+	}
 }
 
 Property

@@ -72,7 +72,7 @@ namespace NMib::NCloud::NVersionManager
 			}
 		;
 		
-		CStr ApplicationDirectory = fg_Format("{}/Applications", CFile::fs_GetProgramDirectory());
+		CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
 		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionIDAndPlatform.f_EncodeFileName());
 		
 		Download.m_FileTransferSend = fg_ConstructActor<CFileTransferSend>(VersionPath);

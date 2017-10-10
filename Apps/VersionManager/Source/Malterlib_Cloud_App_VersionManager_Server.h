@@ -144,7 +144,7 @@ namespace NMib::NCloud::NVersionManager
 		bool fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version);
 		
 		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
-		
+
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
 
 		TCDelegatedActorInterface<CVersionManagerImplementation> mp_ProtocolInterface;

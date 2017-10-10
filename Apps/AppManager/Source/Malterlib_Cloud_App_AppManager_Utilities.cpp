@@ -103,7 +103,7 @@ namespace NMib::NCloud::NAppManager
 		TCSharedPointer<CState> pState = fg_Construct();
 		pState->m_LaunchActor = fg_ConstructActor<CProcessLaunchActor>();
 		
-		CStr FileName = fg_Format("{}/TempScripts/Bash_{}.sh", CFile::fs_GetProgramDirectory(), CHash_MD5::fs_DigestFromData(_Script.f_GetStr(), _Script.f_GetLen()).f_GetString());
+		CStr FileName = fg_Format("{}/TempScripts/Bash_{}.sh", mp_State.m_RootDirectory, CHash_MD5::fs_DigestFromData(_Script.f_GetStr(), _Script.f_GetLen()).f_GetString());
 	
 		fg_Dispatch
 			(
@@ -141,7 +141,7 @@ namespace NMib::NCloud::NAppManager
 					(
 						"bash"
 						, fg_CreateVector<CStr>(FileName)
-						, CFile::fs_GetProgramDirectory()
+						, mp_State.m_RootDirectory
 						, [pState, _Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 						{
 							if (!pState->m_LaunchActor)

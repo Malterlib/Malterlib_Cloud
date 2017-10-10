@@ -49,3 +49,11 @@ namespace NMib::NCloud::NVersionManager
 		return pCanDestroy->m_Continuation;
 	}
 }
+
+namespace NMib::NCloud
+{
+	TCActor<CDistributedAppActor> fg_ConstructApp_VersionManager()
+	{
+		return fg_Construct<NVersionManager::CVersionManagerDaemonActor>();
+	}
+}

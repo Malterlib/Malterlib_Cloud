@@ -6,7 +6,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedApp>
 
-#include "Malterlib_Cloud_App_CloudClient.h"
+#include "Malterlib_Cloud_AppLocal_CloudClient.h"
 
 using namespace NMib;
 using namespace NMib::NCloud::NCloudClient;
@@ -19,7 +19,7 @@ class CCloudClient : public CApplication
 			(
 				[]
 				{
-					return fg_ConstructActor<CCloudClientAppActor>();
+					return fg_ConstructActor<CCloudClientAppLocalActor>();
 				}
 			)
 		;

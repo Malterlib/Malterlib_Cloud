@@ -45,3 +45,11 @@ namespace NMib::NCloud::NSecretsManager
 		return pCanDestroy->m_Continuation;
 	}
 }
+
+namespace NMib::NCloud
+{
+	TCActor<CDistributedAppActor> fg_ConstructApp_SecretsManager()
+	{
+		return fg_Construct<NSecretsManager::CSecretsManagerDaemonActor>();
+	}
+}

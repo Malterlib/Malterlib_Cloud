@@ -12,7 +12,7 @@ namespace NMib::NCloud::NBackupManager
 	public:
 		using CActorHolder = CSeparateThreadActorHolder;
 		
-		CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID);
+		CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID, CStr const &_RootDirectory);
 		~CBackupInstance();
 		
 		TCContinuation<TCActorSubscriptionWithID<>> f_StartManifestRSync

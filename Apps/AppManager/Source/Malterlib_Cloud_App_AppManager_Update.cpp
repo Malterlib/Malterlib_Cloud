@@ -1,4 +1,4 @@
-﻿// Copyright © 2015 Hansoft AB
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
@@ -64,7 +64,7 @@ namespace NMib::NCloud::NAppManager
 			Package = _Params["Package"].f_String();
 			if (Package.f_IsEmpty())
 				return DMibErrorInstance("You have to specify a package");
-			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory()));
+			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
 		}
 		else
 		{

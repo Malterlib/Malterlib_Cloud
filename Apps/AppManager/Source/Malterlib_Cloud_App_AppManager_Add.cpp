@@ -100,7 +100,7 @@ namespace NMib::NCloud::NAppManager
 			Settings.m_VersionManagerApplication = Package;
 		}
 		else if (!bNullPackage)
-			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, CFile::fs_GetProgramDirectory()));
+			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
 
 		TCContinuation<CDistributedAppCommandLineResults> Continuation;
 		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();

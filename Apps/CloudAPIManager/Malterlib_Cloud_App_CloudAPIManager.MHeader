@@ -3,6 +3,46 @@
 
 Import "../../../../External/curl/Curl.MTarget"
 
+%Target "Lib_Malterlib_Cloud_CloudAPIManager"
+{
+	Property
+	{
+		MalterlibConcurrency_DistributedActors true
+		MalterlibCloudTargetLibrary true
+	}
+	Target
+	{
+		Type StaticLibrary
+		BaseName Malterlib_Cloud_CloudAPIManager
+		Group Apps
+	}
+	%Group Source
+	{
+		%File "Source/Malterlib_Cloud_App_*"
+	}
+
+	%Dependency "Lib_Malterlib_Cloud"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Curl"
+	{
+		!DocumentationEnabled true
+
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_zlib"
+	{
+		!DocumentationEnabled true
+
+		Dependency.Indirect true
+	}
+}
+
 %Target "Malterlib_Cloud_CloudAPIManager"
 {
 	Property
@@ -37,6 +77,7 @@ Import "../../../../External/curl/Curl.MTarget"
 	{
 		DebuggerCommandArguments "--daemon-run-debug"
 		BaseFileName "CloudAPIManager"
+		Group Apps
 	}
 	Compile
 	{
@@ -47,18 +88,9 @@ Import "../../../../External/curl/Curl.MTarget"
 	
 	%Group Source
 	{
-		%File "Source/*"
+		%File "Source/Malterlib_Cloud_AppLocal_*"
 	}
-	%Dependency "Lib_Malterlib_Cloud"
-	%Dependency "Lib_Malterlib"
-	%Dependency "Lib_Curl"
-	{
-		!DocumentationEnabled true
-	}
-	%Dependency "Lib_zlib"
-	{
-		!DocumentationEnabled true
-	}
+	%Dependency "Lib_Malterlib_Cloud_CloudAPIManager"
 }
 
 Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_CloudAPIManager;@(Malterlib_Cloud_App_Targets)"

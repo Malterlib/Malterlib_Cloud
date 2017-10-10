@@ -46,4 +46,12 @@ namespace NMib::NCloud::NCloudClient
 	{
 		mp_Timeout = _Params["Timeout"].f_Float();
 	}
+
+}
+namespace NMib::NCloud
+{
+	TCActor<CDistributedAppActor> fg_ConstructApp_CloudClient()
+	{
+		return fg_Construct<NCloudClient::CCloudClientAppActor>();
+	}
 }

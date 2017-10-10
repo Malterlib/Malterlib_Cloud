@@ -299,9 +299,9 @@ namespace NMib::NCloud::NAppManager
 	CStr CAppManagerActor::CApplication::f_GetDirectory()
 	{
 		if (f_IsChildApp())
-			return fg_Format("{}/App/{}/{}", CFile::fs_GetProgramDirectory(), m_Settings.m_ParentApplication, m_Name);
+			return fg_Format("{}/App/{}/{}", m_pThis->mp_State.m_RootDirectory, m_Settings.m_ParentApplication, m_Name);
 		else
-			return fg_Format("{}/App/{}", CFile::fs_GetProgramDirectory(), m_Name);
+			return fg_Format("{}/App/{}", m_pThis->mp_State.m_RootDirectory, m_Name);
 	}
 	
 	TCDispatchedActorCall<uint32> CAppManagerActor::CApplication::f_CloseEncryption(uint32 _Status)

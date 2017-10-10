@@ -144,7 +144,7 @@ namespace NMib
 											TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
 												(
 													fg_Construct("Encrypted Key Manager Database Actor")
-													, CFile::fs_GetProgramDirectory() + "/KeyDatabase.encrypted"
+													, mp_State.m_RootDirectory + "/KeyDatabase.encrypted"
 													, _Password
 													, &Salt
 												)

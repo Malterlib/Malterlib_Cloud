@@ -175,6 +175,7 @@ namespace NMib::NCloud::NBackupManager
 						, BackupKey.m_BackupName
 						, BackupKey.m_BackupTime
 						, BackupKey.m_BackupID
+					 	, pThis->mp_AppState.m_RootDirectory
 					)
 				;
 				

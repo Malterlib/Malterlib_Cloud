@@ -35,12 +35,12 @@ namespace NMib::NCloud::NBackupManager
 			uint64 m_BytesTransferredOut = 0;
 		};
 		
-		CInternal(CStr const &_Name, CTime const &_StartTime, CStr const &_ID)
+		CInternal(CStr const &_Name, CTime const &_StartTime, CStr const &_ID, CStr const &_RootDirectory)
 			: m_Name(_Name)
 			, m_StartTime(_StartTime)
 			, m_ID(_ID)
 		{
-			m_BackupDirectory = fg_Format("{}/Backups/{}/{tst.,tsb_}_{}", CFile::fs_GetProgramDirectory(), _Name, _StartTime, _ID);
+			m_BackupDirectory = fg_Format("{}/Backups/{}/{tst.,tsb_}_{}", _RootDirectory, _Name, _StartTime, _ID);
 			g_Dispatch > [this]
 				{
 					f_InitBackupDirectory();
@@ -93,8 +93,8 @@ namespace NMib::NCloud::NBackupManager
 		bool m_bManifestRSyncDone = false;
 	};
 	
-	CBackupInstance::CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID)
-		: mp_pInternal(fg_Construct(_Name, _StartTime, _ID))
+	CBackupInstance::CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID, CStr const &_RootDirectory)
+		: mp_pInternal(fg_Construct(_Name, _StartTime, _ID, _RootDirectory))
 	{
 	}
 
