@@ -432,7 +432,6 @@ Property
 		!!CompileDialect "C"
 		PrefixHeader "@('Test/PCH.h'->MakeAbsolute())"
 	}
-	%Dependency "Lib_Malterlib_Cloud_VersionManager"
 }
 
 Property
@@ -444,7 +443,11 @@ Property
 	
 	MalterlibTests "Malterlib_Cloud;@(MalterlibTests)"
 	MalterlibTestFiles_Malterlib_Cloud "@('Test/*'->MakeAbsolute())"
-	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud;Malterlib_Cloud_AppManager=Com_Malterlib_Cloud_AppManager;Malterlib_Cloud_VersionManager=Com_Malterlib_Cloud_VersionManager;Malterlib_Cloud_Test=Com_Malterlib_Cloud_Test;Malterlib_Cloud_CloudClient=Com_Malterlib_Cloud_CloudClient;"
+	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud;Malterlib_Cloud_AppManager=Com_Malterlib_Cloud_AppManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
+	MalterlibTestDependencies_Malterlib_Cloud "Malterlib_Cloud_VersionManager=Com_Malterlib_Cloud_VersionManager;Lib_Malterlib_Cloud_VersionManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
+	MalterlibTestDependencies_Malterlib_Cloud "Malterlib_Cloud_Test=Com_Malterlib_Cloud_Test;@(MalterlibTestDependencies_Malterlib_Cloud)"
+	MalterlibTestDependencies_Malterlib_Cloud "Malterlib_Cloud_CloudClient=Com_Malterlib_Cloud_CloudClient;@(MalterlibTestDependencies_Malterlib_Cloud)"
+	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_SecretsManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestExtraGroups_Malterlib_Cloud "{Test}/{Malterlib_Cloud}"
 }
 

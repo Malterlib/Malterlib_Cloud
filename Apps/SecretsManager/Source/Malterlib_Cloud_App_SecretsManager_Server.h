@@ -7,6 +7,8 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedApp>
 #include <Mib/Cloud/SecretsManager>
+#include <Mib/Container/Map>
+
 
 namespace NMib::NCloud::NSecretsManager
 {
@@ -22,7 +24,7 @@ namespace NMib::NCloud::NSecretsManager
 		{
 			TCContinuation<TCSet<CSecretID>> f_EnumerateSecrets
 				(
-					TCOptional<CStrSecure const> &_SemanticID
+					TCOptional<CStrSecure> &_SemanticID
 					, TCSet<CStrSecure> const &_TagsExclusive
 				) override
 			;
@@ -60,5 +62,7 @@ namespace NMib::NCloud::NSecretsManager
 		CDistributedAppState &mp_AppState;
 		
 		CTrustedPermissionSubscription mp_Permissions;
+
+		TCMap<CSecretsManager::CSecretID, CSecretsManager::CSecretProperties> m_Secrets;
 	};
 }

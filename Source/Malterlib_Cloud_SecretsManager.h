@@ -23,6 +23,8 @@ namespace NMib::NCloud
 	
 	struct CSecretsManager : public NConcurrency::CActor
 	{
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/SecretsManager";
+		
 		CSecretsManager();
 
 		enum : uint32
@@ -41,34 +43,57 @@ namespace NMib::NCloud
 		
 		struct CSecretID
 		{
-			NStr::CStr m_Folder;
-			NStr::CStr m_Name;
-			
 			bool operator < (CSecretID const &_Right) const;
 			bool operator == (CSecretID const &_Right) const;
 			
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
+			
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const;
 
+			NStr::CStr m_Folder;
+			NStr::CStr m_Name;
 		};
 		
 		struct CFileTag
 		{
+			bool operator == (CFileTag const &_Right) const;
+
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 		};
 		
-		using CSecret = NContainer::TCStreamableVariant
+		struct CSecret : public NContainer::TCStreamableVariant
 			<
 				ESecretType
 				, NStr::CStrSecure, ESecretType_String
 				, NContainer::CSecureByteVector, ESecretType_Buffer
 				, CFileTag, ESecretType_File
 			>
-		;
+		{
+			using CSuper = NContainer::TCStreamableVariant
+				<
+					ESecretType
+					, NStr::CStrSecure, ESecretType_String
+					, NContainer::CSecureByteVector, ESecretType_Buffer
+					, CFileTag, ESecretType_File
+				>
+			;
+			
+			CSuper &operator *();
+			CSuper const &operator *() const;
+			bool operator == (CSecret const &_Right) const;
+
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+		};
 
 		struct CSecretProperties
 		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
 			NStorage::TCOptional<CSecret> m_Secret;
 			NStorage::TCOptional<NStr::CStrSecure> m_UserName;
 			NStorage::TCOptional<NStr::CStrSecure> m_URL;
@@ -79,14 +104,23 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NTime::CTime> m_Modified;
 			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStrSecure>> m_Tags;
-
-			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream);			
+			
+			CSecretProperties &&f_Secret(CSecret &&_Secret) &&;
+			CSecretProperties &&f_UserName(NStr::CStrSecure const &_UserName) &&;
+			CSecretProperties &&f_URL(NStr::CStrSecure const &_URL) &&;
+			CSecretProperties &&f_Expires(NTime::CTime const &_Expires) &&;
+			CSecretProperties &&f_Notes(NStr::CStrSecure const &_Notes) &&;
+			CSecretProperties &&f_Metadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_MetadataValue) &&;
+			CSecretProperties &&f_Created(NTime::CTime const &_Created) &&;
+			CSecretProperties &&f_Modified(NTime::CTime const &_Modified) &&;
+			CSecretProperties &&f_SemanticID(NStr::CStrSecure const &_SemanticID) &&;
+			CSecretProperties &&f_Tags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &&;
+			CSecretProperties &&f_AddTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &&;
 		};
 
 		virtual NConcurrency::TCContinuation<NContainer::TCSet<CSecretID>> f_EnumerateSecrets
 			(
-				NStorage::TCOptional<NStr::CStrSecure const> &_SemanticID
+				NStorage::TCOptional<NStr::CStrSecure> &_SemanticID
 				, NContainer::TCSet<NStr::CStrSecure> const &_TagsExclusive
 			 ) = 0
 		;

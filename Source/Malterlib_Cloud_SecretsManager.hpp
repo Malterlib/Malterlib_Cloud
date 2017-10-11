@@ -17,10 +17,16 @@ namespace NMib::NCloud
 	}
 
 	template <typename tf_CStream>
-	void NMib::NCloud::CSecretsManager::CSecretID::f_Stream(tf_CStream &_Stream)
+	void CSecretsManager::CSecretID::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Folder;
 		_Stream % m_Name;
+	}
+
+	template <typename tf_CStr>
+	void CSecretsManager::CSecretID::f_Format(tf_CStr &o_Str) const
+	{
+		o_Str += typename tf_CStr::CFormat("{}/{}") << m_Folder << m_Name;
 	}
 
 	template <typename tf_CStream>
@@ -41,5 +47,26 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void CSecretsManager::CFileTag::f_Stream(tf_CStream &_Stream)
 	{
+	}
+	
+	inline bool CSecretsManager::CFileTag::operator == (CSecretsManager::CFileTag const &_Right) const
+	{
+		return true;
+	}
+
+	inline auto CSecretsManager::CSecret::operator *() -> CSuper &
+	{
+		return *this;
+	}
+	
+	inline auto CSecretsManager::CSecret::operator *() const -> CSuper const &
+	{
+		return *this;
+	}
+
+	template <typename tf_CStream>
+	void CSecretsManager::CSecret::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % **this;
 	}
 }
