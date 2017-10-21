@@ -98,7 +98,15 @@ namespace NMib::NCloud
 			m_AESContext.f_Encrypt(RawDatabase.f_GetArray(), RawDatabase.f_GetLen(), EncryptedDatabase.f_GetArray(RawDatabase.f_GetLen()));
 			
 			NFile::CFile::fs_CreateDirectory(NFile::CFile::fs_GetPath(m_Path));
-			NFile::CFile::fs_WriteFile(EncryptedDatabase, m_Path);
+			NFile::CFile OutFile;
+
+			auto Attributes = NFile::EFileAttrib_UserWrite | NFile::EFileAttrib_UserRead | NFile::CFile::fs_GetValidAttributes();
+			OutFile.f_Open(m_Path + ".tmp", NFile::EFileOpen_Write | NFile::EFileOpen_ShareAll, Attributes);
+			OutFile.f_Write(EncryptedDatabase.f_GetArray(), EncryptedDatabase.f_GetLen());
+			if (NFile::CFile::fs_FileExists(m_Path))
+				NFile::CFile::fs_AtomicReplaceFile(m_Path + ".tmp", m_Path);
+			else
+				NFile::CFile::fs_RenameFile(m_Path + ".tmp", m_Path);
 		}
 	};
 	
