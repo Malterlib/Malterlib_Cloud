@@ -1,4 +1,4 @@
-﻿// Copyright © 2015 Hansoft AB
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
@@ -18,7 +18,6 @@ namespace NMib::NCloud::NAppManager
 
 		TCMap<CStr, CApplicationInfo> OutputApplications;
 		
-		CDistributedAppCommandLineResults Results;
 		for (auto &pApplication : m_pThis->mp_Applications)
 		{
 			auto &Application = *pApplication;
@@ -94,87 +93,86 @@ namespace NMib::NCloud::NAppManager
 		return fg_Explicit(fg_Move(Versions));
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON const &_Params)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CStr Name = _Params["Name"].f_String();
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		mp_AppManagerInterface.m_pActor->f_GetInstalled() 
-			> Continuation / [bVerbose, Continuation, Name](TCMap<CStr, CAppManagerInterface::CApplicationInfo> &&_ApplicationInfo)
+			> Continuation / [=](TCMap<CStr, CAppManagerInterface::CApplicationInfo> &&_ApplicationInfo)
 			{
-				CDistributedAppCommandLineResults Results;
 				for (auto &Application : _ApplicationInfo)
 				{
 					auto &ApplicationName = _ApplicationInfo.fs_GetKey(Application);
 					if (!Name.f_IsEmpty() && ApplicationName != Name)
 						continue;
-					
-					Results.f_AddStdOut(fg_Format("{}{\n}", ApplicationName));
+
+					CStr ApplicationInfo;
+					ApplicationInfo += "{}{\n}"_f << ApplicationName;
 					if (bVerbose)
 					{
-						Results.f_AddStdOut(fg_Format("                       Status: {}{\n}{\n}", Application.m_Status));
-						Results.f_AddStdOut(fg_Format("           Encryption storage: {}{\n}", Application.m_EncryptionStorage));
-						Results.f_AddStdOut(fg_Format("       Encryption file system: {}{\n}", Application.m_EncryptionFileSystem));
-						Results.f_AddStdOut(fg_Format("           Parent application: {}{\n}", Application.m_ParentApplication));
-						Results.f_AddStdOut(fg_Format("                 Dependencies: {vs}{\n}", Application.m_Dependencies));
-						Results.f_AddStdOut(fg_Format("   Stop on dependency failure: {}{\n}", Application.m_bStopOnDependencyFailure ? "true" : "false"));
-						Results.f_AddStdOut(fg_Format("           Self update source: {}{\n}{\n}", Application.m_bSelfUpdateSource ? "true" : "false"));
-						Results.f_AddStdOut(fg_Format("                   Executable: {}{\n}", Application.m_Executable));
-						Results.f_AddStdOut(fg_Format("                   Parameters: {vs,vb}{\n}", Application.m_Parameters));
-						Results.f_AddStdOut(fg_Format("                  Run as user: {}{\n}", Application.m_RunAsUser));
-						Results.f_AddStdOut(fg_Format("                 Run as group: {}{\n}", Application.m_RunAsGroup));
-						Results.f_AddStdOut(fg_Format("              Distributed app: {}{\n}{\n}", Application.m_bDistributedApp ? "true" : "false"));
+						ApplicationInfo += "                       Status: {}{\n}{\n}"_f << Application.m_Status;
+						ApplicationInfo += "           Encryption storage: {}{\n}"_f << Application.m_EncryptionStorage;
+						ApplicationInfo += "       Encryption file system: {}{\n}"_f << Application.m_EncryptionFileSystem;
+						ApplicationInfo += "           Parent application: {}{\n}"_f << Application.m_ParentApplication;
+						ApplicationInfo += "                 Dependencies: {vs}{\n}"_f << Application.m_Dependencies;
+						ApplicationInfo += "   Stop on dependency failure: {}{\n}"_f << (Application.m_bStopOnDependencyFailure ? "true" : "false");
+						ApplicationInfo += "           Self update source: {}{\n}{\n}"_f << (Application.m_bSelfUpdateSource ? "true" : "false");
+						ApplicationInfo += "                   Executable: {}{\n}"_f << Application.m_Executable;
+						ApplicationInfo += "                   Parameters: {vs,vb}{\n}"_f << Application.m_Parameters;
+						ApplicationInfo += "                  Run as user: {}{\n}"_f << Application.m_RunAsUser;
+						ApplicationInfo += "                 Run as group: {}{\n}"_f << Application.m_RunAsGroup;
+						ApplicationInfo += "              Distributed app: {}{\n}{\n}"_f << (Application.m_bDistributedApp ? "true" : "false");
 						
-						Results.f_AddStdOut(fg_Format("               Backup enabled: {}{\n}", Application.m_bBackupEnabled ? "true" : "false"));
-						Results.f_AddStdOut(fg_Format("     Backup include wildcards: {vs}{\n}", Application.m_Backup_IncludeWildcards));
-						Results.f_AddStdOut(fg_Format("     Backup exclude wildcards: {vs}{\n}", Application.m_Backup_ExcludeWildcards));
-						Results.f_AddStdOut(fg_Format("        Backup add sync flags: {vs}{\n}", Application.m_Backup_AddSyncFlagsWildcards));
-						Results.f_AddStdOut(fg_Format("     Backup remove sync flags: {vs}{\n}", Application.m_Backup_RemoveSyncFlagsWildcards));
-						Results.f_AddStdOut(fg_Format("        Backup interval hours: {}{\n}{\n}", CTimeSpanConvert(Application.m_Backup_NewBackupInterval).f_GetHoursFloat()));
+						ApplicationInfo += "               Backup enabled: {}{\n}"_f << (Application.m_bBackupEnabled ? "true" : "false");
+						ApplicationInfo += "     Backup include wildcards: {vs}{\n}"_f << Application.m_Backup_IncludeWildcards;
+						ApplicationInfo += "     Backup exclude wildcards: {vs}{\n}"_f << Application.m_Backup_ExcludeWildcards;
+						ApplicationInfo += "        Backup add sync flags: {vs}{\n}"_f << Application.m_Backup_AddSyncFlagsWildcards;
+						ApplicationInfo += "     Backup remove sync flags: {vs}{\n}"_f << Application.m_Backup_RemoveSyncFlagsWildcards;
+						ApplicationInfo += "        Backup interval hours: {}{\n}{\n}"_f << CTimeSpanConvert(Application.m_Backup_NewBackupInterval).f_GetHoursFloat();
 
-						Results.f_AddStdOut(fg_Format("                  Auto update: {}{\n}", !Application.m_AutoUpdateTags.f_IsEmpty() ? "true" : "false"));
-						Results.f_AddStdOut(fg_Format("             Auto update tags: {vs}{\n}", Application.m_AutoUpdateTags));
-						Results.f_AddStdOut(fg_Format("         Auto update branches: {vs}{\n}{\n}", Application.m_AutoUpdateBranches));
+						ApplicationInfo += "                  Auto update: {}{\n}"_f << (!Application.m_AutoUpdateTags.f_IsEmpty() ? "true" : "false");
+						ApplicationInfo += "             Auto update tags: {vs}{\n}"_f << Application.m_AutoUpdateTags;
+						ApplicationInfo += "         Auto update branches: {vs}{\n}{\n}"_f << Application.m_AutoUpdateBranches;
 
-						Results.f_AddStdOut(fg_Format("            Pre update script: {}{\n}", Application.m_UpdateScriptPreUpdate));
-						Results.f_AddStdOut(fg_Format("           Post update script: {}{\n}", Application.m_UpdateScriptPostUpdate));
-						Results.f_AddStdOut(fg_Format("    Post launch update script: {}{\n}", Application.m_UpdateScriptPostLaunch));
-						Results.f_AddStdOut(fg_Format("       On error update script: {}{\n}{\n}", Application.m_UpdateScriptOnError));
+						ApplicationInfo += "            Pre update script: {}{\n}"_f << Application.m_UpdateScriptPreUpdate;
+						ApplicationInfo += "           Post update script: {}{\n}"_f << Application.m_UpdateScriptPostUpdate;
+						ApplicationInfo += "    Post launch update script: {}{\n}"_f << Application.m_UpdateScriptPostLaunch;
+						ApplicationInfo += "       On error update script: {}{\n}{\n}"_f << Application.m_UpdateScriptOnError;
 
-						Results.f_AddStdOut(fg_Format("     Version application name: {}{\n}", Application.m_VersionManagerApplication));
-						Results.f_AddStdOut(fg_Format("                 Update group: {}{\n}", Application.m_UpdateGroup));
-						Results.f_AddStdOut(fg_Format("                      Version: {}{\n}", Application.m_Version));
-						Results.f_AddStdOut(fg_Format("                 Version time: {}{\n}", Application.m_VersionInfo.m_Time.f_ToLocal()));
-						Results.f_AddStdOut(fg_Format("               Version config: {}{\n}", Application.m_VersionInfo.m_Configuration));
-						Results.f_AddStdOut(fg_Format("                 Version size: {}{\n}", Application.m_VersionInfo.m_nBytes));
-						Results.f_AddStdOut(fg_Format("                Version files: {}{\n}", Application.m_VersionInfo.m_nFiles));
+						ApplicationInfo += "     Version application name: {}{\n}"_f << Application.m_VersionManagerApplication;
+						ApplicationInfo += "                 Update group: {}{\n}"_f << Application.m_UpdateGroup;
+						ApplicationInfo += "                      Version: {}{\n}"_f << Application.m_Version;
+						ApplicationInfo += "                 Version time: {}{\n}"_f << Application.m_VersionInfo.m_Time.f_ToLocal();
+						ApplicationInfo += "               Version config: {}{\n}"_f << Application.m_VersionInfo.m_Configuration;
+						ApplicationInfo += "                 Version size: {}{\n}"_f << Application.m_VersionInfo.m_nBytes;
+						ApplicationInfo += "                Version files: {}{\n}"_f << Application.m_VersionInfo.m_nFiles;
 
 						if (Application.m_VersionInfo.m_ExtraInfo.f_IsObject())
 						{
 							CStr InfoString = Application.m_VersionInfo.m_ExtraInfo.f_ToString("    ");
 							CStr FirstLine = fg_GetStrLineSep(InfoString);
-							Results.f_AddStdOut(fg_Format("                Version extra: {}{\n}", FirstLine));
+							ApplicationInfo += "                Version extra: {}{\n}"_f << FirstLine;
 							while (!InfoString.f_IsEmpty())
-								Results.f_AddStdOut(fg_Format("                               {}{\n}", fg_GetStrLineSep(InfoString)));
+								ApplicationInfo += "                               {}{\n}"_f << fg_GetStrLineSep(InfoString);
 						}
 					}
+					*_pCommandLine += ApplicationInfo;
 				}
-				Continuation.f_SetResult(fg_Move(Results));
+				Continuation.f_SetResult(0);
 			}
 		;
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON const &_Params)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 	
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		mp_AppManagerInterface.m_pActor->f_GetAvailableVersions(_Params["Application"].f_String()) 
-			> Continuation / [bVerbose, Continuation](CAppManagerInterface::CVersionsAvailableForUpdate &&_Results)
+			> Continuation / [=](CAppManagerInterface::CVersionsAvailableForUpdate &&_Results)
 			{
-				CDistributedAppCommandLineResults CommandLineResults;
-
 				smint LongestApplication = fg_StrLen("Application");
 				smint LongestVersion = fg_StrLen("Version");
 				smint LongestPlatform = fg_StrLen("Platform");
@@ -213,31 +211,25 @@ namespace NMib::NCloud::NAppManager
 						, auto const &_RetrySequence
 					)
 					{
-						CommandLineResults.f_AddStdOut
-							(
-								fg_Format
-								(
-									"{sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*}   {sj*}   {sj*,a-}   {sj*,a-}\n"
-									, _Application
-									, LongestApplication
-									, _Version
-									, LongestVersion
-									, _Platform
-									, LongestPlatform
-									, _Config
-									, LongestConfig
-									, _Time
-									, LongestTime
-									, _Size
-									, LongestSize
-									, _Files
-									, LongestFiles
-									, _Tags
-									, LongestTags
-									, _RetrySequence
-									, LongestRetrySequence
-								)
-							)
+						*_pCommandLine += "{sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*}   {sj*}   {sj*,a-}   {sj*,a-}\n"_f
+							<< _Application
+							<< LongestApplication
+							<< _Version
+							<< LongestVersion
+							<< _Platform
+							<< LongestPlatform
+							<< _Config
+							<< LongestConfig
+							<< _Time
+							<< LongestTime
+							<< _Size
+							<< LongestSize
+							<< _Files
+							<< LongestFiles
+							<< _Tags
+							<< LongestTags
+							<< _RetrySequence
+							<< LongestRetrySequence
 						;
 					}
 				;
@@ -267,14 +259,14 @@ namespace NMib::NCloud::NAppManager
 							CStr JSONString = Version.m_VersionInfo.m_ExtraInfo.f_ToString("    ");
 							while (!JSONString.f_IsEmpty())
 							{
-								CStr Line = fg_GetStrLineSep(JSONString); 
-								CommandLineResults.f_AddStdOut(fg_Format("{}\n", Line));
+								CStr Line = fg_GetStrLineSep(JSONString);
+								*_pCommandLine += "{}\n"_f << Line;
 							}
 						}
 					}
 				}
 				
-				Continuation.f_SetResult(fg_Move(CommandLineResults));
+				Continuation.f_SetResult(0);
 			}
 		;
 		

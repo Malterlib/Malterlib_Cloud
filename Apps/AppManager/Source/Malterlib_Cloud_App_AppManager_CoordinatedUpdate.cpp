@@ -9,13 +9,13 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSON const &_Params)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 		CStr Group = _Params["Group"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		CStr HostID = _Params["HostID"].f_String();
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		
 		TCActorResultVector<void> Results;
 		
@@ -32,7 +32,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				if (!fg_CombineResults(Continuation, fg_Move(_Results)))
 					return;
-				Continuation.f_SetResult();
+				Continuation.f_SetResult(0);
 			}
 		;
 		return Continuation;

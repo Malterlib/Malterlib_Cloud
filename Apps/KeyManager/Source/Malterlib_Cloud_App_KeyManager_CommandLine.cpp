@@ -32,48 +32,15 @@ namespace NMib
 				
 				auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 
-				DefaultSection.f_RegisterDirectCommand
+				DefaultSection.f_RegisterCommand
 					(
 						{
 							"Names"_= {"--provide-password"}
 							, "Description"_= "Provide a password for the key database to be able to start the key manager."
 						}
-						, [](CEJSON const &_Parameters, CDistributedAppCommandLineClient &_CommandLineClient) -> uint32
+						, [this](CEJSON const &_Parameters, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 						{
-							CBlockingStdInReader StdInReader;
-							CBlockingStdInReader::CPromptParams PasswordPrompt;
-							PasswordPrompt.m_bPassword = true;
-							PasswordPrompt.m_Prompt = "Type password for key database: ";
-							NStr::CStr Password;
-							if (!StdInReader.f_ReadPrompt(PasswordPrompt, Password))
-								return 1;
-							
-							auto Parameters = _Parameters;
-							Parameters["Password"] = Password;
-							_CommandLineClient.f_RunCommand("--provide-password-direct", Parameters);
-							return 0;
-						}
-					)
-				;
-				DefaultSection.f_RegisterCommand
-					(
-						{
-							"Names"_= {"--provide-password-direct"}
-							, "Description"_= 
-								"Provide a password for the key database to be able to start the key manager. [INTERNAL]\n"
-								"Ideally use --provide-password instead so password is not sent on the command line."
-							, "Parameters"_=
-							{
-								"Password"_=
-								{
-									"Description"_= "The password."
-									, "Type"_= ""
-								}
-							}
-						}
-						, [this](CEJSON const &_Parameters)
-						{
-							return f_ProvidePassword(CStrSecure{_Parameters["Password"].f_String()});
+							return f_ProvidePassword(_pCommandLine);
 						}
 					)
 				;
@@ -98,106 +65,113 @@ namespace NMib
 								}
 							}
 						}
-						, [this](CEJSON const &_Parameters)
+						, [this](CEJSON const &_Parameters, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 						{
-							return f_PrecreateKeys(_Parameters["KeySize"].f_Integer(), _Parameters["NumberOfKeys"].f_Integer());
+							return f_PrecreateKeys(_Parameters["KeySize"].f_Integer(), _Parameters["NumberOfKeys"].f_Integer(), _pCommandLine);
 						}
 					)
 				;
 			}
 			
-			TCContinuation<CDistributedAppCommandLineResults> CKeyManagerDaemonActor::f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys)
+			TCContinuation<uint32> CKeyManagerDaemonActor::f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 			{
 				if (!mp_ServerActor)
 					return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
 				
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
+				TCContinuation<uint32> Continuation;
 				
-				mp_ServerActor(&CKeyManagerServer::f_PreCreateKeys, _KeySize, _nKeys) > Continuation / [Continuation, _nKeys, _KeySize]
+				mp_ServerActor(&CKeyManagerServer::f_PreCreateKeys, _KeySize, _nKeys) > Continuation / [=]
 					{
-						Continuation.f_SetResult(fg_Format("The server now has at least {} ({} bit) keys{\n}", _nKeys, _KeySize));
+						*_pCommandLine += "The server now has at least {} ({} bit) keys{\n}"_f << _nKeys << _KeySize;
+						Continuation.f_SetResult(0);
 					}
 				;
 				return Continuation;
 			}
 
-			TCContinuation<CDistributedAppCommandLineResults> CKeyManagerDaemonActor::f_ProvidePassword(NStr::CStrSecure const &_Password)
+			TCContinuation<uint32> CKeyManagerDaemonActor::f_ProvidePassword(NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 			{
-				TCContinuation<CDistributedAppCommandLineResults> Continuation;
-				fg_Dispatch
-					(
-						[this, _Password] () -> TCContinuation<void>
-						{
-							if (mp_bDatabaseDecrypted)
-								return DErrorInstance("A correct password has already been provided");
-							
-							if (!mp_pProvidePasswordOnce)
-							{
-								mp_pProvidePasswordOnce = fg_Construct
-									(
-										fg_ThisActor(this)
-										, [this](NStr::CStr const &_Password)
-										{
-											TCContinuation<void> Continuation;
-											
-											NNet::CEncryptAES::CSalt Salt{'M', 'i', 'B', 'K', 'e', 'y', 'M', 'a'};
-											TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
-												(
-													fg_Construct("Encrypted Key Manager Database Actor")
-													, mp_State.m_RootDirectory + "/KeyDatabase.encrypted"
-													, _Password
-													, &Salt
-												)
-											;
-											
-											CClock Clock;
-											Clock.f_Start();
-											
-											DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_Initialize) 
-												> [this, Continuation, DatabaseActor, Clock](TCAsyncResult<void> &&_Result)
-												{
-													if (!_Result)
-													{
-														// Delay reply to be same response time every time
-														fg_Timeout(fg_Max(fp64(0.5) - Clock.f_GetTime(), fp64(0.01))) 
-															> [Continuation, Result = fg_Move(_Result)]
-															{
-																Continuation.f_SetException
-																	(
-																		DMibErrorInstance(fg_Format("Failed to initialize database: {}", Result.f_GetExceptionStr()))
-																	)
-																;
-															}
-														;
-														return;
-													}
-													mp_bDatabaseDecrypted = true;
-													mp_DatabaseActor = DatabaseActor;
-													
-													fp_DatabaseDecrypted();
-													Continuation.f_SetResult();
-												}
-											;
-											
-											return Continuation;
-										}
-										, "Already processing a password. Try again later."
-									)
-								;
-							}
-							
-							return (*mp_pProvidePasswordOnce)(_Password);
-						}
-					)
-					> [Continuation](TCAsyncResult<void> &&_Result)
+				TCContinuation<uint32> Continuation;
+
+				CStdInReaderPromptParams PasswordPrompt;
+				PasswordPrompt.m_bPassword = true;
+				PasswordPrompt.m_Prompt = "Type password for key database: ";
+
+				_pCommandLine->f_ReadPrompt(PasswordPrompt) > Continuation / [=](CStrSecure &&_Password)
 					{
-						if (!_Result)
-						{
-							DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Error, "Provide password attempt failed: {}", _Result.f_GetExceptionStr());
-							Continuation.f_SetException(_Result);
-						}
-						else						
-							Continuation.f_SetResult(CDistributedAppCommandLineResults());
+						fg_Dispatch
+							(
+								[this, _Password] () -> TCContinuation<void>
+								{
+									if (mp_bDatabaseDecrypted)
+										return DErrorInstance("A correct password has already been provided");
+
+									if (!mp_pProvidePasswordOnce)
+									{
+										mp_pProvidePasswordOnce = fg_Construct
+											(
+												fg_ThisActor(this)
+												, [this](NStr::CStrSecure const &_Password)
+												{
+													TCContinuation<void> Continuation;
+
+													NNet::CEncryptAES::CSalt Salt{'M', 'i', 'B', 'K', 'e', 'y', 'M', 'a'};
+													TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
+														(
+															fg_Construct("Encrypted Key Manager Database Actor")
+															, mp_State.m_RootDirectory + "/KeyDatabase.encrypted"
+															, _Password
+															, &Salt
+														)
+													;
+
+													CClock Clock;
+													Clock.f_Start();
+
+													DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_Initialize)
+														> [this, Continuation, DatabaseActor, Clock](TCAsyncResult<void> &&_Result)
+														{
+															if (!_Result)
+															{
+																// Delay reply to be same response time every time
+																fg_Timeout(fg_Max(fp64(0.5) - Clock.f_GetTime(), fp64(0.01)))
+																	> [Continuation, Result = fg_Move(_Result)]
+																	{
+																		Continuation.f_SetException
+																			(
+																				DMibErrorInstance(fg_Format("Failed to initialize database: {}", Result.f_GetExceptionStr()))
+																			)
+																		;
+																	}
+																;
+																return;
+															}
+															mp_bDatabaseDecrypted = true;
+															mp_DatabaseActor = DatabaseActor;
+
+															fp_DatabaseDecrypted();
+															Continuation.f_SetResult();
+														}
+													;
+
+													return Continuation;
+												}
+												, "Already processing a password. Try again later."
+											)
+										;
+									}
+
+									return (*mp_pProvidePasswordOnce)(_Password);
+								}
+							)
+							> [Continuation](TCAsyncResult<void> &&_Result)
+							{
+								if (!_Result)
+									DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Error, "Provide password attempt failed: {}", _Result.f_GetExceptionStr());
+
+								Continuation.f_SetExceptionOrResult(_Result, 0);
+							}
+						;
 					}
 				;
 				return Continuation;

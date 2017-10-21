@@ -34,7 +34,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJSON const &_Params)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		for (auto &pUpdateWeak : mp_RunningUpdates)
 		{
@@ -48,13 +48,11 @@ namespace NMib::NCloud::NAppManager
 		return fg_Explicit();
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON const &_Params)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
-		
-		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
+		TCContinuation<uint32> Continuation;
 		
 		CStr Package;
 		CAppManagerInterface::CApplicationUpdate Update;
@@ -99,16 +97,15 @@ namespace NMib::NCloud::NAppManager
 				, Update
 				, {} 
 				, Package
-				, [pResult, Name](CStr const &_Info)
+				, [=](CStr const &_Info)
 				{
-					pResult->f_AddStdOut(_Info + DMibNewLine);
+					*_pCommandLine += _Info + DMibNewLine;
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application '{}': {}", Name, _Info);
 				}
 			)
-			> [pResult, Continuation, Name](TCAsyncResult<> &&_Result)
+			> [=](TCAsyncResult<> &&_Result)
 			{
-				pResult->f_AddAsyncResult(_Result);
-				Continuation.f_SetResult(fg_Move(*pResult));
+				Continuation.f_SetResult(_pCommandLine->f_AddAsyncResult(_Result));
 			}
 		;
 		return Continuation;

@@ -105,33 +105,37 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppLocalActor::fp_PreRunCommandLine(CStr const &_Command, NEncoding::CEJSON const &_Params)
+	TCContinuation<void> CCloudClientAppLocalActor::fp_PreRunCommandLine
+		(
+			 CStr const &_Command
+			 , NEncoding::CEJSON const &_Params
+			 , NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+		)
 	{
 		if (!_Params["SelfUpdateCheck"].f_Boolean() || _Command == "--self-update")
-			return fg_Explicit(CDistributedAppCommandLineResults());
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
-		fp_GetSelfUpdateVersion() > [Continuation](TCAsyncResult<CSelfUpdateVersion> &&_Version)
+			return fg_Explicit();
+
+		TCContinuation<void> Continuation;
+		fp_GetSelfUpdateVersion() > [Continuation, _pCommandLine](TCAsyncResult<CSelfUpdateVersion> &&_Version)
 			{
 				if (!_Version)
 				{
-					Continuation.f_SetResult(CDistributedAppCommandLineResults());
+					Continuation.f_SetResult();
 					return;
 				}
-				CDistributedAppCommandLineResults CommandLineResults;
 				auto &Version = *_Version;
-				CommandLineResults.f_AddStdErr(fg_Format("\nA new version {} is available for update by running with --self-update\n\n", Version.m_VersionID));
-				Continuation.f_SetResult(fg_Move(CommandLineResults));
+				*_pCommandLine %= "\nA new version {} is available for update by running with --self-update\n\n"_f << Version.m_VersionID;
 			}
 		;
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params)
+	TCContinuation<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		DMibCheck(mp_State.m_RootDirectory == CFile::fs_GetProgramDirectory());
 
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
-		fp_GetSelfUpdateVersion() > [this, Continuation](TCAsyncResult<CSelfUpdateVersion> &&_Version)
+		TCContinuation<uint32> Continuation;
+		fp_GetSelfUpdateVersion() > [=](TCAsyncResult<CSelfUpdateVersion> &&_Version)
 			{
 				if (!_Version)
 				{
@@ -146,7 +150,7 @@ namespace NMib::NCloud::NCloudClient
 				CStr DestinationDirectory = CFile::fs_GetProgramDirectory() + "/SelfUpdate"; 
 
 				mp_VersionManagerHelper.f_Download(Version.m_Actor, "MalterlibCloud", VersionID, DestinationDirectory)
-					> Continuation / [this, Continuation, Version, DestinationDirectory](CFileTransferResult &&_TransferResult)
+					> Continuation / [=](CFileTransferResult &&_TransferResult)
 					{
 						fg_Dispatch
 							(
@@ -201,24 +205,16 @@ namespace NMib::NCloud::NCloudClient
 									CFile::fs_DeleteDirectoryRecursive(DestinationDirectory);									
 								}
 							)
-							> Continuation % "Failed to update version" / [_TransferResult, Continuation, Version]
+							> Continuation % "Failed to update version" / [=]
 							{
-								CDistributedAppCommandLineResults CommandLine;
-
-								CommandLine.f_AddStdOut
-									(
-										fg_Format
-										(
-											"Downloaded {ns } bytes at {fe2} MB/s\n"
-											, _TransferResult.m_nBytes
-											, _TransferResult.f_BytesPerSecond()/1'000'000.0
-										)
-									)
+								*_pCommandLine += "Downloaded {ns } bytes at {fe2} MB/s\n"_f
+									<< _TransferResult.m_nBytes
+									<< _TransferResult.f_BytesPerSecond()/1'000'000.0
 								;
 						
-								CommandLine.f_AddStdErr(fg_Format("Updated to version {}\n", Version.m_VersionID));
+								*_pCommandLine %= "Updated to version {}\n"_f << Version.m_VersionID;
 								
-								Continuation.f_SetResult(fg_Move(CommandLine));
+								Continuation.f_SetResult(0);
 							}
 						;			
 					}

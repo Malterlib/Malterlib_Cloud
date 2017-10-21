@@ -41,7 +41,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_AddApplication(CEJSON const &_Params)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		bool bForceOverwrite = _Params["ForceOverwrite"].f_Boolean();
@@ -102,9 +102,8 @@ namespace NMib::NCloud::NAppManager
 		else if (!bNullPackage)
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
 
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
-		TCSharedPointer<CDistributedAppCommandLineResults> pResult = fg_Construct();
-		
+		TCContinuation<uint32> Continuation;
+
 		fp_AddApplication
 			(
 				Name
@@ -113,9 +112,9 @@ namespace NMib::NCloud::NAppManager
 				, bForceOverwrite
 				, bForceInstall
 				, bSettingsFromVersionInfo
-				, [pResult](CStr const &_Info)
+				, [=](CStr const &_Info)
 				{
-					pResult->f_AddStdOut(_Info + DMibNewLine);
+					*_pCommandLine += _Info + DMibNewLine;
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Add: {}", _Info);
 				}
 				, bFromFile ? Package : CStr() 
@@ -123,8 +122,7 @@ namespace NMib::NCloud::NAppManager
 			)
 			> [=](TCAsyncResult<void> &&_Result)
 			{
-				pResult->f_AddAsyncResult(_Result);
-				Continuation.f_SetResult(fg_Move(*pResult));
+				Continuation.f_SetResult(_pCommandLine->f_AddAsyncResult(_Result));
 			}
 		;
 		

@@ -65,13 +65,13 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 
-	TCContinuation<CDistributedAppCommandLineResults> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		
 		mp_AppManagerInterface.m_pActor->f_Remove(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
 			{
-				Continuation.f_SetResult(_Result);
+				Continuation.f_SetExceptionOrResult(_Result, 0);
 			}
 		;
 		

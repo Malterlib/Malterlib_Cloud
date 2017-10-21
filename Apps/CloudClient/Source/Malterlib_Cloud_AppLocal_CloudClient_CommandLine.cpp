@@ -45,9 +45,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_SelfUpdate(_Params);
+					return fp_CommandLine_SelfUpdate(_Params, _pCommandLine);
 				}
 			)
 		;

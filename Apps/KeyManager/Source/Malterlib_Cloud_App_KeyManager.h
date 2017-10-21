@@ -21,8 +21,8 @@ namespace NMib
 				CKeyManagerDaemonActor();
 				~CKeyManagerDaemonActor();
 				
-				TCContinuation<CDistributedAppCommandLineResults> f_ProvidePassword(NStr::CStrSecure const &_Password);
-				TCContinuation<CDistributedAppCommandLineResults> f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys);
+				TCContinuation<uint32> f_ProvidePassword(NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+				TCContinuation<uint32> f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 				
 			private:
 				TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
@@ -33,7 +33,7 @@ namespace NMib
 
 				TCActor<CKeyManagerServer> mp_ServerActor;
 				TCActor<CKeyManagerServerDatabase_EncryptedFile> mp_DatabaseActor;
-				TCUniquePointer<TCActorCallOnce<void, NStr::CStr>> mp_pProvidePasswordOnce;
+				TCUniquePointer<TCActorCallOnce<void, NStr::CStrSecure>> mp_pProvidePasswordOnce;
 				bool mp_bDatabaseDecrypted = false;
 			};
 		}		

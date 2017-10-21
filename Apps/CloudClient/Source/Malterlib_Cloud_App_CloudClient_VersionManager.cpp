@@ -31,9 +31,9 @@ namespace NMib::NCloud::NCloudClient
 						VersionManagerHost
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_VersionManager_ListApplications(_Params);
+					return fp_CommandLine_VersionManager_ListApplications(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -62,9 +62,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_VersionManager_ListVersions(_Params);
+					return fp_CommandLine_VersionManager_ListVersions(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -181,9 +181,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_VersionManager_UploadVersion(_Params);
+					return fp_CommandLine_VersionManager_UploadVersion(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -241,9 +241,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_VersionManager_ChangeTags(_Params);
+					return fp_CommandLine_VersionManager_ChangeTags(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -295,9 +295,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_VersionManager_DownloadVersion(_Params);
+					return fp_CommandLine_VersionManager_DownloadVersion(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -337,13 +337,13 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
-			> Continuation / [this, Continuation, Host]
+			> Continuation / [=]
 			{
 				TCActorResultMap<CHostInfo, CVersionManager::CListApplications::CResult> Applications;
 				
@@ -363,22 +363,21 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				Applications.f_GetResults() > Continuation / [Continuation](TCMap<CHostInfo, TCAsyncResult<CVersionManager::CListApplications::CResult>> &&_Results)
+				Applications.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<CVersionManager::CListApplications::CResult>> &&_Results)
 					{
-						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
 						{
 							auto &HostInfo = _Results.fs_GetKey(Result);
-							CommandLineResults.f_AddStdOut(fg_Format("{}\n", HostInfo.f_GetDesc()));
+							*_pCommandLine += "{}\n"_f << HostInfo.f_GetDesc();
 							if (!Result)
 							{
-								CommandLineResults.f_AddStdErr(fg_Format("    Failed getting applicatinos for this host: {}\n", Result.f_GetExceptionStr()));
+								*_pCommandLine %= "    Failed getting applicatinos for this host: {}\n"_f << Result.f_GetExceptionStr();
 								continue;
 							}
 							for (auto &Application : Result->m_Applications)
-								CommandLineResults.f_AddStdOut(fg_Format("    {}\n", Application));
+								*_pCommandLine += "    {}\n"_f << Application;
 						}
-						Continuation.f_SetResult(fg_Move(CommandLineResults));
+						Continuation.f_SetResult(0);
 					}
 				;
 			}
@@ -386,16 +385,16 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		
-		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
-			> Continuation / [this, Continuation, Application, Host, bVerbose]
+		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers")
+			> Continuation / [=]
 			{
 				TCActorResultMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
 				
@@ -416,40 +415,33 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				Versions.f_GetResults() > Continuation / [Continuation, bVerbose](TCMap<CHostInfo, TCAsyncResult<CVersionManager::CListVersions::CResult>> &&_Results)
+				Versions.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<CVersionManager::CListVersions::CResult>> &&_Results)
 					{
-						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
 						{
 							auto &HostInfo = _Results.fs_GetKey(Result);
-							CommandLineResults.f_AddStdOut(fg_Format("{}\n", HostInfo.f_GetDesc()));
+							*_pCommandLine += "{}\n"_f << HostInfo.f_GetDesc();
 							if (!Result)
 							{
-								CommandLineResults.f_AddStdErr(fg_Format("    Failed getting versions for this host: {}\n", Result.f_GetExceptionStr()));
+								*_pCommandLine %= "    Failed getting versions for this host: {}\n"_f << Result.f_GetExceptionStr();
 								continue;
 							}
 							for (auto &Versions : Result->m_Versions)
 							{
 								auto &Application = Result->m_Versions.fs_GetKey(Versions);
-								CommandLineResults.f_AddStdOut(fg_Format("    {}\n", Application));
+								*_pCommandLine += "    {}\n"_f << Application;
 								for (auto &Version : Versions)
 								{
 									auto &VersionID = Versions.fs_GetKey(Version);
-									CommandLineResults.f_AddStdOut
-										(
-											fg_Format
-											(
-												"        {sl20,a-} {sl10,a-} {tc6,sl24,a-} {sl15,a-} {ns ,sl12} bytes ({sl5} files)   {vs,vb,a-}   {}\n"
-												, VersionID.m_VersionID
-												, Version.m_Configuration
-												, Version.m_Time.f_ToLocal()
-												, VersionID.m_Platform
-												, Version.m_nBytes
-												, Version.m_nFiles
-												, Version.m_Tags
-												, Version.m_RetrySequence
-											)
-										)
+									*_pCommandLine += "        {sl20,a-} {sl10,a-} {tc6,sl24,a-} {sl15,a-} {ns ,sl12} bytes ({sl5} files)   {vs,vb,a-}   {}\n"_f
+										<< VersionID.m_VersionID
+										<< Version.m_Configuration
+										<< Version.m_Time.f_ToLocal()
+										<< VersionID.m_Platform
+										<< Version.m_nBytes
+										<< Version.m_nFiles
+										<< Version.m_Tags
+										<< Version.m_RetrySequence
 									;
 									if (bVerbose && Version.m_ExtraInfo.f_IsObject() && Version.m_ExtraInfo.f_Object().f_OrderedIterator())
 									{
@@ -457,13 +449,13 @@ namespace NMib::NCloud::NCloudClient
 										while (!JSONString.f_IsEmpty())
 										{
 											CStr Line = fg_GetStrLineSep(JSONString); 
-											CommandLineResults.f_AddStdOut(fg_Format("            {}\n", Line));
+											*_pCommandLine += "            {}\n"_f << Line;
 										}
 									}
 								}
 							}
 						}
-						Continuation.f_SetResult(fg_Move(CommandLineResults));
+						Continuation.f_SetResult(0);
 					}
 				;
 			}
@@ -471,9 +463,9 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		
 		auto fDoUpload = [=](CEJSON const &_Settings)
 			{
@@ -546,10 +538,10 @@ namespace NMib::NCloud::NCloudClient
 				
 				VersionID.m_Platform = Platform;
 
-				auto fDoCommand = [this, bForce, Continuation, Application, Host, VersionID, QueueSize, Source, Configuration, ExtraInfo, Tags](CTime const &_Time)
+				auto fDoCommand = [=](CTime const &_Time)
 					{
 						fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
-							> Continuation / [this, bForce, Continuation, Application, Host, VersionID, QueueSize, Source, _Time, Configuration, ExtraInfo, Tags]
+							> Continuation / [=]
 							{
 								CStr Error;
 								auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
@@ -587,24 +579,17 @@ namespace NMib::NCloud::NCloudClient
 										, bForce ? CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite : CVersionManager::CStartUploadVersion::EFlag_None
 										, QueueSize
 									)
-									> Continuation / [Continuation](CVersionManagerHelper::CUploadResult &&_UploadResult)
+									> Continuation / [=](CVersionManagerHelper::CUploadResult &&_UploadResult)
 									{
-										CDistributedAppCommandLineResults CommandLine;
 
 										if (!_UploadResult.m_DeniedTags.f_IsEmpty())
-											CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs,vb}\n", _UploadResult.m_DeniedTags));
-										
-										CommandLine.f_AddStdOut
-											(
-												fg_Format
-												(
-													"Upload finished transferring: {ns } bytes at {fe2} MB/s\n"
-													, _UploadResult.m_TransferResult.m_nBytes
-													, _UploadResult.m_TransferResult.f_BytesPerSecond()/1'000'000.0
-												)
-											)
+											*_pCommandLine %= "The following tags were denied: {vs,vb}\n"_f << _UploadResult.m_DeniedTags;
+
+										*_pCommandLine += "Upload finished transferring: {ns } bytes at {fe2} MB/s\n"_f
+											<< _UploadResult.m_TransferResult.m_nBytes
+											<< _UploadResult.m_TransferResult.f_BytesPerSecond()/1'000'000.0
 										;
-										Continuation.f_SetResult(fg_Move(CommandLine));
+										Continuation.f_SetResult(0);
 									}
 								;
 							}
@@ -680,9 +665,9 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -715,7 +700,7 @@ namespace NMib::NCloud::NCloudClient
 		VersionID.m_Platform = Platform;
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
-			> Continuation / [this, Continuation, Application, Host, VersionID, QueueSize, DestinationDirectory]
+			> Continuation / [=]
 			{
 				CStr Error;
 				auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
@@ -730,21 +715,13 @@ namespace NMib::NCloud::NCloudClient
 				}
 				
 				mp_VersionManagerHelper.f_Download(pVersionManager->m_Actor, Application, VersionID, DestinationDirectory, CFileTransferReceive::EReceiveFlag_IgnoreExisting, QueueSize)
-					> Continuation / [Continuation](CFileTransferResult &&_Results)
+					> Continuation / [=](CFileTransferResult &&_Results)
 					{
-						CDistributedAppCommandLineResults CommandLine;
-
-						CommandLine.f_AddStdOut
-							(
-								fg_Format
-								(
-									"Download finished transferring: {ns } bytes at {fe2} MB/s\n"
-									, _Results.m_nBytes
-									, _Results.f_BytesPerSecond()/1'000'000.0
-								)
-							)
+						*_pCommandLine += "Download finished transferring: {ns } bytes at {fe2} MB/s\n"_f
+							<< _Results.m_nBytes
+							<< _Results.f_BytesPerSecond()/1'000'000.0
 						;
-						Continuation.f_SetResult(fg_Move(CommandLine));
+						Continuation.f_SetResult(0);
 					}
 				;
 			}
@@ -752,9 +729,9 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -809,7 +786,7 @@ namespace NMib::NCloud::NCloudClient
 			return DMibErrorInstance("No changes specified. Specify tags to add and remove with --add and --remove, or specify --retry-upgrade");
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
-			> Continuation / [this, Continuation, Application, Host, VersionID, AddTags, RemoveTags, Platform, bRetryUpgrade]
+			> Continuation / [=]
 			{
 				CStr Error;
 				auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
@@ -838,12 +815,11 @@ namespace NMib::NCloud::NCloudClient
 						, fg_Move(ChangeTags)
 					)
 					.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
-					> Continuation % "Failed to change tags" / [Continuation](CVersionManager::CChangeTags::CResult &&_Result)
+					> Continuation % "Failed to change tags" / [=](CVersionManager::CChangeTags::CResult &&_Result)
 					{
-						CDistributedAppCommandLineResults CommandLine;
 						if (!_Result.m_DeniedTags.f_IsEmpty())
-							CommandLine.f_AddStdErr(fg_Format("The following tags were denied: {vs,vb}\n", _Result.m_DeniedTags));
-						Continuation.f_SetResult(fg_Move(CommandLine));
+							*_pCommandLine %= "The following tags were denied: {vs,vb}\n"_f << _Result.m_DeniedTags;
+						Continuation.f_SetResult(0);
 					}
 				;
 			}

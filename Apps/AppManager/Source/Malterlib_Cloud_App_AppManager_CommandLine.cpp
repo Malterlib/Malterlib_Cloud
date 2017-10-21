@@ -299,13 +299,14 @@ namespace NMib::NCloud::NAppManager
 							"Type"_= COneOfType{COneOf{nullptr}, ""}
 							, "Description"_= "The files needed to run the application.\n"
 							"Can be a version manager application name, a directory, a tar.gz file or null. Will look for version manager applications"
-							" by default. Specify --from-file to look for the package on disk. Specifying null will add a application with no package. Useful for example when you want to have an encrypted container shared between several applications."
+							" by default. Specify --from-file to look for the package on disk. Specifying null will add a application with no package. "
+							"Useful for example when you want to have an encrypted container shared between several applications."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_AddApplication(_Params);
+					return fp_CommandLine_AddApplication(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -404,9 +405,9 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_UpdateGroup
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_ChangeApplicationSettings(_Params);
+					return fp_CommandLine_ChangeApplicationSettings(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -432,9 +433,9 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_EnumApplications(_Params);
+					return fp_CommandLine_EnumApplications(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -460,9 +461,9 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_ListAvailableVersions(_Params);
+					return fp_CommandLine_ListAvailableVersions(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -480,9 +481,9 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_RemoveApplication(_Params);
+					return fp_CommandLine_RemoveApplication(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -510,9 +511,9 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_UpdateApplication(_Params);
+					return fp_CommandLine_UpdateApplication(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -564,9 +565,9 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_UpdateApplication(_Params);
+					return fp_CommandLine_UpdateApplication(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -584,9 +585,9 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_StopApplication(_Params);
+					return fp_CommandLine_StopApplication(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -604,9 +605,9 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_RestartApplication(_Params);
+					return fp_CommandLine_RestartApplication(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -624,9 +625,9 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_StartApplication(_Params);
+					return fp_CommandLine_StartApplication(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -659,9 +660,9 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_UpdateApplication(_Params);
+					return fp_CommandLine_UpdateApplication(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -671,9 +672,9 @@ namespace NMib::NCloud::NAppManager
 					"Names"_= {"--cancel-all-updates"}
 					, "Description"_= "Cancel all running pending updates"
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_CancelAllUpdates(_Params);
+					return fp_CommandLine_CancelAllUpdates(_Params, _pCommandLine);
 				}
 			)
 		;

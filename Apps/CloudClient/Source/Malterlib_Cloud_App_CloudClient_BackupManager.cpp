@@ -33,9 +33,9 @@ namespace NMib::NCloud::NCloudClient
 						OptionalBackupHost
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_BackupManager_ListBackupSources(_Params);
+					return fp_CommandLine_BackupManager_ListBackupSources(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -58,9 +58,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_BackupManager_ListBackups(_Params);
+					return fp_CommandLine_BackupManager_ListBackups(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -121,9 +121,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params)
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_BackupManager_DownloadBackup(_Params);
+					return fp_CommandLine_BackupManager_DownloadBackup(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -164,13 +164,13 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
-			> Continuation / [this, Continuation, BackupHost]
+			> Continuation / [=]
 			{
 				TCActorResultMap<CHostInfo, TCVector<CStr>> BackupSources;
 				
@@ -189,22 +189,21 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				BackupSources.f_GetResults() > Continuation / [Continuation](TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> &&_Results)
+				BackupSources.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> &&_Results)
 					{
-						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
 						{
 							auto &HostInfo = _Results.fs_GetKey(Result);
-							CommandLineResults.f_AddStdOut(fg_Format("{}\n", HostInfo.f_GetDesc()));
+							*_pCommandLine += "{}\n"_f << HostInfo.f_GetDesc();
 							if (!Result)
 							{
-								CommandLineResults.f_AddStdErr(fg_Format("    Failed getting backup sources for this host: {}\n", Result.f_GetExceptionStr()));
+								*_pCommandLine += "    Failed getting backup sources for this host: {}\n"_f << Result.f_GetExceptionStr();
 								continue;
 							}
 							for (auto &Source : *Result)
-								CommandLineResults.f_AddStdOut(fg_Format("    {}\n", Source));
+								*_pCommandLine += "    {}\n"_f << Source;
 						}
-						Continuation.f_SetResult(fg_Move(CommandLineResults));
+						Continuation.f_SetResult(0);
 					}
 				;
 			}
@@ -212,15 +211,15 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
-			> Continuation / [this, Continuation, BackupSource, BackupHost]
+			> Continuation / [=]
 			{
 				TCActorResultMap<CHostInfo, TCMap<CStr, TCVector<CBackupManager::CBackupID>>> Backups;
 				
@@ -240,27 +239,26 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				Backups.f_GetResults() > Continuation / [Continuation](TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, TCVector<CBackupManager::CBackupID>>>> &&_Results)
+				Backups.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, TCVector<CBackupManager::CBackupID>>>> &&_Results)
 					{
-						CDistributedAppCommandLineResults CommandLineResults;
 						for (auto &Result : _Results)
 						{
 							auto &HostInfo = _Results.fs_GetKey(Result);
-							CommandLineResults.f_AddStdOut(fg_Format("{}\n", HostInfo.f_GetDesc()));
+							*_pCommandLine += "{}\n"_f << HostInfo.f_GetDesc();
 							if (!Result)
 							{
-								CommandLineResults.f_AddStdErr(fg_Format("    Failed getting backups for this host: {}\n", Result.f_GetExceptionStr()));
+								*_pCommandLine %= "    Failed getting backups for this host: {}\n"_f << Result.f_GetExceptionStr();
 								continue;
 							}
 							for (auto &Backups : *Result)
 							{
 								auto &BackupSouce = Result->fs_GetKey(Backups);
-								CommandLineResults.f_AddStdOut(fg_Format("    {}\n", BackupSouce));
+								*_pCommandLine += "    {}\n"_f << BackupSouce;
 								for (auto &Backup : Backups)
-									CommandLineResults.f_AddStdOut(fg_Format("        {}\n", Backup));
+									*_pCommandLine += "        {}\n"_f << Backup;
 							}
 						}
-						Continuation.f_SetResult(fg_Move(CommandLineResults));
+						Continuation.f_SetResult(0);
 					}
 				;
 			}
@@ -268,9 +266,9 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<CDistributedAppCommandLineResults> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<CDistributedAppCommandLineResults> Continuation;
+		TCContinuation<uint32> Continuation;
 		
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
@@ -343,29 +341,21 @@ namespace NMib::NCloud::NCloudClient
 						, fg_Move(Config)
 						, mp_DownloadBackupSubscription
 					)
-					> Continuation % "Failed to download backup" / [Continuation](CDirectorySyncReceive::CSyncResult &&_Result)
+					> Continuation % "Failed to download backup" / [=](CDirectorySyncReceive::CSyncResult &&_Result)
 					{
-						CDistributedAppCommandLineResults CommandLine;
-
 						if (_Result.m_Stats.m_nSyncedFiles == 0)
-							CommandLine.f_AddStdOut(fg_Format("All files were already up to date\n"));
+							*_pCommandLine += "All files were already up to date\n";
 						else
 						{
-							CommandLine.f_AddStdOut
-								(
-									fg_Format
-									(
-										"Download of {} files finished transferring: {ns } incoming bytes at {fe2} MB/s    {ns } outgoing bytes at {fe2} MB/s\n"
-										, _Result.m_Stats.m_nSyncedFiles
-										, _Result.m_Stats.m_IncomingBytes
-										, _Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
-										, _Result.m_Stats.m_OutgoingBytes
-										, _Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
-									)
-								)
+							*_pCommandLine += "Download of {} files finished transferring: {ns } incoming bytes at {fe2} MB/s    {ns } outgoing bytes at {fe2} MB/s\n"_f
+								<< _Result.m_Stats.m_nSyncedFiles
+								<< _Result.m_Stats.m_IncomingBytes
+								<< _Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+								<< _Result.m_Stats.m_OutgoingBytes
+								<< _Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
 							;
 						}
-						Continuation.f_SetResult(fg_Move(CommandLine));
+						Continuation.f_SetResult(0);
 					}
 				;
 			}

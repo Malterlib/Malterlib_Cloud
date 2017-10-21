@@ -31,19 +31,19 @@ namespace NMib::NCloud::NCloudClient
 		// Backup Manager
 		void fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCContinuation<void> fp_BackupManager_SubscribeToServers();
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params);
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params);
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params);
+		TCContinuation<uint32> fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 		// Version Manager
 		void fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCContinuation<void> fp_VersionManager_SubscribeToServers();
 		
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params);
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params);
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params);
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params);
-		TCContinuation<CDistributedAppCommandLineResults> fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params);
+		TCContinuation<uint32> fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		
 		fp64 mp_Timeout = 0.0;
 		
