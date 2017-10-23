@@ -41,7 +41,6 @@ namespace NMib::NCloud::NCloudAPIManager
 		}
 	}
 
-#ifdef DMalterlibCurlAvailable
 	namespace
 	{
 		class CCurlInit
@@ -176,10 +175,4 @@ namespace NMib::NCloud::NCloudAPIManager
 		CCurlResult Result(State);
 		return Result;
 	}
-#else
-	CCurlResult fg_Curl(ECurlMethod _Method, CStr const &_URL, TCMap<CStr, CStr> const &_Headers, CStr const &_Data)
-	{
-		DMibError("Curl not available");
-	}
-#endif
 }

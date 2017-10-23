@@ -9,6 +9,7 @@ Import "../../../../External/curl/Curl.MTarget"
 	{
 		MalterlibConcurrency_DistributedActors true
 		MalterlibCloudTargetLibrary true
+		MalterlibUseCurl true
 	}
 	Target
 	{
@@ -67,6 +68,7 @@ Import "../../../../External/curl/Curl.MTarget"
 				!MalterlibAppTestPostCopyDestination ""
 			}
 		} 
+		MalterlibUseCurl true
 		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
@@ -78,12 +80,6 @@ Import "../../../../External/curl/Curl.MTarget"
 		DebuggerCommandArguments "--daemon-run-debug"
 		BaseFileName "CloudAPIManager"
 		Group Apps
-	}
-	Compile
-	{
-		!!CompileDialect "C"
-		
-		PreprocessorDefines "DMalterlibCurlAvailable;@(Compile.PreprocessorDefines)"
 	}
 	
 	%Group Source

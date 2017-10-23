@@ -179,6 +179,8 @@ namespace NMib::NCloud::NAppManager
 								ChangeBackupContinuation.f_SetResult();
 						}
 					}
+					else
+						ChangeBackupContinuation.f_SetResult();
 
 					ChangeBackupContinuation > Continuation / [=, InProgressScope = InProgressScope]
 						{

@@ -101,6 +101,9 @@ namespace NMib::NCloud::NVersionManager
 		
 		VersionInfo.m_Tags = pThis->fp_FilterTags(CallingHostID, VersionInfo.m_Tags, DeniedTags);
 
+		// Force time to same as when saving in JSON file
+		VersionInfo.m_Time = CTimeConvert::fs_FromCreateFromUnixMilliseconds(CTimeConvert(VersionInfo.m_Time).f_UnixMilliseconds());
+
 		CStr UploadID = fg_RandomID();
 		
 		auto &Upload = pThis->mp_VersionUploads[UploadID];
@@ -144,7 +147,8 @@ namespace NMib::NCloud::NVersionManager
 				, UploadID
 				, Continuation
 				, Desc = Upload.m_Desc
-				, _Params, VersionInfo
+				, _Params
+				, VersionInfo
 				, VersionPath
 				, VersionID = _Params.m_VersionIDAndPlatform
 				, ApplicationName = _Params.m_Application
