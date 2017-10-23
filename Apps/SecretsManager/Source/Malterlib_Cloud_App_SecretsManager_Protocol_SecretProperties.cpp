@@ -10,20 +10,56 @@ namespace NMib::NCloud::NSecretsManager
 {
 	namespace
 	{
-		bool fg_HasAllTagsSet(TCOptional<TCSet<CStrSecure>> const &_CurrentTags, TCSet<CStrSecure> const &_NeededTags)
+		bool fg_HasAllTagsSet(TCSet<CStrSecure> const &_CurrentTags, TCSet<CStrSecure> const &_NeededTags)
 		{
-			if (_NeededTags.f_IsEmpty())
-				return true;
-			
-			if (!_CurrentTags)
-				return false;
-			
 			for (auto const &Tag : _NeededTags)
 			{
-				if (!_CurrentTags->f_FindEqual(Tag))
+				if (!_CurrentTags.f_FindEqual(Tag))
 					return false;
 			}
 			return true;
+		}
+
+		template<class t_CFunctor>
+		void fg_CollectMatching
+			(
+				TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal> &_Secrets
+				, TCOptional<CStrSecure> const &_SemanticID
+				, TCSet<CStrSecure> const &_TagsExclusive
+				, t_CFunctor _Func
+			)
+		{
+			for (auto const &pSecretProperty : _Secrets)
+			{
+				if (_SemanticID && *_SemanticID != pSecretProperty.m_SemanticID)
+					continue;
+
+				if (!fg_HasAllTagsSet(pSecretProperty.m_Tags, _TagsExclusive))
+					continue;
+
+				_Func(&pSecretProperty);
+			}
+		}
+
+		NStr::CStr fg_SecretIDException(CSecretsManager::CSecretID const &_ID)
+		{
+			return NStr::fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name);
+		}
+
+		NStr::CStr fg_SemanticIDException(NStr::CStr const &_Error, NStr::CStr const &_SemanticID, TCSet<CStrSecure> const &_Tags)
+		{
+			NStr::CStr TagsString;
+			if (!_Tags.f_IsEmpty())
+			{
+				TagsString += fg_Format(" and Tag{}: ", &"s"[_Tags.f_HasOneMember()]);
+				NStr::CStr Comma;
+				for (auto const &Tag : _Tags)
+				{
+					TagsString += fg_Format("{}'{}'", Comma, Tag);
+					Comma = ", ";
+				}
+			}
+			return NStr::fg_Format("{} matching Semantic ID: '{}'{}", _Error, _SemanticID, TagsString);
 		}
 	}
 
@@ -33,48 +69,89 @@ namespace NMib::NCloud::NSecretsManager
 			, TCSet<CStrSecure> const &_TagsExclusive
 		) -> TCContinuation<TCSet<CSecretID>>
 	{
+		auto &This = *m_pThis;
+		auto Auditor = This.mp_AppState.f_Auditor();
+		auto CallingHostID = Auditor.f_HostInfo().f_GetRealHostID(); 
+
+		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/EnumerateSecrets"))
+			return Auditor.f_AccessDenied("(EnumerateSecrets, command)");
+
 		TCSet<CSecretID> IDs;
-		for (auto const &Secret : m_pThis->m_Secrets)
-		{
-			if (_SemanticID)
-			{
-				if (!Secret.m_SemanticID || *_SemanticID != *Secret.m_SemanticID)
-					continue;
-			}
-
-			if (!fg_HasAllTagsSet(Secret.m_Tags, _TagsExclusive))
-				continue;
-
-			IDs[m_pThis->m_Secrets.fs_GetKey(Secret)];
-		}
+		fg_CollectMatching
+			(
+				m_pThis->mp_Secrets
+				, _SemanticID
+				, _TagsExclusive
+				, [&] (CSecretPropertiesInternal const *_pSecretProperty)
+				{
+					// Without permission, do not enumerate this secret
+					NStr::CStr Permission;
+					if (!This.fp_HasPermission("Read", _pSecretProperty->m_SemanticID, _pSecretProperty->m_Tags, Permission))
+						return;
+					
+					IDs[m_pThis->mp_Secrets.fs_GetKey(_pSecretProperty)];
+				}
+			 )
+		;
 		return fg_Explicit(fg_Move(IDs));
 	}
 
 	TCContinuation<CSecretsManager::CSecret> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecret(CSecretsManager::CSecretID &&_ID)
 	{
 		auto &This = *m_pThis;
-
 		auto Auditor = This.mp_AppState.f_Auditor();
-		if (auto *pSecret = m_pThis->m_Secrets.f_FindEqual(_ID))
+		auto CallingHostID = Auditor.f_HostInfo().f_GetRealHostID();
+
+		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/GetSecret"))
+			return Auditor.f_AccessDenied("(GetSecret, command)");
+		
+		if (auto *pSecretProperty = m_pThis->mp_Secrets.f_FindEqual(_ID))
 		{
-			if (pSecret->m_Secret)
-				return fg_Explicit(*pSecret->m_Secret);
-			else
-				return Auditor.f_Exception("No secret set");
+			NStr::CStr Permission;
+			if (!This.fp_HasPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission))
+				return Auditor.f_AccessDenied(fg_Format("(GetSecret, no permission for '{}')", Permission));
+			
+			return fg_Explicit(pSecretProperty->m_Secret);
 		}
 		else
-			return Auditor.f_Exception("SecretID does not exist");
+			return Auditor.f_Exception(fg_SecretIDException(_ID));
 	}
 
 	TCContinuation<CSecretsManager::CSecretProperties> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretProperties(CSecretsManager::CSecretID &&_ID)
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
+		auto CallingHostID = Auditor.f_HostInfo().f_GetRealHostID();
 
-		if (auto *pSecret = This.m_Secrets.f_FindEqual(_ID))
-			return fg_Explicit(*pSecret);
+		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/GetSecretProperties"))
+			return Auditor.f_AccessDenied("(GetSecretProperties, command)");
+
+		if (auto *pSecretProperty = This.mp_Secrets.f_FindEqual(_ID))
+		{
+			NStr::CStr Permission;
+			if (!This.fp_HasPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission))
+				return Auditor.f_AccessDenied(fg_Format("(GetSecretProperties, no permission for '{}')", Permission));
+			
+			return fg_Explicit
+				(
+				 	CSecretsManager::CSecretProperties
+					{
+						pSecretProperty->m_Secret
+		 				, pSecretProperty->m_UserName
+		 				, pSecretProperty->m_URL
+		 				, pSecretProperty->m_Expires
+		 				, pSecretProperty->m_Notes
+		 				, pSecretProperty->m_Metadata
+		 				, pSecretProperty->m_Created
+		 				, pSecretProperty->m_Modified
+		 				, pSecretProperty->m_SemanticID
+		 				, pSecretProperty->m_Tags
+					}
+				)
+		   ;
+		}
 		else
-			return Auditor.f_Exception("SecretID does not exist");
+			return Auditor.f_Exception(fg_SecretIDException(_ID));
 	}
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretBySemanticID(CStrSecure const &_SemanticID, TCSet<CStrSecure> const &_TagsExclusive)
@@ -82,36 +159,38 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
+		auto CallingHostID = Auditor.f_HostInfo().f_GetRealHostID();
+
+		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/GetSecretBySemanticID"))
+			return Auditor.f_AccessDenied("(GetSecretBySemanticID, command)");
 
 		CSecretsManager::CSecret FoundSecret;
 		int32 nFoundCount = 0;
-		
-		for (auto const &Secret : This.m_Secrets)
-		{
-			if (!Secret.m_SemanticID)
-				continue;
 
-			if (!fg_HasAllTagsSet(Secret.m_Tags, _TagsExclusive))
-				continue;
-			
-			if (*Secret.m_SemanticID == _SemanticID)
-			{
-				if (Secret.m_Secret)
+		fg_CollectMatching
+			(
+				m_pThis->mp_Secrets
+				, _SemanticID
+				, _TagsExclusive
+				, [&] (CSecretPropertiesInternal const *_pSecretProperty)
 				{
-					if (++nFoundCount > 1)
-						return Auditor.f_Exception("Non-unique Semantic ID");
-					FoundSecret = *Secret.m_Secret;
+					// Without permission, do not enumerate this secret
+					NStr::CStr Permission;
+					if (!This.fp_HasPermission("Read", _pSecretProperty->m_SemanticID, _pSecretProperty->m_Tags, Permission))
+						return;
+
+					++nFoundCount;
+					FoundSecret = _pSecretProperty->m_Secret;
 				}
-				else
-				{
-					// Semantic ID matches, but no Secret???
-				}
-			}
-		}
+			 )
+		;
 
 		if (nFoundCount == 0)
-			return Auditor.f_Exception("Non matching Semantic ID");
+			return Auditor.f_Exception(fg_SemanticIDException("No secret", _SemanticID, _TagsExclusive));
 			
+		if (nFoundCount > 1)
+			return Auditor.f_Exception(fg_SemanticIDException("Multiple secrets",_SemanticID, _TagsExclusive));
+
 		return fg_Explicit(FoundSecret);
 	}
 	
@@ -119,12 +198,112 @@ namespace NMib::NCloud::NSecretsManager
 		-> TCContinuation<void>
 	{
 		auto &This = *m_pThis;
+		auto Auditor = This.mp_AppState.f_Auditor();
+		auto CallingHostID = Auditor.f_HostInfo().f_GetRealHostID();
 
-		This.m_Secrets[_ID] = _Secret;
+		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/SetSecretProperties"))
+			return Auditor.f_AccessDenied("(SetSecretProperties, command)");
+
+		// Check the correctness of Semantic ID and Tags *before* we use them to match permissions
+		if (_Secret.m_SemanticID)
+		{
+			if (!fs_IsValidTag(*_Secret.m_SemanticID))
+				return Auditor.f_Exception(fg_Format("Malformed Semantic ID: '{}'", *_Secret.m_SemanticID));
+		}
+		if (_Secret.m_Tags)
+		{
+			for (auto const &Tag : *_Secret.m_Tags)
+			{
+				if (!fs_IsValidTag(Tag))
+					return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
+			}
+		}
 		
-		TCContinuation<void> Continuation;
-		Continuation.f_SetResult();
-		return Continuation;
+		auto *pSecretProperty =	This.mp_Secrets.f_FindEqual(_ID);
+		
+		auto CurrentTime = NTime::CTime::fs_NowUTC();
+		auto *pCreatedOrModified = "modified";
+		
+		if (pSecretProperty)
+		{
+			// Must have permission to write to the old semantic ID and tags
+			NStr::CStr Permission;
+			if (!This.fp_HasPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission))
+				return Auditor.f_AccessDenied(fg_Format("(SetSecretProperties, no permission for '{}')", Permission));
+
+			// If SemanticID and/or Tags is changed we must also have permission for the new combo
+			if (_Secret.m_SemanticID || _Secret.m_Tags)
+			{
+				if 
+					(
+						!This.fp_HasPermission
+						(
+							 "Write"
+							 , _Secret.m_SemanticID ? *_Secret.m_SemanticID : pSecretProperty->m_SemanticID
+							 , _Secret.m_Tags ? *_Secret.m_Tags : pSecretProperty->m_Tags
+							 , Permission
+						)
+					)
+				{
+					return Auditor.f_AccessDenied(fg_Format("(SetSecretProperties, no permission for '{}')", Permission));
+				}
+			}
+		}
+		else
+		{
+			// Must have permission for the SemanticID and Tags we're creating, so use the
+			// getter functions to get the empty default values in case they are not set
+			NStr::CStr Permission;
+			if (!This.fp_HasPermission("Write", _Secret.f_GetSemanticID(), _Secret.f_GetTags(), Permission))
+				return Auditor.f_AccessDenied(fg_Format("(SetSecretProperties, no permission for '{}')", Permission));
+
+			pSecretProperty = &This.mp_Secrets[_ID];
+			pSecretProperty->m_Created = CurrentTime;
+			pCreatedOrModified = "created";
+		}
+		
+		pSecretProperty->m_Modified = CurrentTime;
+
+		// Only set the members that are defined in _Secret
+		if (_Secret.m_Secret)
+			pSecretProperty->m_Secret = *_Secret.m_Secret;
+			
+		if (_Secret.m_UserName)
+			pSecretProperty->m_UserName = *_Secret.m_UserName;
+			
+		if (_Secret.m_URL)
+			pSecretProperty->m_URL = *_Secret.m_URL;
+			
+		if (_Secret.m_Expires)
+			pSecretProperty->m_Expires = *_Secret.m_Expires;
+			
+		if (_Secret.m_Notes)
+			pSecretProperty->m_Notes = *_Secret.m_Notes;
+			
+		if (_Secret.m_Metadata)
+			pSecretProperty->m_Metadata = *_Secret.m_Metadata;
+			
+		if (_Secret.m_Created)
+			pSecretProperty->m_Created = *_Secret.m_Created;
+		
+		if (_Secret.m_Modified)
+			pSecretProperty->m_Modified = *_Secret.m_Modified;
+
+		if (_Secret.m_SemanticID)
+		{
+			This.fp_UpdateSemanticIDs(pSecretProperty->m_SemanticID, *_Secret.m_SemanticID);
+			pSecretProperty->m_SemanticID = *_Secret.m_SemanticID;
+		}
+		
+		if (_Secret.m_Tags)
+		{
+			This.fp_UpdateTags(pSecretProperty->m_Tags, *_Secret.m_Tags);
+			pSecretProperty->m_Tags = *_Secret.m_Tags;
+		}
+
+		Auditor.f_Info(fg_Format("Secret properties {} for ID '{}/{}'", pCreatedOrModified, _ID.m_Folder, _ID.m_Name));
+
+		return fg_Explicit();
 	}
 
 	TCContinuation<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_ModifyTags
@@ -136,47 +315,105 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
-		
-		if (auto *pSecret = This.m_Secrets.f_FindEqual(_ID))
+		auto CallingHostID = Auditor.f_HostInfo().f_GetRealHostID();
+
+		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/ModifyTags"))
+			return Auditor.f_AccessDenied("(ModifyTags, command)");
+
+		if (auto *pSecretProperty = This.mp_Secrets.f_FindEqual(_ID))
 		{
-			if (!pSecret->m_Tags)
-				pSecret->m_Tags = NContainer::TCSet<NStr::CStrSecure>{};
-			*pSecret->m_Tags -=_TagsToRemove;
-			*pSecret->m_Tags +=_TagsToAdd;
+			// Check the correctness of Semantic ID and Tags *before* we use them to match permissions
+			for (auto const &Tag : _TagsToRemove)
+			{
+				if (!fs_IsValidTag(Tag))
+					return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
+			}
+			for (auto const &Tag : _TagsToAdd)
+			{
+				if (!fs_IsValidTag(Tag))
+					return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
+			}
+
+			NStr::CStr Permission;
+			if
+				(
+					!This.fp_HasPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission)
+					|| (!_TagsToRemove.f_IsEmpty() && !This.fp_HasPermission("Write", pSecretProperty->m_SemanticID, _TagsToRemove, Permission))
+					|| (!_TagsToAdd.f_IsEmpty() && !This.fp_HasPermission("Write", pSecretProperty->m_SemanticID, _TagsToAdd, Permission))
+				)
+			{
+				return Auditor.f_AccessDenied(fg_Format("(ModifyTags, no permission for '{}')", Permission));
+			}
+			
+			// If we remove everything from the tags set we must have NoTags permission
+			auto CurrentTags(pSecretProperty->m_Tags);
+			CurrentTags -= _TagsToRemove;
+			if (CurrentTags.f_IsEmpty() && !This.fp_HasPermission("Write", pSecretProperty->m_SemanticID, CurrentTags, Permission))
+				return Auditor.f_AccessDenied(fg_Format("(ModifyTags, no permission for '{}')", Permission));
+
+			This.fp_UpdateTags(_TagsToRemove, _TagsToAdd);
+
+			pSecretProperty->m_Tags -= _TagsToRemove;
+			pSecretProperty->m_Tags += _TagsToAdd;
+			pSecretProperty->m_Modified = NTime::CTime::fs_NowUTC();
+			
+			Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+			
 			return fg_Explicit();
 		}
 		else
-			return Auditor.f_Exception("SecretID does not exist");
+			return Auditor.f_Exception(fg_SecretIDException(_ID));
 	}
 	
 	TCContinuation<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SetMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey, CEJSON &&_Metadata)
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
+		auto CallingHostID = Auditor.f_HostInfo().f_GetRealHostID();
+
+		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/SetMetadata"))
+			return Auditor.f_AccessDenied("(SetMetadata, command)");
 		
-		if (auto *pSecret = This.m_Secrets.f_FindEqual(_ID))
+		if (auto *pSecretProperties = This.mp_Secrets.f_FindEqual(_ID))
 		{
-			if (!pSecret->m_Metadata)
-				pSecret->m_Metadata = NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON>{};
-			(*pSecret->m_Metadata)[_MetadataKey] = _Metadata;
+			NStr::CStr Permission;
+			if	(!This.fp_HasPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permission))
+				return Auditor.f_AccessDenied(fg_Format("(SetMetadata, no permission for '{}')", Permission));
+
+			pSecretProperties->m_Metadata[_MetadataKey] = _Metadata;
+			pSecretProperties->m_Modified = NTime::CTime::fs_NowUTC();
+			
+			Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+			
 			return fg_Explicit();
 		}
 		else
-			return Auditor.f_Exception("SecretID does not exist");
+			return Auditor.f_Exception(fg_SecretIDException(_ID));
 	}
 	
 	TCContinuation<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_RemoveMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey)
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
+		auto CallingHostID = Auditor.f_HostInfo().f_GetRealHostID();
+
+		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/RemoveMetadata"))
+			return Auditor.f_AccessDenied("(RemoveMetadata, command)");
 		
-		if (auto *pSecret = This.m_Secrets.f_FindEqual(_ID))
+		if (auto *pSecretProperty = This.mp_Secrets.f_FindEqual(_ID))
 		{
-			if (pSecret->m_Metadata)
-				(*pSecret->m_Metadata).f_Remove(_MetadataKey);
+			NStr::CStr Permission;
+			if	(!This.fp_HasPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission))
+				return Auditor.f_AccessDenied(fg_Format("(RemoveMetadata, no permission for '{}')", Permission));
+
+			pSecretProperty->m_Metadata.f_Remove(_MetadataKey);
+			pSecretProperty->m_Modified = NTime::CTime::fs_NowUTC();
+			
+			Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+			
 			return fg_Explicit();
 		}
 		else
-			return Auditor.f_Exception("SecretID does not exist");
+			return Auditor.f_Exception(fg_SecretIDException(_ID));
 	}
 }

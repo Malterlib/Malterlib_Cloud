@@ -23,37 +23,37 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CSecretsManager::f_UploadFile);
 	}
 
-	auto CSecretsManager::CSecretProperties::f_Secret(CSecret &&_Secret) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetSecret(CSecret &&_Secret) && -> CSecretProperties &&
 	{
 		m_Secret = fg_Move(_Secret);
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_UserName(NStr::CStrSecure const &_UserName) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetUserName(NStr::CStrSecure const &_UserName) && -> CSecretProperties &&
 	{
 		m_UserName = _UserName;
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_URL(NStr::CStrSecure const &_URL) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetURL(NStr::CStrSecure const &_URL) && -> CSecretProperties &&
 	{
 		m_URL = _URL;
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_Expires(NTime::CTime const &_Expires) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetExpires(NTime::CTime const &_Expires) && -> CSecretProperties &&
 	{
 		m_Expires = _Expires;
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_Notes(NStr::CStrSecure const &_Notes) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetNotes(NStr::CStrSecure const &_Notes) && -> CSecretProperties &&
 	{
 		m_Notes = _Notes;
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_Metadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_MetadataValue) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_MetadataValue) && -> CSecretProperties &&
 	{
 		if (!m_Metadata)
 			m_Metadata = NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON>{};
@@ -61,25 +61,25 @@ namespace NMib::NCloud
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_Created(NTime::CTime const &_Created) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetCreated(NTime::CTime const &_Created) && -> CSecretProperties &&
 	{
 		m_Created = _Created;
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_Modified(NTime::CTime const &_Modified) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetModified(NTime::CTime const &_Modified) && -> CSecretProperties &&
 	{
 		m_Modified = _Modified;
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_SemanticID(NStr::CStrSecure const &_SemanticID) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetSemanticID(NStr::CStrSecure const &_SemanticID) && -> CSecretProperties &&
 	{
 		m_SemanticID = _SemanticID;
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_Tags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) && -> CSecretProperties &&
 	{
 		m_Tags = fg_Move(_Tags);
 		return fg_Move(*this);
@@ -91,6 +91,66 @@ namespace NMib::NCloud
 			m_Tags = NContainer::TCSet<NStr::CStrSecure>{};
 		*m_Tags += fg_Move(_Tags);
 		return fg_Move(*this);
+	}
+
+	auto CSecretsManager::CSecretProperties::f_GetSecret() const -> CSecret const &
+	{
+		static CSecret s_Secret;
+		return m_Secret.f_Get(s_Secret);
+	}
+	
+	auto CSecretsManager::CSecretProperties::f_GetUserName() const -> NStr::CStrSecure const &
+	{
+		static NStr::CStrSecure s_UserName;
+		return m_UserName.f_Get(s_UserName);
+	}
+	
+	auto CSecretsManager::CSecretProperties::f_GetURL() const -> NStr::CStrSecure const &
+	{
+		static NStr::CStrSecure s_URL;
+		return m_URL.f_Get(s_URL);
+	}
+	
+	auto CSecretsManager::CSecretProperties::f_GetExpires() const -> NTime::CTime const &
+	{
+		static NTime::CTime s_Expires;
+		return m_Expires.f_Get(s_Expires);
+	}
+	
+	auto CSecretsManager::CSecretProperties::f_GetNotes() const -> NStr::CStrSecure const &
+	{
+		static NStr::CStrSecure s_Notes;
+		return m_Notes.f_Get(s_Notes);
+	}
+	
+	auto CSecretsManager::CSecretProperties::f_GetMetadata() const -> NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON> const &
+	{
+		static NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON> s_Metadata;
+		return m_Metadata.f_Get(s_Metadata);
+	}
+	
+	auto CSecretsManager::CSecretProperties::f_GetCreated() const -> NTime::CTime const &
+	{
+		static NTime::CTime s_Created;
+		return m_Created.f_Get(s_Created);
+	}
+	
+	auto CSecretsManager::CSecretProperties::f_GetModified() const -> NTime::CTime const &
+	{
+		static NTime::CTime s_Modified;
+		return m_Modified.f_Get(s_Modified);
+	}
+	
+	auto CSecretsManager::CSecretProperties::f_GetSemanticID() const -> NStr::CStrSecure const &
+	{
+		static NStr::CStrSecure s_SemanticID;
+		return m_SemanticID.f_Get(s_SemanticID);
+	}
+	
+	auto CSecretsManager::CSecretProperties::f_GetTags() const -> NContainer::TCSet<NStr::CStrSecure> const &
+	{
+		static NContainer::TCSet<NStr::CStrSecure> s_Tags;
+		return m_Tags.f_Get(s_Tags);
 	}
 
 	namespace NPrivate

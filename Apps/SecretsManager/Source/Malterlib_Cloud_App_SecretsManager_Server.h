@@ -12,6 +12,23 @@
 
 namespace NMib::NCloud::NSecretsManager
 {
+	struct CSecretPropertiesInternal
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+		
+		CSecretsManager::CSecret m_Secret;
+		NStr::CStrSecure m_UserName;
+		NStr::CStrSecure m_URL;
+		NTime::CTime m_Expires;
+		NStr::CStrSecure m_Notes;
+		NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON> m_Metadata;
+		NTime::CTime m_Created;
+		NTime::CTime m_Modified;
+		NStr::CStrSecure m_SemanticID;
+		NContainer::TCSet<NStr::CStrSecure> m_Tags;
+	};
+
 	struct CSecretsManagerDaemonActor::CServer : public CActor
 	{
 	public:
@@ -54,15 +71,20 @@ namespace NMib::NCloud::NSecretsManager
 		void fp_Publish();
 		
 		TCContinuation<void> fp_SetupPermissions();
-
+		bool fp_HasPermission(char const *_ReadWrite, NStr::CStr const &_SemanticID, TCSet<CStrSecure> const &_Tags, NStr::CStr &_oPermission);
+		static bool fs_IsValidTag(NStr::CStr const &_Tag);
+		void fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove,TCSet<CStrSecure> const &_TagsToAdd);
+		void fp_UpdateSemanticIDs(NStr::CStr const &_SemanticIDToRemove, NStr::CStr const &_SemanticIDToAdd);
+	
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
-
 		TCDelegatedActorInterface<CSecretsManagerImplementation> mp_ProtocolInterface;
-		
 		CDistributedAppState &mp_AppState;
-		
 		CTrustedPermissionSubscription mp_Permissions;
 
-		TCMap<CSecretsManager::CSecretID, CSecretsManager::CSecretProperties> m_Secrets;
+		TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal> mp_Secrets;
+		TCMap<NStr::CStr, uint32> mp_Tags;
+		TCMap<NStr::CStr, uint32> mp_SemanticIDs;
 	};
 }
+
+#include "Malterlib_Cloud_App_SecretsManager_Server.hpp"

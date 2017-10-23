@@ -35,8 +35,8 @@ namespace NMib::NCloud
 		
 		enum ESecretType : int32
 		{
-			
-			ESecretType_String
+			ESecretType_NotSet
+			, ESecretType_String
 			, ESecretType_Buffer
 			, ESecretType_File
 		};
@@ -67,6 +67,7 @@ namespace NMib::NCloud
 		struct CSecret : public NContainer::TCStreamableVariant
 			<
 				ESecretType
+				, void, ESecretType_NotSet
 				, NStr::CStrSecure, ESecretType_String
 				, NContainer::CSecureByteVector, ESecretType_Buffer
 				, CFileTag, ESecretType_File
@@ -75,6 +76,7 @@ namespace NMib::NCloud
 			using CSuper = NContainer::TCStreamableVariant
 				<
 					ESecretType
+					, void, ESecretType_NotSet
 					, NStr::CStrSecure, ESecretType_String
 					, NContainer::CSecureByteVector, ESecretType_Buffer
 					, CFileTag, ESecretType_File
@@ -105,17 +107,28 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStrSecure>> m_Tags;
 			
-			CSecretProperties &&f_Secret(CSecret &&_Secret) &&;
-			CSecretProperties &&f_UserName(NStr::CStrSecure const &_UserName) &&;
-			CSecretProperties &&f_URL(NStr::CStrSecure const &_URL) &&;
-			CSecretProperties &&f_Expires(NTime::CTime const &_Expires) &&;
-			CSecretProperties &&f_Notes(NStr::CStrSecure const &_Notes) &&;
-			CSecretProperties &&f_Metadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_MetadataValue) &&;
-			CSecretProperties &&f_Created(NTime::CTime const &_Created) &&;
-			CSecretProperties &&f_Modified(NTime::CTime const &_Modified) &&;
-			CSecretProperties &&f_SemanticID(NStr::CStrSecure const &_SemanticID) &&;
-			CSecretProperties &&f_Tags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &&;
+			CSecretProperties &&f_SetSecret(CSecret &&_Secret) &&;
+			CSecretProperties &&f_SetUserName(NStr::CStrSecure const &_UserName) &&;
+			CSecretProperties &&f_SetURL(NStr::CStrSecure const &_URL) &&;
+			CSecretProperties &&f_SetExpires(NTime::CTime const &_Expires) &&;
+			CSecretProperties &&f_SetNotes(NStr::CStrSecure const &_Notes) &&;
+			CSecretProperties &&f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_MetadataValue) &&;
+			CSecretProperties &&f_SetCreated(NTime::CTime const &_Created) &&;
+			CSecretProperties &&f_SetModified(NTime::CTime const &_Modified) &&;
+			CSecretProperties &&f_SetSemanticID(NStr::CStrSecure const &_SemanticID) &&;
+			CSecretProperties &&f_SetTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &&;
 			CSecretProperties &&f_AddTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &&;
+
+			auto f_GetSecret() const -> CSecret const &;
+			auto f_GetUserName() const -> NStr::CStrSecure const &;
+			auto f_GetURL() const -> NStr::CStrSecure const &;
+			auto f_GetExpires() const -> NTime::CTime const &;
+			auto f_GetNotes() const -> NStr::CStrSecure const &;
+			auto f_GetMetadata() const -> NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON> const &;
+			auto f_GetCreated() const -> NTime::CTime const &;
+			auto f_GetModified() const -> NTime::CTime const &;
+			auto f_GetSemanticID() const -> NStr::CStrSecure const &;
+			auto f_GetTags() const -> NContainer::TCSet<NStr::CStrSecure> const &;
 		};
 
 		virtual NConcurrency::TCContinuation<NContainer::TCSet<CSecretID>> f_EnumerateSecrets
