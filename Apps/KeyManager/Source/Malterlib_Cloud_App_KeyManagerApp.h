@@ -7,5 +7,5 @@
 
 namespace NMib::NCloud
 {
-	TCActor<CDistributedAppActor> fg_ConstructApp_KeyManager();
+	NConcurrency::TCActor<NConcurrency::CDistributedAppActor> fg_ConstructApp_KeyManager();
 }

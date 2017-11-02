@@ -53,7 +53,7 @@ public:
 		Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
 		//Config.m_PublicKeysForAllKeyManagers = ; TODO
 		
-		TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config);
+		TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config, fg_GetDistributionManager());
 		
 		auto Subscription = _TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
 		TCDistributedActor<CKeyManager> KeyManager = _TestHelper.f_GetRemoteActor<CKeyManager>(Subscription);
@@ -187,7 +187,7 @@ public:
 			Config.m_DatabaseActor = DatabaseActor;
 			Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
 		
-			TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config);
+			TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config, fg_GetDistributionManager());
 			KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_CallSync(60.0);
 			
 			CSymmetricKey AvailableKey;

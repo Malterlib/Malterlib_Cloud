@@ -67,7 +67,15 @@ Property
 	MalterlibCloudVersionInfo_BranchForVersion "@(MalterlibCloudVersionInfo_Branch->Replace(' ', ''))"
 	MalterlibCloudVersionInfo_BranchForVersion "@(MalterlibCloudVersionInfo_BranchForVersion->Replace('(', '-'))"
 	MalterlibCloudVersionInfo_BranchForVersion "@(MalterlibCloudVersionInfo_BranchForVersion->Replace(')', ''))"
-	
+
+	MalterlibCloudVersionInfo_Version "@(MalterlibCloud_VersionUploadVersion)"
+	{
+		&
+		{
+			MalterlibCloudVersionInfo_Version ""
+			!MalterlibCloud_VersionUploadVersion ""
+		}
+	}
 	MalterlibCloudVersionInfo_Version "@(MalterlibCloudVersionInfo_BranchForVersion)/@(ProductVersionMajor->FormatInt('{}')).@(ProductVersionMinor->FormatInt('{}')).@(ProductVersionRevision->FormatInt('{}'))"
 	{
 		!!MalterlibCloudVersionInfo_Version ""
@@ -447,7 +455,9 @@ Property
 	MalterlibTestDependencies_Malterlib_Cloud "Malterlib_Cloud_VersionManager=Com_Malterlib_Cloud_VersionManager;Lib_Malterlib_Cloud_VersionManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestDependencies_Malterlib_Cloud "Malterlib_Cloud_Test=Com_Malterlib_Cloud_Test;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestDependencies_Malterlib_Cloud "Malterlib_Cloud_CloudClient=Com_Malterlib_Cloud_CloudClient;@(MalterlibTestDependencies_Malterlib_Cloud)"
+	MalterlibTestDependencies_Malterlib_Cloud "Malterlib_Cloud_KeyManager=Com_Malterlib_Cloud_KeyManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_SecretsManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
+	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_KeyManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestExtraGroups_Malterlib_Cloud "{Test}/{Malterlib_Cloud}"
 }
 

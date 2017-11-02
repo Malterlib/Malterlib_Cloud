@@ -5,6 +5,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
+#include <Mib/Concurrency/DistributedActor>
 
 #include "Malterlib_Cloud_KeyManager_Shared.h"
 
@@ -79,7 +80,7 @@ namespace NMib::NCloud
 		friend class CKeyManager;
 		
 	public:
-		CKeyManagerServer(CKeyManagerServerConfig const &_Config);
+		CKeyManagerServer(CKeyManagerServerConfig const &_Config, NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager);
 		~CKeyManagerServer();
 		
 		NConcurrency::TCContinuation<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);

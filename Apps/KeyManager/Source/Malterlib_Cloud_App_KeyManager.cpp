@@ -35,7 +35,7 @@ namespace NMib::NCloud::NKeyManager
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Password provided, starting up key manager");
 		CKeyManagerServerConfig Config;
 		Config.m_DatabaseActor = mp_DatabaseActor;
-		mp_ServerActor = fg_ConstructActor<CKeyManagerServer>(Config);
+		mp_ServerActor = fg_ConstructActor<CKeyManagerServer>(Config, mp_State.m_DistributionManager);
 	}
 
 	TCContinuation<void> CKeyManagerDaemonActor::fp_StopApp()

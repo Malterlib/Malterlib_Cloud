@@ -17,6 +17,7 @@ namespace NMib::NCloud
 		friend class CKeyManagerServer;
 		
 	public:
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/KeyManager";
 		
 		enum : uint32
 		{

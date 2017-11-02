@@ -125,6 +125,8 @@ namespace NMib::NCloud::NCloudClient
 				}
 				auto &Version = *_Version;
 				*_pCommandLine %= "\nA new version {} is available for update by running with --self-update\n\n"_f << Version.m_VersionID;
+
+				Continuation.f_SetResult();
 			}
 		;
 		return Continuation;

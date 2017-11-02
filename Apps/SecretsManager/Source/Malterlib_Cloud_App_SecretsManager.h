@@ -15,12 +15,13 @@ namespace NMib::NCloud::NSecretsManager
 		~CSecretsManagerDaemonActor();
 		
 		struct CServer;
+		struct CServerController;
 		
 	private:
-		TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
+		TCContinuation<void> fp_StartApp(CEJSON const &_Params) override;
 		TCContinuation<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override; 
 		
-		TCActor<CServer> mp_pServer;
+		TCActor<CServerController> mp_pServerController;
 	};
 }

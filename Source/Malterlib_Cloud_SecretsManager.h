@@ -131,6 +131,8 @@ namespace NMib::NCloud
 			auto f_GetTags() const -> NContainer::TCSet<NStr::CStrSecure> const &;
 		};
 
+		static bool fs_IsValidTag(NStr::CStr const &_Tag);
+
 		virtual NConcurrency::TCContinuation<NContainer::TCSet<CSecretID>> f_EnumerateSecrets
 			(
 				NStorage::TCOptional<NStr::CStrSecure> &_SemanticID

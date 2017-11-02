@@ -23,6 +23,11 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CSecretsManager::f_UploadFile);
 	}
 
+	bool CSecretsManager::fs_IsValidTag(CStr const &_Tag)
+	{
+		return NNet::fg_IsValidHostname(_Tag);
+	}
+
 	auto CSecretsManager::CSecretProperties::f_SetSecret(CSecret &&_Secret) && -> CSecretProperties &&
 	{
 		m_Secret = fg_Move(_Secret);

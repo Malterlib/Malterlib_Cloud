@@ -158,7 +158,12 @@ namespace NMib::NCloud::NVersionManager
 			pSubscription = &pThis->mp_GlobalVersionSubscriptions[SubscriptionID];
 		else
 			pSubscription = &pThis->mp_VersionSubscriptions[_Params.m_Application][SubscriptionID];
-			
+
+		if (!_Params.m_DispatchActor)
+			return DMibErrorInstance("m_DispatchActor required");
+		if (!_Params.m_fOnNewVersions)
+			return DMibErrorInstance("m_fOnNewVersions required");
+
 		auto &Subscription = *pSubscription;
 		Subscription.m_DispatchActor = fg_Move(_Params.m_DispatchActor);
 		Subscription.m_fOnNewVersions = fg_Move(_Params.m_fOnNewVersions);
@@ -192,8 +197,18 @@ namespace NMib::NCloud::NVersionManager
 			return fg_Explicit(fg_Move(Result));
 
 		pThis->fp_SendSubscriptionInitial(_Params.m_Application, Subscription, false);
-			
-		return fg_Explicit(fg_Move(Result));
+
+		TCContinuation<CSubscribeToUpdates::CResult> Continuation;
+
+		// Because versions are dispatched through m_DispatchActor we need to dispatch the result to get correct ordering
+		g_Dispatch(Subscription.m_DispatchActor) > [Continuation, Result = fg_Move(Result)]() mutable
+			{
+				Continuation.f_SetResult(fg_Move(Result));
+			}
+			> fg_DiscardResult()
+		;
+
+		return Continuation;
 	}
 }
 

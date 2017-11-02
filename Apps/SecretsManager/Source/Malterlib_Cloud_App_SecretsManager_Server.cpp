@@ -8,8 +8,9 @@
 
 namespace NMib::NCloud::NSecretsManager
 {
-	CSecretsManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState)
+	CSecretsManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState, TCActor<CSecretsManagerServerDatabase> const &_DatabaseActor)
 		: mp_AppState(_AppState)
+		, mp_DatabaseActor(_DatabaseActor)
 		, mp_pCanDestroyTracker(fg_Construct())
 	{
 		fp_Init();
@@ -21,14 +22,31 @@ namespace NMib::NCloud::NSecretsManager
 	
 	void CSecretsManagerDaemonActor::CServer::fp_Init()
 	{
-		fp_SetupPermissions() > [this](TCAsyncResult<void> &&_ResultPermissions)
+		mp_DatabaseActor(&CSecretsManagerServerDatabase::f_ReadDatabase) > [this](TCAsyncResult<CSecretsManagerServerDatabase::CDatabase> &&_Database)
 			{
-				if (!_ResultPermissions)
+				if (!_Database)
 				{
-					DLogWithCategory(Malterlib/Cloud/SecretsManager, Error, "Failed to setup permissions, aborting startup: {}", _ResultPermissions.f_GetExceptionStr());
+					DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to read database: {}", _Database.f_GetExceptionStr());
 					return;
 				}
-				fp_Publish();
+				
+				mp_Database = fg_Move(*_Database);
+				for (auto const &SecretProperties : mp_Database)
+				{
+					fp_UpdateTags({}, SecretProperties.m_Tags);
+					fp_UpdateSemanticIDs("", SecretProperties.m_SemanticID);
+				}
+				
+				fp_SetupPermissions() > [this](TCAsyncResult<void> &&_ResultPermissions)
+					{
+						if (!_ResultPermissions)
+						{
+							DLogWithCategory(Malterlib/Cloud/SecretsManager, Error, "Failed to setup permissions, aborting startup: {}", _ResultPermissions.f_GetExceptionStr());
+							return;
+						}
+						fp_Publish();
+					}
+				;
 			}
 		;
 	}
@@ -90,10 +108,10 @@ namespace NMib::NCloud::NSecretsManager
 		return pCanDestroy->m_Continuation;
 	}
 	
-	bool CSecretsManagerDaemonActor::CServer::fp_HasPermission(char const *_ReadWrite, NStr::CStr const &_SemanticID, TCSet<CStrSecure> const &_Tags, NStr::CStr &o_Permission)
+	bool CSecretsManagerDaemonActor::CServer::fp_HasPermission(char const *_ReadWrite, CStr const &_SemanticID, TCSet<CStrSecure> const &_Tags, CStr &o_Permission)
 	{
 		auto CallingHostID = fg_GetCallingHostID();
-		NStr::CStr SemanticPart{ _SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : "NoSemanticID"};
+		CStr SemanticPart{ _SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : "NoSemanticID"};
 
 		if (_Tags.f_IsEmpty())
 		{
@@ -172,7 +190,7 @@ namespace NMib::NCloud::NSecretsManager
 		}
 	}
 
-	void CSecretsManagerDaemonActor::CServer::fp_UpdateSemanticIDs(NStr::CStr const &_SemanticIDToRemove, NStr::CStr const &_SemanticIDToAdd)
+	void CSecretsManagerDaemonActor::CServer::fp_UpdateSemanticIDs(CStr const &_SemanticIDToRemove, CStr const &_SemanticIDToAdd)
 	{
 		if (_SemanticIDToAdd == _SemanticIDToRemove)
 			return;
@@ -200,8 +218,13 @@ namespace NMib::NCloud::NSecretsManager
 		}
 	}
 	
-	bool CSecretsManagerDaemonActor::CServer::fs_IsValidTag(NStr::CStr const &_Tag)
+	void CSecretsManagerDaemonActor::CServer::fp_WriteDatabase()
 	{
-		return NNet::fg_IsValidHostname(_Tag);
+		mp_DatabaseActor(&CSecretsManagerServerDatabase::f_WriteDatabase, fg_TempCopy(mp_Database)) > [](TCAsyncResult<void> &&_Result)
+			{
+				if (!_Result)
+					DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to write database: {}", _Result.f_GetExceptionStr());
+			}
+		;
 	}
 }

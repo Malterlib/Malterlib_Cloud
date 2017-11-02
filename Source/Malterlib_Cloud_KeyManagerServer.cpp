@@ -171,12 +171,11 @@ namespace NMib::NCloud
 		return Continuation;
 	}		
 	
-	CKeyManagerServer::CKeyManagerServer(CKeyManagerServerConfig const &_Config)
+	CKeyManagerServer::CKeyManagerServer(CKeyManagerServerConfig const &_Config, TCActor<CActorDistributionManager> const &_DistributionManager)
 		: mp_pInternal(fg_Construct(this, _Config))
 	{
 		auto &Internal = *mp_pInternal;
-		auto &DistributionManager = NConcurrency::fg_GetDistributionManager();
-		Internal.m_KeyManagerActor = DistributionManager->f_ConstructActor<CKeyManager>(fg_ThisActor(this));
+		Internal.m_KeyManagerActor = _DistributionManager->f_ConstructActor<CKeyManager>(fg_ThisActor(this));
 		
 		Internal.m_KeyManagerActor->f_Publish<CKeyManager>("com.malterlib/Cloud/KeyManager")
 			> [this] (TCAsyncResult<CDistributedActorPublication> &&_Publication)

@@ -8,11 +8,16 @@
 #include <Mib/Concurrency/DistributedAppInterface>
 #include <Mib/Concurrency/DistributedActorTrustManagerProxy>
 #include <Mib/Concurrency/DistributedAppTestHelpers>
+#include <Mib/Concurrency/DistributedActorTestHelpers>
+#include <Mib/Cloud/KeyManager>
+#include <Mib/Cloud/KeyManagerServer>
+#include <Mib/Cloud/KeyManagerDatabases/EncryptedFile>
+#include <Mib/Cloud/App/KeyManager>
+#include <Mib/Cloud/App/SecretsManager>
 #include <Mib/Cloud/SecretsManager>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Test/Exception>
-#include <Mib/Cloud/App/SecretsManager>
 
 #ifdef DPlatformFamily_Windows
 #include <Windows.h>
@@ -33,7 +38,7 @@ using namespace NMib::NStorage;
 
 #define DTestSecretsManagerEnableLogging 0
 
-static fp64 g_Timeout = 600.0;
+static fp64 g_Timeout = 60.0;
 
 class CSecretsManager_Tests : public NMib::NTest::CTest
 {
@@ -42,109 +47,195 @@ public:
 	{
 		DMibTestSuite("General")
 		{
+			fp_DoGeneralTests();
+		};
+	}
+	
+	void fp_DoGeneralTests()
+	{
 #ifdef DPlatformFamily_Windows
-			AllocConsole();
-			SetConsoleCtrlHandler
-				(
-					nullptr
-					, true
-				)
-			;
+		AllocConsole();
+		SetConsoleCtrlHandler
+			(
+				nullptr
+				, true
+			)
+		;
 #endif
-			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
-			CStr RootDirectory = ProgramDirectory + "/SecretsTests";
-			TCSet<CStr> SecretsManagerPermissionsForTest = fg_CreateSet<CStr>("SecretsManager/CommandAll", "SecretsManager/*/*/*");
 
-			CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);
-			
-			if (CFile::fs_FileExists(RootDirectory))
-				CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+#if DTestSecretsManagerEnableLogging
+		fg_GetSys()->f_AddStdErrLogger();
+#endif
+	
+		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
+		CStr RootDirectory = ProgramDirectory + "/SecretsTests";
+		TCSet<CStr> SecretsManagerPermissionsForTest = fg_CreateSet<CStr>("SecretsManager/CommandAll", "SecretsManager/*/*/*");
 
-			CFile::fs_CreateDirectory(RootDirectory);
-			
-			CTrustManagerTestHelper TrustManagerState;
-			TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
-			CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
-			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
-			
-			CDistributedActorTrustManager_Address ServerAddress;
-			ServerAddress.m_URL = fg_Format("wss://[UNIX(777):{}/controller.sock]/", RootDirectory);
-			TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
-			
-			CDistributedApp_LaunchHelperDependencies Dependencies;
-			Dependencies.m_Address = ServerAddress.m_URL;
-			Dependencies.m_TrustManager = TrustManager;
-			Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(g_Timeout);
-			
-			NMib::NConcurrency::CDistributedActorSecurity Security;
-			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CSecretsManager::mc_pDefaultNamespace);
-			Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(g_Timeout);
-			
-			TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestSecretsManagerEnableLogging);
-			auto Cleanup = g_OnScopeExit > [&]
-				{
-					LaunchHelper->f_BlockDestroy();
-				}
-			;
+		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);
+	
+		if (CFile::fs_FileExists(RootDirectory))
+			CFile::fs_DeleteDirectoryRecursive(RootDirectory);
 
-			// Copy Cloud Client for debugging
-			CStr CloudClientDirectory = RootDirectory + "/MalterlibCloud";
-			CFile::fs_CreateDirectory(CloudClientDirectory);
-			CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/MalterlibCloud", CloudClientDirectory, nullptr);
-			
-			// Copy SecretsManagers to their directories
-			mint nSecretsManagers = 1;
+		CFile::fs_CreateDirectory(RootDirectory);
+	
+		CTrustManagerTestHelper TrustManagerState;
+		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
+		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
+	
+		CDistributedActorTrustManager_Address ServerAddress;
+		ServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}/controller.sock]/", RootDirectory);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
+	
+		CDistributedApp_LaunchHelperDependencies Dependencies;
+		Dependencies.m_Address = ServerAddress.m_URL;
+		Dependencies.m_TrustManager = TrustManager;
+		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(g_Timeout);
+	
+		NMib::NConcurrency::CDistributedActorSecurity Security;
+		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CSecretsManager::mc_pDefaultNamespace);
+		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(g_Timeout);
+	
+		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestSecretsManagerEnableLogging);
+		auto Cleanup = g_OnScopeExit > [&]
 			{
-				TCActorResultVector<void> SecretsManagerLaunchesResults;
-				TCVector<TCActor<CSeparateThreadActor>> FileActors;
-				for (mint i = 0; i < nSecretsManagers; ++i)
-				{
-					auto &FileActor = FileActors.f_Insert() = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-					g_Dispatch(FileActor) > [=]
-						{
-							CStr SecretsManagerName = fg_Format("SecretsManager{sf0,sl2}", i);
-							CStr SecretsManagerDirectory = RootDirectory + "/" + SecretsManagerName;
-							CFile::fs_CreateDirectory(SecretsManagerDirectory);
-							//CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/SecretsManager", SecretsManagerDirectory, nullptr);
-						}
-						> SecretsManagerLaunchesResults.f_AddResult()
-					;
-				}
-				fg_CombineResults(SecretsManagerLaunchesResults.f_GetResults().f_CallSync());
+				LaunchHelper->f_BlockDestroy();
 			}
+		;
 
-			// Launch SecretsManagers
-			TCActorResultVector<CDistributedApp_LaunchInfo> SecretsManagerLaunchesResults;
-			
+		// Launch KeyManager
+		CStr KeyManagerDirectory = RootDirectory + "/KeyManager";
+		CFile::fs_CreateDirectory(KeyManagerDirectory);
+		CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/KeyManager", KeyManagerDirectory, nullptr);
+
+		// Copy Cloud Client for debugging
+		CStr CloudClientDirectory = RootDirectory + "/MalterlibCloud";
+		CFile::fs_CreateDirectory(CloudClientDirectory);
+		CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/MalterlibCloud", CloudClientDirectory, nullptr);
+
+		// Copy SecretsManagers to their directories
+		mint nSecretsManagers = 1;
+		{
+			TCActorResultVector<void> SecretsManagerLaunchesResults;
+			TCVector<TCActor<CSeparateThreadActor>> FileActors;
 			for (mint i = 0; i < nSecretsManagers; ++i)
 			{
-				CStr SecretsManagerName = fg_Format("SecretsManager{sf0,sl2}", i);
-				CStr SecretsManagerDirectory = RootDirectory + "/" + SecretsManagerName;
-				LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, SecretsManagerName, SecretsManagerDirectory, &fg_ConstructApp_SecretsManager)
+				auto &FileActor = FileActors.f_Insert() = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
+				g_Dispatch(FileActor) > [=]
+					{
+						CStr SecretsManagerName = fg_Format("SecretsManager{sf0,sl2}", i);
+						CStr SecretsManagerDirectory = RootDirectory + "/" + SecretsManagerName;
+						CFile::fs_CreateDirectory(SecretsManagerDirectory);
+						//CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/SecretsManager", SecretsManagerDirectory, nullptr);
+					}
 					> SecretsManagerLaunchesResults.f_AddResult()
 				;
 			}
-			
-			TCVector<CDistributedApp_LaunchInfo> SecretsManagerLaunches;
-			for (auto &LaunchResult : SecretsManagerLaunchesResults.f_GetResults().f_CallSync(g_Timeout))
-				SecretsManagerLaunches.f_Insert(fg_Move(*LaunchResult));
+			fg_CombineResults(SecretsManagerLaunchesResults.f_GetResults().f_CallSync());
+		}
 
-			// Setup trust for SecretsManagers
-			
-			struct CSecretsManagerInfo
+		// Launch SecretsManagers
+		TCActorResultVector<CDistributedApp_LaunchInfo> SecretsManagerLaunchesResults;
+		TCVector<CDistributedApp_LaunchInfo> SecretsManagerLaunches;
+		
+		auto fLaunchSecretManagers = [&]
 			{
-				CStr const &f_GetHostID() const
+				SecretsManagerLaunches.f_Clear();
+				SecretsManagerLaunchesResults = {};
+
+				for (mint i = 0; i < nSecretsManagers; ++i)
 				{
-					return TCMap<CStr, CSecretsManagerInfo>::fs_GetKey(*this);
+					CStr SecretsManagerName = fg_Format("SecretsManager{sf0,sl2}", i);
+					CStr SecretsManagerDirectory = RootDirectory + "/" + SecretsManagerName;
+					LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, SecretsManagerName, SecretsManagerDirectory, &fg_ConstructApp_SecretsManager)
+						> SecretsManagerLaunchesResults.f_AddResult()
+					;
 				}
-				
-				TCSharedPointer<TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface>> m_pTrustInterface;
-				CDistributedActorTrustManager_Address m_Address;
-			};
+				for (auto &LaunchResult : SecretsManagerLaunchesResults.f_GetResults().f_CallSync(g_Timeout))
+					SecretsManagerLaunches.f_Insert(fg_Move(*LaunchResult));
+			}
+		;
+		fLaunchSecretManagers();
+		
+		auto KeyManagerLaunch = LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, "KeyManager", KeyManagerDirectory, &fg_ConstructApp_KeyManager).f_CallSync(g_Timeout);
+		DMibExpect(KeyManagerLaunch.m_HostID, !=, "");
 
-			TCSet<CStr> AllSecretsManagerHosts;
-			TCMap<CStr, CSecretsManagerInfo> AllSecretsManagers;
+		// Setup KeyManager
+		auto pKeyManagerTrust = KeyManagerLaunch.m_pTrustInterface;
+		auto &KeyManagerTrust = *pKeyManagerTrust;
+		CStr KeyManagerHostID = KeyManagerLaunch.m_HostID;
+
+		// Add listen socket that secret managers can connect to
+		CDistributedActorTrustManager_Address KeyManagerServerAddress;
+		KeyManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}/Keymanager.sock]/", KeyManagerDirectory);
+		DMibCallActor(KeyManagerTrust, CDistributedActorTrustManagerInterface::f_AddListen, KeyManagerServerAddress).f_CallSync(g_Timeout);
+		
+		auto HelperActor = fg_ConcurrentActor();
+		CCurrentActorScope CurrentActor{HelperActor};
+		
+		{
+			TCActor<CProcessLaunchActor> KeyManagerCommandLine = fg_Construct();
+			CProcessLaunchActor::CSimpleLaunch LaunchParams{KeyManagerDirectory + "/KeyManager", {"--provide-password"}};
+			LaunchParams.m_DestructFlags = EProcessLaunchCloseFlag_BlockOnExit;
+			LaunchParams.m_ToLog = CProcessLaunchActor::ELogFlag_All | CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
+			
+			TCContinuation<void> LaunchedContinuation;
+			TCContinuation<void> ExitedContinuation;
+
+			LaunchParams.m_Params.m_fOnStateChange = [LaunchedContinuation, ExitedContinuation](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+				{
+					switch (_State.f_GetTypeID())
+					{
+					case NProcess::EProcessLaunchState_Launched:
+						{
+							LaunchedContinuation.f_SetResult();
+						}
+						break;
+					case NProcess::EProcessLaunchState_LaunchFailed:
+						{
+							auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
+							LaunchedContinuation.f_SetException(DMibErrorInstance(LaunchError));
+						}
+						break;
+					case NProcess::EProcessLaunchState_Exited:
+						{
+							auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
+							if (ExitStatus)
+								ExitedContinuation.f_SetException(DMibErrorInstance(fg_Format("Launch failed: Status {}", ExitStatus)));
+							else
+								ExitedContinuation.f_SetResult();
+						}
+						break;
+					}
+				}
+			;
+			auto LaunchSubscription = KeyManagerCommandLine(&CProcessLaunchActor::f_Launch, fg_Move(LaunchParams), HelperActor).f_CallSync(g_Timeout);
+			LaunchedContinuation.f_Dispatch().f_CallSync(g_Timeout);
+			KeyManagerCommandLine(&CProcessLaunchActor::f_SendStdIn, "Password\n").f_CallSync(g_Timeout);
+			ExitedContinuation.f_Dispatch().f_CallSync(g_Timeout);
+			KeyManagerCommandLine->f_Destroy().f_CallSync(g_Timeout);
+		}
+
+
+		// Setup trust for SecretsManagers
+		
+		struct CSecretsManagerInfo
+		{
+			CStr const &f_GetHostID() const
 			{
+				return TCMap<CStr, CSecretsManagerInfo>::fs_GetKey(*this);
+			}
+			
+			TCSharedPointer<TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface>> m_pTrustInterface;
+			CDistributedActorTrustManager_Address m_Address;
+		};
+
+		TCSet<CStr> AllSecretsManagerHosts;
+		TCMap<CStr, CSecretsManagerInfo> AllSecretsManagers;
+		auto fSetupListen = [&]
+			{
+				AllSecretsManagerHosts.f_Clear();
+				AllSecretsManagers.f_Clear();
 				TCActorResultVector<void> ListenResults;
 				mint iSecretsManager = 0;
 				for (auto &SecretsManager : SecretsManagerLaunches)
@@ -155,73 +246,116 @@ public:
 					AllSecretsManagerHosts[SecretsManager.m_HostID];
 					auto &SecretsManagerInfo = AllSecretsManagers[SecretsManager.m_HostID];
 					SecretsManagerInfo.m_pTrustInterface = SecretsManager.m_pTrustInterface;
-					SecretsManagerInfo.m_Address.m_URL = fg_Format("wss://[UNIX(777):{}/SecretsManagerTest.sock]/", SecretsManagerDirectory);
+					SecretsManagerInfo.m_Address.m_URL = fg_Format("wss://[UNIX(666):{}/SecretsManagerTest.sock]/", SecretsManagerDirectory);
 					DMibCallActor(*SecretsManager.m_pTrustInterface, CDistributedActorTrustManagerInterface::f_AddListen, SecretsManagerInfo.m_Address) > ListenResults.f_AddResult();
 					++iSecretsManager;
 				}
 				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(g_Timeout));
 			}
+		;
+		fSetupListen();
+		
+		TCActorResultVector<void> SetupTrustResults;
 
-			TCActorResultVector<void> SetupTrustResults;
-			
-			for (auto &SecretsManager : AllSecretsManagers)
+		static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
+		auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
 			{
-				auto pSecretsManagerTrust = SecretsManager.m_pTrustInterface;
-				auto &SecretsManagerTrust = *pSecretsManagerTrust;
-				CStr SecretsManagerHostID = SecretsManager.f_GetHostID();
-				auto TrustSecretsManagers = AllSecretsManagerHosts;
-				TrustSecretsManagers.f_Remove(SecretsManagerHostID);
-#if 0
-				DMibCallActor
-					(
-						SecretsManagerTrust
-						, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
-						, "com.malterlib/Cloud/SecretsManagerCoordination"
-						, TrustSecretsManagers
-					) 
-					> SetupTrustResults.f_AddResult()
-				;
-#endif
-				
-				DMibCallActor
-					(
-						TrustManager
-						, CDistributedActorTrustManager::f_AllowHostsForNamespace
-						, CSecretsManager::mc_pDefaultNamespace
-						, fg_CreateSet<CStr>(SecretsManagerHostID)
-					)				
-					> SetupTrustResults.f_AddResult()
-				;
-				
-				DMibCallActor
-					(
-						SecretsManagerTrust
-						, CDistributedActorTrustManagerInterface::f_AddHostPermissions
-						, TestHostID
-						, SecretsManagerPermissionsForTest
-					)
-					> SetupTrustResults.f_AddResult()
-				;
-				for (auto &SecretsManagerInner : AllSecretsManagers)
-				{
-					CStr SecretsManagerHostIDInner = SecretsManagerInner.f_GetHostID();
-					if (SecretsManagerHostIDInner == SecretsManagerHostID)
-						continue;
-					
-					auto pSecretsManagerTrustInner = SecretsManagerInner.m_pTrustInterface;
-					
-					TCContinuation<void> Continuation;
-					DMibCallActor(SecretsManagerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, SecretsManager.m_Address, nullptr)
-						> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
-						{
-							auto &SecretsManagerTrustInner = *pSecretsManagerTrustInner;
-							DMibCallActor(SecretsManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Continuation.f_ReceiveAny();
-						}
-					;
-					Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
-				}
+				return CDistributedActorTrustManagerInterface::CChangeHostPermissions{_HostID, _Permissions, c_WaitForSubscriptions};
 			}
+		;
+		auto fNamespaceHosts = [](auto &&_Namespace, auto &&_Hosts)
+			{
+				return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, c_WaitForSubscriptions};
+			}
+		;
+
+		for (auto &SecretsManager : AllSecretsManagers)
+		{
+			auto pSecretsManagerTrust = SecretsManager.m_pTrustInterface;
+			auto &SecretsManagerTrust = *pSecretsManagerTrust;
+			CStr SecretsManagerHostID = SecretsManager.f_GetHostID();
+			auto TrustSecretsManagers = AllSecretsManagerHosts;
+			TrustSecretsManagers.f_Remove(SecretsManagerHostID);
+#if 0
+			DMibCallActor
+				(
+					SecretsManagerTrust
+					, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
+					, fNamespaceHosts("com.malterlib/Cloud/SecretsManagerCoordination", TrustSecretsManagers)
+				)
+				> SetupTrustResults.f_AddResult()
+			;
+#endif
 			
+			DMibCallActor
+				(
+					SecretsManagerTrust
+					, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
+				 	, fNamespaceHosts(CKeyManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(KeyManagerHostID))
+				)
+				> SetupTrustResults.f_AddResult()
+			;
+
+			DMibCallActor
+				(
+					TrustManager
+					, CDistributedActorTrustManager::f_AllowHostsForNamespace
+					, CSecretsManager::mc_pDefaultNamespace
+					, fg_CreateSet<CStr>(SecretsManagerHostID)
+				 	, c_WaitForSubscriptions
+				)
+				> SetupTrustResults.f_AddResult()
+			;
+			
+			DMibCallActor
+				(
+					SecretsManagerTrust
+					, CDistributedActorTrustManagerInterface::f_AddHostPermissions
+					, fPermissions(TestHostID, SecretsManagerPermissionsForTest)
+				)
+				> SetupTrustResults.f_AddResult()
+			;
+
+			for (auto &SecretsManagerInner : AllSecretsManagers)
+			{
+				CStr SecretsManagerHostIDInner = SecretsManagerInner.f_GetHostID();
+				if (SecretsManagerHostIDInner == SecretsManagerHostID)
+					continue;
+				
+				auto pSecretsManagerTrustInner = SecretsManagerInner.m_pTrustInterface;
+				
+				TCContinuation<void> Continuation;
+				DMibCallActor(SecretsManagerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, SecretsManager.m_Address, nullptr)
+					> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
+					{
+						auto &SecretsManagerTrustInner = *pSecretsManagerTrustInner;
+						DMibCallActor(SecretsManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Continuation.f_ReceiveAny();
+					}
+				;
+				Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
+
+			}
+
+			TCContinuation<void> Continuation;
+			DMibCallActor(KeyManagerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, KeyManagerServerAddress, nullptr)
+				> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
+				{
+					auto &SecretsManagerTrust = *pSecretsManagerTrust;
+					DMibCallActor(SecretsManagerTrust, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Continuation.f_ReceiveAny();
+				}
+			;
+			Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
+		}
+		
+		SetupTrustResults.f_GetResults().f_CallSync(g_Timeout);
+
+		CSecretsManager::CSecret StringSecret{"Secret1"};
+		CSecretsManager::CSecret ByteVectorSecret{CSecureByteVector{(uint8 const *)"Secret2", 7}};
+		CSecretsManager::CSecret FileSecret{CSecretsManager::CFileTag{}};
+
+		{
+			DMibTestPath("General");
+			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(nSecretsManagers);
 			auto SecretsManager = SecretsManagers[0];
 
@@ -272,10 +406,6 @@ public:
 			//
 			// Set up a number of secrets and send them to the manager
 			//
-			CSecretsManager::CSecret StringSecret{"Secret1"};
-			CSecretsManager::CSecret ByteVectorSecret{CSecureByteVector{(uint8 const *)"Secret2", 7}};
-			CSecretsManager::CSecret FileSecret{CSecretsManager::CFileTag{}};
-			
 			DMibCallActor
 				(
 					SecretsManager
@@ -660,43 +790,43 @@ public:
 							 )
 						;
 						{
-							DMibTestPath("Test SetProperties - only seting Secret");
+							DMibTestPath("Test SetProperties - only setting Secret");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetSecret(CSecretsManager::CSecret{"newtext"}));
 						}
 						{
-							DMibTestPath("Test SetProperties - only seting Username");
+							DMibTestPath("Test SetProperties - only setting Username");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetUserName("NewUsername"));
 						}
 						{
-							DMibTestPath("Test SetProperties - only seting URL");
+							DMibTestPath("Test SetProperties - only setting URL");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetURL("NewURL"));
 						}
 						{
-							DMibTestPath("Test SetProperties - only seting Expires");
+							DMibTestPath("Test SetProperties - only setting Expires");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetExpires(NTime::CTimeConvert::fs_CreateTime(1977, 7, 7)));
 						}
 						{
-							DMibTestPath("Test SetProperties - only seting Created");
+							DMibTestPath("Test SetProperties - only setting Created");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetCreated(NTime::CTimeConvert::fs_CreateTime(1988, 8, 8)));
 						}
 						{
-							DMibTestPath("Test SetProperties - only seting Modified");
+							DMibTestPath("Test SetProperties - only setting Modified");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetModified(NTime::CTimeConvert::fs_CreateTime(1999, 9, 9)));
 						}
 						{
-							DMibTestPath("Test SetProperties - only seting Notes");
+							DMibTestPath("Test SetProperties - only setting Notes");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetNotes("NewNote"));
 						}
 						{
-							DMibTestPath("Test SetProperties - only seting Metadata");
+							DMibTestPath("Test SetProperties - only setting Metadata");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetMetadata("c", "d"));
 						}
 						{
-							DMibTestPath("Test SetProperties - only seting SemanticID");
+							DMibTestPath("Test SetProperties - only setting SemanticID");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetSemanticID("NewSemanticID"));
 						}
 						{
-							DMibTestPath("Test SetProperties - only seting Tags");
+							DMibTestPath("Test SetProperties - only setting Tags");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetTags({"NewTag1", "NewTag2"}));
 						}
 					}
@@ -715,8 +845,7 @@ public:
 							(
 								SecretsManagerTrust
 								, CDistributedActorTrustManagerInterface::f_AddHostPermissions
-								, TestHostID
-								, _Permissions
+								, fPermissions(TestHostID, _Permissions)
 							)
 							.f_CallSync(g_Timeout)
 						;
@@ -735,8 +864,7 @@ public:
 							(
 								SecretsManagerTrust
 								, CDistributedActorTrustManagerInterface::f_RemoveHostPermissions
-								, TestHostID
-								, _Permissions
+								, fPermissions(TestHostID, _Permissions)
 							)
 							.f_CallSync(g_Timeout)
 						;
@@ -1106,6 +1234,58 @@ public:
 				fRemoveKey("Folder1", "Name1", "Key2");
 
 				fRemovePermissions(Needed);
+			}
+			
+			// Reset permissions
+			fAddPermissions(SecretsManagerPermissionsForTest);
+		};
+
+		{
+			DMibTestPath("Check Database Content");
+
+			for (auto &Launch: SecretsManagerLaunches)
+				Launch.f_Destroy();
+
+			// Launch SecretsManagers
+
+			fLaunchSecretManagers();
+
+			fSetupListen();
+
+			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
+			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(nSecretsManagers);
+			auto SecretsManager = SecretsManagers[0];
+
+			//
+			// Set up a number of secrets and send them to the manager
+			//
+			auto fGetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name) -> CSecretsManager::CSecretProperties
+				{
+					return DMibCallActor(SecretsManager, CSecretsManager::f_GetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+				}
+			;
+
+			{
+				//
+				// Verify that we get the correct secrets from different folders and Names
+				//
+				DMibTestPath("Get Properties");
+
+				// Verify all properties in the first secret
+				auto Properties = fGetProperties("Folder1", "Name1");
+				DMibExpect(*Properties.m_Secret, ==, StringSecret);
+				DMibExpect(*Properties.m_UserName, ==, "UserName");
+				DMibExpect(*Properties.m_URL, ==, "http://URL/");
+				DMibExpect(*Properties.m_Expires, ==, NTime::CTimeConvert::fs_CreateTime(1971, 1, 1));
+				DMibExpect(*Properties.m_Notes, ==, "Note");
+				DMibExpect(*Properties.m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{}));
+				DMibExpect(*Properties.m_Created, ==, NTime::CTimeConvert::fs_CreateTime(1972, 2, 2));
+				DMibExpect(*Properties.m_SemanticID, ==, "Semantic1");
+				DMibExpect(*Properties.m_Tags, ==, (TCSet<NStr::CStr>{{"Shared1", "Unique1"}}));
+
+				DMibExpect(*fGetProperties("Folder1", "Name2").m_Notes, ==, "Testing12");
+				DMibExpect(*fGetProperties("Folder2", "Name1").m_Notes, ==, "Testing21");
+				DMibExpect(*fGetProperties("Folder2", "Name2").m_Notes, ==, "Testing22");
 			}
 		};
 	}

@@ -153,7 +153,19 @@ public:
 			CDistributedActorTrustManager_Address VersionManagerServerAddress;
 			VersionManagerServerAddress.m_URL = fg_Format("wss://[UNIX(777):{}/versionmanager.sock]/", VersionManagerDirectory);
 			DMibCallActor(VersionManagerTrust, CDistributedActorTrustManagerInterface::f_AddListen, VersionManagerServerAddress).f_CallSync(g_Timeout);
-			
+
+			static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
+			auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
+				{
+					return CDistributedActorTrustManagerInterface::CChangeHostPermissions{_HostID, _Permissions, c_WaitForSubscriptions};
+				}
+			;
+			auto fNamespaceHosts = [](auto &&_Namespace, auto &&_Hosts)
+				{
+					return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, c_WaitForSubscriptions};
+				}
+			;
+
 			// Add trust to cloud client
 			auto Ticket = DMibCallActor(VersionManagerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, VersionManagerServerAddress, nullptr).f_CallSync(g_Timeout);
 			CStr CloudClientHostID = CProcessLaunch::fs_LaunchTool(CloudClientDirectory + "/MalterlibCloud", fg_CreateVector<CStr>("--trust-host-id")).f_Trim();
@@ -161,12 +173,31 @@ public:
 			{
 				TCVector<CStr> Params = {"--trust-namespace-add-trusted-host", "--namespace", CVersionManager::mc_pDefaultNamespace, VersionManagerHostID};
 				CProcessLaunch::fs_LaunchTool(CloudClientDirectory + "/MalterlibCloud", Params);
-				DMibCallActor(VersionManagerTrust, CDistributedActorTrustManagerInterface::f_AddHostPermissions, CloudClientHostID, VersionManagerPermissionsForTest).f_CallSync(g_Timeout);
+				DMibCallActor
+					(
+						 VersionManagerTrust
+						 , CDistributedActorTrustManagerInterface::f_AddHostPermissions
+						 , fPermissions(CloudClientHostID, VersionManagerPermissionsForTest)
+					).f_CallSync(g_Timeout)
+				;
 			}
 
 			// Setup trust between for VersionManager and Test
- 			DMibCallActor(VersionManagerTrust, CDistributedActorTrustManagerInterface::f_AddHostPermissions, TestHostID, VersionManagerPermissionsForTest).f_CallSync(g_Timeout);
-			TrustManager(&CDistributedActorTrustManager::f_AllowHostsForNamespace, CVersionManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(VersionManagerHostID)).f_CallSync(g_Timeout);
+ 			DMibCallActor
+				(
+					 VersionManagerTrust
+					 , CDistributedActorTrustManagerInterface::f_AddHostPermissions
+					 , fPermissions(TestHostID, VersionManagerPermissionsForTest)
+				).f_CallSync(g_Timeout)
+			;
+			TrustManager
+				(
+					 &CDistributedActorTrustManager::f_AllowHostsForNamespace
+					 , CVersionManager::mc_pDefaultNamespace
+					 , fg_CreateSet<CStr>(VersionManagerHostID)
+					 , c_WaitForSubscriptions
+				).f_CallSync(g_Timeout)
+			;
 			
 			auto VersionManager = Subscriptions.f_Subscribe<CVersionManager>();
 			CVersionManagerHelper VersionManagerHelper;
@@ -242,8 +273,7 @@ public:
 					(
 						AppManagerTrust
 						, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
-						, "com.malterlib/Cloud/AppManagerCoordination"
-						, TrustAppManagers
+						, fNamespaceHosts("com.malterlib/Cloud/AppManagerCoordination", TrustAppManagers)
 					) 
 					> SetupTrustResults.f_AddResult()
 				;
@@ -254,7 +284,8 @@ public:
 						, CDistributedActorTrustManager::f_AllowHostsForNamespace
 						, CAppManagerInterface::mc_pDefaultNamespace
 						, fg_CreateSet<CStr>(AppManagerHostID)
-					)				
+						, c_WaitForSubscriptions
+					)
 					> SetupTrustResults.f_AddResult()
 				;
 					
@@ -294,8 +325,7 @@ public:
 					(
 						AppManagerTrust
 						, CDistributedActorTrustManagerInterface::f_AddHostPermissions
-						, TestHostID
-						, fg_CreateSet<CStr>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll")
+						, fPermissions(TestHostID, fg_CreateSet<CStr>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
 					) 
 					> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket, CVoidTag)
 					{
@@ -306,15 +336,13 @@ public:
 							(
 								VersionManagerTrust
 								, CDistributedActorTrustManagerInterface::f_AddHostPermissions
-								, AppManagerHostID
-								, fg_CreateSet<CStr>("Application/ReadAll")
+								, fPermissions(AppManagerHostID, fg_CreateSet<CStr>("Application/ReadAll"))
 							)
 							+ DMibCallActor
 							(
 								AppManagerTrust
 								, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
-								, CVersionManager::mc_pDefaultNamespace
-								, fg_CreateSet<CStr>(VersionManagerHostID)
+								, fNamespaceHosts(CVersionManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(VersionManagerHostID))
 							)
 							> Continuation / [=]()
 							{

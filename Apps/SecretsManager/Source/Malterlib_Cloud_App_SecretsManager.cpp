@@ -5,6 +5,7 @@
 
 #include "Malterlib_Cloud_App_SecretsManager.h"
 #include "Malterlib_Cloud_App_SecretsManager_Server.h"
+#include "Malterlib_Cloud_App_SecretsManager_ServerController.h"
 
 namespace NMib::NCloud::NSecretsManager
 {
@@ -17,29 +18,27 @@ namespace NMib::NCloud::NSecretsManager
 	{
 	}
 
-	TCContinuation<void> CSecretsManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCContinuation<void> CSecretsManagerDaemonActor::fp_StartApp(CEJSON const &_Params)
 	{
-		TCContinuation<void> Continuation;
-		mp_pServer = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);
-		Continuation.f_SetResult();
-		return Continuation;				
+		mp_pServerController = fg_ConstructActor<CServerController>(fg_Construct(self), self, mp_State);
+		return fg_Explicit();
 	}
 	
 	TCContinuation<void> CSecretsManagerDaemonActor::fp_StopApp()
 	{	
 		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
 		
-		if (mp_pServer)
+		if (mp_pServerController)
 		{
-			DMibLogWithCategory(Mib/Cloud/SecretsManager/Daemon, Info, "Shutting down");
+			DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Shutting down server");
 			
-			mp_pServer->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
+			mp_pServerController->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
 				{
 					if (!_Result)
-						DMibLogWithCategory(Mib/Cloud/SecretsManager/Daemon, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());
+						DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());
 				}
 			;
-			mp_pServer = nullptr;
+			mp_pServerController = nullptr;
 		}
 		
 		return pCanDestroy->m_Continuation;
