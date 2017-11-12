@@ -89,6 +89,8 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const;
 		};
 
 		struct CSecretProperties
@@ -119,6 +121,18 @@ namespace NMib::NCloud
 			CSecretProperties &&f_SetTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &&;
 			CSecretProperties &&f_AddTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &&;
 
+			CSecretProperties &f_SetSecret(CSecret &&_Secret) &;
+			CSecretProperties &f_SetUserName(NStr::CStrSecure const &_UserName) &;
+			CSecretProperties &f_SetURL(NStr::CStrSecure const &_URL) &;
+			CSecretProperties &f_SetExpires(NTime::CTime const &_Expires) &;
+			CSecretProperties &f_SetNotes(NStr::CStrSecure const &_Notes) &;
+			CSecretProperties &f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_MetadataValue) &;
+			CSecretProperties &f_SetCreated(NTime::CTime const &_Created) &;
+			CSecretProperties &f_SetModified(NTime::CTime const &_Modified) &;
+			CSecretProperties &f_SetSemanticID(NStr::CStrSecure const &_SemanticID) &;
+			CSecretProperties &f_SetTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &;
+			CSecretProperties &f_AddTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &;
+
 			auto f_GetSecret() const -> CSecret const &;
 			auto f_GetUserName() const -> NStr::CStrSecure const &;
 			auto f_GetURL() const -> NStr::CStrSecure const &;
@@ -129,6 +143,8 @@ namespace NMib::NCloud
 			auto f_GetModified() const -> NTime::CTime const &;
 			auto f_GetSemanticID() const -> NStr::CStrSecure const &;
 			auto f_GetTags() const -> NContainer::TCSet<NStr::CStrSecure> const &;
+
+			bool operator == (CSecretProperties const &_Right) const;
 		};
 
 		static bool fs_IsValidTag(NStr::CStr const &_Tag);

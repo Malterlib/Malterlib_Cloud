@@ -69,4 +69,27 @@ namespace NMib::NCloud
 	{
 		_Stream % **this;
 	}
+
+	template <typename tf_CStr>
+	void CSecretsManager::CSecret::f_Format(tf_CStr &o_Str) const
+	{
+		switch (f_GetTypeID())
+		{
+		case CSecretsManager::ESecretType_NotSet:
+			o_Str += "<Empty Secret>";
+			break;
+
+		case CSecretsManager::ESecretType_String:
+			o_Str += f_Get<CSecretsManager::ESecretType_String>();
+			break;
+
+		case CSecretsManager::ESecretType_Buffer:
+			o_Str += NDataProcessing::fg_Base64Encode(f_Get<CSecretsManager::ESecretType_Buffer>());
+			break;
+
+		case CSecretsManager::ESecretType_File:
+			o_Str += "<File Secret>";
+			break;
+		}
+	}
 }

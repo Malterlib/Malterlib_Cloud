@@ -98,6 +98,76 @@ namespace NMib::NCloud
 		return fg_Move(*this);
 	}
 
+	auto CSecretsManager::CSecretProperties::f_SetSecret(CSecret &&_Secret) & -> CSecretProperties &
+	{
+		m_Secret = fg_Move(_Secret);
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_SetUserName(NStr::CStrSecure const &_UserName) & -> CSecretProperties &
+	{
+		m_UserName = _UserName;
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_SetURL(NStr::CStrSecure const &_URL) & -> CSecretProperties &
+	{
+		m_URL = _URL;
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_SetExpires(NTime::CTime const &_Expires) & -> CSecretProperties &
+	{
+		m_Expires = _Expires;
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_SetNotes(NStr::CStrSecure const &_Notes) & -> CSecretProperties &
+	{
+		m_Notes = _Notes;
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_MetadataValue) & -> CSecretProperties &
+	{
+		if (!m_Metadata)
+			m_Metadata = NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON>{};
+		(*m_Metadata)[_MetadataKey] = _MetadataValue;
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_SetCreated(NTime::CTime const &_Created) & -> CSecretProperties &
+	{
+		m_Created = _Created;
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_SetModified(NTime::CTime const &_Modified) & -> CSecretProperties &
+	{
+		m_Modified = _Modified;
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_SetSemanticID(NStr::CStrSecure const &_SemanticID) & -> CSecretProperties &
+	{
+		m_SemanticID = _SemanticID;
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_SetTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) & -> CSecretProperties &
+	{
+		m_Tags = fg_Move(_Tags);
+		return *this;
+	}
+
+	auto CSecretsManager::CSecretProperties::f_AddTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) & -> CSecretProperties &
+	{
+		if (!m_Tags)
+			m_Tags = NContainer::TCSet<NStr::CStrSecure>{};
+		*m_Tags += fg_Move(_Tags);
+		return *this;
+	}
+
 	auto CSecretsManager::CSecretProperties::f_GetSecret() const -> CSecret const &
 	{
 		static CSecret s_Secret;
@@ -158,9 +228,25 @@ namespace NMib::NCloud
 		return m_Tags.f_Get(s_Tags);
 	}
 
+	bool CSecretsManager::CSecretProperties::operator == (CSecretsManager::CSecretProperties const &_Right) const
+	{
+		return
+			(
+				m_Secret == _Right.m_Secret
+				&& m_UserName == _Right.m_UserName
+				&& m_URL == _Right.m_URL
+				&& m_Expires == _Right.m_Expires
+				&& m_Notes == _Right.m_Notes
+				&& m_Metadata == _Right.m_Metadata
+				&& m_Created == _Right.m_Created
+				&& m_Modified == _Right.m_Modified
+				&& m_SemanticID == _Right.m_SemanticID
+			 )
+		;
+	}
+
 	namespace NPrivate
 	{
-
 		struct CSecretEqualsVisitor
 		{
 			template <typename tf_CTypeLeft, typename tf_CTypeRight>
