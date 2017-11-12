@@ -9,6 +9,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Cloud/BackupManager>
 #include <Mib/Cloud/VersionManager>
+#include <Mib/Cloud/SecretsManager>
 
 namespace NMib::NCloud::NCloudClient
 {
@@ -44,7 +45,49 @@ namespace NMib::NCloud::NCloudClient
 		TCContinuation<uint32> fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCContinuation<uint32> fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCContinuation<uint32> fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		
+
+		// Secrets manager
+		void fp_SecretsManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
+		TCContinuation<void> fp_SecretsManager_SubscribeToServers();
+		bool fp_SecretsManager_SplitID(CEJSON const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error);
+
+		template<typename tf_CType>
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_Enumerate
+		(
+		 	CEJSON const &_Params
+		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			, TCFunction
+			<
+				TCContinuation<tf_CType>
+		 		(
+				 	TCDistributedActor<CSecretsManager> const &_Actor
+				 	, TCSharedPointer<TCOptional<CStrSecure>> _pSemanticID
+				 	, TCSharedPointer<TCSet<CStrSecure>> _pTags
+				)
+			> &&_fGetResult
+			, TCFunction<void (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)> &&_fOnResult
+		);
+
+		template<typename tf_CType>
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_Get
+			(
+				CEJSON const &_Params
+				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			 	, TCFunction<TCContinuation<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
+				, TCFunction<void (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)> &&_fOnResult
+			)
+		;
+
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_GetSecretBySemanticID(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_GetProperties(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_GetSecret(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_SetProperties(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_SetMetadata(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_RemoveMetadata(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_ChangeTags(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+
 		fp64 mp_Timeout = 0.0;
 		
 		// Backup Manager
@@ -54,5 +97,8 @@ namespace NMib::NCloud::NCloudClient
 		// Version Manager
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagers;
 		CVersionManagerHelper mp_VersionManagerHelper;
+
+		// Secrets Manager
+		TCTrustedActorSubscription<CSecretsManager> mp_SecretsManagers;
 	};
 }
