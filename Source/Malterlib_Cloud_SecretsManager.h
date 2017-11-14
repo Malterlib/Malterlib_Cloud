@@ -37,7 +37,7 @@ namespace NMib::NCloud
 		{
 			ESecretType_NotSet
 			, ESecretType_String
-			, ESecretType_Buffer
+			, ESecretType_Binary
 			, ESecretType_File
 		};
 		
@@ -69,7 +69,7 @@ namespace NMib::NCloud
 				ESecretType
 				, void, ESecretType_NotSet
 				, NStr::CStrSecure, ESecretType_String
-				, NContainer::CSecureByteVector, ESecretType_Buffer
+				, NContainer::CSecureByteVector, ESecretType_Binary
 				, CFileTag, ESecretType_File
 			>
 		{
@@ -78,7 +78,7 @@ namespace NMib::NCloud
 					ESecretType
 					, void, ESecretType_NotSet
 					, NStr::CStrSecure, ESecretType_String
-					, NContainer::CSecureByteVector, ESecretType_Buffer
+					, NContainer::CSecureByteVector, ESecretType_Binary
 					, CFileTag, ESecretType_File
 				>
 			;
@@ -151,7 +151,7 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCContinuation<NContainer::TCSet<CSecretID>> f_EnumerateSecrets
 			(
-				NStorage::TCOptional<NStr::CStrSecure> &_SemanticID
+				NStorage::TCOptional<NStr::CStrSecure> const &_SemanticID
 				, NContainer::TCSet<NStr::CStrSecure> const &_TagsExclusive
 			 ) = 0
 		;
@@ -169,6 +169,7 @@ namespace NMib::NCloud
 		;
 		virtual NConcurrency::TCContinuation<void> f_SetMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_Metadata) = 0;
 		virtual NConcurrency::TCContinuation<void> f_RemoveMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey) = 0;
+		virtual NConcurrency::TCContinuation<void> f_RemoveSecret(CSecretID &&_ID) = 0;
 		virtual auto f_UploadFile(NConcurrency::TCActorFunctorWithID<NConcurrency::TCContinuation<void> (CFileTransferContext &&_TransferContext)> &&_fOnNotification)
 			-> NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> = 0;
 		;

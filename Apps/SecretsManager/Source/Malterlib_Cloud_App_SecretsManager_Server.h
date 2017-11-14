@@ -27,7 +27,7 @@ namespace NMib::NCloud::NSecretsManager
 		{
 			TCContinuation<TCSet<CSecretID>> f_EnumerateSecrets
 				(
-					TCOptional<CStrSecure> &_SemanticID
+					TCOptional<CStrSecure> const &_SemanticID
 					, TCSet<CStrSecure> const &_TagsExclusive
 				) override
 			;
@@ -45,6 +45,7 @@ namespace NMib::NCloud::NSecretsManager
 			;
 			TCContinuation<void> f_SetMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey, CEJSON &&_Metadata) override;
 			TCContinuation<void> f_RemoveMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey) override;
+			TCContinuation<void> f_RemoveSecret(CSecretID &&_ID) override;
 			auto f_UploadFile(TCActorFunctorWithID<TCContinuation<void> (CFileTransferContext &&_TransferContext)> &&_fOnNotification)
 				-> TCContinuation<TCActorSubscriptionWithID<>> override
 			;

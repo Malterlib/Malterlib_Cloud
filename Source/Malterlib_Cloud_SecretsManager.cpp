@@ -20,6 +20,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CSecretsManager::f_ModifyTags);
 		DMibPublishActorFunction(CSecretsManager::f_SetMetadata);
 		DMibPublishActorFunction(CSecretsManager::f_RemoveMetadata);
+		DMibPublishActorFunction(CSecretsManager::f_RemoveSecret);
 		DMibPublishActorFunction(CSecretsManager::f_UploadFile);
 	}
 

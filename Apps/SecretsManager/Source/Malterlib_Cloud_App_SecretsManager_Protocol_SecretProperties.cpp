@@ -65,7 +65,7 @@ namespace NMib::NCloud::NSecretsManager
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_EnumerateSecrets
 		(
-			TCOptional<CStrSecure> &_SemanticID
+			TCOptional<CStrSecure> const &_SemanticID
 			, TCSet<CStrSecure> const &_TagsExclusive
 		) -> TCContinuation<TCSet<CSecretID>>
 	{
@@ -405,7 +405,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/RemoveMetadata"))
 			return Auditor.f_AccessDenied("(RemoveMetadata, command)");
-		
+
 		if (auto *pSecretProperty = This.mp_Database.f_FindEqual(_ID))
 		{
 			CStr Permission;
@@ -414,9 +414,36 @@ namespace NMib::NCloud::NSecretsManager
 
 			pSecretProperty->m_Metadata.f_Remove(_MetadataKey);
 			pSecretProperty->m_Modified = CTime::fs_NowUTC();
-			
+
 			Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
-			
+
+			This.fp_WriteDatabase();
+
+			return fg_Explicit();
+		}
+		else
+			return Auditor.f_Exception(fg_SecretIDException(_ID));
+	}
+
+	TCContinuation<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_RemoveSecret(CSecretID &&_ID)
+	{
+		auto &This = *m_pThis;
+		auto Auditor = This.mp_AppState.f_Auditor();
+		auto CallingHostID = Auditor.f_HostInfo().f_GetRealHostID();
+
+		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/RemoveSecret"))
+			return Auditor.f_AccessDenied("(RemoveSecret, command)");
+
+		if (auto *pSecretProperty = This.mp_Database.f_FindEqual(_ID))
+		{
+			CStr Permission;
+			if	(!This.fp_HasPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission))
+				return Auditor.f_AccessDenied(fg_Format("(RemoveSecret, no permission for '{}')", Permission));
+
+			This.mp_Database.f_Remove(_ID);
+
+			Auditor.f_Info(fg_Format("Secret removed, ID: '{}/{}'", _ID.m_Folder, _ID.m_Name));
+
 			This.fp_WriteDatabase();
 
 			return fg_Explicit();

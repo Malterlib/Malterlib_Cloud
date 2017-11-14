@@ -49,7 +49,8 @@ namespace NMib::NCloud::NCloudClient
 		// Secrets manager
 		void fp_SecretsManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCContinuation<void> fp_SecretsManager_SubscribeToServers();
-		bool fp_SecretsManager_SplitID(CEJSON const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error);
+		static bool fsp_SecretsManager_GetID(CEJSON const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error);
+		static NStr::CStr fsp_SecretsManager_CheckExpect(CSecretsManager::CSecret const &_Secret, NStr::CStr _Expect, bool _bBinaryAsBase64);
 
 		template<typename tf_CType>
 		TCContinuation<uint32> fp_CommandLine_SecretsManager_Enumerate
@@ -58,14 +59,9 @@ namespace NMib::NCloud::NCloudClient
 		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunction
 			<
-				TCContinuation<tf_CType>
-		 		(
-				 	TCDistributedActor<CSecretsManager> const &_Actor
-				 	, TCSharedPointer<TCOptional<CStrSecure>> _pSemanticID
-				 	, TCSharedPointer<TCSet<CStrSecure>> _pTags
-				)
+				TCContinuation<tf_CType>(TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_pSemanticID, TCSet<CStrSecure> const &_Tags)
 			> &&_fGetResult
-			, TCFunction<void (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)> &&_fOnResult
+			, TCFunction<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, NStr::CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 		);
 
 		template<typename tf_CType>
@@ -74,7 +70,7 @@ namespace NMib::NCloud::NCloudClient
 				CEJSON const &_Params
 				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			 	, TCFunction<TCContinuation<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
-				, TCFunction<void (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)> &&_fOnResult
+				, TCFunction<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, NStr::CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 			)
 		;
 
@@ -87,6 +83,7 @@ namespace NMib::NCloud::NCloudClient
 		TCContinuation<uint32> fp_CommandLine_SecretsManager_SetMetadata(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCContinuation<uint32> fp_CommandLine_SecretsManager_RemoveMetadata(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCContinuation<uint32> fp_CommandLine_SecretsManager_ChangeTags(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_RemoveSecret(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 		fp64 mp_Timeout = 0.0;
 		

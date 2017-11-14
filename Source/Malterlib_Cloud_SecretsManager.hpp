@@ -83,8 +83,8 @@ namespace NMib::NCloud
 			o_Str += f_Get<CSecretsManager::ESecretType_String>();
 			break;
 
-		case CSecretsManager::ESecretType_Buffer:
-			o_Str += NDataProcessing::fg_Base64Encode(f_Get<CSecretsManager::ESecretType_Buffer>());
+		case CSecretsManager::ESecretType_Binary:
+			o_Str += NDataProcessing::fg_Base64Encode(f_Get<CSecretsManager::ESecretType_Binary>());
 			break;
 
 		case CSecretsManager::ESecretType_File:

@@ -21,6 +21,14 @@ namespace NMib::NCloud::NCloudClient
 				, "Description"_= "Limit query to only specified host ID"
 			}
 		;
+		auto BinaryAsBase64 = "BinaryAsBase64"_=
+			{
+				"Names"_={"--binary-as-base64"}
+				, "Default"_= true
+				, "Description"_= "Binary secrets will be read and written as base64 encoded strings\n"
+			}
+		;
+
 		auto IDParameter = "Parameters"_=
 			{
 				"ID"_=
@@ -35,7 +43,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-enumerate-secrets"}
-					, "Description"_= "Enumerate secrets in the database"
+					, "Description"_= "List the IDs of all secrets in the database."
 					, "Options"_=
 					{
 						SecretsManagerHost
@@ -66,10 +74,26 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-get-secret-by-semantic-id"}
-					, "Description"_= "Get secret by semantic id and tags"
+					, "Description"_= "Get secret matching the semantic id and tags"
 					, "Options"_=
 					{
 						SecretsManagerHost
+						, "Tags?"_=
+						{
+							"Names"_= {"--tags"}
+							, "Default"_= _[_]
+							, "Type"_= {""}
+							, "Description"_= "Limit query to secrets having the specified tags.\n"
+							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
+						}
+						, "Expect?"_=
+						{
+							"Names"_= {"--expect"}
+							, "Type"_= COneOf{"string", "binary", "file"}
+							, "Default"_= "string"
+							, "Description"_= "Unless the secret is of the expected variant report an error.\n"
+						}
+						, BinaryAsBase64
 					}
 					, "Parameters"_=
 					{
@@ -78,13 +102,6 @@ namespace NMib::NCloud::NCloudClient
 							"Type"_= ""
 							, "Description"_= "Get the secret with the specified semantic ID\n"
 							"The semantic ID must adhere to RFC 1123 (hostname)"
-						}
-						, "Tags?"_=
-						{
-							"Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "Limit query to secrets having the specified tags.\n"
-							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
 						}
 					}
 				}
@@ -98,10 +115,11 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-get-secret-properties"}
-					, "Description"_= "Get secret properties"
+					, "Description"_= "List all properties for the secret"
 					, "Options"_=
 					{
 						SecretsManagerHost
+						, BinaryAsBase64
 					}
 					, IDParameter
 				}
@@ -119,6 +137,14 @@ namespace NMib::NCloud::NCloudClient
 					, "Options"_=
 					{
 						SecretsManagerHost
+						, "Expect?"_=
+						{
+							"Names"_= {"--expect"}
+							, "Type"_= COneOf{"string", "binary", "file"}
+							, "Default"_= "string"
+							, "Description"_= "Unless the secret is of the expected variant report an error.\n"
+						}
+						, BinaryAsBase64
 					}
 					, IDParameter
 				}
@@ -133,7 +159,11 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-set-secret-properties"}
-					, "Description"_= "Set properties for a secret"
+					, "Description"_= "Set properties for a secret\n"
+					"Add a new secret or change the properties of an existing secret.\n"
+					"When creating a new secret, properties that are not set on the command line will be assigned default values. "
+					"The default values will be empty except for the Created and Modified properties which will be set to the current time.\n"
+					"When an existing secret is modified, properties not specified on the command line will retain their previous values, except the Modified property.\n"
 					, "Options"_=
 					{
 						SecretsManagerHost
@@ -144,7 +174,8 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_= "Set the secret.\n"
 							"The secret can be a string secret or a binary secret.\n"
 							"Specify 'string' to be prompted for a string secret.\n"
-							"Specify 'binary' for a binary secret. The binary secret must be piped or redirected to stdin\n"
+							"Specify 'binary' for a binary secret. When --binary-as-base64 is enabled (which it is by default) you will be prompted for a base64 encoded binary secret. "
+							"When --binary-as-base64 is disabled, the raw binary secret must be piped or redirected to stdin\n"
 						}
 						, "SecretFile?"_=
 						{
@@ -209,6 +240,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_= "The semantic ID to set.\n"
 							"The semantic ID must adhere to RFC 1123 (hostname)"
 						}
+						, BinaryAsBase64
 					}
 					, IDParameter
 				}
@@ -222,7 +254,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-change-tags"}
-					, "Description"_= "Add tags to a secret"
+					, "Description"_= "Remove or add tags from/to a secret"
 					, "Options"_=
 					{
 						SecretsManagerHost
@@ -243,15 +275,7 @@ namespace NMib::NCloud::NCloudClient
 							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
 						}
 					}
-					, "Parameters"_=
-					{
-						"ID"_=
-						{
-							"Type"_= ""
-							, "Description"_= "Specify secret ID"
-							"The ID is specified as Folder/Name with folder and name adhering to RFC 1123 (hostname)"
-						}
-					}
+					, IDParameter
 				}
 				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
@@ -263,26 +287,20 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-set-metadata"}
-					, "Description"_= "Add metadata to a secret"
+					, "Description"_= "Set or add metadata to a secret.\n"
+					"Add a new key, value pair to the secrets metadata or replace the value if the key already exists."
 					, "Options"_=
 					{
 						SecretsManagerHost
-					}
-					, "Parameters"_=
-					{
-						"ID"_=
-						{
-							"Type"_= ""
-							, "Description"_= "Specify secret ID"
-							"The ID is specified as Folder/Name with folder and name adhering to RFC 1123 (hostname)"
-						}
 						, "Metadata"_=
 						{
-							"Type"_= EJSONType_Object
+							"Names"_= {"--metadata"}
+							, "Type"_= EJSONType_Object
 							, "Description"_= "The metadata to set.\n"
 							"The metadata is specified as a JSON object '{\"Key\" : \"Value\"}'"
 						}
 					}
+					, IDParameter
 				}
 				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
@@ -294,25 +312,18 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-remove-metadata"}
-					, "Description"_= "Remove metadata from a secret"
+					, "Description"_= "Remove the metadata matching key from the secret"
 					, "Options"_=
 					{
 						SecretsManagerHost
-					}
-					, "Parameters"_=
-					{
-						"ID"_=
-						{
-							"Type"_= ""
-							, "Description"_= "Specify secret ID"
-							"The ID is specified as Folder/Name with folder and name adhering to RFC 1123 (hostname)"
-						}
 						, "Key"_=
 						{
-							"Type"_= ""
+							"Names"_= {"--key"}
+							, "Type"_= ""
 							, "Description"_= "Key of the metadata to remove.\n"
 						}
 					}
+					, IDParameter
 				}
 				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
@@ -320,9 +331,26 @@ namespace NMib::NCloud::NCloudClient
 				}
 			)
 		;
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--secrets-manager-remove-secret"}
+					, "Description"_= "Remove the secret"
+					, "Options"_=
+					{
+						SecretsManagerHost
+					}
+					, IDParameter
+				}
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return fp_CommandLine_SecretsManager_RemoveSecret(_Params, _pCommandLine);
+				}
+			)
+		;
 	}
 
-	bool CCloudClientAppActor::fp_SecretsManager_SplitID(CEJSON const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error)
+	bool CCloudClientAppActor::fsp_SecretsManager_GetID(CEJSON const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error)
 	{
 		if (auto const &ID = _Params["ID"].f_String())
 		{
@@ -351,6 +379,25 @@ namespace NMib::NCloud::NCloudClient
 
 		o_Error = "Expected a non-empty secret id";
 		return true;
+	}
+
+	CStr CCloudClientAppActor::fsp_SecretsManager_CheckExpect(CSecretsManager::CSecret const &_Secret, NStr::CStr _Expect, bool _bBinaryAsBase64)
+	{
+		if (_Expect)
+		{
+			if (_Expect == "string" && _Secret.f_GetTypeID() != CSecretsManager::ESecretType_String && _Secret.f_GetTypeID() != CSecretsManager::ESecretType_Binary)
+				return "Only string secrets and binary secrets can be emitted in string form";
+			if (_Expect == "binary")
+			{
+				if (_Secret.f_GetTypeID() != CSecretsManager::ESecretType_Binary)
+					return "Only binary secrets can be emitted in binary form";
+				if (_bBinaryAsBase64)
+					return "Binary secrets cannot be emitted in raw binary form when --binary-as-base64 is enabled. Use --no-binary-as-base64 to emit secrets in raw binary form.";
+			}
+			if (_Expect == "file" && _Secret.f_GetTypeID() != CSecretsManager::ESecretType_File)
+				return "Only file secrets can be emitted in file form";
+		}
+		return {};
 	}
 
 	TCContinuation<void> CCloudClientAppActor::fp_SecretsManager_SubscribeToServers()
@@ -393,19 +440,26 @@ namespace NMib::NCloud::NCloudClient
 		 	CEJSON const &_Params
 		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunction<TCContinuation<tf_CType>
-		 		(
-				 	TCDistributedActor<CSecretsManager> const &_Actor
-				 	, TCSharedPointer<TCOptional<CStrSecure>> _pSemanticID
-				 	, TCSharedPointer<TCSet<CStrSecure>> _pTags
-				)> &&_fGetResult
-			, TCFunction<void (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)> &&_fOnResult
+	 		(
+			 	TCDistributedActor<CSecretsManager> const &_Actor
+			 	, TCOptional<CStrSecure> const &_SemanticID
+			 	, TCSet<CStrSecure> const &_Tags
+			)> &&_fGetResult
+			, TCFunction<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 		)
 	{
 		TCContinuation<uint32> Continuation;
+		bool bBinaryAsBase64 = true;
+		if (auto pValue = _Params.f_GetMember("BinaryAsBase64"))
+			bBinaryAsBase64 = pValue->f_Boolean();
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 
-		TCSharedPointer<TCOptional<CStrSecure>> pSemanticID = fg_Construct();
+		CStr Expect;
+		if (auto pValue = _Params.f_GetMember("Expect"))
+			Expect = pValue->f_String();
+
+		TCOptional<CStrSecure> SemanticID;
 		if (auto ID = _Params["SemanticID"].f_String())
 		{
 			if (!CSecretsManager::fs_IsValidTag(ID))
@@ -413,10 +467,10 @@ namespace NMib::NCloud::NCloudClient
 				Continuation.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid Semantic ID", ID)));
 				return Continuation;
 			}
-			*pSemanticID = ID;
+			SemanticID = ID;
 		}
 
-		TCSharedPointer<TCSet<CStrSecure>> pTags = fg_Construct();
+		TCSet<CStrSecure> Tags;
 		for (auto &TagJSON : _Params["Tags"].f_Array())
 		{
 			CStr const &Tag = TagJSON.f_String();
@@ -425,7 +479,7 @@ namespace NMib::NCloud::NCloudClient
 				Continuation.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag)));
 				return Continuation;
 			}
-			(*pTags)[Tag];
+			Tags[Tag];
 		}
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
@@ -438,7 +492,7 @@ namespace NMib::NCloud::NCloudClient
 					if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 						continue;
 
-					_fGetResult(TrustedActor.m_Actor, pSemanticID, pTags).f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
+					_fGetResult(TrustedActor.m_Actor, SemanticID, Tags).f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 						> Secrets.f_AddResult(TrustedActor.m_TrustInfo.m_HostInfo)
 					;
 				}
@@ -462,10 +516,12 @@ namespace NMib::NCloud::NCloudClient
 						}
 
 						if (pFirstResult)
-							_fOnResult(pFirstResult, _pCommandLine);
+						{
+							if (auto ErrorStr = _fOnResult(pFirstResult, _pCommandLine, Expect, bBinaryAsBase64))
+								return Continuation.f_SetException(DMibErrorInstance(ErrorStr));
+						}
 						else
 							return Continuation.f_SetException(DMibErrorInstance("No secrets found on any connected secret manager"));
-
 						Continuation.f_SetResult(0);
 					}
 				;
@@ -480,14 +536,16 @@ namespace NMib::NCloud::NCloudClient
 			(
 				_Params
 			 	, _pCommandLine
-			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCSharedPointer<TCOptional<CStrSecure>> _pSemanticID, TCSharedPointer<TCSet<CStrSecure>> _pTags)
+			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_Tags)
 				{
-					return DMibCallActor(_Actor, CSecretsManager::f_EnumerateSecrets, *_pSemanticID, *_pTags);
+					return DMibCallActor(_Actor, CSecretsManager::f_EnumerateSecrets, _SemanticID, _Tags);
 				}
-			 	, [](TCSet<CSecretsManager::CSecretID> *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+			 	, [](TCSet<CSecretsManager::CSecretID> *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
 					for (auto &ID : *pResult)
 						*_pCommandLine += "{}\n"_f << ID;
+
+					return "";
 				}
 			)
 		;
@@ -500,17 +558,24 @@ namespace NMib::NCloud::NCloudClient
 			(
 				_Params
 			 	, _pCommandLine
-			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCSharedPointer<TCOptional<CStrSecure>> _pSemanticID, TCSharedPointer<TCSet<CStrSecure>> _pTags)
+			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_Tags)
 				{
-					return DMibCallActor(_Actor, CSecretsManager::f_GetSecretBySemanticID, **_pSemanticID, *_pTags);
+					return DMibCallActor(_Actor, CSecretsManager::f_GetSecretBySemanticID, *_SemanticID, _Tags);
 				}
-			 	, [](CSecretsManager::CSecret *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
-					auto &Secret = *pResult;
-					if (Secret.f_GetTypeID() == CSecretsManager::ESecretType_Buffer)
-						*_pCommandLine += Secret.f_Get<CSecretsManager::ESecretType_Buffer>();
+					TCContinuation<uint32> Continuation;
+					auto &Secret = *_pResult;
+
+					if (auto Error = fsp_SecretsManager_CheckExpect(Secret, _Expect, _bBinaryAsBase64))
+						return Error;
+
+					if (Secret.f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
+						*_pCommandLine += Secret.f_Get<CSecretsManager::ESecretType_Binary>();
 					else
 						*_pCommandLine += "{}\n"_f << Secret;
+
+					return CStr{};
 				}
 			)
 		;
@@ -523,7 +588,7 @@ namespace NMib::NCloud::NCloudClient
 		 	CEJSON const &_Params
 		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunction<TCContinuation<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
-			, TCFunction<void (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)> &&_fOnResult
+			, TCFunction<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 		)
 	{
 		TCContinuation<uint32> Continuation;
@@ -531,8 +596,16 @@ namespace NMib::NCloud::NCloudClient
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
 		CStr Error;
+		CStr Expect;
 
-		if (fp_SecretsManager_SplitID(_Params, ID, Error))
+		bool bBinaryAsBase64 = true;
+		if (auto pValue = _Params.f_GetMember("BinaryAsBase64"))
+			bBinaryAsBase64 = pValue->f_Boolean();
+
+		if (auto pValue = _Params.f_GetMember("Expect"))
+			Expect = pValue->f_String();
+
+		if (fsp_SecretsManager_GetID(_Params, ID, Error))
 			return DMibErrorInstance(Error);
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
@@ -569,7 +642,10 @@ namespace NMib::NCloud::NCloudClient
 						}
 
 						if (pFirstResult)
-							_fOnResult(pFirstResult, _pCommandLine);
+						{
+							if (auto ErrorStr = _fOnResult(pFirstResult, _pCommandLine, Expect, bBinaryAsBase64))
+								return Continuation.f_SetException(DMibErrorInstance(ErrorStr));
+						}
 						else
 							return Continuation.f_SetException(DMibErrorInstance("No secrets found on any connected secret manager"));
 
@@ -591,13 +667,20 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return DMibCallActor(_Actor, CSecretsManager::f_GetSecret, fg_TempCopy(_ID));
 				}
-			 	, [](CSecretsManager::CSecret *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
-					auto &Secret = *pResult;
-					if (Secret.f_GetTypeID() == CSecretsManager::ESecretType_Buffer)
-						*_pCommandLine += Secret.f_Get<CSecretsManager::ESecretType_Buffer>();
+					TCContinuation<uint32> Continuation;
+					auto &Secret = *_pResult;
+
+					if (auto Error = fsp_SecretsManager_CheckExpect(Secret, _Expect, _bBinaryAsBase64))
+						return Error;
+
+					if (Secret.f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
+						*_pCommandLine += Secret.f_Get<CSecretsManager::ESecretType_Binary>();
 					else
 						*_pCommandLine += "{}\n"_f << Secret;
+
+					return CStr{};
 				}
 			)
 		;
@@ -613,11 +696,11 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return DMibCallActor(_Actor, CSecretsManager::f_GetSecretProperties, fg_TempCopy(_ID));
 				}
-			 	, [](CSecretsManager::CSecretProperties *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+			 	, [](CSecretsManager::CSecretProperties *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
 					auto &Result = *pResult;
 
-					if ((*Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_Buffer)
+					if ((*Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
 						*_pCommandLine += "Secret (base64): {}\n"_f << *Result.m_Secret;
 					else
 						*_pCommandLine += "Secret:          {}\n"_f << *Result.m_Secret;
@@ -639,6 +722,8 @@ namespace NMib::NCloud::NCloudClient
 						*_pCommandLine += "SemanticID:      {}\n"_f << *Result.m_SemanticID;
 					if (!(*Result.m_Tags).f_IsEmpty())
 						*_pCommandLine += "Tags:            {vs}\n"_f << *Result.m_Tags;
+
+					return "";
 				}
 			)
 		;
@@ -649,38 +734,59 @@ namespace NMib::NCloud::NCloudClient
 		TCContinuation<uint32> Continuation;
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
+		bool bBinaryAsBase64 = _Params["BinaryAsBase64"].f_Boolean();
 		CSecretsManager::CSecretID ID;
 		CStr Error;
 
-		if (fp_SecretsManager_SplitID(_Params, ID, Error))
+		if (fsp_SecretsManager_GetID(_Params, ID, Error))
 			return DMibErrorInstance(Error);
 
 		CSecretsManager::CSecretProperties Properties{};
+		aint nSetProperties = 0;
 
 		if (auto pValue = _Params.f_GetMember("Username"))
+		{
 			Properties.f_SetUserName(pValue->f_String());
+			++nSetProperties;
+		}
 
 		if (auto pValue = _Params.f_GetMember("URL"))
+		{
 			Properties.f_SetURL(pValue->f_String());
+			++nSetProperties;
+		}
 
 		if (auto pValue = _Params.f_GetMember("Expires"))
+		{
 			Properties.f_SetExpires(pValue->f_Date());
+			++nSetProperties;
+		}
 
 		if (auto pValue = _Params.f_GetMember("Notes"))
+		{
 			Properties.f_SetNotes(pValue->f_String());
+			++nSetProperties;
+		}
 
 		if (auto pValue = _Params.f_GetMember("Metadata"))
 		{
 			auto Object = pValue->f_Object();
 			for (auto iMetaData = Object.f_OrderedIterator(); iMetaData; ++iMetaData)
 				Properties.f_SetMetadata(iMetaData->f_Name(), fg_TempCopy(iMetaData->f_Value()));
+			++nSetProperties;
 		}
 
 		if (auto pValue = _Params.f_GetMember("Created"))
+		{
 			Properties.f_SetCreated(pValue->f_Date());
+			++nSetProperties;
+		}
 
 		if (auto pValue = _Params.f_GetMember("Modified"))
+		{
 			Properties.f_SetModified(pValue->f_Date());
+			++nSetProperties;
+		}
 
 		if (auto pValue = _Params.f_GetMember("SemanticID"))
 		{
@@ -691,6 +797,7 @@ namespace NMib::NCloud::NCloudClient
 				return Continuation;
 			}
 			Properties.f_SetSemanticID(ID);
+			++nSetProperties;
 		}
 
 		if (auto pValue = _Params.f_GetMember("Tags"))
@@ -707,11 +814,13 @@ namespace NMib::NCloud::NCloudClient
 				Tags[Tag];
 			}
 			Properties.f_SetTags(fg_Move(Tags));
+			++nSetProperties;
 		}
 
 		if (auto pValue = _Params.f_GetMember("SecretFile"))
 		{
 			Continuation.f_SetException(DMibErrorInstance("File secrets not yet handled"));
+			++nSetProperties;
 			return Continuation;
 		}
 
@@ -720,13 +829,13 @@ namespace NMib::NCloud::NCloudClient
 
 		if (auto pValue = _Params.f_GetMember("Secret"))
 		{
+			++nSetProperties;
 			SecretWasSet = true;
+			CStdInReaderPromptParams PasswordPrompt;
+			PasswordPrompt.m_bPassword = true;
 			if (*pValue == "string")
 			{
-				CStdInReaderPromptParams PasswordPrompt;
-				PasswordPrompt.m_bPassword = false;
 				PasswordPrompt.m_Prompt = "Enter secret: ";
-
 				_pCommandLine->f_ReadPrompt(PasswordPrompt) > SecretContinuation / [=](CStrSecure &&_SecretString)
 					{
 						SecretContinuation.f_SetResult(CSecretsManager::CSecret{_SecretString});
@@ -735,17 +844,46 @@ namespace NMib::NCloud::NCloudClient
 			}
 			else if (*pValue == "binary")
 			{
-				_pCommandLine->f_ReadBinary() > SecretContinuation / [=](CSecureByteVector &&_Secret)
-					{
-						SecretContinuation.f_SetResult(CSecretsManager::CSecret{_Secret});
-					}
-				;
+				if (bBinaryAsBase64)
+				{
+					PasswordPrompt.m_Prompt = "Enter base64 encoded secret: ";
+					_pCommandLine->f_ReadPrompt(PasswordPrompt) > SecretContinuation / [=](CStrSecure &&_Encoded)
+						{
+							CSecureByteVector Decoded;
+							try
+							{
+								CDisableExceptionTraceScope Disabled;
+								fg_Base64Decode(_Encoded, Decoded);
+							}
+							catch (CException const &_Exception)
+							{
+								SecretContinuation.f_SetException(DMibErrorInstance(fg_Format("Base64 decoding failed: {}", _Exception)));
+								return;
+							}
+							SecretContinuation.f_SetResult(CSecretsManager::CSecret{Decoded});
+						}
+					;
+				}
+				else
+				{
+					_pCommandLine->f_ReadBinary() > SecretContinuation / [=](CSecureByteVector &&_Secret)
+						{
+							SecretContinuation.f_SetResult(CSecretsManager::CSecret{_Secret});
+						}
+					;
+				}
 			}
 			else
 				DNeverGetHere;
 		}
 		else
 			SecretContinuation.f_SetResult(CSecretsManager::CSecret{});
+
+		if (nSetProperties == 0)
+		{
+			Continuation.f_SetException(DMibErrorInstance("No properties specified. Specify at least one property to change"));
+			return Continuation;
+		}
 
 		SecretContinuation > Continuation / [=](CSecretsManager::CSecret && _Secret) mutable
 			{
@@ -795,7 +933,7 @@ namespace NMib::NCloud::NCloudClient
 		CSecretsManager::CSecretID ID;
 		CStr Error;
 
-		if (fp_SecretsManager_SplitID(_Params, ID, Error))
+		if (fsp_SecretsManager_GetID(_Params, ID, Error))
 			return DMibErrorInstance(Error);
 
 		auto fParseTags = [](CEJSON const &_Tags)
@@ -812,8 +950,8 @@ namespace NMib::NCloud::NCloudClient
 			}
 		;
 
-		TCSet<CStr> AddTags;
-		TCSet<CStr> RemoveTags;
+		TCSet<CStrSecure> AddTags;
+		TCSet<CStrSecure> RemoveTags;
 
 		try
 		{
@@ -870,7 +1008,7 @@ namespace NMib::NCloud::NCloudClient
 		CSecretsManager::CSecretID ID;
 		CStr Error;
 
-		if (fp_SecretsManager_SplitID(_Params, ID, Error))
+		if (fsp_SecretsManager_GetID(_Params, ID, Error))
 			return DMibErrorInstance(Error);
 
 		CStrSecure MetadataKey;
@@ -932,7 +1070,7 @@ namespace NMib::NCloud::NCloudClient
 		CSecretsManager::CSecretID ID;
 		CStr Error;
 
-		if (fp_SecretsManager_SplitID(_Params, ID, Error))
+		if (fsp_SecretsManager_GetID(_Params, ID, Error))
 			return DMibErrorInstance(Error);
 
 		CStrSecure Key;
@@ -955,6 +1093,44 @@ namespace NMib::NCloud::NCloudClient
 				}
 
 				DMibCallActor(pSecretsManager->m_Actor, CSecretsManager::f_RemoveMetadata, fg_Move(ID), Key)
+					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
+					>  Continuation	/ [=]
+					{
+						Continuation.f_SetResult(0);
+					}
+				;
+			}
+		;
+		return Continuation;
+	}
+
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		TCContinuation<uint32> Continuation;
+
+		CStr Host = _Params["SecretsManagerHost"].f_String();
+		CSecretsManager::CSecretID ID;
+		CStr Error;
+
+		if (fsp_SecretsManager_GetID(_Params, ID, Error))
+			return DMibErrorInstance(Error);
+
+		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
+			> Continuation / [=]() mutable
+			{
+				CStr Error;
+				auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
+				if (!pSecretsManager)
+				{
+					Continuation.f_SetException
+						(
+							DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
+						)
+					;
+					return;
+				}
+
+				DMibCallActor(pSecretsManager->m_Actor, CSecretsManager::f_RemoveSecret, fg_Move(ID))
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 					>  Continuation	/ [=]
 					{

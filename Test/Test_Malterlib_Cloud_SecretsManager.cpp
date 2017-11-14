@@ -501,6 +501,11 @@ public:
 					DMibCallActor(SecretsManager, CSecretsManager::f_RemoveMetadata, CSecretsManager::CSecretID{_Folder, _Name}, fg_TempCopy(_Key)).f_CallSync(g_Timeout);
 				}
 			;
+			auto fRemoveSecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)
+				{
+					DMibCallActor(SecretsManager, CSecretsManager::f_RemoveSecret, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+				}
+			;
 
 			
 
@@ -831,6 +836,13 @@ public:
 						}
 					}
 				}
+				{
+					fSetProperties("Removable", "Name1", CSecretsManager::CSecretProperties{}.f_SetNotes("Note"));
+
+					DMibExpect(fGetSecret("Removable", "Name1"), ==, CSecretsManager::CSecret{});
+					fRemoveSecret("Removable", "Name1");
+					DMibExpectException(fGetSecret("Removable", "Name1"), DMibErrorInstance("No secret matching ID: 'Removable/Name1'"));
+				}
 			}
 
 			
@@ -1122,7 +1134,7 @@ public:
 			}
 
 			{
-				DMibTestPath("Test ModifyTags Commnd Permissions");
+				DMibTestPath("Test ModifyTags Command Permissions");
 				DMibExpectException(fAddTagsAndGetProperties("Folder1", "Name1", {{"Extra"}}, {}), DMibErrorInstance("Access denied"));
 				TCSet<NStr::CStr> Needed
 					{
@@ -1235,7 +1247,49 @@ public:
 
 				fRemovePermissions(Needed);
 			}
-			
+			{
+				DMibTestPath("Test RemoveSecret Command Permissions");
+
+				TCSet<NStr::CStr> Needed
+					{
+						"SecretsManager/Write/SemanticID/Semantic1/Tag/T1"
+						, "SecretsManager/Write/SemanticID/Semantic1/Tag/T2"
+						, "SecretsManager/Command/RemoveSecret"
+					}
+				;
+				TCSet<NStr::CStr> NeededForTest
+					{
+						"SecretsManager/Read/SemanticID/Semantic1/Tag/T1"
+						, "SecretsManager/Read/SemanticID/Semantic1/Tag/T2"
+						, "SecretsManager/Command/SetSecretProperties"
+						, "SecretsManager/Command/GetSecret"
+					}
+				;
+				fAddPermissions(NeededForTest);
+				fAddPermissions(Needed);
+				fSetProperties("Removable", "Name1", CSecretsManager::CSecretProperties{}.f_SetSemanticID("Semantic1").f_SetTags({"T1", "T2"}));
+				fRemovePermissions({"SecretsManager/Command/SetSecretProperties"});
+
+
+				for (auto const &Permission : Needed)
+				{
+					DMibTestPath(fg_Format("Test RemoveSwecret Permissions. Missing '{}' permission", Permission));
+
+					// Remove one, check, and add it again
+					fRemovePermissions({Permission});
+					DMibExpectException(fRemoveSecret("Removable", "Name1"), DMibErrorInstance("Access denied"));
+					fAddPermissions({Permission});
+					DMibExpect(fGetSecret("Removable", "Name1"), ==, CSecretsManager::CSecret{});
+				}
+
+				// Check that access was granted and the secret removed
+				fRemoveSecret("Removable", "Name1");
+				DMibExpectException(fGetSecret("Removable", "Name1"), DMibErrorInstance("No secret matching ID: 'Removable/Name1'"));
+
+				fRemovePermissions(Needed);
+				fRemovePermissions(NeededForTest);
+			}
+
 			// Reset permissions
 			fAddPermissions(SecretsManagerPermissionsForTest);
 		};

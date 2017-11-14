@@ -67,6 +67,7 @@ namespace NMib::NCloud::NSecretsManager
 		Permissions["SecretsManager/Command/ModifyTags"];
 		Permissions["SecretsManager/Command/SetMetadata"];
 		Permissions["SecretsManager/Command/RemoveMetadata"];
+		Permissions["SecretsManager/Command/RemoveSecret"];
 		Permissions["SecretsManager/Command/DownloadFile"];
 
 		Permissions["SecretsManager/Read/*/NoTag"];
