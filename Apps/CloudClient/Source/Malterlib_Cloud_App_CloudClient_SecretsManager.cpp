@@ -838,7 +838,7 @@ namespace NMib::NCloud::NCloudClient
 				PasswordPrompt.m_Prompt = "Enter secret: ";
 				_pCommandLine->f_ReadPrompt(PasswordPrompt) > SecretContinuation / [=](CStrSecure &&_SecretString)
 					{
-						SecretContinuation.f_SetResult(CSecretsManager::CSecret{_SecretString});
+						SecretContinuation.f_SetResult(CSecretsManager::CSecret{fg_Move(_SecretString)});
 					}
 				;
 			}
@@ -860,7 +860,7 @@ namespace NMib::NCloud::NCloudClient
 								SecretContinuation.f_SetException(DMibErrorInstance(fg_Format("Base64 decoding failed: {}", _Exception)));
 								return;
 							}
-							SecretContinuation.f_SetResult(CSecretsManager::CSecret{Decoded});
+							SecretContinuation.f_SetResult(CSecretsManager::CSecret{fg_Move(Decoded)});
 						}
 					;
 				}
@@ -868,7 +868,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					_pCommandLine->f_ReadBinary() > SecretContinuation / [=](CSecureByteVector &&_Secret)
 						{
-							SecretContinuation.f_SetResult(CSecretsManager::CSecret{_Secret});
+							SecretContinuation.f_SetResult(CSecretsManager::CSecret{fg_Move(_Secret)});
 						}
 					;
 				}

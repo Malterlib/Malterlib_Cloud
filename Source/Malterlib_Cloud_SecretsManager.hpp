@@ -48,7 +48,7 @@ namespace NMib::NCloud
 	void CSecretsManager::CFileTag::f_Stream(tf_CStream &_Stream)
 	{
 	}
-	
+
 	inline bool CSecretsManager::CFileTag::operator == (CSecretsManager::CFileTag const &_Right) const
 	{
 		return true;
