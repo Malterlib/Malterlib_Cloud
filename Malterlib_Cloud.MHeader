@@ -235,7 +235,10 @@ Property
 								"\t, \"Platform\": \"@(MalterlibCloudPlatform)\"\n"\
 								"\t, \"Configuration\": \"@(MalterlibCloudVersionInfo_Configuration)\"\n"\
 								"\t, \"ExtraInfo\": {\n"\
-								"\t\t\"Dummy\": null\n"
+								"\t\t\"Dummy\": null\n"\
+								"\t\t, \"GitBranch\": \"@(MalterlibGitBranch)\"\n"\
+								"\t\t, \"GitCommit\": \"@(MalterlibGitCommit)\"\n"
+
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t\t, \"Executable\": \"@(MalterlibCloudVersionInfo_Executable)\"\n"
 	{
