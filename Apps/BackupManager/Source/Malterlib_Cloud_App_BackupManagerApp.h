@@ -7,5 +7,5 @@
 
 namespace NMib::NCloud
 {
-	TCActor<CDistributedAppActor> fg_ConstructApp_BackupManager();
+	NConcurrency::TCActor<NConcurrency::CDistributedAppActor> fg_ConstructApp_BackupManager();
 }

@@ -95,7 +95,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= {"--destination"}
 							, "Type"_= ""
 							, "Description"_= "The directory to download to.\n"
-							"By default this directory will be the 'name of the source'/'backup time and id'"
+							"By default this directory will be the 'name of the source'/'backup time'"
 						}
 						, "SetOwner?"_=
 						{
@@ -113,11 +113,11 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, "Parameters"_= 
 					{
-						"Backup?"_=
+						"BackupTime?"_=
 						{
-							"Default"_= ""
-							, "Description"_= "The backup to download.\n"
-								"This is in the format 'Time - BackupID' as displayed in the output from --backup-manager-list-backups.\n"
+							"Default"_= NTime::CTime{}
+							, "Description"_= "The time of the backup to download.\n"
+								"Leave as default to download the latest backup\n"
 						}
 					}
 				}
@@ -221,7 +221,7 @@ namespace NMib::NCloud::NCloudClient
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
 			> Continuation / [=]
 			{
-				TCActorResultMap<CHostInfo, TCMap<CStr, TCVector<CBackupManager::CBackupID>>> Backups;
+				TCActorResultMap<CHostInfo, TCMap<CStr, CBackupManager::CBackupInfo>> Backups;
 				
 				for (auto &TrustedBackupManager : mp_BackupManagers.m_Actors)
 				{
@@ -239,7 +239,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				Backups.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, TCVector<CBackupManager::CBackupID>>>> &&_Results)
+				Backups.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CBackupManager::CBackupInfo>>> &&_Results)
 					{
 						for (auto &Result : _Results)
 						{
@@ -250,12 +250,12 @@ namespace NMib::NCloud::NCloudClient
 								*_pCommandLine %= "    Failed getting backups for this host: {}\n"_f << Result.f_GetExceptionStr();
 								continue;
 							}
-							for (auto &Backups : *Result)
+							for (auto &BackupInfo : *Result)
 							{
-								auto &BackupSouce = Result->fs_GetKey(Backups);
-								*_pCommandLine += "    {}\n"_f << BackupSouce;
-								for (auto &Backup : Backups)
-									*_pCommandLine += "        {}\n"_f << Backup;
+								auto &BackupSouce = Result->fs_GetKey(BackupInfo);
+								*_pCommandLine += "    {}   {} -> {}\n"_f << BackupSouce << BackupInfo.m_Earliest << BackupInfo.m_Latest;
+								for (auto &Snapshot : BackupInfo.m_Snapshots)
+									*_pCommandLine += "        {}\n"_f << Snapshot;
 							}
 						}
 						Continuation.f_SetResult(0);
@@ -272,7 +272,7 @@ namespace NMib::NCloud::NCloudClient
 		
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
-		CStr Backup = _Params["Backup"].f_String();
+		NTime::CTime BackupTime = _Params["BackupTime"].f_Date();
 		CStr Destination;
 		if (auto *pValue = _Params.f_GetMember("Destination"))
 			Destination = CFile::fs_GetExpandedPath(pValue->f_String(), _Params["CurrentDirectory"].f_String());
@@ -284,14 +284,7 @@ namespace NMib::NCloud::NCloudClient
 		
 		if (BackupSource.f_IsEmpty())
 			return DMibErrorInstance("Backup source must be specified");
-		if (Backup.f_IsEmpty())
-			return DMibErrorInstance("Backup must be specified");
-		
-		CStr BackupID;
-		CTime BackupTime;
-		if (!CBackupManager::fs_IsValidBackup(Backup, &BackupID, &BackupTime))
-			return DMibErrorInstance("Backup name format is invalid");
-		
+
 		if (!CBackupManager::fs_IsValidBackupSource(BackupSource, nullptr, nullptr))
 			return DMibErrorInstance("Backup source name format is invalid");
 		
@@ -313,15 +306,11 @@ namespace NMib::NCloud::NCloudClient
 				CStr BasePath;
 				if (!Destination.f_IsEmpty())
 					BasePath = Destination; 
-				else if (BackupID == "Latest")
-					BasePath = fg_Format("{}/{}/Latest", mp_State.m_RootDirectory, BackupSource);
+				else if (BackupTime.f_IsValid())
+					BasePath = fg_Format("{}/{}/{tst.,tsb_}", mp_State.m_RootDirectory, BackupSource, BackupTime);
 				else
-					BasePath = fg_Format("{}/{}/{tst.,tsb_}_{}", mp_State.m_RootDirectory, BackupSource, BackupTime, BackupID);
+					BasePath = fg_Format("{}/{}/Latest", mp_State.m_RootDirectory, BackupSource);
 
-				CBackupManager::CBackupID DownloadBackupID;
-				DownloadBackupID.m_ID = BackupID;
-				DownloadBackupID.m_Time = BackupTime;
-				
 				CDirectorySyncReceive::CConfig Config;
 				Config.m_BasePath = BasePath;
 				Config.m_PreviousBasePath = BasePath;
@@ -336,8 +325,7 @@ namespace NMib::NCloud::NCloudClient
 					(
 						pBackupManager->m_Actor
 						, BackupSource
-						, DownloadBackupID
-						, {}
+						, BackupTime
 						, fg_Move(Config)
 						, mp_DownloadBackupSubscription
 					)

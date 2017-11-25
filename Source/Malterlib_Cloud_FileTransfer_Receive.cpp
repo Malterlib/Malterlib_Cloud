@@ -180,7 +180,7 @@ namespace NMib::NCloud
 								() mutable -> CFileTransferContext::CInternal::CSendPart::CResult
 								{
 									CStr Error;
-									if (!CFileTransferContext::fs_IsValidRelativePath(DownloadPart.m_FilePath, Error))
+									if (!CFileTransferContext::fs_IsSafeRelativePath(DownloadPart.m_FilePath, Error))
 										DMibError(fg_Format("File path cannot {}", Error));
 									
 									CStr FilePath = fg_Format("{}/{}", RootDirectory, DownloadPart.m_FilePath);

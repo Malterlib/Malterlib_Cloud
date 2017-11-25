@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/Function/MergeFunctors>
 
 #include "Malterlib_Cloud_BackupManagerClient.h"
 #include "Malterlib_Cloud_BackupManagerClient_Internal.h"
@@ -9,17 +10,26 @@
 
 namespace NMib::NCloud
 {
+	CFileChangeNotificationActor::CCoalesceSettings CBackupManagerClient::CInternal::f_CoalesceSettings()
+	{
+		return CFileChangeNotificationActor::CCoalesceSettings{5, m_Config.m_ChangeAggregationTime};
+	}
+	
 	TCContinuation<void> CBackupManagerClient::CInternal::f_RetrySubscribeChanges()
 	{
 		if (m_pThis->mp_bDestroyed)
 			return DMibErrorInstance("Destroyed");
 
+		DMibCloudBackupManagerDebugOut("Retry subscribe\n");
+
 		TCContinuation<void> Continuation;
-		
+
+		auto pActive = f_MarkInstancesActive();
+
 		if (m_bRunningRetrySubscribe)
 		{
 			TCContinuation<void> FinishedContinuation = m_SubscribeChangesContinuations.f_Insert();
-			FinishedContinuation > Continuation / [this, Continuation]
+			FinishedContinuation > Continuation / [this, Continuation, pActive]
 				{
 					f_RetrySubscribeChanges() > Continuation;
 				}
@@ -49,11 +59,14 @@ namespace NMib::NCloud
 		};
 		
 		TCSet<CStr> PendingPaths;
-		
+		TCSet<CStr> ToRemovePaths;
+
 		for (auto &WatchedPath : m_WatchedPaths)
 		{
 			if (WatchedPath.m_bPending)
 				PendingPaths[WatchedPath.f_GetPath()];
+			else if (WatchedPath.m_bToBeRemoved)
+				ToRemovePaths[WatchedPath.f_GetPath()];
 		}
 		
 		g_Dispatch(m_FileActor) > [PendingPaths]
@@ -92,7 +105,7 @@ namespace NMib::NCloud
 				}
 				return PendingInfo;
 			}
-			> Continuation / [this, Continuation, PendingPaths, Cleanup](CPendingInfo &&_PendingInfo)
+			> Continuation / [this, Continuation, PendingPaths, Cleanup, ToRemovePaths, pActive](CPendingInfo &&_PendingInfo)
 			{
 				if (m_pThis->mp_bDestroyed)
 					return;
@@ -120,7 +133,7 @@ namespace NMib::NCloud
 							&CFileChangeNotificationActor::f_RegisterForChanges
 							, Path
 							, Changes
-							, [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications)
+							, g_ActorFunctor > [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCContinuation<void>
 							{
 								for (auto Notification : _Notifications)
 								{
@@ -129,11 +142,22 @@ namespace NMib::NCloud
 									if (!Notification.m_PathFrom.f_IsEmpty())
 										Notification.m_PathFrom = CFile::fs_AppendPath(Path, Notification.m_PathFrom);
 									
-									f_OnFileChanged(Notification);
+#ifdef DMibCloudBackupManagerDebug
+									switch (Notification.m_Notification)
+									{
+									case EFileChangeNotification_Unknown: DMibCloudBackupManagerDebugOut("&&& Unknown {}\n", Notification.m_Path); break;
+									case EFileChangeNotification_Added: DMibCloudBackupManagerDebugOut("&&& Added {}\n", Notification.m_Path); break;
+									case EFileChangeNotification_Removed: DMibCloudBackupManagerDebugOut("&&& Removed {}\n", Notification.m_Path); break;
+									case EFileChangeNotification_Modified: DMibCloudBackupManagerDebugOut("&&& Modified {}\n", Notification.m_Path); break;
+									case EFileChangeNotification_Renamed: DMibCloudBackupManagerDebugOut("&&& Renamed {} -> {}\n", Notification.m_PathFrom, Notification.m_Path); break;
+									}
+#endif
+									f_OnFileChanged(Notification, false);
 								}
+
+								return fg_Explicit();
 							}
-							, fg_ThisActor(m_pThis)
-							, CFileChangeNotificationActor::CCoalesceSettings{}
+							, m_pThis->mp_pInternal->f_CoalesceSettings()
 						)
 						> SubscribeResults.f_AddResult(Path)
 					;
@@ -149,16 +173,17 @@ namespace NMib::NCloud
 							&CFileChangeNotificationActor::f_RegisterForChanges
 							, MissingPath
 							, EFileChange_FileName | EFileChange_DirectoryName
-							, [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications)
+							, g_ActorFunctor > [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCContinuation<void>
 							{
 								if (!m_bRerunRetrySubscribe)
 								{
 									m_bRerunRetrySubscribe = true;
 									f_RetrySubscribeChanges();
 								}
+
+								return fg_Explicit();
 							}
-							, fg_ThisActor(m_pThis)
-							, CFileChangeNotificationActor::CCoalesceSettings{}
+							, m_pThis->mp_pInternal->f_CoalesceSettings()
 						)
 						> SubscribeResultsMissing.f_AddResult(MissingPath)
 					;
@@ -177,9 +202,10 @@ namespace NMib::NCloud
 
 				SubscribeResults.f_GetResults()
 					+ SubscribeResultsMissing.f_GetResults()
-					> Continuation / [Continuation, this, Cleanup]
+					> Continuation / [Continuation, this, Cleanup, ToRemovePaths, pActive]
 					(TCMap<CStr, TCAsyncResult<CActorSubscription>> &&_Results, TCMap<CStr, TCAsyncResult<CActorSubscription>> &&_ResultsMissing) mutable
 					{
+						bool bChanged = false;
 						for (auto &Result : _Results)
 						{
 							auto &Path = _Results.fs_GetKey(Result);
@@ -190,8 +216,24 @@ namespace NMib::NCloud
 								continue;
 							}
 							auto &WatchedPath = m_WatchedPaths[Path];
+							if (WatchedPath.m_Subscription)
+							{
+								auto Subscription = fg_Move(WatchedPath.m_Subscription);
+								Subscription->f_Destroy() > [](TCAsyncResult<void> &&_Result) -> TCContinuation<void>
+									{
+#ifdef DMibCloudBackupManagerDebug
+										if (!_Result)
+											DMibCloudBackupManagerDebugOut("FAILED to destroy watch subscription {}\n", _Result.f_GetExceptionStr());
+#endif
+										return fg_Explicit();
+									}
+								;
+							}
 							WatchedPath.m_Subscription = fg_Move(*Result);
-							WatchedPath.m_bPending = false; 
+							WatchedPath.m_bPending = false;
+							if (m_bInitialSubscribeDone)
+								f_NewPathWatched(Path);
+							bChanged = true;
 						}
 						for (auto &Result : _ResultsMissing)
 						{
@@ -203,7 +245,18 @@ namespace NMib::NCloud
 								continue;
 							}
 							m_WatchedPathsMissing[Path].m_Subscription = fg_Move(*Result);
+							bChanged = true;
 						}
+						for (auto &Path : ToRemovePaths)
+						{
+							auto *pWatchedPath = m_WatchedPaths.f_FindEqual(Path);
+							if (!pWatchedPath || !pWatchedPath->m_bToBeRemoved)
+								continue;
+							m_WatchedPaths.f_Remove(Path);
+						}
+
+						if (bChanged)
+							f_RetrySubscribeChanges();
 
 						Continuation.f_SetResult();
 					}
@@ -214,47 +267,147 @@ namespace NMib::NCloud
 		return Continuation;
 	}
 
+	void CBackupManagerClient::CInternal::f_NewPathWatched(CStr const &_Path)
+	{
+		DMibCloudBackupManagerDebugOut("New path watched: {}\n", _Path);
+		g_Dispatch(m_FileActor) > [_Path]
+			{
+				TCVector<CFileChangeNotification::CNotification> Notifications;
+				for (auto &File : CFile::fs_FindFilesEx(_Path / "*", EFileAttrib_File | EFileAttrib_Directory, true, false))
+				{
+					auto &Notification = Notifications.f_Insert();
+					Notification.m_Path = File.m_Path;
+					Notification.m_Notification = EFileChangeNotification_Added;
+				}
+
+				return Notifications;
+			}
+			> [this, _Path](TCAsyncResult<TCVector<CFileChangeNotification::CNotification>> &&_Notifications)
+			{
+				if (!_Notifications)
+				{
+					DMibLogCategoryStr(m_Config.m_LogCategory);
+					DMibLog(Error, "Error processing newly watched path '{}': {}", _Path, _Notifications.f_GetExceptionStr());
+					return;
+				}
+
+				for (auto &Notification : *_Notifications)
+					f_OnFileChanged(Notification, false);
+			}
+		;
+	}
+
 	TCContinuation<void> CBackupManagerClient::CInternal::f_SubscribeChanges()
 	{
 		if (m_pThis->mp_bDestroyed)
 			return DMibErrorInstance("Destroyed");
 		
 		auto &ManifestConfig = m_Config.m_ManifestConfig;
+
+		struct CWatchedPathSettings
+		{
+			CStr const &f_GetPath() const
+			{
+				return TCMap<CStr, CWatchedPathSettings>::fs_GetKey(*this);
+			}
+
+			bool m_bRecursive = false;
+		};
 		
-		TCMap<CStr, zbool> Paths; 
+		TCMap<CStr, CWatchedPathSettings> Paths;
+
+		auto fRemoveChildren = [&](CStr const &_Path)
+			{
+				TCSet<CStr> ToRemove;
+				for (auto &OldPath : Paths)
+				{
+					auto &Directory = OldPath.f_GetPath();
+					if (Directory != _Path && Directory.f_StartsWith(Directory))
+						ToRemove[Directory];
+				}
+				for (auto &Remove : ToRemove)
+					Paths.f_Remove(Remove);
+				return !ToRemove.f_IsEmpty();
+			}
+		;
+
+		// Find most efficient common set of watch paths that include the watched directories, supporting rename operations
 		for (auto &Destination : ManifestConfig.m_IncludeWildcards)
 		{
 			auto &Wildcard = ManifestConfig.m_IncludeWildcards.fs_GetKey(Destination);
 			
 			bool bRecursive = false;
 			auto WildcardParsed = CDirectoryManifestConfig::fs_ParseWildcard(Wildcard, bRecursive);
-			
-			auto &bRecursiveForPath = Paths[CFile::fs_GetPath(CFile::fs_AppendPath(ManifestConfig.m_Root, WildcardParsed))];
+
+			CStr Directory = CFile::fs_GetPath(CFile::fs_AppendPath(ManifestConfig.m_Root, WildcardParsed));
+
+			if (auto *pPath = Paths.f_FindEqual(Directory))
+			{
+				auto &Path = *pPath;
+				if (bRecursive && !Path.m_bRecursive)
+				{
+					fRemoveChildren(Directory);
+					Path.m_bRecursive = true;
+				}
+				continue;
+			}
+
+			bool bFoundParent = false;
+			for (CStr ParentDirectorySearch = CFile::fs_GetPath(Directory); true; ParentDirectorySearch = CFile::fs_GetPath(ParentDirectorySearch))
+			{
+				auto *pPath = Paths.f_FindEqual(ParentDirectorySearch);
+				if (!pPath || !pPath->m_bRecursive)
+				{
+					if (ParentDirectorySearch.f_IsEmpty())
+						break;
+					continue;
+				}
+
+				bFoundParent = true;
+				break;
+			}
+			if (bFoundParent)
+				continue;
+
+			CWatchedPathSettings NewPath;
+			NewPath.m_bRecursive = bRecursive;
+
 			if (bRecursive)
-				bRecursiveForPath = bRecursive; 
+				fRemoveChildren(Directory);
+			Paths[Directory] = fg_Move(NewPath);
 		}
 
-		for (auto &bRecursive : Paths)
+		for (auto &WatchedPath : m_WatchedPaths)
+			WatchedPath.m_bToBeRemoved = true;
+
+		for (auto &WildcardSettings : Paths)
 		{
-			auto &Path = Paths.fs_GetKey(bRecursive);
-			
+			auto &Path = WildcardSettings.f_GetPath();
+
 			auto Mapping = m_WatchedPaths(Path);
 			auto &WatchedPath = *Mapping;
 			if (Mapping.f_WasCreated())
 			{
 				WatchedPath.m_bPending = true;
-				WatchedPath.m_bRecursive = bRecursive;
+				WatchedPath.m_bRecursive = WildcardSettings.m_bRecursive;
 			}
 			else
 			{
-				if (bRecursive && !WatchedPath.m_bRecursive)
+				if (WildcardSettings.m_bRecursive && !WatchedPath.m_bRecursive)
 				{
 					WatchedPath.m_bRecursive = true;
 					WatchedPath.m_bPending = true;
 				}
+				WatchedPath.m_bToBeRemoved = false;
 			}
 		}
-		
+
+		for (auto &WatchedPath : m_WatchedPaths)
+		{
+			if (WatchedPath.m_bToBeRemoved)
+				WatchedPath.m_bPending = false;
+		}
+
 		return f_RetrySubscribeChanges();
 	}
 	
@@ -284,7 +437,7 @@ namespace NMib::NCloud
 			}
 			else
 			{
-				if (NotificationPath != WildcardPath && !NotificationPath.f_StartsWith(WildcardPath + "/"))
+				if (NotificationPath != WildcardPath && !WildcardPath.f_IsEmpty() && !NotificationPath.f_StartsWith(WildcardPath + "/"))
 					continue;
 			}
 
@@ -303,7 +456,6 @@ namespace NMib::NCloud
 				DMibError("Matched file to two different destinations in manifest");
 			
 			bIsIncluded = true;
-			break;
 		}
 		
 		if (!bIsIncluded)
@@ -314,10 +466,61 @@ namespace NMib::NCloud
 		
 		return true;
 	}
-	
-	void CBackupManagerClient::CInternal::f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification)
+
+	void CBackupManagerClient::fp_HashMismatch(NStr::CStr const &_File)
+	{
+		// We inject a change notification with dirty forced to force new hash to be calculated
+
+		auto &Internal = *mp_pInternal;
+		auto &ManifestConfig = Internal.m_Config.m_ManifestConfig;
+
+		CFileChangeNotification::CNotification Notification;
+		Notification.m_Path = ManifestConfig.m_Root / _File;
+		Notification.m_Notification = EFileChangeNotification_Modified;
+		Internal.f_OnFileChanged(Notification, true);
+	}
+
+	COnScopeExitShared CBackupManagerClient::CInternal::f_MarkInstancesActive()
+	{
+		for (auto &RunningInstance : m_RunningBackupInstances)
+		{
+			if (RunningInstance.m_bSentActive)
+				continue;
+			RunningInstance.m_bSentActive = true;
+			RunningInstance.m_Instance(&NPrivate::CBackupManagerClient_Instance::f_MarkActive, true) > fg_DiscardResult();
+		}
+
+		++m_nActive;
+		return g_OnScopeExitActor > [this]
+			{
+				--m_nActive;
+				if (m_nActive)
+					return;
+				for (auto &RunningInstance : m_RunningBackupInstances)
+				{
+					if (!RunningInstance.m_bSentActive)
+						continue;
+					RunningInstance.m_bSentActive = false;
+					RunningInstance.m_Instance(&NPrivate::CBackupManagerClient_Instance::f_MarkActive, false) > fg_DiscardResult();
+				}
+			}
+		;
+	}
+
+	void CBackupManagerClient::CInternal::f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification, bool _bDirty)
 	{
 		CFileChangeNotification::CNotification Notification = _Notification;
+
+#ifdef DMibCloudBackupManagerDebug
+		switch (Notification.m_Notification)
+		{
+		case EFileChangeNotification_Unknown: DMibCloudBackupManagerDebugOut("%%% Unknown {} {}\n", Notification.m_Path, _bDirty); break;
+		case EFileChangeNotification_Added: DMibCloudBackupManagerDebugOut("%%% Added {} {}\n", Notification.m_Path, _bDirty); break;
+		case EFileChangeNotification_Removed: DMibCloudBackupManagerDebugOut("%%% Removed {} {}\n", Notification.m_Path, _bDirty); break;
+		case EFileChangeNotification_Modified: DMibCloudBackupManagerDebugOut("%%% Modified {} {}\n", Notification.m_Path, _bDirty); break;
+		case EFileChangeNotification_Renamed: DMibCloudBackupManagerDebugOut("%%% Renamed {} -> {} {}\n", Notification.m_PathFrom, Notification.m_Path, _bDirty); break;
+		}
+#endif
 		
 		auto &ManifestConfig = m_Config.m_ManifestConfig;
 		
@@ -327,8 +530,23 @@ namespace NMib::NCloud
 		CStr OriginalPath = CFile::fs_MakePathRelative(Notification.m_Path, ManifestConfig.m_Root);
 		CStr OriginalPathFrom;
 		
-		bool bDirtyHint = false;
-		
+		bool bDirtyHint = _bDirty;
+
+		if (Notification.m_Notification == EFileChangeNotification_Removed)
+		{
+			TCSet<CStr> Watched;
+			for (auto &Path : m_WatchedPaths)
+				Watched[Path.f_GetPath()];
+
+			auto pWatchedDeleted = m_WatchedPaths.f_FindEqual(Notification.m_Path);
+			if (pWatchedDeleted)
+			{
+				DMibCloudBackupManagerDebugOut("%%% RESUBSCRIBE {}\n", Notification.m_Path);
+				pWatchedDeleted->m_bPending = true;
+				f_RetrySubscribeChanges();
+			}
+		}
+
 		if (Notification.m_Notification == EFileChangeNotification_Renamed)
 		{
 			OriginalPathFrom = CFile::fs_MakePathRelative(Notification.m_PathFrom, ManifestConfig.m_Root);
@@ -356,29 +574,50 @@ namespace NMib::NCloud
 			return;
 		else if (Notification.m_Notification == EFileChangeNotification_Added || Notification.m_Notification == EFileChangeNotification_Removed)
 			bDirtyHint = true;
-		
+
+		if (RelativePath.f_IsEmpty())
+			return; // We don't support root path
+
+		mint Sequence = m_FileNotificationSequence++;
+
+		auto pActive = f_MarkInstancesActive();
+
 		f_UpdateManifest(RelativePath, OriginalPath, bDirtyHint)
 			+ f_UpdateManifest(RelativePathFrom, OriginalPathFrom, bDirtyHint)
 			> [=](TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
 			{
+				(void)pActive;
+				DMibCheck(Sequence > m_LastSeenNotificationSequence);
+				m_LastSeenNotificationSequence = Sequence;
+
 				if (!_Change)
 				{
 					DMibLogCategoryStr(m_Config.m_LogCategory);
-					DMibLog(Error, "Failed to update manifest: {}", _Change.f_GetExceptionStr());
+					DMibLog(Error, "Failed to update manifest ({}): {}", RelativePath, _Change.f_GetExceptionStr());
 					return;
 				}
 				
 				if (!_ChangeFrom)
 				{
 					DMibLogCategoryStr(m_Config.m_LogCategory);
-					DMibLog(Error, "Failed to update manifest: {}", _ChangeFrom.f_GetExceptionStr());
+					DMibLog(Error, "Failed to update manifest ({}): {}", RelativePath, _ChangeFrom.f_GetExceptionStr());
 					return;
 				}
 				
-				auto fSendManifestChange = [&](CStr const &_Path, CBackupManagerBackup::CManifestChange const &_ManifestChange, bool _bDirty)
+				auto fSendManifestChange = [&]
+					(
+					 	CStr const &_Path
+					 	, CBackupManagerBackup::CManifestChange const &_ManifestChange
+					 	, bool _bDirty
+					 	, CBackupManagerClient_ChecksumState const &_ChecksumState
+					)
 					{
+#if defined DMibContractConfigure_CheckEnabled
+						CStr ManifestError;
+						DMibCheck(CBackupManagerBackup::fs_ManifestChangeValid(_Path, _ManifestChange, ManifestError));
+#endif
 						for (auto &RunningInstance : m_RunningBackupInstances)
-							RunningInstance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty) > fg_DiscardResult();
+							RunningInstance.m_Instance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty, _ChecksumState) > fg_DiscardResult();
 					}
 				;
 				
@@ -405,42 +644,85 @@ namespace NMib::NCloud
 				{
 					auto &Path = UpdatedDirectories.fs_GetKey(UpdatedDirectory);
 					if (UpdatedDirectory.m_bAdded)
-						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Add{fg_Move(UpdatedDirectory.m_ManifestFile)}, false);
+						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Add{fg_Move(UpdatedDirectory.m_ManifestFile)}, false, {});
 					else
-						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Change{fg_Move(UpdatedDirectory.m_ManifestFile)}, false);
+						fSendManifestChange(Path, CBackupManagerBackup::CManifestChange_Change{fg_Move(UpdatedDirectory.m_ManifestFile)}, false, {});
 				}
-				
+
+#ifdef DMibCloudBackupManagerDebug
+				CStr NotificationStr;
+				switch (Notification.m_Notification)
+				{
+				case EFileChangeNotification_Unknown: NotificationStr = "Unknown"; break;
+				case EFileChangeNotification_Added: NotificationStr = "Added"; break;
+				case EFileChangeNotification_Removed: NotificationStr = "Removed"; break;
+				case EFileChangeNotification_Modified: NotificationStr = "Modified"; break;
+				case EFileChangeNotification_Renamed: NotificationStr = "Renamed"; break;
+				}
+#endif
 				if (Notification.m_Notification == EFileChangeNotification_Renamed)
 				{
 					if (ChangeFrom.m_bRemoved)
 					{
 						if (Change.m_bAdded)
-							fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Rename{fg_Move(Change.m_ManifestFile), RelativePathFrom}, Change.m_bIDChanged);
-						else if (Change.m_bRemoved)
 						{
-							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Remove{}, ChangeFrom.m_bIDChanged);
-							if (Change.m_bRemoved)
-								fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Remove{}, Change.m_bIDChanged);
-							else if (Change.m_bExists)
-								fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Change{fg_Move(Change.m_ManifestFile)}, Change.m_bIDChanged);
+							DMibCloudBackupManagerDebugOut("### {},{} {}.m_bRemoved {}.m_bAdded\n", Sequence, NotificationStr, RelativePathFrom, RelativePath);
+							fSendManifestChange
+								(
+								 	RelativePath, CBackupManagerBackup::CManifestChange_Rename{fg_Move(Change.m_ManifestFile), RelativePathFrom}
+								 	, Change.m_bIDChanged
+								 	, Change.m_ChecksumState
+								)
+							;
+							return;
 						}
-						return;
+						DMibCloudBackupManagerDebugOut("### {},{} {}.m_bRemoved\n", Sequence, NotificationStr, RelativePathFrom);
+						fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Remove{}, ChangeFrom.m_bIDChanged, ChangeFrom.m_ChecksumState);
+					}
+					else if (ChangeFrom.m_bAdded)
+					{
+						DMibCloudBackupManagerDebugOut("### {},{} {}.m_bAdded\n", Sequence, NotificationStr, RelativePathFrom);
+						fSendManifestChange
+							(
+								RelativePathFrom
+								, CBackupManagerBackup::CManifestChange_Add{fg_Move(ChangeFrom.m_ManifestFile)}
+								, ChangeFrom.m_bIDChanged, ChangeFrom.m_ChecksumState
+							)
+						;
+					}
+					else if (ChangeFrom.m_bExists)
+					{
+						DMibCloudBackupManagerDebugOut("### {},{} {}.m_bExists\n", Sequence, NotificationStr, RelativePathFrom);
+						fSendManifestChange
+							(
+								RelativePathFrom
+								, CBackupManagerBackup::CManifestChange_Change{fg_Move(ChangeFrom.m_ManifestFile)}
+								, ChangeFrom.m_bIDChanged
+								, ChangeFrom.m_ChecksumState
+							)
+						;
 					}
 					else
-					{
-						if (ChangeFrom.m_bAdded)
-							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Add{fg_Move(ChangeFrom.m_ManifestFile)}, ChangeFrom.m_bIDChanged);
-						else if (ChangeFrom.m_bExists)
-							fSendManifestChange(RelativePathFrom, CBackupManagerBackup::CManifestChange_Change{fg_Move(ChangeFrom.m_ManifestFile)}, ChangeFrom.m_bIDChanged);
-					}
+						DMibCloudBackupManagerDebugOut("### {},{} NOCHANGE {}\n", Sequence, NotificationStr, RelativePath);
 				}
 				
 				if (Change.m_bAdded)
-					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Add{fg_Move(Change.m_ManifestFile)}, Change.m_bIDChanged);
+				{
+					DMibCloudBackupManagerDebugOut("##> {},{} {}.m_bAdded\n", Sequence, NotificationStr, RelativePath);
+					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Add{fg_Move(Change.m_ManifestFile)}, Change.m_bIDChanged, Change.m_ChecksumState);
+				}
 				else if (Change.m_bRemoved)
-					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Remove{}, Change.m_bIDChanged);
+				{
+					DMibCloudBackupManagerDebugOut("##> {},{} {}.m_bRemoved\n", Sequence, NotificationStr, RelativePath);
+					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Remove{}, Change.m_bIDChanged, Change.m_ChecksumState);
+				}
 				else if (Change.m_bExists)
-					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Change{fg_Move(Change.m_ManifestFile)}, Change.m_bIDChanged);
+				{
+					DMibCloudBackupManagerDebugOut("##> {},{} {}.m_bExists\n", Sequence, NotificationStr, RelativePath);
+					fSendManifestChange(RelativePath, CBackupManagerBackup::CManifestChange_Change{fg_Move(Change.m_ManifestFile)}, Change.m_bIDChanged, Change.m_ChecksumState);
+				}
+				else
+					DMibCloudBackupManagerDebugOut("##> {},{} NOCHANGE {}\n", Sequence, NotificationStr, RelativePath);
 			}
 		;
 	}

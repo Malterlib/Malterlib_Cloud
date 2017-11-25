@@ -5,26 +5,6 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	namespace
-	{
-		auto g_fFindBackupSources = [](CStr const &_RootDirectory) -> TCVector<CStr>
-			{
-				CStr FindPath = _RootDirectory + "/Backups";
-				CFile::CFindFilesOptions FindOptions(FindPath + "/*_*", false);
-				FindOptions.m_AttribMask = EFileAttrib_Directory;
-				auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-				TCVector<CStr> BackupSources;
-				for (auto &File : FoundFiles)
-				{
-					CStr BackupSource = File.m_Path.f_Extract(FindPath.f_GetLen() + 1);
-					if (CBackupManager::fs_IsValidBackupSource(BackupSource, nullptr, nullptr))
-						BackupSources.f_Insert(BackupSource);
-				}
-				return BackupSources;
-			}
-		;
-	}
-	
 	TCContinuation<TCVector<CStr>> CBackupManagerServer::fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources)
 	{
 		TCContinuation<TCVector<CStr>> Continuation;
@@ -60,145 +40,98 @@ namespace NMib::NCloud::NBackupManager
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		NConcurrency::TCContinuation<TCVector<CStr>> Continuation;
-		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		Auditor.f_Info("Listing backup sources");
 		
-		CStr CallingHostID = fg_GetCallingHostID();
-		
-		fg_Dispatch
-			(
-				QueryFileActor
-				, [RootDirectory = pThis->mp_AppState.m_RootDirectory]
-			 	{
-					return g_fFindBackupSources(RootDirectory);
-				}
-			)
-			> [pThis, Continuation, Auditor, CallingHostID](TCAsyncResult<TCVector<CStr>> &&_Result)
+		pThis->fp_FilterBackupSourcesByPermissions(pThis->fp_EnumBackupSources()) > Continuation / [=](TCVector<CStr> &&_Sources)
 			{
-				if (!_Result)
-				{
-					CStr DetailedErrror = fg_Format("Error listing backup sources: {}", _Result.f_GetExceptionStr());
-					Continuation.f_SetException(Auditor.f_Exception({"File error when running query. Consult logs on backup server to diagnose.", DetailedErrror}));
-					return;
-				}
-				TCVector<CStr> BackupSources;
-				pThis->fp_FilterBackupSourcesByPermissions(*_Result) > Continuation / [Continuation, Auditor](TCVector<CStr> &&_BackupSources)
-					{
-						Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", _BackupSources));
-
-						Continuation.f_SetResult(fg_Move(_BackupSources));
-					}
-				;
+				Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", _Sources));
+				Continuation.f_SetResult(fg_Move(_Sources));
 			}
 		;
+
 		return Continuation;
 	}
 
-	auto CBackupManagerServer::CBackupManagerImplementation::f_ListBackups(CStr const &_ForBackupSource) -> TCContinuation<TCMap<CStr, TCVector<CBackupID>>>
+	auto CBackupManagerServer::CBackupManagerImplementation::f_ListBackups(CStr const &_ForBackupSource) -> TCContinuation<TCMap<CStr, CBackupInfo>>
 	{
 		auto pThis = m_pThis;
 		if (pThis->f_IsDestroyed())
 			return DMibErrorInstance("Shutting down");
-			
+
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		auto CallingHostID = fg_GetCallingHostID();
-			
-		NConcurrency::TCContinuation<TCMap<CStr, TCVector<CBackupID>>> Continuation;
-		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		Auditor.f_Info("Listing backups");
-		
-		auto fListBackups = [pThis, Continuation, Auditor, RootDirectory = pThis->mp_AppState.m_RootDirectory](TCVector<CStr> const &_BackupSources)
+
+		bool bSingleSource = false;
+
+		TCVector<CStr> BackupSources;
+
+		if (!_ForBackupSource.f_IsEmpty())
+		{
+			bSingleSource = true;
+
+			if (!CBackupManager::fs_IsValidBackupSource(_ForBackupSource, nullptr, nullptr))
+				return Auditor.f_Exception({"Invalid backup source format", "(List backups)"});
+
+			BackupSources.f_Insert(_ForBackupSource);
+		}
+		else
+			BackupSources = pThis->fp_EnumBackupSources();
+
+		NConcurrency::TCContinuation<TCMap<CStr, CBackupInfo>> Continuation;
+
+		pThis->fp_FilterBackupSourcesByPermissions(BackupSources) > Continuation / [=](TCVector<CStr> &&_BackupSources)
 			{
-				auto QueryFileActor = pThis->fp_GetQueryFileActor();
-				
-				fg_Dispatch
-					(
-						QueryFileActor
-						, [_BackupSources, RootDirectory]() -> TCMap<CStr, TCVector<CBackupID>>
-						{
-							CStr ProgramDirectory = RootDirectory;
-							TCMap<CStr, TCVector<CBackupID>> BackupsPerSource;
-							for (auto &BackupSource : _BackupSources)
-							{
-								auto &Backups = BackupsPerSource[BackupSource];
-								CStr FindPath = fg_Format("{}/Backups/{}", ProgramDirectory, BackupSource);
-								CFile::CFindFilesOptions FindOptions(FindPath + "/*_*_*", false);
-								FindOptions.m_AttribMask = EFileAttrib_Directory;
-								auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-								for (auto &File : FoundFiles)
-								{
-									CStr Backup = File.m_Path.f_Extract(FindPath.f_GetLen() + 1);
-									CStr BackupID;
-									CTime Time;
-									if (CBackupManager::fs_IsValidBackup(Backup, &BackupID, &Time))
-									{
-										auto &OutBackup = Backups.f_Insert();
-										OutBackup.m_Time = Time;
-										OutBackup.m_ID = BackupID;
-									}
-								}
-							}
-							return BackupsPerSource;
-						}
-					)
-					> [Continuation, Auditor](TCAsyncResult<TCMap<CStr, TCVector<CBackupID>>> &&_Result)
+				if (bSingleSource)
+				{
+					if (_BackupSources.f_IsEmpty())
+						return Continuation.f_SetException(Auditor.f_AccessDenied("(List backups)"));
+
+					auto *pBackupSource = pThis->mp_BackupSources.f_FindEqual(_ForBackupSource);
+					if (!pBackupSource)
+						return Continuation.f_SetException(Auditor.f_Exception({"No such backup source", "(List backups)"}));
+				}
+
+				TCActorResultMap<CStr, CBackupInfo> BackupInfos;
+				for (auto &BackupSourceID : _BackupSources)
+				{
+					auto *pBackupSource = pThis->mp_BackupSources.f_FindEqual(BackupSourceID);
+					DMibCheck(pBackupSource);
+					if (!pBackupSource)
+						continue;
+
+					(*pBackupSource)(&CBackupSource::f_GetInfo) > BackupInfos.f_AddResult(BackupSourceID);
+				}
+
+				BackupInfos.f_GetResults() > Continuation % Auditor / [=](TCMap<CStr, TCAsyncResult<CBackupInfo>> &&_BackupInfos)
 					{
-						if (!_Result)
+						TCMap<CStr, CBackupInfo> Results;
+						for (auto &BackupInfo : _BackupInfos)
 						{
-							CStr DetailedError = fg_Format("Error listing backups: {}", _Result.f_GetExceptionStr());
-							Continuation.f_SetException(Auditor.f_Exception({"File error when running query. See Backup Server logs.", DetailedError}));
-							return;
+							auto &BackupSource =_BackupInfos.fs_GetKey(BackupInfo);
+							if (!BackupInfo)
+							{
+								DMibLogWithCategory
+									(
+										Mib/Cloud/BackupManager
+										, Error
+										, "Failed to get backup info for backup source '{}': {}"
+										, BackupSource
+									 	, BackupInfo.f_GetExceptionStr()
+									)
+								;
+								continue;
+							}
+							Results[BackupSource] = fg_Move(*BackupInfo);
 						}
-						Auditor.f_Info(fg_Format("Listed backup sources: {}", *_Result));
-						
-						Continuation.f_SetResult(fg_Move(*_Result));
+
+						Continuation.f_SetResult(fg_Move(Results));
 					}
 				;
 			}
 		;
-		
-		if (!_ForBackupSource.f_IsEmpty())
-		{
-			if (!CBackupManager::fs_IsValidBackupSource(_ForBackupSource, nullptr, nullptr))
-				return Auditor.f_Exception("Invalid backup source format");
-				
-			TCVector<CStr> BackupSources;
-			BackupSources.f_Insert(_ForBackupSource);
 
-			pThis->fp_FilterBackupSourcesByPermissions(BackupSources) > Continuation / [Continuation, Auditor, fListBackups](TCVector<CStr> &&_BackupSources)
-				{
-					if (_BackupSources.f_IsEmpty())
-						return Continuation.f_SetException(Auditor.f_AccessDenied("(List backups)"));
-					fListBackups(_BackupSources);
-				}
-			;
-
-		}
-		else
-		{
-			g_Dispatch(QueryFileActor)
-				> [RootDirectory = pThis->mp_AppState.m_RootDirectory]
-			 	{
-					return g_fFindBackupSources(RootDirectory);
-				}
-				> [pThis, Continuation, Auditor, fListBackups, CallingHostID](TCAsyncResult<TCVector<CStr>> &&_Result)
-				{
-					if (!_Result)
-					{
-						CStr DetailedError = fg_Format("Error listing backup sources when listing backups: {}", _Result.f_GetExceptionStr());
-						Continuation.f_SetException(Auditor.f_Exception({"File error when running query. See Backup Server logs.", DetailedError}));
-						return;
-					}
-					pThis->fp_FilterBackupSourcesByPermissions(*_Result) > Continuation / [Continuation, Auditor, fListBackups](TCVector<CStr> &&_BackupSources)
-						{
-							fListBackups(_BackupSources);
-						}
-					;
-				}
-			;
-		}
 		return Continuation;
 	}
 }

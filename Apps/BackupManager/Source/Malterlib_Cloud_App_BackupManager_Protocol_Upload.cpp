@@ -84,6 +84,18 @@ namespace NMib::NCloud::NBackupManager
 		pBackupInstance->m_bPendingDestroy = true;
 		pBackupInstance->m_BackupInstance->f_Destroy() > [this, pCanDestroyTracker, _Key, _Auditor, Continuation](TCAsyncResult<void> &&_Result)
 			{
+				if (!_Result)
+				{
+					DMibLogWithCategory
+						(
+							Mib/Cloud/BackupManager
+							, Error
+							, "Failed to destroy backup instance '{}': {}"
+							, _Key.f_GetDesc()
+						 	, _Result.f_GetExceptionStr()
+						)
+					;
+				}
 				auto *pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
 				DMibCheck(pBackupInstance);
 				if (!pBackupInstance)
@@ -106,7 +118,7 @@ namespace NMib::NCloud::NBackupManager
 		return Continuation;
 	}
 
-	auto CBackupManagerServer::CBackupManagerImplementation::f_InitBackup(CBackupKey const &_BackupKey, TCActorSubscriptionWithID<> &&_Subscription)
+	auto CBackupManagerServer::CBackupManagerImplementation::f_InitBackup(CBackupManager::CInitBackup &&_Params)
 		-> NConcurrency::TCContinuation<TCDistributedActorInterfaceWithID<CBackupManagerBackup>>
 	{
 		auto pThis = m_pThis;
@@ -120,11 +132,18 @@ namespace NMib::NCloud::NBackupManager
 		NConcurrency::TCContinuation<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> Continuation;
 		
 		CBackupManagerServer::CBackupKey BackupKey;
-		if (!pThis->fp_CheckBackupKey(_BackupKey, BackupKey, Auditor, Continuation))
+		if (!pThis->fp_CheckBackupKey(_Params.m_BackupKey, BackupKey, Auditor, Continuation))
 			return Continuation;
 		
 		pThis->mp_Permissions.f_HasPermission("Start backup", {"Backup/WriteSelf"})
-			> Continuation / [=, Subscription = fg_Move(_Subscription)](bool _bHasPermission) mutable
+			> Continuation /
+			[
+			 	=
+				, Subscription = fg_Move(_Params.m_Subscription)
+				, SourceBackupKey = _Params.m_BackupKey
+				, Flags = _Params.m_Flags
+			]
+			(bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Start backup)"));
@@ -157,7 +176,16 @@ namespace NMib::NCloud::NBackupManager
 				;
 
 				auto fInitBackupInstance =
-					[pThis, BackupKey, Continuation, Auditor, Subscription = fg_Move(Subscription)]() mutable
+					[
+						pThis
+						, BackupKey
+						, Continuation
+						, Auditor
+						, Subscription = fg_Move(Subscription)
+						, SourceBackupKey = SourceBackupKey
+						, Flags = Flags
+					]
+					() mutable
 					{
 						if (pThis->f_IsDestroyed())
 							return Continuation.f_SetException(Auditor.f_Exception("Shutting down"));
@@ -179,6 +207,8 @@ namespace NMib::NCloud::NBackupManager
 								, BackupKey.m_BackupTime
 								, BackupKey.m_BackupID
 								, pThis->mp_AppState.m_RootDirectory
+								, (Flags & CBackupManager::EInitBackupFlag_ForceNew) != 0
+								, pThis->fp_CreateBackupSource(BackupKey.m_BackupName)
 							)
 						;
 
@@ -216,6 +246,7 @@ namespace NMib::NCloud::NBackupManager
 				}
 			}
 		;
+
 		return Continuation;
 	}
 }

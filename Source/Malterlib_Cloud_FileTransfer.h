@@ -31,7 +31,7 @@ namespace NMib::NCloud
 		CFileTransferContext &operator =(CFileTransferContext const &_Other) = delete;
 		CFileTransferContext(CFileTransferContext &&_Other);
 		CFileTransferContext &operator =(CFileTransferContext &&_Other);
-		static bool fs_IsValidRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error);
+		static bool fs_IsSafeRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error);
 		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
 		

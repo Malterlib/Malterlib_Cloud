@@ -477,6 +477,7 @@ Property
 	MalterlibTestDependencies_Malterlib_Cloud "Malterlib_Cloud_KeyManager=Com_Malterlib_Cloud_KeyManager*MalterlibGenerateScheme=false;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_SecretsManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_KeyManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
+	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_BackupManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestExtraGroups_Malterlib_Cloud "{Test}/{Malterlib_Cloud}"
 }
 

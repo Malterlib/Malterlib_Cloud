@@ -22,6 +22,14 @@ using namespace NMib::NDataProcessing;
 
 namespace NMib::NCloud
 {
+	static constexpr NFile::EFileOpen gc_ChecksumFileFlags = NFile::EFileOpen_Read | NFile::EFileOpen_ShareAll | NFile::EFileOpen_NoLocalCache | NFile::EFileOpen_ShareBypass;
+
+	struct CBackupManagerClient_ChecksumState
+	{
+		uint64 m_Position = 0;
+		CHash_SHA256 m_DigestState;
+	};
+
 	struct CBackupManagerClient::CInternal
 	{
 		CInternal
@@ -53,6 +61,7 @@ namespace NMib::NCloud
 			CActorSubscription m_Subscription;
 			bool m_bRecursive = false;
 			bool m_bPending = false;
+			bool m_bToBeRemoved = false;
 		};
 		
 		struct CUpdatedDirectory
@@ -71,15 +80,18 @@ namespace NMib::NCloud
 			bool m_bAdded = false;
 			bool m_bIDChanged = false;
 			bool m_Appended = false;
+			bool m_bChecksumValid = false;
+			CBackupManagerClient_ChecksumState m_ChecksumState;
 		};
 		
 		struct CAppendFileState
 		{
 			CFile m_File;
-			CHash_SHA256 m_Hash;
+			CBackupManagerClient_ChecksumState m_ChecksumState;
 			CUniqueFileIdentifier m_FileID;
 			CDirectoryManifestFile m_ManifestFile;
 			bool m_bIsLink = false;
+			bool m_bIsValid = false;
 		};
 
 		struct CNotifacitonSubscription
@@ -96,20 +108,40 @@ namespace NMib::NCloud
 			
 			CBackupManagerClient *m_pThis = nullptr;
 		};
+
+		struct CNotificationAndHost
+		{
+			CNotification m_Notification;
+			CHostInfo m_RemoteHost;
+		};
+
+		struct CRunningInstance
+		{
+			TCActor<NPrivate::CBackupManagerClient_Instance> m_Instance;
+			bool m_bSentActive = false;
+		};
 		
 		void f_Construct(TCActor<CActorDistributionManager> const &_DistributionManager);
 		void f_NewBackupKey();
 		void f_RunBackup();
 		void f_Subscribe();
 		void f_BackupFinishedStarting();
+		void f_BackupInstance_ReportFinishedStarting(TCActor<NPrivate::CBackupManagerClient_Instance> const &_BackupInstance);
+		void f_ReportBackupError(CStr const &_Error, bool _bFatal);
+
 		TCContinuation<void> f_SubscribeChanges();
 		TCContinuation<void> f_RetrySubscribeChanges();
-		void f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification);
+		void f_NewPathWatched(CStr const &_Path);
+		void f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification, bool _bDirty);
 		bool f_IsPathInManifest(CStr const &_Path, CStr &o_FileName);
 		static void fs_CheckDestroy(TCSharedPointer<NAtomic::TCAtomic<bool>> const &_pDestroyed);
+
+		CFileChangeNotificationActor::CCoalesceSettings f_CoalesceSettings();
 		
 		TCContinuation<CUpdateManifestResult> f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName, bool _bDirtyHint);
-		
+
+		COnScopeExitShared f_MarkInstancesActive();
+
 		CBackupManagerClient *m_pThis = nullptr;
 		TCSharedPointer<NAtomic::TCAtomic<bool>> m_pDestroyed;
 		CConfig m_Config;
@@ -117,6 +149,7 @@ namespace NMib::NCloud
 		
 		TCActor<CSeparateThreadActor> m_FileActor;
 		CDirectoryManifest m_Manifest; // Kept up to date
+		TCMap<CStr, CBackupManagerClient_ChecksumState> m_ChecksumState;
 		TCMap<CStr, CUniqueFileIdentifier> m_ManifestFileIDs;
 		TCMap<CStr, TCSharedPointer<CAppendFileState>> m_AppendStates;
 
@@ -129,12 +162,17 @@ namespace NMib::NCloud
 		
 		TCTrustedActorSubscription<CBackupManager> m_BackupManagers;
 		
-		TCMap<TCWeakActor<CBackupManager>, TCActor<NPrivate::CBackupManagerClient_Instance>> m_RunningBackupInstances;
+		TCMap<TCWeakActor<CBackupManager>, CRunningInstance> m_RunningBackupInstances;
 		
 		TCSharedPointer<CCanDestroyTracker> m_pCanDestroyTracker = fg_Construct();
 		
 		CBackupManager::CBackupKey m_BackupKey;
-		
+
+		mint m_nActive = 0;
+
+		mint m_FileNotificationSequence = 1;
+		mint m_LastSeenNotificationSequence = 0;
+
 		TCMap<CStr, CNotifacitonSubscription> m_NotificationSubscriptions;
 		TCMap<CStr, TCActorFunctorWithID<TCContinuation<void> ()>> m_OnInitialFinishedSubscriptions;
 		TCMap<CStr, TCActorFunctorWithID<TCContinuation<void> ()>> m_OnBackupStoppedSubscriptions;
@@ -154,11 +192,15 @@ namespace NMib::NCloud
 		CActorSubscription m_BackupInterfaceSubscription;
 		
 		TCVector<TCContinuation<void>> m_SubscribeChangesContinuations;
+
+		TCMap<ENotification, CNotificationAndHost> m_LastNotification;
 		
 		bool m_bRunningRetrySubscribe = false;
 		bool m_bRerunRetrySubscribe = false;
 		bool m_bBackupFinishedStarting = false;
 		bool m_bInitialFinished = false;
 		bool m_bStopped = false;
+		bool m_bStarted = false;
+		bool m_bInitialSubscribeDone = false;
 	};
 }

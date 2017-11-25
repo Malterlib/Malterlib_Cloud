@@ -44,13 +44,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 	}
 
-	auto CBackupManagerServer::CBackupManagerImplementation::f_DownloadBackup
-		(
-			CStr const &_BackupSource
-			, CBackupID const &_BackupID
-			, NTime::CTime const &_Time
-			, TCActorSubscriptionWithID<> &&_Subscription
-		)
+	auto CBackupManagerServer::CBackupManagerImplementation::f_DownloadBackup(CDownloadBackup &&_DownloadBackup)
 		-> TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 	{
 		auto pThis = m_pThis;
@@ -58,63 +52,51 @@ namespace NMib::NCloud::NBackupManager
 		if (pThis->f_IsDestroyed())
 			return DMibErrorInstance("Shutting down");
 			
-		if (_Time.f_IsValid())
-			return DMibErrorInstance("Point in time backups not yet implemented");
-
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		
 		CStr FriendlyName;
 		CStr HostID;
 		
-		if (!CBackupManager::fs_IsValidBackupSource(_BackupSource, &FriendlyName, &HostID))
-			return Auditor.f_Exception({"Invalid backup source format", "(start download backup)"});
+		if (!CBackupManager::fs_IsValidBackupSource(_DownloadBackup.m_BackupSource, &FriendlyName, &HostID))
+			return Auditor.f_Exception({"Invalid backup source format", "(Download backup)"});
 
-		if (!CBackupManager::fs_IsValidHostname(_BackupID.m_ID))
-			return Auditor.f_Exception({"Invalid backup ID format", "(start download backup)"});
-		
+		if (_DownloadBackup.m_Time.f_IsValid())
+			return Auditor.f_Exception({"Currently only latest backup download is supported", "(Download backup)"});
+
 		auto &CallingHostID = fg_GetCallingHostID();
-		TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> Continuation;
-
-		TCVector<CStr> Permissions = {"Backup/ReadAll", fg_Format("Backup/Read/{}", _BackupSource)};
+		
+		TCVector<CStr> Permissions = {"Backup/ReadAll", fg_Format("Backup/Read/{}", _DownloadBackup.m_BackupSource)};
 		if (HostID == CallingHostID)
 			Permissions.f_Push("Backup/ReadSelf");
 
-		pThis->mp_Permissions.f_HasPermission("Start download backup", Permissions) > Continuation / [=, Subscription = fg_Move(_Subscription)](bool _bHasPermission) mutable
+		TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> Continuation;
+
+		pThis->mp_Permissions.f_HasPermission("Start download backup", Permissions)
+			> Continuation /
+			[
+			   	=
+			   	, Subscription = fg_Move(_DownloadBackup.m_Subscription)
+			 	, BackupSource = _DownloadBackup.m_BackupSource
+			 	, Time = _DownloadBackup.m_Time
+			 	, Desc = _DownloadBackup.f_GetDesc()
+			]
+			(bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Start download backup)"));
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Download backup)"));
 
-				CStr BackupSource = _BackupSource;
-				CTime Time = _BackupID.m_Time;
-				CStr BackupID = _BackupID.m_ID;
-				auto Desc = fg_Format("{}/{}", _BackupSource, _BackupID);
+				auto pBackupSource = pThis->fp_GetBackupSource(BackupSource);
 
-				TCContinuation<CStr> BackupPathContinuation;
+				if (!pBackupSource)
+					return Continuation.f_SetException(Auditor.f_Exception({"No such backup source", "(Download backup)"}));
 
-				CStr ProgramDirectory = pThis->mp_AppState.m_RootDirectory;
-
-				if (BackupID == "Latest")
-				{
-					fg_Dispatch
-						(
-							pThis->fp_GetQueryFileActor()
-							, [ProgramDirectory, BackupSource]() -> CStr
-							{
-								CStr BaseBackups = fg_Format("{}/Backups/{}", ProgramDirectory, BackupSource);
-								return CFile::fs_GetExpandedPath(CFile::fs_ResolveSymbolicLink(fg_Format("{}/Latest", BaseBackups)), BaseBackups);
-							}
-						)
-						> BackupPathContinuation % "Error getting latest backup path"
-					;
-				}
-				else
-					BackupPathContinuation.f_SetResult(fg_Format("{}/Backups/{}/{tst.,tsb_}_{}", ProgramDirectory, BackupSource, Time, BackupID));
-
-				BackupPathContinuation.f_Dispatch() > Continuation % Auditor / [=, Subscription = fg_Move(Subscription)](CStr const &_BackupPath) mutable
+				(*pBackupSource)(&CBackupSource::f_CheckOutDirectory, Time)
+					> Continuation % Auditor("Internal error checking out backup for download, check BackupManager log for details")
+					/ [=, Subscription = fg_Move(Subscription)](CBackupSource::CCheckedOutDirectory &&_CheckedOutDirectory) mutable
 					{
 						CDirectorySyncSend::CConfig Config;
-						Config.m_BasePath = _BackupPath + "/Current";
-						Config.m_Manifest = _BackupPath + "/Manifest.bin";
+						Config.m_BasePath = _CheckedOutDirectory.m_Directory + "/Current";
+						Config.m_Manifest = _CheckedOutDirectory.m_Directory + "/Manifest.bin";
 
 						NStr::CStr DownloadID = fg_RandomID();
 
@@ -126,7 +108,7 @@ namespace NMib::NCloud::NBackupManager
 						TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
 							{
 								Download.m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
-								, g_ActorSubscription > [pThis, Auditor, DownloadID, Desc]() -> TCContinuation<void>
+								, g_ActorSubscription > [pThis, Auditor, DownloadID, Desc, CheckedOutDirectory = fg_Move(_CheckedOutDirectory)]() mutable -> TCContinuation<void>
 								{
 									auto *pDownload = pThis->mp_BackupDownloads.f_FindEqual(DownloadID);
 									if (!pDownload)
@@ -134,7 +116,7 @@ namespace NMib::NCloud::NBackupManager
 
 									TCContinuation<void> Continuation;
 									pDownload->m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult)
-										> [Auditor, Desc, Continuation, Subscription = fg_Move(pDownload->m_Subscription)]
+										> [Auditor, Desc, Continuation, Subscription = fg_Move(pDownload->m_Subscription), CheckedOutDirectory = fg_Move(CheckedOutDirectory)]
 										(TCAsyncResult<CDirectorySyncSend::CSyncResult> &&_Result) mutable
 										{
 											if (!_Result)
@@ -145,12 +127,24 @@ namespace NMib::NCloud::NBackupManager
 
 												CStr StatsMessage;
 												uint64 nBytes = Result.m_Stats.m_IncomingBytes + Result.m_Stats.m_OutgoingBytes;
-												StatsMessage = fg_Format("{} files using {ns } bytes at {fe2} MB/s", Result.m_Stats.m_nSyncedFiles, nBytes, (fp64(nBytes) / Result.m_Stats.m_nSeconds) / 1'000'000.0);
+
+												StatsMessage = fg_Format
+													(
+														"{} files using {ns } bytes at {fe2} MB/s"
+														, Result.m_Stats.m_nSyncedFiles
+														, nBytes
+														, (fp64(nBytes) / Result.m_Stats.m_nSeconds) / 1'000'000.0
+													)
+												;
 
 												Auditor.f_Info(fg_Format("'{}' Backup download finished transferring: {}", Desc, StatsMessage));
 											}
 
-											Subscription->f_Destroy() > Continuation;
+											CheckedOutDirectory.m_Subscription->f_Destroy() > Continuation / [Continuation, Subscription = fg_Move(Subscription)]()
+												{
+													Subscription->f_Destroy() > Continuation;
+												}
+											;
 										}
 									;
 
@@ -168,6 +162,7 @@ namespace NMib::NCloud::NBackupManager
 				;
 			}
 		;
+
 		return Continuation;
 	}
 }

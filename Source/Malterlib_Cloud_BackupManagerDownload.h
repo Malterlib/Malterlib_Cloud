@@ -13,7 +13,6 @@ namespace NMib::NCloud
 		(
 			NConcurrency::TCDistributedActor<CBackupManager> const &_BackupManager
 			, NStr::CStr const &_BackupSource
-			, CBackupManager::CBackupID const &_DownloadBackupID
 			, NTime::CTime const &_PointInTime
 			, NFile::CDirectorySyncReceive::CConfig &&_SyncConfig
 			, NConcurrency::CActorSubscription &o_Subscription

@@ -27,12 +27,14 @@ namespace NMib::NCloud
 						{
 							if (m_pThis->mp_bDestroyed)
 								return;
-							m_RunningBackupInstances[_Actor] = fg_Construct
+							auto &BackupInstance = m_RunningBackupInstances[_Actor].m_Instance = fg_Construct
 								(
-									fg_Construct(_Actor, m_Manifest, m_Config, _ActorInfo, fg_ThisActor(m_pThis), m_BackupKey, m_bBackupFinishedStarting)
+									fg_Construct(_Actor, m_Manifest, m_ChecksumState, m_Config, _ActorInfo, fg_ThisActor(m_pThis), m_BackupKey, m_bBackupFinishedStarting)
 									, fg_Format("Backup for '{}'", _ActorInfo.m_HostInfo.f_GetDesc())
 								)
 							;
+							if (m_bBackupFinishedStarting)
+								f_BackupInstance_ReportFinishedStarting(BackupInstance);
 						}
 					)
 				;
@@ -40,11 +42,11 @@ namespace NMib::NCloud
 					(
 						[this](TCWeakDistributedActor<CActor> const &_Actor)
 						{
-							auto *pActor = m_RunningBackupInstances.f_FindEqual(_Actor);
-							if (!pActor)
+							auto *pInstance = m_RunningBackupInstances.f_FindEqual(_Actor);
+							if (!pInstance)
 								return;
 
-							(*pActor)->f_Destroy() > m_pCanDestroyTracker->f_Track();
+							pInstance->m_Instance->f_Destroy() > m_pCanDestroyTracker->f_Track();
 							
 							m_RunningBackupInstances.f_Remove(_Actor);
 						}

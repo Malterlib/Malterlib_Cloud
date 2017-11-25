@@ -11,6 +11,7 @@
 
 #include "Malterlib_Cloud_App_BackupManager.h"
 #include "Malterlib_Cloud_App_BackupManager_BackupInstance.h"
+#include "Malterlib_Cloud_App_BackupManager_BackupSource.h"
 
 namespace NMib::NCloud::NBackupManager
 {
@@ -77,13 +78,13 @@ namespace NMib::NCloud::NBackupManager
 		
 		struct CBackupManagerImplementation : public CBackupManager
 		{
-			auto f_InitBackup(CBackupKey const &_BackupKey, TCActorSubscriptionWithID<> &&_Subscription)
+			auto f_InitBackup(CBackupManager::CInitBackup &&_Params)
 				-> TCContinuation<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> override
 			;
 			
 			TCContinuation<TCVector<CStr>> f_ListBackupSources() override;
-			TCContinuation<TCMap<CStr, TCVector<CBackupID>>> f_ListBackups(CStr const &_ForBackupSource) override;
-			auto f_DownloadBackup(CStr const &_BackupSource, CBackupID const &_BackupID, CTime const &_Time, TCActorSubscriptionWithID<> &&_Subscription)
+			TCContinuation<TCMap<CStr, CBackupInfo>> f_ListBackups(CStr const &_ForBackupSource) override;
+			auto f_DownloadBackup(CDownloadBackup &&_DownloadBackup)
 				-> TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 				override
 			;
@@ -97,7 +98,11 @@ namespace NMib::NCloud::NBackupManager
 		TCContinuation<void> fp_Destroy() override;
 		TCContinuation<void> fp_Publish();
 		TCContinuation<void> fp_SetupPermissions();
-		
+		TCActor<CBackupSource> const &fp_CreateBackupSource(CStr const &_Source);
+		TCActor<CBackupSource> const *fp_GetBackupSource(CStr const &_Source);
+
+		TCContinuation<TCVector<CStr>> fp_EnumBackupSourcesFromDisk();
+		TCVector<CStr> fp_EnumBackupSources();
 		TCContinuation<TCVector<CStr>> fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources);
 		
 		TCContinuation<void> fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason);
@@ -113,7 +118,8 @@ namespace NMib::NCloud::NBackupManager
 		;		
 		
 		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
-		
+
+		TCMap<CStr, TCActor<CBackupSource>> mp_BackupSources;
 		TCMap<CBackupKey, CBackupInstanceManager> mp_BackupInstances;
 		TCMap<CStr, CBackupDownload> mp_BackupDownloads;
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;

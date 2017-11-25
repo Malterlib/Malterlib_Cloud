@@ -26,71 +26,70 @@ namespace NMib::NCloud::NAppManager
 		BackupConfig.m_NewBackupInterval = Application.m_Settings.m_Backup_NewBackupInterval;
 		BackupConfig.m_LogCategory = Application.m_Name + "/Backup";
 		
-		try
-		{
-			Application.m_BackupClient = fg_Construct
+		Application.m_BackupClient = fg_Construct
+			(
+				BackupConfig
+				, mp_State.m_TrustManager
+				, g_ActorFunctor > [_pApplication]
 				(
-					BackupConfig
-					, mp_State.m_TrustManager
-					, g_ActorFunctor > [_pApplication]
-					(
-						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
-						, NConcurrency::CActorSubscription &&_ManifestFinished
-						, NStr::CStr const &_BackupRoot
-					) -> TCContinuation<TCActorSubscriptionWithID<>>
-					{
-						if (_pApplication->m_bDeleted)
-							return fg_Explicit();
-						
-						if (!_pApplication->m_Settings.m_bDistributedApp)
-							return fg_Explicit();
-						
-						if (_pApplication->m_AppInterface && _pApplication->m_LaunchState == "Launched")
-						{
-							if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
-								return fg_Explicit();
-						
-							return DMibCallActor
-								(
-									_pApplication->m_AppInterface
-									, CDistributedAppInterfaceClient::f_StartBackup
-									, fg_Move(_BackupInterface)
-									, fg_Move(_ManifestFinished)
-									, _BackupRoot
-								)
-							;
-						}
-						else
-						{
-							TCContinuation<TCActorSubscriptionWithID<>> Continuation;
-							_pApplication->m_OnStartedDistributedApp.f_Insert()
-								> Continuation / [=, BackupInterface = fg_Move(_BackupInterface), ManifestFinished = fg_Move(_ManifestFinished)]() mutable
-								{
-									if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
-										return Continuation.f_SetResult();
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
+					, NConcurrency::CActorSubscription &&_ManifestFinished
+					, NStr::CStr const &_BackupRoot
+				) -> TCContinuation<TCActorSubscriptionWithID<>>
+				{
+					if (_pApplication->m_bDeleted)
+						return fg_Explicit();
 
-									DMibCallActor
-										(
-											_pApplication->m_AppInterface
-											, CDistributedAppInterfaceClient::f_StartBackup
-											, fg_Move(BackupInterface)
-											, fg_Move(ManifestFinished)
-											, _BackupRoot
-										)
-										> Continuation
-									;
-								}
-							;
-							return Continuation;
-						}
+					if (!_pApplication->m_Settings.m_bDistributedApp)
+						return fg_Explicit();
+
+					if (_pApplication->m_AppInterface && _pApplication->m_LaunchState == "Launched")
+					{
+						if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
+							return fg_Explicit();
+
+						return DMibCallActor
+							(
+								_pApplication->m_AppInterface
+								, CDistributedAppInterfaceClient::f_StartBackup
+								, fg_Move(_BackupInterface)
+								, fg_Move(_ManifestFinished)
+								, _BackupRoot
+							)
+						;
 					}
-					, mp_State.m_DistributionManager
-				)
-			;
-		}
-		catch (CException const &_Exception)
-		{
-			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to initialize backup client for '{}' app: {}", Application.m_Name, _Exception);
-		}
+					else
+					{
+						TCContinuation<TCActorSubscriptionWithID<>> Continuation;
+						_pApplication->m_OnStartedDistributedApp.f_Insert() 
+							> Continuation / [=, BackupInterface = fg_Move(_BackupInterface), ManifestFinished = fg_Move(_ManifestFinished)]() mutable
+							{
+								if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
+									return Continuation.f_SetResult();
+
+								DMibCallActor
+									(
+										_pApplication->m_AppInterface
+										, CDistributedAppInterfaceClient::f_StartBackup
+										, fg_Move(BackupInterface)
+										, fg_Move(ManifestFinished)
+										, _BackupRoot
+									)
+									> Continuation
+								;
+							}
+						;
+						return Continuation;
+					}
+				}
+				, mp_State.m_DistributionManager
+			)
+		;
+		Application.m_BackupClient(&CBackupManagerClient::f_StartBackup) > [ApplicationName = Application.m_Name](TCAsyncResult<void> &&_Result)
+			{
+				if (!_Result)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to start backup client for '{}' app: {}", ApplicationName, _Result.f_GetExceptionStr());
+			}
+		;
 	}
 }

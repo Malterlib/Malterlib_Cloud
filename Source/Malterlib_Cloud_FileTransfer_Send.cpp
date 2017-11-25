@@ -304,7 +304,7 @@ namespace NMib::NCloud
 		for (auto &FileInfo : Params.m_Manifest.m_Files)
 		{
 			CStr Error;
-			if (!CFileTransferContext::fs_IsValidRelativePath(FileInfo.f_GetPath(), Error))
+			if (!CFileTransferContext::fs_IsSafeRelativePath(FileInfo.f_GetPath(), Error))
 				return DMibErrorInstance(fg_Format("Invalid relative path '{}' in file transfer manifest. Path cannot {}", FileInfo.f_GetPath(), Error));
 		}
 

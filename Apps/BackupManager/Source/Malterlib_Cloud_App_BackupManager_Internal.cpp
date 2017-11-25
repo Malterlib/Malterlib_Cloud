@@ -29,12 +29,15 @@ namespace NMib::NCloud::NBackupManager
 	CBackupManagerServer::~CBackupManagerServer()
 	{
 	}
-	
+
 	TCContinuation<void> CBackupManagerServer::f_Init()
 	{
 		TCContinuation<void> Continuation;
-		fp_SetupPermissions() > Continuation % "Failed to setup permissions" / [=]()
+		fp_SetupPermissions() + fp_EnumBackupSourcesFromDisk() > Continuation % "Failed to setup permissions or enum backup sources" / [=](CVoidTag, TCVector<CStr> &&_BackupSources)
 			{
+				for (auto &BackupSource : _BackupSources)
+					fp_CreateBackupSource(BackupSource);
+
 				fp_Publish() > Continuation % "Failed to publish";
 			}
 		;

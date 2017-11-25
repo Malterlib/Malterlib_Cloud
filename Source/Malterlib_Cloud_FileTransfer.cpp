@@ -10,39 +10,9 @@ namespace NMib::NCloud
 {
 	using namespace NConcurrency;
 	
-	bool CFileTransferContext::fs_IsValidRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error)
+	bool CFileTransferContext::fs_IsSafeRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error)
 	{
-		if (!NFile::CFile::fs_IsValidFilePath(_String, o_Error))
-			return false;
-		
-		if (_String.f_StartsWith("/")) // Root or similar
-		{
-			o_Error = "be root";
-			return false;
-		}
-		if (_String.f_Find("//") >= 0) // Could mean special things
-		{
-			o_Error = "have //";
-			return false;
-		}
-		if (_String.f_Find("..") >= 0) // Could be relative
-		{
-			o_Error = "have ..";
-			return false;
-		}
-		
-		NStr::CStr Path = _String;
-		while (!Path.f_IsEmpty())
-		{
-			NStr::CStr File = NStr::fg_GetStrSep(Path, "/");
-			if (File == ".")
-			{
-				o_Error = "have /./";
-				return false;
-			}
-		}
-			
-		return true;		
+		return NFile::CFile::fs_IsSafeRelativePath(_String, o_Error);
 	}
 	
 	// CFileTransferContext

@@ -30,42 +30,75 @@ namespace NMib::NCloud
 			
 			NStr::CStr m_BackupIdentifier;
 
-			NFile::CDirectoryManifestConfig m_ManifestConfig;												///< The config to generate the manifest
+			NFile::CDirectoryManifestConfig m_ManifestConfig;										///< The config to generate the manifest
 			NTime::CTimeSpan m_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);	///< Interval for creating new full backup snapshots. Set to 0 to disable.
 			NStr::CStr m_LogCategory = "Backup";													///< The category to do logging under.
 			uint32 m_MaxSendQueue = 8*1024*1024;													///< The maximum number of bytes to queue on the network
+			fp32 m_ChangeAggregationTime = 1.0;														///< The number of seconds to aggregate changes over
+			bool m_bReportChangesInInitialFinished = false;											///< Include added/removed/updated files in InitialFinished notification
 		};
 		
 		enum ENotification /// Notification from backup manager client
 		{
 			ENotification_None = 0							///< Used to specify no notification when subscribing. \sa f_SubscribeNotifications
 			, ENotification_BackupAborted = DMibBit(0)		///< Backup was aborted remotely. \sa CNotification_BackupAborted
-			, ENotification_BackupFailed = DMibBit(1)		///< Backup failed. \sa CNotification_BackupFailed
+			, ENotification_BackupError = DMibBit(1)		///< Backup failed. \sa CNotification_BackupError
 			, ENotification_FileFinished = DMibBit(2)		///< A file finished transferring to backup manager. \sa CNotification_FileFinished
 			, ENotification_Quiescent = DMibBit(3)			///< The backup is quiescent. All currently known files have finished transferring. \sa CNotification_Quiescent
-			, ENotification_InitialFinished = DMibBit(4)	///< All files in manifest has been backup up at least once. \sa CNotification_InitialFinished
+			, ENotification_Unquiescent = DMibBit(4)		///< The backup is no longer quiescent. \sa CNotification_Unquiescent
+			, ENotification_InitialFinished = DMibBit(5)	///< All files in manifest has been backup up at least once. \sa CNotification_InitialFinished
+		};
+
+		enum EFileTransferType
+		{
+			EFileTransferType_RSync
+			, EFileTransferType_Append
+			, EFileTransferType_Delete
+			, EFileTransferType_Rename
+		};
+
+		struct CFileTransferStats
+		{
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const;
+			fp64 f_IncomingBytesPerSecond() const;
+			fp64 f_OutgoingBytesPerSecond() const;
+
+			uint64 m_OutgoingBytes = 0;
+			uint64 m_IncomingBytes = 0;
+			fp64 m_nSeconds = 0.0;
+			EFileTransferType m_Type = EFileTransferType_RSync;
 		};
 
 		struct CNotification_BackupAborted /// \brief Notification info for #ENotification_BackupAborted. \headerfile Mib/Cloud/BackupManagerClient
 		{
 		};
 		
-		struct CNotification_BackupFailed /// \brief Notification info for #ENotification_BackupFailed. \headerfile Mib/Cloud/BackupManagerClient
+		struct CNotification_BackupError /// \brief Notification info for #ENotification_BackupError. \headerfile Mib/Cloud/BackupManagerClient
 		{
 			NStr::CStr m_ErrorMessage; ///< The error from exception that caused the backup to fail
+			bool m_bFatal = false; ///< If this is set to true the backup is in a fatal state, and cannot recover automatically.
 		};
 		
 		struct CNotification_FileFinished /// \brief Notification info for #ENotification_FileFinished. \headerfile Mib/Cloud/BackupManagerClient
 		{
 			NStr::CStr m_FileName; ///< The file that finished backing up. Relative to root.
+			CFileTransferStats m_TransferStats; ///< Statistics for the file transfer;
 		};
 		
 		struct CNotification_Quiescent /// \brief Notification info for #ENotification_Quiescent. \headerfile Mib/Cloud/BackupManagerClient
 		{
 		};
-		
+
+		struct CNotification_Unquiescent /// \brief Notification info for #ENotification_Unquiescent. \headerfile Mib/Cloud/BackupManagerClient
+		{
+		};
+
 		struct CNotification_InitialFinished /// \brief Notification info for #ENotification_InitialFinished. \headerfile Mib/Cloud/BackupManagerClient
 		{
+			NContainer::TCVector<NStr::CStr> m_AddedFiles;
+			NContainer::TCVector<NStr::CStr> m_RemovedFiles;
+			NContainer::TCVector<NStr::CStr> m_UpdatedFiles;
 		};
 		
 		using CNotification
@@ -73,9 +106,10 @@ namespace NMib::NCloud
 			<
 				ENotification
 				, CNotification_BackupAborted, ENotification_BackupAborted
-				, CNotification_BackupFailed, ENotification_BackupFailed
+				, CNotification_BackupError, ENotification_BackupError
 				, CNotification_FileFinished, ENotification_FileFinished
 				, CNotification_Quiescent, ENotification_Quiescent
+				, CNotification_Unquiescent, ENotification_Unquiescent
 				, CNotification_InitialFinished, ENotification_InitialFinished
 			>
 		; ///< \brief Notification variant. \sa ENotification
@@ -100,6 +134,8 @@ namespace NMib::NCloud
 
 		~CBackupManagerClient(); ///< \brief Destructor
 
+		NConcurrency::TCContinuation<void> f_StartBackup(); ///< Start backup. Can only be called once. If you need to subscribe to notifications you should do this before starting backup.
+
 		NConcurrency::TCContinuation<NConcurrency::CActorSubscription> f_SubscribeNotifications /// \brief Subscribe to notification. \sa ENotification
 			(
 				ENotification _ToSubscribeTo	/// Specify the notifications to subscribe to 
@@ -117,7 +153,8 @@ namespace NMib::NCloud
 		NConcurrency::TCContinuation<void> fp_Destroy() override;
 		
 		void fp_OnNotification(NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification);
-		
+		void fp_HashMismatch(NStr::CStr const &_File);
+
 		NPtr::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }
@@ -125,3 +162,5 @@ namespace NMib::NCloud
 #ifndef DMibPNoShortCuts
 using namespace NMib::NCloud;
 #endif
+
+#include "Malterlib_Cloud_BackupManagerClient.hpp"

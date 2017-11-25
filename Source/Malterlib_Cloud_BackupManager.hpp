@@ -12,14 +12,27 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void CBackupManagerBackup::CManifestChange_Change::f_Stream(tf_CStream &_Stream)
 	{
-		m_ManifestFile.f_Stream(_Stream, 0x102);
+		_Stream % m_ManifestFile;
 	}
-	
+
 	template <typename tf_CStream>
-	void CBackupManagerBackup::CManifestChange_ChangeAppend::f_Stream(tf_CStream &_Stream)
+	void CBackupManagerBackup::CManifestFile::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream % m_Digest;
-		_Stream % m_WriteTime;
+		NFile::CDirectoryManifestFile::f_Stream(_Stream, 0x102);
+	}
+
+	inline NFile::CDirectoryManifestFile &CBackupManagerBackup::CManifestFile::f_ManifestFile()
+	{
+		return *this;
+	}
+
+	template <typename tf_CStream>
+	void CBackupManagerBackup::CAppendData::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Position;
+		_Stream % m_Data;
+		_Stream % m_PreviousDigest;
+		_Stream % m_ManifestFile;
 	}
 	
 	template <typename tf_CStream>
@@ -32,5 +45,13 @@ namespace NMib::NCloud
 	{
 		CManifestChange_Change::f_Stream(_Stream);
 		_Stream % m_FromFileName;
+	}
+
+	template <typename tf_CStream>
+	void CBackupManagerBackup::CInitialBackupFinishedResult::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_AddedFiles;
+		_Stream % m_RemovedFiles;
+		_Stream % m_UpdatedFiles;
 	}
 }

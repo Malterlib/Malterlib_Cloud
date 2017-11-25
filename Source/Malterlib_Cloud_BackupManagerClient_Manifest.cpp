@@ -30,7 +30,7 @@ namespace NMib::NCloud
 			{
 				auto AbsoluteFileName = CFile::fs_AppendPath(Config.m_ManifestConfig.m_Root, _OriginalFileName);
 				
-				if (pAppendState && !bDirty && !pAppendState->m_bIsLink && pAppendState->m_File.f_IsValid())
+				if (pAppendState && !bDirty && !pAppendState->m_bIsLink && pAppendState->m_bIsValid && pAppendState->m_File.f_IsValid())
 				{
 					auto &AppendState = *pAppendState;
 					
@@ -50,89 +50,128 @@ namespace NMib::NCloud
 						
 						uint8 Buffer[16384];
 						
-						while (uint64(AppendState.m_File.f_GetPosition()) < AppendState.m_ManifestFile.m_Length)
+						while (AppendState.m_ChecksumState.m_Position < AppendState.m_ManifestFile.m_Length)
 						{
 							auto ThisTime = fg_Min(AppendState.m_ManifestFile.m_Length - AppendState.m_File.f_GetPosition(), 16384);
 							AppendState.m_File.f_Read(Buffer, ThisTime);
-							AppendState.m_Hash.f_AddData(Buffer, ThisTime);
+							AppendState.m_ChecksumState.m_DigestState.f_AddData(Buffer, ThisTime);
+							AppendState.m_ChecksumState.m_Position = uint64(AppendState.m_File.f_GetPosition());
 						}
-						
+
 						AppendState.m_ManifestFile.m_WriteTime = AppendState.m_File.f_GetWriteTime();
-						AppendState.m_ManifestFile.m_Digest = AppendState.m_Hash;
+						AppendState.m_ManifestFile.m_Digest = AppendState.m_ChecksumState.m_DigestState;
 
 						CUpdateManifestResult Result;
 						Result.m_bExists = true;
 						Result.m_Appended = true;
+						Result.m_bChecksumValid = true;
 						Result.m_ManifestFile = AppendState.m_ManifestFile;
 						Result.m_FileID = AppendState.m_FileID;
-						
+						Result.m_ChecksumState = AppendState.m_ChecksumState;
+
 						return Result;
 					}
 				}
-				
-				if (!CFile::fs_FileExists(AbsoluteFileName, EFileAttrib_File | EFileAttrib_Link | EFileAttrib_Directory))
-				{
-					if (pAppendState)
-						pAppendState->m_File.f_Close();
-					return {{}, {}, false};
-				}
-				
-				CDirectoryManifestFile ManifestFile;
-				ManifestFile.m_Attributes = CFile::fs_GetAttributes(AbsoluteFileName);
-				
-				CFile::CFileChecksumState_SHA256 ChecksumState;
 
-				CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, _FileName, ManifestFile, _OriginalFileName, &ChecksumState);
-
-				bool bIsLink = false;
-				CUniqueFileIdentifier FileID;
-				if (ManifestFile.m_Attributes & EFileAttrib_Link)
-					bIsLink = true;
-
-				FileID = CFile::fs_GetUniqueIdentifierOnLink(AbsoluteFileName);
-				
-				if (pAppendState)
-				{
-					auto &AppendState = *pAppendState;
-					AppendState.m_Hash = ChecksumState.m_Hash;
-					AppendState.m_bIsLink = bIsLink;
-					AppendState.m_File.f_Close();
-					AppendState.m_FileID = FileID;
-					if (!bIsLink)
+				auto fTryUpdate = [&]() -> CUpdateManifestResult
 					{
-						AppendState.m_File = fg_Move(*ChecksumState.m_pFile);
-						AppendState.m_ManifestFile = ManifestFile;
+						if (!CFile::fs_FileExists(AbsoluteFileName, EFileAttrib_File | EFileAttrib_Link | EFileAttrib_Directory))
+						{
+							if (pAppendState)
+								pAppendState->m_File.f_Close();
+							return {{}, {}, false};
+						}
+
+						CDirectoryManifestFile ManifestFile;
+						ManifestFile.m_Attributes = CFile::fs_GetAttributes(AbsoluteFileName);
+
+						CFile::CFileChecksumState_SHA256 ChecksumState;
+
+						CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, _FileName, ManifestFile, _OriginalFileName, &ChecksumState, gc_ChecksumFileFlags);
+
+						bool bIsLink = false;
+						CUniqueFileIdentifier FileID;
+						if (ManifestFile.m_Attributes & EFileAttrib_Link)
+							bIsLink = true;
+
+						FileID = CFile::fs_GetUniqueIdentifierOnLink(AbsoluteFileName);
+
+						CUpdateManifestResult Result = {ManifestFile, {}, FileID, true};
+
+						if (pAppendState)
+						{
+							auto &AppendState = *pAppendState;
+							AppendState.m_bIsLink = bIsLink;
+							AppendState.m_File.f_Close();
+							AppendState.m_FileID = FileID;
+							if (!bIsLink)
+							{
+								AppendState.m_File = fg_Move(*ChecksumState.m_pFile);
+								AppendState.m_ManifestFile = ManifestFile;
+								AppendState.m_ChecksumState.m_DigestState = ChecksumState.m_Hash;
+								AppendState.m_ChecksumState.m_Position = uint64(AppendState.m_File.f_GetPosition());
+								AppendState.m_bIsValid = true;
+								Result.m_bChecksumValid = true;
+								Result.m_ChecksumState = AppendState.m_ChecksumState;
+							}
+						}
+
+						CStr Directory = CFile::fs_GetPath(_FileName);
+						while (!Directory.f_IsEmpty())
+						{
+							auto &UpdatedDirectory = Result.m_UpdatedDirectories[Directory];
+
+							CStr OriginalFileName;
+							if (_FileName != _OriginalFileName)
+							{
+								if (ManifestFile.f_IsDirectory())
+									OriginalFileName = _OriginalFileName;
+								else
+									OriginalFileName = CFile::fs_GetPath(_OriginalFileName);
+							}
+							else
+								OriginalFileName = Directory;
+
+							UpdatedDirectory.m_ManifestFile.m_Attributes = CFile::fs_GetAttributes(CFile::fs_AppendPath(Config.m_ManifestConfig.m_Root, OriginalFileName));
+
+							CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, Directory, UpdatedDirectory.m_ManifestFile, OriginalFileName, nullptr, gc_ChecksumFileFlags);
+							Directory = CFile::fs_GetPath(Directory);
+						}
+
+						return Result;
 					}
-				}
-				
-				CUpdateManifestResult Result = {fg_Move(ManifestFile), {}, FileID, true};
-				
-				CStr Directory = CFile::fs_GetPath(_FileName);
-				while (!Directory.f_IsEmpty())
-				{
-					auto &UpdatedDirectory = Result.m_UpdatedDirectories[Directory];
+				;
 
-					CStr OriginalFileName;
-					if (_FileName != _OriginalFileName)
+				auto LastException = DMibImpErrorInstance(NFile::CExceptionFile, "DUMMY");
+				mint nRetries = 0;
+				while (true)
+				{
+					try
 					{
-						if (ManifestFile.f_IsDirectory())
-							OriginalFileName = _OriginalFileName;
+						return fTryUpdate();
+					}
+					catch (NFile::CExceptionFile const &_Exception)
+					{
+						if (LastException.f_GetErrorStr() == _Exception.f_GetErrorStr())
+						{
+							if (++nRetries == 3)
+								throw;
+						}
 						else
-							OriginalFileName = CFile::fs_GetPath(_OriginalFileName);
+							nRetries = 0;
+						LastException = _Exception;
 					}
-					else
-						OriginalFileName = Directory;
-
-					UpdatedDirectory.m_ManifestFile.m_Attributes = CFile::fs_GetAttributes(CFile::fs_AppendPath(Config.m_ManifestConfig.m_Root, OriginalFileName));
-						
-					CDirectoryManifest::fs_UpdateManifestFile(Config.m_ManifestConfig, Directory, UpdatedDirectory.m_ManifestFile, OriginalFileName);
-					Directory = CFile::fs_GetPath(Directory);
 				}
-				
-				return Result;
 			}
 			> Continuation / [this, _FileName, Continuation](CUpdateManifestResult &&_Result)
 			{
+				if (_Result.m_bChecksumValid)
+				{
+					m_ChecksumState[_FileName] = _Result.m_ChecksumState;
+				}
+				else
+					m_ChecksumState.f_Remove(_FileName);
+
 				if (!_Result.m_bExists)
 				{
 					m_AppendStates.f_Remove(_FileName);
@@ -150,7 +189,7 @@ namespace NMib::NCloud
 						
 					if (_Result.m_ManifestFile.f_IsFile())
 					{
-						auto FileID = m_ManifestFileIDs[_FileName];
+						auto &FileID = m_ManifestFileIDs[_FileName];
 						if (_Result.m_FileID != FileID)
 						{
 							FileID = _Result.m_FileID;

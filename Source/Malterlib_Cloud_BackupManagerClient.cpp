@@ -27,15 +27,37 @@ namespace NMib::NCloud
 			&&_fOnNewBackup
 			, TCActor<CActorDistributionManager> const &_DistributionManager
 		)
-		: mp_pInternal(fg_Construct(this, _Config.f_Validate(), _TrustManager, fg_Move(_fOnNewBackup)))
+		: mp_pInternal(fg_Construct(this, _Config, _TrustManager, fg_Move(_fOnNewBackup)))
 	{
 		auto &Internal = *mp_pInternal;
 		
 		Internal.f_Construct(_DistributionManager);
-		Internal.f_RunBackup();
 	}
-	
+
 	CBackupManagerClient::~CBackupManagerClient() = default;
+
+	NConcurrency::TCContinuation<void> CBackupManagerClient::f_StartBackup()
+	{
+		auto &Internal = *mp_pInternal;
+		if (Internal.m_bStarted)
+			return DMibErrorInstance("Backup already started");
+
+		try
+		{
+			Internal.m_Config.f_Validate();
+		}
+		catch (NException::CException const &_Exception)
+		{
+			return _Exception;
+		}
+
+		Internal.m_bStarted = true;
+
+		Internal.f_RunBackup();
+
+		return fg_Explicit();
+	}
+
 
 	NConcurrency::TCContinuation<void> CBackupManagerClient::fp_Destroy()
 	{
@@ -45,7 +67,7 @@ namespace NMib::NCloud
 		TCActorResultVector<void> RunningInstancesDestroys;
 		
 		for (auto &BackupInstance : Internal.m_RunningBackupInstances)
-			BackupInstance->f_Destroy() > RunningInstancesDestroys.f_AddResult();
+			BackupInstance.m_Instance->f_Destroy() > RunningInstancesDestroys.f_AddResult();
 		
 		Internal.m_RunningBackupInstances.f_Clear();
 		
@@ -74,7 +96,7 @@ namespace NMib::NCloud
 						Destroys.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<void>> &&_Results)
 							{
 								auto &Internal = *mp_pInternal;
-								g_Dispatch(Internal. m_FileActor) > [AppendStates = fg_Move(Internal.m_AppendStates)]
+								g_Dispatch(Internal.m_FileActor) > [AppendStates = fg_Move(Internal.m_AppendStates)]
 									{
 									}
 									> Continuation / [this, Continuation]
@@ -127,16 +149,19 @@ namespace NMib::NCloud
 
 				if (!_Result)
 				{
-					DMibLogCategoryStr(m_Config.m_LogCategory);
-					DMibLog(Error, "Failed to subscribe to file notifications: {}", _Result.f_GetExceptionStr());
+					f_ReportBackupError("Failed to subscribe to file notifications: {}"_f << _Result.f_GetExceptionStr(), true);
+					return;
 				}
+
+				m_bInitialSubscribeDone = true;
 
 				g_Dispatch(m_FileActor) > [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]()
 					-> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
 					{
 						TCMap<CStr, CFile::CFileChecksumState_SHA256> SourceAppendStates;
 						
-						auto Manifest = CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); }, &SourceAppendStates);
+						auto Manifest = CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); }, &SourceAppendStates, gc_ChecksumFileFlags);
+						Manifest.m_Files.f_Remove("");
 						TCMap<CStr, CUniqueFileIdentifier> FileIDs;
 						TCMap<CStr, TCSharedPointer<CAppendFileState>> AppendStates;
 						
@@ -153,8 +178,11 @@ namespace NMib::NCloud
 							if (auto *pSourceAppendState = SourceAppendStates.f_FindEqual(FileName))
 							{
 								auto &AppendState = *(AppendStates[FileName] = fg_Construct());
-								AppendState.m_Hash = pSourceAppendState->m_Hash;
+								AppendState.m_ChecksumState.m_DigestState = pSourceAppendState->m_Hash;
 								AppendState.m_File = fg_Move(*pSourceAppendState->m_pFile);
+								AppendState.m_ManifestFile = File;
+								AppendState.m_bIsValid = true;
+								AppendState.m_ChecksumState.m_Position = AppendState.m_File.f_GetPosition();
 							}
 						}
 
@@ -167,14 +195,16 @@ namespace NMib::NCloud
 
 						if (!_Manifest)
 						{
-							DMibLogCategoryStr(m_Config.m_LogCategory);
-							DMibLog(Error, "Failed to get manifest: {}", _Manifest.f_GetExceptionStr());
+							f_ReportBackupError("Failed to get manifest: {}"_f << _Manifest.f_GetExceptionStr(), true);
 							return;
 						}
 
 						m_Manifest = fg_Move(fg_Get<0>(*_Manifest));
 						m_ManifestFileIDs = fg_Move(fg_Get<1>(*_Manifest));
 						m_AppendStates = fg_Move(fg_Get<2>(*_Manifest));
+
+						for (auto &pAppendState : m_AppendStates)
+							m_ChecksumState[m_AppendStates.fs_GetKey(pAppendState)] = pAppendState->m_ChecksumState;
 
 						f_NewBackupKey();
 						

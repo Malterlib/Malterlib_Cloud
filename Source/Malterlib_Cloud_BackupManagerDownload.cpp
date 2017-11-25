@@ -15,7 +15,6 @@ namespace NMib::NCloud
 		(
 			TCDistributedActor<CBackupManager> const &_BackupManager
 			, CStr const &_BackupSource
-			, CBackupManager::CBackupID const &_DownloadBackupID
 			, CTime const &_PointInTime
 			, NFile::CDirectorySyncReceive::CConfig &&_SyncConfig
 			, CActorSubscription &o_Subscription
@@ -35,10 +34,11 @@ namespace NMib::NCloud
 			{
 				pState->m_bAborted = true;
 				
-				if (pState->m_DownloadBackupReceive)
-					return pState->m_DownloadBackupReceive->f_Destroy();
-				
-				return fg_Explicit();
+				if (!pState->m_DownloadBackupReceive)
+					return fg_Explicit();
+
+				auto DownloadBackupReceive = fg_Move(pState->m_DownloadBackupReceive);
+				return DownloadBackupReceive->f_Destroy();
 			}
 		;
 		
@@ -53,15 +53,18 @@ namespace NMib::NCloud
 					(
 						_BackupManager
 						, CBackupManager::f_DownloadBackup
-						, _BackupSource
-						, _DownloadBackupID
-						, _PointInTime
-						, g_ActorSubscription > [pState]() -> TCContinuation<void>
+					 	, CBackupManager::CDownloadBackup
 						{
-							if (!pState->m_DownloadBackupReceive)
-								return fg_Explicit();
+							_BackupSource
+							, _PointInTime
+							, g_ActorSubscription > [pState]() -> TCContinuation<void>
+							{
+								if (!pState->m_DownloadBackupReceive)
+									return fg_Explicit();
 
-							return pState->m_DownloadBackupReceive->f_Destroy();
+								auto DownloadBackupReceive = fg_Move(pState->m_DownloadBackupReceive);
+								return DownloadBackupReceive->f_Destroy();
+							}
 						}
 					)
 					> Continuation % "Failed to start download on remote server"
@@ -70,7 +73,18 @@ namespace NMib::NCloud
 						pState->m_DownloadBackupReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(Config), fg_Move(_SyncClient));
 						
 						pState->m_DownloadBackupReceive(&NFile::CDirectorySyncReceive::f_PerformSync)
-							> Continuation % "Failed to perform backup sync"
+							> Continuation % "Failed to perform backup sync" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
+							{
+								if (!pState->m_DownloadBackupReceive)
+									return Continuation.f_SetResult(fg_Move(_Result));
+
+								auto DownloadBackupReceive = fg_Move(pState->m_DownloadBackupReceive);
+								DownloadBackupReceive->f_Destroy() > Continuation / [=, Result = fg_Move(_Result)]() mutable
+									{
+										Continuation.f_SetResult(fg_Move(Result));
+									}
+								;
+							}
 						;
 					}
 				;
