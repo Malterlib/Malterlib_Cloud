@@ -177,7 +177,10 @@ public:
 			TCActor<CProcessLaunchActor> KeyManagerCommandLine = fg_Construct();
 			CProcessLaunchActor::CSimpleLaunch LaunchParams{KeyManagerDirectory + "/KeyManager", {"--provide-password"}};
 			LaunchParams.m_DestructFlags = EProcessLaunchCloseFlag_BlockOnExit;
-			LaunchParams.m_ToLog = CProcessLaunchActor::ELogFlag_All | CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
+			LaunchParams.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+#if DTestSecretsManagerEnableLogging
+			LaunchParams.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
+#endif
 			
 			TCContinuation<void> LaunchedContinuation;
 			TCContinuation<void> ExitedContinuation;
