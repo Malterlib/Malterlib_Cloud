@@ -135,11 +135,14 @@ Property
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards "TrustDatabase.@(Target:Target.BaseFileName)/^*;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards "@(Target:Target.BaseFileName)State.json;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards "@(Target:Target.BaseFileName)Config.json;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
-	MalterlibCloudVersionInfo_Backup_IncludeWildcards "Log/@(Target:Target.BaseFileName).log;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
-	MalterlibCloudVersionInfo_Backup_IncludeWildcards "Log/@(Target:Target.BaseFileName)_?.log;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
-	
-	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards "Log/*=Append;@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards)"
-	
+	MalterlibCloudVersionInfo_Backup_IncludeWildcards "Log/@(Target:Target.BaseFileName)*.log;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
+	MalterlibCloudVersionInfo_Backup_IncludeWildcards "Log/CommandLine/@(Target:Target.BaseFileName)*.log;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
+
+	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards "Log/@(Target:Target.BaseFileName).log=Append;@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards)"
+	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards "Log/@(Target:Target.BaseFileName)_??.log=Append;@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards)"
+	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards "Log/CommandLine/@(Target:Target.BaseFileName).log=Append;@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards)"
+	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards "Log/CommandLine/@(Target:Target.BaseFileName)_??.log=Append;@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards)"
+
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards "*/.tmp;@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards)"
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards "*/.DS_Store;@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards)"
 	{
