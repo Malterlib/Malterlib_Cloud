@@ -204,7 +204,8 @@ namespace NMib::NCloud::NAppManager
 			bool m_bJustUpdated = false;
 			
 			TCVector<TCFunctionMovable<void ()>> m_OnRegisterDistributedApp;
-			
+			TCVector<TCFunctionMovable<void ()>> m_OnStartedDistributedApp;
+
 			TCLinkedList<TCFunction <void (bool _bAborted)>> m_OnLaunchFinished;
 			
 			CStr m_LaunchState;

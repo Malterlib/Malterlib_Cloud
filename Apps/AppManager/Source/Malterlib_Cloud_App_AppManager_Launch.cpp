@@ -119,7 +119,13 @@ namespace NMib::NCloud::NAppManager
 													{
 														pState->m_pCleanup.f_Clear();
 														if (_Result)
+														{
+															for (auto &fOnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
+																fOnStartedDistributedApp();
+															_pApplication->m_OnStartedDistributedApp.f_Clear();
+
 															fp_AppLaunchStateChanged(_pApplication, "Launched");
+														}
 														else
 														{
 															DMibLogWithCategory
@@ -192,6 +198,7 @@ namespace NMib::NCloud::NAppManager
 
 									pState->m_pCleanup.f_Clear();
 									_pApplication->m_OnRegisterDistributedApp.f_Clear();
+									_pApplication->m_OnStartedDistributedApp.f_Clear();
 									
 									if (!_pApplication->m_bStopped)
 										fp_ScheduleRelaunchApp(_pApplication);
