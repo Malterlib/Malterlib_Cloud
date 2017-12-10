@@ -58,8 +58,18 @@ public:
 
 			CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);
 			
-			if (CFile::fs_FileExists(RootDirectory))
-				CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+			for (mint i = 0; i < 5; ++i)
+			{
+				try
+				{
+					if (CFile::fs_FileExists(RootDirectory))
+						CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+					break;
+				}
+				catch (NFile::CExceptionFile const &)
+				{
+				}
+			}
 
 			CFile::fs_CreateDirectory(RootDirectory);
 			

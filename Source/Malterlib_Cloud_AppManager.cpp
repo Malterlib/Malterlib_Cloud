@@ -32,7 +32,7 @@ namespace NMib::NCloud
 	
 	CAppManagerInterface::~CAppManagerInterface() = default;
 
-	static_assert(CVersionManager::EMinProtocolVersion <= 0x105, "");
+	static_assert(CVersionManager::EMinProtocolVersion <= 0x105);
 	
 	template <typename tf_CStream>
 	void CAppManagerInterface::CVersionIDAndPlatform::f_Stream(tf_CStream &_Stream)

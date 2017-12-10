@@ -35,20 +35,8 @@ namespace NMib::NCloud::NAppManager
  			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-#ifdef DCompiler_MSVC
-			CVersionIDAndPlatform() = default;
-			CVersionIDAndPlatform(CVersionIDAndPlatform const &) = default;
-			CVersionIDAndPlatform(CVersionIDAndPlatform &&) = default;
-			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform const &) = default;
-			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform &&) = default;
-
-			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other) : CVersionManager::CVersionIDAndPlatform(_Other) { }
-			CVersionIDAndPlatform &operator = (CVersionManager::CVersionIDAndPlatform const &_Right) { static_cast<CVersionManager::CVersionIDAndPlatform &>(*this) = _Right; return *this; }
-#else
 			using CVersionManager::CVersionIDAndPlatform::CVersionIDAndPlatform;
 			using CVersionManager::CVersionIDAndPlatform::operator =;
-#endif
-
 		};
 		
 		struct CAppInfo

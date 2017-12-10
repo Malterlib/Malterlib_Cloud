@@ -17,7 +17,7 @@ namespace NMib::NCloud::NAppManager
 	{
 	}
 
-	static_assert(CVersionManager::EMinProtocolVersion <= 0x105, "");
+	static_assert(CVersionManager::EMinProtocolVersion <= 0x105);
 	
 	template <typename tf_CStream>
 	void CAppManagerCoordinationInterface::CVersionIDAndPlatform::f_Stream(tf_CStream &_Stream)
