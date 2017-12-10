@@ -131,11 +131,14 @@ namespace NMib::NCloud::NSecretsManager
 		mp_AESContext.f_Encrypt(RawDatabase.f_GetArray(), RawDatabase.f_GetLen(), EncryptedDatabase.f_GetArray(RawDatabase.f_GetLen()));
 		
 		CFile::fs_CreateDirectory(CFile::fs_GetPath(mp_Path));
-		CFile OutFile;
 
-		auto Attributes = EFileAttrib_UserWrite | EFileAttrib_UserRead | CFile::fs_GetValidAttributes();
-		OutFile.f_Open(mp_Path + ".tmp", EFileOpen_Write | EFileOpen_ShareAll, Attributes);
-		OutFile.f_Write(EncryptedDatabase.f_GetArray(), EncryptedDatabase.f_GetLen());
+		{
+			CFile OutFile;
+			auto Attributes = EFileAttrib_UserWrite | EFileAttrib_UserRead | CFile::fs_GetValidAttributes();
+			OutFile.f_Open(mp_Path + ".tmp", EFileOpen_Write | EFileOpen_ShareAll, Attributes);
+			OutFile.f_Write(EncryptedDatabase.f_GetArray(), EncryptedDatabase.f_GetLen());
+		}
+
 		if (CFile::fs_FileExists(mp_Path))
 			CFile::fs_AtomicReplaceFile(mp_Path + ".tmp", mp_Path);
 		else

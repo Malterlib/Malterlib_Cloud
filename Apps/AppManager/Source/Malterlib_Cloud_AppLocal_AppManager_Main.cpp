@@ -19,6 +19,8 @@ class CAppManager : public CApplication
 	{
 #ifdef DPlatformFamily_Windows
 		AllocConsole();
+		fg_GetSys()->f_SetEnvironmentVariable("Path", "c:\\Program Files\\Git\\usr\\bin;{}"_f << fg_GetSys()->f_GetEnvironmentVariable("Path"));
+		NSys::fg_Process_SetEnvironmentVariable_Unsafe("Path", "c:\\Program Files\\Git\\usr\\bin;{}"_f << fg_GetSys()->f_GetEnvironmentVariable("Path"));
 #endif
 
 		NConcurrency::CDistributedDaemon Daemon

@@ -49,6 +49,8 @@ public:
 					, true
 				)
 			;
+			fg_GetSys()->f_SetEnvironmentVariable("Path", "c:\\Program Files\\Git\\usr\\bin;{}"_f << fg_GetSys()->f_GetEnvironmentVariable("Path"));
+			NSys::fg_Process_SetEnvironmentVariable_Unsafe("Path", "c:\\Program Files\\Git\\usr\\bin;{}"_f << fg_GetSys()->f_GetEnvironmentVariable("Path"));
 #endif
 			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 			CStr RootDirectory = ProgramDirectory + "/AppManagerTests";
