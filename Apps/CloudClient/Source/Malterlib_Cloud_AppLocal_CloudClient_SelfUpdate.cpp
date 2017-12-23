@@ -175,6 +175,9 @@ namespace NMib::NCloud::NCloudClient
 											, fg_CreateVector<CStr>
 											(
 												"--no-same-owner"
+#if !defined(DPlatformFamily_OSX)
+												, "--pax-option=delete=SCHILY.*,delete=LIBARCHIVE.*"
+#endif
 												, "-xf"
 #ifdef DPlatformFamily_Windows
 												, NFile::NPlatform::fg_ConvertToMinGWPath(PackageFile)

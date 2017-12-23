@@ -107,6 +107,8 @@ namespace NMib::NCloud::NAppManager
 		else
 		{
 			CFile::fs_CreateDirectory(_Destination);
+			TCVector<CStr> Options;
+
 			CStr Output = fsp_RunTool
 				(
 					CStr::CFormat("[{}] Extracting application") << _ApplicationName
@@ -115,6 +117,9 @@ namespace NMib::NCloud::NAppManager
 					, fg_CreateVector<CStr>
 					(
 						"--no-same-owner"
+#if !defined(DPlatformFamily_OSX)
+						, "--pax-option=delete=SCHILY.*,delete=LIBARCHIVE.*"
+#endif
 						, "-xf"
 #ifdef DPlatformFamily_Windows
 						, NFile::NPlatform::fg_ConvertToMinGWPath(_Source)

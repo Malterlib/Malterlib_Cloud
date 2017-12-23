@@ -328,6 +328,10 @@ namespace NMib::NCloud
 #endif
 				, 
 				{
+#ifdef DPlatformFamily_OSX
+					"--disable-copyfile"
+					,
+#endif
 					"-czf"
 #ifdef DPlatformFamily_Windows
 					, NFile::NPlatform::fg_ConvertToMinGWPath(_DestinationFileName)
