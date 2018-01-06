@@ -145,8 +145,7 @@ public:
 				CStr AppManagerDirectory = RootDirectory + "/" + AppManagerName;
 				TCVector<CStr> ExtraParams;
 #if DTestAppManagerEnableOtherOutput
-				if (CFile::fs_GetFile(_Executable) == "AppManager")
-					ExtraParams.f_Insert("--log-launches-to-stderr");
+				ExtraParams.f_Insert("--log-launches-to-stderr");
 #endif
 				
 				LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, AppManagerName, AppManagerDirectory + "/AppManager", fg_Move(ExtraParams)) > AppManagerLaunchesResults.f_AddResult();
