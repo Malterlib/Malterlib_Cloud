@@ -669,6 +669,7 @@ public:
 
 				{
 					auto TimeBeforeSetPropertiesCall = NTime::CTime::fs_NowUTC();
+					NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
 					DMibCallActor
 						(
 							SecretsManager
@@ -678,6 +679,7 @@ public:
 						 )
 						.f_CallSync(g_Timeout)
 					;
+					NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
 					auto TimeAfterSetPropertiesCall = NTime::CTime::fs_NowUTC();
 
 					// If Created or Modified were not set, ensure they are updated correctly
@@ -690,6 +692,7 @@ public:
 				{
 					{
 						auto TimeBeforeSetPropertiesCall = NTime::CTime::fs_NowUTC();
+						NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
 						DMibCallActor
 							(
 								SecretsManager
@@ -700,6 +703,7 @@ public:
 							 )
 							.f_CallSync(g_Timeout)
 						;
+						NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
 						auto TimeAfterSetPropertiesCall = NTime::CTime::fs_NowUTC();
 
 						// Verify that Created was set correctly and Modified updated
