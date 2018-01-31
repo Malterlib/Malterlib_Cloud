@@ -9,8 +9,8 @@ namespace NMib::NCloud
 {
 	struct CKeyManagerServerDatabase_EncryptedFile::CInternal
 	{
-		CInternal(NStr::CStr const &_Path, NStr::CStrSecure const &_Password, NNet::CEncryptAES::CSalt const *_pSalt)
-			: m_AESContext(_Password, _pSalt)
+		CInternal(NStr::CStr const &_Path, NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt)
+			: m_AESContext(NNet::CEncryptKeyIV::fs_GenerateKeyIV(_Password, _Salt, NNet::CKeyDerivationSettings_PKCS5_Deprecated{NNet::ESSLDigest_SHA256}, NNet::ESSLCrypto_AES_256_CBC))
 			, m_Path(_Path)
 		{
 			
@@ -116,9 +116,9 @@ namespace NMib::NCloud
 		(
 			NStr::CStr const &_Path
 			, NStr::CStrSecure const &_Password
-			, NNet::CEncryptAES::CSalt const *_pSalt
+			, NContainer::CSecureByteVector const &_Salt
 		)
-		: mp_pInternal(fg_Construct(_Path, _Password, _pSalt))
+		: mp_pInternal(fg_Construct(_Path, _Password, _Salt))
 	{
 		
 	}

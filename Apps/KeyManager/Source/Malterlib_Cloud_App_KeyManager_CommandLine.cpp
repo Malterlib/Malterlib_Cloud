@@ -115,13 +115,13 @@ namespace NMib
 												{
 													TCContinuation<void> Continuation;
 
-													NNet::CEncryptAES::CSalt Salt{'M', 'i', 'B', 'K', 'e', 'y', 'M', 'a'};
+													CSecureByteVector Salt{(uint8 const *)"MiBKeyMa", 8};
 													TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
 														(
 															fg_Construct("Encrypted Key Manager Database Actor")
 															, mp_State.m_RootDirectory + "/KeyDatabase.encrypted"
 															, _Password
-															, &Salt
+															, Salt
 														)
 													;
 

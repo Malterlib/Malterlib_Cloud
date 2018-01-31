@@ -15,13 +15,7 @@ namespace NMib::NCloud
 	public:
 		using CActorHolder = NConcurrency::CSeparateThreadActorHolder;
 		
-		CKeyManagerServerDatabase_EncryptedFile
-			(
-				NStr::CStr const &_Path
-				, NStr::CStrSecure const &_Password
-				, NNet::CEncryptAES::CSalt const *_pSalt
-			)
-		;
+		CKeyManagerServerDatabase_EncryptedFile(NStr::CStr const &_Path, NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt);
 		
 		~CKeyManagerServerDatabase_EncryptedFile();
 		

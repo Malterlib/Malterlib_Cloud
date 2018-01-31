@@ -7,6 +7,7 @@
 #include <Mib/Concurrency/DistributedActorTestHelpers>
 #include <Mib/Cloud/KeyManagerDatabases/EncryptedFile>
 #include <Mib/Test/Exception>
+#include <Mib/Container/Vector>
 
 using namespace NMib;
 using namespace NMib::NConcurrency;
@@ -111,7 +112,7 @@ public:
 			if (CFile::fs_FileExists(DatabasePath))
 				CFile::fs_DeleteFile(DatabasePath);
 				
-			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, nullptr);
+			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, NContainer::CSecureByteVector{});
 			DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
 			auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
 			DMibExpect(Database.m_Clients.f_GetLen(), ==, 0);
@@ -128,7 +129,9 @@ public:
 			{
 				DMibTestPath("ExistingKeys");
 				
-				auto DatabaseActor2 = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, nullptr);
+				auto DatabaseActor2
+					= fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, NContainer::CSecureByteVector{})
+				;
 				DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
 				auto Database2 = DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
 				
@@ -159,7 +162,9 @@ public:
 				
 				{
 					DMibTestPath("Check incorrect password is caught");
-					auto DatabaseActor3 = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, "WrongPassword", nullptr);
+					auto DatabaseActor3
+						= fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, "WrongPassword", NContainer::CSecureByteVector{})
+					;
 					
 					DMibTest
 						(
@@ -181,7 +186,7 @@ public:
 			CDistributedActorTestHelperCombined TestHelper{Port};
 			TestHelper.f_Init();
 			
-			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("PreCreatedKeysThread"), DatabasePath, Password, nullptr);
+			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("PreCreatedKeysThread"), DatabasePath, Password, NContainer::CSecureByteVector{});
 			
 			CKeyManagerServerConfig Config;
 			Config.m_DatabaseActor = DatabaseActor;
