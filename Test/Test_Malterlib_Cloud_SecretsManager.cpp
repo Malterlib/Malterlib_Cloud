@@ -1,5 +1,6 @@
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/Actor/Timer>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/Concurrency/DistributedAppInterfaceLaunch>
@@ -13,11 +14,15 @@
 #include <Mib/Cloud/KeyManagerServer>
 #include <Mib/Cloud/KeyManagerDatabases/EncryptedFile>
 #include <Mib/Cloud/App/KeyManager>
-#include <Mib/Cloud/App/SecretsManager>
 #include <Mib/Cloud/SecretsManager>
+#include <Mib/Cloud/SecretsManagerUpload>
+#include <Mib/Cloud/SecretsManagerDownload>
+#include <Mib/Cloud/App/SecretsManager>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Test/Exception>
+#include <Mib/File/DirectorySync>
+#include <Mib/File/DirectoryManifest>
 
 #ifdef DPlatformFamily_Windows
 #include <Windows.h>
@@ -39,6 +44,50 @@ using namespace NMib::NStorage;
 #define DTestSecretsManagerEnableLogging 0
 
 static fp64 g_Timeout = 60.0;
+
+namespace
+{
+	// This class makes it possible to control the order of events for parallel uploads and downloads
+	template <typename t_CStreamType = NStream::CBinaryStreamDefault>
+	class TCBinaryStreamFileDelayed : public TCBinaryStreamFile<t_CStreamType>
+	{
+		typedef TCBinaryStreamFile<t_CStreamType> CParent;
+
+	protected:
+		DMibStreamImplementProtected(TCBinaryStreamFileDelayed);
+	public:
+		DMibStreamImplementOperators(TCBinaryStreamFileDelayed);
+
+		CFile m_File;
+		NThread::CEvent *m_pOpenEvent;
+		NThread::CEvent *m_pCloseEvent;
+
+		TCBinaryStreamFileDelayed(NThread::CEvent *_pOpenEvent, NThread::CEvent *_pCloseEvent)
+			: m_pOpenEvent(_pOpenEvent)
+			, m_pCloseEvent(_pCloseEvent)
+		{
+		}
+
+		template <typename tf_CStr>
+		void f_Open(const tf_CStr &_FileName, EFileOpen _OpenFlags, EFileAttrib _Attributes = EFileAttrib_None)
+		{
+			if (m_pOpenEvent && fg_StrFindReverse(_FileName, ".txt") != -1)
+			{
+				m_pOpenEvent->f_WaitTimeout(60.0);
+			}
+			CParent::m_File.f_Open(_FileName, _OpenFlags, _Attributes);
+		}
+
+		void f_Close()
+		{
+			if (m_pCloseEvent)
+			{
+				m_pCloseEvent->f_WaitTimeout(60.0);
+			}
+			CParent::m_File.f_Close();
+		}
+	};
+};
 
 class CSecretsManager_Tests : public NMib::NTest::CTest
 {
@@ -364,7 +413,7 @@ public:
 
 		CSecretsManager::CSecret StringSecret{"Secret1"};
 		CSecretsManager::CSecret ByteVectorSecret{CSecureByteVector{(uint8 const *)"Secret2", 7}};
-		CSecretsManager::CSecret FileSecret{CSecretsManager::CFileTag{}};
+		CSecretsManager::CSecret FileSecret{CSecretsManager::CSecretFile{}};
 
 		{
 			DMibTestPath("General");
@@ -1204,7 +1253,7 @@ public:
 				fRemovePermissions(Needed2);
 				fRemovePermissions({"SecretsManager/Write/SemanticID/Semantic1/NoTag", "SecretsManager/Read/SemanticID/Semantic1/NoTag"});
 			}
-			
+
 			{
 				DMibTestPath("Test SetMetadata Command Permissions");
 
@@ -1235,6 +1284,7 @@ public:
 				fRemovePermissions(Needed);
 			}
 
+
 			{
 				DMibTestPath("Test RemoveMetadata Command Permissions");
 
@@ -1256,14 +1306,16 @@ public:
 
 					// Remove one, check, and add it again
 					fRemovePermissions({Permission});
-					DMibExpectException(fRemoveKey("Folder1", "Name1", "Key"), DMibErrorInstance("Access denied"));
+					DMibExpectException(fRemoveKey("Folder1", "Name1", "Key2"), DMibErrorInstance("Access denied"));
 					fAddPermissions({Permission});
 				}
 				// Check that access was granted
 				fRemoveKey("Folder1", "Name1", "Key2");
+				fAddPermissions({});
 
 				fRemovePermissions(Needed);
 			}
+
 			{
 				DMibTestPath("Test RemoveSecret Command Permissions");
 
@@ -1290,7 +1342,7 @@ public:
 
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test RemoveSwecret Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test RemoveSecret Permissions. Missing '{}' permission", Permission));
 
 					// Remove one, check, and add it again
 					fRemovePermissions({Permission});
@@ -1309,13 +1361,14 @@ public:
 
 			// Reset permissions
 			fAddPermissions(SecretsManagerPermissionsForTest);
+			DMibExpect(*fGetProperties("Folder1", "Name1").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{}));
 		};
 
 		{
 			DMibTestPath("Check Database Content");
 
 			for (auto &Launch: SecretsManagerLaunches)
-				Launch.f_Destroy();
+				Launch.m_Subscription->f_Destroy().f_CallSync(g_Timeout);
 
 			// Launch SecretsManagers
 
@@ -1359,6 +1412,500 @@ public:
 				DMibExpect(*fGetProperties("Folder2", "Name2").m_Notes, ==, "Testing22");
 			}
 		};
+
+		{
+			DMibTestPath("Upload and Download");
+
+			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
+			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(nSecretsManagers);
+			auto SecretsManager = SecretsManagers[0];
+			auto &SecretsManagerLaunchInfo = SecretsManagerLaunches[0];
+
+			CSecretsManager::CSecretID ID{"Folder1", "Name1"};
+			CStr File1 = "TestFile1.txt";
+			CStr File2 = "TestFile2.txt";
+			CStr File3 = "TestFile3.txt";
+
+			auto fGetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name) -> CSecretsManager::CSecretProperties
+				{
+					return DMibCallActor(SecretsManager, CSecretsManager::f_GetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+				}
+			;
+			auto fSetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties)
+				{
+					DMibCallActor(SecretsManager, CSecretsManager::f_SetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties) ).f_CallSync(g_Timeout);
+				}
+			;
+			auto fSetPropertiesNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties) -> TCContinuation<void>
+				{
+					return DMibCallActor(SecretsManager, CSecretsManager::f_SetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
+				}
+			;
+			auto fRemoveSecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)
+				{
+					DMibCallActor(SecretsManager, CSecretsManager::f_RemoveSecret, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+				}
+			;
+			auto fRemoveSecretNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)  -> TCContinuation<void>
+				{
+					return DMibCallActor(SecretsManager, CSecretsManager::f_RemoveSecret, CSecretsManager::CSecretID{_Folder, _Name});
+				}
+			;
+			auto fWriteFile = [&](CStr _FileName, CStr _Content)
+				{
+					CFile File;
+					File.f_Open(CFile::fs_AppendPath(RootDirectory, _FileName), EFileOpen_Write | EFileOpen_ShareAll);
+					File.f_Write(_Content.f_GetStr(), _Content.f_GetStrLen());
+					File.f_Close();
+				}
+			;
+			auto fAreIdentical = [&](CStr const &_FileName1, CStr const &_FileName2)
+				{
+					NFile::CFile File1;
+					NFile::CFile File2;
+
+					File1.f_Open(CFile::fs_AppendPath(RootDirectory, _FileName1), EFileOpen_Read | EFileOpen_ShareAll | EFileOpen_NoLocalCache);
+					File2.f_Open(CFile::fs_AppendPath(RootDirectory, _FileName2), EFileOpen_Read | EFileOpen_ShareAll | EFileOpen_NoLocalCache);
+
+					NStream::CFilePos FileLen = File1.f_GetLength();
+					if (FileLen != File2.f_GetLength())
+						return false;
+
+					NContainer::TCVector<uint8> DestData1;
+					NContainer::TCVector<uint8> DestData2;
+					File1.f_Read(DestData1.f_GetArray(FileLen), FileLen);
+					File2.f_Read(DestData2.f_GetArray(FileLen), FileLen);
+
+					return NMem::fg_MemCmp(DestData1.f_GetArray(), DestData2.f_GetArray(), FileLen) == 0;
+				}
+			;
+
+			auto fUpload = [&]
+				(
+				 	CSecretsManager::CSecretID const &_ID
+				   	, CStr const &_FileName
+				   	, CStr const &_BasePath
+				 	, CActorSubscription &o_Subscription
+				   	, NThread::CEvent *_pOpenEvent = nullptr
+				   	, NThread::CEvent *_pCloseEvent = nullptr
+				)
+				-> TCContinuation<uint32>
+				{
+
+					CDirectorySyncSend::CConfig Config(CFile::fs_AppendPath(_BasePath, _FileName));
+					Config.m_FileOptions.m_fOpenStream = [pOpenEvent = _pOpenEvent, pCloseEvent = _pCloseEvent]
+						(
+							CStr const &_FileName
+							, EDirectorySyncStreamType _FileType
+							, EFileOpen _OpenFlags
+							, EFileAttrib _Attributes
+						)
+						-> NPtr::TCUniquePointer<NStream::CBinaryStream>
+						{
+							TCUniquePointer<TCBinaryStreamFileDelayed<>> pFile = fg_Construct(pOpenEvent, pCloseEvent);
+							pFile->f_Open(_FileName, _OpenFlags, _Attributes);
+							return pFile;
+						}
+					;
+
+					TCContinuation<uint32> Continuation;
+					fg_UploadSecretFile
+						(
+						 	SecretsManager
+						 	, Dependencies.m_DistributionManager
+						 	, fg_TempCopy(_ID)
+						 	, fg_Move(Config)
+						 	, o_Subscription
+						)
+						> Continuation / [Continuation] (CDirectorySyncSend::CSyncResult &&_Result) mutable
+						{
+							Continuation.f_SetResult(_Result.m_Stats.m_nSyncedFiles - 1);
+						}
+					;
+					return Continuation;
+				}
+			;
+			auto fDownload = [&]
+				(
+				 	CSecretsManager::CSecretID _ID
+				 	, CStr const &_Outfile
+				 	, CStr const &_BasePath
+				 	, NThread::CEvent *_pOpenEvent = nullptr
+				 	, CDirectorySyncReceive::EEasyConfigFlag _Flags = CDirectorySyncReceive::EEasyConfigFlag_None
+				)
+				-> TCContinuation<uint32>
+				{
+					TCContinuation<uint32> Continuation;
+
+					CDirectorySyncReceive::CConfig Config(CFile::fs_GetExpandedPath(_Outfile, _BasePath), _Flags);
+					Config.m_FileOptions.m_fOpenStream = [_pOpenEvent]
+						(
+							CStr const &_FileName
+							, EDirectorySyncStreamType _FileType
+							, EFileOpen _OpenFlags
+							, EFileAttrib _Attributes
+						)
+						-> NPtr::TCUniquePointer<NStream::CBinaryStream>
+						{
+							TCUniquePointer<TCBinaryStreamFileDelayed<>> pFile = fg_Construct(_pOpenEvent, nullptr);
+							pFile->f_Open(_FileName, _OpenFlags, _Attributes);
+							return pFile;
+						}
+					;
+
+					fg_DownloadSecretFile(SecretsManager, fg_Move(_ID), fg_Move(Config))
+						> Continuation % "Failed to transfer secret file" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
+						{
+							Continuation.f_SetResult(_Result.m_Stats.m_nSyncedFiles - 1); // Subtract one for the manifest file
+						}
+					;
+					return Continuation;
+				}
+			;
+			auto fFindFiles = [&]
+				{
+					return CFile::fs_FindFiles(RootDirectory + "/SecretsManager00/SecretsManagerFiles/*", EFileAttrib_File);
+				}
+			;
+			auto fDestination = [](int _Number)
+				{
+					return fg_Format("Destination{}.txt", _Number);
+				}
+			;
+
+			auto fSyncFileOperations = [&](CStr const &_Command, CEJSON const _Params = "") -> TCContinuation<CEJSON>
+				{
+					return SecretsManagerLaunchInfo.f_Test_Command(_Command, _Params);
+				}
+			;
+
+			{
+				fWriteFile(File1, "abcdefghijklmnopqrstuvwxyz");
+				fWriteFile(File2, "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz");
+				fWriteFile(File3, "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz");
+
+				auto Properties = fGetProperties("Folder1", "Name1");
+				DMibExpect(*Properties.m_Secret, ==, StringSecret);
+
+				auto Files = fFindFiles();
+				{
+					CActorSubscription Subscription;
+					DMibExpect(fUpload(ID, File1, RootDirectory, Subscription).f_CallSync(g_Timeout), ==, 1);
+					DMibExpect((*fGetProperties("Folder1", "Name1").m_Secret).f_GetTypeID(), ==, CSecretsManager::ESecretType_File);
+					DMibExpect(fDownload(ID, fDestination(1), RootDirectory).f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(fAreIdentical(File1, fDestination(1)), ==, true);
+					Files = fFindFiles();
+					DMibExpect(Files.f_GetLen(), ==, 1);
+				}
+
+				{
+					// New file => transfer, remove old file, create new one
+					CActorSubscription Subscription;
+					DMibExpect(fUpload(ID, File2, RootDirectory, Subscription).f_CallSync(g_Timeout), ==, 1);
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					auto Files2 = fFindFiles();
+					DMibExpect(Files2.f_GetLen(), ==, 1);
+					DMibExpect(Files2, !=, Files);
+					Files = fg_Move(Files2);
+				}
+
+				{
+					// Same file, new content => transfer, remove old file, create new one
+					fWriteFile(File2, "0123456789klmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz");
+					CActorSubscription Subscription;
+					mint nUploaded = fUpload(ID, File2, RootDirectory, Subscription).f_CallSync(g_Timeout);
+					DMibExpect(nUploaded, ==, 1);
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					auto Files3 = fFindFiles();
+					DMibExpect(Files3.f_GetLen(), ==, 1);
+					DMibExpect(Files3, !=, Files);
+					DMibExpect(fDownload(ID, fDestination(2), RootDirectory).f_CallSync(g_Timeout), ==, 1);
+					DMibExpectTrue(fAreIdentical(File2, fDestination(2)));
+					Files = fg_Move(Files3);
+				}
+
+				{
+					// Upload to non-existing secret
+					CActorSubscription Subscription;
+					DMibExpectException
+						(
+							fUpload(CSecretsManager::CSecretID{"NonExisting", "NonExisting"}, File2, RootDirectory, Subscription).f_CallSync(g_Timeout)
+							, DMibErrorInstance("No secret matching ID: 'NonExisting/NonExisting'")
+						)
+					;
+				}
+
+				{
+					// Two competing uploads, first to complete wins, remove losing file
+					CActorSubscription Subscription;
+					NThread::CEvent Event;
+					auto UploadInitializedContinuation = fSyncFileOperations("UploadInitialized", File1);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation = fUpload(ID, File1, RootDirectory, Subscription, &Event);
+					// Wait for secrets manager to handle the upload request
+					UploadInitializedContinuation.f_CallSync(g_Timeout);
+					CActorSubscription Subscription2;
+					DMibExpect(fUpload(ID, File3, RootDirectory, Subscription2).f_CallSync(g_Timeout), ==, 1);
+					// Release the file1 rsync
+					Event.f_SetSignaled();
+					DMibExpectException
+						(
+							Continuation.f_CallSync(g_Timeout)
+							, DMibErrorInstance("The secret property in secret 'Folder1/Name1' was changed while the secret file was uploaded. Please check and upload again.")
+						)
+					;
+					DMibExpect(fDownload(ID, fDestination(3), RootDirectory).f_CallSync(g_Timeout), ==, 1);
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					DMibExpectTrue(fAreIdentical(File3, fDestination(3)));
+					auto Files4 = fFindFiles();
+					DMibExpect(Files4.f_GetLen(), ==, 1);
+					DMibExpect(Files4, !=, Files);
+					Files = Files4;
+				}
+
+				{
+					DMibTestPath("Secret changed during upload");
+					// Initiate upload, change the secret to a string secret, same error as above, remove file
+					CActorSubscription Subscription;
+					NThread::CEvent Event;
+					auto  UploadInitializedContinuation = fSyncFileOperations("UploadInitialized", File2);
+					auto UploadCompletedContinuation = fSyncFileOperations("UploadCompleted", File2);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation = fUpload(ID, File2, RootDirectory, Subscription, &Event);
+					// Wait for secrets manager to handle the upload request
+					UploadInitializedContinuation.f_CallSync(g_Timeout);
+					fSetProperties(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
+					// Flush file ops before checking number of files in the secret directory
+
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+
+					auto FilesAfterSetSecret = fFindFiles();
+					DMibTest(DMibExpr(FilesAfterSetSecret.f_GetLen()) <= DMibExpr(1) && DMibExpr(FilesAfterSetSecret) != DMibExpr(Files));
+					Event.f_SetSignaled();
+					// Wait for secrets manager to start the rsync
+					UploadCompletedContinuation.f_CallSync(g_Timeout);
+					DMibExpectException
+						(
+							Continuation.f_CallSync(g_Timeout)
+							, DMibErrorInstance("The secret property in secret 'Folder1/Name1' was changed while the secret file was uploaded. Please check and upload again.")
+						)
+					;
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					DMibExpect(0, ==, fFindFiles().f_GetLen());
+				}
+
+				{
+					// Secret deleted during upload, report error, remove downloaded file
+					fSetProperties("Sacrificial", "Lamb", CSecretsManager::CSecretProperties{}.f_SetNotes("Note"));
+					CActorSubscription Subscription;
+					NThread::CEvent Event;
+					auto UploadInitializedContinuation = fSyncFileOperations("UploadInitialized", File1);
+					auto UploadCompletedContinuation = fSyncFileOperations("UploadCompleted", File1);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation = fUpload(CSecretsManager::CSecretID{"Sacrificial", "Lamb"}, File1, RootDirectory, Subscription, &Event);
+					// Wait for secrets manager to handle the upload request
+					UploadInitializedContinuation.f_CallSync(g_Timeout);
+					fRemoveSecret("Sacrificial", "Lamb");
+					// Flush file ops
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					// Release the rsync
+					Event.f_SetSignaled();
+					// Wait for secrets manager to start the rsync
+					UploadCompletedContinuation.f_CallSync(g_Timeout);
+					DMibExpectException
+						(
+							Continuation.f_CallSync(g_Timeout)
+							, DMibErrorInstance("Secret 'Sacrificial/Lamb' removed while the secret file was uploaded")
+						)
+					;
+					DMibExpect(fFindFiles().f_GetLen(), ==, 0);
+				}
+
+				{
+					CActorSubscription Subscription;
+					fUpload(ID, File2, RootDirectory, Subscription).f_CallSync(g_Timeout);
+					// Download initiated before upload, starts after upload completes, should get old file
+					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					auto Continuation = fDownload(ID, fDestination(4), RootDirectory);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					// Wait for download to start
+					DownloadInitializedContinuation.f_CallSync(g_Timeout);
+					auto Files5 = fFindFiles();
+					CActorSubscription Subscription2;
+					fUpload(ID, File3, RootDirectory, Subscription2).f_CallSync(g_Timeout);
+					// Old file from first download?
+					DMibExpect(Continuation.f_CallSync(g_Timeout), ==, 1);
+					DMibExpectTrue(fAreIdentical(File2, fDestination(4)));
+					// New file from the download after the upload
+					fDownload(ID, fDestination(12), RootDirectory).f_CallSync(g_Timeout);
+					DMibExpectTrue(fAreIdentical(File3, fDestination(12)));
+
+					auto Files7 = fFindFiles();
+					DMibExpect(Files5.f_GetLen(), ==, 1);
+					DMibExpect(Files7.f_GetLen(), ==, 1);
+					DMibExpect(Files7, !=, Files5);
+				}
+
+				{
+					DMibTestPath("Overwrite on download");
+					// Check that file is not overwritten
+					DMibExpectExceptionType(fDownload(ID, fDestination(12), RootDirectory).f_CallSync(g_Timeout), NException::CException);
+					// Check that file is overwritten
+					fDownload(ID, fDestination(12), RootDirectory, nullptr, CDirectorySyncReceive::EEasyConfigFlag_AllowOverwrite).f_CallSync(g_Timeout);
+					DMibExpectTrue(fAreIdentical(File3, fDestination(12)));
+				}
+
+				{
+					DMibTestPath("Secret changed during download");
+					// Download initiated before secret change, get the old file
+					NThread::CEvent Event;
+					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					auto DownloadCompletedContinuation = fSyncFileOperations("DownloadCompleted", ID.m_Name);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation = fDownload(ID, fDestination(5), RootDirectory, &Event);
+					// Wait for download to start
+					DownloadInitializedContinuation.f_CallSync(g_Timeout);
+					auto SecretContinuation = fSetPropertiesNoWait(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
+					// Release the download
+					Event.f_SetSignaled();
+					DMibExpect(Continuation.f_CallSync(g_Timeout), ==, 1);
+					DMibExpectTrue(fAreIdentical(File3, fDestination(5)));
+					// Wait for completion and flush file ops
+					DownloadCompletedContinuation.f_CallSync(g_Timeout);
+					SecretContinuation.f_CallSync(g_Timeout);
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					auto Files8 = fFindFiles();
+					DMibExpect(Files8.f_GetLen(), ==, 0);
+				}
+				
+				{
+					CActorSubscription Subscription;
+					fUpload(ID, File2, RootDirectory, Subscription).f_CallSync(g_Timeout);
+					DMibTestPath("Secret removed during download");
+					// Download initiated before remove, starts after secret removal
+					NThread::CEvent Event;
+					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					auto DownloadCompletedContinuation = fSyncFileOperations("DownloadCompleted", ID.m_Name);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation = fDownload(ID, fDestination(6), RootDirectory, &Event);
+					// Wait for download to start
+					DownloadInitializedContinuation.f_CallSync(g_Timeout);
+					auto RemoveContinuation = fRemoveSecretNoWait(ID.m_Folder, ID.m_Name);
+					// Flush file ops
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					// Release the download
+					Event.f_SetSignaled();
+					DMibExpect(Continuation.f_CallSync(g_Timeout), ==, 1);
+					DMibExpectTrue(fAreIdentical(File2, fDestination(6)));
+					// Wait for completion and flush file ops
+					DownloadCompletedContinuation.f_CallSync(g_Timeout);
+					RemoveContinuation.f_CallSync(g_Timeout);
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					auto Files9 = fFindFiles();
+					DMibExpect(Files9.f_GetLen(), ==, 0);
+				}
+
+				{
+					CActorSubscription Subscription;
+					fSetProperties(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
+					fUpload(ID, File2, RootDirectory, Subscription).f_CallSync(g_Timeout);
+					DMibTestPath("Secret changed during download - multiple downloaders");
+					// Downloads initiated before secret change, get the old file
+					NThread::CEvent Event;
+					auto DownloadInitializedContinuation1 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation1 = fDownload(ID, fDestination(7), RootDirectory, &Event);
+					// Wait for download to start
+					DownloadInitializedContinuation1.f_CallSync(g_Timeout);
+					auto DownloadInitializedContinuation2 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation2 = fDownload(ID, fDestination(8), RootDirectory, &Event);
+					// Wait for download to start
+					DownloadInitializedContinuation2.f_CallSync(g_Timeout);
+					auto DownloadInitializedContinuation3 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation3 = fDownload(ID, fDestination(9), RootDirectory, &Event);
+					// Wait for download to start
+					DownloadInitializedContinuation3.f_CallSync(g_Timeout);
+					auto DownloadInitializedContinuation4 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation4 = fDownload(ID, fDestination(10), RootDirectory, &Event);
+					// Wait for download to start
+					DownloadInitializedContinuation4.f_CallSync(g_Timeout);
+					auto DownloadCompletedContinuation = fSyncFileOperations("DownloadCompleted", ID.m_Name);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+
+					auto SecretContinuation = fSetPropertiesNoWait(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
+					// Release the download
+					Event.f_SetSignaled();
+					DMibExpect(Continuation1.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Continuation2.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Continuation3.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Continuation4.f_CallSync(g_Timeout), ==, 1);
+					DMibExpectTrue(fAreIdentical(File2, fDestination(7)));
+					DMibExpectTrue(fAreIdentical(File2, fDestination(8)));
+					DMibExpectTrue(fAreIdentical(File2, fDestination(9)));
+					DMibExpectTrue(fAreIdentical(File2, fDestination(10)));
+					// Wait for completion and flush file ops
+					DownloadCompletedContinuation.f_CallSync(g_Timeout);
+					SecretContinuation.f_CallSync(g_Timeout);
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					auto Files10 = fFindFiles();
+					DMibExpect(Files10.f_GetLen(), ==, 0);
+				}
+
+				{
+					CActorSubscription UploadSubscription;
+					fUpload(ID, File2, RootDirectory, UploadSubscription).f_CallSync(g_Timeout);
+					DMibTestPath("Keep secrets manager alive until last pending delete has completed");
+					fSyncFileOperations("DelayDelete");
+					auto UploadCompletedContinuation = fSyncFileOperations("UploadCompleted", File3);
+					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					auto DestroyWaitingForCanDestroyContinuation = fSyncFileOperations("DestroyWaitingForCanDestroy", ID.m_Name);
+					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
+					auto FilesPreDownload = fFindFiles();
+					DMibExpect(FilesPreDownload.f_GetLen(), ==, 1);
+					NThread::CEvent Event;
+					auto DownloadContinuation = fDownload(ID, fDestination(11), RootDirectory, &Event);
+					// Wait for download to start, now File2 is reserved
+					DownloadInitializedContinuation.f_CallSync(g_Timeout);
+					// Upload a new file
+					CActorSubscription UploadSubscription2;
+					fUpload(ID, File3, RootDirectory, UploadSubscription2).f_CallSync(g_Timeout);
+					UploadCompletedContinuation.f_CallSync(g_Timeout);
+					auto FilesPostUpload = fFindFiles();
+					DMibExpect(FilesPostUpload.f_GetLen(), ==, 2);
+					Event.f_SetSignaled();
+					DownloadContinuation.f_CallSync(g_Timeout);
+					// Now the download is no longer reserving the file and
+					// Kill off the Secrets Manager
+					TCSharedPointer<TCAtomic<bool>> pDestroyFinished = fg_Construct(false);
+					TCSharedPointer<NThread::CEvent> pDestroyFinishedEvent = fg_Construct();
+					auto Subscription = fg_Move(SecretsManagerLaunches[0].m_Subscription);
+					Subscription ->f_Destroy() > [=](auto &&)
+						{
+							pDestroyFinished->f_Exchange(true);
+							pDestroyFinishedEvent->f_SetSignaled();
+						}
+					;
+					DestroyWaitingForCanDestroyContinuation.f_CallSync(g_Timeout);
+
+					DMibExpectFalse(pDestroyFinished->f_Load());
+					try
+					{
+						fSyncFileOperations("ReleaseDelete").f_CallSync(g_Timeout);
+					}
+					catch (NException::CException const &_Exception)
+					{
+						DMibConOut("_Exception: {}\n", _Exception);
+					}
+					DMibExpectFalse(pDestroyFinishedEvent->f_WaitTimeout(g_Timeout))(NTest::ETest_FailAndStop);
+					auto FilesPostDestroy = fFindFiles();
+					DMibExpect(FilesPostDestroy.f_GetLen(), ==, 1);
+				}
+			}
+		}
 	}
 };
 
