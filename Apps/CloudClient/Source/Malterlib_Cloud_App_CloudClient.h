@@ -84,6 +84,8 @@ namespace NMib::NCloud::NCloudClient
 		TCContinuation<uint32> fp_CommandLine_SecretsManager_RemoveMetadata(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCContinuation<uint32> fp_CommandLine_SecretsManager_ChangeTags(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCContinuation<uint32> fp_CommandLine_SecretsManager_RemoveSecret(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_Upload(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_SecretsManager_Download(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 		fp64 mp_Timeout = 0.0;
 		
@@ -97,5 +99,6 @@ namespace NMib::NCloud::NCloudClient
 
 		// Secrets Manager
 		TCTrustedActorSubscription<CSecretsManager> mp_SecretsManagers;
+		CActorSubscription mp_UploadSubscription;
 	};
 }

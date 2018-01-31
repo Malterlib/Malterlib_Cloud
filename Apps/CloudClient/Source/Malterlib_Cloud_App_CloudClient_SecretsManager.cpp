@@ -3,9 +3,12 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Cloud/SecretsManager>
+#include <Mib/Cloud/SecretsManagerUpload>
+#include <Mib/Cloud/SecretsManagerDownload>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/Actor/Timer>
+#include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Encoding/JSONShortcuts>
 
 #include "Malterlib_Cloud_App_CloudClient.h"
@@ -18,27 +21,42 @@ namespace NMib::NCloud::NCloudClient
 			{
 				"Names"_= {"--host"}
 				, "Default"_= ""
-				, "Description"_= "Limit query to only specified host ID"
+				, "Description"_= "Limit query to only specified host ID."
 			}
 		;
 		auto BinaryAsBase64 = "BinaryAsBase64"_=
 			{
-				"Names"_={"--binary-as-base64"}
+				"Names"_= {"--binary-as-base64"}
 				, "Default"_= true
-				, "Description"_= "Binary secrets will be read and written as base64 encoded strings\n"
+				, "Description"_= "Binary secrets will be read and written as base64 encoded strings."
 			}
 		;
-
 		auto IDParameter = "Parameters"_=
 			{
 				"ID"_=
 				{
 					"Type"_= ""
-					, "Description"_= "Specify secret ID\n"
+					, "Description"_= "Specify secret ID.\n"
 					"The ID is specified as Folder/Name with folder and name adhering to RFC 1123 (hostname)"
 				}
 			}
 		;
+		auto CurrentDirectory = "CurrentDirectory?"_=
+			{
+				"Names"_= _[_]
+				, "Default"_= CFile::fs_GetCurrentDirectory()
+				, "Hidden"_= true
+				, "Description"_= "Internal hidden option to forward current directory."
+			}
+		;
+		auto Quiet = "Quiet?"_=
+			{
+				"Names"_= {"--quiet"}
+				, "Default"_= false
+				, "Description"_= "Suppress non-error output."
+			}
+		;
+
 		_Section.f_RegisterCommand
 			(
 				{
@@ -51,7 +69,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Names"_= {"--semantic-id"}
 							, "Default"_= ""
-							, "Description"_= "Limit query to secrets having the specified semantic ID\n"
+							, "Description"_= "Limit query to secrets having the specified semantic ID.\n"
 							"The semantic ID must adhere to RFC 1123 (hostname)"
 						}
 						, "Tags?"_=
@@ -59,7 +77,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= {"--tags"}
 							, "Default"_= _[_]
 							, "Type"_= {""}
-							, "Description"_= "Limit query to secrets having the specified tags\n"
+							, "Description"_= "Limit query to secrets having the specified tags.\n"
 							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
 						}
 					}
@@ -74,7 +92,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-get-secret-by-semantic-id"}
-					, "Description"_= "Get secret matching the semantic id and tags"
+					, "Description"_= "Get secret matching the semantic id and tags."
 					, "Options"_=
 					{
 						SecretsManagerHost
@@ -100,7 +118,7 @@ namespace NMib::NCloud::NCloudClient
 						"SemanticID"_=
 						{
 							"Type"_= ""
-							, "Description"_= "Get the secret with the specified semantic ID\n"
+							, "Description"_= "Get the secret with the specified semantic ID.\n"
 							"The semantic ID must adhere to RFC 1123 (hostname)"
 						}
 					}
@@ -115,7 +133,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-get-secret-properties"}
-					, "Description"_= "List all properties for the secret"
+					, "Description"_= "List all properties for the secret."
 					, "Options"_=
 					{
 						SecretsManagerHost
@@ -133,7 +151,8 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-get-secret"}
-					, "Description"_= "Get secret"
+					, "Description"_= "Get secret."
+					, "Output"_= "The secret formatted acconding to --expect"
 					, "Options"_=
 					{
 						SecretsManagerHost
@@ -159,7 +178,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-set-secret-properties"}
-					, "Description"_= "Set properties for a secret\n"
+					, "Description"_= "Set properties for a secret.\n"
 					"Add a new secret or change the properties of an existing secret.\n"
 					"When creating a new secret, properties that are not set on the command line will be assigned default values. "
 					"The default values will be empty except for the Created and Modified properties which will be set to the current time.\n"
@@ -176,12 +195,7 @@ namespace NMib::NCloud::NCloudClient
 							"Specify 'string' to be prompted for a string secret.\n"
 							"Specify 'binary' for a binary secret. When --binary-as-base64 is enabled (which it is by default) you will be prompted for a base64 encoded binary secret. "
 							"When --binary-as-base64 is disabled, the raw binary secret must be piped or redirected to stdin\n"
-						}
-						, "SecretFile?"_=
-						{
-							"Names"_= {"--secret-file"}
-							, "Type"_= ""
-							, "Description"_= "The secret file to set.\n"
+							"To set a file secret use --secrets-manager-upload-file."
 						}
 						, "Username?"_=
 						{
@@ -254,7 +268,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-change-tags"}
-					, "Description"_= "Remove or add tags from/to a secret"
+					, "Description"_= "Remove or add tags from/to a secret."
 					, "Options"_=
 					{
 						SecretsManagerHost
@@ -312,7 +326,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-remove-metadata"}
-					, "Description"_= "Remove the metadata matching key from the secret"
+					, "Description"_= "Remove the metadata matching key from the secret."
 					, "Options"_=
 					{
 						SecretsManagerHost
@@ -335,7 +349,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--secrets-manager-remove-secret"}
-					, "Description"_= "Remove the secret"
+					, "Description"_= "Remove the secret."
 					, "Options"_=
 					{
 						SecretsManagerHost
@@ -345,6 +359,63 @@ namespace NMib::NCloud::NCloudClient
 				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_RemoveSecret(_Params, _pCommandLine);
+				}
+			)
+		;
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--secrets-manager-upload-file"}
+					, "Description"_= "Upload a file."
+					, "Options"_=
+					{
+						SecretsManagerHost
+						, "SecretFile"_=
+						{
+							"Names"_= {"--secret-file"}
+							, "Type"_= ""
+							, "Description"_= "The secret file to set.\n"
+						}
+						, Quiet
+						, CurrentDirectory
+					}
+					, IDParameter
+				}
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return fp_CommandLine_SecretsManager_Upload(_Params, _pCommandLine);
+				}
+			)
+		;
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--secrets-manager-download-file"}
+					, "Description"_= "Download a file."
+					, "Options"_=
+					{
+						SecretsManagerHost
+						, "OutputFile?"_=
+						{
+							"Names"_= {"--output-file"}
+							, "Type"_= ""
+							, "Description"_= "Filename for the downloaded file.\n"
+						}
+						, "AllowOverwrite?"_=
+						{
+							"Names"_= {"--allow-overwrite"}
+							, "Default"_= false
+							, "Description"_= "Allow overwirte of destination file.\n"
+							"Only valid when output file is specified, otherwise file overwrite is never allowed.\n"
+						}
+						, Quiet
+						, CurrentDirectory
+					}
+					, IDParameter
+				}
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return fp_CommandLine_SecretsManager_Download(_Params, _pCommandLine);
 				}
 			)
 		;
@@ -700,7 +771,9 @@ namespace NMib::NCloud::NCloudClient
 				{
 					auto &Result = *pResult;
 
-					if ((*Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
+					if ((*Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_File)
+						*_pCommandLine += "Secret (file):   {}\n"_f << *Result.m_Secret;
+					else if ((*Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
 						*_pCommandLine += "Secret (base64): {}\n"_f << *Result.m_Secret;
 					else
 						*_pCommandLine += "Secret:          {}\n"_f << *Result.m_Secret;
@@ -815,13 +888,6 @@ namespace NMib::NCloud::NCloudClient
 			}
 			Properties.f_SetTags(fg_Move(Tags));
 			++nSetProperties;
-		}
-
-		if (auto pValue = _Params.f_GetMember("SecretFile"))
-		{
-			Continuation.f_SetException(DMibErrorInstance("File secrets not yet handled"));
-			++nSetProperties;
-			return Continuation;
 		}
 
 		TCContinuation<CSecretsManager::CSecret> SecretContinuation;
@@ -1134,6 +1200,157 @@ namespace NMib::NCloud::NCloudClient
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 					>  Continuation	/ [=]
 					{
+						Continuation.f_SetResult(0);
+					}
+				;
+			}
+		;
+		return Continuation;
+	}
+
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		CStr Host = _Params["SecretsManagerHost"].f_String();
+		CSecretsManager::CSecretID ID;
+		CStr Error;
+
+		if (fsp_SecretsManager_GetID(_Params, ID, Error))
+			return DMibErrorInstance(Error);
+
+		bool bQuiet = _Params["Quiet"].f_Boolean();
+		CStr Filename = _Params["SecretFile"].f_String();
+
+		if (!Filename)
+			return DMibErrorInstance("Secret file name is empty");
+
+		Filename = CFile::fs_GetExpandedPath(Filename, _Params["CurrentDirectory"].f_String());
+
+		// If link, resolve it so we transfer the actual file content and a not a link to it
+		mint nLinks = 0;
+		while (CFile::fs_FileExists(Filename, NFile::EFileAttrib_Link))
+		{
+			auto NewFilename = NFile::CFile::fs_ResolveSymbolicLink(Filename);
+			Filename = CFile::fs_GetExpandedPath(NewFilename, CFile::fs_GetPath(Filename));
+			if (++nLinks > 16)
+				return DMibErrorInstance("Encountered too many symbolic links");
+		}
+		if (!CFile::fs_FileExists(Filename, NFile::EFileAttrib_File))
+			return DMibErrorInstance("The secret file must be a file");
+
+		TCContinuation<uint32> Continuation;
+
+		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
+			> Continuation / [=]() mutable
+			{
+				CStr Error;
+				auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
+				if (!pSecretsManager)
+				{
+					Continuation.f_SetException
+						(
+							DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
+						)
+					;
+					return;
+				}
+				NCloud::fg_UploadSecretFile(pSecretsManager->m_Actor, mp_State.m_DistributionManager, fg_Move(ID), CDirectorySyncSend::CConfig(Filename), mp_UploadSubscription)
+					.f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
+					> Continuation % "Failed to transfer secret file" / [=] (CDirectorySyncSend::CSyncResult &&_Result)
+					{
+						if (!bQuiet)
+						{
+							if (_Result.m_Stats.m_nSyncedFiles <= 1)
+								*_pCommandLine += "All files were already up to date\n";
+							else
+							{
+								*_pCommandLine +=
+									"Upload finished transferring: {ns } incoming bytes at {fe2} MB/s {ns } outgoing bytes at {fe2} MB/s\n"_f
+									<< _Result.m_Stats.m_IncomingBytes
+									<< _Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+									<< _Result.m_Stats.m_OutgoingBytes
+									<< _Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
+								;
+							}
+						}
+						Continuation.f_SetResult(0);
+					}
+				;
+			}
+		;
+		return Continuation;
+	}
+
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		TCContinuation<uint32> Continuation;
+
+		CStr Host = _Params["SecretsManagerHost"].f_String();
+		CSecretsManager::CSecretID ID;
+		CStr Error;
+
+		if (fsp_SecretsManager_GetID(_Params, ID, Error))
+			return DMibErrorInstance(Error);
+
+		bool bQuiet = _Params["Quiet"].f_Boolean();
+		bool bAllowOverwrite = _Params["AllowOverwrite"].f_Boolean();
+
+		CStr OutFile;
+		if (auto pValue = _Params.f_GetMember("OutputFile"))
+			OutFile = pValue->f_String();
+
+//		if (bAllowOverwrite && !OutFile)
+//			return DMibErrorInstance("You cannot specify --allow-overwrite without specifying --output-file");
+
+		CStr CurrentDirectory = _Params["CurrentDirectory"].f_String();
+
+		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
+			> Continuation / [=]() mutable
+			{
+				CStr Error;
+				auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
+				if (!pSecretsManager)
+				{
+					Continuation.f_SetException
+						(
+							DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
+						)
+					;
+					return;
+				}
+
+				CStr Destination;
+				CDirectorySyncReceive::EEasyConfigFlag Flags = CDirectorySyncReceive::EEasyConfigFlag_None;
+
+				if (bAllowOverwrite)
+					Flags |= CDirectorySyncReceive::EEasyConfigFlag_AllowOverwrite;
+
+				if (OutFile)
+					Destination = CFile::fs_GetExpandedPath(OutFile, CurrentDirectory);
+				else
+				{
+					Destination = CurrentDirectory;
+					Flags |= CDirectorySyncReceive::EEasyConfigFlag_DestinationIsDirectory;
+				}
+
+				fg_DownloadSecretFile(pSecretsManager->m_Actor, fg_Move(ID), CDirectorySyncReceive::CConfig(Destination, Flags))
+					.f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
+					> Continuation % "Failed to transfer secret file" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
+					{
+						if (!bQuiet)
+						{
+							if (_Result.m_Stats.m_nSyncedFiles <= 1)
+								*_pCommandLine += "All files were already up to date\n";
+							else
+							{
+								*_pCommandLine +=
+									"Download finished transferring: {ns } incoming bytes at {fe2} MB/s {ns } outgoing bytes at {fe2} MB/s\n"_f
+									<< _Result.m_Stats.m_IncomingBytes
+									<< _Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+									<< _Result.m_Stats.m_OutgoingBytes
+									<< _Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
+								;
+							}
+						}
 						Continuation.f_SetResult(0);
 					}
 				;
