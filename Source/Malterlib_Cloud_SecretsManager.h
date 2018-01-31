@@ -195,7 +195,7 @@ namespace NMib::NCloud
 			(
 			 	CSecretID &&_ID
 			 	, NStr::CStrSecure const &_FileName
-			 	, NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> && _Uploader
+			 	, NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> &&_Uploader
 			) = 0
 		;
 	};
