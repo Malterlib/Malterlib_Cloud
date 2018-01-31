@@ -32,17 +32,28 @@ namespace NMib::NCloud::NSecretsManager
 		{
 			DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Shutting down server");
 			
-			mp_pServerController->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
+			mp_pServerController->f_Destroy() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
 				{
 					if (!_Result)
 						DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());
+					mp_pServerController = nullptr;
 				}
 			;
-			mp_pServerController = nullptr;
 		}
 		
 		return pCanDestroy->m_Continuation;
 	}
+
+#if DMibConfig_Tests_Enable
+	TCContinuation<CEJSON> CSecretsManagerDaemonActor::fp_Test_Command(CStr const &_Command, CEJSON const &_Params)
+	{
+		// This function is used to provoke some special cases during testing
+		if (!mp_pServerController)
+			DMibError("No server controller");
+
+		return DMibCallActor(mp_pServerController, CServerController::f_Test_Command, _Command, _Params);
+	}
+#endif
 }
 
 namespace NMib::NCloud

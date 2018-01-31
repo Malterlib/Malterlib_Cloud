@@ -79,7 +79,7 @@ namespace NMib::NCloud::NSecretsManager
 		TCSet<CSecretID> IDs;
 		fg_CollectMatching
 			(
-				m_pThis->mp_Database
+				m_pThis->mp_Database.m_Secrets
 				, _SemanticID
 				, _TagsExclusive
 				, [&] (CSecretPropertiesInternal const *_pSecretProperty)
@@ -89,7 +89,7 @@ namespace NMib::NCloud::NSecretsManager
 					if (!This.fp_HasPermission("Read", _pSecretProperty->m_SemanticID, _pSecretProperty->m_Tags, Permission))
 						return;
 					
-					IDs[m_pThis->mp_Database.fs_GetKey(_pSecretProperty)];
+					IDs[m_pThis->mp_Database.m_Secrets.fs_GetKey(_pSecretProperty)];
 				}
 			 )
 		;
@@ -105,7 +105,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/GetSecret"))
 			return Auditor.f_AccessDenied("(GetSecret, command)");
 		
-		if (auto *pSecretProperty = m_pThis->mp_Database.f_FindEqual(_ID))
+		if (auto *pSecretProperty = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID))
 		{
 			CStr Permission;
 			if (!This.fp_HasPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission))
@@ -126,7 +126,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/GetSecretProperties"))
 			return Auditor.f_AccessDenied("(GetSecretProperties, command)");
 
-		if (auto *pSecretProperty = This.mp_Database.f_FindEqual(_ID))
+		if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
 		{
 			CStr Permission;
 			if (!This.fp_HasPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission))
@@ -169,7 +169,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		fg_CollectMatching
 			(
-				m_pThis->mp_Database
+				m_pThis->mp_Database.m_Secrets
 				, _SemanticID
 				, _TagsExclusive
 				, [&] (CSecretPropertiesInternal const *_pSecretProperty)
@@ -218,8 +218,12 @@ namespace NMib::NCloud::NSecretsManager
 					return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
 			}
 		}
-		
-		auto *pSecretProperty =	This.mp_Database.f_FindEqual(_ID);
+		if (_Secret.m_Secret)
+		{
+			if (_Secret.m_Secret.f_GetTypeID() == CSecretsManager::ESecretType_File)
+				return Auditor.f_Exception(fg_Format("The secret cannot be a file secret"));
+		}
+		auto *pSecretProperty =	This.mp_Database.m_Secrets.f_FindEqual(_ID);
 		
 		auto CurrentTime = CTime::fs_NowUTC();
 		auto *pCreatedOrModified = "modified";
@@ -257,7 +261,7 @@ namespace NMib::NCloud::NSecretsManager
 			if (!This.fp_HasPermission("Write", _Secret.f_GetSemanticID(), _Secret.f_GetTags(), Permission))
 				return Auditor.f_AccessDenied(fg_Format("(SetSecretProperties, no permission for '{}')", Permission));
 
-			pSecretProperty = &This.mp_Database[_ID];
+			pSecretProperty = &This.mp_Database.m_Secrets[_ID];
 			pSecretProperty->m_Created = CurrentTime;
 			pCreatedOrModified = "created";
 		}
@@ -265,9 +269,19 @@ namespace NMib::NCloud::NSecretsManager
 		pSecretProperty->m_Modified = CurrentTime;
 
 		// Only set the members that are defined in _Secret
+		CStr RandomFileNameToUnreference;
 		if (_Secret.m_Secret)
+		{
+			if (pSecretProperty->m_Secret.f_GetTypeID() == CSecretsManager::ESecretType_File)
+			{
+				RandomFileNameToUnreference = pSecretProperty->m_RandomFileName;
+				// Keep the key, it is enough to generate a new IV for the next file
+				pSecretProperty->m_IV.f_Clear();
+				pSecretProperty->m_HMACKey.f_Clear();
+				pSecretProperty->m_RandomFileName.f_Clear();
+			}
 			pSecretProperty->m_Secret = *_Secret.m_Secret;
-			
+		}
 		if (_Secret.m_UserName)
 			pSecretProperty->m_UserName = *_Secret.m_UserName;
 			
@@ -305,7 +319,10 @@ namespace NMib::NCloud::NSecretsManager
 
 		This.fp_WriteDatabase();
 
-		return fg_Explicit();
+		if (RandomFileNameToUnreference)
+			return This.fp_RemoveUnreferencedFile(RandomFileNameToUnreference, Auditor);
+		else
+			return fg_Explicit();
 	}
 
 	TCContinuation<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_ModifyTags
@@ -322,7 +339,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/ModifyTags"))
 			return Auditor.f_AccessDenied("(ModifyTags, command)");
 
-		if (auto *pSecretProperty = This.mp_Database.f_FindEqual(_ID))
+		if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
 		{
 			// Check the correctness of Semantic ID and Tags *before* we use them to match permissions
 			for (auto const &Tag : _TagsToRemove)
@@ -378,7 +395,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/SetMetadata"))
 			return Auditor.f_AccessDenied("(SetMetadata, command)");
 		
-		if (auto *pSecretProperties = This.mp_Database.f_FindEqual(_ID))
+		if (auto *pSecretProperties = This.mp_Database.m_Secrets.f_FindEqual(_ID))
 		{
 			CStr Permission;
 			if	(!This.fp_HasPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permission))
@@ -406,7 +423,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/RemoveMetadata"))
 			return Auditor.f_AccessDenied("(RemoveMetadata, command)");
 
-		if (auto *pSecretProperty = This.mp_Database.f_FindEqual(_ID))
+		if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
 		{
 			CStr Permission;
 			if	(!This.fp_HasPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission))
@@ -434,19 +451,26 @@ namespace NMib::NCloud::NSecretsManager
 		if (!This.mp_Permissions.f_HostHasAnyPermission(CallingHostID, "SecretsManager/CommandAll", "SecretsManager/Command/RemoveSecret"))
 			return Auditor.f_AccessDenied("(RemoveSecret, command)");
 
-		if (auto *pSecretProperty = This.mp_Database.f_FindEqual(_ID))
+		if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
 		{
 			CStr Permission;
 			if	(!This.fp_HasPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permission))
 				return Auditor.f_AccessDenied(fg_Format("(RemoveSecret, no permission for '{}')", Permission));
 
-			This.mp_Database.f_Remove(_ID);
+			CStr RandomFileNameToUnreference;
+			if (pSecretProperty->m_Secret.f_GetTypeID() == CSecretsManager::ESecretType_File)
+				RandomFileNameToUnreference = pSecretProperty->m_RandomFileName;
+
+			This.mp_Database.m_Secrets.f_Remove(_ID);
 
 			Auditor.f_Info(fg_Format("Secret removed, ID: '{}/{}'", _ID.m_Folder, _ID.m_Name));
 
 			This.fp_WriteDatabase();
 
-			return fg_Explicit();
+			if (RandomFileNameToUnreference)
+				return This.fp_RemoveUnreferencedFile(RandomFileNameToUnreference, Auditor);
+			else
+				return fg_Explicit();
 		}
 		else
 			return Auditor.f_Exception(fg_SecretIDException(_ID));

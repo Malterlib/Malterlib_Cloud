@@ -18,5 +18,34 @@ namespace NMib::NCloud
 		_Stream % m_Modified;
 		_Stream % m_SemanticID;
 		_Stream % m_Tags;
+		_Stream % m_Key;
+		_Stream % m_IV;
+		_Stream % m_HMACKey;
+		_Stream % m_RandomFileName;
+	}
+
+	template <typename tf_CStream>
+	void NSecretsManager::CSecretsDatabase::f_Stream(tf_CStream &_Stream)
+	{
+		uint32 Version = ESecretsManagerDatabaseVersion;
+		_Stream % Version;
+		if (Version < 0x101 || Version > ESecretsManagerDatabaseVersion)
+			DMibError("Invalid secrets database version");
+		DMibBinaryStreamVersion(_Stream, Version);
+
+		_Stream % m_Secrets;
+	}
+
+	template <typename tf_CStream>
+	void NSecretsManager::CSecretsDatabaseIV::f_Stream(tf_CStream &_Stream)
+	{
+		uint32 Version = ESecretsManagerDatabaseIVVersion;
+		_Stream % Version;
+		if (Version < 0x101 || Version > ESecretsManagerDatabaseIVVersion)
+			DMibError("Invalid secrets database IV version");
+		DMibBinaryStreamVersion(_Stream, Version);
+
+		_Stream % m_InternalSalt;
+		_Stream % m_ExternalSalt;
 	}
 }

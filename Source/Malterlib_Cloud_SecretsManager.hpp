@@ -45,13 +45,16 @@ namespace NMib::NCloud
 	}
 
 	template <typename tf_CStream>
-	void CSecretsManager::CFileTag::f_Stream(tf_CStream &_Stream)
+	void CSecretsManager::CSecretFile::f_Stream(tf_CStream &_Stream)
 	{
+		uint32 Version = 0x102;
+		DMibBinaryStreamVersion(_Stream, 0x102);
+		m_Manifest.f_Stream(_Stream, Version);
 	}
 
-	inline bool CSecretsManager::CFileTag::operator == (CSecretsManager::CFileTag const &_Right) const
+	inline bool CSecretsManager::CSecretFile::operator == (CSecretsManager::CSecretFile const &_Right) const
 	{
-		return true;
+		return m_Manifest == _Right.m_Manifest;
 	}
 
 	inline auto CSecretsManager::CSecret::operator *() -> CSuper &
@@ -88,7 +91,7 @@ namespace NMib::NCloud
 			break;
 
 		case CSecretsManager::ESecretType_File:
-			o_Str += "<File Secret>";
+			o_Str += f_Get<CSecretsManager::ESecretType_File>().m_Manifest.m_OriginalPath;
 			break;
 		}
 	}

@@ -2,19 +2,15 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Network/SSL>
+#include <Mib/Cryptography/EncryptedStream>
 
 #include "Malterlib_Cloud_App_SecretsManager_Database.h"
 
 namespace NMib::NCloud::NSecretsManager
 {
-	CSecretsManagerServerDatabase::CSecretsManagerServerDatabase
-		(
-			CStr const &_Path
-			, CSecureByteVector const &_Key
-			, CEncryptAES::CSalt const *_pSalt
-		)
-		: mp_Path(_Path)
-		, mp_AESContext(_Key, _pSalt)
+	CSecretsManagerServerDatabase::CSecretsManagerServerDatabase(CStr const &_Path, CSecureByteVector const &_Key)
+		: mp_Path{_Path}
+		, mp_Key{_Key}
 	{
 	}
 	
@@ -38,6 +34,14 @@ namespace NMib::NCloud::NSecretsManager
 		return Continuation;
 	}
 
+	CSecureByteVector CSecretsManagerServerDatabase::fp_ComputeSalt(CSecretsDatabaseIV const &_Salt)
+	{
+		CBinaryStreamMemory<CBinaryStreamDefault, CSecureByteVector> Stream;
+		Stream << mp_IVSalt.m_InternalSalt;
+		Stream << mp_IVSalt.m_ExternalSalt;
+		return Stream.f_MoveVector();
+	}
+
 	TCContinuation<void> CSecretsManagerServerDatabase::f_Initialize()
 	{
 		return TCContinuation<void>::fs_RunProtected<CException>() > [&]
@@ -45,28 +49,18 @@ namespace NMib::NCloud::NSecretsManager
 				if (!CFile::fs_FileExists(mp_Path))
 				{
 					DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "No current database found. Creating new");
-					CSecretsManagerServerDatabase::CDatabase Database;
+					CSecretsDatabase Database;
 					fp_WriteDatabase(Database);
 				}
 				else
 				{
-					TCVector<uint8> FileData;
-					CFile File;
-					File.f_Open(mp_Path, EFileOpen_Read|EFileOpen_ShareAll);
-					FileData.f_SetLen(32);
-					File.f_Read(FileData.f_GetArray(), FileData.f_GetLen());
-					
-					CSecureByteVector PlainTextCheck;
-					mp_AESContext.f_Decrypt(FileData.f_GetArray(), FileData.f_GetLen(), PlainTextCheck.f_GetArray(32));
-					
-					if (fg_MemCmp(PlainTextCheck.f_GetArray(), (uint8 const *)mc_pPlainTextCheck, 32) != 0)
-						DMibError("Password mismatch");
+					fp_ReadDatabase(nullptr);
 				}
 			}
 		;
 	}
 	
-	TCContinuation<void> CSecretsManagerServerDatabase::f_WriteDatabase(CSecretsManagerServerDatabase::CDatabase &&_Database)
+	TCContinuation<void> CSecretsManagerServerDatabase::f_WriteDatabase(CSecretsDatabase &&_Database)
 	{
 		if (!mp_pPendingWrite)
 		{
@@ -96,53 +90,77 @@ namespace NMib::NCloud::NSecretsManager
 		return mp_PendingWriteContinuations.f_Insert();
 	}
 	
-	TCContinuation<CSecretsManagerServerDatabase::CDatabase> CSecretsManagerServerDatabase::f_ReadDatabase()
+	TCContinuation<CSecretsDatabase> CSecretsManagerServerDatabase::f_ReadDatabase()
 	{
-		return TCContinuation<CDatabase>::fs_RunProtected<CException>() > [&]
+		return TCContinuation<CSecretsDatabase>::fs_RunProtected<CException>() > [&]
 			{
-				TCVector<uint8> EncryptedDatabase = CFile::fs_ReadFile(mp_Path);
-				CSecureByteVector RawDatabase;
-				mp_AESContext.f_Decrypt(EncryptedDatabase.f_GetArray(), EncryptedDatabase.f_GetLen(), RawDatabase.f_GetArray(EncryptedDatabase.f_GetLen()));
-
-				ch8 PlainTextCheck[32];
-				CDatabase Database;
-				CBinaryStreamMemoryPtr<> Stream;
-				Stream.f_OpenRead(RawDatabase.f_GetArray(), RawDatabase.f_GetLen());
-				Stream.f_ConsumeBytes(PlainTextCheck, 32);
-
-				if (fg_MemCmp((uint8 const *)PlainTextCheck, (uint8 const *)mc_pPlainTextCheck, 32) != 0)
-					DMibError("Password mismatch");
-
-				Stream >> Database;
+				CSecretsDatabase Database;
+				fp_ReadDatabase(&Database);
 				return Database;
 			}
 		;
 	}
 
-	void CSecretsManagerServerDatabase::fp_WriteDatabase(CDatabase const &_Database)
+	void CSecretsManagerServerDatabase::fp_WriteDatabase(CSecretsDatabase const &_Database)
 	{
-		CBinaryStreamMemory<CBinaryStreamDefault, CSecureByteVector> Stream;
-		Stream.f_FeedBytes(mc_pPlainTextCheck, 32);
-		Stream << _Database;
-		fg_PadAlignStream(Stream, 32);
-		
-		CSecureByteVector RawDatabase = Stream.f_MoveVector();
-		TCVector<uint8> EncryptedDatabase;
-		mp_AESContext.f_Encrypt(RawDatabase.f_GetArray(), RawDatabase.f_GetLen(), EncryptedDatabase.f_GetArray(RawDatabase.f_GetLen()));
-		
+		auto Attributes = EFileAttrib_UserWrite | EFileAttrib_UserRead | CFile::fs_GetValidAttributes();
+		TCBinaryStreamFile<> BaseStream;
 		CFile::fs_CreateDirectory(CFile::fs_GetPath(mp_Path));
+		BaseStream.f_Open(mp_Path + ".tmp", NFile::EFileOpen_Write, Attributes);
+		BaseStream << mp_IVSalt;
+		auto BasePosition = BaseStream.f_GetPosition();
 
-		{
-			CFile OutFile;
-			auto Attributes = EFileAttrib_UserWrite | EFileAttrib_UserRead | CFile::fs_GetValidAttributes();
-			OutFile.f_Open(mp_Path + ".tmp", EFileOpen_Write | EFileOpen_ShareAll, Attributes);
-			OutFile.f_Write(EncryptedDatabase.f_GetArray(), EncryptedDatabase.f_GetLen());
-		}
+		CBinaryStreamSubStream<> SubStream;
+		SubStream.f_Open(&BaseStream, BasePosition);
+
+		CSecureByteVector Salt{fp_ComputeSalt(mp_IVSalt)};
+		CKeyExpansion KeyExpansion{mp_Key, Salt};
+
+		TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), ESSLDigest_SHA512, KeyExpansion.f_GetHMACKey(ESSLDigest_SHA512)};
+
+		auto CheckBuffer = KeyExpansion.f_GetKey("SecretsManagerCheck", 32);
+
+		EncryptedStream.f_Open(&SubStream, NFile::EFileOpen_Write);
+		EncryptedStream.f_FeedBytes(CheckBuffer.f_GetArray(), 32);
+		EncryptedStream << _Database;
+		EncryptedStream.f_Close();
 
 		if (CFile::fs_FileExists(mp_Path))
 			CFile::fs_AtomicReplaceFile(mp_Path + ".tmp", mp_Path);
 		else
 			CFile::fs_RenameFile(mp_Path + ".tmp", mp_Path);
+
+		++mp_IVSalt.m_InternalSalt;
+	}
+
+	void CSecretsManagerServerDatabase::fp_ReadDatabase(CSecretsDatabase *_pDatabase)
+	{
+		TCBinaryStreamFile<> BaseStream;
+		BaseStream.f_Open(mp_Path, EFileOpen_Read|EFileOpen_ShareAll);
+		BaseStream >> mp_IVSalt;
+		auto BasePosition = BaseStream.f_GetPosition();
+
+		CBinaryStreamSubStream<> SubStream;
+		SubStream.f_Open(&BaseStream, BasePosition, BaseStream.f_GetLength() - BasePosition);
+
+		CSecureByteVector Salt{fp_ComputeSalt(mp_IVSalt)};
+		CKeyExpansion KeyExpansion{mp_Key, Salt};
+
+		TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), ESSLDigest_SHA512, KeyExpansion.f_GetHMACKey(ESSLDigest_SHA512)};
+		EncryptedStream.f_Open(&SubStream, NFile::EFileOpen_Read);
+
+		auto CheckBuffer = KeyExpansion.f_GetKey("SecretsManagerCheck", 32);
+
+		uint8 PlainTextCheck[32];
+		EncryptedStream.f_ConsumeBytes(PlainTextCheck, 32);
+		if (fg_MemCmp(PlainTextCheck, CheckBuffer.f_GetArray(), 32) != 0)
+			DMibError("Invalid database. Key mismatch.");
+		if (_pDatabase)
+			EncryptedStream >> *_pDatabase;
+		EncryptedStream.f_Close();
+
+		++mp_IVSalt.m_ExternalSalt;
+		mp_IVSalt.m_InternalSalt = 0;
 	}
 
 	void NSecretsManager::CSecretPropertiesInternal::f_Format(CStrAggregate &o_Str) const

@@ -19,6 +19,16 @@ namespace NMib::NCloud::NSecretsManager
 	{
 	}
 	
+#if DMibConfig_Tests_Enable
+	TCContinuation<CEJSON> CSecretsManagerDaemonActor::CServerController::f_Test_Command(CStr const &_Command, CEJSON const &_Params)
+	{
+		if (!mp_ServerActor)
+			DMibError("No server");
+
+		return DMibCallActor(mp_ServerActor, CSecretsManagerDaemonActor::CServer::f_Test_Command, _Command, _Params);
+	}
+#endif
+
 	void CSecretsManagerDaemonActor::CServerController::fp_Init()
 	{
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "ServerController started");
@@ -65,16 +75,15 @@ namespace NMib::NCloud::NSecretsManager
 		static const mint c_KeyBits = 512;
 		CSymmetricKey Key;
 		DCallActor(_KeyManager, CKeyManager::f_RequestKey, "SecretsManagerDB", c_KeyBits / 8)
-			> Continuation / [this](CSymmetricKey &&_Key)
+			> Continuation / [this, Continuation, KeyManager = _KeyManager](CSymmetricKey &&_Key)
 			{
 				if (mp_ServerActor || mp_AppState.m_bStoppingApp)
 					return;
 
 				DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Keymanager available, reading database");
 
-				CStr DatabasePath = mp_AppState.m_RootDirectory + "/SecretsDB.enc";
-				CEncryptAES::CSalt Salt{'M', 'i', 'B', 'S', 'e', 'c', 'r', 'e'};
-				auto DatabaseActor = fg_ConstructActor<CSecretsManagerServerDatabase>(fg_Construct("SecretsManager Database"), DatabasePath, _Key, &Salt);
+				CStr DatabasePath = mp_AppState.m_RootDirectory + "/SecretsManagerDB.enc";
+				auto DatabaseActor = fg_ConstructActor<CSecretsManagerServerDatabase>(fg_Construct("SecretsManager Database"), DatabasePath, _Key);
 
 				mp_PendingDatabases[DatabaseActor];
 

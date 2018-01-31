@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/File/File>
 
 #include "Malterlib_Cloud_App_SecretsManager.h"
 #include "Malterlib_Cloud_App_SecretsManager_Server.h"
@@ -11,7 +12,8 @@ namespace NMib::NCloud::NSecretsManager
 	CSecretsManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState, TCActor<CSecretsManagerServerDatabase> const &_DatabaseActor)
 		: mp_AppState(_AppState)
 		, mp_DatabaseActor(_DatabaseActor)
-		, mp_pCanDestroyTracker(fg_Construct())
+		, mp_FileActor(fg_ConstructActor<CFileActor>(fg_Construct("SecretsManager FileActor")))
+		, mp_pCanDestroyFileActorTracker(fg_Construct())
 	{
 		fp_Init();
 	}
@@ -20,9 +22,51 @@ namespace NMib::NCloud::NSecretsManager
 	{
 	}
 	
+#if DMibConfig_Tests_Enable
+	TCContinuation<CEJSON> CSecretsManagerDaemonActor::CServer::f_Test_Command(CStr const &_Command, CEJSON const &_Params)
+	{
+		if (_Command == "UploadInitialized")
+			return mp_UploadInitialized[_Params.f_String()];
+
+		if (_Command == "UploadCompleted")
+			return mp_UploadCompleted[_Params.f_String()];
+
+		if (_Command == "DownloadInitialized")
+			return mp_DownloadInitialized[_Params.f_String()];
+
+		if (_Command == "DownloadCompleted")
+			return mp_DownloadCompleted[_Params.f_String()];
+
+		if (_Command == "PreviousCommandCompleted")
+			return fg_Explicit();
+
+		if (_Command == "DelayDelete")
+		{
+			mp_bDelayDelete = true;
+			return fg_Explicit();
+		}
+
+		if (_Command == "ReleaseDelete")
+		{
+			for (auto &Continutaion : mp_DelayDeletes)
+				Continutaion.f_SetResult();
+			mp_DelayDeletes.f_Clear();
+			return fg_Explicit();
+		}
+
+		if (_Command == "DestroyWaitingForCanDestroy")
+			return *(mp_DestroyWaitingForCanDestroy = TCContinuation<CEJSON>{});
+
+		if (_Command == "SyncFileOperations")
+			return mp_FileActor(&CSecretsManagerDaemonActor::CServer::CFileActor::f_SyncFileOperations);
+
+		return DMibErrorInstance(fg_Format("Unhandled test command: {}", _Command));
+	}
+#endif
+
 	void CSecretsManagerDaemonActor::CServer::fp_Init()
 	{
-		mp_DatabaseActor(&CSecretsManagerServerDatabase::f_ReadDatabase) > [this](TCAsyncResult<CSecretsManagerServerDatabase::CDatabase> &&_Database)
+		mp_DatabaseActor(&CSecretsManagerServerDatabase::f_ReadDatabase) > [this](TCAsyncResult<CSecretsDatabase> &&_Database)
 			{
 				if (!_Database)
 				{
@@ -31,7 +75,7 @@ namespace NMib::NCloud::NSecretsManager
 				}
 				
 				mp_Database = fg_Move(*_Database);
-				for (auto const &SecretProperties : mp_Database)
+				for (auto const &SecretProperties : mp_Database.m_Secrets)
 				{
 					fp_UpdateTags({}, SecretProperties.m_Tags);
 					fp_UpdateSemanticIDs("", SecretProperties.m_SemanticID);
@@ -104,9 +148,55 @@ namespace NMib::NCloud::NSecretsManager
 	
 	TCContinuation<void> CSecretsManagerDaemonActor::CServer::fp_Destroy()
 	{
-		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
-		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
-		return pCanDestroy->m_Continuation;
+		TCContinuation<void> Continuation;
+		mp_ProtocolInterface.m_Publication.f_Clear();
+		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Protocol detroyed, destroying uploads and downloads");
+		TCActorResultVector<void> Results;
+		for (auto &Upload : mp_Uploads)
+			Upload.f_Destroy() > Results.f_AddResult();
+		for (auto &Download : mp_Downloads)
+			Download.f_Destroy() > Results.f_AddResult();
+
+		Results.f_GetResults() > [=](auto &&)
+			{
+#if DMibConfig_Tests_Enable
+				if (mp_DestroyWaitingForCanDestroy)
+					mp_DestroyWaitingForCanDestroy->f_SetResult();
+#endif
+				auto pCanDestroy = fg_Move(mp_pCanDestroyFileActorTracker);
+				DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Uploads and downloads destroyed, wating for can destroy file actor");
+				pCanDestroy->m_Continuation.f_Dispatch() > [=](auto &&)
+					{
+						TCContinuation<void> FileActorContinuation;
+						if (mp_FileActor)
+							mp_FileActor->f_Destroy() > FileActorContinuation;
+						else
+							FileActorContinuation.f_SetResult();
+
+						TCContinuation<void> DatabaseContinuation;
+						if (mp_DatabaseActor)
+							mp_DatabaseActor->f_Destroy() > DatabaseContinuation;
+						else
+							DatabaseContinuation.f_SetResult();
+
+						DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Can destroy file actor, waiting for file and database actor destroy");
+						FileActorContinuation + DatabaseContinuation > [=](auto &&, auto &&)
+							{
+								DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroying protocol interface");
+								mp_ProtocolInterface.f_Destroy() > [=](auto &&)
+									{
+										DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroy finished");
+										Continuation.f_SetResult();
+									}
+								;
+							}
+						;
+					}
+				;
+			}
+		;
+
+		return Continuation;
 	}
 	
 	bool CSecretsManagerDaemonActor::CServer::fp_HasPermission(char const *_ReadWrite, CStr const &_SemanticID, TCSet<CStrSecure> const &_Tags, CStr &o_Permission)
@@ -160,14 +250,11 @@ namespace NMib::NCloud::NSecretsManager
 		TCSet<CStr> InBoth;
 		fg_SetIntersection(_TagsToRemove.f_GetIterator(), _TagsToAdd.f_GetIterator(), InBoth);
 		
-		for (auto const &Tag : InBoth)
-		{
-			mp_Tags.f_Remove(Tag);
-			mp_Tags.f_Remove(Tag);
-		}
-
 		for (auto const &Tag : _TagsToRemove)
 		{
+			if (InBoth.f_FindEqual(Tag))
+				continue;
+
 			// Take care: Since we allow "removal" of tags not on the property we should only decrease the count if the count is in the set.
 			// Otherwise we risk getting negativ counts and ending up with a too low count when the tags is added later
 			if (auto *pCount = mp_Tags.f_FindEqual(Tag))
@@ -183,6 +270,9 @@ namespace NMib::NCloud::NSecretsManager
 
 		for (auto const &Tag : _TagsToAdd)
 		{
+			if (InBoth.f_FindEqual(Tag))
+				continue;
+
 			if (++mp_Tags[Tag] == 1)
 			{
 				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, TCSet<CStr>{fg_Format("SecretsManager/Read/*/Tag/{}", Tag)}) > fg_DiscardResult();
@@ -218,7 +308,94 @@ namespace NMib::NCloud::NSecretsManager
 			}
 		}
 	}
-	
+
+	TCContinuation<void> CSecretsManagerDaemonActor::CServer::fp_RemoveFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor)
+	{
+		TCContinuation<void> Continuation;
+		CStr FileName{"{}/SecretsManagerFiles/{}"_f << mp_AppState.m_RootDirectory << _FileName};
+		mp_FileActor(&CFileActor::f_Delete, FileName) > [Continuation, _Auditor, pCanDestroyTracker = mp_pCanDestroyFileActorTracker](TCAsyncResult<void> &&_Result) mutable
+			{
+				if (!_Result)
+				{
+					Continuation.f_SetException
+						(
+						 	_Auditor.f_Exception({"Internal error. Check SecretsManager.log for details.", fg_Format("File removal failed: {}", _Result.f_GetExceptionStr())})
+						)
+					;
+				}
+				else
+					Continuation.f_SetResult();
+			}
+		;
+		return Continuation;
+	}
+
+	TCContinuation<void> CSecretsManagerDaemonActor::CServer::fp_RemoveUnreferencedFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor)
+	{
+		if (!_FileName)
+			return fg_Explicit();
+
+		if (auto *pReservedFile = mp_ReservedFiles.f_FindEqual(_FileName))
+		{
+			DCheck(!pReservedFile->m_fPendingDelete);
+			TCContinuation<void> Continuation;
+			pReservedFile->m_fPendingDelete = [=, pCanDestroyTracker = mp_pCanDestroyFileActorTracker]()
+				{
+#if DMibConfig_Tests_Enable
+					if (mp_bDelayDelete)
+					{
+
+						// This is used to test shutdown. We wait here while the test checks that the file has been deleted
+						// and that the continuation from the secrets manager destruction has not been set yet
+						mp_DelayDeletes.f_Insert() > [=, pCanDestroyTracker = pCanDestroyTracker](auto &&)
+							{
+								fp_RemoveFile(_FileName, _Auditor) > Continuation / [pCanDestroyTracker, Continuation]()
+									{
+										Continuation.f_SetResult();
+									}
+								;
+							}
+						;
+					}
+					else
+#endif
+					{
+						fp_RemoveFile(_FileName, _Auditor) > Continuation / [pCanDestroyTracker, Continuation]()
+							{
+								Continuation.f_SetResult();
+							}
+						;
+					}
+				}
+			;
+			return Continuation;
+		}
+		else
+			return fp_RemoveFile(_FileName, _Auditor);
+	}
+
+	CActorSubscription CSecretsManagerDaemonActor::CServer::fp_ReserveFile(CStr const &_FileName)
+	{
+		if (!_FileName)
+			DMibError("Empty file name");
+
+		++mp_ReservedFiles[_FileName].m_RefCount;
+		return NConcurrency::g_ActorSubscription > [this, _FileName]
+			{
+				if (auto *pReservedFile = mp_ReservedFiles.f_FindEqual(_FileName))
+				{
+					if (--pReservedFile->m_RefCount == 0)
+					{
+						if (pReservedFile->m_fPendingDelete)
+							pReservedFile->m_fPendingDelete();
+
+						mp_ReservedFiles.f_Remove(pReservedFile);
+					}
+				}
+			}
+		;
+	}
+
 	void CSecretsManagerDaemonActor::CServer::fp_WriteDatabase()
 	{
 		mp_DatabaseActor(&CSecretsManagerServerDatabase::f_WriteDatabase, fg_TempCopy(mp_Database)) > [](TCAsyncResult<void> &&_Result)
@@ -228,4 +405,30 @@ namespace NMib::NCloud::NSecretsManager
 			}
 		;
 	}
+
+	TCContinuation<void> CSecretsManagerDaemonActor::CServer::CFileActor::f_Delete(NStr::CStr const &_File)
+	{
+		return TCContinuation<void>::fs_RunProtected<CExceptionFile>()
+			> [&]()
+			{
+				if (CFile::fs_FileExists(_File))
+					CFile::fs_DeleteFile(_File);
+			}
+		;
+	}
+
+#if DMibConfig_Tests_Enable
+	TCContinuation<CEJSON> CSecretsManagerDaemonActor::CServer::CFileActor::f_SyncFileOperations()
+	{
+		// This function is used for debugging concurrent operations.
+		return fg_Explicit();
+	}
+
+	TCContinuation<CEJSON> CSecretsManagerDaemonActor::CServer::f_SyncFileOperations()
+	{
+		return mp_FileActor(&CFileActor::f_SyncFileOperations);
+	}
+
+#endif
+
 }

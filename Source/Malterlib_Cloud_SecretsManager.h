@@ -10,6 +10,8 @@
 #include <Mib/Storage/Optional>
 #include <Mib/Encoding/EJSON>
 #include <Mib/Cloud/FileTransfer>
+#include <Mib/File/DirectorySync>
+#include <Mib/File/DirectoryManifest>
 
 namespace NMib::NCloud
 {
@@ -56,12 +58,14 @@ namespace NMib::NCloud
 			NStr::CStr m_Name;
 		};
 		
-		struct CFileTag
+		struct CSecretFile
 		{
-			bool operator == (CFileTag const &_Right) const;
+			bool operator == (CSecretFile const &_Right) const;
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
+
+			NFile::CDirectoryManifestFile m_Manifest;
 		};
 		
 		struct CSecret : public NContainer::TCStreamableVariant
@@ -70,7 +74,7 @@ namespace NMib::NCloud
 				, void, ESecretType_NotSet
 				, NStr::CStrSecure, ESecretType_String
 				, NContainer::CSecureByteVector, ESecretType_Binary
-				, CFileTag, ESecretType_File
+				, CSecretFile, ESecretType_File
 			>
 		{
 			using CSuper = NContainer::TCStreamableVariant
@@ -79,7 +83,7 @@ namespace NMib::NCloud
 					, void, ESecretType_NotSet
 					, NStr::CStrSecure, ESecretType_String
 					, NContainer::CSecureByteVector, ESecretType_Binary
-					, CFileTag, ESecretType_File
+					, CSecretFile, ESecretType_File
 				>
 			;
 
@@ -171,7 +175,12 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCContinuation<CSecretProperties> f_GetSecretProperties(CSecretID &&_ID) = 0;
 		virtual NConcurrency::TCContinuation<CSecret> f_GetSecret(CSecretID &&_ID) = 0;
 		virtual NConcurrency::TCContinuation<CSecret> f_GetSecretBySemanticID(NStr::CStrSecure const &_SemanticID, NContainer::TCSet<NStr::CStrSecure> const &_TagsExclusive) = 0;
-		virtual NConcurrency::TCContinuation<NConcurrency::CActorSubscription> f_DownloadFile(CFileTransferContext &&_TransferContext) = 0;
+		virtual NConcurrency::TCContinuation<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> f_DownloadFile
+			(
+			 	CSecretID &&_ID
+			 	, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription
+			) = 0
+		;
 		virtual NConcurrency::TCContinuation<void> f_ModifyTags
 			(
 				CSecretID &&_ID
@@ -182,8 +191,12 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCContinuation<void> f_SetMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_Metadata) = 0;
 		virtual NConcurrency::TCContinuation<void> f_RemoveMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey) = 0;
 		virtual NConcurrency::TCContinuation<void> f_RemoveSecret(CSecretID &&_ID) = 0;
-		virtual auto f_UploadFile(NConcurrency::TCActorFunctorWithID<NConcurrency::TCContinuation<void> (CFileTransferContext &&_TransferContext)> &&_fOnNotification)
-			-> NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> = 0;
+		virtual NConcurrency::TCContinuation<NConcurrency::TCActorFunctorWithID<NConcurrency::TCContinuation<void> ()>> f_UploadFile
+			(
+			 	CSecretID &&_ID
+			 	, NStr::CStrSecure const &_FileName
+			 	, NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> && _Uploader
+			) = 0
 		;
 	};
 }
