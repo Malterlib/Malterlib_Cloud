@@ -103,27 +103,28 @@ namespace NMib::NCloud::NSecretsManager
 
 	void CSecretsManagerServerDatabase::fp_WriteDatabase(CSecretsDatabase const &_Database)
 	{
-		auto Attributes = EFileAttrib_UserWrite | EFileAttrib_UserRead | CFile::fs_GetValidAttributes();
-		TCBinaryStreamFile<> BaseStream;
-		CFile::fs_CreateDirectory(CFile::fs_GetPath(mp_Path));
-		BaseStream.f_Open(mp_Path + ".tmp", NFile::EFileOpen_Write, Attributes);
-		BaseStream << mp_IVSalt;
-		auto BasePosition = BaseStream.f_GetPosition();
+		{
+			auto Attributes = EFileAttrib_UserWrite | EFileAttrib_UserRead | CFile::fs_GetValidAttributes();
+			TCBinaryStreamFile<> BaseStream;
+			CFile::fs_CreateDirectory(CFile::fs_GetPath(mp_Path));
+			BaseStream.f_Open(mp_Path + ".tmp", NFile::EFileOpen_Write, Attributes);
+			BaseStream << mp_IVSalt;
+			auto BasePosition = BaseStream.f_GetPosition();
 
-		CBinaryStreamSubStream<> SubStream;
-		SubStream.f_Open(&BaseStream, BasePosition);
+			CBinaryStreamSubStream<> SubStream;
+			SubStream.f_Open(&BaseStream, BasePosition);
 
-		CSecureByteVector Salt{fp_ComputeSalt(mp_IVSalt)};
-		CKeyExpansion KeyExpansion{mp_Key, Salt};
+			CSecureByteVector Salt{fp_ComputeSalt(mp_IVSalt)};
+			CKeyExpansion KeyExpansion{mp_Key, Salt};
 
-		TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), ESSLDigest_SHA512, KeyExpansion.f_GetHMACKey(ESSLDigest_SHA512)};
+			TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), ESSLDigest_SHA512, KeyExpansion.f_GetHMACKey(ESSLDigest_SHA512)};
 
-		auto CheckBuffer = KeyExpansion.f_GetKey("SecretsManagerCheck", 32);
+			auto CheckBuffer = KeyExpansion.f_GetKey("SecretsManagerCheck", 32);
 
-		EncryptedStream.f_Open(&SubStream, NFile::EFileOpen_Write);
-		EncryptedStream.f_FeedBytes(CheckBuffer.f_GetArray(), 32);
-		EncryptedStream << _Database;
-		EncryptedStream.f_Close();
+			EncryptedStream.f_Open(&SubStream, NFile::EFileOpen_Write);
+			EncryptedStream.f_FeedBytes(CheckBuffer.f_GetArray(), 32u);
+			EncryptedStream << _Database;
+		}
 
 		if (CFile::fs_FileExists(mp_Path))
 			CFile::fs_AtomicReplaceFile(mp_Path + ".tmp", mp_Path);
