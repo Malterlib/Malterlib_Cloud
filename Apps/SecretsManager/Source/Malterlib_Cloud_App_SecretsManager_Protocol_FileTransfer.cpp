@@ -169,6 +169,12 @@ namespace NMib::NCloud::NSecretsManager
 
 						auto &Download = *pDownload;
 
+						if (!Download.m_DirectorySyncSend)
+						{
+							pThis->mp_Downloads.f_Remove(DownloadID);
+							return Auditor.f_Exception("Sync aborted");
+						}
+
 						TCContinuation<void> Continuation;
 						Download.m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult) > [=](TCAsyncResult<CDirectorySyncSend::CSyncResult> &&_Result)
 							{
