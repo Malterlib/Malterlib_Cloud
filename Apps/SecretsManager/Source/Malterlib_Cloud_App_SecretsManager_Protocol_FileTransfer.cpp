@@ -383,7 +383,8 @@ namespace NMib::NCloud::NSecretsManager
 					{
 						if (pSecretProperty->m_Secret != SavedSecret)
 						{
-							(*pCleanupFile)->f_Destroy() > [=](auto &&)
+
+							(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
 								{
 									// For the problem with two competing simultaneous uploads we chose to let the one that completes first win.
 									// Another alternative would have been to lock the secret during an upload and disallow other operations during the upload,
@@ -430,7 +431,7 @@ namespace NMib::NCloud::NSecretsManager
 						}
 						else
 						{
-							(*pCleanupFile)->f_Destroy() > [=](auto &&)
+							(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
 								{
 									CStr Error = "{} files in the manifest? This was unexpected"_f << Result.m_Manifest.m_Files.f_GetLen();
 									CheckResultContinuation.f_SetException(Auditor.f_Exception(Error));
@@ -441,7 +442,7 @@ namespace NMib::NCloud::NSecretsManager
 					else
 					{
 						// The secret was removed while the file was transferred. Ooops.
-						(*pCleanupFile)->f_Destroy() > [=](auto &&)
+						(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
 							{
 								CheckResultContinuation.f_SetException(Auditor.f_Exception("Secret '{}' removed while the secret file was uploaded"_f << _ID));
 							}
