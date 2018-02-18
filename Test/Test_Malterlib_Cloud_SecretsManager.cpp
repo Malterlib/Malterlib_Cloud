@@ -99,7 +99,7 @@ public:
 			fp_DoGeneralTests();
 		};
 	}
-	
+
 	void fp_DoGeneralTests()
 	{
 #ifdef DPlatformFamily_Windows
@@ -115,7 +115,7 @@ public:
 #if DTestSecretsManagerEnableLogging
 		fg_GetSys()->f_AddStdErrLogger();
 #endif
-	
+
 		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 		CStr RootDirectory = ProgramDirectory + "/SecretsTests";
 		TCSet<CStr> SecretsManagerPermissionsForTest = fg_CreateSet<CStr>("SecretsManager/CommandAll", "SecretsManager/*/*/*");
@@ -136,25 +136,25 @@ public:
 		}
 
 		CFile::fs_CreateDirectory(RootDirectory);
-	
+
 		CTrustManagerTestHelper TrustManagerState;
 		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
 		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
 		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
-	
+
 		CDistributedActorTrustManager_Address ServerAddress;
 		ServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}/controller.sock]/", RootDirectory);
 		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
-	
+
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
 		Dependencies.m_TrustManager = TrustManager;
 		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(g_Timeout);
-	
+
 		NMib::NConcurrency::CDistributedActorSecurity Security;
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CSecretsManager::mc_pDefaultNamespace);
 		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(g_Timeout);
-	
+
 		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestSecretsManagerEnableLogging);
 		auto Cleanup = g_OnScopeExit > [&]
 			{
@@ -228,10 +228,10 @@ public:
 		CDistributedActorTrustManager_Address KeyManagerServerAddress;
 		KeyManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}/Keymanager.sock]/", KeyManagerDirectory);
 		DMibCallActor(KeyManagerTrust, CDistributedActorTrustManagerInterface::f_AddListen, KeyManagerServerAddress).f_CallSync(g_Timeout);
-		
+
 		auto HelperActor = fg_ConcurrentActor();
 		CCurrentActorScope CurrentActor{HelperActor};
-		
+
 		{
 			TCActor<CProcessLaunchActor> KeyManagerCommandLine = fg_Construct();
 			CProcessLaunchActor::CSimpleLaunch LaunchParams{KeyManagerDirectory + "/KeyManager", {"--provide-password"}};
@@ -240,7 +240,6 @@ public:
 #if DTestSecretsManagerEnableLogging
 			LaunchParams.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
 #endif
-			
 			TCContinuation<void> LaunchedContinuation;
 			TCContinuation<void> ExitedContinuation;
 
@@ -277,7 +276,6 @@ public:
 			ExitedContinuation.f_Dispatch().f_CallSync(g_Timeout);
 			KeyManagerCommandLine->f_Destroy().f_CallSync(g_Timeout);
 		}
-
 
 		// Setup trust for SecretsManagers
 		
@@ -348,7 +346,6 @@ public:
 				> SetupTrustResults.f_AddResult()
 			;
 #endif
-			
 			DMibCallActor
 				(
 					SecretsManagerTrust
@@ -368,7 +365,7 @@ public:
 				)
 				> SetupTrustResults.f_AddResult()
 			;
-			
+
 			DMibCallActor
 				(
 					SecretsManagerTrust
@@ -408,7 +405,7 @@ public:
 			;
 			Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
 		}
-		
+
 		SetupTrustResults.f_GetResults().f_CallSync(g_Timeout);
 
 		CSecretsManager::CSecret StringSecret{"Secret1"};
@@ -437,7 +434,7 @@ public:
 				DMibExpect(Properties.f_GetModified(), ==, NTime::CTime{});
 				DMibExpect(Properties.f_GetSemanticID(), ==, NStr::CStrSecure{});
 				DMibExpect(Properties.f_GetTags(), ==, TCSet<NStr::CStrSecure>{});
-				
+
 				CSecretsManager::CSecretProperties Properties2
 					{
 						CSecretsManager::CSecretProperties{}
@@ -464,7 +461,7 @@ public:
 				DMibExpect(Properties2.f_GetSemanticID(), ==, "SemanticID");
 				DMibExpect(Properties2.f_GetTags(), ==, (TCSet<NStr::CStrSecure>{{"Tag1", "Tag2"}}));
 			}
-			
+
 			//
 			// Set up a number of secrets and send them to the manager
 			//
@@ -519,13 +516,11 @@ public:
 				.f_CallSync(g_Timeout)
 			;
 
-			
 			auto fGetSecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name) -> CSecretsManager::CSecret
 				{
 					return DMibCallActor(SecretsManager, CSecretsManager::f_GetSecret, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
-
 			auto fGetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name) -> CSecretsManager::CSecretProperties
 				{
 					return DMibCallActor(SecretsManager, CSecretsManager::f_GetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
@@ -568,8 +563,6 @@ public:
 					DMibCallActor(SecretsManager, CSecretsManager::f_RemoveSecret, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
-
-			
 
 			{
 				//
