@@ -5,6 +5,7 @@
 
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/Actor/Timer>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -150,22 +151,33 @@ namespace NMib::NCloud::NAppManager
 				Notification.m_Stage = _Stage;
 				
 				CStr AppPermission = fg_Format("AppManager/App/{}", Application.m_Name);
+
+				TCActorResultVector<void> OnUpdateResults;
 				
 				for (auto &Subscription : mp_UpdateNotificationSubscriptions)
 				{
 					if (!mp_Permissions.f_HostHasAnyPermission(Subscription.m_CallingHostID, "AppManager/AppAll", AppPermission))
 						continue;
 					
-					Subscription.m_fOnUpdate(Notification) > fg_DiscardResult();
+					Subscription.m_fOnUpdate(Notification)
+						.f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << Subscription.m_CallingHostID)
+						> OnUpdateResults.f_AddResult()
+					;
 				}
-				
+
+				TCContinuation<void> UpdateJSONContinuation;
 				if (!bUpdatedAppInfo)
-				{
-					Continuation.f_SetResult();
-					return;
-				}
-				
-				fp_UpdateApplicationJSON(_pState->m_pApplication) > Continuation;
+					UpdateJSONContinuation.f_SetResult();
+				else
+					UpdateJSONContinuation = fp_UpdateApplicationJSON(_pState->m_pApplication);
+
+				UpdateJSONContinuation
+					+ OnUpdateResults.f_GetResults()
+					> [Continuation](TCAsyncResult<void> &&_UpdateJSONResult, auto &&_OnUpdateResults)
+					{
+						Continuation.f_SetResult(fg_Move(_UpdateJSONResult));
+					}
+				;
 			}
 		;
 		
