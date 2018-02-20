@@ -40,6 +40,7 @@ using namespace NMib::NPtr;
 using namespace NMib::NAtomic;
 using namespace NMib::NEncoding;
 using namespace NMib::NStorage;
+using namespace NMib::NNet;
 
 #define DTestSecretsManagerEnableLogging 0
 
@@ -143,7 +144,7 @@ public:
 		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 
 		CDistributedActorTrustManager_Address ServerAddress;
-		ServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}/controller.sock]/", RootDirectory);
+		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
 		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
@@ -226,7 +227,7 @@ public:
 
 		// Add listen socket that secret managers can connect to
 		CDistributedActorTrustManager_Address KeyManagerServerAddress;
-		KeyManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}/Keymanager.sock]/", KeyManagerDirectory);
+		KeyManagerServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/Keymanager.sock"_f << KeyManagerDirectory);
 		DMibCallActor(KeyManagerTrust, CDistributedActorTrustManagerInterface::f_AddListen, KeyManagerServerAddress).f_CallSync(g_Timeout);
 
 		auto HelperActor = fg_ConcurrentActor();
@@ -306,7 +307,8 @@ public:
 					AllSecretsManagerHosts[SecretsManager.m_HostID];
 					auto &SecretsManagerInfo = AllSecretsManagers[SecretsManager.m_HostID];
 					SecretsManagerInfo.m_pTrustInterface = SecretsManager.m_pTrustInterface;
-					SecretsManagerInfo.m_Address.m_URL = fg_Format("wss://[UNIX(666):{}/SecretsManagerTest.sock]/", SecretsManagerDirectory);
+
+					SecretsManagerInfo.m_Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/SecretsManagerTest.sock"_f << SecretsManagerDirectory);
 					DMibCallActor(*SecretsManager.m_pTrustInterface, CDistributedActorTrustManagerInterface::f_AddListen, SecretsManagerInfo.m_Address) > ListenResults.f_AddResult();
 					++iSecretsManager;
 				}
@@ -1719,8 +1721,8 @@ public:
 					fUpload(ID, File2, RootDirectory, Subscription).f_CallSync(g_Timeout);
 					// Download initiated before upload, starts after upload completes, should get old file
 					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
-					auto Continuation = fDownload(ID, fDestination(4), RootDirectory);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
+					auto Continuation = fDownload(ID, fDestination(4), RootDirectory);
 					// Wait for download to start
 					DownloadInitializedContinuation.f_CallSync(g_Timeout);
 					auto Files5 = fFindFiles();

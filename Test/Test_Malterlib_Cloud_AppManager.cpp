@@ -28,6 +28,7 @@ using namespace NMib::NCryptography;
 using namespace NMib::NCloud;
 using namespace NMib::NPtr;
 using namespace NMib::NAtomic;
+using namespace NMib::NNet;
 
 #define DTestAppManagerEnableLogging 0
 #define DTestAppManagerEnableOtherOutput 0
@@ -79,7 +80,8 @@ public:
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 			
 			CDistributedActorTrustManager_Address ServerAddress;
-			ServerAddress.m_URL = fg_Format("wss://[UNIX(777):{}/controller.sock]/", RootDirectory);
+
+			ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
 			TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
 			
 			CDistributedApp_LaunchHelperDependencies Dependencies;
@@ -162,7 +164,8 @@ public:
 
 			// Add listen socket that app managers can connect to
 			CDistributedActorTrustManager_Address VersionManagerServerAddress;
-			VersionManagerServerAddress.m_URL = fg_Format("wss://[UNIX(777):{}/versionmanager.sock]/", VersionManagerDirectory);
+
+			VersionManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/versionmanager.sock"_f << VersionManagerDirectory));
 			DMibCallActor(VersionManagerTrust, CDistributedActorTrustManagerInterface::f_AddListen, VersionManagerServerAddress).f_CallSync(g_Timeout);
 
 			static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
@@ -264,7 +267,7 @@ public:
 					AllAppManagerHosts[AppManager.m_HostID];
 					auto &AppManagerInfo = AllAppManagers[AppManager.m_HostID];
 					AppManagerInfo.m_pTrustInterface = AppManager.m_pTrustInterface;
-					AppManagerInfo.m_Address.m_URL = fg_Format("wss://[UNIX(777):{}/appmanager.sock]/", AppManagerDirectory);
+					AppManagerInfo.m_Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << AppManagerDirectory);
 					DMibCallActor(*AppManager.m_pTrustInterface, CDistributedActorTrustManagerInterface::f_AddListen, AppManagerInfo.m_Address) > ListenResults.f_AddResult();
 					++iAppManager;
 				}
