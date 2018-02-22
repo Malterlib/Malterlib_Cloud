@@ -12,20 +12,30 @@
 
 namespace NMib::NCloud::NVersionManager
 {
-	TCSet<CStr> CVersionManagerDaemonActor::CServer::fp_FilterApplicationsByPermissions(CStr const &_CallingHostID, TCSet<CStr> const &_Applications)
+	TCContinuation<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_FilterApplicationsByPermissions(CStr const &_Description, TCSet<CStr> const &_Applications)
 	{
-		TCSet<CStr> Applications;
-
-		bool bListAllAccess = mp_Permissions.f_HostHasAnyPermission(_CallingHostID, "Application/ReadAll", "Application/ListAll");
-		
+		TCContinuation<TCSet<CStr>> Continuation;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		Permissions["//ALL//"] = {{"Application/ReadAll", "Application/ListAll"}};
 		for (auto &Application : _Applications)
-		{
-			if (!bListAllAccess && !mp_Permissions.f_HostHasPermission(_CallingHostID, fg_Format("Application/Read/{}", Application)))
-				continue;
-			Applications[Application];
-		}
-		
-		return Applications;
+			Permissions[Application] = {CPermissions{fg_Format("Application/Read/{}", Application)}.f_Description("Access application {} in VersionManager"_f << Application)};
+
+		mp_Permissions.f_HasPermissions(_Description, Permissions) > Continuation / [Continuation, _Applications](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			{
+				TCSet<CStr> Applications;
+				bool bListAllAccess = _HasPermissions["//ALL//"];
+
+				for (auto &Application : _Applications)
+				{
+					if (!bListAllAccess && !_HasPermissions[Application])
+						continue;
+					Applications[Application];
+				}
+
+				Continuation.f_SetResult(fg_Move(Applications));
+			}
+		;
+		return Continuation;
 	}
 
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications &&_Params) -> TCContinuation<CListApplications::CResult> 
@@ -41,12 +51,16 @@ namespace NMib::NCloud::NVersionManager
 
 		Auditor.f_Info("Listing applications");
 		
-		CVersionManager::CListApplications::CResult Results;
-		Results.m_Applications = pThis->fp_FilterApplicationsByPermissions(fg_GetCallingHostID(), pThis->fp_ApplicationSet());
+		pThis->fp_FilterApplicationsByPermissions("List applications", pThis->fp_ApplicationSet()) > Continuation / [Continuation, Auditor](TCSet<CStr> &&_Applications)
+			{
+				Auditor.f_Info(fg_Format("Listed applications: {vs,vb}", _Applications));
 
-		Auditor.f_Info(fg_Format("Listed applications: {vs,vb}", Results.m_Applications));
-		
-		Continuation.f_SetResult(fg_Move(Results));
+				CVersionManager::CListApplications::CResult Results;
+				Results.m_Applications = fg_Move(_Applications);
+				Continuation.f_SetResult(fg_Move(Results));
+			}
+		;
+
 		return Continuation;
 	}
 
@@ -64,40 +78,43 @@ namespace NMib::NCloud::NVersionManager
 		Auditor.f_Info("Listing versions");
 		
 		TCSet<CStr> Applications;
-		
-		CStr CallingHostID = fg_GetCallingHostID();
-		
+
 		if (!_Params.m_ForApplication.f_IsEmpty())
 		{
 			if (!CVersionManager::fs_IsValidApplicationName(_Params.m_ForApplication))
 				return Auditor.f_Exception("Invalid application format");
 			
 			Applications[_Params.m_ForApplication];
-			if (pThis->fp_FilterApplicationsByPermissions(CallingHostID, Applications).f_IsEmpty())
-				return Auditor.f_AccessDenied("(List Versions)");
 		}
 		else
-			Applications = pThis->fp_FilterApplicationsByPermissions(CallingHostID, pThis->fp_ApplicationSet());
-			
-		CVersionManager::CListVersions::CResult Results;
-		for (auto &ApplicationName : Applications)
-		{
-			auto *pApplication = pThis->mp_Applications.f_FindEqual(ApplicationName);
-			if (!pApplication)
-				continue;
-			auto &Application = *pApplication;
-			auto &OutVersions = Results.m_Versions[ApplicationName];
-			for (auto &Version : Application.m_Versions)
-				OutVersions[Version.f_GetIdentifier()] = Version.m_VersionInfo;
-		}
+			Applications = pThis->fp_ApplicationSet();
 
-		TCMap<CStr, CStr> VersionsText;
-		for (auto &Application : Results.m_Versions)
-			VersionsText[Results.m_Versions.fs_GetKey(Application)] = fg_Format("{} versions", Application.f_GetLen());
-		
-		Auditor.f_Info(fg_Format("Listed versions: {vs,vb}", VersionsText));
-		
-		Continuation.f_SetResult(fg_Move(Results));
+		pThis->fp_FilterApplicationsByPermissions("List versions", Applications) > Continuation / [=](TCSet<CStr> &&_Applications)
+			{
+				if (!_Params.m_ForApplication.f_IsEmpty() && _Applications.f_IsEmpty())
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(List Versions)"));
+
+				CVersionManager::CListVersions::CResult Results;
+				for (auto &ApplicationName : _Applications)
+				{
+					auto *pApplication = pThis->mp_Applications.f_FindEqual(ApplicationName);
+					if (!pApplication)
+						continue;
+					auto &Application = *pApplication;
+					auto &OutVersions = Results.m_Versions[ApplicationName];
+					for (auto &Version : Application.m_Versions)
+						OutVersions[Version.f_GetIdentifier()] = Version.m_VersionInfo;
+				}
+
+				TCMap<CStr, CStr> VersionsText;
+				for (auto &Application : Results.m_Versions)
+					VersionsText[Results.m_Versions.fs_GetKey(Application)] = fg_Format("{} versions", Application.f_GetLen());
+
+				Auditor.f_Info(fg_Format("Listed versions: {vs,vb}", VersionsText));
+
+				Continuation.f_SetResult(fg_Move(Results));
+			}
+		;
 
 		return Continuation;
 	}

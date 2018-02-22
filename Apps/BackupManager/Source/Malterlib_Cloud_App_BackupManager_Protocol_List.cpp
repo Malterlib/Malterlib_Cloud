@@ -25,20 +25,31 @@ namespace NMib::NCloud::NBackupManager
 		;
 	}
 	
-	TCVector<CStr> CBackupManagerServer::fp_FilterBackupSourcesByPermissions(CStr const &_CallingHostID, TCVector<CStr> const &_Sources)
+	TCContinuation<TCVector<CStr>> CBackupManagerServer::fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources)
 	{
-		TCVector<CStr> BackupSources;
-		
-		bool bListAllAccess = mp_Permissions.f_HostHasAnyPermission(_CallingHostID, "Backup/ListAll", "Backup/ReadAll");
-		
+		TCContinuation<TCVector<CStr>> Continuation;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		Permissions["//ALL//"] = {{"Backup/ListAll", "Backup/ReadAll"}};
 		for (auto &Backup : _Sources)
-		{
-			if (!bListAllAccess && !mp_Permissions.f_HostHasPermission(_CallingHostID, fg_Format("Backup/Read/{}", Backup)))
-				continue;
-			BackupSources.f_Insert(Backup);
-		}
-		
-		return BackupSources;
+			Permissions[Backup] = {CPermissions{fg_Format("Backup/Read/{}", Backup)}.f_Description("Access source {} in BackupManager"_f << Backup)};
+
+		mp_Permissions.f_HasPermissions("List backup sources", Permissions) > Continuation / [Continuation, _Sources](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			{
+				TCVector<CStr> BackupSources;
+				bool bListAllAccess = _HasPermissions["//ALL//"];
+
+				for (auto &Backup : _Sources)
+				{
+					auto pHasPermission = _HasPermissions.f_FindEqual(Backup);
+					if (!bListAllAccess && (!pHasPermission || !*pHasPermission))
+						continue;
+					BackupSources.f_Insert(Backup);
+				}
+
+				Continuation.f_SetResult(fg_Move(BackupSources));
+			}
+		;
+		return Continuation;
 	}
 
 	TCContinuation<TCVector<CStr>> CBackupManagerServer::CBackupManagerImplementation::f_ListBackupSources()
@@ -72,11 +83,13 @@ namespace NMib::NCloud::NBackupManager
 					return;
 				}
 				TCVector<CStr> BackupSources;
-				BackupSources = pThis->fp_FilterBackupSourcesByPermissions(CallingHostID, *_Result);
+				pThis->fp_FilterBackupSourcesByPermissions(*_Result) > Continuation / [Continuation, Auditor](TCVector<CStr> &&_BackupSources)
+					{
+						Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", _BackupSources));
 
-				Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", BackupSources));
-				
-				Continuation.f_SetResult(fg_Move(BackupSources));
+						Continuation.f_SetResult(fg_Move(_BackupSources));
+					}
+				;
 			}
 		;
 		return Continuation;
@@ -153,9 +166,15 @@ namespace NMib::NCloud::NBackupManager
 				
 			TCVector<CStr> BackupSources;
 			BackupSources.f_Insert(_ForBackupSource);
-			if (pThis->fp_FilterBackupSourcesByPermissions(CallingHostID, BackupSources).f_IsEmpty())
-				return Auditor.f_AccessDenied("(List backups)");
-			fListBackups(BackupSources);
+
+			pThis->fp_FilterBackupSourcesByPermissions(BackupSources) > Continuation / [Continuation, Auditor, fListBackups](TCVector<CStr> &&_BackupSources)
+				{
+					if (_BackupSources.f_IsEmpty())
+						return Continuation.f_SetException(Auditor.f_AccessDenied("(List backups)"));
+					fListBackups(_BackupSources);
+				}
+			;
+
 		}
 		else
 		{
@@ -172,7 +191,11 @@ namespace NMib::NCloud::NBackupManager
 						Continuation.f_SetException(Auditor.f_Exception({"File error when running query. See Backup Server logs.", DetailedError}));
 						return;
 					}
-					fListBackups(pThis->fp_FilterBackupSourcesByPermissions(CallingHostID, *_Result));
+					pThis->fp_FilterBackupSourcesByPermissions(*_Result) > Continuation / [Continuation, Auditor, fListBackups](TCVector<CStr> &&_BackupSources)
+						{
+							fListBackups(_BackupSources);
+						}
+					;
 				}
 			;
 		}

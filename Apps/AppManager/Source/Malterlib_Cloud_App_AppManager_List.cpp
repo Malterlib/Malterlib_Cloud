@@ -11,86 +11,127 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
-		CStr CallingHostID = fg_GetCallingHostID();
-		
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationEnum"))
-			return Auditor.f_AccessDenied("(Application enum)");
 
-		TCMap<CStr, CApplicationInfo> OutputApplications;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
 		
+		Permissions["//Command//"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationEnum"}};
+
 		for (auto &pApplication : m_pThis->mp_Applications)
 		{
 			auto &Application = *pApplication;
-			
-			if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/AppAll", fg_Format("AppManager/App/{}", Application.m_Name)))
-				continue;
-			
-			auto &OutApplication = OutputApplications[Application.m_Name];
-			auto &Settings = Application.m_Settings;
-			
-			OutApplication.m_Status = Application.m_LaunchState;
-			OutApplication.m_EncryptionStorage = Settings.m_EncryptionStorage;
-			OutApplication.m_EncryptionFileSystem = Settings.m_EncryptionFileSystem;
-			OutApplication.m_ParentApplication = Settings.m_ParentApplication;
-			OutApplication.m_Version = Application.m_LastInstalledVersion;
-			OutApplication.m_VersionInfo = Application.m_LastInstalledVersionInfo;
-			OutApplication.m_VersionManagerApplication = Settings.m_VersionManagerApplication;
-			OutApplication.m_Executable = Settings.m_Executable;
-			OutApplication.m_Parameters = Settings.m_ExecutableParameters;
-			OutApplication.m_RunAsUser = Settings.m_RunAsUser;
-			OutApplication.m_RunAsGroup = Settings.m_RunAsGroup;
-			OutApplication.m_Backup_IncludeWildcards = Settings.m_Backup_IncludeWildcards;
-			OutApplication.m_Backup_ExcludeWildcards = Settings.m_Backup_ExcludeWildcards;
-			OutApplication.m_Backup_AddSyncFlagsWildcards = Settings.m_Backup_AddSyncFlagsWildcards;
-			OutApplication.m_Backup_RemoveSyncFlagsWildcards = Settings.m_Backup_RemoveSyncFlagsWildcards;
-			OutApplication.m_Backup_NewBackupInterval = Settings.m_Backup_NewBackupInterval;
-			OutApplication.m_AutoUpdateTags = Settings.m_AutoUpdateTags;
-			OutApplication.m_AutoUpdateBranches = Settings.m_AutoUpdateBranches;
-			OutApplication.m_UpdateScriptPreUpdate = Settings.m_UpdateScripts.m_PreUpdate;
-			OutApplication.m_UpdateScriptPostUpdate = Settings.m_UpdateScripts.m_PostUpdate;
-			OutApplication.m_UpdateScriptPostLaunch = Settings.m_UpdateScripts.m_PostLaunch;
-			OutApplication.m_UpdateScriptOnError = Settings.m_UpdateScripts.m_OnError;
-			OutApplication.m_bSelfUpdateSource = Settings.m_bSelfUpdateSource;
-			OutApplication.m_UpdateGroup = Settings.m_UpdateGroup;
-			OutApplication.m_bDistributedApp = Settings.m_bDistributedApp;
-			OutApplication.m_Dependencies = Settings.m_Dependencies;
-			OutApplication.m_bStopOnDependencyFailure = Settings.m_bStopOnDependencyFailure;
-			OutApplication.m_bBackupEnabled = Settings.m_bBackupEnabled;
+
+			Permissions[Application.m_Name]
+				= {CPermissions{"AppManager/AppAll", fg_Format("AppManager/App/{}", Application.m_Name)}.f_Description("Access application {} in AppManager"_f << Application.m_Name)}
+			;
 		}
-		Auditor.f_Info("Enum applications");
-		return fg_Explicit(fg_Move(OutputApplications));
+
+		TCContinuation<TCMap<CStr, CApplicationInfo>> Continuation;
+		pThis->mp_Permissions.f_HasPermissions("Enumerate Apps in AppManager", Permissions)
+			> Continuation / [Continuation, Auditor, pThis = m_pThis](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			{
+				if (!_HasPermissions["//Command//"])
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application enum)"));
+
+				TCMap<CStr, CApplicationInfo> OutputApplications;
+				for (auto &pApplication : pThis->mp_Applications)
+				{
+					auto &Application = *pApplication;
+
+					auto pHasPermission = _HasPermissions.f_FindEqual(Application.m_Name);
+					if (!pHasPermission || !*pHasPermission)
+						continue;
+
+					auto &OutApplication = OutputApplications[Application.m_Name];
+					auto &Settings = Application.m_Settings;
+
+					OutApplication.m_Status = Application.m_LaunchState;
+					OutApplication.m_EncryptionStorage = Settings.m_EncryptionStorage;
+					OutApplication.m_EncryptionFileSystem = Settings.m_EncryptionFileSystem;
+					OutApplication.m_ParentApplication = Settings.m_ParentApplication;
+					OutApplication.m_Version = Application.m_LastInstalledVersion;
+					OutApplication.m_VersionInfo = Application.m_LastInstalledVersionInfo;
+					OutApplication.m_VersionManagerApplication = Settings.m_VersionManagerApplication;
+					OutApplication.m_Executable = Settings.m_Executable;
+					OutApplication.m_Parameters = Settings.m_ExecutableParameters;
+					OutApplication.m_RunAsUser = Settings.m_RunAsUser;
+					OutApplication.m_RunAsGroup = Settings.m_RunAsGroup;
+					OutApplication.m_Backup_IncludeWildcards = Settings.m_Backup_IncludeWildcards;
+					OutApplication.m_Backup_ExcludeWildcards = Settings.m_Backup_ExcludeWildcards;
+					OutApplication.m_Backup_AddSyncFlagsWildcards = Settings.m_Backup_AddSyncFlagsWildcards;
+					OutApplication.m_Backup_RemoveSyncFlagsWildcards = Settings.m_Backup_RemoveSyncFlagsWildcards;
+					OutApplication.m_Backup_NewBackupInterval = Settings.m_Backup_NewBackupInterval;
+					OutApplication.m_AutoUpdateTags = Settings.m_AutoUpdateTags;
+					OutApplication.m_AutoUpdateBranches = Settings.m_AutoUpdateBranches;
+					OutApplication.m_UpdateScriptPreUpdate = Settings.m_UpdateScripts.m_PreUpdate;
+					OutApplication.m_UpdateScriptPostUpdate = Settings.m_UpdateScripts.m_PostUpdate;
+					OutApplication.m_UpdateScriptPostLaunch = Settings.m_UpdateScripts.m_PostLaunch;
+					OutApplication.m_UpdateScriptOnError = Settings.m_UpdateScripts.m_OnError;
+					OutApplication.m_bSelfUpdateSource = Settings.m_bSelfUpdateSource;
+					OutApplication.m_UpdateGroup = Settings.m_UpdateGroup;
+					OutApplication.m_bDistributedApp = Settings.m_bDistributedApp;
+					OutApplication.m_Dependencies = Settings.m_Dependencies;
+					OutApplication.m_bStopOnDependencyFailure = Settings.m_bStopOnDependencyFailure;
+					OutApplication.m_bBackupEnabled = Settings.m_bBackupEnabled;
+				}
+				Continuation.f_SetResult(fg_Move(OutputApplications));
+				Auditor.f_Info("Enum applications");
+			}
+		;
+
+		return Continuation;
 	}
 	
 	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_GetAvailableVersions(CStr const &_Application) -> TCContinuation<CVersionsAvailableForUpdate> 
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
-		CStr CallingHostID = fg_GetCallingHostID();
 		
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/VersionEnum"))
-			return Auditor.f_AccessDenied("(Versions available for update)");
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
 
-		TCMap<CStr, TCVector<CApplicationVersion>> Versions;
-			
+		Permissions["//Command//"] = {{"AppManager/CommandAll", "AppManager/Command/VersionEnum"}};
+
 		for (auto &Application : m_pThis->mp_VersionManagerApplications)
 		{
-			if (!_Application.f_IsEmpty() && Application.f_GetApplicationName() != _Application)
+			auto const &Name = Application.f_GetApplicationName();
+			if (!_Application.f_IsEmpty() && Name != _Application)
 				continue;
 
-			if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/VersionAppAll", fg_Format("AppManager/VersionApp/{}", Application.f_GetApplicationName())))
-				continue;
-			
-			auto &OutVersions = Versions[Application.f_GetApplicationName()];
-			for (auto &Version : Application.m_VersionsByTime)
-			{
-				auto &OutVersion = OutVersions.f_Insert();
-				OutVersion.m_VersionID = Version.f_GetVersionID();
-				OutVersion.m_VersionInfo = Version.m_VersionInfo; 
-			}
+			Permissions[Name] = {CPermissions{"AppManager/VersionAppAll", fg_Format("AppManager/VersionApp/{}", Name)}.f_Description("Get versions of application {} in AppManager"_f << Name)};
 		}
-		
-		Auditor.f_Info("Enum versions available for update");
-		return fg_Explicit(fg_Move(Versions));
+
+		TCContinuation<CVersionsAvailableForUpdate> Continuation;
+		pThis->mp_Permissions.f_HasPermissions("Enumerate versions in AppManager", Permissions)
+			> Continuation / [Continuation, Auditor, pThis = m_pThis, _Application](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			{
+				if (!_HasPermissions["//Command//"])
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Versions available for update)"));
+
+				TCMap<CStr, TCVector<CApplicationVersion>> Versions;
+
+				for (auto &Application : pThis->mp_VersionManagerApplications)
+				{
+					auto const &Name = Application.f_GetApplicationName();
+					if (!_Application.f_IsEmpty() && Name != _Application)
+						continue;
+
+					auto pHasPermission = _HasPermissions.f_FindEqual(Name);
+					if (!pHasPermission || !*pHasPermission)
+						continue;
+
+					auto &OutVersions = Versions[Name];
+					for (auto &Version : Application.m_VersionsByTime)
+					{
+						auto &OutVersion = OutVersions.f_Insert();
+						OutVersion.m_VersionID = Version.f_GetVersionID();
+						OutVersion.m_VersionInfo = Version.m_VersionInfo;
+					}
+				}
+
+				Auditor.f_Info("Enum versions available for update");
+				Continuation.f_SetResult(fg_Move(Versions));
+			}
+		;
+		return Continuation;
 	}
 	
 	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)

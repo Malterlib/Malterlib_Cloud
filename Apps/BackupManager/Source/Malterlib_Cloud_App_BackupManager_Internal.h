@@ -98,7 +98,7 @@ namespace NMib::NCloud::NBackupManager
 		TCContinuation<void> fp_Publish();
 		TCContinuation<void> fp_SetupPermissions();
 		
-		TCVector<CStr> fp_FilterBackupSourcesByPermissions(CStr const &_CallingHostID, TCVector<CStr> const &_Sources);
+		TCContinuation<TCVector<CStr>> fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources);
 		
 		TCContinuation<void> fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason);
 		

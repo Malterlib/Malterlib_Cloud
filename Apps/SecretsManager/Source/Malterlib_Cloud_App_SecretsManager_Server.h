@@ -94,7 +94,31 @@ namespace NMib::NCloud::NSecretsManager
 		void fp_Publish();
 		
 		TCContinuation<void> fp_SetupPermissions();
-		bool fp_HasPermission(char const *_ReadWrite, NStr::CStr const &_SemanticID, TCSet<CStrSecure> const &_Tags, NStr::CStr &_oPermission);
+		static void fsp_AddPermissionQueryIndexedByPermission
+			(
+				char const *_ReadWrite
+				, NStr::CStr const &_SemanticID
+				, TCSet<NStr::CStrSecure> const &_Tags
+				, TCMap<NStr::CStr, TCVector<CPermissions>> &o_Permissions
+			)
+		;
+		static void fsp_AddPermissionQueryIndexedBySecretID
+			(
+				CSecretsManager::CSecretID const &_ID
+				, char const *_ReadWrite
+				, NStr::CStr const &_SemanticID
+				, TCSet<NStr::CStrSecure> const &_Tags
+				, TCMap<NStr::CStr, TCVector<CPermissions>> &o_Permissions
+			)
+		;
+		static void fsp_AddPermissionsForMatchingSecrets
+			(
+				TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal> &_Secrets
+				, TCOptional<CStrSecure> const &_SemanticID
+				, TCSet<CStrSecure> const &_TagsExclusive
+			 	, NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> &o_Permissions
+			)
+		;
 		void fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove,TCSet<CStrSecure> const &_TagsToAdd);
 		void fp_UpdateSemanticIDs(NStr::CStr const &_SemanticIDToRemove, NStr::CStr const &_SemanticIDToAdd);
 		TCContinuation<void> fp_RemoveFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor);

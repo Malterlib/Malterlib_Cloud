@@ -12,6 +12,22 @@
 
 namespace NMib::NCloud::NVersionManager
 {
+	auto CVersionManagerDaemonActor::CServer::fp_GetSubscription(CStr const &_ApplicationName, CStr const &_SubscriptionID) const -> CSubscription const *
+	{
+		CSubscription const *pSubscription = nullptr;
+		if (_ApplicationName.f_IsEmpty())
+			pSubscription = mp_GlobalVersionSubscriptions.f_FindEqual(_SubscriptionID);
+		else
+		{
+			auto pApplicationSubscriptions = mp_VersionSubscriptions.f_FindEqual(_ApplicationName);
+			if (!pApplicationSubscriptions)
+				return nullptr;
+			pSubscription = pApplicationSubscriptions->f_FindEqual(_SubscriptionID);
+		}
+
+		return pSubscription;
+	}
+
 	bool CVersionManagerDaemonActor::CServer::fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version)
 	{
 		if (!_Subscription.m_Platforms.f_IsEmpty() && !_Subscription.m_Platforms.f_FindEqual(_Version.f_GetIdentifier().m_Platform))
@@ -35,35 +51,64 @@ namespace NMib::NCloud::NVersionManager
 	
 	void CVersionManagerDaemonActor::CServer::fp_NewVersion(CStr const &_ApplicationName, CVersion const &_Version)
 	{
-		CVersionManager::CNewVersionNotifications NewVersionNotifications;
-		auto &NewVersionNotification = NewVersionNotifications.m_NewVersions.f_Insert();
-		NewVersionNotification.m_Application = _ApplicationName;
-		NewVersionNotification.m_VersionIDAndPlatform = _Version.f_GetIdentifier();
-		NewVersionNotification.m_VersionInfo = _Version.m_VersionInfo;
+		TCSharedPointer<CVersionManager::CNewVersionNotifications> pNewVersionNotifications = fg_Construct();
+		{
+			auto &NewVersionNotification = pNewVersionNotifications->m_NewVersions.f_Insert();
+			NewVersionNotification.m_Application = _ApplicationName;
+			NewVersionNotification.m_VersionIDAndPlatform = _Version.f_GetIdentifier();
+			NewVersionNotification.m_VersionInfo = _Version.m_VersionInfo;
+		}
 		
 		fp_NewTagsKnown(_Version.m_VersionInfo.m_Tags);
-		
+
 		TCVector<CStr> Permissions;
 		Permissions.f_Insert("Application/ReadAll");
 		Permissions.f_Insert("Application/ListAll");
 		Permissions.f_Insert(fg_Format("Application/Read/{}", _ApplicationName));
 		
-		auto fSendToSubscription = [&](CSubscription const &_Subscription)
+		auto fSendToSubscription = [&](CSubscription const &_Subscription, CStr const &_SubscriptionApplication)
 			{
-				if (!mp_Permissions.f_HostHasAnyPermission(_Subscription.m_HostID, Permissions))
-					return;
-				if (!fp_VersionMatchesSubscription(_Subscription, _Version))
-					return;
-				_Subscription.f_SendVersions(NewVersionNotifications);
+				mp_Permissions.f_HasPermission("Subscribe to VersionManager versions", Permissions, _Subscription.m_CallingHostInfo)
+					> [=, VersionID = _Version.f_GetIdentifier(), SubscriptionID = _Subscription.f_GetSubscriptionID()](TCAsyncResult<bool> &&_Result)
+					{
+						CSubscription const *pSubscription = fp_GetSubscription(_SubscriptionApplication, SubscriptionID);
+
+						if (!pSubscription)
+							return;
+
+						if (!_Result)
+						{
+							CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo);
+							Auditor.f_Error("Errors checking permissions for subscription:  {}"_f << _Result.f_GetExceptionStr());
+							return;
+						}
+						if (!*_Result)
+							return;
+
+						auto pApplication = mp_Applications.f_FindEqual(_ApplicationName);
+						if (!pApplication)
+							return;
+
+						auto pVersion = pApplication->m_Versions.f_FindEqual(VersionID);
+						if (!pVersion)
+							return;
+
+						if (!fp_VersionMatchesSubscription(*pSubscription, *pVersion))
+							return;
+
+						pSubscription->f_SendVersions(*pNewVersionNotifications);
+					}
+				;
 			}
 		;
+
 		for (auto &Subscription : mp_GlobalVersionSubscriptions)
-			fSendToSubscription(Subscription);
+			fSendToSubscription(Subscription, {});
 		auto *pSubscription = mp_VersionSubscriptions.f_FindEqual(_ApplicationName);
 		if (pSubscription)
 		{
 			for (auto &Subscription : *pSubscription)
-				fSendToSubscription(Subscription);
+				fSendToSubscription(Subscription, _ApplicationName);
 		}
 	}
 	
@@ -87,9 +132,9 @@ namespace NMib::NCloud::NVersionManager
 			{
 				for (auto &Subscription : _Subscriptions)
 				{
-					if (Subscription.m_HostID != _HostID)
+					if (Subscription.m_CallingHostInfo.f_GetRealHostID() != _HostID)
 						continue;
-					fp_SendSubscriptionInitial(_Application, Subscription, true);
+					fp_SendSubscriptionInitial(_Application, Subscription) > fg_DiscardResult();
 				}
 			}
 		;
@@ -98,54 +143,93 @@ namespace NMib::NCloud::NVersionManager
 			fSendForSubscriptions(Subscriptions, mp_VersionSubscriptions.fs_GetKey(Subscriptions));
 	}
 	
-	void CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription, bool _bPermissionsChanged)
+	TCContinuation<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr const &_ApplicationName, CSubscription const &_Subscription)
 	{
-		TCVector<CStr> SharedPermissions;
-		SharedPermissions.f_Insert("Application/ReadAll");
-		SharedPermissions.f_Insert("Application/ListAll");
-
-		CVersionManager::CNewVersionNotifications NewVersionNotifications;
-
-		NewVersionNotifications.m_bFullResend = true; 
-		
-		auto fSendInitialForApplication = [&](CApplication const &_Application)
+		auto fSendInitialForApplication = [&](CStr const &_Application) -> TCContinuation<TCVector<CVersionManager::CNewVersionNotification>>
 			{
-				if 
+				TCContinuation<TCVector<CVersionManager::CNewVersionNotification>> Continuation;
+				mp_Permissions.f_HasPermission
 					(
-						!mp_Permissions.f_HostHasAnyPermission(_Subscription.m_HostID, SharedPermissions) 
-						&& !mp_Permissions.f_HostHasPermission(_Subscription.m_HostID, fg_Format("Application/Read/{}", _Application.f_GetName()))
+						"Subscribe to VersionManager versions"
+						, {"Application/ReadAll", "Application/ListAll", fg_Format("Application/Read/{}", _Application)}
+						, _Subscription.m_CallingHostInfo
 					)
-				{
-					return;
-				}
-				
-				mint nToSend = _Subscription.m_nInitial;
-				mint nVersions = _Application.m_VersionsByTime.f_GetLen();
-				(void)nVersions;
-				decltype(_Application.m_VersionsByTime.f_GetIterator()) iVersion;
-				for (iVersion.f_StartBackward(_Application.m_VersionsByTime); iVersion && nToSend; --iVersion)
-				{
-					auto &Version = *iVersion;
-					if (!fp_VersionMatchesSubscription(_Subscription, Version))
-						continue;
-					auto &NewVersionNotification = NewVersionNotifications.m_NewVersions.f_Insert();
-					NewVersionNotification.m_Application = _Application.f_GetName();
-					NewVersionNotification.m_VersionIDAndPlatform = Version.f_GetIdentifier();
-					NewVersionNotification.m_VersionInfo = Version.m_VersionInfo;
-					--nToSend;
-				}
+					> Continuation / [=, SubscriptionID = _Subscription.f_GetSubscriptionID()](bool _bHasPermission)
+					{
+						CSubscription const *pSubscription = fp_GetSubscription(_Application, SubscriptionID);
+
+						TCVector<CVersionManager::CNewVersionNotification> NewVersionNotifications;
+						if (pSubscription && _bHasPermission)
+						{
+							auto *pApplication = mp_Applications.f_FindEqual(_Application);
+							mint nToSend = pSubscription->m_nInitial;
+							mint nVersions = pApplication->m_VersionsByTime.f_GetLen();
+							(void)nVersions;
+							decltype(pApplication->m_VersionsByTime.f_GetIterator()) iVersion;
+							for (iVersion.f_StartBackward(pApplication->m_VersionsByTime); iVersion && nToSend; --iVersion)
+							{
+								auto &Version = *iVersion;
+								if (!fp_VersionMatchesSubscription(*pSubscription, Version))
+									continue;
+								auto &NewVersionNotification = NewVersionNotifications.f_Insert();
+								NewVersionNotification.m_Application = pApplication->f_GetName();
+								NewVersionNotification.m_VersionIDAndPlatform = Version.f_GetIdentifier();
+								NewVersionNotification.m_VersionInfo = Version.m_VersionInfo;
+								--nToSend;
+							}
+						}
+						Continuation.f_SetResult(NewVersionNotifications);
+					}
+				;
+				return Continuation;
 			}
 		;
-		
-		if (_Application.f_IsEmpty())
+		TCActorResultVector<TCVector<CVersionManager::CNewVersionNotification>> NewVersionNotificationResults;
+		if (_ApplicationName.f_IsEmpty())
 		{
 			for (auto &Application : mp_Applications)
-				fSendInitialForApplication(Application);
+				fSendInitialForApplication(mp_Applications.fs_GetKey(Application)) > NewVersionNotificationResults.f_AddResult();
 		}
-		else if (auto *pApplication = mp_Applications.f_FindEqual(_Application))
-			fSendInitialForApplication(*pApplication);
+		else if (auto *pApplication = mp_Applications.f_FindEqual(_ApplicationName))
+			fSendInitialForApplication(mp_Applications.fs_GetKey(pApplication)) > NewVersionNotificationResults.f_AddResult();
 		
-		_Subscription.f_SendVersions(NewVersionNotifications);
+		TCContinuation<void> Continuation;
+		NewVersionNotificationResults.f_GetResults()
+			> Continuation / [this, Continuation, _ApplicationName, SubscriptionID = _Subscription.f_GetSubscriptionID()]
+			(TCVector<TCAsyncResult<TCVector<CVersionManager::CNewVersionNotification>>> &&_Results)
+			{
+				CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, SubscriptionID);
+
+				if (!pSubscription)
+					return Continuation.f_SetResult();
+
+				CVersionManager::CNewVersionNotifications NewVersionNotifications;
+				NewVersionNotifications.m_bFullResend = true;
+
+				CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo);
+
+				CStr Errors;
+
+				for (auto &Result : _Results)
+				{
+					if (!Result)
+					{
+						Errors += "{}\n"_f << Result.f_GetExceptionStr();
+						continue;
+					}
+					NewVersionNotifications.m_NewVersions.f_InsertLast(*Result);
+				}
+
+				if (!Errors.f_IsEmpty())
+					Auditor.f_Error("Errors checking permissions for subscription:\n\n{}"_f << Errors);
+
+				pSubscription->f_SendVersions(NewVersionNotifications);
+
+				Continuation.f_SetResult();
+			}
+		;
+
+		return Continuation;
 	}
 	
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) -> TCContinuation<CSubscribeToUpdates::CResult> 
@@ -167,7 +251,7 @@ namespace NMib::NCloud::NVersionManager
 		auto &Subscription = *pSubscription;
 		Subscription.m_DispatchActor = fg_Move(_Params.m_DispatchActor);
 		Subscription.m_fOnNewVersions = fg_Move(_Params.m_fOnNewVersions);
-		Subscription.m_HostID = fg_GetCallingHostID();
+		Subscription.m_CallingHostInfo = fg_GetCallingHostInfo();
 		Subscription.m_Tags = _Params.m_Tags;
 		Subscription.m_Platforms = _Params.m_Platforms;
 		Subscription.m_nInitial = _Params.m_nInitial;
@@ -196,18 +280,22 @@ namespace NMib::NCloud::NVersionManager
 		if (!_Params.m_nInitial)
 			return fg_Explicit(fg_Move(Result));
 
-		pThis->fp_SendSubscriptionInitial(_Params.m_Application, Subscription, false);
-
 		TCContinuation<CSubscribeToUpdates::CResult> Continuation;
-
-		// Because versions are dispatched through m_DispatchActor we need to dispatch the result to get correct ordering
-		g_Dispatch(Subscription.m_DispatchActor) > [Continuation, Result = fg_Move(Result)]() mutable
+		pThis->fp_SendSubscriptionInitial(_Params.m_Application, Subscription)
+			> Continuation / [Continuation, DispatchActor = Subscription.m_DispatchActor, Result = fg_Move(Result)] () mutable
 			{
-				Continuation.f_SetResult(fg_Move(Result));
-			}
-			> fg_DiscardResult()
-		;
+				if (DispatchActor.f_IsEmpty())
+					return Continuation.f_SetResult(fg_Move(Result));
 
+				// Because versions are dispatched through m_DispatchActor we need to dispatch the result to get correct ordering
+				g_Dispatch(DispatchActor) > [Continuation, Result = fg_Move(Result)]() mutable
+					{
+						Continuation.f_SetResult(fg_Move(Result));
+					}
+					> fg_DiscardResult()
+				;
+			}
+		;
 		return Continuation;
 	}
 }

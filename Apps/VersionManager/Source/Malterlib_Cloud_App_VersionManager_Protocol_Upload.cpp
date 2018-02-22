@@ -72,8 +72,7 @@ namespace NMib::NCloud::NVersionManager
 			return DMibErrorInstance("Shutting down");
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		CStr CallingHostID = fg_GetCallingHostID();
-		
+
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
 			return Auditor.f_Exception({"Invalid application format", "(start upload version)"});
 
@@ -85,229 +84,248 @@ namespace NMib::NCloud::NVersionManager
 		
 		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
 			return Auditor.f_Exception({"Invalid version platform format", "(start upload version)"});
-		
-		bool bFullAccess = pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "Application/WriteAll");
-		
-		while (!bFullAccess)
-		{
-			if (pThis->mp_Permissions.f_HostHasPermission(CallingHostID, fg_Format("Application/Write/{}", _Params.m_Application)))
-				break;
-			return Auditor.f_AccessDenied("(Start upload version)");
-		}
-		
+
+		TCContinuation<CStartUploadVersion::CResult> Continuation;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+
+		Permissions["//Command//"] = {{"Application/WriteAll", fg_Format("Application/Write/{}", _Params.m_Application)}};
+		Permissions["//TagAll//"] = {{"Application/TagAll"}};
+
 		TCSet<CStr> DeniedTags;
+		for (auto &Tag : _Params.m_VersionInfo.m_Tags)
+		{
+			if (CVersionManager::fs_IsValidTag(Tag))
+				Permissions[Tag] = {CPermissions{fg_Format("Application/Tag/{}", Tag)}.f_Description("Access to tag {} in VersionManager"_f << Tag)};
+			else
+				DeniedTags[Tag];
+		}
 
-		auto VersionInfo = _Params.m_VersionInfo;
-		
-		VersionInfo.m_Tags = pThis->fp_FilterTags(CallingHostID, VersionInfo.m_Tags, DeniedTags);
-
-		// Force time to same as when saving in JSON file
-		VersionInfo.m_Time = CTimeConvert::fs_FromCreateFromUnixMilliseconds(CTimeConvert(VersionInfo.m_Time).f_UnixMilliseconds());
-
-		CStr UploadID = fg_RandomID();
-		
-		auto &Upload = pThis->mp_VersionUploads[UploadID];
-		Upload.m_Desc = fg_Format("{} - {}", _Params.m_Application, _Params.m_VersionIDAndPlatform);
-		auto pCleanup = fg_OnScopeExitShared
-			(
-				[pThis, UploadID, ThisWeak = fg_ThisActor(pThis).f_Weak(), Desc = Upload.m_Desc, Auditor]
-				{
-					fg_Dispatch
-						(
-							ThisWeak
-							, [pThis, UploadID, Desc, Auditor]
-							{
-								if (pThis->mp_VersionUploads.f_Remove(UploadID))
-									Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
-							}
-						)
-						> fg_DiscardResult()
-					;
-				}
-			)
-		;
-		
-		CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
-		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionIDAndPlatform.f_EncodeFileName());
-		
-		Upload.m_UploadFileAccess = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Upload version file access"));
-		Upload.m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, Upload.m_UploadFileAccess);
-		
-		TCContinuation<CVersionManager::CStartUploadVersion::CResult> Continuation;
-		
-		auto ReceiveFlags = CFileTransferReceive::EReceiveFlag_FailOnExisting;
-		if (_Params.m_Flags & CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite)
-			ReceiveFlags = CFileTransferReceive::EReceiveFlag_DeleteExisting; 
-		
-		Upload.m_FileTransferReceive(&CFileTransferReceive::f_ReceiveFiles, _Params.m_QueueSize, ReceiveFlags) 
-			> 
-			[
-				pCleanup
-				, pThis
-				, UploadID
-				, Continuation
-				, Desc = Upload.m_Desc
-				, _Params
-				, VersionInfo
-				, VersionPath
-				, VersionID = _Params.m_VersionIDAndPlatform
-				, ApplicationName = _Params.m_Application
-				, DeniedTags
-				, Auditor
-			]
-			(TCAsyncResult<CFileTransferContext> &&_FileTransferContext) mutable
+		pThis->mp_Permissions.f_HasPermissions("Upload version", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
 			{
-				if (!_FileTransferContext)
+				if (!_HasPermissions["//Command//"])
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Start upload version)"));
+
+				auto VersionInfo = _Params.m_VersionInfo;
+
+				if (!_HasPermissions["//TagAll//"])
 				{
-					CStr Error = _FileTransferContext.f_GetExceptionStr();
-					Auditor.f_Error(fg_Format("'{}' Failed to initialize version upload: {}", Desc, Error));
-					if (Error == "Failed to extract current manifest: Directory already exists")
-						Continuation.f_SetException(DMibErrorInstance("Version already exists"));
-					else
-						Continuation.f_SetException(DMibErrorInstance("Failed to receive files. See Version Manager log."));
-					return;
+					for (auto &Tag : VersionInfo.m_Tags)
+					{
+						auto pHasPermission = _HasPermissions.f_FindEqual(Tag);
+						if (!pHasPermission || !*pHasPermission)
+							DeniedTags[Tag];
+					}
+					for (auto &Tag : DeniedTags)
+						VersionInfo.m_Tags.f_Remove(Tag);
 				}
-				auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
-				if (!pUpload)
-					return;
-				auto &Upload = *pUpload;
-				
-				CVersionManager::CStartUploadTransfer StartTransfer;
-				StartTransfer.m_TransferContext = fg_Move(*_FileTransferContext);
-				fg_Dispatch
+
+				// Force time to same as when saving in JSON file
+				VersionInfo.m_Time = CTimeConvert::fs_FromCreateFromUnixMilliseconds(CTimeConvert(VersionInfo.m_Time).f_UnixMilliseconds());
+
+				CStr UploadID = fg_RandomID();
+
+				auto &Upload = pThis->mp_VersionUploads[UploadID];
+				Upload.m_Desc = fg_Format("{} - {}", _Params.m_Application, _Params.m_VersionIDAndPlatform);
+				auto pCleanup = fg_OnScopeExitShared
 					(
-						_Params.m_DispatchActor
-						, [fStartTransfer = fg_Move(_Params.m_fStartTransfer), StartTransfer = fg_Move(StartTransfer)]() mutable
+						[pThis, UploadID, ThisWeak = fg_ThisActor(pThis).f_Weak(), Desc = Upload.m_Desc, Auditor]
 						{
-							return fStartTransfer(fg_Move(StartTransfer));
+							fg_Dispatch
+								(
+									ThisWeak
+									, [pThis, UploadID, Desc, Auditor]
+									{
+										if (pThis->mp_VersionUploads.f_Remove(UploadID))
+											Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
+									}
+								)
+								> fg_DiscardResult()
+							;
 						}
 					)
-					> [pThis, Continuation, Desc, pCleanup, UploadID, DeniedTags, Auditor]
-					(TCAsyncResult<CVersionManager::CStartUploadTransfer::CResult> &&_Result)
+				;
+
+				CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
+				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionIDAndPlatform.f_EncodeFileName());
+
+				Upload.m_UploadFileAccess = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Upload version file access"));
+				Upload.m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, Upload.m_UploadFileAccess);
+
+				auto ReceiveFlags = CFileTransferReceive::EReceiveFlag_FailOnExisting;
+				if (_Params.m_Flags & CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite)
+					ReceiveFlags = CFileTransferReceive::EReceiveFlag_DeleteExisting;
+
+				Upload.m_FileTransferReceive(&CFileTransferReceive::f_ReceiveFiles, _Params.m_QueueSize, ReceiveFlags)
+					>
+					[
+						pCleanup
+						, pThis
+						, UploadID
+						, Continuation
+						, Desc = Upload.m_Desc
+						, _Params
+						, VersionInfo
+						, VersionPath
+						, VersionID = _Params.m_VersionIDAndPlatform
+						, ApplicationName = _Params.m_Application
+						, DeniedTags
+						, Auditor
+					]
+					(TCAsyncResult<CFileTransferContext> &&_FileTransferContext) mutable
 					{
-						if (!_Result)
+						if (!_FileTransferContext)
 						{
-							CStr Error = Auditor.f_Error({"Failed to start transfer. See Version Manager log.", fg_Format("'{}': {}", Desc, _Result.f_GetExceptionStr())});
-							Continuation.f_SetException(DMibErrorInstance(Error));
+							CStr Error = _FileTransferContext.f_GetExceptionStr();
+							Auditor.f_Error(fg_Format("'{}' Failed to initialize version upload: {}", Desc, Error));
+							if (Error == "Failed to extract current manifest: Directory already exists")
+								Continuation.f_SetException(DMibErrorInstance("Version already exists"));
+							else
+								Continuation.f_SetException(DMibErrorInstance("Failed to receive files. See Version Manager log."));
 							return;
 						}
-
 						auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
 						if (!pUpload)
 							return;
 						auto &Upload = *pUpload;
-						
-						Upload.m_DownloadSubscription = fg_Move(_Result->m_Subscription); 
-						CVersionManager::CStartUploadVersion::CResult Result;
-						Result.m_DeniedTags = DeniedTags;
-						Result.m_Subscription = fg_ActorSubscriptionAsync
+
+						CVersionManager::CStartUploadTransfer StartTransfer;
+						StartTransfer.m_TransferContext = fg_Move(*_FileTransferContext);
+						fg_Dispatch
 							(
-								fg_ThisActor(pThis)
-								, [pThis, UploadID, Desc, Auditor]() -> TCContinuation<void>
+								_Params.m_DispatchActor
+								, [fStartTransfer = fg_Move(_Params.m_fStartTransfer), StartTransfer = fg_Move(StartTransfer)]() mutable
 								{
-									auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
-									if (!pUpload)
-										return fg_Explicit();
-									
-									TCContinuation<void> Continuation;
-									if (pUpload->m_FileTransferReceive)
-									{
-										pUpload->m_FileTransferReceive->f_Destroy() > Continuation;
-										pUpload->m_FileTransferReceive.f_Clear();
-									}
-									else
-										Continuation.f_SetResult();
-									
-									if (pThis->mp_VersionUploads.f_Remove(UploadID))
-										Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
-									
-									return Continuation;
+									return fStartTransfer(fg_Move(StartTransfer));
 								}
 							)
-						;
-						Continuation.f_SetResult(fg_Move(Result));
-						pCleanup->f_Clear();
-					}
-				;
-				
-				Upload.m_FileTransferReceive(&CFileTransferReceive::f_GetResult) 
-					> [pThis, UploadID, ApplicationName, VersionID, VersionInfo, VersionPath, Desc, Auditor](TCAsyncResult<CFileTransferResult> &&_Result)
-					{
-						if (!_Result)
-							Auditor.f_Error(fg_Format("'{}' Failed to transfer version (upload): {}", Desc, _Result.f_GetExceptionStr()));
-						else
-						{
-							auto &Result = *_Result;
-							CStr Message;
-							Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
-							
-							Auditor.f_Info
-								(
-									fg_Format
-									(
-										"'{}' Version upload finished transferring: {}"
-										, Desc
-										, Message
-									)
-								)
-							;
-						}
-						
-						auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
-						if (!pUpload)
-							return;
-						if (pUpload->m_FileTransferReceive)
-						{
-							pUpload->m_FileTransferReceive->f_DestroyNoResult(DMibPFile, DMibPLine);
-							pUpload->m_FileTransferReceive.f_Clear();
-						}
-						auto FileAccess = pUpload->m_UploadFileAccess;
-						pThis->mp_VersionUploads.f_Remove(UploadID);
-						
-						if (!_Result)
-							return;
-						
-						pThis->fp_SaveVersionInfo(FileAccess, VersionPath, VersionInfo)
-							> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
+							> [pThis, Continuation, Desc, pCleanup, UploadID, DeniedTags, Auditor]
+							(TCAsyncResult<CVersionManager::CStartUploadTransfer::CResult> &&_Result)
 							{
-								if (!_InfoWriteResult)
+								if (!_Result)
 								{
-									Auditor.f_Error(fg_Format("'{}' Failed to write version info file: {}", Desc, _InfoWriteResult.f_GetExceptionStr()));
+									CStr Error = Auditor.f_Error({"Failed to start transfer. See Version Manager log.", fg_Format("'{}': {}", Desc, _Result.f_GetExceptionStr())});
+									Continuation.f_SetException(DMibErrorInstance(Error));
 									return;
 								}
-								
-								auto ApplicationMapped = pThis->mp_Applications(ApplicationName); 
-								auto &Application = *ApplicationMapped;
-								
-								if (ApplicationMapped.f_WasCreated())
+
+								auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
+								if (!pUpload)
+									return;
+								auto &Upload = *pUpload;
+
+								Upload.m_DownloadSubscription = fg_Move(_Result->m_Subscription);
+								CVersionManager::CStartUploadVersion::CResult Result;
+								Result.m_DeniedTags = DeniedTags;
+								Result.m_Subscription = fg_ActorSubscriptionAsync
+									(
+										fg_ThisActor(pThis)
+										, [pThis, UploadID, Desc, Auditor]() -> TCContinuation<void>
+										{
+											auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
+											if (!pUpload)
+												return fg_Explicit();
+
+											TCContinuation<void> Continuation;
+											if (pUpload->m_FileTransferReceive)
+											{
+												pUpload->m_FileTransferReceive->f_Destroy() > Continuation;
+												pUpload->m_FileTransferReceive.f_Clear();
+											}
+											else
+												Continuation.f_SetResult();
+
+											if (pThis->mp_VersionUploads.f_Remove(UploadID))
+												Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
+
+											return Continuation;
+										}
+									)
+								;
+								Continuation.f_SetResult(fg_Move(Result));
+								pCleanup->f_Clear();
+							}
+						;
+
+						Upload.m_FileTransferReceive(&CFileTransferReceive::f_GetResult)
+							> [pThis, UploadID, ApplicationName, VersionID, VersionInfo, VersionPath, Desc, Auditor](TCAsyncResult<CFileTransferResult> &&_Result)
+							{
+								if (!_Result)
+									Auditor.f_Error(fg_Format("'{}' Failed to transfer version (upload): {}", Desc, _Result.f_GetExceptionStr()));
+								else
 								{
-									TCSet<CStr> Permissions;
-									{
-										Permissions[fg_Format("Application/Read/{}", ApplicationName)];
-										Permissions[fg_Format("Application/Write/{}", ApplicationName)];
-									}
-									pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+									auto &Result = *_Result;
+									CStr Message;
+									Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
+
+									Auditor.f_Info
+										(
+											fg_Format
+											(
+												"'{}' Version upload finished transferring: {}"
+												, Desc
+												, Message
+											)
+										)
+									;
 								}
 
-								VersionInfo.m_nFiles  = _InfoWriteResult->m_nFiles;
-								VersionInfo.m_nBytes = _InfoWriteResult->m_nBytes;
-								
-								auto &Version = Application.m_Versions[VersionID];
-								if (Version.m_TimeLink.f_IsInTree())
-									Application.m_VersionsByTime.f_Remove(Version);
-								Version.m_VersionInfo = VersionInfo;
-								Application.m_VersionsByTime.f_Insert(Version);
+								auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
+								if (!pUpload)
+									return;
+								if (pUpload->m_FileTransferReceive)
+								{
+									pUpload->m_FileTransferReceive->f_DestroyNoResult(DMibPFile, DMibPLine);
+									pUpload->m_FileTransferReceive.f_Clear();
+								}
+								auto FileAccess = pUpload->m_UploadFileAccess;
+								pThis->mp_VersionUploads.f_Remove(UploadID);
 
-								pThis->fp_NewVersion(ApplicationName, Version); 
+								if (!_Result)
+									return;
+
+								pThis->fp_SaveVersionInfo(FileAccess, VersionPath, VersionInfo)
+									> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
+									{
+										if (!_InfoWriteResult)
+										{
+											Auditor.f_Error(fg_Format("'{}' Failed to write version info file: {}", Desc, _InfoWriteResult.f_GetExceptionStr()));
+											return;
+										}
+
+										auto ApplicationMapped = pThis->mp_Applications(ApplicationName);
+										auto &Application = *ApplicationMapped;
+
+										if (ApplicationMapped.f_WasCreated())
+										{
+											TCSet<CStr> Permissions;
+											{
+												Permissions[fg_Format("Application/Read/{}", ApplicationName)];
+												Permissions[fg_Format("Application/Write/{}", ApplicationName)];
+											}
+											pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+										}
+
+										VersionInfo.m_nFiles  = _InfoWriteResult->m_nFiles;
+										VersionInfo.m_nBytes = _InfoWriteResult->m_nBytes;
+
+										auto &Version = Application.m_Versions[VersionID];
+										if (Version.m_TimeLink.f_IsInTree())
+											Application.m_VersionsByTime.f_Remove(Version);
+										Version.m_VersionInfo = VersionInfo;
+										Application.m_VersionsByTime.f_Insert(Version);
+
+										pThis->fp_NewVersion(ApplicationName, Version);
+									}
+								;
 							}
 						;
 					}
 				;
+
+				Auditor.f_Info(fg_Format("'{}' Starting upload of version", Upload.m_Desc));
 			}
 		;
-		
-		Auditor.f_Info(fg_Format("'{}' Starting upload of version", Upload.m_Desc));
-		
+
 		return Continuation;
 	}
 }

@@ -47,6 +47,7 @@ namespace NMib::NCloud
 		{
 			bool operator < (CSecretID const &_Right) const;
 			bool operator == (CSecretID const &_Right) const;
+			operator NStr::CStr() const;
 			
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);

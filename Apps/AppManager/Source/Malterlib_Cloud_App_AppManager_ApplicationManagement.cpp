@@ -439,41 +439,47 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
-		auto CallingHostID = fg_GetCallingHostID();
 
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationStart"))
-			return Auditor.f_AccessDenied("(Application start, command)");
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
 
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)))
-			return Auditor.f_AccessDenied("(Application start, app name)");
-		
-		auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
-		if (!pOldApplication)
-			return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
-		
-		TCSharedPointer<CApplication> pApplication = *pOldApplication;
-		
-		if (pApplication->f_IsInProgress())
-			return Auditor.f_Exception("Operation already in progress for application");
-		if (pApplication->m_ProcessLaunch)
-			return Auditor.f_Exception("Application already started");
-
-		auto InProgressScope = pApplication->f_SetInProgress();
+		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationStart"}};
+		Permissions["App"] = {CPermissions{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
 		TCContinuation<void> Continuation;
-		
-		pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
+
+		pThis->mp_Permissions.f_HasPermissions("Start application", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
-				pThis->fp_LaunchApp(pApplication, true)
-					> [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<bool> &&_Result)
+				if (!_HasPermissions["Command"])
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application start, command)"));
+
+				if (!_HasPermissions["App"])
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application start, app name)"));
+
+				auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
+				if (!pOldApplication)
+					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+
+				TCSharedPointer<CApplication> pApplication = *pOldApplication;
+
+				if (pApplication->f_IsInProgress())
+					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
+				if (pApplication->m_ProcessLaunch)
+					return Continuation.f_SetException(Auditor.f_Exception("Application already started"));
+
+				auto InProgressScope = pApplication->f_SetInProgress();
+
+				pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
 					{
-						if (!_Result)
-						{
-							Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
-							return;
-						}
-						Auditor.f_Info(fg_Format("Started '{}'", _Name));
-						Continuation.f_SetResult();
+						pThis->fp_LaunchApp(pApplication, true)
+							> [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<bool> &&_Result)
+							{
+								if (!_Result)
+									return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
+
+								Auditor.f_Info(fg_Format("Started '{}'", _Name));
+								Continuation.f_SetResult();
+							}
+						;
 					}
 				;
 			}
@@ -485,48 +491,52 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
-		auto CallingHostID = fg_GetCallingHostID();
 
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationStop"))
-			return Auditor.f_AccessDenied("(Application stop, command)");
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
 
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)))
-			return Auditor.f_AccessDenied("(Application stop, app name)");
-		
-		auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
-		if (!pOldApplication)
-			return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
-		
-		TCSharedPointer<CApplication> pApplication = *pOldApplication;
-		
-		if (pApplication->f_IsInProgress())
-			return Auditor.f_Exception("Operation already in progress for application");
-		if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
-			return Auditor.f_Exception("Application already stopped");
+		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationStop"}};
+		Permissions["App"] = {CPermissions{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
-		auto InProgressScope = pApplication->f_SetInProgress();
 		TCContinuation<void> Continuation;
-		
-		pApplication->f_Stop(EStopFlag_PreventLaunchUser) > [pThis, pApplication, Continuation, InProgressScope, Auditor](TCAsyncResult<uint32> &&_ExitStatus)
+
+		pThis->mp_Permissions.f_HasPermissions("Stop application", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
-				NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
-				
-				if (!Error.f_IsEmpty())
-					Auditor.f_Warning(Error);
-				
-				if (!_ExitStatus)
-				{
-					Continuation.f_SetException(Auditor.f_Exception("Failed to exit old application"));
-					return;
-				}
-				
-				if (pApplication->m_bDeleted)
-				{
-					Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
-					return;
-				}
-				
-				Continuation.f_SetResult();
+				if (!_HasPermissions["Command"])
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application stop, command)"));
+
+				if (!_HasPermissions["App"])
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application stop, app name)"));
+
+				auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
+				if (!pOldApplication)
+					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+
+				TCSharedPointer<CApplication> pApplication = *pOldApplication;
+
+				if (pApplication->f_IsInProgress())
+					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
+				if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
+					return Continuation.f_SetException(Auditor.f_Exception("Application already stopped"));
+
+				auto InProgressScope = pApplication->f_SetInProgress();
+				TCContinuation<void> Continuation;
+
+				pApplication->f_Stop(EStopFlag_PreventLaunchUser) > [pThis, pApplication, Continuation, InProgressScope, Auditor](TCAsyncResult<uint32> &&_ExitStatus)
+					{
+						NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
+
+						if (!Error.f_IsEmpty())
+							Auditor.f_Warning(Error);
+
+						if (!_ExitStatus)
+							return Continuation.f_SetException(Auditor.f_Exception("Failed to exit old application"));
+
+						if (pApplication->m_bDeleted)
+							return Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
+
+						Continuation.f_SetResult();
+					}
+				;
 			}
 		;
 		return Continuation;
@@ -536,57 +546,59 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
-		auto CallingHostID = fg_GetCallingHostID();
 
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationRestart"))
-			return Auditor.f_AccessDenied("(Application restart, command)");
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
 
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)))
-			return Auditor.f_AccessDenied("(Application restart, app name)");
-		
-		auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
-		if (!pOldApplication)
-			return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
-		
-		TCSharedPointer<CApplication> pApplication = *pOldApplication;
-		
-		if (pApplication->f_IsInProgress())
-			return Auditor.f_Exception("Operation already in progress for application");
+		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationRestart"}};
+		Permissions["App"] = {CPermissions{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
-		auto InProgressScope = pApplication->f_SetInProgress();
 		TCContinuation<void> Continuation;
-		
-		pApplication->f_Stop(EStopFlag_None) > [pThis, pApplication, Continuation, InProgressScope, Auditor, _Name]
-			(TCAsyncResult<uint32> &&_ExitStatus)
-			{
-				NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
-				
-				if (!Error.f_IsEmpty())
-					Auditor.f_Warning(Error);
-				
-				if (!_ExitStatus)
-				{
-					Continuation.f_SetException(Auditor.f_Exception("Failed to exit old application"));
-					return;
-				}
-				
-				if (pApplication->m_bDeleted)
-				{
-					Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
-					return;
-				}
 
-				pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
+		pThis->mp_Permissions.f_HasPermissions("Restart application", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			{
+				if (!_HasPermissions["Command"])
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application restart, command)"));
+
+				if (!_HasPermissions["App"])
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application restart, app name)"));
+
+				auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
+				if (!pOldApplication)
+					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+
+				TCSharedPointer<CApplication> pApplication = *pOldApplication;
+
+				if (pApplication->f_IsInProgress())
+					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
+
+				auto InProgressScope = pApplication->f_SetInProgress();
+				TCContinuation<void> Continuation;
+
+				pApplication->f_Stop(EStopFlag_None) > [pThis, pApplication, Continuation, InProgressScope, Auditor, _Name]
+					(TCAsyncResult<uint32> &&_ExitStatus)
 					{
-						pThis->fp_LaunchApp(pApplication, true) > [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<bool> &&_Result)
+						NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
+
+						if (!Error.f_IsEmpty())
+							Auditor.f_Warning(Error);
+
+						if (!_ExitStatus)
+							return Continuation.f_SetException(Auditor.f_Exception("Failed to exit old application"));
+
+						if (pApplication->m_bDeleted)
+							return Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
+
+						pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
 							{
-								if (!_Result)
-								{
-									Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
-									return;
-								}
-								Auditor.f_Info(fg_Format("Restarted '{}'", _Name));
-								Continuation.f_SetResult();
+								pThis->fp_LaunchApp(pApplication, true) > [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<bool> &&_Result)
+									{
+										if (!_Result)
+											return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
+
+										Auditor.f_Info(fg_Format("Restarted '{}'", _Name));
+										Continuation.f_SetResult();
+									}
+								;
 							}
 						;
 					}

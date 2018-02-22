@@ -106,7 +106,7 @@ namespace NMib::NCloud::NVersionManager
 				return TCMap<CStr, CSubscription>::fs_GetKey(*this);
 			}
 			uint32 m_nInitial = 0;
-			CStr m_HostID;
+			CCallingHostInfo m_CallingHostInfo;
 			TCSet<CStr> m_Platforms;
 			TCSet<CStr> m_Tags;
 			TCActor<> m_DispatchActor;
@@ -124,6 +124,13 @@ namespace NMib::NCloud::NVersionManager
 		};
 		
 	private:
+		struct CFilteredTagsResult
+		{
+			TCSet<CStr> m_DeniedTags;
+			TCSet<CStr> m_TagsAdded;
+			TCSet<CStr> m_TagsRemoved;
+		};
+
 		TCContinuation<void> fp_Destroy() override;
 
 		void fp_Init();
@@ -131,17 +138,18 @@ namespace NMib::NCloud::NVersionManager
 		TCContinuation<void> fp_SetupPermissions();
 		TCContinuation<void> fp_FindVersions();
 
-		void fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription, bool _bPermissionsChanged);
+		TCContinuation<void> fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription);
 		void fp_UpdateSubscriptionsForChangedPermissions(CStr const &_HostID);
 		
-		TCSet<CStr> fp_FilterApplicationsByPermissions(CStr const &_CallingHostID, TCSet<CStr> const &_Applications);
+		TCContinuation<TCSet<CStr>> fp_FilterApplicationsByPermissions(CStr const &_Description, TCSet<CStr> const &_Applications);
 		TCContinuation<TCSet<CStr>> fp_EnumApplications();
 		TCSet<CStr> fp_ApplicationSet();
-		TCSet<CStr> fp_FilterTags(CStr const &_HostID, TCSet<CStr> const &_Tags, TCSet<CStr> &o_DeniedTags);
+		TCContinuation<CFilteredTagsResult> fp_FilterTags(CStr const &_HostID, TCSet<CStr> const &_TagsAdded, TCSet<CStr> const &_TagsRemoved);
 		void fp_NewTagsKnown(TCSet<CStr> const &_Tags);
 		void fp_NewVersion(CStr const &_ApplicationName, CVersion const &_Version);
 		TCContinuation<CSizeInfo> fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo);
 		bool fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version);
+		CSubscription const *fp_GetSubscription(CStr const &_ApplicationName, CStr const &_SubscriptionID) const;
 		
 		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
 

@@ -18,35 +18,42 @@ namespace NMib::NCloud::NAppManager
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
 		CStr SubscriptionID = fg_RandomID();
-		CStr CallingHostID = fg_GetCallingHostID();
+		auto CallingHostInfo = fg_GetCallingHostInfo();
+		NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> Continuation;
 
-		if (!pThis->mp_Permissions.f_HostHasAnyPermission(CallingHostID, "AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeUpdates"))
-			return Auditor.f_AccessDenied("(Application enum)");
-		
-		auto &Subscription = pThis->mp_UpdateNotificationSubscriptions[SubscriptionID];
-		Subscription.m_fOnUpdate = fg_Move(_fOnNotification);
-		Subscription.m_CallingHostID = CallingHostID;
-		
-		Auditor.f_Info(fg_Format("Subscribe to update notifications '{}'", SubscriptionID));
+		pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", {"AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeUpdates"})
+			> Continuation / [=, fOnNotification = fg_Move(_fOnNotification)](bool _bHasPermission) mutable
+			{
+				if (!_bHasPermission)
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Subscribe to update notifications)"));
 
-		return fg_Explicit
-			(	
-				g_ActorSubscription > [pThis, SubscriptionID, Auditor]() -> TCContinuation<void>
-				{
-					Auditor.f_Info(fg_Format("Unsubscribe from update notifications '{}'", SubscriptionID));
-					
-					auto pUpdateNotificationSubscriptions = pThis->mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
-					if (!pUpdateNotificationSubscriptions)
-						return fg_Explicit();
-					
-					TCContinuation<void> Continuation = pUpdateNotificationSubscriptions->m_fOnUpdate.f_Destroy();
-					
-					pThis->mp_UpdateNotificationSubscriptions.f_Remove(SubscriptionID);
-					
-					return Continuation;
-				}
-			)
+				auto &Subscription = pThis->mp_UpdateNotificationSubscriptions[SubscriptionID];
+				Subscription.m_fOnUpdate = fg_Move(fOnNotification);
+				Subscription.m_CallingHostInfo = CallingHostInfo;
+
+				Auditor.f_Info(fg_Format("Subscribe to update notifications '{}'", SubscriptionID));
+
+				Continuation.f_SetResult
+					(
+						g_ActorSubscription > [pThis, SubscriptionID, Auditor]() -> TCContinuation<void>
+						{
+							Auditor.f_Info(fg_Format("Unsubscribe from update notifications '{}'", SubscriptionID));
+
+							auto pUpdateNotificationSubscriptions = pThis->mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
+							if (!pUpdateNotificationSubscriptions)
+								return fg_Explicit();
+
+							TCContinuation<void> Continuation = pUpdateNotificationSubscriptions->m_fOnUpdate.f_Destroy();
+
+							pThis->mp_UpdateNotificationSubscriptions.f_Remove(SubscriptionID);
+
+							return Continuation;
+						}
+					)
+				;
+			}
 		;
+		return Continuation;
 	}
 
 	TCContinuation<void> CAppManagerActor::fp_OnUpdateEvent
@@ -156,13 +163,21 @@ namespace NMib::NCloud::NAppManager
 				
 				for (auto &Subscription : mp_UpdateNotificationSubscriptions)
 				{
-					if (!mp_Permissions.f_HostHasAnyPermission(Subscription.m_CallingHostID, "AppManager/AppAll", AppPermission))
-						continue;
-					
-					Subscription.m_fOnUpdate(Notification)
-						.f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << Subscription.m_CallingHostID)
-						> OnUpdateResults.f_AddResult()
+					TCContinuation<void> OnUpdateContinuation;
+					mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
+						> OnUpdateContinuation / [=, SubscriptionID = mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission)
+						{
+							auto pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
+							if (!_bHasPermission || !pSubscription)
+								return OnUpdateContinuation.f_SetResult();
+
+							pSubscription->m_fOnUpdate(Notification)
+								.f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+								> OnUpdateContinuation
+							;
+						}
 					;
+					OnUpdateContinuation > OnUpdateResults.f_AddResult();
 				}
 
 				TCContinuation<void> UpdateJSONContinuation;

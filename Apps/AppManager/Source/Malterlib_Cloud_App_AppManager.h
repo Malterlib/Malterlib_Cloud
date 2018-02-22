@@ -340,7 +340,7 @@ namespace NMib::NCloud::NAppManager
 		struct CUpdateNotificationSubscription
 		{
 			TCActorFunctor<NConcurrency::TCContinuation<void> (CAppManagerInterface::CUpdateNotification const &_Notification)> m_fOnUpdate;
-			CStr m_CallingHostID;
+			CCallingHostInfo m_CallingHostInfo;
 		};
 		
 		enum EEncryptOperation

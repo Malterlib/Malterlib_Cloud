@@ -123,95 +123,99 @@ namespace NMib::NCloud::NBackupManager
 		if (!pThis->fp_CheckBackupKey(_BackupKey, BackupKey, Auditor, Continuation))
 			return Continuation;
 		
-		if (!pThis->mp_Permissions.f_HostHasPermission(CallingHostID, "Backup/WriteSelf"))
-			return Auditor.f_AccessDenied("(Start backup)");
-		
-		CStr BackupPermission = fg_Format("Backup/Read/{}", BackupKey.m_BackupName);
-		pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_CreateSet(BackupPermission)) > fg_DiscardResult();
-		
-		Auditor.f_Info(fg_Format("Starting backup '{}'", BackupKey.f_GetDesc()));
-		
-		auto NewInstance = pThis->mp_BackupInstances(BackupKey);
-		auto &Instance = *NewInstance;
-			
-		Auditor.f_HostInfo().f_OnDisconnect
-			(
-				fg_ThisActor(this)
-				, [pThis, BackupKey, Auditor]
-				{
-					pThis->fp_DestroyBackupInstance(BackupKey, Auditor, true, "Actor host disconnected (restarted)");
-				}
-			)
-			> [pThis, BackupKey, Auditor](TCAsyncResult<CActorSubscription> &&_Subscription)
+		pThis->mp_Permissions.f_HasPermission("Start backup", {"Backup/WriteSelf"})
+			> Continuation / [=, Subscription = fg_Move(_Subscription)](bool _bHasPermission) mutable
 			{
-				if (!_Subscription || !*_Subscription)
-					return;
-				auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
-				if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
-					return;
-				pBackupInstance->m_OnDisconnectSubscrption = fg_Move(*_Subscription);
-			}
-		;
-		
-		auto fInitBackupInstance = 
-			[pThis, BackupKey, Continuation, Auditor, Subscription = fg_Move(_Subscription)]() mutable
-			{
-				if (pThis->f_IsDestroyed())
-					return Continuation.f_SetException(Auditor.f_Exception("Shutting down"));
-				
-				auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
-				if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
-				{
-					Continuation.f_SetException(Auditor.f_Exception("Another backup was already started taking precedence"));
-					return;
-				}
-				
-				pBackupInstance->m_BackupRunningSubscription = fg_Move(Subscription);
-				
-				DCheck(pBackupInstance->m_BackupInstance.f_IsEmpty());
-				pBackupInstance->m_BackupInstance = pThis->mp_AppState.m_DistributionManager->f_ConstructActor<CBackupInstance>
-					(
-						fg_Construct(fg_Format("Backup instance for '{}'", BackupKey.m_BackupName))
-						, BackupKey.m_BackupName
-						, BackupKey.m_BackupTime
-						, BackupKey.m_BackupID
-					 	, pThis->mp_AppState.m_RootDirectory
-					)
-				;
-				
-				TCDistributedActorInterfaceWithID<CBackupManagerBackup> BackupInterface
-					{
-						pBackupInstance->m_BackupInstance->f_ShareInterface<CBackupManagerBackup>()
-						, g_ActorSubscription > [pThis, BackupKey, Auditor]() -> TCContinuation<void>
-						{
-							auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
-							if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
-								return fg_Explicit();
+				if (!_bHasPermission)
+					return Continuation.f_SetException(Auditor.f_AccessDenied("(Start backup)"));
 
-							auto &Instance = *pBackupInstance;
-							
-							return pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Backup stopped remotely");
+				CStr BackupPermission = fg_Format("Backup/Read/{}", BackupKey.m_BackupName);
+				pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_CreateSet(BackupPermission)) > fg_DiscardResult();
+
+				Auditor.f_Info(fg_Format("Starting backup '{}'", BackupKey.f_GetDesc()));
+
+				auto NewInstance = pThis->mp_BackupInstances(BackupKey);
+				auto &Instance = *NewInstance;
+
+				Auditor.f_HostInfo().f_OnDisconnect
+					(
+						fg_ThisActor(this)
+						, [pThis, BackupKey, Auditor]
+						{
+							pThis->fp_DestroyBackupInstance(BackupKey, Auditor, true, "Actor host disconnected (restarted)");
 						}
+					)
+					> [pThis, BackupKey, Auditor](TCAsyncResult<CActorSubscription> &&_Subscription)
+					{
+						if (!_Subscription || !*_Subscription)
+							return;
+						auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
+						if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
+							return;
+						pBackupInstance->m_OnDisconnectSubscrption = fg_Move(*_Subscription);
 					}
 				;
-				
-				Auditor.f_Info(fg_Format("Backup initialized for '{}'", BackupKey.f_GetDesc()));
-				Continuation.f_SetResult(fg_Move(BackupInterface));
+
+				auto fInitBackupInstance =
+					[pThis, BackupKey, Continuation, Auditor, Subscription = fg_Move(Subscription)]() mutable
+					{
+						if (pThis->f_IsDestroyed())
+							return Continuation.f_SetException(Auditor.f_Exception("Shutting down"));
+
+						auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
+						if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
+						{
+							Continuation.f_SetException(Auditor.f_Exception("Another backup was already started taking precedence"));
+							return;
+						}
+
+						pBackupInstance->m_BackupRunningSubscription = fg_Move(Subscription);
+
+						DCheck(pBackupInstance->m_BackupInstance.f_IsEmpty());
+						pBackupInstance->m_BackupInstance = pThis->mp_AppState.m_DistributionManager->f_ConstructActor<CBackupInstance>
+							(
+								fg_Construct(fg_Format("Backup instance for '{}'", BackupKey.m_BackupName))
+								, BackupKey.m_BackupName
+								, BackupKey.m_BackupTime
+								, BackupKey.m_BackupID
+								, pThis->mp_AppState.m_RootDirectory
+							)
+						;
+
+						TCDistributedActorInterfaceWithID<CBackupManagerBackup> BackupInterface
+							{
+								pBackupInstance->m_BackupInstance->f_ShareInterface<CBackupManagerBackup>()
+								, g_ActorSubscription > [pThis, BackupKey, Auditor]() -> TCContinuation<void>
+								{
+									auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
+									if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
+										return fg_Explicit();
+
+									auto &Instance = *pBackupInstance;
+
+									return pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Backup stopped remotely");
+								}
+							}
+						;
+
+						Auditor.f_Info(fg_Format("Backup initialized for '{}'", BackupKey.f_GetDesc()));
+						Continuation.f_SetResult(fg_Move(BackupInterface));
+					}
+				;
+
+				if (NewInstance.f_WasCreated())
+				{
+					Instance.m_OwningHost = Auditor;
+					fInitBackupInstance();
+				}
+				else
+				{
+					Instance.m_OnDestroyed.f_Insert(fg_Move(fInitBackupInstance));
+					pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Old host removed"); // Remove old Host
+					Instance.m_OwningHost = Auditor; // Take ownership
+				}
 			}
 		;
-
-		if (NewInstance.f_WasCreated())
-		{
-			Instance.m_OwningHost = Auditor;
-			fInitBackupInstance();
-		}
-		else
-		{
-			Instance.m_OnDestroyed.f_Insert(fg_Move(fInitBackupInstance));
-			pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Old host removed"); // Remove old Host
-			Instance.m_OwningHost = Auditor; // Take ownership
-		}
-		
 		return Continuation;
 	}
 }

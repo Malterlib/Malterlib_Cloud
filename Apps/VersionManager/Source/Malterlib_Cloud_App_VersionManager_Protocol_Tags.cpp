@@ -25,20 +25,65 @@ namespace NMib::NCloud::NVersionManager
 			mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, NewPermissions) > fg_DiscardResult();
 	}
 
-	TCSet<CStr> CVersionManagerDaemonActor::CServer::fp_FilterTags(CStr const &_HostID, TCSet<CStr> const &_Tags, TCSet<CStr> &o_DeniedTags)
+	TCContinuation<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> CVersionManagerDaemonActor::CServer::fp_FilterTags
+		(
+			CStr const &_Description
+			, TCSet<CStr> const &_TagsAdded
+			, TCSet<CStr> const &_TagsRemoved
+		)
 	{
-		if (mp_Permissions.f_HostHasAnyPermission(_HostID, "Application/TagAll"))
-			return _Tags;
-		
-		TCSet<CStr> Tags;
-		for (auto &Tag : _Tags)
+		TCContinuation<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> Continuation;
+		TCMap<CStr, TCVector<CPermissions>> Permissions;
+
+		Permissions["//TagAll//"] = {{"Application/TagAll"}};
+		TCSet<CStr> DeniedTags;
+		for (auto &Tag : _TagsAdded)
 		{
-			if (CVersionManager::fs_IsValidTag(Tag) && mp_Permissions.f_HostHasPermission(_HostID, fg_Format("Application/Tag/{}", Tag)))
-				Tags[Tag];
+			if (CVersionManager::fs_IsValidTag(Tag))
+				Permissions[Tag] = {CPermissions{fg_Format("Application/Tag/{}", Tag)}.f_Description("Access to tag {} in VersionManager"_f << Tag)};
 			else
-				o_DeniedTags[Tag];
+				DeniedTags[Tag];
 		}
-		return Tags;
+		for (auto &Tag : _TagsRemoved)
+		{
+			if (CVersionManager::fs_IsValidTag(Tag))
+				Permissions[Tag] = {CPermissions{fg_Format("Application/Tag/{}", Tag)}.f_Description("Access to tag {} in VersionManager"_f << Tag)};
+			else
+				DeniedTags[Tag];
+		}
+
+		mp_Permissions.f_HasPermissions(_Description, Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			{
+				CFilteredTagsResult Result;
+				Result.m_DeniedTags = DeniedTags;
+				if (_HasPermissions["//TagAll//"])
+				{
+					Result.m_TagsAdded = _TagsAdded;
+					Result.m_TagsRemoved = _TagsRemoved;
+				}
+				else
+				{
+					for (auto &Tag : _TagsAdded)
+					{
+						auto pHasPermission = _HasPermissions.f_FindEqual(Tag);
+						if (pHasPermission && *pHasPermission)
+							Result.m_TagsAdded[Tag];
+						else
+							Result.m_DeniedTags[Tag];
+					}
+					for (auto &Tag : _TagsRemoved)
+					{
+						auto pHasPermission = _HasPermissions.f_FindEqual(Tag);
+						if (pHasPermission && *pHasPermission)
+							Result.m_TagsRemoved[Tag];
+						else
+							Result.m_DeniedTags[Tag];
+					}
+				}
+				Continuation.f_SetResult(Result);
+			}
+		;
+		return Continuation;
 	}
 
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags &&_Params) -> TCContinuation<CChangeTags::CResult> 
@@ -49,7 +94,6 @@ namespace NMib::NCloud::NVersionManager
 			return DMibErrorInstance("Shutting down");
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		CStr CallingHostID = fg_GetCallingHostID();
 		
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
 			return Auditor.f_Exception({"Invalid application format", "(change tags)"});
@@ -59,110 +103,108 @@ namespace NMib::NCloud::NVersionManager
 			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionID, ErrorStr))
 				return Auditor.f_Exception({fg_Format("Invalid version ID format: {}", ErrorStr), "(change tags)"});
 		}
-		
-		TCSet<CStr> DeniedTags;
-		TCSet<CStr> AddTags = pThis->fp_FilterTags(CallingHostID, _Params.m_AddTags, DeniedTags);
-		TCSet<CStr> RemoveTags = pThis->fp_FilterTags(CallingHostID, _Params.m_RemoveTags, DeniedTags);
-		
-		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())
-		{
-			if (!DeniedTags.f_IsEmpty())
-				return Auditor.f_AccessDenied({fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags), "(Change tags)"});
-				
-			if (!_Params.m_bIncreaseRetrySequence)
-			{
-				Auditor.f_Info("Change tags resulted in no changed tags");
-				CVersionManager::CChangeTags::CResult Result;
-				return fg_Explicit(Result);
-			}
-		}
 
-		auto *pApplication = pThis->mp_Applications.f_FindEqual(_Params.m_Application);
-		if (!pApplication)
-			return Auditor.f_Exception(fg_Format("No such application: {}", _Params.m_Application));
-
-		TCActorResultVector<CSizeInfo> VersionResults;
-		
-		auto fTagVersion = [&](CVersion &_Version)
-			{
-				CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
-				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Version.f_GetIdentifier().f_EncodeFileName());
-				
-				_Version.m_VersionInfo.m_Tags -= RemoveTags;
-				_Version.m_VersionInfo.m_Tags += AddTags;
-				if (_Params.m_bIncreaseRetrySequence)
-					++_Version.m_VersionInfo.m_RetrySequence;
-				
-				pThis->fp_NewVersion(_Params.m_Application, _Version); 
-				pThis->fp_SaveVersionInfo(pThis->fp_GetQueryFileActor(), VersionPath, _Version.m_VersionInfo) > VersionResults.f_AddResult(); 
-			}
-		;
-
-		if (!_Params.m_Platform.f_IsEmpty())
-		{
-			CVersionManager::CVersionIDAndPlatform VersionIDAndPlatform;
-			VersionIDAndPlatform.m_VersionID = _Params.m_VersionID;
-			VersionIDAndPlatform.m_Platform = _Params.m_Platform;
-			auto *pVersion = pApplication->m_Versions.f_FindEqual(VersionIDAndPlatform);
-			if (!pVersion)
-				return Auditor.f_Exception(fg_Format("No such version: {}", VersionIDAndPlatform));
-			fTagVersion(*pVersion);
-		}
-		else
-		{
-			CVersionManager::CVersionIDAndPlatform VersionIDAndPlatform;
-			VersionIDAndPlatform.m_VersionID = _Params.m_VersionID;
-			for (auto iVersion = pApplication->m_Versions.f_GetIterator_SmallestGreaterThanEqual(VersionIDAndPlatform); iVersion; ++iVersion)
-			{
-				if (iVersion.f_GetKey().m_VersionID != _Params.m_VersionID)
-					break;
-				fTagVersion(*iVersion);
-			}
-		}
-		
 		TCContinuation<CVersionManager::CChangeTags::CResult> Continuation;
-		
-		VersionResults.f_GetResults() > 
-			[
-				Continuation
-				, DeniedTags
-				, ApplicationName = _Params.m_Application
-				, VersionID = _Params.m_VersionID
-				, Platform = _Params.m_Platform
-				, AddTags
-				, RemoveTags
-				, Auditor
-			]
-			(TCAsyncResult<TCVector<TCAsyncResult<CSizeInfo>>> &&_Results)
+		pThis->fp_FilterTags("Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags) > Continuation / [=](CFilteredTagsResult const &_Result)
 			{
-				if (!_Results)
+				TCSet<CStr> const &DeniedTags = _Result.m_DeniedTags;
+				TCSet<CStr> const &AddTags = _Result.m_TagsAdded;
+				TCSet<CStr> const &RemoveTags = _Result.m_TagsRemoved;
+				if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())
 				{
-					CStr Error = Auditor.f_Error({"Failed to save version infos. See Version Manager log.", fg_Format("Error: {}", _Results.f_GetExceptionStr())});
-					Continuation.f_SetException(DMibErrorInstance(Error));
-					return;
-				}
-				
-				bool bFailed = false;
-				for (auto &Version : *_Results)
-				{
-					if (!Version)
+					if (!DeniedTags.f_IsEmpty())
+						return Continuation.f_SetException(Auditor.f_AccessDenied({fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags), "(Change tags)"}));
+
+					if (!_Params.m_bIncreaseRetrySequence)
 					{
-						Auditor.f_Error(fg_Format("Failed to save version info: {}", Version.f_GetExceptionStr()));
-						bFailed = true;
+						Auditor.f_Info("Change tags resulted in no changed tags");
+						CVersionManager::CChangeTags::CResult Result;
+						return Continuation.f_SetResult(Result);
 					}
 				}
 
-				Auditor.f_Info(fg_Format("Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, Platform, AddTags, RemoveTags));
-				
-				if (bFailed)
+				auto *pApplication = pThis->mp_Applications.f_FindEqual(_Params.m_Application);
+				if (!pApplication)
+					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application: {}", _Params.m_Application)));
+
+				TCActorResultVector<CSizeInfo> VersionResults;
+
+				auto fTagVersion = [&](CVersion &_Version)
+					{
+						CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
+						CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Version.f_GetIdentifier().f_EncodeFileName());
+
+						_Version.m_VersionInfo.m_Tags -= RemoveTags;
+						_Version.m_VersionInfo.m_Tags += AddTags;
+						if (_Params.m_bIncreaseRetrySequence)
+							++_Version.m_VersionInfo.m_RetrySequence;
+
+						pThis->fp_NewVersion(_Params.m_Application, _Version);
+						pThis->fp_SaveVersionInfo(pThis->fp_GetQueryFileActor(), VersionPath, _Version.m_VersionInfo) > VersionResults.f_AddResult();
+					}
+				;
+
+				if (!_Params.m_Platform.f_IsEmpty())
 				{
-					Continuation.f_SetException(DMibErrorInstance("Failed to save one or more version infos. Consult version manager log files for more info."));
-					return;
+					CVersionManager::CVersionIDAndPlatform VersionIDAndPlatform;
+					VersionIDAndPlatform.m_VersionID = _Params.m_VersionID;
+					VersionIDAndPlatform.m_Platform = _Params.m_Platform;
+					auto *pVersion = pApplication->m_Versions.f_FindEqual(VersionIDAndPlatform);
+					if (!pVersion)
+						return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such version: {}", VersionIDAndPlatform)));
+					fTagVersion(*pVersion);
 				}
-					
-				CVersionManager::CChangeTags::CResult Result;
-				Result.m_DeniedTags = DeniedTags;
-				Continuation.f_SetResult(fg_Move(Result));
+				else
+				{
+					CVersionManager::CVersionIDAndPlatform VersionIDAndPlatform;
+					VersionIDAndPlatform.m_VersionID = _Params.m_VersionID;
+					for (auto iVersion = pApplication->m_Versions.f_GetIterator_SmallestGreaterThanEqual(VersionIDAndPlatform); iVersion; ++iVersion)
+					{
+						if (iVersion.f_GetKey().m_VersionID != _Params.m_VersionID)
+							break;
+						fTagVersion(*iVersion);
+					}
+				}
+
+				VersionResults.f_GetResults() >
+					[
+						Continuation
+						, DeniedTags
+						, ApplicationName = _Params.m_Application
+						, VersionID = _Params.m_VersionID
+						, Platform = _Params.m_Platform
+						, AddTags
+						, RemoveTags
+						, Auditor
+					]
+					(TCAsyncResult<TCVector<TCAsyncResult<CSizeInfo>>> &&_Results)
+					{
+						if (!_Results)
+						{
+							CStr Error = Auditor.f_Error({"Failed to save version infos. See Version Manager log.", fg_Format("Error: {}", _Results.f_GetExceptionStr())});
+							return Continuation.f_SetException(DMibErrorInstance(Error));
+						}
+
+						bool bFailed = false;
+						for (auto &Version : *_Results)
+						{
+							if (!Version)
+							{
+								Auditor.f_Error(fg_Format("Failed to save version info: {}", Version.f_GetExceptionStr()));
+								bFailed = true;
+							}
+						}
+
+						Auditor.f_Info(fg_Format("Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, Platform, AddTags, RemoveTags));
+
+						if (bFailed)
+							return Continuation.f_SetException(DMibErrorInstance("Failed to save one or more version infos. Consult version manager log files for more info."));
+
+						CVersionManager::CChangeTags::CResult Result;
+						Result.m_DeniedTags = DeniedTags;
+						Continuation.f_SetResult(fg_Move(Result));
+					}
+				;
 			}
 		;
 		return Continuation;

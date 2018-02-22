@@ -29,6 +29,12 @@ namespace NMib::NCloud
 		o_Str += typename tf_CStr::CFormat("{}/{}") << m_Folder << m_Name;
 	}
 
+	inline CSecretsManager::CSecretID::operator NStr::CStr() const
+	{
+		return NStr::CStr::CFormat("{}/{}") << m_Folder << m_Name;
+	}
+
+
 	template <typename tf_CStream>
 	void CSecretsManager::CSecretProperties::f_Stream(tf_CStream &_Stream)
 	{

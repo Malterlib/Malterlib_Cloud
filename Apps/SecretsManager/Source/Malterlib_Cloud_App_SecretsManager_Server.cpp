@@ -198,29 +198,86 @@ namespace NMib::NCloud::NSecretsManager
 
 		return Continuation;
 	}
-	
-	bool CSecretsManagerDaemonActor::CServer::fp_HasPermission(char const *_ReadWrite, CStr const &_SemanticID, TCSet<CStrSecure> const &_Tags, CStr &o_Permission)
+
+	namespace
 	{
-		auto CallingHostID = fg_GetCallingHostID();
-		CStr SemanticPart{ _SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : "NoSemanticID"};
+		CStr fg_GetPermissionsDescription(CStr const &_SemanticID, TCSet<CStrSecure> const &_Tags)
+		{
+			CStr Description;
+
+			if (!_SemanticID.f_IsEmpty() && !_Tags.f_IsEmpty())
+				Description = "Access to semantic ID '{}' and tags {vs}"_f << _SemanticID << _Tags;
+			else if (!_SemanticID.f_IsEmpty())
+				Description = "Access to semantic ID '{}'"_f << _SemanticID;
+			else if (!_Tags.f_IsEmpty())
+				Description = "Access to tags {vs}"_f << _Tags;
+
+			return Description;
+		}
+	}
+
+	// This function is similar to fsp_AddPermissionQueryIndexedBySecretID below.
+	//
+	// fsp_AddPermissionQueryIndexedByPermission adds _several_ queries with wildcard patterns where _ALL_ have to be fulfilled.
+	void CSecretsManagerDaemonActor::CServer::fsp_AddPermissionQueryIndexedByPermission
+		(
+			char const *_ReadWrite
+			, CStr const &_SemanticID
+			, TCSet<CStrSecure> const &_Tags
+			, TCMap<CStr, TCVector<CPermissions>> &o_Permissions
+		)
+	{
+		CStr SemanticPart{_SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : "NoSemanticID"};
+		CStr Description = fg_GetPermissionsDescription(_SemanticID, _Tags);
 
 		if (_Tags.f_IsEmpty())
 		{
-			o_Permission = fg_Format("SecretsManager/{}/{}/NoTag", _ReadWrite, SemanticPart);
-			return mp_Permissions.f_HostHasWildcardPermission(CallingHostID, o_Permission);
+			auto PermissionString = fg_Format("SecretsManager/{}/{}/NoTag", _ReadWrite, SemanticPart);
+			o_Permissions[PermissionString] = {CPermissions{{PermissionString}}.f_Wildcard(true).f_Description(Description)};
 		}
 		else
 		{
 			for (auto const &Tag : _Tags)
 			{
-				o_Permission = fg_Format("SecretsManager/{}/{}/Tag/{}", _ReadWrite, SemanticPart, Tag);
-				if (!mp_Permissions.f_HostHasWildcardPermission(CallingHostID, o_Permission))
-					return false;
+				auto PermissionString = fg_Format("SecretsManager/{}/{}/Tag/{}", _ReadWrite, SemanticPart, Tag);
+				o_Permissions[PermissionString] = {CPermissions{{PermissionString}}.f_Wildcard(true).f_Description(Description)};
+				Description.f_Clear();
 			}
 		}
-		return true;
 	}
-	
+
+	// This function is similar to fsp_AddPermissionQueryIndexedByPermission above.
+	//
+	// fsp_AddPermissionQueryIndexedBySecretID adds _one_ permission query with _several_ wildcards patterns where _ALL_ have to be fulfilled.
+	void CSecretsManagerDaemonActor::CServer::fsp_AddPermissionQueryIndexedBySecretID
+		(
+			CSecretsManager::CSecretID const &_ID
+			, char const *_ReadWrite
+			, CStr const &_SemanticID
+			, TCSet<CStrSecure> const &_Tags
+			, TCMap<CStr, TCVector<CPermissions>> &o_Permissions
+		)
+	{
+		auto &PermissionCollection = o_Permissions[CStr::fs_ToStr(_ID)];
+		CStr SemanticPart{ _SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : "NoSemanticID"};
+		CStr Description = fg_GetPermissionsDescription(_SemanticID, _Tags);
+
+		if (_Tags.f_IsEmpty())
+		{
+			auto PermissionString = fg_Format("SecretsManager/{}/{}/NoTag", _ReadWrite, SemanticPart);
+			PermissionCollection.f_Insert({CPermissions{{fg_Move(PermissionString)}}.f_Wildcard(true).f_Description(Description)});
+		}
+		else
+		{
+			for (auto const &Tag : _Tags)
+			{
+				CStr PermissionString = "SecretsManager/{}/{}/Tag/{}"_f << _ReadWrite << SemanticPart << Tag;
+				PermissionCollection.f_Insert({CPermissions{{fg_Move(PermissionString)}}.f_Wildcard(true).f_Description(Description)});
+				Description.f_Clear();
+			}
+		}
+	}
+
 	namespace
 	{
 		template <class _InputIterator>
@@ -256,7 +313,7 @@ namespace NMib::NCloud::NSecretsManager
 				continue;
 
 			// Take care: Since we allow "removal" of tags not on the property we should only decrease the count if the count is in the set.
-			// Otherwise we risk getting negativ counts and ending up with a too low count when the tags is added later
+			// Otherwise we risk getting negative counts and ending up with a too low count when the tags is added later
 			if (auto *pCount = mp_Tags.f_FindEqual(Tag))
 			{
 				if (--*pCount == 0)
