@@ -5,6 +5,18 @@
 
 namespace NMib::NCloud::NAppManager
 {
+	CStr CAppManagerActor::CApplicationSettings::f_GetRunAsGroup() const
+	{
+		if (m_RunAsGroup.f_IsEmpty())
+			return {};
+
+#ifdef DPlatformFamily_Windows
+		return "Group_" + m_RunAsGroup;
+#else
+		return m_RunAsGroup;
+#endif
+	}
+
 	bool CAppManagerActor::CApplicationSettings::f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed)
 	{
 		if (auto *pValue = _Params.f_GetMember("SelfUpdateSource"))
@@ -89,6 +101,13 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_RunAsUser;
 			m_RunAsUser = pValue->f_String();
 		}
+#ifdef DPlatformFamily_Windows
+		if (auto *pValue = _Params.f_GetMember("RunAsUserPassword"))
+		{
+			o_ChangedSettings |= EApplicationSetting_RunAsUserPassword;
+			m_RunAsUserPassword = pValue->f_String();
+		}
+#endif
 		
 		if (auto *pValue = _Params.f_GetMember("RunAsGroup"))
 		{
@@ -229,6 +248,10 @@ namespace NMib::NCloud::NAppManager
 			m_ExecutableParameters = _Source.m_ExecutableParameters;
 		if (_ChangedSettings & EApplicationSetting_RunAsUser)
 			m_RunAsUser = _Source.m_RunAsUser;
+#ifdef DPlatformFamily_Windows
+		if (_ChangedSettings & EApplicationSetting_RunAsUserPassword)
+			m_RunAsUserPassword = _Source.m_RunAsUserPassword;
+#endif
 		if (_ChangedSettings & EApplicationSetting_RunAsGroup)
 			m_RunAsGroup = _Source.m_RunAsGroup;
 
@@ -294,6 +317,10 @@ namespace NMib::NCloud::NAppManager
 				return fError("For self update you cannot specify executable parameters");
 			else if (!m_RunAsUser.f_IsEmpty())
 				return fError("For self update you cannot specify run as user");
+#ifdef DPlatformFamily_Windows
+			else if (!m_RunAsUserPassword.f_IsEmpty())
+				return fError("For self update you cannot specify run as user password");
+#endif
  			else if (!m_RunAsGroup.f_IsEmpty())
 				return fError("For self update you cannot specify run as group");
 		}
@@ -327,6 +354,10 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_ExecutableParameters;
 		if (m_RunAsUser != _Other.m_RunAsUser)
 			ChangedSettings |= EApplicationSetting_RunAsUser;
+#ifdef DPlatformFamily_Windows
+		if (m_RunAsUserPassword != _Other.m_RunAsUserPassword)
+			ChangedSettings |= EApplicationSetting_RunAsUserPassword;
+#endif
 		if (m_RunAsGroup != _Other.m_RunAsGroup)
 			ChangedSettings |= EApplicationSetting_RunAsGroup;
 			

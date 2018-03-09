@@ -228,11 +228,19 @@ namespace NMib::NCloud::NAppManager
 				;
 				
 				LaunchParams.m_RunAsUser = Application.m_Settings.m_RunAsUser;
-				LaunchParams.m_RunAsGroup = Application.m_Settings.m_RunAsGroup;
+#ifdef DPlatformFamily_Windows
+				LaunchParams.m_RunAsUserPassword = Application.m_Settings.m_RunAsUserPassword;
+#endif
+				LaunchParams.m_RunAsGroup = Application.m_Settings.f_GetRunAsGroup();
 				LaunchParams.m_Environment["HOME"] = ApplicationDirectory + "/.home";
 				LaunchParams.m_Environment["TMPDIR"] = ApplicationDirectory + "/.tmp";
+#ifdef DPlatformFamily_Windows
+				LaunchParams.m_Environment["TMP"] = ApplicationDirectory + "/.tmp";
+				LaunchParams.m_Environment["TEMP"] = ApplicationDirectory + "/.tmp";
+#endif
 				LaunchParams.m_bMergeEnvironment = true;
 				LaunchParams.m_bCreateNewProcessGroup = true;
+				LaunchParams.m_bShowLaunched = false;
 				
 				Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
 					(

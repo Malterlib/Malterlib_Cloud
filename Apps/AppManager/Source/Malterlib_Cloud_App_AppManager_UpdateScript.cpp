@@ -99,7 +99,7 @@ namespace NMib::NCloud::NAppManager
 		
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 			(
-				"bash"
+				CProcessLaunch::fs_GetBashPath()
 				, fg_CreateVector<CStr>(FileName, _Param)
 				, _pApplication->f_GetDirectory()
 				, [pState, Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
@@ -186,9 +186,17 @@ namespace NMib::NCloud::NAppManager
 		;
 		
 		LaunchParams.m_RunAsUser = _pApplication->m_Settings.m_RunAsUser;
-		LaunchParams.m_RunAsGroup = _pApplication->m_Settings.m_RunAsGroup;
+#ifdef DPlatformFamily_Windows
+		LaunchParams.m_RunAsUserPassword = _pApplication->m_Settings.m_RunAsUserPassword;
+#endif
+		LaunchParams.m_RunAsGroup = _pApplication->m_Settings.f_GetRunAsGroup();
+
 		LaunchParams.m_Environment["HOME"] = _pApplication->f_GetDirectory() + "/.home";
 		LaunchParams.m_Environment["TMPDIR"] = _pApplication->f_GetDirectory() + "/.tmp";
+#ifdef DPlatformFamily_Windows
+		LaunchParams.m_Environment["TMP"] = _pApplication->f_GetDirectory() + "/.tmp";
+		LaunchParams.m_Environment["TEMP"] = _pApplication->f_GetDirectory() + "/.tmp";
+#endif
 		
 		LaunchParams.m_Environment["MalterlibCloud_TimeSinceStart"] = fg_Format("{fe1}", _TimeSinceUpdateStart);
 		LaunchParams.m_Environment["MalterlibCloud_Application"] = _pApplication->m_Name;

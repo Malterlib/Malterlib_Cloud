@@ -94,8 +94,6 @@ namespace NMib::NCloud::NAppManager
 						&CAppManagerActor::fp_RunBashScript
 						, pScript
 						, pDesc
-						, ""
-						, ""
 						, fg_Move(Environment)
 						, [_Key](NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)
 						{

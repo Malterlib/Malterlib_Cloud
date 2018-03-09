@@ -56,8 +56,6 @@ namespace NMib::NCloud::NAppManager
 			(
 				g_pLimitsSetupScript
 				, "SetupLimits"
-				, ""
-				, ""
 				, fg_Move(Environment)
 				, nullptr
 			)

@@ -27,31 +27,15 @@ namespace NMib::NCloud::NAppManager
 			, CStr const &_Tool
 			, CStr const &_WorkingDir
 			, TCVector<CStr> const &_Arguments
-			, CStr const &_Home
-			, CStr const &_User
-			, TCMap<CStr, CStr> const &_Environment
-			, bool _bQuiet
 		)
 	{
 		CProcessLaunchParams Params;
 		Params.m_bAllowExecutableLocate = true;
 		Params.m_WorkingDirectory = _WorkingDir;
-		if (!_User.f_IsEmpty())
-		{
-			Params.m_RunAsUser = _User;
-			Params.m_RunAsGroup = _User;
-		}
-		if (!_Home.f_IsEmpty())
-		{
-			Params.m_Environment["HOME"] = _Home;
-			Params.m_Environment["TMPDIR"] = _Home + "/.tmp";
-		}
 		
-		Params.m_Environment += _Environment;
 		Params.m_bMergeEnvironment = true;
 		
-		if (!_bQuiet)
-			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{cc}", _Description);
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{cc}", _Description);
 		
 		CStr StdOut;
 		CStr StdErr;
@@ -67,8 +51,7 @@ namespace NMib::NCloud::NAppManager
 		}
 		else
 			DMibError(fg_Format("Failed to launch {} when {}: {}", _Tool, _Description, StdErr));
-		if (!_bQuiet)
-			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{} was successful {}", _Description, fg_ConcatOutput(StdOut, StdErr));
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{} was successful {}", _Description, fg_ConcatOutput(StdOut, StdErr));
 		return StdOut;
 	}
 
@@ -76,8 +59,6 @@ namespace NMib::NCloud::NAppManager
 		(
 			CStr const &_Script
 			, CStr const &_Description
-			, CStr const &_Home
-			, CStr const &_User
 			, TCMap<CStr, CStr> const &_Environment
 			, TCFunction<void (NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)> const &_fOnStdOutput
 		)
@@ -125,7 +106,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 			> pState->m_Continuation % fg_Format("[{}] Failed to save temporary script", _Description) 
-			/ [this, FileName, _Description, _Home, _User, _Environment, _fOnStdOutput, pState]
+			/ [this, FileName, _Description, _Environment, _fOnStdOutput, pState]
 			{
 				auto fReportError = [pState, _Description](CStr const &_Error)
 					{
@@ -139,7 +120,7 @@ namespace NMib::NCloud::NAppManager
 				
 				CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 					(
-						"bash"
+						CProcessLaunch::fs_GetBashPath()
 						, fg_CreateVector<CStr>(FileName)
 						, mp_State.m_RootDirectory
 						, [pState, _Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
@@ -223,17 +204,6 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				;
-				
-				if (!_User.f_IsEmpty())
-				{
-					LaunchParams.m_RunAsUser = _User;
-					LaunchParams.m_RunAsGroup = _User;
-				}
-				if (!_Home.f_IsEmpty())
-				{
-					LaunchParams.m_Environment["HOME"] = _Home;
-					LaunchParams.m_Environment["TMPDIR"] = _Home + "/.tmp";
-				}
 				
 				LaunchParams.m_Environment += _Environment;
 				LaunchParams.m_bMergeEnvironment = true;

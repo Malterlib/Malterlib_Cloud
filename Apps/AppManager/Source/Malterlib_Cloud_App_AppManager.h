@@ -73,6 +73,7 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_BackupRemoveSyncFlagsWildcards = DBit(22)
 			, EApplicationSetting_BackupNewBackupInterval = DBit(23)
 			, EApplicationSetting_BackupEnabled = DBit(24)
+			, EApplicationSetting_RunAsUserPassword = DBit(25)
 
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
@@ -101,7 +102,7 @@ namespace NMib::NCloud::NAppManager
 			// Settings that can be updated from version information
 			CStr m_Executable; 
 			CStr m_RunAsUser; 
-			CStr m_RunAsGroup; 
+			CStr m_RunAsGroup;
 			TCVector<CStr> m_ExecutableParameters;
 			bool m_bDistributedApp = false;
 			
@@ -118,11 +119,15 @@ namespace NMib::NCloud::NAppManager
 			TCSet<CStr> m_AutoUpdateTags;
 			TCSet<CStr> m_AutoUpdateBranches;
 			CUpdateScripts m_UpdateScripts;
+#ifdef DPlatformFamily_Windows
+			CStrSecure m_RunAsUserPassword;
+#endif
 			bool m_bAutoUpdate = false;
 			bool m_bSelfUpdateSource = false;
 			bool m_bStopOnDependencyFailure = true;
 			bool m_bBackupEnabled = false;
-			
+
+			CStr f_GetRunAsGroup() const;
 			bool f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
 			void f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source);
 			void f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings);
@@ -516,18 +521,12 @@ namespace NMib::NCloud::NAppManager
 				, CStr const &_Tool
 				, CStr const &_WorkingDir
 				, TCVector<CStr> const &_Arguments
-				, CStr const &_Home
-				, CStr const &_User
-				, TCMap<CStr, CStr> const &_Environment = fg_Default()
-				, bool _bQuiet = false
 			)
 		;
 		TCContinuation<CBashScriptOutput> fp_RunBashScript
 			(
 				CStr const &_Script
 				, CStr const &_Description
-				, CStr const &_Home
-				, CStr const &_User
 				, TCMap<CStr, CStr> const &_Environment
 				, TCFunction<void (CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)> const &_fOnStdOutput
 			)

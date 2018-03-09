@@ -81,7 +81,7 @@ namespace NMib::NCloud::NAppManager
 				PendingSelfUpdateSequence = Pending["VersionRetrySequence"].f_Integer();
 
 				mp_State.m_StateDatabase.m_Data.f_RemoveMember("PendingSelfUpdateProcess");
-				bChangedDatabase = true;	
+				bChangedDatabase = true;
 			}
 			
 			if (auto pApplication = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
@@ -97,6 +97,10 @@ namespace NMib::NCloud::NAppManager
 					
 					Settings.m_Executable = ApplicationJSON["Executable"].f_String(); 
 					Settings.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String(); 
+#ifdef DPlatformFamily_Windows
+					if (auto pValue = ApplicationJSON.f_GetMember("RunAsUserPassword", EJSONType_String))
+						Settings.m_RunAsUserPassword = pValue->f_String();
+#endif
 					Settings.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String(); 
 					
 					if (auto *pValue = ApplicationJSON.f_GetMember("Backup"))
@@ -376,7 +380,7 @@ namespace NMib::NCloud::NAppManager
 										}
 									)
 								;
-								
+
 								Continuation.f_SetResult();
 							}
 						;

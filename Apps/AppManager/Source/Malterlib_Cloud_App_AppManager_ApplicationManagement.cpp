@@ -127,8 +127,6 @@ namespace NMib::NCloud::NAppManager
 						, _Source
 #endif
 					)
-					, ""
-					, ""
 				)
 			;
 			Return = Output;
@@ -136,21 +134,24 @@ namespace NMib::NCloud::NAppManager
 		
 		auto &Settings = _Settings;
 
-		CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable); 
-		if 
-			(
-				!CFile::fs_FileExists
-				(
-					ExcutableFile
-#ifdef DPlatformFamily_Windows
-					, EFileAttrib_File
-#else
-					, EFileAttrib_Executable
-#endif
-				)
-			)
+		if (!Settings.m_Executable.f_IsEmpty())
 		{
-			DMibError(fg_Format("Executable file '{}' does not exist or does not have the executable flag set", ExcutableFile));
+			CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable); 
+			if 
+				(
+					!CFile::fs_FileExists
+					(
+						ExcutableFile
+	#ifdef DPlatformFamily_Windows
+						, EFileAttrib_File
+	#else
+						, EFileAttrib_Executable
+	#endif
+					)
+				)
+			{
+				DMibError(fg_Format("Executable file '{}' does not exist or does not have the executable flag set", ExcutableFile));
+			}
 		}
 		
 		CFile::CFindFilesOptions FindOptions(_Destination + "/*", true);
@@ -178,7 +179,7 @@ namespace NMib::NCloud::NAppManager
 			if (!Settings.m_RunAsUser.f_IsEmpty())
 				CFile::fs_SetOwner(File.m_Path, Settings.m_RunAsUser);
 			if (!Settings.m_RunAsGroup.f_IsEmpty())
-				CFile::fs_SetGroup(File.m_Path, Settings.m_RunAsGroup);
+				CFile::fs_SetGroup(File.m_Path, Settings.f_GetRunAsGroup());
 			
 			fsp_UpdateAttributes(File.m_Path);
 			
@@ -243,6 +244,9 @@ namespace NMib::NCloud::NAppManager
 
 		ApplicationJSON["AssociatedHostID"] = Application.m_AssociatedHostID;
 		ApplicationJSON["UpdateGroup"] = Settings.m_UpdateGroup;
+#ifdef DPlatformFamily_Windows
+		ApplicationJSON["RunAsUserPassword"] = Settings.m_RunAsUserPassword;
+#endif
 
 		{
 			auto &BackupJSON = ApplicationJSON["Backup"] = CEJSON();
@@ -319,31 +323,28 @@ namespace NMib::NCloud::NAppManager
 	{
 		if (!_Settings.m_RunAsGroup.f_IsEmpty())
 		{
-#ifdef DPlatformFamily_Windows
-			DError("User management not supported on Windows");
-#else
 			CStr GroupID;
-			if (!NSys::fg_UserManagement_GroupExists(_Settings.m_RunAsGroup, GroupID))
+			if (!NSys::fg_UserManagement_GroupExists(_Settings.f_GetRunAsGroup(), GroupID))
 			{
-				NSys::fg_UserManagement_CreateGroup(_Settings.m_RunAsGroup, GroupID);
+				NSys::fg_UserManagement_CreateGroup(_Settings.f_GetRunAsGroup(), GroupID);
 				if (_fLogInfo)
-					_fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", _Settings.m_RunAsGroup, GroupID));
+					_fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", _Settings.f_GetRunAsGroup(), GroupID));
 			}
-#endif
 		}
 		if (!_Settings.m_RunAsUser.f_IsEmpty())
 		{
-#ifdef DPlatformFamily_Windows
-			DError("User management not supported on Windows");
-#else
 			CStr UserID;
 			if (!NSys::fg_UserManagement_UserExists(_Settings.m_RunAsUser, UserID))
 			{
 				NSys::fg_UserManagement_CreateUser
 					(
-						_Settings.m_RunAsGroup
+						_Settings.f_GetRunAsGroup()
 						, _Settings.m_RunAsUser
+#ifdef DPlatformFamily_Windows
+						, _Settings.m_RunAsUserPassword
+#else
 						, ""
+#endif
 						, _Settings.m_RunAsUser
 						, _HomeDir
 						, UserID
@@ -352,7 +353,6 @@ namespace NMib::NCloud::NAppManager
 				if (_fLogInfo)
 					_fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", _Settings.m_RunAsUser, UserID));
 			}
-#endif
 		}
 	}
 	
@@ -363,10 +363,10 @@ namespace NMib::NCloud::NAppManager
 			{
 				while (_Directory.f_GetLen() >= _ApplicationDir.f_GetLen())
 				{
-					if (!Settings.m_RunAsGroup.f_IsEmpty())
+					if (!Settings.m_RunAsUser.f_IsEmpty())
 						CFile::fs_SetOwner(_Directory, Settings.m_RunAsUser);
 					if (!Settings.m_RunAsGroup.f_IsEmpty())
-						CFile::fs_SetGroup(_Directory, Settings.m_RunAsGroup);
+						CFile::fs_SetGroup(_Directory, Settings.f_GetRunAsGroup());
 					_Directory = CFile::fs_GetPath(_Directory);
 				}
 			}

@@ -23,6 +23,7 @@ namespace NMib::NCloud::NAppManager
 			ApplicationSettings.m_ExecutableParameters = {"--daemon-run-standalone"};
 			ChangedSettings |= EApplicationSetting_ExecutableParameters;
 		}
+
 		return m_pThis->fp_AddApplication
 			(
 				_Name
@@ -101,7 +102,7 @@ namespace NMib::NCloud::NAppManager
 		}
 		else if (!bNullPackage)
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
-
+		
 		TCContinuation<uint32> Continuation;
 
 		fp_AddApplication
@@ -268,12 +269,16 @@ namespace NMib::NCloud::NAppManager
 
 				auto fUnpackAppAndFinish = [=](CStr const &_SourcePath, CStr const &_DeletePath)
 					{
+#ifdef DPlatformFamily_Windows
+						if (!pApplication->m_Settings.m_RunAsUser.f_IsEmpty() && pApplication->m_Settings.m_RunAsUserPassword.f_IsEmpty())
+							pApplication->m_Settings.m_RunAsUserPassword = fg_HighEntropyRandomID("23456789ABCDEFGHJKLMNPQRSTWXYZabcdefghijkmnopqrstuvwxyz&=*!@~^") + "2Dg&";
+#endif
 						fOnInfo("Unpacking application");
 						g_Dispatch(mp_FileActor) >
 							[=]
 							{
 								auto &Settings = pApplication->m_Settings;
-								fsp_CreateApplicationUserGroup(Settings, fOnInfo, Directory);
+								fsp_CreateApplicationUserGroup(Settings, fOnInfo, Directory / ".home");
 
 								TCVector<CStr> Files;
 

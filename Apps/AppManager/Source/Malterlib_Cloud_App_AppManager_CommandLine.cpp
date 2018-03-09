@@ -48,6 +48,16 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_= "Run the application as this user."
 			}
 		;
+#ifdef DPlatformFamily_Windows
+		auto SettingsOption_RunAsUserPassword = "RunAsUserPassword?"_=
+			{
+				"Names"_= {"--run-as-user-password"}
+				, "Type"_= ""
+				, "Description"_= "Set the password for the run as user.\n"
+				"This password is automatically set when a user is created. If you change it you can use this function to change the password used to launch the application."
+			}
+		;
+#endif
 		auto SettingsOption_RunAsGroup = "RunAsGroup?"_= 
 			{
 				"Names"_= {"--run-as-group"}
@@ -236,6 +246,9 @@ namespace NMib::NCloud::NAppManager
 							, "Description"_= "Run the application with these executable parameters."
 						}
 						, SettingsOption_RunAsUser
+#ifdef DPlatformFamily_Windows
+						, SettingsOption_RunAsUserPassword
+#endif
 						, SettingsOption_RunAsGroup
 						, SettingsOption_DistributedApp
 						, SettingsOption_BackupEnabled 
@@ -333,6 +346,9 @@ namespace NMib::NCloud::NAppManager
 							, "Description"_= "Run the application with these executable parameters."
 						}				
 						, SettingsOption_RunAsUser
+#ifdef DPlatformFamily_Windows
+						, SettingsOption_RunAsUserPassword
+#endif
 						, SettingsOption_RunAsGroup
 						, SettingsOption_DistributedApp
 						, SettingsOption_BackupEnabled 

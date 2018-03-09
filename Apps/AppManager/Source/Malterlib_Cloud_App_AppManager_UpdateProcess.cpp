@@ -319,7 +319,7 @@ namespace NMib::NCloud::NAppManager
 					]
 					() mutable
 					{
-						fsp_CreateApplicationUserGroup(Settings, fOnInfo, OutputDirectory);
+						fsp_CreateApplicationUserGroup(Settings, fOnInfo, OutputDirectory / ".home");
 						
 						
 						if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))

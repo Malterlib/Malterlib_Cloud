@@ -474,14 +474,19 @@ Property
 		MalterlibEnableInternalWorkspaces true
 	}
 	
-	Property.MalterlibPostCopyProject "Malterlib_Cloud"
+	Property
 	{
-		!!TargetIsExecutable true
-	}
+		MalterlibCloud_EnableVersionUpload true
+
+		MalterlibPostCopyProject "Malterlib_Cloud"
+		{
+			!!TargetIsExecutable true
+		}
 	
-	Property.MalterlibLog_Severities "Error;Critical;Warning;Info"
-	{
-		!!MalterlibLog_EnableVerboseDebugLog false
+		MalterlibLog_Severities "Error;Critical;Warning;Info"
+		{
+			!!MalterlibLog_EnableVerboseDebugLog false
+		}
 	}
 
 	%Group Apps

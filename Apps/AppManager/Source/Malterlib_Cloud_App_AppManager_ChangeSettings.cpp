@@ -144,6 +144,14 @@ namespace NMib::NCloud::NAppManager
 
 				ChangedSettings = Application.m_Settings.f_ChangedSettings(NewSettings);
 
+#ifdef DPlatformFamily_Windows
+				if (!NewSettings.m_RunAsUser.f_IsEmpty() && ((ChangedSettings & EApplicationSetting_RunAsUser) || NewSettings.m_RunAsUserPassword.f_IsEmpty()))
+				{
+					NewSettings.m_RunAsUserPassword = fg_HighEntropyRandomID("23456789ABCDEFGHJKLMNPQRSTWXYZabcdefghijkmnopqrstuvwxyz&=*!@~^") + "2Dg&";
+					ChangedSettings |= EApplicationSetting_RunAsUserPassword;
+				}
+#endif
+
 				if (ChangedSettings & EApplicationSetting_EncryptionStorage)
 					return Continuation.f_SetException(Auditor.f_Exception("Changing encryption storage is not supported"));
 				if (ChangedSettings & EApplicationSetting_EncryptionFileSystem)
@@ -252,7 +260,7 @@ namespace NMib::NCloud::NAppManager
 										mp_FileActor
 										, [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope]()
 										{
-											fsp_CreateApplicationUserGroup(NewSettings, fOnInfo, Directory);
+											fsp_CreateApplicationUserGroup(NewSettings, fOnInfo, Directory / ".home");
 											fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files);
 										}
 									)

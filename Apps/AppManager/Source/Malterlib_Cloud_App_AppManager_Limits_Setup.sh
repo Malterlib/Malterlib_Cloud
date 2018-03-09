@@ -19,6 +19,8 @@ elif  [ "$PlatformFamily" == "Linux" ]; then
 
 	echo never > /sys/kernel/mm/transparent_hugepage/defrag
 	echo never > /sys/kernel/mm/transparent_hugepage/enabled
+elif  [ "$PlatformFamily" == "Windows" ]; then
+	echo Not implemented
 else
 	echo Unknown platform, cannot setup OS
 	exit 1

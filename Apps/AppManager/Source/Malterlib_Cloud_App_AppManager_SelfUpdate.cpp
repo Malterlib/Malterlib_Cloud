@@ -16,7 +16,7 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<bool> Continuation;
 
 		if (CFile::fs_GetProgramDirectory() != mp_State.m_RootDirectory)
-			return DMibErrorInstance("Cannot self update when root directory differs from program directory");
+			return DMibErrorInstance("Cannot self update when root directory differs from program directory. '{}' != '{}'"_f << CFile::fs_GetProgramDirectory() << mp_State.m_RootDirectory);
 
 		g_Dispatch(mp_FileActor) > [SourceDir = _pApplication->f_GetDirectory()]() -> bool
 			{
@@ -93,7 +93,7 @@ namespace NMib::NCloud::NAppManager
 					CService::fs_QuitDaemon(); // Initiate application quit
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Self updating by quitting daemon");
 				}
-				else if (CProcessLaunch::fs_LaunchBlock("bash", fg_CreateVector(FileName, ProgramPath, Type), StdOut, StdErr, ExitCode, Params))
+				else if (CProcessLaunch::fs_LaunchBlock(CProcessLaunch::fs_GetBashPath(), fg_CreateVector(FileName, ProgramPath, Type), StdOut, StdErr, ExitCode, Params))
 				{
 					if (ExitCode)
 					{
