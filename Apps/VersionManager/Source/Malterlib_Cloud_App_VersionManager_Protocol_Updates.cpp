@@ -156,7 +156,7 @@ namespace NMib::NCloud::NVersionManager
 					)
 					> Continuation / [=, SubscriptionID = _Subscription.f_GetSubscriptionID()](bool _bHasPermission)
 					{
-						CSubscription const *pSubscription = fp_GetSubscription(_Application, SubscriptionID);
+						CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, SubscriptionID);
 
 						TCVector<CVersionManager::CNewVersionNotification> NewVersionNotifications;
 						if (pSubscription && _bHasPermission)
