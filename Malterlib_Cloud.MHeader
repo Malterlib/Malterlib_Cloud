@@ -82,7 +82,11 @@ Property
 	}
 	MalterlibCloudVersionInfo_Executable "@(Target.FileName)@(Target.FileExtension)"
 	{
-		!!MalterlibCloudVersionInfo_Executable ""
+		&
+		{
+			MalterlibCloudVersionInfo_Executable ""
+			!MalterlibCloudVersionInfo_NoExecutable true
+		}
 	}
 	MalterlibCloudVersionInfo_Application "@(Target.FileName)"
 	{
