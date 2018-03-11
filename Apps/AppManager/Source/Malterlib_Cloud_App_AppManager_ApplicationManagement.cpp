@@ -519,7 +519,6 @@ namespace NMib::NCloud::NAppManager
 					return Continuation.f_SetException(Auditor.f_Exception("Application already stopped"));
 
 				auto InProgressScope = pApplication->f_SetInProgress();
-				TCContinuation<void> Continuation;
 
 				pApplication->f_Stop(EStopFlag_PreventLaunchUser) > [pThis, pApplication, Continuation, InProgressScope, Auditor](TCAsyncResult<uint32> &&_ExitStatus)
 					{
@@ -572,7 +571,6 @@ namespace NMib::NCloud::NAppManager
 					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
 
 				auto InProgressScope = pApplication->f_SetInProgress();
-				TCContinuation<void> Continuation;
 
 				pApplication->f_Stop(EStopFlag_None) > [pThis, pApplication, Continuation, InProgressScope, Auditor, _Name]
 					(TCAsyncResult<uint32> &&_ExitStatus)
