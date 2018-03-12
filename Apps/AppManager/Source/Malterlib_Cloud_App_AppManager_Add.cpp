@@ -48,9 +48,6 @@ namespace NMib::NCloud::NAppManager
 		bool bForceOverwrite = _Params["ForceOverwrite"].f_Boolean();
 		bool bForceInstall = _Params["ForceInstall"].f_Boolean();
 		
-		if (Name.f_IsEmpty())
-			return DMibErrorInstance("You have to specify application name");
-		
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		CApplicationSettings Settings;
 		{
@@ -76,7 +73,15 @@ namespace NMib::NCloud::NAppManager
 
 		if (bFromFile && bNullPackage)
 			return DMibErrorInstance("You cannot specify from file when installing will null package");
-		
+
+		if (Name.f_IsEmpty())
+		{
+			if (bFromFile || bNullPackage)
+				return DMibErrorInstance("You have to specify application name");
+			else
+				Name = Package;
+		}
+
 		bool bSettingsFromVersionInfo = false;
 		
 		CStr Platform;

@@ -30,9 +30,8 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		
-		
-		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
-		
+		auto ApplicationManagement = o_CommandLine.f_AddSection("Application Management", "Commands to manage AppManager applications");
+
 		auto SettingsOption_Executable = "Executable?"_= 
 			{
 				"Names"_= {"--executable"}
@@ -158,8 +157,55 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_= "Enable backups for this application.\n"
 			}
 		;
-		
-		DefaultSection.f_RegisterCommand
+
+		auto AddOption_AutoUpdateTags = "AutoUpdateTags?"_=
+			{
+				"Names"_= {"--auto-update-tags"}
+				, "Default"_= false
+				, "Type"_= COneOfType{CEJSON{""}, COneOf{false}}
+				, "Description"_= "Auto update the application when new versions become available that has all these these tags."
+			}
+		;
+		auto AddOption_AutoUpdateBranches = "AutoUpdateBranches?"_=
+			{
+				"Names"_= {"--auto-update-branches"}
+				, "Default"_= _[_]
+				, "Type"_= {""}
+				, "Description"_= "Auto update the application only for versions from these branches.\n"
+				"Leave empty to allow any branch.\n"
+				"Branches can be matched with wildcards.\n"
+			}
+		;
+		auto AddOption_UpdateScriptPreUpdate = "UpdateScript_PreUpdate?"_=
+			{
+				"Names"_= {"--update-script-pre-update"}
+				, "Default"_= ""
+				, "Description"_= "Set a script to run pre update.\n"
+			}
+		;
+		auto AddOption_UpdateScriptPostUpdate = "UpdateScript_PostUpdate?"_=
+			{
+				"Names"_= {"--update-script-post-update"}
+				, "Default"_= ""
+				, "Description"_= "Set a script to run post update.\n"
+			}
+		;
+		auto AddOption_UpdateScriptPostLaunch = "UpdateScript_PostLaunch?"_=
+			{
+				"Names"_= {"--update-script-post-launch"}
+				, "Default"_= ""
+				, "Description"_= "Set a script to run post launch.\n"
+			}
+		;
+		auto AddOption_UpdateScriptOnError = "UpdateScript_OnError?"_=
+			{
+				"Names"_= {"--update-script-on-error"}
+				, "Default"_= ""
+				, "Description"_= "Set a script to run when an error occurs during the update process.\n"
+			}
+		;
+
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-add"}
@@ -171,8 +217,10 @@ namespace NMib::NCloud::NAppManager
 						"Name"_= 
 						{
 							"Names"_= {"--name"}
-							,"Type"_= ""
-							, "Description"_= "Uniquely name the application."
+							,"Default"_= ""
+							, "Description"_= "Uniquely name the application.\n"
+							"If left empty the name defaults to the package name when installing from a Versionanager, "
+							"otherwise if --from-file or a null package is specified specifying a name is required."
 						}
 						, "FromFile?"_= 
 						{
@@ -256,48 +304,14 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_BackupExcludeWildcards 
 						, SettingsOption_BackupAddSyncFlagsWildcards 
 						, SettingsOption_BackupRemoveSyncFlagsWildcards 
-						, SettingsOption_BackupNewBackupIntervalHours 
-						, "AutoUpdateTags?"_= 
-						{
-							"Names"_= {"--auto-update-tags"}
-							, "Default"_= false
-							, "Type"_= COneOfType{CEJSON{""}, COneOf{false}}
-							, "Description"_= "Auto update the application when new versions become available that has all these these tags."
-						}
-						, "AutoUpdateBranches?"_= 
-						{
-							"Names"_= {"--auto-update-branches"}
-							, "Default"_= _[_]
-							, "Type"_= {""} 
-							, "Description"_= "Auto update the application only for versions from these branches.\n"
-							"Leave empty to allow any branch.\n"
-							"Branches can be matched with wildcards.\n"
-						}
-						, "UpdateScript_PreUpdate?"_= 
-						{
-							"Names"_= {"--update-script-pre-update"}
-							, "Default"_= ""
-							, "Description"_= "Set a script to run pre update.\n"
-						}
-						, "UpdateScript_PostUpdate?"_= 
-						{
-							"Names"_= {"--update-script-post-update"}
-							, "Default"_= ""
-							, "Description"_= "Set a script to run post update.\n"
-						}
-						, "UpdateScript_PostLaunch?"_= 
-						{
-							"Names"_= {"--update-script-post-launch"}
-							, "Default"_= ""
-							, "Description"_= "Set a script to run post launch.\n"
-						}
-						, "UpdateScript_OnError?"_= 
-						{
-							"Names"_= {"--update-script-on-error"}
-							, "Default"_= ""
-							, "Description"_= "Set a script to run when an error occurs during the update process.\n"
-						}
-						, "SelfUpdateSource?"_= 
+						, SettingsOption_BackupNewBackupIntervalHours
+						, AddOption_AutoUpdateTags
+						, AddOption_AutoUpdateBranches
+						, AddOption_UpdateScriptPreUpdate
+						, AddOption_UpdateScriptPostUpdate
+						, AddOption_UpdateScriptPostLaunch
+						, AddOption_UpdateScriptOnError
+						, "SelfUpdateSource?"_=
 						{
 							"Names"_= {"--self-update-source"}
 							, "Default"_= false
@@ -323,7 +337,102 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--application-enable-self-update"}
+					, "Description"_=
+						"Adds a a self update application.\n"
+						"This is a shortcut for doing --application-add with --self-update-source specified.\n"
+					, "Options"_=
+					{
+						"Name"_=
+						{
+							"Names"_= _[_]
+							, "Hidden"_= true
+							, "Description"_= "Hidden"
+							,"Default"_= "SelfUpdate"
+						}
+						, "FromFile?"_=
+						{
+							"Names"_= _[_]
+							, "Hidden"_= true
+							, "Description"_= "Hidden"
+							, "Default"_= false
+						}
+						, "EncryptionStorage?"_=
+						{
+							"Names"_= _[_]
+							, "Hidden"_= true
+							, "Description"_= "Hidden"
+							, "Default"_= ""
+						}
+						, "ParentApplication?"_=
+						{
+							"Names"_= _[_]
+							, "Hidden"_= true
+							, "Description"_= "Hidden"
+							, "Default"_= ""
+						}
+						, "ForceOverwrite?"_=
+						{
+							"Names"_= _[_]
+							, "Hidden"_= true
+							, "Description"_= "Hidden"
+							,"Default"_= false
+						}
+						, "ForceInstall?"_=
+						{
+							"Names"_= _[_]
+							, "Hidden"_= true
+							, "Description"_= "Hidden"
+							,"Default"_= false
+						}
+						, "SettingsFromVersionInfo?"_=
+						{
+							"Names"_= _[_]
+							, "Hidden"_= true
+							, "Description"_= "Hidden"
+							, "Default"_= true
+						}
+						, "ExecutableParameters?"_=
+						{
+							"Names"_= _[_]
+							, "Hidden"_= true
+							, "Description"_= "Hidden"
+							, "Default"_= _[_]
+						}
+						, "SelfUpdateSource?"_=
+						{
+							"Names"_= _[_]
+							, "Hidden"_= true
+							, "Description"_= "Hidden"
+							, "Default"_= true
+						}
+						, AddOption_AutoUpdateTags
+						, AddOption_AutoUpdateBranches
+						, AddOption_UpdateScriptPreUpdate
+						, AddOption_UpdateScriptPostUpdate
+						, AddOption_UpdateScriptPostLaunch
+						, AddOption_UpdateScriptOnError
+						, SettingsOption_UpdateGroup
+					}
+					, "Parameters"_=
+					{
+						"Package?"_=
+						{
+							"Default"_= "AppManager"
+							, "Description"_= "Package AppManager defaulted for self update."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return fp_CommandLine_AddApplication(_Params, _pCommandLine);
+				}
+			)
+		;
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-change-settings"}
@@ -428,7 +537,7 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-list"}
@@ -455,7 +564,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-list-versions"}
@@ -483,7 +592,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-remove"}
@@ -503,7 +612,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-update-from-file"}
@@ -533,7 +642,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-update"}
@@ -587,7 +696,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-stop"}
@@ -607,7 +716,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-restart"}
@@ -627,7 +736,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--application-start"}
@@ -647,7 +756,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--remove-known-host"}
@@ -682,7 +791,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		DefaultSection.f_RegisterCommand
+		ApplicationManagement.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--cancel-all-updates"}
