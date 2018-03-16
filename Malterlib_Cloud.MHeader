@@ -523,7 +523,11 @@ Property
 	}
 	
 	MalterlibCloud_VersionUploadSources "@(MalterlibBuildServerPutSources);@(MalterlibCloud_VersionUploadSources)"
-	
+	MalterlibCloud_VersionUploadSources "@(MalterlibCloudVersionInfoFileName)|/VersionInfo.json~;@(MalterlibCloud_VersionUploadSources)"
+	{
+		!MalterlibCloudVersionInfoFileName ""
+	}
+
 	MalterlibCloud_CloudClientCommand "\"@(MalterlibCloud_CloudClientExecutable)\""
 	{
 		!MalterlibCloud_CloudClientExecutable ""
@@ -558,8 +562,14 @@ Property
 	{
 		!"Expand0" "@(Expand0->Replace('~', ''))"
 	}
- 
-	MalterlibCloud_VersionUploadCopyTempTemplateExpand	"MTool DiffCopy \"@(Expand0->ReplaceChars('~^', ''))\" \"@(MalterlibCloud_VersionUploadTempPath)@(MalterlibCloud_VersionUploadDestinationDir)@(Expand1)\" \"\" @(MalterlibCloud_VersionUploadCopyTempTemplateRecursive) 0 @(MalterlibCloud_VersionUploadCopyTempTemplateDirectory)\r\n"\
+
+	MalterlibCloud_VersionUploadCopyTempTemplateDestinationFile 0
+	MalterlibCloud_VersionUploadCopyTempTemplateDestinationFile 1
+	{
+		!"Expand1" "@(Expand1->Replace('~', ''))"
+	}
+
+	MalterlibCloud_VersionUploadCopyTempTemplateExpand	"MTool DiffCopy \"@(Expand0->ReplaceChars('~^', ''))\" \"@(MalterlibCloud_VersionUploadTempPath)@(MalterlibCloud_VersionUploadDestinationDir)@(Expand1->ReplaceChars('~^', ''))\" \"\" @(MalterlibCloud_VersionUploadCopyTempTemplateRecursive) 0 @(MalterlibCloud_VersionUploadCopyTempTemplateDirectory) @(MalterlibCloud_VersionUploadCopyTempTemplateDestinationFile)\r\n"\
 														"@(CheckErrors)\r\n"
 
 	MalterlibCloud_VersionUploadCopyTempTemplate	"@(Builtin.Function->ExpandList('@(Explodee)', '|', 'MalterlibCloud_VersionUploadCopyTempTemplateExpand'))"

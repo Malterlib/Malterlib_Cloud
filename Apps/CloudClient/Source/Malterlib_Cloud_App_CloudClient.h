@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedApp>
+#include <Mib/Process/ProcessLaunchActor>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Cloud/BackupManager>
 #include <Mib/Cloud/VersionManager>
@@ -88,7 +89,9 @@ namespace NMib::NCloud::NCloudClient
 		TCContinuation<uint32> fp_CommandLine_SecretsManager_Download(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 		fp64 mp_Timeout = 0.0;
-		
+
+		TCVector<TCActor<CProcessLaunchActor>> mp_LaunchActors;
+
 		// Backup Manager
 		TCTrustedActorSubscription<CBackupManager> mp_BackupManagers;
 		CActorSubscription mp_DownloadBackupSubscription;

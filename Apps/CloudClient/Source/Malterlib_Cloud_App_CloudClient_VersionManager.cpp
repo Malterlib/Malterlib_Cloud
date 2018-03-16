@@ -10,6 +10,10 @@
 
 #include "Malterlib_Cloud_App_CloudClient.h"
 
+#ifdef DPlatformFamily_Windows
+#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#endif
+
 namespace NMib::NCloud::NCloudClient
 {
 	void CCloudClientAppActor::fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section)
@@ -81,6 +85,14 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_= ""
 							, "Description"_= "The host ID of the host to upload the version to."
 						}					
+						, "SettingsFileFromPackage?"_=
+						{
+							"Names"_= {"--settings-file-from-package"}
+							, "Default"_= true
+							, "Description"_= "If the uploaded file is a tar.gz file, look inside it for VersionInfo.json and use as settings file.\n"
+							"If --settings-file is specified that will override the settings file inside the uploaded package.\n"
+							"Settings in the settings file is overridden by settings specified on the command line.\n"
+						}
 						, "SettingsFile?"_=
 						{
 							"Names"_= {"--settings-file"}
@@ -465,203 +477,263 @@ namespace NMib::NCloud::NCloudClient
 	
 	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
+		CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
+		if (Source.f_IsEmpty())
+			return DMibErrorInstance("Source must be specified");
+
 		TCContinuation<uint32> Continuation;
 		
-		auto fDoUpload = [=](CEJSON const &_Settings)
+		CStr SettingsFile = _Params["SettingsFile"].f_String();
+		if (!SettingsFile.f_IsEmpty())
+			SettingsFile = CFile::fs_GetFullPath(SettingsFile, _Params["CurrentDirectory"].f_String());
+
+		TCContinuation<TCVariant<CStr, CEJSON>> SettingsFileContinuation;
+		if (!SettingsFile.f_IsEmpty())
+			SettingsFileContinuation.f_SetResult(SettingsFile);
+		else if (_Params["SettingsFileFromPackage"].f_Boolean() && Source.f_EndsWith(".tar.gz"))
+		{
+			// tar -xOf AppManager.tar.gz VersionInfo.json
+
+			auto &LaunchActor = mp_LaunchActors.f_Insert() = fg_Construct();
+
+			CProcessLaunchActor::CSimpleLaunch Launch
+				{
+	#ifdef DPlatformFamily_Windows
+					"tar.exe"
+	#else
+					"tar"
+	#endif
+					,
+					{
+						"-xOf"
+	#ifdef DPlatformFamily_Windows
+						, NFile::NPlatform::fg_ConvertToMinGWPath(Source)
+	#else
+						, Source
+	#endif
+						, "VersionInfo.json"
+					}
+					, CFile::fs_GetPath(Source)
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+				}
+			;
+
+			LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))
+				> [SettingsFileContinuation, _pCommandLine](TCAsyncResult<CProcessLaunchActor::CSimpleLaunchResult> &&_LaunchResult)
+				{
+					CEJSON VersionInfo = EJSONType_Object;
+					if (_LaunchResult)
+					{
+						try
+						{
+							VersionInfo = CEJSON::fs_FromString(_LaunchResult->f_GetStdOut());
+						}
+						catch (CException const &_Exception)
+						{
+							*_pCommandLine %= "Failed to parse version info from VersionInfo.json in package (Disable with --no-settings-file-from-package): {}"_f << _Exception;
+						}
+					}
+					else
+						*_pCommandLine %= "Failed to extract version info from package (Disable with --no-settings-file-from-package): {}"_f << _LaunchResult.f_GetExceptionStr();
+
+					SettingsFileContinuation.f_SetResult(fg_Move(VersionInfo));
+				}
+			;
+		}
+		else
+			SettingsFileContinuation.f_SetResult();
+
+		SettingsFileContinuation > Continuation / [=](TCVariant<CStr, CEJSON> const &_SettingsFileOrSettings)
 			{
-				CStr Application;
-				CStr Version;
-				CStr Configuration;
-				CStr Platform;
-				CEJSON ExtraInfo;
-
-				auto fApplySettings = [&](CEJSON const &_Settings)
-					{
-						if (auto *pValue = _Settings.f_GetMember("Application", EJSONType_String))
-							Application = pValue->f_String();
-						if (auto *pValue = _Settings.f_GetMember("Version", EJSONType_String))
-							Version = pValue->f_String();
-						if (auto *pValue = _Settings.f_GetMember("Configuration", EJSONType_String))
-							Configuration = pValue->f_String();
-						if (auto *pValue = _Settings.f_GetMember("Platform", EJSONType_String))
-							Platform = pValue->f_String();
-						if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJSONType_Object))
-							ExtraInfo = pValue->f_Object();
-					}
-				;
-				
-				fApplySettings(_Settings);
-				fApplySettings(_Params);
-
-				CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
-				CStr Host = _Params["VersionManagerHost"].f_String();
-				CTime Time = _Params["Time"].f_Date();
-				uint64 QueueSize = _Params["TransferQueueSize"].f_Integer();
-				bool bForce = _Params["Force"].f_Boolean();
-				if (QueueSize < 128*1024)
-					QueueSize = 128*1024;
-				
-				auto fReportError = [Continuation](CStr const &_Error)
-					{
-						Continuation.f_SetException(DMibErrorInstance(_Error));
-					}
-				;
-
-				TCSet<CStr> Tags;
-				for (auto &TagJSON : _Params["Tags"].f_Array())
+				TCContinuation<CEJSON> SettingsContinuation;
+				if (_SettingsFileOrSettings.f_IsOfType<CEJSON>())
+					SettingsContinuation.f_SetResult(_SettingsFileOrSettings.f_Get<1>());
+				else
 				{
-					CStr const &Tag = TagJSON.f_String();
-					if (!CVersionManager::fs_IsValidTag(Tag))
-						return fReportError(fg_Format("'{}' is not a valid tag", Tag));
-					Tags[Tag];
-				}
-				
-				if (Application.f_IsEmpty())
-					return fReportError("Application must be specified");
-				if (Version.f_IsEmpty())
-					return fReportError("Version must be specified");
-				if (Source.f_IsEmpty())
-					return fReportError("Source must be specified");
-				
-				if (!CVersionManager::fs_IsValidApplicationName(Application))
-					return fReportError("Application format is invalid");
-				
-				CVersionManager::CVersionIDAndPlatform VersionID;
-				{
-					CStr Error; 
-					if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
-						return fReportError(fg_Format("Version identifier format is invalid: {}", Error));
-				}
-				
-				if (!CVersionManager::fs_IsValidPlatform(Platform))
-					return fReportError("Invalid version platform format");
-				
-				VersionID.m_Platform = Platform;
-
-				auto fDoCommand = [=](CTime const &_Time)
+					CStr SettingsFile = _SettingsFileOrSettings.f_Get<0>();
+					if (!SettingsFile.f_IsEmpty())
 					{
-						fg_ThisActor(this)(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") 
-							> Continuation / [=]
+						g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) > [SettingsFile]
 							{
-								CStr Error;
-								auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
-								if (!pVersionManager)
+								return CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
+							}
+							> [SettingsContinuation](TCAsyncResult<CEJSON> &&_Settings)
+							{
+								if (!_Settings)
 								{
-									Continuation.f_SetException
-										(
-											DMibErrorInstance
-											(
-												fg_Format
-												(
-													"Error selecting version manager for host '{}': {}. Connection might have failed. Use --log-to-stderr to see more info."
-													, Host
-													, Error
-												)
-											)
-										)
-									;
+									SettingsContinuation.f_SetException(DMibErrorInstance(fg_Format("Error reading settings file: {}", _Settings.f_GetExceptionStr())));
 									return;
 								}
-								
-								CVersionManager::CVersionInformation VersionInfo;
-								VersionInfo.m_Time = _Time;
-								VersionInfo.m_Configuration = Configuration;
-								VersionInfo.m_ExtraInfo = ExtraInfo;
-								VersionInfo.m_Tags = Tags; 						
+								if (!_Settings->f_IsObject())
+								{
+									SettingsContinuation.f_SetException(DMibErrorInstance("Settings file does not contain a valid JSON object"));
+									return;
+								}
+								SettingsContinuation.f_SetResult(*_Settings);
+							}
+						;
+					}
+					else
+						SettingsContinuation.f_SetResult(EJSONType_Object);
+				}
 
-								mp_VersionManagerHelper.f_Upload
-									(
-										pVersionManager->m_Actor
-										, Application
-										, VersionID
-										, VersionInfo
-										, Source
-										, bForce ? CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite : CVersionManager::CStartUploadVersion::EFlag_None
-										, QueueSize
-									)
-									> Continuation / [=](CVersionManagerHelper::CUploadResult &&_UploadResult)
+				SettingsContinuation > Continuation / [=](CEJSON &&_Settings)
+					{
+						CStr Application;
+						CStr Version;
+						CStr Configuration;
+						CStr Platform;
+						CEJSON ExtraInfo;
+
+						auto fApplySettings = [&](CEJSON const &_Settings)
+							{
+								if (auto *pValue = _Settings.f_GetMember("Application", EJSONType_String))
+									Application = pValue->f_String();
+								if (auto *pValue = _Settings.f_GetMember("Version", EJSONType_String))
+									Version = pValue->f_String();
+								if (auto *pValue = _Settings.f_GetMember("Configuration", EJSONType_String))
+									Configuration = pValue->f_String();
+								if (auto *pValue = _Settings.f_GetMember("Platform", EJSONType_String))
+									Platform = pValue->f_String();
+								if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJSONType_Object))
+									ExtraInfo = pValue->f_Object();
+							}
+						;
+
+						fApplySettings(_Settings);
+						fApplySettings(_Params);
+
+						CStr Host = _Params["VersionManagerHost"].f_String();
+						CTime Time = _Params["Time"].f_Date();
+						uint64 QueueSize = _Params["TransferQueueSize"].f_Integer();
+						bool bForce = _Params["Force"].f_Boolean();
+						if (QueueSize < 128*1024)
+							QueueSize = 128*1024;
+
+						auto fReportError = [Continuation](CStr const &_Error)
+							{
+								Continuation.f_SetException(DMibErrorInstance(_Error));
+							}
+						;
+
+						TCSet<CStr> Tags;
+						for (auto &TagJSON : _Params["Tags"].f_Array())
+						{
+							CStr const &Tag = TagJSON.f_String();
+							if (!CVersionManager::fs_IsValidTag(Tag))
+								return fReportError(fg_Format("'{}' is not a valid tag", Tag));
+							Tags[Tag];
+						}
+
+						if (Application.f_IsEmpty())
+							return fReportError("Application must be specified");
+						if (Version.f_IsEmpty())
+							return fReportError("Version must be specified");
+
+						if (!CVersionManager::fs_IsValidApplicationName(Application))
+							return fReportError("Application format is invalid");
+
+						CVersionManager::CVersionIDAndPlatform VersionID;
+						{
+							CStr Error;
+							if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
+								return fReportError(fg_Format("Version identifier format is invalid: {}", Error));
+						}
+
+						if (!CVersionManager::fs_IsValidPlatform(Platform))
+							return fReportError("Invalid version platform format");
+
+						VersionID.m_Platform = Platform;
+
+						TCContinuation<CTime> TimeContinuation;
+
+						if (Time.f_IsValid())
+							TimeContinuation.f_SetResult(Time);
+						else
+						{
+							g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) > [Source]() -> CTime
+								{
+									if (!CFile::fs_FileExists(Source))
+										DMibError(fg_Format("Source specified does not exist: {}", Source));
+									if (CFile::fs_FileExists(Source, EFileAttrib_File))
+										return CFile::fs_GetWriteTime(Source);
+									CFile::CFindFilesOptions FindOptions{Source + "/*", true};
+									FindOptions.m_AttribMask = EFileAttrib_File;
+									CTime ReturnTime;
+									for (auto &FoundFile : CFile::fs_FindFiles(FindOptions))
 									{
+										auto FoundTime = CFile::fs_GetWriteTime(FoundFile.m_Path);
+										if (!ReturnTime.f_IsValid() || FoundTime > ReturnTime)
+											ReturnTime = FoundTime;
+									}
+									return ReturnTime;
+								}
+								> TimeContinuation % "Failed to deduce backup time";
+							;
+						}
 
-										if (!_UploadResult.m_DeniedTags.f_IsEmpty())
-											*_pCommandLine %= "The following tags were denied: {vs,vb}\n"_f << _UploadResult.m_DeniedTags;
+						TimeContinuation > Continuation / [=](CTime &&_Time)
+							{
+								fp_VersionManager_SubscribeToServers().f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") > Continuation / [=]
+									{
+										CStr Error;
+										auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
+										if (!pVersionManager)
+										{
+											Continuation.f_SetException
+												(
+													DMibErrorInstance
+													(
+														fg_Format
+														(
+															"Error selecting version manager for host '{}': {}. Connection might have failed. Use --log-to-stderr to see more info."
+															, Host
+															, Error
+														)
+													)
+												)
+											;
+											return;
+										}
 
-										*_pCommandLine += "Upload finished transferring: {ns } bytes at {fe2} MB/s\n"_f
-											<< _UploadResult.m_TransferResult.m_nBytes
-											<< _UploadResult.m_TransferResult.f_BytesPerSecond()/1'000'000.0
+										CVersionManager::CVersionInformation VersionInfo;
+										VersionInfo.m_Time = _Time;
+										VersionInfo.m_Configuration = Configuration;
+										VersionInfo.m_ExtraInfo = ExtraInfo;
+										VersionInfo.m_Tags = Tags;
+
+										mp_VersionManagerHelper.f_Upload
+											(
+												pVersionManager->m_Actor
+												, Application
+												, VersionID
+												, VersionInfo
+												, Source
+												, bForce ? CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite : CVersionManager::CStartUploadVersion::EFlag_None
+												, QueueSize
+											)
+											> Continuation / [=](CVersionManagerHelper::CUploadResult &&_UploadResult)
+											{
+												if (!_UploadResult.m_DeniedTags.f_IsEmpty())
+													*_pCommandLine %= "The following tags were denied: {vs,vb}\n"_f << _UploadResult.m_DeniedTags;
+
+												*_pCommandLine += "Upload finished transferring: {ns } bytes at {fe2} MB/s\n"_f
+													<< _UploadResult.m_TransferResult.m_nBytes
+													<< _UploadResult.m_TransferResult.f_BytesPerSecond()/1'000'000.0
+												;
+												Continuation.f_SetResult(0);
+											}
 										;
-										Continuation.f_SetResult(0);
 									}
 								;
 							}
 						;
 					}
 				;
-				
-				if (Time.f_IsValid())
-					fDoCommand(Time);
-				else
-				{
-					fg_Dispatch
-						(
-							mp_VersionManagerHelper.f_GetFileActor()
-							, [Source]() -> CTime
-							{
-								if (!CFile::fs_FileExists(Source))
-									DMibError(fg_Format("Source specified does not exist: {}", Source));
-								if (CFile::fs_FileExists(Source, EFileAttrib_File))
-									return CFile::fs_GetWriteTime(Source);
-								CFile::CFindFilesOptions FindOptions{Source + "/*", true};
-								FindOptions.m_AttribMask = EFileAttrib_File;
-								CTime ReturnTime;
-								for (auto &FoundFile : CFile::fs_FindFiles(FindOptions))
-								{
-									auto FoundTime = CFile::fs_GetWriteTime(FoundFile.m_Path);
-									if (!ReturnTime.f_IsValid() || FoundTime > ReturnTime)
-										ReturnTime = FoundTime;
-								}
-								return ReturnTime;
-							}
-						)
-						> Continuation % "Failed to deduce backup time" / [fDoCommand](CTime const &_Time)
-						{
-							fDoCommand(_Time);
-						}
-					;			
-				}
 			}
 		;
 		
-		CStr SettingsFile = CFile::fs_GetFullPath(_Params["SettingsFile"].f_String(), _Params["CurrentDirectory"].f_String());
-		
-		if (!SettingsFile.f_IsEmpty())
-		{
-			fg_Dispatch
-				(
-					mp_VersionManagerHelper.f_GetFileActor()
-					, [SettingsFile]
-					{
-						return CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
-					}
-				)
-				> [fDoUpload, Continuation](TCAsyncResult<CEJSON> &&_Settings)
-				{
-					if (!_Settings)
-					{
-						Continuation.f_SetException(DMibErrorInstance(fg_Format("Error reading settings file: {}", _Settings.f_GetExceptionStr())));
-						return;
-					}
-					if (!_Settings->f_IsObject())
-					{
-						Continuation.f_SetException(DMibErrorInstance("Settings file does not contain a valid JSON object"));
-						return;
-					}
-					fDoUpload(*_Settings);
-				}
-			;
-		}
-		else
-			fDoUpload(EJSONType_Object);
-		
+
 		return Continuation;
 	}
 	

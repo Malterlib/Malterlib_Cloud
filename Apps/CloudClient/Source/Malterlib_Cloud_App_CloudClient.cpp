@@ -35,8 +35,11 @@ namespace NMib::NCloud::NCloudClient
 		if (mp_DownloadBackupSubscription)
 			mp_DownloadBackupSubscription->f_Destroy() > Destroys.f_AddResult();
 		
-		mp_VersionManagerHelper.f_AbortAll() > Destroys.f_AddResult();  
-		
+		mp_VersionManagerHelper.f_AbortAll() > Destroys.f_AddResult();
+
+		for (auto &Launch : mp_LaunchActors)
+			Launch->f_Destroy() > Destroys.f_AddResult();
+
 		TCContinuation<void> Continuation;
 		Destroys.f_GetResults() > Continuation.f_ReceiveAny();
 		return Continuation;
