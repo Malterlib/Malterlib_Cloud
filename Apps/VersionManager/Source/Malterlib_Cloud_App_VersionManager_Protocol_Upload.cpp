@@ -179,7 +179,7 @@ namespace NMib::NCloud::NVersionManager
 						{
 							CStr Error = _FileTransferContext.f_GetExceptionStr();
 							Auditor.f_Error(fg_Format("'{}' Failed to initialize version upload: {}", Desc, Error));
-							if (Error == "Failed to extract current manifest: Directory already exists")
+							if (Error == "Failed to generate current manifest: Directory already exists")
 								Continuation.f_SetException(DMibErrorInstance("Version already exists"));
 							else
 								Continuation.f_SetException(DMibErrorInstance("Failed to receive files. See Version Manager log."));
