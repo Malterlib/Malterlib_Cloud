@@ -58,7 +58,14 @@ namespace NMib::NCloud
 	struct CFileTransferReceive : public NConcurrency::CActor
 	{
 		~CFileTransferReceive();
-		CFileTransferReceive(NStr::CStr const &_BasePath, NConcurrency::TCActor<CActor> const &_FileActor = {});
+		CFileTransferReceive
+			(
+			 	NStr::CStr const &_BasePath
+			 	, NFile::EFileAttrib _AttributeMask = NFile::EFileAttrib_UserRead | NFile::EFileAttrib_UserWrite | NFile::EFileAttrib_UserExecute | NFile::EFileAttrib_UnixAttributesValid
+			 	, NFile::EFileAttrib _AttributeAdd = NFile::EFileAttrib_None
+			 	, NConcurrency::TCActor<CActor> const &_FileActor = {}
+			)
+		;
 		
 		enum EReceiveFlag
 		{

@@ -26,6 +26,8 @@ namespace NMib::NCloud::NVersionManager
 	{
 	}
 
+	static constexpr EFileAttrib gc_FilePermissions = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid;
+
 	auto CVersionManagerDaemonActor::CServer::fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo) 
 		-> TCContinuation<CSizeInfo> 
 	{
@@ -54,7 +56,7 @@ namespace NMib::NCloud::NVersionManager
 						SizeInfo.m_nBytes += CFile::fs_GetFileSize(File);										
 					
 					CFile::fs_CreateDirectory(CFile::fs_GetPath(VersionInfoPath));
-					CFile::fs_WriteStringToFile(VersionInfoPath, VersionJSONInfo.f_ToString());
+					CFile::fs_WriteStringToFile(VersionInfoPath, VersionJSONInfo.f_ToString(), false, gc_FilePermissions);
 					
 					return SizeInfo;
 				}
@@ -149,7 +151,7 @@ namespace NMib::NCloud::NVersionManager
 				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionIDAndPlatform.f_EncodeFileName());
 
 				Upload.m_UploadFileAccess = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Upload version file access"));
-				Upload.m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, Upload.m_UploadFileAccess);
+				Upload.m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, gc_FilePermissions, gc_FilePermissions, Upload.m_UploadFileAccess);
 
 				auto ReceiveFlags = CFileTransferReceive::EReceiveFlag_FailOnExisting;
 				if (_Params.m_Flags & CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite)

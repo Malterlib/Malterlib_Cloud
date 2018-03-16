@@ -342,7 +342,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					"Names"_= {"--application-enable-self-update"}
 					, "Description"_=
-						"Adds a a self update application.\n"
+						"Adds an AppManager application that is used for self updating this AppManager.\n"
 						"This is a shortcut for doing --application-add with --self-update-source specified.\n"
 					, "Options"_=
 					{

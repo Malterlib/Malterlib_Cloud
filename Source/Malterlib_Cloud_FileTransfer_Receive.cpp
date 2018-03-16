@@ -14,7 +14,7 @@ namespace NMib::NCloud
 	using namespace NTime;
 	using namespace NFile;
 	using namespace NPtr;
-	
+
 	struct CFileTransferReceive::CInternal
 	{
 		struct CFileCache
@@ -43,6 +43,8 @@ namespace NMib::NCloud
 		CStr m_BasePath;
 		TCContinuation<CFileTransferResult> m_DoneContinuation;
 		TCSharedPointer<CFileCache> m_pFileCache = fg_Construct();
+		EFileAttrib m_AttributeMask = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute | EFileAttrib_UnixAttributesValid;
+		EFileAttrib m_AttributeAdd = EFileAttrib_None;
 		CStr m_RootDirectory;
 		bool m_bCalled = false;
 		bool m_bDoneCalled = false;
@@ -50,10 +52,12 @@ namespace NMib::NCloud
 
 	CFileTransferReceive::~CFileTransferReceive() = default;
 	
-	CFileTransferReceive::CFileTransferReceive(NStr::CStr const &_BasePath, TCActor<CActor> const &_FileActor)
+	CFileTransferReceive::CFileTransferReceive(NStr::CStr const &_BasePath, EFileAttrib _AttributeMask, NFile::EFileAttrib _AttributeAdd, TCActor<CActor> const &_FileActor)
 		: mp_pInternal(fg_Construct()) 
 	{
 		auto &Internal = *mp_pInternal;
+		Internal.m_AttributeMask = _AttributeMask;
+		Internal.m_AttributeAdd = _AttributeAdd;
 		Internal.m_BasePath = _BasePath;
 		auto &Cache = *Internal.m_pFileCache;
 		Cache.m_FileActor = _FileActor;
@@ -165,7 +169,14 @@ namespace NMib::NCloud
 						fg_Dispatch
 							(
 								Cache.m_FileActor
-								, [pCache = Internal.m_pFileCache, RootDirectory = Internal.m_RootDirectory, DownloadPart = fg_Move(_Part)]
+								,
+							 	[
+								 	pCache = Internal.m_pFileCache
+								 	, RootDirectory = Internal.m_RootDirectory
+								 	, DownloadPart = fg_Move(_Part)
+								 	, AttributeMask = Internal.m_AttributeMask
+								 	, AttributeAdd = Internal.m_AttributeAdd
+								]
 								() mutable -> CFileTransferContext::CInternal::CSendPart::CResult
 								{
 									CStr Error;
@@ -175,11 +186,24 @@ namespace NMib::NCloud
 									CStr FilePath = fg_Format("{}/{}", RootDirectory, DownloadPart.m_FilePath);
 									
 									auto &Cache = *pCache;
-									
+
+									auto Attributes = DownloadPart.m_FileAttributes;
+
+									if (Attributes == EFileAttrib_None)
+										Attributes = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+
+									Attributes = ((Attributes & AttributeMask) | AttributeAdd);
+
 									if (Cache.m_FileName != FilePath)
 									{
 										CFile::fs_CreateDirectory(CFile::fs_GetPath(FilePath));
-										Cache.m_File.f_Open(FilePath, EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareRead);
+										Cache.m_File.f_Open
+											(
+											 	FilePath
+											 	, EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareRead
+											 	, Attributes | EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid
+											)
+										;
 									}
 									
 									Cache.m_File.f_SetPosition(DownloadPart.m_FilePosition);
@@ -188,7 +212,7 @@ namespace NMib::NCloud
 									if (DownloadPart.m_bFinished)
 									{
 										Cache.m_File.f_SetLength(DownloadPart.m_FilePosition + DownloadPart.m_Data.f_GetLen());
-										Cache.m_File.f_SetAttributes(DownloadPart.m_FileAttributes | EFileAttrib_UnixAttributesValid);
+										Cache.m_File.f_SetAttributes(Attributes);
 										Cache.m_File.f_SetWriteTime(DownloadPart.m_WriteTime);
 										Cache.m_FileName.f_Clear();
 										Cache.m_File.f_Close();

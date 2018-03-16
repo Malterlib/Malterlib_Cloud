@@ -238,7 +238,14 @@ namespace NMib::NCloud
 		auto &Internal = *mp_pInternal;
 		TCSharedPointer<CDownloadState, CSupportWeakTag> pState = fg_Construct();
 		
-		pState->m_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>(_DestinationDirectory, Internal.f_GetFileActor());
+		pState->m_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>
+			(
+			 	_DestinationDirectory
+			 	, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute | EFileAttrib_UnixAttributesValid
+			 	, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid
+			 	, Internal.f_GetFileActor()
+			)
+		;
 
 		CStr StateID = fg_RandomID();
 		Internal.m_States[StateID] = pState;
