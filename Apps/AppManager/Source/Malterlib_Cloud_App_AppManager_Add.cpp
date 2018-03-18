@@ -5,6 +5,10 @@
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppManager.h"
 
+#ifdef DPlatformFamily_Windows
+#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#endif
+
 namespace NMib::NCloud::NAppManager
 {
 	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Add
@@ -82,14 +86,13 @@ namespace NMib::NCloud::NAppManager
 				Name = Package;
 		}
 
-		bool bSettingsFromVersionInfo = false;
+		bool bSettingsFromVersionInfo = _Params["SettingsFromVersionInfo"].f_Boolean();
 		
 		CStr Platform;
 		TCOptional<CVersionManager::CVersionIDAndPlatform> VersionID;
 		
 		if (!bFromFile && !bNullPackage)
 		{
-			bSettingsFromVersionInfo = _Params["SettingsFromVersionInfo"].f_Boolean();
 			CVersionManager::CVersionIDAndPlatform VersionIDTemp;
 			if (auto *pValue = _Params.f_GetMember("VersionManagerPlatform"))
 			{
@@ -356,9 +359,139 @@ namespace NMib::NCloud::NAppManager
 				fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Setup, _bForceOverwrite)
 					> Continuation % Auditor / [=]
 					{
+						auto fApplyVersion = [=](CVersionManager::CVersionIDAndPlatform const &_VersionID, CVersionManager::CVersionInformation const &_VersionInfo)
+							{
+								if (_bSettingsFromVersionInfo)
+								{
+									CApplicationSettings NewSettings = pApplication->m_Settings;
+									CApplicationSettings VersionInfoSettings;
+									EApplicationSetting NewChangedSettings = EApplicationSetting_None;
+									try
+									{
+										VersionInfoSettings.f_FromVersionInfo(_VersionInfo, NewChangedSettings);
+									}
+									catch (CException const &_Exception)
+									{
+										DMibError(fg_Format("Failed to get settings from version info: {}", _Exception));
+									}
+									NewSettings.f_ApplySettings(NewChangedSettings, VersionInfoSettings);
+
+									CStr Error;
+									if (!NewSettings.f_Validate(Error))
+										DMibError(Error);
+
+									pApplication->m_Settings = NewSettings;
+								}
+
+								pApplication->m_LastInstalledVersion = _VersionID;
+								pApplication->m_LastInstalledVersionInfo = _VersionInfo;
+								if (mp_KnownPlatforms(_VersionID.m_Platform).f_WasCreated())
+									fp_VersionManagerResubscribeAll();
+							}
+						;
+
 						if (!_FromLocalFile.f_IsEmpty() || bNullApplication)
 						{
-							fUnpackAppAndFinish(_FromLocalFile, CStr());
+							if (_bSettingsFromVersionInfo && _FromLocalFile.f_EndsWith(".tar.gz"))
+							{
+								auto &LaunchActor = mp_LaunchActors.f_Insert() = fg_Construct();
+
+								CProcessLaunchActor::CSimpleLaunch Launch
+									{
+						#ifdef DPlatformFamily_Windows
+										"tar.exe"
+						#else
+										"tar"
+						#endif
+										,
+										{
+											"-xOf"
+						#ifdef DPlatformFamily_Windows
+											, NFile::NPlatform::fg_ConvertToMinGWPath(_FromLocalFile)
+						#else
+											, _FromLocalFile
+						#endif
+											, "VersionInfo.json"
+										}
+										, CFile::fs_GetPath(_FromLocalFile)
+										, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+									}
+								;
+
+								LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))
+									> [=](TCAsyncResult<CProcessLaunchActor::CSimpleLaunchResult> &&_LaunchResult)
+									{
+										if (_LaunchResult)
+										{
+											try
+											{
+												CEJSON VersionInfoJSON = CEJSON::fs_FromString(_LaunchResult->f_GetStdOut());
+
+												CStr Application;
+												CStr Version;
+												CStr Configuration;
+												CStr Platform;
+												CEJSON ExtraInfo;
+
+												auto fApplySettings = [&](CEJSON const &_Settings)
+													{
+														if (auto *pValue = _Settings.f_GetMember("Application", EJSONType_String))
+															Application = pValue->f_String();
+														if (auto *pValue = _Settings.f_GetMember("Version", EJSONType_String))
+															Version = pValue->f_String();
+														if (auto *pValue = _Settings.f_GetMember("Configuration", EJSONType_String))
+															Configuration = pValue->f_String();
+														if (auto *pValue = _Settings.f_GetMember("Platform", EJSONType_String))
+															Platform = pValue->f_String();
+														if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJSONType_Object))
+															ExtraInfo = pValue->f_Object();
+													}
+												;
+
+												fApplySettings(VersionInfoJSON);
+
+												if (Application.f_IsEmpty())
+													DMibError("Application must be specified");
+												if (Version.f_IsEmpty())
+													DMibError("Version must be specified");
+
+												if (!CVersionManager::fs_IsValidApplicationName(Application))
+													DMibError("Application format is invalid");
+
+												CVersionManager::CVersionIDAndPlatform VersionID;
+												{
+													CStr Error;
+													if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
+														DMibError(fg_Format("Version identifier format is invalid: {}", Error));
+												}
+
+												if (!CVersionManager::fs_IsValidPlatform(Platform))
+													DMibError("Invalid version platform format");
+
+												VersionID.m_Platform = Platform;
+
+												CVersionManager::CVersionInformation VersionInfo;
+												VersionInfo.m_Configuration = Configuration;
+												VersionInfo.m_ExtraInfo = ExtraInfo;
+
+												fApplyVersion(VersionID, VersionInfo);
+
+												pApplication->m_Settings.m_VersionManagerApplication = Application;
+											}
+											catch (CException const &_Exception)
+											{
+												fOnInfo("Failed to parse version info from VersionInfo.json in package: {}"_f << _Exception);
+											}
+										}
+										else
+											fOnInfo("Failed to extract version info from package: {}"_f << _LaunchResult.f_GetExceptionStr());
+
+										fUnpackAppAndFinish(_FromLocalFile, CStr());
+									}
+								;
+							}
+							else
+								fUnpackAppAndFinish(_FromLocalFile, CStr());
 							return;
 						}
 
@@ -369,35 +502,14 @@ namespace NMib::NCloud::NAppManager
 							{
 								auto &VersionInfo = _VersionInfo;
 
-								if (_bSettingsFromVersionInfo)
+								try
 								{
-									CApplicationSettings NewSettings = pApplication->m_Settings;
-									CApplicationSettings VersionInfoSettings;
-									EApplicationSetting NewChangedSettings = EApplicationSetting_None;
-									try
-									{
-										VersionInfoSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
-									}
-									catch (CException const &_Exception)
-									{
-										Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to get settings from version info: {}", _Exception)));
-										return;
-									}
-									NewSettings.f_ApplySettings(NewChangedSettings, VersionInfoSettings);
-
-									CStr Error;
-									if (!NewSettings.f_Validate(Error))
-									{
-										Continuation.f_SetException(Auditor.f_Exception(Error));
-										return ;
-									}
-									pApplication->m_Settings = NewSettings;
+									fApplyVersion(VersionID, VersionInfo);
 								}
-
-								pApplication->m_LastInstalledVersion = VersionID;
-								pApplication->m_LastInstalledVersionInfo = VersionInfo;
-								if (mp_KnownPlatforms(VersionID.m_Platform).f_WasCreated())
-									fp_VersionManagerResubscribeAll();
+								catch (CException const &_Exception)
+								{
+									Continuation.f_SetException(Auditor.f_Exception(_Exception.f_GetErrorStr()));
+								}
 
 								fUnpackAppAndFinish(DownloadDirectory, DownloadDirectory);
 							}

@@ -777,7 +777,8 @@ namespace NMib::NCloud::NAppManager
 		TCSet<TCSharedPointerSupportWeak<COnAppUpdateInfoChange>> mp_OnAppUpdateInfoChange;
 		
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroy = fg_Construct();
-		
+		TCVector<TCActor<CProcessLaunchActor>> mp_LaunchActors;
+
 		TCContinuation<void> mp_InitialStartupResult;
 		mint mp_PendingAutoLaunches = 0;
 		

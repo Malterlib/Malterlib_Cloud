@@ -426,7 +426,17 @@ namespace NMib::NCloud::NAppManager
 											pApplication->f_Clear();
 										}
 
-										mp_AppInterfaceServer.f_Destroy() > Continuation;
+										mp_AppInterfaceServer.f_Destroy() > [this, Continuation](auto &&)
+											{
+												TCActorResultVector<void> Destroys;
+
+												for (auto &Launch : mp_LaunchActors)
+													Launch->f_Destroy() > Destroys.f_AddResult();
+												mp_LaunchActors.f_Clear();
+
+												Destroys.f_GetResults() > Continuation.f_ReceiveAny();
+											}
+										;
 									}
 								;
 							}
