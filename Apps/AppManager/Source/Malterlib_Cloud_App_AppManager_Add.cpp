@@ -283,10 +283,10 @@ namespace NMib::NCloud::NAppManager
 #endif
 						fOnInfo("Unpacking application");
 						g_Dispatch(mp_FileActor) >
-							[=]
+							[=, pUniqueUserGroup = mp_pUniqueUserGroup]
 							{
 								auto &Settings = pApplication->m_Settings;
-								fsp_CreateApplicationUserGroup(Settings, fOnInfo, Directory / ".home");
+								fsp_CreateApplicationUserGroup(Settings, fOnInfo, Directory / ".home", pUniqueUserGroup);
 
 								TCVector<CStr> Files;
 
@@ -303,12 +303,23 @@ namespace NMib::NCloud::NAppManager
 									AllowExist[Directory + "/lost+found"];
 									if (!_DeletePath.f_IsEmpty())
 										AllowExist[_DeletePath];
-									CStr Output = fsp_UnpackApplication(SourcePath, Directory, pApplication->m_Name, pApplication->m_Settings, Files, AllowExist, _bForceInstall);
+									CStr Output = fsp_UnpackApplication
+										(
+										 	SourcePath
+										 	, Directory
+										 	, pApplication->m_Name
+										 	, pApplication->m_Settings
+										 	, Files
+										 	, AllowExist
+										 	, _bForceInstall
+										 	, pUniqueUserGroup
+										)
+									;
 									if (!Output.f_IsEmpty())
 										fOnInfo(Output.f_TrimRight());
 								}
 
-								fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files);
+								fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
 
 								if (!_DeletePath.f_IsEmpty())
 									CFile::fs_DeleteDirectoryRecursive(_DeletePath);

@@ -315,11 +315,12 @@ namespace NMib::NCloud::NAppManager
 						, ApplicationName = State.m_pApplication->m_Name
 						, fOnInfo = State.m_fOnInfo
 						, AllowSourceExist = State.m_AllowSourceExist
-						, SourcePath = State.m_SourcePath 
+						, SourcePath = State.m_SourcePath
+					 	, pUniqueUserGroup = mp_pUniqueUserGroup
 					]
 					() mutable
 					{
-						fsp_CreateApplicationUserGroup(Settings, fOnInfo, OutputDirectory / ".home");
+						fsp_CreateApplicationUserGroup(Settings, fOnInfo, OutputDirectory / ".home", pUniqueUserGroup);
 						
 						
 						if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
@@ -334,7 +335,7 @@ namespace NMib::NCloud::NAppManager
 							CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
 						
 						TCVector<CStr> Files;
-						CStr Output = fsp_UnpackApplication(SourcePath, TemporaryDirectory, ApplicationName, Settings, Files, AllowSourceExist, false);
+						CStr Output = fsp_UnpackApplication(SourcePath, TemporaryDirectory, ApplicationName, Settings, Files, AllowSourceExist, false, pUniqueUserGroup);
 						if (!Output.f_IsEmpty())
 							fOnInfo(Output);
 						return Files;
@@ -435,6 +436,7 @@ namespace NMib::NCloud::NAppManager
 						, OldFiles = State.m_pApplication->m_Files
 						, Files = State.m_Files
 						, pApplication = State.m_pApplication
+					 	, pUniqueUserGroup = mp_pUniqueUserGroup
 					]
 					{
 						// 3. Delete old files
@@ -469,7 +471,7 @@ namespace NMib::NCloud::NAppManager
 							}
 						}
 
-						fsp_UpdateApplicationFiles(OutputDirectory, pApplication, Files);
+						fsp_UpdateApplicationFiles(OutputDirectory, pApplication, Files, pUniqueUserGroup);
 					}
 					> Continuation / [=]
 					{

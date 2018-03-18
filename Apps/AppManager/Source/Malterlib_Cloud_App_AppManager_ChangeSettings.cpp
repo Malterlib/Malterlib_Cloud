@@ -258,10 +258,10 @@ namespace NMib::NCloud::NAppManager
 								fg_Dispatch
 									(
 										mp_FileActor
-										, [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope]()
+										, [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope, pUniqueUserGroup = mp_pUniqueUserGroup]()
 										{
-											fsp_CreateApplicationUserGroup(NewSettings, fOnInfo, Directory / ".home");
-											fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files);
+											fsp_CreateApplicationUserGroup(NewSettings, fOnInfo, Directory / ".home", pUniqueUserGroup);
+											fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
 										}
 									)
 									+ fp_UpdateApplicationJSON(pApplication)

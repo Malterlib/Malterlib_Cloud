@@ -185,11 +185,11 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		
-		LaunchParams.m_RunAsUser = _pApplication->m_Settings.m_RunAsUser;
+		LaunchParams.m_RunAsUser = fp_GetRunAsUser(_pApplication->m_Settings);
 #ifdef DPlatformFamily_Windows
 		LaunchParams.m_RunAsUserPassword = _pApplication->m_Settings.m_RunAsUserPassword;
 #endif
-		LaunchParams.m_RunAsGroup = _pApplication->m_Settings.f_GetRunAsGroup();
+		LaunchParams.m_RunAsGroup = fp_GetRunAsGroup(_pApplication->m_Settings);
 
 		LaunchParams.m_Environment["HOME"] = _pApplication->f_GetDirectory() + "/.home";
 		LaunchParams.m_Environment["TMPDIR"] = _pApplication->f_GetDirectory() + "/.tmp";

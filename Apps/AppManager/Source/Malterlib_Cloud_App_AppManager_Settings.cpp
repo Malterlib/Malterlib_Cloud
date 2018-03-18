@@ -2,19 +2,23 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include "Malterlib_Cloud_App_AppManager.h"
+#include <Mib/Cryptography/Hashes/SHA>
 
 namespace NMib::NCloud::NAppManager
 {
-	CStr CAppManagerActor::CApplicationSettings::f_GetRunAsGroup() const
+	CStr CAppManagerActor::fp_TransformUserGroup(CStr const &_UserName) const
 	{
-		if (m_RunAsGroup.f_IsEmpty())
-			return {};
+		return mp_pUniqueUserGroup->f_TransformUserGroup(_UserName);
+	}
 
-#ifdef DPlatformFamily_Windows
-		return "Group_" + m_RunAsGroup;
-#else
-		return m_RunAsGroup;
-#endif
+	CStr CAppManagerActor::fp_GetRunAsUser(CApplicationSettings const &_Settings) const
+	{
+		return mp_pUniqueUserGroup->f_GetUser(_Settings.m_RunAsUser);
+	}
+
+	CStr CAppManagerActor::fp_GetRunAsGroup(CApplicationSettings const &_Settings) const
+	{
+		return mp_pUniqueUserGroup->f_GetGroup(_Settings.m_RunAsGroup);
 	}
 
 	bool CAppManagerActor::CApplicationSettings::f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed)

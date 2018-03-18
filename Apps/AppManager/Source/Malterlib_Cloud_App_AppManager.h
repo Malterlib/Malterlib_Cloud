@@ -13,6 +13,7 @@
 #include <Mib/Concurrency/DistributedAppInterfaceLaunch>
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cloud/BackupManagerClient>
+#include <Mib/Security/UniqueUserGroup>
 
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
 
@@ -127,7 +128,6 @@ namespace NMib::NCloud::NAppManager
 			bool m_bStopOnDependencyFailure = true;
 			bool m_bBackupEnabled = false;
 
-			CStr f_GetRunAsGroup() const;
 			bool f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
 			void f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source);
 			void f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings);
@@ -136,7 +136,7 @@ namespace NMib::NCloud::NAppManager
 			EApplicationSetting f_ChangedSettings(CApplicationSettings const &_Other) const;
 			bool f_Validate(CStr &o_Error) const;
 		};
-		
+
 		struct CApplication : public TCSharedPointerIntrusiveBase<>
 		{
 			CApplication(CStr const &_Name, CAppManagerActor *_pThis)
@@ -512,7 +512,7 @@ namespace NMib::NCloud::NAppManager
 			, EWaitStageFlag_IgnoreFailed = DBit(0)
 			, EWaitStageFlag_DisallowInProgressStates = DBit(1)
 		};
-		
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		
 		static CStr fsp_RunTool
@@ -541,8 +541,22 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<bool> fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
 		TCContinuation<bool> fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
 		void fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication);
-		static void fsp_CreateApplicationUserGroup(CApplicationSettings const &_Settings, TCFunction<void (CStr const &_Info)> const &_fLogInfo, CStr const &_HomeDir);
-		static void fsp_UpdateApplicationFiles(CStr const &_ApplicationDir, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> const &_Files);
+		static void fsp_CreateApplicationUserGroup
+			(
+			 	CApplicationSettings const &_Settings
+			 	, TCFunction<void (CStr const &_Info)> const &_fLogInfo
+			 	, CStr const &_HomeDir
+			 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+			)
+		;
+		static void fsp_UpdateApplicationFiles
+			(
+			 	CStr const &_ApplicationDir
+			 	, TCSharedPointer<CApplication> const &_pApplication
+			 	, TCVector<CStr> const &_Files
+			 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+			)
+		;
 		TCContinuation<void> fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication);
 		TCContinuation<void> fp_RunUpdateScript
 			(
@@ -638,6 +652,7 @@ namespace NMib::NCloud::NAppManager
 				, TCVector<CStr> &o_Files
 				, TCSet<CStr> const &_AllowExist
 				, bool _bForceInstall
+			 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			)
 		;
 		TCContinuation<void> fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite);
@@ -748,6 +763,16 @@ namespace NMib::NCloud::NAppManager
 		
 		void fp_ApplicationStartBackup(TCSharedPointer<CApplication> const &_pApplication);
 
+		CStr fp_GetRunAsUser(CApplicationSettings const &_Settings) const;
+		CStr fp_GetRunAsGroup(CApplicationSettings const &_Settings) const;
+		CStr fp_TransformUserGroup(CStr const &_UserName) const;
+
+#ifdef DPlatformFamily_Windows
+		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M");
+#else
+		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("/M");
+#endif
+
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
 		TCActor<CSeparateThreadActor> mp_FileActor;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
@@ -756,7 +781,7 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bPendingAutoUpdate = false;
 		bool mp_bLogLaunchesToStdErr = false;
 		bool mp_bPendingSelfUpdateInProgress = false;
-		
+
 		TCLinkedList<CVersionManagerDownloadState> mp_Downloads;
 		
 		TCMap<CStr, CVersionManagerApplication> mp_VersionManagerApplications;

@@ -70,7 +70,10 @@ namespace NMib::NCloud::NAppManager
 			CVersionManager::CVersionIDAndPlatform PendingSelfUpdateVersionID;
 			CTime PendingSelfUpdateTime;
 			uint32 PendingSelfUpdateSequence = 0;
-			
+
+			if (auto *pUserNameTransform = mp_State.m_ConfigDatabase.m_Data.f_GetMember("UserGroupNameTransform"))
+				mp_pUniqueUserGroup->m_UserGroupNameTransform = pUserNameTransform->f_String();
+
 			if (auto *pPendingSelfUpdateProcess = mp_State.m_StateDatabase.m_Data.f_GetMember("PendingSelfUpdateProcess"))
 			{
 				auto &Pending = *pPendingSelfUpdateProcess;

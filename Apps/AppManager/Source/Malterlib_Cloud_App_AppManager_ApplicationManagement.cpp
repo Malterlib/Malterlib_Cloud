@@ -58,6 +58,7 @@ namespace NMib::NCloud::NAppManager
 			, TCVector<CStr> &o_Files
 			, TCSet<CStr> const &_AllowExist
 			, bool _bForceInstall
+		 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 		)
 	{
 		CStr Return;
@@ -177,9 +178,9 @@ namespace NMib::NCloud::NAppManager
 				continue;
 			
 			if (!Settings.m_RunAsUser.f_IsEmpty())
-				CFile::fs_SetOwner(File.m_Path, Settings.m_RunAsUser);
+				CFile::fs_SetOwner(File.m_Path, _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser));
 			if (!Settings.m_RunAsGroup.f_IsEmpty())
-				CFile::fs_SetGroup(File.m_Path, Settings.f_GetRunAsGroup());
+				CFile::fs_SetGroup(File.m_Path, _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup));
 			
 			fsp_UpdateAttributes(File.m_Path);
 			
@@ -319,44 +320,59 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 	
-	void CAppManagerActor::fsp_CreateApplicationUserGroup(CApplicationSettings const &_Settings, TCFunction<void (CStr const &_Info)> const &_fLogInfo, CStr const &_HomeDir)
+	void CAppManagerActor::fsp_CreateApplicationUserGroup
+		(
+		 	CApplicationSettings const &_Settings
+		 	, TCFunction<void (CStr const &_Info)> const &_fLogInfo
+		 	, CStr const &_HomeDir
+		 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+		)
 	{
+		CStr Group = _pUniqueUserGroup->f_GetGroup(_Settings.m_RunAsGroup);
+		CStr User = _pUniqueUserGroup->f_GetUser(_Settings.m_RunAsUser);
+
 		if (!_Settings.m_RunAsGroup.f_IsEmpty())
 		{
 			CStr GroupID;
-			if (!NSys::fg_UserManagement_GroupExists(_Settings.f_GetRunAsGroup(), GroupID))
+			if (!NSys::fg_UserManagement_GroupExists(Group, GroupID))
 			{
-				NSys::fg_UserManagement_CreateGroup(_Settings.f_GetRunAsGroup(), GroupID);
+				NSys::fg_UserManagement_CreateGroup(Group, GroupID);
 				if (_fLogInfo)
-					_fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", _Settings.f_GetRunAsGroup(), GroupID));
+					_fLogInfo(fg_Format("Created group '{}' with resulting group ID: {}", Group, GroupID));
 			}
 		}
 		if (!_Settings.m_RunAsUser.f_IsEmpty())
 		{
 			CStr UserID;
-			if (!NSys::fg_UserManagement_UserExists(_Settings.m_RunAsUser, UserID))
+			if (!NSys::fg_UserManagement_UserExists(User, UserID))
 			{
 				NSys::fg_UserManagement_CreateUser
 					(
-						_Settings.f_GetRunAsGroup()
-						, _Settings.m_RunAsUser
+						Group
+						, User
 #ifdef DPlatformFamily_Windows
 						, _Settings.m_RunAsUserPassword
 #else
 						, ""
 #endif
-						, _Settings.m_RunAsUser
+						, User
 						, _HomeDir
 						, UserID
 					)
 				;
 				if (_fLogInfo)
-					_fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", _Settings.m_RunAsUser, UserID));
+					_fLogInfo(fg_Format("Created user '{}' with resulting user ID: {}", User, UserID));
 			}
 		}
 	}
 	
-	void CAppManagerActor::fsp_UpdateApplicationFiles(CStr const &_ApplicationDir, TCSharedPointer<CApplication> const &_pApplication, TCVector<CStr> const &_Files)
+	void CAppManagerActor::fsp_UpdateApplicationFiles
+		(
+		 	CStr const &_ApplicationDir
+		 	, TCSharedPointer<CApplication> const &_pApplication
+		 	, TCVector<CStr> const &_Files
+		 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+		)
 	{
 		auto &Settings = _pApplication->m_Settings;
 		auto fSetOwners = [&](CStr _Directory)
@@ -364,9 +380,9 @@ namespace NMib::NCloud::NAppManager
 				while (_Directory.f_GetLen() >= _ApplicationDir.f_GetLen())
 				{
 					if (!Settings.m_RunAsUser.f_IsEmpty())
-						CFile::fs_SetOwner(_Directory, Settings.m_RunAsUser);
+						CFile::fs_SetOwner(_Directory, _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser));
 					if (!Settings.m_RunAsGroup.f_IsEmpty())
-						CFile::fs_SetGroup(_Directory, Settings.f_GetRunAsGroup());
+						CFile::fs_SetGroup(_Directory, _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup));
 					_Directory = CFile::fs_GetPath(_Directory);
 				}
 			}
