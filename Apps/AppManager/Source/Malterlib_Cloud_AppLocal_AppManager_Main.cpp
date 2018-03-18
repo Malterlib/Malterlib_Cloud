@@ -23,10 +23,32 @@ class CAppManager : public CApplication
 		NSys::fg_Process_SetEnvironmentVariable_Unsafe("Path", "c:\\Program Files\\Git\\usr\\bin;{}"_f << fg_GetSys()->f_GetEnvironmentVariable("Path"));
 #endif
 
+		CStr ProgramDirectory = NFile::CFile::fs_GetProgramDirectory();
+#ifdef DPlatformFamily_Windows
+		CStr DefaultProgramDirectory = "c:/M";
+#else
+		CStr DefaultProgramDirectory = "/M";
+#endif
+
+		CStr DefaultDaemonName = "MalterlibCloudAppManager";
+		CStr Description = "Malterlib Cloud App Manager";
+
+		if (ProgramDirectory != DefaultProgramDirectory)
+		{
+			NDataProcessing::CHash_SHA256 Hash;
+
+			CStr Salt = "MalterlibAppManagerDaemoName";
+
+			Hash.f_AddData(Salt.f_GetStr(), Salt.f_GetLen());
+			Hash.f_AddData(ProgramDirectory.f_GetStr(), ProgramDirectory.f_GetLen());
+			DefaultDaemonName = "MalterlibCloudAppManager_{}"_f << Hash.f_GetDigest().f_GetString().f_Left(16);
+			Description = "Malterlib Cloud App Manager [{}]"_f << ProgramDirectory;
+		}
+
 		NConcurrency::CDistributedDaemon Daemon
 			{
 				"MalterlibCloudAppManager"
-				, "Malterlib Cloud App Manager"
+				, Description
 				, "Manages distributed cloud apps running on one host"
 				, []
 				{
@@ -34,6 +56,7 @@ class CAppManager : public CApplication
 				}
 			}
 		;
+
 		return Daemon.f_Run();
 	}	
 };
