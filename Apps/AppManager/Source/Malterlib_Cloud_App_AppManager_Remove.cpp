@@ -36,8 +36,6 @@ namespace NMib::NCloud::NAppManager
 					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
 				auto InProgressScope = Application.f_SetInProgress();
 
-				TCContinuation<void> Continuation;
-
 				Application.f_Stop(EStopFlag_CloseEncryption) > [pThis, Auditor, Continuation, _Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
 					{
 						CStr Error = pThis->fp_GetApplicationStopErrors(_Result, _Name);
