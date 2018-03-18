@@ -47,7 +47,7 @@ class CAppManager : public CApplication
 
 		NConcurrency::CDistributedDaemon Daemon
 			{
-				"MalterlibCloudAppManager"
+				DefaultDaemonName
 				, Description
 				, "Manages distributed cloud apps running on one host"
 				, []
