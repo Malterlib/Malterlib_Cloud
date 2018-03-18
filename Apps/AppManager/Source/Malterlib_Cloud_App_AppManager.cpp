@@ -429,7 +429,7 @@ namespace NMib::NCloud::NAppManager
 											pApplication->f_Clear();
 										}
 
-										mp_AppInterfaceServer.f_Destroy() > [this, Continuation](auto &&)
+										mp_AppInterfaceServer.f_Destroy() > [this, Continuation](TCAsyncResult<void> &&)
 											{
 												TCActorResultVector<void> Destroys;
 
