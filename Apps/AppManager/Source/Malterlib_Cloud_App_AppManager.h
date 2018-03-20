@@ -513,6 +513,12 @@ namespace NMib::NCloud::NAppManager
 			, EWaitStageFlag_DisallowInProgressStates = DBit(1)
 		};
 
+		struct CAppLaunchResult
+		{
+			CStr m_StartupError;
+			bool m_bQuitManager = false;
+		};
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		
 		static CStr fsp_RunTool
@@ -538,8 +544,8 @@ namespace NMib::NCloud::NAppManager
 		void fp_InitApplications();
 		void fp_OnApplicationAdded(TCSharedPointer<CApplication> const &_pApplication);
 
-		TCContinuation<bool> fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
-		TCContinuation<bool> fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
+		TCContinuation<CAppLaunchResult> fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
+		TCContinuation<CAppLaunchResult> fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
 		void fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication);
 		static void fsp_CreateApplicationUserGroup
 			(

@@ -308,9 +308,11 @@ namespace NMib::NCloud::NAppManager
 										fOnInfo("Launching applicaion with changed settings");
 
 										fp_LaunchApp(pApplication, false)
-											> Continuation % "Failed to launch app. Will retry periodically." % Auditor / [=, InProgressScope = InProgressScope](bool _bQuitManager)
+											> Continuation % "Failed to launch app. Will retry periodically." % Auditor / [=, InProgressScope = InProgressScope](CAppLaunchResult &&_Result)
 											{
 												fOnInfo("Application settings were successfully changed");
+												if (_Result.m_StartupError)
+													fOnInfo("Application startup failed: {}"_f << _Result.m_StartupError);
 												Auditor.f_Info("Updated application settings");
 												Continuation.f_SetResult();
 											}

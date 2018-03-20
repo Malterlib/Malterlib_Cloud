@@ -353,10 +353,12 @@ namespace NMib::NCloud::NAppManager
 									{
 										pApplication->m_bJustUpdated = true;
 										fp_LaunchApp(pApplication, false)
-											> Continuation % "Failed to launch app. Will retry periodically" % Auditor / [=, InProgressScope = InProgressScope](bool _bQuitManager)
+											> Continuation % "Failed to launch app. Will retry periodically" % Auditor / [=, InProgressScope = InProgressScope](CAppLaunchResult &&_Result)
 											{
 												fOnInfo("Application was successfully added");
 												Auditor.f_Info("Application added");
+												if (_Result.m_StartupError)
+													fOnInfo("Application startup failed: {}"_f << _Result.m_StartupError);
 												Continuation.f_SetResult();
 											}
 										;

@@ -22,8 +22,9 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 	}
-	
-	TCContinuation<bool> CAppManagerActor::fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)
+
+	auto CAppManagerActor::fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)
+		-> TCContinuation<CAppLaunchResult>
 	{
 		DCheck(!_pApplication->m_bLaunching);
 
@@ -59,9 +60,9 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		
-		auto fLaunch = [this, _pApplication, pState]() -> TCContinuation<bool>
+		auto fLaunch = [this, _pApplication, pState]() -> TCContinuation<CAppLaunchResult>
 			{
-				TCContinuation<bool> Continuation;
+				TCContinuation<CAppLaunchResult> Continuation;
 				auto &Application = *_pApplication;
 				
 				if (Application.m_Settings.m_bSelfUpdateSource)
@@ -70,10 +71,16 @@ namespace NMib::NCloud::NAppManager
 					if (_pApplication->m_bJustUpdated)
 					{
 						_pApplication->m_bJustUpdated = false;
-						Continuation = fp_SelfUpdate(_pApplication);
+						fp_SelfUpdate(_pApplication) > Continuation / [Continuation](bool _bQuitManager)
+							{
+								CAppLaunchResult Result;
+								Result.m_bQuitManager = _bQuitManager;
+								Continuation.f_SetResult(fg_Move(Result));
+							}
+						;
 					}
 					else
-						Continuation.f_SetResult(false);
+						Continuation.f_SetResult(CAppLaunchResult{});
 					_pApplication->m_bLaunched = true;
 					return Continuation;
 				}
@@ -82,7 +89,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					fp_AppLaunchStateChanged(_pApplication, "No executable");
 					_pApplication->m_bLaunched = true;
-					return fg_Explicit(false);
+					return fg_Explicit(CAppLaunchResult{});
 				}
 				
 				fp_AppLaunchStateChanged(_pApplication, "Launching");
@@ -125,6 +132,8 @@ namespace NMib::NCloud::NAppManager
 															_pApplication->m_OnStartedDistributedApp.f_Clear();
 
 															fp_AppLaunchStateChanged(_pApplication, "Launched");
+															if (!Continuation.f_IsSet())
+																Continuation.f_SetResult(CAppLaunchResult{});
 														}
 														else
 														{
@@ -137,11 +146,11 @@ namespace NMib::NCloud::NAppManager
 																	, _Result.f_GetExceptionStr()
 																)
 															;
-															fp_AppLaunchStateChanged(_pApplication, fg_Format("Launched (app startup failed: '{}')", _Result.f_GetExceptionStr()));
+															fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Result.f_GetExceptionStr());
+
+															if (!Continuation.f_IsSet())
+																Continuation.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
 														}
-														
-														if (!Continuation.f_IsSet())
-															Continuation.f_SetResult(false);
 													}
 												;
 											}
@@ -151,7 +160,7 @@ namespace NMib::NCloud::NAppManager
 									pState->m_pCleanup.f_Clear();
 									fp_AppLaunchStateChanged(_pApplication, "Launched");
 									if (!Continuation.f_IsSet())
-										Continuation.f_SetResult(false);
+										Continuation.f_SetResult(CAppLaunchResult{});
 								}
 								break;
 							case NProcess::EProcessLaunchState_LaunchFailed:
@@ -276,6 +285,29 @@ namespace NMib::NCloud::NAppManager
 							;
 							return Continuation;
 						}
+					 	, g_ActorFunctor > [this, _pApplication, pState, Continuation](NStr::CStr const &_Error) -> TCContinuation<void>
+					 	{
+							if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
+								return fg_Explicit();
+
+							pState->m_pCleanup.f_Clear();
+							DMibLogWithCategory
+								(
+									Malterlib/Cloud/AppManager
+									, Error
+									, "Launched app '{}' failed to start up before registering: {}"
+									, _pApplication->m_Name
+									, _Error
+								)
+							;
+
+							fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Error);
+
+							if (!Continuation.f_IsSet())
+								Continuation.f_SetResult(CAppLaunchResult{_Error});
+
+							return fg_Explicit();
+						}
 						, Application.m_Name
 						, false
 					)
@@ -308,7 +340,7 @@ namespace NMib::NCloud::NAppManager
 		;
 		if (_bOpenEncryption)
 		{
-			TCContinuation<bool> Continuation;
+			TCContinuation<CAppLaunchResult> Continuation;
 			fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, _pApplication, EEncryptOperation_Open, false)
 				> [Continuation, this, fLaunch, _pApplication](TCAsyncResult<void> &&_Result)
 				{
@@ -331,11 +363,12 @@ namespace NMib::NCloud::NAppManager
 		return fLaunch();
 	}
 	
-	TCContinuation<bool> CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)
+	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)
+		-> TCContinuation<CAppLaunchResult>
 	{
 		if (_pApplication->m_bLaunching)
 		{
-			TCContinuation<bool> Continuation;
+			TCContinuation<CAppLaunchResult> Continuation;
 			_pApplication->m_OnLaunchFinished.f_Insert
 				(
 					[this, Continuation, _pApplication, _bOpenEncryption](bool _bAborted)

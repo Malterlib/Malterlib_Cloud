@@ -487,10 +487,12 @@ namespace NMib::NCloud::NAppManager
 				pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
 					{
 						pThis->fp_LaunchApp(pApplication, true)
-							> [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<bool> &&_Result)
+							> [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<CAppLaunchResult> &&_Result)
 							{
 								if (!_Result)
 									return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
+								if (_Result->m_StartupError)
+									return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Application startup failed: {}", _Result->m_StartupError)));
 
 								Auditor.f_Info(fg_Format("Started '{}'", _Name));
 								Continuation.f_SetResult();
@@ -604,10 +606,12 @@ namespace NMib::NCloud::NAppManager
 
 						pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
 							{
-								pThis->fp_LaunchApp(pApplication, true) > [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<bool> &&_Result)
+								pThis->fp_LaunchApp(pApplication, true) > [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<CAppLaunchResult> &&_Result)
 									{
 										if (!_Result)
 											return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
+										if (_Result->m_StartupError)
+											return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Application startup failed: {}", _Result->m_StartupError)));
 
 										Auditor.f_Info(fg_Format("Restarted '{}'", _Name));
 										Continuation.f_SetResult();

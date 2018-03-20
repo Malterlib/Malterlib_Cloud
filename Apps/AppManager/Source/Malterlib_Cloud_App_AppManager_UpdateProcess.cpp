@@ -566,14 +566,14 @@ namespace NMib::NCloud::NAppManager
 				}
 
 				fp_LaunchApp(State.m_pApplication, false)
-					> Continuation / [=](bool _bQuitManager)
+					> Continuation / [=](CAppLaunchResult &&_Result)
 					{
 						auto &State = *_pState; 
 						if (State.m_VersionID.f_IsValid())
 							State.m_fOnInfo(fg_Format("Application was successfully updated to version {}", State.m_VersionID));
 						else
 							State.m_fOnInfo("Application was successfully updated");
-						Continuation.f_SetResult(_bQuitManager);
+						Continuation.f_SetResult(_Result.m_bQuitManager);
 					}
 				;
 			}
