@@ -55,6 +55,7 @@ namespace NMib::NCloud::NAppManager
 					OutApplication.m_Parameters = Settings.m_ExecutableParameters;
 					OutApplication.m_RunAsUser = Settings.m_RunAsUser;
 					OutApplication.m_RunAsGroup = Settings.m_RunAsGroup;
+					OutApplication.m_bRunAsUserHasShell = Settings.m_bRunAsUserHasShell;
 					OutApplication.m_Backup_IncludeWildcards = Settings.m_Backup_IncludeWildcards;
 					OutApplication.m_Backup_ExcludeWildcards = Settings.m_Backup_ExcludeWildcards;
 					OutApplication.m_Backup_AddSyncFlagsWildcards = Settings.m_Backup_AddSyncFlagsWildcards;
@@ -163,6 +164,7 @@ namespace NMib::NCloud::NAppManager
 						ApplicationInfo += "                   Parameters: {vs,vb}{\n}"_f << Application.m_Parameters;
 						ApplicationInfo += "                  Run as user: {}{\n}"_f << Application.m_RunAsUser;
 						ApplicationInfo += "                 Run as group: {}{\n}"_f << Application.m_RunAsGroup;
+						ApplicationInfo += "        Run as user has shell: {}{\n}"_f << (Application.m_bRunAsUserHasShell ? "true" : "false");
 						ApplicationInfo += "              Distributed app: {}{\n}{\n}"_f << (Application.m_bDistributedApp ? "true" : "false");
 						
 						ApplicationInfo += "               Backup enabled: {}{\n}"_f << (Application.m_bBackupEnabled ? "true" : "false");

@@ -113,6 +113,7 @@ namespace NMib::NCloud::NCloudClient
 										, "ExecutableParams"_= {"--daemon-run-standalone", "--debug"}
 										, "RunAsUser"_= "ApplicationSpecificUser"
 										, "RunAsGroup"_= "ApplicationSpecificGroup"
+										, "RunAsUserHasShell"_= false
 										, "DistributedApp"_= true
 									}
 								}

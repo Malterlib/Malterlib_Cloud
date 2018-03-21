@@ -181,7 +181,14 @@ public:
 			;
 
 			// Add trust to cloud client
-			auto Ticket = DMibCallActor(VersionManagerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, VersionManagerServerAddress, nullptr).f_CallSync(g_Timeout);
+			auto Ticket = DMibCallActor
+				(
+				 	VersionManagerTrust
+				 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
+				 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{VersionManagerServerAddress}
+				 )
+				.f_CallSync(g_Timeout)
+			;
 			CStr CloudClientHostID = CProcessLaunch::fs_LaunchTool(CloudClientDirectory + "/MalterlibCloud", fg_CreateVector<CStr>("--trust-host-id")).f_Trim();
 			CProcessLaunch::fs_LaunchTool(CloudClientDirectory + "/MalterlibCloud", {"--trust-connection-add", Ticket.m_Ticket.f_ToStringTicket()});
 			{
@@ -312,7 +319,12 @@ public:
 					auto pAppManagerTrustInner = AppManagerInner.m_pTrustInterface; 
 					
 					TCContinuation<void> Continuation;
-					DMibCallActor(AppManagerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, AppManager.m_Address, nullptr)
+					DMibCallActor
+						(
+						 	AppManagerTrust
+						 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
+						 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{AppManager.m_Address}
+						)
 						> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 						{
 							auto &AppManagerTrustInner = *pAppManagerTrustInner;
@@ -334,7 +346,12 @@ public:
 
 				TCContinuation<> Continuation;
 				
-				DMibCallActor(VersionManagerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, VersionManagerServerAddress, nullptr)
+				DMibCallActor
+					(
+					 	VersionManagerTrust
+					 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
+					 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{VersionManagerServerAddress}
+					)
 					+ DMibCallActor
 					(
 						AppManagerTrust

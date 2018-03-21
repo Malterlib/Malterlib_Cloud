@@ -386,7 +386,12 @@ public:
 				auto pSecretsManagerTrustInner = SecretsManagerInner.m_pTrustInterface;
 				
 				TCContinuation<void> Continuation;
-				DMibCallActor(SecretsManagerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, SecretsManager.m_Address, nullptr)
+				DMibCallActor
+					(
+					 	SecretsManagerTrust
+					 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
+					 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SecretsManager.m_Address}
+					)
 					> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &SecretsManagerTrustInner = *pSecretsManagerTrustInner;
@@ -398,7 +403,12 @@ public:
 			}
 
 			TCContinuation<void> Continuation;
-			DMibCallActor(KeyManagerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, KeyManagerServerAddress, nullptr)
+			DMibCallActor
+				(
+				 	KeyManagerTrust
+				 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
+				 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{KeyManagerServerAddress}
+				)
 				> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 				{
 					auto &SecretsManagerTrust = *pSecretsManagerTrust;

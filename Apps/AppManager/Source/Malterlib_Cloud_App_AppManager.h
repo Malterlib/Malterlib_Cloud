@@ -75,7 +75,7 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_BackupNewBackupInterval = DBit(23)
 			, EApplicationSetting_BackupEnabled = DBit(24)
 			, EApplicationSetting_RunAsUserPassword = DBit(25)
-
+			, EApplicationSetting_RunAsUserHasShell = DBit(26)
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
 			| EApplicationSetting_ExecutableParameters 
@@ -105,8 +105,9 @@ namespace NMib::NCloud::NAppManager
 			CStr m_RunAsUser; 
 			CStr m_RunAsGroup;
 			TCVector<CStr> m_ExecutableParameters;
+			bool m_bRunAsUserHasShell = false;
 			bool m_bDistributedApp = false;
-			
+
 			NContainer::TCMap<NStr::CStr, CDirectoryManifestConfig::CDestination> m_Backup_IncludeWildcards;
 			NContainer::TCSet<NStr::CStr> m_Backup_ExcludeWildcards;
 			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;

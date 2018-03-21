@@ -118,7 +118,13 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 			m_RunAsGroup = pValue->f_String();
 		}
-		
+
+		if (auto *pValue = _Params.f_GetMember("RunAsUserHasShell"))
+		{
+			o_ChangedSettings |= EApplicationSetting_RunAsUserHasShell;
+			m_bRunAsUserHasShell = pValue->f_Boolean();
+		}
+
 		if (auto *pValue = _Params.f_GetMember("BackupIncludeWildcards"))
 		{
 			o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
@@ -258,6 +264,8 @@ namespace NMib::NCloud::NAppManager
 #endif
 		if (_ChangedSettings & EApplicationSetting_RunAsGroup)
 			m_RunAsGroup = _Source.m_RunAsGroup;
+		if (_ChangedSettings & EApplicationSetting_RunAsUserHasShell)
+			m_bRunAsUserHasShell = _Source.m_bRunAsUserHasShell;
 
 		if (_ChangedSettings & EApplicationSetting_BackupIncludeWildcards)
 			m_Backup_IncludeWildcards = _Source.m_Backup_IncludeWildcards;
@@ -364,7 +372,9 @@ namespace NMib::NCloud::NAppManager
 #endif
 		if (m_RunAsGroup != _Other.m_RunAsGroup)
 			ChangedSettings |= EApplicationSetting_RunAsGroup;
-			
+		if (m_bRunAsUserHasShell != _Other.m_bRunAsUserHasShell)
+			ChangedSettings |= EApplicationSetting_RunAsUserHasShell;
+
 		if (m_Backup_IncludeWildcards != _Other.m_Backup_IncludeWildcards)
 			ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
 		if (m_Backup_ExcludeWildcards != _Other.m_Backup_ExcludeWildcards)
@@ -457,10 +467,15 @@ namespace NMib::NCloud::NAppManager
 		}
 		if (_Settings.m_RunAsGroup)
 		{
-			m_RunAsGroup = *_Settings.m_RunAsGroup; 
+			m_RunAsGroup = *_Settings.m_RunAsGroup;
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 		}
-		
+		if (_Settings.m_bRunAsUserHasShell)
+		{
+			m_bRunAsUserHasShell = *_Settings.m_bRunAsUserHasShell;
+			o_ChangedSettings |= EApplicationSetting_RunAsUserHasShell;
+		}
+
 		if (_Settings.m_Backup_IncludeWildcards)
 		{
 			m_Backup_IncludeWildcards = *_Settings.m_Backup_IncludeWildcards; 
@@ -569,6 +584,12 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 			m_RunAsGroup = pValue->f_String();
+		}
+
+		if (auto *pValue = ExtraInfo.f_GetMember("RunAsUserHasShell", EJSONType_Boolean))
+		{
+			o_ChangedSettings |= EApplicationSetting_RunAsUserHasShell;
+			m_bRunAsUserHasShell = pValue->f_Boolean();
 		}
 
 		if (auto *pValue = ExtraInfo.f_GetMember("Backup", EJSONType_Object))

@@ -63,6 +63,8 @@ namespace NMib::NCloud
 		_Stream % m_ExecutableParameters;
 		_Stream % m_RunAsUser;
 		_Stream % m_RunAsGroup;
+		if (_Stream.f_GetVersion() >= 0x108)
+			_Stream % m_bRunAsUserHasShell;
 
 		_Stream % m_Backup_IncludeWildcards;
 		_Stream % m_Backup_ExcludeWildcards;
@@ -118,7 +120,9 @@ namespace NMib::NCloud
 		_Stream % m_Parameters;
 		_Stream % m_RunAsUser;
 		_Stream % m_RunAsGroup;
-		
+		if (_Stream.f_GetVersion() >= 0x108)
+			_Stream % m_bRunAsUserHasShell;
+
 		_Stream % m_Backup_IncludeWildcards;
 		_Stream % m_Backup_ExcludeWildcards;
 		_Stream % m_Backup_AddSyncFlagsWildcards;

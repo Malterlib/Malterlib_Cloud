@@ -104,8 +104,11 @@ namespace NMib::NCloud::NAppManager
 					if (auto pValue = ApplicationJSON.f_GetMember("RunAsUserPassword", EJSONType_String))
 						Settings.m_RunAsUserPassword = pValue->f_String();
 #endif
-					Settings.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String(); 
+					Settings.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String();
 					
+					if (auto pValue = ApplicationJSON.f_GetMember("RunAsUserHasShell", EJSONType_Boolean))
+						Settings.m_bRunAsUserHasShell = pValue->f_Boolean();
+
 					if (auto *pValue = ApplicationJSON.f_GetMember("Backup"))
 					{
 						auto &BackupJSON = *pValue;

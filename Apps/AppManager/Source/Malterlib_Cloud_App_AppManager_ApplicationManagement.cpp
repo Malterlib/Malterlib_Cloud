@@ -201,6 +201,7 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["Executable"] = Settings.m_Executable; 
 		ApplicationJSON["RunAsUser"] = Settings.m_RunAsUser; 
 		ApplicationJSON["RunAsGroup"] = Settings.m_RunAsGroup;
+		ApplicationJSON["RunAsUserHasShell"] = Settings.m_bRunAsUserHasShell;
 		ApplicationJSON["DistributedApp"] = Settings.m_bDistributedApp;
 		{
 			auto &Parameters = ApplicationJSON["Parameters"].f_Array();
@@ -358,6 +359,7 @@ namespace NMib::NCloud::NAppManager
 						, User
 						, _HomeDir
 						, UserID
+					 	, _Settings.m_bRunAsUserHasShell ? NSys::EUserManagementCreateUserFlag_ShellAccess : NSys::EUserManagementCreateUserFlag_None
 					)
 				;
 				if (_fLogInfo)

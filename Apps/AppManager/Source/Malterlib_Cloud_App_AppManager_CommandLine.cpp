@@ -57,14 +57,21 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 #endif
-		auto SettingsOption_RunAsGroup = "RunAsGroup?"_= 
+		auto SettingsOption_RunAsGroup = "RunAsGroup?"_=
 			{
 				"Names"_= {"--run-as-group"}
 				, "Type"_= ""
 				, "Description"_= "Run the application as this group."
 			}
 		;
-		auto SettingsOption_DistributedApp = "DistributedApp?"_= 
+		auto SettingsOption_RunAsUserHasShell = "RunAsUserHasShell?"_=
+			{
+				"Names"_= {"--run-as-user-has-shell"}
+				, "Type"_= ""
+				, "Description"_= "The run as user gets created with shell access."
+			}
+		;
+		auto SettingsOption_DistributedApp = "DistributedApp?"_=
 			{
 				"Names"_= {"--distributed-app"}
 				, "Type"_= true
@@ -298,6 +305,7 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_RunAsUserPassword
 #endif
 						, SettingsOption_RunAsGroup
+						, SettingsOption_RunAsUserHasShell
 						, SettingsOption_DistributedApp
 						, SettingsOption_BackupEnabled 
 						, SettingsOption_BackupIncludeWildcards 
@@ -459,6 +467,7 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_RunAsUserPassword
 #endif
 						, SettingsOption_RunAsGroup
+						, SettingsOption_RunAsUserHasShell
 						, SettingsOption_DistributedApp
 						, SettingsOption_BackupEnabled 
 						, SettingsOption_BackupIncludeWildcards 
