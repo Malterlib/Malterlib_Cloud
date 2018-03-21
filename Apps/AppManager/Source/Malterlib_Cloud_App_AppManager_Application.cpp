@@ -17,6 +17,11 @@ namespace NMib::NCloud::NAppManager
 		for (auto &fOnFinished : m_OnLaunchFinished)
 			fOnFinished(true);
 		m_OnLaunchFinished.f_Clear();
+		for (auto &Continuation : m_OnRegisterDistributedApp)
+			Continuation.f_SetException(DMibErrorInstance("Aborted launch"));
+		for (auto &Continuation : m_OnStartedDistributedApp)
+			Continuation.f_SetException(DMibErrorInstance("Aborted launch"));
+
 		m_OnRegisterDistributedApp.f_Clear();
 		m_OnStartedDistributedApp.f_Clear();
 	}
@@ -188,7 +193,7 @@ namespace NMib::NCloud::NAppManager
 						else
 							PreStopContinuation.f_SetResult();
 						
-						PreStopContinuation.f_Dispatch() > [=](TCAsyncResult<void> &&_Result)
+						PreStopContinuation.f_Dispatch().f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)") > [=](TCAsyncResult<void> &&_Result)
 							{
 								if (!_Result)
 									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", _Result.f_GetExceptionStr());

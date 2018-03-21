@@ -50,6 +50,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				[_pApplication]
 				{
+					_pApplication->m_AppInterface.f_Clear();
 					_pApplication->m_bLaunching = false;
 					if (!_pApplication->m_OnLaunchFinished.f_IsEmpty())
 					{
@@ -116,19 +117,40 @@ namespace NMib::NCloud::NAppManager
 									if (_pApplication->m_Settings.m_bDistributedApp)
 									{
 										fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)");
-										_pApplication->m_OnRegisterDistributedApp.f_Insert() = [this, pState, Continuation, _pApplication]
+										_pApplication->m_OnRegisterDistributedApp.f_Insert().f_Dispatch().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)")
+											> [this, pState, Continuation, _pApplication](TCAsyncResult<void> &&_Result)
 											{
 												if (_pApplication->m_bDeleted)
 													return;
+
+												if (!_Result)
+												{
+													DMibLogWithCategory
+														(
+															Malterlib/Cloud/AppManager
+															, Error
+															, "Launched app '{}' failed to register: {}"
+															, _pApplication->m_Name
+															, _Result.f_GetExceptionStr()
+														)
+													;
+													fp_AppLaunchStateChanged(_pApplication, "Launched (app register failed: '{}')"_f << _Result.f_GetExceptionStr());
+
+													if (!Continuation.f_IsSet())
+														Continuation.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
+													return;
+												}
+
 												fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)");
-												DCallActor(_pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_GetAppStartResult) 
+												DCallActor(_pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_GetAppStartResult)
+													.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
 													> [this, pState, Continuation, _pApplication](TCAsyncResult<void> &&_Result)
 													{
 														pState->m_pCleanup.f_Clear();
 														if (_Result)
 														{
 															for (auto &fOnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
-																fOnStartedDistributedApp();
+																fOnStartedDistributedApp.f_SetResult();
 															_pApplication->m_OnStartedDistributedApp.f_Clear();
 
 															fp_AppLaunchStateChanged(_pApplication, "Launched");
@@ -206,6 +228,10 @@ namespace NMib::NCloud::NAppManager
 										Continuation.f_SetException(DMibErrorInstance(fg_Format("Launch exited with '{}' before fully launched", ExitStatus)));
 
 									pState->m_pCleanup.f_Clear();
+									for (auto &Continuation : _pApplication->m_OnRegisterDistributedApp)
+										Continuation.f_SetException(DMibErrorInstance("Application exited"));
+									for (auto &Continuation : _pApplication->m_OnStartedDistributedApp)
+										Continuation.f_SetException(DMibErrorInstance("Application exited"));
 									_pApplication->m_OnRegisterDistributedApp.f_Clear();
 									_pApplication->m_OnStartedDistributedApp.f_Clear();
 									

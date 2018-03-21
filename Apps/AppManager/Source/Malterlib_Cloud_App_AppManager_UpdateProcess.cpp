@@ -573,6 +573,35 @@ namespace NMib::NCloud::NAppManager
 							State.m_fOnInfo(fg_Format("Application was successfully updated to version {}", State.m_VersionID));
 						else
 							State.m_fOnInfo("Application was successfully updated");
+
+						if (!_Result.m_StartupError.f_IsEmpty())
+						{
+							fp_RunUpdateScript
+								(
+								 	State.m_pApplication
+								 	, EUpdateScript_OnError
+								 	, "Error starting updated application: {}"_f << _Result.m_StartupError
+								 	, State.m_VersionID
+								 	, State.m_pVersionInfo.f_Get()
+								 	, State.m_pClock->f_GetTime()
+								)
+								> [](TCAsyncResult<void> &&_Result)
+								{
+									if (!_Result)
+									{
+										DMibLogWithCategory
+											(
+												Malterlib/Cloud/AppManager
+												, Warning
+												, "Error script failed: {}"
+												, _Result.f_GetExceptionStr()
+											)
+										;
+									}
+								}
+							;
+						}
+
 						Continuation.f_SetResult(_Result.m_bQuitManager);
 					}
 				;

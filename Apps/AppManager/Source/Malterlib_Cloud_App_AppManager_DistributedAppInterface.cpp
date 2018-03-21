@@ -48,7 +48,7 @@ namespace NMib::NCloud::NAppManager
 				;
 				
 				for (auto &fOnRegisterDistributedApp : Application.m_OnRegisterDistributedApp)
-					fOnRegisterDistributedApp();
+					fOnRegisterDistributedApp.f_SetResult();
 				Application.m_OnRegisterDistributedApp.f_Clear();
 				
 				return fg_Explicit
