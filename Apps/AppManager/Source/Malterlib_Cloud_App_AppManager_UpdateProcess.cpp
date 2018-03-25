@@ -467,7 +467,10 @@ namespace NMib::NCloud::NAppManager
 							{
 								CStr Directory = CFile::fs_GetPath(DestinationPath);
 								CFile::fs_CreateDirectory(Directory);
-								CFile::fs_RenameFile(SourcePath, DestinationPath);
+								if (CFile::fs_FileExists(DestinationPath))
+									CFile::fs_AtomicReplaceFile(SourcePath, DestinationPath);
+								else
+									CFile::fs_RenameFile(SourcePath, DestinationPath);
 							}
 						}
 
