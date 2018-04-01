@@ -17,7 +17,6 @@ namespace NMib::NCloud
 
 		bool bDirty = _bDirtyHint;
 		TCSharedPointer<CAppendFileState> pAppendState;
-		CUniqueFileIdentifier OldFileID;
 		
 		{
 			auto pFile = m_Manifest.m_Files.f_FindEqual(_FileName);
