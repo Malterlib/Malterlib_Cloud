@@ -114,7 +114,7 @@ namespace NMib::NCloud::NBackupManager
 									, Debug
 									, "Appending data for file '{}':   at {}   {} bytes"
 									, _FileName
-									, _Position
+									, Data.m_Position
 									, Data.m_Data.f_GetLen()
 								)
 							;
