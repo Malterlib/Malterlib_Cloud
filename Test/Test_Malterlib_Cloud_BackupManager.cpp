@@ -166,7 +166,7 @@ public:
 		{
 			m_BackupConfig.m_BackupIdentifier = "Test";
 			m_BackupConfig.m_ManifestConfig.m_Root = _TestBackupDirectory;
-			m_BackupConfig.m_ChangeAggregationTime = 0.05;
+			m_BackupConfig.m_ChangeAggregationTime = 0.05f;
 			m_BackupConfig.m_bReportChangesInInitialFinished = true;
 		}
 

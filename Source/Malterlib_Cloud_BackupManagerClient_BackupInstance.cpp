@@ -174,7 +174,7 @@ namespace NMib::NCloud::NPrivate
 										DMibLog(Info, "Reschedule: {}: {}", FileName, _Exception);
 										return fReportHashMismatch();
 									}
-									catch (NException::CException const &_Exception)
+									catch (NException::CException const &)
 									{
 									}
 
@@ -363,14 +363,14 @@ namespace NMib::NCloud::NPrivate
 							{
 								_Result.f_Access();
 							}
-							catch (CExceptionBackupManagerHashMismatch const &_Exception)
+							catch (CExceptionBackupManagerHashMismatch const &)
 							{
 								DMibCloudBackupManagerDebugOut("Hash mismatch (End append): {}\n", RunningState.m_FileName);
 								fp_ReportHashMismatch(pRunningState, *pPendingFile);
 								_Continuation.f_SetException(DMibErrorInstance(fg_Format("Hash mismatch appending backup data, rescheduling: {}", _Result.f_GetExceptionStr())));
 								return;
 							}
-							catch (NException::CException const &_Exception)
+							catch (NException::CException const &)
 							{
 							}
 						}
@@ -672,7 +672,7 @@ namespace NMib::NCloud::NPrivate
 											Continuation.f_SetException(_Exception);
 											break;
 										}
-										catch (NException::CException const &_Exception)
+										catch (NException::CException const &)
 										{
 										}
 
