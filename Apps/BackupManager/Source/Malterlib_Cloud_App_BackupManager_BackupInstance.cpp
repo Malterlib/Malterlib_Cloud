@@ -60,6 +60,9 @@ namespace NMib::NCloud::NBackupManager
 	TCContinuation<void> CBackupInstance::fp_Destroy()
 	{
 		auto &Internal = *mp_pInternal;
+		if (!Internal.m_BackupSourceSubscription)
+			return fg_Explicit();
+
 		return Internal.m_BackupSourceSubscription->f_Destroy();
 	}
 	
