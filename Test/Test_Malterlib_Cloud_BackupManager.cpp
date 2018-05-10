@@ -378,7 +378,7 @@ public:
 
 			mint Length = File.f_GetLength();
 			mint Start = _Random.f_GetValue(Length);
-			mint End = Start + fg_Min(_Random.f_GetValue(Length), fg_Min(Length - Start, 8192));
+			mint End = Start + fg_Min(_Random.f_GetValue(Length), fg_Min(Length - Start, 8192u));
 
 			for (mint Position = Start; Position < End; ++Position)
 			{
@@ -399,7 +399,7 @@ public:
 			File.f_Open(m_BackupConfig.m_ManifestConfig.m_Root / _Name, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 
 			mint Length = File.f_GetLength();
-			mint NewLen = fg_Max(_Random.f_GetValue(Length), 1);
+			mint NewLen = fg_Max(_Random.f_GetValue(Length), 1u);
 			File.f_SetLength(NewLen);
 		}
 
@@ -1164,8 +1164,8 @@ public:
 						FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
 
-					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), >=, 1);
-					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Quiescent), >=, 0);
+					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), >=, 1u);
+					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Quiescent), >=, 0u);
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
 					DMibExpect(CleanupNotifications.f_UnclaimedNotificaions(), ==, None);
 
@@ -1209,8 +1209,8 @@ public:
 						FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
 
-					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), >=, 1);
-					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Quiescent), >=, 0);
+					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), >=, 1u);
+					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Quiescent), >=, 0u);
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
 					DMibExpect(CleanupNotifications.f_UnclaimedNotificaions(), ==, None);
 
