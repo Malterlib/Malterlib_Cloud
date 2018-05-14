@@ -511,23 +511,23 @@ Property
 
 Property
 {
-	MalterlibCloud_CloudClientExecutable "" // User: Configure client executable to test local deploy to version manager
+	MalterlibCloud_CloudClientExecutable "" // User(Cloud Debug)=/Deploy/Malterlib_Cloud/MalterlibCloud: Configure client executable to test local deploy to version manager
 	{
 		!!MalterlibCloud_CloudClientExecutable ""
 	}
-	MalterlibCloud_VersionUploadVersion "" // User: Allows you to override the version uploaded to version manager for debug purposes
+	MalterlibCloud_VersionUploadVersion "" // User(Cloud Debug): Allows you to override the version uploaded to version manager for debug purposes
 	{
 		!!MalterlibCloud_VersionUploadVersion ""
 	}
-	MalterlibCloud_VersionUploadForce "" // User: Force uploads to vension manager even if version already exists
+	MalterlibCloud_VersionUploadForce "" // User(Cloud Debug)=true: Force uploads to version manager even if version already exists
 	{
 		!!MalterlibCloud_VersionUploadForce ""
 	}
-	MalterlibCloud_VersionUploadTags "" // User: Set the tags to use when uploading to version managers
+	MalterlibCloud_VersionUploadTags "" // User(Cloud Debug)=Debug: Set the tags to use when uploading to version managers
 	{
 		!!MalterlibCloud_VersionUploadTags ""
 	}
-	MalterlibCloud_VersionUploadHosts "@(MalterlibCloud_VersionUploadHostsDefault)" // User: Set the hosts to upload version to
+	MalterlibCloud_VersionUploadHosts "@(MalterlibCloud_VersionUploadHostsDefault)" // User(Cloud Debug): Set the hosts to upload version to
 	{
 		!!MalterlibCloud_VersionUploadHosts ""
 	}
