@@ -88,7 +88,7 @@ namespace NMib::NCloud::NVersionManager
 			return Auditor.f_Exception({"Invalid version platform format", "(start upload version)"});
 
 		TCContinuation<CStartUploadVersion::CResult> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["//Command//"] = {{"Application/WriteAll", fg_Format("Application/Write/{}", _Params.m_Application)}};
 		Permissions["//TagAll//"] = {{"Application/TagAll"}};
@@ -97,7 +97,7 @@ namespace NMib::NCloud::NVersionManager
 		for (auto &Tag : _Params.m_VersionInfo.m_Tags)
 		{
 			if (CVersionManager::fs_IsValidTag(Tag))
-				Permissions[Tag] = {CPermissions{fg_Format("Application/Tag/{}", Tag)}.f_Description("Access to tag {} in VersionManager"_f << Tag)};
+				Permissions[Tag] = {CPermissionQuery{fg_Format("Application/Tag/{}", Tag)}.f_Description("Access to tag {} in VersionManager"_f << Tag)};
 			else
 				DeniedTags[Tag];
 		}

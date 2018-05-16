@@ -127,7 +127,7 @@ namespace NMib::NCloud::NBackupManager
 
 		RSyncContext.m_ExpectedDigest = _ExpectedDigest;
 
-		auto pActorSubscription = g_ActorSubscription > [=]() -> TCContinuation<void>
+		auto ActorSubscription = g_ActorSubscription > [=]() -> TCContinuation<void>
 			{
 				TCContinuation<void> DestroyContinuation;
 
@@ -271,7 +271,7 @@ namespace NMib::NCloud::NBackupManager
 			)
 		;
 
-		return fg_Explicit(fg_Move(pActorSubscription));
+		return fg_Explicit(fg_Move(ActorSubscription));
 	}
 
 	TCContinuation<TCActorSubscriptionWithID<>> CBackupInstance::f_StartRSync

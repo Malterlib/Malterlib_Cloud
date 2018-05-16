@@ -33,21 +33,21 @@ namespace NMib::NCloud::NVersionManager
 		)
 	{
 		TCContinuation<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> Continuation;
-		TCMap<CStr, TCVector<CPermissions>> Permissions;
+		TCMap<CStr, TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["//TagAll//"] = {{"Application/TagAll"}};
 		TCSet<CStr> DeniedTags;
 		for (auto &Tag : _TagsAdded)
 		{
 			if (CVersionManager::fs_IsValidTag(Tag))
-				Permissions[Tag] = {CPermissions{fg_Format("Application/Tag/{}", Tag)}.f_Description("Access to tag {} in VersionManager"_f << Tag)};
+				Permissions[Tag] = {CPermissionQuery{fg_Format("Application/Tag/{}", Tag)}.f_Description("Access to tag {} in VersionManager"_f << Tag)};
 			else
 				DeniedTags[Tag];
 		}
 		for (auto &Tag : _TagsRemoved)
 		{
 			if (CVersionManager::fs_IsValidTag(Tag))
-				Permissions[Tag] = {CPermissions{fg_Format("Application/Tag/{}", Tag)}.f_Description("Access to tag {} in VersionManager"_f << Tag)};
+				Permissions[Tag] = {CPermissionQuery{fg_Format("Application/Tag/{}", Tag)}.f_Description("Access to tag {} in VersionManager"_f << Tag)};
 			else
 				DeniedTags[Tag];
 		}

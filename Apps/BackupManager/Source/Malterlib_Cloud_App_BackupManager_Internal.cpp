@@ -63,17 +63,30 @@ namespace NMib::NCloud::NBackupManager
 			> Continuation / [this, Continuation](CTrustedPermissionSubscription &&_Subscription)
 			{
 				mp_Permissions = fg_Move(_Subscription);
-				auto fOnPermissionsChange = [this](NStr::CStr const &_HostID, NContainer::TCSet<NStr::CStr> const &_Permissions)
-					{
-						if (!mp_ProtocolInterface.m_Publication.f_IsValid())
-							return;
-						if (!_Permissions.f_FindEqual("Backup/WriteSelf"))
-							return;
-						mp_ProtocolInterface.m_Publication.f_Republish(_HostID); // Force clients to reconnect
-					}
+				mp_Permissions.f_OnPermissionsAdded
+					(
+					 	[this](CPermissionIdentifiers const &_Identity, NContainer::TCMap<NStr::CStr, CPermissionRequirements> const &_Permissions)
+						{
+							if (!mp_ProtocolInterface.m_Publication.f_IsValid())
+								return;
+							if (!_Permissions.f_FindEqual("Backup/WriteSelf"))
+								return;
+							mp_ProtocolInterface.m_Publication.f_Republish(_Identity.f_GetHostID()); // Force clients to reconnect
+						}
+					)
 				;
-				mp_Permissions.f_OnPermissionsAdded(fOnPermissionsChange);
-				mp_Permissions.f_OnPermissionsRemoved(fOnPermissionsChange);
+				mp_Permissions.f_OnPermissionsRemoved
+					(
+					 	[this](CPermissionIdentifiers const &_Identity, NContainer::TCSet<NStr::CStr> const &_Permissions)
+						{
+							if (!mp_ProtocolInterface.m_Publication.f_IsValid())
+								return;
+							if (!_Permissions.f_FindEqual("Backup/WriteSelf"))
+								return;
+							mp_ProtocolInterface.m_Publication.f_Republish(_Identity.f_GetHostID()); // Force clients to reconnect
+						}
+					)
+				;
 				
 				Continuation.f_SetResult();
 			}

@@ -88,6 +88,44 @@ namespace
 			CParent::m_File.f_Close();
 		}
 	};
+
+	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return)
+	{
+	}
+
+	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return, tf_CKey &&_First, tf_CParams && ...p_Params)
+	{
+		_Return[fg_Forward<tf_CKey>(_First)];
+		fg_CreateMapHelper<tf_CKey, tf_CValue>(_Return, fg_Forward<tf_CParams>(p_Params)...);
+	}
+
+	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	TCMap<typename NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>::CType, typename NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>::CType> fg_CreateMap
+		(
+			tf_CKey && _First
+			, tf_CParams && ...p_Params
+		)
+	{
+		TCMap<typename NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>::CType, typename NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>::CType> Return;
+		fg_CreateMapHelper<typename NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>::CType, typename NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>::CType>
+			(
+				Return
+				, fg_Forward<tf_CKey>(_First)
+				, fg_Forward<tf_CParams>(p_Params)...
+			)
+		;
+		return Return;
+	}
+
+	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	TCMap<tf_CKey, tf_CValue> fg_CreateMap(tf_CParams && ...p_Params)
+	{
+		TCMap<tf_CKey, tf_CValue> Return;
+		fg_CreateMapHelper<tf_CKey, tf_CValue>(Return, fg_Forward<tf_CParams>(p_Params)...);
+		return Return;
+	}
 };
 
 class CSecretsManager_Tests : public NMib::NTest::CTest
@@ -119,7 +157,7 @@ public:
 
 		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 		CStr RootDirectory = ProgramDirectory + "/SecretsTests";
-		TCSet<CStr> SecretsManagerPermissionsForTest = fg_CreateSet<CStr>("SecretsManager/CommandAll", "SecretsManager/*/*/*");
+		auto SecretsManagerPermissionsForTest = fg_CreateMap<CStr, CPermissionRequirements>("SecretsManager/CommandAll", "SecretsManager/*/*/*");
 
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);
 
@@ -320,9 +358,14 @@ public:
 		TCActorResultVector<void> SetupTrustResults;
 
 		static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
-		auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
+		auto fPermissionsAdd = [](auto &&_HostID, auto &&_Permissions)
 			{
-				return CDistributedActorTrustManagerInterface::CChangeHostPermissions{_HostID, _Permissions, c_WaitForSubscriptions};
+				return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, c_WaitForSubscriptions};
+			}
+		;
+		auto fPermissionsRemove = [](auto &&_HostID, auto &&_Permissions)
+			{
+				return CDistributedActorTrustManagerInterface::CRemovePermissions{{_HostID, ""}, _Permissions, c_WaitForSubscriptions};
 			}
 		;
 		auto fNamespaceHosts = [](auto &&_Namespace, auto &&_Hosts)
@@ -371,8 +414,8 @@ public:
 			DMibCallActor
 				(
 					SecretsManagerTrust
-					, CDistributedActorTrustManagerInterface::f_AddHostPermissions
-					, fPermissions(TestHostID, SecretsManagerPermissionsForTest)
+					, CDistributedActorTrustManagerInterface::f_AddPermissions
+					, fPermissionsAdd(TestHostID, SecretsManagerPermissionsForTest)
 				)
 				> SetupTrustResults.f_AddResult()
 			;
@@ -917,7 +960,7 @@ public:
 			}
 
 			
-			auto fAddPermissions = [&](TCSet<NStr::CStr> const &_Permissions)
+			auto fAddPermissions = [&](TCMap<CStr, CPermissionRequirements> const &_Permissions)
 				{
 					for (auto &SecretsManager : AllSecretsManagers)
 					{
@@ -927,8 +970,8 @@ public:
 						DMibCallActor
 							(
 								SecretsManagerTrust
-								, CDistributedActorTrustManagerInterface::f_AddHostPermissions
-								, fPermissions(TestHostID, _Permissions)
+								, CDistributedActorTrustManagerInterface::f_AddPermissions
+								, fPermissionsAdd(TestHostID, _Permissions)
 							)
 							.f_CallSync(g_Timeout)
 						;
@@ -936,24 +979,44 @@ public:
 				}
 			;
 			
+			auto fAddPermission = [&](CStr const &_Permission)
+				{
+					fAddPermissions(fg_CreateMap<CStr, CPermissionRequirements>(fg_TempCopy(_Permission)));
+				}
+			;
+
 			auto fRemovePermissions = [&](TCSet<NStr::CStr> const &_Permissions)
 				{
+					TCMap<CStr, CPermissionRequirements> Permissions;
+					for (auto const &Permission : _Permissions)
+						Permissions[Permission];
+
 					for (auto &SecretsManager : AllSecretsManagers)
 					{
 						auto pSecretsManagerTrust = SecretsManager.m_pTrustInterface;
 						auto &SecretsManagerTrust = *pSecretsManagerTrust;
-						
+
 						DMibCallActor
 							(
 								SecretsManagerTrust
-								, CDistributedActorTrustManagerInterface::f_RemoveHostPermissions
-								, fPermissions(TestHostID, _Permissions)
+								, CDistributedActorTrustManagerInterface::f_RemovePermissions
+								, fPermissionsRemove(TestHostID, Permissions)
 							)
 							.f_CallSync(g_Timeout)
 						;
 					}
 				}
 			;
+
+			auto fRemovePermissionsMap = [&](TCMap<CStr, CPermissionRequirements> const &_Permissions)
+				{
+					TCSet<NStr::CStr> Permissions;
+					for (auto const &Methods : _Permissions)
+						Permissions[_Permissions.fs_GetKey(Methods)];
+					fRemovePermissions(Permissions);
+				}
+			;
+
 
 			// So far we have used the Wildcard and All permissions. Remove them so we can test more fine grained permissions.
 			fRemovePermissions(SecretsManagerPermissionsForTest);
@@ -963,13 +1026,12 @@ public:
 				DMibTestPath("Test GetProperties Command Permissions");
 				DMibExpectException(fGetProperties("Folder1", "Name1"), DMibErrorInstance("Access denied"));
 				
-				TCSet<NStr::CStr> Needed
-					{
+				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Read/SemanticID/Semantic1/Tag/Shared1"
 						, "SecretsManager/Read/SemanticID/Semantic1/Tag/Unique1"
 						, "SecretsManager/Command/GetSecretProperties"
-						
-					}
+					)
 				;
 				// Add all permissions we need
 				fAddPermissions(Needed);
@@ -979,12 +1041,12 @@ public:
 
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test GetProperties Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test GetProperties Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
 
 					// Remove one, check, and add it again
-					fRemovePermissions({Permission});
+					fRemovePermissions({Needed.fs_GetKey(Permission)});
 					DMibExpectException(fGetProperties("Folder1", "Name1"), DMibErrorInstance("Access denied"));
-					fAddPermissions({Permission});
+					fAddPermission(Needed.fs_GetKey(Permission));
 				}
 
 				// Check that access is permitted again
@@ -998,7 +1060,13 @@ public:
 				DMibTestPath("Test GetSecret Command Permissions");
 				DMibExpectException(fGetSecret("Folder1", "Name1"), DMibErrorInstance("Access denied"));
 				
-				TCSet<NStr::CStr> Needed{"SecretsManager/Read/SemanticID/Semantic1/Tag/Shared1", "SecretsManager/Read/SemanticID/Semantic1/Tag/Unique1", "SecretsManager/Command/GetSecret"};
+				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
+					(
+						"SecretsManager/Read/SemanticID/Semantic1/Tag/Shared1"
+						, "SecretsManager/Read/SemanticID/Semantic1/Tag/Unique1"
+						, "SecretsManager/Command/GetSecret"
+					)
+				;
 				// Add all permissions we need
 				fAddPermissions(Needed);
 				
@@ -1007,12 +1075,12 @@ public:
 
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test GetSecret Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test GetSecret Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
 
 					// Remove one, check, and add it again
-					fRemovePermissions({Permission});
+					fRemovePermissions({Needed.fs_GetKey(Permission)});
 					DMibExpectException(fGetSecret("Folder1", "Name1"), DMibErrorInstance("Access denied"));
-					fAddPermissions({Permission});
+					fAddPermission(Needed.fs_GetKey(Permission));
 				}
 
 				{
@@ -1028,12 +1096,12 @@ public:
 				DMibTestPath("Test GetSecretBySemanticID Command Permissions");
 				DMibExpectException(fGetBySemantic("Semantic1", {{"Shared1", "Unique1"}}), DMibErrorInstance("Access denied"));
 				
-				TCSet<NStr::CStr> Needed
-					{
+				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Read/SemanticID/Semantic1/Tag/Shared1"
 						, "SecretsManager/Read/SemanticID/Semantic1/Tag/Unique1"
 						, "SecretsManager/Command/GetSecretBySemanticID"
-					}
+					)
 				;
 				// Add all permissions we need
 				fAddPermissions(Needed);
@@ -1043,13 +1111,13 @@ public:
 				
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test GetSecretBySemanticID Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test GetSecretBySemanticID Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
 					
 					// Remove one, check, and add it again
-					fRemovePermissions({Permission});
+					fRemovePermissions({Needed.fs_GetKey(Permission)});
 					// GetBySemanticID and EnumerateSecrets simply skips the secrets one hasn't permission to see so here
 					// we can either get an access denied exception or a no secret exception
-					if (Permission == "SecretsManager/Command/GetSecretBySemanticID")
+					if (Needed.fs_GetKey(Permission) == "SecretsManager/Command/GetSecretBySemanticID")
 						DMibExpectException(fGetBySemantic("Semantic1", {{"Shared1", "Unique1"}}), DMibErrorInstance("Access denied"));
 					else
 					{
@@ -1060,7 +1128,7 @@ public:
 							 )
 						;
 					}
-					fAddPermissions({Permission});
+					fAddPermission(Needed.fs_GetKey(Permission));
 				}
 				
 				{
@@ -1089,13 +1157,13 @@ public:
 				DMibTestPath("Test EnumerateSecrets Command Permissions");
 				DMibExpectException(fEnumerateFor({"Semantic1"}, {{"Shared1", "Unique1"}}), DMibErrorInstance("Access denied"));
 				
-				TCSet<NStr::CStr> Needed
-					{
+				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Read/SemanticID/Semantic1/Tag/Shared1"
 						, "SecretsManager/Read/SemanticID/Semantic1/Tag/Unique1"
 						, "SecretsManager/Command/EnumerateSecrets"
 						
-					}
+					)
 				;
 				// Add all permissions we need
 				fAddPermissions(Needed);
@@ -1105,17 +1173,17 @@ public:
 				
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test EnumerateSecrets Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test EnumerateSecrets Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
 					
 					// Remove one, check, and add it again
-					fRemovePermissions({Permission});
+					fRemovePermissions({Needed.fs_GetKey(Permission)});
 					// As in the SemanticID case enumerate simply skips the secrets without permission and we get an empty set
-					if (Permission == "SecretsManager/Command/EnumerateSecrets")
+					if (Needed.fs_GetKey(Permission) == "SecretsManager/Command/EnumerateSecrets")
 						DMibExpectException(fEnumerateFor({"Semantic1"}, {{"Shared1", "Unique1"}}), DMibErrorInstance("Access denied"));
 					else
 						DMibExpect(fEnumerateFor({"Semantic1"}, {{"Shared1", "Unique1"}}), ==, (TCSet<CSecretsManager::CSecretID>{}));
 
-					fAddPermissions({Permission});
+					fAddPermission(Needed.fs_GetKey(Permission));
 				}
 				
 				{
@@ -1130,12 +1198,12 @@ public:
 				DMibTestPath("Test SetProperties Command Permissions");
 				DMibExpectException(fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetNotes("Note")), DMibErrorInstance("Access denied"));
 				
-				TCSet<NStr::CStr> Needed
-					{
+				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Write/SemanticID/Semantic1/Tag/Shared1"
 						, "SecretsManager/Write/SemanticID/Semantic1/Tag/Unique1"
 						, "SecretsManager/Command/SetSecretProperties"
-					}
+					)
 				;
 				// Add all permissions we need
 				fAddPermissions(Needed);
@@ -1145,12 +1213,12 @@ public:
 
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test SetProperties Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test SetProperties Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
 
 					// Remove one, check, and add it again
-					fRemovePermissions({Permission});
+					fRemovePermissions({Needed.fs_GetKey(Permission)});
 					DMibExpectException(fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetNotes("Note")), DMibErrorInstance("Access denied"));
-					fAddPermissions({Permission});
+					fAddPermission(Needed.fs_GetKey(Permission));
 				}
 
 				{
@@ -1207,21 +1275,21 @@ public:
 			{
 				DMibTestPath("Test ModifyTags Command Permissions");
 				DMibExpectException(fAddTagsAndGetProperties("Folder1", "Name1", {{"Extra"}}, {}), DMibErrorInstance("Access denied"));
-				TCSet<NStr::CStr> Needed
-					{
+				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Write/SemanticID/Semantic1/Tag/Shared1"
 						, "SecretsManager/Write/SemanticID/Semantic1/Tag/Unique1"
 						, "SecretsManager/Write/SemanticID/Semantic1/Tag/Extra"
 						, "SecretsManager/Command/ModifyTags"
-					}
+					)
 				;
-				TCSet<NStr::CStr> Needed2
-					{
+				auto Needed2 = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Read/SemanticID/Semantic1/Tag/Shared1"
 						, "SecretsManager/Read/SemanticID/Semantic1/Tag/Unique1"
 						, "SecretsManager/Read/SemanticID/Semantic1/Tag/Extra"
 						, "SecretsManager/Command/GetSecretProperties"
-					}
+					)
 				;
 				fAddPermissions(Needed);
 				fAddPermissions(Needed2);
@@ -1231,13 +1299,13 @@ public:
 
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test ModifyTags Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test ModifyTags Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
 
 					// Remove one, check, and add it again
-					fRemovePermissions({Permission});
+					fRemovePermissions({Needed.fs_GetKey(Permission)});
 					DMibExpectException(fAddTagsAndGetProperties("Folder1", "Name1", {{"Extra"}}, {}), DMibErrorInstance("Access denied"));
 					DMibExpectException(fAddTagsAndGetProperties("Folder1", "Name1", {}, {{"Extra"}}), DMibErrorInstance("Access denied"));
-					fAddPermissions({Permission});
+					fAddPermission(Needed.fs_GetKey(Permission));
 				}
 
 				// Check that access is permitted again
@@ -1245,29 +1313,31 @@ public:
 
 				// We cannot remove all tags without NoTag permission
 				DMibExpectException(fAddTagsAndGetProperties("Folder1", "Name1", {{"Unique1", "Shared1", "Extra"}}, {}), DMibErrorInstance("Access denied"));
-				fAddPermissions({"SecretsManager/Write/SemanticID/Semantic1/NoTag", "SecretsManager/Read/SemanticID/Semantic1/NoTag"});
+				fAddPermission("SecretsManager/Write/SemanticID/Semantic1/NoTag");
+				fAddPermission("SecretsManager/Read/SemanticID/Semantic1/NoTag");
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {"Unique1", "Shared1", "Extra"}, {})).m_Tags, ==, (TCSet<NStr::CStr>{}));
 				fRemovePermissions({"SecretsManager/Write/SemanticID/Semantic1/NoTag", "SecretsManager/Read/SemanticID/Semantic1/NoTag"});
 
 				// Same here, we cannot add tags from the NoTags state without that permission
 				DMibExpectException(fAddTagsAndGetProperties("Folder1", "Name1", {}, {"Unique1", "Shared1"}), DMibErrorInstance("Access denied"));
-				fAddPermissions({"SecretsManager/Write/SemanticID/Semantic1/NoTag", "SecretsManager/Read/SemanticID/Semantic1/NoTag"});
+				fAddPermission("SecretsManager/Write/SemanticID/Semantic1/NoTag");
+				fAddPermission("SecretsManager/Read/SemanticID/Semantic1/NoTag");
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {}, {"Unique1", "Shared1"})).m_Tags, ==, (TCSet<NStr::CStr>{{"Unique1", "Shared1"}}));
 
-				fRemovePermissions(Needed);
-				fRemovePermissions(Needed2);
+				fRemovePermissionsMap(Needed);
+				fRemovePermissionsMap(Needed2);
 				fRemovePermissions({"SecretsManager/Write/SemanticID/Semantic1/NoTag", "SecretsManager/Read/SemanticID/Semantic1/NoTag"});
 			}
 
 			{
 				DMibTestPath("Test SetMetadata Command Permissions");
 
-				TCSet<NStr::CStr> Needed
-					{
+				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Write/SemanticID/Semantic1/Tag/Shared1"
 						, "SecretsManager/Write/SemanticID/Semantic1/Tag/Unique1"
 						, "SecretsManager/Command/SetMetadata"
-					}
+					)
 				;
 				fAddPermissions(Needed);
 
@@ -1276,12 +1346,12 @@ public:
 
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test SetMetadata Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test SetMetadata Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
 
 					// Remove one, check, and add it again
-					fRemovePermissions({Permission});
+					fRemovePermissions({Needed.fs_GetKey(Permission)});
 					DMibExpectException(fSetKeyValue("Folder1", "Name1", "Key", "Value"), DMibErrorInstance("Access denied"));
-					fAddPermissions({Permission});
+					fAddPermission(Needed.fs_GetKey(Permission));
 				}
 				// Check that access was granted
 				fSetKeyValue("Folder1", "Name1", "Key2", "Value");
@@ -1293,12 +1363,12 @@ public:
 			{
 				DMibTestPath("Test RemoveMetadata Command Permissions");
 
-				TCSet<NStr::CStr> Needed
-					{
+				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Write/SemanticID/Semantic1/Tag/Shared1"
 						, "SecretsManager/Write/SemanticID/Semantic1/Tag/Unique1"
 						, "SecretsManager/Command/RemoveMetadata"
-					}
+					)
 				;
 				fAddPermissions(Needed);
 
@@ -1307,12 +1377,12 @@ public:
 
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test RemoveMetadata Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test RemoveMetadata Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
 
 					// Remove one, check, and add it again
-					fRemovePermissions({Permission});
+					fRemovePermissions({Needed.fs_GetKey(Permission)});
 					DMibExpectException(fRemoveKey("Folder1", "Name1", "Key2"), DMibErrorInstance("Access denied"));
-					fAddPermissions({Permission});
+					fAddPermission(Needed.fs_GetKey(Permission));
 				}
 				// Check that access was granted
 				fRemoveKey("Folder1", "Name1", "Key2");
@@ -1324,20 +1394,20 @@ public:
 			{
 				DMibTestPath("Test RemoveSecret Command Permissions");
 
-				TCSet<NStr::CStr> Needed
-					{
+				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Write/SemanticID/Semantic1/Tag/T1"
 						, "SecretsManager/Write/SemanticID/Semantic1/Tag/T2"
 						, "SecretsManager/Command/RemoveSecret"
-					}
+					)
 				;
-				TCSet<NStr::CStr> NeededForTest
-					{
+				auto NeededForTest = fg_CreateMap<CStr, CPermissionRequirements>
+					(
 						"SecretsManager/Read/SemanticID/Semantic1/Tag/T1"
 						, "SecretsManager/Read/SemanticID/Semantic1/Tag/T2"
 						, "SecretsManager/Command/SetSecretProperties"
 						, "SecretsManager/Command/GetSecret"
-					}
+					)
 				;
 				fAddPermissions(NeededForTest);
 				fAddPermissions(Needed);
@@ -1347,12 +1417,12 @@ public:
 
 				for (auto const &Permission : Needed)
 				{
-					DMibTestPath(fg_Format("Test RemoveSecret Permissions. Missing '{}' permission", Permission));
+					DMibTestPath(fg_Format("Test RemoveSecret Permissions. Missing '{}' permission", Needed.fs_GetKey(Permission)));
 
 					// Remove one, check, and add it again
-					fRemovePermissions({Permission});
+					fRemovePermissions({Needed.fs_GetKey(Permission)});
 					DMibExpectException(fRemoveSecret("Removable", "Name1"), DMibErrorInstance("Access denied"));
-					fAddPermissions({Permission});
+					fAddPermission(Needed.fs_GetKey(Permission));
 					DMibExpect(fGetSecret("Removable", "Name1"), ==, CSecretsManager::CSecret{});
 				}
 

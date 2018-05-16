@@ -8,10 +8,10 @@ namespace NMib::NCloud::NBackupManager
 	TCContinuation<TCVector<CStr>> CBackupManagerServer::fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources)
 	{
 		TCContinuation<TCVector<CStr>> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 		Permissions["//ALL//"] = {{"Backup/ListAll", "Backup/ReadAll"}};
 		for (auto &Backup : _Sources)
-			Permissions[Backup] = {CPermissions{fg_Format("Backup/Read/{}", Backup)}.f_Description("Access source {} in BackupManager"_f << Backup)};
+			Permissions[Backup] = {CPermissionQuery{fg_Format("Backup/Read/{}", Backup)}.f_Description("Access source {} in BackupManager"_f << Backup)};
 
 		mp_Permissions.f_HasPermissions("List backup sources", Permissions) > Continuation / [Continuation, _Sources](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{

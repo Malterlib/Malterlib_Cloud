@@ -71,8 +71,14 @@ namespace NMib::NCloud::NAppManager
 	TCContinuation<void> CAppManagerActor::fp_SetupAppManagerInterfacePermissions()
 	{
 		TCContinuation<void> Continuation;
-		auto CommandLinePermissions = fg_CreateSet<CStr>("AppManager/VersionAppAll", "AppManager/AppAll", "AppManager/CommandAll");
-		mp_State.m_TrustManager(&CDistributedActorTrustManager::f_AddHostPermissions, mp_State.m_CommandLineHostID, CommandLinePermissions, EDistributedActorTrustManagerOrderingFlag_None)
+		NContainer::TCMap<NStr::CStr, CPermissionRequirements> CommandLinePermissions = {{"AppManager/VersionAppAll"}, {"AppManager/AppAll"}, {"AppManager/CommandAll"}};
+		mp_State.m_TrustManager
+			(
+				&CDistributedActorTrustManager::f_AddPermissions
+			 	, CPermissionIdentifiers{mp_State.m_CommandLineHostID, ""}
+				, CommandLinePermissions
+				, EDistributedActorTrustManagerOrderingFlag_None
+			)
 			+ fp_RegisterPermissions()
 			+ fp_SubscribePermissions()
 			> Continuation.f_ReceiveAny()

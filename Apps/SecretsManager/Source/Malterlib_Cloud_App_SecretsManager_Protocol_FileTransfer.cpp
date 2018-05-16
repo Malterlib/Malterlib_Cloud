@@ -87,7 +87,7 @@ namespace NMib::NCloud::NSecretsManager
 		auto Auditor = This.mp_AppState.f_Auditor();
 
 		TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/DownloadFile"}};
 		auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID);
@@ -258,7 +258,7 @@ namespace NMib::NCloud::NSecretsManager
 			return Auditor.f_Exception("The file name cannot contain any of the characters: '^*?[]'");
 
 		TCContinuation<NConcurrency::TCActorFunctorWithID<TCContinuation<void> ()>> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/UploadFile"}};
 		auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID);

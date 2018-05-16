@@ -126,13 +126,13 @@ namespace NMib::NCloud::NVersionManager
 		;
 	}
 
-	void CVersionManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CStr const &_HostID)
+	void CVersionManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity)
 	{
 		auto fSendForSubscriptions = [&](TCMap<CStr, CSubscription> const &_Subscriptions, CStr const &_Application)
 			{
 				for (auto &Subscription : _Subscriptions)
 				{
-					if (Subscription.m_CallingHostInfo.f_GetRealHostID() != _HostID)
+					if (Subscription.m_CallingHostInfo.f_GetRealHostID() != _Identity.f_GetHostID())
 						continue;
 					fp_SendSubscriptionInitial(_Application, Subscription) > fg_DiscardResult();
 				}

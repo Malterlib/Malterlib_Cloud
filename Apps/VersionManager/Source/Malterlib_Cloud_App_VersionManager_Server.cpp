@@ -246,18 +246,18 @@ namespace NMib::NCloud::NVersionManager
 				
 				mp_Permissions.f_OnPermissionsAdded
 					(
-						[this](CStr const &_HostID, TCSet<CStr> const &_AddedPermissions)
+						[this](CPermissionIdentifiers const &_Identity, TCMap<CStr, CPermissionRequirements> const &_AddedPermissions)
 						{
-							fp_UpdateSubscriptionsForChangedPermissions(_HostID);
+							fp_UpdateSubscriptionsForChangedPermissions(_Identity);
 						}
 					)
 				;
 				
 				mp_Permissions.f_OnPermissionsRemoved
 					(
-						[this](CStr const &_HostID, TCSet<CStr> const &_AddedRemoved)
+						[this](CPermissionIdentifiers const &_Identity, TCSet<CStr> const &_RemovedPermissions)
 						{
-							fp_UpdateSubscriptionsForChangedPermissions(_HostID);
+							fp_UpdateSubscriptionsForChangedPermissions(_Identity);
 						}
 					)
 				;

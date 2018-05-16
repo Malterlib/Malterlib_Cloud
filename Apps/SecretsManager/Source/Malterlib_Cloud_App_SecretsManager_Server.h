@@ -99,7 +99,7 @@ namespace NMib::NCloud::NSecretsManager
 				char const *_ReadWrite
 				, NStr::CStr const &_SemanticID
 				, TCSet<NStr::CStrSecure> const &_Tags
-				, TCMap<NStr::CStr, TCVector<CPermissions>> &o_Permissions
+				, TCMap<NStr::CStr, TCVector<CPermissionQuery>> &o_Permissions
 			)
 		;
 		static void fsp_AddPermissionQueryIndexedBySecretID
@@ -108,7 +108,7 @@ namespace NMib::NCloud::NSecretsManager
 				, char const *_ReadWrite
 				, NStr::CStr const &_SemanticID
 				, TCSet<NStr::CStrSecure> const &_Tags
-				, TCMap<NStr::CStr, TCVector<CPermissions>> &o_Permissions
+				, TCMap<NStr::CStr, TCVector<CPermissionQuery>> &o_Permissions
 			)
 		;
 		static void fsp_AddPermissionsForMatchingSecrets
@@ -116,7 +116,7 @@ namespace NMib::NCloud::NSecretsManager
 				TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal> &_Secrets
 				, TCOptional<CStrSecure> const &_SemanticID
 				, TCSet<CStrSecure> const &_TagsExclusive
-			 	, NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> &o_Permissions
+			 	, NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> &o_Permissions
 			)
 		;
 		void fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove,TCSet<CStrSecure> const &_TagsToAdd);

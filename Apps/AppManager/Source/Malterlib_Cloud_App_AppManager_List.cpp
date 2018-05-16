@@ -12,7 +12,7 @@ namespace NMib::NCloud::NAppManager
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
 
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 		
 		Permissions["//Command//"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationEnum"}};
 
@@ -21,7 +21,7 @@ namespace NMib::NCloud::NAppManager
 			auto &Application = *pApplication;
 
 			Permissions[Application.m_Name]
-				= {CPermissions{"AppManager/AppAll", fg_Format("AppManager/App/{}", Application.m_Name)}.f_Description("Access application {} in AppManager"_f << Application.m_Name)}
+				= {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", Application.m_Name)}.f_Description("Access application {} in AppManager"_f << Application.m_Name)}
 			;
 		}
 
@@ -87,7 +87,7 @@ namespace NMib::NCloud::NAppManager
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
 		
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["//Command//"] = {{"AppManager/CommandAll", "AppManager/Command/VersionEnum"}};
 
@@ -97,7 +97,7 @@ namespace NMib::NCloud::NAppManager
 			if (!_Application.f_IsEmpty() && Name != _Application)
 				continue;
 
-			Permissions[Name] = {CPermissions{"AppManager/VersionAppAll", fg_Format("AppManager/VersionApp/{}", Name)}.f_Description("Get versions of application {} in AppManager"_f << Name)};
+			Permissions[Name] = {CPermissionQuery{"AppManager/VersionAppAll", "AppManager/VersionApp/{}"_f << Name}.f_Description("Get versions of application {} in AppManager"_f << Name)};
 		}
 
 		TCContinuation<CVersionsAvailableForUpdate> Continuation;

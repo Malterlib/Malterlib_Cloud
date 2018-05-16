@@ -458,10 +458,10 @@ namespace NMib::NCloud::NAppManager
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
 
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationStart"}};
-		Permissions["App"] = {CPermissions{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
+		Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
 		TCContinuation<void> Continuation;
 
@@ -512,10 +512,10 @@ namespace NMib::NCloud::NAppManager
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
 
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationStop"}};
-		Permissions["App"] = {CPermissions{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
+		Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
 		TCContinuation<void> Continuation;
 
@@ -566,10 +566,10 @@ namespace NMib::NCloud::NAppManager
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
 
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationRestart"}};
-		Permissions["App"] = {CPermissions{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
+		Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
 		TCContinuation<void> Continuation;
 

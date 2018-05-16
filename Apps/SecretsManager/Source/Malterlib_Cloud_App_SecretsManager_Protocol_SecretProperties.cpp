@@ -68,7 +68,7 @@ namespace NMib::NCloud::NSecretsManager
 			TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal> &_Secrets
 			, TCOptional<CStrSecure> const &_SemanticID
 			, TCSet<CStrSecure> const &_TagsExclusive
-			, NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> &o_Permissions
+			, NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> &o_Permissions
 		)
 	{
 		fg_CollectMatchingSecrets
@@ -102,7 +102,7 @@ namespace NMib::NCloud::NSecretsManager
 		auto Auditor = This.mp_AppState.f_Auditor();
 
 		TCContinuation<TCSet<CSecretID>> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/EnumerateSecrets"}};
 		fsp_AddPermissionsForMatchingSecrets(m_pThis->mp_Database.m_Secrets, _SemanticID, _TagsExclusive, Permissions);
@@ -140,7 +140,7 @@ namespace NMib::NCloud::NSecretsManager
 		auto Auditor = This.mp_AppState.f_Auditor();
 
 		TCContinuation<CSecretsManager::CSecret> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecret"}};
 		auto *pSecretProperty = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
@@ -173,7 +173,7 @@ namespace NMib::NCloud::NSecretsManager
 		auto Auditor = This.mp_AppState.f_Auditor();
 
 		TCContinuation<CSecretsManager::CSecretProperties> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecretProperties"}};
 		auto *pSecretProperty = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
@@ -225,7 +225,7 @@ namespace NMib::NCloud::NSecretsManager
 		auto Auditor = This.mp_AppState.f_Auditor();
 
 		TCContinuation<CSecretsManager::CSecret> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecretBySemanticID"}};
 		fsp_AddPermissionsForMatchingSecrets(m_pThis->mp_Database.m_Secrets, _SemanticID, _TagsExclusive, Permissions);
@@ -295,7 +295,7 @@ namespace NMib::NCloud::NSecretsManager
 		}
 
 		TCContinuation<void> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SetSecretProperties"}};
 		auto *pSecretProperty = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
@@ -426,7 +426,7 @@ namespace NMib::NCloud::NSecretsManager
 		}
 
 		TCContinuation<void> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/ModifyTags"}};
 		auto *pSecretProperty = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
@@ -486,7 +486,7 @@ namespace NMib::NCloud::NSecretsManager
 		auto Auditor = This.mp_AppState.f_Auditor();
 
 		TCContinuation<void> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SetMetadata"}};
 		auto *pSecretProperty = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
@@ -528,7 +528,7 @@ namespace NMib::NCloud::NSecretsManager
 		auto Auditor = This.mp_AppState.f_Auditor();
 
 		TCContinuation<void> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/RemoveMetadata"}};
 		auto *pSecretProperty = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);
@@ -570,7 +570,7 @@ namespace NMib::NCloud::NSecretsManager
 		auto Auditor = This.mp_AppState.f_Auditor();
 
 		TCContinuation<void> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/RemoveSecret"}};
 		auto *pSecretProperty = m_pThis->mp_Database.m_Secrets.f_FindEqual(_ID);

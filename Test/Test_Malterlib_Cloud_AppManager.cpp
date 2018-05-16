@@ -35,6 +35,47 @@ using namespace NMib::NNet;
 
 static fp64 g_Timeout = 60.0;
 
+namespace
+{
+	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return)
+	{
+	}
+
+	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	void fg_CreateMapHelper(TCMap<tf_CKey, tf_CValue> &_Return, tf_CKey &&_First, tf_CParams && ...p_Params)
+	{
+		_Return[fg_Forward<tf_CKey>(_First)];
+		fg_CreateMapHelper<tf_CKey, tf_CValue>(_Return, fg_Forward<tf_CParams>(p_Params)...);
+	}
+
+	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	TCMap<typename NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>::CType, typename NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>::CType> fg_CreateMap
+		(
+			tf_CKey && _First
+			, tf_CParams && ...p_Params
+		)
+	{
+		TCMap<typename NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>::CType, typename NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>::CType> Return;
+		fg_CreateMapHelper<typename NTraits::TCRemoveReferenceAndQualifiers<tf_CKey>::CType, typename NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>::CType>
+			(
+				Return
+				, fg_Forward<tf_CKey>(_First)
+				, fg_Forward<tf_CParams>(p_Params)...
+			)
+		;
+		return Return;
+	}
+
+	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
+	TCMap<tf_CKey, tf_CValue> fg_CreateMap(tf_CParams && ...p_Params)
+	{
+		TCMap<tf_CKey, tf_CValue> Return;
+		fg_CreateMapHelper<tf_CKey, tf_CValue>(Return, fg_Forward<tf_CParams>(p_Params)...);
+		return Return;
+	}
+}
+
 class CAppManager_Tests : public NMib::NTest::CTest
 {
 public:
@@ -55,7 +96,7 @@ public:
 #endif
 			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 			CStr RootDirectory = ProgramDirectory + "/AppManagerTests";
-			TCSet<CStr> VersionManagerPermissionsForTest = fg_CreateSet<CStr>("Application/WriteAll", "Application/ReadAll", "Application/TagAll"); 
+			auto VersionManagerPermissionsForTest = fg_CreateMap<CStr, CPermissionRequirements>("Application/WriteAll", "Application/ReadAll", "Application/TagAll");
 
 			CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);
 			
@@ -171,7 +212,7 @@ public:
 			static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 			auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
 				{
-					return CDistributedActorTrustManagerInterface::CChangeHostPermissions{_HostID, _Permissions, c_WaitForSubscriptions};
+					return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, c_WaitForSubscriptions};
 				}
 			;
 			auto fNamespaceHosts = [](auto &&_Namespace, auto &&_Hosts)
@@ -197,7 +238,7 @@ public:
 				DMibCallActor
 					(
 						 VersionManagerTrust
-						 , CDistributedActorTrustManagerInterface::f_AddHostPermissions
+						 , CDistributedActorTrustManagerInterface::f_AddPermissions
 						 , fPermissions(CloudClientHostID, VersionManagerPermissionsForTest)
 					).f_CallSync(g_Timeout)
 				;
@@ -207,7 +248,7 @@ public:
  			DMibCallActor
 				(
 					 VersionManagerTrust
-					 , CDistributedActorTrustManagerInterface::f_AddHostPermissions
+					 , CDistributedActorTrustManagerInterface::f_AddPermissions
 					 , fPermissions(TestHostID, VersionManagerPermissionsForTest)
 				).f_CallSync(g_Timeout)
 			;
@@ -355,8 +396,8 @@ public:
 					+ DMibCallActor
 					(
 						AppManagerTrust
-						, CDistributedActorTrustManagerInterface::f_AddHostPermissions
-						, fPermissions(TestHostID, fg_CreateSet<CStr>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
+						, CDistributedActorTrustManagerInterface::f_AddPermissions
+						, fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
 					) 
 					> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket, CVoidTag)
 					{
@@ -366,8 +407,8 @@ public:
 							+ DMibCallActor
 							(
 								VersionManagerTrust
-								, CDistributedActorTrustManagerInterface::f_AddHostPermissions
-								, fPermissions(AppManagerHostID, fg_CreateSet<CStr>("Application/ReadAll"))
+								, CDistributedActorTrustManagerInterface::f_AddPermissions
+								, fPermissions(AppManagerHostID, fg_CreateMap<CStr, CPermissionRequirements>("Application/ReadAll"))
 							)
 							+ DMibCallActor
 							(

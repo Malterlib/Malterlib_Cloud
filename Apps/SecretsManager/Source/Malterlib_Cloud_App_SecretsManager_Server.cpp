@@ -224,7 +224,7 @@ namespace NMib::NCloud::NSecretsManager
 			char const *_ReadWrite
 			, CStr const &_SemanticID
 			, TCSet<CStrSecure> const &_Tags
-			, TCMap<CStr, TCVector<CPermissions>> &o_Permissions
+			, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
 		)
 	{
 		CStr SemanticPart{_SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : "NoSemanticID"};
@@ -233,14 +233,14 @@ namespace NMib::NCloud::NSecretsManager
 		if (_Tags.f_IsEmpty())
 		{
 			auto PermissionString = fg_Format("SecretsManager/{}/{}/NoTag", _ReadWrite, SemanticPart);
-			o_Permissions[PermissionString] = {CPermissions{{PermissionString}}.f_Wildcard(true).f_Description(Description)};
+			o_Permissions[PermissionString] = {CPermissionQuery{{PermissionString}}.f_Wildcard(true).f_Description(Description)};
 		}
 		else
 		{
 			for (auto const &Tag : _Tags)
 			{
 				auto PermissionString = fg_Format("SecretsManager/{}/{}/Tag/{}", _ReadWrite, SemanticPart, Tag);
-				o_Permissions[PermissionString] = {CPermissions{{PermissionString}}.f_Wildcard(true).f_Description(Description)};
+				o_Permissions[PermissionString] = {CPermissionQuery{{PermissionString}}.f_Wildcard(true).f_Description(Description)};
 				Description.f_Clear();
 			}
 		}
@@ -255,7 +255,7 @@ namespace NMib::NCloud::NSecretsManager
 			, char const *_ReadWrite
 			, CStr const &_SemanticID
 			, TCSet<CStrSecure> const &_Tags
-			, TCMap<CStr, TCVector<CPermissions>> &o_Permissions
+			, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
 		)
 	{
 		auto &PermissionCollection = o_Permissions[CStr::fs_ToStr(_ID)];
@@ -265,14 +265,14 @@ namespace NMib::NCloud::NSecretsManager
 		if (_Tags.f_IsEmpty())
 		{
 			auto PermissionString = fg_Format("SecretsManager/{}/{}/NoTag", _ReadWrite, SemanticPart);
-			PermissionCollection.f_Insert({CPermissions{{fg_Move(PermissionString)}}.f_Wildcard(true).f_Description(Description)});
+			PermissionCollection.f_Insert({CPermissionQuery{{fg_Move(PermissionString)}}.f_Wildcard(true).f_Description(Description)});
 		}
 		else
 		{
 			for (auto const &Tag : _Tags)
 			{
 				CStr PermissionString = "SecretsManager/{}/{}/Tag/{}"_f << _ReadWrite << SemanticPart << Tag;
-				PermissionCollection.f_Insert({CPermissions{{fg_Move(PermissionString)}}.f_Wildcard(true).f_Description(Description)});
+				PermissionCollection.f_Insert({CPermissionQuery{{fg_Move(PermissionString)}}.f_Wildcard(true).f_Description(Description)});
 				Description.f_Clear();
 			}
 		}

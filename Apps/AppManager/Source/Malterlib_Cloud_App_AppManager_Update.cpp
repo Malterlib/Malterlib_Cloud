@@ -125,10 +125,10 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<void> PermissionsContinuation;
 		if (_bCheckPermissions)
 		{
-			NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+			NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 			Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationUpdate"}};
-			Permissions["App"] = {CPermissions{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
+			Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
 			mp_Permissions.f_HasPermissions("Update application in AppManager", Permissions) > PermissionsContinuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 				{

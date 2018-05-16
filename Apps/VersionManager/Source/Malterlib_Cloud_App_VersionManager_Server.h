@@ -139,7 +139,7 @@ namespace NMib::NCloud::NVersionManager
 		TCContinuation<void> fp_FindVersions();
 
 		TCContinuation<void> fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription);
-		void fp_UpdateSubscriptionsForChangedPermissions(CStr const &_HostID);
+		void fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity);
 		
 		TCContinuation<TCSet<CStr>> fp_FilterApplicationsByPermissions(CStr const &_Description, TCSet<CStr> const &_Applications);
 		TCContinuation<TCSet<CStr>> fp_EnumApplications();

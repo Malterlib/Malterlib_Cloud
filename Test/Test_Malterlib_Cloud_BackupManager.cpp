@@ -460,7 +460,7 @@ public:
 		fg_GetSys()->f_AddStdErrLogger();
 #endif
 
-		TCSet<CStr> BackupManagerPermissionsForTest = fg_CreateSet<CStr>("Backup/WriteSelf", "Backup/ReadAll");
+		NContainer::TCMap<NStr::CStr, CPermissionRequirements> BackupManagerPermissionsForTest = {{"Backup/WriteSelf"}, {"Backup/ReadAll"}};
 
 		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 		CStr RootDirectory = ProgramDirectory + "/BackupManagerTests";
@@ -592,7 +592,7 @@ public:
 		static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 		auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
 			{
-				return CDistributedActorTrustManagerInterface::CChangeHostPermissions{_HostID, _Permissions, c_WaitForSubscriptions};
+				return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, c_WaitForSubscriptions};
 			}
 		;
 
@@ -618,7 +618,7 @@ public:
 			DMibCallActor
 				(
 					BackupManagerTrust
-					, CDistributedActorTrustManagerInterface::f_AddHostPermissions
+					, CDistributedActorTrustManagerInterface::f_AddPermissions
 					, fPermissions(TestHostID, BackupManagerPermissionsForTest)
 				)
 				> SetupTrustResults.f_AddResult()

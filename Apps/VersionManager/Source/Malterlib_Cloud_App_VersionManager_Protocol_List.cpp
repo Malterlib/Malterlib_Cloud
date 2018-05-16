@@ -15,10 +15,10 @@ namespace NMib::NCloud::NVersionManager
 	TCContinuation<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_FilterApplicationsByPermissions(CStr const &_Description, TCSet<CStr> const &_Applications)
 	{
 		TCContinuation<TCSet<CStr>> Continuation;
-		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissions>> Permissions;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 		Permissions["//ALL//"] = {{"Application/ReadAll", "Application/ListAll"}};
 		for (auto &Application : _Applications)
-			Permissions[Application] = {CPermissions{fg_Format("Application/Read/{}", Application)}.f_Description("Access application {} in VersionManager"_f << Application)};
+			Permissions[Application] = {CPermissionQuery{fg_Format("Application/Read/{}", Application)}.f_Description("Access application {} in VersionManager"_f << Application)};
 
 		mp_Permissions.f_HasPermissions(_Description, Permissions) > Continuation / [Continuation, _Applications](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
