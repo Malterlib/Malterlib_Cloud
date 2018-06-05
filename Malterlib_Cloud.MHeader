@@ -239,6 +239,11 @@ Property
 Property
 {
 	MalterlibCloudVersionInfoFileName "@(GeneratedDirectory)@(Target.FileName)VersionInfo.json"
+	{
+		!!Target.Type "UIExecutable"
+		!!Target.Type "Executable"
+		!!Target.Type "ConsoleExecutable"
+	}
 	
 	MalterlibCloudVersionInfo	"{\n"\
 								"\t\"Application\": \"@(MalterlibCloudVersionInfo_Application)\"\n"\
