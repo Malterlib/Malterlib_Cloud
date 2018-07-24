@@ -95,7 +95,7 @@ namespace NMib::NCloud::NSecretsManager
 			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
 		This.mp_Permissions.f_HasPermissions("Download file from SecretsManager", Permissions)
-			> Continuation / [=, Subscription = fg_Move(_Subscription)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
+			> Continuation % "Permission denied downloading file" % Auditor / [=, Subscription = fg_Move(_Subscription)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(DownloadFile, command)"));
@@ -266,7 +266,7 @@ namespace NMib::NCloud::NSecretsManager
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
 		This.mp_Permissions.f_HasPermissions("Upload file to SecretsManager", Permissions)
-			> Continuation / [=, Uploader = fg_Move(_Uploader)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
+			> Continuation % "Permission denied uploading file" % Auditor / [=, Uploader = fg_Move(_Uploader)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(UploadFile, command)"));

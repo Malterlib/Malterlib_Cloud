@@ -163,7 +163,7 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<void> Continuation;
 
 		mp_Permissions.f_HasPermissions("Add application to AppManager", Permissions)
-			> Continuation / [=, fOnInfo = fg_Move(_fOnInfo)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			> Continuation % "Permission denied adding application" % Auditor / [=, fOnInfo = fg_Move(_fOnInfo)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application add, command)"));

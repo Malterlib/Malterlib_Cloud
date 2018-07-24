@@ -105,7 +105,8 @@ namespace NMib::NCloud::NVersionManager
 		}
 
 		TCContinuation<CVersionManager::CChangeTags::CResult> Continuation;
-		pThis->fp_FilterTags("Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags) > Continuation / [=](CFilteredTagsResult const &_Result)
+		pThis->fp_FilterTags("Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags)
+			> Continuation % "Access denied filtering tags by permission" % Auditor / [=](CFilteredTagsResult const &_Result)
 			{
 				TCSet<CStr> const &DeniedTags = _Result.m_DeniedTags;
 				TCSet<CStr> const &AddTags = _Result.m_TagsAdded;

@@ -51,7 +51,8 @@ namespace NMib::NCloud::NVersionManager
 
 		Auditor.f_Info("Listing applications");
 		
-		pThis->fp_FilterApplicationsByPermissions("List applications", pThis->fp_ApplicationSet()) > Continuation / [Continuation, Auditor](TCSet<CStr> &&_Applications)
+		pThis->fp_FilterApplicationsByPermissions("List applications", pThis->fp_ApplicationSet())
+			> Continuation % "Permission denied listing applications" % Auditor / [Continuation, Auditor](TCSet<CStr> &&_Applications)
 			{
 				Auditor.f_Info(fg_Format("Listed applications: {vs,vb}", _Applications));
 
@@ -89,7 +90,7 @@ namespace NMib::NCloud::NVersionManager
 		else
 			Applications = pThis->fp_ApplicationSet();
 
-		pThis->fp_FilterApplicationsByPermissions("List versions", Applications) > Continuation / [=](TCSet<CStr> &&_Applications)
+		pThis->fp_FilterApplicationsByPermissions("List versions", Applications) > Continuation % "Permission denied listing versions" % Auditor / [=](TCSet<CStr> &&_Applications)
 			{
 				if (!_Params.m_ForApplication.f_IsEmpty() && _Applications.f_IsEmpty())
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(List Versions)"));

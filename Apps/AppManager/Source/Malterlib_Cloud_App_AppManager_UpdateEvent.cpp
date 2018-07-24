@@ -22,7 +22,7 @@ namespace NMib::NCloud::NAppManager
 		NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> Continuation;
 
 		pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", {"AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeUpdates"})
-			> Continuation / [=, fOnNotification = fg_Move(_fOnNotification)](bool _bHasPermission) mutable
+			> Continuation % "Permission denied subscribing to update notifications" % Auditor / [=, fOnNotification = fg_Move(_fOnNotification)](bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Subscribe to update notifications)"));
@@ -165,6 +165,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					TCContinuation<void> OnUpdateContinuation;
 					mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
+						.f_Dispatch().f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
 						> OnUpdateContinuation / [=, SubscriptionID = mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission)
 						{
 							auto pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);

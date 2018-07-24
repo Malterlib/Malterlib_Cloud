@@ -465,7 +465,8 @@ namespace NMib::NCloud::NAppManager
 
 		TCContinuation<void> Continuation;
 
-		pThis->mp_Permissions.f_HasPermissions("Start application", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		pThis->mp_Permissions.f_HasPermissions("Start application", Permissions)
+			> Continuation % "Permission denied starting application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application start, command)"));
@@ -519,7 +520,8 @@ namespace NMib::NCloud::NAppManager
 
 		TCContinuation<void> Continuation;
 
-		pThis->mp_Permissions.f_HasPermissions("Stop application", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		pThis->mp_Permissions.f_HasPermissions("Stop application", Permissions)
+			> Continuation % "Permission denied stopping application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application stop, command)"));
@@ -573,7 +575,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCContinuation<void> Continuation;
 
-		pThis->mp_Permissions.f_HasPermissions("Restart application", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		pThis->mp_Permissions.f_HasPermissions("Restart application", Permissions) > Continuation % "Permission denied restarting application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application restart, command)"));

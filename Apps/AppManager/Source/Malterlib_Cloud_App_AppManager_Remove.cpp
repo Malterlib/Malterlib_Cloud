@@ -19,7 +19,8 @@ namespace NMib::NCloud::NAppManager
 
 		TCContinuation<void> Continuation;
 
-		pThis->mp_Permissions.f_HasPermissions("Remove application from AppManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		pThis->mp_Permissions.f_HasPermissions("Remove application from AppManager", Permissions)
+			> Continuation % "Permission denied removing application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application remove, command)"));

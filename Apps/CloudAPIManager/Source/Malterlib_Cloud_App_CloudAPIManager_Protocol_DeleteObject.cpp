@@ -31,7 +31,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			return Auditor.f_Exception("Object id format not valid");
 		
 		pThis->mp_Permissions.f_HasPermission("Delete object from cloud API manager", {"ObjectStorage/DeleteObjectAll", "ObjectStorage/DeleteObject/{}"_f << _Params.m_CloudContext})
-			> Continuation / [=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
+			> Continuation % "Permission denied deleting object" % Auditor / [=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Delete object)"));

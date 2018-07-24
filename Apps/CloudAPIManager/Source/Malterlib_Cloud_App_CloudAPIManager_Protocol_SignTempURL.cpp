@@ -34,7 +34,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			return Auditor.f_Exception("Temp URL key format not valid");
 		
 		pThis->mp_Permissions.f_HasPermission("Sign Temp URL", {"ObjectStorage/SignTempURLAll", fg_Format("ObjectStorage/SignTempURL/{}", _Params.m_CloudContext)})
-			> Continuation / [=](bool _bHasPermission)
+			> Continuation % "Permission denied signing temp URL" % Auditor / [=](bool _bHasPermission)
 			{
 				if (!_bHasPermission)
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Sign Temp URL)"));

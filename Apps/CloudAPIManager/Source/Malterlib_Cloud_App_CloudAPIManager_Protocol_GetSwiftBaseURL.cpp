@@ -24,7 +24,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			return Auditor.f_Exception("Cloud context format not valid");
 		
 		pThis->mp_Permissions.f_HasPermission("Get swift base URL", {"ObjectStorage/GetSwiftBaseURLAll", fg_Format("ObjectStorage/GetSwiftBaseURL/{}", _Params.m_CloudContext)})
-			> Continuation / [=](bool _bHasPermission)
+			> Continuation % "Permission denied getting swift base URL" % Auditor / [=](bool _bHasPermission)
 			{
 				if (!_bHasPermission)
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Get Swift base URL)"));

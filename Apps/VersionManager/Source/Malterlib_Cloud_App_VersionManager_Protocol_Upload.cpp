@@ -102,7 +102,8 @@ namespace NMib::NCloud::NVersionManager
 				DeniedTags[Tag];
 		}
 
-		pThis->mp_Permissions.f_HasPermissions("Upload version", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
+		pThis->mp_Permissions.f_HasPermissions("Upload version", Permissions)
+			> Continuation % "Permission denied uploading version" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
 			{
 				if (!_HasPermissions["//Command//"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Start upload version)"));

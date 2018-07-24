@@ -72,7 +72,7 @@ namespace NMib::NCloud::NBackupManager
 		TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> Continuation;
 
 		pThis->mp_Permissions.f_HasPermission("Start download backup", Permissions)
-			> Continuation /
+			> Continuation % "Permission denied downloading backup" % Auditor /
 			[
 			   	=
 			   	, Subscription = fg_Move(_DownloadBackup.m_Subscription)

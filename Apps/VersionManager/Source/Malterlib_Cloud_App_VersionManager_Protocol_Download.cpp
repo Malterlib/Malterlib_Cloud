@@ -46,7 +46,8 @@ namespace NMib::NCloud::NVersionManager
 			return Auditor.f_Exception({"Invalid version platform format", "(start download version)"});
 
 		TCContinuation<CStartDownloadVersion::CResult> Continuation;
-		pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", {"Application/ReadAll", "Application/Read/{}"_f << _Params.m_Application}) > Continuation /
+		pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", {"Application/ReadAll", "Application/Read/{}"_f << _Params.m_Application})
+			> Continuation % "Permission denied downloading version" % Auditor /
 			[=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)

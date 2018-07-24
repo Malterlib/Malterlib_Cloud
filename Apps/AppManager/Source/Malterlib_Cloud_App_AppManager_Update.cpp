@@ -130,7 +130,8 @@ namespace NMib::NCloud::NAppManager
 			Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationUpdate"}};
 			Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
-			mp_Permissions.f_HasPermissions("Update application in AppManager", Permissions) > PermissionsContinuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			mp_Permissions.f_HasPermissions("Update application in AppManager", Permissions)
+				> PermissionsContinuation % "Permission denied updating application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 				{
 					if (!_HasPermissions["Command"])
 						return PermissionsContinuation.f_SetException(Auditor.f_AccessDenied("(Application update, command)"));

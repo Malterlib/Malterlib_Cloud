@@ -94,7 +94,7 @@ namespace NMib::NCloud::NAppManager
 		TCContinuation<void> Continuation;
 
 		mp_Permissions.f_HasPermissions("Change applications settings in AppManager", Permissions)
-			> Continuation / [=, fOnInfo = fg_Move(_fOnInfo)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			> Continuation % "Permission denied changing application settings" % Auditor / [=, fOnInfo = fg_Move(_fOnInfo)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application change settings, command)"));
@@ -201,7 +201,7 @@ namespace NMib::NCloud::NAppManager
 							else
 								ChangeBackupContinuation.f_SetResult();
 
-							ChangeBackupContinuation > Continuation / [=, InProgressScope = InProgressScope]
+							ChangeBackupContinuation > Continuation % "Failed to stop backup client" % Auditor / [=, InProgressScope = InProgressScope]
 								{
 									fOnInfo("Application settings were successfully changed");
 									Auditor.f_Info("Updated application settings (No restart required)");
@@ -277,9 +277,9 @@ namespace NMib::NCloud::NAppManager
 										if (!_UpdateJSONResults)
 										{
 											bError = true;
-											auto Excption = Auditor.f_Exception(fg_Format("Failed to save application state: {}", _UpdateJSONResults.f_GetExceptionStr()));
+											auto Exception = Auditor.f_Exception(fg_Format("Failed to save application state: {}", _UpdateJSONResults.f_GetExceptionStr()));
 											if (!Continuation.f_IsSet())
-												Continuation.f_SetException(Excption);
+												Continuation.f_SetException(Exception);
 										}
 										else
 											fOnInfo("Application state successfully stored, so any changes will persist");

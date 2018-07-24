@@ -31,7 +31,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			return Auditor.f_Exception("Temp URL key format not valid");
 		
 		pThis->mp_Permissions.f_HasPermission("Ensure container in cloud API manager", {"ObjectStorage/EnsureContainerAll", "ObjectStorage/EnsureContainer/{}"_f << _Params.m_CloudContext})
-			> Continuation / [=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
+			> Continuation % "Permission denied ensuring container" % Auditor / [=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
 			{
 				if (_bHasPermission)
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Ensure container)"));

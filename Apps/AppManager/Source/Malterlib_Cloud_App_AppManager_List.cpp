@@ -27,7 +27,10 @@ namespace NMib::NCloud::NAppManager
 
 		TCContinuation<TCMap<CStr, CApplicationInfo>> Continuation;
 		pThis->mp_Permissions.f_HasPermissions("Enumerate Apps in AppManager", Permissions)
-			> Continuation / [Continuation, Auditor, pThis = m_pThis](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			> Continuation
+			% "Permission denied enumerating installed applications"
+			% Auditor
+			/ [Continuation, Auditor, pThis = m_pThis](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["//Command//"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application enum)"));
@@ -102,7 +105,10 @@ namespace NMib::NCloud::NAppManager
 
 		TCContinuation<CVersionsAvailableForUpdate> Continuation;
 		pThis->mp_Permissions.f_HasPermissions("Enumerate versions in AppManager", Permissions)
-			> Continuation / [Continuation, Auditor, pThis = m_pThis, _Application](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			> Continuation
+			% "Permission denied enumerating versions"
+			% Auditor
+			/ [Continuation, Auditor, pThis = m_pThis, _Application](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["//Command//"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(Versions available for update)"));

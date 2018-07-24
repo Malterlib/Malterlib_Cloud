@@ -43,7 +43,8 @@ namespace NMib::NCloud::NBackupManager
 
 		Auditor.f_Info("Listing backup sources");
 		
-		pThis->fp_FilterBackupSourcesByPermissions(pThis->fp_EnumBackupSources()) > Continuation / [=](TCVector<CStr> &&_Sources)
+		pThis->fp_FilterBackupSourcesByPermissions(pThis->fp_EnumBackupSources())
+			> Continuation % "Permission denied listing backup sources" % Auditor / [=](TCVector<CStr> &&_Sources)
 			{
 				Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", _Sources));
 				Continuation.f_SetResult(fg_Move(_Sources));
@@ -81,7 +82,7 @@ namespace NMib::NCloud::NBackupManager
 
 		NConcurrency::TCContinuation<TCMap<CStr, CBackupInfo>> Continuation;
 
-		pThis->fp_FilterBackupSourcesByPermissions(BackupSources) > Continuation / [=](TCVector<CStr> &&_BackupSources)
+		pThis->fp_FilterBackupSourcesByPermissions(BackupSources) > Continuation % "Permission denied listing backups" % Auditor / [=](TCVector<CStr> &&_BackupSources)
 			{
 				if (bSingleSource)
 				{

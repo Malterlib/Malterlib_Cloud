@@ -107,7 +107,8 @@ namespace NMib::NCloud::NSecretsManager
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/EnumerateSecrets"}};
 		fsp_AddPermissionsForMatchingSecrets(m_pThis->mp_Database.m_Secrets, _SemanticID, _TagsExclusive, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Enumerate secret in SecretsManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		This.mp_Permissions.f_HasPermissions("Enumerate secret in SecretsManager", Permissions)
+			> Continuation % "Permission denied enumerating secrets" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(EnumerateSecrets, command)"));
@@ -147,7 +148,8 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Get secret from SecretsManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		This.mp_Permissions.f_HasPermissions("Get secret from SecretsManager", Permissions)
+			> Continuation % "Permission denied getting secret" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(GetSecret, command)"));
@@ -180,7 +182,8 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions)
+			> Continuation % "Permission denied getting secret properties" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(GetSecretProperties, command)"));
@@ -230,7 +233,8 @@ namespace NMib::NCloud::NSecretsManager
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecretBySemanticID"}};
 		fsp_AddPermissionsForMatchingSecrets(m_pThis->mp_Database.m_Secrets, _SemanticID, _TagsExclusive, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Get secret by semantic ID from SecretsManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		This.mp_Permissions.f_HasPermissions("Get secret by semantic ID from SecretsManager", Permissions)
+			> Continuation % "Permission denied getting secret by semantic ID" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(GetSecretBySemanticID, command)"));
@@ -319,7 +323,8 @@ namespace NMib::NCloud::NSecretsManager
 		else
 			fsp_AddPermissionQueryIndexedByPermission("Write", _Secret.f_GetSemanticID(), _Secret.f_GetTags(), Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
+		This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions)
+			> Continuation % "Permission denied setting secret properties" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(SetSecretProperties, command)"));
@@ -447,7 +452,8 @@ namespace NMib::NCloud::NSecretsManager
 				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, CurrentTags, Permissions);
 		}
 
-		This.mp_Permissions.f_HasPermissions("Modify tags in SecretsManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		This.mp_Permissions.f_HasPermissions("Modify tags in SecretsManager", Permissions)
+			> Continuation % "Permission denied modifying tags" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(ModifyTags, command)"));
@@ -493,7 +499,8 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Set metadata in SecretsManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		This.mp_Permissions.f_HasPermissions("Set metadata in SecretsManager", Permissions)
+			> Continuation % "Permission denied setting meta data" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(SetMetadata, command)"));
@@ -535,7 +542,8 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Remove metadata from SecretsManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		This.mp_Permissions.f_HasPermissions("Remove metadata in SecretsManager", Permissions)
+			> Continuation % "Permission denied removing meta data" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(RemoveMetadata, command)"));
@@ -577,7 +585,8 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Get secret from SecretsManager", Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		This.mp_Permissions.f_HasPermissions("Remove secret in SecretsManager", Permissions)
+			> Continuation % "Permission denied removing secret" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
 					return Continuation.f_SetException(Auditor.f_AccessDenied("(RemoveSecret, command)"));

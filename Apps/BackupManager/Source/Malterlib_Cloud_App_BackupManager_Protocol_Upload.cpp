@@ -136,7 +136,7 @@ namespace NMib::NCloud::NBackupManager
 			return Continuation;
 		
 		pThis->mp_Permissions.f_HasPermission("Start backup", {"Backup/WriteSelf"})
-			> Continuation /
+			> Continuation % "Permission denied starting backup" % Auditor /
 			[
 			 	=
 				, Subscription = fg_Move(_Params.m_Subscription)
