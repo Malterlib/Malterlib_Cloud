@@ -3,6 +3,7 @@
 
 Import "../Core/Lib_Malterlib.MTarget"
 Import "Apps/*/*.MHeader"
+Import "Tools/*/*.MHeader"
 
 %Group "{Malterlib}/{Lib_Malterlib_Cloud}"
 {

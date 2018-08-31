@@ -1,0 +1,125 @@
+// Copyright © 2015 Hansoft AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+%Repository "libarchive"
+{
+	Repository
+	{
+		Type External
+		Remotes "upstream=https://github.com/libarchive/libarchive.git;@(Repository.Remotes)"
+	}
+}
+
+%Import "../../../../External/libarchive/CMakeLists.txt"
+{
+	Property.MalterlibLinkWithOpenSSL true
+
+	Property
+	{
+		!!PlatformFamily Windows
+
+		MalterlibWindowsNtVersion "_WIN32_WINNT_WIN7"
+		MalterlibWindowsVersion "NTDDI_WIN7"
+	}
+
+	Import.CMake_FullRebuildVersion 6
+	Import.CMake_Variables "ENABLE_TAR=1;ENABLE_TAR_SHARED=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_CPIO=0;ENABLE_CPIO=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_CAT=0;ENABLE_CAT_SHARED=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_TEST=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_COVERAGE=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_INSTALL=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_ICONV=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_LZ4=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_OPENSSL=1;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_NETTLE=0;@(Import.CMake_Variables)"
+
+	Import.CMake_Variables "HAVE_LZMA_STREAM_ENCODER_MT=0;@(Import.CMake_Variables)"
+	{
+		!!PlatformFamily OSX
+	}
+
+	Import.CMake_Variables "CMAKE_BUILD_WITH_INSTALL_RPATH=ON;@(Import.CMake_Variables)"
+	{
+		&
+		{
+			PlatformFamily Linux
+			!HostPlatformFamily Linux 
+		}
+	}
+
+	Compile
+	{
+		!!MalterlibCompileSupportTabSetings true
+		IndentWidth 4
+		TabWidth 4
+		UsesTabs true
+	}
+	Compile
+	{
+		!!CompileDialect C
+		PrefixHeader ""
+	}
+	
+	%Target Exe_bsdtar
+	{
+		Target
+		{
+			LinkWithLibraries "-llzma -lbz2 -lxml2 @(Target.LinkWithLibraries)"
+			{
+				!!PlatformFamily OSX
+				!!PlatformFamily Linux
+			}
+			LinkWithLibraries "-lacl @(Target.LinkWithLibraries)"
+			{
+				!!PlatformFamily Linux
+			}
+		}
+		%Group Source
+		{
+			%File "Source/AllowInvalidExit.cpp"
+			{
+				!!PlatformFamily Windows
+			}
+		}
+		%Dependency "Lib_Malterlib"
+		%Dependency "Lib_zlib"
+	}
+}
+
+%Target Exe_gzip
+{
+	Property
+	{
+		MalterlibTargetNameType "Normal"
+	}
+	Target
+	{
+		BaseName gzip
+
+		Type ConsoleExecutable
+	}
+	Compile
+	{
+		!!CompileDialect C
+		PrefixHeader ""
+		PreprocessorDefines "NO_BZIP2_SUPPORT;NO_XZ_SUPPORT;NO_COMPRESS_SUPPORT;NO_PACK_SUPPORT;@(Compile.PreprocessorDefines)"
+		Warnings Minimal
+	}
+	%Group Source
+	{
+		%File "Source/gzip.c"
+		%File "Source/getopt.c"
+		%File "Source/getopt.h"
+		%File "Source/BaseName.cpp"
+		{
+			!!PlatformFamily Windows
+		}
+		%File "Source/AllowInvalidExit.cpp"
+		{
+			!!PlatformFamily Windows
+		}
+	}
+	%Dependency "Lib_Malterlib"
+	%Dependency "Lib_zlib"
+}
