@@ -649,7 +649,34 @@ Property
 	
 	MalterlibCloud_VersionUploadCloudClientCommand "@(MalterlibCloud_CloudClientCommand) --no-self-update-check --version-manager-upload-version --settings-file \"@(MalterlibCloudVersionInfoFileName)\" --tags @(MalterlibCloud_VersionUploadCloudClientCommand_Tags)@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified) \"@(MalterlibCloud_VersionUploadTarArchivePath)\"\r\n"\
 													"@(CheckErrors)\r\n"
-	
+	{
+		!!MalterlibCloud_VersionUploadToBuildServerPath ""
+	}
+
+	MalterlibCloud_VersionUploadCloudClientCommand 	"MTool BuildServerPut Recursive=0 \"Source=@(MalterlibCloud_VersionUploadTarArchivePath)\" \"DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)\"\r\n"\
+													"@(CheckErrors)\r\n"\
+													"MTool BuildServerPut Recursive=0 \"Source=@(MalterlibCloudVersionInfoFileName)\" \"DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)\"\r\n"\
+													"@(CheckErrors)\r\n"
+	{
+		&
+		{
+			!MalterlibCloud_VersionUploadToBuildServerPath ""
+			MalterlibBuildServerBuild true
+		}
+	}
+
+	MalterlibCloud_VersionUploadCloudClientCommand 	"MTool PostCopy \"@(MalterlibCloud_VersionUploadTarArchivePath)\" \"Config=@(MalterlibPostCopyConfigFile)\" \"Project=SimulateBuildServerStore\" \"OutFolder=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)\"\r\n"\
+													"@(CheckErrors)\r\n"\
+													"MTool PostCopy \"@(MalterlibCloudVersionInfoFileName)\" \"Config=@(MalterlibPostCopyConfigFile)\" \"Project=SimulateBuildServerStore\" \"OutFolder=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)\"\r\n"\
+													"@(CheckErrors)\r\n"
+	{
+		&
+		{
+			!MalterlibCloud_VersionUploadToBuildServerPath ""
+			!MalterlibBuildServerBuild true
+		}
+	}
+
 	MalterlibCloud_VersionUploadCloudClientTemplate	"@(MalterlibCloud_VersionUploadCloudClientCommand)"
 	{
 		!Explodee ""
@@ -681,6 +708,7 @@ Property
 					MalterlibBuildServerBuild true
 					!MalterlibCloud_VersionUploadToolName ""
 				}
+				!MalterlibCloud_VersionUploadToBuildServerPath ""
 			}
 			!MalterlibCloud_VersionUploadSources ""
 			TargetIsExecutable true
