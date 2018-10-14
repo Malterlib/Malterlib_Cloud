@@ -34,11 +34,11 @@ namespace NMib::NCloud::NSecretsManager
 		return Continuation;
 	}
 
-	CSecureByteVector CSecretsManagerServerDatabase::fp_ComputeSalt(CSecretsDatabaseIV const &_Salt)
+	CSecureByteVector CSecretsManagerServerDatabase::fsp_ComputeSalt(CSecretsDatabaseIV const &_Salt)
 	{
 		CBinaryStreamMemory<CBinaryStreamDefault, CSecureByteVector> Stream;
-		Stream << mp_IVSalt.m_InternalSalt;
-		Stream << mp_IVSalt.m_ExternalSalt;
+		Stream << _Salt.m_InternalSalt;
+		Stream << _Salt.m_ExternalSalt;
 		return Stream.f_MoveVector();
 	}
 
@@ -114,7 +114,7 @@ namespace NMib::NCloud::NSecretsManager
 			CBinaryStreamSubStream<> SubStream;
 			SubStream.f_Open(&BaseStream, BasePosition);
 
-			CSecureByteVector Salt{fp_ComputeSalt(mp_IVSalt)};
+			CSecureByteVector Salt{fsp_ComputeSalt(mp_IVSalt)};
 			CKeyExpansion KeyExpansion{mp_Key, Salt};
 
 			TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), ESSLDigest_SHA512, KeyExpansion.f_GetHMACKey(ESSLDigest_SHA512)};
@@ -144,7 +144,7 @@ namespace NMib::NCloud::NSecretsManager
 		CBinaryStreamSubStream<> SubStream;
 		SubStream.f_Open(&BaseStream, BasePosition, BaseStream.f_GetLength() - BasePosition);
 
-		CSecureByteVector Salt{fp_ComputeSalt(mp_IVSalt)};
+		CSecureByteVector Salt{fsp_ComputeSalt(mp_IVSalt)};
 		CKeyExpansion KeyExpansion{mp_Key, Salt};
 
 		TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), ESSLDigest_SHA512, KeyExpansion.f_GetHMACKey(ESSLDigest_SHA512)};

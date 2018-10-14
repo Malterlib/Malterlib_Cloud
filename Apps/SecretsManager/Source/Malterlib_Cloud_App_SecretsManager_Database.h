@@ -77,7 +77,7 @@ namespace NMib::NCloud::NSecretsManager
 		void fp_WriteDatabase(CSecretsDatabase const &_Database);
 		void fp_ReadDatabase(CSecretsDatabase *_pDatabase);
 		TCContinuation<void> fp_Destroy() override;
-		NContainer::CSecureByteVector fp_ComputeSalt(CSecretsDatabaseIV const &_Salt);
+		static NContainer::CSecureByteVector fsp_ComputeSalt(CSecretsDatabaseIV const &_Salt);
 
 		TCSharedPointer<CSecretsDatabase> mp_pPendingWrite;
 		TCVector<TCContinuation<void>> mp_PendingWriteContinuations;
