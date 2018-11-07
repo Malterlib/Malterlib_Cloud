@@ -239,6 +239,26 @@ Property
 
 Property
 {
+	MalterlibCloudVersionInfo_AppDistribution_DeployDestinations_Contents_Template ", \"@(Explodee)\""
+	{
+		!Explodee ""
+	}
+
+	MalterlibCloudVersionInfo_AppDistribution_DeployDestinations_Contents "[Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_AppDistribution_DeployDestinations)', ';', 'MalterlibCloudVersionInfo_AppDistribution_DeployDestinations_Contents_Template'))]"
+
+	MalterlibCloudVersionInfo_AppDistribution_DeployDestinations_Contents "@(MalterlibCloudVersionInfo_AppDistribution_DeployDestinations_Contents->Replace('Dummy, ', ''))"
+	MalterlibCloudVersionInfo_AppDistribution_DeployDestinations_Contents "@(MalterlibCloudVersionInfo_AppDistribution_DeployDestinations_Contents->Replace('[Dummy]', '[]'))"
+}
+
+Property
+{
+	NewLine "\n"
+	MalterlibCloudVersionInfo_AppDistribution_ReleaseNotes_Escaped "@(MalterlibCloudVersionInfo_AppDistribution_ReleaseNotes->Replace('@(NewLine)','\\\\n'))"
+}
+
+
+Property
+{
 	MalterlibCloudVersionInfoFileName "@(GeneratedDirectory)@(Target.FileName)VersionInfo.json"
 	{
 		!!Target.Type "UIExecutable"
@@ -287,6 +307,25 @@ Property
 	{
 		!MalterlibCloudVersionInfo_DistributedApp ""
 	}
+
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t, \"AppDistribution\": {\n"\
+								"\t\t\t\"Dummy\": null\n"
+
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t\t, \"DeployDestinations\": @(MalterlibCloudVersionInfo_AppDistribution_DeployDestinations_Contents)\n"
+	{
+		!MalterlibCloudVersionInfo_AppDistribution_DeployDestinations ""
+	}
+
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t\t, \"ReleaseNotes\": \"@(MalterlibCloudVersionInfo_AppDistribution_ReleaseNotes_Escaped)\"\n"
+	{
+		!MalterlibCloudVersionInfo_AppDistribution_ReleaseNotes ""
+	}
+
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t}\n"
 
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t\t, \"Backup\": {\n"\
