@@ -33,9 +33,10 @@ namespace NMib::NCloud
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
-			void f_Format(NStr::CStrAggregate &o_Str) const;
-			
+
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const;
+
 			bool f_IsValid() const;
 			
 			NStr::CStr f_EncodeFileName() const;
@@ -53,7 +54,8 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 			
-			void f_Format(NStr::CStrAggregate &o_Str) const;
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const;
 
 			bool f_IsValid() const;
 
@@ -76,7 +78,9 @@ namespace NMib::NCloud
 
 			NEncoding::CEJSON f_ToJSON() const;
 			static CVersionInformation fs_FromJSON(NEncoding::CEJSON const &_JSON);
-			
+
+			bool operator == (CVersionInformation const &_Right) const;
+
 			NTime::CTime m_Time;
 			NStr::CStr m_Configuration;
 			NContainer::TCSet<NStr::CStr> m_Tags;
@@ -330,3 +334,5 @@ namespace NMib::NCloud
 #ifndef DMibPNoShortCuts
 using namespace NMib::NCloud;
 #endif
+
+#include "Malterlib_Cloud_VersionManager.hpp"

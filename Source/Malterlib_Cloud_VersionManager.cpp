@@ -136,16 +136,6 @@ namespace NMib::NCloud
 		return _FileName.f_ReplaceChar('_', '/');
 	}
 	
-	void CVersionManager::CVersionID::f_Format(CStrAggregate &o_Str) const
-	{
-		o_Str += CStr::CFormat("{}/{}.{}.{}")
-			<< m_Branch
-			<< m_Major
-			<< m_Minor
-			<< m_Revision
-		;
-	}
-	
 	NEncoding::CEJSON CVersionManager::CVersionID::f_ToJSON() const
 	{
 		NEncoding::CEJSON Ret;
@@ -195,14 +185,6 @@ namespace NMib::NCloud
 		return fg_Format("{}/{}", m_VersionID.f_EncodeFileName(), m_Platform);
 	}
 	
-	void CVersionManager::CVersionIDAndPlatform::f_Format(CStrAggregate &o_Str) const
-	{
-		o_Str += CStr::CFormat("{} {}")
-			<< m_VersionID
-			<< m_Platform
-		;
-	}
-	
 	NEncoding::CEJSON CVersionManager::CVersionIDAndPlatform::f_ToJSON() const
 	{
 		NEncoding::CEJSON Ret;
@@ -239,6 +221,13 @@ namespace NMib::NCloud
 	}
 	
 	// CVersionInformation
+
+	bool CVersionManager::CVersionInformation::operator == (CVersionInformation const &_Right) const
+	{
+		return fg_TupleReferences(m_Time, m_Configuration, m_Tags, m_ExtraInfo, m_RetrySequence, m_nFiles, m_nBytes)
+			== fg_TupleReferences(_Right.m_Time, _Right.m_Configuration, _Right.m_Tags, _Right.m_ExtraInfo, _Right.m_RetrySequence, _Right.m_nFiles, _Right.m_nBytes)
+		;
+	}
 
 	NEncoding::CEJSON CVersionManager::CVersionInformation::f_ToJSON() const
 	{
