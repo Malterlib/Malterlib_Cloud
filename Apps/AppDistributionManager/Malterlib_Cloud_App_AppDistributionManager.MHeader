@@ -42,6 +42,9 @@
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_Executable ""
+		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudAppDistManager"
+		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudAppDistManager"
+		MalterlibCloudVersionInfo_Backup_IncludeWildcards "Distribution/^*.json;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
 	}
 	Target
 	{
