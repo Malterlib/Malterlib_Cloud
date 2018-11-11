@@ -117,23 +117,41 @@ Property
 										"\r\n"\
 										"function UploadToVersionManager()\r\n"\
 										"{\r\n"\
+										"	local FileName=\"$1\"\r\n"\
+										"	shift\r\n"\
+										"	local SettingsFile=\"$1\"\r\n"\
+										"	shift\r\n"\
 										"	UploadHosts=$(echo $MalterlibCloud_VersionUploadHosts | tr \";\" \"\\n\")\r\n"\
 										"	for Host in $UploadHosts; do\r\n"\
-										"		MTool BuildServerTool Tool=@(MalterlibCloud_VersionUploadToolName) --no-self-update-check --version-manager-upload-version --host $Host --settings-file \"$2\" \"$1\"\r\n"\
+										"		@(MalterlibCloud_CloudClientCommand) --no-self-update-check --version-manager-upload-version --host $Host --settings-file \"$SettingsFile\" --tags @(MalterlibCloud_VersionUploadCloudClientCommand_Tags)@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified) \"$FileName\" \"$@\"\r\n"\
 										"	done\r\n"\
 										"}\r\n"\
 										"\r\n"\
 										"function UploadToVersionManagerWithInfo()\r\n"\
 										"{\r\n"\
+										"	local FileName=\"$1\"\r\n"\
+										"	shift\r\n"\
+										"	local Application=\"$1\"\r\n"\
+										"	shift\r\n"\
+										"	local Platform=\"$1\"\r\n"\
+										"	shift\r\n"\
 										"	cat > \"${TempDirectory}TempVersionInfo.json\" << EOF\r\n"\
 										"{\r\n"\
-										"	\"Application\": \"$2\"\r\n"\
+										"	\"Application\": \"$Application\"\r\n"\
 										"	, \"Version\": \"$MalterlibCloudVersionInfo_Version\"\r\n"\
-										"	, \"Platform\": \"$3\"\r\n"\
+										"	, \"Platform\": \"$Platform\"\r\n"\
 										"	, \"Configuration\": \"Release\"\r\n"\
+										"	, \"ExtraInfo\": {\n"\
+										"		\"GitBranch\": \"@(MalterlibGitBranch)\"\r\n"\
+										"		, \"GitCommit\": \"@(MalterlibGitCommit)\"\r\n"\
+										"		, \"AppDistribution\": {\r\n"\
+										"			\"DeployDestinations\": [$MalterlibCloudVersionInfo_AppDistribution_DeployDestinations]\r\n"\
+										"			, \"ReleaseNotes\": \"@(MalterlibCloudVersionInfo_AppDistribution_ReleaseNotes_Escaped)\"\r\n"\
+										"		}\r\n"\
+										"	}\r\n"\
 										"}\r\n"\
 										"EOF\r\n"\
-										"	UploadToVersionManager \"$1\" \"${TempDirectory}TempVersionInfo.json\"\r\n"\
+										"	UploadToVersionManager \"$FileName\" \"${TempDirectory}TempVersionInfo.json\"\r\n"\
 										"}\r\n"
 	{
 		!HostPlatformFamily Windows
