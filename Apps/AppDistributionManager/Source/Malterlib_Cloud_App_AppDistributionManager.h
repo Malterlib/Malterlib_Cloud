@@ -34,16 +34,26 @@ namespace NMib::NCloud::NAppDistributionManager
 		CVersionManager::CVersionInformation m_VersionInfo;
 	};
 
+	struct CDeployInfo
+	{
+		CStr m_SourceFile;
+		CApplicationVersion m_Version;
+		CDistributionSettings m_Settings;
+		CStr m_Renamed;
+		bool m_bElectron = false;
+		CStr m_ElectronPlatform;
+	};
+
 	struct CDeployDestination : public CActor
 	{
-		virtual TCContinuation<void> f_Deploy(CStr const &_SourceFile, CApplicationVersion const &_Version, CDistributionSettings const &_Settings, CStr const &_Renamed) = 0;
+		virtual TCContinuation<void> f_Deploy(CDeployInfo const &_DeployInfo) = 0;
 	};
 
 	struct CDeployDestination_FileSystem : public CDeployDestination
 	{
 		CDeployDestination_FileSystem();
 
-		TCContinuation<void> f_Deploy(CStr const &_SourceFile, CApplicationVersion const &_Version, CDistributionSettings const &_Settings, CStr const &_Renamed) override;
+		TCContinuation<void> f_Deploy(CDeployInfo const &_DeployInfo) override;
 
 	private:
 		TCContinuation<void> fp_Destroy() override;

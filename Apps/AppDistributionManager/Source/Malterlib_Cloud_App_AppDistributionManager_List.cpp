@@ -53,6 +53,8 @@ namespace NMib::NCloud::NAppDistributionManager
 				DistributionInfo += "                 Required tags: {vs}{\n}"_f << Distribution.m_Settings.m_Tags;
 				DistributionInfo += "                     Platforms: {vs}{\n}"_f << Distribution.m_Settings.m_Platforms;
 				DistributionInfo += "    Allowed branches wildcards: {vs}{\n}"_f << Distribution.m_Settings.m_BranchWildcards;
+				DistributionInfo += "           Deploy destinations: {vs}{\n}"_f << Distribution.m_Settings.m_DeployDestinations;
+				DistributionInfo += "               Rename template: {}{\n}"_f << Distribution.m_Settings.m_RenameTemplate;
 			}
 
 			*_pCommandLine += DistributionInfo;

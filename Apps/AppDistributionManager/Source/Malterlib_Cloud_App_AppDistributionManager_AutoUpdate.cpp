@@ -242,7 +242,11 @@ namespace NMib::NCloud::NAppDistributionManager
 									auto DeployDestinationActor = fp_CreateDeploy(DeployDestination);
 									RunningDeploys.f_Insert(DeployDestinationActor);
 
-									CStr Renamed;
+									CDeployInfo DeployInfo;
+									DeployInfo.m_SourceFile = SourcePath;
+									DeployInfo.m_Version = ApplicationVersion;
+									DeployInfo.m_Settings = DistributionSettings;
+
 									{
 										CStr RenamedTemplate = DistributionSettings.m_RenameTemplate;
 
@@ -263,6 +267,12 @@ namespace NMib::NCloud::NAppDistributionManager
 
 										CStr ParsePlatform = ApplicationVersion.m_VersionID.m_Platform;
 										CStr Platform = fg_GetStrSep(ParsePlatform, "-");
+										if (Platform == "electron")
+										{
+											DeployInfo.m_bElectron = true;
+											Platform = fg_GetStrSep(ParsePlatform, "-");
+											DeployInfo.m_ElectronPlatform = Platform;
+										}
 										CStr PlatformArchitecture = fg_GetStrSep(ParsePlatform, "-");
 										ch8 const *pPlatformParse = Platform;
 										fg_ParseAlpha(pPlatformParse);
@@ -274,7 +284,7 @@ namespace NMib::NCloud::NAppDistributionManager
 										CStr SourceFileName = fg_GetStrSep(ParseSourceFile, ".");
 										CStr SourceFileExtension = ParseSourceFile;
 
-										Renamed = CStr::CFormat(RenamedTemplate)
+										DeployInfo.m_Renamed = CStr::CFormat(RenamedTemplate)
 											<< DistributionName
 											<< VersionManagerApplicationName
 											<< ApplicationVersion.m_VersionID.m_Platform
@@ -292,7 +302,7 @@ namespace NMib::NCloud::NAppDistributionManager
 										;
 									}
 
-									DeployDestinationActor(&CDeployDestination::f_Deploy, SourcePath, ApplicationVersion, DistributionSettings, Renamed)
+									DeployDestinationActor(&CDeployDestination::f_Deploy, DeployInfo)
 										> DeploysResults.f_AddResult(DeployDestinationName)
 									;
 								}
