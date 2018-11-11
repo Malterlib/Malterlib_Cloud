@@ -130,6 +130,9 @@ namespace NMib::NCloud::NAppDistributionManager
 					auto DistributionFiles = CFile::fs_FindFiles(TempDirectory / "*");
 					for (auto &File : DistributionFiles)
 					{
+						if (CFile::fs_GetFile(File).f_StartsWith("."))
+							continue;
+
 						CStr RelativePath = CFile::fs_MakePathRelative(File, TempDirectory);
 						CStr Destination = DestinationDirectory / RelativePath;
 						CStr RelativeDestination = _DeployInfo.m_Renamed / RelativePath;
