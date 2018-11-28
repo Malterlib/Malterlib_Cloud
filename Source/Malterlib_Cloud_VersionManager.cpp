@@ -49,10 +49,33 @@ namespace NMib::NCloud
 	
 	bool CVersionManager::fs_IsValidBranch(NStr::CStr const &_String, bool _bAllowWildCards)
 	{
+		if (_String.f_IsEmpty())
+			return false;
+
+		if (_String.f_StartsWith("."))
+			return false;
+
+		if (_String.f_Find("/.") >= 0)
+			return false;
+
+		if (_String.f_EndsWith("/"))
+			return false;
+
+		if (_String.f_EndsWith(".lock"))
+			return false;
+
 		if (_bAllowWildCards)
-			return NNet::fg_IsValidHostname(_String, "/*?");
+		{
+			if (_String.f_FindChars("~^:[]\\ \t\b\r\n") >= 0)
+				return false;
+		}
 		else
-			return NNet::fg_IsValidHostname(_String, "/");
+		{
+			if (_String.f_FindChars("*?~^:[]\\ \t\b\r\n") >= 0)
+				return false;
+		}
+
+		return true;
 	}
 
 	bool CVersionManager::fs_IsValidTag(CStr const &_String)
