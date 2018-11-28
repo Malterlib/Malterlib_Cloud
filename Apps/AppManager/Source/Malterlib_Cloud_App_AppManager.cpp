@@ -8,7 +8,7 @@
 namespace NMib::NCloud::NAppManager
 {
 	CAppManagerActor::CAppManagerActor()
-		: CDistributedAppActor(CDistributedAppActor_Settings("AppManager", false).f_AuditCategory("Malterlib/Cloud/AppManager"))
+		: CDistributedAppActor(CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager"))
 	{
 	}
 	

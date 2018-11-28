@@ -13,7 +13,7 @@
 namespace NMib::NCloud::NVersionManager
 {
 	CVersionManagerDaemonActor::CVersionManagerDaemonActor()
-		: CDistributedAppActor(CDistributedAppActor_Settings{"VersionManager", false}.f_AuditCategory("Malterlib/Cloud/VersionManager"))
+		: CDistributedAppActor(CDistributedAppActor_Settings{"VersionManager"}.f_AuditCategory("Malterlib/Cloud/VersionManager"))
 	{
 	}
 	

@@ -10,7 +10,7 @@
 namespace NMib::NCloud::NCloudClient
 {
 	CCloudClientAppActor::CCloudClientAppActor()
-		: CDistributedAppActor{CDistributedAppActor_Settings{"MalterlibCloud", false}}
+		: CDistributedAppActor{CDistributedAppActor_Settings{"MalterlibCloud"}}
 	{
 	}
 	

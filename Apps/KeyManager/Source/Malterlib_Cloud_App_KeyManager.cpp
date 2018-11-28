@@ -14,7 +14,7 @@
 namespace NMib::NCloud::NKeyManager
 {
 	CKeyManagerDaemonActor::CKeyManagerDaemonActor()
-		: CDistributedAppActor(CDistributedAppActor_Settings{"KeyManager", false})
+		: CDistributedAppActor(CDistributedAppActor_Settings{"KeyManager"})
 	{
 	}
 

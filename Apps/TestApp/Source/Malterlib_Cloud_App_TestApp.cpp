@@ -11,7 +11,7 @@ using namespace NMib;
 namespace NMib::NCloud::NTest
 {
 	CTestAppActor::CTestAppActor()
-		: CDistributedAppActor(CDistributedAppActor_Settings("TestApp", false))
+		: CDistributedAppActor(CDistributedAppActor_Settings("TestApp"))
 	{
 	}
 

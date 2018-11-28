@@ -11,7 +11,7 @@
 namespace NMib::NCloud::NBackupManager
 {
 	CBackupManagerApp::CBackupManagerApp()
-		: CDistributedAppActor(CDistributedAppActor_Settings{"BackupManager", false})
+		: CDistributedAppActor(CDistributedAppActor_Settings{"BackupManager"})
 	{
 	}
 	

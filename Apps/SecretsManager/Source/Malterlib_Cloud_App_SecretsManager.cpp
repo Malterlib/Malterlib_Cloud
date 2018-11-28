@@ -10,7 +10,7 @@
 namespace NMib::NCloud::NSecretsManager
 {
 	CSecretsManagerDaemonActor::CSecretsManagerDaemonActor()
-		: CDistributedAppActor(CDistributedAppActor_Settings{"SecretsManager", false})
+		: CDistributedAppActor(CDistributedAppActor_Settings{"SecretsManager"})
 	{
 	}
 	

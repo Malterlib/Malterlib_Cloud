@@ -13,7 +13,7 @@
 namespace NMib::NCloud::NCloudAPIManager
 {
 	CCloudAPIManagerDaemonActor::CCloudAPIManagerDaemonActor()
-		: CDistributedAppActor(CDistributedAppActor_Settings{"CloudAPIManager", false})
+		: CDistributedAppActor(CDistributedAppActor_Settings{"CloudAPIManager"})
 	{
 	}
 	
