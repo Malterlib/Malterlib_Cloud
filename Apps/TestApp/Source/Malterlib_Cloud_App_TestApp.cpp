@@ -31,7 +31,7 @@ namespace NMib::NCloud::NTest
 					{
 						"Names"_= {"--update-type"}
 						,"Type"_= COneOf{"Independent", "OneAtATime", "AllAtOnce"}
-						, "Description"_= "Override the update type for the application"
+						, "Description"_= "Override the update type for the application."
 					}
 				}
 			)

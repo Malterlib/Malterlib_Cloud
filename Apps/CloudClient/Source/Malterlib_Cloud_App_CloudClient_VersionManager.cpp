@@ -22,14 +22,14 @@ namespace NMib::NCloud::NCloudClient
 			{
 				"Names"_= {"--host"}
 				, "Default"_= ""
-				, "Description"_= "Limit query to only specified host ID"
+				, "Description"_= "Limit query to only specified host ID."
 			}
 		;
 		_Section.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--version-manager-list-applications"}
-					, "Description"_= "List applications available on remote version managers"
+					, "Description"_= "List applications available on remote version managers."
 					, "Options"_=
 					{
 						VersionManagerHost
@@ -45,7 +45,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--version-manager-list-versions"}
-					, "Description"_= "List application versions available on remote version managers"
+					, "Description"_= "List application versions available on remote version managers."
 					, "Options"_=
 					{
 						VersionManagerHost
@@ -76,7 +76,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--version-manager-upload-version"}
-					, "Description"_= "Upload a version to remote version manager\n"
+					, "Description"_= "Upload a version to remote version manager.\n"
 					, "Options"_=
 					{
 						"VersionManagerHost?"_=
@@ -118,7 +118,7 @@ namespace NMib::NCloud::NCloudClient
 									}
 								}
 							)
-							.f_ToString("    ").f_Replace("\r\n", "\r").f_Replace("\n", "\r")
+							.f_ToStringColored("    ", CDistributedAppActor::fs_ColorEnabledDefault()).f_Replace("\r\n", "\r").f_Replace("\n", "\r")
 						}
 						, "Application?"_=
 						{
@@ -182,7 +182,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= _[_]
 							, "Default"_= CFile::fs_GetCurrentDirectory()
 							, "Hidden"_= true
-							, "Description"_= "Internal hidden option to forward current directory"
+							, "Description"_= "Internal hidden option to forward current directory."
 						}					
 					}
 					, "Parameters"_= 

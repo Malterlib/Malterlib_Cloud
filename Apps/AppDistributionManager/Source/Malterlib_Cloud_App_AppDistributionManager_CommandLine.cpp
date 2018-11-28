@@ -98,8 +98,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			(
 				{
 					"Names"_= {"--distribution-add"}
-					, "Description"_= 
-						"Adds an application distribution.\n"
+					, "Description"_= "Adds an application distribution.\n"
 					, "Options"_=
 					{
 						"VersionManagerApplication"_= AddOption_VersionManagerApplication
@@ -108,7 +107,7 @@ namespace NMib::NCloud::NAppDistributionManager
 							"Names"_= {"--distribution"}
 							, "Type"_= ""
 							, "Description"_= "The unique name you give the distribution.\n"
-							"Defaults to the name of the version manager application"
+							"Defaults to the name of the version manager application."
 						}
 						, AddOption_Tags
 						, AddOption_Platforms
@@ -155,7 +154,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			(
 				{
 					"Names"_= {"--distribution-list"}
-					, "Description"_= "List distributions"
+					, "Description"_= "List distributions."
 					, "Options"_=
 					{
 						"Verbose?"_= 
@@ -182,13 +181,13 @@ namespace NMib::NCloud::NAppDistributionManager
 			(
 				{
 					"Names"_= {"--distribution-remove"}
-					, "Description"_= "Remove the distribution"
+					, "Description"_= "Remove the distribution."
 					, "Parameters"_=
 					{
 						"Distribution"_=
 						{
 							"Type"_= ""
-							, "Description"_= "The name of the distribution to remove"
+							, "Description"_= "The name of the distribution to remove."
 						}
 					}
 				}

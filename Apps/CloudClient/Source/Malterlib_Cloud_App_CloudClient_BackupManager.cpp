@@ -20,14 +20,14 @@ namespace NMib::NCloud::NCloudClient
 			{
 				"Names"_= {"--host"}
 				, "Default"_= ""
-				, "Description"_= "Limit backup query to only specified host ID"
+				, "Description"_= "Limit backup query to only specified host ID."
 			}
 		;
 		_Section.f_RegisterCommand
 			(
 				{
 					"Names"_= {"--backup-manager-list-sources"}
-					, "Description"_= "List backup sources available on remote backup managers"
+					, "Description"_= "List backup sources available on remote backup managers."
 					, "Options"_=
 					{
 						OptionalBackupHost
@@ -43,7 +43,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--backup-manager-list-backups"}
-					, "Description"_= "List backups available on remote backup managers"
+					, "Description"_= "List backups available on remote backup managers."
 					, "Options"_=
 					{
 						OptionalBackupHost
@@ -68,8 +68,8 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--backup-manager-download-backup"}
-					, "Description"_= "Download a backup from remote backup manager\n"
-						"If a backup already exists the download will be resumed or ammended with the latest changes. Only appended files such as oplogs are supported\n"
+					, "Description"_= "Download a backup from remote backup manager.\n"
+						"If a backup already exists the download will be resumed or ammended with the latest changes. Only appended files such as oplogs are supported.\n"
 					, "Options"_=
 					{
 						"BackupHost?"_=
@@ -108,7 +108,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= _[_]
 							, "Default"_= CFile::fs_GetCurrentDirectory()
 							, "Hidden"_= true
-							, "Description"_= "Internal hidden option to forward current directory"
+							, "Description"_= "Internal hidden option to forward current directory."
 						}					
 					}
 					, "Parameters"_= 
@@ -117,7 +117,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Default"_= NTime::CTime{}
 							, "Description"_= "The time of the backup to download.\n"
-								"Leave as default to download the latest backup\n"
+								"Leave as default to download the latest backup.\n"
 						}
 					}
 				}

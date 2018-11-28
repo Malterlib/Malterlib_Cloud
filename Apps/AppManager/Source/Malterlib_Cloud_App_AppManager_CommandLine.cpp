@@ -24,7 +24,7 @@ namespace NMib::NCloud::NAppManager
 					{
 						"Names"_= {"--log-launches-to-stderr"}
 						,"Default"_= false
-						, "Description"_= "Log application launch output to stderr"
+						, "Description"_= "Log application launch output to stderr."
 					}
 				}
 			)
@@ -75,7 +75,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_= {"--distributed-app"}
 				, "Type"_= true
-				, "Description"_= "Expect the app to register as a distributed app. This will cause the AppManager to wait for the app to register before"
+				, "Description"_= "Expect the app to register as a distributed app. This will cause the AppManager to wait for the app to register before."
 					"returning from add, start and update operations."
 			}
 		;
@@ -125,7 +125,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_= {"--backup-add-sync-flags-wildcards"}
 				, "Type"_= {"*"_= {""}}
-				, "Description"_= "Specify wildcards mapped to flags to add for files to back up\n" 
+				, "Description"_= "Specify wildcards mapped to flags to add for files to back up.\n"
 				"Relative to application root. Flags:\n"
 				"@Indent=20\r"
 				"   Append:          Append syncing. Any changes are assumed to be append only.\r"
@@ -139,7 +139,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_= {"--backup-remove-sync-flags-wildcards"}
 				, "Type"_= {"*"_= {""}}
-				, "Description"_= "Specify wildcards mapped to flags to remove for files to back up\n" 
+				, "Description"_= "Specify wildcards mapped to flags to remove for files to back up.\n"
 				"Relative to application root. Evaluated after add sync flags wildcards. Flags:\n"
 				"@Indent=20\r"
 				"   Append:          Append syncing. Any changes are assumed to be append only.\r"
@@ -153,7 +153,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_= {"--backup-new-backup-interval"}
 				, "Type"_= 0.0
-				, "Description"_= "Number of hours interval for creating new full backup snapshots. Set to 0 to disable. Defaults to 24 hours\n"
+				, "Description"_= "Number of hours interval for creating new full backup snapshots. Set to 0 to disable. Defaults to 24 hours.\n"
 			}
 		;
 
@@ -276,13 +276,13 @@ namespace NMib::NCloud::NAppManager
 						{
 							"Names"_= {"--force-overwrite"}
 							,"Default"_= false 
-							, "Description"_= "Force zfs to overwrite storage"
+							, "Description"_= "Force zfs to overwrite storage."
 						}
 						, "ForceInstall?"_= 
 						{
 							"Names"_= {"--force-install"}
 							,"Default"_= false 
-							, "Description"_= "Force application install even if application directory already exists"
+							, "Description"_= "Force application install even if application directory already exists."
 						}
 						, "SettingsFromVersionInfo?"_= 
 						{
@@ -550,7 +550,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_= {"--application-list"}
-					, "Description"_= "List applications"
+					, "Description"_= "List applications."
 					, "Options"_=
 					{
 						"Verbose?"_= 
@@ -605,13 +605,13 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_= {"--application-remove"}
-					, "Description"_= "Remove the application"
+					, "Description"_= "Remove the application."
 					, "Parameters"_=
 					{
 						"Name"_= 
 						{
 							"Type"_= ""
-							, "Description"_= "The name of the application to remove"
+							, "Description"_= "The name of the application to remove."
 						}
 					}
 				}
@@ -625,7 +625,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_= {"--application-update-from-file"}
-					, "Description"_= "Update the application package from file"
+					, "Description"_= "Update the application package from file."
 					, "Options"_= 
 					{
 						"Name"_= 
@@ -655,7 +655,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_= {"--application-update"}
-					, "Description"_= "Update the application package from version manager"
+					, "Description"_= "Update the application package from version manager."
 					, "Options"_= 
 					{
 						"Name"_= 
@@ -709,7 +709,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_= {"--application-stop"}
-					, "Description"_= "Stop the application, keeping any encryption loaded"
+					, "Description"_= "Stop the application, keeping any encryption loaded."
 					, "Parameters"_=
 					{
 						"Name"_= 
@@ -729,7 +729,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_= {"--application-restart"}
-					, "Description"_= "Restart the application, keeping any encryption loaded"
+					, "Description"_= "Restart the application, keeping any encryption loaded."
 					, "Parameters"_=
 					{
 						"Name"_= 
@@ -749,7 +749,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_= {"--application-start"}
-					, "Description"_= "Start the application"
+					, "Description"_= "Start the application."
 					, "Parameters"_=
 					{
 						"Name"_= 
@@ -769,7 +769,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_= {"--remove-known-host"}
-					, "Description"_= "Remove known host for group and application on this AppManager and any connected remote AppManagers"
+					, "Description"_= "Remove known host for group and application on this AppManager and any connected remote AppManagers."
 					, "Options"_= 
 					{
 						"Application"_= 
@@ -804,7 +804,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				{
 					"Names"_= {"--cancel-all-updates"}
-					, "Description"_= "Cancel all running pending updates"
+					, "Description"_= "Cancel all running pending updates."
 				}
 				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{

@@ -20,7 +20,8 @@ namespace NMib::NCloud::NCloudClient
 					"SelfUpdateCheck?"_= 
 					{
 						"Names"_= {"--self-update-check"}
-						,"Default"_= true
+						, "Default"_= true
+						, "ValidForDirectCommand"_= false
 						, "Description"_= "Check if a new version of the cloud client is available when running other commands."
 					}
 				}
@@ -34,14 +35,14 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_= {"--self-update"}
-					, "Description"_= "Update cloud client from from connected version managers"
+					, "Description"_= "Update cloud client from from connected version managers."
 					, "Options"_=
 					{
 						"VersionManagerHost?"_=
 						{
 							"Names"_= {"--host"}
 							, "Default"_= ""
-							, "Description"_= "Only look for a new version on this version manager"
+							, "Description"_= "Only look for a new version on this version manager."
 						}
 					}
 				}
