@@ -1009,7 +1009,8 @@ gz_uncompress(int in, int out, char *pre, size_t prelen, off_t *gsizep,
 				    tflag == 0 &&
 #endif
 				    write_retry(out, outbufp, wr) != wr) {
-					maybe_warn("error writing to output\n");
+					if (errno != EPIPE)
+						maybe_warn("error writing to output: %d\n", errno);
 					goto stop_and_fail;
 				}
 
