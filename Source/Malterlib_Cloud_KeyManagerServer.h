@@ -72,7 +72,7 @@ namespace NMib::NCloud
 	struct CKeyManagerServerConfig
 	{
 		NConcurrency::TCActor<ICKeyManagerServerDatabase> m_DatabaseActor;
-		NContainer::TCSet<NContainer::TCVector<uint8>> m_PublicKeysForAllKeyManagers;
+		NContainer::TCSet<NContainer::CByteVector> m_PublicKeysForAllKeyManagers;
 	};
 
 	class CKeyManagerServer : public NConcurrency::CActor
@@ -90,10 +90,10 @@ namespace NMib::NCloud
 		
 	private:
 		struct CInternal;
-		NPtr::TCUniquePointer<CInternal> mp_pInternal;
+		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }
 
 #ifndef DMibPNoShortCuts
-using namespace NMib::NCloud;
+	using namespace NMib::NCloud;
 #endif

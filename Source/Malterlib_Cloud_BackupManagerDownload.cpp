@@ -7,7 +7,7 @@
 namespace NMib::NCloud
 {
 	using namespace NConcurrency;
-	using namespace NPtr;
+	using namespace NStorage;
 	using namespace NStr;
 	using namespace NTime;
 	

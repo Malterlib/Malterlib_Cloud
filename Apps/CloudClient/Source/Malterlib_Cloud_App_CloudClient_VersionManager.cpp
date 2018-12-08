@@ -35,7 +35,7 @@ namespace NMib::NCloud::NCloudClient
 						VersionManagerHost
 					}
 				}
-				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_ListApplications(_Params, _pCommandLine);
 				}
@@ -66,7 +66,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_ListVersions(_Params, _pCommandLine);
 				}
@@ -194,7 +194,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_UploadVersion(_Params, _pCommandLine);
 				}
@@ -254,7 +254,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_ChangeTags(_Params, _pCommandLine);
 				}
@@ -308,7 +308,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_DownloadVersion(_Params, _pCommandLine);
 				}
@@ -350,7 +350,7 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		TCContinuation<uint32> Continuation;
 		CStr Host = _Params["VersionManagerHost"].f_String();
@@ -398,7 +398,7 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		TCContinuation<uint32> Continuation;
 		
@@ -476,7 +476,7 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
 		if (Source.f_IsEmpty())
@@ -738,7 +738,7 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		TCContinuation<uint32> Continuation;
 		
@@ -802,7 +802,7 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		TCContinuation<uint32> Continuation;
 		

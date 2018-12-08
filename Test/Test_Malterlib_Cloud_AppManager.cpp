@@ -26,9 +26,9 @@ using namespace NMib::NProcess;
 using namespace NMib::NContainer;
 using namespace NMib::NCryptography;
 using namespace NMib::NCloud;
-using namespace NMib::NPtr;
+using namespace NMib::NStorage;
 using namespace NMib::NAtomic;
-using namespace NMib::NNet;
+using namespace NMib::NNetwork;
 
 #define DTestAppManagerEnableLogging 0
 #define DTestAppManagerEnableOtherOutput 0

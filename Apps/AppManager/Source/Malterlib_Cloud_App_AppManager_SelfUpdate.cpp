@@ -63,7 +63,7 @@ namespace NMib::NCloud::NAppManager
 				bool bDaemon = false;
 				bool bDaemonDebug = false;
 				bool bDaemonStandalone = false;
-				bool bDaemonSupportRestart = CService::fs_SupportsAutoRestart();
+				bool bDaemonSupportRestart = CDaemon::fs_SupportsAutoRestart();
 				
 				for (auto &Parameter : CommandLine)
 				{
@@ -90,7 +90,7 @@ namespace NMib::NCloud::NAppManager
 				uint32 ExitCode;
 				if (bDaemon && bDaemonSupportRestart)
 				{
-					CService::fs_QuitDaemon(); // Initiate application quit
+					CDaemon::fs_QuitDaemon(); // Initiate application quit
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Self updating by quitting daemon");
 				}
 				else if (CProcessLaunch::fs_LaunchBlock(CProcessLaunch::fs_GetBashPath(), fg_CreateVector(FileName, ProgramPath, Type), StdOut, StdErr, ExitCode, Params))
@@ -100,7 +100,7 @@ namespace NMib::NCloud::NAppManager
 						DMibError(fg_Format("Self update script failed with exit code {} and reported: {}", ExitCode, fg_ConcatOutput(StdOut, StdErr)));
 					}
 					else if (bDaemonDebug)
-						CService::fs_QuitDaemon(); // Initiate application quit
+						CDaemon::fs_QuitDaemon(); // Initiate application quit
 				}
 				else
 					DMibError(fg_Format("Failed to launch self update script: {}", StdErr));

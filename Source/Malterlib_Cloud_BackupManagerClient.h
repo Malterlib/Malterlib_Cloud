@@ -102,7 +102,7 @@ namespace NMib::NCloud
 		};
 		
 		using CNotification
-			= NContainer::TCStreamableVariant
+			= NStorage::TCStreamableVariant
 			<
 				ENotification
 				, CNotification_BackupAborted, ENotification_BackupAborted
@@ -155,12 +155,12 @@ namespace NMib::NCloud
 		void fp_OnNotification(NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification);
 		void fp_HashMismatch(NStr::CStr const &_File);
 
-		NPtr::TCUniquePointer<CInternal> mp_pInternal;
+		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }
 
 #ifndef DMibPNoShortCuts
-using namespace NMib::NCloud;
+	using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_BackupManagerClient.hpp"

@@ -109,7 +109,7 @@ namespace NMib::NCloud::NCloudClient
 		(
 			 CStr const &_Command
 			 , NEncoding::CEJSON const &_Params
-			 , NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			 , NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
 		)
 	{
 		if (!_Params["SelfUpdateCheck"].f_Boolean() || _Command == "--self-update")
@@ -132,7 +132,7 @@ namespace NMib::NCloud::NCloudClient
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		DMibCheck(mp_State.m_RootDirectory == CFile::fs_GetProgramDirectory());
 

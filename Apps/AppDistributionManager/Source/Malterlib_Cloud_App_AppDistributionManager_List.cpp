@@ -33,7 +33,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		return fg_Explicit(fg_Move(Versions));
 	}
 
-	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionEnum(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionEnum(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CStr DistributionName = _Params["Distribution"].f_String();
@@ -63,7 +63,11 @@ namespace NMib::NCloud::NAppDistributionManager
 		return fg_Explicit(0);
 	}
 	
-	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions
+		(
+		 	CEJSON const &_Params
+		 	, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+		)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 	

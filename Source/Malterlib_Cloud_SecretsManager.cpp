@@ -26,7 +26,7 @@ namespace NMib::NCloud
 
 	bool CSecretsManager::fs_IsValidTag(CStr const &_Tag)
 	{
-		return NNet::fg_IsValidHostname(_Tag);
+		return NNetwork::fg_IsValidHostname(_Tag);
 	}
 
 	auto CSecretsManager::CSecretProperties::f_SetSecret(CSecret &&_Secret) && -> CSecretProperties &&

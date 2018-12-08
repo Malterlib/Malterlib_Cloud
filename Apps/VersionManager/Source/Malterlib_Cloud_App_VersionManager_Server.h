@@ -59,7 +59,7 @@ namespace NMib::NCloud::NVersionManager
 			}
 			
 			CVersionManager::CVersionInformation m_VersionInfo;
-			DIntrusiveLink(CVersion, TCAVLLink<>, m_TimeLink);
+			TCAVLLink<> m_TimeLink;
 			
 			struct CCompareTime
 			{
@@ -69,8 +69,8 @@ namespace NMib::NCloud::NVersionManager
 						return true;
 					else if (_Left.m_VersionInfo.m_Time.f_IsValid() && !_Right.m_VersionInfo.m_Time.f_IsValid())
 						return false;					
-					return NContainer::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetIdentifier()) 
-						< NContainer::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetIdentifier())
+					return NStorage::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetIdentifier()) 
+						< NStorage::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetIdentifier())
 					;
 				}
 			};
@@ -84,7 +84,7 @@ namespace NMib::NCloud::NVersionManager
 			}
 			
 			TCMap<CVersionManager::CVersionIDAndPlatform, CVersion> m_Versions;
-			TCAVLTree<CVersion::CLinkTraits_m_TimeLink, CVersion::CCompareTime> m_VersionsByTime;
+			TCAVLTree<&CVersion::m_TimeLink, CVersion::CCompareTime> m_VersionsByTime;
 		};
 		
 		struct CVersionManagerImplementation : public CVersionManager

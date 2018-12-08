@@ -24,12 +24,12 @@ using namespace NMib::NProcess;
 using namespace NMib::NContainer;
 using namespace NMib::NCryptography;
 using namespace NMib::NCloud;
-using namespace NMib::NPtr;
+using namespace NMib::NStorage;
 using namespace NMib::NAtomic;
 using namespace NMib::NEncoding;
 using namespace NMib::NStorage;
 using namespace NMib::NTime;
-using namespace NMib::NNet;
+using namespace NMib::NNetwork;
 
 #define DTestBackupManagerEnableLogging 0
 
@@ -290,7 +290,7 @@ public:
 		void f_CreateFile(CStr const &_Name, mint _Size)
 		{
 			DMibCloudBackupManagerDebugOut("Create file      {} {}\n", _Name, _Size);
-			TCVector<uint8> Data;
+			CByteVector Data;
 			mint BufferSize = fg_AlignUp(_Size, 4);
 			Data.f_SetLen(BufferSize);
 
@@ -406,7 +406,7 @@ public:
 		void f_AppendFile(CStr const &_Name, mint _Size)
 		{
 			DMibCloudBackupManagerDebugOut("Append file      {} {}\n", _Name, _Size);
-			TCVector<uint8> Data;
+			CByteVector Data;
 			mint BufferSize = fg_AlignUp(_Size, 4);
 			Data.f_SetLen(BufferSize);
 

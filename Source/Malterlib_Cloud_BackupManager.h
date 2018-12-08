@@ -73,7 +73,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 			
-			NContainer::TCMap<NStr::CStr, NDataProcessing::CHashDigest_SHA256> m_FilesNotUpToDate;
+			NContainer::TCMap<NStr::CStr, NCryptography::CHashDigest_SHA256> m_FilesNotUpToDate;
 		};
 
 		struct CManifestChange_Change
@@ -118,7 +118,7 @@ namespace NMib::NCloud
 			NStr::CStr m_FromFileName;
 		};
 
-		using CManifestChange = NContainer::TCStreamableVariant
+		using CManifestChange = NStorage::TCStreamableVariant
 			<
 				EManifestChange
 				, CManifestChange_Change, EManifestChange_Change
@@ -146,7 +146,7 @@ namespace NMib::NCloud
 			NStr::CStr m_FileName;
 			uint64 m_Position;
 			NContainer::CSecureByteVector m_Data;
-			NDataProcessing::CHashDigest_SHA256 m_PreviousDigest;
+			NCryptography::CHashDigest_SHA256 m_PreviousDigest;
 			CManifestFile m_ManifestFile;
 		};
 
@@ -164,7 +164,7 @@ namespace NMib::NCloud
 			(
 			 	FRunRSyncProtocol &&_fRunProtocol
 			 	, uint64 _ManifestSize
-			 	, NDataProcessing::CHashDigest_SHA256 const &_ExpectedDigest
+			 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 			) = 0
 		;
 		virtual NConcurrency::TCContinuation<CStartBackupResult> f_StartBackup() = 0;
@@ -370,7 +370,7 @@ DMibConcurrencyRegisterMemberFunctionLowestVersion(NMib::NCloud::CBackupManager:
 DMibConcurrencyRegisterMemberFunctionLowestVersion(NMib::NCloud::CBackupManager::f_ListBackups, 0x103);
 
 #ifndef DMibPNoShortCuts
-using namespace NMib::NCloud;
+	using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_BackupManager.hpp"

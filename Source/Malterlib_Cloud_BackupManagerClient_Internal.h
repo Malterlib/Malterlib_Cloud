@@ -15,10 +15,10 @@
 using namespace NMib; 
 using namespace NMib::NConcurrency; 
 using namespace NMib::NContainer; 
-using namespace NMib::NPtr; 
+using namespace NMib::NStorage; 
 using namespace NMib::NFile; 
 using namespace NMib::NStr; 
-using namespace NMib::NDataProcessing;
+using namespace NMib::NCryptography;
 
 namespace NMib::NCloud
 {

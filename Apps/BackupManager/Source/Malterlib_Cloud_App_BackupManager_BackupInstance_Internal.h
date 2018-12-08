@@ -29,7 +29,7 @@ namespace NMib::NCloud::NBackupManager
 			
 			TCVector<CStr> m_TempFileNames;
 			
-			NDataProcessing::CHashDigest_SHA256 m_ExpectedDigest;
+			NCryptography::CHashDigest_SHA256 m_ExpectedDigest;
 
 			COnScopeExitShared m_SequenceSyncsCleanup;
 			
@@ -86,7 +86,7 @@ namespace NMib::NCloud::NBackupManager
 				, EDirectoryManifestSyncFlag _SyncFlags
 				, CStr &o_RSyncID
 				, TCFunctionMutable<TCContinuation<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
-			 	, NDataProcessing::CHashDigest_SHA256 const &_ExpectedDigest
+			 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 			)
 		;
 		TCContinuation<void> f_CommitFile(CStr const &_File, CBackupManagerBackup::CManifestFile const &_ManifestFile);

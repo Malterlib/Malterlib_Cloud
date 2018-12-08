@@ -27,7 +27,7 @@ namespace NMib::NCloud
 		CKeyManagerServerConfig m_Config;
 		NConcurrency::TCDistributedActor<CKeyManager> m_KeyManagerActor;
 		NConcurrency::CDistributedActorPublication m_KeyManagerPublication;
-		NPtr::TCUniquePointer<ICKeyManagerServerDatabase::CDatabase> m_pDatabase;
+		NStorage::TCUniquePointer<ICKeyManagerServerDatabase::CDatabase> m_pDatabase;
 		NContainer::TCLinkedList<NFunction::TCFunction<void ()>> m_OnDatabaseReadyQueue;
 		NContainer::TCLinkedList<NFunction::TCFunction<void (NStr::CStr const&)>> m_OnDatabaseErrorQueue;
 	};

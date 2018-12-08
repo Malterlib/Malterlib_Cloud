@@ -74,7 +74,7 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		TCContinuation<uint32> Continuation;
 		

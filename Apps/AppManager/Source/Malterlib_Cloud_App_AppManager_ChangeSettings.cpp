@@ -30,7 +30,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		

@@ -282,7 +282,7 @@ namespace NMib::NCloud::NAppManager
 						mp_State.m_LocalAddress
 						, mp_State.m_TrustManager
 						, g_ActorFunctor > [_pApplication, this]
-						(CStr const &_HostID, CCallingHostInfo const &_HostInfo, TCVector<uint8> const &_Certificate) -> TCContinuation<void>
+						(CStr const &_HostID, CCallingHostInfo const &_HostInfo, CByteVector const &_Certificate) -> TCContinuation<void>
 						{
 							if (_pApplication->m_bDeleted)
 								return DMibErrorInstance("Application deleted");

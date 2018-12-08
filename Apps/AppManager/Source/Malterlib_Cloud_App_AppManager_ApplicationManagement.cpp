@@ -406,7 +406,7 @@ namespace NMib::NCloud::NAppManager
 		CFile::fs_SetAttributes(_ApplicationDir, gc_RootAttributes);
 	}
 
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		TCContinuation<uint32> Continuation;
 		mp_AppManagerInterface.m_pActor->f_Stop(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
@@ -417,7 +417,7 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		TCContinuation<uint32> Continuation;
 		mp_AppManagerInterface.m_pActor->f_Start(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
@@ -428,7 +428,7 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		TCContinuation<uint32> Continuation;
 		mp_AppManagerInterface.m_pActor->f_Restart(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)

@@ -36,11 +36,11 @@ using namespace NMib::NProcess;
 using namespace NMib::NContainer;
 using namespace NMib::NCryptography;
 using namespace NMib::NCloud;
-using namespace NMib::NPtr;
+using namespace NMib::NStorage;
 using namespace NMib::NAtomic;
 using namespace NMib::NEncoding;
 using namespace NMib::NStorage;
-using namespace NMib::NNet;
+using namespace NMib::NNetwork;
 
 #define DTestSecretsManagerEnableLogging 0
 
@@ -1546,12 +1546,12 @@ public:
 					if (FileLen != File2.f_GetLength())
 						return false;
 
-					NContainer::TCVector<uint8> DestData1;
-					NContainer::TCVector<uint8> DestData2;
+					NContainer::CByteVector DestData1;
+					NContainer::CByteVector DestData2;
 					File1.f_Read(DestData1.f_GetArray(FileLen), FileLen);
 					File2.f_Read(DestData2.f_GetArray(FileLen), FileLen);
 
-					return NMem::fg_MemCmp(DestData1.f_GetArray(), DestData2.f_GetArray(), FileLen) == 0;
+					return NMemory::fg_MemCmp(DestData1.f_GetArray(), DestData2.f_GetArray(), FileLen) == 0;
 				}
 			;
 
@@ -1575,7 +1575,7 @@ public:
 							, EFileOpen _OpenFlags
 							, EFileAttrib _Attributes
 						)
-						-> NPtr::TCUniquePointer<NStream::CBinaryStream>
+						-> NStorage::TCUniquePointer<NStream::CBinaryStream>
 						{
 							TCUniquePointer<TCBinaryStreamFileDelayed<>> pFile = fg_Construct(pOpenEvent, pCloseEvent);
 							pFile->f_Open(_FileName, _OpenFlags, _Attributes);
@@ -1620,7 +1620,7 @@ public:
 							, EFileOpen _OpenFlags
 							, EFileAttrib _Attributes
 						)
-						-> NPtr::TCUniquePointer<NStream::CBinaryStream>
+						-> NStorage::TCUniquePointer<NStream::CBinaryStream>
 						{
 							TCUniquePointer<TCBinaryStreamFileDelayed<>> pFile = fg_Construct(_pOpenEvent, nullptr);
 							pFile->f_Open(_FileName, _OpenFlags, _Attributes);

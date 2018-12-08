@@ -20,8 +20,8 @@ namespace NMib::NCloud::NCloudAPIManager
 	
 	struct CState
 	{
-		TCVector<uint8> m_Headers;
-		TCVector<uint8> m_Body;
+		CByteVector m_Headers;
+		CByteVector m_Body;
 	};
 	
 	struct CCurlResult

@@ -39,7 +39,7 @@ namespace NMib::NCloud
 		friend struct CFileTransferSend;
 		friend struct CFileTransferReceive;
 		struct CInternal;
-		NPtr::TCUniquePointer<CInternal> mp_pInternal;
+		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 	
 	struct CFileTransferSend : public NConcurrency::CActor
@@ -52,7 +52,7 @@ namespace NMib::NCloud
 		
 	private:
 		struct CInternal;
-		NPtr::TCUniquePointer<CInternal> mp_pInternal;
+		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 	
 	struct CFileTransferReceive : public NConcurrency::CActor
@@ -80,10 +80,10 @@ namespace NMib::NCloud
 		
 	private:
 		struct CInternal;
-		NPtr::TCUniquePointer<CInternal> mp_pInternal;
+		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }
 
 #ifndef DMibPNoShortCuts
-using namespace NMib::NCloud;
+	using namespace NMib::NCloud;
 #endif

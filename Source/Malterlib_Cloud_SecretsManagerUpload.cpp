@@ -76,7 +76,7 @@ namespace NMib::NCloud
 			, CActorSubscription &o_Subscription
 		)
 	{
-		NPtr::TCSharedPointer<CState> pState = fg_Construct();
+		NStorage::TCSharedPointer<CState> pState = fg_Construct();
 
 		if (!_Config.m_Manifest.f_IsOfType<CDirectoryManifestConfig>() || _Config.m_Manifest.f_Get<1>().m_IncludeWildcards.f_GetLen() != 1)
 			return DMibErrorInstance("Incorrect config. Expected a CDirectoryManifestConfig with a single file in m_IncludeWildcards");

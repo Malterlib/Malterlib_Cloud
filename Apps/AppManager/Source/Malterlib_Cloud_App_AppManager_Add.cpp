@@ -46,7 +46,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		bool bForceOverwrite = _Params["ForceOverwrite"].f_Boolean();

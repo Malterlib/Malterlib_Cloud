@@ -14,7 +14,7 @@ namespace NMib::NCloud
 	using namespace NFile;
 	using namespace NTime;
 	using namespace NContainer;
-	using namespace NPtr;
+	using namespace NStorage;
 
 	namespace NPrivate
 	{

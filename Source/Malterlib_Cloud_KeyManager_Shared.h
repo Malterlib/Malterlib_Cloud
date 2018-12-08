@@ -7,5 +7,5 @@
 
 namespace NMib::NCloud
 {
-	using CSymmetricKey = NContainer::TCVector<uint8, NMem::CAllocator_HeapSecure>;
+	using CSymmetricKey = NContainer::CSecureByteVector;
 }

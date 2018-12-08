@@ -25,10 +25,10 @@ namespace NMib::NCloud
 	
 	private:
 		struct CInternal;
-		NPtr::TCUniquePointer<CInternal> mp_pInternal;
+		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }
 
 #ifndef DMibPNoShortCuts
-using namespace NMib::NCloud;
+	using namespace NMib::NCloud;
 #endif

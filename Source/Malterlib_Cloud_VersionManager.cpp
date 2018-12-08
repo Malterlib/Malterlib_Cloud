@@ -44,7 +44,7 @@ namespace NMib::NCloud
 	
 	bool CVersionManager::fs_IsValidApplicationName(CStr const &_String)
 	{
-		return NNet::fg_IsValidHostname(_String);
+		return NNetwork::fg_IsValidHostname(_String);
 	}
 	
 	bool CVersionManager::fs_IsValidBranch(NStr::CStr const &_String, bool _bAllowWildCards)
@@ -80,7 +80,7 @@ namespace NMib::NCloud
 
 	bool CVersionManager::fs_IsValidTag(CStr const &_String)
 	{
-		return NNet::fg_IsValidHostname(_String);
+		return NNetwork::fg_IsValidHostname(_String);
 	}
 	
 	bool CVersionManager::fs_IsValidProtocolVersion(uint32 _Version)
@@ -135,7 +135,7 @@ namespace NMib::NCloud
 
 	bool CVersionManager::fs_IsValidPlatform(NStr::CStr const &_String)
 	{
-		return NNet::fg_IsValidHostname(_String);
+		return NNetwork::fg_IsValidHostname(_String);
 	}
 	
 	// CVersionID
@@ -231,15 +231,15 @@ namespace NMib::NCloud
 	
 	bool CVersionManager::CVersionIDAndPlatform::operator == (CVersionIDAndPlatform const &_Right) const
 	{
-		return NContainer::fg_TupleReferences(m_VersionID, m_Platform) 
-			== NContainer::fg_TupleReferences(_Right.m_VersionID, _Right.m_Platform)
+		return NStorage::fg_TupleReferences(m_VersionID, m_Platform) 
+			== NStorage::fg_TupleReferences(_Right.m_VersionID, _Right.m_Platform)
 		;
 	}
 	
 	bool CVersionManager::CVersionIDAndPlatform::operator < (CVersionIDAndPlatform const &_Right) const
 	{
-		return NContainer::fg_TupleReferences(m_VersionID, m_Platform) 
-			< NContainer::fg_TupleReferences(_Right.m_VersionID, _Right.m_Platform)
+		return NStorage::fg_TupleReferences(m_VersionID, m_Platform) 
+			< NStorage::fg_TupleReferences(_Right.m_VersionID, _Right.m_Platform)
 		;
 	}
 	
@@ -247,8 +247,8 @@ namespace NMib::NCloud
 
 	bool CVersionManager::CVersionInformation::operator == (CVersionInformation const &_Right) const
 	{
-		return fg_TupleReferences(m_Time, m_Configuration, m_Tags, m_ExtraInfo, m_RetrySequence, m_nFiles, m_nBytes)
-			== fg_TupleReferences(_Right.m_Time, _Right.m_Configuration, _Right.m_Tags, _Right.m_ExtraInfo, _Right.m_RetrySequence, _Right.m_nFiles, _Right.m_nBytes)
+		return NStorage::fg_TupleReferences(m_Time, m_Configuration, m_Tags, m_ExtraInfo, m_RetrySequence, m_nFiles, m_nBytes)
+			== NStorage::fg_TupleReferences(_Right.m_Time, _Right.m_Configuration, _Right.m_Tags, _Right.m_ExtraInfo, _Right.m_RetrySequence, _Right.m_nFiles, _Right.m_nBytes)
 		;
 	}
 

@@ -263,8 +263,8 @@ namespace NMib::NCloud::NAppManager
 			CVersionManagerState *m_pVersionManager;
 			CVersionManagerApplication *m_pApplication = nullptr;
 			CVersionManager::CVersionInformation m_VersionInfo;
-			DIntrusiveLink(CVersionManagerVersion, TCAVLLink<>, m_ApplicationTimeLink);
-			DIntrusiveLink(CVersionManagerVersion, TCAVLLink<>, m_ApplicationLink);
+			TCAVLLink<> m_ApplicationTimeLink;
+			TCAVLLink<> m_ApplicationLink;
 		};
 		
 		struct CVersionManagerApplication
@@ -275,8 +275,8 @@ namespace NMib::NCloud::NAppManager
 				return TCMap<CStr, CVersionManagerApplication>::fs_GetKey(*this);
 			}
 			
-			TCAVLTree<CVersionManagerVersion::CLinkTraits_m_ApplicationTimeLink, CVersionManagerVersion::CCompareApplicationByTime> m_VersionsByTime;
-			TCAVLTree<CVersionManagerVersion::CLinkTraits_m_ApplicationLink, CVersionManagerVersion::CCompareApplication> m_Versions;
+			TCAVLTree<&CVersionManagerVersion::m_ApplicationTimeLink, CVersionManagerVersion::CCompareApplicationByTime> m_VersionsByTime;
+			TCAVLTree<&CVersionManagerVersion::m_ApplicationLink, CVersionManagerVersion::CCompareApplication> m_Versions;
 			CAppManagerActor &m_This;
 		};
 		
@@ -431,7 +431,7 @@ namespace NMib::NCloud::NAppManager
 
 			void f_Clear();
 			
-			DIntrusiveLink(CRemoteAppManager, TCAVLLink<>, m_ByActorLink);
+			TCAVLLink<> m_ByActorLink;
 			
 			TCDistributedActor<CAppManagerCoordinationInterface> m_Actor;
 			CTrustedActorInfo m_HostInfo;
@@ -577,20 +577,20 @@ namespace NMib::NCloud::NAppManager
 		;
 		TCContinuation<bool> fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication);
 		
-		TCContinuation<uint32> fp_CommandLine_EnumApplications(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_AddApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_RemoveApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_UpdateApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_StartApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_StopApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_RestartApplication(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_EnumApplications(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_AddApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_RemoveApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_UpdateApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_StartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_StopApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_RestartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		
-		TCContinuation<uint32> fp_CommandLine_ListAvailableVersions(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_ListAvailableVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
-		TCContinuation<uint32> fp_CommandLine_RemoveKnownHost(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_RemoveKnownHost(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
-		TCContinuation<uint32> fp_CommandLine_CancelAllUpdates(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_CancelAllUpdates(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		
 		TCContinuation<void> fp_AddApplication
 			(
@@ -804,7 +804,7 @@ namespace NMib::NCloud::NAppManager
 		TCTrustedActorSubscription<CAppManagerCoordinationInterface> mp_RemoteAppManagers;
 
 		TCMap<CStr, CRemoteAppManager> mp_RemoteAppManagerState;
-		TCAVLTree<CRemoteAppManager::CLinkTraits_m_ByActorLink, CRemoteAppManager::CCompareActor> mp_RemoteAppManagerStateByActor;
+		TCAVLTree<&CRemoteAppManager::m_ByActorLink, CRemoteAppManager::CCompareActor> mp_RemoteAppManagerStateByActor;
 		TCMap<CRemoteApplicationKey, TCSet<CStr>> mp_KnownRemoteApplications;
 		TCSet<TCSharedPointerSupportWeak<COnAppUpdateInfoChange>> mp_OnAppUpdateInfoChange;
 		

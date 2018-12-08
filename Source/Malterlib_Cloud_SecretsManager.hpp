@@ -9,11 +9,11 @@ namespace NMib::NCloud
 {
 	inline bool CSecretsManager::CSecretID::operator < (CSecretID const &_Right) const
 	{
-		return NContainer::fg_TupleReferences(m_Folder, m_Name) < NContainer::fg_TupleReferences(_Right.m_Folder, _Right.m_Name);
+		return NStorage::fg_TupleReferences(m_Folder, m_Name) < NStorage::fg_TupleReferences(_Right.m_Folder, _Right.m_Name);
 	}
 	inline bool CSecretsManager::CSecretID::operator == (CSecretID const &_Right) const
 	{
-		return NContainer::fg_TupleReferences(m_Folder, m_Name) == NContainer::fg_TupleReferences(_Right.m_Folder, _Right.m_Name);
+		return NStorage::fg_TupleReferences(m_Folder, m_Name) == NStorage::fg_TupleReferences(_Right.m_Folder, _Right.m_Name);
 	}
 
 	template <typename tf_CStream>
@@ -93,7 +93,7 @@ namespace NMib::NCloud
 			break;
 
 		case CSecretsManager::ESecretType_Binary:
-			o_Str += NDataProcessing::fg_Base64Encode(f_Get<CSecretsManager::ESecretType_Binary>());
+			o_Str += NEncoding::fg_Base64Encode(f_Get<CSecretsManager::ESecretType_Binary>());
 			break;
 
 		case CSecretsManager::ESecretType_File:

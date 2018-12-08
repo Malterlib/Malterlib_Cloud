@@ -44,5 +44,5 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-using namespace NMib::NCloud;
+	using namespace NMib::NCloud;
 #endif

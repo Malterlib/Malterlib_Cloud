@@ -35,7 +35,7 @@ class CAppDistributionManager : public CApplication
 
 		if (ProgramDirectory != DefaultProgramDirectory)
 		{
-			NDataProcessing::CHash_SHA256 Hash;
+			NCryptography::CHash_SHA256 Hash;
 
 			CStr Salt = "MalterlibAppDistributionManagerDaemoName";
 

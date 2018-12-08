@@ -118,7 +118,7 @@ namespace NMib::NCloud::NBackupManager
 			, EDirectoryManifestSyncFlag _SyncFlags
 			, CStr &o_RSyncID
 			, TCFunctionMutable<TCContinuation<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
-		 	, NDataProcessing::CHashDigest_SHA256 const &_ExpectedDigest
+		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 		)
 	{
 		CStr RSyncID = fg_RandomID();

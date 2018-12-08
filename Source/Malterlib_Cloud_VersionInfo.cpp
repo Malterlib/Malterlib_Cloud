@@ -10,15 +10,15 @@ namespace NMib::NCloud
 {
 	bool CCloudVersion::operator == (CCloudVersion const &_Right) const
 	{
-		return NContainer::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 
-			== NContainer::fg_TupleReferences(_Right.m_Branch, _Right.m_Major, _Right.m_Minor, _Right.m_Revision)
+		return NStorage::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 
+			== NStorage::fg_TupleReferences(_Right.m_Branch, _Right.m_Major, _Right.m_Minor, _Right.m_Revision)
 		;
 	}
 	
 	bool CCloudVersion::operator < (CCloudVersion const &_Right) const
 	{
-		return NContainer::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 
-			< NContainer::fg_TupleReferences(_Right.m_Branch, _Right.m_Major, _Right.m_Minor, _Right.m_Revision)
+		return NStorage::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 
+			< NStorage::fg_TupleReferences(_Right.m_Branch, _Right.m_Major, _Right.m_Minor, _Right.m_Revision)
 		;
 	}
 	

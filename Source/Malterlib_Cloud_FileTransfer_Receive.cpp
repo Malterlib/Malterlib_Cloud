@@ -13,7 +13,7 @@ namespace NMib::NCloud
 	using namespace NContainer;
 	using namespace NTime;
 	using namespace NFile;
-	using namespace NPtr;
+	using namespace NStorage;
 
 	struct CFileTransferReceive::CInternal
 	{

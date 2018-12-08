@@ -70,14 +70,14 @@ namespace NMib::NCloud::NCloudAPIManager
 									int64 Expires = (TimeSinceEpoch.f_GetSeconds() + ValidTimeInSeconds) * constant_int64(1000);
 
 									CStr FullURL = fg_Format("{}/{}/{}", ServiceInfo.m_URLs["swift"], _Params.m_ContainerName, _Params.m_ObjectId);
-									NHTTP::CURL URL(FullURL);
+									NWeb::NHTTP::CURL URL(FullURL);
 
 									CStr HMAC_Body = fg_Format("{}\n{}\n{}", _Params.m_Method, Expires, URL.f_GetFullPath());
 
-									TCVector<uint8> Data;
+									CByteVector Data;
 									Data.f_Insert((uint8*)HMAC_Body.f_GetStr(), HMAC_Body.f_GetLen());
 
-									TCVector<uint8> Key;
+									CByteVector Key;
 									Key.f_Insert((uint8*)_Params.m_TempURLKey.f_GetStr(), _Params.m_TempURLKey.f_GetLen());
 
 									auto Digest = fg_MessageAuthenication_HMAC_SHA1(Data, Key);

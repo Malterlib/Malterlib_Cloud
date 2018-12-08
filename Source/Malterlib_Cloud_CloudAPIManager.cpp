@@ -19,12 +19,12 @@ namespace NMib::NCloud
 	
 	bool CCloudAPIManager::fs_IsValidCloudContext(CStr const &_String)
 	{
-		return NNet::fg_IsValidHostname(_String);
+		return NNetwork::fg_IsValidHostname(_String);
 	}
 	
 	bool CCloudAPIManager::fs_IsValidContainerName(NStr::CStr const &_String)
 	{
-		return NNet::fg_IsValidHostname(_String);
+		return NNetwork::fg_IsValidHostname(_String);
 	}
 	
 	bool CCloudAPIManager::fs_IsValidTempURLKey(NStr::CStr const &_String)

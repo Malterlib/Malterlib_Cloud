@@ -90,5 +90,5 @@ namespace NMib::NCloud::NSecretsManager
 #include "Malterlib_Cloud_App_SecretsManager_Database.hpp"
 
 #ifndef DMibPNoShortCuts
-using namespace NMib::NCloud;
+	using namespace NMib::NCloud;
 #endif

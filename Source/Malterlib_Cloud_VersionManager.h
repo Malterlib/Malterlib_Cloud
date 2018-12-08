@@ -327,12 +327,12 @@ namespace NMib::NCloud
 		NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> f_GetFileActor() const;
 		
 	private:
-		NPtr::TCSharedPointer<CVersionManagerHelperInternal> mp_pInternal;
+		NStorage::TCSharedPointer<CVersionManagerHelperInternal> mp_pInternal;
 	};
 }
 
 #ifndef DMibPNoShortCuts
-using namespace NMib::NCloud;
+	using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_VersionManager.hpp"

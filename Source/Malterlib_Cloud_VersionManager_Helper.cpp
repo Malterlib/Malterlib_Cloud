@@ -21,7 +21,7 @@ namespace NMib::NCloud
 	using namespace NEncoding;
 	using namespace NFile;
 	using namespace NProcess;
-	using namespace NPtr;
+	using namespace NStorage;
 	using namespace NStr;
 	using namespace NTime;
 	

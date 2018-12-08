@@ -115,8 +115,8 @@ namespace NMib::NCloud::NAppDistributionManager
 			CVersionManagerState *m_pVersionManager;
 			CVersionManagerApplication *m_pApplication = nullptr;
 			CVersionManager::CVersionInformation m_VersionInfo;
-			DIntrusiveLink(CVersionManagerVersion, TCAVLLink<>, m_ApplicationTimeLink);
-			DIntrusiveLink(CVersionManagerVersion, TCAVLLink<>, m_ApplicationLink);
+			TCAVLLink<> m_ApplicationTimeLink;
+			TCAVLLink<> m_ApplicationLink;
 		};
 		
 		struct CVersionManagerApplication
@@ -173,11 +173,11 @@ namespace NMib::NCloud::NAppDistributionManager
 		TCContinuation<void> fp_StopApp() override;
 		TCContinuation<void> fp_ReadState();
 
-		TCContinuation<uint32> fp_CommandLine_DistributionEnum(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_DistributionAdd(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_DistributionChangeSettings(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_DistributionRemove(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_ApplicationListAvailableVersions(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_DistributionEnum(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_DistributionAdd(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_DistributionChangeSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_DistributionRemove(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCContinuation<uint32> fp_CommandLine_ApplicationListAvailableVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 		static CStr fsp_DeployDestinationToString(EDeployDestination _Type);
 		static EDeployDestination fsp_DeployDestinationFromString(CStr const &_Type);

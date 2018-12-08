@@ -69,7 +69,7 @@ namespace NMib::NCloud
 			NFile::CDirectoryManifestFile m_Manifest;
 		};
 		
-		struct CSecret : public NContainer::TCStreamableVariant
+		struct CSecret : public NStorage::TCStreamableVariant
 			<
 				ESecretType
 				, void, ESecretType_NotSet
@@ -78,7 +78,7 @@ namespace NMib::NCloud
 				, CSecretFile, ESecretType_File
 			>
 		{
-			using CSuper = NContainer::TCStreamableVariant
+			using CSuper = NStorage::TCStreamableVariant
 				<
 					ESecretType
 					, void, ESecretType_NotSet
@@ -203,7 +203,7 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-using namespace NMib::NCloud;
+	using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_SecretsManager.hpp"

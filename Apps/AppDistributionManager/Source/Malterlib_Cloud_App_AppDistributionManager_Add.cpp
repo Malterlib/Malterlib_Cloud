@@ -6,7 +6,7 @@
 
 namespace NMib::NCloud::NAppDistributionManager
 {
-	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionAdd(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionAdd(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 

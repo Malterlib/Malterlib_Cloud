@@ -286,7 +286,7 @@ namespace NMib::NCloud
 	
 	bool CBackupManager::fs_IsValidHostname(NStr::CStr const &_String)
 	{
-		return NNet::fg_IsValidHostname(_String);
+		return NNetwork::fg_IsValidHostname(_String);
 	}
 	
 	bool CBackupManager::fs_IsValidBackupSource(NStr::CStr const &_String, NStr::CStr *o_pFriendlyName, NStr::CStr *o_pHostID)
@@ -439,7 +439,7 @@ namespace NMib::NCloud
 
 	bool CBackupManager::CBackupID::operator < (CBackupID const &_Right) const
 	{
-		return NContainer::fg_TupleReferences(m_Time, m_ID) < NContainer::fg_TupleReferences(_Right.m_Time, _Right.m_ID);
+		return NStorage::fg_TupleReferences(m_Time, m_ID) < NStorage::fg_TupleReferences(_Right.m_Time, _Right.m_ID);
 	}
 
 	template <typename tf_CStream>

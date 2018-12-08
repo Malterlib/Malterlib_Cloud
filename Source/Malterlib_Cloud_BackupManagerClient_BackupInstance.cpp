@@ -917,7 +917,7 @@ namespace NMib::NCloud::NPrivate
 					auto *pManifestFile = mp_Manifest.m_Files.f_FindEqual(SourceFile);
 					bool bFile;
 
-					NDataProcessing::CHashDigest_SHA256 NewRenameDigest;
+					NCryptography::CHashDigest_SHA256 NewRenameDigest;
 
 					if (!pManifestFile)
 					{

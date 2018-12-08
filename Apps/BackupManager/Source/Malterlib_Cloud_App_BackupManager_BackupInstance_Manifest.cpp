@@ -10,7 +10,7 @@ namespace NMib::NCloud::NBackupManager
 		(
 			FRunRSyncProtocol &&_fRunProtocol
 			, uint64 _ManifestSize
-		 	, NDataProcessing::CHashDigest_SHA256 const &_ExpectedDigest
+		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 		)
 	{
 		auto &Internal = *mp_pInternal;

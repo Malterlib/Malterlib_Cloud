@@ -141,7 +141,7 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CStr Name = _Params["Name"].f_String();
@@ -214,7 +214,7 @@ namespace NMib::NCloud::NAppManager
 		return Continuation;
 	}
 	
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON const &_Params, NPtr::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 	
