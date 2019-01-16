@@ -127,7 +127,7 @@ namespace NMib::NCloud::NBackupManager
 
 		RSyncContext.m_ExpectedDigest = _ExpectedDigest;
 
-		auto ActorSubscription = g_ActorSubscription > [=]() -> TCContinuation<void>
+		auto ActorSubscription = g_ActorSubscription / [=]() -> TCContinuation<void>
 			{
 				TCContinuation<void> DestroyContinuation;
 

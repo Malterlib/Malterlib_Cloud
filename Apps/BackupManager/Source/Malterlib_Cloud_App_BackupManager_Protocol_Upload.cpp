@@ -215,7 +215,7 @@ namespace NMib::NCloud::NBackupManager
 						TCDistributedActorInterfaceWithID<CBackupManagerBackup> BackupInterface
 							{
 								pBackupInstance->m_BackupInstance->f_ShareInterface<CBackupManagerBackup>()
-								, g_ActorSubscription > [pThis, BackupKey, Auditor]() -> TCContinuation<void>
+								, g_ActorSubscription / [pThis, BackupKey, Auditor]() -> TCContinuation<void>
 								{
 									auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
 									if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())

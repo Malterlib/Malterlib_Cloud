@@ -175,7 +175,7 @@ namespace NMib::NCloud::NSecretsManager
 					TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
 						{
 							Download.m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
-							, g_ActorSubscription > [=, pThis = m_pThis, DownloadFile = ManifestFile.m_OriginalPath]() -> TCContinuation<void>
+							, g_ActorSubscription / [=, pThis = m_pThis, DownloadFile = ManifestFile.m_OriginalPath]() -> TCContinuation<void>
 							{
 								auto *pDownload = pThis->mp_Downloads.f_FindEqual(DownloadID);
 								if (!pDownload)
@@ -296,7 +296,7 @@ namespace NMib::NCloud::NSecretsManager
 
 					TCSharedPointer<CActorSubscription> pCleanupFile = fg_Construct
 						(
-							g_ActorSubscription > [=, pThis = m_pThis, pCanDestroy = This.mp_pCanDestroyFileActorTracker]
+							g_ActorSubscription / [=, pThis = m_pThis, pCanDestroy = This.mp_pCanDestroyFileActorTracker]
 							{
 								if (!*pNewFileClaimed)
 									pThis->fp_RemoveFile(NewFileName, Auditor) > fg_DiscardResult();
@@ -389,7 +389,7 @@ namespace NMib::NCloud::NSecretsManager
 								}
 							;
 		#endif
-							auto Cleanup = NConcurrency::g_ActorSubscription > [this, NewFileName]
+							auto Cleanup = NConcurrency::g_ActorSubscription / [this, NewFileName]
 								{
 									auto &This = *m_pThis;
 									This.mp_Uploads.f_Remove(NewFileName);
@@ -491,13 +491,13 @@ namespace NMib::NCloud::NSecretsManager
 						(
 							g_ActorFunctor
 							(
-								g_ActorSubscription > [this, NewFileName, AllowDestroy = g_AllowWrongThreadDestroy]
+								g_ActorSubscription / [this, NewFileName, AllowDestroy = g_AllowWrongThreadDestroy]
 								{
 									auto &This = *m_pThis;
 									This.mp_Uploads.f_Remove(NewFileName);
 								}
 							)
-							> [CheckResultContinuation, AllowDestroy = g_AllowWrongThreadDestroy]() -> TCContinuation<void>
+							/ [CheckResultContinuation, AllowDestroy = g_AllowWrongThreadDestroy]() -> TCContinuation<void>
 							{
 								if (!CheckResultContinuation.f_IsSet())
 									CheckResultContinuation.f_SetResult();

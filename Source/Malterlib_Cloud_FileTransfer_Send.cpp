@@ -97,7 +97,7 @@ namespace NMib::NCloud
 		CFileTransferContext::CInternal::CStateChange StateChange{m_Version};
 		StateChange.m_State = CFileTransferContext::CInternal::EState_Error;
 		StateChange.m_Error = _Error;
-		m_StateCallback(fg_Move(StateChange));
+		m_StateCallback(fg_Move(StateChange)) > fg_DiscardResult();
 		if (!m_Continuation.f_IsSet() && !m_bDelayedFinish)
 			m_Continuation.f_SetException(DMibErrorInstance(_Error));
 	}
@@ -110,7 +110,7 @@ namespace NMib::NCloud
 		StateChange.m_Finished.m_nSeconds = m_TransferStats.m_Clock.f_GetTime();
 		auto Continuation = m_StateCallback.f_Call(fg_TempCopy(StateChange));
 		m_bDelayedFinish = true;
-		fg_Dispatch([Continuation]{ return Continuation; }) > [this, Finished = StateChange.m_Finished](TCAsyncResult<CFileTransferContext::CInternal::CStateChange::CResult> &&_Result)
+		Continuation > [this, Finished = StateChange.m_Finished](TCAsyncResult<CFileTransferContext::CInternal::CStateChange::CResult> &&_Result)
 			{
 				if (!m_Continuation.f_IsSet())
 					m_Continuation.f_SetResult(Finished);

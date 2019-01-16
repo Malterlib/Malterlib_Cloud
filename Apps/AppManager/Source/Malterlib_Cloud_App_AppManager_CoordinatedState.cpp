@@ -71,7 +71,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				_AppManager.m_Actor
 				, CAppManagerCoordinationInterface::f_SubscribeToAppChanges
-				, g_ActorFunctor > [this, HostID, AllowDestroy = g_AllowWrongThreadDestroy]
+				, g_ActorFunctor / [this, HostID, AllowDestroy = g_AllowWrongThreadDestroy]
 				(TCVector<CAppManagerCoordinationInterface::CAppChange> const &_Changes, bool _bInitial) -> TCContinuation<void>
 				{
 					auto &RemoteAppManager = mp_RemoteAppManagerState[HostID];
@@ -152,7 +152,7 @@ namespace NMib::NCloud::NAppManager
 		
 		return fg_Explicit
 			(	
-				g_ActorSubscription > [pThis, CallingHostID, SubscriptionSequence]() -> TCContinuation<void>
+				g_ActorSubscription / [pThis, CallingHostID, SubscriptionSequence]() -> TCContinuation<void>
 				{
 					auto &RemoteAppManager = pThis->mp_RemoteAppManagerState[CallingHostID];
 					if (RemoteAppManager.m_iOnChangeSubscriptionSequence != SubscriptionSequence)

@@ -437,7 +437,7 @@ namespace NMib::NCloud::NSecretsManager
 			DMibError("Empty file name");
 
 		++mp_ReservedFiles[_FileName].m_RefCount;
-		return NConcurrency::g_ActorSubscription > [this, _FileName]
+		return NConcurrency::g_ActorSubscription / [this, _FileName]
 			{
 				if (auto *pReservedFile = mp_ReservedFiles.f_FindEqual(_FileName))
 				{
@@ -465,8 +465,7 @@ namespace NMib::NCloud::NSecretsManager
 
 	TCContinuation<void> CSecretsManagerDaemonActor::CServer::CFileActor::f_Delete(NStr::CStr const &_File)
 	{
-		return TCContinuation<void>::fs_RunProtected<CExceptionFile>()
-			> [&]()
+		return TCContinuation<void>::fs_RunProtected<CExceptionFile>() / [&]()
 			{
 				if (CFile::fs_FileExists(_File))
 					CFile::fs_DeleteFile(_File);

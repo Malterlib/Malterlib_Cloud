@@ -53,7 +53,7 @@ namespace NMib::NCloud::NAppManager
 				
 				return fg_Explicit
 					(
-						g_ActorSubscription > [pApplication, AssignSequence = ++Application.m_AppInterfaceAssignSequence, HostInfo = CallingHostInfo.f_GetHostInfo()]
+						g_ActorSubscription / [pApplication, AssignSequence = ++Application.m_AppInterfaceAssignSequence, HostInfo = CallingHostInfo.f_GetHostInfo()]
 						() -> TCContinuation<void>
 						{
 							if (pApplication->m_bDeleted || AssignSequence != pApplication->m_AppInterfaceAssignSequence)

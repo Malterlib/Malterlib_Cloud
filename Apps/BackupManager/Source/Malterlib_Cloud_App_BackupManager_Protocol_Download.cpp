@@ -108,7 +108,7 @@ namespace NMib::NCloud::NBackupManager
 						TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
 							{
 								Download.m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
-								, g_ActorSubscription > [pThis, Auditor, DownloadID, Desc, CheckedOutDirectory = fg_Move(_CheckedOutDirectory)]() mutable -> TCContinuation<void>
+								, g_ActorSubscription / [pThis, Auditor, DownloadID, Desc, CheckedOutDirectory = fg_Move(_CheckedOutDirectory)]() mutable -> TCContinuation<void>
 								{
 									auto *pDownload = pThis->mp_BackupDownloads.f_FindEqual(DownloadID);
 									if (!pDownload)

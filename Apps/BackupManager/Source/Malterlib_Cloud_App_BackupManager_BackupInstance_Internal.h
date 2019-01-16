@@ -58,7 +58,7 @@ namespace NMib::NCloud::NBackupManager
 			, m_bForceNew(_bForceNew)
 			, m_BackupSource(_BackupSource)
 		{
-			g_Dispatch > [this]
+			g_Dispatch / [this]
 				{
 					f_InitBackupDirectory();
 				}

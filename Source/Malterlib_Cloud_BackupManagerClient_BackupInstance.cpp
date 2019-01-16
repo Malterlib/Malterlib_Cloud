@@ -135,7 +135,7 @@ namespace NMib::NCloud::NPrivate
 			 	, CBackupManagerBackup::CManifestFile{_PendingFile.m_ManifestFile}
 				, g_ActorFunctor
 				(
-					g_ActorSubscription > [this, pRunningState, FileName, SyncFlags = _PendingFile.m_ManifestFile.m_Flags]() -> TCContinuation<void>
+					g_ActorSubscription / [this, pRunningState, FileName, SyncFlags = _PendingFile.m_ManifestFile.m_Flags]() -> TCContinuation<void>
 					{
 						auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName);
 						if (!pPendingFile)
@@ -214,9 +214,9 @@ namespace NMib::NCloud::NPrivate
 						return ContinuationReturn;
 					}
 				) 
-				> [this, pRunningState, FileName](CSecureByteVector &&_Packet) mutable -> TCContinuation<CSecureByteVector>
+				/ [this, pRunningState, FileName](CSecureByteVector &&_Packet) mutable -> TCContinuation<CSecureByteVector>
 				{
-					return TCContinuation<CSecureByteVector>::fs_RunProtected() > [&]() -> CSecureByteVector
+					return TCContinuation<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
 						{
 							NContainer::CSecureByteVector ToSendToClient;
 							auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName);
@@ -640,7 +640,7 @@ namespace NMib::NCloud::NPrivate
 				, CBackupManagerBackup::f_StartManifestRSync
 				, g_ActorFunctor
 				(
-					g_ActorSubscription > [this, Continuation]() -> TCContinuation<void>
+					g_ActorSubscription / [this, Continuation]() -> TCContinuation<void>
 					{
 						if (!mp_pManifestSyncState)
 							return fg_Explicit();
@@ -692,12 +692,12 @@ namespace NMib::NCloud::NPrivate
 						return ContinuationReturn;
 					}
 				) 
-				> [this, Continuation](CSecureByteVector &&_Packet) mutable -> TCContinuation<CSecureByteVector>
+				/ [this, Continuation](CSecureByteVector &&_Packet) mutable -> TCContinuation<CSecureByteVector>
 				{
 					if (!mp_pManifestSyncState)
 						return DMibErrorInstance("Aborted");
 								
-					return TCContinuation<CSecureByteVector>::fs_RunProtected() > [&]() -> CSecureByteVector
+					return TCContinuation<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
 						{
 							NContainer::CSecureByteVector ToSendToClient;
 							if (mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket(_Packet, ToSendToClient))
@@ -733,7 +733,7 @@ namespace NMib::NCloud::NPrivate
 		CBackupManager::CInitBackup InitParams;
 		
 		InitParams.m_BackupKey = mp_BackupKey;
-		InitParams.m_Subscription = g_ActorSubscription > [this]() -> TCContinuation<void>
+		InitParams.m_Subscription = g_ActorSubscription / [this]() -> TCContinuation<void>
 			{
 				if (mp_bDestroyed || !mp_Backup)
 					return fg_Explicit();

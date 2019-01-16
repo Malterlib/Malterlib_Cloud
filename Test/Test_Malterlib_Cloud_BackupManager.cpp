@@ -191,7 +191,7 @@ public:
 				(
 					m_BackupConfig
 					, _TrustManager
-					, g_ActorFunctor > [pManifestFinished, pBackupInterface, ReceivedManifestFinished]
+					, g_ActorFunctor / [pManifestFinished, pBackupInterface, ReceivedManifestFinished]
 					(
 						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
 						, CActorSubscription &&_ManifestFinished
@@ -204,7 +204,7 @@ public:
 							ReceivedManifestFinished.f_SetResult();
 						return fg_Explicit
 							(
-								g_ActorSubscription > []
+								g_ActorSubscription / []
 								{
 								}
 							)
@@ -223,7 +223,7 @@ public:
 					| CBackupManagerClient::ENotification_Quiescent
 					| CBackupManagerClient::ENotification_Unquiescent
 					| CBackupManagerClient::ENotification_InitialFinished
-					, g_ActorFunctor > [pState = m_pState, ReceivedManifestFinished](NConcurrency::CHostInfo const &_RemoteHost, CBackupManagerClient::CNotification &&_Notification)
+					, g_ActorFunctor / [pState = m_pState, ReceivedManifestFinished](NConcurrency::CHostInfo const &_RemoteHost, CBackupManagerClient::CNotification &&_Notification)
 					-> NConcurrency::TCContinuation<void>
 					{
 #ifdef DMibCloudBackupManagerDebug
@@ -510,7 +510,7 @@ public:
 			for (mint i = 0; i < nBackupManagers; ++i)
 			{
 				auto &FileActor = FileActors.f_Insert() = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-				g_Dispatch(FileActor) > [=]
+				g_Dispatch(FileActor) / [=]
 					{
 						CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << i;
 						CStr BackupManagerDirectory = RootDirectory + "/" + BackupManagerName;

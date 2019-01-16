@@ -44,7 +44,7 @@ namespace NMib::NCloud::NSecretsManager
 
 	TCContinuation<void> CSecretsManagerServerDatabase::f_Initialize()
 	{
-		return TCContinuation<void>::fs_RunProtected<CException>() > [&]
+		return TCContinuation<void>::fs_RunProtected<CException>() / [&]
 			{
 				if (!CFile::fs_FileExists(mp_Path))
 				{
@@ -64,9 +64,9 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		if (!mp_pPendingWrite)
 		{
-			g_Dispatch > [this]
+			g_Dispatch / [this]
 				{
-					auto WriteResult = TCContinuation<void>::fs_RunProtected<CException>() > [&]
+					auto WriteResult = TCContinuation<void>::fs_RunProtected<CException>() / [&]
 						{
 							fp_WriteDatabase(*mp_pPendingWrite);
 						}
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NSecretsManager
 	
 	TCContinuation<CSecretsDatabase> CSecretsManagerServerDatabase::f_ReadDatabase()
 	{
-		return TCContinuation<CSecretsDatabase>::fs_RunProtected<CException>() > [&]
+		return TCContinuation<CSecretsDatabase>::fs_RunProtected<CException>() / [&]
 			{
 				CSecretsDatabase Database;
 				fp_ReadDatabase(&Database);

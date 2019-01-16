@@ -166,7 +166,7 @@ public:
 				for (mint i = 0; i < nAppManagers; ++i)
 				{
 					auto &FileActor = FileActors.f_Insert() = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-					g_Dispatch(FileActor) > [=]
+					g_Dispatch(FileActor) / [=]
 						{
 							CStr AppManagerName = fg_Format("AppManager{sf0,sl2}", i);
 							CStr AppManagerDirectory = RootDirectory + "/" + AppManagerName;
@@ -269,7 +269,7 @@ public:
 				{
 					return
 						(
-							g_Dispatch > [&]
+							g_Dispatch / [&]
 							{
 								return _fToDispatch();
 							}
@@ -498,7 +498,7 @@ public:
 						(
 							AppManager
 							, CAppManagerInterface::f_SubscribeUpdateNotifications
-							, g_ActorFunctor > [pUpdateNotificationsState, iAppManager]
+							, g_ActorFunctor / [pUpdateNotificationsState, iAppManager]
 							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCContinuation<void> 
 							{
 								auto &State = *pUpdateNotificationsState;

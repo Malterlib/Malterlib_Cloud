@@ -69,7 +69,7 @@ namespace NMib::NCloud
 				ToRemovePaths[WatchedPath.f_GetPath()];
 		}
 		
-		g_Dispatch(m_FileActor) > [PendingPaths]
+		g_Dispatch(m_FileActor) / [PendingPaths]
 			{
 				CPendingInfo PendingInfo;
 				
@@ -133,7 +133,7 @@ namespace NMib::NCloud
 							&CFileChangeNotificationActor::f_RegisterForChanges
 							, Path
 							, Changes
-							, g_ActorFunctor > [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCContinuation<void>
+							, g_ActorFunctor / [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCContinuation<void>
 							{
 								for (auto Notification : _Notifications)
 								{
@@ -173,7 +173,7 @@ namespace NMib::NCloud
 							&CFileChangeNotificationActor::f_RegisterForChanges
 							, MissingPath
 							, EFileChange_FileName | EFileChange_DirectoryName
-							, g_ActorFunctor > [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCContinuation<void>
+							, g_ActorFunctor / [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCContinuation<void>
 							{
 								if (!m_bRerunRetrySubscribe)
 								{
@@ -270,7 +270,7 @@ namespace NMib::NCloud
 	void CBackupManagerClient::CInternal::f_NewPathWatched(CStr const &_Path)
 	{
 		DMibCloudBackupManagerDebugOut("New path watched: {}\n", _Path);
-		g_Dispatch(m_FileActor) > [_Path]
+		g_Dispatch(m_FileActor) / [_Path]
 			{
 				TCVector<CFileChangeNotification::CNotification> Notifications;
 				for (auto &File : CFile::fs_FindFilesEx(_Path / "*", EFileAttrib_File | EFileAttrib_Directory, true, false))

@@ -30,7 +30,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				BackupConfig
 				, mp_State.m_TrustManager
-				, g_ActorFunctor > [_pApplication]
+				, g_ActorFunctor / [_pApplication]
 				(
 					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
 					, NConcurrency::CActorSubscription &&_ManifestFinished

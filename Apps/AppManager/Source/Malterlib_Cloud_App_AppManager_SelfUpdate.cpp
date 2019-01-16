@@ -18,7 +18,7 @@ namespace NMib::NCloud::NAppManager
 		if (CFile::fs_GetProgramDirectory() != mp_State.m_RootDirectory)
 			return DMibErrorInstance("Cannot self update when root directory differs from program directory. '{}' != '{}'"_f << CFile::fs_GetProgramDirectory() << mp_State.m_RootDirectory);
 
-		g_Dispatch(mp_FileActor) > [SourceDir = _pApplication->f_GetDirectory()]() -> bool
+		g_Dispatch(mp_FileActor) / [SourceDir = _pApplication->f_GetDirectory()]() -> bool
 			{
 				CStr ProgramDir = CFile::fs_GetProgramDirectory();
 				CStr ProgramPath = CFile::fs_GetProgramPath();

@@ -554,7 +554,7 @@ namespace NMib::NCloud::NCloudClient
 					CStr SettingsFile = _SettingsFileOrSettings.f_Get<0>();
 					if (!SettingsFile.f_IsEmpty())
 					{
-						g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) > [SettingsFile]
+						g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [SettingsFile]
 							{
 								return CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
 							}
@@ -652,7 +652,7 @@ namespace NMib::NCloud::NCloudClient
 							TimeContinuation.f_SetResult(Time);
 						else
 						{
-							g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) > [Source]() -> CTime
+							g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [Source]() -> CTime
 								{
 									if (!CFile::fs_FileExists(Source))
 										DMibError(fg_Format("Source specified does not exist: {}", Source));

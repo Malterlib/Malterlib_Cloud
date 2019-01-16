@@ -96,7 +96,7 @@ namespace NMib::NCloud
 						Destroys.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<void>> &&_Results)
 							{
 								auto &Internal = *mp_pInternal;
-								g_Dispatch(Internal.m_FileActor) > [AppendStates = fg_Move(Internal.m_AppendStates)]
+								g_Dispatch(Internal.m_FileActor) / [AppendStates = fg_Move(Internal.m_AppendStates)]
 									{
 									}
 									> Continuation / [this, Continuation]
@@ -155,7 +155,7 @@ namespace NMib::NCloud
 
 				m_bInitialSubscribeDone = true;
 
-				g_Dispatch(m_FileActor) > [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]()
+				g_Dispatch(m_FileActor) / [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]()
 					-> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
 					{
 						TCMap<CStr, CFile::CFileChecksumState_SHA256> SourceAppendStates;
@@ -213,7 +213,7 @@ namespace NMib::NCloud
 							m_fOnNewBackup
 								(
 									m_BackupInterface.m_Actor->f_ShareInterface<CDistributedAppInterfaceBackup>()
-									, g_ActorSubscription > [this]
+									, g_ActorSubscription / [this]
 									{
 										f_BackupFinishedStarting();
 									}

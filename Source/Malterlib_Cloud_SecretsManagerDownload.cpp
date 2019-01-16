@@ -25,7 +25,7 @@ namespace NMib::NCloud
 				_SecretsManager
 				, CSecretsManager::f_DownloadFile
 				, fg_Move(_ID)
-				, g_ActorSubscription > [=]() -> TCContinuation<void>
+				, g_ActorSubscription / [=]() -> TCContinuation<void>
 				{
 					// Cleanup?
 					return fg_Explicit();

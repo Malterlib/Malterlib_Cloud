@@ -26,7 +26,7 @@ namespace NMib::NCloud
 		
 		NConcurrency::TCContinuation<void> f_Initialize()
 		{
-			return NConcurrency::TCContinuation<void>::fs_RunProtected<NException::CException>() > [&]
+			return NConcurrency::TCContinuation<void>::fs_RunProtected<NException::CException>() / [&]
 				{
 					if (!NFile::CFile::fs_FileExists(m_Path))
 					{
@@ -53,7 +53,7 @@ namespace NMib::NCloud
 		
 		NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database)
 		{
-			return NConcurrency::TCContinuation<void>::fs_RunProtected<NException::CException>() > [&]
+			return NConcurrency::TCContinuation<void>::fs_RunProtected<NException::CException>() / [&]
 				{
 					fp_WriteDatabase(_Database);
 				}
@@ -62,7 +62,7 @@ namespace NMib::NCloud
 		
 		NConcurrency::TCContinuation<CDatabase> f_ReadDatabase()
 		{
-			return NConcurrency::TCContinuation<CDatabase>::fs_RunProtected<NException::CException>() > [&]
+			return NConcurrency::TCContinuation<CDatabase>::fs_RunProtected<NException::CException>() / [&]
 				{
 					NContainer::CByteVector EncryptedDatabase = NFile::CFile::fs_ReadFile(m_Path);
 					NContainer::CSecureByteVector RawDatabase;

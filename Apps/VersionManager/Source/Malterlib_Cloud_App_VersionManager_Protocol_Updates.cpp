@@ -290,7 +290,7 @@ namespace NMib::NCloud::NVersionManager
 					return Continuation.f_SetResult(fg_Move(Result));
 
 				// Because versions are dispatched through m_DispatchActor we need to dispatch the result to get correct ordering
-				g_Dispatch(DispatchActor) > [Continuation, Result = fg_Move(Result)]() mutable
+				g_Dispatch(DispatchActor) / [Continuation, Result = fg_Move(Result)]() mutable
 					{
 						Continuation.f_SetResult(fg_Move(Result));
 					}

@@ -93,7 +93,7 @@ namespace NMib::NCloud::NAppManager
 
 	TCDispatchedActorCall<uint32> CAppManagerActor::CApplication::f_Stop(EStopFlag _Flags)
 	{
-		return g_Dispatch > [this, _Flags, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCContinuation<uint32>
+		return g_Dispatch / [this, _Flags, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCContinuation<uint32>
 			{
 				if (pApplication->m_bDeleted)
 					return fg_Explicit(0);
@@ -163,7 +163,7 @@ namespace NMib::NCloud::NAppManager
 
 									if (_Flags & EStopFlag_CloseEncryption)
 									{
-										g_Dispatch > [this, pApplication]() -> TCContinuation<uint32>
+										g_Dispatch / [this, pApplication]() -> TCContinuation<uint32>
 											{
 												if (pApplication->m_bDeleted)
 													return fg_Explicit(0);
@@ -312,7 +312,7 @@ namespace NMib::NCloud::NAppManager
 	
 	TCDispatchedActorCall<uint32> CAppManagerActor::CApplication::f_CloseEncryption(uint32 _Status)
 	{
-		return g_Dispatch > [this, _Status, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() -> TCContinuation<uint32>
+		return g_Dispatch / [this, _Status, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() -> TCContinuation<uint32>
 			{
 				if (m_Settings.m_EncryptionStorage.f_IsEmpty() || !m_bEncryptionOpened)
 					return fg_Explicit(_Status);

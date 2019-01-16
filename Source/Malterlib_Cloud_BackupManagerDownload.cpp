@@ -30,7 +30,7 @@ namespace NMib::NCloud
 		
 		auto ProcessingActor = fg_ConcurrentActor();
 		
-		o_Subscription = g_ActorSubscription(ProcessingActor) > [pState]() -> TCContinuation<void>
+		o_Subscription = g_ActorSubscription(ProcessingActor) / [pState]() -> TCContinuation<void>
 			{
 				pState->m_bAborted = true;
 				
@@ -42,7 +42,7 @@ namespace NMib::NCloud
 			}
 		;
 		
-		return g_Dispatch(ProcessingActor) > [=, Config = fg_Move(_SyncConfig)]() mutable -> TCContinuation<NFile::CDirectorySyncReceive::CSyncResult>
+		return g_Dispatch(ProcessingActor) / [=, Config = fg_Move(_SyncConfig)]() mutable -> TCContinuation<NFile::CDirectorySyncReceive::CSyncResult>
 			{
 				if (pState->m_bAborted)
 					return DMibErrorInstance("Aborted");
@@ -57,7 +57,7 @@ namespace NMib::NCloud
 						{
 							_BackupSource
 							, _PointInTime
-							, g_ActorSubscription > [pState]() -> TCContinuation<void>
+							, g_ActorSubscription / [pState]() -> TCContinuation<void>
 							{
 								if (!pState->m_DownloadBackupReceive)
 									return fg_Explicit();

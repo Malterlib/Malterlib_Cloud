@@ -307,7 +307,7 @@ namespace NMib::NCloud::NAppManager
 						}
 					)
 				;
-				g_Dispatch(mp_FileActor) > 
+				g_Dispatch(mp_FileActor) /
 					[
 						=
 						, Settings = State.m_pNewSettings ? *State.m_pNewSettings : State.m_pApplication->m_Settings
@@ -428,7 +428,7 @@ namespace NMib::NCloud::NAppManager
 				if (State.f_CheckAbort(Continuation))
 					return;
 				
-				g_Dispatch(mp_FileActor) >
+				g_Dispatch(mp_FileActor) /
 					[
 						=
 						, OutputDirectory = State.m_pApplication->f_GetDirectory()

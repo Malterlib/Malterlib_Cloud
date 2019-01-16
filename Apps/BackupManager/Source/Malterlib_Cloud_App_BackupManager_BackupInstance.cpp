@@ -76,8 +76,7 @@ namespace NMib::NCloud::NBackupManager
 		if (Internal.m_bBackupStarted)
 			return DMibErrorInstance("Backup already started");
 		
-		return TCContinuation<CStartBackupResult>::fs_RunProtected<CExceptionFile>()
-			> [&]()
+		return TCContinuation<CStartBackupResult>::fs_RunProtected<CExceptionFile>() / [&]()
 			{
 				auto &Internal = *mp_pInternal;
 				

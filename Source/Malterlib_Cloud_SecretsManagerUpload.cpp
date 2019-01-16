@@ -83,7 +83,7 @@ namespace NMib::NCloud
 
 		auto ProcessingActor = fg_ConcurrentActor();
 
-		o_Subscription = g_ActorSubscription(ProcessingActor) > [pState]() -> TCContinuation<void>
+		o_Subscription = g_ActorSubscription(ProcessingActor) / [pState]() -> TCContinuation<void>
 			{
 				pState->m_bAborted = true;
 
@@ -94,7 +94,7 @@ namespace NMib::NCloud
 			}
 		;
 
-		return g_Dispatch(ProcessingActor) > [=, Config = fg_Move(_Config)]() mutable -> TCContinuation<CDirectorySyncSend::CSyncResult>
+		return g_Dispatch(ProcessingActor) / [=, Config = fg_Move(_Config)]() mutable -> TCContinuation<CDirectorySyncSend::CSyncResult>
 			{
 				CStr const FileName = *Config.m_Manifest.f_Get<1>().m_IncludeWildcards.f_FindSmallestKey();
 				pState->m_DirectorySyncSend = _DistributionManager->f_ConstructActor<CDirectorySyncSend>(fg_Move(Config));
@@ -104,7 +104,7 @@ namespace NMib::NCloud
 				TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
 					{
 						pState->m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
-						, g_ActorSubscription > [pState]() mutable -> TCContinuation<void>
+						, g_ActorSubscription / [pState]() mutable -> TCContinuation<void>
 						{
 							if (pState->m_bAborted)
 								return DMibErrorInstance("Aborted");

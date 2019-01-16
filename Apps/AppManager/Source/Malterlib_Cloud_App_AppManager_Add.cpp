@@ -282,7 +282,7 @@ namespace NMib::NCloud::NAppManager
 							pApplication->m_Settings.m_RunAsUserPassword = fg_HighEntropyRandomID("23456789ABCDEFGHJKLMNPQRSTWXYZabcdefghijkmnopqrstuvwxyz&=*!@~^") + "2Dg&";
 #endif
 						fOnInfo("Unpacking application");
-						g_Dispatch(mp_FileActor) >
+						g_Dispatch(mp_FileActor) /
 							[=, pUniqueUserGroup = mp_pUniqueUserGroup]
 							{
 								auto &Settings = pApplication->m_Settings;

@@ -219,7 +219,7 @@ public:
 			for (mint i = 0; i < nSecretsManagers; ++i)
 			{
 				auto &FileActor = FileActors.f_Insert() = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-				g_Dispatch(FileActor) > [=]
+				g_Dispatch(FileActor) / [=]
 					{
 						CStr SecretsManagerName = fg_Format("SecretsManager{sf0,sl2}", i);
 						CStr SecretsManagerDirectory = RootDirectory + "/" + SecretsManagerName;

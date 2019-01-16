@@ -47,8 +47,7 @@ namespace NMib::NCloud::NBackupManager
 
 					CManifestChange_Change ManifestChange;
 
-					auto Result = TCContinuation<void>::fs_RunProtected<CException>()
-						> [&]()
+					auto Result = TCContinuation<void>::fs_RunProtected<CException>() / [&]()
 						{
 							auto &ManifestFile = *pManifestFile;
 

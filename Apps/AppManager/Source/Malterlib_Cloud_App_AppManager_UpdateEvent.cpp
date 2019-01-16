@@ -35,7 +35,7 @@ namespace NMib::NCloud::NAppManager
 
 				Continuation.f_SetResult
 					(
-						g_ActorSubscription > [pThis, SubscriptionID, Auditor]() -> TCContinuation<void>
+						g_ActorSubscription / [pThis, SubscriptionID, Auditor]() -> TCContinuation<void>
 						{
 							Auditor.f_Info(fg_Format("Unsubscribe from update notifications '{}'", SubscriptionID));
 

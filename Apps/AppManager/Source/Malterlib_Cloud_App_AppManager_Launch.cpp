@@ -281,7 +281,7 @@ namespace NMib::NCloud::NAppManager
 					(
 						mp_State.m_LocalAddress
 						, mp_State.m_TrustManager
-						, g_ActorFunctor > [_pApplication, this]
+						, g_ActorFunctor / [_pApplication, this]
 						(CStr const &_HostID, CCallingHostInfo const &_HostInfo, CByteVector const &_Certificate) -> TCContinuation<void>
 						{
 							if (_pApplication->m_bDeleted)
@@ -311,7 +311,7 @@ namespace NMib::NCloud::NAppManager
 							;
 							return Continuation;
 						}
-					 	, g_ActorFunctor > [this, _pApplication, pState, Continuation](NStr::CStr const &_Error) -> TCContinuation<void>
+					 	, g_ActorFunctor / [this, _pApplication, pState, Continuation](NStr::CStr const &_Error) -> TCContinuation<void>
 					 	{
 							if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
 								return fg_Explicit();

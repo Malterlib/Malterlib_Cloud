@@ -33,7 +33,7 @@ namespace NMib::NCloud
 			Subscription.m_fOnNotification(Notification.m_RemoteHost, fg_TempCopy(Notification.m_Notification)) > fg_DiscardResult();
 		}
 
-		return g_Explicit = g_ActorSubscription > [this, SubscriptionID]() -> TCContinuation<void>
+		return g_Explicit = g_ActorSubscription / [this, SubscriptionID]() -> TCContinuation<void>
 			{
 				auto &Internal = *mp_pInternal;
 
@@ -101,7 +101,7 @@ namespace NMib::NCloud
 		if (Internal.m_bInitialFinished)
 			fOnFinished() > fg_DiscardResult();
 		
-		return g_Explicit = g_ActorSubscription > [pThis = m_pThis, SubscriptionID]() -> TCContinuation<void>
+		return g_Explicit = g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCContinuation<void>
 			{
 				auto &Internal = *pThis->mp_pInternal;
 
@@ -131,7 +131,7 @@ namespace NMib::NCloud
 		if (Internal.m_bStopped)
 			fOnStopped() > fg_DiscardResult();
 		
-		return g_Explicit = g_ActorSubscription > [pThis = m_pThis, SubscriptionID]() -> TCContinuation<void>
+		return g_Explicit = g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCContinuation<void>
 			{
 				auto &Internal = *pThis->mp_pInternal;
 
