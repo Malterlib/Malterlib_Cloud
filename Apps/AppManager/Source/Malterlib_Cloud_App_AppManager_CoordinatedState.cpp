@@ -280,7 +280,7 @@ namespace NMib::NCloud::NAppManager
 		}
 		
 		mp_State.m_StateDatabase.m_Data["KnownRemoteApplications"][_RemoteKey.m_Group][_RemoteKey.m_VersionManagerApplication][_HostID] = true;
-		fp_SaveStateDatabase();
+		fp_SaveStateDatabase() > fg_DiscardResult();
 	}
 	
 	void CAppManagerActor::fp_BroadcastRemoteAppChange(CAppManagerCoordinationInterface::CAppChange &&_Change)

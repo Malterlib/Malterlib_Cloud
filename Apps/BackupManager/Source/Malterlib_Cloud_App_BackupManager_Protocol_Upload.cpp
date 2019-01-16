@@ -161,7 +161,7 @@ namespace NMib::NCloud::NBackupManager
 						fg_ThisActor(this)
 						, [pThis, BackupKey, Auditor]
 						{
-							pThis->fp_DestroyBackupInstance(BackupKey, Auditor, true, "Actor host disconnected (restarted)");
+							pThis->fp_DestroyBackupInstance(BackupKey, Auditor, true, "Actor host disconnected (restarted)") > fg_DiscardResult();
 						}
 					)
 					> [pThis, BackupKey, Auditor](TCAsyncResult<CActorSubscription> &&_Subscription)
@@ -241,7 +241,7 @@ namespace NMib::NCloud::NBackupManager
 				else
 				{
 					Instance.m_OnDestroyed.f_Insert(fg_Move(fInitBackupInstance));
-					pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Old host removed"); // Remove old Host
+					pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Old host removed") > fg_DiscardResult(); // Remove old Host
 					Instance.m_OwningHost = Auditor; // Take ownership
 				}
 			}

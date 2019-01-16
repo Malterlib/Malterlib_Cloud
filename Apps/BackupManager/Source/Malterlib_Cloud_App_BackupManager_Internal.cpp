@@ -97,11 +97,11 @@ namespace NMib::NCloud::NBackupManager
 	
 	TCContinuation<void> CBackupManagerServer::fp_Destroy()
 	{
-		for (auto &BackupInstance : mp_BackupInstances)
-			fp_DestroyBackupInstance(BackupInstance.f_GetKey(), BackupInstance.m_OwningHost, true, "Backup Manager shutting down");
-		
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
-		
+
+		for (auto &BackupInstance : mp_BackupInstances)
+			fp_DestroyBackupInstance(BackupInstance.f_GetKey(), BackupInstance.m_OwningHost, true, "Backup Manager shutting down") > pCanDestroy->f_Track();
+
 		for (auto &Download : mp_BackupDownloads)
 			Download.f_Destroy() > pCanDestroy->f_Track();
 		

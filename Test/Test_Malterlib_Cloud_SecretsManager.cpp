@@ -1933,7 +1933,7 @@ public:
 					CActorSubscription UploadSubscription;
 					fUpload(ID, File2, RootDirectory, UploadSubscription).f_CallSync(g_Timeout);
 					DMibTestPath("Keep secrets manager alive until last pending delete has completed");
-					fSyncFileOperations("DelayDelete");
+					fSyncFileOperations("DelayDelete") > fg_DiscardResult();
 					auto UploadCompletedContinuation = fSyncFileOperations("UploadCompleted", File3);
 					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
 					auto DestroyWaitingForCanDestroyContinuation = fSyncFileOperations("DestroyWaitingForCanDestroy", ID.m_Name);

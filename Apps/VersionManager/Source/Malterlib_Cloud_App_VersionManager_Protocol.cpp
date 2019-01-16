@@ -14,6 +14,11 @@ namespace NMib::NCloud::NVersionManager
 {
 	void CVersionManagerDaemonActor::CServer::fp_Publish()
 	{
-		mp_ProtocolInterface.f_Publish<CVersionManager>(mp_AppState.m_DistributionManager, this, CVersionManager::mc_pDefaultNamespace);
+		mp_ProtocolInterface.f_Publish<CVersionManager>(mp_AppState.m_DistributionManager, this, CVersionManager::mc_pDefaultNamespace) > [](TCAsyncResult<void> &&_Result)
+			{
+				if (!_Result)
+					DMibLog(Error, "Failed to publish version manager {}", _Result.f_GetExceptionStr());
+			}
+		;
 	}
 }

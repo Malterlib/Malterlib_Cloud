@@ -178,7 +178,7 @@ namespace NMib::NCloud
 								if (!m_bRerunRetrySubscribe)
 								{
 									m_bRerunRetrySubscribe = true;
-									f_RetrySubscribeChanges();
+									f_RetrySubscribeChanges() > fg_DiscardResult();
 								}
 
 								return fg_Explicit();
@@ -256,7 +256,7 @@ namespace NMib::NCloud
 						}
 
 						if (bChanged)
-							f_RetrySubscribeChanges();
+							f_RetrySubscribeChanges() > fg_DiscardResult();
 
 						Continuation.f_SetResult();
 					}
@@ -543,7 +543,7 @@ namespace NMib::NCloud
 			{
 				DMibCloudBackupManagerDebugOut("%%% RESUBSCRIBE {}\n", Notification.m_Path);
 				pWatchedDeleted->m_bPending = true;
-				f_RetrySubscribeChanges();
+				f_RetrySubscribeChanges() > fg_DiscardResult();
 			}
 		}
 

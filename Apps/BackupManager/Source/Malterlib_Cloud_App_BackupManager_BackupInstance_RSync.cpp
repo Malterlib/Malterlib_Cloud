@@ -172,19 +172,19 @@ namespace NMib::NCloud::NBackupManager
 						{
 							TCAsyncResult<void> Result;
 							Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("General failure for RSync"));
- 							_fOnDone(Result);
+ 							_fOnDone(Result) > fg_DiscardResult();
 							Continuation.f_SetException(fg_Move(Result));
 						}
 						else if (bFailedHash)
 						{
 							TCAsyncResult<void> Result;
 							Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("Digest does not match after RSync"));
-							_fOnDone(Result);
+							_fOnDone(Result) > fg_DiscardResult();
 							Continuation.f_SetException(fg_Move(Result));
 						}
 						else if (!_Result)
 						{
-							_fOnDone(_Result);
+							_fOnDone(_Result) > fg_DiscardResult();
 							Continuation.f_SetException(fg_Move(_Result));
 						}
 						else

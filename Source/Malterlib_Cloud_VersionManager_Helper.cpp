@@ -179,7 +179,7 @@ namespace NMib::NCloud
 		
 		auto pCleanupAfterTimeout = g_OnScopeExitActor > [pState]
 			{
-				pState->f_Abort();
+				(void)pState->f_Abort();
 			}
 		;
 
@@ -273,7 +273,7 @@ namespace NMib::NCloud
 
 				auto pCleanupAfterTimeout = g_OnScopeExitActor > [pState]
 					{
-						pState->f_Abort();
+						(void)pState->f_Abort();
 					}
 				;
 
