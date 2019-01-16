@@ -10,7 +10,7 @@
 
 namespace NMib::NCloud
 {
-	DMibImpErrorClass(CExceptionCloudAPI, NException::CException);
+	DMibImpErrorClassDefine(CExceptionCloudAPI, NException::CException);
 		
 #	define DMibErrorCloudAPI(_Description) DMibImpError(NMib::NCloud::CExceptionCloudAPI, _Description)
 

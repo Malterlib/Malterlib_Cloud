@@ -7,6 +7,8 @@
 
 namespace NMib::NCloud
 {
+	DMibImpErrorClassImplement(CExceptionBackupManagerHashMismatch);
+
 #ifdef DCompiler_MSVC_Workaround
 	CBackupManagerBackup::CManifestChange_Change::CManifestChange_Change() = default;
 

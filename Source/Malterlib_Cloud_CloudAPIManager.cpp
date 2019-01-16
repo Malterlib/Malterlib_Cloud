@@ -7,6 +7,8 @@
 
 namespace NMib::NCloud
 {
+	DMibImpErrorClassImplement(CExceptionCloudAPI);
+	
 	using namespace NStr;
 	
 	CCloudAPIManager::CCloudAPIManager()

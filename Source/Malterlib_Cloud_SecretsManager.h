@@ -15,7 +15,7 @@
 
 namespace NMib::NCloud
 {
-	DMibImpErrorClass(CExceptionSecrets, NException::CException);
+	DMibImpErrorClassDefine(CExceptionSecrets, NException::CException);
 		
 #	define DMibErrorSecrets(_Description) DMibImpError(NMib::NCloud::CExceptionSecrets, _Description)
 

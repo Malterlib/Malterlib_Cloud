@@ -20,7 +20,7 @@ namespace NMib::NCloud
 		, EBackupManagerProtocolVersion = 0x104
 	};
 
-	DMibImpErrorClass(CExceptionBackupManagerHashMismatch, NException::CException);
+	DMibImpErrorClassDefine(CExceptionBackupManagerHashMismatch, NException::CException);
 
 #	define DMibErrorBackupManagerHashMismatch(_Description) DMibImpError(NMib::NCloud::CExceptionBackupManagerHashMismatch, _Description)
 #	define DMibErrorInstanceBackupManagerHashMismatch(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionBackupManagerHashMismatch, _Description)

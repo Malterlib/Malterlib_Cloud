@@ -7,6 +7,8 @@
 
 namespace NMib::NCloud
 {
+	DMibImpErrorClassImplement(CExceptionSecrets);
+
 	using namespace NStr;
 	
 	CSecretsManager::CSecretsManager()
