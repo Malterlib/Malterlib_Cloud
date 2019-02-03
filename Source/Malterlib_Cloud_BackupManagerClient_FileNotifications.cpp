@@ -219,13 +219,12 @@ namespace NMib::NCloud
 							if (WatchedPath.m_Subscription)
 							{
 								auto Subscription = fg_Move(WatchedPath.m_Subscription);
-								Subscription->f_Destroy() > [](TCAsyncResult<void> &&_Result) -> TCContinuation<void>
+								Subscription->f_Destroy() > [](TCAsyncResult<void> &&_Result)
 									{
 #ifdef DMibCloudBackupManagerDebug
 										if (!_Result)
 											DMibCloudBackupManagerDebugOut("FAILED to destroy watch subscription {}\n", _Result.f_GetExceptionStr());
 #endif
-										return fg_Explicit();
 									}
 								;
 							}

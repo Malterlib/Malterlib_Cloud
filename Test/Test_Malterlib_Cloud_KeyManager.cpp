@@ -27,18 +27,18 @@ public:
 		
 		TCContinuation<void> f_Initialize()
 		{
-			return TCContinuation<void>::fs_Finished();
+			return fg_Explicit();
 		}
 		
 		TCContinuation<void> f_WriteDatabase(CDatabase const &_Database)
 		{
 			m_Database = _Database;
-			return TCContinuation<void>::fs_Finished();
+			return fg_Explicit();
 		}
 		
 		TCContinuation<CDatabase> f_ReadDatabase()
 		{
-			return TCContinuation<CDatabase>::fs_Finished(m_Database);
+			return fg_Explicit(m_Database);
 		}
 	};
 	
