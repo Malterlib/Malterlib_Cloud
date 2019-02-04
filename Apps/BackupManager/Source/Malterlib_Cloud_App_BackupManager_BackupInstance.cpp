@@ -162,6 +162,7 @@ namespace NMib::NCloud::NBackupManager
 						}
 						catch (CExceptionFile const &_Exception)
 						{
+							(void)_Exception;
 							DMibLogWithCategory(Mib/Cloud/BackupManager, Info, "Hardlink file optimization failed: {}", _Exception);
 						}
 

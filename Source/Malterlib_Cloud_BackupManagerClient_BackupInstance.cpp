@@ -171,6 +171,7 @@ namespace NMib::NCloud::NPrivate
 									}
 									catch (CExceptionBackupManagerHashMismatch const &_Exception)
 									{
+										(void)_Exception;
 										DMibLog(Info, "Reschedule: {}: {}", FileName, _Exception);
 										return fReportHashMismatch();
 									}
