@@ -53,7 +53,7 @@ namespace NMib::NCloud::NPrivate
 		}
 	}
 	
-	TCContinuation<void> CBackupManagerClient_Instance::fp_Destroy()
+	TCFuture<void> CBackupManagerClient_Instance::fp_Destroy()
 	{
 		auto pCanDestroyTracker = fg_Move(mp_pCanDestroyTracker);
 		DMibCheck(pCanDestroyTracker);
@@ -64,7 +64,7 @@ namespace NMib::NCloud::NPrivate
 		if (mp_pManifestSyncState && mp_pManifestSyncState->m_RSyncSubscription)
 			mp_pManifestSyncState->m_RSyncSubscription->f_Destroy() > pCanDestroyTracker->f_Track();
 		
-		return pCanDestroyTracker->m_Continuation;
+		return pCanDestroyTracker->m_Promise;
 	}
 
 	void CBackupManagerClient_Instance::fp_BackupNotification(CBackupManagerClient::CNotification &&_Notification)
@@ -135,7 +135,7 @@ namespace NMib::NCloud::NPrivate
 			 	, CBackupManagerBackup::CManifestFile{_PendingFile.m_ManifestFile}
 				, g_ActorFunctor
 				(
-					g_ActorSubscription / [this, pRunningState, FileName, SyncFlags = _PendingFile.m_ManifestFile.m_Flags]() -> TCContinuation<void>
+					g_ActorSubscription / [this, pRunningState, FileName, SyncFlags = _PendingFile.m_ManifestFile.m_Flags]() -> TCFuture<void>
 					{
 						auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName);
 						if (!pPendingFile)
@@ -147,21 +147,21 @@ namespace NMib::NCloud::NPrivate
 
 						auto Subscription = fg_Move(pPendingFile->m_RSyncSubscription);
 
-						TCContinuation<void> DestroyContinuation;
+						TCFuture<void> DestroyFuture;
 						if (!Subscription)
-							DestroyContinuation.f_SetResult();
+							DestroyFuture = fg_Explicit();
 						else
-							DestroyContinuation = Subscription->f_Destroy();
+							DestroyFuture = Subscription->f_Destroy();
 
-						TCContinuation<void> ContinuationReturn;
-						DestroyContinuation > [this, ContinuationReturn, FileName, pRunningState, SyncFlags](TCAsyncResult<void> &&_Result)
+						TCPromise<void> PromiseReturn;
+						DestroyFuture > [this, PromiseReturn, FileName, pRunningState, SyncFlags](TCAsyncResult<void> &&_Result)
 							{
 								if (auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName))
 								{
 									auto fReportHashMismatch = [&]
 										{
 											fp_ReportHashMismatch(pRunningState, *pPendingFile);
-											ContinuationReturn.f_SetResult();
+											PromiseReturn.f_SetResult();
 										}
 									;
 
@@ -208,16 +208,16 @@ namespace NMib::NCloud::NPrivate
 
 								DMibCloudBackupManagerDebugOut("RSync done clear on scope exit: {}\n", FileName);
 								pRunningState->m_pOnScopeExit.f_Clear();
-								ContinuationReturn.f_SetResult(_Result);
+								PromiseReturn.f_SetResult(_Result);
 							}
 						;
 
-						return ContinuationReturn;
+						return PromiseReturn.f_MoveFuture();
 					}
 				) 
-				/ [this, pRunningState, FileName](CSecureByteVector &&_Packet) mutable -> TCContinuation<CSecureByteVector>
+				/ [this, pRunningState, FileName](CSecureByteVector &&_Packet) mutable -> TCFuture<CSecureByteVector>
 				{
-					return TCContinuation<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
+					return TCFuture<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
 						{
 							NContainer::CSecureByteVector ToSendToClient;
 							auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName);
@@ -285,7 +285,7 @@ namespace NMib::NCloud::NPrivate
 	void CBackupManagerClient_Instance::fp_SendAppendSyncFile
 		(
 			TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState
-			, TCContinuation<bool> const &_Continuation
+			, TCPromise<bool> const &_Promise
 			, uint64 _Length
 			, TCSharedPointer<CAppendFileCache> const &_pFile
 		 	, bool _bForceSync
@@ -316,8 +316,8 @@ namespace NMib::NCloud::NPrivate
 			}
 			catch (NException::CException const &_Exception)
 			{
-				if (!_Continuation.f_IsSet())
-					_Continuation.f_SetException(DMibErrorInstance(fg_Format("Error reading append backup data: {}", _Exception)));
+				if (!_Promise.f_IsSet())
+					_Promise.f_SetException(DMibErrorInstance(fg_Format("Error reading append backup data: {}", _Exception)));
 				return;
 			}
 
@@ -328,11 +328,11 @@ namespace NMib::NCloud::NPrivate
 				{
 					DMibCloudBackupManagerDebugOut("Hash mismatch (Start append): {}\n", RunningState.m_FileName);
 					fp_ReportHashMismatch(_pRunningState, *pPendingFile);
-					_Continuation.f_SetException(DMibErrorInstance(fg_Format("Hash mismatch reading apppend backup data, rescheduling")));
+					_Promise.f_SetException(DMibErrorInstance(fg_Format("Hash mismatch reading apppend backup data, rescheduling")));
 					return;
 				}
 
-				_Continuation.f_SetException(DMibErrorInstance(fg_Format("Hash mismatch reading apppend backup data")));
+				_Promise.f_SetException(DMibErrorInstance(fg_Format("Hash mismatch reading apppend backup data")));
 				return;
 			}
 
@@ -347,14 +347,14 @@ namespace NMib::NCloud::NPrivate
 					, RunningState.m_FileName
 					, fg_Move(AppendData)
 				)
-				> [this, pRunningState = _pRunningState, ThisTime, _Continuation, _Length, _pFile](TCAsyncResult<void> &&_Result)
+				> [this, pRunningState = _pRunningState, ThisTime, _Promise, _Length, _pFile](TCAsyncResult<void> &&_Result)
 				{
 					auto &RunningState = *pRunningState;
 					RunningState.m_PendingQueue -= ThisTime;
 
 					auto *pPendingFile = mp_PendingFiles.f_FindEqual(RunningState.m_FileName);
 
-					if (_Continuation.f_IsSet())
+					if (_Promise.f_IsSet())
 						return;
 					else if (!_Result)
 					{
@@ -368,7 +368,7 @@ namespace NMib::NCloud::NPrivate
 							{
 								DMibCloudBackupManagerDebugOut("Hash mismatch (End append): {}\n", RunningState.m_FileName);
 								fp_ReportHashMismatch(pRunningState, *pPendingFile);
-								_Continuation.f_SetException(DMibErrorInstance(fg_Format("Hash mismatch appending backup data, rescheduling: {}", _Result.f_GetExceptionStr())));
+								_Promise.f_SetException(DMibErrorInstance(fg_Format("Hash mismatch appending backup data, rescheduling: {}", _Result.f_GetExceptionStr())));
 								return;
 							}
 							catch (NException::CException const &)
@@ -376,13 +376,13 @@ namespace NMib::NCloud::NPrivate
 							}
 						}
 
-						_Continuation.f_SetException(DMibErrorInstance(fg_Format("Error uploading append backup data: {}", _Result.f_GetExceptionStr())));
+						_Promise.f_SetException(DMibErrorInstance(fg_Format("Error uploading append backup data: {}", _Result.f_GetExceptionStr())));
 						return;
 					}
 					else if (pPendingFile)
 						pPendingFile->m_TransferStats.m_OutgoingBytes += ThisTime;
 					
-					fp_SendAppendSyncFile(pRunningState, _Continuation, _Length, _pFile, false);
+					fp_SendAppendSyncFile(pRunningState, _Promise, _Length, _pFile, false);
 				}
 			;
 			Position += ThisTime;
@@ -391,8 +391,8 @@ namespace NMib::NCloud::NPrivate
 		
 		if (RunningState.m_PendingQueue == 0 && Position >= _Length)
 		{
-			if (!_Continuation.f_IsSet())
-				_Continuation.f_SetResult(true);
+			if (!_Promise.f_IsSet())
+				_Promise.f_SetResult(true);
 		}
 	}
 
@@ -404,13 +404,13 @@ namespace NMib::NCloud::NPrivate
 		auto SyncSequence = _SyncSequence;
 		auto pRunningState = _pRunningState;
 		
-		TCContinuation<bool> Continuation;
+		TCPromise<bool> Promise;
 		
 		try
 		{
 			auto pFileCache = fp_GetAppendFileCache(RunningState.m_ManifestFile.m_OriginalPath);
 			
-			fp_SendAppendSyncFile(_pRunningState, Continuation, _pRunningState->m_ManifestFile.m_Length, pFileCache, true);
+			fp_SendAppendSyncFile(_pRunningState, Promise, _pRunningState->m_ManifestFile.m_Length, pFileCache, true);
 		}
 		catch (NException::CException const &_Exception)
 		{
@@ -421,7 +421,7 @@ namespace NMib::NCloud::NPrivate
 			return;
 		}
 		
-		Continuation > [=](TCAsyncResult<bool> &&_Result)
+		Promise > [=](TCAsyncResult<bool> &&_Result)
 			{
 				if (!_Result)
 				{
@@ -616,7 +616,7 @@ namespace NMib::NCloud::NPrivate
 		fp_CheckInitialBackupFinished();
 	}
 	
-	TCContinuation<void> CBackupManagerClient_Instance::fp_SyncManifest()
+	TCFuture<void> CBackupManagerClient_Instance::fp_SyncManifest()
 	{
 		TCSharedPointer<CManifestSyncState> pState = fg_Construct();
 		pState->m_ManifestStream << mp_Manifest;
@@ -633,7 +633,7 @@ namespace NMib::NCloud::NPrivate
 			return DMibErrorInstance(fg_Format("Failed to prepare manifest rsync: {}", _Exception));
 		}
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		DMibCallActor
 			(
@@ -641,7 +641,7 @@ namespace NMib::NCloud::NPrivate
 				, CBackupManagerBackup::f_StartManifestRSync
 				, g_ActorFunctor
 				(
-					g_ActorSubscription / [this, Continuation]() -> TCContinuation<void>
+					g_ActorSubscription / [this, Promise]() -> TCFuture<void>
 					{
 						if (!mp_pManifestSyncState)
 							return fg_Explicit();
@@ -651,16 +651,16 @@ namespace NMib::NCloud::NPrivate
 						auto Subscription = fg_Move(mp_pManifestSyncState->m_RSyncSubscription);
 						mp_pManifestSyncState.f_Clear();
 						
-						TCContinuation<void> DestroyContinuation;
+						TCFuture<void> DestroyFuture;
 						if (!Subscription)
-							DestroyContinuation.f_SetResult();
+							DestroyFuture = fg_Explicit();
 						else
-							DestroyContinuation = Subscription->f_Destroy();
+							DestroyFuture = Subscription->f_Destroy();
 						
-						TCContinuation<void> ContinuationReturn;
-						DestroyContinuation > [Continuation, ContinuationReturn, bDone](TCAsyncResult<void> &&_Result)
+						TCPromise<void> PromiseReturn;
+						DestroyFuture > [Promise, PromiseReturn, bDone](TCAsyncResult<void> &&_Result)
 							{
-								if (!Continuation.f_IsSet())
+								if (!Promise.f_IsSet())
 								{
 									do
 									{
@@ -670,7 +670,7 @@ namespace NMib::NCloud::NPrivate
 										}
 										catch (CExceptionBackupManagerHashMismatch const &_Exception)
 										{
-											Continuation.f_SetException(_Exception);
+											Promise.f_SetException(_Exception);
 											break;
 										}
 										catch (NException::CException const &)
@@ -678,27 +678,27 @@ namespace NMib::NCloud::NPrivate
 										}
 
 										if (bDone)
-											Continuation.f_SetResult();
+											Promise.f_SetResult();
 										else
-											Continuation.f_SetException(DMibErrorInstance("Manifest rsync aborted"));
+											Promise.f_SetException(DMibErrorInstance("Manifest rsync aborted"));
 									}
 									while (false)
 										;
 								}
 
-								ContinuationReturn.f_SetResult(_Result);
+								PromiseReturn.f_SetResult(_Result);
 							}
 						;
 						
-						return ContinuationReturn;
+						return PromiseReturn.f_MoveFuture();
 					}
 				) 
-				/ [this, Continuation](CSecureByteVector &&_Packet) mutable -> TCContinuation<CSecureByteVector>
+				/ [this, Promise](CSecureByteVector &&_Packet) mutable -> TCFuture<CSecureByteVector>
 				{
 					if (!mp_pManifestSyncState)
 						return DMibErrorInstance("Aborted");
 								
-					return TCContinuation<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
+					return TCFuture<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
 						{
 							NContainer::CSecureByteVector ToSendToClient;
 							if (mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket(_Packet, ToSendToClient))
@@ -711,11 +711,11 @@ namespace NMib::NCloud::NPrivate
 				, pState->m_ManifestStream.f_GetLength()
 			 	, ManifestDigest
 			)
-			> [this, Continuation](TCAsyncResult<TCActorSubscriptionWithID<>> &&_Subscription)
+			> [this, Promise](TCAsyncResult<TCActorSubscriptionWithID<>> &&_Subscription)
 			{
 				if (!_Subscription)
 				{
-					Continuation.f_SetException(DMibErrorInstance(fg_Format("Manifest start rsync failed: ", _Subscription.f_GetExceptionStr())));
+					Promise.f_SetException(DMibErrorInstance(fg_Format("Manifest start rsync failed: ", _Subscription.f_GetExceptionStr())));
 					return;
 				}
 				
@@ -726,7 +726,7 @@ namespace NMib::NCloud::NPrivate
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
 	void CBackupManagerClient_Instance::fp_StartBackup()
@@ -734,7 +734,7 @@ namespace NMib::NCloud::NPrivate
 		CBackupManager::CInitBackup InitParams;
 		
 		InitParams.m_BackupKey = mp_BackupKey;
-		InitParams.m_Subscription = g_ActorSubscription / [this]() -> TCContinuation<void>
+		InitParams.m_Subscription = g_ActorSubscription / [this]() -> TCFuture<void>
 			{
 				if (mp_bDestroyed || !mp_Backup)
 					return fg_Explicit();
@@ -898,7 +898,7 @@ namespace NMib::NCloud::NPrivate
 			(
 				[
 				 	=
-				 	, ChangeContinuation = _ManifestChange.m_Continuation
+				 	, ChangePromise = _ManifestChange.m_Promise
 				 	, ManifestChange = _ManifestChange.m_ManifestChange
 				 	, bDirty = _ManifestChange.m_bDirty
 				]
@@ -948,7 +948,7 @@ namespace NMib::NCloud::NPrivate
 						else
 						{
 							DMibCloudBackupManagerDebugOut("IGNORE remove: {} ({})\n", SourceFile, _FileName);
-							ChangeContinuation.f_SetResult();
+							ChangePromise.f_SetResult();
 							return;
 						}
 					}
@@ -973,7 +973,7 @@ namespace NMib::NCloud::NPrivate
 					if (!CBackupManagerBackup::fs_PretendApplyManifestChange(mp_Manifest, _FileName, ManifestChange))
 					{
 						DMibCloudBackupManagerDebugOut("NOT CHANGED: {} ({})\n", SourceFile, _FileName);
-						ChangeContinuation.f_SetResult();
+						ChangePromise.f_SetResult();
 						return;
 					}
 
@@ -987,7 +987,7 @@ namespace NMib::NCloud::NPrivate
 							auto &ManifestFile = CBackupManagerBackup::fs_ManifestFileFromChange(_ManifestChange);
 							if (!ManifestFile.f_IsFile())
 							{
-								ChangeContinuation.f_SetResult();
+								ChangePromise.f_SetResult();
 								return false;
 							}
 
@@ -1009,7 +1009,7 @@ namespace NMib::NCloud::NPrivate
 							fp_NewPendingFile(_FileName);
 							fp_ProcessBackupQueue();
 
-							ChangeContinuation.f_SetResult();
+							ChangePromise.f_SetResult();
 
 							return true;
 						}
@@ -1033,7 +1033,7 @@ namespace NMib::NCloud::NPrivate
 								if (!_Result)
 								{
 									fp_ReportBackupError(fg_Format("Failed to change manifest on remote: {}", _Result.f_GetExceptionStr()), false);
-									ChangeContinuation.f_SetResult();
+									ChangePromise.f_SetResult();
 									return;
 								}
 
@@ -1053,7 +1053,7 @@ namespace NMib::NCloud::NPrivate
 											fp_FileFinished(_FileName);
 										}
 										CBackupManagerBackup::fs_ApplyManifestChange(mp_Manifest, _FileName, ManifestChange);
-										ChangeContinuation.f_SetResult();
+										ChangePromise.f_SetResult();
 										return;
 									}
 								case CBackupManagerBackup::EManifestChange_Rename:
@@ -1074,7 +1074,7 @@ namespace NMib::NCloud::NPrivate
 											if (Change.m_ManifestFile.m_Digest == NewRenameDigest)
 											{
 												DMibCloudBackupManagerDebugOut("Rename MATCH digest: {} -> {}\n", SourceFile, _FileName);
-												ChangeContinuation.f_SetResult();
+												ChangePromise.f_SetResult();
 												return;
 											}
 											else
@@ -1104,7 +1104,7 @@ namespace NMib::NCloud::NPrivate
 		;
 	}
 	
-	TCContinuation<void> CBackupManagerClient_Instance::f_ManifestChanged
+	TCFuture<void> CBackupManagerClient_Instance::f_ManifestChanged
 		(
 		 	CStr const &_FileName
 		 	, CBackupManagerBackup::CManifestChange const &_ManifestChange
@@ -1128,24 +1128,24 @@ namespace NMib::NCloud::NPrivate
 		}
 #endif
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		if (mp_Backup)
 		{
 			if (mp_bBackupStarted)
-				fp_ProcessManifestChange(_FileName, {_ManifestChange, Continuation, _bDirty});
+				fp_ProcessManifestChange(_FileName, {_ManifestChange, Promise, _bDirty});
 			else if (!mp_bBackupStartFailed)
-				mp_PendingManifestChanges.f_Insert({_FileName, {_ManifestChange, Continuation, _bDirty}});
+				mp_PendingManifestChanges.f_Insert({_FileName, {_ManifestChange, Promise, _bDirty}});
 			else
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 		}
 		else
 		{
 			CBackupManagerBackup::fs_ApplyManifestChange(mp_Manifest, _FileName, _ManifestChange);
-			Continuation.f_SetResult();
+			Promise.f_SetResult();
 		}
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	void CBackupManagerClient_Instance::f_MarkActive(bool _bActive)

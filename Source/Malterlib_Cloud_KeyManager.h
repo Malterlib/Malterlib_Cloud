@@ -28,7 +28,7 @@ namespace NMib::NCloud
 		CKeyManager(NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
 		~CKeyManager();
 		
-		NConcurrency::TCContinuation<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize);
+		NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize);
 	private:
 		struct CInternal;
 		

@@ -11,21 +11,21 @@ namespace NMib::NCloud::NAppManager
 {
 	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeUpdateNotifications
 		(
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCContinuation<void> (CUpdateNotification const &_Notification)> &&_fOnNotification
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CUpdateNotification const &_Notification)> &&_fOnNotification
 		) 
-		-> NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>>
+		-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
 		CStr SubscriptionID = fg_RandomID();
 		auto CallingHostInfo = fg_GetCallingHostInfo();
-		NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> Continuation;
+		NConcurrency::TCPromise<NConcurrency::TCActorSubscriptionWithID<>> Promise;
 
 		pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", {"AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeUpdates"})
-			> Continuation % "Permission denied subscribing to update notifications" % Auditor / [=, fOnNotification = fg_Move(_fOnNotification)](bool _bHasPermission) mutable
+			> Promise % "Permission denied subscribing to update notifications" % Auditor / [=, fOnNotification = fg_Move(_fOnNotification)](bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Subscribe to update notifications)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Subscribe to update notifications)"));
 
 				auto &Subscription = pThis->mp_UpdateNotificationSubscriptions[SubscriptionID];
 				Subscription.m_fOnUpdate = fg_Move(fOnNotification);
@@ -33,9 +33,9 @@ namespace NMib::NCloud::NAppManager
 
 				Auditor.f_Info(fg_Format("Subscribe to update notifications '{}'", SubscriptionID));
 
-				Continuation.f_SetResult
+				Promise.f_SetResult
 					(
-						g_ActorSubscription / [pThis, SubscriptionID, Auditor]() -> TCContinuation<void>
+						g_ActorSubscription / [pThis, SubscriptionID, Auditor]() -> TCFuture<void>
 						{
 							Auditor.f_Info(fg_Format("Unsubscribe from update notifications '{}'", SubscriptionID));
 
@@ -43,20 +43,20 @@ namespace NMib::NCloud::NAppManager
 							if (!pUpdateNotificationSubscriptions)
 								return fg_Explicit();
 
-							TCContinuation<void> Continuation = pUpdateNotificationSubscriptions->m_fOnUpdate.f_Destroy();
+							TCFuture<void> DestroyFuture = pUpdateNotificationSubscriptions->m_fOnUpdate.f_Destroy();
 
 							pThis->mp_UpdateNotificationSubscriptions.f_Remove(SubscriptionID);
 
-							return Continuation;
+							return DestroyFuture;
 						}
 					)
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<void> CAppManagerActor::fp_OnUpdateEvent
+	TCFuture<void> CAppManagerActor::fp_OnUpdateEvent
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
 			, EUpdateStage _Stage
@@ -73,7 +73,7 @@ namespace NMib::NCloud::NAppManager
 			fp_OnAppUpdateInfoChange(_pState->m_pApplication);
 		}
 		
-		TCContinuation<void> CoordinationContinuation;
+		TCFuture<void> CoordinationFuture;
 
 		auto UpdateType = Application.f_GetUpdateType(); 
 		switch (UpdateType)
@@ -83,7 +83,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				if (_Stage == EUpdateStage::EUpdateStage_None)
 				{
-					CoordinationContinuation = fp_Coordination_WaitForAllToReachWantUpdateStage
+					CoordinationFuture = fp_Coordination_WaitForAllToReachWantUpdateStage
 						(
 							_pState
 							, EUpdateStage::EUpdateStage_None
@@ -93,21 +93,21 @@ namespace NMib::NCloud::NAppManager
 					;
 				}
 				else if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
-					CoordinationContinuation = fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
+					CoordinationFuture = fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
 				else if (_Stage == EUpdateStage::EUpdateStage_StopOldApp)
 				{
 					if (UpdateType == EDistributedAppUpdateType_OneAtATime)
-						CoordinationContinuation = fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pState);
+						CoordinationFuture = fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pState);
 					else
-						CoordinationContinuation = fp_Coordination_WaitForAllToReachWantUpdateStage(_pState, EUpdateStage::EUpdateStage_StopOldApp, 30.0*60.0, EWaitStageFlag_None);
+						CoordinationFuture = fp_Coordination_WaitForAllToReachWantUpdateStage(_pState, EUpdateStage::EUpdateStage_StopOldApp, 30.0*60.0, EWaitStageFlag_None);
 				}
 				else
-					CoordinationContinuation.f_SetResult();
+					CoordinationFuture = fg_Explicit();
 				break;
 			}
 		case EDistributedAppUpdateType_Independent:
 			{
-				CoordinationContinuation.f_SetResult();
+				CoordinationFuture = fg_Explicit();
 				break;
 			}
 		default:
@@ -117,9 +117,9 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 		
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
-		CoordinationContinuation.f_Dispatch() > Continuation / [=]
+		CoordinationFuture > Promise / [=]
 			{
 				auto &Application = *_pState->m_pApplication;
 		
@@ -163,40 +163,40 @@ namespace NMib::NCloud::NAppManager
 				
 				for (auto &Subscription : mp_UpdateNotificationSubscriptions)
 				{
-					TCContinuation<void> OnUpdateContinuation;
+					TCPromise<void> OnUpdatePromise;
 					mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
 						.f_Dispatch().f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
-						> OnUpdateContinuation / [=, SubscriptionID = mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission)
+						> OnUpdatePromise / [=, SubscriptionID = mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission)
 						{
 							auto pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
 							if (!_bHasPermission || !pSubscription)
-								return OnUpdateContinuation.f_SetResult();
+								return OnUpdatePromise.f_SetResult();
 
 							pSubscription->m_fOnUpdate(Notification)
 								.f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
-								> OnUpdateContinuation
+								> OnUpdatePromise
 							;
 						}
 					;
-					OnUpdateContinuation > OnUpdateResults.f_AddResult();
+					OnUpdatePromise > OnUpdateResults.f_AddResult();
 				}
 
-				TCContinuation<void> UpdateJSONContinuation;
+				TCFuture<void> UpdateJSONFuture;
 				if (!bUpdatedAppInfo)
-					UpdateJSONContinuation.f_SetResult();
+					UpdateJSONFuture = fg_Explicit();
 				else
-					UpdateJSONContinuation = fp_UpdateApplicationJSON(_pState->m_pApplication);
+					UpdateJSONFuture = fp_UpdateApplicationJSON(_pState->m_pApplication);
 
-				UpdateJSONContinuation
+				UpdateJSONFuture
 					+ OnUpdateResults.f_GetResults()
-					> [Continuation](TCAsyncResult<void> &&_UpdateJSONResult, auto &&_OnUpdateResults)
+					> [Promise](TCAsyncResult<void> &&_UpdateJSONResult, auto &&_OnUpdateResults)
 					{
-						Continuation.f_SetResult(fg_Move(_UpdateJSONResult));
+						Promise.f_SetResult(fg_Move(_UpdateJSONResult));
 					}
 				;
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

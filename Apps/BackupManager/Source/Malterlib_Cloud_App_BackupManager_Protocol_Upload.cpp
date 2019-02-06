@@ -18,22 +18,22 @@ namespace NMib::NCloud::NBackupManager
 			CBackupManager::CBackupKey const &_BackupKey
 			, CBackupManagerServer::CBackupKey &o_BackupKey
 			, CDistributedAppAuditor const &_Auditor
-			, NConcurrency::TCContinuation<tf_CResult> &_Continuation
+			, NConcurrency::TCPromise<tf_CResult> &_Promise
 		)
 	{
 		if (!CBackupManager::fs_IsValidHostname(_BackupKey.m_FriendlyName))
 		{
-			_Continuation.f_SetException(_Auditor.f_Exception({"Backup key friendly name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_FriendlyName)}));
+			_Promise.f_SetException(_Auditor.f_Exception({"Backup key friendly name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_FriendlyName)}));
 			return false;
 		}
 		if (!CBackupManager::fs_IsValidHostname(_BackupKey.m_ID))
 		{
-			_Continuation.f_SetException(_Auditor.f_Exception({"Backup key ID name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_ID)}));
+			_Promise.f_SetException(_Auditor.f_Exception({"Backup key ID name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_ID)}));
 			return false;
 		}
 		if (_BackupKey.m_Time < g_MinBackupTime || _BackupKey.m_Time > CTime::fs_NowUTC() + g_BackupTimeMaxInFuture)
 		{
-			_Continuation.f_SetException(_Auditor.f_Exception({"Backup key time is out of range", fg_Format("'{}'", _BackupKey.m_Time)}));
+			_Promise.f_SetException(_Auditor.f_Exception({"Backup key time is out of range", fg_Format("'{}'", _BackupKey.m_Time)}));
 			return false;
 		}
 		
@@ -49,14 +49,14 @@ namespace NMib::NCloud::NBackupManager
 		
 		if (o_BackupKey.m_BackupName.f_GetLen() > 128)
 		{
-			_Continuation.f_SetException(_Auditor.f_Exception({"Backup key friendly name is too long", fg_Format("'{}'", o_BackupKey.m_BackupName)}));
+			_Promise.f_SetException(_Auditor.f_Exception({"Backup key friendly name is too long", fg_Format("'{}'", o_BackupKey.m_BackupName)}));
 			return false;
 		}
 		
 		return true;
 	}		
 	
-	TCContinuation<void> CBackupManagerServer::fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason)
+	TCFuture<void> CBackupManagerServer::fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason)
 	{
 		auto *pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
 		if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != _Auditor.f_HostInfo())
@@ -79,10 +79,10 @@ namespace NMib::NCloud::NBackupManager
 		else
 			_Auditor.f_Info(Message);
 	
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		auto pCanDestroyTracker = mp_pCanDestroyTracker;
 		pBackupInstance->m_bPendingDestroy = true;
-		pBackupInstance->m_BackupInstance->f_Destroy() > [this, pCanDestroyTracker, _Key, _Auditor, Continuation](TCAsyncResult<void> &&_Result)
+		pBackupInstance->m_BackupInstance->f_Destroy() > [this, pCanDestroyTracker, _Key, _Auditor, Promise](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 				{
@@ -100,7 +100,7 @@ namespace NMib::NCloud::NBackupManager
 				DMibCheck(pBackupInstance);
 				if (!pBackupInstance)
 				{
-					Continuation.f_SetResult();
+					Promise.f_SetResult();
 					return;
 				}
 				pBackupInstance->m_bPendingDestroy = false;
@@ -110,16 +110,16 @@ namespace NMib::NCloud::NBackupManager
 					mp_BackupInstances.f_Remove(pBackupInstance->f_GetKey());
 				for (auto &OnDestroy : OnDestroyed)
 					OnDestroy();
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 		pBackupInstance->m_BackupInstance.f_Clear();
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	auto CBackupManagerServer::CBackupManagerImplementation::f_InitBackup(CBackupManager::CInitBackup &&_Params)
-		-> NConcurrency::TCContinuation<TCDistributedActorInterfaceWithID<CBackupManagerBackup>>
+		-> NConcurrency::TCFuture<TCDistributedActorInterfaceWithID<CBackupManagerBackup>>
 	{
 		auto pThis = m_pThis;
 		
@@ -129,14 +129,14 @@ namespace NMib::NCloud::NBackupManager
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		auto CallingHostID = fg_GetCallingHostID();
 			
-		NConcurrency::TCContinuation<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> Continuation;
+		NConcurrency::TCPromise<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> Promise;
 		
 		CBackupManagerServer::CBackupKey BackupKey;
-		if (!pThis->fp_CheckBackupKey(_Params.m_BackupKey, BackupKey, Auditor, Continuation))
-			return Continuation;
+		if (!pThis->fp_CheckBackupKey(_Params.m_BackupKey, BackupKey, Auditor, Promise))
+			return Promise.f_MoveFuture();
 		
 		pThis->mp_Permissions.f_HasPermission("Start backup", {"Backup/WriteSelf"})
-			> Continuation % "Permission denied starting backup" % Auditor /
+			> Promise % "Permission denied starting backup" % Auditor /
 			[
 			 	=
 				, Subscription = fg_Move(_Params.m_Subscription)
@@ -146,7 +146,7 @@ namespace NMib::NCloud::NBackupManager
 			(bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Start backup)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Start backup)"));
 
 				CStr BackupPermission = fg_Format("Backup/Read/{}", BackupKey.m_BackupName);
 				pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_CreateSet(BackupPermission)) > fg_DiscardResult();
@@ -179,7 +179,7 @@ namespace NMib::NCloud::NBackupManager
 					[
 						pThis
 						, BackupKey
-						, Continuation
+						, Promise
 						, Auditor
 						, Subscription = fg_Move(Subscription)
 						, SourceBackupKey = SourceBackupKey
@@ -188,12 +188,12 @@ namespace NMib::NCloud::NBackupManager
 					() mutable
 					{
 						if (pThis->f_IsDestroyed())
-							return Continuation.f_SetException(Auditor.f_Exception("Shutting down"));
+							return Promise.f_SetException(Auditor.f_Exception("Shutting down"));
 
 						auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
 						if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
 						{
-							Continuation.f_SetException(Auditor.f_Exception("Another backup was already started taking precedence"));
+							Promise.f_SetException(Auditor.f_Exception("Another backup was already started taking precedence"));
 							return;
 						}
 
@@ -215,7 +215,7 @@ namespace NMib::NCloud::NBackupManager
 						TCDistributedActorInterfaceWithID<CBackupManagerBackup> BackupInterface
 							{
 								pBackupInstance->m_BackupInstance->f_ShareInterface<CBackupManagerBackup>()
-								, g_ActorSubscription / [pThis, BackupKey, Auditor]() -> TCContinuation<void>
+								, g_ActorSubscription / [pThis, BackupKey, Auditor]() -> TCFuture<void>
 								{
 									auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
 									if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
@@ -229,7 +229,7 @@ namespace NMib::NCloud::NBackupManager
 						;
 
 						Auditor.f_Info(fg_Format("Backup initialized for '{}'", BackupKey.f_GetDesc()));
-						Continuation.f_SetResult(fg_Move(BackupInterface));
+						Promise.f_SetResult(fg_Move(BackupInterface));
 					}
 				;
 
@@ -247,6 +247,6 @@ namespace NMib::NCloud::NBackupManager
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

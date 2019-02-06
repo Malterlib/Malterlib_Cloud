@@ -8,7 +8,7 @@
 
 namespace NMib::NCloud
 {
-	NConcurrency::TCContinuation<NFile::CDirectorySyncSend::CSyncResult> fg_UploadSecretFile
+	NConcurrency::TCFuture<NFile::CDirectorySyncSend::CSyncResult> fg_UploadSecretFile
 		(
 			NConcurrency::TCDistributedActor<CSecretsManager> const &_SecretsManager
 		 	, NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager

@@ -26,25 +26,25 @@ namespace NMib::NCloud
 	{
 	}
 	
-	NConcurrency::TCContinuation<CSymmetricKey> CKeyManager::f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize)
+	NConcurrency::TCFuture<CSymmetricKey> CKeyManager::f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize)
 	{
 		auto &Internal = *mp_pInternal;
 		
 		auto ServerActor = Internal.m_ServerActor.f_Lock();
 
-		NConcurrency::TCContinuation<CSymmetricKey> Continuation;
+		NConcurrency::TCPromise<CSymmetricKey> Promise;
 		
 		if (!ServerActor)
 		{
-			Continuation.f_SetException(DMibErrorInstance("Key manager server was deleted"));
-			return Continuation;
+			Promise.f_SetException(DMibErrorInstance("Key manager server was deleted"));
+			return Promise.f_MoveFuture();
 		}
 		
-		ServerActor(&CKeyManagerServer::fp_RequestKey, NConcurrency::CActorDistributionManager::fs_GetCallingHostInfo().f_GetRealHostID(), _Identifier, _KeySize) > [Continuation](NConcurrency::TCAsyncResult<CSymmetricKey> &&_Result)
+		ServerActor(&CKeyManagerServer::fp_RequestKey, NConcurrency::CActorDistributionManager::fs_GetCallingHostInfo().f_GetRealHostID(), _Identifier, _KeySize) > [Promise](NConcurrency::TCAsyncResult<CSymmetricKey> &&_Result)
 			{
-				Continuation.f_SetResult(fg_Move(_Result));
+				Promise.f_SetResult(fg_Move(_Result));
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

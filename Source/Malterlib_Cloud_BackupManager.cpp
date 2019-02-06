@@ -266,22 +266,22 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CBackupManager::f_DownloadBackup);
 	}
 	
-	auto CBackupManager::f_StartBackup(CStartBackup &&_Params) -> NConcurrency::TCContinuation<CStartBackup::CResult> 
+	auto CBackupManager::f_StartBackup(CStartBackup &&_Params) -> NConcurrency::TCFuture<CStartBackup::CResult>
 	{
 		return DMibErrorInstance("Deprecated");
 	}
 	
-	auto CBackupManager::f_StopBackup(CStopBackup &&_Params) -> NConcurrency::TCContinuation<CStopBackup::CResult> 
+	auto CBackupManager::f_StopBackup(CStopBackup &&_Params) -> NConcurrency::TCFuture<CStopBackup::CResult>
 	{
 		return DMibErrorInstance("Deprecated");
 	}
 	
-	auto CBackupManager::f_UploadData(CUploadData &&_Params) -> NConcurrency::TCContinuation<CUploadData::CResult>
+	auto CBackupManager::f_UploadData(CUploadData &&_Params) -> NConcurrency::TCFuture<CUploadData::CResult>
 	{
 		return DMibErrorInstance("Deprecated");
 	}
 	
-	auto CBackupManager::f_StartDownloadBackup(CStartDownloadBackup &&_Params) -> NConcurrency::TCContinuation<CStartDownloadBackup::CResult>
+	auto CBackupManager::f_StartDownloadBackup(CStartDownloadBackup &&_Params) -> NConcurrency::TCFuture<CStartDownloadBackup::CResult>
 	{
 		return DMibErrorInstance("Deprecated");
 	}

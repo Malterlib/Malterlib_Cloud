@@ -166,33 +166,33 @@ namespace NMib::NCloud
 
 		static bool fs_IsValidTag(NStr::CStr const &_Tag);
 
-		virtual NConcurrency::TCContinuation<NContainer::TCSet<CSecretID>> f_EnumerateSecrets
+		virtual NConcurrency::TCFuture<NContainer::TCSet<CSecretID>> f_EnumerateSecrets
 			(
 				NStorage::TCOptional<NStr::CStrSecure> const &_SemanticID
 				, NContainer::TCSet<NStr::CStrSecure> const &_TagsExclusive
 			 ) = 0
 		;
-		virtual NConcurrency::TCContinuation<void> f_SetSecretProperties(CSecretID &&_ID, CSecretProperties &&_Secret) = 0;
-		virtual NConcurrency::TCContinuation<CSecretProperties> f_GetSecretProperties(CSecretID &&_ID) = 0;
-		virtual NConcurrency::TCContinuation<CSecret> f_GetSecret(CSecretID &&_ID) = 0;
-		virtual NConcurrency::TCContinuation<CSecret> f_GetSecretBySemanticID(NStr::CStrSecure const &_SemanticID, NContainer::TCSet<NStr::CStrSecure> const &_TagsExclusive) = 0;
-		virtual NConcurrency::TCContinuation<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> f_DownloadFile
+		virtual NConcurrency::TCFuture<void> f_SetSecretProperties(CSecretID &&_ID, CSecretProperties &&_Secret) = 0;
+		virtual NConcurrency::TCFuture<CSecretProperties> f_GetSecretProperties(CSecretID &&_ID) = 0;
+		virtual NConcurrency::TCFuture<CSecret> f_GetSecret(CSecretID &&_ID) = 0;
+		virtual NConcurrency::TCFuture<CSecret> f_GetSecretBySemanticID(NStr::CStrSecure const &_SemanticID, NContainer::TCSet<NStr::CStrSecure> const &_TagsExclusive) = 0;
+		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> f_DownloadFile
 			(
 			 	CSecretID &&_ID
 			 	, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription
 			) = 0
 		;
-		virtual NConcurrency::TCContinuation<void> f_ModifyTags
+		virtual NConcurrency::TCFuture<void> f_ModifyTags
 			(
 				CSecretID &&_ID
 				, NContainer::TCSet<NStr::CStrSecure> &&_TagsToRemove
 				, NContainer::TCSet<NStr::CStrSecure> &&_TagsToAdd
 			) = 0
 		;
-		virtual NConcurrency::TCContinuation<void> f_SetMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_Metadata) = 0;
-		virtual NConcurrency::TCContinuation<void> f_RemoveMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey) = 0;
-		virtual NConcurrency::TCContinuation<void> f_RemoveSecret(CSecretID &&_ID) = 0;
-		virtual NConcurrency::TCContinuation<NConcurrency::TCActorFunctorWithID<NConcurrency::TCContinuation<void> ()>> f_UploadFile
+		virtual NConcurrency::TCFuture<void> f_SetMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_Metadata) = 0;
+		virtual NConcurrency::TCFuture<void> f_RemoveMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey) = 0;
+		virtual NConcurrency::TCFuture<void> f_RemoveSecret(CSecretID &&_ID) = 0;
+		virtual NConcurrency::TCFuture<NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()>> f_UploadFile
 			(
 			 	CSecretID &&_ID
 			 	, NStr::CStrSecure const &_FileName

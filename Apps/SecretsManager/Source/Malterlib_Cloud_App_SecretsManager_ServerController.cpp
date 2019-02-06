@@ -20,7 +20,7 @@ namespace NMib::NCloud::NSecretsManager
 	}
 	
 #if DMibConfig_Tests_Enable
-	TCContinuation<CEJSON> CSecretsManagerDaemonActor::CServerController::f_Test_Command(CStr const &_Command, CEJSON const &_Params)
+	TCFuture<CEJSON> CSecretsManagerDaemonActor::CServerController::f_Test_Command(CStr const &_Command, CEJSON const &_Params)
 	{
 		if (!mp_ServerActor)
 			DMibError("No server");
@@ -70,12 +70,12 @@ namespace NMib::NCloud::NSecretsManager
 		if (mp_ServerActor || mp_AppState.m_bStoppingApp)
 			return;
 				
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		static const mint c_KeyBits = 512;
 		CSymmetricKey Key;
 		DCallActor(_KeyManager, CKeyManager::f_RequestKey, "SecretsManagerDB", c_KeyBits / 8)
-			> Continuation / [this, Continuation, KeyManager = _KeyManager](CSymmetricKey &&_Key)
+			> Promise / [this, Promise, KeyManager = _KeyManager](CSymmetricKey &&_Key)
 			{
 				if (mp_ServerActor || mp_AppState.m_bStoppingApp)
 					return;
@@ -130,7 +130,7 @@ namespace NMib::NCloud::NSecretsManager
 		;
 	}
 
-	TCContinuation<void> CSecretsManagerDaemonActor::CServerController::fp_Destroy()
+	TCFuture<void> CSecretsManagerDaemonActor::CServerController::fp_Destroy()
 	{
 		TCActorResultVector<void> Destroys;
 
@@ -141,8 +141,8 @@ namespace NMib::NCloud::NSecretsManager
 			Database->f_Destroy() > Destroys.f_AddResult();
 		mp_PendingDatabases.f_Clear();
 
-		TCContinuation<void> Continuation;
-		Destroys.f_GetResults() > Continuation.f_ReceiveAny();
-		return Continuation;
+		TCPromise<void> Promise;
+		Destroys.f_GetResults() > Promise.f_ReceiveAny();
+		return Promise.f_MoveFuture();
 	}
 }

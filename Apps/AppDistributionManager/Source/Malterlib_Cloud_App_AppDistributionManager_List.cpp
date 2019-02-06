@@ -7,7 +7,7 @@
 
 namespace NMib::NCloud::NAppDistributionManager
 {
-	auto CAppDistributionManagerActor::fp_GetAvailableVersions(CStr const &_Application) -> TCContinuation<CVersionsAvailableForUpdate>
+	auto CAppDistributionManagerActor::fp_GetAvailableVersions(CStr const &_Application) -> TCFuture<CVersionsAvailableForUpdate>
 	{
 		auto Auditor = f_Auditor();
 		
@@ -33,12 +33,12 @@ namespace NMib::NCloud::NAppDistributionManager
 		return fg_Explicit(fg_Move(Versions));
 	}
 
-	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionEnum(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionEnum(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CStr DistributionName = _Params["Distribution"].f_String();
 
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		for (auto &Distribution : mp_Distributions)
 		{
 			auto &Name = Distribution.f_GetName();
@@ -63,7 +63,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		return fg_Explicit(0);
 	}
 	
-	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions
+	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions
 		(
 		 	CEJSON const &_Params
 		 	, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
@@ -71,9 +71,9 @@ namespace NMib::NCloud::NAppDistributionManager
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 	
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		fp_GetAvailableVersions(_Params["Application"].f_String())
-			> Continuation / [=](CVersionsAvailableForUpdate &&_Results)
+			> Promise / [=](CVersionsAvailableForUpdate &&_Results)
 			{
 				smint LongestDistribution = fg_StrLen("Distribution");
 				smint LongestVersion = fg_StrLen("Version");
@@ -162,10 +162,10 @@ namespace NMib::NCloud::NAppDistributionManager
 					}
 				}
 				
-				Continuation.f_SetResult(0);
+				Promise.f_SetResult(0);
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

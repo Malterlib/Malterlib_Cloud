@@ -24,9 +24,9 @@ namespace NMib::NCloud
 			
 		}
 		
-		NConcurrency::TCContinuation<void> f_Initialize()
+		NConcurrency::TCFuture<void> f_Initialize()
 		{
-			return NConcurrency::TCContinuation<void>::fs_RunProtected<NException::CException>() / [&]
+			return NConcurrency::TCFuture<void>::fs_RunProtected<NException::CException>() / [&]
 				{
 					if (!NFile::CFile::fs_FileExists(m_Path))
 					{
@@ -51,18 +51,18 @@ namespace NMib::NCloud
 			;
 		}
 		
-		NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database)
+		NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase const &_Database)
 		{
-			return NConcurrency::TCContinuation<void>::fs_RunProtected<NException::CException>() / [&]
+			return NConcurrency::TCFuture<void>::fs_RunProtected<NException::CException>() / [&]
 				{
 					fp_WriteDatabase(_Database);
 				}
 			;
 		}
 		
-		NConcurrency::TCContinuation<CDatabase> f_ReadDatabase()
+		NConcurrency::TCFuture<CDatabase> f_ReadDatabase()
 		{
-			return NConcurrency::TCContinuation<CDatabase>::fs_RunProtected<NException::CException>() / [&]
+			return NConcurrency::TCFuture<CDatabase>::fs_RunProtected<NException::CException>() / [&]
 				{
 					NContainer::CByteVector EncryptedDatabase = NFile::CFile::fs_ReadFile(m_Path);
 					NContainer::CSecureByteVector RawDatabase;
@@ -131,17 +131,17 @@ namespace NMib::NCloud
 		
 	}
 	
-	NConcurrency::TCContinuation<void> CKeyManagerServerDatabase_EncryptedFile::f_Initialize()
+	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::f_Initialize()
 	{
 		return mp_pInternal->f_Initialize();
 	}
 		
-	NConcurrency::TCContinuation<void> CKeyManagerServerDatabase_EncryptedFile::f_WriteDatabase(CDatabase const &_Database)
+	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::f_WriteDatabase(CDatabase const &_Database)
 	{
 		return mp_pInternal->f_WriteDatabase(_Database);
 	}
 	
-	NConcurrency::TCContinuation<ICKeyManagerServerDatabase::CDatabase> CKeyManagerServerDatabase_EncryptedFile::f_ReadDatabase()
+	NConcurrency::TCFuture<ICKeyManagerServerDatabase::CDatabase> CKeyManagerServerDatabase_EncryptedFile::f_ReadDatabase()
 	{
 		return mp_pInternal->f_ReadDatabase();
 	}

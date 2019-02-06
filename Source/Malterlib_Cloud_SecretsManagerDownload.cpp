@@ -12,32 +12,32 @@ namespace NMib::NCloud
 	using namespace NFile;
 	using namespace NStr;
 
-	TCContinuation<CDirectorySyncReceive::CSyncResult> fg_DownloadSecretFile
+	TCFuture<CDirectorySyncReceive::CSyncResult> fg_DownloadSecretFile
 		(
 			TCDistributedActor<CSecretsManager> const &_SecretsManager
 		 	, CSecretsManager::CSecretID &&_ID
 		 	, CDirectorySyncReceive::CConfig &&_Config
 		)
 	{
-		TCContinuation<CDirectorySyncReceive::CSyncResult> Continuation;
+		TCPromise<CDirectorySyncReceive::CSyncResult> Promise;
 		DMibCallActor
 			(
 				_SecretsManager
 				, CSecretsManager::f_DownloadFile
 				, fg_Move(_ID)
-				, g_ActorSubscription / [=]() -> TCContinuation<void>
+				, g_ActorSubscription / [=]() -> TCFuture<void>
 				{
 					// Cleanup?
 					return fg_Explicit();
 				}
 			)
-			>  Continuation	/ [=] (TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Downloader) mutable
+			>  Promise	/ [=] (TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Downloader) mutable
 			{
 				auto UploadReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(_Config), fg_Move(_Downloader));
 
-				UploadReceive(&NFile::CDirectorySyncReceive::f_PerformSync) > Continuation;
+				UploadReceive(&NFile::CDirectorySyncReceive::f_PerformSync) > Promise;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

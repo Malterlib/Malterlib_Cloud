@@ -24,7 +24,7 @@ namespace NMib::NCloud::NAppManager
 	}
 
 	auto CAppManagerActor::fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)
-		-> TCContinuation<CAppLaunchResult>
+		-> TCFuture<CAppLaunchResult>
 	{
 		DCheck(!_pApplication->m_bLaunching);
 
@@ -61,9 +61,9 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		
-		auto fLaunch = [this, _pApplication, pState]() -> TCContinuation<CAppLaunchResult>
+		auto fLaunch = [this, _pApplication, pState]() -> TCFuture<CAppLaunchResult>
 			{
-				TCContinuation<CAppLaunchResult> Continuation;
+				TCPromise<CAppLaunchResult> Promise;
 				auto &Application = *_pApplication;
 				
 				if (Application.m_Settings.m_bSelfUpdateSource)
@@ -72,18 +72,18 @@ namespace NMib::NCloud::NAppManager
 					if (_pApplication->m_bJustUpdated)
 					{
 						_pApplication->m_bJustUpdated = false;
-						fp_SelfUpdate(_pApplication) > Continuation / [Continuation](bool _bQuitManager)
+						fp_SelfUpdate(_pApplication) > Promise / [Promise](bool _bQuitManager)
 							{
 								CAppLaunchResult Result;
 								Result.m_bQuitManager = _bQuitManager;
-								Continuation.f_SetResult(fg_Move(Result));
+								Promise.f_SetResult(fg_Move(Result));
 							}
 						;
 					}
 					else
-						Continuation.f_SetResult(CAppLaunchResult{});
+						Promise.f_SetResult(CAppLaunchResult{});
 					_pApplication->m_bLaunched = true;
-					return Continuation;
+					return Promise.f_MoveFuture();
 				}
 				
 				if (Application.m_Settings.m_Executable.f_IsEmpty())
@@ -105,7 +105,7 @@ namespace NMib::NCloud::NAppManager
 						fg_Format("{}/{}", ApplicationDirectory, Application.m_Settings.m_Executable)
 						, Application.m_Settings.m_ExecutableParameters
 						, ApplicationDirectory
-						, [this, _pApplication, pState, Continuation](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+						, [this, _pApplication, pState, Promise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 						{
 							if (_pApplication->m_bDeleted)
 								return;
@@ -118,7 +118,7 @@ namespace NMib::NCloud::NAppManager
 									{
 										fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)");
 										_pApplication->m_OnRegisterDistributedApp.f_Insert().f_Dispatch().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)")
-											> [this, pState, Continuation, _pApplication](TCAsyncResult<void> &&_Result)
+											> [this, pState, Promise, _pApplication](TCAsyncResult<void> &&_Result)
 											{
 												if (_pApplication->m_bDeleted)
 													return;
@@ -136,15 +136,15 @@ namespace NMib::NCloud::NAppManager
 													;
 													fp_AppLaunchStateChanged(_pApplication, "Launched (app register failed: '{}')"_f << _Result.f_GetExceptionStr());
 
-													if (!Continuation.f_IsSet())
-														Continuation.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
+													if (!Promise.f_IsSet())
+														Promise.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
 													return;
 												}
 
 												fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)");
 												DCallActor(_pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_GetAppStartResult)
 													.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
-													> [this, pState, Continuation, _pApplication](TCAsyncResult<void> &&_Result)
+													> [this, pState, Promise, _pApplication](TCAsyncResult<void> &&_Result)
 													{
 														pState->m_pCleanup.f_Clear();
 														if (_Result)
@@ -154,8 +154,8 @@ namespace NMib::NCloud::NAppManager
 															_pApplication->m_OnStartedDistributedApp.f_Clear();
 
 															fp_AppLaunchStateChanged(_pApplication, "Launched");
-															if (!Continuation.f_IsSet())
-																Continuation.f_SetResult(CAppLaunchResult{});
+															if (!Promise.f_IsSet())
+																Promise.f_SetResult(CAppLaunchResult{});
 														}
 														else
 														{
@@ -170,8 +170,8 @@ namespace NMib::NCloud::NAppManager
 															;
 															fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Result.f_GetExceptionStr());
 
-															if (!Continuation.f_IsSet())
-																Continuation.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
+															if (!Promise.f_IsSet())
+																Promise.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
 														}
 													}
 												;
@@ -181,8 +181,8 @@ namespace NMib::NCloud::NAppManager
 									}
 									pState->m_pCleanup.f_Clear();
 									fp_AppLaunchStateChanged(_pApplication, "Launched");
-									if (!Continuation.f_IsSet())
-										Continuation.f_SetResult(CAppLaunchResult{});
+									if (!Promise.f_IsSet())
+										Promise.f_SetResult(CAppLaunchResult{});
 								}
 								break;
 							case NProcess::EProcessLaunchState_LaunchFailed:
@@ -193,8 +193,8 @@ namespace NMib::NCloud::NAppManager
 									
 									fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", LaunchError));
 									pState->m_pCleanup.f_Clear();
-									if (!Continuation.f_IsSet())
-										Continuation.f_SetException(DMibErrorInstance(LaunchError));
+									if (!Promise.f_IsSet())
+										Promise.f_SetException(DMibErrorInstance(LaunchError));
 								}
 								break;
 							case NProcess::EProcessLaunchState_Exited:
@@ -224,14 +224,14 @@ namespace NMib::NCloud::NAppManager
 									else
 										fp_AppLaunchStateChanged(_pApplication, fg_Format("{}Exited with {}", RelaunchInfo, ExitStatus));
 									
-									if (!Continuation.f_IsSet())
-										Continuation.f_SetException(DMibErrorInstance(fg_Format("Launch exited with '{}' before fully launched", ExitStatus)));
+									if (!Promise.f_IsSet())
+										Promise.f_SetException(DMibErrorInstance(fg_Format("Launch exited with '{}' before fully launched", ExitStatus)));
 
 									pState->m_pCleanup.f_Clear();
-									for (auto &Continuation : _pApplication->m_OnRegisterDistributedApp)
-										Continuation.f_SetException(DMibErrorInstance("Application exited"));
-									for (auto &Continuation : _pApplication->m_OnStartedDistributedApp)
-										Continuation.f_SetException(DMibErrorInstance("Application exited"));
+									for (auto &Promise : _pApplication->m_OnRegisterDistributedApp)
+										Promise.f_SetException(DMibErrorInstance("Application exited"));
+									for (auto &Promise : _pApplication->m_OnStartedDistributedApp)
+										Promise.f_SetException(DMibErrorInstance("Application exited"));
 									_pApplication->m_OnRegisterDistributedApp.f_Clear();
 									_pApplication->m_OnStartedDistributedApp.f_Clear();
 									
@@ -282,15 +282,15 @@ namespace NMib::NCloud::NAppManager
 						mp_State.m_LocalAddress
 						, mp_State.m_TrustManager
 						, g_ActorFunctor / [_pApplication, this]
-						(CStr const &_HostID, CCallingHostInfo const &_HostInfo, CByteVector const &_Certificate) -> TCContinuation<void>
+						(CStr const &_HostID, CCallingHostInfo const &_HostInfo, CByteVector const &_Certificate) -> TCFuture<void>
 						{
 							if (_pApplication->m_bDeleted)
 								return DMibErrorInstance("Application deleted");
 							
 							_pApplication->m_AssociatedHostID = _HostID;
 							
-							TCContinuation<void> Continuation;
-							fp_UpdateApplicationJSON(_pApplication) > [_pApplication, Continuation](TCAsyncResult<void> &&_Result)
+							TCPromise<void> Promise;
+							fp_UpdateApplicationJSON(_pApplication) > [_pApplication, Promise](TCAsyncResult<void> &&_Result)
 								{
 									if (!_Result)
 									{
@@ -303,15 +303,15 @@ namespace NMib::NCloud::NAppManager
 												, _Result.f_GetExceptionStr()
 											)
 										;
-										Continuation.f_SetException(DMibErrorInstance("Failed to update application JSON, see AppManager log for details"));
+										Promise.f_SetException(DMibErrorInstance("Failed to update application JSON, see AppManager log for details"));
 										return;
 									}
-									Continuation.f_SetResult();
+									Promise.f_SetResult();
 								}
 							;
-							return Continuation;
+							return Promise.f_MoveFuture();
 						}
-					 	, g_ActorFunctor / [this, _pApplication, pState, Continuation](NStr::CStr const &_Error) -> TCContinuation<void>
+					 	, g_ActorFunctor / [this, _pApplication, pState, Promise](NStr::CStr const &_Error) -> TCFuture<void>
 					 	{
 							if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
 								return fg_Explicit();
@@ -329,8 +329,8 @@ namespace NMib::NCloud::NAppManager
 
 							fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Error);
 
-							if (!Continuation.f_IsSet())
-								Continuation.f_SetResult(CAppLaunchResult{_Error});
+							if (!Promise.f_IsSet())
+								Promise.f_SetResult(CAppLaunchResult{_Error});
 
 							return fg_Explicit();
 						}
@@ -345,14 +345,14 @@ namespace NMib::NCloud::NAppManager
 						, Launch
 						, fg_ThisActor(this)
 					)
-					> [this, _pApplication, pState, Continuation](TCAsyncResult<CActorSubscription> &&_Subscription)
+					> [this, _pApplication, pState, Promise](TCAsyncResult<CActorSubscription> &&_Subscription)
 					{
 						if (_pApplication->m_bDeleted)
 							return;
 						if (!_Subscription)
 						{
 							pState->m_pCleanup.f_Clear();
-							Continuation.f_SetException(_Subscription);
+							Promise.f_SetException(_Subscription);
 							DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to launch app '{}': {}", _pApplication->m_Name, _Subscription.f_GetExceptionStr());
 							fp_ScheduleRelaunchApp(_pApplication);
 							return;
@@ -361,56 +361,56 @@ namespace NMib::NCloud::NAppManager
 					}
 				;
 				
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		;
 		if (_bOpenEncryption)
 		{
-			TCContinuation<CAppLaunchResult> Continuation;
+			TCPromise<CAppLaunchResult> Promise;
 			fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, _pApplication, EEncryptOperation_Open, false)
-				> [Continuation, this, fLaunch, _pApplication](TCAsyncResult<void> &&_Result)
+				> [Promise, this, fLaunch, _pApplication](TCAsyncResult<void> &&_Result)
 				{
 					if (!_Result)
 					{
 						CStr Error = fg_Format("Failed to open encryption: {}", _Result.f_GetExceptionStr());
-						Continuation.f_SetException(DMibErrorInstance(Error)); 
+						Promise.f_SetException(DMibErrorInstance(Error)); 
 						fp_AppLaunchStateChanged(_pApplication, Error);
 						if (!_pApplication->m_bStopped && !_pApplication->m_bDeleted)
 							fp_ScheduleRelaunchApp(_pApplication);
 						return;
 					}
 					
-					fLaunch() > Continuation;
+					fLaunch() > Promise;
 				}
 			;
-			return Continuation;
+			return Promise.f_MoveFuture();
 		}
 		
 		return fLaunch();
 	}
 	
 	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)
-		-> TCContinuation<CAppLaunchResult>
+		-> TCFuture<CAppLaunchResult>
 	{
 		if (_pApplication->m_bLaunching)
 		{
-			TCContinuation<CAppLaunchResult> Continuation;
+			TCPromise<CAppLaunchResult> Promise;
 			_pApplication->m_OnLaunchFinished.f_Insert
 				(
-					[this, Continuation, _pApplication, _bOpenEncryption](bool _bAborted)
+					[this, Promise, _pApplication, _bOpenEncryption](bool _bAborted)
 					{
 						if (_bAborted)
 						{
-							Continuation.f_SetException(DMibErrorInstance("Application was deleted or shut down before app could attempt launching"));
+							Promise.f_SetException(DMibErrorInstance("Application was deleted or shut down before app could attempt launching"));
 							return;
 						}
 						
 						DCheck(!_pApplication->m_bLaunching);
-						CAppManagerActor::fp_LaunchAppInternal(_pApplication, _bOpenEncryption) > Continuation;
+						CAppManagerActor::fp_LaunchAppInternal(_pApplication, _bOpenEncryption) > Promise;
 					}
 				)
 			;
-			return Continuation;
+			return Promise.f_MoveFuture();
 		}
 		return fp_LaunchAppInternal(_pApplication, _bOpenEncryption);
 	}

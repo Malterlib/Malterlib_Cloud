@@ -41,7 +41,7 @@ namespace NMib::NCloud::NAppManager
 		return "Unknown";
 	}
 
-	TCContinuation<void> CAppManagerActor::fp_RunUpdateScript
+	TCFuture<void> CAppManagerActor::fp_RunUpdateScript
 		(
 			TCSharedPointer<CApplication> const &_pApplication
 			, EUpdateScript _Script
@@ -57,7 +57,7 @@ namespace NMib::NCloud::NAppManager
 		
 		struct CState
 		{
-			TCContinuation<void> m_Continuation;
+			TCPromise<void> m_Promise;
 			TCActor<CProcessLaunchActor> m_LaunchActor;
 			CActorSubscription m_LaunchSubscription;
 			CStr m_ErrorOutput;
@@ -83,7 +83,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				if (pState->m_bReplied)
 					return;
-				pState->m_Continuation.f_SetException(DMibErrorInstance(_Error));
+				pState->m_Promise.f_SetException(DMibErrorInstance(_Error));
 				pState->f_Replied();
 			}
 		;
@@ -150,7 +150,7 @@ namespace NMib::NCloud::NAppManager
 								;
 								if (!pState->m_bReplied)
 								{
-									pState->m_Continuation.f_SetResult();
+									pState->m_Promise.f_SetResult();
 									pState->f_Replied();
 								}
 							}
@@ -250,6 +250,6 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		
-		return pState->m_Continuation;
+		return pState->m_Promise;
 	}
 }

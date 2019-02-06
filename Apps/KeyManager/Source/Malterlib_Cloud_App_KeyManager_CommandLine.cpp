@@ -69,35 +69,35 @@ namespace NMib::NCloud::NKeyManager
 		;
 	}
 
-	TCContinuation<uint32> CKeyManagerDaemonActor::f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		if (!mp_ServerActor)
 			return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
 
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
-		mp_ServerActor(&CKeyManagerServer::f_PreCreateKeys, _KeySize, _nKeys) > Continuation / [=]
+		mp_ServerActor(&CKeyManagerServer::f_PreCreateKeys, _KeySize, _nKeys) > Promise / [=]
 			{
 				*_pCommandLine += "The server now has at least {} ({} bit) keys{\n}"_f << _nKeys << _KeySize;
-				Continuation.f_SetResult(0);
+				Promise.f_SetResult(0);
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CKeyManagerDaemonActor::f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		CStdInReaderPromptParams PasswordPrompt;
 		PasswordPrompt.m_bPassword = true;
 		PasswordPrompt.m_Prompt = "Type password for key database: ";
 
-		_pCommandLine->f_ReadPrompt(PasswordPrompt) > Continuation / [=](CStrSecure &&_Password)
+		_pCommandLine->f_ReadPrompt(PasswordPrompt) > Promise / [=](CStrSecure &&_Password)
 			{
 				fg_Dispatch
 					(
-						[this, _Password] () -> TCContinuation<void>
+						[this, _Password] () -> TCFuture<void>
 						{
 							if (mp_bDatabaseDecrypted)
 								return DErrorInstance("A correct password has already been provided");
@@ -109,7 +109,7 @@ namespace NMib::NCloud::NKeyManager
 										fg_ThisActor(this)
 										, [this](NStr::CStrSecure const &_Password)
 										{
-											TCContinuation<void> Continuation;
+											TCPromise<void> Promise;
 
 											CSecureByteVector Salt{(uint8 const *)"MiBKeyMa", 8};
 											TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
@@ -125,15 +125,15 @@ namespace NMib::NCloud::NKeyManager
 											Clock.f_Start();
 
 											DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_Initialize)
-												> [this, Continuation, DatabaseActor, Clock](TCAsyncResult<void> &&_Result)
+												> [this, Promise, DatabaseActor, Clock](TCAsyncResult<void> &&_Result)
 												{
 													if (!_Result)
 													{
 														// Delay reply to be same response time every time
 														fg_Timeout(fg_Max(fp64(0.5) - Clock.f_GetTime(), fp64(0.01)))
-															> [Continuation, Result = fg_Move(_Result)]
+															> [Promise, Result = fg_Move(_Result)]
 															{
-																Continuation.f_SetException
+																Promise.f_SetException
 																	(
 																		DMibErrorInstance(fg_Format("Failed to initialize database: {}", Result.f_GetExceptionStr()))
 																	)
@@ -146,11 +146,11 @@ namespace NMib::NCloud::NKeyManager
 													mp_DatabaseActor = DatabaseActor;
 
 													fp_DatabaseDecrypted();
-													Continuation.f_SetResult();
+													Promise.f_SetResult();
 												}
 											;
 
-											return Continuation;
+											return Promise.f_MoveFuture();
 										}
 										, "Already processing a password. Try again later."
 									)
@@ -160,16 +160,16 @@ namespace NMib::NCloud::NKeyManager
 							return (*mp_pProvidePasswordOnce)(_Password);
 						}
 					)
-					> [Continuation](TCAsyncResult<void> &&_Result)
+					> [Promise](TCAsyncResult<void> &&_Result)
 					{
 						if (!_Result)
 							DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Error, "Provide password attempt failed: {}", _Result.f_GetExceptionStr());
 
-						Continuation.f_SetExceptionOrResult(_Result, 0);
+						Promise.f_SetExceptionOrResult(_Result, 0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

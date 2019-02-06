@@ -69,7 +69,7 @@ namespace NMib::NCloud::NAppManager
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppChange_AddKnownHosts);
 	
-	TCContinuation<void> CAppManagerActor::fp_PublishCoordinationInterface()
+	TCFuture<void> CAppManagerActor::fp_PublishCoordinationInterface()
 	{
 		return mp_AppManagerCoordinationInterface.f_Publish<CAppManagerCoordinationInterface>(mp_State.m_DistributionManager, this, CAppManagerCoordinationInterface::mc_pDefaultNamespace);
 	}

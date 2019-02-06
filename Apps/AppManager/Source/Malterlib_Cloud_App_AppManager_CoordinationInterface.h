@@ -94,9 +94,9 @@ namespace NMib::NCloud::NAppManager
 			>
 		;
 		
-		virtual TCContinuation<void> f_RemoveKnownHost(CStr const &_Group, CStr const &_Application, CStr const &_HostID) = 0; 
-		virtual auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCContinuation<void> (TCVector<CAppChange> const &_Changes, bool _bInitial)> &&_fOnChange) 
-			-> TCContinuation<TCActorSubscriptionWithID<>> = 0 
+		virtual TCFuture<void> f_RemoveKnownHost(CStr const &_Group, CStr const &_Application, CStr const &_HostID) = 0;
+		virtual auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> const &_Changes, bool _bInitial)> &&_fOnChange)
+			-> TCFuture<TCActorSubscriptionWithID<>> = 0 
 		;
 	};
 }

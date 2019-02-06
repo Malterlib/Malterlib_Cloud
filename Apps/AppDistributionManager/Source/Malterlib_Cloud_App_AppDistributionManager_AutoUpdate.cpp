@@ -164,7 +164,7 @@ namespace NMib::NCloud::NAppDistributionManager
 					)
 				;
 
-				mp_DistributeSequencer > [=]() -> TCContinuation<TCSet<CStr>>
+				mp_DistributeSequencer / [=]() -> TCFuture<TCSet<CStr>>
 					{
 						if (!mp_Distributions.f_FindEqual(DistributionName))
 							return DMibErrorInstance("Distribution no longer exists");
@@ -176,7 +176,7 @@ namespace NMib::NCloud::NAppDistributionManager
 								if (!mp_FileActor)
 									return;
 
-								g_Dispatch(mp_FileActor) > [=]
+								g_Dispatch(mp_FileActor) / [=]
 									{
 										if (CFile::fs_FileExists(DownloadDirectory))
 											CFile::fs_DeleteDirectoryRecursive(DownloadDirectory);
@@ -202,19 +202,19 @@ namespace NMib::NCloud::NAppDistributionManager
 							}
 						;
 
-						TCContinuation<TCSet<CStr>> Continuation;
+						TCPromise<TCSet<CStr>> Promise;
 						fp_DownloadApplication(VersionManagerApplicationName, VersionID, DownloadDirectory)
-							> Continuation
+							> Promise
 							% ("Failed to download '{}' ({}) version '{}'"_f << DistributionName << VersionManagerApplicationName << VersionID)
 							/ [=](CVersionInformation &&_VersionInformation)
 							{
 								auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
 								if (!pDistribution)
-									return Continuation.f_SetException(DMibErrorInstance("Distribution no longer exists"));
+									return Promise.f_SetException(DMibErrorInstance("Distribution no longer exists"));
 								if (mp_State.m_bStoppingApp)
-									return Continuation.f_SetException(DMibErrorInstance("Stopping app"));
+									return Promise.f_SetException(DMibErrorInstance("Stopping app"));
 								if (_VersionInformation.m_Files.f_GetLen() != 1)
-									return Continuation.f_SetException(DMibErrorInstance("Version must contain exactly 1 file. {} files found"_f << _VersionInformation.m_Files.f_GetLen()));
+									return Promise.f_SetException(DMibErrorInstance("Version must contain exactly 1 file. {} files found"_f << _VersionInformation.m_Files.f_GetLen()));
 
 								CStr SourceFile = _VersionInformation.m_Files[0];
 								CStr SourcePath = DownloadDirectory / SourceFile;
@@ -311,9 +311,9 @@ namespace NMib::NCloud::NAppDistributionManager
 									{
 										auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
 										if (!pDistribution)
-											return Continuation.f_SetException(DMibErrorInstance("Distribution no longer exists"));
+											return Promise.f_SetException(DMibErrorInstance("Distribution no longer exists"));
 										if (mp_State.m_bStoppingApp)
-											return Continuation.f_SetException(DMibErrorInstance("Stopping app"));
+											return Promise.f_SetException(DMibErrorInstance("Stopping app"));
 
 										auto &Distribution = *pDistribution;
 
@@ -322,7 +322,7 @@ namespace NMib::NCloud::NAppDistributionManager
 										(void)CleanupDeploy;
 
 										if (!_Results)
-											return Continuation.f_SetException(_Results);
+											return Promise.f_SetException(_Results);
 
 										CStr DeployFailures;
 										TCSet<CStr> SuccessFullDeploys;
@@ -341,9 +341,9 @@ namespace NMib::NCloud::NAppDistributionManager
 
 											fp_SaveState(Distribution);
 
-											mp_State.m_StateDatabase.f_Save() > Continuation % "Failed to save state" / [=]
+											mp_State.m_StateDatabase.f_Save() > Promise % "Failed to save state" / [=]
 												{
-													Continuation.f_SetResult(SuccessFullDeploys);
+													Promise.f_SetResult(SuccessFullDeploys);
 												}
 											;
 										}
@@ -351,7 +351,7 @@ namespace NMib::NCloud::NAppDistributionManager
 										{
 											if (!SuccessFullDeploys.f_IsEmpty())
 											{
-												Continuation.f_SetException
+												Promise.f_SetException
 													(
 													 	DMibErrorInstance
 													 	(
@@ -363,13 +363,13 @@ namespace NMib::NCloud::NAppDistributionManager
 												;
 											}
 											else
-												Continuation.f_SetException(DMibErrorInstance("Failed to deploy to all deploy destinations:\n{}"_f << DeployFailures));
+												Promise.f_SetException(DMibErrorInstance("Failed to deploy to all deploy destinations:\n{}"_f << DeployFailures));
 										}
 									}
 								;
 							}
 						;
-						return Continuation;
+						return Promise.f_MoveFuture();
 					}
 					> [=](TCAsyncResult<TCSet<CStr>> &&_SuccessFullDeploys)
 					{

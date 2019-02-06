@@ -120,7 +120,7 @@ namespace NMib::NCloud
 				, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
 				, NConcurrency::TCActorFunctor
 				<
-					NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>>
+					NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 					(
 						NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppInterfaceBackup> &&_BackupInterface
 						, NConcurrency::CActorSubscription &&_ManifestFinished
@@ -134,23 +134,23 @@ namespace NMib::NCloud
 
 		~CBackupManagerClient(); ///< \brief Destructor
 
-		NConcurrency::TCContinuation<void> f_StartBackup(); ///< Start backup. Can only be called once. If you need to subscribe to notifications you should do this before starting backup.
+		NConcurrency::TCFuture<void> f_StartBackup(); ///< Start backup. Can only be called once. If you need to subscribe to notifications you should do this before starting backup.
 
-		NConcurrency::TCContinuation<NConcurrency::CActorSubscription> f_SubscribeNotifications /// \brief Subscribe to notification. \sa ENotification
+		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SubscribeNotifications /// \brief Subscribe to notification. \sa ENotification
 			(
 				ENotification _ToSubscribeTo	/// Specify the notifications to subscribe to 
-				, NConcurrency::TCActorFunctor<NConcurrency::TCContinuation<void> (NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification)> &&_fOnNotification
+				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification)> &&_fOnNotification
 				/// The actor functor to receive notifications
 			)
 		;
 
-		NConcurrency::TCContinuation<void> f_StartNewBackup(); ///< Forces a new backup to start outside of the regular scheduling configured through CConfig::m_NewBackupInterval
+		NConcurrency::TCFuture<void> f_StartNewBackup(); ///< Forces a new backup to start outside of the regular scheduling configured through CConfig::m_NewBackupInterval
 
 	protected:
 		struct CInternal;
 		friend struct NPrivate::CBackupManagerClient_Instance;
 		
-		NConcurrency::TCContinuation<void> fp_Destroy() override;
+		NConcurrency::TCFuture<void> fp_Destroy() override;
 		
 		void fp_OnNotification(NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification);
 		void fp_HashMismatch(NStr::CStr const &_File);

@@ -39,7 +39,7 @@ namespace NMib::NCloud
 				, TCActor<CDistributedActorTrustManager> const &_TrustManager
 				, TCActorFunctor
 				<
-					TCContinuation<TCActorSubscriptionWithID<>>
+					TCFuture<TCActorSubscriptionWithID<>>
 					(
 						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
 						, CActorSubscription &&_ManifestFinished
@@ -97,14 +97,14 @@ namespace NMib::NCloud
 		struct CNotifacitonSubscription
 		{
 			CBackupManagerClient::ENotification m_Notifications;
-			TCActorFunctor<TCContinuation<void> (CHostInfo const &_RemoteHost, CBackupManagerClient::CNotification &&_Notification)> m_fOnNotification;
+			TCActorFunctor<TCFuture<void> (CHostInfo const &_RemoteHost, CBackupManagerClient::CNotification &&_Notification)> m_fOnNotification;
 		};
 		
 		struct CDistributedAppInterfaceBackupImplementation : public CDistributedAppInterfaceBackup
 		{
-			TCContinuation<void> f_AppendManifest(NFile::CDirectoryManifestConfig const &_Config) override;
-			TCContinuation<TCActorSubscriptionWithID<>> f_SubscribeInitialFinished(TCActorFunctorWithID<TCContinuation<void> ()> &&_fOnInitialFinished) override;
-			TCContinuation<TCActorSubscriptionWithID<>> f_SubscribeBackupStopped(TCActorFunctorWithID<TCContinuation<void> ()> &&_fOnStopped) override;
+			TCFuture<void> f_AppendManifest(NFile::CDirectoryManifestConfig const &_Config) override;
+			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeInitialFinished(TCActorFunctorWithID<TCFuture<void> ()> &&_fOnInitialFinished) override;
+			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeBackupStopped(TCActorFunctorWithID<TCFuture<void> ()> &&_fOnStopped) override;
 			
 			CBackupManagerClient *m_pThis = nullptr;
 		};
@@ -129,8 +129,8 @@ namespace NMib::NCloud
 		void f_BackupInstance_ReportFinishedStarting(TCActor<NPrivate::CBackupManagerClient_Instance> const &_BackupInstance);
 		void f_ReportBackupError(CStr const &_Error, bool _bFatal);
 
-		TCContinuation<void> f_SubscribeChanges();
-		TCContinuation<void> f_RetrySubscribeChanges();
+		TCFuture<void> f_SubscribeChanges();
+		TCFuture<void> f_RetrySubscribeChanges();
 		void f_NewPathWatched(CStr const &_Path);
 		void f_OnFileChanged(CFileChangeNotification::CNotification const &_Notification, bool _bDirty);
 		bool f_IsPathInManifest(CStr const &_Path, CStr &o_FileName);
@@ -138,7 +138,7 @@ namespace NMib::NCloud
 
 		CFileChangeNotificationActor::CCoalesceSettings f_CoalesceSettings();
 		
-		TCContinuation<CUpdateManifestResult> f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName, bool _bDirtyHint);
+		TCFuture<CUpdateManifestResult> f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName, bool _bDirtyHint);
 
 		COnScopeExitShared f_MarkInstancesActive();
 
@@ -174,12 +174,12 @@ namespace NMib::NCloud
 		mint m_LastSeenNotificationSequence = 0;
 
 		TCMap<CStr, CNotifacitonSubscription> m_NotificationSubscriptions;
-		TCMap<CStr, TCActorFunctorWithID<TCContinuation<void> ()>> m_OnInitialFinishedSubscriptions;
-		TCMap<CStr, TCActorFunctorWithID<TCContinuation<void> ()>> m_OnBackupStoppedSubscriptions;
+		TCMap<CStr, TCActorFunctorWithID<TCFuture<void> ()>> m_OnInitialFinishedSubscriptions;
+		TCMap<CStr, TCActorFunctorWithID<TCFuture<void> ()>> m_OnBackupStoppedSubscriptions;
 		
 		TCActorFunctor
 			<
-				TCContinuation<TCActorSubscriptionWithID<>>
+				TCFuture<TCActorSubscriptionWithID<>>
 				(
 					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
 					, CActorSubscription &&_ManifestFinished
@@ -191,7 +191,7 @@ namespace NMib::NCloud
 		TCDelegatedActorInterface<CDistributedAppInterfaceBackupImplementation> m_BackupInterface;
 		CActorSubscription m_BackupInterfaceSubscription;
 		
-		TCVector<TCContinuation<void>> m_SubscribeChangesContinuations;
+		TCVector<TCPromise<void>> m_SubscribeChangesPromises;
 
 		TCMap<ENotification, CNotificationAndHost> m_LastNotification;
 		

@@ -41,7 +41,7 @@ namespace NMib::NCloud
 		};
 
 		CStr m_BasePath;
-		TCContinuation<CFileTransferResult> m_DoneContinuation;
+		TCPromise<CFileTransferResult> m_DonePromise;
 		TCSharedPointer<CFileCache> m_pFileCache = fg_Construct();
 		EFileAttrib m_AttributeMask = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute | EFileAttrib_UnixAttributesValid;
 		EFileAttrib m_AttributeAdd = EFileAttrib_None;
@@ -65,7 +65,7 @@ namespace NMib::NCloud
 			Cache.m_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File transfer receive file access"));
 	}
 	
-	NConcurrency::TCContinuation<CFileTransferContext> CFileTransferReceive::f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags)
+	NConcurrency::TCFuture<CFileTransferContext> CFileTransferReceive::f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags)
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_RootDirectory = Internal.m_BasePath;
@@ -73,7 +73,7 @@ namespace NMib::NCloud
 			return DMibErrorInstance("The file transfer context has already been gotten");
 		Internal.m_bCalled = true;
 		
-		NConcurrency::TCContinuation<CFileTransferContext> Continuation;
+		NConcurrency::TCPromise<CFileTransferContext> Promise;
 		
 		auto &Cache = *Internal.m_pFileCache;
 		
@@ -133,8 +133,8 @@ namespace NMib::NCloud
 					return Manifest;
 				}
 			)
-			> Continuation % "Failed to generate current manifest" 
-			/ [this, Continuation, _QueueSize, ThisActor = fg_ThisActor(this)]
+			> Promise % "Failed to generate current manifest" 
+			/ [this, Promise, _QueueSize, ThisActor = fg_ThisActor(this)]
 			(CFileTransferContext::CInternal::CManifest &&_Manifest)
 			{
 				CFileTransferContext StartDownloadResult;
@@ -144,28 +144,28 @@ namespace NMib::NCloud
 				StartDownload.m_DispatchActor = ThisActor; 
 				
 				StartDownload.m_fStateChange = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CStateChange &&_StateChange) mutable 
-					-> NConcurrency::TCContinuation<CFileTransferContext::CInternal::CStateChange::CResult>  
+					-> NConcurrency::TCFuture<CFileTransferContext::CInternal::CStateChange::CResult>
 					{
 						CFileTransferContext::CInternal::CStateChange::CResult Result = _StateChange.f_GetResult();
 						auto &Internal = *mp_pInternal;
 						
-						if (Internal.m_DoneContinuation.f_IsSet())
+						if (Internal.m_DonePromise.f_IsSet())
 							return fg_Explicit(Result);
 						
 						if (_StateChange.m_State == CFileTransferContext::CInternal::EState_Error)
-							Internal.m_DoneContinuation.f_SetException(DMibErrorInstance(_StateChange.m_Error));
+							Internal.m_DonePromise.f_SetException(DMibErrorInstance(_StateChange.m_Error));
 						else if (_StateChange.m_State == CFileTransferContext::CInternal::EState_Finished)
-							Internal.m_DoneContinuation.f_SetResult(_StateChange.m_Finished);
+							Internal.m_DonePromise.f_SetResult(_StateChange.m_Finished);
 						return fg_Explicit(Result);
 					}
 				;
 				
 				StartDownload.m_fSendPart = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CSendPart &&_Part) mutable
-					-> NConcurrency::TCContinuation<CFileTransferContext::CInternal::CSendPart::CResult>
+					-> NConcurrency::TCFuture<CFileTransferContext::CInternal::CSendPart::CResult>
 					{
 						auto &Internal = *mp_pInternal;
 						auto &Cache = *Internal.m_pFileCache;
-						NConcurrency::TCContinuation<CFileTransferContext::CInternal::CSendPart::CResult> Continuation;
+						NConcurrency::TCPromise<CFileTransferContext::CInternal::CSendPart::CResult> Promise;
 						fg_Dispatch
 							(
 								Cache.m_FileActor
@@ -221,24 +221,24 @@ namespace NMib::NCloud
 									return DownloadPart.f_GetResult();
 								}
 							)
-							> Continuation
+							> Promise
 						;
-						return Continuation;
+						return Promise.f_MoveFuture();
 					}
 				;
 				
-				Continuation.f_SetResult(fg_Move(StartDownloadResult));
+				Promise.f_SetResult(fg_Move(StartDownloadResult));
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	NConcurrency::TCContinuation<CFileTransferResult> CFileTransferReceive::f_GetResult()
+	NConcurrency::TCFuture<CFileTransferResult> CFileTransferReceive::f_GetResult()
 	{
 		auto &Internal = *mp_pInternal;
 		if (Internal.m_bDoneCalled)
 			return DMibErrorInstance("The file result has already been gotten");
 		Internal.m_bDoneCalled = true;
-		return Internal.m_DoneContinuation;
+		return Internal.m_DonePromise;
 	}
 }

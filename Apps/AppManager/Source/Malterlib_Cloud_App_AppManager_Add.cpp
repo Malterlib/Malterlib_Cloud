@@ -11,7 +11,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Add
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Add
 		(
 			NStr::CStr const &_Name
 			, CApplicationAdd const &_Add
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		bool bForceOverwrite = _Params["ForceOverwrite"].f_Boolean();
@@ -111,7 +111,7 @@ namespace NMib::NCloud::NAppManager
 		else if (!bNullPackage)
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
 		
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		fp_AddApplication
 			(
@@ -131,14 +131,14 @@ namespace NMib::NCloud::NAppManager
 			)
 			> [=](TCAsyncResult<void> &&_Result)
 			{
-				Continuation.f_SetResult(_pCommandLine->f_AddAsyncResult(_Result));
+				Promise.f_SetResult(_pCommandLine->f_AddAsyncResult(_Result));
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_AddApplication
+	TCFuture<void> CAppManagerActor::fp_AddApplication
 		(
 			NStr::CStr const &_Name
 			, CApplicationSettings const &_Settings
@@ -160,21 +160,21 @@ namespace NMib::NCloud::NAppManager
 		if (!_Settings.m_VersionManagerApplication.f_IsEmpty())
 			Permissions["Version"] = {{"AppManager/VersionAppAll", fg_Format("AppManager/VersionApp/{}", _Settings.m_VersionManagerApplication)}};
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		mp_Permissions.f_HasPermissions("Add application to AppManager", Permissions)
-			> Continuation % "Permission denied adding application" % Auditor / [=, fOnInfo = fg_Move(_fOnInfo)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			> Promise % "Permission denied adding application" % Auditor / [=, fOnInfo = fg_Move(_fOnInfo)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application add, command)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application add, command)"));
 
 				if (!_HasPermissions["App"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application add, app name)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application add, app name)"));
 
 				if (auto *pVersion = _HasPermissions.f_FindEqual("Version"))
 				{
 					if (!*pVersion)
-						return Continuation.f_SetException(Auditor.f_AccessDenied("(Application add, version application)"));
+						return Promise.f_SetException(Auditor.f_AccessDenied("(Application add, version application)"));
 				}
 
 				TCSharedPointer<CApplication> pApplication = fg_Construct(_Name, this);
@@ -185,7 +185,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					CStr Error;
 					if (!_Settings.f_Validate(Error))
-						return Continuation.f_SetException(Auditor.f_Exception(Error));
+						return Promise.f_SetException(Auditor.f_Exception(Error));
 				}
 
 				pApplication->m_Settings = _Settings;
@@ -204,7 +204,7 @@ namespace NMib::NCloud::NAppManager
 						if (_Version && !_Version->m_Platform.f_IsEmpty())
 							Platform = _Version->m_Platform;
 						if (!CVersionManager::fs_IsValidPlatform(Platform))
-							return Continuation.f_SetException(Auditor.f_Exception("Invalid platform format"));
+							return Promise.f_SetException(Auditor.f_Exception("Invalid platform format"));
 
 						if (_Version && _Version->m_VersionID.f_IsValid())
 						{
@@ -228,12 +228,12 @@ namespace NMib::NCloud::NAppManager
 							;
 
 							if (!VersionID.f_IsValid())
-								return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No suitable version found for application '{}': {}", VersionManagerApplication, Error)));
+								return Promise.f_SetException(Auditor.f_Exception(fg_Format("No suitable version found for application '{}': {}", VersionManagerApplication, Error)));
 						}
 					}
 					else
 					{
-						return Continuation.f_SetException
+						return Promise.f_SetException
 							(
 							 	Auditor.f_Exception
 								(
@@ -254,10 +254,10 @@ namespace NMib::NCloud::NAppManager
 				{
 					auto *pParentApplication = mp_Applications.f_FindEqual(pApplication->m_Settings.m_ParentApplication);
 					if (!pParentApplication)
-						return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Parent application '{}' not found", pApplication->m_Settings.m_ParentApplication)));
+						return Promise.f_SetException(Auditor.f_Exception(fg_Format("Parent application '{}' not found", pApplication->m_Settings.m_ParentApplication)));
 
 					if ((*pParentApplication)->f_IsChildApp())
-						return Continuation.f_SetException(Auditor.f_Exception("Parent application is not a root application"));
+						return Promise.f_SetException(Auditor.f_Exception("Parent application is not a root application"));
 					pApplication->m_pParentApplication = &**pParentApplication;
 					pApplication->m_pParentApplication->m_Children.f_Insert(*pApplication);
 				}
@@ -270,7 +270,7 @@ namespace NMib::NCloud::NAppManager
 				if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 				{
 					if (pApplicationsState->f_GetMember(pApplication->m_Name))
-						return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Application with name '{}' already exists", pApplication->m_Name)));
+						return Promise.f_SetException(Auditor.f_Exception(fg_Format("Application with name '{}' already exists", pApplication->m_Name)));
 				}
 
 				auto Directory = pApplication->f_GetDirectory();
@@ -326,13 +326,13 @@ namespace NMib::NCloud::NAppManager
 
 								return Files;
 							}
-							> Continuation % "Failed to unpack application" % Auditor / [=](TCVector<CStr> &&_Files)
+							> Promise % "Failed to unpack application" % Auditor / [=](TCVector<CStr> &&_Files)
 							{
 								if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 								{
 									if (pApplicationsState->f_GetMember(pApplication->m_Name))
 									{
-										Continuation.f_SetException(Auditor.f_Exception(fg_Format("Application with name '{}' already exists", pApplication->m_Name)));
+										Promise.f_SetException(Auditor.f_Exception(fg_Format("Application with name '{}' already exists", pApplication->m_Name)));
 										return;
 									}
 								}
@@ -349,17 +349,17 @@ namespace NMib::NCloud::NAppManager
 								pApplication->m_LastInstalledVersionInfoFinished = pApplication->m_LastInstalledVersionInfo;
 
 								fp_UpdateApplicationJSON(pApplication)
-									> Continuation % "Failed to save state" % Auditor / [=]
+									> Promise % "Failed to save state" % Auditor / [=]
 									{
 										pApplication->m_bJustUpdated = true;
 										fp_LaunchApp(pApplication, false)
-											> Continuation % "Failed to launch app. Will retry periodically" % Auditor / [=, InProgressScope = InProgressScope](CAppLaunchResult &&_Result)
+											> Promise % "Failed to launch app. Will retry periodically" % Auditor / [=, InProgressScope = InProgressScope](CAppLaunchResult &&_Result)
 											{
 												fOnInfo("Application was successfully added");
 												Auditor.f_Info("Application added");
 												if (_Result.m_StartupError)
 													fOnInfo("Application startup failed: {}"_f << _Result.m_StartupError);
-												Continuation.f_SetResult();
+												Promise.f_SetResult();
 											}
 										;
 									}
@@ -370,7 +370,7 @@ namespace NMib::NCloud::NAppManager
 				;
 
 				fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Setup, _bForceOverwrite)
-					> Continuation % Auditor / [=]
+					> Promise % Auditor / [=]
 					{
 						auto fApplyVersion = [=](CVersionManager::CVersionIDAndPlatform const &_VersionID, CVersionManager::CVersionInformation const &_VersionInfo)
 							{
@@ -511,7 +511,7 @@ namespace NMib::NCloud::NAppManager
 						CStr DownloadDirectory = Directory + "/TempVersionDownload";
 						fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
 						self(&CAppManagerActor::fp_DownloadApplication, VersionManagerApplication, VersionID, DownloadDirectory)
-							> Continuation % "Failed to download application from version manager" % Auditor / [=](CVersionManager::CVersionInformation &&_VersionInfo)
+							> Promise % "Failed to download application from version manager" % Auditor / [=](CVersionManager::CVersionInformation &&_VersionInfo)
 							{
 								auto &VersionInfo = _VersionInfo;
 
@@ -521,7 +521,7 @@ namespace NMib::NCloud::NAppManager
 								}
 								catch (CException const &_Exception)
 								{
-									Continuation.f_SetException(Auditor.f_Exception(_Exception.f_GetErrorStr()));
+									Promise.f_SetException(Auditor.f_Exception(_Exception.f_GetErrorStr()));
 								}
 
 								fUnpackAppAndFinish(DownloadDirectory, DownloadDirectory);
@@ -532,6 +532,6 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

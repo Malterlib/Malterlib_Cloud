@@ -47,8 +47,8 @@ namespace NMib::NCloud
 		~CFileTransferSend();
 		CFileTransferSend(NStr::CStr const &_BasePath, NConcurrency::TCActor<CActor> const &_FileActor = {});
 		
-		NConcurrency::TCContinuation<NConcurrency::CActorSubscription> f_SendFiles(CFileTransferContext &&_TransferContext);
-		NConcurrency::TCContinuation<CFileTransferResult> f_GetResult(); 
+		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SendFiles(CFileTransferContext &&_TransferContext);
+		NConcurrency::TCFuture<CFileTransferResult> f_GetResult();
 		
 	private:
 		struct CInternal;
@@ -75,8 +75,8 @@ namespace NMib::NCloud
 			, EReceiveFlag_DeleteExisting = DMibBit(2)
 		};
 
-		NConcurrency::TCContinuation<CFileTransferContext> f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags);
-		NConcurrency::TCContinuation<CFileTransferResult> f_GetResult(); 
+		NConcurrency::TCFuture<CFileTransferContext> f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags);
+		NConcurrency::TCFuture<CFileTransferResult> f_GetResult(); 
 		
 	private:
 		struct CInternal;

@@ -30,7 +30,7 @@ namespace NMib::NCloud
 		
 		auto ProcessingActor = fg_ConcurrentActor();
 		
-		o_Subscription = g_ActorSubscription(ProcessingActor) / [pState]() -> TCContinuation<void>
+		o_Subscription = g_ActorSubscription(ProcessingActor) / [pState]() -> TCFuture<void>
 			{
 				pState->m_bAborted = true;
 				
@@ -42,12 +42,12 @@ namespace NMib::NCloud
 			}
 		;
 		
-		return g_Dispatch(ProcessingActor) / [=, Config = fg_Move(_SyncConfig)]() mutable -> TCContinuation<NFile::CDirectorySyncReceive::CSyncResult>
+		return g_Dispatch(ProcessingActor) / [=, Config = fg_Move(_SyncConfig)]() mutable -> TCFuture<NFile::CDirectorySyncReceive::CSyncResult>
 			{
 				if (pState->m_bAborted)
 					return DMibErrorInstance("Aborted");
 				
-				TCContinuation<NFile::CDirectorySyncReceive::CSyncResult> Continuation;
+				TCPromise<NFile::CDirectorySyncReceive::CSyncResult> Promise;
 				
 				DMibCallActor
 					(
@@ -57,7 +57,7 @@ namespace NMib::NCloud
 						{
 							_BackupSource
 							, _PointInTime
-							, g_ActorSubscription / [pState]() -> TCContinuation<void>
+							, g_ActorSubscription / [pState]() -> TCFuture<void>
 							{
 								if (!pState->m_DownloadBackupReceive)
 									return fg_Explicit();
@@ -67,28 +67,28 @@ namespace NMib::NCloud
 							}
 						}
 					)
-					> Continuation % "Failed to start download on remote server"
+					> Promise % "Failed to start download on remote server"
 					/ [=, Config = fg_Move(Config)](TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> &&_SyncClient) mutable
 					{
 						pState->m_DownloadBackupReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(Config), fg_Move(_SyncClient));
 						
 						pState->m_DownloadBackupReceive(&NFile::CDirectorySyncReceive::f_PerformSync)
-							> Continuation % "Failed to perform backup sync" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
+							> Promise % "Failed to perform backup sync" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
 							{
 								if (!pState->m_DownloadBackupReceive)
-									return Continuation.f_SetResult(fg_Move(_Result));
+									return Promise.f_SetResult(fg_Move(_Result));
 
 								auto DownloadBackupReceive = fg_Move(pState->m_DownloadBackupReceive);
-								DownloadBackupReceive->f_Destroy() > Continuation / [=, Result = fg_Move(_Result)]() mutable
+								DownloadBackupReceive->f_Destroy() > Promise / [=, Result = fg_Move(_Result)]() mutable
 									{
-										Continuation.f_SetResult(fg_Move(Result));
+										Promise.f_SetResult(fg_Move(Result));
 									}
 								;
 							}
 						;
 					}
 				;
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		;
 	}

@@ -18,20 +18,20 @@ namespace NMib::NCloud::NSecretsManager
 	{
 	}
 
-	TCContinuation<void> CSecretsManagerServerDatabase::fp_Destroy()
+	TCFuture<void> CSecretsManagerServerDatabase::fp_Destroy()
 	{
 		if (!mp_pPendingWrite)
 			return fg_Explicit();
 
-		auto WriteContinuation = mp_PendingWriteContinuations.f_Insert();
+		auto WritePromise = mp_PendingWritePromises.f_Insert();
 
-		TCContinuation<void> Continuation;
-		WriteContinuation > [Continuation](TCAsyncResult<void> &&_Result)
+		TCPromise<void> Promise;
+		WritePromise > [Promise](TCAsyncResult<void> &&_Result)
 			{
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	CSecureByteVector CSecretsManagerServerDatabase::fsp_ComputeSalt(CSecretsDatabaseIV const &_Salt)
@@ -42,9 +42,9 @@ namespace NMib::NCloud::NSecretsManager
 		return Stream.f_MoveVector();
 	}
 
-	TCContinuation<void> CSecretsManagerServerDatabase::f_Initialize()
+	TCFuture<void> CSecretsManagerServerDatabase::f_Initialize()
 	{
-		return TCContinuation<void>::fs_RunProtected<CException>() / [&]
+		return TCFuture<void>::fs_RunProtected<CException>() / [&]
 			{
 				if (!CFile::fs_FileExists(mp_Path))
 				{
@@ -60,13 +60,13 @@ namespace NMib::NCloud::NSecretsManager
 		;
 	}
 	
-	TCContinuation<void> CSecretsManagerServerDatabase::f_WriteDatabase(CSecretsDatabase &&_Database)
+	TCFuture<void> CSecretsManagerServerDatabase::f_WriteDatabase(CSecretsDatabase &&_Database)
 	{
 		if (!mp_pPendingWrite)
 		{
 			g_Dispatch / [this]
 				{
-					auto WriteResult = TCContinuation<void>::fs_RunProtected<CException>() / [&]
+					auto WriteResult = TCFuture<void>::fs_RunProtectedAsyncResult<CException>() / [&]
 						{
 							fp_WriteDatabase(*mp_pPendingWrite);
 						}
@@ -74,10 +74,10 @@ namespace NMib::NCloud::NSecretsManager
 
 					mp_pPendingWrite.f_Clear();
 
-					for (auto &Continuation : mp_PendingWriteContinuations)
-						Continuation.f_SetResult(WriteResult.m_pData->m_Result);
+					for (auto &Promise : mp_PendingWritePromises)
+						Promise.f_SetResult(WriteResult);
 
-					mp_PendingWriteContinuations.f_Clear();
+					mp_PendingWritePromises.f_Clear();
 				}
 				> fg_DiscardResult();
 			;
@@ -87,12 +87,12 @@ namespace NMib::NCloud::NSecretsManager
 		else
 			*mp_pPendingWrite = fg_Move(_Database);
 
-		return mp_PendingWriteContinuations.f_Insert();
+		return mp_PendingWritePromises.f_Insert();
 	}
 	
-	TCContinuation<CSecretsDatabase> CSecretsManagerServerDatabase::f_ReadDatabase()
+	TCFuture<CSecretsDatabase> CSecretsManagerServerDatabase::f_ReadDatabase()
 	{
-		return TCContinuation<CSecretsDatabase>::fs_RunProtected<CException>() / [&]
+		return TCFuture<CSecretsDatabase>::fs_RunProtected<CException>() / [&]
 			{
 				CSecretsDatabase Database;
 				fp_ReadDatabase(&Database);

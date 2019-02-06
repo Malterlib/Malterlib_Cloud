@@ -129,14 +129,14 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 	
-	TCContinuation<void> CCloudClientAppActor::fp_BackupManager_SubscribeToServers()
+	TCFuture<void> CCloudClientAppActor::fp_BackupManager_SubscribeToServers()
 	{
 		if (!mp_BackupManagers.f_IsEmpty())
 			return fg_Explicit();
 		
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to backup managers");
 		
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
 		mp_State.m_TrustManager
 			(
@@ -144,33 +144,33 @@ namespace NMib::NCloud::NCloudClient
 				, "com.malterlib/Cloud/BackupManager"
 				, fg_ThisActor(this)
 			)
-			> [this, Continuation](TCAsyncResult<TCTrustedActorSubscription<CBackupManager>> &&_Subscription)
+			> [this, Promise](TCAsyncResult<TCTrustedActorSubscription<CBackupManager>> &&_Subscription)
 			{
 				if (!_Subscription)
 				{
 					DMibLogWithCategory(Malterlib/Cloud/CloudClient, Error, "Failed to subscribe to backup managers: {}", _Subscription.f_GetExceptionStr());
-					Continuation.f_SetException(_Subscription);
+					Promise.f_SetException(_Subscription);
 					return;
 				}
 				mp_BackupManagers = fg_Move(*_Subscription);
 				if (mp_BackupManagers.m_Actors.f_IsEmpty())
 				{
-					Continuation.f_SetException(DMibErrorInstance("Not connected to any backup managers, or they are not trusted for 'com.malterlib/Cloud/BackupManager' namespace"));
+					Promise.f_SetException(DMibErrorInstance("Not connected to any backup managers, or they are not trusted for 'com.malterlib/Cloud/BackupManager' namespace"));
 					return;
 				}
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
-			> Continuation / [=]
+			> Promise / [=]
 			{
 				TCActorResultMap<CHostInfo, TCVector<CStr>> BackupSources;
 				
@@ -189,7 +189,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				BackupSources.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> &&_Results)
+				BackupSources.f_GetResults() > Promise / [=](TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> &&_Results)
 					{
 						for (auto &Result : _Results)
 						{
@@ -203,23 +203,23 @@ namespace NMib::NCloud::NCloudClient
 							for (auto &Source : *Result)
 								*_pCommandLine += "    {}\n"_f << Source;
 						}
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
-			> Continuation / [=]
+			> Promise / [=]
 			{
 				TCActorResultMap<CHostInfo, TCMap<CStr, CBackupManager::CBackupInfo>> Backups;
 				
@@ -239,7 +239,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				
-				Backups.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CBackupManager::CBackupInfo>>> &&_Results)
+				Backups.f_GetResults() > Promise / [=](TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CBackupManager::CBackupInfo>>> &&_Results)
 					{
 						for (auto &Result : _Results)
 						{
@@ -258,17 +258,17 @@ namespace NMib::NCloud::NCloudClient
 									*_pCommandLine += "        {}\n"_f << Snapshot;
 							}
 						}
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
@@ -289,13 +289,13 @@ namespace NMib::NCloud::NCloudClient
 			return DMibErrorInstance("Backup source name format is invalid");
 		
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers") 
-			> Continuation / [=]
+			> Promise / [=]
 			{
 				CStr Error;
 				auto *pBackupManager = mp_BackupManagers.f_GetOneActor(BackupHost, Error);
 				if (!pBackupManager)
 				{
-					Continuation.f_SetException
+					Promise.f_SetException
 						(
 							DMibErrorInstance(fg_Format("Error selecting backup manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
 						)
@@ -329,7 +329,7 @@ namespace NMib::NCloud::NCloudClient
 						, fg_Move(Config)
 						, mp_DownloadBackupSubscription
 					)
-					> Continuation % "Failed to download backup" / [=](CDirectorySyncReceive::CSyncResult &&_Result)
+					> Promise % "Failed to download backup" / [=](CDirectorySyncReceive::CSyncResult &&_Result)
 					{
 						if (_Result.m_Stats.m_nSyncedFiles == 0)
 							*_pCommandLine += "All files were already up to date\n";
@@ -343,11 +343,11 @@ namespace NMib::NCloud::NCloudClient
 								<< _Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
 							;
 						}
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

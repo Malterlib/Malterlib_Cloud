@@ -22,12 +22,12 @@ namespace NMib::NCloud::NKeyManager
 	{
 	}
 
-	TCContinuation<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Warning, "Waiting for user to provide password");
-		Continuation.f_SetResult();
-		return Continuation;
+		Promise.f_SetResult();
+		return Promise.f_MoveFuture();
 	}
 
 	void CKeyManagerDaemonActor::fp_DatabaseDecrypted()
@@ -38,7 +38,7 @@ namespace NMib::NCloud::NKeyManager
 		mp_ServerActor = fg_ConstructActor<CKeyManagerServer>(Config, mp_State.m_DistributionManager);
 	}
 
-	TCContinuation<void> CKeyManagerDaemonActor::fp_StopApp()
+	TCFuture<void> CKeyManagerDaemonActor::fp_StopApp()
 	{
 		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
 
@@ -72,7 +72,7 @@ namespace NMib::NCloud::NKeyManager
 			mp_DatabaseActor = nullptr;
 		}
 
-		return pCanDestroy->m_Continuation;
+		return pCanDestroy->f_Future();
 	}
 }
 

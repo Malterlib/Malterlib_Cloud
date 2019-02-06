@@ -18,15 +18,15 @@
 
 namespace NMib::NCloud::NCloudClient
 {
-	auto CCloudClientAppLocalActor::fp_GetSelfUpdateVersion() -> TCContinuation<CSelfUpdateVersion>
+	auto CCloudClientAppLocalActor::fp_GetSelfUpdateVersion() -> TCFuture<CSelfUpdateVersion>
 	{
-		TCContinuation<CSelfUpdateVersion> Continuation;
+		TCPromise<CSelfUpdateVersion> Promise;
 		fg_ThisActor(this)(&CCloudClientAppLocalActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers")
-			> [this, Continuation](TCAsyncResult<void> &&_Result)
+			> [this, Promise](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 				{
-					Continuation.f_SetException(_Result);
+					Promise.f_SetException(_Result);
 					return;
 				}
 				
@@ -44,7 +44,7 @@ namespace NMib::NCloud::NCloudClient
 					SubscriptionParams.m_fOnNewVersions 
 						= [pVersions, Actor = Actor.m_Actor, AllowDestroy = g_AllowWrongThreadDestroy]
 						(CVersionManager::CNewVersionNotifications &&_NewVersions) 
-						-> NConcurrency::TCContinuation<CVersionManager::CNewVersionNotifications::CResult>
+						-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 						{
 							(*pVersions)[Actor].f_Insert(fg_Move(_NewVersions.m_NewVersions)); 
 							return fg_Explicit(CVersionManager::CNewVersionNotifications::CResult());
@@ -53,11 +53,11 @@ namespace NMib::NCloud::NCloudClient
 					DCallActor(Actor.m_Actor, CVersionManager::f_SubscribeToUpdates, fg_Move(SubscriptionParams)) > SubscribeResults.f_AddResult();
 				}
 				
-				SubscribeResults.f_GetResults() > [Continuation, pVersions](TCAsyncResult<TCVector<TCAsyncResult<CVersionManager::CSubscribeToUpdates::CResult>>> &&_Results)
+				SubscribeResults.f_GetResults() > [Promise, pVersions](TCAsyncResult<TCVector<TCAsyncResult<CVersionManager::CSubscribeToUpdates::CResult>>> &&_Results)
 					{
 						if (!_Results)
 						{
-							Continuation.f_SetException(_Results);
+							Promise.f_SetException(_Results);
 							return;
 						}
 						auto CurrentVersionInfo = fg_GetCloudVersionInfo();
@@ -81,7 +81,7 @@ namespace NMib::NCloud::NCloudClient
 						
 						if (!BestVersionTime.f_IsValid())
 						{
-							Continuation.f_SetException(DMibErrorInstance("No new version was found"));
+							Promise.f_SetException(DMibErrorInstance("No new version was found"));
 							return;
 						}
 
@@ -91,21 +91,21 @@ namespace NMib::NCloud::NCloudClient
 								&& BestVersion.m_VersionIDAndPlatform.m_VersionID <= CurrentVersionInfo.m_Version
 							)
 						{
-							Continuation.f_SetException(DMibErrorInstance("No new version was found"));
+							Promise.f_SetException(DMibErrorInstance("No new version was found"));
 							return;
 						}
 						CSelfUpdateVersion SelfUpdateVersion;
 						SelfUpdateVersion.m_VersionID = BestVersion.m_VersionIDAndPlatform.m_VersionID;
 						SelfUpdateVersion.m_Actor = BestActor;
-						Continuation.f_SetResult(fg_Move(SelfUpdateVersion));
+						Promise.f_SetResult(fg_Move(SelfUpdateVersion));
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<void> CCloudClientAppLocalActor::fp_PreRunCommandLine
+	TCFuture<void> CCloudClientAppLocalActor::fp_PreRunCommandLine
 		(
 			 CStr const &_Command
 			 , NEncoding::CEJSON const &_Params
@@ -115,33 +115,33 @@ namespace NMib::NCloud::NCloudClient
 		if (!_Params["SelfUpdateCheck"].f_Boolean() || _Command == "--self-update")
 			return fg_Explicit();
 
-		TCContinuation<void> Continuation;
-		fp_GetSelfUpdateVersion() > [Continuation, _pCommandLine](TCAsyncResult<CSelfUpdateVersion> &&_Version)
+		TCPromise<void> Promise;
+		fp_GetSelfUpdateVersion() > [Promise, _pCommandLine](TCAsyncResult<CSelfUpdateVersion> &&_Version)
 			{
 				if (!_Version)
 				{
-					Continuation.f_SetResult();
+					Promise.f_SetResult();
 					return;
 				}
 				auto &Version = *_Version;
 				*_pCommandLine %= "\nA new version {} is available for update by running with --self-update\n\n"_f << Version.m_VersionID;
 
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		DMibCheck(mp_State.m_RootDirectory == CFile::fs_GetProgramDirectory());
 
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		fp_GetSelfUpdateVersion() > [=](TCAsyncResult<CSelfUpdateVersion> &&_Version)
 			{
 				if (!_Version)
 				{
-					Continuation.f_SetException(_Version);
+					Promise.f_SetException(_Version);
 					return;
 				}
 				
@@ -152,7 +152,7 @@ namespace NMib::NCloud::NCloudClient
 				CStr DestinationDirectory = CFile::fs_GetProgramDirectory() + "/SelfUpdate"; 
 
 				mp_VersionManagerHelper.f_Download(Version.m_Actor, "MalterlibCloud", VersionID, DestinationDirectory)
-					> Continuation / [=](CFileTransferResult &&_TransferResult)
+					> Promise / [=](CFileTransferResult &&_TransferResult)
 					{
 						fg_Dispatch
 							(
@@ -210,7 +210,7 @@ namespace NMib::NCloud::NCloudClient
 									CFile::fs_DeleteDirectoryRecursive(DestinationDirectory);									
 								}
 							)
-							> Continuation % "Failed to update version" / [=]
+							> Promise % "Failed to update version" / [=]
 							{
 								*_pCommandLine += "Downloaded {ns } bytes at {fe2} MB/s\n"_f
 									<< _TransferResult.m_nBytes
@@ -219,13 +219,13 @@ namespace NMib::NCloud::NCloudClient
 						
 								*_pCommandLine %= "Updated to version {}\n"_f << Version.m_VersionID;
 								
-								Continuation.f_SetResult(0);
+								Promise.f_SetResult(0);
 							}
 						;			
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

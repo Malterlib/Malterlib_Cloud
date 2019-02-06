@@ -53,18 +53,18 @@ namespace NMib::NCloud
 		;
 	}
 	
-	NConcurrency::TCContinuation<void> CKeyManagerServer::CInternal::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys)
+	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys)
 	{
-		NConcurrency::TCContinuation<void> Continuation;
+		NConcurrency::TCPromise<void> Promise;
 		
 		f_ReadDatabase
 			(
-				[this, Continuation, _KeySize, _nKeys]
+				[this, Promise, _KeySize, _nKeys]
 				{
 					auto const& CurrentKeys = m_pDatabase->m_AvailableKeys[_KeySize];
 					if (CurrentKeys.f_GetLen() >= _nKeys)
 					{
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 						return;
 					}
 					
@@ -80,35 +80,35 @@ namespace NMib::NCloud
 					m_pDatabase->m_AvailableKeys[_KeySize].f_InsertFirst(fg_Move(GeneratedKeys));
 					
 					m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, *m_pDatabase)
-						> [Continuation] (NConcurrency::TCAsyncResult<void> &&_Result) mutable
+						> [Promise] (NConcurrency::TCAsyncResult<void> &&_Result) mutable
 						{
 							if (!_Result)
 							{
 								DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to write database: {}", _Result.f_GetExceptionStr());
-								Continuation.f_SetException(DMibErrorInstance(fg_Format("Failed to write database: {}", _Result.f_GetExceptionStr())));
+								Promise.f_SetException(DMibErrorInstance(fg_Format("Failed to write database: {}", _Result.f_GetExceptionStr())));
 								return;
 							}
 							
-							Continuation.f_SetResult();
+							Promise.f_SetResult();
 						}
 					;
 				}
-				, [Continuation] (NStr::CStr const &_Error)
+				, [Promise] (NStr::CStr const &_Error)
 				{
-					Continuation.f_SetException(DMibErrorInstance(fg_Format("Failed to read database: {}", _Error)));
+					Promise.f_SetException(DMibErrorInstance(fg_Format("Failed to read database: {}", _Error)));
 				}
 			)
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 		
-	NConcurrency::TCContinuation<CSymmetricKey> CKeyManagerServer::CInternal::f_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize)
+	NConcurrency::TCFuture<CSymmetricKey> CKeyManagerServer::CInternal::f_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize)
 	{
-		NConcurrency::TCContinuation<CSymmetricKey> Continuation;
+		NConcurrency::TCPromise<CSymmetricKey> Promise;
 		
 		f_ReadDatabase
 			(
-				[this, Continuation, _HostID, _Identifier, _KeySize]
+				[this, Promise, _HostID, _Identifier, _KeySize]
 				{
 					auto &Client = m_pDatabase->m_Clients[_HostID];
 					auto pKey = Client.m_Keys.f_FindEqual(_Identifier);
@@ -129,7 +129,7 @@ namespace NMib::NCloud
 							{
 								NStr::CStr Error = NStr::fg_Format("Requested key size mismatch with pre-created key. Requested: {}, Pre-created: {}", _KeySize, pKey->f_GetLen());
 								DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "{}", Error);
-								Continuation.f_SetException(DMibErrorInstance(Error));
+								Promise.f_SetException(DMibErrorInstance(Error));
 								return;
 							}
 							
@@ -139,16 +139,16 @@ namespace NMib::NCloud
 						}
 						
 						m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, *m_pDatabase)
-							> [Continuation, Key = *pKey] (NConcurrency::TCAsyncResult<void> &&_Result) mutable
+							> [Promise, Key = *pKey] (NConcurrency::TCAsyncResult<void> &&_Result) mutable
 							{
 								if (!_Result)
 								{
 									DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to write database: {}", _Result.f_GetExceptionStr());
-									Continuation.f_SetException(DMibErrorInstance(fg_Format("Failed to write database: {}", _Result.f_GetExceptionStr())));
+									Promise.f_SetException(DMibErrorInstance(fg_Format("Failed to write database: {}", _Result.f_GetExceptionStr())));
 									return;
 								}
 								
-								Continuation.f_SetResult(fg_Move(Key));
+								Promise.f_SetResult(fg_Move(Key));
 							}
 						;
 					}
@@ -156,19 +156,19 @@ namespace NMib::NCloud
 					{
 						if (pKey->f_GetLen() != _KeySize)
 						{
-							Continuation.f_SetException(DMibErrorInstance(NStr::fg_Format("Saved key has different size {} from requested size {}", pKey->f_GetLen(), _KeySize)));
+							Promise.f_SetException(DMibErrorInstance(NStr::fg_Format("Saved key has different size {} from requested size {}", pKey->f_GetLen(), _KeySize)));
 							return;
 						}
-						Continuation.f_SetResult(*pKey);
+						Promise.f_SetResult(*pKey);
 					}
 				}
-				, [Continuation] (NStr::CStr const &_Error)
+				, [Promise] (NStr::CStr const &_Error)
 				{
-					Continuation.f_SetException(DMibErrorInstance(NStr::fg_Format("Failed to read database: {}", _Error)));
+					Promise.f_SetException(DMibErrorInstance(NStr::fg_Format("Failed to read database: {}", _Error)));
 				}
 			)
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}		
 	
 	CKeyManagerServer::CKeyManagerServer(CKeyManagerServerConfig const &_Config, TCActor<CActorDistributionManager> const &_DistributionManager)
@@ -190,12 +190,12 @@ namespace NMib::NCloud
 	{
 	}
 	
-	NConcurrency::TCContinuation<void> CKeyManagerServer::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys)
+	NConcurrency::TCFuture<void> CKeyManagerServer::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys)
 	{
 		return mp_pInternal->f_PreCreateKeys(_KeySize, _nKeys);
 	}
 	
-	NConcurrency::TCContinuation<CSymmetricKey> CKeyManagerServer::fp_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize)
+	NConcurrency::TCFuture<CSymmetricKey> CKeyManagerServer::fp_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize)
 	{
 		return mp_pInternal->f_RequestKey(_HostID, _Identifier, _KeySize);
 	}

@@ -128,9 +128,9 @@ namespace NMib::NCloud::NAppDistributionManager
 		}
 	}
 
-	TCContinuation<void> CAppDistributionManagerActor::fp_ReadState()
+	TCFuture<void> CAppDistributionManagerActor::fp_ReadState()
 	{
-		return TCContinuation<void>::fs_RunProtected() > [&]
+		return TCFuture<void>::fs_RunProtected() / [&]
 			{
 				auto pDistributions = mp_State.m_StateDatabase.m_Data.f_GetMember("Distributions");
 				if (!pDistributions)

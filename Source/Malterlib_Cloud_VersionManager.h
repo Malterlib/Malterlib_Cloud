@@ -162,7 +162,7 @@ namespace NMib::NCloud
 			uint64 m_QueueSize = 8*1024*1024;
 			EFlag m_Flags = EFlag_None;
 			NConcurrency::TCActor<> m_DispatchActor;
-			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<CStartUploadTransfer::CResult> (CStartUploadTransfer &&_Params)> m_fStartTransfer;
+			NFunction::TCFunctionMutable<NConcurrency::TCFuture<CStartUploadTransfer::CResult> (CStartUploadTransfer &&_Params)> m_fStartTransfer;
 		};
 		
 		struct CStartDownloadVersion
@@ -226,7 +226,7 @@ namespace NMib::NCloud
 			NContainer::TCSet<NStr::CStr> m_Platforms; /// Leave empty to subscribe to all platforms
 			NContainer::TCSet<NStr::CStr> m_Tags; /// Leave empty to subscribe to all tags
 			NConcurrency::TCActor<> m_DispatchActor;
-			NFunction::TCFunctionMutable<NConcurrency::TCContinuation<CNewVersionNotifications::CResult> (CNewVersionNotifications &&_VersionInfo)> m_fOnNewVersions;
+			NFunction::TCFunctionMutable<NConcurrency::TCFuture<CNewVersionNotifications::CResult> (CNewVersionNotifications &&_VersionInfo)> m_fOnNewVersions;
 			uint32 m_nInitial = 10;
 		};
 
@@ -262,12 +262,12 @@ namespace NMib::NCloud
 		CVersionManager();
 		~CVersionManager();
 		
-		virtual NConcurrency::TCContinuation<CListApplications::CResult> f_ListApplications(CListApplications &&_Params) = 0;
-		virtual NConcurrency::TCContinuation<CListVersions::CResult> f_ListVersions(CListVersions &&_Params) = 0;
-		virtual NConcurrency::TCContinuation<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion &&_Params) = 0;
-		virtual NConcurrency::TCContinuation<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) = 0;
-		virtual NConcurrency::TCContinuation<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) = 0;
-		virtual NConcurrency::TCContinuation<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) = 0;
+		virtual NConcurrency::TCFuture<CListApplications::CResult> f_ListApplications(CListApplications &&_Params) = 0;
+		virtual NConcurrency::TCFuture<CListVersions::CResult> f_ListVersions(CListVersions &&_Params) = 0;
+		virtual NConcurrency::TCFuture<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion &&_Params) = 0;
+		virtual NConcurrency::TCFuture<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) = 0;
+		virtual NConcurrency::TCFuture<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) = 0;
+		virtual NConcurrency::TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) = 0;
 	};
 	
 	struct CVersionManagerHelper
@@ -298,7 +298,7 @@ namespace NMib::NCloud
 			CVersionManager::CVersionInformation m_VersionInfo;
 		};
 		
-		NConcurrency::TCContinuation<CUploadResult> f_Upload
+		NConcurrency::TCFuture<CUploadResult> f_Upload
 			(
 				NConcurrency::TCDistributedActor<CVersionManager> const &_VersionManager
 				, NStr::CStr const &_Application
@@ -310,7 +310,7 @@ namespace NMib::NCloud
 			) const
 		;
 		
-		NConcurrency::TCContinuation<CFileTransferResult> f_Download
+		NConcurrency::TCFuture<CFileTransferResult> f_Download
 			(
 				NConcurrency::TCDistributedActor<CVersionManager> const &_VersionManager
 				, NStr::CStr const &_Application
@@ -321,8 +321,8 @@ namespace NMib::NCloud
 			) const
 		;
 		
-		NConcurrency::TCContinuation<CPackageInfo> f_CreatePackage(NStr::CStr const &_SourceDirectory, NStr::CStr const &_DestinationFileName) const;
-		NConcurrency::TCContinuation<void> f_AbortAll() const;
+		NConcurrency::TCFuture<CPackageInfo> f_CreatePackage(NStr::CStr const &_SourceDirectory, NStr::CStr const &_DestinationFileName) const;
+		NConcurrency::TCFuture<void> f_AbortAll() const;
 		
 		NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> f_GetFileActor() const;
 		

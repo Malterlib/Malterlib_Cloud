@@ -61,7 +61,7 @@ namespace NMib::NCloud::NAppManager
 		mp_InitialStartupResult.f_SetException(_pException);
 	}
 
-	TCContinuation<void> CAppManagerActor::fp_ReadState()
+	TCFuture<void> CAppManagerActor::fp_ReadState()
 	{
 		bool bChangedDatabase = false;
 		try
@@ -286,25 +286,25 @@ namespace NMib::NCloud::NAppManager
 		fp_UpdateApplicationDependencies();
 	}
 
-	TCContinuation<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
 		mp_bLogLaunchesToStdErr = _Params["LogLaunchesToStdErr"].f_Boolean();
 		
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations"));
 		mp_KnownPlatforms[DMalterlibCloudPlatform];
 		
-		TCContinuation<void> Continuation;
-		fp_ReadState() > Continuation / [this, Continuation]
+		TCPromise<void> Promise;
+		fp_ReadState() > Promise / [this, Promise]
 			{
 				if (mp_State.m_bStoppingApp)
-					return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
+					return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
 				
 				fp_PublishAppInterface()
 					+ fp_SetupLimits()
-					> Continuation / [this, Continuation]
+					> Promise / [this, Promise]
 					{
 						if (mp_State.m_bStoppingApp)
-							return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
+							return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
 						
 						fp_InitApplications();
 						fp_UpdateApplicationDependencies();
@@ -351,10 +351,10 @@ namespace NMib::NCloud::NAppManager
 								, "com.malterlib/Cloud/VersionManager"
 								, fg_ThisActor(this)
 							)
-							> Continuation / [this, Continuation](TCTrustedActorSubscription<CKeyManager> &&_KeySubscrption, TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
+							> Promise / [this, Promise](TCTrustedActorSubscription<CKeyManager> &&_KeySubscrption, TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
 							{
 								if (mp_State.m_bStoppingApp)
-									return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
+									return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
 								
 								mp_KeyManagerSubscription = fg_Move(_KeySubscrption);
 
@@ -387,7 +387,7 @@ namespace NMib::NCloud::NAppManager
 									)
 								;
 
-								Continuation.f_SetResult();
+								Promise.f_SetResult();
 							}
 						;
 					}
@@ -395,36 +395,36 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		
-		TCContinuation<void> ReturnContinuation;
-		Continuation.f_Dispatch() > [this, ReturnContinuation](TCAsyncResult<void> &&_Result)
+		TCPromise<void> ReturnPromise;
+		Promise.f_Dispatch() > [this, ReturnPromise](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 					fp_InitialStartupFailed(_Result.f_GetException());
 				
-				ReturnContinuation.f_SetResult(fg_Move(_Result));
+				ReturnPromise.f_SetResult(fg_Move(_Result));
 			}
 		;
-		return ReturnContinuation;
+		return ReturnPromise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_StopApp()
+	TCFuture<void> CAppManagerActor::fp_StopApp()
 	{	
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
 		auto pCanDestroy = fg_Move(mp_pCanDestroy);
 		
-		pCanDestroy->m_Continuation.f_Dispatch() > Continuation / [=]
+		pCanDestroy->f_Future() > Promise / [=]
 			{
-				fp_CancelAllApplicationUpdatesOnStopAppManager() > Continuation / [=]
+				fp_CancelAllApplicationUpdatesOnStopAppManager() > Promise / [=]
 					{
 						mp_AppManagerInterface.f_Destroy()
-							+ mp_AppManagerCoordinationInterface.f_Destroy() > Continuation / [=]
+							+ mp_AppManagerCoordinationInterface.f_Destroy() > Promise / [=]
 							{
 								TCActorResultVector<uint32> ApplicationStops;
 								for (auto &pApplication : mp_Applications)
 									pApplication->f_Stop(EStopFlag_CloseEncryption) > ApplicationStops.f_AddResult();
 								
-								ApplicationStops.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<uint32>> &&_Results)
+								ApplicationStops.f_GetResults() > Promise / [this, Promise](TCVector<TCAsyncResult<uint32>> &&_Results)
 									{
 										for (auto &pApplication : mp_Applications)
 										{
@@ -432,7 +432,7 @@ namespace NMib::NCloud::NAppManager
 											pApplication->f_Clear();
 										}
 
-										mp_AppInterfaceServer.f_Destroy() > [this, Continuation](TCAsyncResult<void> &&)
+										mp_AppInterfaceServer.f_Destroy() > [this, Promise](TCAsyncResult<void> &&)
 											{
 												TCActorResultVector<void> Destroys;
 
@@ -440,7 +440,7 @@ namespace NMib::NCloud::NAppManager
 													Launch->f_Destroy() > Destroys.f_AddResult();
 												mp_LaunchActors.f_Clear();
 
-												Destroys.f_GetResults() > Continuation.f_ReceiveAny();
+												Destroys.f_GetResults() > Promise.f_ReceiveAny();
 											}
 										;
 									}
@@ -452,7 +452,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }
 

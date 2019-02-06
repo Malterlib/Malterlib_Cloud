@@ -75,7 +75,7 @@ namespace NMib::NCloud::NBackupManager
 		CStr f_GetTempPath(CStr const &_Path);
 		CStr f_GetCurrentPath(CStr const &_Path);
 		CStr f_GetLatestPath(CStr const &_Path);
-		TCContinuation<TCActorSubscriptionWithID<>> f_StartRSyncShared
+		TCFuture<TCActorSubscriptionWithID<>> f_StartRSyncShared
 			(
 				FRunRSyncProtocol &&_fRunProtocol
 				, CStr const &_FileName
@@ -85,12 +85,12 @@ namespace NMib::NCloud::NBackupManager
 				, uint64 _FileLength
 				, EDirectoryManifestSyncFlag _SyncFlags
 				, CStr &o_RSyncID
-				, TCFunctionMutable<TCContinuation<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
+				, TCFunctionMutable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
 			 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 			)
 		;
-		TCContinuation<void> f_CommitFile(CStr const &_File, CBackupManagerBackup::CManifestFile const &_ManifestFile);
-		TCContinuation<void> f_CommitManifestChange(CStr const &_FileName, CManifestChange const &_Change, CStr const &_Description);
+		TCFuture<void> f_CommitFile(CStr const &_File, CBackupManagerBackup::CManifestFile const &_ManifestFile);
+		TCFuture<void> f_CommitManifestChange(CStr const &_FileName, CManifestChange const &_Change, CStr const &_Description);
 
 		void f_InitBackupDirectory();
 

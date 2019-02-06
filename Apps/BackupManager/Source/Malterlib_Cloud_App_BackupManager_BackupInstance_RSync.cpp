@@ -107,7 +107,7 @@ namespace NMib::NCloud::NBackupManager
 		}
 	}
 
-	TCContinuation<TCActorSubscriptionWithID<>> CBackupInstance::CInternal::f_StartRSyncShared
+	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::CInternal::f_StartRSyncShared
 		(
 			FRunRSyncProtocol &&_fRunProtocol
 			, CStr const &_FileName
@@ -117,7 +117,7 @@ namespace NMib::NCloud::NBackupManager
 			, uint64 _FileLength
 			, EDirectoryManifestSyncFlag _SyncFlags
 			, CStr &o_RSyncID
-			, TCFunctionMutable<TCContinuation<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
+			, TCFunctionMutable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
 		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 		)
 	{
@@ -127,9 +127,9 @@ namespace NMib::NCloud::NBackupManager
 
 		RSyncContext.m_ExpectedDigest = _ExpectedDigest;
 
-		auto ActorSubscription = g_ActorSubscription / [=]() -> TCContinuation<void>
+		auto ActorSubscription = g_ActorSubscription / [=]() -> TCFuture<void>
 			{
-				TCContinuation<void> DestroyContinuation;
+				TCFuture<void> DestroyFuture;
 
 				TCVector<CStr> TempFiles;
 
@@ -142,12 +142,12 @@ namespace NMib::NCloud::NBackupManager
 					bFailedHash = pRsyncContext->m_bFailedHash;
 
 					TempFiles = fg_Move(pRsyncContext->m_TempFileNames);
-					DestroyContinuation = pRsyncContext->m_fRunProtocol.f_Destroy();
+					DestroyFuture = pRsyncContext->m_fRunProtocol.f_Destroy();
 				}
 				else
 				{
 					bGeneralFailure = true;
-					DestroyContinuation.f_SetResult();
+					DestroyFuture = fg_Explicit();
 				}
 
 				m_RSyncContexts.f_Remove(RSyncID);
@@ -165,39 +165,39 @@ namespace NMib::NCloud::NBackupManager
 					}
 				}
 
-				TCContinuation<void> Continuation;
-				DestroyContinuation > [=](TCAsyncResult<void> &&_Result) mutable
+				TCPromise<void> Promise;
+				DestroyFuture > [=](TCAsyncResult<void> &&_Result) mutable
 					{
 						if (bGeneralFailure)
 						{
 							TCAsyncResult<void> Result;
 							Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("General failure for RSync"));
  							_fOnDone(Result) > fg_DiscardResult();
-							Continuation.f_SetException(fg_Move(Result));
+							Promise.f_SetException(fg_Move(Result));
 						}
 						else if (bFailedHash)
 						{
 							TCAsyncResult<void> Result;
 							Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("Digest does not match after RSync"));
 							_fOnDone(Result) > fg_DiscardResult();
-							Continuation.f_SetException(fg_Move(Result));
+							Promise.f_SetException(fg_Move(Result));
 						}
 						else if (!_Result)
 						{
 							_fOnDone(_Result) > fg_DiscardResult();
-							Continuation.f_SetException(fg_Move(_Result));
+							Promise.f_SetException(fg_Move(_Result));
 						}
 						else
 						{
-							_fOnDone(_Result) > Continuation / [Continuation, _Result]()
+							_fOnDone(_Result) > Promise / [Promise, _Result]()
 								{
-									Continuation.f_SetResult();
+									Promise.f_SetResult();
 								}
 							;
 						}
 					}
 				;
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		;
 
@@ -274,7 +274,7 @@ namespace NMib::NCloud::NBackupManager
 		return fg_Explicit(fg_Move(ActorSubscription));
 	}
 
-	TCContinuation<TCActorSubscriptionWithID<>> CBackupInstance::f_StartRSync
+	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::f_StartRSync
 		(
 			CStr const &_FileName
 		 	, CManifestFile const &_ManifestFile
@@ -305,7 +305,7 @@ namespace NMib::NCloud::NBackupManager
 				, _ManifestFile.m_Length
 				, _ManifestFile.m_Flags
 				, RSyncID
-				, [this, _FileName, _ManifestFile](TCAsyncResult<void> const &_Result) -> TCContinuation<void>
+				, [this, _FileName, _ManifestFile](TCAsyncResult<void> const &_Result) -> TCFuture<void>
 				{
 					auto &Internal = *mp_pInternal;
 					if (_Result)

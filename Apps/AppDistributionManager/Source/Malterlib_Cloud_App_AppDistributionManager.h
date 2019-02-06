@@ -46,17 +46,17 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	struct CDeployDestination : public CActor
 	{
-		virtual TCContinuation<void> f_Deploy(CDeployInfo const &_DeployInfo) = 0;
+		virtual TCFuture<void> f_Deploy(CDeployInfo const &_DeployInfo) = 0;
 	};
 
 	struct CDeployDestination_FileSystem : public CDeployDestination
 	{
 		CDeployDestination_FileSystem();
 
-		TCContinuation<void> f_Deploy(CDeployInfo const &_DeployInfo) override;
+		TCFuture<void> f_Deploy(CDeployInfo const &_DeployInfo) override;
 
 	private:
-		TCContinuation<void> fp_Destroy() override;
+		TCFuture<void> fp_Destroy() override;
 
 		TCActor<CSeparateThreadActor> mp_FileActor;
 	};
@@ -127,8 +127,8 @@ namespace NMib::NCloud::NAppDistributionManager
 				return TCMap<CStr, CVersionManagerApplication>::fs_GetKey(*this);
 			}
 			
-			TCAVLTree<CVersionManagerVersion::CLinkTraits_m_ApplicationTimeLink, CVersionManagerVersion::CCompareApplicationByTime> m_VersionsByTime;
-			TCAVLTree<CVersionManagerVersion::CLinkTraits_m_ApplicationLink, CVersionManagerVersion::CCompareApplication> m_Versions;
+			TCAVLTree<&CVersionManagerVersion::m_ApplicationTimeLink, CVersionManagerVersion::CCompareApplicationByTime> m_VersionsByTime;
+			TCAVLTree<&CVersionManagerVersion::m_ApplicationLink, CVersionManagerVersion::CCompareApplication> m_Versions;
 			CAppDistributionManagerActor &m_This;
 		};
 
@@ -169,15 +169,15 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
-		TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
-		TCContinuation<void> fp_StopApp() override;
-		TCContinuation<void> fp_ReadState();
+		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
+		TCFuture<void> fp_StopApp() override;
+		TCFuture<void> fp_ReadState();
 
-		TCContinuation<uint32> fp_CommandLine_DistributionEnum(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_DistributionAdd(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_DistributionChangeSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_DistributionRemove(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> fp_CommandLine_ApplicationListAvailableVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionEnum(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionAdd(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionChangeSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionRemove(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ApplicationListAvailableVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 		static CStr fsp_DeployDestinationToString(EDeployDestination _Type);
 		static EDeployDestination fsp_DeployDestinationFromString(CStr const &_Type);
@@ -190,9 +190,9 @@ namespace NMib::NCloud::NAppDistributionManager
 		void fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState);
 		void fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info);
 		void fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
-		TCContinuation<CVersionsAvailableForUpdate> fp_GetAvailableVersions(CStr const &_Application);
+		TCFuture<CVersionsAvailableForUpdate> fp_GetAvailableVersions(CStr const &_Application);
 
-		TCContinuation<CVersionInformation> fp_DownloadApplicationFromManager
+		TCFuture<CVersionInformation> fp_DownloadApplicationFromManager
 			(
 				TCDistributedActor<CVersionManager> const &_Manager
 				, CStr const &_ApplicationName
@@ -201,7 +201,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			)
 		;
 		
-		TCContinuation<CVersionInformation> fp_DownloadApplication
+		TCFuture<CVersionInformation> fp_DownloadApplication
 			(
 				CStr const &_ApplicationName
 				, CVersionManager::CVersionIDAndPlatform const &_VersionID

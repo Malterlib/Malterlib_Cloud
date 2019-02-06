@@ -35,7 +35,7 @@ namespace NMib::NCloud::NAppManager
 					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
 					, NConcurrency::CActorSubscription &&_ManifestFinished
 					, NStr::CStr const &_BackupRoot
-				) -> TCContinuation<TCActorSubscriptionWithID<>>
+				) -> TCFuture<TCActorSubscriptionWithID<>>
 				{
 					if (_pApplication->m_bDeleted)
 						return fg_Explicit();
@@ -60,12 +60,12 @@ namespace NMib::NCloud::NAppManager
 					}
 					else
 					{
-						TCContinuation<TCActorSubscriptionWithID<>> Continuation;
+						TCPromise<TCActorSubscriptionWithID<>> Promise;
 						_pApplication->m_OnStartedDistributedApp.f_Insert() 
-							> Continuation / [=, BackupInterface = fg_Move(_BackupInterface), ManifestFinished = fg_Move(_ManifestFinished)]() mutable
+							> Promise / [=, BackupInterface = fg_Move(_BackupInterface), ManifestFinished = fg_Move(_ManifestFinished)]() mutable
 							{
 								if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
-									return Continuation.f_SetResult();
+									return Promise.f_SetResult();
 
 								DMibCallActor
 									(
@@ -75,11 +75,11 @@ namespace NMib::NCloud::NAppManager
 										, fg_Move(ManifestFinished)
 										, _BackupRoot
 									)
-									> Continuation
+									> Promise
 								;
 							}
 						;
-						return Continuation;
+						return Promise.f_MoveFuture();
 					}
 				}
 				, mp_State.m_DistributionManager

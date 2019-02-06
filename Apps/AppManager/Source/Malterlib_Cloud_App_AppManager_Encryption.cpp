@@ -26,7 +26,7 @@ namespace NMib::NCloud::NAppManager
 		fp_UpdateApplicationDependencies();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite)
+	TCFuture<void> CAppManagerActor::fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite)
 	{
 		auto pEncryptionApplication = _pApplication;
 		if (pEncryptionApplication->f_IsChildApp())
@@ -54,9 +54,9 @@ namespace NMib::NCloud::NAppManager
 		if (mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
 			return DMibErrorInstance("No key managers are connected, so key cannot be generated");
 		
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
-		auto fLaunchScript = [this, Continuation, pEncryptionApplication, _Operation, _bForceOverwrite](CSymmetricKey &&_Key)
+		auto fLaunchScript = [this, Promise, pEncryptionApplication, _Operation, _bForceOverwrite](CSymmetricKey &&_Key)
 			{
 				TCMap<CStr, CStr> Environment;
 				Environment["MibCloudApp_EncryptionStorage"] = pEncryptionApplication->m_Settings.m_EncryptionStorage;
@@ -101,13 +101,13 @@ namespace NMib::NCloud::NAppManager
 								_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, _Key) > fg_DiscardResult();
 						}
 					)
-					> Continuation % "Failed to change encryption" / [this, Continuation, pEncryptionApplication, _Operation](CBashScriptOutput &&_Output)
+					> Promise % "Failed to change encryption" / [this, Promise, pEncryptionApplication, _Operation](CBashScriptOutput &&_Output)
 					{
 						if (_Operation == EEncryptOperation_Open || _Operation == EEncryptOperation_Setup)
 							fp_AppEncryptionStateChanged(pEncryptionApplication, true);
 						else if (_Operation == EEncryptOperation_Close)
 							fp_AppEncryptionStateChanged(pEncryptionApplication, false);
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 					}
 				;
 			}
@@ -116,18 +116,18 @@ namespace NMib::NCloud::NAppManager
 		if (_Operation == EEncryptOperation_Close)
 		{
 			fLaunchScript(fg_Default());
-			return Continuation;
+			return Promise.f_MoveFuture();
 		}
 		
 		auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
 		static const mint c_KeyBits = 512; 
 		DCallActor(KeyManagerInfo.m_Actor, CKeyManager::f_RequestKey, pEncryptionApplication->m_Name, c_KeyBits / 8)
-			> Continuation / [Continuation, pEncryptionApplication, _pApplication, fLaunchScript](CSymmetricKey &&_Key)
+			> Promise / [Promise, pEncryptionApplication, _pApplication, fLaunchScript](CSymmetricKey &&_Key)
 			{
 				fLaunchScript(fg_Move(_Key));
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 #endif
 	}
 }

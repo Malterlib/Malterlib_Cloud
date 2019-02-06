@@ -14,12 +14,12 @@ namespace NMib::NCloud::NAppDistributionManager
 		mp_FileActor = fg_Construct(fg_Construct(), "DeployDestination_FileSystem file actor");
 	}
 
-	TCContinuation<void> CDeployDestination_FileSystem::fp_Destroy()
+	TCFuture<void> CDeployDestination_FileSystem::fp_Destroy()
 	{
 		TCSharedPointer<CCanDestroyTracker> pDestroyTracker = fg_Construct();
 		mp_FileActor->f_Destroy() > pDestroyTracker->f_Track();
 
-		return pDestroyTracker->m_Continuation;
+		return pDestroyTracker->m_Promise;
 	}
 
 	namespace
@@ -76,9 +76,9 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	}
 
-	TCContinuation<void> CDeployDestination_FileSystem::f_Deploy(CDeployInfo const &_DeployInfo)
+	TCFuture<void> CDeployDestination_FileSystem::f_Deploy(CDeployInfo const &_DeployInfo)
 	{
-		return g_Dispatch(mp_FileActor) > [=]() -> void
+		return g_Dispatch(mp_FileActor) / [=]() -> void
 			{
 				CStr TempDirectory = CFile::fs_GetProgramDirectory() / "Temp" / fg_RandomID();
 				CStr TempFile = TempDirectory / "TempFile";

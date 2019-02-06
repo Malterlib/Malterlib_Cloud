@@ -6,7 +6,7 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	TCContinuation<TCVector<CStr>> CBackupManagerServer::fp_EnumBackupSourcesFromDisk()
+	TCFuture<TCVector<CStr>> CBackupManagerServer::fp_EnumBackupSourcesFromDisk()
 	{
 		return fg_Dispatch
 			(
@@ -70,7 +70,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 	}
 
-	TCContinuation<void> CBackupSource::fp_Destroy()
+	TCFuture<void> CBackupSource::fp_Destroy()
 	{
 		for (auto &State : mp_CheckedOutStates)
 			State.f_Cleanup();
@@ -129,12 +129,12 @@ namespace NMib::NCloud::NBackupManager
 		}
 	}
 
-	TCContinuation<CBackupManager::CBackupInfo> CBackupSource::f_GetInfo()
+	TCFuture<CBackupManager::CBackupInfo> CBackupSource::f_GetInfo()
 	{
 		return fg_Explicit(mp_BackupInfo);
 	}
 
-	auto CBackupSource::f_CheckOutDirectory(CTime const &_Time) -> TCContinuation<CCheckedOutDirectory>
+	auto CBackupSource::f_CheckOutDirectory(CTime const &_Time) -> TCFuture<CCheckedOutDirectory>
 	{
 		CStr CheckedOutID = fg_RandomID();
 
@@ -155,7 +155,7 @@ namespace NMib::NCloud::NBackupManager
 			}
 		;
 
-		return TCContinuation<CCheckedOutDirectory>::fs_RunProtected() / [&]() mutable
+		return TCFuture<CCheckedOutDirectory>::fs_RunProtected() / [&]() mutable
 			{
 				CFile::CFindFilesOptions Options{mp_LatestDirectory + "/*", true};
 				Options.m_AttribMask = EFileAttrib_File | EFileAttrib_Link;
@@ -223,9 +223,9 @@ namespace NMib::NCloud::NBackupManager
 	}
 
 	auto CBackupSource::f_InitialCommit(CStr const &_BackupID, CStr const &_Directory, CDirectoryManifest &&_Manifest, CBackupManagerBackup::EInitialBackupFinishedFlag _FinishedFlags)
-		-> TCContinuation<CInitialCommitResult>
+		-> TCFuture<CInitialCommitResult>
 	{
-		return TCContinuation<CInitialCommitResult>::fs_RunProtected() / [&]() mutable
+		return TCFuture<CInitialCommitResult>::fs_RunProtected() / [&]() mutable
 			{
 				if (mp_Backups.f_FindEqual(_BackupID))
 					DMibError("Backup with this ID has already done initial commit");
@@ -361,7 +361,7 @@ namespace NMib::NCloud::NBackupManager
 		;
 	}
 
-	TCContinuation<void> CBackupSource::f_Commit(CStr const &_BackupID, CStr const &_File, CBackupManagerBackup::CManifestChange const &_ManifestChange)
+	TCFuture<void> CBackupSource::f_Commit(CStr const &_BackupID, CStr const &_File, CBackupManagerBackup::CManifestChange const &_ManifestChange)
 	{
 		CStr ManifestError;
 		if (!CBackupManagerBackup::fs_ManifestChangeValid(_File, _ManifestChange, ManifestError))
@@ -391,7 +391,7 @@ namespace NMib::NCloud::NBackupManager
 			}
 		;
 
-		return TCContinuation<void>::fs_RunProtected() / [&]() mutable
+		return TCFuture<void>::fs_RunProtected() / [&]() mutable
 			{
 				TCSet<CStr> CheckDeleteDirectories;
 
@@ -600,7 +600,7 @@ namespace NMib::NCloud::NBackupManager
 			Backup.m_AppendFiles.f_Remove(_FileName);
 	}
 
-	TCContinuation<void> CBackupSource::f_CommitAppend
+	TCFuture<void> CBackupSource::f_CommitAppend
 		(
 		 	CStr const &_BackupID
 		 	, CStr const &_File
@@ -631,7 +631,7 @@ namespace NMib::NCloud::NBackupManager
 		if (!pOriginalManifestFile->f_IsFile())
 			return DMibErrorInstance("Original manifest file '{}' is not a file in append operation"_f << _File);
 
-		return TCContinuation<void>::fs_RunProtected() / [&]() mutable
+		return TCFuture<void>::fs_RunProtected() / [&]() mutable
 			{
 				auto Cleanup = g_OnScopeExit > [&]
 					{

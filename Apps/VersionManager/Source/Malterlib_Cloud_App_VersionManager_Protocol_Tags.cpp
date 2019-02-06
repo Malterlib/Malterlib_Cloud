@@ -25,14 +25,14 @@ namespace NMib::NCloud::NVersionManager
 			mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, NewPermissions) > fg_DiscardResult();
 	}
 
-	TCContinuation<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> CVersionManagerDaemonActor::CServer::fp_FilterTags
+	TCFuture<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> CVersionManagerDaemonActor::CServer::fp_FilterTags
 		(
 			CStr const &_Description
 			, TCSet<CStr> const &_TagsAdded
 			, TCSet<CStr> const &_TagsRemoved
 		)
 	{
-		TCContinuation<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> Continuation;
+		TCPromise<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> Promise;
 		TCMap<CStr, TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["//TagAll//"] = {{"Application/TagAll"}};
@@ -52,7 +52,7 @@ namespace NMib::NCloud::NVersionManager
 				DeniedTags[Tag];
 		}
 
-		mp_Permissions.f_HasPermissions(_Description, Permissions) > Continuation / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		mp_Permissions.f_HasPermissions(_Description, Permissions) > Promise / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				CFilteredTagsResult Result;
 				Result.m_DeniedTags = DeniedTags;
@@ -80,13 +80,13 @@ namespace NMib::NCloud::NVersionManager
 							Result.m_DeniedTags[Tag];
 					}
 				}
-				Continuation.f_SetResult(Result);
+				Promise.f_SetResult(Result);
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags &&_Params) -> TCContinuation<CChangeTags::CResult> 
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags &&_Params) -> TCFuture<CChangeTags::CResult>
 	{
 		auto pThis = m_pThis;
 		
@@ -104,9 +104,9 @@ namespace NMib::NCloud::NVersionManager
 				return Auditor.f_Exception({fg_Format("Invalid version ID format: {}", ErrorStr), "(change tags)"});
 		}
 
-		TCContinuation<CVersionManager::CChangeTags::CResult> Continuation;
+		TCPromise<CVersionManager::CChangeTags::CResult> Promise;
 		pThis->fp_FilterTags("Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags)
-			> Continuation % "Access denied filtering tags by permission" % Auditor / [=](CFilteredTagsResult const &_Result)
+			> Promise % "Access denied filtering tags by permission" % Auditor / [=](CFilteredTagsResult const &_Result)
 			{
 				TCSet<CStr> const &DeniedTags = _Result.m_DeniedTags;
 				TCSet<CStr> const &AddTags = _Result.m_TagsAdded;
@@ -114,19 +114,19 @@ namespace NMib::NCloud::NVersionManager
 				if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())
 				{
 					if (!DeniedTags.f_IsEmpty())
-						return Continuation.f_SetException(Auditor.f_AccessDenied({fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags), "(Change tags)"}));
+						return Promise.f_SetException(Auditor.f_AccessDenied({fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags), "(Change tags)"}));
 
 					if (!_Params.m_bIncreaseRetrySequence)
 					{
 						Auditor.f_Info("Change tags resulted in no changed tags");
 						CVersionManager::CChangeTags::CResult Result;
-						return Continuation.f_SetResult(Result);
+						return Promise.f_SetResult(Result);
 					}
 				}
 
 				auto *pApplication = pThis->mp_Applications.f_FindEqual(_Params.m_Application);
 				if (!pApplication)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application: {}", _Params.m_Application)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application: {}", _Params.m_Application)));
 
 				TCActorResultVector<CSizeInfo> VersionResults;
 
@@ -152,7 +152,7 @@ namespace NMib::NCloud::NVersionManager
 					VersionIDAndPlatform.m_Platform = _Params.m_Platform;
 					auto *pVersion = pApplication->m_Versions.f_FindEqual(VersionIDAndPlatform);
 					if (!pVersion)
-						return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such version: {}", VersionIDAndPlatform)));
+						return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such version: {}", VersionIDAndPlatform)));
 					fTagVersion(*pVersion);
 				}
 				else
@@ -169,7 +169,7 @@ namespace NMib::NCloud::NVersionManager
 
 				VersionResults.f_GetResults() >
 					[
-						Continuation
+						Promise
 						, DeniedTags
 						, ApplicationName = _Params.m_Application
 						, VersionID = _Params.m_VersionID
@@ -183,7 +183,7 @@ namespace NMib::NCloud::NVersionManager
 						if (!_Results)
 						{
 							CStr Error = Auditor.f_Error({"Failed to save version infos. See Version Manager log.", fg_Format("Error: {}", _Results.f_GetExceptionStr())});
-							return Continuation.f_SetException(DMibErrorInstance(Error));
+							return Promise.f_SetException(DMibErrorInstance(Error));
 						}
 
 						bool bFailed = false;
@@ -199,15 +199,15 @@ namespace NMib::NCloud::NVersionManager
 						Auditor.f_Info(fg_Format("Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, Platform, AddTags, RemoveTags));
 
 						if (bFailed)
-							return Continuation.f_SetException(DMibErrorInstance("Failed to save one or more version infos. Consult version manager log files for more info."));
+							return Promise.f_SetException(DMibErrorInstance("Failed to save one or more version infos. Consult version manager log files for more info."));
 
 						CVersionManager::CChangeTags::CResult Result;
 						Result.m_DeniedTags = DeniedTags;
-						Continuation.f_SetResult(fg_Move(Result));
+						Promise.f_SetResult(fg_Move(Result));
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

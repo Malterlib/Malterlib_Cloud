@@ -190,7 +190,7 @@ namespace NMib::NCloud::NAppManager
 		return Return;
 	}
 
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		auto &Application = *_pApplication;
 		if (Application.m_bDeleted)
@@ -316,9 +316,9 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["PreventLaunchUser"] = Application.m_bPreventLaunch_User; 
 		ApplicationJSON["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update;
 		
-		TCContinuation<void> Continuation;
-		mp_State.m_StateDatabase.f_Save() > Continuation;
-		return Continuation;
+		TCPromise<void> Promise;
+		mp_State.m_StateDatabase.f_Save() > Promise;
+		return Promise.f_MoveFuture();
 	}
 	
 	void CAppManagerActor::fsp_CreateApplicationUserGroup
@@ -406,40 +406,40 @@ namespace NMib::NCloud::NAppManager
 		CFile::fs_SetAttributes(_ApplicationDir, gc_RootAttributes);
 	}
 
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
-		mp_AppManagerInterface.m_pActor->f_Stop(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
+		TCPromise<uint32> Promise;
+		mp_AppManagerInterface.m_pActor->f_Stop(_Params["Name"].f_String()) > [Promise](TCAsyncResult<void> &&_Result)
 			{
-				Continuation.f_SetExceptionOrResult(_Result, 0);
+				Promise.f_SetExceptionOrResult(_Result, 0);
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
-		mp_AppManagerInterface.m_pActor->f_Start(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
+		TCPromise<uint32> Promise;
+		mp_AppManagerInterface.m_pActor->f_Start(_Params["Name"].f_String()) > [Promise](TCAsyncResult<void> &&_Result)
 			{
-				Continuation.f_SetExceptionOrResult(_Result, 0);
+				Promise.f_SetExceptionOrResult(_Result, 0);
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
-		mp_AppManagerInterface.m_pActor->f_Restart(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
+		TCPromise<uint32> Promise;
+		mp_AppManagerInterface.m_pActor->f_Restart(_Params["Name"].f_String()) > [Promise](TCAsyncResult<void> &&_Result)
 			{
-				Continuation.f_SetExceptionOrResult(_Result, 0);
+				Promise.f_SetExceptionOrResult(_Result, 0);
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_ClearPreventLaunch(TCSharedPointer<CApplication> const &_pApplication)
+	TCFuture<void> CAppManagerActor::fp_ClearPreventLaunch(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		if (!_pApplication->m_bPreventLaunch_User && !_pApplication->m_bPreventLaunch_Update && !_pApplication->m_bPreventLaunch_DelayAfterFailure)
 			return fg_Explicit();
@@ -448,12 +448,12 @@ namespace NMib::NCloud::NAppManager
 		_pApplication->m_bPreventLaunch_Update = false;
 		_pApplication->m_bPreventLaunch_DelayAfterFailure = false;
 	
-		TCContinuation<void> Continuation;
-		fp_UpdateApplicationJSON(_pApplication) > Continuation % "Failed to save application state";
-		return Continuation;
+		TCPromise<void> Promise;
+		fp_UpdateApplicationJSON(_pApplication) > Promise % "Failed to save application state";
+		return Promise.f_MoveFuture();
 	}
 	
-	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Start(NStr::CStr const &_Name)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Start(NStr::CStr const &_Name)
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -463,52 +463,52 @@ namespace NMib::NCloud::NAppManager
 		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationStart"}};
 		Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		pThis->mp_Permissions.f_HasPermissions("Start application", Permissions)
-			> Continuation % "Permission denied starting application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			> Promise % "Permission denied starting application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application start, command)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application start, command)"));
 
 				if (!_HasPermissions["App"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application start, app name)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application start, app name)"));
 
 				auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
 				if (!pOldApplication)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
 
 				TCSharedPointer<CApplication> pApplication = *pOldApplication;
 
 				if (pApplication->f_IsInProgress())
-					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
+					return Promise.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
 				if (pApplication->m_ProcessLaunch)
-					return Continuation.f_SetException(Auditor.f_Exception("Application already started"));
+					return Promise.f_SetException(Auditor.f_Exception("Application already started"));
 
 				auto InProgressScope = pApplication->f_SetInProgress();
 
-				pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
+				pThis->fp_ClearPreventLaunch(pApplication) > Promise / [=]
 					{
 						pThis->fp_LaunchApp(pApplication, true)
-							> [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<CAppLaunchResult> &&_Result)
+							> [Promise, InProgressScope, Auditor, _Name](TCAsyncResult<CAppLaunchResult> &&_Result)
 							{
 								if (!_Result)
-									return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
+									return Promise.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
 								if (_Result->m_StartupError)
-									return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Application startup failed: {}", _Result->m_StartupError)));
+									return Promise.f_SetException(Auditor.f_Exception(fg_Format("Application startup failed: {}", _Result->m_StartupError)));
 
 								Auditor.f_Info(fg_Format("Started '{}'", _Name));
-								Continuation.f_SetResult();
+								Promise.f_SetResult();
 							}
 						;
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Stop(NStr::CStr const &_Name)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Stop(NStr::CStr const &_Name)
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -518,31 +518,31 @@ namespace NMib::NCloud::NAppManager
 		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationStop"}};
 		Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		pThis->mp_Permissions.f_HasPermissions("Stop application", Permissions)
-			> Continuation % "Permission denied stopping application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			> Promise % "Permission denied stopping application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application stop, command)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application stop, command)"));
 
 				if (!_HasPermissions["App"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application stop, app name)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application stop, app name)"));
 
 				auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
 				if (!pOldApplication)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
 
 				TCSharedPointer<CApplication> pApplication = *pOldApplication;
 
 				if (pApplication->f_IsInProgress())
-					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
+					return Promise.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
 				if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
-					return Continuation.f_SetException(Auditor.f_Exception("Application already stopped"));
+					return Promise.f_SetException(Auditor.f_Exception("Application already stopped"));
 
 				auto InProgressScope = pApplication->f_SetInProgress();
 
-				pApplication->f_Stop(EStopFlag_PreventLaunchUser) > [pThis, pApplication, Continuation, InProgressScope, Auditor](TCAsyncResult<uint32> &&_ExitStatus)
+				pApplication->f_Stop(EStopFlag_PreventLaunchUser) > [pThis, pApplication, Promise, InProgressScope, Auditor](TCAsyncResult<uint32> &&_ExitStatus)
 					{
 						NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
 
@@ -550,20 +550,20 @@ namespace NMib::NCloud::NAppManager
 							Auditor.f_Warning(Error);
 
 						if (!_ExitStatus)
-							return Continuation.f_SetException(Auditor.f_Exception("Failed to exit old application"));
+							return Promise.f_SetException(Auditor.f_Exception("Failed to exit old application"));
 
 						if (pApplication->m_bDeleted)
-							return Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
+							return Promise.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
 
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Restart(NStr::CStr const &_Name)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Restart(NStr::CStr const &_Name)
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -573,28 +573,28 @@ namespace NMib::NCloud::NAppManager
 		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationRestart"}};
 		Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
-		pThis->mp_Permissions.f_HasPermissions("Restart application", Permissions) > Continuation % "Permission denied restarting application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		pThis->mp_Permissions.f_HasPermissions("Restart application", Permissions) > Promise % "Permission denied restarting application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application restart, command)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application restart, command)"));
 
 				if (!_HasPermissions["App"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application restart, app name)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application restart, app name)"));
 
 				auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
 				if (!pOldApplication)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
 
 				TCSharedPointer<CApplication> pApplication = *pOldApplication;
 
 				if (pApplication->f_IsInProgress())
-					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
+					return Promise.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
 
 				auto InProgressScope = pApplication->f_SetInProgress();
 
-				pApplication->f_Stop(EStopFlag_None) > [pThis, pApplication, Continuation, InProgressScope, Auditor, _Name]
+				pApplication->f_Stop(EStopFlag_None) > [pThis, pApplication, Promise, InProgressScope, Auditor, _Name]
 					(TCAsyncResult<uint32> &&_ExitStatus)
 					{
 						NStr::CStr Error = pThis->fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
@@ -603,22 +603,22 @@ namespace NMib::NCloud::NAppManager
 							Auditor.f_Warning(Error);
 
 						if (!_ExitStatus)
-							return Continuation.f_SetException(Auditor.f_Exception("Failed to exit old application"));
+							return Promise.f_SetException(Auditor.f_Exception("Failed to exit old application"));
 
 						if (pApplication->m_bDeleted)
-							return Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
+							return Promise.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
 
-						pThis->fp_ClearPreventLaunch(pApplication) > Continuation / [=]
+						pThis->fp_ClearPreventLaunch(pApplication) > Promise / [=]
 							{
-								pThis->fp_LaunchApp(pApplication, true) > [Continuation, InProgressScope, Auditor, _Name](TCAsyncResult<CAppLaunchResult> &&_Result)
+								pThis->fp_LaunchApp(pApplication, true) > [Promise, InProgressScope, Auditor, _Name](TCAsyncResult<CAppLaunchResult> &&_Result)
 									{
 										if (!_Result)
-											return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
+											return Promise.f_SetException(Auditor.f_Exception(fg_Format("Failed to launch app. Might retry periodically. {}", _Result.f_GetExceptionStr())));
 										if (_Result->m_StartupError)
-											return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Application startup failed: {}", _Result->m_StartupError)));
+											return Promise.f_SetException(Auditor.f_Exception(fg_Format("Application startup failed: {}", _Result->m_StartupError)));
 
 										Auditor.f_Info(fg_Format("Restarted '{}'", _Name));
-										Continuation.f_SetResult();
+										Promise.f_SetResult();
 									}
 								;
 							}
@@ -627,6 +627,6 @@ namespace NMib::NCloud::NAppManager
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

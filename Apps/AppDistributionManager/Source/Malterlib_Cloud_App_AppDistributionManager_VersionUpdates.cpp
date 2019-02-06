@@ -87,7 +87,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		SubscriptionParams.m_fOnNewVersions
 			= [this, Actor = _VersionManagerState.f_GetManager().f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
 			(CVersionManager::CNewVersionNotifications &&_NewVersions) 
-			-> NConcurrency::TCContinuation<CVersionManager::CNewVersionNotifications::CResult>
+			-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 			{
 				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
 				if (!pManager)
@@ -168,7 +168,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			, CVersionManager::CVersionIDAndPlatform const &_VersionID
 			, CStr const &_DestinationDir
 		)
-		-> TCContinuation<CVersionInformation>
+		-> TCFuture<CVersionInformation>
 	{
 		auto &DownloadState = mp_Downloads.f_Insert();
 		auto pDownloadState = &DownloadState;
@@ -177,7 +177,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				mp_Downloads.f_Remove(*pDownloadState);
 			}
 		;
-		TCContinuation<CVersionInformation> Continuation;
+		TCPromise<CVersionInformation> Promise;
 
 		DownloadState.m_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>
 			(
@@ -187,7 +187,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			)
 		;
 		DownloadState.m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, 16*1024*1024, CFileTransferReceive::EReceiveFlag_FailOnExisting)
-			> Continuation % "Failed to initialize file transfer context" 
+			> Promise % "Failed to initialize file transfer context" 
 			/ [=]
 			(CFileTransferContext &&_TransferContext)
 			{
@@ -203,7 +203,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						, fg_Move(StartDownload)
 					)
 					.f_Timeout(30.0, "Timed out waiting for version manager to reply")
-					> Continuation % "Failed to start download on remote server" / [=]
+					> Promise % "Failed to start download on remote server" / [=]
 					(CVersionManager::CStartDownloadVersion::CResult &&_Result)
 					{
 						pDownloadState->m_Subscription = fg_Move(_Result.m_Subscription);
@@ -214,10 +214,10 @@ namespace NMib::NCloud::NAppDistributionManager
 							{
 								pDownloadState->m_Subscription.f_Clear();
 								if (!_Results)
-									Continuation.f_SetException(fg_Move(_Results));
+									Promise.f_SetException(fg_Move(_Results));
 								else
 								{
-									g_Dispatch(mp_FileActor) > [=]() -> TCVector<CStr>
+									g_Dispatch(mp_FileActor) / [=]() -> TCVector<CStr>
 										{
 											TCVector<CStr> RawFiles = CFile::fs_FindFiles(_DestinationDir / "*");
 											TCVector<CStr> Files;
@@ -226,10 +226,10 @@ namespace NMib::NCloud::NAppDistributionManager
 
 											return Files;
 										}
-										> Continuation / [=](TCVector<CStr> &&_Files)
+										> Promise / [=](TCVector<CStr> &&_Files)
 										{
 											(void)pCleanup;
-											Continuation.f_SetResult(CVersionInformation{VersionInfo, fg_Move(_Files)});
+											Promise.f_SetResult(CVersionInformation{VersionInfo, fg_Move(_Files)});
 										}
 									;
 								}
@@ -240,7 +240,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
 	auto CAppDistributionManagerActor::fp_DownloadApplication
@@ -249,7 +249,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			, CVersionManager::CVersionIDAndPlatform const &_VersionID
 			, CStr const &_DestinationDir
 		)
-		-> TCContinuation<CVersionInformation>
+		-> TCFuture<CVersionInformation>
 	{
 		TCSet<TCDistributedActor<CVersionManager>> ManagersToTrySet;
 		struct CState
@@ -287,18 +287,18 @@ namespace NMib::NCloud::NAppDistributionManager
 				return DMibErrorInstance("Found no version managers to check if application exists on");
 		}
 		
-		TCContinuation<CVersionInformation> Continuation;
+		TCPromise<CVersionInformation> Promise;
 		
-		pState->m_fContinue = [this, Continuation, _ApplicationName, _VersionID, _DestinationDir](TCSharedPointer<CState> const &_pState)
+		pState->m_fContinue = [this, Promise, _ApplicationName, _VersionID, _DestinationDir](TCSharedPointer<CState> const &_pState)
 			{
 				if (_pState->m_ManagersToTry.f_IsEmpty())
 				{
-					Continuation.f_SetException(DMibErrorInstance(fg_Format("Failed to download the application from any manager: {}", _pState->m_Errors)));
+					Promise.f_SetException(DMibErrorInstance(fg_Format("Failed to download the application from any manager: {}", _pState->m_Errors)));
 					return;
 				}
 				auto Manager = _pState->m_ManagersToTry.f_Pop();
 				self(&CAppDistributionManagerActor::fp_DownloadApplicationFromManager, Manager, _ApplicationName, _VersionID, _DestinationDir) 
-					> [_pState, Continuation](TCAsyncResult<CVersionInformation> &&_Result)
+					> [_pState, Promise](TCAsyncResult<CVersionInformation> &&_Result)
 					{
 						if (!_Result)
 						{
@@ -306,7 +306,7 @@ namespace NMib::NCloud::NAppDistributionManager
 							_pState->m_fContinue(_pState);
 							return;
 						}
-						Continuation.f_SetResult(fg_Move(*_Result));
+						Promise.f_SetResult(fg_Move(*_Result));
 					}
 				;
 			}
@@ -314,6 +314,6 @@ namespace NMib::NCloud::NAppDistributionManager
 		
 		pState->m_fContinue(pState);
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

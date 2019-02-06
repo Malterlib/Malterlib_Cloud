@@ -69,18 +69,18 @@ namespace NMib::NCloud::NSecretsManager
 		CSecretsManagerServerDatabase(NStr::CStr const &_Path, NContainer::CSecureByteVector const &_Key);
 		~CSecretsManagerServerDatabase();
 		
-		NConcurrency::TCContinuation<void> f_Initialize();
-		NConcurrency::TCContinuation<void> f_WriteDatabase(CSecretsDatabase &&_Database);
-		NConcurrency::TCContinuation<CSecretsDatabase> f_ReadDatabase();
+		NConcurrency::TCFuture<void> f_Initialize();
+		NConcurrency::TCFuture<void> f_WriteDatabase(CSecretsDatabase &&_Database);
+		NConcurrency::TCFuture<CSecretsDatabase> f_ReadDatabase();
 
 	private:
 		void fp_WriteDatabase(CSecretsDatabase const &_Database);
 		void fp_ReadDatabase(CSecretsDatabase *_pDatabase);
-		TCContinuation<void> fp_Destroy() override;
+		TCFuture<void> fp_Destroy() override;
 		static NContainer::CSecureByteVector fsp_ComputeSalt(CSecretsDatabaseIV const &_Salt);
 
 		TCSharedPointer<CSecretsDatabase> mp_pPendingWrite;
-		TCVector<TCContinuation<void>> mp_PendingWriteContinuations;
+		TCVector<TCPromise<void>> mp_PendingWritePromises;
 		NStr::CStr mp_Path;
 		NContainer::CSecureByteVector const mp_Key;
 		CSecretsDatabaseIV mp_IVSalt;

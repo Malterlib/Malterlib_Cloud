@@ -43,7 +43,7 @@ namespace NMib::NCloud::NPrivate
 		
 		void f_BackupFinishedStarting();
 		void f_MarkActive(bool _bActive);
-		TCContinuation<void> f_ManifestChanged
+		TCFuture<void> f_ManifestChanged
 			(
 			 	CStr const &_FileName
 			 	, CBackupManagerBackup::CManifestChange const &_ManifestChange
@@ -106,7 +106,7 @@ namespace NMib::NCloud::NPrivate
 		struct CManifestChangeInfo
 		{
 			CBackupManagerBackup::CManifestChange m_ManifestChange;
-			TCContinuation<void> m_Continuation;
+			TCPromise<void> m_Promise;
 			bool m_bDirty = false;
 		};
 		
@@ -140,19 +140,19 @@ namespace NMib::NCloud::NPrivate
 			CManifestChangeInfo m_Info;
 		};
 
-		TCContinuation<void> fp_Destroy() override;
+		TCFuture<void> fp_Destroy() override;
 		void fp_StartBackup();
 		void fp_BackupNotification(CBackupManagerClient::CNotification &&_Notification);
 		void fp_ReportBackupError(CStr const &_Error, bool _bFatal);
 
-		TCContinuation<void> fp_SyncManifest();
+		TCFuture<void> fp_SyncManifest();
 		
 		void fp_ProcessBackupQueue();
 		void fp_RSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, CPendingBackupFile &_PendingFile, mint _SyncSequence);
 		void fp_SendAppendSyncFile
 			(
 				TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState
-				, TCContinuation<bool> const &_Continuation
+				, TCPromise<bool> const &_Promise
 				, uint64 _Length
 				, TCSharedPointer<CAppendFileCache> const &_pFile
 			 	, bool _bForceSync

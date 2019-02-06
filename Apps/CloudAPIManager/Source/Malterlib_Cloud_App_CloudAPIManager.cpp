@@ -21,15 +21,15 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 	}
 
-	TCContinuation<void> CCloudAPIManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CCloudAPIManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		mp_pServer = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);
-		Continuation.f_SetResult();
-		return Continuation;				
+		Promise.f_SetResult();
+		return Promise.f_MoveFuture();				
 	}
 	
-	TCContinuation<void> CCloudAPIManagerDaemonActor::fp_StopApp()
+	TCFuture<void> CCloudAPIManagerDaemonActor::fp_StopApp()
 	{	
 		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
 		
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			mp_pServer = nullptr;
 		}
 		
-		return pCanDestroy->m_Continuation;
+		return pCanDestroy->f_Future();
 	}
 }
 

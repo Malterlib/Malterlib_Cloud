@@ -5,7 +5,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_ChangeSettings
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_ChangeSettings
 		(
 			NStr::CStr const &_Name
 			, CApplicationChangeSettings const &_ChangeSettings
@@ -30,7 +30,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NAppManager
 				return DMibErrorInstance(Error);
 		}
 
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		
 		fp_ChangeApplicationSettings
 			(
@@ -63,14 +63,14 @@ namespace NMib::NCloud::NAppManager
 			)
 			> [=](TCAsyncResult<void> &&_Result)
 			{
-				Continuation.f_SetResult(_pCommandLine->f_AddAsyncResult(_Result));
+				Promise.f_SetResult(_pCommandLine->f_AddAsyncResult(_Result));
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_ChangeApplicationSettings
+	TCFuture<void> CAppManagerActor::fp_ChangeApplicationSettings
 		(
 			NStr::CStr const &_Name
 			, CApplicationSettings const &_Settings
@@ -91,26 +91,26 @@ namespace NMib::NCloud::NAppManager
 			CStr const &App = _Settings.m_VersionManagerApplication;
 			Permissions["Version"] ={CPermissionQuery{"AppManager/VersionAppAll", "AppManager/VersionApp/{}"_f << App}.f_Description("Access application {} in AppManager"_f << App)};
 		}
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		mp_Permissions.f_HasPermissions("Change applications settings in AppManager", Permissions)
-			> Continuation % "Permission denied changing application settings" % Auditor / [=, fOnInfo = fg_Move(_fOnInfo)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			> Promise % "Permission denied changing application settings" % Auditor / [=, fOnInfo = fg_Move(_fOnInfo)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application change settings, command)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application change settings, command)"));
 
 				if (!_HasPermissions["App"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application change settings, app name)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application change settings, app name)"));
 
 				if (auto *pVersion = _HasPermissions.f_FindEqual("Version"))
 				{
 					if (!*pVersion)
-						return Continuation.f_SetException(Auditor.f_AccessDenied("(Application change settings, version application)"));
+						return Promise.f_SetException(Auditor.f_AccessDenied("(Application change settings, version application)"));
 				}
 
 				auto *pApplication = mp_Applications.f_FindEqual(_Name);
 				if (!pApplication)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
 				auto &Application = **pApplication;
 
 				CApplicationSettings Settings;
@@ -119,14 +119,14 @@ namespace NMib::NCloud::NAppManager
 				if (_bUpdateFromVersionInfo)
 				{
 					if (!Application.m_LastInstalledVersion.f_IsValid())
-						return Continuation.f_SetException(Auditor.f_Exception("Found no install from last version to get settings from"));
+						return Promise.f_SetException(Auditor.f_Exception("Found no install from last version to get settings from"));
 					try
 					{
 						Settings.f_FromVersionInfo(Application.m_LastInstalledVersionInfo, ChangedSettings);
 					}
 					catch (CException const &_Exception)
 					{
-						return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to get settings from version info: {}", _Exception)));
+						return Promise.f_SetException(Auditor.f_Exception(fg_Format("Failed to get settings from version info: {}", _Exception)));
 					}
 				}
 
@@ -139,7 +139,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					CStr Error;
 					if (!NewSettings.f_Validate(Error))
-						return Continuation.f_SetException(Auditor.f_Exception(Error));
+						return Promise.f_SetException(Auditor.f_Exception(Error));
 				}
 
 				ChangedSettings = Application.m_Settings.f_ChangedSettings(NewSettings);
@@ -153,19 +153,19 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 				if (ChangedSettings & EApplicationSetting_EncryptionStorage)
-					return Continuation.f_SetException(Auditor.f_Exception("Changing encryption storage is not supported"));
+					return Promise.f_SetException(Auditor.f_Exception("Changing encryption storage is not supported"));
 				if (ChangedSettings & EApplicationSetting_EncryptionFileSystem)
-					return Continuation.f_SetException(Auditor.f_Exception("Changing encryption file system is not supported"));
+					return Promise.f_SetException(Auditor.f_Exception("Changing encryption file system is not supported"));
 				if (ChangedSettings & EApplicationSetting_ParentApplication)
-					return Continuation.f_SetException(Auditor.f_Exception("Changing parent application is not supported"));
+					return Promise.f_SetException(Auditor.f_Exception("Changing parent application is not supported"));
 				if (ChangedSettings == EApplicationSetting_None && !_bForce)
 				{
 					fOnInfo("No settings were changed. To update file permissions run with --force");
-					return Continuation.f_SetResult();
+					return Promise.f_SetResult();
 				}
 
 				if (Application.f_IsInProgress())
-					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
+					return Promise.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
 
 				auto InProgressScope = Application.f_SetInProgress();
 
@@ -176,36 +176,36 @@ namespace NMib::NCloud::NAppManager
 						fp_OnAppUpdateInfoChange(*pApplication);
 					fOnInfo("Saving application state");
 					fp_UpdateApplicationJSON(*pApplication)
-						> Continuation % "Failed to save application state" % Auditor / [=, pApplication = *pApplication]
+						> Promise % "Failed to save application state" % Auditor / [=, pApplication = *pApplication]
 						{
-							TCContinuation<void> ChangeBackupContinuation;
+							TCPromise<void> ChangeBackupPromise;
 							if (ChangedSettings & EApplicationSetting_BackupEnabled)
 							{
 								auto &Application = *pApplication;
 								if (Application.m_Settings.m_bBackupEnabled)
 								{
 									fp_ApplicationStartBackup(pApplication);
-									ChangeBackupContinuation.f_SetResult();
+									ChangeBackupPromise.f_SetResult();
 								}
 								else
 								{
 									if (Application.m_BackupClient)
 									{
-										Application.m_BackupClient->f_Destroy() > ChangeBackupContinuation;
+										Application.m_BackupClient->f_Destroy() > ChangeBackupPromise;
 										Application.m_BackupClient.f_Clear();
 									}
 									else
-										ChangeBackupContinuation.f_SetResult();
+										ChangeBackupPromise.f_SetResult();
 								}
 							}
 							else
-								ChangeBackupContinuation.f_SetResult();
+								ChangeBackupPromise.f_SetResult();
 
-							ChangeBackupContinuation > Continuation % "Failed to stop backup client" % Auditor / [=, InProgressScope = InProgressScope]
+							ChangeBackupPromise > Promise % "Failed to stop backup client" % Auditor / [=, InProgressScope = InProgressScope]
 								{
 									fOnInfo("Application settings were successfully changed");
 									Auditor.f_Info("Updated application settings (No restart required)");
-									Continuation.f_SetResult();
+									Promise.f_SetResult();
 								}
 							;
 						}
@@ -218,12 +218,12 @@ namespace NMib::NCloud::NAppManager
 					{
 						if (!_Result)
 						{
-							Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to open encryption: {}", _Result.f_GetExceptionStr())));
+							Promise.f_SetException(Auditor.f_Exception(fg_Format("Failed to open encryption: {}", _Result.f_GetExceptionStr())));
 							return;
 						}
 						if (pApplication->m_bDeleted)
 						{
-							Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
+							Promise.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
 							return;
 						}
 
@@ -240,13 +240,13 @@ namespace NMib::NCloud::NAppManager
 
 								if (!_ExitStatus)
 								{
-									Continuation.f_SetException(Auditor.f_Exception("Failed to exit old application, aborting update"));
+									Promise.f_SetException(Auditor.f_Exception("Failed to exit old application, aborting update"));
 									return;
 								}
 
 								if (pApplication->m_bDeleted)
 								{
-									Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
+									Promise.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
 									return;
 								}
 
@@ -271,15 +271,15 @@ namespace NMib::NCloud::NAppManager
 										if (!_Result)
 										{
 											bError = true;
-											Continuation.f_SetException(Auditor.f_Exception(fg_Format("Failed to update application files: {}", _Result.f_GetExceptionStr())));
+											Promise.f_SetException(Auditor.f_Exception(fg_Format("Failed to update application files: {}", _Result.f_GetExceptionStr())));
 										}
 
 										if (!_UpdateJSONResults)
 										{
 											bError = true;
 											auto Exception = Auditor.f_Exception(fg_Format("Failed to save application state: {}", _UpdateJSONResults.f_GetExceptionStr()));
-											if (!Continuation.f_IsSet())
-												Continuation.f_SetException(Exception);
+											if (!Promise.f_IsSet())
+												Promise.f_SetException(Exception);
 										}
 										else
 											fOnInfo("Application state successfully stored, so any changes will persist");
@@ -289,7 +289,7 @@ namespace NMib::NCloud::NAppManager
 
 										if (pApplication->m_bDeleted)
 										{
-											Continuation.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
+											Promise.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
 											return;
 										}
 
@@ -301,20 +301,20 @@ namespace NMib::NCloud::NAppManager
 										{
 											fOnInfo(fg_Format("Application settings were successfully changed. Launch skipped because of missing dependencies: {}", DependenciesMessage));
 											Auditor.f_Info("Updated application settings");
-											Continuation.f_SetResult();
+											Promise.f_SetResult();
 											return;
 										}
 
 										fOnInfo("Launching applicaion with changed settings");
 
 										fp_LaunchApp(pApplication, false)
-											> Continuation % "Failed to launch app. Will retry periodically." % Auditor / [=, InProgressScope = InProgressScope](CAppLaunchResult &&_Result)
+											> Promise % "Failed to launch app. Will retry periodically." % Auditor / [=, InProgressScope = InProgressScope](CAppLaunchResult &&_Result)
 											{
 												fOnInfo("Application settings were successfully changed");
 												if (_Result.m_StartupError)
 													fOnInfo("Application startup failed: {}"_f << _Result.m_StartupError);
 												Auditor.f_Info("Updated application settings");
-												Continuation.f_SetResult();
+												Promise.f_SetResult();
 											}
 										;
 									}
@@ -325,6 +325,6 @@ namespace NMib::NCloud::NAppManager
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

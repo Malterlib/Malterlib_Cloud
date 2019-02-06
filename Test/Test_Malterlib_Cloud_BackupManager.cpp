@@ -186,7 +186,7 @@ public:
 		{
 			TCSharedPointer<NConcurrency::CActorSubscription> pManifestFinished = fg_Construct();
 			TCSharedPointer<TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup>> pBackupInterface = fg_Construct();
-			TCContinuation<void> ReceivedManifestFinished;
+			TCPromise<void> ReceivedManifestFinished;
 			m_BackupClient = fg_Construct
 				(
 					m_BackupConfig
@@ -196,7 +196,7 @@ public:
 						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
 						, CActorSubscription &&_ManifestFinished
 						, CStr const &_BackupRoot
-					) -> TCContinuation<TCActorSubscriptionWithID<>>
+					) -> TCFuture<TCActorSubscriptionWithID<>>
 					{
 						*pManifestFinished = fg_Move(_ManifestFinished);
 						*pBackupInterface = fg_Move(_BackupInterface);
@@ -224,7 +224,7 @@ public:
 					| CBackupManagerClient::ENotification_Unquiescent
 					| CBackupManagerClient::ENotification_InitialFinished
 					, g_ActorFunctor / [pState = m_pState, ReceivedManifestFinished](NConcurrency::CHostInfo const &_RemoteHost, CBackupManagerClient::CNotification &&_Notification)
-					-> NConcurrency::TCContinuation<void>
+					-> NConcurrency::TCFuture<void>
 					{
 #ifdef DMibCloudBackupManagerDebug
 						switch (_Notification.f_GetTypeID())
@@ -632,20 +632,20 @@ public:
 				
 				auto pBackupManagerTrustInner = BackupManagerInner.m_pTrustInterface;
 				
-				TCContinuation<void> Continuation;
+				TCPromise<void> Promise;
 				DMibCallActor
 					(
 					 	BackupManagerTrust
 					 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
 					 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{BackupManager.m_Address}
 					)
-					> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
+					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &BackupManagerTrustInner = *pBackupManagerTrustInner;
-						DMibCallActor(BackupManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Continuation.f_ReceiveAny();
+						DMibCallActor(BackupManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 					}
 				;
-				Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
+				Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
 
 			}
 		}

@@ -144,11 +144,11 @@ namespace NMib::NCloud::NVersionManager
 			fSendForSubscriptions(Subscriptions, mp_VersionSubscriptions.fs_GetKey(Subscriptions));
 	}
 	
-	TCContinuation<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr const &_ApplicationName, CSubscription const &_Subscription)
+	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr const &_ApplicationName, CSubscription const &_Subscription)
 	{
-		auto fSendInitialForApplication = [&](CStr const &_Application) -> TCContinuation<TCVector<CVersionManager::CNewVersionNotification>>
+		auto fSendInitialForApplication = [&](CStr const &_Application) -> TCFuture<TCVector<CVersionManager::CNewVersionNotification>>
 			{
-				TCContinuation<TCVector<CVersionManager::CNewVersionNotification>> Continuation;
+				TCPromise<TCVector<CVersionManager::CNewVersionNotification>> Promise;
 				mp_Permissions.f_HasPermission
 					(
 						"Receive VersionManager version update notification"
@@ -156,7 +156,7 @@ namespace NMib::NCloud::NVersionManager
 						, _Subscription.m_CallingHostInfo
 					)
 					.f_Dispatch().f_Timeout(60.0, "Timed out checking permissions for sending version update subscription")
-					> Continuation / [=, SubscriptionID = _Subscription.f_GetSubscriptionID()](bool _bHasPermission)
+					> Promise / [=, SubscriptionID = _Subscription.f_GetSubscriptionID()](bool _bHasPermission)
 					{
 						CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, SubscriptionID);
 
@@ -180,10 +180,10 @@ namespace NMib::NCloud::NVersionManager
 								--nToSend;
 							}
 						}
-						Continuation.f_SetResult(NewVersionNotifications);
+						Promise.f_SetResult(NewVersionNotifications);
 					}
 				;
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		;
 		TCActorResultVector<TCVector<CVersionManager::CNewVersionNotification>> NewVersionNotificationResults;
@@ -195,15 +195,15 @@ namespace NMib::NCloud::NVersionManager
 		else if (auto *pApplication = mp_Applications.f_FindEqual(_ApplicationName))
 			fSendInitialForApplication(mp_Applications.fs_GetKey(pApplication)) > NewVersionNotificationResults.f_AddResult();
 		
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		NewVersionNotificationResults.f_GetResults()
-			> Continuation / [this, Continuation, _ApplicationName, SubscriptionID = _Subscription.f_GetSubscriptionID()]
+			> Promise / [this, Promise, _ApplicationName, SubscriptionID = _Subscription.f_GetSubscriptionID()]
 			(TCVector<TCAsyncResult<TCVector<CVersionManager::CNewVersionNotification>>> &&_Results)
 			{
 				CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, SubscriptionID);
 
 				if (!pSubscription)
-					return Continuation.f_SetResult();
+					return Promise.f_SetResult();
 
 				CVersionManager::CNewVersionNotifications NewVersionNotifications;
 				NewVersionNotifications.m_bFullResend = true;
@@ -227,14 +227,14 @@ namespace NMib::NCloud::NVersionManager
 
 				pSubscription->f_SendVersions(NewVersionNotifications);
 
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) -> TCContinuation<CSubscribeToUpdates::CResult> 
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) -> TCFuture<CSubscribeToUpdates::CResult>
 	{
 		auto pThis = m_pThis;
 		
@@ -282,23 +282,23 @@ namespace NMib::NCloud::NVersionManager
 		if (!_Params.m_nInitial)
 			return fg_Explicit(fg_Move(Result));
 
-		TCContinuation<CSubscribeToUpdates::CResult> Continuation;
+		TCPromise<CSubscribeToUpdates::CResult> Promise;
 		pThis->fp_SendSubscriptionInitial(_Params.m_Application, Subscription)
-			> Continuation / [Continuation, DispatchActor = Subscription.m_DispatchActor, Result = fg_Move(Result)] () mutable
+			> Promise / [Promise, DispatchActor = Subscription.m_DispatchActor, Result = fg_Move(Result)] () mutable
 			{
 				if (DispatchActor.f_IsEmpty())
-					return Continuation.f_SetResult(fg_Move(Result));
+					return Promise.f_SetResult(fg_Move(Result));
 
 				// Because versions are dispatched through m_DispatchActor we need to dispatch the result to get correct ordering
-				g_Dispatch(DispatchActor) / [Continuation, Result = fg_Move(Result)]() mutable
+				g_Dispatch(DispatchActor) / [Promise, Result = fg_Move(Result)]() mutable
 					{
-						Continuation.f_SetResult(fg_Move(Result));
+						Promise.f_SetResult(fg_Move(Result));
 					}
 					> fg_DiscardResult()
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }
 

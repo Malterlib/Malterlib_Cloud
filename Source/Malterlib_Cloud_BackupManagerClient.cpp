@@ -17,7 +17,7 @@ namespace NMib::NCloud
 			, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
 			, TCActorFunctor
 			<
-				TCContinuation<TCActorSubscriptionWithID<>>
+				TCFuture<TCActorSubscriptionWithID<>>
 				(
 					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
 					, CActorSubscription &&_ManifestFinished
@@ -36,7 +36,7 @@ namespace NMib::NCloud
 
 	CBackupManagerClient::~CBackupManagerClient() = default;
 
-	NConcurrency::TCContinuation<void> CBackupManagerClient::f_StartBackup()
+	NConcurrency::TCFuture<void> CBackupManagerClient::f_StartBackup()
 	{
 		auto &Internal = *mp_pInternal;
 		if (Internal.m_bStarted)
@@ -59,7 +59,7 @@ namespace NMib::NCloud
 	}
 
 
-	NConcurrency::TCContinuation<void> CBackupManagerClient::fp_Destroy()
+	NConcurrency::TCFuture<void> CBackupManagerClient::fp_Destroy()
 	{
 		auto &Internal = *mp_pInternal;
 		*Internal.m_pDestroyed = true;
@@ -71,8 +71,8 @@ namespace NMib::NCloud
 		
 		Internal.m_RunningBackupInstances.f_Clear();
 		
-		NConcurrency::TCContinuation<void> Continuation;
-		RunningInstancesDestroys.f_GetResults() > Continuation / [this, Continuation]
+		NConcurrency::TCPromise<void> Promise;
+		RunningInstancesDestroys.f_GetResults() > Promise / [this, Promise]
 			{
 				auto &Internal = *mp_pInternal;
 				
@@ -81,7 +81,7 @@ namespace NMib::NCloud
 				for (auto &fOnStopped : Internal.m_OnBackupStoppedSubscriptions)
 					fOnStopped() > StoppedNotifications.f_AddResult();
 				
-				StoppedNotifications.f_GetResults() > Continuation / [this, Continuation]
+				StoppedNotifications.f_GetResults() > Promise / [this, Promise]
 					{
 						auto &Internal = *mp_pInternal;
 				
@@ -91,18 +91,18 @@ namespace NMib::NCloud
 						
 						auto pTracker = fg_Move(Internal.m_pCanDestroyTracker);
 						
-						pTracker->m_Continuation.f_Dispatch() > Destroys.f_AddResult();  
+						pTracker->f_Future() > Destroys.f_AddResult();  
 						
-						Destroys.f_GetResults() > Continuation / [this, Continuation](TCVector<TCAsyncResult<void>> &&_Results)
+						Destroys.f_GetResults() > Promise / [this, Promise](TCVector<TCAsyncResult<void>> &&_Results)
 							{
 								auto &Internal = *mp_pInternal;
 								g_Dispatch(Internal.m_FileActor) / [AppendStates = fg_Move(Internal.m_AppendStates)]
 									{
 									}
-									> Continuation / [this, Continuation]
+									> Promise / [this, Promise]
 									{
 										auto &Internal = *mp_pInternal;
-										Internal.m_FileActor->f_Destroy() > Continuation;
+										Internal.m_FileActor->f_Destroy() > Promise;
 									}
 								;
 								
@@ -113,7 +113,7 @@ namespace NMib::NCloud
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	void CBackupManagerClient::CInternal::fs_CheckDestroy(TCSharedPointer<NAtomic::TCAtomic<bool>> const &_pDestroyed)

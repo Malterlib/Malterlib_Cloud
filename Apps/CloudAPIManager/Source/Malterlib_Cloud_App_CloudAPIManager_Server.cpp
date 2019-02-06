@@ -63,9 +63,9 @@ namespace NMib::NCloud::NCloudAPIManager
 		;
 	}
 	
-	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions()
+	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions()
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
 		TCSet<CStr> Permissions;
 		
@@ -88,17 +88,17 @@ namespace NMib::NCloud::NCloudAPIManager
 		SubscribePermissions.f_Insert("ObjectStorage/*");
 	
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
-			> Continuation / [this, Continuation](CTrustedPermissionSubscription &&_Subscription)
+			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
 			{
 				mp_Permissions = fg_Move(_Subscription);
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs()
+	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs()
 	{
 		if (auto const *pCloudContexts = mp_AppState.m_ConfigDatabase.m_Data.f_GetMember("CloudContexts", EJSONType_Object))
 		{
@@ -131,13 +131,13 @@ namespace NMib::NCloud::NCloudAPIManager
 		return fg_Explicit();
 	}
 	
-	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::fp_Destroy()
+	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_Destroy()
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
 		if (mp_CURLQueryActor)
 			mp_CURLQueryActor->f_Destroy() > pCanDestroy->f_Track();
-		return pCanDestroy->m_Continuation;
+		return pCanDestroy->f_Future();
 	}
 	
 	TCActor<CSeparateThreadActor> const &CCloudAPIManagerDaemonActor::CServer::fp_GetCURLQueryActor()

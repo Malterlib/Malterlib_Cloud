@@ -23,11 +23,11 @@ namespace NMib::NCloud::NSecretsManager
 		~CServerController();
 
 #if DMibConfig_Tests_Enable
-		TCContinuation<CEJSON> f_Test_Command(CStr const &_Command, CEJSON const &_Params);
+		TCFuture<CEJSON> f_Test_Command(CStr const &_Command, CEJSON const &_Params);
 #endif
 
 	private:
-		TCContinuation<void> fp_Destroy() override;
+		TCFuture<void> fp_Destroy() override;
 		void fp_Init();
 		void fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> const &_KeyManager);
 		

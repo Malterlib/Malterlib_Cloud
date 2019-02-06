@@ -12,7 +12,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		;
 	}
 
-	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionChangeSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionChangeSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 
@@ -44,16 +44,16 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		fp_SaveState(Distribution);
 
-		TCContinuation<uint32> Continuation;
-		mp_State.m_StateDatabase.f_Save() > Continuation % "[Change distribution settings] Failed to save state" % Auditor / [Continuation, Name, Auditor]() mutable
+		TCPromise<uint32> Promise;
+		mp_State.m_StateDatabase.f_Save() > Promise % "[Change distribution settings] Failed to save state" % Auditor / [Promise, Name, Auditor]() mutable
 			{
 				Auditor.f_Info("Changed distribution settings '{}'"_f << Name);
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 
 		fp_AutoUpdate_Update();
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

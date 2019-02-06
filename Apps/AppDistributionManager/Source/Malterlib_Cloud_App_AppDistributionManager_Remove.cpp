@@ -7,7 +7,7 @@
 
 namespace NMib::NCloud::NAppDistributionManager
 {
-	TCContinuation<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionRemove(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionRemove(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 
@@ -24,17 +24,17 @@ namespace NMib::NCloud::NAppDistributionManager
 				pDistributionState->f_RemoveMember(Name);
 		}
 
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
-		mp_State.m_StateDatabase.f_Save() > Continuation % "[Remove distribution] Failed to save state" % Auditor / [Continuation, Name, Auditor]() mutable
+		mp_State.m_StateDatabase.f_Save() > Promise % "[Remove distribution] Failed to save state" % Auditor / [Promise, Name, Auditor]() mutable
 			{
 				Auditor.f_Info(fg_Format("Removed distribution '{}'", Name));
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 
 		fp_AutoUpdate_Update();
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

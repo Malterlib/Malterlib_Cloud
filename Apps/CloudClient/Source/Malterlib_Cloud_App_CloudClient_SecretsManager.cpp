@@ -471,13 +471,13 @@ namespace NMib::NCloud::NCloudClient
 		return {};
 	}
 
-	TCContinuation<void> CCloudClientAppActor::fp_SecretsManager_SubscribeToServers()
+	TCFuture<void> CCloudClientAppActor::fp_SecretsManager_SubscribeToServers()
 	{
 		if (!mp_SecretsManagers.f_IsEmpty())
 			return fg_Explicit();
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to secrets managers");
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		mp_State.m_TrustManager
 			(
@@ -485,32 +485,32 @@ namespace NMib::NCloud::NCloudClient
 				, "com.malterlib/Cloud/SecretsManager"
 				, fg_ThisActor(this)
 			)
-			> [this, Continuation](TCAsyncResult<TCTrustedActorSubscription<CSecretsManager>> &&_Subscription)
+			> [this, Promise](TCAsyncResult<TCTrustedActorSubscription<CSecretsManager>> &&_Subscription)
 			{
 				if (!_Subscription)
 				{
 					DMibLogWithCategory(Malterlib/Cloud/CloudClient, Error, "Failed to subscribe to secrets managers: {}", _Subscription.f_GetExceptionStr());
-					Continuation.f_SetException(_Subscription);
+					Promise.f_SetException(_Subscription);
 					return;
 				}
 				mp_SecretsManagers = fg_Move(*_Subscription);
 				if (mp_SecretsManagers.m_Actors.f_IsEmpty())
 				{
-					Continuation.f_SetException(DMibErrorInstance("Not connected to any secrets managers, or they are not trusted for 'com.malterlib/Cloud/SecretsManager' namespace"));
+					Promise.f_SetException(DMibErrorInstance("Not connected to any secrets managers, or they are not trusted for 'com.malterlib/Cloud/SecretsManager' namespace"));
 					return;
 				}
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	template<typename tf_CType>
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Enumerate
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Enumerate
 		(
 		 	CEJSON const &_Params
 		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-			, TCFunction<TCContinuation<tf_CType>
+			, TCFunction<TCFuture<tf_CType>
 	 		(
 			 	TCDistributedActor<CSecretsManager> const &_Actor
 			 	, TCOptional<CStrSecure> const &_SemanticID
@@ -519,7 +519,7 @@ namespace NMib::NCloud::NCloudClient
 			, TCFunction<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 		)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		bool bBinaryAsBase64 = true;
 		if (auto pValue = _Params.f_GetMember("BinaryAsBase64"))
 			bBinaryAsBase64 = pValue->f_Boolean();
@@ -535,8 +535,8 @@ namespace NMib::NCloud::NCloudClient
 		{
 			if (!CSecretsManager::fs_IsValidTag(ID))
 			{
-				Continuation.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid Semantic ID", ID)));
-				return Continuation;
+				Promise.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid Semantic ID", ID)));
+				return Promise.f_MoveFuture();
 			}
 			SemanticID = ID;
 		}
@@ -547,14 +547,14 @@ namespace NMib::NCloud::NCloudClient
 			CStr const &Tag = TagJSON.f_String();
 			if (!CSecretsManager::fs_IsValidTag(Tag))
 			{
-				Continuation.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag)));
-				return Continuation;
+				Promise.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag)));
+				return Promise.f_MoveFuture();
 			}
 			Tags[Tag];
 		}
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
-			> Continuation / [=]
+			> Promise / [=]
 			{
 				TCActorResultMap<CHostInfo, tf_CType> Secrets;
 
@@ -568,7 +568,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 
-				Secrets.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<tf_CType>> &&_Results)
+				Secrets.f_GetResults() > Promise / [=](TCMap<CHostInfo, TCAsyncResult<tf_CType>> &&_Results)
 					{
 						tf_CType *pFirstResult = nullptr;
 
@@ -583,25 +583,25 @@ namespace NMib::NCloud::NCloudClient
 							if (!pFirstResult)
 								pFirstResult = &*Result;
 							else if (*pFirstResult != *Result)
-								return Continuation.f_SetException(DMibErrorInstance("Data inconsistency between secrets managers. Please try again later."));
+								return Promise.f_SetException(DMibErrorInstance("Data inconsistency between secrets managers. Please try again later."));
 						}
 
 						if (pFirstResult)
 						{
 							if (auto ErrorStr = _fOnResult(pFirstResult, _pCommandLine, Expect, bBinaryAsBase64))
-								return Continuation.f_SetException(DMibErrorInstance(ErrorStr));
+								return Promise.f_SetException(DMibErrorInstance(ErrorStr));
 						}
 						else
-							return Continuation.f_SetException(DMibErrorInstance("No secrets found on any connected secret manager"));
-						Continuation.f_SetResult(0);
+							return Promise.f_SetException(DMibErrorInstance("No secrets found on any connected secret manager"));
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		return fp_CommandLine_SecretsManager_Enumerate<TCSet<CSecretsManager::CSecretID>>
 			(
@@ -623,7 +623,7 @@ namespace NMib::NCloud::NCloudClient
 
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID
 		(
 		 	CEJSON const &_Params
 		 	, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
@@ -639,7 +639,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
-					TCContinuation<uint32> Continuation;
+					TCPromise<uint32> Promise;
 					auto &Secret = *_pResult;
 
 					if (auto Error = fsp_SecretsManager_CheckExpect(Secret, _Expect, _bBinaryAsBase64))
@@ -658,15 +658,15 @@ namespace NMib::NCloud::NCloudClient
 	}
 
 	template<typename tf_CType>
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Get
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Get
 		(
 		 	CEJSON const &_Params
 		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-			, TCFunction<TCContinuation<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
+			, TCFunction<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
 			, TCFunction<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 		)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -684,7 +684,7 @@ namespace NMib::NCloud::NCloudClient
 			return DMibErrorInstance(Error);
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
-			> Continuation / [=]
+			> Promise / [=]
 			{
 				TCActorResultMap<CHostInfo, tf_CType> Secrets;
 
@@ -698,7 +698,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 
-				Secrets.f_GetResults() > Continuation / [=](TCMap<CHostInfo, TCAsyncResult<tf_CType>> &&_Results)
+				Secrets.f_GetResults() > Promise / [=](TCMap<CHostInfo, TCAsyncResult<tf_CType>> &&_Results)
 					{
 						tf_CType *pFirstResult = nullptr;
 
@@ -713,26 +713,26 @@ namespace NMib::NCloud::NCloudClient
 							if (!pFirstResult)
 								pFirstResult = &*Result;
 							else if (*pFirstResult != *Result)
-								return Continuation.f_SetException(DMibErrorInstance("Data inconsistency between secrets managers. Please try again later."));
+								return Promise.f_SetException(DMibErrorInstance("Data inconsistency between secrets managers. Please try again later."));
 						}
 
 						if (pFirstResult)
 						{
 							if (auto ErrorStr = _fOnResult(pFirstResult, _pCommandLine, Expect, bBinaryAsBase64))
-								return Continuation.f_SetException(DMibErrorInstance(ErrorStr));
+								return Promise.f_SetException(DMibErrorInstance(ErrorStr));
 						}
 						else
-							return Continuation.f_SetException(DMibErrorInstance("No secrets found on any connected secret manager"));
+							return Promise.f_SetException(DMibErrorInstance("No secrets found on any connected secret manager"));
 
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		return fp_CommandLine_SecretsManager_Get<CSecretsManager::CSecret>
 			(
@@ -744,7 +744,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
-					TCContinuation<uint32> Continuation;
+					TCPromise<uint32> Promise;
 					auto &Secret = *_pResult;
 
 					if (auto Error = fsp_SecretsManager_CheckExpect(Secret, _Expect, _bBinaryAsBase64))
@@ -761,7 +761,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		return fp_CommandLine_SecretsManager_Get<CSecretsManager::CSecretProperties>
 			(
@@ -806,9 +806,9 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		bool bBinaryAsBase64 = _Params["BinaryAsBase64"].f_Boolean();
@@ -870,8 +870,8 @@ namespace NMib::NCloud::NCloudClient
 			auto ID = pValue->f_String();
 			if (!CSecretsManager::fs_IsValidTag(ID))
 			{
-				Continuation.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid SemanticID", ID)));
-				return Continuation;
+				Promise.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid SemanticID", ID)));
+				return Promise.f_MoveFuture();
 			}
 			Properties.f_SetSemanticID(ID);
 			++nSetProperties;
@@ -885,8 +885,8 @@ namespace NMib::NCloud::NCloudClient
 				CStr const &Tag = TagJSON.f_String();
 				if (!CSecretsManager::fs_IsValidTag(Tag))
 				{
-					Continuation.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag)));
-					return Continuation;
+					Promise.f_SetException(DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag)));
+					return Promise.f_MoveFuture();
 				}
 				Tags[Tag];
 			}
@@ -894,7 +894,7 @@ namespace NMib::NCloud::NCloudClient
 			++nSetProperties;
 		}
 
-		TCContinuation<CSecretsManager::CSecret> SecretContinuation;
+		TCPromise<CSecretsManager::CSecret> SecretPromise;
 		bool SecretWasSet = false;
 
 		if (auto pValue = _Params.f_GetMember("Secret"))
@@ -906,9 +906,9 @@ namespace NMib::NCloud::NCloudClient
 			if (*pValue == "string")
 			{
 				PasswordPrompt.m_Prompt = "Enter secret: ";
-				_pCommandLine->f_ReadPrompt(PasswordPrompt) > SecretContinuation / [=](CStrSecure &&_SecretString)
+				_pCommandLine->f_ReadPrompt(PasswordPrompt) > SecretPromise / [=](CStrSecure &&_SecretString)
 					{
-						SecretContinuation.f_SetResult(CSecretsManager::CSecret{fg_Move(_SecretString)});
+						SecretPromise.f_SetResult(CSecretsManager::CSecret{fg_Move(_SecretString)});
 					}
 				;
 			}
@@ -917,7 +917,7 @@ namespace NMib::NCloud::NCloudClient
 				if (bBinaryAsBase64)
 				{
 					PasswordPrompt.m_Prompt = "Enter base64 encoded secret: ";
-					_pCommandLine->f_ReadPrompt(PasswordPrompt) > SecretContinuation / [=](CStrSecure &&_Encoded)
+					_pCommandLine->f_ReadPrompt(PasswordPrompt) > SecretPromise / [=](CStrSecure &&_Encoded)
 						{
 							CSecureByteVector Decoded;
 							try
@@ -927,18 +927,18 @@ namespace NMib::NCloud::NCloudClient
 							}
 							catch (CException const &_Exception)
 							{
-								SecretContinuation.f_SetException(DMibErrorInstance(fg_Format("Base64 decoding failed: {}", _Exception)));
+								SecretPromise.f_SetException(DMibErrorInstance(fg_Format("Base64 decoding failed: {}", _Exception)));
 								return;
 							}
-							SecretContinuation.f_SetResult(CSecretsManager::CSecret{fg_Move(Decoded)});
+							SecretPromise.f_SetResult(CSecretsManager::CSecret{fg_Move(Decoded)});
 						}
 					;
 				}
 				else
 				{
-					_pCommandLine->f_ReadBinary() > SecretContinuation / [=](CSecureByteVector &&_Secret)
+					_pCommandLine->f_ReadBinary() > SecretPromise / [=](CSecureByteVector &&_Secret)
 						{
-							SecretContinuation.f_SetResult(CSecretsManager::CSecret{fg_Move(_Secret)});
+							SecretPromise.f_SetResult(CSecretsManager::CSecret{fg_Move(_Secret)});
 						}
 					;
 				}
@@ -947,27 +947,27 @@ namespace NMib::NCloud::NCloudClient
 				DNeverGetHere;
 		}
 		else
-			SecretContinuation.f_SetResult(CSecretsManager::CSecret{});
+			SecretPromise.f_SetResult(CSecretsManager::CSecret{});
 
 		if (nSetProperties == 0)
 		{
-			Continuation.f_SetException(DMibErrorInstance("No properties specified. Specify at least one property to change"));
-			return Continuation;
+			Promise.f_SetException(DMibErrorInstance("No properties specified. Specify at least one property to change"));
+			return Promise.f_MoveFuture();
 		}
 
-		SecretContinuation > Continuation / [=](CSecretsManager::CSecret && _Secret) mutable
+		SecretPromise > Promise / [=](CSecretsManager::CSecret && _Secret) mutable
 			{
 				if (SecretWasSet)
 					Properties.f_SetSecret(fg_Move(_Secret));
 
 				fp_SecretsManager_SubscribeToServers().f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
-					> Continuation / [=]() mutable
+					> Promise / [=]() mutable
 					{
 						CStr Error;
 						auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
 						if (!pSecretsManager)
 						{
-							Continuation.f_SetException
+							Promise.f_SetException
 								(
 									DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
 								)
@@ -983,21 +983,21 @@ namespace NMib::NCloud::NCloudClient
 								, fg_Move(Properties)
 							)
 							.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-							>  Continuation	/ [=]
+							>  Promise	/ [=]
 							{
-								Continuation.f_SetResult(0);
+								Promise.f_SetResult(0);
 							}
 						;
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1037,13 +1037,13 @@ namespace NMib::NCloud::NCloudClient
 			return DMibErrorInstance("No changes specified. Specify tags to add and remove with --add and --remove");
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
-			> Continuation / [=]() mutable
+			> Promise / [=]() mutable
 			{
 				CStr Error;
 				auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
 				if (!pSecretsManager)
 				{
-					Continuation.f_SetException
+					Promise.f_SetException
 						(
 							DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
 						)
@@ -1060,19 +1060,19 @@ namespace NMib::NCloud::NCloudClient
 					 	, fg_Move(AddTags)
 					)
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-					>  Continuation	/ [=]
+					>  Promise	/ [=]
 					{
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1099,13 +1099,13 @@ namespace NMib::NCloud::NCloudClient
 		}
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
-			> Continuation / [=]() mutable
+			> Promise / [=]() mutable
 			{
 				CStr Error;
 				auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
 				if (!pSecretsManager)
 				{
-					Continuation.f_SetException
+					Promise.f_SetException
 						(
 							DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
 						)
@@ -1122,19 +1122,19 @@ namespace NMib::NCloud::NCloudClient
 						, fg_Move(MetadataValue)
 					)
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-					>  Continuation	/ [=]
+					>  Promise	/ [=]
 					{
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1148,13 +1148,13 @@ namespace NMib::NCloud::NCloudClient
 			Key = pValue->f_String();
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
-			> Continuation / [=]() mutable
+			> Promise / [=]() mutable
 			{
 				CStr Error;
 				auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
 				if (!pSecretsManager)
 				{
-					Continuation.f_SetException
+					Promise.f_SetException
 						(
 							DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
 						)
@@ -1164,19 +1164,19 @@ namespace NMib::NCloud::NCloudClient
 
 				DMibCallActor(pSecretsManager->m_Actor, CSecretsManager::f_RemoveMetadata, fg_Move(ID), Key)
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-					>  Continuation	/ [=]
+					>  Promise	/ [=]
 					{
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1186,13 +1186,13 @@ namespace NMib::NCloud::NCloudClient
 			return DMibErrorInstance(Error);
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
-			> Continuation / [=]() mutable
+			> Promise / [=]() mutable
 			{
 				CStr Error;
 				auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
 				if (!pSecretsManager)
 				{
-					Continuation.f_SetException
+					Promise.f_SetException
 						(
 							DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
 						)
@@ -1202,17 +1202,17 @@ namespace NMib::NCloud::NCloudClient
 
 				DMibCallActor(pSecretsManager->m_Actor, CSecretsManager::f_RemoveSecret, fg_Move(ID))
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-					>  Continuation	/ [=]
+					>  Promise	/ [=]
 					{
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1241,16 +1241,16 @@ namespace NMib::NCloud::NCloudClient
 		if (!CFile::fs_FileExists(Filename, NFile::EFileAttrib_File))
 			return DMibErrorInstance("The secret file must be a file");
 
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
-			> Continuation / [=]() mutable
+			> Promise / [=]() mutable
 			{
 				CStr Error;
 				auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
 				if (!pSecretsManager)
 				{
-					Continuation.f_SetException
+					Promise.f_SetException
 						(
 							DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
 						)
@@ -1259,7 +1259,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				NCloud::fg_UploadSecretFile(pSecretsManager->m_Actor, mp_State.m_DistributionManager, fg_Move(ID), CDirectorySyncSend::CConfig(Filename), mp_UploadSubscription)
 					.f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-					> Continuation % "Failed to transfer secret file" / [=] (CDirectorySyncSend::CSyncResult &&_Result)
+					> Promise % "Failed to transfer secret file" / [=] (CDirectorySyncSend::CSyncResult &&_Result)
 					{
 						if (!bQuiet)
 						{
@@ -1276,17 +1276,17 @@ namespace NMib::NCloud::NCloudClient
 								;
 							}
 						}
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1308,13 +1308,13 @@ namespace NMib::NCloud::NCloudClient
 		CStr CurrentDirectory = _Params["CurrentDirectory"].f_String();
 
 		fg_ThisActor(this)(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
-			> Continuation / [=]() mutable
+			> Promise / [=]() mutable
 			{
 				CStr Error;
 				auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
 				if (!pSecretsManager)
 				{
-					Continuation.f_SetException
+					Promise.f_SetException
 						(
 							DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error))
 						)
@@ -1338,7 +1338,7 @@ namespace NMib::NCloud::NCloudClient
 
 				fg_DownloadSecretFile(pSecretsManager->m_Actor, fg_Move(ID), CDirectorySyncReceive::CConfig(Destination, Flags))
 					.f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-					> Continuation % "Failed to transfer secret file" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
+					> Promise % "Failed to transfer secret file" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
 					{
 						if (!bQuiet)
 						{
@@ -1355,11 +1355,11 @@ namespace NMib::NCloud::NCloudClient
 								;
 							}
 						}
-						Continuation.f_SetResult(0);
+						Promise.f_SetResult(0);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

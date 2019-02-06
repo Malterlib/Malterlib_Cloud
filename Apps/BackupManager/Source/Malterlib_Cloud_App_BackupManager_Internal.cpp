@@ -30,22 +30,22 @@ namespace NMib::NCloud::NBackupManager
 	{
 	}
 
-	TCContinuation<void> CBackupManagerServer::f_Init()
+	TCFuture<void> CBackupManagerServer::f_Init()
 	{
-		TCContinuation<void> Continuation;
-		fp_SetupPermissions() + fp_EnumBackupSourcesFromDisk() > Continuation % "Failed to setup permissions or enum backup sources" / [=](CVoidTag, TCVector<CStr> &&_BackupSources)
+		TCPromise<void> Promise;
+		fp_SetupPermissions() + fp_EnumBackupSourcesFromDisk() > Promise % "Failed to setup permissions or enum backup sources" / [=](CVoidTag, TCVector<CStr> &&_BackupSources)
 			{
 				for (auto &BackupSource : _BackupSources)
 					fp_CreateBackupSource(BackupSource);
 
-				fp_Publish() > Continuation % "Failed to publish";
+				fp_Publish() > Promise % "Failed to publish";
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CBackupManagerServer::fp_SetupPermissions()
+	TCFuture<void> CBackupManagerServer::fp_SetupPermissions()
 	{
 		TCSet<CStr> Permissions;
 		Permissions["Backup/WriteSelf"];
@@ -58,9 +58,9 @@ namespace NMib::NCloud::NBackupManager
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("Backup/*");
 	
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
-			> Continuation / [this, Continuation](CTrustedPermissionSubscription &&_Subscription)
+			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
 			{
 				mp_Permissions = fg_Move(_Subscription);
 				mp_Permissions.f_OnPermissionsAdded
@@ -88,14 +88,14 @@ namespace NMib::NCloud::NBackupManager
 					)
 				;
 				
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CBackupManagerServer::fp_Destroy()
+	TCFuture<void> CBackupManagerServer::fp_Destroy()
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 
@@ -110,7 +110,7 @@ namespace NMib::NCloud::NBackupManager
 		if (mp_QueryFileActor)
 			mp_QueryFileActor->f_Destroy() > pCanDestroy->f_Track();
 		
-		return pCanDestroy->m_Continuation;
+		return pCanDestroy->f_Future();
 	}
 	
 	TCActor<CSeparateThreadActor> const &CBackupManagerServer::fp_GetQueryFileActor()

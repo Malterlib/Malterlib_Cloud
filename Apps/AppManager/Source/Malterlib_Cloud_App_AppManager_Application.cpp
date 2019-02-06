@@ -17,10 +17,10 @@ namespace NMib::NCloud::NAppManager
 		for (auto &fOnFinished : m_OnLaunchFinished)
 			fOnFinished(true);
 		m_OnLaunchFinished.f_Clear();
-		for (auto &Continuation : m_OnRegisterDistributedApp)
-			Continuation.f_SetException(DMibErrorInstance("Aborted launch"));
-		for (auto &Continuation : m_OnStartedDistributedApp)
-			Continuation.f_SetException(DMibErrorInstance("Aborted launch"));
+		for (auto &Promise : m_OnRegisterDistributedApp)
+			Promise.f_SetException(DMibErrorInstance("Aborted launch"));
+		for (auto &Promise : m_OnStartedDistributedApp)
+			Promise.f_SetException(DMibErrorInstance("Aborted launch"));
 
 		m_OnRegisterDistributedApp.f_Clear();
 		m_OnStartedDistributedApp.f_Clear();
@@ -93,24 +93,24 @@ namespace NMib::NCloud::NAppManager
 
 	TCDispatchedActorCall<uint32> CAppManagerActor::CApplication::f_Stop(EStopFlag _Flags)
 	{
-		return g_Dispatch / [this, _Flags, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCContinuation<uint32>
+		return g_Dispatch / [this, _Flags, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCFuture<uint32>
 			{
 				if (pApplication->m_bDeleted)
 					return fg_Explicit(0);
 
-				TCContinuation<void> SaveStateContinuation;
-				
 				if (_Flags & EStopFlag_PreventLaunchUser)
 					pApplication->m_bPreventLaunch_User = true;
 				if (_Flags & EStopFlag_PreventLaunchUpdate)
 					pApplication->m_bPreventLaunch_Update = true;
 				
+				TCFuture<void> SaveStateFuture;
+
 				if (_Flags & (EStopFlag_PreventLaunchUser | EStopFlag_PreventLaunchUpdate))
-					SaveStateContinuation = m_pThis->fp_UpdateApplicationJSON(pApplication);
+					SaveStateFuture = m_pThis->fp_UpdateApplicationJSON(pApplication);
 				else
-					SaveStateContinuation.f_SetResult();
+					SaveStateFuture = fg_Explicit();
 				
-				TCContinuation<uint32> Continuation;
+				TCPromise<uint32> Promise;
 				
 				TCActorResultVector<uint32> ChildrenCloses;
 				
@@ -122,8 +122,8 @@ namespace NMib::NCloud::NAppManager
 					ChildApp.f_Stop(EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
 				
 				ChildrenCloses.f_GetResults()
-					+ SaveStateContinuation.f_Dispatch()
-					> Continuation % "Failed to stop child application" 
+					+ SaveStateFuture
+					> Promise % "Failed to stop child application" 
 					/ [=]
 					(TCVector<TCAsyncResult<uint32>> &&_ChildrenCloseResults, CVoidTag) mutable
 					{
@@ -135,7 +135,7 @@ namespace NMib::NCloud::NAppManager
 						}
 						if (!ChildCloseErrors.f_IsEmpty())
 						{
-							Continuation.f_SetException(DMibErrorInstance(fg_Format("Errors stopping child applications: {}", ChildCloseErrors)));
+							Promise.f_SetException(DMibErrorInstance(fg_Format("Errors stopping child applications: {}", ChildCloseErrors)));
 							return;
 						}
 				
@@ -145,16 +145,16 @@ namespace NMib::NCloud::NAppManager
 						
 						if (!pApplication->m_ProcessLaunch || bWasStopped || pApplication->m_bDeleted)
 						{
-							TCContinuation<void> StopBackupContinuation;
+							TCPromise<void> StopBackupPromise;
 							if (pApplication->m_BackupClient)
 							{
-								pApplication->m_BackupClient->f_Destroy() > StopBackupContinuation;
+								pApplication->m_BackupClient->f_Destroy() > StopBackupPromise;
 								pApplication->m_BackupClient.f_Clear();
 							}
 							else
-								StopBackupContinuation.f_SetResult();
+								StopBackupPromise.f_SetResult();
 							
-							StopBackupContinuation.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult)
+							StopBackupPromise.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult)
 								{
 									if (!_BackupDestroyResult)
 										DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", _BackupDestroyResult.f_GetExceptionStr());
@@ -163,37 +163,37 @@ namespace NMib::NCloud::NAppManager
 
 									if (_Flags & EStopFlag_CloseEncryption)
 									{
-										g_Dispatch / [this, pApplication]() -> TCContinuation<uint32>
+										g_Dispatch / [this, pApplication]() -> TCFuture<uint32>
 											{
 												if (pApplication->m_bDeleted)
 													return fg_Explicit(0);
 												return f_CloseEncryption(0);
 											}
-											> Continuation
+											> Promise
 										;
 									}
 									else
 									{
-										Continuation.f_SetResult(0);
+										Promise.f_SetResult(0);
 									}
 								}
 							;
 							return;
 						}
 						
-						TCContinuation<void> PreStopContinuation;
+						TCPromise<void> PreStopPromise;
 						
 						bool bRanPreStop = false;
 						
 						if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= 0x103)
 						{
 							bRanPreStop = true;
-							DMibCallActor(pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_PreStop) > PreStopContinuation;
+							DMibCallActor(pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_PreStop) > PreStopPromise;
 						}
 						else
-							PreStopContinuation.f_SetResult();
+							PreStopPromise.f_SetResult();
 						
-						PreStopContinuation.f_Dispatch().f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)") > [=](TCAsyncResult<void> &&_Result)
+						PreStopPromise.f_Dispatch().f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)") > [=](TCAsyncResult<void> &&_Result)
 							{
 								if (!_Result)
 									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", _Result.f_GetExceptionStr());
@@ -223,16 +223,16 @@ namespace NMib::NCloud::NAppManager
 													pApplication->f_Clear();
 												}
 
-												TCContinuation<void> BackupContinuation;
+												TCPromise<void> BackupPromise;
 												if (pApplication->m_BackupClient)
 												{
-													pApplication->m_BackupClient->f_Destroy() > BackupContinuation;
+													pApplication->m_BackupClient->f_Destroy() > BackupPromise;
 													pApplication->m_BackupClient.f_Clear();
 												}
 												else
-													BackupContinuation.f_SetResult();
+													BackupPromise.f_SetResult();
 												
-												BackupContinuation.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult) mutable
+												BackupPromise.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult) mutable
 													{
 														if (!_BackupDestroyResult)
 														{
@@ -252,25 +252,25 @@ namespace NMib::NCloud::NAppManager
 														{
 															if (!_Result)
 															{
-																Continuation.f_SetException
+																Promise.f_SetException
 																	(
 																		DMibErrorInstance(fg_Format("Error stopping process, cannot close encryption: {}", _Result.f_GetExceptionStr()))
 																	)
 																;
 																return;
 															}
-															f_CloseEncryption(*_Result) > [Continuation](TCAsyncResult<uint32> &&_Result)
+															f_CloseEncryption(*_Result) > [Promise](TCAsyncResult<uint32> &&_Result)
 																{
 																	if (!_Result)
 																		DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", _Result.f_GetExceptionStr());
 																	
-																	Continuation.f_SetResult(fg_Move(_Result));
+																	Promise.f_SetResult(fg_Move(_Result));
 																}
 															;
 															return;
 														}
 														
-														Continuation.f_SetResult(fg_Move(_Result));
+														Promise.f_SetResult(fg_Move(_Result));
 													}
 												;
 											}
@@ -297,7 +297,7 @@ namespace NMib::NCloud::NAppManager
 					}
 				;
 				
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		;
 	}
@@ -312,19 +312,19 @@ namespace NMib::NCloud::NAppManager
 	
 	TCDispatchedActorCall<uint32> CAppManagerActor::CApplication::f_CloseEncryption(uint32 _Status)
 	{
-		return g_Dispatch / [this, _Status, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() -> TCContinuation<uint32>
+		return g_Dispatch / [this, _Status, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() -> TCFuture<uint32>
 			{
 				if (m_Settings.m_EncryptionStorage.f_IsEmpty() || !m_bEncryptionOpened)
 					return fg_Explicit(_Status);
 				
-				TCContinuation<uint32> Continuation;
+				TCPromise<uint32> Promise;
 				fg_ThisActor(m_pThis)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Close, false) 
-					> Continuation / [_Status, Continuation]
+					> Promise / [_Status, Promise]
 					{
-						Continuation.f_SetResult(_Status);
+						Promise.f_SetResult(_Status);
 					}
 				;
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		;
 	}

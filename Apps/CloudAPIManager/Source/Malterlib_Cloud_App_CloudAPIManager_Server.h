@@ -24,10 +24,10 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		struct CCloudAPIManagerImplementation : public CCloudAPIManager
 		{
-			TCContinuation<CGetSwiftBaseURL::CResult> f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params) override;
-			TCContinuation<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer &&_Params) override;
-			TCContinuation<CSignTempURL::CResult> f_SignTempURL(CSignTempURL &&_Params) override;
-			TCContinuation<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) override;
+			TCFuture<CGetSwiftBaseURL::CResult> f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params) override;
+			TCFuture<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer &&_Params) override;
+			TCFuture<CSignTempURL::CResult> f_SignTempURL(CSignTempURL &&_Params) override;
+			TCFuture<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) override;
 			
 			CServer *m_pThis;
 		};
@@ -67,16 +67,16 @@ namespace NMib::NCloud::NCloudAPIManager
 		};
 		
 	private:
-		TCContinuation<void> fp_Destroy() override;
+		TCFuture<void> fp_Destroy() override;
 		void fp_Init();
 		void fp_Publish();
 		
-		TCContinuation<void> fp_SetupCloudContexs();
-		TCContinuation<void> fp_SetupPermissions();
-		TCContinuation<void> fp_SetupDDPBridge();
+		TCFuture<void> fp_SetupCloudContexs();
+		TCFuture<void> fp_SetupPermissions();
+		TCFuture<void> fp_SetupDDPBridge();
 		TCVector<CDistributedTrustDDPBridge::CMethod> fp_GetDDPMethods();
 		
-		TCContinuation<COpenStackServiceInfo> fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext);
+		TCFuture<COpenStackServiceInfo> fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext);
 
 		static TCVector<CStr> fsp_AuditMessages(CStr const &_Error, CExceptionPointer _pException);
 		

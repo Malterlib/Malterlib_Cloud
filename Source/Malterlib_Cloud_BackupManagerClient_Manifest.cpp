@@ -8,12 +8,12 @@
 
 namespace NMib::NCloud
 {
-	auto CBackupManagerClient::CInternal::f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName, bool _bDirtyHint) -> TCContinuation<CUpdateManifestResult>
+	auto CBackupManagerClient::CInternal::f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName, bool _bDirtyHint) -> TCFuture<CUpdateManifestResult>
 	{
 		if (_FileName.f_IsEmpty())
 			return fg_Explicit(CUpdateManifestResult{});
 			
-		TCContinuation<CUpdateManifestResult> Continuation;
+		TCPromise<CUpdateManifestResult> Promise;
 
 		bool bDirty = _bDirtyHint;
 		TCSharedPointer<CAppendFileState> pAppendState;
@@ -163,7 +163,7 @@ namespace NMib::NCloud
 					}
 				}
 			}
-			> Continuation / [this, _FileName, Continuation](CUpdateManifestResult &&_Result)
+			> Promise / [this, _FileName, Promise](CUpdateManifestResult &&_Result)
 			{
 				if (_Result.m_bChecksumValid)
 				{
@@ -229,10 +229,10 @@ namespace NMib::NCloud
 					}
 				}
 				
-				Continuation.f_SetResult(fg_Move(_Result));
+				Promise.f_SetResult(fg_Move(_Result));
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

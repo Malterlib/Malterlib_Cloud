@@ -29,9 +29,9 @@ namespace NMib::NCloud::NVersionManager
 	static constexpr EFileAttrib gc_FilePermissions = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid;
 
 	auto CVersionManagerDaemonActor::CServer::fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo) 
-		-> TCContinuation<CSizeInfo> 
+		-> TCFuture<CSizeInfo>
 	{
-		TCContinuation<CSizeInfo> Continuation;
+		TCPromise<CSizeInfo> Promise;
 		fg_Dispatch
 			(
 				_FileActor
@@ -61,12 +61,12 @@ namespace NMib::NCloud::NVersionManager
 					return SizeInfo;
 				}
 			)
-			> Continuation
+			> Promise
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_UploadVersion(CStartUploadVersion &&_Params) -> TCContinuation<CStartUploadVersion::CResult>
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_UploadVersion(CStartUploadVersion &&_Params) -> TCFuture<CStartUploadVersion::CResult>
 	{
 		auto pThis = m_pThis;
 		
@@ -87,7 +87,7 @@ namespace NMib::NCloud::NVersionManager
 		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
 			return Auditor.f_Exception({"Invalid version platform format", "(start upload version)"});
 
-		TCContinuation<CStartUploadVersion::CResult> Continuation;
+		TCPromise<CStartUploadVersion::CResult> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["//Command//"] = {{"Application/WriteAll", fg_Format("Application/Write/{}", _Params.m_Application)}};
@@ -103,10 +103,10 @@ namespace NMib::NCloud::NVersionManager
 		}
 
 		pThis->mp_Permissions.f_HasPermissions("Upload version", Permissions)
-			> Continuation % "Permission denied uploading version" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
+			> Promise % "Permission denied uploading version" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
 			{
 				if (!_HasPermissions["//Command//"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Start upload version)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Start upload version)"));
 
 				auto VersionInfo = _Params.m_VersionInfo;
 
@@ -164,7 +164,7 @@ namespace NMib::NCloud::NVersionManager
 						pCleanup
 						, pThis
 						, UploadID
-						, Continuation
+						, Promise
 						, Desc = Upload.m_Desc
 						, _Params
 						, VersionInfo
@@ -181,9 +181,9 @@ namespace NMib::NCloud::NVersionManager
 							CStr Error = _FileTransferContext.f_GetExceptionStr();
 							Auditor.f_Error(fg_Format("'{}' Failed to initialize version upload: {}", Desc, Error));
 							if (Error == "Failed to generate current manifest: Directory already exists")
-								Continuation.f_SetException(DMibErrorInstance("Version already exists"));
+								Promise.f_SetException(DMibErrorInstance("Version already exists"));
 							else
-								Continuation.f_SetException(DMibErrorInstance("Failed to receive files. See Version Manager log."));
+								Promise.f_SetException(DMibErrorInstance("Failed to receive files. See Version Manager log."));
 							return;
 						}
 						auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
@@ -201,13 +201,13 @@ namespace NMib::NCloud::NVersionManager
 									return fStartTransfer(fg_Move(StartTransfer));
 								}
 							)
-							> [pThis, Continuation, Desc, pCleanup, UploadID, DeniedTags, Auditor]
+							> [pThis, Promise, Desc, pCleanup, UploadID, DeniedTags, Auditor]
 							(TCAsyncResult<CVersionManager::CStartUploadTransfer::CResult> &&_Result)
 							{
 								if (!_Result)
 								{
 									CStr Error = Auditor.f_Error({"Failed to start transfer. See Version Manager log.", fg_Format("'{}': {}", Desc, _Result.f_GetExceptionStr())});
-									Continuation.f_SetException(DMibErrorInstance(Error));
+									Promise.f_SetException(DMibErrorInstance(Error));
 									return;
 								}
 
@@ -222,29 +222,29 @@ namespace NMib::NCloud::NVersionManager
 								Result.m_Subscription = fg_ActorSubscriptionAsync
 									(
 										fg_ThisActor(pThis)
-										, [pThis, UploadID, Desc, Auditor]() -> TCContinuation<void>
+										, [pThis, UploadID, Desc, Auditor]() -> TCFuture<void>
 										{
 											auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
 											if (!pUpload)
 												return fg_Explicit();
 
-											TCContinuation<void> Continuation;
+											TCPromise<void> Promise;
 											if (pUpload->m_FileTransferReceive)
 											{
-												pUpload->m_FileTransferReceive->f_Destroy() > Continuation;
+												pUpload->m_FileTransferReceive->f_Destroy() > Promise;
 												pUpload->m_FileTransferReceive.f_Clear();
 											}
 											else
-												Continuation.f_SetResult();
+												Promise.f_SetResult();
 
 											if (pThis->mp_VersionUploads.f_Remove(UploadID))
 												Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
 
-											return Continuation;
+											return Promise.f_MoveFuture();
 										}
 									)
 								;
-								Continuation.f_SetResult(fg_Move(Result));
+								Promise.f_SetResult(fg_Move(Result));
 								pCleanup->f_Clear();
 							}
 						;
@@ -329,6 +329,6 @@ namespace NMib::NCloud::NVersionManager
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

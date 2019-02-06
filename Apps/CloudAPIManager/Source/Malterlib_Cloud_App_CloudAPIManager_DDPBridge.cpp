@@ -11,19 +11,19 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	TCContinuation<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge()
+	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge()
 	{
 		mp_DDPBridge = fg_ConstructActor<CDistributedTrustDDPBridge>(mp_AppState.m_TrustManager);
 		
-		TCContinuation<void> Continuation;
-		mp_DDPBridge(&CDistributedTrustDDPBridge::f_RegisterMethods, fg_ThisActor(this).f_Weak(), fp_GetDDPMethods()) > Continuation / [this, Continuation](CActorSubscription &&_ActorSub)
+		TCPromise<void> Promise;
+		mp_DDPBridge(&CDistributedTrustDDPBridge::f_RegisterMethods, fg_ThisActor(this).f_Weak(), fp_GetDDPMethods()) > Promise / [this, Promise](CActorSubscription &&_ActorSub)
 			{
 				mp_DDPBridgeSubscription = fg_Move(_ActorSub);
-				mp_DDPBridge(&CDistributedTrustDDPBridge::f_Startup) > Continuation;
+				mp_DDPBridge(&CDistributedTrustDDPBridge::f_Startup) > Promise;
 			}
 		;		
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
 	TCVector<CDistributedTrustDDPBridge::CMethod> CCloudAPIManagerDaemonActor::CServer::fp_GetDDPMethods()
@@ -33,9 +33,9 @@ namespace NMib::NCloud::NCloudAPIManager
 			 	CDistributedTrustDDPBridge::CMethod
 				{
 					"getSwiftBaseURL"
-					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON> 
+					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCFuture<NEncoding::CEJSON> 
 					{
-						TCContinuation<NEncoding::CEJSON> Continuation;
+						TCPromise<NEncoding::CEJSON> Promise;
 						CCloudAPIManager::CGetSwiftBaseURL Params;
 						try
 						{
@@ -48,23 +48,23 @@ namespace NMib::NCloud::NCloudAPIManager
 							return _Exception;
 						}
 						
-						mp_ProtocolInterface.m_pActor->f_GetSwiftBaseURL(fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CGetSwiftBaseURL::CResult &&_Result)
+						mp_ProtocolInterface.m_pActor->f_GetSwiftBaseURL(fg_Move(Params)) > Promise / [Promise](CCloudAPIManager::CGetSwiftBaseURL::CResult &&_Result)
 							{
 								NEncoding::CEJSON Result = _Result.m_BaseURL;
-								Continuation.f_SetResult(Result);
+								Promise.f_SetResult(Result);
 							}
 						;
-						return Continuation;
+						return Promise.f_MoveFuture();
 					}
 				}
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIEnsureContainer"
-					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON>
+					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCFuture<NEncoding::CEJSON>
 					{
 						if (_Params.f_GetLen() != 1)
 							return fg_Explicit("Method takes 1 parameter");
-						TCContinuation<NEncoding::CEJSON> Continuation;
+						TCPromise<NEncoding::CEJSON> Promise;
 						CCloudAPIManager::CEnsureContainer Params;
 						try
 						{
@@ -78,23 +78,23 @@ namespace NMib::NCloud::NCloudAPIManager
 						{
 							return _Exception;
 						}
-						mp_ProtocolInterface.m_pActor->f_EnsureContainer(fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CEnsureContainer::CResult &&_Result)
+						mp_ProtocolInterface.m_pActor->f_EnsureContainer(fg_Move(Params)) > Promise / [Promise](CCloudAPIManager::CEnsureContainer::CResult &&_Result)
 							{
 								NEncoding::CEJSON Result;
-								Continuation.f_SetResult(Result);
+								Promise.f_SetResult(Result);
 							}
 						;
-						return Continuation;
+						return Promise.f_MoveFuture();
 					}
 				}
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPISignTempURL"
-					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON> 
+					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCFuture<NEncoding::CEJSON> 
 					{
 						if (_Params.f_GetLen() != 1)
 							return fg_Explicit("Method takes 1 parameter");
-						TCContinuation<NEncoding::CEJSON> Continuation;
+						TCPromise<NEncoding::CEJSON> Promise;
 						CCloudAPIManager::CSignTempURL Params;
 						try
 						{
@@ -110,23 +110,23 @@ namespace NMib::NCloud::NCloudAPIManager
 						{
 							return _Exception;
 						}
-						mp_ProtocolInterface.m_pActor->f_SignTempURL(fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CSignTempURL::CResult &&_Result)
+						mp_ProtocolInterface.m_pActor->f_SignTempURL(fg_Move(Params)) > Promise / [Promise](CCloudAPIManager::CSignTempURL::CResult &&_Result)
 							{
 								NEncoding::CEJSON Result = _Result.m_SignedURL;
-								Continuation.f_SetResult(Result);
+								Promise.f_SetResult(Result);
 							}
 						;
-						return Continuation;
+						return Promise.f_MoveFuture();
 					}
 				}
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIDeleteObject"
-					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCContinuation<NEncoding::CEJSON>
+					, [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCFuture<NEncoding::CEJSON>
 					{
 						if (_Params.f_GetLen() != 1)
 							return fg_Explicit("Method takes 1 parameter");
-						TCContinuation<NEncoding::CEJSON> Continuation;
+						TCPromise<NEncoding::CEJSON> Promise;
 						CCloudAPIManager::CDeleteObject Params;
 						try
 						{
@@ -140,13 +140,13 @@ namespace NMib::NCloud::NCloudAPIManager
 						{
 							return _Exception;
 						}
-						mp_ProtocolInterface.m_pActor->f_DeleteObject(fg_Move(Params)) > Continuation / [Continuation](CCloudAPIManager::CDeleteObject::CResult &&_Result)
+						mp_ProtocolInterface.m_pActor->f_DeleteObject(fg_Move(Params)) > Promise / [Promise](CCloudAPIManager::CDeleteObject::CResult &&_Result)
 							{
 								NEncoding::CEJSON Result;
-								Continuation.f_SetResult(Result);
+								Promise.f_SetResult(Result);
 							}
 						;
-						return Continuation;
+						return Promise.f_MoveFuture();
 					}
 				}
 			)

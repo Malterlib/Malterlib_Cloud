@@ -19,9 +19,9 @@ namespace NMib::NCloud
 		
 		~CKeyManagerServerDatabase_EncryptedFile();
 		
-		NConcurrency::TCContinuation<void> f_Initialize() override;
-		NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database) override;
-		NConcurrency::TCContinuation<CDatabase> f_ReadDatabase() override;
+		NConcurrency::TCFuture<void> f_Initialize() override;
+		NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase const &_Database) override;
+		NConcurrency::TCFuture<CDatabase> f_ReadDatabase() override;
 	
 	private:
 		struct CInternal;

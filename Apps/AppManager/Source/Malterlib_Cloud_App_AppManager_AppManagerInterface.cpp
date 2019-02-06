@@ -5,12 +5,12 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCContinuation<void> CAppManagerActor::fp_PublishAppManagerInterface()
+	TCFuture<void> CAppManagerActor::fp_PublishAppManagerInterface()
 	{
 		return mp_AppManagerInterface.f_Publish<CAppManagerInterface>(mp_State.m_DistributionManager, this, CAppManagerInterface::mc_pDefaultNamespace);
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_RegisterPermissions()
+	TCFuture<void> CAppManagerActor::fp_RegisterPermissions()
 	{
 		TCSet<CStr> Permissions;
 		Permissions["AppManager/VersionAppAll"];
@@ -38,39 +38,39 @@ namespace NMib::NCloud::NAppManager
 		return mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_RegisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication)
+	TCFuture<void> CAppManagerActor::fp_RegisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		auto Permissions = fg_CreateSet<CStr>(fg_Format("AppManager/App/{}", _pApplication->m_Name));
 		return mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UnregisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication)
+	TCFuture<void> CAppManagerActor::fp_UnregisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		auto Permissions = fg_CreateSet<CStr>(fg_Format("AppManager/App/{}", _pApplication->m_Name));
 		return mp_State.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions));
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_SubscribePermissions()
+	TCFuture<void> CAppManagerActor::fp_SubscribePermissions()
 	{
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("AppManager/*");
 		
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 	
 		mp_State.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
-			> Continuation / [this, Continuation](CTrustedPermissionSubscription &&_Subscription)
+			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
 			{
 				mp_Permissions = fg_Move(_Subscription);
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<void> CAppManagerActor::fp_SetupAppManagerInterfacePermissions()
+	TCFuture<void> CAppManagerActor::fp_SetupAppManagerInterfacePermissions()
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		NContainer::TCMap<NStr::CStr, CPermissionRequirements> CommandLinePermissions = {{"AppManager/VersionAppAll"}, {"AppManager/AppAll"}, {"AppManager/CommandAll"}};
 		mp_State.m_TrustManager
 			(
@@ -81,8 +81,8 @@ namespace NMib::NCloud::NAppManager
 			)
 			+ fp_RegisterPermissions()
 			+ fp_SubscribePermissions()
-			> Continuation.f_ReceiveAny()
+			> Promise.f_ReceiveAny()
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

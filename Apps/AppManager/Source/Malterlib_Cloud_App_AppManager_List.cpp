@@ -7,7 +7,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_GetInstalled() -> TCContinuation<TCMap<CStr, CApplicationInfo>>
+	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_GetInstalled() -> TCFuture<TCMap<CStr, CApplicationInfo>>
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -25,15 +25,15 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
-		TCContinuation<TCMap<CStr, CApplicationInfo>> Continuation;
+		TCPromise<TCMap<CStr, CApplicationInfo>> Promise;
 		pThis->mp_Permissions.f_HasPermissions("Enumerate Apps in AppManager", Permissions)
-			> Continuation
+			> Promise
 			% "Permission denied enumerating installed applications"
 			% Auditor
-			/ [Continuation, Auditor, pThis = m_pThis](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			/ [Promise, Auditor, pThis = m_pThis](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["//Command//"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application enum)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application enum)"));
 
 				TCMap<CStr, CApplicationInfo> OutputApplications;
 				for (auto &pApplication : pThis->mp_Applications)
@@ -77,15 +77,15 @@ namespace NMib::NCloud::NAppManager
 					OutApplication.m_bStopOnDependencyFailure = Settings.m_bStopOnDependencyFailure;
 					OutApplication.m_bBackupEnabled = Settings.m_bBackupEnabled;
 				}
-				Continuation.f_SetResult(fg_Move(OutputApplications));
+				Promise.f_SetResult(fg_Move(OutputApplications));
 				Auditor.f_Info("Enum applications");
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_GetAvailableVersions(CStr const &_Application) -> TCContinuation<CVersionsAvailableForUpdate> 
+	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_GetAvailableVersions(CStr const &_Application) -> TCFuture<CVersionsAvailableForUpdate>
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -103,15 +103,15 @@ namespace NMib::NCloud::NAppManager
 			Permissions[Name] = {CPermissionQuery{"AppManager/VersionAppAll", "AppManager/VersionApp/{}"_f << Name}.f_Description("Get versions of application {} in AppManager"_f << Name)};
 		}
 
-		TCContinuation<CVersionsAvailableForUpdate> Continuation;
+		TCPromise<CVersionsAvailableForUpdate> Promise;
 		pThis->mp_Permissions.f_HasPermissions("Enumerate versions in AppManager", Permissions)
-			> Continuation
+			> Promise
 			% "Permission denied enumerating versions"
 			% Auditor
-			/ [Continuation, Auditor, pThis = m_pThis, _Application](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			/ [Promise, Auditor, pThis = m_pThis, _Application](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["//Command//"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Versions available for update)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Versions available for update)"));
 
 				TCMap<CStr, TCVector<CApplicationVersion>> Versions;
 
@@ -135,19 +135,19 @@ namespace NMib::NCloud::NAppManager
 				}
 
 				Auditor.f_Info("Enum versions available for update");
-				Continuation.f_SetResult(fg_Move(Versions));
+				Promise.f_SetResult(fg_Move(Versions));
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CStr Name = _Params["Name"].f_String();
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		mp_AppManagerInterface.m_pActor->f_GetInstalled() 
-			> Continuation / [=](TCMap<CStr, CAppManagerInterface::CApplicationInfo> &&_ApplicationInfo)
+			> Promise / [=](TCMap<CStr, CAppManagerInterface::CApplicationInfo> &&_ApplicationInfo)
 			{
 				for (auto &Application : _ApplicationInfo)
 				{
@@ -208,19 +208,19 @@ namespace NMib::NCloud::NAppManager
 					}
 					*_pCommandLine += ApplicationInfo;
 				}
-				Continuation.f_SetResult(0);
+				Promise.f_SetResult(0);
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 	
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		mp_AppManagerInterface.m_pActor->f_GetAvailableVersions(_Params["Application"].f_String()) 
-			> Continuation / [=](CAppManagerInterface::CVersionsAvailableForUpdate &&_Results)
+			> Promise / [=](CAppManagerInterface::CVersionsAvailableForUpdate &&_Results)
 			{
 				smint LongestApplication = fg_StrLen("Application");
 				smint LongestVersion = fg_StrLen("Version");
@@ -315,10 +315,10 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 				
-				Continuation.f_SetResult(0);
+				Promise.f_SetResult(0);
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

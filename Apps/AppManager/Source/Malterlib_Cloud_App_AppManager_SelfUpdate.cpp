@@ -11,9 +11,9 @@ namespace NMib::NCloud::NAppManager
 	ch8 const *g_pSelfUpdateScript =
 #		include "Malterlib_Cloud_App_AppManager_SelfUpdate.sh"
 	;
-	TCContinuation<bool> CAppManagerActor::fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication)
+	TCFuture<bool> CAppManagerActor::fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication)
 	{
-		TCContinuation<bool> Continuation;
+		TCPromise<bool> Promise;
 
 		if (CFile::fs_GetProgramDirectory() != mp_State.m_RootDirectory)
 			return DMibErrorInstance("Cannot self update when root directory differs from program directory. '{}' != '{}'"_f << CFile::fs_GetProgramDirectory() << mp_State.m_RootDirectory);
@@ -109,16 +109,16 @@ namespace NMib::NCloud::NAppManager
 
 				return true;
 			}
-			> [Continuation](TCAsyncResult<bool> &&_Result)
+			> [Promise](TCAsyncResult<bool> &&_Result)
 			{
 				if (!_Result)
 				{
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Self update failed: {}", _Result.f_GetExceptionStr());
 				}
-				Continuation.f_SetResult(fg_Move(_Result)); 
+				Promise.f_SetResult(fg_Move(_Result)); 
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

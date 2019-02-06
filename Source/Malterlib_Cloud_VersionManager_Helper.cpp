@@ -30,7 +30,7 @@ namespace NMib::NCloud
 		struct CState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
 		{
 			virtual ~CState() = default;
-			virtual TCContinuation<void> f_Abort() = 0;
+			virtual TCFuture<void> f_Abort() = 0;
 		};
 		
 		struct CDownloadState : public CState 
@@ -39,7 +39,7 @@ namespace NMib::NCloud
 			TCActor<CFileTransferReceive> m_DownloadVersionReceive;
 			CActorSubscription m_DownloadVersionSubscription;
 			
-			TCContinuation<void> f_Abort()
+			TCFuture<void> f_Abort()
 			{
 				m_DownloadVersionReceive.f_Clear();
 				m_DownloadVersionSubscription.f_Clear();
@@ -54,7 +54,7 @@ namespace NMib::NCloud
 			TCActor<CFileTransferSend> m_UploadVersionSend;
 			CActorSubscription m_UploadVersionSubscription;
 			
-			TCContinuation<void> f_Abort()
+			TCFuture<void> f_Abort()
 			{
 				m_UploadVersionSend.f_Clear();
 				m_UploadVersionSubscription.f_Clear();
@@ -68,7 +68,7 @@ namespace NMib::NCloud
 		{
 			TCActor<CProcessLaunchActor> m_Launch;
 			
-			TCContinuation<void> f_Abort()
+			TCFuture<void> f_Abort()
 			{
 				if (m_Launch)
 					return m_Launch->f_Destroy();
@@ -115,7 +115,7 @@ namespace NMib::NCloud
 	CVersionManagerHelper &CVersionManagerHelper::operator = (CVersionManagerHelper const &) = default;
 	CVersionManagerHelper &CVersionManagerHelper::operator = (CVersionManagerHelper &&) = default;
 	
-	TCContinuation<void> CVersionManagerHelper::f_AbortAll() const
+	TCFuture<void> CVersionManagerHelper::f_AbortAll() const
 	{
 		auto &Internal = *mp_pInternal;
 		
@@ -128,13 +128,13 @@ namespace NMib::NCloud
 				pLockedState->f_Abort() > Destroys.f_AddResult();
 		}
 		
-		TCContinuation<void> Continuation;
-		Destroys.f_GetResults() > Continuation.f_ReceiveAny();
+		TCPromise<void> Promise;
+		Destroys.f_GetResults() > Promise.f_ReceiveAny();
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<CVersionManagerHelper::CUploadResult> CVersionManagerHelper::f_Upload
+	TCFuture<CVersionManagerHelper::CUploadResult> CVersionManagerHelper::f_Upload
 		(
 			TCDistributedActor<CVersionManager> const &_VersionManager
 			, CStr const &_Application
@@ -147,7 +147,7 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 		
-		TCContinuation<CUploadResult> Continuation;
+		TCPromise<CUploadResult> Promise;
 		
 		TCSharedPointer<CUploadState, CSupportWeakTag> pState = fg_Construct();
 		
@@ -162,18 +162,18 @@ namespace NMib::NCloud
 		
 		StartUpload.m_DispatchActor = fg_CurrentActor();
 		StartUpload.m_fStartTransfer = [pState](CVersionManager::CStartUploadTransfer &&_Params) 
-			-> TCContinuation<CVersionManager::CStartUploadTransfer::CResult>
+			-> TCFuture<CVersionManager::CStartUploadTransfer::CResult>
 			{
-				TCContinuation<CVersionManager::CStartUploadTransfer::CResult> StartTransferContinuation;
+				TCPromise<CVersionManager::CStartUploadTransfer::CResult> StartTransferPromise;
 				pState->m_UploadVersionSend(&CFileTransferSend::f_SendFiles, fg_Move(_Params.m_TransferContext)) 
-					> StartTransferContinuation / [pState, StartTransferContinuation](CActorSubscription &&_Subscription)
+					> StartTransferPromise / [pState, StartTransferPromise](CActorSubscription &&_Subscription)
 					{
 						CVersionManager::CStartUploadTransfer::CResult Result;
 						Result.m_Subscription = fg_Move(_Subscription);
-						StartTransferContinuation.f_SetResult(fg_Move(Result));
+						StartTransferPromise.f_SetResult(fg_Move(Result));
 					}
 				;
-				return StartTransferContinuation;
+				return StartTransferPromise.f_MoveFuture();
 			}
 		;
 		
@@ -200,15 +200,15 @@ namespace NMib::NCloud
 				, fg_Move(StartUpload)
 			)
 			.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
-			> Continuation % "Failed to start upload on remote server" 
-			/ [pCleanupAfterTimeout, pState, Continuation, pStateCleanup]
+			> Promise % "Failed to start upload on remote server" 
+			/ [pCleanupAfterTimeout, pState, Promise, pStateCleanup]
 			(CVersionManager::CStartUploadVersion::CResult &&_Result)
 			{
 				pCleanupAfterTimeout->f_Clear();
 				
 				pState->m_UploadVersionSubscription = fg_Move(_Result.m_Subscription);
 				pState->m_UploadVersionSend(&CFileTransferSend::f_GetResult) 
-					> Continuation / [pState, Continuation, DeniedTags = _Result.m_DeniedTags, pStateCleanup](CFileTransferResult &&_Result) mutable
+					> Promise / [pState, Promise, DeniedTags = _Result.m_DeniedTags, pStateCleanup](CFileTransferResult &&_Result) mutable
 					{
 						pState->m_UploadVersionSubscription.f_Clear();
 						
@@ -216,16 +216,16 @@ namespace NMib::NCloud
 						Result.m_TransferResult = fg_Move(_Result);
 						Result.m_DeniedTags = fg_Move(DeniedTags);
 						
-						Continuation.f_SetResult(fg_Move(Result));
+						Promise.f_SetResult(fg_Move(Result));
 					}
 				;
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<CFileTransferResult> CVersionManagerHelper::f_Download
+	TCFuture<CFileTransferResult> CVersionManagerHelper::f_Download
 		(
 			TCDistributedActor<CVersionManager> const &_VersionManager
 			, CStr const &_Application
@@ -257,11 +257,11 @@ namespace NMib::NCloud
 			}
 		;
 		
-		TCContinuation<CFileTransferResult> Continuation;
+		TCPromise<CFileTransferResult> Promise;
 
 		pState->m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, _QueueSize ? _QueueSize : Internal.m_QueueSize, _ReceiveFlags) 
-			> Continuation % "Failed to initialize file transfer context" 
-			/ [_VersionManager, _Application, _VersionID, pInternal = mp_pInternal, Continuation, pState, pStateCleanup]
+			> Promise % "Failed to initialize file transfer context" 
+			/ [_VersionManager, _Application, _VersionID, pInternal = mp_pInternal, Promise, pState, pStateCleanup]
 			(CFileTransferContext &&_TransferContext)
 			{
 				auto &Internal = *pInternal;
@@ -284,16 +284,16 @@ namespace NMib::NCloud
 						, fg_Move(StartDownload)
 					)
 					.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
-					> Continuation % "Failed to start download on remote server" 
-					/ [pState, pCleanupAfterTimeout, Continuation, pStateCleanup](CVersionManager::CStartDownloadVersion::CResult &&_Result)
+					> Promise % "Failed to start download on remote server" 
+					/ [pState, pCleanupAfterTimeout, Promise, pStateCleanup](CVersionManager::CStartDownloadVersion::CResult &&_Result)
 					{
 						pCleanupAfterTimeout->f_Clear();
 						pState->m_DownloadVersionSubscription = fg_Move(_Result.m_Subscription);
 
-						pState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResult) > [pState, Continuation](TCAsyncResult<CFileTransferResult> &&_Results)
+						pState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResult) > [pState, Promise](TCAsyncResult<CFileTransferResult> &&_Results)
 							{
 								pState->m_DownloadVersionSubscription.f_Clear();
-								Continuation.f_SetResult(fg_Move(_Results));
+								Promise.f_SetResult(fg_Move(_Results));
 							}
 						;
 					}
@@ -301,7 +301,7 @@ namespace NMib::NCloud
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
 	TCActor<CSeparateThreadActor> CVersionManagerHelper::f_GetFileActor() const
@@ -310,7 +310,7 @@ namespace NMib::NCloud
 		return Internal.f_GetFileActor();
 	}
 	
-	TCContinuation<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_CreatePackage(NStr::CStr const &_SourceDirectory, NStr::CStr const &_DestinationFileName) const
+	TCFuture<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_CreatePackage(NStr::CStr const &_SourceDirectory, NStr::CStr const &_DestinationFileName) const
 	{
 		auto &Internal = *mp_pInternal;
 		TCSharedPointer<CProcessLaunchState, CSupportWeakTag> pState = fg_Construct();
@@ -352,7 +352,7 @@ namespace NMib::NCloud
 			}
 		;
 	
-		TCContinuation<CPackageInfo> Continuation;
+		TCPromise<CPackageInfo> Promise;
 		pState->m_Launch(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))
 			+ fg_Dispatch
 			(
@@ -413,13 +413,13 @@ namespace NMib::NCloud
 					return PackageInfo;
 				}
 			)
-			> Continuation 
-			/ [pState, pStateCleanup, Continuation](CProcessLaunchActor::CSimpleLaunchResult &&_LaunchResult, CPackageInfo &&_PackageInfo)
+			> Promise 
+			/ [pState, pStateCleanup, Promise](CProcessLaunchActor::CSimpleLaunchResult &&_LaunchResult, CPackageInfo &&_PackageInfo)
 			{
-				Continuation.f_SetResult(fg_Move(_PackageInfo));
+				Promise.f_SetResult(fg_Move(_PackageInfo));
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

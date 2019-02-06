@@ -14,12 +14,12 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_DeleteObject(CDeleteObject &&_Params) -> TCContinuation<CDeleteObject::CResult>
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_DeleteObject(CDeleteObject &&_Params) -> TCFuture<CDeleteObject::CResult>
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		
-		TCContinuation<CCloudAPIManager::CDeleteObject::CResult> Continuation;
+		TCPromise<CCloudAPIManager::CDeleteObject::CResult> Promise;
 		
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
 			return Auditor.f_Exception("Cloud context format not valid");
@@ -31,16 +31,16 @@ namespace NMib::NCloud::NCloudAPIManager
 			return Auditor.f_Exception("Object id format not valid");
 		
 		pThis->mp_Permissions.f_HasPermission("Delete object from cloud API manager", {"ObjectStorage/DeleteObjectAll", "ObjectStorage/DeleteObject/{}"_f << _Params.m_CloudContext})
-			> Continuation % "Permission denied deleting object" % Auditor / [=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
+			> Promise % "Permission denied deleting object" % Auditor / [=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Delete object)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Delete object)"));
 
 				auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(Params.m_CloudContext);
 				if (!pCloudContext)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such cloud context: {}", Params.m_CloudContext)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such cloud context: {}", Params.m_CloudContext)));
 
-				pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [pThis, Continuation, Params, Auditor](COpenStackServiceInfo &&_ServiceInfo)
+				pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Promise / [pThis, Promise, Params, Auditor](COpenStackServiceInfo &&_ServiceInfo)
 					{
 						fg_Dispatch
 							(
@@ -64,16 +64,16 @@ namespace NMib::NCloud::NCloudAPIManager
 									return URL;
 								}
 							)
-							> [Continuation, Params, Auditor](TCAsyncResult<CStr> &&_Value)
+							> [Promise, Params, Auditor](TCAsyncResult<CStr> &&_Value)
 							{
 								if (!_Value)
 								{
 									CStr Error = fg_Format("Failed to delete object {}/{} on {}", Params.m_ContainerName, Params.m_ObjectId, Params.m_CloudContext);
-									return Continuation.f_SetException(Auditor.f_Exception(fsp_AuditMessages(Error, _Value.f_GetException())));
+									return Promise.f_SetException(Auditor.f_Exception(fsp_AuditMessages(Error, _Value.f_GetException())));
 								}
 
 								CCloudAPIManager::CDeleteObject::CResult Result;
-								Continuation.f_SetResult(Result);
+								Promise.f_SetResult(Result);
 								Auditor.f_Info(fg_Format("Deleted object {}/{} on {}", Params.m_ContainerName, Params.m_ObjectId, Params.m_CloudContext));
 							}
 						;
@@ -82,7 +82,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }
 

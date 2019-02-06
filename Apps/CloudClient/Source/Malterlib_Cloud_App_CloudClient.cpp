@@ -18,17 +18,17 @@ namespace NMib::NCloud::NCloudClient
 	{
 	}
 
-	TCContinuation<void> CCloudClientAppActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CCloudClientAppActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
 		fp_ParseCommonOptions(_Params);
 		
-		Continuation.f_SetResult();
-		return Continuation;				
+		Promise.f_SetResult();
+		return Promise.f_MoveFuture();				
 	}
 	
-	TCContinuation<void> CCloudClientAppActor::fp_StopApp()
+	TCFuture<void> CCloudClientAppActor::fp_StopApp()
 	{	
 		TCActorResultVector<void> Destroys;
 
@@ -40,9 +40,9 @@ namespace NMib::NCloud::NCloudClient
 		for (auto &Launch : mp_LaunchActors)
 			Launch->f_Destroy() > Destroys.f_AddResult();
 
-		TCContinuation<void> Continuation;
-		Destroys.f_GetResults() > Continuation.f_ReceiveAny();
-		return Continuation;
+		TCPromise<void> Promise;
+		Destroys.f_GetResults() > Promise.f_ReceiveAny();
+		return Promise.f_MoveFuture();
 	}
 	
 	void CCloudClientAppActor::fp_ParseCommonOptions(NEncoding::CEJSON const &_Params)

@@ -62,11 +62,11 @@ namespace NMib::NCloud::NVersionManager
 	}
 
 
-	TCContinuation<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_EnumApplications()
+	TCFuture<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_EnumApplications()
 	{
 		auto QueryFileActor = fp_GetQueryFileActor();
 		
-		TCContinuation<TCSet<CStr>> Continuation;
+		TCPromise<TCSet<CStr>> Promise;
 		
 		fg_Dispatch
 			(
@@ -87,19 +87,19 @@ namespace NMib::NCloud::NVersionManager
 					return Applications;
 				}
 			)
-			> Continuation / [Continuation](TCSet<CStr> &&_Result)
+			> Promise / [Promise](TCSet<CStr> &&_Result)
 			{
-				Continuation.f_SetResult(fg_Move(_Result));
+				Promise.f_SetResult(fg_Move(_Result));
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CVersionManagerDaemonActor::CServer::fp_FindVersions()
+	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_FindVersions()
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
-		self(&CVersionManagerDaemonActor::CServer::fp_EnumApplications) > Continuation / [this, Continuation](TCSet<CStr> &&_Applications)
+		self(&CVersionManagerDaemonActor::CServer::fp_EnumApplications) > Promise / [this, Promise](TCSet<CStr> &&_Applications)
 			{
 				for (auto &Application : _Applications)
 				{
@@ -183,12 +183,12 @@ namespace NMib::NCloud::NVersionManager
 							return VersionsPerApplication;
 						}
 					)
-					> [this, Continuation]
+					> [this, Promise]
 					(TCAsyncResult<NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>> &&_Result)
 					{
 						if (!_Result)
 						{
-							Continuation.f_SetException(_Result);
+							Promise.f_SetException(_Result);
 							return;
 						}
 						auto &Result = *_Result;
@@ -203,18 +203,18 @@ namespace NMib::NCloud::NVersionManager
 								mp_KnownTags += Version.m_Tags;
 							}
 						}
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 					}
 				;
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CVersionManagerDaemonActor::CServer::fp_SetupPermissions()
+	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SetupPermissions()
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
 		TCSet<CStr> Permissions;
 		Permissions["Application/ReadAll"];
@@ -239,7 +239,7 @@ namespace NMib::NCloud::NVersionManager
 		SubscribePermissions.f_Insert("Application/*");
 	
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
-			> Continuation / [this, Continuation](CTrustedPermissionSubscription &&_Subscription)
+			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
 			{
 				mp_Permissions = fg_Move(_Subscription);
 				
@@ -262,20 +262,20 @@ namespace NMib::NCloud::NVersionManager
 					)
 				;
 				
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CVersionManagerDaemonActor::CServer::fp_Destroy()
+	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_Destroy()
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		if (mp_QueryFileActor)
 			mp_QueryFileActor->f_Destroy() > pCanDestroy->f_Track();
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
-		return pCanDestroy->m_Continuation;
+		return pCanDestroy->f_Future();
 	}
 	
 	TCActor<CSeparateThreadActor> const &CVersionManagerDaemonActor::CServer::fp_GetQueryFileActor()

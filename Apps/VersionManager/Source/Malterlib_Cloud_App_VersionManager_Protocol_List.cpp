@@ -12,15 +12,15 @@
 
 namespace NMib::NCloud::NVersionManager
 {
-	TCContinuation<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_FilterApplicationsByPermissions(CStr const &_Description, TCSet<CStr> const &_Applications)
+	TCFuture<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_FilterApplicationsByPermissions(CStr const &_Description, TCSet<CStr> const &_Applications)
 	{
-		TCContinuation<TCSet<CStr>> Continuation;
+		TCPromise<TCSet<CStr>> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 		Permissions["//ALL//"] = {{"Application/ReadAll", "Application/ListAll"}};
 		for (auto &Application : _Applications)
 			Permissions[Application] = {CPermissionQuery{fg_Format("Application/Read/{}", Application)}.f_Description("Access application {} in VersionManager"_f << Application)};
 
-		mp_Permissions.f_HasPermissions(_Description, Permissions) > Continuation / [Continuation, _Applications](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		mp_Permissions.f_HasPermissions(_Description, Permissions) > Promise / [Promise, _Applications](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				TCSet<CStr> Applications;
 				bool bListAllAccess = _HasPermissions["//ALL//"];
@@ -32,13 +32,13 @@ namespace NMib::NCloud::NVersionManager
 					Applications[Application];
 				}
 
-				Continuation.f_SetResult(fg_Move(Applications));
+				Promise.f_SetResult(fg_Move(Applications));
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications &&_Params) -> TCContinuation<CListApplications::CResult> 
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications &&_Params) -> TCFuture<CListApplications::CResult>
 	{
 		auto pThis = m_pThis;
 		
@@ -46,32 +46,32 @@ namespace NMib::NCloud::NVersionManager
 			return DMibErrorInstance("Shutting down");
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		NConcurrency::TCContinuation<CVersionManager::CListApplications::CResult> Continuation;
+		NConcurrency::TCPromise<CVersionManager::CListApplications::CResult> Promise;
 		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		Auditor.f_Info("Listing applications");
 		
 		pThis->fp_FilterApplicationsByPermissions("List applications", pThis->fp_ApplicationSet())
-			> Continuation % "Permission denied listing applications" % Auditor / [Continuation, Auditor](TCSet<CStr> &&_Applications)
+			> Promise % "Permission denied listing applications" % Auditor / [Promise, Auditor](TCSet<CStr> &&_Applications)
 			{
 				Auditor.f_Info(fg_Format("Listed applications: {vs,vb}", _Applications));
 
 				CVersionManager::CListApplications::CResult Results;
 				Results.m_Applications = fg_Move(_Applications);
-				Continuation.f_SetResult(fg_Move(Results));
+				Promise.f_SetResult(fg_Move(Results));
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListVersions(CListVersions &&_Params) -> TCContinuation<CListVersions::CResult>
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListVersions(CListVersions &&_Params) -> TCFuture<CListVersions::CResult>
 	{
 		auto pThis = m_pThis;
 		
 		if (!pThis->mp_pCanDestroyTracker)
 			return DMibErrorInstance("Shutting down");
-		NConcurrency::TCContinuation<CVersionManager::CListVersions::CResult> Continuation;
+		NConcurrency::TCPromise<CVersionManager::CListVersions::CResult> Promise;
 		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -90,10 +90,10 @@ namespace NMib::NCloud::NVersionManager
 		else
 			Applications = pThis->fp_ApplicationSet();
 
-		pThis->fp_FilterApplicationsByPermissions("List versions", Applications) > Continuation % "Permission denied listing versions" % Auditor / [=](TCSet<CStr> &&_Applications)
+		pThis->fp_FilterApplicationsByPermissions("List versions", Applications) > Promise % "Permission denied listing versions" % Auditor / [=](TCSet<CStr> &&_Applications)
 			{
 				if (!_Params.m_ForApplication.f_IsEmpty() && _Applications.f_IsEmpty())
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(List Versions)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(List Versions)"));
 
 				CVersionManager::CListVersions::CResult Results;
 				for (auto &ApplicationName : _Applications)
@@ -113,10 +113,10 @@ namespace NMib::NCloud::NVersionManager
 
 				Auditor.f_Info(fg_Format("Listed versions: {vs,vb}", VersionsText));
 
-				Continuation.f_SetResult(fg_Move(Results));
+				Promise.f_SetResult(fg_Move(Results));
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

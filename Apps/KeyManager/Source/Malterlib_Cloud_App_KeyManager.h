@@ -17,12 +17,12 @@ namespace NMib::NCloud::NKeyManager
 		CKeyManagerDaemonActor();
 		~CKeyManagerDaemonActor();
 
-		TCContinuation<uint32> f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCContinuation<uint32> f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 	private:
-		TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
-		TCContinuation<void> fp_StopApp() override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
+		TCFuture<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
 		void fp_DatabaseDecrypted();

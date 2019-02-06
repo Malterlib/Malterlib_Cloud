@@ -13,12 +13,12 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_EnsureContainer(CEnsureContainer &&_Params) -> TCContinuation<CEnsureContainer::CResult> 
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_EnsureContainer(CEnsureContainer &&_Params) -> TCFuture<CEnsureContainer::CResult> 
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		
-		TCContinuation<CCloudAPIManager::CEnsureContainer::CResult> Continuation;
+		TCPromise<CCloudAPIManager::CEnsureContainer::CResult> Promise;
 		
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
 			return Auditor.f_Exception("Cloud context format not valid");
@@ -31,18 +31,18 @@ namespace NMib::NCloud::NCloudAPIManager
 			return Auditor.f_Exception("Temp URL key format not valid");
 		
 		pThis->mp_Permissions.f_HasPermission("Ensure container in cloud API manager", {"ObjectStorage/EnsureContainerAll", "ObjectStorage/EnsureContainer/{}"_f << _Params.m_CloudContext})
-			> Continuation % "Permission denied ensuring container" % Auditor / [=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
+			> Promise % "Permission denied ensuring container" % Auditor / [=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
 			{
 				if (_bHasPermission)
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Ensure container)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Ensure container)"));
 
 				auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
 				if (!pCloudContext)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such cloud context: {}", _Params.m_CloudContext)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such cloud context: {}", _Params.m_CloudContext)));
 
 				CStr StoragePolicy = pCloudContext->m_SwiftStoragePolicy;
 
-				pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [pThis, Continuation, _Params, StoragePolicy, Auditor](COpenStackServiceInfo &&_ServiceInfo)
+				pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Promise / [pThis, Promise, _Params, StoragePolicy, Auditor](COpenStackServiceInfo &&_ServiceInfo)
 					{
 						fg_Dispatch
 							(
@@ -84,17 +84,17 @@ namespace NMib::NCloud::NCloudAPIManager
 									return URL;
 								}
 							)
-							> [Continuation, _Params, Auditor](TCAsyncResult<CStr> &&_Value)
+							> [Promise, _Params, Auditor](TCAsyncResult<CStr> &&_Value)
 							{
 								if (!_Value)
 								{
 									CStr Error = fg_Format("Failed to ensure container {} on {}", _Params.m_ContainerName, _Params.m_CloudContext);
-									Continuation.f_SetException(Auditor.f_Exception(fsp_AuditMessages(Error, _Value.f_GetException())));
+									Promise.f_SetException(Auditor.f_Exception(fsp_AuditMessages(Error, _Value.f_GetException())));
 									return;
 								}
 
 								CCloudAPIManager::CEnsureContainer::CResult Result;
-								Continuation.f_SetResult(Result);
+								Promise.f_SetResult(Result);
 								Auditor.f_Info(fg_Format("Ensure container {} on {}", _Params.m_ContainerName, _Params.m_CloudContext));
 							}
 						;
@@ -103,7 +103,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }
 

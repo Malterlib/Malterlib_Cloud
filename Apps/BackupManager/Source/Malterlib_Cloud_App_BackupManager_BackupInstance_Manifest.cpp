@@ -6,7 +6,7 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	TCContinuation<TCActorSubscriptionWithID<>> CBackupInstance::f_StartManifestRSync
+	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::f_StartManifestRSync
 		(
 			FRunRSyncProtocol &&_fRunProtocol
 			, uint64 _ManifestSize
@@ -33,7 +33,7 @@ namespace NMib::NCloud::NBackupManager
 				, _ManifestSize
 				, EDirectoryManifestSyncFlag_None
 				, Internal.m_ManifestRSyncID
-				, [this](TCAsyncResult<void> const &_Result) -> TCContinuation<void>
+				, [this](TCAsyncResult<void> const &_Result) -> TCFuture<void>
 				{
 					auto &Internal = *mp_pInternal;
 					if (_Result)
@@ -45,7 +45,7 @@ namespace NMib::NCloud::NBackupManager
 		;
 	}
 
-	TCContinuation<void> CBackupInstance::f_ManifestChange(CStr const &_FileName, CManifestChange const &_Change)
+	TCFuture<void> CBackupInstance::f_ManifestChange(CStr const &_FileName, CManifestChange const &_Change)
 	{
 		CStr ManifestError;
 		if (!CBackupManagerBackup::fs_ManifestChangeValid(_FileName, _Change, ManifestError))
@@ -70,7 +70,7 @@ namespace NMib::NCloud::NBackupManager
 
 				DMibCloudBackupManagerDebugOut("--- Add {}\n", _FileName);
 
-				TCContinuation<void> Continuation;
+				TCPromise<void> Promise;
 				Internal.f_SequenceSyncs
 					(
 					 	_FileName
@@ -80,15 +80,15 @@ namespace NMib::NCloud::NBackupManager
 							DMibLogWithCategory(Mib/Cloud/BackupManager, DebugVerbose1, "Add manifest: {}", _FileName);
 
 							if (Internal.m_Manifest.m_Files.f_FindEqual(_FileName))
-								return Continuation.f_SetException(DMibErrorInstance("File already exists in manifest: {}"_f << _FileName));
+								return Promise.f_SetException(DMibErrorInstance("File already exists in manifest: {}"_f << _FileName));
 
 							Internal.m_AppendStates.f_Remove(_FileName);
 
-							Internal.f_CommitManifestChange(_FileName, _Change, "add") > Continuation;
+							Internal.f_CommitManifestChange(_FileName, _Change, "add") > Promise;
 						}
 					)
 				;
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		case EManifestChange_Change:
 			{
@@ -102,7 +102,7 @@ namespace NMib::NCloud::NBackupManager
 
 				DMibCloudBackupManagerDebugOut("--- Change {}\n", _FileName);
 
-				TCContinuation<void> Continuation;
+				TCPromise<void> Promise;
 				Internal.f_SequenceSyncs
 					(
 						_FileName
@@ -114,14 +114,14 @@ namespace NMib::NCloud::NBackupManager
 							auto *pManifestFile = Internal.m_Manifest.m_Files.f_FindEqual(_FileName);
 
 							if (!pManifestFile)
-								return Continuation.f_SetException(DMibErrorInstance("File does not exists in manifest: {}"_f << _FileName));
+								return Promise.f_SetException(DMibErrorInstance("File does not exists in manifest: {}"_f << _FileName));
 
 							Internal.m_AppendStates.f_Remove(_FileName);
-							Internal.f_CommitManifestChange(_FileName, _Change, "change") > Continuation;
+							Internal.f_CommitManifestChange(_FileName, _Change, "change") > Promise;
 						}
 					)
 				;
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		case EManifestChange_Remove:
 			{
@@ -132,11 +132,11 @@ namespace NMib::NCloud::NBackupManager
 
 				auto PendingCleanup = Internal.f_FilePending(_FileName);
 
-				TCContinuation<void> Continuation;
+				TCPromise<void> Promise;
 				Internal.f_SequenceSyncs
 					(
 					 	_FileName
-					 	, [Continuation, _FileName, this, PendingCleanup, _Change](COnScopeExitShared &&_pCleanup)
+					 	, [Promise, _FileName, this, PendingCleanup, _Change](COnScopeExitShared &&_pCleanup)
 					 	{
 							auto &Internal = *mp_pInternal;
 							DMibLogWithCategory(Mib/Cloud/BackupManager, DebugVerbose1, "Remove manifest: {}", _FileName);
@@ -146,7 +146,7 @@ namespace NMib::NCloud::NBackupManager
 							auto *pManifestFile = Internal.m_Manifest.m_Files.f_FindEqual(_FileName);
 
 							if (!pManifestFile)
-								return Continuation.f_SetException(DMibErrorInstance("File does not exists in manifest: {}"_f << _FileName));
+								return Promise.f_SetException(DMibErrorInstance("File does not exists in manifest: {}"_f << _FileName));
 
 							CStr AbsolutePath = Internal.f_GetCurrentPath(_FileName);
 
@@ -163,11 +163,11 @@ namespace NMib::NCloud::NBackupManager
 								}
 							}
 
-							Internal.f_CommitManifestChange(_FileName, _Change, "remove") > Continuation;
+							Internal.f_CommitManifestChange(_FileName, _Change, "remove") > Promise;
 						}
 					)
 				;
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		case EManifestChange_Rename:
 			{
@@ -183,7 +183,7 @@ namespace NMib::NCloud::NBackupManager
 
 				DMibCloudBackupManagerDebugOut("--- Rename {} -> {}\n", Change.m_FromFileName, _FileName);
 
-				TCContinuation<void> Continuation;
+				TCPromise<void> Promise;
 				Internal.f_SequenceMultipleSyncs
 					(
 					 	[=](COnScopeExitShared &&_pCleanup)
@@ -197,7 +197,7 @@ namespace NMib::NCloud::NBackupManager
 							auto *pManifestFile = Internal.m_Manifest.m_Files.f_FindEqual(Change.m_FromFileName);
 
 							if (!pManifestFile)
-								return Continuation.f_SetException(DMibErrorInstance("File does not exists in manifest: {}"_f << _FileName));
+								return Promise.f_SetException(DMibErrorInstance("File does not exists in manifest: {}"_f << _FileName));
 
 							CStr AbsoluteFrom = Internal.f_GetCurrentPath(Change.m_FromFileName);
 							CStr AbsoluteTo = Internal.f_GetCurrentPath(_FileName);
@@ -228,12 +228,12 @@ namespace NMib::NCloud::NBackupManager
 								}
 							}
 
-							Internal.f_CommitManifestChange(_FileName, _Change, "rename") > Continuation;
+							Internal.f_CommitManifestChange(_FileName, _Change, "rename") > Promise;
 						}
 					 	, {_FileName, Change.m_FromFileName}
 					)
 				;
-				return Continuation;
+				return Promise.f_MoveFuture();
 			}
 		}
 

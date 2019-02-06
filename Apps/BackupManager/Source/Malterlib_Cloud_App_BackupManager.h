@@ -16,8 +16,8 @@ namespace NMib::NCloud::NBackupManager
 		~CBackupManagerApp();
 		
 	private:
-		TCContinuation<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
-		TCContinuation<void> fp_StopApp() override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
+		TCFuture<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override; 
 		TCActor<CBackupManagerServer> mp_pServer;
 	};

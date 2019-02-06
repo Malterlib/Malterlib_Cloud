@@ -31,7 +31,7 @@ namespace NMib::NCloud
 			f_BackupInstance_ReportFinishedStarting(RunningInstance.m_Instance);
 	}
 
-	TCContinuation<void> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_AppendManifest(CDirectoryManifestConfig const &_Config)
+	TCFuture<void> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_AppendManifest(CDirectoryManifestConfig const &_Config)
 	{
 		if (!_Config.m_Root.f_IsEmpty())
 			return DMibErrorInstance("You cannot change manifest root when appending manifest");
@@ -68,12 +68,12 @@ namespace NMib::NCloud
 
 		auto pActive = Internal.f_MarkInstancesActive();
 
-		TCContinuation<void> Continuation;
-		Internal.f_SubscribeChanges() > [pActive, Continuation, pThis = m_pThis, NewConfig = fg_Move(NewConfig)](TCAsyncResult<void> &&_Result) mutable
+		TCPromise<void> Promise;
+		Internal.f_SubscribeChanges() > [pActive, Promise, pThis = m_pThis, NewConfig = fg_Move(NewConfig)](TCAsyncResult<void> &&_Result) mutable
 			{
 				if (pThis->f_IsDestroyed())
 				{
-					Continuation.f_SetException(DMibErrorInstance("Destroyed"));
+					Promise.f_SetException(DMibErrorInstance("Destroyed"));
 					return;
 				}
 				
@@ -113,12 +113,12 @@ namespace NMib::NCloud
 
 						return {fg_Move(Manifest), fg_Move(FileIDs), fg_Move(AppendStates)};
 					}
-					> [pThis, Continuation, pActive]
+					> [pThis, Promise, pActive]
 					(TCAsyncResult<TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>> &&_Manifest)
 					{
 						if (pThis->f_IsDestroyed())
 						{
-							Continuation.f_SetException(DMibErrorInstance("Destroyed"));
+							Promise.f_SetException(DMibErrorInstance("Destroyed"));
 							return;
 						}
 
@@ -127,7 +127,7 @@ namespace NMib::NCloud
 						if (!_Manifest)
 						{
 							Internal.f_ReportBackupError("Failed to get manifest when appending: {}"_f << _Manifest.f_GetExceptionStr(), true);
-							Continuation.f_SetException(fg_Move(_Manifest));
+							Promise.f_SetException(fg_Move(_Manifest));
 							return;
 						}
 
@@ -166,7 +166,7 @@ namespace NMib::NCloud
 								}
 								else
 								{
-									Continuation.f_SetException
+									Promise.f_SetException
 										(
 											DMibErrorInstance
 											(
@@ -232,12 +232,12 @@ namespace NMib::NCloud
 						
 						Internal.m_ManifestFileIDs += NewManifestFileIDs;
 						
-						ManifestChangedResults.f_GetResults() > Continuation.f_ReceiveAny();
+						ManifestChangedResults.f_GetResults() > Promise.f_ReceiveAny();
 					}
 				;
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

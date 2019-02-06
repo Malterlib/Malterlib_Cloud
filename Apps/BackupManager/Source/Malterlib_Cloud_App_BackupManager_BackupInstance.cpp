@@ -57,7 +57,7 @@ namespace NMib::NCloud::NBackupManager
 		return nullptr;
 	}
 
-	TCContinuation<void> CBackupInstance::fp_Destroy()
+	TCFuture<void> CBackupInstance::fp_Destroy()
 	{
 		auto &Internal = *mp_pInternal;
 		if (!Internal.m_BackupSourceSubscription)
@@ -66,7 +66,7 @@ namespace NMib::NCloud::NBackupManager
 		return Internal.m_BackupSourceSubscription->f_Destroy();
 	}
 	
-	auto CBackupInstance::f_StartBackup() -> TCContinuation<CStartBackupResult>
+	auto CBackupInstance::f_StartBackup() -> TCFuture<CStartBackupResult>
 	{
 		auto &Internal = *mp_pInternal;
 		
@@ -76,7 +76,7 @@ namespace NMib::NCloud::NBackupManager
 		if (Internal.m_bBackupStarted)
 			return DMibErrorInstance("Backup already started");
 		
-		return TCContinuation<CStartBackupResult>::fs_RunProtected<CExceptionFile>() / [&]()
+		return TCFuture<CStartBackupResult>::fs_RunProtected<CExceptionFile>() / [&]()
 			{
 				auto &Internal = *mp_pInternal;
 				
@@ -191,7 +191,7 @@ namespace NMib::NCloud::NBackupManager
 		;
 	}
 
-	TCContinuation<void> CBackupInstance::CInternal::f_CommitManifestChange(CStr const &_FileName, CManifestChange const &_Change, CStr const &_Description)
+	TCFuture<void> CBackupInstance::CInternal::f_CommitManifestChange(CStr const &_FileName, CManifestChange const &_Change, CStr const &_Description)
 	{
 #if defined DMibContractConfigure_CheckEnabled
 		CStr ManifestError;
@@ -203,22 +203,22 @@ namespace NMib::NCloud::NBackupManager
 		if (!m_bInitialBackupFinished)
 			return fg_Explicit();
 
-		TCContinuation<void> Continuation;
-		m_BackupSource(&CBackupSource::f_Commit, m_ID, _FileName, _Change) > [Continuation, _Description](TCAsyncResult<void> &&_Result)
+		TCPromise<void> Promise;
+		m_BackupSource(&CBackupSource::f_Commit, m_ID, _FileName, _Change) > [Promise, _Description](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 				{
 					DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to commit file {}: {}", _Description, _Result.f_GetExceptionStr());
-					Continuation.f_SetException(DMibErrorInstance("Failed to commit {} file in backup (check backup manager log)"_f << _Description));
+					Promise.f_SetException(DMibErrorInstance("Failed to commit {} file in backup (check backup manager log)"_f << _Description));
 					return;
 				}
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<void> CBackupInstance::CInternal::f_CommitFile(CStr const &_File, CBackupManagerBackup::CManifestFile const &_ManifestFile)
+	TCFuture<void> CBackupInstance::CInternal::f_CommitFile(CStr const &_File, CBackupManagerBackup::CManifestFile const &_ManifestFile)
 	{
 #if defined DMibContractConfigure_CheckEnabled
 		CStr ManifestError;
@@ -245,14 +245,14 @@ namespace NMib::NCloud::NBackupManager
 		return m_BackupSource(&CBackupSource::f_Commit, m_ID, _File, fg_Move(ManifestChange));
 	}
 
-	auto CBackupInstance::f_InitialBackupFinished(EInitialBackupFinishedFlag _FinishedFlags) -> TCContinuation<CInitialBackupFinishedResult>
+	auto CBackupInstance::f_InitialBackupFinished(EInitialBackupFinishedFlag _FinishedFlags) -> TCFuture<CInitialBackupFinishedResult>
 	{
 		auto &Internal = *mp_pInternal;
-		TCContinuation<CInitialBackupFinishedResult> Continuation;
+		TCPromise<CInitialBackupFinishedResult> Promise;
 
 		Internal.f_OnPendingQuiescence
 			(
-			 	[Continuation, this, _FinishedFlags]
+			 	[Promise, this, _FinishedFlags]
 			 	{
 					// When we get here no rsyncs should be running, only appends can be queued. Guard against this by sequencing against all files in manifest
 
@@ -263,13 +263,13 @@ namespace NMib::NCloud::NBackupManager
 
 					Internal.f_SequenceMultipleSyncs
 						(
-						 	[Continuation, this, _FinishedFlags](COnScopeExitShared &&_pCleanup)
+						 	[Promise, this, _FinishedFlags](COnScopeExitShared &&_pCleanup)
 						 	{
 								auto &Internal = *mp_pInternal;
 								Internal.m_bInitialBackupFinished = true;
 								DMibLogWithCategory(Mib/Cloud/BackupManager, Info, "({} - {tc5}) Initial backup finished, committing to latest", Internal.m_Name, Internal.m_StartTime);
 								Internal.m_BackupSource(&CBackupSource::f_InitialCommit, Internal.m_ID, Internal.f_GetCurrentPath(""), fg_TempCopy(Internal.m_Manifest), _FinishedFlags)
-									> Continuation / [=](CBackupSource::CInitialCommitResult &&_Result)
+									> Promise / [=](CBackupSource::CInitialCommitResult &&_Result)
 									{
 										(void)_pCleanup;
 										auto &Internal = *mp_pInternal;
@@ -277,7 +277,7 @@ namespace NMib::NCloud::NBackupManager
 
 										DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "({} - {tc5}) Committed to latest, finishing", Internal.m_Name, Internal.m_StartTime);
 
-										Continuation.f_SetResult(_Result.m_Result);
+										Promise.f_SetResult(_Result.m_Result);
 									}
 								;
 							}
@@ -289,6 +289,6 @@ namespace NMib::NCloud::NBackupManager
 			)
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

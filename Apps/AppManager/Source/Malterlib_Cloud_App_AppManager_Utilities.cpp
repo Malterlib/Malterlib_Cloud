@@ -55,7 +55,7 @@ namespace NMib::NCloud::NAppManager
 		return StdOut;
 	}
 
-	TCContinuation<CAppManagerActor::CBashScriptOutput> CAppManagerActor::fp_RunBashScript
+	TCFuture<CAppManagerActor::CBashScriptOutput> CAppManagerActor::fp_RunBashScript
 		(
 			CStr const &_Script
 			, CStr const &_Description
@@ -67,7 +67,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			TCActor<CProcessLaunchActor> m_LaunchActor;
 			CActorSubscription m_LaunchSubscription;
-			TCContinuation<CBashScriptOutput> m_Continuation;
+			TCPromise<CBashScriptOutput> m_Promise;
 			CStr m_ErrorOutput;
 			CStr m_StdOutput;
 			
@@ -105,7 +105,7 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 			)
-			> pState->m_Continuation % fg_Format("[{}] Failed to save temporary script", _Description) 
+			> pState->m_Promise % fg_Format("[{}] Failed to save temporary script", _Description) 
 			/ [this, FileName, _Description, _Environment, _fOnStdOutput, pState]
 			{
 				auto fReportError = [pState, _Description](CStr const &_Error)
@@ -113,7 +113,7 @@ namespace NMib::NCloud::NAppManager
 						if (pState->m_bReplied)
 							return;
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "[{}] {}", _Description, _Error);
-						pState->m_Continuation.f_SetException(DMibErrorInstance(_Error));
+						pState->m_Promise.f_SetException(DMibErrorInstance(_Error));
 						pState->f_Replied();
 					}
 				;
@@ -165,7 +165,7 @@ namespace NMib::NCloud::NAppManager
 										;
 										if (!pState->m_bReplied)
 										{
-											pState->m_Continuation.f_SetResult(fg_Move(pState->m_Output));
+											pState->m_Promise.f_SetResult(fg_Move(pState->m_Output));
 											pState->f_Replied();
 										}
 									}
@@ -231,6 +231,6 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		
-		return pState->m_Continuation;
+		return pState->m_Promise;
 	}
 }

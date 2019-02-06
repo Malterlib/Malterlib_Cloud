@@ -359,20 +359,20 @@ public:
 					
 					auto pAppManagerTrustInner = AppManagerInner.m_pTrustInterface; 
 					
-					TCContinuation<void> Continuation;
+					TCPromise<void> Promise;
 					DMibCallActor
 						(
 						 	AppManagerTrust
 						 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
 						 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{AppManager.m_Address}
 						)
-						> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
+						> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 						{
 							auto &AppManagerTrustInner = *pAppManagerTrustInner;
-							DMibCallActor(AppManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Continuation.f_ReceiveAny();
+							DMibCallActor(AppManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 						}
 					;
-					Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
+					Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
 				}
 			}
 			
@@ -385,7 +385,7 @@ public:
 				auto &VersionManagerTrust = *pVersionManagerTrust;
 				CStr AppManagerHostID = AppManager.f_GetHostID();
 
-				TCContinuation<> Continuation;
+				TCPromise<> Promise;
 				
 				DMibCallActor
 					(
@@ -399,7 +399,7 @@ public:
 						, CDistributedActorTrustManagerInterface::f_AddPermissions
 						, fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
 					) 
-					> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket, CVoidTag)
+					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket, CVoidTag)
 					{
 						auto &AppManagerTrust = *pAppManagerTrust;
 						auto &VersionManagerTrust = *pVersionManagerTrust;
@@ -416,14 +416,14 @@ public:
 								, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
 								, fNamespaceHosts(CVersionManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(VersionManagerHostID))
 							)
-							> Continuation / [=]()
+							> Promise / [=]()
 							{
-								Continuation.f_SetResult();
+								Promise.f_SetResult();
 							}
 						;
 					}
 				;
-				Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
+				Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
 			}
 			fg_CombineResults(SetupTrustResults.f_GetResults().f_CallSync(g_Timeout));
 
@@ -493,13 +493,13 @@ public:
 				mint iAppManager = 0;
 				for (auto &AppManager : AppManagers)
 				{
-					TCContinuation<void> Continuation;
+					TCPromise<void> Promise;
 					DMibCallActor
 						(
 							AppManager
 							, CAppManagerInterface::f_SubscribeUpdateNotifications
 							, g_ActorFunctor / [pUpdateNotificationsState, iAppManager]
-							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCContinuation<void> 
+							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void> 
 							{
 								auto &State = *pUpdateNotificationsState;
 								
@@ -529,14 +529,14 @@ public:
 								return fg_Explicit();
 							}
 						) 
-						> Continuation / [pUpdateNotificationsState, Continuation](NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
+						> Promise / [pUpdateNotificationsState, Promise](NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
 						{
 							pUpdateNotificationsState->m_Subscriptions.f_Insert(fg_Move(_Subscription));
-							Continuation.f_SetResult();
+							Promise.f_SetResult();
 						}
 					;
 					
-					Continuation.f_Dispatch() > AppCommandResults.f_AddResult();
+					Promise.f_Dispatch() > AppCommandResults.f_AddResult();
 					++iAppManager;
 				}
 				fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));

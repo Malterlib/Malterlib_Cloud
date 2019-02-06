@@ -25,10 +25,10 @@ namespace NMib::NCloud::NBackupManager
 		CBackupSource(CStr const &_Directory);
 		~CBackupSource();
 
-		TCContinuation<CCheckedOutDirectory> f_CheckOutDirectory(CTime const &_Time);
-		TCContinuation<CBackupManager::CBackupInfo> f_GetInfo();
+		TCFuture<CCheckedOutDirectory> f_CheckOutDirectory(CTime const &_Time);
+		TCFuture<CBackupManager::CBackupInfo> f_GetInfo();
 
-		TCContinuation<CInitialCommitResult> f_InitialCommit
+		TCFuture<CInitialCommitResult> f_InitialCommit
 			(
 			 	CStr const &_BackupID
 			 	, CStr const &_Directory
@@ -36,8 +36,8 @@ namespace NMib::NCloud::NBackupManager
 			 	, CBackupManagerBackup::EInitialBackupFinishedFlag _FinishedFlags
 			)
 		;
-		TCContinuation<void> f_Commit(CStr const &_BackupID, CStr const &_File, CBackupManagerBackup::CManifestChange const &_ManifestChange);
-		TCContinuation<void> f_CommitAppend
+		TCFuture<void> f_Commit(CStr const &_BackupID, CStr const &_File, CBackupManagerBackup::CManifestChange const &_ManifestChange);
+		TCFuture<void> f_CommitAppend
 			(
 			 	CStr const &_BackupID
 			 	, CStr const &_File
@@ -61,7 +61,7 @@ namespace NMib::NCloud::NBackupManager
 			TCMap<CStr, CFile> m_AppendFiles;
 		};
 
-		TCContinuation<void> fp_Destroy() override;
+		TCFuture<void> fp_Destroy() override;
 		void fp_Init();
 		void fp_CloseFiles(CStr const &_FileName);
 		void fp_SaveManifest();

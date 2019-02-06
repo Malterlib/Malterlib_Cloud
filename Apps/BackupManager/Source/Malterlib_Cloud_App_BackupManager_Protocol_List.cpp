@@ -5,15 +5,15 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	TCContinuation<TCVector<CStr>> CBackupManagerServer::fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources)
+	TCFuture<TCVector<CStr>> CBackupManagerServer::fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources)
 	{
-		TCContinuation<TCVector<CStr>> Continuation;
+		TCPromise<TCVector<CStr>> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 		Permissions["//ALL//"] = {{"Backup/ListAll", "Backup/ReadAll"}};
 		for (auto &Backup : _Sources)
 			Permissions[Backup] = {CPermissionQuery{fg_Format("Backup/Read/{}", Backup)}.f_Description("Access source {} in BackupManager"_f << Backup)};
 
-		mp_Permissions.f_HasPermissions("List backup sources", Permissions) > Continuation / [Continuation, _Sources](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		mp_Permissions.f_HasPermissions("List backup sources", Permissions) > Promise / [Promise, _Sources](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				TCVector<CStr> BackupSources;
 				bool bListAllAccess = _HasPermissions["//ALL//"];
@@ -26,35 +26,35 @@ namespace NMib::NCloud::NBackupManager
 					BackupSources.f_Insert(Backup);
 				}
 
-				Continuation.f_SetResult(fg_Move(BackupSources));
+				Promise.f_SetResult(fg_Move(BackupSources));
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<TCVector<CStr>> CBackupManagerServer::CBackupManagerImplementation::f_ListBackupSources()
+	TCFuture<TCVector<CStr>> CBackupManagerServer::CBackupManagerImplementation::f_ListBackupSources()
 	{
 		auto pThis = m_pThis;
 		if (pThis->f_IsDestroyed())
 			return DMibErrorInstance("Shutting down");
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		NConcurrency::TCContinuation<TCVector<CStr>> Continuation;
+		NConcurrency::TCPromise<TCVector<CStr>> Promise;
 
 		Auditor.f_Info("Listing backup sources");
 		
 		pThis->fp_FilterBackupSourcesByPermissions(pThis->fp_EnumBackupSources())
-			> Continuation % "Permission denied listing backup sources" % Auditor / [=](TCVector<CStr> &&_Sources)
+			> Promise % "Permission denied listing backup sources" % Auditor / [=](TCVector<CStr> &&_Sources)
 			{
 				Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", _Sources));
-				Continuation.f_SetResult(fg_Move(_Sources));
+				Promise.f_SetResult(fg_Move(_Sources));
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	auto CBackupManagerServer::CBackupManagerImplementation::f_ListBackups(CStr const &_ForBackupSource) -> TCContinuation<TCMap<CStr, CBackupInfo>>
+	auto CBackupManagerServer::CBackupManagerImplementation::f_ListBackups(CStr const &_ForBackupSource) -> TCFuture<TCMap<CStr, CBackupInfo>>
 	{
 		auto pThis = m_pThis;
 		if (pThis->f_IsDestroyed())
@@ -80,18 +80,18 @@ namespace NMib::NCloud::NBackupManager
 		else
 			BackupSources = pThis->fp_EnumBackupSources();
 
-		NConcurrency::TCContinuation<TCMap<CStr, CBackupInfo>> Continuation;
+		NConcurrency::TCPromise<TCMap<CStr, CBackupInfo>> Promise;
 
-		pThis->fp_FilterBackupSourcesByPermissions(BackupSources) > Continuation % "Permission denied listing backups" % Auditor / [=](TCVector<CStr> &&_BackupSources)
+		pThis->fp_FilterBackupSourcesByPermissions(BackupSources) > Promise % "Permission denied listing backups" % Auditor / [=](TCVector<CStr> &&_BackupSources)
 			{
 				if (bSingleSource)
 				{
 					if (_BackupSources.f_IsEmpty())
-						return Continuation.f_SetException(Auditor.f_AccessDenied("(List backups)"));
+						return Promise.f_SetException(Auditor.f_AccessDenied("(List backups)"));
 
 					auto *pBackupSource = pThis->mp_BackupSources.f_FindEqual(_ForBackupSource);
 					if (!pBackupSource)
-						return Continuation.f_SetException(Auditor.f_Exception({"No such backup source", "(List backups)"}));
+						return Promise.f_SetException(Auditor.f_Exception({"No such backup source", "(List backups)"}));
 				}
 
 				TCActorResultMap<CStr, CBackupInfo> BackupInfos;
@@ -105,7 +105,7 @@ namespace NMib::NCloud::NBackupManager
 					(*pBackupSource)(&CBackupSource::f_GetInfo) > BackupInfos.f_AddResult(BackupSourceID);
 				}
 
-				BackupInfos.f_GetResults() > Continuation % Auditor / [=](TCMap<CStr, TCAsyncResult<CBackupInfo>> &&_BackupInfos)
+				BackupInfos.f_GetResults() > Promise % Auditor / [=](TCMap<CStr, TCAsyncResult<CBackupInfo>> &&_BackupInfos)
 					{
 						TCMap<CStr, CBackupInfo> Results;
 						for (auto &BackupInfo : _BackupInfos)
@@ -127,12 +127,12 @@ namespace NMib::NCloud::NBackupManager
 							Results[BackupSource] = fg_Move(*BackupInfo);
 						}
 
-						Continuation.f_SetResult(fg_Move(Results));
+						Promise.f_SetResult(fg_Move(Results));
 					}
 				;
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

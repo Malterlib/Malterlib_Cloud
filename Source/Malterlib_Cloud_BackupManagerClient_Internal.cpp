@@ -13,7 +13,7 @@ namespace NMib::NCloud
 			, TCActor<CDistributedActorTrustManager> const &_TrustManager
 			, TCActorFunctor
 			<
-				TCContinuation<TCActorSubscriptionWithID<>>
+				TCFuture<TCActorSubscriptionWithID<>>
 				(
 					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
 					, CActorSubscription &&_ManifestFinished

@@ -14,12 +14,12 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_SignTempURL(CSignTempURL &&_Params) -> TCContinuation<CSignTempURL::CResult>
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_SignTempURL(CSignTempURL &&_Params) -> TCFuture<CSignTempURL::CResult>
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		
-		TCContinuation<CCloudAPIManager::CSignTempURL::CResult> Continuation;
+		TCPromise<CCloudAPIManager::CSignTempURL::CResult> Promise;
 		
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
 			return Auditor.f_Exception("Cloud context format not valid");
@@ -34,16 +34,16 @@ namespace NMib::NCloud::NCloudAPIManager
 			return Auditor.f_Exception("Temp URL key format not valid");
 		
 		pThis->mp_Permissions.f_HasPermission("Sign Temp URL", {"ObjectStorage/SignTempURLAll", fg_Format("ObjectStorage/SignTempURL/{}", _Params.m_CloudContext)})
-			> Continuation % "Permission denied signing temp URL" % Auditor / [=](bool _bHasPermission)
+			> Promise % "Permission denied signing temp URL" % Auditor / [=](bool _bHasPermission)
 			{
 				if (!_bHasPermission)
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Sign Temp URL)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Sign Temp URL)"));
 
 				auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
 				if (!pCloudContext)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such cloud context: {}", _Params.m_CloudContext)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such cloud context: {}", _Params.m_CloudContext)));
 
-				pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Continuation / [pThis, Continuation, _Params, Auditor](COpenStackServiceInfo &&_ServiceInfo)
+				pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Promise / [pThis, Promise, _Params, Auditor](COpenStackServiceInfo &&_ServiceInfo)
 					{
 						fg_Dispatch
 							(
@@ -86,17 +86,17 @@ namespace NMib::NCloud::NCloudAPIManager
 									return SignedURL;
 								}
 							)
-							> [Continuation, _Params, Auditor](TCAsyncResult<CStr> &&_Value)
+							> [Promise, _Params, Auditor](TCAsyncResult<CStr> &&_Value)
 							{
 								if (!_Value)
 								{
 									CStr Error = fg_Format("Failed to sign temp URL {}/{} on {}", _Params.m_ContainerName, _Params.m_ObjectId, _Params.m_CloudContext);
-									Continuation.f_SetException(Auditor.f_Exception(fsp_AuditMessages(Error, _Value.f_GetException())));
+									Promise.f_SetException(Auditor.f_Exception(fsp_AuditMessages(Error, _Value.f_GetException())));
 									return;
 								}
 								CCloudAPIManager::CSignTempURL::CResult Result;
 								Result.m_SignedURL = *_Value;
-								Continuation.f_SetResult(Result);
+								Promise.f_SetResult(Result);
 								Auditor.f_Info(fg_Format("Sign temp URL {}/{} on {}", _Params.m_ContainerName, _Params.m_ObjectId, _Params.m_CloudContext));
 							}
 						;
@@ -104,7 +104,7 @@ namespace NMib::NCloud::NCloudAPIManager
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }
 

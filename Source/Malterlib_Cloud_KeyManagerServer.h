@@ -64,9 +64,9 @@ namespace NMib::NCloud
 			}
 		};
 		
-		virtual NConcurrency::TCContinuation<void> f_Initialize() = 0;
-		virtual NConcurrency::TCContinuation<void> f_WriteDatabase(CDatabase const &_Database) = 0;
-		virtual NConcurrency::TCContinuation<CDatabase> f_ReadDatabase() = 0;
+		virtual NConcurrency::TCFuture<void> f_Initialize() = 0;
+		virtual NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase const &_Database) = 0;
+		virtual NConcurrency::TCFuture<CDatabase> f_ReadDatabase() = 0;
 	};
 	
 	struct CKeyManagerServerConfig
@@ -83,10 +83,10 @@ namespace NMib::NCloud
 		CKeyManagerServer(CKeyManagerServerConfig const &_Config, NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager);
 		~CKeyManagerServer();
 		
-		NConcurrency::TCContinuation<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
+		NConcurrency::TCFuture<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
 		
 	protected:
-		NConcurrency::TCContinuation<CSymmetricKey> fp_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize);
+		NConcurrency::TCFuture<CSymmetricKey> fp_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize);
 		
 	private:
 		struct CInternal;

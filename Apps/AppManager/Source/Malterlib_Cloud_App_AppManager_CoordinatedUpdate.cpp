@@ -9,13 +9,13 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 		CStr Group = _Params["Group"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		CStr HostID = _Params["HostID"].f_String();
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		
 		TCActorResultVector<void> Results;
 		
@@ -28,14 +28,14 @@ namespace NMib::NCloud::NAppManager
 		
 		mp_AppManagerCoordinationInterface.m_pActor->f_RemoveKnownHost(Group, Application, HostID) > Results.f_AddResult();
 		
-		Results.f_GetResults() > Continuation % Auditor / [Continuation](TCVector<TCAsyncResult<void>> &&_Results)
+		Results.f_GetResults() > Promise % Auditor / [Promise](TCVector<TCAsyncResult<void>> &&_Results)
 			{
-				if (!fg_CombineResults(Continuation, fg_Move(_Results)))
+				if (!fg_CombineResults(Promise, fg_Move(_Results)))
 					return;
-				Continuation.f_SetResult(0);
+				Promise.f_SetResult(0);
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	static bool fg_IsSameVersion
@@ -86,7 +86,7 @@ namespace NMib::NCloud::NAppManager
 
 #define DDebugAppTurnUpdateLogic 0
 
-	TCContinuation<void> CAppManagerActor::fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		CRemoteApplicationKey OurRemoteKey{_pState->m_pApplication->m_Settings};
 		
@@ -198,7 +198,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_Coordination_WaitForAllToReachWantUpdateStage
+	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForAllToReachWantUpdateStage
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
 			, EUpdateStage _Stage
@@ -216,7 +216,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				_pState
 				, _Timeout
-				, [=](TCContinuation<void> &o_Continuation) mutable -> bool
+				, [=](TCPromise<void> &o_Promise) mutable -> bool
 				{
 					bool bAllInStage = true;
 					
@@ -269,7 +269,7 @@ namespace NMib::NCloud::NAppManager
 							return false;
 						if (!_fEvalState)
 							_pState->m_fOnInfo(fg_Format("All ready to start stage '{}'", fsp_UpdateStageToStr(_Stage)));
-						o_Continuation.f_SetResult();
+						o_Promise.f_SetResult();
 						return true;
 					}
 					return false;
@@ -282,22 +282,22 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		CRemoteApplicationKey RemoteKey{_pState->m_pApplication->m_Settings};
 		
 		// First wait for all applications to be fully ready for doing update without being dependent on version manager
 		fp_Coordination_WaitForAllToReachWantUpdateStage(_pState, EUpdateStage::EUpdateStage_StopOldApp, 30.0*60.0, EWaitStageFlag_None) 
-			> Continuation / [this, RemoteKey, Continuation, _pState]
+			> Promise / [this, RemoteKey, Promise, _pState]
 			{
 				_pState->m_fOnInfo("Waiting for our turn to update");
 				fp_Coordination_WaitForState
 					(
 						_pState
 						, 60.0*60.0
-						, [=](TCContinuation<void> &o_Continuation) -> bool
+						, [=](TCPromise<void> &o_Promise) -> bool
 						{
 							CStr SmallestHostID = mp_State.m_HostID;
 							for (auto &RemoteAppManager : mp_RemoteAppManagerState)
@@ -325,7 +325,7 @@ namespace NMib::NCloud::NAppManager
 							if (SmallestHostID == mp_State.m_HostID)
 							{
 								_pState->m_fOnInfo("Our turn to update");
-								o_Continuation.f_SetResult();
+								o_Promise.f_SetResult();
 								return true;
 							}
 							return false;
@@ -334,11 +334,11 @@ namespace NMib::NCloud::NAppManager
 						, "Timed out waiting for our turn to update"
 						, "Timed out wating for remote app manager to connect while waiting for our turn to update"
 					)
-					> Continuation 
+					> Promise 
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
 	ch8 const *CAppManagerActor::fsp_UpdateStageToStr(EUpdateStage _Stage)
@@ -363,11 +363,11 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_Coordination_WaitForState
+	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForState
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
 			, fp64 _Timeout
-			, TCFunctionMutable<bool (TCContinuation<void> &_Continuation)> &&_fEvalState
+			, TCFunctionMutable<bool (TCPromise<void> &_Promise)> &&_fEvalState
 			, CStr const &_RemoteFailError
 			, CStr const &_TimeoutError
 			, CStr const &_DisconnectedError
@@ -387,7 +387,7 @@ namespace NMib::NCloud::NAppManager
 		
 		TCSharedPointer<CState> pState = fg_Construct();
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
 		pOnAppUpdateInfoChange->m_fOnChanged = [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() mutable
 			{
@@ -395,7 +395,7 @@ namespace NMib::NCloud::NAppManager
 				if (!pOnAppUpdateInfoChange)
 					return;
 
-				if (_pState->f_CheckAbort(Continuation))
+				if (_pState->f_CheckAbort(Promise))
 				{
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					return;
@@ -417,9 +417,9 @@ namespace NMib::NCloud::NAppManager
 						continue;
 					if (*pKnownApplications != RemoteKnownHosts)
 					{
-						if (!Continuation.f_IsSet())
+						if (!Promise.f_IsSet())
 						{
-							Continuation.f_SetException
+							Promise.f_SetException
 								(
 									DMibErrorInstance(fg_Format("AppManagers don't agree on known hosts for application '{vs}' != '{vs}'", *pKnownApplications, RemoteKnownHosts))
 								)
@@ -486,8 +486,8 @@ namespace NMib::NCloud::NAppManager
 				
 				if (bFailed)
 				{
-					if (!Continuation.f_IsSet())
-						Continuation.f_SetException(DErrorInstance(_RemoteFailError));
+					if (!Promise.f_IsSet())
+						Promise.f_SetException(DErrorInstance(_RemoteFailError));
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					return;
 				}
@@ -504,7 +504,7 @@ namespace NMib::NCloud::NAppManager
 				
 				pState->m_bWasDisconnected = false;
 				
-				if (_fEvalState(Continuation))
+				if (_fEvalState(Promise))
 				{
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					return;
@@ -520,12 +520,12 @@ namespace NMib::NCloud::NAppManager
 			(
 				1.0*60.0
 				, self
-				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() -> TCContinuation<void>
+				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() -> TCFuture<void>
 				{
 					if (pState->m_bWasDisconnected && pState->m_DisconnectClock.f_GetTime() >= DisconnectTimeout)
 					{
-						if (!Continuation.f_IsSet())
-							Continuation.f_SetException(DErrorInstance(_DisconnectedError));
+						if (!Promise.f_IsSet())
+							Promise.f_SetException(DErrorInstance(_DisconnectedError));
 						mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					}
 					return fg_Explicit();
@@ -546,8 +546,8 @@ namespace NMib::NCloud::NAppManager
 				, self
 				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]
 				{
-					if (!Continuation.f_IsSet())
-						Continuation.f_SetException(DErrorInstance(_TimeoutError));
+					if (!Promise.f_IsSet())
+						Promise.f_SetException(DErrorInstance(_TimeoutError));
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 				}
 			) 
@@ -562,6 +562,6 @@ namespace NMib::NCloud::NAppManager
 		
 		pOnAppUpdateInfoChange->m_fOnChanged();
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

@@ -4,7 +4,7 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	TCContinuation<void> CBackupInstance::f_AppendData(CStr const &_FileName, CAppendData &&_Data)
+	TCFuture<void> CBackupInstance::f_AppendData(CStr const &_FileName, CAppendData &&_Data)
 	{
 		CStr ManifestError;
 		if (!CBackupManagerBackup::fs_ManifestFileValid(_FileName, _Data.m_ManifestFile, ManifestError))
@@ -18,7 +18,7 @@ namespace NMib::NCloud::NBackupManager
 		if (!_Data.m_ManifestFile.f_IsFile())
 			return DMibErrorInstance("Cannot append non-file: {}"_f << _FileName);
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		DMibCloudBackupManagerDebugOut("--- Append {}\n", _FileName);
 
 		Internal.f_SequenceSyncs
@@ -31,7 +31,7 @@ namespace NMib::NCloud::NBackupManager
 					CDirectoryManifestFile *pManifestFile;
 
 					if (auto pException = Internal.f_CheckFileName(_FileName, &pManifestFile))
-						return Continuation.f_SetException(pException);
+						return Promise.f_SetException(pException);
 
 					auto fDigestFailed = [&]
 						{
@@ -42,12 +42,12 @@ namespace NMib::NCloud::NBackupManager
 					if (pManifestFile->m_Digest != Data.m_PreviousDigest)
 					{
 						fDigestFailed();
-						return Continuation.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("Previous digest does not match"));
+						return Promise.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("Previous digest does not match"));
 					}
 
 					CManifestChange_Change ManifestChange;
 
-					auto Result = TCContinuation<void>::fs_RunProtected<CException>() / [&]()
+					auto Result = TCFuture<void>::fs_RunProtectedAsyncResult<CException>() / [&]()
 						{
 							auto &ManifestFile = *pManifestFile;
 
@@ -122,7 +122,7 @@ namespace NMib::NCloud::NBackupManager
 
 					if (!Result)
 					{
-						Continuation.f_SetResult(Result);
+						Promise.f_SetResult(Result);
 						return;
 					}
 
@@ -130,15 +130,15 @@ namespace NMib::NCloud::NBackupManager
 
 					if (!Internal.m_bInitialBackupFinished)
 					{
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 						return;
 					}
 
-					Internal.m_BackupSource(&CBackupSource::f_CommitAppend, Internal.m_ID, _FileName, Data.m_Position, fg_Move(Data.m_Data), ManifestChange) > Continuation;
+					Internal.m_BackupSource(&CBackupSource::f_CommitAppend, Internal.m_ID, _FileName, Data.m_Position, fg_Move(Data.m_Data), ManifestChange) > Promise;
 				}
 			)
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

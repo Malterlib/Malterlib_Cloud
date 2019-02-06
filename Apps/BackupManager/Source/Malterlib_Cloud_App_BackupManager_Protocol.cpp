@@ -5,7 +5,7 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	TCContinuation<void> CBackupManagerServer::fp_Publish()
+	TCFuture<void> CBackupManagerServer::fp_Publish()
 	{
 		return mp_ProtocolInterface.f_Publish<CBackupManager>(mp_AppState.m_DistributionManager, this, CBackupManager::mc_pDefaultNamespace);
 	}

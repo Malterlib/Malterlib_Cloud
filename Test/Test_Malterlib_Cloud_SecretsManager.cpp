@@ -279,40 +279,40 @@ public:
 #if DTestSecretsManagerEnableLogging
 			LaunchParams.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
 #endif
-			TCContinuation<void> LaunchedContinuation;
-			TCContinuation<void> ExitedContinuation;
+			TCPromise<void> LaunchedPromise;
+			TCPromise<void> ExitedPromise;
 
-			LaunchParams.m_Params.m_fOnStateChange = [LaunchedContinuation, ExitedContinuation](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+			LaunchParams.m_Params.m_fOnStateChange = [LaunchedPromise, ExitedPromise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 				{
 					switch (_State.f_GetTypeID())
 					{
 					case NProcess::EProcessLaunchState_Launched:
 						{
-							LaunchedContinuation.f_SetResult();
+							LaunchedPromise.f_SetResult();
 						}
 						break;
 					case NProcess::EProcessLaunchState_LaunchFailed:
 						{
 							auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
-							LaunchedContinuation.f_SetException(DMibErrorInstance(LaunchError));
+							LaunchedPromise.f_SetException(DMibErrorInstance(LaunchError));
 						}
 						break;
 					case NProcess::EProcessLaunchState_Exited:
 						{
 							auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
 							if (ExitStatus)
-								ExitedContinuation.f_SetException(DMibErrorInstance(fg_Format("Launch failed: Status {}", ExitStatus)));
+								ExitedPromise.f_SetException(DMibErrorInstance(fg_Format("Launch failed: Status {}", ExitStatus)));
 							else
-								ExitedContinuation.f_SetResult();
+								ExitedPromise.f_SetResult();
 						}
 						break;
 					}
 				}
 			;
 			auto LaunchSubscription = KeyManagerCommandLine(&CProcessLaunchActor::f_Launch, fg_Move(LaunchParams), HelperActor).f_CallSync(g_Timeout);
-			LaunchedContinuation.f_Dispatch().f_CallSync(g_Timeout);
+			LaunchedPromise.f_Dispatch().f_CallSync(g_Timeout);
 			KeyManagerCommandLine(&CProcessLaunchActor::f_SendStdIn, "Password\n").f_CallSync(g_Timeout);
-			ExitedContinuation.f_Dispatch().f_CallSync(g_Timeout);
+			ExitedPromise.f_Dispatch().f_CallSync(g_Timeout);
 			KeyManagerCommandLine->f_Destroy().f_CallSync(g_Timeout);
 		}
 
@@ -428,37 +428,37 @@ public:
 				
 				auto pSecretsManagerTrustInner = SecretsManagerInner.m_pTrustInterface;
 				
-				TCContinuation<void> Continuation;
+				TCPromise<void> Promise;
 				DMibCallActor
 					(
 					 	SecretsManagerTrust
 					 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
 					 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SecretsManager.m_Address}
 					)
-					> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
+					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &SecretsManagerTrustInner = *pSecretsManagerTrustInner;
-						DMibCallActor(SecretsManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Continuation.f_ReceiveAny();
+						DMibCallActor(SecretsManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 					}
 				;
-				Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
+				Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
 
 			}
 
-			TCContinuation<void> Continuation;
+			TCPromise<void> Promise;
 			DMibCallActor
 				(
 				 	KeyManagerTrust
 				 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
 				 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{KeyManagerServerAddress}
 				)
-				> Continuation / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
+				> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 				{
 					auto &SecretsManagerTrust = *pSecretsManagerTrust;
-					DMibCallActor(SecretsManagerTrust, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Continuation.f_ReceiveAny();
+					DMibCallActor(SecretsManagerTrust, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 				}
 			;
-			Continuation.f_Dispatch() > SetupTrustResults.f_AddResult();
+			Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
 		}
 
 		SetupTrustResults.f_GetResults().f_CallSync(g_Timeout);
@@ -1511,7 +1511,7 @@ public:
 					DMibCallActor(SecretsManager, CSecretsManager::f_SetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties) ).f_CallSync(g_Timeout);
 				}
 			;
-			auto fSetPropertiesNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties) -> TCContinuation<void>
+			auto fSetPropertiesNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties) -> TCFuture<void>
 				{
 					return DMibCallActor(SecretsManager, CSecretsManager::f_SetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
 				}
@@ -1521,7 +1521,7 @@ public:
 					DMibCallActor(SecretsManager, CSecretsManager::f_RemoveSecret, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
-			auto fRemoveSecretNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)  -> TCContinuation<void>
+			auto fRemoveSecretNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)  -> TCFuture<void>
 				{
 					return DMibCallActor(SecretsManager, CSecretsManager::f_RemoveSecret, CSecretsManager::CSecretID{_Folder, _Name});
 				}
@@ -1564,7 +1564,7 @@ public:
 				   	, NThread::CEvent *_pOpenEvent = nullptr
 				   	, NThread::CEvent *_pCloseEvent = nullptr
 				)
-				-> TCContinuation<uint32>
+				-> TCFuture<uint32>
 				{
 
 					CDirectorySyncSend::CConfig Config(CFile::fs_AppendPath(_BasePath, _FileName));
@@ -1583,7 +1583,7 @@ public:
 						}
 					;
 
-					TCContinuation<uint32> Continuation;
+					TCPromise<uint32> Promise;
 					fg_UploadSecretFile
 						(
 						 	SecretsManager
@@ -1592,12 +1592,12 @@ public:
 						 	, fg_Move(Config)
 						 	, o_Subscription
 						)
-						> Continuation / [Continuation] (CDirectorySyncSend::CSyncResult &&_Result) mutable
+						> Promise / [Promise] (CDirectorySyncSend::CSyncResult &&_Result) mutable
 						{
-							Continuation.f_SetResult(_Result.m_Stats.m_nSyncedFiles - 1);
+							Promise.f_SetResult(_Result.m_Stats.m_nSyncedFiles - 1);
 						}
 					;
-					return Continuation;
+					return Promise.f_MoveFuture();
 				}
 			;
 			auto fDownload = [&]
@@ -1608,9 +1608,9 @@ public:
 				 	, NThread::CEvent *_pOpenEvent = nullptr
 				 	, CDirectorySyncReceive::EEasyConfigFlag _Flags = CDirectorySyncReceive::EEasyConfigFlag_None
 				)
-				-> TCContinuation<uint32>
+				-> TCFuture<uint32>
 				{
-					TCContinuation<uint32> Continuation;
+					TCPromise<uint32> Promise;
 
 					CDirectorySyncReceive::CConfig Config(CFile::fs_GetExpandedPath(_Outfile, _BasePath), _Flags);
 					Config.m_FileOptions.m_fOpenStream = [_pOpenEvent]
@@ -1629,12 +1629,12 @@ public:
 					;
 
 					fg_DownloadSecretFile(SecretsManager, fg_Move(_ID), fg_Move(Config))
-						> Continuation % "Failed to transfer secret file" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
+						> Promise % "Failed to transfer secret file" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
 						{
-							Continuation.f_SetResult(_Result.m_Stats.m_nSyncedFiles - 1); // Subtract one for the manifest file
+							Promise.f_SetResult(_Result.m_Stats.m_nSyncedFiles - 1); // Subtract one for the manifest file
 						}
 					;
-					return Continuation;
+					return Promise.f_MoveFuture();
 				}
 			;
 			auto fFindFiles = [&]
@@ -1648,7 +1648,7 @@ public:
 				}
 			;
 
-			auto fSyncFileOperations = [&](CStr const &_Command, CEJSON const _Params = "") -> TCContinuation<CEJSON>
+			auto fSyncFileOperations = [&](CStr const &_Command, CEJSON const _Params = "") -> TCFuture<CEJSON>
 				{
 					return SecretsManagerLaunchInfo.f_Test_Command(_Command, _Params);
 				}
@@ -1714,18 +1714,18 @@ public:
 					// Two competing uploads, first to complete wins, remove losing file
 					CActorSubscription Subscription;
 					NThread::CEvent Event;
-					auto UploadInitializedContinuation = fSyncFileOperations("UploadInitialized", File1);
+					auto UploadInitializedFuture = fSyncFileOperations("UploadInitialized", File1);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation = fUpload(ID, File1, RootDirectory, Subscription, &Event);
+					auto Promise = fUpload(ID, File1, RootDirectory, Subscription, &Event);
 					// Wait for secrets manager to handle the upload request
-					UploadInitializedContinuation.f_CallSync(g_Timeout);
+					UploadInitializedFuture.f_CallSync(g_Timeout);
 					CActorSubscription Subscription2;
 					DMibExpect(fUpload(ID, File3, RootDirectory, Subscription2).f_CallSync(g_Timeout), ==, 1);
 					// Release the file1 rsync
 					Event.f_SetSignaled();
 					DMibExpectException
 						(
-							Continuation.f_CallSync(g_Timeout)
+							Promise.f_CallSync(g_Timeout)
 							, DMibErrorInstance("The secret property in secret 'Folder1/Name1' was changed while the secret file was uploaded. Please check and upload again.")
 						)
 					;
@@ -1743,12 +1743,12 @@ public:
 					// Initiate upload, change the secret to a string secret, same error as above, remove file
 					CActorSubscription Subscription;
 					NThread::CEvent Event;
-					auto  UploadInitializedContinuation = fSyncFileOperations("UploadInitialized", File2);
-					auto UploadCompletedContinuation = fSyncFileOperations("UploadCompleted", File2);
+					auto UploadInitializedFuture = fSyncFileOperations("UploadInitialized", File2);
+					auto UploadCompletedFuture = fSyncFileOperations("UploadCompleted", File2);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation = fUpload(ID, File2, RootDirectory, Subscription, &Event);
+					auto Promise = fUpload(ID, File2, RootDirectory, Subscription, &Event);
 					// Wait for secrets manager to handle the upload request
-					UploadInitializedContinuation.f_CallSync(g_Timeout);
+					UploadInitializedFuture.f_CallSync(g_Timeout);
 					fSetProperties(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
 					// Flush file ops before checking number of files in the secret directory
 
@@ -1758,10 +1758,10 @@ public:
 					DMibTest(DMibExpr(FilesAfterSetSecret.f_GetLen()) <= DMibExpr(1u) && DMibExpr(FilesAfterSetSecret) != DMibExpr(Files));
 					Event.f_SetSignaled();
 					// Wait for secrets manager to start the rsync
-					UploadCompletedContinuation.f_CallSync(g_Timeout);
+					UploadCompletedFuture.f_CallSync(g_Timeout);
 					DMibExpectException
 						(
-							Continuation.f_CallSync(g_Timeout)
+							Promise.f_CallSync(g_Timeout)
 							, DMibErrorInstance("The secret property in secret 'Folder1/Name1' was changed while the secret file was uploaded. Please check and upload again.")
 						)
 					;
@@ -1774,22 +1774,22 @@ public:
 					fSetProperties("Sacrificial", "Lamb", CSecretsManager::CSecretProperties{}.f_SetNotes("Note"));
 					CActorSubscription Subscription;
 					NThread::CEvent Event;
-					auto UploadInitializedContinuation = fSyncFileOperations("UploadInitialized", File1);
-					auto UploadCompletedContinuation = fSyncFileOperations("UploadCompleted", File1);
+					auto UploadInitializedFuture = fSyncFileOperations("UploadInitialized", File1);
+					auto UploadCompletedFuture = fSyncFileOperations("UploadCompleted", File1);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation = fUpload(CSecretsManager::CSecretID{"Sacrificial", "Lamb"}, File1, RootDirectory, Subscription, &Event);
+					auto Promise = fUpload(CSecretsManager::CSecretID{"Sacrificial", "Lamb"}, File1, RootDirectory, Subscription, &Event);
 					// Wait for secrets manager to handle the upload request
-					UploadInitializedContinuation.f_CallSync(g_Timeout);
+					UploadInitializedFuture.f_CallSync(g_Timeout);
 					fRemoveSecret("Sacrificial", "Lamb");
 					// Flush file ops
 					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
 					// Release the rsync
 					Event.f_SetSignaled();
 					// Wait for secrets manager to start the rsync
-					UploadCompletedContinuation.f_CallSync(g_Timeout);
+					UploadCompletedFuture.f_CallSync(g_Timeout);
 					DMibExpectException
 						(
-							Continuation.f_CallSync(g_Timeout)
+							Promise.f_CallSync(g_Timeout)
 							, DMibErrorInstance("Secret 'Sacrificial/Lamb' removed while the secret file was uploaded")
 						)
 					;
@@ -1800,16 +1800,16 @@ public:
 					CActorSubscription Subscription;
 					fUpload(ID, File2, RootDirectory, Subscription).f_CallSync(g_Timeout);
 					// Download initiated before upload, starts after upload completes, should get old file
-					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					auto DownloadInitializedFuture = fSyncFileOperations("DownloadInitialized", ID.m_Name);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation = fDownload(ID, fDestination(4), RootDirectory);
+					auto Promise = fDownload(ID, fDestination(4), RootDirectory);
 					// Wait for download to start
-					DownloadInitializedContinuation.f_CallSync(g_Timeout);
+					DownloadInitializedFuture.f_CallSync(g_Timeout);
 					auto Files5 = fFindFiles();
 					CActorSubscription Subscription2;
 					fUpload(ID, File3, RootDirectory, Subscription2).f_CallSync(g_Timeout);
 					// Old file from first download?
-					DMibExpect(Continuation.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Promise.f_CallSync(g_Timeout), ==, 1);
 					DMibExpectTrue(fAreIdentical(File2, fDestination(4)));
 					// New file from the download after the upload
 					fDownload(ID, fDestination(12), RootDirectory).f_CallSync(g_Timeout);
@@ -1834,20 +1834,20 @@ public:
 					DMibTestPath("Secret changed during download");
 					// Download initiated before secret change, get the old file
 					NThread::CEvent Event;
-					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
-					auto DownloadCompletedContinuation = fSyncFileOperations("DownloadCompleted", ID.m_Name);
+					auto DownloadInitializedFuture = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					auto DownloadCompletedFuture = fSyncFileOperations("DownloadCompleted", ID.m_Name);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation = fDownload(ID, fDestination(5), RootDirectory, &Event);
+					auto Promise = fDownload(ID, fDestination(5), RootDirectory, &Event);
 					// Wait for download to start
-					DownloadInitializedContinuation.f_CallSync(g_Timeout);
-					auto SecretContinuation = fSetPropertiesNoWait(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
+					DownloadInitializedFuture.f_CallSync(g_Timeout);
+					auto SecretFuture = fSetPropertiesNoWait(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
 					// Release the download
 					Event.f_SetSignaled();
-					DMibExpect(Continuation.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Promise.f_CallSync(g_Timeout), ==, 1);
 					DMibExpectTrue(fAreIdentical(File3, fDestination(5)));
 					// Wait for completion and flush file ops
-					DownloadCompletedContinuation.f_CallSync(g_Timeout);
-					SecretContinuation.f_CallSync(g_Timeout);
+					DownloadCompletedFuture.f_CallSync(g_Timeout);
+					SecretFuture.f_CallSync(g_Timeout);
 					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
 					auto Files8 = fFindFiles();
 					DMibExpect(Files8.f_GetLen(), ==, 0);
@@ -1859,22 +1859,22 @@ public:
 					DMibTestPath("Secret removed during download");
 					// Download initiated before remove, starts after secret removal
 					NThread::CEvent Event;
-					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
-					auto DownloadCompletedContinuation = fSyncFileOperations("DownloadCompleted", ID.m_Name);
+					auto DownloadInitializedFuture = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					auto DownloadCompletedFuture = fSyncFileOperations("DownloadCompleted", ID.m_Name);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation = fDownload(ID, fDestination(6), RootDirectory, &Event);
+					auto Promise = fDownload(ID, fDestination(6), RootDirectory, &Event);
 					// Wait for download to start
-					DownloadInitializedContinuation.f_CallSync(g_Timeout);
-					auto RemoveContinuation = fRemoveSecretNoWait(ID.m_Folder, ID.m_Name);
+					DownloadInitializedFuture.f_CallSync(g_Timeout);
+					auto RemoveFuture = fRemoveSecretNoWait(ID.m_Folder, ID.m_Name);
 					// Flush file ops
 					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
 					// Release the download
 					Event.f_SetSignaled();
-					DMibExpect(Continuation.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Promise.f_CallSync(g_Timeout), ==, 1);
 					DMibExpectTrue(fAreIdentical(File2, fDestination(6)));
 					// Wait for completion and flush file ops
-					DownloadCompletedContinuation.f_CallSync(g_Timeout);
-					RemoveContinuation.f_CallSync(g_Timeout);
+					DownloadCompletedFuture.f_CallSync(g_Timeout);
+					RemoveFuture.f_CallSync(g_Timeout);
 					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
 					auto Files9 = fFindFiles();
 					DMibExpect(Files9.f_GetLen(), ==, 0);
@@ -1887,43 +1887,43 @@ public:
 					DMibTestPath("Secret changed during download - multiple downloaders");
 					// Downloads initiated before secret change, get the old file
 					NThread::CEvent Event;
-					auto DownloadInitializedContinuation1 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					auto DownloadInitializedFuture1 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation1 = fDownload(ID, fDestination(7), RootDirectory, &Event);
+					auto Future1 = fDownload(ID, fDestination(7), RootDirectory, &Event);
 					// Wait for download to start
-					DownloadInitializedContinuation1.f_CallSync(g_Timeout);
-					auto DownloadInitializedContinuation2 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					DownloadInitializedFuture1.f_CallSync(g_Timeout);
+					auto DownloadInitializedFuture2 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation2 = fDownload(ID, fDestination(8), RootDirectory, &Event);
+					auto Future2 = fDownload(ID, fDestination(8), RootDirectory, &Event);
 					// Wait for download to start
-					DownloadInitializedContinuation2.f_CallSync(g_Timeout);
-					auto DownloadInitializedContinuation3 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					DownloadInitializedFuture2.f_CallSync(g_Timeout);
+					auto DownloadInitializedFuture3 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation3 = fDownload(ID, fDestination(9), RootDirectory, &Event);
+					auto Future3 = fDownload(ID, fDestination(9), RootDirectory, &Event);
 					// Wait for download to start
-					DownloadInitializedContinuation3.f_CallSync(g_Timeout);
-					auto DownloadInitializedContinuation4 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					DownloadInitializedFuture3.f_CallSync(g_Timeout);
+					auto DownloadInitializedFuture4 = fSyncFileOperations("DownloadInitialized", ID.m_Name);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
-					auto Continuation4 = fDownload(ID, fDestination(10), RootDirectory, &Event);
+					auto Future4 = fDownload(ID, fDestination(10), RootDirectory, &Event);
 					// Wait for download to start
-					DownloadInitializedContinuation4.f_CallSync(g_Timeout);
-					auto DownloadCompletedContinuation = fSyncFileOperations("DownloadCompleted", ID.m_Name);
+					DownloadInitializedFuture4.f_CallSync(g_Timeout);
+					auto DownloadCompletedFuture = fSyncFileOperations("DownloadCompleted", ID.m_Name);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
 
-					auto SecretContinuation = fSetPropertiesNoWait(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
+					auto SecretFuture = fSetPropertiesNoWait(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
 					// Release the download
 					Event.f_SetSignaled();
-					DMibExpect(Continuation1.f_CallSync(g_Timeout), ==, 1);
-					DMibExpect(Continuation2.f_CallSync(g_Timeout), ==, 1);
-					DMibExpect(Continuation3.f_CallSync(g_Timeout), ==, 1);
-					DMibExpect(Continuation4.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Future1.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Future2.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Future3.f_CallSync(g_Timeout), ==, 1);
+					DMibExpect(Future4.f_CallSync(g_Timeout), ==, 1);
 					DMibExpectTrue(fAreIdentical(File2, fDestination(7)));
 					DMibExpectTrue(fAreIdentical(File2, fDestination(8)));
 					DMibExpectTrue(fAreIdentical(File2, fDestination(9)));
 					DMibExpectTrue(fAreIdentical(File2, fDestination(10)));
 					// Wait for completion and flush file ops
-					DownloadCompletedContinuation.f_CallSync(g_Timeout);
-					SecretContinuation.f_CallSync(g_Timeout);
+					DownloadCompletedFuture.f_CallSync(g_Timeout);
+					SecretFuture.f_CallSync(g_Timeout);
 					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
 					auto Files10 = fFindFiles();
 					DMibExpect(Files10.f_GetLen(), ==, 0);
@@ -1934,25 +1934,25 @@ public:
 					fUpload(ID, File2, RootDirectory, UploadSubscription).f_CallSync(g_Timeout);
 					DMibTestPath("Keep secrets manager alive until last pending delete has completed");
 					fSyncFileOperations("DelayDelete") > fg_DiscardResult();
-					auto UploadCompletedContinuation = fSyncFileOperations("UploadCompleted", File3);
-					auto DownloadInitializedContinuation = fSyncFileOperations("DownloadInitialized", ID.m_Name);
-					auto DestroyWaitingForCanDestroyContinuation = fSyncFileOperations("DestroyWaitingForCanDestroy", ID.m_Name);
+					auto UploadCompletedFuture = fSyncFileOperations("UploadCompleted", File3);
+					auto DownloadInitializedFuture = fSyncFileOperations("DownloadInitialized", ID.m_Name);
+					auto DestroyWaitingForCanDestroyFuture = fSyncFileOperations("DestroyWaitingForCanDestroy", ID.m_Name);
 					fSyncFileOperations("PreviousCommandCompleted").f_CallSync(g_Timeout);
 					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
 					auto FilesPreDownload = fFindFiles();
 					DMibExpect(FilesPreDownload.f_GetLen(), ==, 1);
 					NThread::CEvent Event;
-					auto DownloadContinuation = fDownload(ID, fDestination(11), RootDirectory, &Event);
+					auto DownloadFuture = fDownload(ID, fDestination(11), RootDirectory, &Event);
 					// Wait for download to start, now File2 is reserved
-					DownloadInitializedContinuation.f_CallSync(g_Timeout);
+					DownloadInitializedFuture.f_CallSync(g_Timeout);
 					// Upload a new file
 					CActorSubscription UploadSubscription2;
 					fUpload(ID, File3, RootDirectory, UploadSubscription2).f_CallSync(g_Timeout);
-					UploadCompletedContinuation.f_CallSync(g_Timeout);
+					UploadCompletedFuture.f_CallSync(g_Timeout);
 					auto FilesPostUpload = fFindFiles();
 					DMibExpect(FilesPostUpload.f_GetLen(), ==, 2);
 					Event.f_SetSignaled();
-					DownloadContinuation.f_CallSync(g_Timeout);
+					DownloadFuture.f_CallSync(g_Timeout);
 					// Now the download is no longer reserving the file and
 					// Kill off the Secrets Manager
 					TCSharedPointer<TCAtomic<bool>> pDestroyFinished = fg_Construct(false);
@@ -1964,7 +1964,7 @@ public:
 							pDestroyFinishedEvent->f_SetSignaled();
 						}
 					;
-					DestroyWaitingForCanDestroyContinuation.f_CallSync(g_Timeout);
+					DestroyWaitingForCanDestroyFuture.f_CallSync(g_Timeout);
 
 					DMibExpectFalse(pDestroyFinished->f_Load());
 					try

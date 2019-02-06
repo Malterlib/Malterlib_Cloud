@@ -8,7 +8,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	NConcurrency::TCContinuation<NConcurrency::TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterDistributedApp
+	NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterDistributedApp
 		(
 			NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
 			, NConcurrency::TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> &&_TrustInterface
@@ -54,20 +54,20 @@ namespace NMib::NCloud::NAppManager
 				return fg_Explicit
 					(
 						g_ActorSubscription / [pApplication, AssignSequence = ++Application.m_AppInterfaceAssignSequence, HostInfo = CallingHostInfo.f_GetHostInfo()]
-						() -> TCContinuation<void>
+						() -> TCFuture<void>
 						{
 							if (pApplication->m_bDeleted || AssignSequence != pApplication->m_AppInterfaceAssignSequence)
 								return fg_Explicit();
 							
 							auto &Application = *pApplication;
 
-							TCContinuation<void> Continuation = Application.m_AppInterface.f_Destroy();
+							TCFuture<void> DestroyFuture = Application.m_AppInterface.f_Destroy();
 								
 							Application.m_AppInterface.f_Clear();
 							
 							DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application registration lost: {}", HostInfo.f_GetDesc());
 							
-							return Continuation;
+							return DestroyFuture;
 						}
 					)
 				;
@@ -79,7 +79,7 @@ namespace NMib::NCloud::NAppManager
 		return DErrorInstance("Application not associated with your host");
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_PublishAppInterface()
+	TCFuture<void> CAppManagerActor::fp_PublishAppInterface()
 	{
 		return mp_AppInterfaceServer.f_Publish<CDistributedAppInterfaceServer>(mp_State.m_DistributionManager, this, CDistributedAppInterfaceServer::mc_pDefaultNamespace);
 	}

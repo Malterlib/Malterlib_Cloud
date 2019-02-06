@@ -14,15 +14,15 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	CAppDistributionManagerActor::~CAppDistributionManagerActor() = default;
 
-	TCContinuation<void> CAppDistributionManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CAppDistributionManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App distribution manager file operations"));
 		
-		TCContinuation<void> Continuation;
-		fp_ReadState() > Continuation / [this, Continuation]
+		TCPromise<void> Promise;
+		fp_ReadState() > Promise / [this, Promise]
 			{
 				if (mp_State.m_bStoppingApp)
-					return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
+					return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
 				
 				mp_State.m_TrustManager
 					(
@@ -30,10 +30,10 @@ namespace NMib::NCloud::NAppDistributionManager
 						, CVersionManager::mc_pDefaultNamespace
 						, fg_ThisActor(this)
 					)
-					> Continuation / [this, Continuation](TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
+					> Promise / [this, Promise](TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
 					{
 						if (mp_State.m_bStoppingApp)
-							return Continuation.f_SetException(DMibErrorInstance("Startup aborted"));
+							return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
 
 						mp_VersionManagerSubscription = fg_Move(_VersionSubscrption);
 						mp_VersionManagerSubscription.f_OnActor
@@ -53,16 +53,16 @@ namespace NMib::NCloud::NAppDistributionManager
 							)
 						;
 
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 					}
 				;
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppDistributionManagerActor::fp_StopApp()
+	TCFuture<void> CAppDistributionManagerActor::fp_StopApp()
 	{	
 		TCActorResultVector<void> DistributionDestroys;
 
@@ -75,15 +75,15 @@ namespace NMib::NCloud::NAppDistributionManager
 			}
 		}
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
 		DistributionDestroys.f_GetResults() > [=](auto &&)
 			{
-				mp_FileActor->f_Destroy() > Continuation;
+				mp_FileActor->f_Destroy() > Promise;
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	TCActor<CDeployDestination> CAppDistributionManagerActor::fp_CreateDeploy(EDeployDestination _Type)

@@ -18,13 +18,13 @@ namespace NMib::NCloud::NSecretsManager
 	{
 	}
 
-	TCContinuation<void> CSecretsManagerDaemonActor::fp_StartApp(CEJSON const &_Params)
+	TCFuture<void> CSecretsManagerDaemonActor::fp_StartApp(CEJSON const &_Params)
 	{
 		mp_pServerController = fg_ConstructActor<CServerController>(fg_Construct(self), self, mp_State);
 		return fg_Explicit();
 	}
 	
-	TCContinuation<void> CSecretsManagerDaemonActor::fp_StopApp()
+	TCFuture<void> CSecretsManagerDaemonActor::fp_StopApp()
 	{	
 		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
 		
@@ -41,11 +41,11 @@ namespace NMib::NCloud::NSecretsManager
 			;
 		}
 		
-		return pCanDestroy->m_Continuation;
+		return pCanDestroy->f_Future();
 	}
 
 #if DMibConfig_Tests_Enable
-	TCContinuation<CEJSON> CSecretsManagerDaemonActor::fp_Test_Command(CStr const &_Command, CEJSON const &_Params)
+	TCFuture<CEJSON> CSecretsManagerDaemonActor::fp_Test_Command(CStr const &_Command, CEJSON const &_Params)
 	{
 		// This function is used to provoke some special cases during testing
 		if (!mp_pServerController)

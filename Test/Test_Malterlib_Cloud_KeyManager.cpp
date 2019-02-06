@@ -25,18 +25,18 @@ public:
 		
 		CDatabase m_Database;
 		
-		TCContinuation<void> f_Initialize()
+		TCFuture<void> f_Initialize()
 		{
 			return fg_Explicit();
 		}
 		
-		TCContinuation<void> f_WriteDatabase(CDatabase const &_Database)
+		TCFuture<void> f_WriteDatabase(CDatabase const &_Database)
 		{
 			m_Database = _Database;
 			return fg_Explicit();
 		}
 		
-		TCContinuation<CDatabase> f_ReadDatabase()
+		TCFuture<CDatabase> f_ReadDatabase()
 		{
 			return fg_Explicit(m_Database);
 		}

@@ -25,7 +25,7 @@ namespace NMib::NCloud::NVersionManager
 	{
 	}
 
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_DownloadVersion(CStartDownloadVersion &&_Params) -> TCContinuation<CStartDownloadVersion::CResult>
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_DownloadVersion(CStartDownloadVersion &&_Params) -> TCFuture<CStartDownloadVersion::CResult>
 	{
 		auto pThis = m_pThis;
 		
@@ -45,20 +45,20 @@ namespace NMib::NCloud::NVersionManager
 		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
 			return Auditor.f_Exception({"Invalid version platform format", "(start download version)"});
 
-		TCContinuation<CStartDownloadVersion::CResult> Continuation;
+		TCPromise<CStartDownloadVersion::CResult> Promise;
 		pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", {"Application/ReadAll", "Application/Read/{}"_f << _Params.m_Application})
-			> Continuation % "Permission denied downloading version" % Auditor /
+			> Promise % "Permission denied downloading version" % Auditor /
 			[=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Start download version)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Start download version)"));
 
 				auto *pApplication = pThis->mp_Applications.f_FindEqual(Params.m_Application);
 				if (!pApplication)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application: {}", Params.m_Application)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application: {}", Params.m_Application)));
 				auto *pVersion = pApplication->m_Versions.f_FindEqual(Params.m_VersionIDAndPlatform);
 				if (!pVersion)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such version: {}", Params.m_VersionIDAndPlatform)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such version: {}", Params.m_VersionIDAndPlatform)));
 
 				NStr::CStr DownloadID = fg_RandomID();
 
@@ -76,12 +76,12 @@ namespace NMib::NCloud::NVersionManager
 				Download.m_Desc = fg_Format("{}", Params.m_VersionIDAndPlatform);
 
 				Download.m_FileTransferSend(&CFileTransferSend::f_SendFiles, fg_Move(Params.m_TransferContext))
-					> [pThis, DownloadID, Continuation, Desc = Download.m_Desc, VersionInfo = pVersion->m_VersionInfo, Auditor]
+					> [pThis, DownloadID, Promise, Desc = Download.m_Desc, VersionInfo = pVersion->m_VersionInfo, Auditor]
 					(TCAsyncResult<CActorSubscription> &&_Subscription) mutable
 					{
 						if (!_Subscription)
 						{
-							Continuation.f_SetException
+							Promise.f_SetException
 								(
 									Auditor.f_Exception
 									(
@@ -97,7 +97,7 @@ namespace NMib::NCloud::NVersionManager
 						CVersionManager::CStartDownloadVersion::CResult Result;
 						Result.m_Subscription = fg_Move(fg_Move(*_Subscription));
 						Result.m_VersionInfo = fg_Move(VersionInfo);
-						Continuation.f_SetResult(fg_Move(Result));
+						Promise.f_SetResult(fg_Move(Result));
 						auto *pDownload = pThis->mp_VersionDownloads.f_FindEqual(DownloadID);
 						if (!pDownload)
 							return;
@@ -144,7 +144,7 @@ namespace NMib::NCloud::NVersionManager
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }
 

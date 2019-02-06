@@ -7,16 +7,16 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCContinuation<void> CAppManagerActor::fp_SubscribeCoordinationInterface()
+	TCFuture<void> CAppManagerActor::fp_SubscribeCoordinationInterface()
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		mp_State.m_TrustManager
 			(
 				&CDistributedActorTrustManager::f_SubscribeTrustedActors<CAppManagerCoordinationInterface>
 				, CAppManagerCoordinationInterface::mc_pDefaultNamespace
 				, fg_ThisActor(this)
 			)
-			> Continuation / [this, Continuation](TCTrustedActorSubscription<CAppManagerCoordinationInterface> &&_VersionSubscrption)
+			> Promise / [this, Promise](TCTrustedActorSubscription<CAppManagerCoordinationInterface> &&_VersionSubscrption)
 			{
 				mp_RemoteAppManagers = fg_Move(_VersionSubscrption);
 				mp_RemoteAppManagers.f_OnActor
@@ -46,11 +46,11 @@ namespace NMib::NCloud::NAppManager
 						}
 					)
 				;
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	void CAppManagerActor::fp_OnAppUpdateInfoChange()
@@ -72,7 +72,7 @@ namespace NMib::NCloud::NAppManager
 				_AppManager.m_Actor
 				, CAppManagerCoordinationInterface::f_SubscribeToAppChanges
 				, g_ActorFunctor / [this, HostID, AllowDestroy = g_AllowWrongThreadDestroy]
-				(TCVector<CAppManagerCoordinationInterface::CAppChange> const &_Changes, bool _bInitial) -> TCContinuation<void>
+				(TCVector<CAppManagerCoordinationInterface::CAppChange> const &_Changes, bool _bInitial) -> TCFuture<void>
 				{
 					auto &RemoteAppManager = mp_RemoteAppManagerState[HostID];
 					
@@ -136,9 +136,9 @@ namespace NMib::NCloud::NAppManager
 	
 	auto CAppManagerActor::CAppManagerCoordinationInterfaceImplementation::f_SubscribeToAppChanges
 		(
-			TCActorFunctorWithID<TCContinuation<void> (TCVector<CAppChange> const &_Changes, bool _bInitial)> &&_fOnChange
+			TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> const &_Changes, bool _bInitial)> &&_fOnChange
 		)
-		-> TCContinuation<TCActorSubscriptionWithID<>>
+		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
 		auto pThis = m_pThis;
 		CStr SubscriptionID = fg_RandomID();
@@ -152,23 +152,23 @@ namespace NMib::NCloud::NAppManager
 		
 		return fg_Explicit
 			(	
-				g_ActorSubscription / [pThis, CallingHostID, SubscriptionSequence]() -> TCContinuation<void>
+				g_ActorSubscription / [pThis, CallingHostID, SubscriptionSequence]() -> TCFuture<void>
 				{
 					auto &RemoteAppManager = pThis->mp_RemoteAppManagerState[CallingHostID];
 					if (RemoteAppManager.m_iOnChangeSubscriptionSequence != SubscriptionSequence)
 						return fg_Explicit();
 					
-					TCContinuation<void> Continuation = RemoteAppManager.m_fOnChange.f_Destroy();
+					TCFuture<void> DestroyFuture = RemoteAppManager.m_fOnChange.f_Destroy();
 					
 					RemoteAppManager.m_fOnChange.f_Clear();
 					
-					return Continuation;
+					return DestroyFuture;
 				}
 			)
 		;
 	}
 
-	TCContinuation<void> CAppManagerActor::CAppManagerCoordinationInterfaceImplementation::f_RemoveKnownHost(CStr const &_Group, CStr const &_Application, CStr const &_HostID)
+	TCFuture<void> CAppManagerActor::CAppManagerCoordinationInterfaceImplementation::f_RemoveKnownHost(CStr const &_Group, CStr const &_Application, CStr const &_HostID)
 	{
 		auto pThis = m_pThis;
 

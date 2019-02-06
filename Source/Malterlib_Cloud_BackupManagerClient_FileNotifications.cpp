@@ -15,26 +15,26 @@ namespace NMib::NCloud
 		return CFileChangeNotificationActor::CCoalesceSettings{5, m_Config.m_ChangeAggregationTime};
 	}
 	
-	TCContinuation<void> CBackupManagerClient::CInternal::f_RetrySubscribeChanges()
+	TCFuture<void> CBackupManagerClient::CInternal::f_RetrySubscribeChanges()
 	{
 		if (m_pThis->mp_bDestroyed)
 			return DMibErrorInstance("Destroyed");
 
 		DMibCloudBackupManagerDebugOut("Retry subscribe\n");
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		auto pActive = f_MarkInstancesActive();
 
 		if (m_bRunningRetrySubscribe)
 		{
-			TCContinuation<void> FinishedContinuation = m_SubscribeChangesContinuations.f_Insert();
-			FinishedContinuation > Continuation / [this, Continuation, pActive]
+			TCPromise<void> FinishedPromise = m_SubscribeChangesPromises.f_Insert();
+			FinishedPromise > Promise / [this, Promise, pActive]
 				{
-					f_RetrySubscribeChanges() > Continuation;
+					f_RetrySubscribeChanges() > Promise;
 				}
 			;
-			return Continuation;
+			return Promise.f_MoveFuture();
 		}
 		
 		DMibCheck(!m_bRunningRetrySubscribe);
@@ -45,10 +45,10 @@ namespace NMib::NCloud
 			{
 				m_bRunningRetrySubscribe = false;
 				
-				auto SubscribeChangesContinuations = fg_Move(m_SubscribeChangesContinuations);
+				auto SubscribeChangesPromises = fg_Move(m_SubscribeChangesPromises);
 				
-				for (auto &Continuation : SubscribeChangesContinuations)
-					Continuation.f_SetResult();
+				for (auto &Promise : SubscribeChangesPromises)
+					Promise.f_SetResult();
 			}
 		;
 		
@@ -105,7 +105,7 @@ namespace NMib::NCloud
 				}
 				return PendingInfo;
 			}
-			> Continuation / [this, Continuation, PendingPaths, Cleanup, ToRemovePaths, pActive](CPendingInfo &&_PendingInfo)
+			> Promise / [this, Promise, PendingPaths, Cleanup, ToRemovePaths, pActive](CPendingInfo &&_PendingInfo)
 			{
 				if (m_pThis->mp_bDestroyed)
 					return;
@@ -133,7 +133,7 @@ namespace NMib::NCloud
 							&CFileChangeNotificationActor::f_RegisterForChanges
 							, Path
 							, Changes
-							, g_ActorFunctor / [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCContinuation<void>
+							, g_ActorFunctor / [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCFuture<void>
 							{
 								for (auto Notification : _Notifications)
 								{
@@ -173,7 +173,7 @@ namespace NMib::NCloud
 							&CFileChangeNotificationActor::f_RegisterForChanges
 							, MissingPath
 							, EFileChange_FileName | EFileChange_DirectoryName
-							, g_ActorFunctor / [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCContinuation<void>
+							, g_ActorFunctor / [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCFuture<void>
 							{
 								if (!m_bRerunRetrySubscribe)
 								{
@@ -202,7 +202,7 @@ namespace NMib::NCloud
 
 				SubscribeResults.f_GetResults()
 					+ SubscribeResultsMissing.f_GetResults()
-					> Continuation / [Continuation, this, Cleanup, ToRemovePaths, pActive]
+					> Promise / [Promise, this, Cleanup, ToRemovePaths, pActive]
 					(TCMap<CStr, TCAsyncResult<CActorSubscription>> &&_Results, TCMap<CStr, TCAsyncResult<CActorSubscription>> &&_ResultsMissing) mutable
 					{
 						bool bChanged = false;
@@ -257,13 +257,13 @@ namespace NMib::NCloud
 						if (bChanged)
 							f_RetrySubscribeChanges() > fg_DiscardResult();
 
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 					}
 				;
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	void CBackupManagerClient::CInternal::f_NewPathWatched(CStr const &_Path)
@@ -296,7 +296,7 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCContinuation<void> CBackupManagerClient::CInternal::f_SubscribeChanges()
+	TCFuture<void> CBackupManagerClient::CInternal::f_SubscribeChanges()
 	{
 		if (m_pThis->mp_bDestroyed)
 			return DMibErrorInstance("Destroyed");

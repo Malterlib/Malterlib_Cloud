@@ -10,10 +10,10 @@
 
 namespace NMib::NCloud
 {
-	NConcurrency::TCContinuation<NConcurrency::CActorSubscription> CBackupManagerClient::f_SubscribeNotifications
+	NConcurrency::TCFuture<NConcurrency::CActorSubscription> CBackupManagerClient::f_SubscribeNotifications
 		(
 			ENotification _ToSubscribeTo
-			, NConcurrency::TCActorFunctor<NConcurrency::TCContinuation<void> (NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification)> &&_fOnNotification
+			, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification)> &&_fOnNotification
 		)
 	{
 		auto &Internal = *mp_pInternal;
@@ -33,7 +33,7 @@ namespace NMib::NCloud
 			Subscription.m_fOnNotification(Notification.m_RemoteHost, fg_TempCopy(Notification.m_Notification)) > fg_DiscardResult();
 		}
 
-		return g_Explicit = g_ActorSubscription / [this, SubscriptionID]() -> TCContinuation<void>
+		return g_Explicit = g_ActorSubscription / [this, SubscriptionID]() -> TCFuture<void>
 			{
 				auto &Internal = *mp_pInternal;
 
@@ -41,11 +41,11 @@ namespace NMib::NCloud
 				if (!pSubscription)
 					return fg_Explicit();
 				
-				auto Continuation = pSubscription->m_fOnNotification.f_Destroy();
+				auto DestroyFuture = pSubscription->m_fOnNotification.f_Destroy();
 
 				Internal.m_NotificationSubscriptions.f_Remove(SubscriptionID);
 				
-				return Continuation;
+				return DestroyFuture;
 			}
 		;
 	}
@@ -88,9 +88,9 @@ namespace NMib::NCloud
 		m_pThis->fp_OnNotification({}, CBackupManagerClient::CNotification_BackupError{_Error, _bFatal});
 	}
 
-	TCContinuation<TCActorSubscriptionWithID<>> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_SubscribeInitialFinished
+	TCFuture<TCActorSubscriptionWithID<>> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_SubscribeInitialFinished
 		(
-			TCActorFunctorWithID<TCContinuation<void> ()> &&_fOnInitialFinished
+			TCActorFunctorWithID<TCFuture<void> ()> &&_fOnInitialFinished
 		)
 	{
 		auto &Internal = *m_pThis->mp_pInternal;
@@ -101,7 +101,7 @@ namespace NMib::NCloud
 		if (Internal.m_bInitialFinished)
 			fOnFinished() > fg_DiscardResult();
 		
-		return g_Explicit = g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCContinuation<void>
+		return g_Explicit = g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCFuture<void>
 			{
 				auto &Internal = *pThis->mp_pInternal;
 
@@ -109,18 +109,18 @@ namespace NMib::NCloud
 				if (!pSubscription)
 					return fg_Explicit();
 				
-				auto Continuation = pSubscription->f_Destroy();
+				auto DestroyFuture = pSubscription->f_Destroy();
 
 				Internal.m_OnInitialFinishedSubscriptions.f_Remove(SubscriptionID);
 				
-				return Continuation;
+				return DestroyFuture;
 			}
 		;
 	}
 	
-	TCContinuation<TCActorSubscriptionWithID<>> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_SubscribeBackupStopped
+	TCFuture<TCActorSubscriptionWithID<>> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_SubscribeBackupStopped
 		(
-			TCActorFunctorWithID<TCContinuation<void> ()> &&_fOnStopped
+			TCActorFunctorWithID<TCFuture<void> ()> &&_fOnStopped
 		)
 	{
 		auto &Internal = *m_pThis->mp_pInternal;
@@ -131,7 +131,7 @@ namespace NMib::NCloud
 		if (Internal.m_bStopped)
 			fOnStopped() > fg_DiscardResult();
 		
-		return g_Explicit = g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCContinuation<void>
+		return g_Explicit = g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCFuture<void>
 			{
 				auto &Internal = *pThis->mp_pInternal;
 
@@ -139,11 +139,11 @@ namespace NMib::NCloud
 				if (!pSubscription)
 					return fg_Explicit();
 				
-				auto Continuation = pSubscription->f_Destroy();
+				auto DestroyFuture = pSubscription->f_Destroy();
 
 				Internal.m_OnBackupStoppedSubscriptions.f_Remove(SubscriptionID);
 				
-				return Continuation;
+				return DestroyFuture;
 			}
 		;
 	}

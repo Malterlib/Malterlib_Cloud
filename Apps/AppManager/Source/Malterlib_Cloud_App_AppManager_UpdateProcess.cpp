@@ -59,7 +59,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplication_DeferToNextRestart
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_DeferToNextRestart
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
 			, TCSharedPointer<CCanDestroyTracker> const &_pCanDestroy
@@ -76,70 +76,70 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
-		fp_SaveStateDatabase() > Continuation % "Failed save state database" / [_pCanDestroy, Continuation]
+		fp_SaveStateDatabase() > Promise % "Failed save state database" / [_pCanDestroy, Promise]
 			{
-				Continuation.f_SetResult();
+				Promise.f_SetResult();
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplicationRunProcess(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplicationRunProcess(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_None, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_None, {}) > Promise / [=]
 		{
-			fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_SyncStart, {}) > Continuation / [=]
+			fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_SyncStart, {}) > Promise / [=]
 			{
 				auto &State = *_pState;
 				State.m_fOnInfo("Change encryption");
-				fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_ChangeEncryption, {}) > Continuation / [=]
+				fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_ChangeEncryption, {}) > Promise / [=]
 				{
 					auto &State = *_pState;
-					if (State.f_CheckAbort(Continuation))
+					if (State.f_CheckAbort(Promise))
 						return;
 					
-					fp_ChangeEncryption(_pState->m_pApplication, EEncryptOperation_Open, false) > Continuation % "Failed to open encryption" / [=]
+					fp_ChangeEncryption(_pState->m_pApplication, EEncryptOperation_Open, false) > Promise % "Failed to open encryption" / [=]
 					{
 						_pState->m_bUnencrypted = true;
-						fp_UpdateApplication_DownloadVersion(_pState) > Continuation % "Failed to download version" / [=]
+						fp_UpdateApplication_DownloadVersion(_pState) > Promise % "Failed to download version" / [=]
 						{
-							fp_UpdateApplication_Unpack(_pState) > Continuation % "Failed to unpack application" / [=]
+							fp_UpdateApplication_Unpack(_pState) > Promise % "Failed to unpack application" / [=]
 							{
 								if (_pState->m_bDryRun)
 								{
 									_pState->m_fOnInfo("Skipping stop, update and restart because of dry run");
-									Continuation.f_SetResult();
+									Promise.f_SetResult();
 									return;
 								}
-								fp_UpdateApplication_StopOldApp(_pState) > Continuation % "Failed to stop old app" / [=]
+								fp_UpdateApplication_StopOldApp(_pState) > Promise % "Failed to stop old app" / [=]
 								{
-									fp_UpdateApplication_PreUpdate(_pState) > Continuation % "Failed pre update app" / [=]
+									fp_UpdateApplication_PreUpdate(_pState) > Promise % "Failed pre update app" / [=]
 									{
-										fp_UpdateApplication_UpdateApplicationFiles(_pState) > Continuation % "Failed to update application files" / [=]
+										fp_UpdateApplication_UpdateApplicationFiles(_pState) > Promise % "Failed to update application files" / [=]
 										{
-											fp_UpdateApplication_SaveApplicationState(_pState) > Continuation % "Failed to save application state" / [=]
+											fp_UpdateApplication_SaveApplicationState(_pState) > Promise % "Failed to save application state" / [=]
 											{
-												fp_UpdateApplication_PostUpdate(_pState) > Continuation % "Failed post update" / [=]
+												fp_UpdateApplication_PostUpdate(_pState) > Promise % "Failed post update" / [=]
 												{
 													auto pCanDestroy = mp_pCanDestroy;
 													if (!pCanDestroy)
 													{
-														Continuation.f_SetException(DErrorInstance("Application stopped"));
+														Promise.f_SetException(DErrorInstance("Application stopped"));
 														return;
 													}
 
-													fp_UpdateApplication_StartNewApp(_pState) > Continuation % "Failed to start new app. Will retry periodically" / [=](bool _bQuitManager)
+													fp_UpdateApplication_StartNewApp(_pState) > Promise % "Failed to start new app. Will retry periodically" / [=](bool _bQuitManager)
 													{
 														auto &Application = *_pState->m_pApplication;
 														if (!Application.m_bDeleted && _bQuitManager)
-															fp_UpdateApplication_DeferToNextRestart(_pState, pCanDestroy) > Continuation;
+															fp_UpdateApplication_DeferToNextRestart(_pState, pCanDestroy) > Promise;
 														else
-															fp_UpdateApplication_PostLaunch(_pState) > Continuation % "Failed post launch";
+															fp_UpdateApplication_PostLaunch(_pState) > Promise % "Failed post launch";
 													};
 												};
 											};
@@ -153,26 +153,26 @@ namespace NMib::NCloud::NAppManager
 			};
 		};
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplication_DownloadVersion(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_DownloadVersion(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		auto &State = *_pState;
 		
-		TCContinuation<void> Continuation;
-		if (State.f_CheckAbort(Continuation))
-			return Continuation;
+		TCPromise<void> Promise;
+		if (State.f_CheckAbort(Promise))
+			return Promise.f_MoveFuture();
 		
 		if (!State.m_SourcePath.f_IsEmpty())
 			return fg_Explicit(); // Already specified
 
 		State.m_fOnInfo(fg_Format("Downloading version '{}' from version managers", State.m_VersionID));
 		
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_DownloadVersion, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_DownloadVersion, {}) > Promise / [=]
 			{
 				auto &State = *_pState; 
-				if (State.f_CheckAbort(Continuation))
+				if (State.f_CheckAbort(Promise))
 					return;
 				
 				CStr DownloadDirectory = fg_Format("{}/TempVersionDownload", State.m_pApplication->f_GetDirectory());
@@ -197,14 +197,14 @@ namespace NMib::NCloud::NAppManager
 				;
 
 				self(&CAppManagerActor::fp_DownloadApplication, State.m_pApplication->m_Settings.m_VersionManagerApplication, State.m_VersionID, DownloadDirectory) 
-					> Continuation / [=](CVersionManager::CVersionInformation &&_VersionInfo)
+					> Promise / [=](CVersionManager::CVersionInformation &&_VersionInfo)
 					{
 						auto &State = *_pState;
 						auto &Application = *State.m_pApplication; 
 
 						if (Application.m_bDeleted)
 						{
-							Continuation.f_SetException(DMibErrorInstance("Application has been deleted, aborting"));
+							Promise.f_SetException(DMibErrorInstance("Application has been deleted, aborting"));
 							return;
 						}
 
@@ -218,14 +218,14 @@ namespace NMib::NCloud::NAppManager
 						{
 							if (!VersionInfo.m_Tags.f_FindEqual(Tag))
 							{
-								Continuation.f_SetException(DMibErrorInstance(fg_Format("Missing required tag: '{}'", Tag)));
+								Promise.f_SetException(DMibErrorInstance(fg_Format("Missing required tag: '{}'", Tag)));
 								return;
 							}
 						}
 
 						if (State.m_bDryRun)
 						{
-							Continuation.f_SetResult();
+							Promise.f_SetResult();
 							return;
 						}
 
@@ -240,14 +240,14 @@ namespace NMib::NCloud::NAppManager
 							}
 							catch (CException const &_Exception)
 							{
-								Continuation.f_SetException(DMibErrorInstance(fg_Format("Failed to get settings from version info: {}", _Exception)));
+								Promise.f_SetException(DMibErrorInstance(fg_Format("Failed to get settings from version info: {}", _Exception)));
 								return;
 							}
 							
 							CStr Error;
 							if (!NewSettings.f_Validate(Error))
 							{
-								Continuation.f_SetException(DMibErrorInstance(fg_Format("Updating settings resulted in invalid settings: {}", Error)));
+								Promise.f_SetException(DMibErrorInstance(fg_Format("Updating settings resulted in invalid settings: {}", Error)));
 								return;
 							}
 							State.m_pNewSettings = fg_Construct(NewSettings);
@@ -264,29 +264,29 @@ namespace NMib::NCloud::NAppManager
 							}
 						;
 
-						fp_UpdateApplicationJSON(State.m_pApplication) > Continuation;
+						fp_UpdateApplicationJSON(State.m_pApplication) > Promise;
 					}
 				;
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplication_Unpack(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_Unpack(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		auto &State = *_pState;
 
-		TCContinuation<void> Continuation;
-		if (State.f_CheckAbort(Continuation))
-			return Continuation;
+		TCPromise<void> Promise;
+		if (State.f_CheckAbort(Promise))
+			return Promise.f_MoveFuture();
 		
 		State.m_fOnInfo("Extracting application to temporary directory");
 		
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_Unpack, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_Unpack, {}) > Promise / [=]
 			{
 				auto &State = *_pState; 
-				if (State.f_CheckAbort(Continuation))
+				if (State.f_CheckAbort(Promise))
 					return;
 				
 				CStr TemporaryDirectory = fg_Format("{}/TempVersion", State.m_pApplication->f_GetDirectory());
@@ -340,32 +340,32 @@ namespace NMib::NCloud::NAppManager
 							fOnInfo(Output);
 						return Files;
 					}
-					> Continuation / [=](TCVector<CStr> &&_Files)
+					> Promise / [=](TCVector<CStr> &&_Files)
 					{
 						auto &State = *_pState;
 						State.m_Files = fg_Move(_Files);
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplication_StopOldApp(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_StopOldApp(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		auto &State = *_pState; 
 
-		TCContinuation<void> Continuation;
-		if (State.f_CheckAbort(Continuation))
+		TCPromise<void> Promise;
+		if (State.f_CheckAbort(Promise))
 			return DMibErrorInstance("Application has been deleted, aborting");
 		
 		State.m_fOnInfo("Stopping old application");
 		
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_StopOldApp, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_StopOldApp, {}) > Promise / [=]
 			{
 				auto &State = *_pState; 
-				if (State.f_CheckAbort(Continuation))
+				if (State.f_CheckAbort(Promise))
 					return;
 				
 				State.m_pApplication->f_Stop(EStopFlag_PreventLaunchUpdate) > [=](TCAsyncResult<uint32> &&_ExitStatus)
@@ -378,54 +378,54 @@ namespace NMib::NCloud::NAppManager
 						
 						if (!_ExitStatus)
 						{
-							Continuation.f_SetException(DMibErrorInstance("Failed to exit old application, aborting update"));
+							Promise.f_SetException(DMibErrorInstance("Failed to exit old application, aborting update"));
 							return;
 						}
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplication_PreUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_PreUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		auto &State = *_pState;
 		
-		TCContinuation<void> Continuation;
-		if (State.f_CheckAbort(Continuation))
-			return Continuation;
+		TCPromise<void> Promise;
+		if (State.f_CheckAbort(Promise))
+			return Promise.f_MoveFuture();
 		
 		State.m_fOnInfo("Pre update");
 		
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_PreUpdateScript, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_PreUpdateScript, {}) > Promise / [=]
 			{
 				auto &State = *_pState; 
-				if (State.f_CheckAbort(Continuation))
+				if (State.f_CheckAbort(Promise))
 					return;
 
-				fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PreUpdate, CStr{}, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime()) > Continuation;
+				fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PreUpdate, CStr{}, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime()) > Promise;
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplication_UpdateApplicationFiles(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_UpdateApplicationFiles(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		auto &State = *_pState; 
 
-		TCContinuation<void> Continuation;
-		if (State.f_CheckAbort(Continuation))
-			return Continuation;
+		TCPromise<void> Promise;
+		if (State.f_CheckAbort(Promise))
+			return Promise.f_MoveFuture();
 		
 		State.m_fOnInfo("Updating application files");
 
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_UpdateApplicationFiles, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_UpdateApplicationFiles, {}) > Promise / [=]
 			{
 				auto &State = *_pState; 
-				if (State.f_CheckAbort(Continuation))
+				if (State.f_CheckAbort(Promise))
 					return;
 				
 				g_Dispatch(mp_FileActor) /
@@ -476,34 +476,34 @@ namespace NMib::NCloud::NAppManager
 
 						fsp_UpdateApplicationFiles(OutputDirectory, pApplication, Files, pUniqueUserGroup);
 					}
-					> Continuation / [=]
+					> Promise / [=]
 					{
 						auto &State = *_pState; 
 						State.m_pDownloadDirectoryCleanup.f_Clear();
 						State.m_pTemporaryDirectoryCleanup.f_Clear();
 						
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplication_SaveApplicationState(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_SaveApplicationState(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		auto &State = *_pState;
 
-		TCContinuation<void> Continuation; 
-		if (State.f_CheckAbort(Continuation))
-			return Continuation;
+		TCPromise<void> Promise; 
+		if (State.f_CheckAbort(Promise))
+			return Promise.f_MoveFuture();
 		
 		State.m_fOnInfo("Saving application state");
 
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_SaveApplicationState, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_SaveApplicationState, {}) > Promise / [=]
 			{
 				auto &State = *_pState; 
-				if (State.f_CheckAbort(Continuation))
+				if (State.f_CheckAbort(Promise))
 					return;
 				
 				if (State.m_pNewSettings)
@@ -514,46 +514,46 @@ namespace NMib::NCloud::NAppManager
 				
 				State.m_pApplication->m_bPreventLaunch_Update = false;
 
-				fp_UpdateApplicationJSON(State.m_pApplication) > Continuation;
+				fp_UpdateApplicationJSON(State.m_pApplication) > Promise;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplication_PostUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_PostUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		auto &State = *_pState;
 
-		TCContinuation<void> Continuation;
-		if (State.f_CheckAbort(Continuation))
-			return Continuation;
+		TCPromise<void> Promise;
+		if (State.f_CheckAbort(Promise))
+			return Promise.f_MoveFuture();
 		
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_PostUpdateScript, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_PostUpdateScript, {}) > Promise / [=]
 			{
 				auto &State = *_pState; 
-				if (State.f_CheckAbort(Continuation))
+				if (State.f_CheckAbort(Promise))
 					return;
 				
-				fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PostUpdate, CStr{}, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime()) > Continuation;
+				fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PostUpdate, CStr{}, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime()) > Promise;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<bool> CAppManagerActor::fp_UpdateApplication_StartNewApp(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<bool> CAppManagerActor::fp_UpdateApplication_StartNewApp(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		auto &State = *_pState; 
 
-		TCContinuation<bool> Continuation;
-		if (State.f_CheckAbort(Continuation))
-			return Continuation;
+		TCPromise<bool> Promise;
+		if (State.f_CheckAbort(Promise))
+			return Promise.f_MoveFuture();
 		
 		State.m_fOnInfo("Launching updated application");
 		State.m_pApplication->m_bJustUpdated = true;
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_StartNewApp, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_StartNewApp, {}) > Promise / [=]
 			{
 				auto &State = *_pState; 
-				if (State.f_CheckAbort(Continuation))
+				if (State.f_CheckAbort(Promise))
 					return;
 				
 				CStr Message;
@@ -564,12 +564,12 @@ namespace NMib::NCloud::NAppManager
 					else
 						State.m_fOnInfo(fg_Format("Application was successfully updated. Launch skipped because of missing dependency: {}", Message));
 
-					Continuation.f_SetResult(false);
+					Promise.f_SetResult(false);
 					return;
 				}
 
 				fp_LaunchApp(State.m_pApplication, false)
-					> Continuation / [=](CAppLaunchResult &&_Result)
+					> Promise / [=](CAppLaunchResult &&_Result)
 					{
 						auto &State = *_pState; 
 						if (State.m_VersionID.f_IsValid())
@@ -605,26 +605,26 @@ namespace NMib::NCloud::NAppManager
 							;
 						}
 
-						Continuation.f_SetResult(_Result.m_bQuitManager);
+						Promise.f_SetResult(_Result.m_bQuitManager);
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CAppManagerActor::fp_UpdateApplication_PostLaunch(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_PostLaunch(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
 	{
 		auto &State = *_pState; 
 
-		TCContinuation<void> Continuation; 
-		if (State.f_CheckAbort(Continuation))
-			return Continuation;
+		TCPromise<void> Promise; 
+		if (State.f_CheckAbort(Promise))
+			return Promise.f_MoveFuture();
 		
-		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_PostLaunch, {}) > Continuation / [=]
+		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_PostLaunch, {}) > Promise / [=]
 			{
 				auto &State = *_pState; 
-				if (State.f_CheckAbort(Continuation))
+				if (State.f_CheckAbort(Promise))
 					return;
 				
 				fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PostLaunch, CStr{}, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime()) 
@@ -646,11 +646,11 @@ namespace NMib::NCloud::NAppManager
 						State.m_pInProgressScope.f_Clear();
 						fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_Finished, {}) > fg_DiscardResult();
 						
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 					}
 				;
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

@@ -11,7 +11,7 @@ namespace NMib::NCloud::NAppManager
 #		include "Malterlib_Cloud_App_AppManager_Limits_Setup.sh"
 	;
 
-	TCContinuation<void> CAppManagerActor::fp_SetupLimits()
+	TCFuture<void> CAppManagerActor::fp_SetupLimits()
 	{
 #ifdef DPlatformFamily_Windows
 		return fg_Explicit();
@@ -44,7 +44,7 @@ namespace NMib::NCloud::NAppManager
 				nProceses += *Application.m_RegisterInfo.m_Resources_Processes; 
 		}
 		
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		TCMap<CStr, CStr> Environment;
 		Environment["NumFiles"] = CStr::fs_ToStr(nFiles);
 		Environment["NumFilesPerProc"] = CStr::fs_ToStr(nMaxFilesPerProc);
@@ -59,10 +59,10 @@ namespace NMib::NCloud::NAppManager
 				, fg_Move(Environment)
 				, nullptr
 			)
-			> Continuation % "Failed to setup limits"
+			> Promise % "Failed to setup limits"
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 #endif
 	}
 	

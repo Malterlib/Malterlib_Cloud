@@ -15,7 +15,7 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	TCContinuation<CCloudAPIManagerDaemonActor::CServer::COpenStackServiceInfo> CCloudAPIManagerDaemonActor::CServer::fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext)
+	TCFuture<CCloudAPIManagerDaemonActor::CServer::COpenStackServiceInfo> CCloudAPIManagerDaemonActor::CServer::fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext)
 	{
 		if 
 			(
@@ -36,14 +36,14 @@ namespace NMib::NCloud::NCloudAPIManager
 			_CloudContext.m_pGetToken = fg_Construct
 				(
 					self
-					, [this, KeystoneInfo = _CloudContext.m_KeystoneInfo, Name = _CloudContext.f_GetName()]() -> TCContinuation<COpenStackServiceInfo>
+					, [this, KeystoneInfo = _CloudContext.m_KeystoneInfo, Name = _CloudContext.f_GetName()]() -> TCFuture<COpenStackServiceInfo>
 					{
-						TCContinuation<COpenStackServiceInfo> Continuation;
+						TCPromise<COpenStackServiceInfo> Promise;
 
 						fg_Dispatch
 							(
 								fp_GetCURLQueryActor()
-								, [Continuation, KeystoneInfo]() -> COpenStackServiceInfo
+								, [Promise, KeystoneInfo]() -> COpenStackServiceInfo
 								{
 									NException::CDisableExceptionTraceScope DisableTracing;
 									
@@ -128,7 +128,7 @@ namespace NMib::NCloud::NCloudAPIManager
 									return ServiceInfo;
 								}
 							)
-							> [this, Continuation, Name](TCAsyncResult<COpenStackServiceInfo> && _ServiceInfo)
+							> [this, Promise, Name](TCAsyncResult<COpenStackServiceInfo> && _ServiceInfo)
 							{
 								auto *pCloudContext = mp_CloudContexts.f_FindEqual(Name);
 								if (!_ServiceInfo)
@@ -139,7 +139,7 @@ namespace NMib::NCloud::NCloudAPIManager
 										pCloudContext->m_bLastWasError = true;
 										DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to generate OpenStack service info: {}", _ServiceInfo.f_GetExceptionStr());
 									}
-									Continuation.f_SetException(_ServiceInfo);
+									Promise.f_SetException(_ServiceInfo);
 									return;
 								}
 								else if (pCloudContext)
@@ -149,11 +149,11 @@ namespace NMib::NCloud::NCloudAPIManager
 									DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Info, "Generate OpenStack service info. Auth token expires at {}", pCloudContext->m_TokenExpiresAt);
 								}
 								
-								Continuation.f_SetResult(fg_Move(*_ServiceInfo));
+								Promise.f_SetResult(fg_Move(*_ServiceInfo));
 							}
 						;
 
-						return Continuation;
+						return Promise.f_MoveFuture();
 					}
 					, true
 				)

@@ -16,28 +16,28 @@ namespace NMib::NCloud::NBackupManager
 		}
 	}
 	
-	TCContinuation<void> CBackupManagerServer::CBackupDownload::f_Destroy()
+	TCFuture<void> CBackupManagerServer::CBackupDownload::f_Destroy()
 	{
 		auto DirectorySend = fg_Move(m_DirectorySyncSend);
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		if (m_Subscription)
 		{
 			m_Subscription->f_Destroy().f_Dispatch().f_Timeout(10.0, "Timed out waiting for backup download to destroy")
-				> [Continuation, DirectorySend = fg_Move(DirectorySend)](auto &&)
+				> [Promise, DirectorySend = fg_Move(DirectorySend)](auto &&)
 				{
 					if (DirectorySend)
-						DirectorySend->f_Destroy() > Continuation;
+						DirectorySend->f_Destroy() > Promise;
 					else
-						Continuation.f_SetResult();
+						Promise.f_SetResult();
 				}
 			;
 		}
 		else if (DirectorySend)
-			DirectorySend->f_Destroy() > Continuation;
+			DirectorySend->f_Destroy() > Promise;
 		else
-			Continuation.f_SetResult();
+			Promise.f_SetResult();
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	CBackupManagerServer::CBackupDownload::CBackupDownload()
@@ -45,7 +45,7 @@ namespace NMib::NCloud::NBackupManager
 	}
 
 	auto CBackupManagerServer::CBackupManagerImplementation::f_DownloadBackup(CDownloadBackup &&_DownloadBackup)
-		-> TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
+		-> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 	{
 		auto pThis = m_pThis;
 		
@@ -69,10 +69,10 @@ namespace NMib::NCloud::NBackupManager
 		if (HostID == CallingHostID)
 			Permissions.f_Push("Backup/ReadSelf");
 
-		TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> Continuation;
+		TCPromise<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> Promise;
 
 		pThis->mp_Permissions.f_HasPermission("Start download backup", Permissions)
-			> Continuation % "Permission denied downloading backup" % Auditor /
+			> Promise % "Permission denied downloading backup" % Auditor /
 			[
 			   	=
 			   	, Subscription = fg_Move(_DownloadBackup.m_Subscription)
@@ -83,15 +83,15 @@ namespace NMib::NCloud::NBackupManager
 			(bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Download backup)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Download backup)"));
 
 				auto pBackupSource = pThis->fp_GetBackupSource(BackupSource);
 
 				if (!pBackupSource)
-					return Continuation.f_SetException(Auditor.f_Exception({"No such backup source", "(Download backup)"}));
+					return Promise.f_SetException(Auditor.f_Exception({"No such backup source", "(Download backup)"}));
 
 				(*pBackupSource)(&CBackupSource::f_CheckOutDirectory, Time)
-					> Continuation % Auditor("Internal error checking out backup for download, check BackupManager log for details")
+					> Promise % Auditor("Internal error checking out backup for download, check BackupManager log for details")
 					/ [=, Subscription = fg_Move(Subscription)](CBackupSource::CCheckedOutDirectory &&_CheckedOutDirectory) mutable
 					{
 						CDirectorySyncSend::CConfig Config;
@@ -108,15 +108,15 @@ namespace NMib::NCloud::NBackupManager
 						TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
 							{
 								Download.m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
-								, g_ActorSubscription / [pThis, Auditor, DownloadID, Desc, CheckedOutDirectory = fg_Move(_CheckedOutDirectory)]() mutable -> TCContinuation<void>
+								, g_ActorSubscription / [pThis, Auditor, DownloadID, Desc, CheckedOutDirectory = fg_Move(_CheckedOutDirectory)]() mutable -> TCFuture<void>
 								{
 									auto *pDownload = pThis->mp_BackupDownloads.f_FindEqual(DownloadID);
 									if (!pDownload)
 										return fg_Explicit();
 
-									TCContinuation<void> Continuation;
+									TCPromise<void> Promise;
 									pDownload->m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult)
-										> [Auditor, Desc, Continuation, Subscription = fg_Move(pDownload->m_Subscription), CheckedOutDirectory = fg_Move(CheckedOutDirectory)]
+										> [Auditor, Desc, Promise, Subscription = fg_Move(pDownload->m_Subscription), CheckedOutDirectory = fg_Move(CheckedOutDirectory)]
 										(TCAsyncResult<CDirectorySyncSend::CSyncResult> &&_Result) mutable
 										{
 											if (!_Result)
@@ -140,9 +140,9 @@ namespace NMib::NCloud::NBackupManager
 												Auditor.f_Info(fg_Format("'{}' Backup download finished transferring: {}", Desc, StatsMessage));
 											}
 
-											CheckedOutDirectory.m_Subscription->f_Destroy() > Continuation / [Continuation, Subscription = fg_Move(Subscription)]()
+											CheckedOutDirectory.m_Subscription->f_Destroy() > Promise / [Promise, Subscription = fg_Move(Subscription)]()
 												{
-													Subscription->f_Destroy() > Continuation;
+													Subscription->f_Destroy() > Promise;
 												}
 											;
 										}
@@ -150,19 +150,19 @@ namespace NMib::NCloud::NBackupManager
 
 									pThis->mp_BackupDownloads.f_Remove(DownloadID);
 
-									return Continuation;
+									return Promise.f_MoveFuture();
 								}
 							}
 						;
 
 						Auditor.f_Info(fg_Format("'{}' Starting download of backup", Desc));
 
-						Continuation.f_SetResult(fg_Move(SyncInterface));
+						Promise.f_SetResult(fg_Move(SyncInterface));
 					}
 				;
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

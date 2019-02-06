@@ -27,32 +27,32 @@ namespace NMib::NCloud::NSecretsManager
 		}
 	}
 
-	TCContinuation<void> CSecretsManagerDaemonActor::CServer::CDownload::f_Destroy()
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::CDownload::f_Destroy()
 	{
 		auto DirectorySend = fg_Move(m_DirectorySyncSend);
-		TCContinuation<void> SubscriptionContinuation;
+		TCPromise<void> SubscriptionPromise;
 		if (m_Subscription)
-			m_Subscription->f_Destroy().f_Dispatch().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > SubscriptionContinuation;
+			m_Subscription->f_Destroy().f_Dispatch().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > SubscriptionPromise;
 		else
-			SubscriptionContinuation.f_SetResult();
+			SubscriptionPromise.f_SetResult();
 
-		TCContinuation<void> FileSubscriptionContinuation;
+		TCPromise<void> FileSubscriptionPromise;
 		if (m_FileSubscription)
-			m_Subscription->f_Destroy().f_Dispatch().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > FileSubscriptionContinuation;
+			m_Subscription->f_Destroy().f_Dispatch().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > FileSubscriptionPromise;
 		else
-			FileSubscriptionContinuation.f_SetResult();
+			FileSubscriptionPromise.f_SetResult();
 
-		TCContinuation<void> Continuation;
-		SubscriptionContinuation + FileSubscriptionContinuation > [=](auto &&, auto &&)
+		TCPromise<void> Promise;
+		SubscriptionPromise + FileSubscriptionPromise > [=](auto &&, auto &&)
 			{
 				if (DirectorySend)
-					DirectorySend->f_Destroy() > Continuation;
+					DirectorySend->f_Destroy() > Promise;
 				else
-					Continuation.f_SetResult();
+					Promise.f_SetResult();
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	CSecretsManagerDaemonActor::CServer::CUpload::CUpload()
@@ -68,25 +68,25 @@ namespace NMib::NCloud::NSecretsManager
 		}
 	}
 
-	TCContinuation<void> CSecretsManagerDaemonActor::CServer::CUpload::f_Destroy()
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::CUpload::f_Destroy()
 	{
 		auto DirectoryReceive = fg_Move(m_DirectorySyncReceive);
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		if (DirectoryReceive)
-			DirectoryReceive->f_Destroy() > Continuation;
+			DirectoryReceive->f_Destroy() > Promise;
 		else
-			Continuation.f_SetResult();
+			Promise.f_SetResult();
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_DownloadFile(CSecretID &&_ID, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
-		-> TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
+		-> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
-		TCContinuation<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> Continuation;
+		TCPromise<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/DownloadFile"}};
@@ -95,15 +95,15 @@ namespace NMib::NCloud::NSecretsManager
 			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
 		This.mp_Permissions.f_HasPermissions("Download file from SecretsManager", Permissions)
-			> Continuation % "Permission denied downloading file" % Auditor / [=, Subscription = fg_Move(_Subscription)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
+			> Promise % "Permission denied downloading file" % Auditor / [=, Subscription = fg_Move(_Subscription)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
 			{
 				if (!_HasPermissions["Command"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(DownloadFile, command)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(DownloadFile, command)"));
 
 				for (auto const &bHasPermission : _HasPermissions)
 				{
 					if (!bHasPermission)
-						return Continuation.f_SetException(Auditor.f_AccessDenied(fg_Format("(DownloadFile, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
+						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(DownloadFile, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
 				}
 
 				auto &This = *m_pThis;
@@ -112,7 +112,7 @@ namespace NMib::NCloud::NSecretsManager
 				{
 					CStr Permission;
 					if (pSecretProperty->m_Secret.f_GetTypeID() != CSecretsManager::ESecretType_File)
-						return Continuation.f_SetException(Auditor.f_Exception(fg_Format("Secret '{}' does not contain a file secret", _ID)));
+						return Promise.f_SetException(Auditor.f_Exception(fg_Format("Secret '{}' does not contain a file secret", _ID)));
 
 					CDirectoryManifest Manifest;
 					auto &ManifestFile = pSecretProperty->m_Secret.f_Get<CSecretsManager::ESecretType_File>().m_Manifest;
@@ -165,17 +165,17 @@ namespace NMib::NCloud::NSecretsManager
 					Download.m_FileSubscription = This.fp_ReserveFile(pSecretProperty->m_RandomFileName);
 
 		#if DMibConfig_Tests_Enable
-					if (auto *pContinuation = This.mp_DownloadInitialized.f_FindEqual(_ID.m_Name))
+					if (auto *pPromise = This.mp_DownloadInitialized.f_FindEqual(_ID.m_Name))
 					{
-						pContinuation->f_SetResult();	// Tell the test that the download has reserved the file
-						This.mp_DownloadInitialized.f_Remove(pContinuation);
+						pPromise->f_SetResult();	// Tell the test that the download has reserved the file
+						This.mp_DownloadInitialized.f_Remove(pPromise);
 					}
 		#endif
 
 					TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
 						{
 							Download.m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
-							, g_ActorSubscription / [=, pThis = m_pThis, DownloadFile = ManifestFile.m_OriginalPath]() -> TCContinuation<void>
+							, g_ActorSubscription / [=, pThis = m_pThis, DownloadFile = ManifestFile.m_OriginalPath]() -> TCFuture<void>
 							{
 								auto *pDownload = pThis->mp_Downloads.f_FindEqual(DownloadID);
 								if (!pDownload)
@@ -189,16 +189,16 @@ namespace NMib::NCloud::NSecretsManager
 									return Auditor.f_Exception("Sync aborted");
 								}
 
-								TCContinuation<void> Continuation;
+								TCPromise<void> Promise;
 								Download.m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult) > [=](TCAsyncResult<CDirectorySyncSend::CSyncResult> &&_Result)
 									{
 										pThis->mp_Downloads.f_Remove(DownloadID);
 										if (!_Result)
-											Continuation.f_SetException(Auditor.f_Exception({"Error getting result for directory sync send", _Result.f_GetExceptionStr()}));
+											Promise.f_SetException(Auditor.f_Exception({"Error getting result for directory sync send", _Result.f_GetExceptionStr()}));
 										else
 										{
 											auto &Result = *_Result;
-											Continuation.f_SetResult();
+											Promise.f_SetResult();
 											if (Result.m_Stats.m_nSyncedFiles <= 1)
 												Auditor.f_Info("Download of '{}' from '{}' finished without transferring any content"_f << DownloadFile << _ID);
 											else
@@ -217,30 +217,30 @@ namespace NMib::NCloud::NSecretsManager
 											}
 										}
 		#if DMibConfig_Tests_Enable
-										if (auto *pContinuation = pThis->mp_DownloadCompleted.f_FindEqual(_ID.m_Name))
+										if (auto *pPromise = pThis->mp_DownloadCompleted.f_FindEqual(_ID.m_Name))
 										{
-											pThis->f_SyncFileOperations() > *pContinuation / [Continuation = *pContinuation]
+											pThis->f_SyncFileOperations() > *pPromise / [Promise = *pPromise]
 												{
-													Continuation.f_SetResult();	// Tell the test the transfer has completed and any file ops should have completed
+													Promise.f_SetResult();	// Tell the test the transfer has completed and any file ops should have completed
 												}
 											;
-											pThis->mp_DownloadCompleted.f_Remove(pContinuation);
+											pThis->mp_DownloadCompleted.f_Remove(pPromise);
 										}
 		#endif
 									}
 								;
-								return Continuation;
+								return Promise.f_MoveFuture();
 							}
 						}
 					;
-					Continuation.f_SetResult(fg_Move(SyncInterface));
+					Promise.f_SetResult(fg_Move(SyncInterface));
 				}
 				else
-					Continuation.f_SetException(Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name)));
+					Promise.f_SetException(Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name)));
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_UploadFile
@@ -249,7 +249,7 @@ namespace NMib::NCloud::NSecretsManager
 		 	, NStr::CStrSecure const &_FileName
 		 	, TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Uploader
 		 )
-		-> TCContinuation<NConcurrency::TCActorFunctorWithID<TCContinuation<void> ()>>
+		-> TCFuture<NConcurrency::TCActorFunctorWithID<TCFuture<void> ()>>
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
@@ -257,7 +257,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (_FileName.f_FindChars("*^?[]") != -1)
 			return Auditor.f_Exception("The file name cannot contain any of the characters: '^*?[]'");
 
-		TCContinuation<NConcurrency::TCActorFunctorWithID<TCContinuation<void> ()>> Continuation;
+		TCPromise<NConcurrency::TCActorFunctorWithID<TCFuture<void> ()>> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/UploadFile"}};
@@ -266,18 +266,18 @@ namespace NMib::NCloud::NSecretsManager
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
 		This.mp_Permissions.f_HasPermissions("Upload file to SecretsManager", Permissions)
-			> Continuation % "Permission denied uploading file" % Auditor / [=, Uploader = fg_Move(_Uploader)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
+			> Promise % "Permission denied uploading file" % Auditor / [=, Uploader = fg_Move(_Uploader)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
 			{
 				if (!_HasPermissions["Command"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(UploadFile, command)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(UploadFile, command)"));
 
 				for (auto const &bHasPermission : _HasPermissions)
 				{
 					if (!bHasPermission)
-						return Continuation.f_SetException(Auditor.f_AccessDenied(fg_Format("(UploadFile, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
+						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(UploadFile, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
 				}
 
-				TCContinuation<void> CheckResultContinuation;
+				TCPromise<void> CheckResultPromise;
 
 				auto &This = *m_pThis;
 				if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
@@ -381,10 +381,10 @@ namespace NMib::NCloud::NSecretsManager
 		#if DMibConfig_Tests_Enable
 							auto CleanupTest = g_OnScopeExit > [&]
 								{
-									if (auto *pContinuation = This.mp_UploadCompleted.f_FindEqual(OldFileName))
+									if (auto *pPromise = This.mp_UploadCompleted.f_FindEqual(OldFileName))
 									{
-										pContinuation->f_SetResult();	// Tell the test the transfer has completed
-										This.mp_UploadCompleted.f_Remove(pContinuation);
+										pPromise->f_SetResult();	// Tell the test the transfer has completed
+										This.mp_UploadCompleted.f_Remove(pPromise);
 									}
 								}
 							;
@@ -398,7 +398,7 @@ namespace NMib::NCloud::NSecretsManager
 
 							if (!_Result)
 							{
-								CheckResultContinuation.f_SetException
+								CheckResultPromise.f_SetException
 									(
 										Auditor.f_Exception({"Internal error. Check SecretsManager.Log for details.", fg_Format("UploadFile - sync failed: {}", _Result.f_GetExceptionStr())})
 									)
@@ -421,7 +421,7 @@ namespace NMib::NCloud::NSecretsManager
 											// locked secrets. This way we also handle the case when someone changes the secret to a string or binary secret during upload.
 											// We can just remove the uploaded file and report an error.
 											CStr Error = "The secret property in secret '{}' was changed while the secret file was uploaded. Please check and upload again."_f << _ID;
-											CheckResultContinuation.f_SetException(Auditor.f_Exception(Error));
+											CheckResultPromise.f_SetException(Auditor.f_Exception(Error));
 										}
 									;
 									return;
@@ -463,7 +463,7 @@ namespace NMib::NCloud::NSecretsManager
 									(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
 										{
 											CStr Error = "{} files in the manifest? This was unexpected"_f << Result.m_Manifest.m_Files.f_GetLen();
-											CheckResultContinuation.f_SetException(Auditor.f_Exception(Error));
+											CheckResultPromise.f_SetException(Auditor.f_Exception(Error));
 										}
 									;
 								}
@@ -473,7 +473,7 @@ namespace NMib::NCloud::NSecretsManager
 								// The secret was removed while the file was transferred. Ooops.
 								(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
 									{
-										CheckResultContinuation.f_SetException(Auditor.f_Exception("Secret '{}' removed while the secret file was uploaded"_f << _ID));
+										CheckResultPromise.f_SetException(Auditor.f_Exception("Secret '{}' removed while the secret file was uploaded"_f << _ID));
 									}
 								;
 							}
@@ -481,13 +481,13 @@ namespace NMib::NCloud::NSecretsManager
 					;
 
 		#if DMibConfig_Tests_Enable
-					if (auto *pContinuation = This.mp_UploadInitialized.f_FindEqual(_FileName))
+					if (auto *pPromise = This.mp_UploadInitialized.f_FindEqual(_FileName))
 					{
-						pContinuation->f_SetResult();	// Tell the test the transfer has been initialized (SaveSecret has been set so we know if it has changed when the transfer completes)
-						This.mp_UploadInitialized.f_Remove(pContinuation);
+						pPromise->f_SetResult();	// Tell the test the transfer has been initialized (SaveSecret has been set so we know if it has changed when the transfer completes)
+						This.mp_UploadInitialized.f_Remove(pPromise);
 					}
 		#endif
-					Continuation.f_SetResult
+					Promise.f_SetResult
 						(
 							g_ActorFunctor
 							(
@@ -497,20 +497,20 @@ namespace NMib::NCloud::NSecretsManager
 									This.mp_Uploads.f_Remove(NewFileName);
 								}
 							)
-							/ [CheckResultContinuation, AllowDestroy = g_AllowWrongThreadDestroy]() -> TCContinuation<void>
+							/ [CheckResultPromise, AllowDestroy = g_AllowWrongThreadDestroy]() -> TCFuture<void>
 							{
-								if (!CheckResultContinuation.f_IsSet())
-									CheckResultContinuation.f_SetResult();
+								if (!CheckResultPromise.f_IsSet())
+									CheckResultPromise.f_SetResult();
 
-								return CheckResultContinuation;
+								return CheckResultPromise;
 							}
 						)
 					;
 				}
 				else
-					Continuation.f_SetException(Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name)));
+					Promise.f_SetException(Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name)));
 			}
 		;
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
  }

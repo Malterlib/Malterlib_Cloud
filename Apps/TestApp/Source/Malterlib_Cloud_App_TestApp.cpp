@@ -52,12 +52,12 @@ namespace NMib::NCloud::NTest
 		}
 	}
 
-	TCContinuation<void> CTestAppActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CTestAppActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
 		return fg_Explicit();
 	}
 
-	TCContinuation<void> CTestAppActor::fp_StopApp()
+	TCFuture<void> CTestAppActor::fp_StopApp()
 	{
 		return fg_Explicit();
 	}

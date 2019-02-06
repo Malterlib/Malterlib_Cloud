@@ -7,7 +7,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	NConcurrency::TCContinuation<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Remove(NStr::CStr const &_Name)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Remove(NStr::CStr const &_Name)
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -17,27 +17,27 @@ namespace NMib::NCloud::NAppManager
 		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationRemove"}};
 		Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 
 		pThis->mp_Permissions.f_HasPermissions("Remove application from AppManager", Permissions)
-			> Continuation % "Permission denied removing application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+			> Promise % "Permission denied removing application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
 			{
 				if (!_HasPermissions["Command"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application remove, command)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application remove, command)"));
 
 				if (!_HasPermissions["App"])
-					return Continuation.f_SetException(Auditor.f_AccessDenied("(Application remove, app name)"));
+					return Promise.f_SetException(Auditor.f_AccessDenied("(Application remove, app name)"));
 
 				auto *pApplication = pThis->mp_Applications.f_FindEqual(_Name);
 				if (!pApplication)
-					return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
 
 				auto &Application = **pApplication;
 				if (Application.f_IsInProgress())
-					return Continuation.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
+					return Promise.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
 				auto InProgressScope = Application.f_SetInProgress();
 
-				Application.f_Stop(EStopFlag_CloseEncryption) > [pThis, Auditor, Continuation, _Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
+				Application.f_Stop(EStopFlag_CloseEncryption) > [pThis, Auditor, Promise, _Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
 					{
 						CStr Error = pThis->fp_GetApplicationStopErrors(_Result, _Name);
 
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NAppManager
 
 						auto *pApplication = pThis->mp_Applications.f_FindEqual(_Name);
 						if (!pApplication)
-							return Continuation.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+							return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
 
 						auto pApplicationPtr = *pApplication;
 						(*pApplication)->f_Delete();
@@ -60,10 +60,10 @@ namespace NMib::NCloud::NAppManager
 								pApplicationsState->f_RemoveMember(_Name);
 						}
 
-						pThis->mp_State.m_StateDatabase.f_Save() > Continuation % "Failed to save state" % Auditor / [InProgressScope, Continuation, _Name, Auditor]() mutable
+						pThis->mp_State.m_StateDatabase.f_Save() > Promise % "Failed to save state" % Auditor / [InProgressScope, Promise, _Name, Auditor]() mutable
 							{
 								Auditor.f_Info(fg_Format("Removed application '{}'", _Name));
-								Continuation.f_SetResult();
+								Promise.f_SetResult();
 							}
 						;
 					}
@@ -71,19 +71,19 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 
-	TCContinuation<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCContinuation<uint32> Continuation;
+		TCPromise<uint32> Promise;
 		
-		mp_AppManagerInterface.m_pActor->f_Remove(_Params["Name"].f_String()) > [Continuation](TCAsyncResult<void> &&_Result)
+		mp_AppManagerInterface.m_pActor->f_Remove(_Params["Name"].f_String()) > [Promise](TCAsyncResult<void> &&_Result)
 			{
-				Continuation.f_SetExceptionOrResult(_Result, 0);
+				Promise.f_SetExceptionOrResult(_Result, 0);
 			}
 		;
 		
-		return Continuation;
+		return Promise.f_MoveFuture();
 	}
 }

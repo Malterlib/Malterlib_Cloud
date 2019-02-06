@@ -19,15 +19,15 @@ namespace NMib::NCloud::NBackupManager
 	{
 	}
 
-	TCContinuation<void> CBackupManagerApp::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CBackupManagerApp::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		TCContinuation<void> Continuation;
+		TCPromise<void> Promise;
 		mp_pServer = fg_ConstructActor<CBackupManagerServer>(fg_Construct(self), mp_State);
-		mp_pServer(&CBackupManagerServer::f_Init) > Continuation;
-		return Continuation;
+		mp_pServer(&CBackupManagerServer::f_Init) > Promise;
+		return Promise.f_MoveFuture();
 	}
 	
-	TCContinuation<void> CBackupManagerApp::fp_StopApp()
+	TCFuture<void> CBackupManagerApp::fp_StopApp()
 	{	
 		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
 		
@@ -44,7 +44,7 @@ namespace NMib::NCloud::NBackupManager
 			mp_pServer = nullptr;
 		}
 		
-		return pCanDestroy->m_Continuation;
+		return pCanDestroy->f_Future();
 	}
 }
 
