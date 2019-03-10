@@ -450,30 +450,32 @@ namespace NMib::NCloud::NAppManager
 			CUpdateApplicationState(CUpdateApplicationState const &) = delete;
 			CUpdateApplicationState(CUpdateApplicationState &&) = delete;
 			
+			CExceptionPointer f_CheckAbort()
+			{
+				if (m_pApplication->m_bDeleted)
+					return DMibErrorInstance("Application has been deleted, aborting").f_ExceptionPointer();
+
+				if (m_bCancel)
+					return DMibErrorInstance("Update was cancelled").f_ExceptionPointer();
+
+				if (m_bCancelOnAppManagerStop)
+					return DMibErrorInstance("AppManager stopped").f_ExceptionPointer();
+
+				return nullptr;
+			}
+
 			template <typename tf_CType>
 			bool f_CheckAbort(TCPromise<tf_CType> const &o_Error)
 			{
-				if (m_pApplication->m_bDeleted)
+				if (auto Error = f_CheckAbort())
 				{
 					if (!o_Error.f_IsSet())
-						o_Error.f_SetException(DMibErrorInstance("Application has been deleted, aborting"));
-					return true;
-				}
-				if (m_bCancel)
-				{
-					if (!o_Error.f_IsSet())
-						o_Error.f_SetException(DMibErrorInstance("Update was cancelled"));
-					return true;
-				}
-				if (m_bCancelOnAppManagerStop)
-				{
-					if (!o_Error.f_IsSet())
-						o_Error.f_SetException(DMibErrorInstance("AppManager stopped"));
+						o_Error.f_SetException(Error);
 					return true;
 				}
 				return false;
 			}
-			
+
 			TCSharedPointer<CApplication> m_pApplication;
 			TCFunction<void (CStr const &_Info)> m_fOnInfo;
 			TCFunction <void ()> m_fUpdateVersionInfo;
@@ -538,7 +540,9 @@ namespace NMib::NCloud::NAppManager
 				, TCFunction<void (CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)> const &_fOnStdOutput
 			)
 		;
-		
+
+		TCFuture<void> fp_InitApp();
+
 		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
 		TCFuture<void> fp_StopApp() override;
 		TCFuture<void> fp_ReadState();
@@ -577,20 +581,20 @@ namespace NMib::NCloud::NAppManager
 		;
 		TCFuture<bool> fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication);
 		
-		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_AddApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_RemoveApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_UpdateApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_StartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_StopApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_RestartApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_AddApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ChangeApplicationSettings(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RemoveApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_UpdateApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StartApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StopApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RestartApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		
-		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_RemoveKnownHost(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RemoveKnownHost(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_CancelAllUpdates(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CancelAllUpdates(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		
 		TCFuture<void> fp_AddApplication
 			(
@@ -602,7 +606,8 @@ namespace NMib::NCloud::NAppManager
 				, bool _bSettingsFromVersionInfo
 				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
 				, CStr const &_FromLocalFile
-				, TCOptional<CVersionManager::CVersionIDAndPlatform> const &_Version 
+				, TCOptional<CVersionManager::CVersionIDAndPlatform> const &_Version
+			 	, CCallingHostInfo const &_CallingHostInfo
 			)
 		;
 		
@@ -614,36 +619,38 @@ namespace NMib::NCloud::NAppManager
 				, bool _bUpdateFromVersionInfo
 				, bool _bForce
 				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
+			 	, CCallingHostInfo const &_CallingHostInfo
 			)
 		;
 		
 		TCFuture<void> fp_UpdateApplication
 			(
-				CStr const &_Name
-				, CAppManagerInterface::CApplicationUpdate const &_Update
-		 		, CVersionManager::CVersionInformation const &_VersionInfo
-				, CStr const &_FromFileName
-				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
+				CStr _Name
+				, CAppManagerInterface::CApplicationUpdate _Update
+		 		, CVersionManager::CVersionInformation _VersionInfo
+				, CStr _FromFileName
+				, TCFunction<void (CStr const &_Info)> _fOnInfo
+			 	, CCallingHostInfo _CallingHostInfo
 				, bool _bCheckPermissions = true
 			)
 		;
 
-		TCFuture<void> fp_UpdateApplicationRunProcess(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
-		TCFuture<void> fp_UpdateApplication_DownloadVersion(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
-		TCFuture<void> fp_UpdateApplication_Unpack(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
-		TCFuture<void> fp_UpdateApplication_StopOldApp(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
-		TCFuture<void> fp_UpdateApplication_PreUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
-		TCFuture<void> fp_UpdateApplication_UpdateApplicationFiles(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
-		TCFuture<void> fp_UpdateApplication_SaveApplicationState(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
-		TCFuture<void> fp_UpdateApplication_PostUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
-		TCFuture<bool> fp_UpdateApplication_StartNewApp(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCFuture<void> fp_UpdateApplicationRunProcess(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
+		TCFuture<void> fp_UpdateApplication_DownloadVersion(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
+		TCFuture<void> fp_UpdateApplication_Unpack(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
+		TCFuture<void> fp_UpdateApplication_StopOldApp(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
+		TCFuture<void> fp_UpdateApplication_PreUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
+		TCFuture<void> fp_UpdateApplication_UpdateApplicationFiles(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
+		TCFuture<void> fp_UpdateApplication_SaveApplicationState(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
+		TCFuture<void> fp_UpdateApplication_PostUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
+		TCFuture<bool> fp_UpdateApplication_StartNewApp(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		TCFuture<void> fp_UpdateApplication_DeferToNextRestart
 			(
-				 TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
-				 , TCSharedPointer<CCanDestroyTracker> const &_pCanDestroy
+				 TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
+				 , TCSharedPointer<CCanDestroyTracker> _pCanDestroy
 			)
 		;
-		TCFuture<void> fp_UpdateApplication_PostLaunch(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCFuture<void> fp_UpdateApplication_PostLaunch(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		
 		TCFuture<void> fp_CancelAllApplicationUpdatesOnStopAppManager();
 		
@@ -714,15 +721,15 @@ namespace NMib::NCloud::NAppManager
 		
 		TCFuture<void> fp_OnUpdateEvent
 			(
-				TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+				TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 				, EUpdateStage _Stage
-				, NStr::CStr const &_Message
+				, NStr::CStr _Message
 			)
 		;
 
 		TCFuture<void> fp_PublishCoordinationInterface();
 		TCFuture<void> fp_SubscribeCoordinationInterface();
-		void fp_NewRemoteAppManager(CRemoteAppManager &_AppManager);
+		TCFutureAllowReferences<void> fp_NewRemoteAppManager(CRemoteAppManager &_AppManager);
 		void fp_NewRemoteKnownApplication(CRemoteApplicationKey const &_RemoteKey, CStr const &_HostID);
 		void fp_SendInitialInfoToRemoteAppManager(CRemoteAppManager &_AppManager);
 		void fp_OnAppUpdateInfoChange(TCSharedPointer<CApplication> const &_pApplication);
@@ -734,25 +741,25 @@ namespace NMib::NCloud::NAppManager
 		void fp_AppLaunchStateChanged(TCSharedPointer<CApplication> const &_pApplication, CStr const &_State);
 		void fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted);
 		
-		TCFuture<void> fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
-		TCFuture<void> fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState);
+		TCFuture<void> fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
+		TCFuture<void> fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		TCFuture<void> fp_Coordination_WaitForAllToReachWantUpdateStage
 			(
-				TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+				TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 				, EUpdateStage _Stage
 				, fp64 _Timeout
 				, EWaitStageFlag _Flags
-				, TCFunctionMutable<bool ()> &&_fEvalState = {}
+				, TCFunctionMutable<bool ()> _fEvalState = {}
 			)
 		;
 		TCFuture<void> fp_Coordination_WaitForState
 			(
-				TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+				TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 				, fp64 _Timeout
-				, TCFunctionMutable<bool (TCPromise<void> &_Promise)> &&_fEvalState
-				, CStr const &_RemoteFailError
-				, CStr const &_TimeoutError
-				, CStr const &_DisconnectedError
+				, TCFunctionMutable<bool (TCPromise<void> &_Promise)> _fEvalState
+				, CStr _RemoteFailError
+				, CStr _TimeoutError
+				, CStr _DisconnectedError
 				, bool _bIgnoreFailed = false
 			)
 		;
@@ -766,7 +773,7 @@ namespace NMib::NCloud::NAppManager
 		void fp_UpdateApplicationDependencies();
 		
 		void fp_InitialStartupFailed(CExceptionPointer const &_pException);
-		TCFuture<void> fp_ClearPreventLaunch(TCSharedPointer<CApplication> const &_pApplication);
+		TCFuture<void> fp_ClearPreventLaunch(TCSharedPointer<CApplication> _pApplication);
 		
 		void fp_ApplicationStartBackup(TCSharedPointer<CApplication> const &_pApplication);
 

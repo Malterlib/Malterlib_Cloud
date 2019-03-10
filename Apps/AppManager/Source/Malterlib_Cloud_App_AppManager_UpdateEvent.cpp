@@ -5,7 +5,6 @@
 
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/ActorSubscription>
-#include <Mib/Concurrency/Actor/Timer>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -19,184 +18,187 @@ namespace NMib::NCloud::NAppManager
 		auto Auditor = pThis->f_Auditor();
 		CStr SubscriptionID = fg_RandomID();
 		auto CallingHostInfo = fg_GetCallingHostInfo();
-		NConcurrency::TCPromise<NConcurrency::TCActorSubscriptionWithID<>> Promise;
 
-		pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", {"AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeUpdates"})
-			> Promise % "Permission denied subscribing to update notifications" % Auditor / [=, fOnNotification = fg_Move(_fOnNotification)](bool _bHasPermission) mutable
-			{
-				if (!_bHasPermission)
-					return Promise.f_SetException(Auditor.f_AccessDenied("(Subscribe to update notifications)"));
-
-				auto &Subscription = pThis->mp_UpdateNotificationSubscriptions[SubscriptionID];
-				Subscription.m_fOnUpdate = fg_Move(fOnNotification);
-				Subscription.m_CallingHostInfo = CallingHostInfo;
-
-				Auditor.f_Info(fg_Format("Subscribe to update notifications '{}'", SubscriptionID));
-
-				Promise.f_SetResult
-					(
-						g_ActorSubscription / [pThis, SubscriptionID, Auditor]() -> TCFuture<void>
-						{
-							Auditor.f_Info(fg_Format("Unsubscribe from update notifications '{}'", SubscriptionID));
-
-							auto pUpdateNotificationSubscriptions = pThis->mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
-							if (!pUpdateNotificationSubscriptions)
-								return fg_Explicit();
-
-							TCFuture<void> DestroyFuture = pUpdateNotificationSubscriptions->m_fOnUpdate.f_Destroy();
-
-							pThis->mp_UpdateNotificationSubscriptions.f_Remove(SubscriptionID);
-
-							return DestroyFuture;
-						}
-					)
-				;
-			}
+		bool bHasPermission = co_await
+			(
+				pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", {"AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeUpdates"})
+			 	% "Permission denied subscribing to update notifications" % Auditor
+			)
 		;
-		return Promise.f_MoveFuture();
+		if (!bHasPermission)
+			co_return Auditor.f_AccessDenied("(Subscribe to update notifications)");
+
+		auto &Subscription = pThis->mp_UpdateNotificationSubscriptions[SubscriptionID];
+		Subscription.m_fOnUpdate = fg_Move(_fOnNotification);
+		Subscription.m_CallingHostInfo = CallingHostInfo;
+
+		Auditor.f_Info(fg_Format("Subscribe to update notifications '{}'", SubscriptionID));
+
+		co_return
+			(
+				g_ActorSubscription / [pThis, SubscriptionID, Auditor]() -> TCFuture<void>
+				{
+					Auditor.f_Info(fg_Format("Unsubscribe from update notifications '{}'", SubscriptionID));
+
+					auto pUpdateNotificationSubscriptions = pThis->mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
+					if (!pUpdateNotificationSubscriptions)
+						co_return {};
+
+					TCFuture<void> DestroyFuture = pUpdateNotificationSubscriptions->m_fOnUpdate.f_Destroy();
+
+					pThis->mp_UpdateNotificationSubscriptions.f_Remove(SubscriptionID);
+
+					co_await DestroyFuture;
+					co_return {};
+				}
+			)
+		;
 	}
 
 	TCFuture<void> CAppManagerActor::fp_OnUpdateEvent
 		(
-			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 			, EUpdateStage _Stage
-			, NStr::CStr const &_Message
+			, NStr::CStr _Message
 		)
 	{
-		auto &Application = *_pState->m_pApplication;
-				
-		if (_Stage != Application.m_WantUpdateStage)
 		{
-			Application.m_WantUpdateStage = _Stage;
-			if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
-				Application.m_UpdateStartSequence = ++mp_AppStageChangeSequence;
-			fp_OnAppUpdateInfoChange(_pState->m_pApplication);
-		}
-		
-		TCFuture<void> CoordinationFuture;
+			auto &Application = *_pState->m_pApplication;
 
-		auto UpdateType = Application.f_GetUpdateType(); 
-		switch (UpdateType)
-		{
-		case EDistributedAppUpdateType_AllAtOnce:
-		case EDistributedAppUpdateType_OneAtATime:
+			if (_Stage != Application.m_WantUpdateStage)
 			{
-				if (_Stage == EUpdateStage::EUpdateStage_None)
-				{
-					CoordinationFuture = fp_Coordination_WaitForAllToReachWantUpdateStage
-						(
-							_pState
-							, EUpdateStage::EUpdateStage_None
-							, 10.0*60.0
-							, EWaitStageFlag_IgnoreFailed | EWaitStageFlag_DisallowInProgressStates
-						)
-					;
-				}
-				else if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
-					CoordinationFuture = fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
-				else if (_Stage == EUpdateStage::EUpdateStage_StopOldApp)
-				{
-					if (UpdateType == EDistributedAppUpdateType_OneAtATime)
-						CoordinationFuture = fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pState);
-					else
-						CoordinationFuture = fp_Coordination_WaitForAllToReachWantUpdateStage(_pState, EUpdateStage::EUpdateStage_StopOldApp, 30.0*60.0, EWaitStageFlag_None);
-				}
-				else
-					CoordinationFuture = fg_Explicit();
-				break;
+				Application.m_WantUpdateStage = _Stage;
+				if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
+					Application.m_UpdateStartSequence = ++mp_AppStageChangeSequence;
+				fp_OnAppUpdateInfoChange(_pState->m_pApplication);
 			}
-		case EDistributedAppUpdateType_Independent:
+
+			TCFuture<void> CoordinationFuture;
+
+			auto UpdateType = Application.f_GetUpdateType();
+			switch (UpdateType)
 			{
-				CoordinationFuture = fg_Explicit();
-				break;
-			}
-		default:
-			{
-				DNeverGetHere;
-				break;
-			}
-		}
-		
-		TCPromise<void> Promise;
-		
-		CoordinationFuture > Promise / [=]
-			{
-				auto &Application = *_pState->m_pApplication;
-		
-				bool bUpdatedAppInfo = false;
-				
-				if (_Stage != Application.m_UpdateStage)
+			case EDistributedAppUpdateType_AllAtOnce:
+			case EDistributedAppUpdateType_OneAtATime:
 				{
-					if (_Stage == EUpdateStage::EUpdateStage_Finished)
+					if (_Stage == EUpdateStage::EUpdateStage_None)
 					{
-						Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
-						Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo;
-						bUpdatedAppInfo = true;
+						CoordinationFuture = fp_Coordination_WaitForAllToReachWantUpdateStage
+							(
+								_pState
+								, EUpdateStage::EUpdateStage_None
+								, 10.0*60.0
+								, EWaitStageFlag_IgnoreFailed | EWaitStageFlag_DisallowInProgressStates
+								, TCFunctionMutable<bool ()>{}
+							)
+						;
 					}
-					else if (_Stage == EUpdateStage::EUpdateStage_Failed)
+					else if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
+						CoordinationFuture = fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
+					else if (_Stage == EUpdateStage::EUpdateStage_StopOldApp)
 					{
-						Application.m_LastFailedInstalledVersion = _pState->m_VersionID;
-						Application.m_LastFailedInstalledVersionTime = _pState->m_VersionTime;
-						Application.m_LastFailedInstalledVersionRetrySequence = _pState->m_VersionRetrySequence; 
-						if (!_pState->m_bSetLastTried)
+						if (UpdateType == EDistributedAppUpdateType_OneAtATime)
+							CoordinationFuture = fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pState);
+						else
 						{
-							Application.m_LastTriedInstalledVersion = _pState->m_VersionID;
-							Application.m_LastTriedInstalledVersionInfo.m_Time = _pState->m_VersionTime;
-							Application.m_LastTriedInstalledVersionInfo.m_RetrySequence = _pState->m_VersionRetrySequence;
-							bUpdatedAppInfo = true;
-						}
-					}
-					Application.m_UpdateStage = _Stage;
-					fp_OnAppUpdateInfoChange(_pState->m_pApplication);
-				}
-				
-				CAppManagerInterface::CUpdateNotification Notification;
-				Notification.m_Application = Application.m_Name;
-				Notification.m_Message = _Message;
-				Notification.m_VersionID = _pState->m_VersionID;
-				Notification.m_VersionTime = _pState->m_VersionTime;
-				Notification.m_Stage = _Stage;
-				
-				CStr AppPermission = fg_Format("AppManager/App/{}", Application.m_Name);
-
-				TCActorResultVector<void> OnUpdateResults;
-				
-				for (auto &Subscription : mp_UpdateNotificationSubscriptions)
-				{
-					TCPromise<void> OnUpdatePromise;
-					mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
-						.f_Dispatch().f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
-						> OnUpdatePromise / [=, SubscriptionID = mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission)
-						{
-							auto pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
-							if (!_bHasPermission || !pSubscription)
-								return OnUpdatePromise.f_SetResult();
-
-							pSubscription->m_fOnUpdate(Notification)
-								.f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
-								> OnUpdatePromise
+							CoordinationFuture = fp_Coordination_WaitForAllToReachWantUpdateStage
+								(
+									_pState
+									, EUpdateStage::EUpdateStage_StopOldApp
+									, 30.0*60.0
+									, EWaitStageFlag_None
+									, TCFunctionMutable<bool ()>{}
+								)
 							;
 						}
-					;
-					OnUpdatePromise > OnUpdateResults.f_AddResult();
-				}
-
-				TCFuture<void> UpdateJSONFuture;
-				if (!bUpdatedAppInfo)
-					UpdateJSONFuture = fg_Explicit();
-				else
-					UpdateJSONFuture = fp_UpdateApplicationJSON(_pState->m_pApplication);
-
-				UpdateJSONFuture
-					+ OnUpdateResults.f_GetResults()
-					> [Promise](TCAsyncResult<void> &&_UpdateJSONResult, auto &&_OnUpdateResults)
-					{
-						Promise.f_SetResult(fg_Move(_UpdateJSONResult));
 					}
-				;
+					else
+						CoordinationFuture = fg_Explicit();
+					break;
+				}
+			case EDistributedAppUpdateType_Independent:
+				{
+					CoordinationFuture = fg_Explicit();
+					break;
+				}
+			default:
+				{
+					DNeverGetHere;
+					break;
+				}
 			}
-		;
+
+			co_await CoordinationFuture;
+		}
 		
-		return Promise.f_MoveFuture();
+		auto &Application = *_pState->m_pApplication;
+
+		bool bUpdatedAppInfo = false;
+
+		if (_Stage != Application.m_UpdateStage)
+		{
+			if (_Stage == EUpdateStage::EUpdateStage_Finished)
+			{
+				Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
+				Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo;
+				bUpdatedAppInfo = true;
+			}
+			else if (_Stage == EUpdateStage::EUpdateStage_Failed)
+			{
+				Application.m_LastFailedInstalledVersion = _pState->m_VersionID;
+				Application.m_LastFailedInstalledVersionTime = _pState->m_VersionTime;
+				Application.m_LastFailedInstalledVersionRetrySequence = _pState->m_VersionRetrySequence;
+				if (!_pState->m_bSetLastTried)
+				{
+					Application.m_LastTriedInstalledVersion = _pState->m_VersionID;
+					Application.m_LastTriedInstalledVersionInfo.m_Time = _pState->m_VersionTime;
+					Application.m_LastTriedInstalledVersionInfo.m_RetrySequence = _pState->m_VersionRetrySequence;
+					bUpdatedAppInfo = true;
+				}
+			}
+			Application.m_UpdateStage = _Stage;
+			fp_OnAppUpdateInfoChange(_pState->m_pApplication);
+		}
+
+		CAppManagerInterface::CUpdateNotification Notification;
+		Notification.m_Application = Application.m_Name;
+		Notification.m_Message = _Message;
+		Notification.m_VersionID = _pState->m_VersionID;
+		Notification.m_VersionTime = _pState->m_VersionTime;
+		Notification.m_Stage = _Stage;
+
+		CStr AppPermission = fg_Format("AppManager/App/{}", Application.m_Name);
+
+		TCActorResultVector<void> OnUpdateResultsVector;
+
+		for (auto &Subscription : mp_UpdateNotificationSubscriptions)
+		{
+			TCPromise<void> OnUpdatePromise;
+			mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
+				.f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
+				> OnUpdatePromise / [=, SubscriptionID = mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission)
+				{
+					auto pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
+					if (!_bHasPermission || !pSubscription)
+						return OnUpdatePromise.f_SetResult();
+
+					pSubscription->m_fOnUpdate(Notification)
+						.f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+						> OnUpdatePromise
+					;
+				}
+			;
+			OnUpdatePromise > OnUpdateResultsVector.f_AddResult();
+		}
+
+		TCFuture<void> UpdateJSONFuture;
+		if (!bUpdatedAppInfo)
+			UpdateJSONFuture = fg_Explicit();
+		else
+			UpdateJSONFuture = fp_UpdateApplicationJSON(_pState->m_pApplication);
+
+		auto [UpdateJSONResult, OnUpdateResults] = co_await (UpdateJSONFuture + OnUpdateResultsVector.f_GetResults()).f_Wrap();
+
+		co_return UpdateJSONResult;
 	}
 }

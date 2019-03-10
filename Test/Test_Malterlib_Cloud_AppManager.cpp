@@ -13,6 +13,7 @@
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cloud/App/VersionManager>
+#include <Mib/Cloud/App/AppManager>
 
 #ifdef DPlatformFamily_Windows
 #include <Windows.h>
@@ -94,6 +95,10 @@ public:
 			fg_GetSys()->f_SetEnvironmentVariable("Path", "c:\\Program Files\\Git\\usr\\bin;{}"_f << fg_GetSys()->f_GetEnvironmentVariable("Path"));
 			NSys::fg_Process_SetEnvironmentVariable_Unsafe("Path", "c:\\Program Files\\Git\\usr\\bin;{}"_f << fg_GetSys()->f_GetEnvironmentVariable("Path"));
 #endif
+#if DTestAppManagerEnableLogging
+			fg_GetSys()->f_AddStdErrLogger();
+#endif
+
 			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 			CStr RootDirectory = ProgramDirectory + "/AppManagerTests";
 			auto VersionManagerPermissionsForTest = fg_CreateMap<CStr, CPermissionRequirements>("Application/WriteAll", "Application/ReadAll", "Application/TagAll");
@@ -117,6 +122,12 @@ public:
 			
 			CTrustManagerTestHelper TrustManagerState;
 			TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+			auto CleanupTrustManager = g_OnScopeExit > [&]
+				{
+					TrustManager->f_BlockDestroy();
+				}
+			;
+
 			CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 			
@@ -149,8 +160,17 @@ public:
 			CFile::fs_CreateDirectory(VersionManagerDirectory);
 			CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/VersionManager", VersionManagerDirectory, nullptr);
 			
-			auto VersionManagerLaunch = LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, "VersionManager", VersionManagerDirectory, &fg_ConstructApp_VersionManager).f_CallSync(g_Timeout);
-			
+			auto VersionManagerLaunch = LaunchHelper
+				(
+					&CDistributedApp_LaunchHelper::f_LaunchInProcess
+					, "VersionManager"
+					, VersionManagerDirectory
+					, &fg_ConstructApp_VersionManager
+					, NContainer::TCVector<NStr::CStr>{}
+				)
+				.f_CallSync(g_Timeout)
+			;
+
 			DMibExpect(VersionManagerLaunch.m_HostID, !=, "");
 
 			// Copy Cloud Client for debugging
@@ -190,8 +210,10 @@ public:
 #if DTestAppManagerEnableOtherOutput
 				ExtraParams.f_Insert("--log-launches-to-stderr");
 #endif
-				
-				LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, AppManagerName, AppManagerDirectory + "/AppManager", fg_Move(ExtraParams)) > AppManagerLaunchesResults.f_AddResult();
+				//LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, AppManagerName, AppManagerDirectory + "/AppManager", fg_Move(ExtraParams)) > AppManagerLaunchesResults.f_AddResult();
+				LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, AppManagerName, AppManagerDirectory, &fg_ConstructApp_AppManager, fg_Move(ExtraParams))
+					> AppManagerLaunchesResults.f_AddResult()
+				;
 			}
 			
 			TCVector<CDistributedApp_LaunchInfo> AppManagerLaunches;
@@ -227,7 +249,7 @@ public:
 				 	VersionManagerTrust
 				 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
 				 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{VersionManagerServerAddress}
-				 )
+				)
 				.f_CallSync(g_Timeout)
 			;
 			CStr CloudClientHostID = CProcessLaunch::fs_LaunchTool(CloudClientDirectory + "/MalterlibCloud", fg_CreateVector<CStr>("--trust-host-id")).f_Trim();
@@ -240,7 +262,8 @@ public:
 						 VersionManagerTrust
 						 , CDistributedActorTrustManagerInterface::f_AddPermissions
 						 , fPermissions(CloudClientHostID, VersionManagerPermissionsForTest)
-					).f_CallSync(g_Timeout)
+					)
+					.f_CallSync(g_Timeout)
 				;
 			}
 
@@ -250,7 +273,8 @@ public:
 					 VersionManagerTrust
 					 , CDistributedActorTrustManagerInterface::f_AddPermissions
 					 , fPermissions(TestHostID, VersionManagerPermissionsForTest)
-				).f_CallSync(g_Timeout)
+				)
+				.f_CallSync(g_Timeout)
 			;
 			TrustManager
 				(
@@ -258,7 +282,8 @@ public:
 					 , CVersionManager::mc_pDefaultNamespace
 					 , fg_CreateSet<CStr>(VersionManagerHostID)
 					 , c_WaitForSubscriptions
-				).f_CallSync(g_Timeout)
+				)
+				.f_CallSync(g_Timeout)
 			;
 			
 			auto VersionManager = Subscriptions.f_Subscribe<CVersionManager>();

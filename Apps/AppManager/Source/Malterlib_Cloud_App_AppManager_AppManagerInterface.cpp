@@ -54,35 +54,31 @@ namespace NMib::NCloud::NAppManager
 	{
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("AppManager/*");
-		
-		TCPromise<void> Promise;
-	
-		mp_State.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
-			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
-			{
-				mp_Permissions = fg_Move(_Subscription);
-				Promise.f_SetResult();
-			}
-		;
-		
-		return Promise.f_MoveFuture();
+
+		mp_Permissions = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this));
+
+		co_return {};
 	}
 
 	TCFuture<void> CAppManagerActor::fp_SetupAppManagerInterfacePermissions()
 	{
 		TCPromise<void> Promise;
 		NContainer::TCMap<NStr::CStr, CPermissionRequirements> CommandLinePermissions = {{"AppManager/VersionAppAll"}, {"AppManager/AppAll"}, {"AppManager/CommandAll"}};
-		mp_State.m_TrustManager
+
+		co_await
 			(
-				&CDistributedActorTrustManager::f_AddPermissions
-			 	, CPermissionIdentifiers{mp_State.m_CommandLineHostID, ""}
-				, CommandLinePermissions
-				, EDistributedActorTrustManagerOrderingFlag_None
+				mp_State.m_TrustManager
+				(
+					&CDistributedActorTrustManager::f_AddPermissions
+					, CPermissionIdentifiers{mp_State.m_CommandLineHostID, ""}
+					, CommandLinePermissions
+					, EDistributedActorTrustManagerOrderingFlag_None
+				)
+				+ fp_RegisterPermissions()
+				+ fp_SubscribePermissions()
 			)
-			+ fp_RegisterPermissions()
-			+ fp_SubscribePermissions()
-			> Promise.f_ReceiveAny()
 		;
-		return Promise.f_MoveFuture();
+
+		co_return {};
 	}
 }

@@ -15,7 +15,7 @@ namespace NMib::NCloud
 		// Synchronize databases
 	};
 	
-	struct CKeyManagerServer::CInternal
+	struct CKeyManagerServer::CInternal : public NConcurrency::CActorInternal
 	{
 		CInternal(CKeyManagerServer *_pThis, CKeyManagerServerConfig const &_Config);
 		
@@ -32,7 +32,7 @@ namespace NMib::NCloud
 		NContainer::TCLinkedList<NFunction::TCFunction<void (NStr::CStr const&)>> m_OnDatabaseErrorQueue;
 	};
 	
-	struct CKeyManager::CInternal
+	struct CKeyManager::CInternal : public NConcurrency::CActorInternal
 	{
 		CInternal(CKeyManager *_pThis, NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
 		

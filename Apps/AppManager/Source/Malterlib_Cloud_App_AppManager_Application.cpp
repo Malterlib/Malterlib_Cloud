@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include "Malterlib_Cloud_App_AppManager.h"
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -78,16 +79,12 @@ namespace NMib::NCloud::NAppManager
 	{
 		DRequire(!f_IsInProgress());
 		m_bOperationInProgress = true;
-		return fg_OnScopeExitActor
-			(
-				fg_ThisActor(m_pThis)
-				, [pThis = m_pThis, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]
-				{
-					DCheck(pApplication->m_bOperationInProgress);
-					pApplication->m_bOperationInProgress = false;
-					pThis->fp_UpdateApplicationDependencies();
-				}
-			)
+		return g_OnScopeExitActor(fg_ThisActor(m_pThis)) > [pThis = m_pThis, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]
+			{
+				DCheck(pApplication->m_bOperationInProgress);
+				pApplication->m_bOperationInProgress = false;
+				pThis->fp_UpdateApplicationDependencies();
+			}
 		;
 	}
 
@@ -96,7 +93,7 @@ namespace NMib::NCloud::NAppManager
 		return g_Dispatch / [this, _Flags, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() mutable -> TCFuture<uint32>
 			{
 				if (pApplication->m_bDeleted)
-					return fg_Explicit(0);
+					co_return 0;
 
 				if (_Flags & EStopFlag_PreventLaunchUser)
 					pApplication->m_bPreventLaunch_User = true;
@@ -121,183 +118,111 @@ namespace NMib::NCloud::NAppManager
 				for (auto &ChildApp : m_Children)
 					ChildApp.f_Stop(EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
 				
-				ChildrenCloses.f_GetResults()
-					+ SaveStateFuture
-					> Promise % "Failed to stop child application" 
-					/ [=]
-					(TCVector<TCAsyncResult<uint32>> &&_ChildrenCloseResults, CVoidTag) mutable
-					{
-						CStr ChildCloseErrors;
-						for (auto &ChildCloseResult : _ChildrenCloseResults)
-						{
-							if (!ChildCloseResult)
-								fg_AddStrSep(ChildCloseErrors, ChildCloseResult.f_GetExceptionStr(), "\n");
-						}
-						if (!ChildCloseErrors.f_IsEmpty())
-						{
-							Promise.f_SetException(DMibErrorInstance(fg_Format("Errors stopping child applications: {}", ChildCloseErrors)));
-							return;
-						}
-				
-						bool bWasStopped = pApplication->m_bStopped;
-						pApplication->m_bLaunched = false;
-						pApplication->m_bStopped = true;
-						
-						if (!pApplication->m_ProcessLaunch || bWasStopped || pApplication->m_bDeleted)
-						{
-							TCPromise<void> StopBackupPromise;
-							if (pApplication->m_BackupClient)
-							{
-								pApplication->m_BackupClient->f_Destroy() > StopBackupPromise;
-								pApplication->m_BackupClient.f_Clear();
-							}
-							else
-								StopBackupPromise.f_SetResult();
-							
-							StopBackupPromise.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult)
-								{
-									if (!_BackupDestroyResult)
-										DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", _BackupDestroyResult.f_GetExceptionStr());
-									
-									pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
+				auto [ChildrenCloseResults, SaveStateResult] = co_await ((ChildrenCloses.f_GetResults() + SaveStateFuture) % "Failed to stop child application");
 
-									if (_Flags & EStopFlag_CloseEncryption)
-									{
-										g_Dispatch / [this, pApplication]() -> TCFuture<uint32>
-											{
-												if (pApplication->m_bDeleted)
-													return fg_Explicit(0);
-												return f_CloseEncryption(0);
-											}
-											> Promise
-										;
-									}
-									else
-									{
-										Promise.f_SetResult(0);
-									}
-								}
-							;
-							return;
-						}
-						
-						TCPromise<void> PreStopPromise;
-						
-						bool bRanPreStop = false;
-						
-						if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= 0x103)
+				CStr ChildCloseErrors;
+				for (auto &ChildCloseResult : ChildrenCloseResults)
+				{
+					if (!ChildCloseResult)
+						fg_AddStrSep(ChildCloseErrors, ChildCloseResult.f_GetExceptionStr(), "\n");
+				}
+
+				if (!ChildCloseErrors.f_IsEmpty())
+					co_return DMibErrorInstance(fg_Format("Errors stopping child applications: {}", ChildCloseErrors));
+
+				bool bWasStopped = pApplication->m_bStopped;
+				pApplication->m_bLaunched = false;
+				pApplication->m_bStopped = true;
+
+				TCAsyncResult<uint32> StopResult;
+				if (!pApplication->m_ProcessLaunch || bWasStopped || pApplication->m_bDeleted)
+					StopResult.f_SetResult(0);
+				else
+				{
+					TCFuture<void> PreStopFuture;
+
+					bool bRanPreStop = false;
+
+					if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= 0x103)
+					{
+						bRanPreStop = true;
+						PreStopFuture = DMibCallActor(pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_PreStop);
+					}
+					else
+						PreStopFuture = fg_Explicit();
+
+					auto PreStopResult = co_await PreStopFuture.f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)").f_Wrap();
+					if (!PreStopResult)
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", PreStopResult.f_GetExceptionStr());
+
+					CLogError LogError("Malterlib/Cloud/AppManager");
+
+					if (bRanPreStop && pApplication->m_BackupClient && PreStopResult)
+					{
+
+						auto BackupClientDestroyFuture = pApplication->m_BackupClient->f_Destroy();
+						pApplication->m_BackupClient.f_Clear();
+
+						auto DestroyBackupResult = co_await BackupClientDestroyFuture.f_Wrap();
+
+						if (!DestroyBackupResult)
+							LogError.f_Log("Error stopping application backup", DestroyBackupResult);
+					}
+
+					StopResult = co_await pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess).f_Wrap();
+					if (!StopResult)
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", StopResult.f_GetExceptionStr());
+					else
+					{
+						if (*StopResult)
 						{
-							bRanPreStop = true;
-							DMibCallActor(pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_PreStop) > PreStopPromise;
+							DMibLogWithCategory
+								(
+									Malterlib/Cloud/AppManager
+									, Error
+									, "Application '{}' exited with non 0 status: {}"
+									, pApplication->m_Name
+									, *StopResult
+								)
+							;
 						}
 						else
-							PreStopPromise.f_SetResult();
-						
-						PreStopPromise.f_Dispatch().f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)") > [=](TCAsyncResult<void> &&_Result)
-							{
-								if (!_Result)
-									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", _Result.f_GetExceptionStr());
-								
-								auto fStopProcess = [=]
-									{
-										pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess) > [=](TCAsyncResult<uint32> &&_Result)
-											{
-												if (!_Result)
-													DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", _Result.f_GetExceptionStr());
-												else
-												{
-													if (*_Result)
-													{
-														DMibLogWithCategory
-															(
-																Malterlib/Cloud/AppManager
-																, Error
-																, "Application '{}' exited with non 0 status: {}"
-																, pApplication->m_Name
-																, *_Result
-															)
-														;
-													}
-													else
-														DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' exited cleanly", pApplication->m_Name);
-													pApplication->f_Clear();
-												}
-
-												TCPromise<void> BackupPromise;
-												if (pApplication->m_BackupClient)
-												{
-													pApplication->m_BackupClient->f_Destroy() > BackupPromise;
-													pApplication->m_BackupClient.f_Clear();
-												}
-												else
-													BackupPromise.f_SetResult();
-												
-												BackupPromise.f_Dispatch() > [=](TCAsyncResult<void> &&_BackupDestroyResult) mutable
-													{
-														if (!_BackupDestroyResult)
-														{
-															DMibLogWithCategory
-																(
-																	Malterlib/Cloud/AppManager
-																	, Error
-																	, "Error stopping application backup: {}"
-																	, _BackupDestroyResult.f_GetExceptionStr()
-																)
-															;
-														}
-														
-														pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
-														
-														if (_Flags & EStopFlag_CloseEncryption)
-														{
-															if (!_Result)
-															{
-																Promise.f_SetException
-																	(
-																		DMibErrorInstance(fg_Format("Error stopping process, cannot close encryption: {}", _Result.f_GetExceptionStr()))
-																	)
-																;
-																return;
-															}
-															f_CloseEncryption(*_Result) > [Promise](TCAsyncResult<uint32> &&_Result)
-																{
-																	if (!_Result)
-																		DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", _Result.f_GetExceptionStr());
-																	
-																	Promise.f_SetResult(fg_Move(_Result));
-																}
-															;
-															return;
-														}
-														
-														Promise.f_SetResult(fg_Move(_Result));
-													}
-												;
-											}
-										;
-									}
-								;
-								
-								if (bRanPreStop && pApplication->m_BackupClient && _Result)
-								{
-									pApplication->m_BackupClient->f_Destroy() > [=](TCAsyncResult<void> &&_BackupDestroyResult)
-										{
-											if (!_BackupDestroyResult)
-												DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", _BackupDestroyResult.f_GetExceptionStr());
-
-											fStopProcess();
-										}
-									;
-									pApplication->m_BackupClient.f_Clear();
-								}
-								else
-									fStopProcess();
-							}
-						;
+							DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' exited cleanly", pApplication->m_Name);
+						pApplication->f_Clear();
 					}
-				;
-				
-				return Promise.f_MoveFuture();
+				}
+
+				TCFuture<void> BackupDestroyFuture;
+				if (pApplication->m_BackupClient)
+				{
+					BackupDestroyFuture = pApplication->m_BackupClient->f_Destroy();
+					pApplication->m_BackupClient.f_Clear();
+				}
+				else
+					BackupDestroyFuture = fg_Explicit();
+
+				auto BackupDestroyResult = co_await BackupDestroyFuture.f_Wrap();
+				if (!BackupDestroyResult)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", BackupDestroyResult.f_GetExceptionStr());
+
+				pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
+
+				if (_Flags & EStopFlag_CloseEncryption)
+				{
+					if (!StopResult)
+						co_return DMibErrorInstance(fg_Format("Error stopping process, cannot close encryption: {}", StopResult.f_GetExceptionStr()));
+
+					if (pApplication->m_bDeleted)
+						co_return 0;
+
+					auto CloseEncryptionResult = co_await f_CloseEncryption(*StopResult).f_Wrap();
+					if (!CloseEncryptionResult)
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error closing encryption: {}", CloseEncryptionResult.f_GetExceptionStr());
+
+					co_return fg_Move(CloseEncryptionResult);
+				}
+
+				co_return fg_Move(StopResult);
 			}
 		;
 	}
@@ -315,16 +240,11 @@ namespace NMib::NCloud::NAppManager
 		return g_Dispatch / [this, _Status, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() -> TCFuture<uint32>
 			{
 				if (m_Settings.m_EncryptionStorage.f_IsEmpty() || !m_bEncryptionOpened)
-					return fg_Explicit(_Status);
-				
-				TCPromise<uint32> Promise;
-				fg_ThisActor(m_pThis)(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Close, false) 
-					> Promise / [_Status, Promise]
-					{
-						Promise.f_SetResult(_Status);
-					}
-				;
-				return Promise.f_MoveFuture();
+					co_return _Status;
+
+				co_await m_pThis->self(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Close, false);
+
+				co_return _Status;
 			}
 		;
 	}

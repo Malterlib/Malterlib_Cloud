@@ -3,7 +3,6 @@
 #include "Malterlib_Cloud_App_BackupManager_Internal.h"
 #include <Mib/Cryptography/Hashes/SHA>
 #include <Mib/Concurrency/ActorSubscription>
-#include <Mib/Concurrency/Actor/Timer>
 
 namespace NMib::NCloud::NBackupManager
 {
@@ -22,7 +21,7 @@ namespace NMib::NCloud::NBackupManager
 		TCPromise<void> Promise;
 		if (m_Subscription)
 		{
-			m_Subscription->f_Destroy().f_Dispatch().f_Timeout(10.0, "Timed out waiting for backup download to destroy")
+			m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for backup download to destroy")
 				> [Promise, DirectorySend = fg_Move(DirectorySend)](auto &&)
 				{
 					if (DirectorySend)

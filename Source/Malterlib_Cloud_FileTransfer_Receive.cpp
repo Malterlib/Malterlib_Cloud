@@ -15,7 +15,7 @@ namespace NMib::NCloud
 	using namespace NFile;
 	using namespace NStorage;
 
-	struct CFileTransferReceive::CInternal
+	struct CFileTransferReceive::CInternal : public CActorInternal
 	{
 		struct CFileCache
 		{

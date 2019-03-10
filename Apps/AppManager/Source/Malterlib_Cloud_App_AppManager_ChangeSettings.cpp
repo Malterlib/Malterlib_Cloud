@@ -15,9 +15,11 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerActor::CApplicationSettings ApplicationSettings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		ApplicationSettings.f_FromInterfaceSettings(_Settings, ChangedSettings);
-		return m_pThis->fp_ChangeApplicationSettings
+
+		return m_pThis->self
 			(
-				_Name
+				&CAppManagerActor::fp_ChangeApplicationSettings
+				, _Name
 				, ApplicationSettings
 				, ChangedSettings
 				, _ChangeSettings.m_bUpdateFromVersionInfo
@@ -26,31 +28,33 @@ namespace NMib::NCloud::NAppManager
 				{
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Change Settings: {}", _Info);
 				}
+			 	, fg_GetCallingHostInfo()
 			)
 		;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
-		
+
 		CApplicationSettings Settings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
-		
+
 		bool bUpdateFromVersionInfo = _Params["UpdateFromVersionInfo"].f_Boolean();
 		bool bForce = _Params["Force"].f_Boolean();
 
 		{
 			CStr Error;
 			if (!Settings.f_ParseSettings(_Params, ChangedSettings, Error, false))
-				return DMibErrorInstance(Error);
+				co_return DMibErrorInstance(Error);
 		}
 
 		TCPromise<uint32> Promise;
-		
-		fp_ChangeApplicationSettings
+
+		auto Result = co_await self
 			(
-				Name
+			 	&CAppManagerActor::fp_ChangeApplicationSettings
+				, Name
 				, Settings
 				, ChangedSettings
 				, bUpdateFromVersionInfo
@@ -60,14 +64,12 @@ namespace NMib::NCloud::NAppManager
 					*_pCommandLine += _Info + DMibNewLine;
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{}", _Info);
 				}
+			 	, fg_GetCallingHostInfo()
 			)
-			> [=](TCAsyncResult<void> &&_Result)
-			{
-				Promise.f_SetResult(_pCommandLine->f_AddAsyncResult(_Result));
-			}
+			.f_Wrap()
 		;
-		
-		return Promise.f_MoveFuture();
+
+		co_return _pCommandLine->f_AddAsyncResult(Result);
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_ChangeApplicationSettings
@@ -78,9 +80,10 @@ namespace NMib::NCloud::NAppManager
 			, bool _bUpdateFromVersionInfo
 			, bool _bForce
 			, TCFunction<void (CStr const &_Info)> &&_fOnInfo
+		 	, CCallingHostInfo const &_CallingHostInfo
 		)
 	{
-		auto Auditor = f_Auditor();
+		auto Auditor = f_Auditor(_CallingHostInfo);
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
@@ -89,242 +92,205 @@ namespace NMib::NCloud::NAppManager
 		if (!_Settings.m_VersionManagerApplication.f_IsEmpty() && (_ChangedSettings & EApplicationSetting_VersionManagerApplication))
 		{
 			CStr const &App = _Settings.m_VersionManagerApplication;
-			Permissions["Version"] ={CPermissionQuery{"AppManager/VersionAppAll", "AppManager/VersionApp/{}"_f << App}.f_Description("Access application {} in AppManager"_f << App)};
+			Permissions["Version"] = {CPermissionQuery{"AppManager/VersionAppAll", "AppManager/VersionApp/{}"_f << App}.f_Description("Access application {} in AppManager"_f << App)};
 		}
-		TCPromise<void> Promise;
 
-		mp_Permissions.f_HasPermissions("Change applications settings in AppManager", Permissions)
-			> Promise % "Permission denied changing application settings" % Auditor / [=, fOnInfo = fg_Move(_fOnInfo)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
+			(
+			 	mp_Permissions.f_HasPermissions("Change applications settings in AppManager", Permissions, _CallingHostInfo) % "Permission denied changing application settings" % Auditor
+			)
+		;
+
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(Application change settings, command)");
+
+		if (!HasPermissions["App"])
+			co_return Auditor.f_AccessDenied("(Application change settings, app name)");
+
+		if (auto *pVersion = HasPermissions.f_FindEqual("Version"))
+		{
+			if (!*pVersion)
+				co_return Auditor.f_AccessDenied("(Application change settings, version application)");
+		}
+
+		auto *pFindApplication = mp_Applications.f_FindEqual(_Name);
+		if (!pFindApplication)
+			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
+
+		auto pApplication = *pFindApplication;
+
+		auto &Application = *pApplication;
+
+		CApplicationSettings Settings;
+		EApplicationSetting ChangedSettings = EApplicationSetting_None;
+
+		if (_bUpdateFromVersionInfo)
+		{
+			if (!Application.m_LastInstalledVersion.f_IsValid())
+				co_return Auditor.f_Exception("Found no install from last version to get settings from");
+			try
 			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(Application change settings, command)"));
+				Settings.f_FromVersionInfo(Application.m_LastInstalledVersionInfo, ChangedSettings);
+			}
+			catch (CException const &_Exception)
+			{
+				co_return Auditor.f_Exception(fg_Format("Failed to get settings from version info: {}", _Exception));
+			}
+		}
 
-				if (!_HasPermissions["App"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(Application change settings, app name)"));
+		Settings.f_ApplySettings(_ChangedSettings, _Settings);
+		ChangedSettings |= _ChangedSettings;
 
-				if (auto *pVersion = _HasPermissions.f_FindEqual("Version"))
-				{
-					if (!*pVersion)
-						return Promise.f_SetException(Auditor.f_AccessDenied("(Application change settings, version application)"));
-				}
+		auto NewSettings = Application.m_Settings;
+		NewSettings.f_ApplySettings(ChangedSettings, Settings);
 
-				auto *pApplication = mp_Applications.f_FindEqual(_Name);
-				if (!pApplication)
-					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
-				auto &Application = **pApplication;
+		{
+			CStr Error;
+			if (!NewSettings.f_Validate(Error))
+				co_return Auditor.f_Exception(Error);
+		}
 
-				CApplicationSettings Settings;
-				EApplicationSetting ChangedSettings = EApplicationSetting_None;
-
-				if (_bUpdateFromVersionInfo)
-				{
-					if (!Application.m_LastInstalledVersion.f_IsValid())
-						return Promise.f_SetException(Auditor.f_Exception("Found no install from last version to get settings from"));
-					try
-					{
-						Settings.f_FromVersionInfo(Application.m_LastInstalledVersionInfo, ChangedSettings);
-					}
-					catch (CException const &_Exception)
-					{
-						return Promise.f_SetException(Auditor.f_Exception(fg_Format("Failed to get settings from version info: {}", _Exception)));
-					}
-				}
-
-				Settings.f_ApplySettings(_ChangedSettings, _Settings);
-				ChangedSettings |= _ChangedSettings;
-
-				auto NewSettings = Application.m_Settings;
-				NewSettings.f_ApplySettings(ChangedSettings, Settings);
-
-				{
-					CStr Error;
-					if (!NewSettings.f_Validate(Error))
-						return Promise.f_SetException(Auditor.f_Exception(Error));
-				}
-
-				ChangedSettings = Application.m_Settings.f_ChangedSettings(NewSettings);
+		ChangedSettings = Application.m_Settings.f_ChangedSettings(NewSettings);
 
 #ifdef DPlatformFamily_Windows
-				if (!NewSettings.m_RunAsUser.f_IsEmpty() && ((ChangedSettings & EApplicationSetting_RunAsUser) || NewSettings.m_RunAsUserPassword.f_IsEmpty()))
-				{
-					NewSettings.m_RunAsUserPassword = fg_HighEntropyRandomID("23456789ABCDEFGHJKLMNPQRSTWXYZabcdefghijkmnopqrstuvwxyz&=*!@~^") + "2Dg&";
-					ChangedSettings |= EApplicationSetting_RunAsUserPassword;
-				}
+		if (!NewSettings.m_RunAsUser.f_IsEmpty() && ((ChangedSettings & EApplicationSetting_RunAsUser) || NewSettings.m_RunAsUserPassword.f_IsEmpty()))
+		{
+			NewSettings.m_RunAsUserPassword = fg_HighEntropyRandomID("23456789ABCDEFGHJKLMNPQRSTWXYZabcdefghijkmnopqrstuvwxyz&=*!@~^") + "2Dg&";
+			ChangedSettings |= EApplicationSetting_RunAsUserPassword;
+		}
 #endif
 
-				if (ChangedSettings & EApplicationSetting_EncryptionStorage)
-					return Promise.f_SetException(Auditor.f_Exception("Changing encryption storage is not supported"));
-				if (ChangedSettings & EApplicationSetting_EncryptionFileSystem)
-					return Promise.f_SetException(Auditor.f_Exception("Changing encryption file system is not supported"));
-				if (ChangedSettings & EApplicationSetting_ParentApplication)
-					return Promise.f_SetException(Auditor.f_Exception("Changing parent application is not supported"));
-				if (ChangedSettings == EApplicationSetting_None && !_bForce)
+		if (ChangedSettings & EApplicationSetting_EncryptionStorage)
+			co_return Auditor.f_Exception("Changing encryption storage is not supported");
+		if (ChangedSettings & EApplicationSetting_EncryptionFileSystem)
+			co_return Auditor.f_Exception("Changing encryption file system is not supported");
+		if (ChangedSettings & EApplicationSetting_ParentApplication)
+			co_return Auditor.f_Exception("Changing parent application is not supported");
+		if (ChangedSettings == EApplicationSetting_None && !_bForce)
+		{
+			_fOnInfo("No settings were changed. To update file permissions run with --force");
+			co_return {};
+		}
+
+		if (Application.f_IsInProgress())
+			co_return Auditor.f_Exception("Operation already in progress for application");
+
+		auto InProgressScope = Application.f_SetInProgress();
+
+		if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !_bForce)
+		{
+			Application.m_Settings = NewSettings;
+			if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
+				fp_OnAppUpdateInfoChange(pApplication);
+			_fOnInfo("Saving application state");
+			co_await (fp_UpdateApplicationJSON(pApplication) % "Failed to save application state" % Auditor);
+
+			TCPromise<void> ChangeBackupPromise;
+			if (ChangedSettings & EApplicationSetting_BackupEnabled)
+			{
+				if (Application.m_Settings.m_bBackupEnabled)
 				{
-					fOnInfo("No settings were changed. To update file permissions run with --force");
-					return Promise.f_SetResult();
+					fp_ApplicationStartBackup(pApplication);
+					ChangeBackupPromise.f_SetResult();
 				}
-
-				if (Application.f_IsInProgress())
-					return Promise.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
-
-				auto InProgressScope = Application.f_SetInProgress();
-
-				if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !_bForce)
+				else
 				{
-					Application.m_Settings = NewSettings;
-					if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
-						fp_OnAppUpdateInfoChange(*pApplication);
-					fOnInfo("Saving application state");
-					fp_UpdateApplicationJSON(*pApplication)
-						> Promise % "Failed to save application state" % Auditor / [=, pApplication = *pApplication]
-						{
-							TCPromise<void> ChangeBackupPromise;
-							if (ChangedSettings & EApplicationSetting_BackupEnabled)
-							{
-								auto &Application = *pApplication;
-								if (Application.m_Settings.m_bBackupEnabled)
-								{
-									fp_ApplicationStartBackup(pApplication);
-									ChangeBackupPromise.f_SetResult();
-								}
-								else
-								{
-									if (Application.m_BackupClient)
-									{
-										Application.m_BackupClient->f_Destroy() > ChangeBackupPromise;
-										Application.m_BackupClient.f_Clear();
-									}
-									else
-										ChangeBackupPromise.f_SetResult();
-								}
-							}
-							else
-								ChangeBackupPromise.f_SetResult();
-
-							ChangeBackupPromise > Promise % "Failed to stop backup client" % Auditor / [=, InProgressScope = InProgressScope]
-								{
-									fOnInfo("Application settings were successfully changed");
-									Auditor.f_Info("Updated application settings (No restart required)");
-									Promise.f_SetResult();
-								}
-							;
-						}
-					;
-					return;
-				}
-
-				fg_ThisActor(this)(&CAppManagerActor::fp_ChangeEncryption, *pApplication, EEncryptOperation_Open, false)
-					> [=, pApplication = *pApplication](TCAsyncResult<void> &&_Result)
+					if (Application.m_BackupClient)
 					{
-						if (!_Result)
-						{
-							Promise.f_SetException(Auditor.f_Exception(fg_Format("Failed to open encryption: {}", _Result.f_GetExceptionStr())));
-							return;
-						}
-						if (pApplication->m_bDeleted)
-						{
-							Promise.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
-							return;
-						}
-
-						fOnInfo("Stopping old application");
-						pApplication->f_Stop(EStopFlag_None) > [=](TCAsyncResult<uint32> &&_ExitStatus)
-							{
-								CStr Error = fp_GetApplicationStopErrors(_ExitStatus, pApplication->m_Name);
-
-								if (!Error.f_IsEmpty())
-								{
-									fOnInfo(Error);
-									Auditor.f_Warning(Error);
-								}
-
-								if (!_ExitStatus)
-								{
-									Promise.f_SetException(Auditor.f_Exception("Failed to exit old application, aborting update"));
-									return;
-								}
-
-								if (pApplication->m_bDeleted)
-								{
-									Promise.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
-									return;
-								}
-
-								pApplication->m_Settings = NewSettings;
-								if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
-									fp_OnAppUpdateInfoChange(pApplication);
-
-								fOnInfo("Saving application state and update application files");
-								fg_Dispatch
-									(
-										mp_FileActor
-										, [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope, pUniqueUserGroup = mp_pUniqueUserGroup]()
-										{
-											fsp_CreateApplicationUserGroup(NewSettings, fOnInfo, Directory / ".home", pUniqueUserGroup);
-											fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
-										}
-									)
-									+ fp_UpdateApplicationJSON(pApplication)
-									> [=](TCAsyncResult<void> &&_Result, TCAsyncResult<void> &&_UpdateJSONResults)
-									{
-										bool bError = false;
-										if (!_Result)
-										{
-											bError = true;
-											Promise.f_SetException(Auditor.f_Exception(fg_Format("Failed to update application files: {}", _Result.f_GetExceptionStr())));
-										}
-
-										if (!_UpdateJSONResults)
-										{
-											bError = true;
-											auto Exception = Auditor.f_Exception(fg_Format("Failed to save application state: {}", _UpdateJSONResults.f_GetExceptionStr()));
-											if (!Promise.f_IsSet())
-												Promise.f_SetException(Exception);
-										}
-										else
-											fOnInfo("Application state successfully stored, so any changes will persist");
-
-										if (bError)
-											return;
-
-										if (pApplication->m_bDeleted)
-										{
-											Promise.f_SetException(Auditor.f_Exception("Application has been deleted, aborting"));
-											return;
-										}
-
-										if (pApplication->m_bPreventLaunch_DelayAfterFailure)
-											pApplication->m_bPreventLaunch_DelayAfterFailure = false;
-
-										CStr DependenciesMessage;
-										if (!pApplication->f_DependenciesSatisfied(DependenciesMessage))
-										{
-											fOnInfo(fg_Format("Application settings were successfully changed. Launch skipped because of missing dependencies: {}", DependenciesMessage));
-											Auditor.f_Info("Updated application settings");
-											Promise.f_SetResult();
-											return;
-										}
-
-										fOnInfo("Launching applicaion with changed settings");
-
-										fp_LaunchApp(pApplication, false)
-											> Promise % "Failed to launch app. Will retry periodically." % Auditor / [=, InProgressScope = InProgressScope](CAppLaunchResult &&_Result)
-											{
-												fOnInfo("Application settings were successfully changed");
-												if (_Result.m_StartupError)
-													fOnInfo("Application startup failed: {}"_f << _Result.m_StartupError);
-												Auditor.f_Info("Updated application settings");
-												Promise.f_SetResult();
-											}
-										;
-									}
-								;
-							}
-						;
+						Application.m_BackupClient->f_Destroy() > ChangeBackupPromise;
+						Application.m_BackupClient.f_Clear();
 					}
-				;
+					else
+						ChangeBackupPromise.f_SetResult();
+				}
 			}
+			else
+				ChangeBackupPromise.f_SetResult();
+
+			co_await (ChangeBackupPromise.f_Dispatch() % "Failed to stop backup client" % Auditor);
+
+			_fOnInfo("Application settings were successfully changed");
+			Auditor.f_Info("Updated application settings (No restart required)");
+
+			co_return {};
+		}
+
+		co_await (self(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Open, false) % "Failed to open encryption" % Auditor);
+
+		if (pApplication->m_bDeleted)
+			co_return Auditor.f_Exception("Application has been deleted, aborting");
+
+		_fOnInfo("Stopping old application");
+
+		TCAsyncResult<uint32> ExitStatus = co_await pApplication->f_Stop(EStopFlag_None).f_Wrap();
+
+		CStr Error = fp_GetApplicationStopErrors(ExitStatus, pApplication->m_Name);
+
+		if (!Error.f_IsEmpty())
+		{
+			_fOnInfo(Error);
+			Auditor.f_Warning(Error);
+		}
+
+		if (!ExitStatus)
+			co_return Auditor.f_Exception("Failed to exit old application, aborting update");
+
+		if (pApplication->m_bDeleted)
+			co_return Auditor.f_Exception("Application has been deleted, aborting");
+
+		pApplication->m_Settings = NewSettings;
+		if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
+			fp_OnAppUpdateInfoChange(pApplication);
+
+		_fOnInfo("Saving application state and update application files");
+
+		auto [Result, UpdateJSONResults] = co_await
+			(
+				(
+					g_Dispatch(mp_FileActor) / [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope, pUniqueUserGroup = mp_pUniqueUserGroup]()
+					{
+						fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
+						fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
+					}
+				)
+				+ fp_UpdateApplicationJSON(pApplication)
+			)
+			.f_Wrap()
 		;
-		return Promise.f_MoveFuture();
+
+		if (!Result && !UpdateJSONResults)
+			co_return Auditor.f_Exception("Failed to update application files and save application state: {} {}"_f << Result.f_GetExceptionStr() << UpdateJSONResults.f_GetExceptionStr());
+		else if (!Result)
+			co_return Auditor.f_Exception("Failed to update application files: {}"_f << Result.f_GetExceptionStr());
+		else if (!UpdateJSONResults)
+			co_return Auditor.f_Exception("Failed to save application state: {}"_f << UpdateJSONResults.f_GetExceptionStr());
+		else
+			_fOnInfo("Application state successfully stored, so any changes will persist");
+
+		if (pApplication->m_bDeleted)
+			co_return Auditor.f_Exception("Application has been deleted, aborting");
+
+		if (pApplication->m_bPreventLaunch_DelayAfterFailure)
+			pApplication->m_bPreventLaunch_DelayAfterFailure = false;
+
+		CStr DependenciesMessage;
+		if (!pApplication->f_DependenciesSatisfied(DependenciesMessage))
+		{
+			_fOnInfo(fg_Format("Application settings were successfully changed. Launch skipped because of missing dependencies: {}", DependenciesMessage));
+			Auditor.f_Info("Updated application settings");
+			co_return {};
+		}
+
+		_fOnInfo("Launching applicaion with changed settings");
+
+		CAppLaunchResult LaunchResult = co_await (fp_LaunchApp(pApplication, false) % "Failed to launch app. Will retry periodically." % Auditor);
+
+		_fOnInfo("Application settings were successfully changed");
+		if (LaunchResult.m_StartupError)
+			_fOnInfo("Application startup failed: {}"_f << LaunchResult.m_StartupError);
+
+		Auditor.f_Info("Updated application settings");
+
+		co_return {};
 	}
 }

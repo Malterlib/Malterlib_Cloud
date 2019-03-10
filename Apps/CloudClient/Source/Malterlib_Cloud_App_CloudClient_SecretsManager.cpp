@@ -7,7 +7,6 @@
 #include <Mib/Cloud/SecretsManagerDownload>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
-#include <Mib/Concurrency/Actor/Timer>
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Encoding/JSONShortcuts>
 
@@ -563,7 +562,7 @@ namespace NMib::NCloud::NCloudClient
 					if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 						continue;
 
-					_fGetResult(TrustedActor.m_Actor, SemanticID, Tags).f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
+					_fGetResult(TrustedActor.m_Actor, SemanticID, Tags).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 						> Secrets.f_AddResult(TrustedActor.m_TrustInfo.m_HostInfo)
 					;
 				}
@@ -693,7 +692,7 @@ namespace NMib::NCloud::NCloudClient
 					if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 						continue;
 
-					_fGetResult(TrustedActor.m_Actor, ID).f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
+					_fGetResult(TrustedActor.m_Actor, ID).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 						> Secrets.f_AddResult(TrustedActor.m_TrustInfo.m_HostInfo)
 					;
 				}
@@ -960,7 +959,7 @@ namespace NMib::NCloud::NCloudClient
 				if (SecretWasSet)
 					Properties.f_SetSecret(fg_Move(_Secret));
 
-				fp_SecretsManager_SubscribeToServers().f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
+				fp_SecretsManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers")
 					> Promise / [=]() mutable
 					{
 						CStr Error;
@@ -1258,7 +1257,7 @@ namespace NMib::NCloud::NCloudClient
 					return;
 				}
 				NCloud::fg_UploadSecretFile(pSecretsManager->m_Actor, mp_State.m_DistributionManager, fg_Move(ID), CDirectorySyncSend::CConfig(Filename), mp_UploadSubscription)
-					.f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
+					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 					> Promise % "Failed to transfer secret file" / [=] (CDirectorySyncSend::CSyncResult &&_Result)
 					{
 						if (!bQuiet)
@@ -1337,7 +1336,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 
 				fg_DownloadSecretFile(pSecretsManager->m_Actor, fg_Move(ID), CDirectorySyncReceive::CConfig(Destination, Flags))
-					.f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
+					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 					> Promise % "Failed to transfer secret file" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
 					{
 						if (!bQuiet)

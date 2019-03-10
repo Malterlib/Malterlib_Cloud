@@ -541,6 +541,7 @@ Property
 	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_SecretsManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_KeyManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_BackupManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
+	MalterlibTestDependencies_Malterlib_Cloud "Lib_Malterlib_Cloud_AppManager;@(MalterlibTestDependencies_Malterlib_Cloud)"
 	MalterlibTestExtraGroups_Malterlib_Cloud "{Test}/{Malterlib_Cloud}"
 }
 
@@ -823,5 +824,4 @@ Property
 			GeneratorFamily VisualStudio
 		}
 	}
-	
 }

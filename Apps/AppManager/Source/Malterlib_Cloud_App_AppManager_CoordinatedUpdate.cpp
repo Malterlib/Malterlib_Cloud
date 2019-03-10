@@ -3,39 +3,32 @@
 
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Concurrency/Actor/Timer>
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
 {
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 		CStr Group = _Params["Group"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		CStr HostID = _Params["HostID"].f_String();
-		TCPromise<uint32> Promise;
-		
-		TCActorResultVector<void> Results;
+
+		TCActorResultVector<void> ResultsVector;
 		
 		for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 		{
 			 if (!RemoteAppManager.m_Actor)
 				 continue;
-			DCallActor(RemoteAppManager.m_Actor, CAppManagerCoordinationInterface::f_RemoveKnownHost, Group, Application, HostID) > Results.f_AddResult();
+			DCallActor(RemoteAppManager.m_Actor, CAppManagerCoordinationInterface::f_RemoveKnownHost, Group, Application, HostID) > ResultsVector.f_AddResult();
 		}
 		
-		mp_AppManagerCoordinationInterface.m_pActor->f_RemoveKnownHost(Group, Application, HostID) > Results.f_AddResult();
+		mp_AppManagerCoordinationInterface.m_pActor->f_RemoveKnownHost(Group, Application, HostID) > ResultsVector.f_AddResult();
 		
-		Results.f_GetResults() > Promise % Auditor / [Promise](TCVector<TCAsyncResult<void>> &&_Results)
-			{
-				if (!fg_CombineResults(Promise, fg_Move(_Results)))
-					return;
-				Promise.f_SetResult(0);
-			}
-		;
-		return Promise.f_MoveFuture();
+		co_await (ResultsVector.f_GetResults() % Auditor) | (g_Unwrap % Auditor);
+
+		co_return 0;
 	}
 
 	static bool fg_IsSameVersion
@@ -86,13 +79,13 @@ namespace NMib::NCloud::NAppManager
 
 #define DDebugAppTurnUpdateLogic 0
 
-	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
 		CRemoteApplicationKey OurRemoteKey{_pState->m_pApplication->m_Settings};
 		
 		_pState->m_fOnInfo(fg_Format("Waiting for our apps '{}' turn to update", OurRemoteKey));
 		
-		return fp_Coordination_WaitForAllToReachWantUpdateStage
+		co_await fp_Coordination_WaitForAllToReachWantUpdateStage
 			(
 				_pState
 				, EUpdateStage::EUpdateStage_SyncStart
@@ -196,15 +189,17 @@ namespace NMib::NCloud::NAppManager
 				}
 			) 
 		;
+
+		co_return {};
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForAllToReachWantUpdateStage
 		(
-			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 			, EUpdateStage _Stage
 			, fp64 _Timeout
 			, EWaitStageFlag _Flags
-			, TCFunctionMutable<bool ()> &&_fEvalState
+			, TCFunctionMutable<bool ()> _fEvalState
 		)
 	{
 		CRemoteApplicationKey RemoteKey{_pState->m_pApplication->m_Settings};
@@ -212,7 +207,7 @@ namespace NMib::NCloud::NAppManager
 		if (!_fEvalState)
 			_pState->m_fOnInfo(fg_Format("Waiting for all before starting stage '{}'", fsp_UpdateStageToStr(_Stage)));
 		
-		return fp_Coordination_WaitForState
+		co_await fp_Coordination_WaitForState
 			(
 				_pState
 				, _Timeout
@@ -280,65 +275,72 @@ namespace NMib::NCloud::NAppManager
 				, (_Flags & EWaitStageFlag_IgnoreFailed) != 0
 			)
 		;
+
+		co_return {};
 	}
 	
-	TCFuture<void> CAppManagerActor::fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState)
+	TCFuture<void> CAppManagerActor::fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
-		TCPromise<void> Promise;
-
 		CRemoteApplicationKey RemoteKey{_pState->m_pApplication->m_Settings};
 		
 		// First wait for all applications to be fully ready for doing update without being dependent on version manager
-		fp_Coordination_WaitForAllToReachWantUpdateStage(_pState, EUpdateStage::EUpdateStage_StopOldApp, 30.0*60.0, EWaitStageFlag_None) 
-			> Promise / [this, RemoteKey, Promise, _pState]
-			{
-				_pState->m_fOnInfo("Waiting for our turn to update");
-				fp_Coordination_WaitForState
-					(
-						_pState
-						, 60.0*60.0
-						, [=](TCPromise<void> &o_Promise) -> bool
-						{
-							CStr SmallestHostID = mp_State.m_HostID;
-							for (auto &RemoteAppManager : mp_RemoteAppManagerState)
-							{
-								bool bAllFinished = true;
-								for (auto &AppInfo : RemoteAppManager.m_AppInfos)
-								{
-									if (RemoteKey != AppInfo.m_AppInfo)
-										continue;
-								
-									if (fg_IsSameVersion(AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime, _pState->m_VersionID, _pState->m_VersionTime))
-										continue; // Already installed this version
-									
-									if (AppInfo.m_AppInfo.m_UpdateStage != EUpdateStage::EUpdateStage_Finished)
-									{
-										bAllFinished = false;
-										break;
-									} 
-								}
-								if (bAllFinished)
-									continue;
-								SmallestHostID = fg_Min(SmallestHostID, mp_RemoteAppManagerState.fs_GetKey(RemoteAppManager));
-							}
-							
-							if (SmallestHostID == mp_State.m_HostID)
-							{
-								_pState->m_fOnInfo("Our turn to update");
-								o_Promise.f_SetResult();
-								return true;
-							}
-							return false;
-						}
-						, "Remote app manager failed while waiting for our turn to update"
-						, "Timed out waiting for our turn to update"
-						, "Timed out wating for remote app manager to connect while waiting for our turn to update"
-					)
-					> Promise 
-				;
-			}
+		co_await fp_Coordination_WaitForAllToReachWantUpdateStage
+			(
+				_pState
+				, EUpdateStage::EUpdateStage_StopOldApp
+				, 30.0*60.0
+				, EWaitStageFlag_None
+				, TCFunctionMutable<bool ()>{}
+			)
 		;
-		return Promise.f_MoveFuture();
+
+		_pState->m_fOnInfo("Waiting for our turn to update");
+
+		co_await fp_Coordination_WaitForState
+			(
+				_pState
+				, 60.0*60.0
+				, [=](TCPromise<void> &o_Promise) -> bool
+				{
+					CStr SmallestHostID = mp_State.m_HostID;
+					for (auto &RemoteAppManager : mp_RemoteAppManagerState)
+					{
+						bool bAllFinished = true;
+						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
+						{
+							if (RemoteKey != AppInfo.m_AppInfo)
+								continue;
+
+							if (fg_IsSameVersion(AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime, _pState->m_VersionID, _pState->m_VersionTime))
+								continue; // Already installed this version
+
+							if (AppInfo.m_AppInfo.m_UpdateStage != EUpdateStage::EUpdateStage_Finished)
+							{
+								bAllFinished = false;
+								break;
+							}
+						}
+						if (bAllFinished)
+							continue;
+						SmallestHostID = fg_Min(SmallestHostID, mp_RemoteAppManagerState.fs_GetKey(RemoteAppManager));
+					}
+
+					if (SmallestHostID == mp_State.m_HostID)
+					{
+						_pState->m_fOnInfo("Our turn to update");
+						o_Promise.f_SetResult();
+						return true;
+					}
+					return false;
+				}
+				, "Remote app manager failed while waiting for our turn to update"
+				, "Timed out waiting for our turn to update"
+				, "Timed out wating for remote app manager to connect while waiting for our turn to update"
+				, false
+			)
+		;
+
+		co_return {};
 	}
 	
 	ch8 const *CAppManagerActor::fsp_UpdateStageToStr(EUpdateStage _Stage)
@@ -365,12 +367,12 @@ namespace NMib::NCloud::NAppManager
 	
 	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForState
 		(
-			TCSharedPointerSupportWeak<CUpdateApplicationState> const &_pState
+			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 			, fp64 _Timeout
-			, TCFunctionMutable<bool (TCPromise<void> &_Promise)> &&_fEvalState
-			, CStr const &_RemoteFailError
-			, CStr const &_TimeoutError
-			, CStr const &_DisconnectedError
+			, TCFunctionMutable<bool (TCPromise<void> &_Promise)> _fEvalState
+			, CStr _RemoteFailError
+			, CStr _TimeoutError
+			, CStr _DisconnectedError
 			, bool _bIgnoreFailed
 		)
 	{

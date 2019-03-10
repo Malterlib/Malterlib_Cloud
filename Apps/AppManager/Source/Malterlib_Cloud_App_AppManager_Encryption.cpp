@@ -7,16 +7,16 @@ namespace NMib::NCloud::NAppManager
 {
 #ifdef DPlatformFamily_Linux
 	ch8 const *g_pSetupEncryptionScript =
-#				include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
-#				include "Malterlib_Cloud_App_AppManager_Encryption_SetupLinux.sh"
+#		include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
+#		include "Malterlib_Cloud_App_AppManager_Encryption_SetupLinux.sh"
 	;
 	ch8 const *g_pOpenEncryptionScript =
-#				include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
-#				include "Malterlib_Cloud_App_AppManager_Encryption_OpenLinux.sh"
+#		include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
+#		include "Malterlib_Cloud_App_AppManager_Encryption_OpenLinux.sh"
 	;
 	ch8 const *g_pCloseEncryptionScript =
-#				include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
-#				include "Malterlib_Cloud_App_AppManager_Encryption_CloseLinux.sh"
+#		include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
+#		include "Malterlib_Cloud_App_AppManager_Encryption_CloseLinux.sh"
 	;
 #endif
 	
@@ -32,102 +32,93 @@ namespace NMib::NCloud::NAppManager
 		if (pEncryptionApplication->f_IsChildApp())
 		{
 			if (!pEncryptionApplication->m_pParentApplication)
-				return DMibErrorInstance("Cannot change encryption because parent application is missing");
+				co_return DMibErrorInstance("Cannot change encryption because parent application is missing");
 			if (_Operation == EEncryptOperation_Setup)
-				return fg_Explicit(); // Parent application already set up
+				co_return {}; // Parent application already set up
 			else if (_Operation == EEncryptOperation_Close)
-				return fg_Explicit(); // Don't close until main application closes
+				co_return {}; // Don't close until main application closes
+
 			pEncryptionApplication = fg_Explicit(pEncryptionApplication->m_pParentApplication);
 		}
+
 		if (pEncryptionApplication->m_Settings.m_EncryptionStorage.f_IsEmpty())
-			return fg_Explicit();
+			co_return {};
 		
 #if !defined(DPlatformFamily_Linux)
-		return DMibErrorInstance("Encryption is not supported on this platform");
+		co_return DMibErrorInstance("Encryption is not supported on this platform");
 #else
 		if (_Operation == EEncryptOperation_Open)
 		{
 			if (pEncryptionApplication->m_bEncryptionOpened)
-				return fg_Explicit(); 
+				co_return {};
 		}
 		
 		if (mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
-			return DMibErrorInstance("No key managers are connected, so key cannot be generated");
+			co_return DMibErrorInstance("No key managers are connected, so key cannot be generated");
 		
-		TCPromise<void> Promise;
-		
-		auto fLaunchScript = [this, Promise, pEncryptionApplication, _Operation, _bForceOverwrite](CSymmetricKey &&_Key)
-			{
-				TCMap<CStr, CStr> Environment;
-				Environment["MibCloudApp_EncryptionStorage"] = pEncryptionApplication->m_Settings.m_EncryptionStorage;
-				Environment["MibCloudApp_EncryptionFileSystem"] = pEncryptionApplication->m_Settings.m_EncryptionFileSystem;
-				Environment["MibCloudApp_DeviceName"] = "enc_" + pEncryptionApplication->m_Name.f_LowerCase();
-				Environment["MibCloudApp_ZPoolName"] = "zpool_" + pEncryptionApplication->m_Name.f_LowerCase();
-				Environment["MibCloudApp_MountPoint"] = pEncryptionApplication->f_GetDirectory();
-				if (_Operation == EEncryptOperation_Setup && _bForceOverwrite)
-					Environment["MibCloudApp_ForceOverwrite"] = "1";
-				
-				ch8 const *pScript = nullptr;
-				ch8 const *pDesc = nullptr;
-				
-				switch (_Operation)
-				{
-				case EEncryptOperation_Setup:
-					pScript = g_pSetupEncryptionScript;
-					pDesc = "SetupEncryption";
-					break;
-				case EEncryptOperation_Open:
-					pScript = g_pOpenEncryptionScript;
-					pDesc = "OpenEncryption";
-					break;
-				case EEncryptOperation_Close:
-					pScript = g_pCloseEncryptionScript;
-					pDesc = "CloseEncryption";
-					break;
-				default:
-					DNeverGetHere;
-					break;
-				}
-				
-				fg_ThisActor(this)
-					(
-						&CAppManagerActor::fp_RunBashScript
-						, pScript
-						, pDesc
-						, fg_Move(Environment)
-						, [_Key](NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)
-						{
-							if (_Output == "PROVIDE KEY")
-								_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, _Key) > fg_DiscardResult();
-						}
-					)
-					> Promise % "Failed to change encryption" / [this, Promise, pEncryptionApplication, _Operation](CBashScriptOutput &&_Output)
-					{
-						if (_Operation == EEncryptOperation_Open || _Operation == EEncryptOperation_Setup)
-							fp_AppEncryptionStateChanged(pEncryptionApplication, true);
-						else if (_Operation == EEncryptOperation_Close)
-							fp_AppEncryptionStateChanged(pEncryptionApplication, false);
-						Promise.f_SetResult();
-					}
-				;
-			}
-		;
-		
-		if (_Operation == EEncryptOperation_Close)
+		CSymmetricKey Key;
+		if (_Operation != EEncryptOperation_Close)
 		{
-			fLaunchScript(fg_Default());
-			return Promise.f_MoveFuture();
+			auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
+			static const mint c_KeyBits = 512;
+			Key = co_await DCallActor(KeyManagerInfo.m_Actor, CKeyManager::f_RequestKey, pEncryptionApplication->m_Name, c_KeyBits / 8);
 		}
 		
-		auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
-		static const mint c_KeyBits = 512; 
-		DCallActor(KeyManagerInfo.m_Actor, CKeyManager::f_RequestKey, pEncryptionApplication->m_Name, c_KeyBits / 8)
-			> Promise / [Promise, pEncryptionApplication, _pApplication, fLaunchScript](CSymmetricKey &&_Key)
-			{
-				fLaunchScript(fg_Move(_Key));
-			}
+		TCMap<CStr, CStr> Environment;
+		Environment["MibCloudApp_EncryptionStorage"] = pEncryptionApplication->m_Settings.m_EncryptionStorage;
+		Environment["MibCloudApp_EncryptionFileSystem"] = pEncryptionApplication->m_Settings.m_EncryptionFileSystem;
+		Environment["MibCloudApp_DeviceName"] = "enc_" + pEncryptionApplication->m_Name.f_LowerCase();
+		Environment["MibCloudApp_ZPoolName"] = "zpool_" + pEncryptionApplication->m_Name.f_LowerCase();
+		Environment["MibCloudApp_MountPoint"] = pEncryptionApplication->f_GetDirectory();
+		if (_Operation == EEncryptOperation_Setup && _bForceOverwrite)
+			Environment["MibCloudApp_ForceOverwrite"] = "1";
+
+		ch8 const *pScript = nullptr;
+		ch8 const *pDesc = nullptr;
+
+		switch (_Operation)
+		{
+		case EEncryptOperation_Setup:
+			pScript = g_pSetupEncryptionScript;
+			pDesc = "SetupEncryption";
+			break;
+		case EEncryptOperation_Open:
+			pScript = g_pOpenEncryptionScript;
+			pDesc = "OpenEncryption";
+			break;
+		case EEncryptOperation_Close:
+			pScript = g_pCloseEncryptionScript;
+			pDesc = "CloseEncryption";
+			break;
+		default:
+			DNeverGetHere;
+			break;
+		}
+
+		co_await
+			(
+			 	self
+				(
+					&CAppManagerActor::fp_RunBashScript
+					, pScript
+					, pDesc
+					, fg_Move(Environment)
+					, [_Key](NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)
+					{
+						if (_Output == "PROVIDE KEY")
+							_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, _Key) > fg_DiscardResult();
+					}
+				)
+			 	% "Failed to change encryption"
+			)
 		;
-		return Promise.f_MoveFuture();
+
+		if (_Operation == EEncryptOperation_Open || _Operation == EEncryptOperation_Setup)
+			fp_AppEncryptionStateChanged(pEncryptionApplication, true);
+		else if (_Operation == EEncryptOperation_Close)
+			fp_AppEncryptionStateChanged(pEncryptionApplication, false);
+
+		co_return {};
 #endif
 	}
 }

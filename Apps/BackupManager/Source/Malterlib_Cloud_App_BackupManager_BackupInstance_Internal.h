@@ -6,7 +6,7 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	struct CBackupInstance::CInternal
+	struct CBackupInstance::CInternal : public NConcurrency::CActorInternal
 	{
 		struct CRSyncContext
 		{

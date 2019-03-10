@@ -2,7 +2,6 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
-#include <Mib/Concurrency/Actor/Timer>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -14,12 +13,12 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<void> CAppManagerActor::fp_SetupLimits()
 	{
 #ifdef DPlatformFamily_Windows
-		return fg_Explicit();
+		co_return {};
 #else
 		if (NProcess::NPlatform::fg_Process_GetElevation() == EProcessElevation_IsNotElevated)
 		{
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Skipping limits setup because not elevated");
-			return fg_Explicit();
+			co_return {};
 		}
 		
 		uint32 nFiles = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("ResourcesExtraFiles", 256*1024).f_Integer();
@@ -44,7 +43,6 @@ namespace NMib::NCloud::NAppManager
 				nProceses += *Application.m_RegisterInfo.m_Resources_Processes; 
 		}
 		
-		TCPromise<void> Promise;
 		TCMap<CStr, CStr> Environment;
 		Environment["NumFiles"] = CStr::fs_ToStr(nFiles);
 		Environment["NumFilesPerProc"] = CStr::fs_ToStr(nMaxFilesPerProc);
@@ -52,17 +50,20 @@ namespace NMib::NCloud::NAppManager
 		Environment["NumPids"] = CStr::fs_ToStr(nProceses);
 		Environment["PlatformFamily"] = DMibStringize(DPlatformFamily);
 		
-		fp_RunBashScript
+		co_await
 			(
-				g_pLimitsSetupScript
-				, "SetupLimits"
-				, fg_Move(Environment)
-				, nullptr
+				fp_RunBashScript
+				(
+					g_pLimitsSetupScript
+					, "SetupLimits"
+					, fg_Move(Environment)
+					, nullptr
+				)
+				% "Failed to setup limits"
 			)
-			> Promise % "Failed to setup limits"
 		;
 
-		return Promise.f_MoveFuture();
+		co_return {};
 #endif
 	}
 	

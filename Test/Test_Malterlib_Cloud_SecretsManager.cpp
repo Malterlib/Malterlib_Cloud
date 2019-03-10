@@ -178,6 +178,12 @@ public:
 
 		CTrustManagerTestHelper TrustManagerState;
 		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+		auto CleanupTrustManager = g_OnScopeExit > [&]
+			{
+				TrustManager->f_BlockDestroy();
+			}
+		;
+
 		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
 		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 
@@ -245,7 +251,14 @@ public:
 				{
 					CStr SecretsManagerName = fg_Format("SecretsManager{sf0,sl2}", i);
 					CStr SecretsManagerDirectory = RootDirectory + "/" + SecretsManagerName;
-					LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, SecretsManagerName, SecretsManagerDirectory, &fg_ConstructApp_SecretsManager)
+					LaunchHelper
+						(
+							&CDistributedApp_LaunchHelper::f_LaunchInProcess
+							, SecretsManagerName
+							, SecretsManagerDirectory
+							, &fg_ConstructApp_SecretsManager
+							, NContainer::TCVector<NStr::CStr>{}
+						)
 						> SecretsManagerLaunchesResults.f_AddResult()
 					;
 				}
@@ -255,7 +268,16 @@ public:
 		;
 		fLaunchSecretManagers();
 		
-		auto KeyManagerLaunch = LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, "KeyManager", KeyManagerDirectory, &fg_ConstructApp_KeyManager).f_CallSync(g_Timeout);
+		auto KeyManagerLaunch = LaunchHelper
+			(
+				&CDistributedApp_LaunchHelper::f_LaunchInProcess
+				, "KeyManager"
+				, KeyManagerDirectory
+				, &fg_ConstructApp_KeyManager
+				, NContainer::TCVector<NStr::CStr>{}
+			)
+			.f_CallSync(g_Timeout)
+		;
 		DMibExpect(KeyManagerLaunch.m_HostID, !=, "");
 
 		// Setup KeyManager

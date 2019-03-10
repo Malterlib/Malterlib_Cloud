@@ -7,7 +7,7 @@
 
 namespace NMib::NCloud
 {
-	struct CKeyManagerServerDatabase_EncryptedFile::CInternal
+	struct CKeyManagerServerDatabase_EncryptedFile::CInternal : public NConcurrency::CActorInternal
 	{
 		CInternal(NStr::CStr const &_Path, NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt)
 			: m_AESContext

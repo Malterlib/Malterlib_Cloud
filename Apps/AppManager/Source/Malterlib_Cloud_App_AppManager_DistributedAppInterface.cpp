@@ -51,32 +51,28 @@ namespace NMib::NCloud::NAppManager
 					fOnRegisterDistributedApp.f_SetResult();
 				Application.m_OnRegisterDistributedApp.f_Clear();
 				
-				return fg_Explicit
-					(
-						g_ActorSubscription / [pApplication, AssignSequence = ++Application.m_AppInterfaceAssignSequence, HostInfo = CallingHostInfo.f_GetHostInfo()]
-						() -> TCFuture<void>
-						{
-							if (pApplication->m_bDeleted || AssignSequence != pApplication->m_AppInterfaceAssignSequence)
-								return fg_Explicit();
-							
-							auto &Application = *pApplication;
+				co_return g_ActorSubscription / [pApplication, AssignSequence = ++Application.m_AppInterfaceAssignSequence, HostInfo = CallingHostInfo.f_GetHostInfo()]
+					() -> TCFuture<void>
+					{
+						if (pApplication->m_bDeleted || AssignSequence != pApplication->m_AppInterfaceAssignSequence)
+							co_return {};
 
-							TCFuture<void> DestroyFuture = Application.m_AppInterface.f_Destroy();
-								
-							Application.m_AppInterface.f_Clear();
-							
-							DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application registration lost: {}", HostInfo.f_GetDesc());
-							
-							return DestroyFuture;
-						}
-					)
+						auto &Application = *pApplication;
+
+						TCFuture<void> DestroyFuture = Application.m_AppInterface.f_Destroy();
+						Application.m_AppInterface.f_Clear();
+
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application registration lost: {}", HostInfo.f_GetDesc());
+
+						co_await DestroyFuture;
+						co_return {};
+					}
 				;
-				break;
 			}
 		}
 		
 		DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application registered: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
-		return DErrorInstance("Application not associated with your host");
+		co_return DErrorInstance("Application not associated with your host");
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_PublishAppInterface()

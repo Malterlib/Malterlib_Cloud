@@ -5,7 +5,6 @@
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
-#include <Mib/Concurrency/Actor/Timer>
 #include <Mib/Encoding/JSONShortcuts>
 
 #include "Malterlib_Cloud_App_CloudClient.h"
@@ -675,7 +674,7 @@ namespace NMib::NCloud::NCloudClient
 
 						TimePromise > Promise / [=](CTime &&_Time)
 							{
-								fp_VersionManager_SubscribeToServers().f_Dispatch().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") > Promise / [=]
+								fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers") > Promise / [=]
 									{
 										CStr Error;
 										auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);

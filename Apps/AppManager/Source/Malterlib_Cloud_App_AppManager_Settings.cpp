@@ -412,6 +412,7 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_Dependencies;
 		if (m_bStopOnDependencyFailure != _Other.m_bStopOnDependencyFailure)
 			ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
+
 		return ChangedSettings;
 	}
 

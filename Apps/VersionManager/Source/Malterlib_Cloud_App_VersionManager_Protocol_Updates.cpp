@@ -69,7 +69,7 @@ namespace NMib::NCloud::NVersionManager
 		auto fSendToSubscription = [&](CSubscription const &_Subscription, CStr const &_SubscriptionApplication)
 			{
 				mp_Permissions.f_HasPermission("Receive VersionManager version update notification", Permissions, _Subscription.m_CallingHostInfo)
-					.f_Dispatch().f_Timeout(60.0, "Timed out checking permissions for sending version update subscription")
+					.f_Timeout(60.0, "Timed out checking permissions for sending version update subscription")
 					> [=, VersionID = _Version.f_GetIdentifier(), SubscriptionID = _Subscription.f_GetSubscriptionID()](TCAsyncResult<bool> &&_Result)
 					{
 						CSubscription const *pSubscription = fp_GetSubscription(_SubscriptionApplication, SubscriptionID);
@@ -155,7 +155,7 @@ namespace NMib::NCloud::NVersionManager
 						, {"Application/ReadAll", "Application/ListAll", fg_Format("Application/Read/{}", _Application)}
 						, _Subscription.m_CallingHostInfo
 					)
-					.f_Dispatch().f_Timeout(60.0, "Timed out checking permissions for sending version update subscription")
+					.f_Timeout(60.0, "Timed out checking permissions for sending version update subscription")
 					> Promise / [=, SubscriptionID = _Subscription.f_GetSubscriptionID()](bool _bHasPermission)
 					{
 						CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, SubscriptionID);

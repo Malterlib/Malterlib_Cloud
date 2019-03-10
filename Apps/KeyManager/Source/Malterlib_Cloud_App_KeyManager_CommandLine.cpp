@@ -8,7 +8,6 @@
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
 #include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
-#include <Mib/Concurrency/Actor/Timer>
 #include <Mib/Process/StdIn>
 #include <Mib/Encoding/JSONShortcuts>
 

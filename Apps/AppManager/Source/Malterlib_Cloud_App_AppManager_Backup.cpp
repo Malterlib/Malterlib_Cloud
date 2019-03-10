@@ -38,53 +38,33 @@ namespace NMib::NCloud::NAppManager
 				) -> TCFuture<TCActorSubscriptionWithID<>>
 				{
 					if (_pApplication->m_bDeleted)
-						return fg_Explicit();
+						co_return {};
 
 					if (!_pApplication->m_Settings.m_bDistributedApp)
-						return fg_Explicit();
+						co_return {};
 
-					if (_pApplication->m_AppInterface && _pApplication->m_LaunchState == "Launched")
-					{
-						if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
-							return fg_Explicit();
+					if (!_pApplication->m_AppInterface || _pApplication->m_LaunchState != "Launched")
+						co_await _pApplication->m_OnStartedDistributedApp.f_Insert();
 
-						return DMibCallActor
-							(
-								_pApplication->m_AppInterface
-								, CDistributedAppInterfaceClient::f_StartBackup
-								, fg_Move(_BackupInterface)
-								, fg_Move(_ManifestFinished)
-								, _BackupRoot
-							)
-						;
-					}
-					else
-					{
-						TCPromise<TCActorSubscriptionWithID<>> Promise;
-						_pApplication->m_OnStartedDistributedApp.f_Insert() 
-							> Promise / [=, BackupInterface = fg_Move(_BackupInterface), ManifestFinished = fg_Move(_ManifestFinished)]() mutable
-							{
-								if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
-									return Promise.f_SetResult();
+					if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
+						co_return {};
 
-								DMibCallActor
-									(
-										_pApplication->m_AppInterface
-										, CDistributedAppInterfaceClient::f_StartBackup
-										, fg_Move(BackupInterface)
-										, fg_Move(ManifestFinished)
-										, _BackupRoot
-									)
-									> Promise
-								;
-							}
-						;
-						return Promise.f_MoveFuture();
-					}
+					co_await DMibCallActor
+						(
+							_pApplication->m_AppInterface
+							, CDistributedAppInterfaceClient::f_StartBackup
+							, fg_Move(_BackupInterface)
+							, fg_Move(_ManifestFinished)
+							, _BackupRoot
+						)
+					;
+
+					co_return {};
 				}
 				, mp_State.m_DistributionManager
 			)
 		;
+
 		Application.m_BackupClient(&CBackupManagerClient::f_StartBackup) > [ApplicationName = Application.m_Name](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)

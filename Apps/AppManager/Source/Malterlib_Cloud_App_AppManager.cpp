@@ -2,7 +2,8 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
-#include <Mib/Concurrency/Actor/Timer>
+#include <Mib/Concurrency/LogError>
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -286,173 +287,138 @@ namespace NMib::NCloud::NAppManager
 		fp_UpdateApplicationDependencies();
 	}
 
+	TCFuture<void> CAppManagerActor::fp_InitApp()
+	{
+		co_await fp_ReadState();
+
+		if (mp_State.m_bStoppingApp)
+			co_return DMibErrorInstance("Startup aborted");
+
+		co_await (fp_PublishAppInterface() + fp_SetupLimits());
+
+		if (mp_State.m_bStoppingApp)
+			co_return DMibErrorInstance("Startup aborted");
+
+		fp_InitApplications();
+		fp_UpdateApplicationDependencies();
+
+		CLogError LogError("Malterlib/Cloud/AppManager");
+
+		fp_PublishCoordinationInterface() > LogError("Failed to publish coordination interface");
+		fp_SubscribeCoordinationInterface() > LogError("Failed to subscribe to coordination interface");
+		fp_SetupAppManagerInterfacePermissions() > LogError("Failed to setup permissions") / [this, LogError]()
+			{
+				if (mp_State.m_bStoppingApp)
+					return;
+
+				fp_PublishAppManagerInterface() > LogError("Failed to publish app manager interface");
+			}
+		;
+
+		auto [KeySubscrption, VersionSubscrption] = co_await
+			(
+				mp_State.m_TrustManager
+				(
+					&CDistributedActorTrustManager::f_SubscribeTrustedActors<CKeyManager>
+					, CKeyManager::mc_pDefaultNamespace
+					, fg_ThisActor(this)
+				)
+				+ mp_State.m_TrustManager
+				(
+					&CDistributedActorTrustManager::f_SubscribeTrustedActors<CVersionManager>
+					, CVersionManager::mc_pDefaultNamespace
+					, fg_ThisActor(this)
+				)
+			)
+		;
+
+		if (mp_State.m_bStoppingApp)
+			co_return DMibErrorInstance("Startup aborted");
+
+		mp_KeyManagerSubscription = fg_Move(KeySubscrption);
+		mp_KeyManagerSubscription.f_OnActor
+			(
+				[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
+				{
+					fp_KeyManagerAvailable();
+				}
+			)
+		;
+
+		mp_VersionManagerSubscription = fg_Move(VersionSubscrption);
+		mp_VersionManagerSubscription.f_OnActor
+			(
+				[this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo)
+				{
+					fp_VersionManagerAdded(_VersionManager, _ActorInfo);
+				}
+			)
+		;
+
+		mp_VersionManagerSubscription.f_OnRemoveActor
+			(
+				[this](TCWeakDistributedActor<CActor> const &_VersionManagero)
+				{
+					fp_VersionManagerRemoved(_VersionManagero);
+				}
+			)
+		;
+
+		co_return {};
+	}
+
 	TCFuture<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
 		mp_bLogLaunchesToStdErr = _Params["LogLaunchesToStdErr"].f_Boolean();
 		
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations"));
 		mp_KnownPlatforms[DMalterlibCloudPlatform];
-		
-		TCPromise<void> Promise;
-		fp_ReadState() > Promise / [this, Promise]
-			{
-				if (mp_State.m_bStoppingApp)
-					return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
-				
-				fp_PublishAppInterface()
-					+ fp_SetupLimits()
-					> Promise / [this, Promise]
-					{
-						if (mp_State.m_bStoppingApp)
-							return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
-						
-						fp_InitApplications();
-						fp_UpdateApplicationDependencies();
-						fp_PublishCoordinationInterface() > [](TCAsyncResult<void> &&_Result)
-							{
-								if (!_Result)
-									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to publish coordination interface: {}", _Result.f_GetExceptionStr());
-							}
-						;
-						fp_SubscribeCoordinationInterface() > [](TCAsyncResult<void> &&_Result)
-							{
-								if (!_Result)
-									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to subscribe to coordination interface: {}", _Result.f_GetExceptionStr());
-							}
-						;
-						fp_SetupAppManagerInterfacePermissions() > [this](TCAsyncResult<void> &&_Result)
-							{
-								if (!_Result)
-								{
-									DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to setup permissions: {}", _Result.f_GetExceptionStr());
-									return;
-								}
-								if (mp_State.m_bStoppingApp)
-									return;
-								
-								fp_PublishAppManagerInterface() > [](TCAsyncResult<void> &&_Result)
-									{
-										if (!_Result)
-											DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to publish app manager interface: {}", _Result.f_GetExceptionStr());
-									}
-								;
-							}
-						;
-						
-						mp_State.m_TrustManager
-							(
-								&CDistributedActorTrustManager::f_SubscribeTrustedActors<CKeyManager>
-								, "com.malterlib/Cloud/KeyManager"
-								, fg_ThisActor(this)
-							)
-							+ mp_State.m_TrustManager
-							(
-								&CDistributedActorTrustManager::f_SubscribeTrustedActors<CVersionManager>
-								, "com.malterlib/Cloud/VersionManager"
-								, fg_ThisActor(this)
-							)
-							> Promise / [this, Promise](TCTrustedActorSubscription<CKeyManager> &&_KeySubscrption, TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
-							{
-								if (mp_State.m_bStoppingApp)
-									return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
-								
-								mp_KeyManagerSubscription = fg_Move(_KeySubscrption);
 
-								mp_KeyManagerSubscription.f_OnActor
-									(
-										[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
-										{
-											fp_KeyManagerAvailable();
-										}
-									)
-								;
+		auto InitResult = co_await fp_InitApp().f_Wrap();
 
-								mp_VersionManagerSubscription = fg_Move(_VersionSubscrption);
-								
-								mp_VersionManagerSubscription.f_OnActor
-									(
-										[this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo)
-										{
-											fp_VersionManagerAdded(_VersionManager, _ActorInfo);
-										}
-									)
-								;
-								
-								mp_VersionManagerSubscription.f_OnRemoveActor
-									(
-										[this](TCWeakDistributedActor<CActor> const &_VersionManagero)
-										{
-											fp_VersionManagerRemoved(_VersionManagero);
-										}
-									)
-								;
+		if (!InitResult)
+			fp_InitialStartupFailed(InitResult.f_GetException());
 
-								Promise.f_SetResult();
-							}
-						;
-					}
-				;
-			}
-		;
-		
-		TCPromise<void> ReturnPromise;
-		Promise.f_Dispatch() > [this, ReturnPromise](TCAsyncResult<void> &&_Result)
-			{
-				if (!_Result)
-					fp_InitialStartupFailed(_Result.f_GetException());
-				
-				ReturnPromise.f_SetResult(fg_Move(_Result));
-			}
-		;
-		return ReturnPromise.f_MoveFuture();
+		co_return fg_Move(InitResult);
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_StopApp()
 	{	
-		TCPromise<void> Promise;
+		auto CanDestroyFuture = mp_pCanDestroy->f_Future();
+		mp_pCanDestroy.f_Clear();
+		co_await CanDestroyFuture;
 		
-		auto pCanDestroy = fg_Move(mp_pCanDestroy);
-		
-		pCanDestroy->f_Future() > Promise / [=]
-			{
-				fp_CancelAllApplicationUpdatesOnStopAppManager() > Promise / [=]
-					{
-						mp_AppManagerInterface.f_Destroy()
-							+ mp_AppManagerCoordinationInterface.f_Destroy() > Promise / [=]
-							{
-								TCActorResultVector<uint32> ApplicationStops;
-								for (auto &pApplication : mp_Applications)
-									pApplication->f_Stop(EStopFlag_CloseEncryption) > ApplicationStops.f_AddResult();
-								
-								ApplicationStops.f_GetResults() > Promise / [this, Promise](TCVector<TCAsyncResult<uint32>> &&_Results)
-									{
-										for (auto &pApplication : mp_Applications)
-										{
-											pApplication->f_AbortPendingLaunches();
-											pApplication->f_Clear();
-										}
+		co_await fp_CancelAllApplicationUpdatesOnStopAppManager();
 
-										mp_AppInterfaceServer.f_Destroy() > [this, Promise](TCAsyncResult<void> &&)
-											{
-												TCActorResultVector<void> Destroys;
+		co_await (mp_AppManagerInterface.f_Destroy() + mp_AppManagerCoordinationInterface.f_Destroy());
 
-												for (auto &Launch : mp_LaunchActors)
-													Launch->f_Destroy() > Destroys.f_AddResult();
-												mp_LaunchActors.f_Clear();
+		{
+			TCActorResultVector<uint32> ApplicationStops;
+			for (auto &pApplication : mp_Applications)
+				pApplication->f_Stop(EStopFlag_CloseEncryption) > ApplicationStops.f_AddResult();
 
-												Destroys.f_GetResults() > Promise.f_ReceiveAny();
-											}
-										;
-									}
-								;
-							}
-						;
-					}
-				;
-			}
-		;
-		
-		return Promise.f_MoveFuture();
+			co_await ApplicationStops.f_GetResults().f_Wrap();
+		}
+
+		for (auto &pApplication : mp_Applications)
+		{
+			pApplication->f_AbortPendingLaunches();
+			pApplication->f_Clear();
+		}
+
+		co_await mp_AppInterfaceServer.f_Destroy().f_Wrap();
+
+		{
+			TCActorResultVector<void> Destroys;
+
+			for (auto &Launch : mp_LaunchActors)
+				Launch->f_Destroy() > Destroys.f_AddResult();
+			mp_LaunchActors.f_Clear();
+
+			co_await Destroys.f_GetResults().f_Wrap();
+		}
+
+		co_return {};
 	}
 }
 

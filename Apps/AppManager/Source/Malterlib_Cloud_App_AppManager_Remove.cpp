@@ -17,73 +17,51 @@ namespace NMib::NCloud::NAppManager
 		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationRemove"}};
 		Permissions["App"] = {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)};
 
-		TCPromise<void> Promise;
+		auto HasPermissions = co_await (pThis->mp_Permissions.f_HasPermissions("Remove application from AppManager", Permissions) % "Permission denied removing application" % Auditor);
 
-		pThis->mp_Permissions.f_HasPermissions("Remove application from AppManager", Permissions)
-			> Promise % "Permission denied removing application" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(Application remove, command)"));
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(Application remove, command)");
 
-				if (!_HasPermissions["App"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(Application remove, app name)"));
+		if (!HasPermissions["App"])
+			co_return Auditor.f_AccessDenied("(Application remove, app name)");
 
-				auto *pApplication = pThis->mp_Applications.f_FindEqual(_Name);
-				if (!pApplication)
-					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+		auto *pApplication = pThis->mp_Applications.f_FindEqual(_Name);
+		if (!pApplication)
+			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 
-				auto &Application = **pApplication;
-				if (Application.f_IsInProgress())
-					return Promise.f_SetException(Auditor.f_Exception("Operation already in progress for application"));
-				auto InProgressScope = Application.f_SetInProgress();
+		if ((*pApplication)->f_IsInProgress())
+			co_return Auditor.f_Exception("Operation already in progress for application");
 
-				Application.f_Stop(EStopFlag_CloseEncryption) > [pThis, Auditor, Promise, _Name, InProgressScope](TCAsyncResult<uint32> &&_Result)
-					{
-						CStr Error = pThis->fp_GetApplicationStopErrors(_Result, _Name);
+		auto InProgressScope = (*pApplication)->f_SetInProgress();
 
-						if (!Error.f_IsEmpty())
-							Auditor.f_Warning(Error);
+		if (CStr Error = pThis->fp_GetApplicationStopErrors(co_await (*pApplication)->f_Stop(EStopFlag_CloseEncryption).f_Wrap(), _Name); !Error.f_IsEmpty())
+			Auditor.f_Warning(Error);
 
-						auto *pApplication = pThis->mp_Applications.f_FindEqual(_Name);
-						if (!pApplication)
-							return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application '{}'", _Name)));
+		pApplication = pThis->mp_Applications.f_FindEqual(_Name);
+		if (!pApplication)
+			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 
-						auto pApplicationPtr = *pApplication;
-						(*pApplication)->f_Delete();
-						pThis->mp_Applications.f_Remove(_Name);
-						pThis->fp_SendRemovedAppToRemoteAppManagers(pApplicationPtr);
-						pThis->fp_UpdateLimits();
+		auto pApplicationPtr = *pApplication;
+		(*pApplication)->f_Delete();
+		pThis->mp_Applications.f_Remove(_Name);
+		pThis->fp_SendRemovedAppToRemoteAppManagers(pApplicationPtr);
+		pThis->fp_UpdateLimits();
 
-						if (auto *pApplicationsState = pThis->mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
-						{
-							if (pApplicationsState->f_GetMember(_Name))
-								pApplicationsState->f_RemoveMember(_Name);
-						}
+		if (auto *pApplicationsState = pThis->mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
+		{
+			if (pApplicationsState->f_GetMember(_Name))
+				pApplicationsState->f_RemoveMember(_Name);
+		}
 
-						pThis->mp_State.m_StateDatabase.f_Save() > Promise % "Failed to save state" % Auditor / [InProgressScope, Promise, _Name, Auditor]() mutable
-							{
-								Auditor.f_Info(fg_Format("Removed application '{}'", _Name));
-								Promise.f_SetResult();
-							}
-						;
-					}
-				;
-			}
-		;
+		co_await (pThis->mp_State.m_StateDatabase.f_Save() % "Failed to save state" % Auditor);
 
-		return Promise.f_MoveFuture();
+		Auditor.f_Info(fg_Format("Removed application '{}'", _Name));
+		co_return {};
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		TCPromise<uint32> Promise;
-		
-		mp_AppManagerInterface.m_pActor->f_Remove(_Params["Name"].f_String()) > [Promise](TCAsyncResult<void> &&_Result)
-			{
-				Promise.f_SetExceptionOrResult(_Result, 0);
-			}
-		;
-		
-		return Promise.f_MoveFuture();
+		co_await mp_AppManagerInterface.m_pActor->self(&CAppManagerInterfaceImplementation::f_Remove, _Params["Name"].f_String());
+		co_return 0;
 	}
 }

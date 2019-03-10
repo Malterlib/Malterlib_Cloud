@@ -2,7 +2,6 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
-#include <Mib/Concurrency/Actor/Timer>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -196,7 +195,8 @@ namespace NMib::NCloud::NAppManager
 					{
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Auto update application '{}': {}", Name, _Info);
 					}
-					, false 
+				 	, fg_GetCallingHostInfo()
+					, false
 				)
 				> [](TCAsyncResult<> &&_Results) mutable
 				{

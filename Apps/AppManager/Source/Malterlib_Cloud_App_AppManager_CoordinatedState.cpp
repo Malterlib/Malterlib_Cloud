@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
@@ -9,48 +10,44 @@ namespace NMib::NCloud::NAppManager
 {
 	TCFuture<void> CAppManagerActor::fp_SubscribeCoordinationInterface()
 	{
-		TCPromise<void> Promise;
-		mp_State.m_TrustManager
+		mp_RemoteAppManagers = co_await mp_State.m_TrustManager
 			(
 				&CDistributedActorTrustManager::f_SubscribeTrustedActors<CAppManagerCoordinationInterface>
 				, CAppManagerCoordinationInterface::mc_pDefaultNamespace
 				, fg_ThisActor(this)
 			)
-			> Promise / [this, Promise](TCTrustedActorSubscription<CAppManagerCoordinationInterface> &&_VersionSubscrption)
-			{
-				mp_RemoteAppManagers = fg_Move(_VersionSubscrption);
-				mp_RemoteAppManagers.f_OnActor
-					(
-						[this](TCDistributedActor<CAppManagerCoordinationInterface> const &_NewActor, CTrustedActorInfo const &_ActorInfo)
-						{
-							auto &RemoteActor = mp_RemoteAppManagerState[_ActorInfo.m_HostInfo.m_HostID];
-							if (RemoteActor.m_ByActorLink.f_IsInTree())
-								mp_RemoteAppManagerStateByActor.f_Remove(RemoteActor);
-							RemoteActor.m_Actor = _NewActor;
-							RemoteActor.m_HostInfo = _ActorInfo;
-							mp_RemoteAppManagerStateByActor.f_Insert(RemoteActor);
-							RemoteActor.m_bInitialStateReceived = false;
-							fp_NewRemoteAppManager(RemoteActor);
-						}
-					)
-				;
-				mp_RemoteAppManagers.f_OnRemoveActor
-					(
-						[this](TCWeakDistributedActor<CActor> const &_RemovedActor)
-						{
-							auto pActor = mp_RemoteAppManagerStateByActor.f_FindEqual(_RemovedActor);
-							if (!pActor)
-								return;
-							mp_RemoteAppManagerStateByActor.f_Remove(pActor);
-							mp_RemoteAppManagerState.f_Remove(pActor);
-						}
-					)
-				;
-				Promise.f_SetResult();
-			}
 		;
-		
-		return Promise.f_MoveFuture();
+
+		mp_RemoteAppManagers.f_OnActor
+			(
+				[this](TCDistributedActor<CAppManagerCoordinationInterface> const &_NewActor, CTrustedActorInfo const &_ActorInfo)
+				{
+					auto &RemoteActor = mp_RemoteAppManagerState[_ActorInfo.m_HostInfo.m_HostID];
+					if (RemoteActor.m_ByActorLink.f_IsInTree())
+						mp_RemoteAppManagerStateByActor.f_Remove(RemoteActor);
+					RemoteActor.m_Actor = _NewActor;
+					RemoteActor.m_HostInfo = _ActorInfo;
+					mp_RemoteAppManagerStateByActor.f_Insert(RemoteActor);
+					RemoteActor.m_bInitialStateReceived = false;
+					fp_NewRemoteAppManager(RemoteActor) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to process new remote app manager");
+				}
+			)
+		;
+
+		mp_RemoteAppManagers.f_OnRemoveActor
+			(
+				[this](TCWeakDistributedActor<CActor> const &_RemovedActor)
+				{
+					auto pActor = mp_RemoteAppManagerStateByActor.f_FindEqual(_RemovedActor);
+					if (!pActor)
+						return;
+					mp_RemoteAppManagerStateByActor.f_Remove(pActor);
+					mp_RemoteAppManagerState.f_Remove(pActor);
+				}
+			)
+		;
+
+		co_return {};
 	}
 
 	void CAppManagerActor::fp_OnAppUpdateInfoChange()
@@ -63,13 +60,14 @@ namespace NMib::NCloud::NAppManager
 			pOnChange->m_fOnChanged();
 	}
 	
-	void CAppManagerActor::fp_NewRemoteAppManager(CRemoteAppManager &_AppManager)
+	TCFutureAllowReferences<void> CAppManagerActor::fp_NewRemoteAppManager(CRemoteAppManager &_AppManager)
 	{	
 		CStr HostID = _AppManager.f_GetHostID();
+		auto Actor = _AppManager.m_Actor;
 		
-		DMibCallActor
+		auto Subscription = co_await DMibCallActor
 			(
-				_AppManager.m_Actor
+				Actor
 				, CAppManagerCoordinationInterface::f_SubscribeToAppChanges
 				, g_ActorFunctor / [this, HostID, AllowDestroy = g_AllowWrongThreadDestroy]
 				(TCVector<CAppManagerCoordinationInterface::CAppChange> const &_Changes, bool _bInitial) -> TCFuture<void>
@@ -120,18 +118,13 @@ namespace NMib::NCloud::NAppManager
 					fp_OnAppUpdateInfoChange();
 					return fg_Explicit();
 				}
-			) 
-			> [this, HostID](TCAsyncResult<TCActorSubscriptionWithID<>> &&_Subscription)
-			{
-				if (!_Subscription)
-				{
-					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to subscribe to remote app manager: {}", _Subscription.f_GetExceptionStr());
-					return;
-				}
-				auto &RemoteAppManager = mp_RemoteAppManagerState[HostID];
-				RemoteAppManager.m_OnChangeSubscription = fg_Move(*_Subscription);
-			}
+			)
 		;
+
+		auto &RemoteAppManager = mp_RemoteAppManagerState[HostID];
+		RemoteAppManager.m_OnChangeSubscription = fg_Move(Subscription);
+
+		co_return {};
 	}
 	
 	auto CAppManagerActor::CAppManagerCoordinationInterfaceImplementation::f_SubscribeToAppChanges
@@ -150,21 +143,18 @@ namespace NMib::NCloud::NAppManager
 		
 		pThis->fp_SendInitialInfoToRemoteAppManager(RemoteAppManager);
 		
-		return fg_Explicit
-			(	
-				g_ActorSubscription / [pThis, CallingHostID, SubscriptionSequence]() -> TCFuture<void>
-				{
-					auto &RemoteAppManager = pThis->mp_RemoteAppManagerState[CallingHostID];
-					if (RemoteAppManager.m_iOnChangeSubscriptionSequence != SubscriptionSequence)
-						return fg_Explicit();
-					
-					TCFuture<void> DestroyFuture = RemoteAppManager.m_fOnChange.f_Destroy();
-					
-					RemoteAppManager.m_fOnChange.f_Clear();
-					
-					return DestroyFuture;
-				}
-			)
+		co_return g_ActorSubscription / [pThis, CallingHostID, SubscriptionSequence]() -> TCFuture<void>
+			{
+				auto &RemoteAppManager = pThis->mp_RemoteAppManagerState[CallingHostID];
+				if (RemoteAppManager.m_iOnChangeSubscriptionSequence != SubscriptionSequence)
+					return fg_Explicit();
+
+				TCFuture<void> DestroyFuture = RemoteAppManager.m_fOnChange.f_Destroy();
+
+				RemoteAppManager.m_fOnChange.f_Clear();
+
+				return DestroyFuture;
+			}
 		;
 	}
 
@@ -225,10 +215,12 @@ namespace NMib::NCloud::NAppManager
 			fRemoveRemote(RemoteAppManager.m_KnownApplications, nullptr);
 			
 		if (!bChanged)
-			return fg_Explicit();
+			co_return {};
 		
 		pThis->mp_State.m_StateDatabase.m_Data["KnownRemoteApplications"].f_RemoveMember(_HostID);
-		return pThis->fp_SaveStateDatabase();
+		co_await pThis->fp_SaveStateDatabase();
+
+		co_return {};
 	}
 
 	void CAppManagerActor::CRemoteAppManager::f_Clear()

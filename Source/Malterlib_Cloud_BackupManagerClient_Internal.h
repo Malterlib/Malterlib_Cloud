@@ -30,7 +30,7 @@ namespace NMib::NCloud
 		CHash_SHA256 m_DigestState;
 	};
 
-	struct CBackupManagerClient::CInternal
+	struct CBackupManagerClient::CInternal : public CActorInternal
 	{
 		CInternal
 			(

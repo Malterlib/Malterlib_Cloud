@@ -42,7 +42,7 @@ namespace NMib::NCloud
 	}
 	using namespace NPrivate;
 	
-	struct CFileTransferSend::CInternal
+	struct CFileTransferSend::CInternal : public CActorInternal
 	{
 		CInternal(CFileTransferSend *_pThis)
 			: m_pThis(_pThis)

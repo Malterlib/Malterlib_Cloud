@@ -3,7 +3,6 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ActorSubscription>
-#include <Mib/Concurrency/Actor/Timer>
 #include <Mib/Cryptography/EncryptedStream>
 #include <Mib/Cloud/SecretsManagerUpload>
 
@@ -32,13 +31,13 @@ namespace NMib::NCloud::NSecretsManager
 		auto DirectorySend = fg_Move(m_DirectorySyncSend);
 		TCPromise<void> SubscriptionPromise;
 		if (m_Subscription)
-			m_Subscription->f_Destroy().f_Dispatch().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > SubscriptionPromise;
+			m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > SubscriptionPromise;
 		else
 			SubscriptionPromise.f_SetResult();
 
 		TCPromise<void> FileSubscriptionPromise;
 		if (m_FileSubscription)
-			m_Subscription->f_Destroy().f_Dispatch().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > FileSubscriptionPromise;
+			m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > FileSubscriptionPromise;
 		else
 			FileSubscriptionPromise.f_SetResult();
 

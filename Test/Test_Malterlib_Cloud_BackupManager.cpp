@@ -474,6 +474,12 @@ public:
 	
 		CTrustManagerTestHelper TrustManagerState;
 		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+		auto CleanupTrustManager = g_OnScopeExit > [&]
+			{
+				TrustManager->f_BlockDestroy();
+			}
+		;
+
 		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
 		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 	
@@ -536,7 +542,14 @@ public:
 				{
 					CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << i;
 					CStr BackupManagerDirectory = RootDirectory + "/" + BackupManagerName;
-					LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, BackupManagerName, BackupManagerDirectory, &fg_ConstructApp_BackupManager)
+					LaunchHelper
+						(
+							&CDistributedApp_LaunchHelper::f_LaunchInProcess
+							, BackupManagerName
+							, BackupManagerDirectory
+							, &fg_ConstructApp_BackupManager
+							, NContainer::TCVector<NStr::CStr>{}
+						)
 						> BackupManagerLaunchesResults.f_AddResult()
 					;
 				}

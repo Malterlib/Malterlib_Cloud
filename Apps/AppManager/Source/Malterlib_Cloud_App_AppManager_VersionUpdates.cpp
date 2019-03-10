@@ -2,7 +2,6 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
-#include <Mib/Concurrency/Actor/Timer>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -43,10 +42,12 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto *pLeft = &_Left;
 		auto *pRight = &_Right;
+
 		if (!_Left.m_VersionInfo.m_Time.f_IsValid() && _Right.m_VersionInfo.m_Time.f_IsValid())
 			return true;
 		else if (_Left.m_VersionInfo.m_Time.f_IsValid() && !_Right.m_VersionInfo.m_Time.f_IsValid())
 			return false;
+
 		return NStorage::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetVersionID(), pLeft)
 			< NStorage::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetVersionID(), pRight)
 		;
@@ -56,9 +57,8 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto *pLeft = &_Left;
 		auto *pRight = &_Right;
-		return NStorage::fg_TupleReferences(_Left.f_GetVersionID(), pLeft)
-			< NStorage::fg_TupleReferences(_Right.f_GetVersionID(), pRight)
-		;
+
+		return NStorage::fg_TupleReferences(_Left.f_GetVersionID(), pLeft) < NStorage::fg_TupleReferences(_Right.f_GetVersionID(), pRight);
 	}
 	
 	bool CAppManagerActor::CVersionManagerVersion::CCompareApplication::operator()(CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const
@@ -84,15 +84,16 @@ namespace NMib::NCloud::NAppManager
 		SubscriptionParams.m_Application = CStr(); // All applications we have access to 
 		SubscriptionParams.m_nInitial = 20;
 		SubscriptionParams.m_DispatchActor = self;
-		SubscriptionParams.m_Platforms = mp_KnownPlatforms; 
+		SubscriptionParams.m_Platforms = mp_KnownPlatforms;
 		SubscriptionParams.m_fOnNewVersions
 			= [this, Actor = _VersionManagerState.f_GetManager().f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
 			(CVersionManager::CNewVersionNotifications &&_NewVersions) 
-			-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
+			-> NConcurrency::TCFutureAllowReferences<CVersionManager::CNewVersionNotifications::CResult>
 			{
 				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
 				if (!pManager)
-					return DMibErrorInstance("Manager gone");
+					co_return DMibErrorInstance("Manager gone");
+
 				auto &Manager = *pManager;
 
 				if (_NewVersions.m_bFullResend)
@@ -109,8 +110,8 @@ namespace NMib::NCloud::NAppManager
 				
 				if (_NewVersions.m_bFullResend)
 				{
-					// Wait 5 second for other managers to send their versions 
-					fg_Timeout(5.0) > [this]
+					// Wait 15 second for other managers to send their versions
+					fg_Timeout(15.0) > [this]
 						{
 							fp_AutoUpdate_Update();
 						}
@@ -118,7 +119,8 @@ namespace NMib::NCloud::NAppManager
 				}
 				else
 					fp_AutoUpdate_Update();
-				return fg_Explicit(CVersionManager::CNewVersionNotifications::CResult());
+
+				co_return {};
 			}
 		;
 		
