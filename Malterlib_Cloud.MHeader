@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 Import "../Core/Lib_Malterlib.MTarget"
@@ -31,7 +31,35 @@ Import "Tools/*/*.MHeader"
 	%Dependency Lib_Malterlib_Concurrency
 	{
 		Dependency.Indirect true
-	}	
+	}
+}
+
+Property
+{
+	MalterlibCloudCompatibilityTests false // User(Tests)=true: Set to true to enable compatibility tests for Cloud applications
+	{
+		!!MalterlibCloudCompatibilityTests ""
+	}
+
+	MalterlibBinaryTestRepositories "Cloud_Linux_x64;@(MalterlibBinaryTestRepositories)"
+	{
+		&
+		{
+			MalterlibCloudCompatibilityTests true
+			EnablePlatform_Linux2_6 true
+			EnableArchitecture_x64 true
+		}
+	}
+
+	MalterlibBinaryTestRepositories "Cloud_OSX_x64;@(MalterlibBinaryTestRepositories)"
+	{
+		&
+		{
+			MalterlibCloudCompatibilityTests true
+			EnablePlatformFamily_OSX true
+			EnableArchitecture_x64 true
+		}
+	}
 }
 
 Property
@@ -39,14 +67,14 @@ Property
 	MalterlibCloudTargetInDependenciesTemplate_TargetName "@(Builtin.Function->GetProperty('Property', 'TargetIdentity', '@(Explodee)'))"
 	{
 	}
-	
+
 	MalterlibCloudTargetInDependenciesTemplate true
 	{
 		!!MalterlibCloudTargetInDependenciesTemplate_TargetName "Lib_Malterlib_Cloud"
 	}
-	
+
 	MalterlibCloudTargetInDependencies "@(Builtin.Function->ExplodeList('@(Target.Dependencies)', ';', 'MalterlibCloudTargetInDependenciesTemplate'))"
-	
+
 	MalterlibCloudTarget true
 	{
 		&
@@ -59,12 +87,12 @@ Property
 			}
 		}
 	}
-	
+
 	MalterlibCloudVersionInfo_Branch "@(MalterlibFullBranch)"
 	{
 		!!MalterlibCloudVersionInfo_Branch ""
 	}
-	
+
 	MalterlibCloudVersionInfo_BranchForVersion "@(MalterlibCloudVersionInfo_Branch->Replace(' ', ''))"
 	MalterlibCloudVersionInfo_BranchForVersion "@(MalterlibCloudVersionInfo_BranchForVersion->Replace('(', '-'))"
 	MalterlibCloudVersionInfo_BranchForVersion "@(MalterlibCloudVersionInfo_BranchForVersion->Replace(')', ''))"
@@ -105,7 +133,7 @@ Property
 	{
 		!!MalterlibCloudVersionInfo_RunAsUserHasShell ""
 	}
-	
+
 	SharedBuildSettingsScriptContents	"@(SharedBuildSettingsScriptContents)"\
 										"\r\n"\
 										"@(ScriptExport) \"MalterlibCloudVersionInfo_Version=@(MalterlibCloudVersionInfo_Version)\"\r\n"\
@@ -183,19 +211,19 @@ Property
 	{
 		!Expand1 ""
 	}
-	
+
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_ExpandTemplate "\"@(Expand0)\": null"
 	{
 		!!Expand1 ""
 	}
-	
+
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_Template ", @(Builtin.Function->ExpandList('@(Explodee)', '=', 'MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_ExpandTemplate'))"
 	{
 		!Explodee ""
 	}
 
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "{Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents_Template'))}"
-	
+
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents->Replace('Dummy, ', ''))"
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_IncludeWildcards_Contents->Replace('{Dummy}', '{}'))"
 }
@@ -208,27 +236,27 @@ Property
 	}
 
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents "[Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents_Template'))]"
-	
+
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents->Replace('Dummy, ', ''))"
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards_Contents->Replace('[Dummy]', '[]'))"
 }
-	
+
 Property
 {
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_InnerTemplate ", \"@(Explodee)\""
 	{
 		!Explodee ""
 	}
-	
+
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_ExpandTemplate "\"@(Expand0)\": [Dummy@(Builtin.Function->ExplodeList('@(Expand1)', ',', 'MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_InnerTemplate'))]"
-	
+
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_Template ", @(Builtin.Function->ExpandList('@(Explodee)', '=', 'MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_ExpandTemplate'))"
 	{
 		!Explodee ""
 	}
 
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents "{Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_Template'))}"
-	
+
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents->Replace('Dummy, ', ''))"
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents->Replace('{Dummy}', '{}'))"
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents->Replace('[Dummy]', '[]'))"
@@ -240,16 +268,16 @@ Property
 	{
 		!Explodee ""
 	}
-	
+
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_ExpandTemplate "\"@(Expand0)\": [Dummy@(Builtin.Function->ExplodeList('@(Expand1)', ',', 'MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_InnerTemplate'))]"
-	
+
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_Template ", @(Builtin.Function->ExpandList('@(Explodee)', '=', 'MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_ExpandTemplate'))"
 	{
 		!Explodee ""
 	}
 
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents "{Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards)', ';', 'MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents_Template'))}"
-	
+
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents->Replace('Dummy, ', ''))"
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents->Replace('[Dummy]', '[]'))"
 	MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents "@(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents->Replace('{Dummy}', '{}'))"
@@ -283,7 +311,7 @@ Property
 		!!Target.Type "Executable"
 		!!Target.Type "ConsoleExecutable"
 	}
-	
+
 	MalterlibCloudVersionInfo	"{\n"\
 								"\t\"Application\": \"@(MalterlibCloudVersionInfo_Application)\"\n"\
 								"\t, \"Version\": \"@(MalterlibCloudVersionInfo_Version)\"\n"\
@@ -299,7 +327,7 @@ Property
 	{
 		!MalterlibCloudVersionInfo_Executable ""
 	}
-	
+
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t\t, \"ExecutableParams\": \"@(MalterlibCloudVersionInfo_ExecutableParams)\"\n"
 	{
@@ -360,40 +388,40 @@ Property
 	{
 		!MalterlibCloudVersionInfo_Backup_ExcludeWildcards ""
 	}
-	
+
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t\t\t, \"AddSyncFlagsWildcards\": @(MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents)\n"
 	{
 		!MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards ""
 	}
-	
+
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t\t\t, \"RemoveSyncFlagsWildcards\": @(MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards_Contents)\n"
 	{
 		!MalterlibCloudVersionInfo_Backup_RemoveSyncFlagsWildcards ""
 	}
-	
+
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t\t\t, \"NewBackupInterval\": @(MalterlibCloudVersionInfo_Backup_NewBackupInterval)\n"
 	{
 		!MalterlibCloudVersionInfo_Backup_NewBackupInterval ""
 	}
-	
+
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t\t}\n"
-	
+
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t}\n"\
 								"}\n"
-	
+
 	MalterlibCloudVersionInfo "@(MalterlibCloudVersionInfo->Replace('\"Dummy\": null\\\n\t\t\t, ', ''))"
 	MalterlibCloudVersionInfo "@(MalterlibCloudVersionInfo->Replace('\t\t\t\"Dummy\": null\\\n', ''))"
 	MalterlibCloudVersionInfo "@(MalterlibCloudVersionInfo->Replace('\"Dummy\": null\\\n\t\t, ', ''))"
 	MalterlibCloudVersionInfo "@(MalterlibCloudVersionInfo->Replace('\t\t\"Dummy\": null\\\n', ''))"
 
 	MalterlibCloudVersionInfoCppFileName "@(GeneratedDirectory)CloudVersionInfo.h"
-	
-	MalterlibCloudVersionInfoCpp	"#include <Mib/Cloud/VersionInfo>\n"\ 
+
+	MalterlibCloudVersionInfoCpp	"#include <Mib/Cloud/VersionInfo>\n"\
 									"namespace\n"\
 									"{\n"\
 									"	NMib::NCloud::CCloudVersionInfo fg_GetCloudVersionInfo()\n"\
@@ -457,7 +485,7 @@ Property
 	}
 	MalterlibBuildServerPutSources "@(MalterlibCloudVersionInfoFileName);@(MalterlibBuildServerPutSources)"
 	{
-		&	
+		&
 		{
 			TargetIsExecutable true
 			MalterlibCloudTarget true
@@ -465,7 +493,7 @@ Property
 	}
 	MalterlibPostCopySources "@(MalterlibCloudVersionInfoFileName);@(MalterlibPostCopySources)"
 	{
-		&	
+		&
 		{
 			TargetIsExecutable true
 			MalterlibCloudTarget true
@@ -484,7 +512,7 @@ Compile
 			MalterlibCloudTargetLibrary true
 		}
 	}
-	
+
 	PreprocessorDefines "DMalterlibCloudPlatform=\"@(MalterlibCloudPlatform)\";@(Compile.PreprocessorDefines)"
 }
 
@@ -551,7 +579,7 @@ Property
 	{
 		MalterlibEnableInternalWorkspaces true
 	}
-	
+
 	Property
 	{
 		MalterlibCloud_EnableVersionUpload true
@@ -560,7 +588,7 @@ Property
 		{
 			!!TargetIsExecutable true
 		}
-	
+
 		MalterlibLog_Severities "Error;Critical;Warning;Info"
 		{
 			!!MalterlibLog_EnableVerboseDebugLog false
@@ -595,7 +623,7 @@ Property
 	{
 		!!MalterlibCloud_VersionUploadHosts ""
 	}
-	
+
 	MalterlibCloud_VersionUploadSources "@(MalterlibBuildServerPutSources);@(MalterlibCloud_VersionUploadSources)"
 	MalterlibCloud_VersionUploadSources "@(MalterlibCloudVersionInfoFileName)|/VersionInfo.json~;@(MalterlibCloud_VersionUploadSources)"
 	{
@@ -624,13 +652,13 @@ Property
 Property
 {
 	MalterlibCloud_VersionUploadTempPath "@(Target.IntermediateDirectory)VersionUpload"
-	
+
 	MalterlibCloud_VersionUploadCopyTempTemplateRecursive 0
 	MalterlibCloud_VersionUploadCopyTempTemplateRecursive 1
 	{
 		!"Expand0" "@(Expand0->Replace('^', ''))"
 	}
- 
+
 	MalterlibCloud_VersionUploadCopyTempTemplateDirectory 0
 	MalterlibCloud_VersionUploadCopyTempTemplateDirectory 1
 	{
@@ -650,7 +678,7 @@ Property
 	{
 		!Explodee ""
 	}
-	
+
 	MalterlibCloud_VersionUploadCopyTempContents	"@(Builtin.Function->ExplodeList('@(MalterlibCloud_VersionUploadSources)', ';', 'MalterlibCloud_VersionUploadCopyTempTemplate'))"
 }
 
@@ -695,7 +723,7 @@ Property
 	{
 		!MalterlibCloud_VersionUploadHosts ""
 	}
-	
+
 	MalterlibCloud_VersionUploadCloudClientCommand_Tags "'[@(MalterlibCloud_VersionUploadTagsContents)]'"
 	{
 		!GeneratorFamily VisualStudio
@@ -704,7 +732,7 @@ Property
 	{
 		!!GeneratorFamily VisualStudio
 	}
-	
+
 	MalterlibCloud_VersionUploadCloudClientCommand "@(MalterlibCloud_CloudClientCommand) --no-self-update-check --version-manager-upload-version --settings-file \"@(MalterlibCloudVersionInfoFileName)\" --tags @(MalterlibCloud_VersionUploadCloudClientCommand_Tags)@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified) \"@(MalterlibCloud_VersionUploadTarArchivePath)\"\r\n"\
 													"@(CheckErrors)\r\n"
 	{
@@ -739,12 +767,12 @@ Property
 	{
 		!Explodee ""
 	}
-	
+
 	MalterlibCloud_VersionUploadCloudClientContents "@(MalterlibCloud_VersionUploadCloudClientCommand)"
 	{
 		!!MalterlibCloud_VersionUploadHosts ""
 	}
-	
+
 	MalterlibCloud_VersionUploadCloudClientContents "@(Builtin.Function->ExplodeList('@(MalterlibCloud_VersionUploadHosts)', ';', 'MalterlibCloud_VersionUploadCloudClientTemplate'))"
 	{
 		!MalterlibCloud_VersionUploadHosts ""
@@ -773,19 +801,19 @@ Property
 			MalterlibCloudTarget true
 		}
 	}
-	
+
 	MalterlibBuildServerPutDisabled true
 	{
 		!!MalterilbCloud_DoVersionManagerUpload true
 	}
-	
+
 	MalterlibCloud_VersionUploadTarArchivePath "@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application).tar.gz"
 	MalterlibCloud_VersionUploadTarArchivePathTar "@(MalterlibCloud_VersionUploadTarArchivePath)"
 	MalterlibCloud_VersionUploadTarArchivePathTar "@(MalterlibCloud_VersionUploadTarArchivePath->ParseFormatString('{}:{}','/{0,cl}{1}'))"
 	{
 		!!PlatformFamily Windows // For MinGW
 	}
-	
+
 	MalterlibPostBuildScript_Last "@(MalterlibPostBuildScript_Last)"\
 					"[ -e \"@(MalterlibCloud_VersionUploadTempPath)\" ] && rm -rf \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
 					"mkdir -p \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
@@ -804,7 +832,7 @@ Property
 			!GeneratorFamily VisualStudio
 		}
 	}
-	
+
 	MalterlibPostBuildScript_Last "@(MalterlibPostBuildScript_Last)"\
 					"IF EXIST \"@(MalterlibCloud_VersionUploadTempPath)\" rmdir /s /q \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
 					"mkdir \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
