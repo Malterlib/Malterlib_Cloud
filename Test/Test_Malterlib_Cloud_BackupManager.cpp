@@ -559,9 +559,14 @@ public:
 		;
 		fLaunchSecretManagers();
 
-		auto HelperActor = fg_ConcurrentActor();
+		TCActor<CSeparateThreadActor> HelperActor{fg_Construct(), "Test actor"};
+		auto CleanupTestActor = g_OnScopeExit > [&]
+			{
+				HelperActor->f_BlockDestroy();
+			}
+		;
 		CCurrentActorScope CurrentActor{HelperActor};
-		
+
 		// Setup trust for BackupManagers
 		
 		struct CBackupManagerInfo

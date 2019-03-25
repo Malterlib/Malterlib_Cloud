@@ -55,6 +55,57 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
+	TCFuture<void> CAppManagerActor::fp_SendUpdateNotifications
+		(
+			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
+			, EUpdateStage _Stage
+			, NStr::CStr _Message
+			, CAppManagerInterface::CUpdateNotification _Notification
+		 )
+	{
+		TCActorResultVector<void> OnUpdateResultsVector;
+
+		CStr AppPermission = fg_Format("AppManager/App/{}", _Notification.m_Application);
+
+		for (auto &Subscription : mp_UpdateNotificationSubscriptions)
+		{
+			TCPromise<void> OnUpdatePromise;
+			mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
+				.f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
+				> OnUpdatePromise / [=, SubscriptionID = mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission)
+				{
+					auto pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
+					if (!_bHasPermission || !pSubscription)
+						return OnUpdatePromise.f_SetResult();
+
+					pSubscription->m_fOnUpdate(_Notification).f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+						> OnUpdatePromise
+					;
+				}
+			;
+			OnUpdatePromise > OnUpdateResultsVector.f_AddResult();
+		}
+
+		try
+		{
+			co_await OnUpdateResultsVector.f_GetResults();
+		}
+		catch (CException const &_Exception)
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Warning
+					, "Failed to send update notification: {}"
+					, _Exception
+				)
+			;
+		}
+
+		co_return {};
+	}
+
+
 	TCFuture<void> CAppManagerActor::fp_OnUpdateEvent
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
@@ -62,6 +113,16 @@ namespace NMib::NCloud::NAppManager
 			, NStr::CStr _Message
 		)
 	{
+		auto &Application = *_pState->m_pApplication;
+
+		CAppManagerInterface::CUpdateNotification Notification;
+		Notification.m_Application = Application.m_Name;
+		Notification.m_Message = _Message;
+		Notification.m_VersionID = _pState->m_VersionID;
+		Notification.m_VersionTime = _pState->m_VersionTime;
+		Notification.m_Stage = _Stage;
+		Notification.m_bCoordinateWait = true;
+
 		{
 			auto &Application = *_pState->m_pApplication;
 
@@ -73,8 +134,6 @@ namespace NMib::NCloud::NAppManager
 				fp_OnAppUpdateInfoChange(_pState->m_pApplication);
 			}
 
-			TCFuture<void> CoordinationFuture;
-
 			auto UpdateType = Application.f_GetUpdateType();
 			switch (UpdateType)
 			{
@@ -83,7 +142,8 @@ namespace NMib::NCloud::NAppManager
 				{
 					if (_Stage == EUpdateStage::EUpdateStage_None)
 					{
-						CoordinationFuture = fp_Coordination_WaitForAllToReachWantUpdateStage
+						co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
+						co_await fp_Coordination_WaitForAllToReachWantUpdateStage
 							(
 								_pState
 								, EUpdateStage::EUpdateStage_None
@@ -94,14 +154,18 @@ namespace NMib::NCloud::NAppManager
 						;
 					}
 					else if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
-						CoordinationFuture = fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
+					{
+						co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
+						co_await fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
+					}
 					else if (_Stage == EUpdateStage::EUpdateStage_StopOldApp)
 					{
+						co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
 						if (UpdateType == EDistributedAppUpdateType_OneAtATime)
-							CoordinationFuture = fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pState);
+							co_await fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pState);
 						else
 						{
-							CoordinationFuture = fp_Coordination_WaitForAllToReachWantUpdateStage
+							co_await fp_Coordination_WaitForAllToReachWantUpdateStage
 								(
 									_pState
 									, EUpdateStage::EUpdateStage_StopOldApp
@@ -112,13 +176,10 @@ namespace NMib::NCloud::NAppManager
 							;
 						}
 					}
-					else
-						CoordinationFuture = fg_Explicit();
 					break;
 				}
 			case EDistributedAppUpdateType_Independent:
 				{
-					CoordinationFuture = fg_Explicit();
 					break;
 				}
 			default:
@@ -127,13 +188,12 @@ namespace NMib::NCloud::NAppManager
 					break;
 				}
 			}
-
-			co_await CoordinationFuture;
 		}
-		
-		auto &Application = *_pState->m_pApplication;
 
 		bool bUpdatedAppInfo = false;
+
+		Notification.m_bCoordinateWait = false;
+		co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
 
 		if (_Stage != Application.m_UpdateStage)
 		{
@@ -160,45 +220,14 @@ namespace NMib::NCloud::NAppManager
 			fp_OnAppUpdateInfoChange(_pState->m_pApplication);
 		}
 
-		CAppManagerInterface::CUpdateNotification Notification;
-		Notification.m_Application = Application.m_Name;
-		Notification.m_Message = _Message;
-		Notification.m_VersionID = _pState->m_VersionID;
-		Notification.m_VersionTime = _pState->m_VersionTime;
-		Notification.m_Stage = _Stage;
-
-		CStr AppPermission = fg_Format("AppManager/App/{}", Application.m_Name);
-
-		TCActorResultVector<void> OnUpdateResultsVector;
-
-		for (auto &Subscription : mp_UpdateNotificationSubscriptions)
-		{
-			TCPromise<void> OnUpdatePromise;
-			mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
-				.f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
-				> OnUpdatePromise / [=, SubscriptionID = mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission)
-				{
-					auto pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
-					if (!_bHasPermission || !pSubscription)
-						return OnUpdatePromise.f_SetResult();
-
-					pSubscription->m_fOnUpdate(Notification)
-						.f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
-						> OnUpdatePromise
-					;
-				}
-			;
-			OnUpdatePromise > OnUpdateResultsVector.f_AddResult();
-		}
-
 		TCFuture<void> UpdateJSONFuture;
 		if (!bUpdatedAppInfo)
 			UpdateJSONFuture = fg_Explicit();
 		else
 			UpdateJSONFuture = fp_UpdateApplicationJSON(_pState->m_pApplication);
 
-		auto [UpdateJSONResult, OnUpdateResults] = co_await (UpdateJSONFuture + OnUpdateResultsVector.f_GetResults()).f_Wrap();
+		auto UpdateJSONResult = co_await UpdateJSONFuture;
 
-		co_return UpdateJSONResult;
+		co_return fg_Move(UpdateJSONResult);
 	}
 }

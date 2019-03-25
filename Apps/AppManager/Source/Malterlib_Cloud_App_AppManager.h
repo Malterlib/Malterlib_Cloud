@@ -727,9 +727,18 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		TCFuture<void> fp_SendUpdateNotifications
+			(
+				TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
+				, EUpdateStage _Stage
+				, NStr::CStr _Message
+			 	, CAppManagerInterface::CUpdateNotification _Notification
+			)
+		;
+
 		TCFuture<void> fp_PublishCoordinationInterface();
 		TCFuture<void> fp_SubscribeCoordinationInterface();
-		TCFutureAllowReferences<void> fp_NewRemoteAppManager(CRemoteAppManager &_AppManager);
+		TCFuture<void> fp_NewRemoteAppManager(CRemoteAppManager &_AppManager);
 		void fp_NewRemoteKnownApplication(CRemoteApplicationKey const &_RemoteKey, CStr const &_HostID);
 		void fp_SendInitialInfoToRemoteAppManager(CRemoteAppManager &_AppManager);
 		void fp_OnAppUpdateInfoChange(TCSharedPointer<CApplication> const &_pApplication);

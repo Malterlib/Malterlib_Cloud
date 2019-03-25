@@ -123,8 +123,15 @@ namespace NMib::NCloud::NAppManager
 							if (_pApplication->m_Settings.m_bDistributedApp)
 							{
 								fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)");
-								_pApplication->m_OnRegisterDistributedApp.f_Insert().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)")
-									> [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
+
+								TCFuture<void> RegisterFuture;
+
+								if (_pApplication->m_AppInterface)
+									RegisterFuture = fg_Explicit();
+								else
+									RegisterFuture = _pApplication->m_OnRegisterDistributedApp.f_Insert().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)");
+
+								RegisterFuture > [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
 									{
 										if (_pApplication->m_bDeleted)
 											return;

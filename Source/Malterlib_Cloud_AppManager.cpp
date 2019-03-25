@@ -152,6 +152,8 @@ namespace NMib::NCloud
 		_Stream % m_VersionID;
 		_Stream % m_VersionTime;
 		_Stream % m_Stage;
+		if (_Stream.f_GetVersion() >= 0x109)
+			_Stream % m_bCoordinateWait;
 	}
 	
 	template <typename tf_CStream>

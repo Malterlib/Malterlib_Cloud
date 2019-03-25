@@ -19,7 +19,7 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EMinProtocolVersion = 0x107
-			, EProtocolVersion = 0x108
+			, EProtocolVersion = 0x109
 		};
 		
 		CAppManagerInterface();
@@ -192,6 +192,7 @@ namespace NMib::NCloud
 			CVersionIDAndPlatform m_VersionID;
 			NTime::CTime m_VersionTime;
 			EUpdateStage m_Stage = EUpdateStage_Failed;
+			bool m_bCoordinateWait = false; // When set the stage has not yet been reached, the group is coordinating the update
 		};
 		
 		struct CApplicationAdd

@@ -103,10 +103,10 @@ namespace NMib::NCloud::NAppManager
 					, pScript
 					, pDesc
 					, fg_Move(Environment)
-					, [_Key](NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)
+					, [Key](NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)
 					{
 						if (_Output == "PROVIDE KEY")
-							_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, _Key) > fg_DiscardResult();
+							_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, Key) > fg_DiscardResult();
 					}
 				)
 			 	% "Failed to change encryption"

@@ -290,7 +290,12 @@ public:
 		KeyManagerServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/Keymanager.sock"_f << KeyManagerDirectory);
 		DMibCallActor(KeyManagerTrust, CDistributedActorTrustManagerInterface::f_AddListen, KeyManagerServerAddress).f_CallSync(g_Timeout);
 
-		auto HelperActor = fg_ConcurrentActor();
+		TCActor<CSeparateThreadActor> HelperActor{fg_Construct(), "Test actor"};
+		auto CleanupTestActor = g_OnScopeExit > [&]
+			{
+				HelperActor->f_BlockDestroy();
+			}
+		;
 		CCurrentActorScope CurrentActor{HelperActor};
 
 		{

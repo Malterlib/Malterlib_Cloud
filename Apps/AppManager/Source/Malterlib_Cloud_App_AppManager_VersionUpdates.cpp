@@ -88,8 +88,10 @@ namespace NMib::NCloud::NAppManager
 		SubscriptionParams.m_fOnNewVersions
 			= [this, Actor = _VersionManagerState.f_GetManager().f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
 			(CVersionManager::CNewVersionNotifications &&_NewVersions) 
-			-> NConcurrency::TCFutureAllowReferences<CVersionManager::CNewVersionNotifications::CResult>
+			-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 			{
+				co_await NConcurrency::ECoroutineFlag_AllowReferences;
+
 				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
 				if (!pManager)
 					co_return DMibErrorInstance("Manager gone");

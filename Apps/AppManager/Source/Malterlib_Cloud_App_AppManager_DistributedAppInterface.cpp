@@ -46,7 +46,7 @@ namespace NMib::NCloud::NAppManager
 						, fsp_UpdateTypeToStr(_RegisterInfo.m_UpdateType)
 					)
 				;
-				
+
 				for (auto &fOnRegisterDistributedApp : Application.m_OnRegisterDistributedApp)
 					fOnRegisterDistributedApp.f_SetResult();
 				Application.m_OnRegisterDistributedApp.f_Clear();

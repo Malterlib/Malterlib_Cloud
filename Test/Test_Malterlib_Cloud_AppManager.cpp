@@ -104,7 +104,7 @@ public:
 			auto VersionManagerPermissionsForTest = fg_CreateMap<CStr, CPermissionRequirements>("Application/WriteAll", "Application/ReadAll", "Application/TagAll");
 
 			CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);
-			
+
 			for (mint i = 0; i < 5; ++i)
 			{
 				try
@@ -119,7 +119,7 @@ public:
 			}
 
 			CFile::fs_CreateDirectory(RootDirectory);
-			
+
 			CTrustManagerTestHelper TrustManagerState;
 			TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
 			auto CleanupTrustManager = g_OnScopeExit > [&]
@@ -130,22 +130,22 @@ public:
 
 			CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
-			
+
 			CDistributedActorTrustManager_Address ServerAddress;
 
 			ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
 			TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
-			
+
 			CDistributedApp_LaunchHelperDependencies Dependencies;
 			Dependencies.m_Address = ServerAddress.m_URL;
 			Dependencies.m_TrustManager = TrustManager;
 			Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(g_Timeout);
-			
+
 			NMib::NConcurrency::CDistributedActorSecurity Security;
 			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CVersionManager::mc_pDefaultNamespace);
 			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CAppManagerInterface::mc_pDefaultNamespace);
 			Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(g_Timeout);
-			
+
 			TCActor<CDistributedApp_LaunchHelper> LaunchHelper
 				= fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestAppManagerEnableLogging || DTestAppManagerEnableOtherOutput)
 			;
@@ -159,7 +159,7 @@ public:
 			CStr VersionManagerDirectory = RootDirectory + "/VersionManager";
 			CFile::fs_CreateDirectory(VersionManagerDirectory);
 			CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/VersionManager", VersionManagerDirectory, nullptr);
-			
+
 			auto VersionManagerLaunch = LaunchHelper
 				(
 					&CDistributedApp_LaunchHelper::f_LaunchInProcess
@@ -177,9 +177,12 @@ public:
 			CStr CloudClientDirectory = RootDirectory + "/MalterlibCloud";
 			CFile::fs_CreateDirectory(CloudClientDirectory);
 			CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/MalterlibCloud", CloudClientDirectory, nullptr);
-			
+
 			// Copy AppManagers to their directories
 			mint nAppManagers = 10;
+#if DMibPPtrBits <= 32
+			nAppManagers = 2;
+#endif
 			{
 				TCActorResultVector<void> AppManagerLaunchesResults;
 				TCVector<TCActor<CSeparateThreadActor>> FileActors;
@@ -201,7 +204,7 @@ public:
 
 			// Launch AppManagers
 			TCActorResultVector<CDistributedApp_LaunchInfo> AppManagerLaunchesResults;
-			
+
 			for (mint i = 0; i < nAppManagers; ++i)
 			{
 				CStr AppManagerName = fg_Format("AppManager{sf0,sl2}", i);
@@ -210,12 +213,18 @@ public:
 #if DTestAppManagerEnableOtherOutput
 				ExtraParams.f_Insert("--log-launches-to-stderr");
 #endif
-				//LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, AppManagerName, AppManagerDirectory + "/AppManager", fg_Move(ExtraParams)) > AppManagerLaunchesResults.f_AddResult();
+
+#if 0
+				LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, AppManagerName, AppManagerDirectory + "/AppManager", fg_Move(ExtraParams))
+					> AppManagerLaunchesResults.f_AddResult()
+				;
+#else
 				LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchInProcess, AppManagerName, AppManagerDirectory, &fg_ConstructApp_AppManager, fg_Move(ExtraParams))
 					> AppManagerLaunchesResults.f_AddResult()
 				;
+#endif
 			}
-			
+
 			TCVector<CDistributedApp_LaunchInfo> AppManagerLaunches;
 			for (auto &LaunchResult : AppManagerLaunchesResults.f_GetResults().f_CallSync(g_Timeout))
 				AppManagerLaunches.f_Insert(fg_Move(*LaunchResult));
@@ -285,11 +294,18 @@ public:
 				)
 				.f_CallSync(g_Timeout)
 			;
-			
+
 			auto VersionManager = Subscriptions.f_Subscribe<CVersionManager>();
 			CVersionManagerHelper VersionManagerHelper;
-			
-			auto HelperActor = fg_ConcurrentActor();
+
+			TCActor<CSeparateThreadActor> HelperActor{fg_Construct(), "Test actor"};
+			auto CleanupTestActor = g_OnScopeExit > [&]
+				{
+					HelperActor->f_BlockDestroy();
+				}
+			;
+			CCurrentActorScope CurrentActor{HelperActor};
+
 			auto fDispatchOnHelper = [&](auto _fToDispatch)
 				{
 					return
@@ -303,26 +319,24 @@ public:
 					;
 				}
 			;
-			
-			CCurrentActorScope CurrentActor{HelperActor};
 
 			// Add initial application to version manager
 			CStr TestAppArchive = ProgramDirectory + "/TestApps/TestApp.tar.gz";
-			
+
 			auto PackageInfo = fDispatchOnHelper([&]{ return VersionManagerHelper.f_CreatePackage(ProgramDirectory + "/TestApps/TestApp", TestAppArchive); });
 
 			PackageInfo.m_VersionInfo.m_Tags["TestTag"];
 			fDispatchOnHelper([&]{return VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);});
-			
+
 			// Setup trust for AppManagers
-			
+
 			struct CAppManagerInfo
 			{
 				CStr const &f_GetHostID() const
 				{
 					return TCMap<CStr, CAppManagerInfo>::fs_GetKey(*this);
 				}
-				
+
 				TCSharedPointer<TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface>> m_pTrustInterface;
 				CDistributedActorTrustManager_Address m_Address;
 			};
@@ -336,7 +350,7 @@ public:
 				{
 					CStr AppManagerName = fg_Format("AppManager{sf0,sl2}", iAppManager);
 					CStr AppManagerDirectory = RootDirectory + "/" + AppManagerName;
-					
+
 					AllAppManagerHosts[AppManager.m_HostID];
 					auto &AppManagerInfo = AllAppManagers[AppManager.m_HostID];
 					AppManagerInfo.m_pTrustInterface = AppManager.m_pTrustInterface;
@@ -348,11 +362,11 @@ public:
 			}
 
 			TCActorResultVector<void> SetupTrustResults;
-			
+
 			for (auto &AppManager : AllAppManagers)
 			{
 				auto pAppManagerTrust = AppManager.m_pTrustInterface;
-				auto &AppManagerTrust = *pAppManagerTrust; 
+				auto &AppManagerTrust = *pAppManagerTrust;
 				CStr AppManagerHostID = AppManager.f_GetHostID();
 				auto TrustAppManagers = AllAppManagerHosts;
 				TrustAppManagers.f_Remove(AppManagerHostID);
@@ -361,10 +375,10 @@ public:
 						AppManagerTrust
 						, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
 						, fNamespaceHosts("com.malterlib/Cloud/AppManagerCoordination", TrustAppManagers)
-					) 
+					)
 					> SetupTrustResults.f_AddResult()
 				;
-				
+
 				DMibCallActor
 					(
 						TrustManager
@@ -375,15 +389,15 @@ public:
 					)
 					> SetupTrustResults.f_AddResult()
 				;
-					
+
 				for (auto &AppManagerInner : AllAppManagers)
 				{
 					CStr AppManagerHostIDInner = AppManagerInner.f_GetHostID();
 					if (AppManagerHostIDInner == AppManagerHostID)
 						continue;
-					
-					auto pAppManagerTrustInner = AppManagerInner.m_pTrustInterface; 
-					
+
+					auto pAppManagerTrustInner = AppManagerInner.m_pTrustInterface;
+
 					TCPromise<void> Promise;
 					DMibCallActor
 						(
@@ -400,18 +414,18 @@ public:
 					Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
 				}
 			}
-			
+
 			// Setup trust for version manager
-			
+
 			for (auto &AppManager : AllAppManagers)
 			{
-				auto pAppManagerTrust = AppManager.m_pTrustInterface; 
+				auto pAppManagerTrust = AppManager.m_pTrustInterface;
 				auto &AppManagerTrust = *pAppManagerTrust;
 				auto &VersionManagerTrust = *pVersionManagerTrust;
 				CStr AppManagerHostID = AppManager.f_GetHostID();
 
 				TCPromise<> Promise;
-				
+
 				DMibCallActor
 					(
 					 	VersionManagerTrust
@@ -423,7 +437,7 @@ public:
 						AppManagerTrust
 						, CDistributedActorTrustManagerInterface::f_AddPermissions
 						, fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
-					) 
+					)
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket, CVoidTag)
 					{
 						auto &AppManagerTrust = *pAppManagerTrust;
@@ -464,7 +478,7 @@ public:
 					Settings.m_VersionManagerApplication = "TestApp";
 					Settings.m_AutoUpdateTags = fg_CreateSet<CStr>("TestTag");
 					Add.m_Version = PackageInfo.m_VersionID;
-					
+
 					DMibCallActor(AppManager, CAppManagerInterface::f_Add, "TestApp", Add, Settings) > AddAppResults.f_AddResult();
 				}
 				fg_CombineResults(AddAppResults.f_GetResults().f_CallSync(g_Timeout));
@@ -484,12 +498,24 @@ public:
 				TCSet<mint> m_InProgress;
 				mint m_nMaxInProgress = 0;
 				TCMap<mint, CAppManagerInterface::EUpdateStage> m_LastInStage;
+				TCMap<mint, CAppManagerInterface::EUpdateStage> m_LastInStageCoordination;
 				TCMap<CAppManagerInterface::EUpdateStage, TCSet<mint>> m_InStage;
+				TCMap<CAppManagerInterface::EUpdateStage, TCSet<mint>> m_InStageCoordination;
 				TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStage;
+				TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStageCoordination;
 				TCAtomic<mint> m_nSuccess = 0;
 				TCAtomic<mint> m_nFinished = 0;
 				NThread::CEventAutoReset m_Event;
-				
+
+				void f_Destroy()
+				{
+					TCActorResultVector<void> Destroys;
+					for (auto &Subscription : m_Subscriptions)
+						Subscription->f_Destroy() > Destroys.f_AddResult();;
+					Destroys.f_GetResults().f_CallSync();
+					f_Clear();
+				}
+
 				void f_Clear()
 				{
 					m_InProgress.f_Clear();
@@ -501,16 +527,18 @@ public:
 					m_nFinished = 0;
 				}
 			};
-			
+
 			TCSharedPointer<CUpdateNotificationsState> pUpdateNotificationsState = fg_Construct();
-			
+
 			auto CleanupNotifications = g_OnScopeExit > [&]
 				{
-					pUpdateNotificationsState->m_Subscriptions.f_Clear();
+					pUpdateNotificationsState->f_Destroy();
 				}
 			;
-			
+
 			auto &UpdateNotificationState = *pUpdateNotificationsState;
+
+			TCSharedPointer<CStr> pUpdateType = fg_Construct();
 
 			// Subscribe for notifications
 			{
@@ -524,43 +552,52 @@ public:
 							AppManager
 							, CAppManagerInterface::f_SubscribeUpdateNotifications
 							, g_ActorFunctor / [pUpdateNotificationsState, iAppManager]
-							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void> 
+							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
 							{
 								auto &State = *pUpdateNotificationsState;
-								
-								if (auto pInStage = State.m_LastInStage.f_FindEqual(iAppManager))
-									State.m_InStage[*pInStage].f_Remove(iAppManager);
-								State.m_InStage[_Notification.m_Stage][iAppManager];
-								State.m_MaxInStage[_Notification.m_Stage] = fg_Max(State.m_MaxInStage[_Notification.m_Stage], State.m_InStage[_Notification.m_Stage].f_GetLen());
-								State.m_LastInStage[iAppManager] = _Notification.m_Stage;
-								
+
+								if (!_Notification.m_bCoordinateWait)
+								{
+									if (auto pInStage = State.m_LastInStage.f_FindEqual(iAppManager))
+										State.m_InStage[*pInStage].f_Remove(iAppManager);
+									State.m_InStage[_Notification.m_Stage][iAppManager];
+									State.m_MaxInStage[_Notification.m_Stage] = fg_Max(State.m_MaxInStage[_Notification.m_Stage], State.m_InStage[_Notification.m_Stage].f_GetLen());
+									State.m_LastInStage[iAppManager] = _Notification.m_Stage;
+								}
+
+								if (auto pInStage = State.m_LastInStageCoordination.f_FindEqual(iAppManager))
+									State.m_InStageCoordination[*pInStage].f_Remove(iAppManager);
+								State.m_InStageCoordination[_Notification.m_Stage][iAppManager];
+								State.m_MaxInStageCoordination[_Notification.m_Stage] = fg_Max(State.m_MaxInStageCoordination[_Notification.m_Stage], State.m_InStageCoordination[_Notification.m_Stage].f_GetLen());
+								State.m_LastInStageCoordination[iAppManager] = _Notification.m_Stage;
+
 								if (_Notification.m_Stage == CAppManagerInterface::EUpdateStage_Failed)
 								{
 									State.m_InProgress.f_Remove(iAppManager);
 									++State.m_nFinished;
 								}
-								else if (_Notification.m_Stage == CAppManagerInterface::EUpdateStage_Finished)
+								else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage == CAppManagerInterface::EUpdateStage_Finished)
 								{
 									State.m_InProgress.f_Remove(iAppManager);
 									++State.m_nFinished;
 									++State.m_nSuccess;
 								}
-								else if (_Notification.m_Stage >= CAppManagerInterface::EUpdateStage_StopOldApp)
+								else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage >= CAppManagerInterface::EUpdateStage_StopOldApp)
 								{
 									State.m_InProgress[iAppManager];
-									State.m_nMaxInProgress = fg_Max(State.m_nMaxInProgress, State.m_InProgress.f_GetLen()); 
+									State.m_nMaxInProgress = fg_Max(State.m_nMaxInProgress, State.m_InProgress.f_GetLen());
 								}
 								State.m_Event.f_Signal();
 								return fg_Explicit();
 							}
-						) 
+						)
 						> Promise / [pUpdateNotificationsState, Promise](NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
 						{
 							pUpdateNotificationsState->m_Subscriptions.f_Insert(fg_Move(_Subscription));
 							Promise.f_SetResult();
 						}
 					;
-					
+
 					Promise.f_Dispatch() > AppCommandResults.f_AddResult();
 					++iAppManager;
 				}
@@ -580,20 +617,21 @@ public:
 					}
 				}
 			;
-			
+
 			auto fSetUpdateType = [&](CStr const &_UpdateType)
 				{
-					PackageInfo.m_VersionInfo.m_ExtraInfo["ExecutableParameters"] = {"--update-type", _UpdateType, "--daemon-run-standalone"}; 
+					PackageInfo.m_VersionInfo.m_ExtraInfo["ExecutableParameters"] = {"--update-type", _UpdateType, "--daemon-run-standalone"};
 					TCActorResultVector<void> AppCommandResults;
 					for (auto &AppManager : AppManagers)
 					{
 						CAppManagerInterface::CApplicationChangeSettings ChangeSettings;
 						CAppManagerInterface::CApplicationSettings Settings;
 						Settings.m_ExecutableParameters = {"--update-type", _UpdateType, "--daemon-run-standalone"};
-						
-						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, "TestApp", ChangeSettings, Settings) > AppCommandResults.f_AddResult(); 
+
+						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, "TestApp", ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
 					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
+					*pUpdateType = _UpdateType;
 				}
 			;
 
@@ -603,7 +641,7 @@ public:
 				UpdateNotificationState.f_Clear();
 				fUpdateTestApp();
 				fWaitForAllUpdated();
-				
+
 				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
 				DMibExpect(UpdateNotificationState.m_nMaxInProgress, >= , 1u);
 			}
@@ -615,7 +653,7 @@ public:
 				fWaitForAllUpdated();
 
 				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
-				DMibTest(DMibExpr(UpdateNotificationState.m_nMaxInProgress) == DMibExpr(1) || DMibExpr(UpdateNotificationState.m_nMaxInProgress) == DMibExpr(2));
+				DMibTest(DMibExpr(UpdateNotificationState.m_nMaxInProgress) == DMibExpr(1));
 				DMibExpect(UpdateNotificationState.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], == , 1);
 			}
 			{
@@ -624,10 +662,10 @@ public:
 				UpdateNotificationState.f_Clear();
 				fUpdateTestApp();
 				fWaitForAllUpdated();
-				
+
 				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
-				DMibExpect(UpdateNotificationState.m_nMaxInProgress, == , nAppManagers);
-				DMibExpect(UpdateNotificationState.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], == , nAppManagers);
+				DMibExpect(UpdateNotificationState.m_nMaxInProgress, >= , 1u);
+				DMibExpect(UpdateNotificationState.m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], == , nAppManagers);
 			}
 		};
 	}

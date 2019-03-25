@@ -90,7 +90,7 @@ namespace NMib::NCloud
 			NContainer::TCMap<NStr::CStr, CFileInfo> m_Files;
 		};
 
-		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
+		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream);
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
 		
 		uint32 m_Version = EProtocolVersion;
@@ -98,7 +98,7 @@ namespace NMib::NCloud
 		CManifest m_Manifest;
 		uint64 m_QueueSize = 8*1024*1024;
 		NConcurrency::TCActor<> m_DispatchActor; 
-		NFunction::TCFunctionMutable<NConcurrency::TCFuture<CInternal::CSendPart::CResult> (CInternal::CSendPart &&_Part)> m_fSendPart;
-		NFunction::TCFunctionMutable<NConcurrency::TCFuture<CInternal::CStateChange::CResult> (CInternal::CStateChange &&_State)> m_fStateChange;
+		NFunction::TCFunctionMovable<NConcurrency::TCFuture<CInternal::CSendPart::CResult> (CInternal::CSendPart &&_Part)> m_fSendPart;
+		NFunction::TCFunctionMovable<NConcurrency::TCFuture<CInternal::CStateChange::CResult> (CInternal::CStateChange &&_State)> m_fStateChange;
 	};
 }

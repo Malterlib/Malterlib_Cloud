@@ -36,15 +36,15 @@ namespace NMib::NCloud
 		mp_pInternal->f_Consume(_Stream);
 	}
 	
-	void CFileTransferContext::CInternal::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CFileTransferContext::CInternal::f_Feed(CDistributedActorWriteStream &_Stream)
 	{
 		DMibRequire(m_Version != 0);
 		_Stream << m_Version;
 		_Stream << m_Manifest;
 		_Stream << m_QueueSize;
-		_Stream << m_DispatchActor;
-		_Stream << m_fSendPart;
-		_Stream << m_fStateChange;
+		_Stream << fg_Move(m_DispatchActor);
+		_Stream << fg_Move(m_fSendPart);
+		_Stream << fg_Move(m_fStateChange);
 		// Any version management needs to be additions past this point
 	}
 	

@@ -60,8 +60,10 @@ namespace NMib::NCloud::NAppManager
 			pOnChange->m_fOnChanged();
 	}
 	
-	TCFutureAllowReferences<void> CAppManagerActor::fp_NewRemoteAppManager(CRemoteAppManager &_AppManager)
-	{	
+	TCFuture<void> CAppManagerActor::fp_NewRemoteAppManager(CRemoteAppManager &_AppManager)
+	{
+		co_await NConcurrency::ECoroutineFlag_AllowReferences;
+
 		CStr HostID = _AppManager.f_GetHostID();
 		auto Actor = _AppManager.m_Actor;
 		
