@@ -36,8 +36,8 @@ ScpCommand: C:/Windows/System32/OpenSSH/scp.exe
 NightlyStartTime: 01:00:00 UTC
 
 # Commands for the build/test/submit cycle
-ConfigureCommand: "../../../../../../BuildSystem/SafeMib/Binaries/MTool.exe" "../../../../../../External/libarchive"
-MakeCommand: x:\Development\Hansoft\Dev\BuildSystem\SafeMib\Binaries\MTool.exe --build . --config "${CTEST_CONFIGURATION_TYPE}"
+ConfigureCommand: "../../../../../../BuildSystem/SafeMib/Binaries/MToolCMake.exe" "../../../../../../External/libarchive"
+MakeCommand: x:\Source\Favro\BuildSystem\SafeMib\Binaries\MToolCMake.exe --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 
 # version control
@@ -72,7 +72,7 @@ UpdateOptions:
 UpdateType: git
 
 # Compiler info
-Compiler: x:/Development/Malterlib/Tools/MSVC/14.14.26428/bin/HostX64/x64/cl.exe
+Compiler: 
 CompilerVersion: 
 
 # Dynamic analysis (MemCheck)

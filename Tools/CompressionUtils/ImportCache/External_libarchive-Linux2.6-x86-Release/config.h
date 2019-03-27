@@ -315,13 +315,13 @@ typedef uint64_t uintmax_t;
 #define ARCHIVE_XATTR_LINUX 1
 
 /* Version number of bsdcpio */
-#define BSDCPIO_VERSION_STRING "3.3.3dev"
+#define BSDCPIO_VERSION_STRING "3.3.3"
 
 /* Version number of bsdtar */
-#define BSDTAR_VERSION_STRING "3.3.3dev"
+#define BSDTAR_VERSION_STRING "3.3.3"
 
 /* Version number of bsdcat */
-#define BSDCAT_VERSION_STRING "3.3.3dev"
+#define BSDCAT_VERSION_STRING "3.3.3"
 
 /* Define to 1 if you have the `acl_create_entry' function. */
 #define HAVE_ACL_CREATE_ENTRY 1
@@ -838,22 +838,22 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_NDIR_H */
 
 /* Define to 1 if you have the <nettle/aes.h> header file. */
-#define HAVE_NETTLE_AES_H 1
+/* #undef HAVE_NETTLE_AES_H */
 
 /* Define to 1 if you have the <nettle/hmac.h> header file. */
-#define HAVE_NETTLE_HMAC_H 1
+/* #undef HAVE_NETTLE_HMAC_H */
 
 /* Define to 1 if you have the <nettle/md5.h> header file. */
-#define HAVE_NETTLE_MD5_H 1
+/* #undef HAVE_NETTLE_MD5_H */
 
 /* Define to 1 if you have the <nettle/pbkdf2.h> header file. */
-#define HAVE_NETTLE_PBKDF2_H 1
+/* #undef HAVE_NETTLE_PBKDF2_H */
 
 /* Define to 1 if you have the <nettle/ripemd160.h> header file. */
-#define HAVE_NETTLE_RIPEMD160_H 1
+/* #undef HAVE_NETTLE_RIPEMD160_H */
 
 /* Define to 1 if you have the <nettle/sha.h> header file. */
-#define HAVE_NETTLE_SHA_H 1
+/* #undef HAVE_NETTLE_SHA_H */
 
 /* Define to 1 if you have the `nl_langinfo' function. */
 #define HAVE_NL_LANGINFO 1
@@ -1068,6 +1068,10 @@ typedef uint64_t uintmax_t;
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
 
+
+/* Define to 1 if you have the <sys/sysmacros.h> header file. */
+#define HAVE_SYS_SYSMACROS_H 1
+
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
 
@@ -1207,7 +1211,7 @@ typedef uint64_t uintmax_t;
 #define LIBARCHIVE_VERSION_NUMBER "3003003"
 
 /* Version number of libarchive */
-#define LIBARCHIVE_VERSION_STRING "3.3.3dev"
+#define LIBARCHIVE_VERSION_STRING "3.3.3"
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing
    slash. */
@@ -1261,7 +1265,7 @@ typedef uint64_t uintmax_t;
 #endif /* SAFE_TO_DEFINE_EXTENSIONS */
 
 /* Version number of package */
-#define VERSION "3.3.3dev"
+#define VERSION "3.3.3"
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 #define _FILE_OFFSET_BITS 64

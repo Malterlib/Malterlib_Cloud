@@ -4,7 +4,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type C
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/Development/Malterlib/Tools/SDKs/Linux2.6.sdk/usr/include/libxml2'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/CompiledFiles/Dependencies/Binaries/Malterlib_Linux/SDKs/Linux2.6.sdk/usr/include/libxml2'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;NDEBUG;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType Normal
@@ -616,7 +616,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type C
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/Development/Malterlib/Tools/SDKs/Linux2.6.sdk/usr/include/libxml2'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/CompiledFiles/Dependencies/Binaries/Malterlib_Linux/SDKs/Linux2.6.sdk/usr/include/libxml2'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;NDEBUG;archive_EXPORTS;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType Normal
@@ -1228,7 +1228,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type C
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/Development/Malterlib/Tools/SDKs/Linux2.6.sdk/usr/include/libxml2'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/CompiledFiles/Dependencies/Binaries/Malterlib_Linux/SDKs/Linux2.6.sdk/usr/include/libxml2'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;NDEBUG;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType Normal

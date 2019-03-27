@@ -315,13 +315,13 @@ typedef uint64_t uintmax_t;
 /* #undef ARCHIVE_XATTR_LINUX */
 
 /* Version number of bsdcpio */
-#define BSDCPIO_VERSION_STRING "3.3.3dev"
+#define BSDCPIO_VERSION_STRING "3.3.3"
 
 /* Version number of bsdtar */
-#define BSDTAR_VERSION_STRING "3.3.3dev"
+#define BSDTAR_VERSION_STRING "3.3.3"
 
 /* Version number of bsdcat */
-#define BSDCAT_VERSION_STRING "3.3.3dev"
+#define BSDCAT_VERSION_STRING "3.3.3"
 
 /* Define to 1 if you have the `acl_create_entry' function. */
 #define HAVE_ACL_CREATE_ENTRY 1
@@ -717,10 +717,10 @@ typedef uint64_t uintmax_t;
 #define HAVE_LIBXML2 1
 
 /* Define to 1 if you have the <libxml/xmlreader.h> header file. */
-#define HAVE_LIBXML_XMLREADER_H 1
+/* #undef HAVE_LIBXML_XMLREADER_H */
 
 /* Define to 1 if you have the <libxml/xmlwriter.h> header file. */
-#define HAVE_LIBXML_XMLWRITER_H 1
+/* #undef HAVE_LIBXML_XMLWRITER_H */
 
 /* Define to 1 if you have the `z' library (-lz). */
 #define HAVE_LIBZ 1
@@ -1068,6 +1068,10 @@ typedef uint64_t uintmax_t;
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
 
+
+/* Define to 1 if you have the <sys/sysmacros.h> header file. */
+/* #undef HAVE_SYS_SYSMACROS_H */
+
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
 
@@ -1207,7 +1211,7 @@ typedef uint64_t uintmax_t;
 #define LIBARCHIVE_VERSION_NUMBER "3003003"
 
 /* Version number of libarchive */
-#define LIBARCHIVE_VERSION_STRING "3.3.3dev"
+#define LIBARCHIVE_VERSION_STRING "3.3.3"
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing
    slash. */
@@ -1261,7 +1265,7 @@ typedef uint64_t uintmax_t;
 #endif /* SAFE_TO_DEFINE_EXTENSIONS */
 
 /* Version number of package */
-#define VERSION "3.3.3dev"
+#define VERSION "3.3.3"
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 /* #undef _FILE_OFFSET_BITS */

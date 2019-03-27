@@ -36,8 +36,8 @@ ScpCommand: scp
 NightlyStartTime: 01:00:00 UTC
 
 # Commands for the build/test/submit cycle
-ConfigureCommand: "../../../../../../Binaries/Malterlib/OSX/x64/MTool" "../../../../../../External/libarchive"
-MakeCommand: ../../../../../../Binaries/Malterlib/OSX/x64/MTool --build . --config "${CTEST_CONFIGURATION_TYPE}"
+ConfigureCommand: "../../../../../../Binaries/Malterlib/OSX/x64/MToolCMake" "../../../../../../External/libarchive"
+MakeCommand: ../../../../../../Binaries/Malterlib/OSX/x64/MToolCMake --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 
 # version control
@@ -72,7 +72,7 @@ UpdateOptions:
 UpdateType: git
 
 # Compiler info
-Compiler: /CompiledFiles/Dependencies/llvm/6.0/build/main/bin/clang++
+Compiler: /CompiledFiles/Dependencies/llvm/8.0/build/main/bin/clang++
 CompilerVersion: 
 
 # Dynamic analysis (MemCheck)

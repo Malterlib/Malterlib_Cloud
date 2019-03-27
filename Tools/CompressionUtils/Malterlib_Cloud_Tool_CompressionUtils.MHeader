@@ -31,6 +31,7 @@
 	Import.CMake_Variables "ENABLE_INSTALL=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_ICONV=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_LZ4=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "ENABLE_ZSTD=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_OPENSSL=1;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_NETTLE=0;@(Import.CMake_Variables)"
 
