@@ -18,7 +18,7 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 	public:
 		using CActorHolder = CDelegatedActorHolder;
-		
+
 		CServer(CDistributedAppState &_AppState);
 		~CServer();
 
@@ -28,10 +28,10 @@ namespace NMib::NCloud::NCloudAPIManager
 			TCFuture<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer &&_Params) override;
 			TCFuture<CSignTempURL::CResult> f_SignTempURL(CSignTempURL &&_Params) override;
 			TCFuture<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) override;
-			
+
 			CServer *m_pThis;
 		};
-		
+
 		struct COpenStackKeystoneInfo
 		{
 			CStr m_Username;
@@ -41,57 +41,57 @@ namespace NMib::NCloud::NCloudAPIManager
 			CStr m_RegionName;
 			CStr m_TenantId;
 		};
-		
+
 		struct COpenStackServiceInfo
 		{
 			CStr m_Token;
 			CTime m_TokenExpiresAt;
 			TCMap<CStr, CStr> m_URLs;
 		};
-		
+
 		struct CCloudContext
 		{
 			CStr const &f_GetName() const
 			{
-				return TCMap<CStr, CCloudContext>::fs_GetKey(*this); 
+				return TCMap<CStr, CCloudContext>::fs_GetKey(*this);
 			}
-			
+
 			COpenStackKeystoneInfo m_KeystoneInfo;
 			CStr m_SwiftStoragePolicy;
-			
+
 			TCUniquePointer<TCActorCallOnce<COpenStackServiceInfo>> m_pGetToken;
-			
+
 			CClock m_LastErrorClock;
 			bool m_bLastWasError = false;
 			CTime m_TokenExpiresAt;
 		};
-		
+
 	private:
 		TCFuture<void> fp_Destroy() override;
 		void fp_Init();
 		void fp_Publish();
-		
+
 		TCFuture<void> fp_SetupCloudContexs();
 		TCFuture<void> fp_SetupPermissions();
 		TCFuture<void> fp_SetupDDPBridge();
 		TCVector<CDistributedTrustDDPBridge::CMethod> fp_GetDDPMethods();
-		
+
 		TCFuture<COpenStackServiceInfo> fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext);
 
 		static TCVector<CStr> fsp_AuditMessages(CStr const &_Error, CExceptionPointer _pException);
-		
+
 		TCActor<CSeparateThreadActor> const &fp_GetCURLQueryActor();
 
 		TCMap<CStr, CCloudContext> mp_CloudContexts;
-		
+
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
 
-		TCDelegatedActorInterface<CCloudAPIManagerImplementation> mp_ProtocolInterface;
-		
+		TCDistributedActorInstance<CCloudAPIManagerImplementation> mp_ProtocolInterface;
+
 		CDistributedAppState &mp_AppState;
-		
+
 		CTrustedPermissionSubscription mp_Permissions;
-		
+
 		TCActor<CSeparateThreadActor> mp_CURLQueryActor;
 
 		TCActor<CDistributedTrustDDPBridge> mp_DDPBridge;

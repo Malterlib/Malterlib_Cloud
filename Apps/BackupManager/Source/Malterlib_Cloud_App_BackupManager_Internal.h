@@ -19,7 +19,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 	public:
 		using CActorHolder = CDelegatedActorHolder;
-		
+
 		CBackupManagerServer(CDistributedAppState &_AppState);
 		~CBackupManagerServer();
 
@@ -28,9 +28,9 @@ namespace NMib::NCloud::NBackupManager
 			CStr m_BackupName;
 			CTime m_BackupTime;
 			CStr m_BackupID;
-			
+
 			CStr f_GetDesc() const;
-			
+
 			bool operator < (CBackupKey const &_Right) const
 			{
 				return fg_TupleReferences(m_BackupName, m_BackupTime, m_BackupID) < fg_TupleReferences(_Right.m_BackupName, _Right.m_BackupTime, _Right.m_BackupID);
@@ -42,7 +42,7 @@ namespace NMib::NCloud::NBackupManager
 			uint64 m_nTransferredBytes = 0;
 			CClock m_Clock{true};
 		};
-		
+
 		struct CBackupInstanceManager;
 		struct CBackupInstanceManager
 		{
@@ -50,7 +50,7 @@ namespace NMib::NCloud::NBackupManager
 			{
 				return TCMap<CBackupKey, CBackupInstanceManager>::fs_GetKey(*this);
 			}
-			
+
 			TCDistributedActor<CBackupInstance> m_BackupInstance;
 			TCLinkedList<TCFunctionMovable<void ()>> m_OnDestroyed;
 			CDistributedAppAuditor m_OwningHost;
@@ -64,24 +64,24 @@ namespace NMib::NCloud::NBackupManager
 		{
 			CBackupDownload();
 			~CBackupDownload();
-			
+
 			CStr const &f_GetDownloadID() const
 			{
 				return TCMap<CStr, CBackupDownload>::fs_GetKey(*this);
 			}
-			
+
 			TCFuture<void> f_Destroy();
-			
+
 			TCDistributedActor<CDirectorySyncSend> m_DirectorySyncSend;
 			CActorSubscription m_Subscription;
 		};
-		
+
 		struct CBackupManagerImplementation : public CBackupManager
 		{
 			auto f_InitBackup(CBackupManager::CInitBackup &&_Params)
 				-> TCFuture<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> override
 			;
-			
+
 			TCFuture<TCVector<CStr>> f_ListBackupSources() override;
 			TCFuture<TCMap<CStr, CBackupInfo>> f_ListBackups(CStr const &_ForBackupSource) override;
 			auto f_DownloadBackup(CDownloadBackup &&_DownloadBackup)
@@ -91,9 +91,9 @@ namespace NMib::NCloud::NBackupManager
 
 			CBackupManagerServer *m_pThis;
 		};
-		
+
 		TCFuture<void> f_Init();
-		
+
 	private:
 		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_Publish();
@@ -104,9 +104,9 @@ namespace NMib::NCloud::NBackupManager
 		TCFuture<TCVector<CStr>> fp_EnumBackupSourcesFromDisk();
 		TCVector<CStr> fp_EnumBackupSources();
 		TCFuture<TCVector<CStr>> fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources);
-		
+
 		TCFuture<void> fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason);
-		
+
 		template <typename tf_CResult>
 		bool fp_CheckBackupKey
 			(
@@ -115,20 +115,20 @@ namespace NMib::NCloud::NBackupManager
 				, CDistributedAppAuditor const &_Auditor
 				, TCPromise<tf_CResult> &_Promise
 			)
-		;		
-		
+		;
+
 		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
 
 		TCMap<CStr, TCActor<CBackupSource>> mp_BackupSources;
 		TCMap<CBackupKey, CBackupInstanceManager> mp_BackupInstances;
 		TCMap<CStr, CBackupDownload> mp_BackupDownloads;
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
-		TCDelegatedActorInterface<CBackupManagerImplementation> mp_ProtocolInterface;
+		TCDistributedActorInstance<CBackupManagerImplementation> mp_ProtocolInterface;
 		CDistributedAppState &mp_AppState;
 		CStr mp_FriendlyName;
-		
+
 		CTrustedPermissionSubscription mp_Permissions;
-		
+
 		TCActor<CSeparateThreadActor> mp_QueryFileActor;
 	};
 }

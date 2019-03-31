@@ -20,7 +20,7 @@ namespace NMib::NCloud::NSecretsManager
 	{
 	public:
 		using CActorHolder = CDelegatedActorHolder;
-		
+
 		CServer(CDistributedAppState &_AppState, TCActor<CSecretsManagerServerDatabase> const &_DatabaseActor);
 		~CServer();
 
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NSecretsManager
 		TCFuture<void> fp_Destroy() override;
 		void fp_Init();
 		void fp_Publish();
-		
+
 		TCFuture<void> fp_SetupPermissions();
 		static void fsp_AddPermissionQueryIndexedByPermission
 			(
@@ -125,13 +125,13 @@ namespace NMib::NCloud::NSecretsManager
 		CActorSubscription fp_ReserveFile(CStr const &_FileName);
 		TCFuture<void> fp_RemoveUnreferencedFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor);
 		void fp_WriteDatabase();
-		
+
 #if DMibConfig_Tests_Enable
 		NConcurrency::TCFuture<CEJSON> f_SyncFileOperations();
 #endif
 
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyFileActorTracker;
-		TCDelegatedActorInterface<CSecretsManagerImplementation> mp_ProtocolInterface;
+		TCDistributedActorInstance<CSecretsManagerImplementation> mp_ProtocolInterface;
 		CDistributedAppState &mp_AppState;
 		CTrustedPermissionSubscription mp_Permissions;
 

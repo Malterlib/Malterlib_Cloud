@@ -4,6 +4,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Process/Platform>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_BackupManagerClient.h"
 #include "Malterlib_Cloud_BackupManagerClient_Internal.h"
@@ -63,57 +64,44 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 		*Internal.m_pDestroyed = true;
-		
-		TCActorResultVector<void> RunningInstancesDestroys;
-		
-		for (auto &BackupInstance : Internal.m_RunningBackupInstances)
-			BackupInstance.m_Instance->f_Destroy() > RunningInstancesDestroys.f_AddResult();
-		
-		Internal.m_RunningBackupInstances.f_Clear();
-		
-		NConcurrency::TCPromise<void> Promise;
-		RunningInstancesDestroys.f_GetResults() > Promise / [this, Promise]
+		{
+			TCActorResultVector<void> RunningInstancesDestroys;
+			for (auto &BackupInstance : Internal.m_RunningBackupInstances)
+				BackupInstance.m_Instance->f_Destroy() > RunningInstancesDestroys.f_AddResult();
+
+			Internal.m_RunningBackupInstances.f_Clear();
+
+			co_await RunningInstancesDestroys.f_GetResults().f_Wrap();
+		}
+		{
+			TCActorResultVector<void> StoppedNotifications;
+			for (auto &fOnStopped : Internal.m_OnBackupStoppedSubscriptions)
+				fOnStopped() > StoppedNotifications.f_AddResult();
+
+			co_await StoppedNotifications.f_GetResults().f_Wrap();
+		}
+		{
+			TCActorResultVector<void> Destroys;
+
+			Internal.m_fOnNewBackup.f_Destroy() > Destroys.f_AddResult();
+
 			{
-				auto &Internal = *mp_pInternal;
-				
-				TCActorResultVector<void> StoppedNotifications;
-				
-				for (auto &fOnStopped : Internal.m_OnBackupStoppedSubscriptions)
-					fOnStopped() > StoppedNotifications.f_AddResult();
-				
-				StoppedNotifications.f_GetResults() > Promise / [this, Promise]
-					{
-						auto &Internal = *mp_pInternal;
-				
-						TCActorResultVector<void> Destroys;
-						
-						Internal.m_fOnNewBackup.f_Destroy() > Destroys.f_AddResult();
-						
-						auto pTracker = fg_Move(Internal.m_pCanDestroyTracker);
-						
-						pTracker->f_Future() > Destroys.f_AddResult();  
-						
-						Destroys.f_GetResults() > Promise / [this, Promise](TCVector<TCAsyncResult<void>> &&_Results)
-							{
-								auto &Internal = *mp_pInternal;
-								g_Dispatch(Internal.m_FileActor) / [AppendStates = fg_Move(Internal.m_AppendStates)]
-									{
-									}
-									> Promise / [this, Promise]
-									{
-										auto &Internal = *mp_pInternal;
-										Internal.m_FileActor->f_Destroy() > Promise;
-									}
-								;
-								
-							}
-						;
-					}
-				;
+				auto pTracker = fg_Move(Internal.m_pCanDestroyTracker);
+				pTracker->f_Future() > Destroys.f_AddResult();
 			}
+			co_await Destroys.f_GetResults().f_Wrap();
+		}
+		co_await
+			(
+				g_Dispatch(Internal.m_FileActor) / [AppendStates = fg_Move(Internal.m_AppendStates)]
+				{
+				}
+			)
 		;
-		
-		return Promise.f_MoveFuture();
+		co_await Internal.m_FileActor->f_Destroy();
+		co_await Internal.m_BackupInterface.f_Destroy();
+
+		co_return {};
 	}
 
 	void CBackupManagerClient::CInternal::fs_CheckDestroy(TCSharedPointer<NAtomic::TCAtomic<bool>> const &_pDestroyed)

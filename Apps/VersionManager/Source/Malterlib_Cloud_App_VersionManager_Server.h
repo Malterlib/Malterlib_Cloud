@@ -16,7 +16,7 @@ namespace NMib::NCloud::NVersionManager
 	{
 	public:
 		using CActorHolder = CDelegatedActorHolder;
-		
+
 		CServer(CDistributedAppState &_AppState);
 		~CServer();
 
@@ -24,12 +24,12 @@ namespace NMib::NCloud::NVersionManager
 		{
 			CVersionDownload();
 			~CVersionDownload();
-			
+
 			CStr const &f_GetDownloadID() const
 			{
 				return TCMap<CStr, CVersionDownload>::fs_GetKey(*this);
 			}
-			
+
 			TCActor<NCloud::CFileTransferSend> m_FileTransferSend;
 			CStr m_Desc;
 		};
@@ -38,29 +38,29 @@ namespace NMib::NCloud::NVersionManager
 		{
 			CVersionUpload();
 			~CVersionUpload();
-			
+
 			CStr const &f_GetUploadID() const
 			{
 				return TCMap<CStr, CVersionUpload>::fs_GetKey(*this);
 			}
-			
+
 			TCActor<CSeparateThreadActor> m_UploadFileAccess;
 			TCActor<NCloud::CFileTransferReceive> m_FileTransferReceive;
 			CActorSubscription m_DownloadSubscription;
-			
+
 			CStr m_Desc;
 		};
-		
+
 		struct CVersion
 		{
 			CVersionManager::CVersionIDAndPlatform const &f_GetIdentifier() const
 			{
 				return TCMap<CVersionManager::CVersionIDAndPlatform, CVersion>::fs_GetKey(*this);
 			}
-			
+
 			CVersionManager::CVersionInformation m_VersionInfo;
 			TCAVLLink<> m_TimeLink;
-			
+
 			struct CCompareTime
 			{
 				bool operator()(CVersion const &_Left, CVersion const &_Right) const
@@ -68,25 +68,25 @@ namespace NMib::NCloud::NVersionManager
 					if (!_Left.m_VersionInfo.m_Time.f_IsValid() && _Right.m_VersionInfo.m_Time.f_IsValid())
 						return true;
 					else if (_Left.m_VersionInfo.m_Time.f_IsValid() && !_Right.m_VersionInfo.m_Time.f_IsValid())
-						return false;					
-					return NStorage::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetIdentifier()) 
+						return false;
+					return NStorage::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetIdentifier())
 						< NStorage::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetIdentifier())
 					;
 				}
 			};
 		};
-		
+
 		struct CApplication
 		{
 			CStr const &f_GetName() const
 			{
 				return TCMap<CStr, CApplication>::fs_GetKey(*this);
 			}
-			
+
 			TCMap<CVersionManager::CVersionIDAndPlatform, CVersion> m_Versions;
 			TCAVLTree<&CVersion::m_TimeLink, CVersion::CCompareTime> m_VersionsByTime;
 		};
-		
+
 		struct CVersionManagerImplementation : public CVersionManager
 		{
 			TCFuture<CListApplications::CResult> f_ListApplications(CListApplications &&_Params) override;
@@ -95,10 +95,10 @@ namespace NMib::NCloud::NVersionManager
 			TCFuture<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) override;
 			TCFuture<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) override;
 			TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) override;
-			
+
 			CServer *m_pThis = nullptr;
 		};
-		
+
 		struct CSubscription
 		{
 			CStr const &f_GetSubscriptionID() const
@@ -113,16 +113,16 @@ namespace NMib::NCloud::NVersionManager
 			TCFunctionMutable<NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult> (CVersionManager::CNewVersionNotifications &&_VersionInfo)>
 				m_fOnNewVersions
 			;
-			
+
 			void f_SendVersions(CVersionManager::CNewVersionNotifications const &_NewVersionNotification) const;
 		};
-		
+
 		struct CSizeInfo
 		{
 			uint32 m_nFiles = 0;
 			uint64 m_nBytes = 0;
 		};
-		
+
 	private:
 		struct CFilteredTagsResult
 		{
@@ -140,7 +140,7 @@ namespace NMib::NCloud::NVersionManager
 
 		TCFuture<void> fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription);
 		void fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity);
-		
+
 		TCFuture<TCSet<CStr>> fp_FilterApplicationsByPermissions(CStr const &_Description, TCSet<CStr> const &_Applications);
 		TCFuture<TCSet<CStr>> fp_EnumApplications();
 		TCSet<CStr> fp_ApplicationSet();
@@ -150,27 +150,27 @@ namespace NMib::NCloud::NVersionManager
 		TCFuture<CSizeInfo> fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo);
 		bool fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version);
 		CSubscription const *fp_GetSubscription(CStr const &_ApplicationName, CStr const &_SubscriptionID) const;
-		
+
 		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
 
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
 
-		TCDelegatedActorInterface<CVersionManagerImplementation> mp_ProtocolInterface;
-		
+		TCDistributedActorInstance<CVersionManagerImplementation> mp_ProtocolInterface;
+
 		CDistributedAppState &mp_AppState;
-		
+
 		CTrustedPermissionSubscription mp_Permissions;
-		
+
 		TCSet<CStr> mp_KnownTags;
-		
+
 		TCMap<CStr, CVersionDownload> mp_VersionDownloads;
 		TCMap<CStr, CVersionUpload> mp_VersionUploads;
-		
+
 		TCActor<CSeparateThreadActor> mp_QueryFileActor;
-		
+
 		TCMap<CStr, CApplication> mp_Applications;
-		
+
 		TCMap<CStr, CSubscription> mp_GlobalVersionSubscriptions;
-		TCMap<CStr, TCMap<CStr, CSubscription>> mp_VersionSubscriptions; 
+		TCMap<CStr, TCMap<CStr, CSubscription>> mp_VersionSubscriptions;
 	};
 }

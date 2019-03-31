@@ -148,10 +148,13 @@ namespace NMib::NCloud::NSecretsManager
 	
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_Destroy()
 	{
+		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroying protocol, uploads and downloads");
+
 		TCPromise<void> Promise;
-		mp_ProtocolInterface.m_Publication.f_Clear();
-		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Protocol detroyed, destroying uploads and downloads");
 		TCActorResultVector<void> Results;
+
+		mp_ProtocolInterface.m_Publication.f_Destroy() > Results.f_AddResult();
+		
 		for (auto &Upload : mp_Uploads)
 			Upload.f_Destroy() > Results.f_AddResult();
 		for (auto &Download : mp_Downloads)

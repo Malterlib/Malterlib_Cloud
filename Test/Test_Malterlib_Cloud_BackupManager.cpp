@@ -172,8 +172,14 @@ public:
 
 		~CBackupClientHelper()
 		{
+			if (m_BackupInterface)
+				m_BackupInterface.f_Destroy().f_CallSync(60.0);
+
+			if (m_ChangeSubscription)
+				m_ChangeSubscription->f_Destroy().f_CallSync(60.0);
+
 			if (m_BackupClient)
-				m_BackupClient->f_BlockDestroy();
+				m_BackupClient->f_Destroy().f_CallSync(60.0);
 		}
 
 		template <CBackupManagerClient::ENotification tf_Notification>
