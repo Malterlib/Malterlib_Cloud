@@ -1,0 +1,48 @@
+// Copyright © 2019 Nonna Holding AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+#pragma once
+
+#include <Mib/Core/Core>
+#include <Mib/Cloud/NetworkTunnel>
+#include <Mib/Concurrency/ConcurrencyManager>
+#include <Mib/Concurrency/DistributedActor>
+#include <Mib/Concurrency/DistributedApp>
+
+namespace NMib::NCloud
+{
+	struct CNetworkTunnelServer : public NConcurrency::CActor
+	{
+		CNetworkTunnelServer
+			(
+			 	NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
+			 	, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
+			 	, NFunction::TCFunctionMovable<NConcurrency::CDistributedAppAuditor (NConcurrency::CCallingHostInfo const &_CallingHostInfo)> &&_AuditorFactory
+			 	, NStr::CStr const &_LogCategory
+			 	, NStr::CStr const &_PermissionPrefix
+			)
+		;
+		~CNetworkTunnelServer();
+
+		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_PublishNetworkTunnel
+			(
+			 	ICNetworkTunnel::CNetworkTunnelName const &_Name
+			 	, NStr::CStr const &_Host
+			 	, uint16 _Port
+			 	, NEncoding::CEJSON &&_MetaData
+			)
+		;
+
+		NConcurrency::TCFuture<void> f_Start();
+
+	private:
+		NConcurrency::TCFuture<void> fp_Destroy() override;
+
+		struct CInternal;
+		NStorage::TCUniquePointer<CInternal> mp_pInternal;
+	};
+}
+
+#ifndef DMibPNoShortCuts
+	using namespace NMib::NCloud;
+#endif

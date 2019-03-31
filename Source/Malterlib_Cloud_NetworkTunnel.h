@@ -1,0 +1,48 @@
+// Copyright © 2019 Nonna Holding AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+#pragma once
+
+#include <Mib/Core/Core>
+#include <Mib/Concurrency/ConcurrencyManager>
+#include <Mib/Concurrency/DistributedActor>
+#include <Mib/Encoding/EJSON>
+
+namespace NMib::NCloud
+{
+	struct ICNetworkTunnel : public NConcurrency::CActor
+	{
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/NetworkTunnel";
+		
+		ICNetworkTunnel();
+		~ICNetworkTunnel();
+
+		enum : uint32
+		{
+			EMinProtocolVersion = 0x101
+			, EProtocolVersion = 0x101
+		};
+
+		using CNetworkTunnelName = NStr::CStr;
+
+		struct CNetworkTunnel
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NEncoding::CEJSON m_MetaData;
+		};
+
+		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSecureByteVector const &_Data)>;
+
+
+		virtual NConcurrency::TCFuture<NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() = 0;
+		virtual NConcurrency::TCFuture<FSendBytes> f_OpenConnection(CNetworkTunnelName const &_Name, FSendBytes &&_fOnReceive) = 0;
+	};
+}
+
+#ifndef DMibPNoShortCuts
+	using namespace NMib::NCloud;
+#endif
+
+#include "Malterlib_Cloud_NetworkTunnel.hpp"

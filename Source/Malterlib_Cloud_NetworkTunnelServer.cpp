@@ -1,0 +1,313 @@
+// Copyright © 2019 Nonna Holding AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+#include <Mib/Core/Core>
+#include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Network/AsyncSocket>
+
+#include "Malterlib_Cloud_NetworkTunnelServer.h"
+
+namespace NMib::NCloud
+{
+	using namespace NStr;
+	using namespace NConcurrency;
+	using namespace NContainer;
+	using namespace NNetwork;
+	using namespace NStorage;
+	using namespace NEncoding;
+	using namespace NFunction;
+
+	struct CNetworkTunnelServer::CInternal : public CActorInternal
+	{
+		CInternal
+			(
+			 	CNetworkTunnelServer *_pThis
+			 	, TCActor<CActorDistributionManager> const &_DistributionManager
+			 	, TCActor<CDistributedActorTrustManager> const &_TrustManager
+			 	, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo)> &&_AuditorFactory
+			 	, CStr const &_LogCategory
+			 	, CStr const &_PermissionPrefix
+			)
+			: m_pThis(_pThis)
+			, m_DistributionManager(_DistributionManager)
+			, m_TrustManager(_TrustManager)
+			, m_AuditorFactory(fg_Move(_AuditorFactory))
+			, m_LogCategory(_LogCategory)
+			, m_PermissionPrefix(_PermissionPrefix)
+		{
+		}
+
+		struct CNetworkTunnel
+		{
+			CStr m_Host;
+			uint16 m_Port = 0;
+			CEJSON m_MetaData;
+		};
+
+		struct CConnection
+		{
+			TCActorInterface<CAsyncSocketActor> m_Socket;
+			ICNetworkTunnel::FSendBytes m_fSendData;
+		};
+
+		struct CNetworkTunnelImplementation : public ICNetworkTunnel
+		{
+			TCFuture<NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() override
+			{
+				auto &Internal = *m_pThis->mp_pInternal;
+
+				auto AppAuditor = Internal.m_AuditorFactory(fg_GetCallingHostInfo());
+
+				TCSet<CNetworkTunnelName> Tunnels;
+
+				NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+				Permissions["//ALL//"] = {{"{}/ConnectAll"_f << Internal.m_PermissionPrefix}};
+				for (auto &Tunnel : Internal.m_NetworkTunnels)
+				{
+					auto &TunnelName = Internal.m_NetworkTunnels.fs_GetKey(Tunnel);
+					Permissions[TunnelName] =
+						{
+							CPermissionQuery{"{}/Connect/{}"_f << Internal.m_PermissionPrefix << TunnelName}.f_Description("Connect to {} tunnel"_f << TunnelName)
+						}
+					;
+				}
+
+				auto HasPermissions = co_await (Internal.m_Permissions.f_HasPermissions("Enum tunnels", Permissions) % AppAuditor);
+
+				TCMap<CNetworkTunnelName, CNetworkTunnel> ReturnTunnels;
+				TCSet<CNetworkTunnelName> TunnelNames;
+				bool bAccessAll = HasPermissions["//ALL//"];
+
+				for (auto &Tunnel : Internal.m_NetworkTunnels)
+				{
+					auto &TunnelName = Internal.m_NetworkTunnels.fs_GetKey(Tunnel);
+					if (!bAccessAll && !HasPermissions[TunnelName])
+						continue;
+					ReturnTunnels[TunnelName].m_MetaData = Tunnel.m_MetaData;
+					TunnelNames[TunnelName];
+				}
+
+				AppAuditor.f_Info("Enumerated tunnels: {vs}"_f << TunnelNames);
+
+				co_return ReturnTunnels;
+			}
+
+			TCFuture<FSendBytes> f_OpenConnection(CNetworkTunnelName const &_Name, FSendBytes &&_fOnReceive) override
+			{
+				auto &Internal = *m_pThis->mp_pInternal;
+
+				auto AppAuditor = Internal.m_AuditorFactory(fg_GetCallingHostInfo());
+
+				TCVector<CStr> Permissions = {"{}/ConnectAll"_f << Internal.m_PermissionPrefix, "{}/{}/Connect"_f << Internal.m_PermissionPrefix << _Name};
+
+				bool bHasPermisions = co_await (Internal.m_Permissions.f_HasPermission("Open connection", Permissions) % AppAuditor);
+
+				if (!bHasPermisions)
+					co_return AppAuditor.f_AccessDenied("(Download backup)");
+
+				auto pTunnel = Internal.m_NetworkTunnels.f_FindEqual(_Name);
+				if (!pTunnel)
+					co_return DMibErrorInstance("No such network tunnel");
+
+
+				auto NewConnection = co_await
+					(
+					 	Internal.m_SocketClient(&CAsyncSocketClientActor::f_Connect, pTunnel->m_Host, "", ENetAddressType_None, pTunnel->m_Port, nullptr) % AppAuditor
+					)
+				;
+
+				mint ConnectionID = ++Internal.m_ConnectionID;
+
+				auto &Connection = Internal.m_Connections[ConnectionID];
+
+				auto Cleanup = g_OnScopeExitActor > [pThis = m_pThis, ConnectionID]
+					{
+						auto &Internal = *pThis->mp_pInternal;
+						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
+						if (pConnection)
+						{
+							if (pConnection->m_Socket)
+								pConnection->m_Socket->f_Destroy() > fg_DiscardResult();
+							pConnection->m_fSendData.f_Destroy() > fg_DiscardResult();
+
+							Internal.m_Connections.f_Remove(pConnection);
+						}
+					}
+				;
+
+				Connection.m_fSendData = fg_Move(_fOnReceive);
+
+				CAsyncSocketCallbacks SocketCallbacks;
+				SocketCallbacks.m_fOnClose = g_ActorFunctor / [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
+					(EAsyncSocketStatus _Reason, NStr::CStr const &_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
+					{
+						auto &Internal = *pThis->mp_pInternal;
+						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
+						if (pConnection)
+						{
+							auto Connection = fg_Move(*pConnection);
+							Internal.m_Connections.f_Remove(pConnection);
+
+							if (Connection.m_Socket)
+								co_await Connection.m_Socket->f_Destroy();
+							co_await Connection.m_fSendData.f_Destroy();
+						}
+						co_return {};
+					}
+				;
+
+				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
+					(TCSharedPointer<CSecureByteVector> const &_pMessage) -> TCFuture<void>
+					{
+						auto &Internal = *pThis->mp_pInternal;
+						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
+						if (!pConnection)
+							co_return DMibErrorInstance("Socket no longer exists");
+						co_await pConnection->m_fSendData(*_pMessage);
+						co_return {};
+					}
+				;
+
+				Connection.m_Socket = co_await (NewConnection.f_Accept(fg_Move(SocketCallbacks)) % AppAuditor);
+
+				Cleanup->f_Clear();
+
+				AppAuditor.f_Info("Opened tunnel connection: {}"_f << _Name);
+
+				co_return g_ActorFunctor
+					(
+						g_ActorSubscription / [pThis = m_pThis, ConnectionID]() -> TCFuture<void>
+					 	{
+							auto &Internal = *pThis->mp_pInternal;
+							auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
+							if (pConnection)
+							{
+								auto Connection = fg_Move(*pConnection);
+								Internal.m_Connections.f_Remove(pConnection);
+
+								if (Connection.m_Socket)
+									co_await Connection.m_Socket->f_Destroy();
+								co_await Connection.m_fSendData.f_Destroy();
+							}
+							co_return {};
+						}
+					)
+					/ [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](NContainer::CSecureByteVector const &_Data) -> TCFuture<void>
+					{
+						auto &Internal = *pThis->mp_pInternal;
+						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
+						if (!pConnection)
+							co_return DMibErrorInstance("Socket no longer exists");
+						co_await pConnection->m_Socket(&CAsyncSocketActor::f_SendData, fg_Construct(_Data), 0);
+						co_return {};
+					}
+				;
+			}
+
+			CNetworkTunnelServer *m_pThis = nullptr;
+		};
+
+		TCFuture<void> f_SetupPermissions();
+
+		CNetworkTunnelServer *m_pThis;
+		TCActor<CActorDistributionManager> m_DistributionManager;
+		TCActor<CDistributedActorTrustManager> m_TrustManager;
+		CStr m_LogCategory;
+		CStr m_PermissionPrefix;
+
+		TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo)> m_AuditorFactory;
+		TCDistributedActorInstance<CNetworkTunnelImplementation> m_NetworkTunnelInstance;
+		CTrustedPermissionSubscription m_Permissions;
+
+		TCMap<CStr, CNetworkTunnel> m_NetworkTunnels;
+		TCActor<CAsyncSocketClientActor> m_SocketClient = fg_Construct();
+		TCMap<mint, CConnection> m_Connections;
+
+		mint m_ConnectionID = 0;
+	};
+
+	CNetworkTunnelServer::CNetworkTunnelServer
+		(
+		 	TCActor<CActorDistributionManager> const &_DistributionManager
+		 	, TCActor<CDistributedActorTrustManager> const &_TrustManager
+		 	, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo)> &&_AuditorFactory
+		 	, CStr const &_LogCategory
+		 	, CStr const &_PermissionPrefix
+		)
+		: mp_pInternal(fg_Construct(this, _DistributionManager, _TrustManager, fg_Move(_AuditorFactory), _LogCategory, _PermissionPrefix))
+	{
+	}
+
+	CNetworkTunnelServer::~CNetworkTunnelServer() = default;
+
+	TCFuture<void> CNetworkTunnelServer::fp_Destroy()
+	{
+		auto &Internal = *mp_pInternal;
+
+		TCActorResultVector<void> Destroys;
+		for (auto &Connection : Internal.m_Connections)
+		{
+			if (Connection.m_Socket)
+				Connection.m_Socket->f_Destroy() > Destroys.f_AddResult();
+			Connection.m_fSendData.f_Destroy() > Destroys.f_AddResult();
+		}
+		Internal.m_Connections.f_Clear();
+
+		co_await Destroys.f_GetResults();
+		co_await Internal.m_NetworkTunnelInstance.f_Destroy();
+		co_return {};
+	}
+
+	TCFuture<void> CNetworkTunnelServer::CInternal::f_SetupPermissions()
+	{
+		TCSet<CStr> Permissions{CStr("{}/ConnectAll"_f << m_PermissionPrefix)};
+
+		co_await m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
+
+		TCVector<CStr> SubscribePermissions;
+		SubscribePermissions.f_Insert("{}/*"_f << m_PermissionPrefix);
+
+		m_Permissions = co_await m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(m_pThis));
+
+		co_return {};
+	}
+
+	TCFuture<void> CNetworkTunnelServer::f_Start()
+	{
+		auto &Internal = *mp_pInternal;
+
+		co_await Internal.f_SetupPermissions();
+		co_await Internal.m_NetworkTunnelInstance.f_Publish<ICNetworkTunnel>(Internal.m_DistributionManager, this);
+		co_return {};
+	}
+
+	TCFuture<CActorSubscription> CNetworkTunnelServer::f_PublishNetworkTunnel
+		(
+		 	ICNetworkTunnel::CNetworkTunnelName const &_Name
+		 	, CStr const &_Host
+		 	, uint16 _Port
+		 	, NEncoding::CEJSON &&_MetaData
+		)
+	{
+		auto &Internal = *mp_pInternal;
+
+		auto TunnelMap = Internal.m_NetworkTunnels(_Name, CInternal::CNetworkTunnel{_Host, _Port, fg_Move(_MetaData)});
+		if (!TunnelMap.f_WasCreated())
+			co_return DMibErrorInstance("A tunnel with same name is already published");
+
+		auto Permissions = TCSet<CStr>{fg_Format("{}/Connect/{}", Internal.m_PermissionPrefix, _Name)};
+		co_await Internal.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
+
+		co_return
+			(
+				g_ActorSubscription / [this, Permissions, _Name]() mutable -> TCFuture<void>
+				{
+					auto &Internal = *mp_pInternal;
+					co_await Internal.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions)).f_Wrap();
+					Internal.m_NetworkTunnels.f_Remove(_Name);
+					co_return {};
+				}
+			)
+		;
+	}
+}
