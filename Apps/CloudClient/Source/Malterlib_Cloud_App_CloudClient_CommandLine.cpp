@@ -41,5 +41,6 @@ namespace NMib::NCloud::NCloudClient
 		fp_BackupManager_RegisterCommands(o_CommandLine.f_AddSection("Backup Manager", "Commands to control backup managers"));
 		fp_VersionManager_RegisterCommands(o_CommandLine.f_AddSection("Version Manager", "Commands to control version managers"));
 		fp_SecretsManager_RegisterCommands(o_CommandLine.f_AddSection("Secrets Manager", "Commands to control secrets managers"));
+		fp_NetworkTunnel_RegisterCommands(o_CommandLine.f_AddSection("Network Tunnel", "Commands to use network tunnels"));
 	}
 }

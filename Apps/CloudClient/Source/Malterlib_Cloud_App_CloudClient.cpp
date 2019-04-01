@@ -32,6 +32,9 @@ namespace NMib::NCloud::NCloudClient
 	{	
 		TCActorResultVector<void> Destroys;
 
+		for (auto &StopPromise : mp_AppStopPromises)
+			StopPromise.f_SetResult();
+
 		if (mp_DownloadBackupSubscription)
 			mp_DownloadBackupSubscription->f_Destroy() > Destroys.f_AddResult();
 		

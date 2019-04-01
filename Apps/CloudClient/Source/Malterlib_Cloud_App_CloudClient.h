@@ -11,6 +11,8 @@
 #include <Mib/Cloud/BackupManager>
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Cloud/SecretsManager>
+#include <Mib/Cloud/NetworkTunnel>
+#include <Mib/Cloud/NetworkTunnelClient>
 
 namespace NMib::NCloud::NCloudClient
 {
@@ -29,7 +31,6 @@ namespace NMib::NCloud::NCloudClient
 
 		void fp_ParseCommonOptions(NEncoding::CEJSON const &_Params);
 
-		
 		// Backup Manager
 		void fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_BackupManager_SubscribeToServers();
@@ -88,9 +89,18 @@ namespace NMib::NCloud::NCloudClient
 		TCFuture<uint32> fp_CommandLine_SecretsManager_Upload(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> fp_CommandLine_SecretsManager_Download(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
+		// Network tunnel
+		void fp_NetworkTunnel_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
+		TCFuture<uint32> fp_CommandLine_NetworkTunnel_EnumTunnels(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<void> fp_NetworkTunnel_Init();
+		TCFuture<TCMap<CStr, TCMap<ICNetworkTunnel::CNetworkTunnelName, ICNetworkTunnel::CNetworkTunnel>>> fp_NetworkTunnel_Filter(CEJSON const &_Params);
+
 		fp64 mp_Timeout = 0.0;
 
 		TCVector<TCActor<CProcessLaunchActor>> mp_LaunchActors;
+
+		TCVector<TCPromise<void>> mp_AppStopPromises;
 
 		// Backup Manager
 		TCTrustedActorSubscription<CBackupManager> mp_BackupManagers;
@@ -103,5 +113,9 @@ namespace NMib::NCloud::NCloudClient
 		// Secrets Manager
 		TCTrustedActorSubscription<CSecretsManager> mp_SecretsManagers;
 		CActorSubscription mp_UploadSubscription;
+
+		// Network Tunnel
+		TCVector<CActorSubscription> mp_TunnelSubscriptions;
+		TCActor<CNetworkTunnelClient> mp_TunnelClient;
 	};
 }
