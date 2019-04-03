@@ -5,7 +5,7 @@
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Network/AsyncSocket>
 
-#include "Malterlib_Cloud_NetworkTunnelServer.h"
+#include "Malterlib_Cloud_NetworkTunnelsServer.h"
 
 namespace NMib::NCloud
 {
@@ -17,11 +17,11 @@ namespace NMib::NCloud
 	using namespace NEncoding;
 	using namespace NFunction;
 
-	struct CNetworkTunnelServer::CInternal : public CActorInternal
+	struct CNetworkTunnelsServer::CInternal : public CActorInternal
 	{
 		CInternal
 			(
-			 	CNetworkTunnelServer *_pThis
+			 	CNetworkTunnelsServer *_pThis
 			 	, TCActor<CActorDistributionManager> const &_DistributionManager
 			 	, TCActor<CDistributedActorTrustManager> const &_TrustManager
 			 	, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo)> &&_AuditorFactory
@@ -47,10 +47,10 @@ namespace NMib::NCloud
 		struct CConnection
 		{
 			TCActorInterface<CAsyncSocketActor> m_Socket;
-			ICNetworkTunnel::FSendBytes m_fSendData;
+			ICNetworkTunnels::FSendBytes m_fSendData;
 		};
 
-		struct CNetworkTunnelImplementation : public ICNetworkTunnel
+		struct CNetworkTunnelImplementation : public ICNetworkTunnels
 		{
 			TCFuture<NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() override
 			{
@@ -120,27 +120,10 @@ namespace NMib::NCloud
 
 				auto &Connection = Internal.m_Connections[ConnectionID];
 
-				auto Cleanup = g_OnScopeExitActor > [pThis = m_pThis, ConnectionID]
+				auto fCleanupConnection = [pThis = m_pThis, ConnectionID]() -> TCFuture<void>
 					{
-						auto &Internal = *pThis->mp_pInternal;
-						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
-						if (pConnection)
-						{
-							if (pConnection->m_Socket)
-								pConnection->m_Socket->f_Destroy() > fg_DiscardResult();
-							pConnection->m_fSendData.f_Destroy() > fg_DiscardResult();
+						co_await ECoroutineFlag_AllowReferences;
 
-							Internal.m_Connections.f_Remove(pConnection);
-						}
-					}
-				;
-
-				Connection.m_fSendData = fg_Move(_fOnReceive);
-
-				CAsyncSocketCallbacks SocketCallbacks;
-				SocketCallbacks.m_fOnClose = g_ActorFunctor / [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
-					(EAsyncSocketStatus _Reason, NStr::CStr const &_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
-					{
 						auto &Internal = *pThis->mp_pInternal;
 						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
 						if (pConnection)
@@ -156,13 +139,32 @@ namespace NMib::NCloud
 					}
 				;
 
+				auto Cleanup = g_OnScopeExitActor > [pThis = m_pThis, fCleanupConnection]() mutable
+					{
+						(pThis->self / fg_Move(fCleanupConnection)) > fg_DiscardResult();
+					}
+				;
+
+				Connection.m_fSendData = fg_Move(_fOnReceive);
+
+				CAsyncSocketCallbacks SocketCallbacks;
+				SocketCallbacks.m_fOnClose = g_ActorFunctor / [fCleanupConnection, AllowDestroy = g_AllowWrongThreadDestroy]
+					(EAsyncSocketStatus _Reason, NStr::CStr const &_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
+					{
+						co_await fCleanupConnection();
+						co_return {};
+					}
+				;
+
 				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
 					(TCSharedPointer<CSecureByteVector> const &_pMessage) -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
+
 						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
 						if (!pConnection)
 							co_return DMibErrorInstance("Socket no longer exists");
+
 						co_await pConnection->m_fSendData(*_pMessage);
 						co_return {};
 					}
@@ -176,40 +178,26 @@ namespace NMib::NCloud
 
 				co_return g_ActorFunctor
 					(
-						g_ActorSubscription / [pThis = m_pThis, ConnectionID]() -> TCFuture<void>
-					 	{
-							auto &Internal = *pThis->mp_pInternal;
-							auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
-							if (pConnection)
-							{
-								auto Connection = fg_Move(*pConnection);
-								Internal.m_Connections.f_Remove(pConnection);
-
-								if (Connection.m_Socket)
-									co_await Connection.m_Socket->f_Destroy();
-								co_await Connection.m_fSendData.f_Destroy();
-							}
-							co_return {};
-						}
+						g_ActorSubscription / fCleanupConnection
 					)
-					/ [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](NContainer::CSecureByteVector const &_Data) -> TCFuture<void>
+					/ [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](NContainer::CSecureByteVector &&_Data) -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
 						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
 						if (!pConnection)
 							co_return DMibErrorInstance("Socket no longer exists");
-						co_await pConnection->m_Socket(&CAsyncSocketActor::f_SendData, fg_Construct(_Data), 0);
+						co_await pConnection->m_Socket(&CAsyncSocketActor::f_SendData, fg_Construct(fg_Move(_Data)), 0);
 						co_return {};
 					}
 				;
 			}
 
-			CNetworkTunnelServer *m_pThis = nullptr;
+			CNetworkTunnelsServer *m_pThis = nullptr;
 		};
 
 		TCFuture<void> f_SetupPermissions();
 
-		CNetworkTunnelServer *m_pThis;
+		CNetworkTunnelsServer *m_pThis;
 		TCActor<CActorDistributionManager> m_DistributionManager;
 		TCActor<CDistributedActorTrustManager> m_TrustManager;
 		CStr m_LogCategory;
@@ -226,7 +214,7 @@ namespace NMib::NCloud
 		mint m_ConnectionID = 0;
 	};
 
-	CNetworkTunnelServer::CNetworkTunnelServer
+	CNetworkTunnelsServer::CNetworkTunnelsServer
 		(
 		 	TCActor<CActorDistributionManager> const &_DistributionManager
 		 	, TCActor<CDistributedActorTrustManager> const &_TrustManager
@@ -238,9 +226,9 @@ namespace NMib::NCloud
 	{
 	}
 
-	CNetworkTunnelServer::~CNetworkTunnelServer() = default;
+	CNetworkTunnelsServer::~CNetworkTunnelsServer() = default;
 
-	TCFuture<void> CNetworkTunnelServer::fp_Destroy()
+	TCFuture<void> CNetworkTunnelsServer::fp_Destroy()
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -258,7 +246,7 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	TCFuture<void> CNetworkTunnelServer::CInternal::f_SetupPermissions()
+	TCFuture<void> CNetworkTunnelsServer::CInternal::f_SetupPermissions()
 	{
 		TCSet<CStr> Permissions{CStr("{}/ConnectAll"_f << m_PermissionPrefix)};
 
@@ -272,18 +260,18 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	TCFuture<void> CNetworkTunnelServer::f_Start()
+	TCFuture<void> CNetworkTunnelsServer::f_Start()
 	{
 		auto &Internal = *mp_pInternal;
 
 		co_await Internal.f_SetupPermissions();
-		co_await Internal.m_NetworkTunnelInstance.f_Publish<ICNetworkTunnel>(Internal.m_DistributionManager, this);
+		co_await Internal.m_NetworkTunnelInstance.f_Publish<ICNetworkTunnels>(Internal.m_DistributionManager, this);
 		co_return {};
 	}
 
-	TCFuture<CActorSubscription> CNetworkTunnelServer::f_PublishNetworkTunnel
+	TCFuture<CActorSubscription> CNetworkTunnelsServer::f_PublishNetworkTunnel
 		(
-		 	ICNetworkTunnel::CNetworkTunnelName const &_Name
+		 	ICNetworkTunnels::CNetworkTunnelName const &_Name
 		 	, CStr const &_Host
 		 	, uint16 _Port
 		 	, NEncoding::CEJSON &&_MetaData

@@ -10,12 +10,12 @@
 
 namespace NMib::NCloud
 {
-	struct ICNetworkTunnel : public NConcurrency::CActor
+	struct ICNetworkTunnels : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/NetworkTunnel";
 		
-		ICNetworkTunnel();
-		~ICNetworkTunnel();
+		ICNetworkTunnels();
+		~ICNetworkTunnels();
 
 		enum : uint32
 		{
@@ -33,8 +33,7 @@ namespace NMib::NCloud
 			NEncoding::CEJSON m_MetaData;
 		};
 
-		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSecureByteVector const &_Data)>;
-
+		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSecureByteVector &&_Data)>;
 
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() = 0;
 		virtual NConcurrency::TCFuture<FSendBytes> f_OpenConnection(CNetworkTunnelName const &_Name, FSendBytes &&_fOnReceive) = 0;
@@ -45,4 +44,4 @@ namespace NMib::NCloud
 	using namespace NMib::NCloud;
 #endif
 
-#include "Malterlib_Cloud_NetworkTunnel.hpp"
+#include "Malterlib_Cloud_NetworkTunnels.hpp"

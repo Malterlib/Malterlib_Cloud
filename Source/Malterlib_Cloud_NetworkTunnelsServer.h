@@ -4,16 +4,16 @@
 #pragma once
 
 #include <Mib/Core/Core>
-#include <Mib/Cloud/NetworkTunnel>
+#include <Mib/Cloud/NetworkTunnels>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedApp>
 
 namespace NMib::NCloud
 {
-	struct CNetworkTunnelServer : public NConcurrency::CActor
+	struct CNetworkTunnelsServer : public NConcurrency::CActor
 	{
-		CNetworkTunnelServer
+		CNetworkTunnelsServer
 			(
 			 	NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
 			 	, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
@@ -22,11 +22,11 @@ namespace NMib::NCloud
 			 	, NStr::CStr const &_PermissionPrefix
 			)
 		;
-		~CNetworkTunnelServer();
+		~CNetworkTunnelsServer();
 
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_PublishNetworkTunnel
 			(
-			 	ICNetworkTunnel::CNetworkTunnelName const &_Name
+			 	ICNetworkTunnels::CNetworkTunnelName const &_Name
 			 	, NStr::CStr const &_Host
 			 	, uint16 _Port
 			 	, NEncoding::CEJSON &&_MetaData

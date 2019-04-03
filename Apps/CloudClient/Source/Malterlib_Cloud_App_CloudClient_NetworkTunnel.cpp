@@ -85,15 +85,15 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<void> CCloudClientAppActor::fp_NetworkTunnel_Init()
 	{
-		if (!mp_TunnelClient)
+		if (!mp_TunnelsClient)
 		{
-			mp_TunnelClient = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager);
-			co_await mp_TunnelClient(&CNetworkTunnelClient::f_Start);
+			mp_TunnelsClient = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager);
+			co_await mp_TunnelsClient(&CNetworkTunnelsClient::f_Start);
 		}
 		co_return {};
 	}
 
-	TCFuture<TCMap<CStr, TCMap<ICNetworkTunnel::CNetworkTunnelName, ICNetworkTunnel::CNetworkTunnel>>> CCloudClientAppActor::fp_NetworkTunnel_Filter(CEJSON const &_Params)
+	TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> CCloudClientAppActor::fp_NetworkTunnel_Filter(CEJSON const &_Params)
 	{
 		co_await self(&CCloudClientAppActor::fp_NetworkTunnel_Init);
 
@@ -105,9 +105,9 @@ namespace NMib::NCloud::NCloudClient
 		for (auto &Host : _Params["Hosts"].f_Array())
 			Hosts[Host.f_String()];
 
-		auto TunnelsPerHost = co_await mp_TunnelClient(&CNetworkTunnelClient::f_EnumTunnels);
+		auto TunnelsPerHost = co_await mp_TunnelsClient(&CNetworkTunnelsClient::f_EnumTunnels);
 
-		TCMap<CStr, TCMap<ICNetworkTunnel::CNetworkTunnelName, ICNetworkTunnel::CNetworkTunnel>> Return;
+		TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>> Return;
 		for (auto &Tunnels : TunnelsPerHost)
 		{
 			auto &HostID = TunnelsPerHost.fs_GetKey(Tunnels);
@@ -173,7 +173,7 @@ namespace NMib::NCloud::NCloudClient
 		if (TunnelsPerHost.f_IsEmpty())
 			co_return DMibErrorInstance("No matching tunnels found");
 
-		TCActorResultMap<CTunnelKey, CNetworkTunnelClient::CTunnel> OpenedTunnelResults;
+		TCActorResultMap<CTunnelKey, CNetworkTunnelsClient::CTunnel> OpenedTunnelResults;
 		TCMap<CTunnelKey, CStr> URLTemplates;
 		for (auto &Tunnels : TunnelsPerHost)
 		{
@@ -190,9 +190,9 @@ namespace NMib::NCloud::NCloudClient
 				else
 					URLTemplate = "{Host}:{Port}";
 
-				mp_TunnelClient
+				mp_TunnelsClient
 					(
-						&CNetworkTunnelClient::f_OpenTunnel
+						&CNetworkTunnelsClient::f_OpenTunnel
 						, HostID
 						, TunnelName
 						, g_ActorFunctor / [=](CNetAddress const &_Address) -> TCFuture<void>

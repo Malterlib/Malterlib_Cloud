@@ -11,8 +11,8 @@
 #include <Mib/Cloud/BackupManager>
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Cloud/SecretsManager>
-#include <Mib/Cloud/NetworkTunnel>
-#include <Mib/Cloud/NetworkTunnelClient>
+#include <Mib/Cloud/NetworkTunnels>
+#include <Mib/Cloud/NetworkTunnelsClient>
 
 namespace NMib::NCloud::NCloudClient
 {
@@ -94,7 +94,7 @@ namespace NMib::NCloud::NCloudClient
 		TCFuture<uint32> fp_CommandLine_NetworkTunnel_EnumTunnels(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<void> fp_NetworkTunnel_Init();
-		TCFuture<TCMap<CStr, TCMap<ICNetworkTunnel::CNetworkTunnelName, ICNetworkTunnel::CNetworkTunnel>>> fp_NetworkTunnel_Filter(CEJSON const &_Params);
+		TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> fp_NetworkTunnel_Filter(CEJSON const &_Params);
 
 		fp64 mp_Timeout = 0.0;
 
@@ -116,6 +116,6 @@ namespace NMib::NCloud::NCloudClient
 
 		// Network Tunnel
 		TCVector<CActorSubscription> mp_TunnelSubscriptions;
-		TCActor<CNetworkTunnelClient> mp_TunnelClient;
+		TCActor<CNetworkTunnelsClient> mp_TunnelsClient;
 	};
 }

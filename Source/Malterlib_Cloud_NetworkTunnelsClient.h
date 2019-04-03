@@ -4,22 +4,22 @@
 #pragma once
 
 #include <Mib/Core/Core>
-#include <Mib/Cloud/NetworkTunnel>
+#include <Mib/Cloud/NetworkTunnels>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedApp>
 
 namespace NMib::NCloud
 {
-	struct CNetworkTunnelClient : public NConcurrency::CActor
+	struct CNetworkTunnelsClient : public NConcurrency::CActor
 	{
-		CNetworkTunnelClient
+		CNetworkTunnelsClient
 			(
 			 	NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
 			 	, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
 			)
 		;
-		~CNetworkTunnelClient();
+		~CNetworkTunnelsClient();
 
 		struct CTunnel
 		{
@@ -29,12 +29,12 @@ namespace NMib::NCloud
 
 		NConcurrency::TCFuture<void> f_Start();
 
-		NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, NContainer::TCMap<ICNetworkTunnel::CNetworkTunnelName, ICNetworkTunnel::CNetworkTunnel>>> f_EnumTunnels();
+		NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, NContainer::TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> f_EnumTunnels();
 
 		NConcurrency::TCFuture<CTunnel> f_OpenTunnel
 			(
 			 	NStr::CStr const &_HostID
-			 	, ICNetworkTunnel::CNetworkTunnelName const &_TunnelName
+			 	, ICNetworkTunnels::CNetworkTunnelName const &_TunnelName
 			 	, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address)> &&_fOnConnection
 			 	, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Message)> &&_fOnClose
 			 	, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Error)> &&_fOnError

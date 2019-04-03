@@ -1,7 +1,7 @@
 #include <Mib/Core/Core>
-#include <Mib/Cloud/NetworkTunnel>
-#include <Mib/Cloud/NetworkTunnelServer>
-#include <Mib/Cloud/NetworkTunnelClient>
+#include <Mib/Cloud/NetworkTunnels>
+#include <Mib/Cloud/NetworkTunnelsServer>
+#include <Mib/Cloud/NetworkTunnelsClient>
 #include <Mib/Concurrency/DistributedActorTestHelpers>
 #include <Mib/Concurrency/DistributedTrustTestHelpers>
 #include <Mib/Concurrency/DistributedAppTestHelpers>
@@ -53,9 +53,9 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				)
 			;
 
-			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelServer::f_PublishNetworkTunnel, "TestTunnel", "localhost", g_TestConnectionPort, CEJSON{}));
+			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", "localhost", g_TestConnectionPort, CEJSON{}));
 
-			co_await m_TunnelServer(&CNetworkTunnelServer::f_Start);
+			co_await m_TunnelServer(&CNetworkTunnelsServer::f_Start);
 
 			co_return {};
 		}
@@ -74,7 +74,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			co_return {};
 		}
 
-		TCActor<CNetworkTunnelServer> m_TunnelServer;
+		TCActor<CNetworkTunnelsServer> m_TunnelServer;
 		TCVector<CActorSubscription> m_PublishedTunnels;
 	};
 
@@ -95,7 +95,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		{
 			m_TunnelClient = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager);
 
-			co_await m_TunnelClient(&CNetworkTunnelClient::f_Start);
+			co_await m_TunnelClient(&CNetworkTunnelsClient::f_Start);
 
 			co_return {};
 		}
@@ -120,7 +120,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			{
 				auto Tunnel = co_await m_TunnelClient
 					(
-					 	&CNetworkTunnelClient::f_OpenTunnel
+					 	&CNetworkTunnelsClient::f_OpenTunnel
 					 	, _Params["HostID"].f_String()
 					 	, _Params["TunnelName"].f_String()
 						, g_ActorFunctor / [](CNetAddress const &_Address) -> TCFuture<void> // New connection
@@ -153,7 +153,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			}
 			else if (_Command == "EnumTunnels")
 			{
-				auto Tunnels = co_await m_TunnelClient(&CNetworkTunnelClient::f_EnumTunnels);
+				auto Tunnels = co_await m_TunnelClient(&CNetworkTunnelsClient::f_EnumTunnels);
 
 				CEJSON Return;
 
@@ -175,7 +175,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		}
 
 		TCVector<CActorSubscription> m_TunnelSubscriptions;
-		TCActor<CNetworkTunnelClient> m_TunnelClient;
+		TCActor<CNetworkTunnelsClient> m_TunnelClient;
 	};
 
 	void f_DoTests()
@@ -320,7 +320,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 					(
 					 	TunnelClientTrust
 					 	, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
-					 	, fNamespaceHosts(ICNetworkTunnel::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID})
+					 	, fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID})
 					)
 					.f_CallSync(g_Timeout)
 				;
