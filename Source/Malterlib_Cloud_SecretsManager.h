@@ -72,19 +72,19 @@ namespace NMib::NCloud
 		struct CSecret : public NStorage::TCStreamableVariant
 			<
 				ESecretType
-				, void, ESecretType_NotSet
-				, NStr::CStrSecure, ESecretType_String
-				, NContainer::CSecureByteVector, ESecretType_Binary
-				, CSecretFile, ESecretType_File
+				, NContainer::TCMember<void, ESecretType_NotSet>
+				, NContainer::TCMember<NStr::CStrSecure, ESecretType_String>
+				, NContainer::TCMember<NContainer::CSecureByteVector, ESecretType_Binary>
+				, NContainer::TCMember<CSecretFile, ESecretType_File>
 			>
 		{
 			using CSuper = NStorage::TCStreamableVariant
 				<
 					ESecretType
-					, void, ESecretType_NotSet
-					, NStr::CStrSecure, ESecretType_String
-					, NContainer::CSecureByteVector, ESecretType_Binary
-					, CSecretFile, ESecretType_File
+					, NContainer::TCMember<void, ESecretType_NotSet>
+					, NContainer::TCMember<NStr::CStrSecure, ESecretType_String>
+					, NContainer::TCMember<NContainer::CSecureByteVector, ESecretType_Binary>
+					, NContainer::TCMember<CSecretFile, ESecretType_File>
 				>
 			;
 

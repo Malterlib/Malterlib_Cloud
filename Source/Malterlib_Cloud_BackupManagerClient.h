@@ -105,12 +105,12 @@ namespace NMib::NCloud
 			= NStorage::TCStreamableVariant
 			<
 				ENotification
-				, CNotification_BackupAborted, ENotification_BackupAborted
-				, CNotification_BackupError, ENotification_BackupError
-				, CNotification_FileFinished, ENotification_FileFinished
-				, CNotification_Quiescent, ENotification_Quiescent
-				, CNotification_Unquiescent, ENotification_Unquiescent
-				, CNotification_InitialFinished, ENotification_InitialFinished
+				, NContainer::TCMember<CNotification_BackupAborted, ENotification_BackupAborted>
+				, NContainer::TCMember<CNotification_BackupError, ENotification_BackupError>
+				, NContainer::TCMember<CNotification_FileFinished, ENotification_FileFinished>
+				, NContainer::TCMember<CNotification_Quiescent, ENotification_Quiescent>
+				, NContainer::TCMember<CNotification_Unquiescent, ENotification_Unquiescent>
+				, NContainer::TCMember<CNotification_InitialFinished, ENotification_InitialFinished>
 			>
 		; ///< \brief Notification variant. \sa ENotification
 
