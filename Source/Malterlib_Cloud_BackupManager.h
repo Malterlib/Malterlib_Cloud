@@ -121,10 +121,10 @@ namespace NMib::NCloud
 		using CManifestChange = NStorage::TCStreamableVariant
 			<
 				EManifestChange
-				, NContainer::TCMember<CManifestChange_Change, EManifestChange_Change>
-				, NContainer::TCMember<CManifestChange_Add, EManifestChange_Add>
-				, NContainer::TCMember<CManifestChange_Remove, EManifestChange_Remove>
-				, NContainer::TCMember<CManifestChange_Rename, EManifestChange_Rename>
+				, NStorage::TCMember<CManifestChange_Change, EManifestChange_Change>
+				, NStorage::TCMember<CManifestChange_Add, EManifestChange_Add>
+				, NStorage::TCMember<CManifestChange_Remove, EManifestChange_Remove>
+				, NStorage::TCMember<CManifestChange_Rename, EManifestChange_Rename>
 			>
 		;
 

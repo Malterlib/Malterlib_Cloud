@@ -88,9 +88,9 @@ namespace NMib::NCloud::NAppManager
 		using CAppChange = TCStreamableVariant
 			<
 				EAppChange
-				, NContainer::TCMember<CAppChange_Update, EAppChange_Update>
-				, NContainer::TCMember<CAppChange_Remove, EAppChange_Remove>
-				, NContainer::TCMember<CAppChange_AddKnownHosts, EAppChange_AddKnownHosts>
+				, NStorage::TCMember<CAppChange_Update, EAppChange_Update>
+				, NStorage::TCMember<CAppChange_Remove, EAppChange_Remove>
+				, NStorage::TCMember<CAppChange_AddKnownHosts, EAppChange_AddKnownHosts>
 			>
 		;
 		
