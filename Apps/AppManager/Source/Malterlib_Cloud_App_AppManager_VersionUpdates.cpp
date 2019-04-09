@@ -90,8 +90,6 @@ namespace NMib::NCloud::NAppManager
 			(CVersionManager::CNewVersionNotifications &&_NewVersions) 
 			-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 			{
-				co_await NConcurrency::ECoroutineFlag_AllowReferences;
-
 				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
 				if (!pManager)
 					co_return DMibErrorInstance("Manager gone");
@@ -215,7 +213,7 @@ namespace NMib::NCloud::NAppManager
 						, CVersionManager::f_DownloadVersion
 						, fg_Move(StartDownload)
 					)
-					.f_Timeout(30.0, "Timed out waiting for version manager to reply")
+					.f_Timeout(60.0, "Timed out waiting for version manager to reply")
 					> Promise % "Failed to start download on remote server" / [Promise, pCleanup, pDownloadState]
 					(CVersionManager::CStartDownloadVersion::CResult &&_Result)
 					{

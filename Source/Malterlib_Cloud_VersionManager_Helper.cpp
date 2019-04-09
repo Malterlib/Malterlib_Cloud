@@ -78,10 +78,11 @@ namespace NMib::NCloud
 
 	struct CVersionManagerHelperInternal
 	{
-		CVersionManagerHelperInternal(TCActor<CSeparateThreadActor> const &_FileActor, uint64 _QueueSize, fp64 _Timeout)
+		CVersionManagerHelperInternal(TCActor<CSeparateThreadActor> const &_FileActor, uint64 _QueueSize, fp64 _Timeout, CStr const &_RootDirectory)
 			: m_FileActor(_FileActor)
 			, m_QueueSize(_QueueSize)
 			, m_Timeout(_Timeout)
+			, m_RootDirectory(_RootDirectory)
 		{
 		}
 
@@ -93,18 +94,20 @@ namespace NMib::NCloud
 		}
 
 		TCActor<CSeparateThreadActor> m_FileActor;
-		uint64 m_QueueSize = 0;
-		fp64 m_Timeout = 0.0;
+		CStr m_RootDirectory;
 		TCMap<CStr, TCWeakPointer<CState>> m_States;
+		fp64 m_Timeout = 0.0;
+		uint64 m_QueueSize = 0;
 	};
 	
 	CVersionManagerHelper::CVersionManagerHelper
 		(
-			TCActor<CSeparateThreadActor> const &_FileActor
+		 	CStr const &_RootDirectory
+ 			, TCActor<CSeparateThreadActor> const &_FileActor
 			, uint64 _QueueSize
 			, fp64 _Timeout
 		)
-		: mp_pInternal(fg_Construct(_FileActor, _QueueSize, _Timeout))
+		: mp_pInternal(fg_Construct(_FileActor, _QueueSize, _Timeout, _RootDirectory))
 	{
 	}
 	
@@ -327,23 +330,12 @@ namespace NMib::NCloud
 		
 		CProcessLaunchActor::CSimpleLaunch Launch
 			{
-#ifdef DPlatformFamily_Windows
-				"tar.exe"
-#else
-				"tar"
-#endif
-				, 
+				Internal.m_RootDirectory / "bin/bsdtar"
+				,
 				{
-#ifdef DPlatformFamily_OSX
 					"--disable-copyfile"
-					,
-#endif
-					"-czf"
-#ifdef DPlatformFamily_Windows
-					, NFile::NPlatform::fg_ConvertToMinGWPath(_DestinationFileName)
-#else
+					, "-czf"
 					, _DestinationFileName
-#endif
 					, "."
 				}
 				, _SourceDirectory

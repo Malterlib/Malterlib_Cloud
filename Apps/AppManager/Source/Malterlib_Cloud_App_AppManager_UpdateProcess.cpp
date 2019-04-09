@@ -258,6 +258,7 @@ namespace NMib::NCloud::NAppManager
 					, AllowSourceExist = State.m_AllowSourceExist
 					, SourcePath = State.m_SourcePath
 					, pUniqueUserGroup = mp_pUniqueUserGroup
+				 	, RootDirectory = mp_State.m_RootDirectory
 				]
 				() mutable
 				{
@@ -276,7 +277,7 @@ namespace NMib::NCloud::NAppManager
 						CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
 
 					TCVector<CStr> Files;
-					CStr Output = fsp_UnpackApplication(SourcePath, TemporaryDirectory, ApplicationName, Settings, Files, AllowSourceExist, false, pUniqueUserGroup);
+					CStr Output = fsp_UnpackApplication(RootDirectory, SourcePath, TemporaryDirectory, ApplicationName, Settings, Files, AllowSourceExist, false, pUniqueUserGroup);
 					if (!Output.f_IsEmpty())
 						fOnInfo(Output);
 					return Files;

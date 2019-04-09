@@ -853,3 +853,16 @@ Property
 		}
 	}
 }
+
+%Group "{Malterlib}/{CloudTarBinaries}"
+{
+	%Dependency "Exe_bsdtar=Com_@(Target:Target.BaseName)_bsdtar*MalterlibPostCopyProject=@(MalterlibPostCopyProject)*MalterlibPostCopyDestination=@(MalterlibAppTestPostCopyDestination)bin/*Target.Name=Com_@(Target:Target.BaseName)_bsdtar*Target.Group=ExternalBinaries/@(Target:Target.BaseName)"
+	{
+		Dependency.Link false
+	}
+
+	Property
+	{
+		MalterlibCloud_VersionUploadSources "@(Builtin.Function->GetProperty('Property', 'MalterlibFinalModuleDestination', 'Group:ExternalBinaries.Group:@(Target:Target.BaseName).Target:Exe_bsdtar.Target:Exe_bsdtar'))|/bin;@(MalterlibCloud_VersionUploadSources)"
+	}
+}

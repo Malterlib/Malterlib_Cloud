@@ -319,19 +319,11 @@ namespace NMib::NCloud::NAppManager
 
 				CProcessLaunchActor::CSimpleLaunch Launch
 					{
-		#ifdef DPlatformFamily_Windows
-						"tar.exe"
-		#else
-						"tar"
-		#endif
+						mp_State.m_RootDirectory / "bin/bsdtar"
 						,
 						{
 							"-xOf"
-		#ifdef DPlatformFamily_Windows
-							, NFile::NPlatform::fg_ConvertToMinGWPath(_FromLocalFile)
-		#else
 							, _FromLocalFile
-		#endif
 							, "VersionInfo.json"
 						}
 						, CFile::fs_GetPath(_FromLocalFile)
@@ -441,7 +433,7 @@ namespace NMib::NCloud::NAppManager
 		_fOnInfo("Unpacking application");
 		auto Files = co_await
 			(
-				g_Dispatch(mp_FileActor) / [=, pUniqueUserGroup = mp_pUniqueUserGroup]() mutable
+				g_Dispatch(mp_FileActor) / [=, pUniqueUserGroup = mp_pUniqueUserGroup, RootDirectory = mp_State.m_RootDirectory]() mutable
 				{
 					auto &Settings = pApplication->m_Settings;
 					fsp_CreateApplicationUserGroup(Settings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
@@ -462,7 +454,8 @@ namespace NMib::NCloud::NAppManager
 							AllowExist[DeletePath];
 						CStr Output = fsp_UnpackApplication
 							(
-								SourcePath
+							 	RootDirectory
+								, SourcePath
 								, Directory
 								, pApplication->m_Name
 								, pApplication->m_Settings

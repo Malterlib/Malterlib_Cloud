@@ -166,23 +166,12 @@ namespace NMib::NCloud::NCloudClient
 									CStr PackageFile = DestinationDirectory + "/MalterlibCloud.tar.gz";
 									bool bLaunchSuccess = CProcessLaunch::fs_LaunchBlock
 										(
-#ifdef DPlatformFamily_Windows
-											"tar.exe"
-#else
-											"tar"
-#endif
+										 	CFile::fs_GetProgramDirectory() / "bin/bsdtar"
 											, fg_CreateVector<CStr>
 											(
 												"--no-same-owner"
-#if !defined(DPlatformFamily_OSX)
-												, "--pax-option=delete=SCHILY.*,delete=LIBARCHIVE.*"
-#endif
 												, "-xf"
-#ifdef DPlatformFamily_Windows
-												, NFile::NPlatform::fg_ConvertToMinGWPath(PackageFile)
-#else
 												, PackageFile
-#endif
 											)
 											, StdOut
 											, StdErr

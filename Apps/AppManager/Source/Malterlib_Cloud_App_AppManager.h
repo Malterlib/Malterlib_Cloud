@@ -659,7 +659,8 @@ namespace NMib::NCloud::NAppManager
 		static void fsp_UpdateAttributes(CStr const &_File);
 		static CStr fsp_UnpackApplication
 			(
-				CStr const &_Source
+			 	CStr const &_ApplicationRootDirectory
+				, CStr const &_Source
 				, CStr const &_Destination
 				, CStr const &_ApplicationName
 				, CApplicationSettings const &_Settings

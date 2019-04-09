@@ -51,7 +51,8 @@ namespace NMib::NCloud::NAppManager
 
 	CStr CAppManagerActor::fsp_UnpackApplication
 		(
-			CStr const &_Source
+		 	CStr const &_ApplicationRootDirectory
+			, CStr const &_Source
 			, CStr const &_Destination
 			, CStr const &_ApplicationName
 			, CApplicationSettings const &_Settings 
@@ -113,20 +114,13 @@ namespace NMib::NCloud::NAppManager
 			CStr Output = fsp_RunTool
 				(
 					CStr::CFormat("[{}] Extracting application") << _ApplicationName
-					, "tar"
+					, _ApplicationRootDirectory / "bin/bsdtar"
 					, _Destination
 					, fg_CreateVector<CStr>
 					(
 						"--no-same-owner"
-#if !defined(DPlatformFamily_OSX)
-						, "--pax-option=delete=SCHILY.*,delete=LIBARCHIVE.*"
-#endif
 						, "-xf"
-#ifdef DPlatformFamily_Windows
-						, NFile::NPlatform::fg_ConvertToMinGWPath(_Source)
-#else
 						, _Source
-#endif
 					)
 				)
 			;

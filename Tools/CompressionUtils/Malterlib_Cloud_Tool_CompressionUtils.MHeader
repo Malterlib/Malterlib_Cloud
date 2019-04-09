@@ -60,6 +60,7 @@
 	{
 		!!CompileDialect C
 		PrefixHeader ""
+		PreprocessorDefines "HAVE_ZLIB_H=1;@(Compile.PreprocessorDefines)"
 	}
 	
 	%Target Exe_bsdtar
@@ -86,41 +87,4 @@
 		%Dependency "Lib_Malterlib"
 		%Dependency "Lib_zlib"
 	}
-}
-
-%Target Exe_gzip
-{
-	Property
-	{
-		MalterlibTargetNameType "Normal"
-	}
-	Target
-	{
-		BaseName gzip
-
-		Type ConsoleExecutable
-	}
-	Compile
-	{
-		!!CompileDialect C
-		PrefixHeader ""
-		PreprocessorDefines "NO_BZIP2_SUPPORT;NO_XZ_SUPPORT;NO_COMPRESS_SUPPORT;NO_PACK_SUPPORT;@(Compile.PreprocessorDefines)"
-		Warnings Minimal
-	}
-	%Group Source
-	{
-		%File "Source/gzip.c"
-		%File "Source/getopt.c"
-		%File "Source/getopt.h"
-		%File "Source/BaseName.cpp"
-		{
-			!!PlatformFamily Windows
-		}
-		%File "Source/AllowInvalidExit.cpp"
-		{
-			!!PlatformFamily Windows
-		}
-	}
-	%Dependency "Lib_Malterlib"
-	%Dependency "Lib_zlib"
 }

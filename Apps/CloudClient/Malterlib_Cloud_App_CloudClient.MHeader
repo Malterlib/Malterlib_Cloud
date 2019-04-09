@@ -48,6 +48,7 @@
 	{
 		BaseFileName "MalterlibCloud"
 		Group Apps
+		ExtraGroups "{Malterlib}/{CloudTarBinaries};@(Target.ExtraGroups)"
 	}
 	%Group Source
 	{

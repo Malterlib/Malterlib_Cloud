@@ -50,6 +50,7 @@
 		DebuggerCommandArguments "--daemon-run-debug"
 		BaseFileName "VersionManager"
 		Group Apps
+		ExtraGroups "{Malterlib}/{CloudTarBinaries};@(Target.ExtraGroups)"
 	}
 	%Group Source
 	{

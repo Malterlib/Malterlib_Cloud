@@ -498,19 +498,11 @@ namespace NMib::NCloud::NCloudClient
 
 			CProcessLaunchActor::CSimpleLaunch Launch
 				{
-	#ifdef DPlatformFamily_Windows
-					"tar.exe"
-	#else
-					"tar"
-	#endif
+					CFile::fs_GetProgramDirectory() / "bin/bsdtar"
 					,
 					{
 						"-xOf"
-	#ifdef DPlatformFamily_Windows
-						, NFile::NPlatform::fg_ConvertToMinGWPath(Source)
-	#else
 						, Source
-	#endif
 						, "VersionInfo.json"
 					}
 					, CFile::fs_GetPath(Source)
