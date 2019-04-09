@@ -807,7 +807,7 @@ Property
 		!!MalterilbCloud_DoVersionManagerUpload true
 	}
 
-	MalterlibCloud_VersionUploadTarArchivePath "@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application).tar.gz"
+	MalterlibCloud_VersionUploadTarArchivePath "@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application)@(MalterlibCloudVersionInfo_PackageSuffix).tar.gz"
 	MalterlibCloud_VersionUploadTarArchivePathTar "@(MalterlibCloud_VersionUploadTarArchivePath)"
 	MalterlibCloud_VersionUploadTarArchivePathTar "@(MalterlibCloud_VersionUploadTarArchivePath->ParseFormatString('{}:{}','/{0,cl}{1}'))"
 	{
