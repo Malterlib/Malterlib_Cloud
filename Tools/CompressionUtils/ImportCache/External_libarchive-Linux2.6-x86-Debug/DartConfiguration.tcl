@@ -20,17 +20,7 @@ BuildName: Linux-clang++
 LabelsForSubprojects: 
 
 # Submission information
-IsCDash: TRUE
-CDashVersion: 
-QueryCDashVersion: 
-DropSite: my.cdash.org
-DropLocation: /submit.php?project=libarchive
-DropSiteUser: 
-DropSitePassword: 
-DropSiteMode: 
-DropMethod: http
-TriggerSite: 
-ScpCommand: scp
+SubmitURL: http://my.cdash.org
 
 # Dashboard start time
 NightlyStartTime: 01:00:00 UTC
@@ -86,7 +76,7 @@ MemoryCheckCommandOptions:
 MemoryCheckSuppressionFile: 
 
 # Coverage
-CoverageCommand: gcov
+CoverageCommand: /Users/erik/Library/Developer/Toolchains/Malterlib.xctoolchaingcov
 CoverageExtraFlags: -l
 
 # Cluster commands

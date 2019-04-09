@@ -9,6 +9,9 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	}
 	Property.MalterlibTargetNameType Normal
 	Target.Group "External/libarchive"
+	{
+		!!Target.Group ""
+	}
 	Target.Type StaticLibrary
 	Target.BaseName archive_static
 	%Group libarchive
@@ -621,6 +624,9 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	}
 	Property.MalterlibTargetNameType Normal
 	Target.Group "External/libarchive"
+	{
+		!!Target.Group ""
+	}
 	Target.Type SharedDynamicLibrary
 	Target.BaseName archive
 	%Group libarchive
@@ -1233,6 +1239,9 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	}
 	Property.MalterlibTargetNameType Normal
 	Target.Group "External/libarchive"
+	{
+		!!Target.Group ""
+	}
 	Target.Type ConsoleExecutable
 	Target.BaseName bsdtar
 	%Group tar
