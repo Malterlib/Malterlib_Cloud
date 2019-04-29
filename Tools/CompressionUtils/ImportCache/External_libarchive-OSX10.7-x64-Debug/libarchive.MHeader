@@ -4,7 +4,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type C
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/opt/local/include'->MakeAbsolute());@('/opt/local/include/libxml2'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/opt/local/include'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType Normal
@@ -619,7 +619,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type C
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/opt/local/include'->MakeAbsolute());@('/opt/local/include/libxml2'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/opt/local/include'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;archive_EXPORTS;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType Normal
@@ -1234,7 +1234,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type C
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/opt/local/include'->MakeAbsolute());@('/opt/local/include/libxml2'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/opt/local/include'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType Normal

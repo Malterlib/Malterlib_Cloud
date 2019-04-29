@@ -372,7 +372,7 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_BSDXML_H */
 
 /* Define to 1 if you have the <bzlib.h> header file. */
-#define HAVE_BZLIB_H 1
+/* #undef HAVE_BZLIB_H */
 
 /* Define to 1 if you have the `chflags' function. */
 /* #undef HAVE_CHFLAGS */
@@ -678,7 +678,7 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_LIBBSDXML */
 
 /* Define to 1 if you have the `bz2' library (-lbz2). */
-#define HAVE_LIBBZ2 1
+/* #undef HAVE_LIBBZ2 */
 
 /* Define to 1 if you have the `charset' library (-lcharset). */
 /* #undef HAVE_LIBCHARSET */
@@ -696,7 +696,7 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_LIBLZ4 */
 
 /* Define to 1 if you have the `lzma' library (-llzma). */
-#define HAVE_LIBLZMA 1
+/* #undef HAVE_LIBLZMA */
 
 /* Define to 1 if you have the `lzmadec' library (-llzmadec). */
 /* #undef HAVE_LIBLZMADEC */
@@ -714,13 +714,13 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_LIBPCREPOSIX */
 
 /* Define to 1 if you have the `xml2' library (-lxml2). */
-#define HAVE_LIBXML2 1
+/* #undef HAVE_LIBXML2 */
 
 /* Define to 1 if you have the <libxml/xmlreader.h> header file. */
-#define HAVE_LIBXML_XMLREADER_H 1
+/* #undef HAVE_LIBXML_XMLREADER_H */
 
 /* Define to 1 if you have the <libxml/xmlwriter.h> header file. */
-#define HAVE_LIBXML_XMLWRITER_H 1
+/* #undef HAVE_LIBXML_XMLWRITER_H */
 
 /* Define to 1 if you have the `z' library (-lz). */
 #define HAVE_LIBZ 1
@@ -799,7 +799,7 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_LZMADEC_H */
 
 /* Define to 1 if you have the <lzma.h> header file. */
-#define HAVE_LZMA_H 1
+/* #undef HAVE_LZMA_H */
 
 /* Define to 1 if you have a working `lzma_stream_encoder_mt' function. */
 /* #undef HAVE_LZMA_STREAM_ENCODER_MT */
