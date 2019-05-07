@@ -134,6 +134,12 @@ namespace NMib::NCloud::NAppManager
 				fp_OnAppUpdateInfoChange(_pState->m_pApplication);
 			}
 
+			if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
+			{
+				co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
+				co_await fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
+			}
+
 			auto UpdateType = Application.f_GetUpdateType();
 			switch (UpdateType)
 			{
@@ -152,11 +158,6 @@ namespace NMib::NCloud::NAppManager
 								, TCFunctionMutable<bool ()>{}
 							)
 						;
-					}
-					else if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
-					{
-						co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
-						co_await fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
 					}
 					else if (_Stage == EUpdateStage::EUpdateStage_StopOldApp)
 					{
@@ -205,9 +206,17 @@ namespace NMib::NCloud::NAppManager
 			}
 			else if (_Stage == EUpdateStage::EUpdateStage_Failed)
 			{
-				Application.m_LastFailedInstalledVersion = _pState->m_VersionID;
-				Application.m_LastFailedInstalledVersionTime = _pState->m_VersionTime;
-				Application.m_LastFailedInstalledVersionRetrySequence = _pState->m_VersionRetrySequence;
+				if (Application.m_LastFailedInstalledVersionFailureStage != Application.m_UpdateStage)
+				{
+					Application.m_LastFailedInstalledVersionFailureStage = Application.m_UpdateStage;
+					bUpdatedAppInfo = true;
+				}
+				if (Application.m_UpdateStage > EUpdateStage::EUpdateStage_DownloadVersion)
+				{
+					Application.m_LastFailedInstalledVersion = _pState->m_VersionID;
+					Application.m_LastFailedInstalledVersionTime = _pState->m_VersionTime;
+					Application.m_LastFailedInstalledVersionRetrySequence = _pState->m_VersionRetrySequence;
+				}
 				if (!_pState->m_bSetLastTried)
 				{
 					Application.m_LastTriedInstalledVersion = _pState->m_VersionID;

@@ -27,6 +27,8 @@ namespace NMib::NCloud::NAppManager
 		using EUpdateStage = CAppManagerInterface::EUpdateStage;
 		struct CFirstApplicationUpdate;
 
+		static constexpr uint32 mc_CurrentAppMangerVersion = 0x101;
+
 		enum EUpdateScript
 		{
 			EUpdateScript_PreUpdate
@@ -124,6 +126,7 @@ namespace NMib::NCloud::NAppManager
 #ifdef DPlatformFamily_Windows
 			CStrSecure m_RunAsUserPassword;
 #endif
+			uint32 m_AppManagerVersion = mc_CurrentAppMangerVersion;
 			bool m_bAutoUpdate = false;
 			bool m_bSelfUpdateSource = false;
 			bool m_bStopOnDependencyFailure = true;
@@ -191,6 +194,7 @@ namespace NMib::NCloud::NAppManager
 			CVersionManager::CVersionIDAndPlatform m_LastFailedInstalledVersion;
 			CTime m_LastFailedInstalledVersionTime;
 			uint32 m_LastFailedInstalledVersionRetrySequence = 0;
+			EUpdateStage m_LastFailedInstalledVersionFailureStage = EUpdateStage::EUpdateStage_None;
 
 			EUpdateStage m_WantUpdateStage = EUpdateStage::EUpdateStage_None;
 			EUpdateStage m_UpdateStage = EUpdateStage::EUpdateStage_None;
@@ -394,14 +398,19 @@ namespace NMib::NCloud::NAppManager
 			{
 			}
 
+			auto f_Tuple() const
+			{
+				return fg_TupleReferences(m_Group, m_VersionManagerApplication);
+			}
+
 			bool operator < (CRemoteApplicationKey const &_Right) const
 			{
-				return fg_TupleReferences(m_Group, m_VersionManagerApplication) < fg_TupleReferences(_Right.m_Group, _Right.m_VersionManagerApplication);
+				return f_Tuple() < _Right.f_Tuple();
 			}
 
 			bool operator == (CRemoteApplicationKey const &_Right) const
 			{
-				return m_Group == _Right.m_Group && m_VersionManagerApplication == _Right.m_VersionManagerApplication;
+				return f_Tuple() == _Right.f_Tuple();
 			}
 
 			template <typename tf_CStr>
@@ -412,6 +421,51 @@ namespace NMib::NCloud::NAppManager
 
 			CStr m_Group;
 			CStr m_VersionManagerApplication;
+		};
+
+		struct CRemoteApplicationWithTypeKey : public CRemoteApplicationKey
+		{
+			CRemoteApplicationWithTypeKey() = default;
+
+			CRemoteApplicationWithTypeKey(CAppManagerCoordinationInterface::CAppInfo const &_AppInfo)
+				: CRemoteApplicationKey(_AppInfo)
+				, m_UpdateType(_AppInfo.m_UpdateType)
+			{
+			}
+
+			CRemoteApplicationWithTypeKey(CApplication const &_Application)
+				: CRemoteApplicationKey(_Application.m_Settings)
+				, m_UpdateType(_Application.f_GetUpdateType())
+			{
+			}
+
+			CRemoteApplicationKey const &f_WithoutType() const
+			{
+				return *this;
+			}
+
+			auto f_Tuple() const
+			{
+				return fg_TupleReferences(m_Group, m_VersionManagerApplication, m_UpdateType);
+			}
+
+			bool operator < (CRemoteApplicationWithTypeKey const &_Right) const
+			{
+				return f_Tuple() < _Right.f_Tuple();
+			}
+
+			bool operator == (CRemoteApplicationWithTypeKey const &_Right) const
+			{
+				return f_Tuple() == _Right.f_Tuple();
+			}
+
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const
+			{
+				o_Str += typename tf_CStr::CFormat("{}/{}/{}") << m_Group << m_VersionManagerApplication << m_UpdateType;
+			}
+
+			EDistributedAppUpdateType m_UpdateType = EDistributedAppUpdateType_Independent;
 		};
 
 		struct CRemoteAppManager
@@ -560,7 +614,7 @@ namespace NMib::NCloud::NAppManager
 			 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			)
 		;
-		static void fsp_UpdateApplicationFiles
+		static void fsp_UpdateApplicationFilePermissions
 			(
 			 	CStr const &_ApplicationDir
 			 	, TCSharedPointer<CApplication> const &_pApplication
@@ -568,6 +622,8 @@ namespace NMib::NCloud::NAppManager
 			 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			)
 		;
+		TCFuture<void> fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> const &_pApplication, uint32 _OldVersion);
+
 		TCFuture<void> fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication);
 		TCFuture<void> fp_RunUpdateScript
 			(
@@ -792,9 +848,9 @@ namespace NMib::NCloud::NAppManager
 		CStr fp_TransformUserGroup(CStr const &_UserName) const;
 
 #ifdef DPlatformFamily_Windows
-		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M");
+		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #else
-		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("/M");
+		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #endif
 
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;

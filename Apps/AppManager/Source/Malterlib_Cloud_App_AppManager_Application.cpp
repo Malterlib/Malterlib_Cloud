@@ -145,6 +145,7 @@ namespace NMib::NCloud::NAppManager
 
 					if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= 0x103)
 					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pre-stopping application '{}'", pApplication->m_Name);
 						bRanPreStop = true;
 						PreStopFuture = DMibCallActor(pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_PreStop);
 					}
@@ -159,7 +160,6 @@ namespace NMib::NCloud::NAppManager
 
 					if (bRanPreStop && pApplication->m_BackupClient && PreStopResult)
 					{
-
 						auto BackupClientDestroyFuture = pApplication->m_BackupClient->f_Destroy();
 						pApplication->m_BackupClient.f_Clear();
 
@@ -168,6 +168,8 @@ namespace NMib::NCloud::NAppManager
 						if (!DestroyBackupResult)
 							LogError.f_Log("Error stopping application backup", DestroyBackupResult);
 					}
+
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Stopping process '{}'", pApplication->m_Name);
 
 					StopResult = co_await pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess).f_Wrap();
 					if (!StopResult)

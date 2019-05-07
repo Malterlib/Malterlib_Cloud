@@ -301,18 +301,25 @@ namespace NMib::NCloud::NAppManager
 	{
 		if (mp_RunningUpdates.f_IsEmpty())
 			return fg_Explicit();
-		
-		TCPromise<void> Promise;
-		
-		mp_CancelRunningUpdatesOnStopAppManagerPromise = Promise;
+
+		bool bNeedCancel = false;
 		
 		for (auto &pUpdateWeak : mp_RunningUpdates)
 		{
 			auto pUpdate = pUpdateWeak.f_Lock();
 			if (pUpdate)
+			{
 				pUpdate->m_bCancelOnAppManagerStop = true;
+				bNeedCancel = true;
+			}
 		}
-		
+
+		TCPromise<void> Promise;
+		if (bNeedCancel)
+			mp_CancelRunningUpdatesOnStopAppManagerPromise = Promise;
+		else
+			Promise.f_SetResult();
+
 		fp_OnAppUpdateInfoChange();
 		
 		return Promise.f_MoveFuture();

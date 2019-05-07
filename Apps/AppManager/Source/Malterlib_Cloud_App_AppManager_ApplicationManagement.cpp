@@ -102,6 +102,7 @@ namespace NMib::NCloud::NAppManager
 						}
 						return CFile::EDiffCopyChangeAction_Perform;
 					}
+				 	, {}
 					, 0.0
 				)
 			;
@@ -213,7 +214,9 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJSON();
 		ApplicationJSON["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJSON();
 		ApplicationJSON["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJSON();
+		ApplicationJSON["LastFailedInstalledVersionFailureStage"] = (uint32)Application.m_LastFailedInstalledVersionFailureStage;
 		ApplicationJSON["AutoUpdate"] = Settings.m_bAutoUpdate;
+
 		{
 			auto &Array = ApplicationJSON["AutoUpdateTags"].f_Array();
 			Array.f_Clear();
@@ -309,7 +312,8 @@ namespace NMib::NCloud::NAppManager
 		
 		ApplicationJSON["PreventLaunchUser"] = Application.m_bPreventLaunch_User; 
 		ApplicationJSON["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update;
-		
+		ApplicationJSON["AppManagerVersion"] = Settings.m_AppManagerVersion;
+
 		return mp_State.m_StateDatabase.f_Save();
 	}
 	
@@ -360,7 +364,7 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 	
-	void CAppManagerActor::fsp_UpdateApplicationFiles
+	void CAppManagerActor::fsp_UpdateApplicationFilePermissions
 		(
 		 	CStr const &_ApplicationDir
 		 	, TCSharedPointer<CApplication> const &_pApplication
@@ -369,14 +373,16 @@ namespace NMib::NCloud::NAppManager
 		)
 	{
 		auto &Settings = _pApplication->m_Settings;
+		auto User = _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser);
+		auto Group = _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup);
 		auto fSetOwners = [&](CStr _Directory)
 			{
 				while (_Directory.f_GetLen() >= _ApplicationDir.f_GetLen())
 				{
-					if (!Settings.m_RunAsUser.f_IsEmpty())
-						CFile::fs_SetOwner(_Directory, _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser));
-					if (!Settings.m_RunAsGroup.f_IsEmpty())
-						CFile::fs_SetGroup(_Directory, _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup));
+					if (!User.f_IsEmpty())
+						CFile::fs_SetOwner(_Directory, User);
+					if (!Group.f_IsEmpty())
+						CFile::fs_SetGroup(_Directory, Group);
 					_Directory = CFile::fs_GetPath(_Directory);
 				}
 			}

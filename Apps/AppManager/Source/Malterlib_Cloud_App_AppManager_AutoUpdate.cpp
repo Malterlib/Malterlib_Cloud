@@ -24,9 +24,10 @@ namespace NMib::NCloud::NAppManager
 			return {};
 		}
 		decltype(pVersionManagerApp->m_VersionsByTime.f_GetIterator()) iVersion;
-		auto &CurrentVersionID = _pApplication->m_LastInstalledVersionFinished;
-		auto &CurrentVersionInfo = _pApplication->m_LastInstalledVersionInfoFinished;
-		
+		auto &CurrentVersionID = _pApplication->m_LastInstalledVersion;
+		auto &CurrentVersionInfo = _pApplication->m_LastInstalledVersionInfo;
+		auto &LastFailedInstalledVersionFailureStage = _pApplication->m_LastFailedInstalledVersionFailureStage;
+
 		CVersionManager::CVersionIDAndPlatform VersionID;
 		for (iVersion.f_StartBackward(pVersionManagerApp->m_VersionsByTime); iVersion; --iVersion)
 		{
@@ -123,6 +124,7 @@ namespace NMib::NCloud::NAppManager
 				&& VersionID == _pApplication->m_LastTriedInstalledVersion 
 				&& o_VersionInfo.m_Time == _pApplication->m_LastTriedInstalledVersionInfo.m_Time
 				&& o_VersionInfo.m_RetrySequence == _pApplication->m_LastTriedInstalledVersionInfo.m_RetrySequence
+				&& LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion
 			)
 		{
 			o_Error = "Already tried and failed to install this version";
@@ -134,6 +136,8 @@ namespace NMib::NCloud::NAppManager
 			o_Error = fg_Format("The selected version {} was older than the currently installed version", VersionID);
 			return {};
 		}
+
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, DebugVerbose1, "Found version: '{}'\n   {} - {}\n   {} - {}", _pApplication->m_Name, VersionID, o_VersionInfo.m_Time, CurrentVersionID, CurrentVersionInfo.m_Time);
 
 		return VersionID;
 	}
@@ -175,6 +179,7 @@ namespace NMib::NCloud::NAppManager
 			
 			if (pApplication->f_IsInProgress())
 			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Debug, "In progress, reschedule '{}'", pApplication->m_Name);
 				bReschedule = true;
 				continue;
 			}

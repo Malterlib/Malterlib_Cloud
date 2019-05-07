@@ -450,6 +450,7 @@ namespace NMib::NCloud::NAppManager
 						}
 						TCSet<CStr> AllowExist;
 						AllowExist[Directory + "/lost+found"];
+						AllowExist[Directory + "/.home"];
 						if (!DeletePath.f_IsEmpty())
 							AllowExist[DeletePath];
 						CStr Output = fsp_UnpackApplication
@@ -469,7 +470,7 @@ namespace NMib::NCloud::NAppManager
 							_fOnInfo(Output.f_TrimRight());
 					}
 
-					fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
+					fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
 
 					if (!DeletePath.f_IsEmpty())
 						CFile::fs_DeleteDirectoryRecursive(DeletePath);

@@ -16,16 +16,16 @@ namespace NMib::NCloud::NAppManager
 		CStr HostID = _Params["HostID"].f_String();
 
 		TCActorResultVector<void> ResultsVector;
-		
+
 		for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 		{
 			 if (!RemoteAppManager.m_Actor)
 				 continue;
 			DCallActor(RemoteAppManager.m_Actor, CAppManagerCoordinationInterface::f_RemoveKnownHost, Group, Application, HostID) > ResultsVector.f_AddResult();
 		}
-		
+
 		mp_AppManagerCoordinationInterface.m_pActor->f_RemoveKnownHost(Group, Application, HostID) > ResultsVector.f_AddResult();
-		
+
 		co_await (ResultsVector.f_GetResults() % Auditor) | (g_Unwrap % Auditor);
 
 		co_return 0;
@@ -43,18 +43,18 @@ namespace NMib::NCloud::NAppManager
 			return false;
 		if (!_LeftTime.f_IsValid() || !_RightTime.f_IsValid())
 			return true;
-		return _LeftTime == _RightTime;  
+		return _LeftTime == _RightTime;
 	}
 
 	struct CAppManagerActor::CFirstApplicationUpdate
 	{
-		CRemoteApplicationKey m_RemoteKey;
+		CRemoteApplicationWithTypeKey m_RemoteKey;
 		uint64 m_UpdateStartSequence = TCLimitsInt<uint64>::mc_Max;
 		bool m_bInProgress = false;
-		
-		void f_AddApplication(EUpdateStage _WantUpdateState, uint64 _UpdateStartSequence, CRemoteApplicationKey const &_RemoteKey)
+
+		void f_AddApplication(EUpdateStage _WantUpdateState, uint64 _UpdateStartSequence, CRemoteApplicationWithTypeKey const &_RemoteKey)
 		{
-			if 
+			if
 				(
 					_WantUpdateState >= EUpdateStage::EUpdateStage_SyncStart
 					&& _WantUpdateState != EUpdateStage::EUpdateStage_Failed
@@ -66,11 +66,11 @@ namespace NMib::NCloud::NAppManager
 				{
 					m_bInProgress = bInProgress;
 					m_RemoteKey = _RemoteKey;
-					m_UpdateStartSequence = _UpdateStartSequence; 
+					m_UpdateStartSequence = _UpdateStartSequence;
 				}
 			}
 		}
-		
+
 		bool f_IsValid() const
 		{
 			return m_UpdateStartSequence != TCLimitsInt<uint64>::mc_Max;
@@ -81,10 +81,10 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
-		CRemoteApplicationKey OurRemoteKey{_pState->m_pApplication->m_Settings};
-		
+		CRemoteApplicationWithTypeKey OurRemoteKey{*_pState->m_pApplication};
+
 		_pState->m_fOnInfo(fg_Format("Waiting for our apps '{}' turn to update", OurRemoteKey));
-		
+
 		co_await fp_Coordination_WaitForAllToReachWantUpdateStage
 			(
 				_pState
@@ -93,10 +93,9 @@ namespace NMib::NCloud::NAppManager
 				, EWaitStageFlag_None
 				, [=]() -> bool
 				{
-					TCMap<CRemoteApplicationKey, zmint> WinningApplications;
-					TCSet<CRemoteApplicationKey> InProgressApplications;
-
-#if DDebugAppTurnUpdateLogic
+					TCMap<CRemoteApplicationWithTypeKey, zmint> WinningApplications;
+					TCSet<CRemoteApplicationWithTypeKey> InProgressApplications;
+#if DDebugAppTurnUpdateLogic > 1
 					TCVector<CStr> ApplicationInfos;
 #endif
 					{
@@ -104,23 +103,24 @@ namespace NMib::NCloud::NAppManager
 						for (auto &pApplication : mp_Applications)
 						{
 							auto &Application = *pApplication;
-							FirstApplication.f_AddApplication(Application.m_WantUpdateStage, Application.m_UpdateStartSequence, Application.m_Settings);
-#if DDebugAppTurnUpdateLogic
+							FirstApplication.f_AddApplication(Application.m_WantUpdateStage, Application.m_UpdateStartSequence, CRemoteApplicationWithTypeKey(Application));
+#if DDebugAppTurnUpdateLogic > 1
 							ApplicationInfos.f_Insert
 								(
 									fg_Format
 									(
-										"{}:{}:{}:{}"
+										"{}:{}:{}:{}-{}"
 										, mp_State.m_HostID
 										, fsp_UpdateStageToStr(Application.m_WantUpdateStage)
 										, Application.m_UpdateStartSequence
-										, CRemoteApplicationKey{Application.m_Settings}
+										, CRemoteApplicationWithTypeKey{Application}
+										, Application.m_Name
 									)
 								)
 							;
 #endif
 						}
-						
+
 						if (FirstApplication.f_IsValid())
 						{
 							++WinningApplications[FirstApplication.m_RemoteKey];
@@ -128,29 +128,30 @@ namespace NMib::NCloud::NAppManager
 								InProgressApplications[FirstApplication.m_RemoteKey];
 						}
 					}
-					
+
 					for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 					{
 						CFirstApplicationUpdate FirstApplication;
 						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
 						{
-							FirstApplication.f_AddApplication(AppInfo.m_AppInfo.m_WantUpdateStage, AppInfo.m_AppInfo.m_UpdateStartSequence, AppInfo.m_AppInfo);
-#if DDebugAppTurnUpdateLogic
+							FirstApplication.f_AddApplication(AppInfo.m_AppInfo.m_WantUpdateStage, AppInfo.m_AppInfo.m_UpdateStartSequence, CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo));
+#if DDebugAppTurnUpdateLogic > 1
 							ApplicationInfos.f_Insert
 								(
 									fg_Format
 									(
-										"{}:{}:{}:{}"
+										"{}:{}:{}:{}-{}"
 										, RemoteAppManager.m_AppInfos.fs_GetKey(AppInfo)
 										, fsp_UpdateStageToStr(AppInfo.m_AppInfo.m_WantUpdateStage)
 										, AppInfo.m_AppInfo.m_UpdateStartSequence
-										, CRemoteApplicationKey{AppInfo.m_AppInfo}
+										, CRemoteApplicationWithTypeKey{AppInfo.m_AppInfo}
+										, RemoteAppManager.m_AppInfos.fs_GetKey(AppInfo)
 									)
 								)
 							;
 #endif
 						}
-						
+
 						if (FirstApplication.f_IsValid())
 						{
 							++WinningApplications[FirstApplication.m_RemoteKey];
@@ -158,11 +159,7 @@ namespace NMib::NCloud::NAppManager
 								InProgressApplications[FirstApplication.m_RemoteKey];
 						}
 					}
-					
-#if DDebugAppTurnUpdateLogic
-					DLog(Info, "Winning applications: {vs} - {vs} - {vs}", InProgressApplications, WinningApplications, ApplicationInfos);
-#endif
-					
+
 					if (!InProgressApplications.f_IsEmpty())
 					{
 						for (auto iApplication = WinningApplications.f_GetIterator(); iApplication;)
@@ -175,24 +172,40 @@ namespace NMib::NCloud::NAppManager
 							++iApplication;
 						}
 					}
-					
+
+#if DDebugAppTurnUpdateLogic > 1
+					DMibConOut2
+						(
+						 	"[{}, {a-,sj20}, {a-,sj8}] # {vs} - {vs} - {vs}\n"
+							, this
+							, OurRemoteKey
+							, _pState->m_pApplication->m_Name
+							, InProgressApplications
+							, WinningApplications
+							, ApplicationInfos
+						)
+					;
+#endif
 					auto *pWinning = WinningApplications.f_FindSmallest();
 					if (!pWinning)
 						return false;
-					
+
 					if (WinningApplications.fs_GetKey(*pWinning) == OurRemoteKey)
 					{
+#if DDebugAppTurnUpdateLogic > 0
+						DMibConOut2("[{}, {a-,sj20}, {a-,sj8}] # UPDATE\n", this, OurRemoteKey, _pState->m_pApplication->m_Name);
+#endif
 						_pState->m_fOnInfo(fg_Format("Our apps '{}' turn to update", OurRemoteKey));
 						return true;
 					}
 					return false;
 				}
-			) 
+			)
 		;
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForAllToReachWantUpdateStage
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
@@ -202,11 +215,11 @@ namespace NMib::NCloud::NAppManager
 			, TCFunctionMutable<bool ()> _fEvalState
 		)
 	{
-		CRemoteApplicationKey RemoteKey{_pState->m_pApplication->m_Settings};
-		
+		CRemoteApplicationWithTypeKey RemoteKey{*_pState->m_pApplication};
+
 		if (!_fEvalState)
 			_pState->m_fOnInfo(fg_Format("Waiting for all before starting stage '{}'", fsp_UpdateStageToStr(_Stage)));
-		
+
 		co_await fp_Coordination_WaitForState
 			(
 				_pState
@@ -214,17 +227,17 @@ namespace NMib::NCloud::NAppManager
 				, [=](TCPromise<void> &o_Promise) mutable -> bool
 				{
 					bool bAllInStage = true;
-					
+
 					auto fCheckStageCondition = [&]
 						(
 							EUpdateStage _CurrentStage
 							, CVersionManager::CVersionIDAndPlatform const &_CurrentVersionID
-							, CTime const &_CurrentVersionTime 
+							, CTime const &_CurrentVersionTime
 						)
 						{
 							if (fg_IsSameVersion(_CurrentVersionID, _CurrentVersionTime, _pState->m_VersionID, _pState->m_VersionTime))
 								return true; // Already installed this version
-							
+
 							if (_Flags & EWaitStageFlag_DisallowInProgressStates)
 							{
 								if (_CurrentStage > EUpdateStage::EUpdateStage_SyncStart)
@@ -235,26 +248,25 @@ namespace NMib::NCloud::NAppManager
 							return true;
 						}
 					;
-					
+
 					for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 					{
 						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
 						{
-							if (RemoteKey != AppInfo.m_AppInfo)
+							if (RemoteKey != CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo))
 								continue;
 							if (!fCheckStageCondition(AppInfo.m_AppInfo.m_WantUpdateStage, AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime))
 								bAllInStage = false;
 						}
 					}
-					
-					// We might have several local applications with the same version manager application, so check locals as well 
+
+					// We might have several local applications with the same version manager application, so check locals as well
 					for (auto &pApplication : mp_Applications)
 					{
 						auto &Application = *pApplication;
-						
-						if (RemoteKey != Application.m_Settings)
+
+						if (RemoteKey != CRemoteApplicationWithTypeKey(Application))
 							continue;
-							
 						if (!fCheckStageCondition(Application.m_WantUpdateStage, Application.m_LastInstalledVersionFinished, Application.m_LastInstalledVersionInfoFinished.m_Time))
 							bAllInStage = false;
 					}
@@ -278,11 +290,11 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
-		CRemoteApplicationKey RemoteKey{_pState->m_pApplication->m_Settings};
-		
+		CRemoteApplicationWithTypeKey RemoteKey{*_pState->m_pApplication};
+
 		// First wait for all applications to be fully ready for doing update without being dependent on version manager
 		co_await fp_Coordination_WaitForAllToReachWantUpdateStage
 			(
@@ -308,7 +320,7 @@ namespace NMib::NCloud::NAppManager
 						bool bAllFinished = true;
 						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
 						{
-							if (RemoteKey != AppInfo.m_AppInfo)
+							if (RemoteKey != CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo))
 								continue;
 
 							if (fg_IsSameVersion(AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime, _pState->m_VersionID, _pState->m_VersionTime))
@@ -327,9 +339,50 @@ namespace NMib::NCloud::NAppManager
 
 					if (SmallestHostID == mp_State.m_HostID)
 					{
-						_pState->m_fOnInfo("Our turn to update");
-						o_Promise.f_SetResult();
-						return true;
+						CStr SmallestApplication;
+						for (auto &pApplication : mp_Applications)
+						{
+							auto &Application = *pApplication;
+
+							if (RemoteKey != CRemoteApplicationWithTypeKey(Application))
+								continue;
+
+							if
+								(
+								 	fg_IsSameVersion
+								 	(
+									 	Application.m_LastInstalledVersionFinished
+									 	, Application.m_LastInstalledVersionInfoFinished.m_Time
+									 	, _pState->m_VersionID
+									 	, _pState->m_VersionTime
+									)
+								)
+							{
+								continue; // Already installed this version
+							}
+
+							if (Application.m_UpdateStage == EUpdateStage::EUpdateStage_Finished)
+								continue;
+
+							if (SmallestApplication.f_IsEmpty() || Application.m_Name < SmallestApplication)
+								SmallestApplication = Application.m_Name;
+						}
+
+						if (_pState->m_pApplication->m_Name == SmallestApplication)
+						{
+#if DDebugAppTurnUpdateLogic > 0
+							DMibConOut2("[{}, {a-,sj20}, {a-,sj8}] # Smallest updating\n", this, RemoteKey, _pState->m_pApplication->m_Name);
+#endif
+							_pState->m_fOnInfo("Our turn to update");
+							o_Promise.f_SetResult();
+							return true;
+						}
+						else
+						{
+#if DDebugAppTurnUpdateLogic > 1
+							DMibConOut2("[{}, {a-,sj20}, {a-,sj8}] # NOT Smallest {2} != {3}\n", this, RemoteKey, _pState->m_pApplication->m_Name, SmallestApplication);
+#endif
+						}
 					}
 					return false;
 				}
@@ -342,7 +395,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 	}
-	
+
 	ch8 const *CAppManagerActor::fsp_UpdateStageToStr(EUpdateStage _Stage)
 	{
 		switch (_Stage)
@@ -364,7 +417,7 @@ namespace NMib::NCloud::NAppManager
 		default: DNeverGetHere; return "unknown";
 		}
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForState
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
@@ -376,21 +429,21 @@ namespace NMib::NCloud::NAppManager
 			, bool _bIgnoreFailed
 		)
 	{
-		CRemoteApplicationKey RemoteKey{_pState->m_pApplication->m_Settings};
-		
+		CRemoteApplicationWithTypeKey RemoteKey{*_pState->m_pApplication};
+
 		TCSharedPointerSupportWeak<COnAppUpdateInfoChange> pOnAppUpdateInfoChange = fg_Construct();
 		mp_OnAppUpdateInfoChange[pOnAppUpdateInfoChange];
-		
+
 		struct CState
 		{
 			CClock m_DisconnectClock;
 			bool m_bWasDisconnected = false;
 		};
-		
+
 		TCSharedPointer<CState> pState = fg_Construct();
 
 		TCPromise<void> Promise;
-		
+
 		pOnAppUpdateInfoChange->m_fOnChanged = [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() mutable
 			{
 				auto pOnAppUpdateInfoChange = pOnAppUpdateInfoChangeWeak.f_Lock();
@@ -402,19 +455,19 @@ namespace NMib::NCloud::NAppManager
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					return;
 				}
-				
+
 				bool bFailed = false;
 				TCSet<CStr> ConnectedRemoteHosts;
 				ConnectedRemoteHosts[mp_State.m_HostID];
-				
+
 				TCSet<CStr> RemoteKnownHosts;
-				auto *pRemoteKnownHosts = mp_KnownRemoteApplications.f_FindEqual(RemoteKey);
+				auto *pRemoteKnownHosts = mp_KnownRemoteApplications.f_FindEqual(RemoteKey.f_WithoutType());
 				if (pRemoteKnownHosts)
 					RemoteKnownHosts = *pRemoteKnownHosts;
-				
+
 				for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 				{
-					auto *pKnownApplications = RemoteAppManager.m_KnownApplications.f_FindEqual(RemoteKey);
+					auto *pKnownApplications = RemoteAppManager.m_KnownApplications.f_FindEqual(RemoteKey.f_WithoutType());
 					if (!RemoteAppManager.m_bInitialStateReceived || !pKnownApplications)
 						continue;
 					if (*pKnownApplications != RemoteKnownHosts)
@@ -430,18 +483,18 @@ namespace NMib::NCloud::NAppManager
 						mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 						return;
 					}
-					
+
 					ConnectedRemoteHosts[mp_RemoteAppManagerState.fs_GetKey(RemoteAppManager)];
-					
+
 					for (auto &AppInfo : RemoteAppManager.m_AppInfos)
 					{
-						if (RemoteKey != AppInfo.m_AppInfo)
+						if (RemoteKey != CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo))
 							continue;
 
 						if (fg_IsSameVersion(AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime, _pState->m_VersionID, _pState->m_VersionTime))
 							continue; // Already installed this version
-						
-						if 
+
+						if
 							(
 								fg_IsSameVersion(AppInfo.m_AppInfo.m_FailedVersionID, AppInfo.m_AppInfo.m_FailedVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
 								&& AppInfo.m_AppInfo.m_FailedVersionRetrySequence == _pState->m_VersionRetrySequence
@@ -450,7 +503,7 @@ namespace NMib::NCloud::NAppManager
 							bFailed = true;
 							break;
 						}
-					
+
 						if (AppInfo.m_AppInfo.m_WantUpdateStage == EUpdateStage::EUpdateStage_Failed && !_bIgnoreFailed)
 						{
 							bFailed = true;
@@ -458,18 +511,18 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				
-				// We might have several local applications with the same version manager application, so check locals as well 
+
+				// We might have several local applications with the same version manager application, so check locals as well
 				for (auto &pApplication : mp_Applications)
 				{
 					auto &Application = *pApplication;
-					if (RemoteKey != Application.m_Settings)
+					if (RemoteKey != CRemoteApplicationWithTypeKey(Application))
 						continue;
 
 					if (fg_IsSameVersion(Application.m_LastInstalledVersionFinished, Application.m_LastInstalledVersionInfoFinished.m_Time, _pState->m_VersionID, _pState->m_VersionTime))
 						continue; // Already installed this version
-					
-					if 
+
+					if
 						(
 							fg_IsSameVersion(Application.m_LastFailedInstalledVersion, Application.m_LastFailedInstalledVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
 							&& Application.m_LastFailedInstalledVersionRetrySequence == _pState->m_VersionRetrySequence
@@ -478,14 +531,14 @@ namespace NMib::NCloud::NAppManager
 						bFailed = true;
 						break;
 					}
-					
+
 					if (Application.m_WantUpdateStage == EUpdateStage::EUpdateStage_Failed && !_bIgnoreFailed)
 					{
 						bFailed = true;
 						break;
 					}
 				}
-				
+
 				if (bFailed)
 				{
 					if (!Promise.f_IsSet())
@@ -493,7 +546,7 @@ namespace NMib::NCloud::NAppManager
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					return;
 				}
-				
+
 				if (ConnectedRemoteHosts != RemoteKnownHosts)
 				{
 					if (!pState->m_bWasDisconnected)
@@ -503,9 +556,9 @@ namespace NMib::NCloud::NAppManager
 					}
 					return; // Wait for missing to connect
 				}
-				
+
 				pState->m_bWasDisconnected = false;
-				
+
 				if (_fEvalState(Promise))
 				{
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
@@ -513,10 +566,10 @@ namespace NMib::NCloud::NAppManager
 				}
 			}
 		;
-		
+
 		fp64 DisconnectTimeout = 5.0*60.0;
 		if (_Timeout <= DisconnectTimeout)
-			DisconnectTimeout = _Timeout / 2.0; 
+			DisconnectTimeout = _Timeout / 2.0;
 
 		fg_RegisterTimer
 			(
@@ -532,7 +585,7 @@ namespace NMib::NCloud::NAppManager
 					}
 					return fg_Explicit();
 				}
-			) 
+			)
 			> [pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
 			{
 				auto pOnAppUpdateInfoChange = pOnAppUpdateInfoChangeWeak.f_Lock();
@@ -541,7 +594,7 @@ namespace NMib::NCloud::NAppManager
 				pOnAppUpdateInfoChange->m_DisconnectTimerSubscription = fg_Move(*_Subscription);
 			}
 		;
-		
+
 		fg_OneshotTimerAbortable
 			(
 				_Timeout
@@ -552,7 +605,7 @@ namespace NMib::NCloud::NAppManager
 						Promise.f_SetException(DErrorInstance(_TimeoutError));
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 				}
-			) 
+			)
 			> [pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
 			{
 				auto pOnAppUpdateInfoChange = pOnAppUpdateInfoChangeWeak.f_Lock();
@@ -561,9 +614,9 @@ namespace NMib::NCloud::NAppManager
 				pOnAppUpdateInfoChange->m_TimerSubscription = fg_Move(*_Subscription);
 			}
 		;
-		
+
 		pOnAppUpdateInfoChange->m_fOnChanged();
-		
+
 		return Promise.f_MoveFuture();
 	}
 }

@@ -175,6 +175,11 @@ namespace NMib::NCloud::NAppManager
 						Application.m_LastTriedInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
 					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionInfo", EJSONType_Object))
 						Application.m_LastTriedInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+
+					if (auto pValue = ApplicationJSON.f_GetMember("LastFailedInstalledVersionFailureStage", EJSONType_Integer))
+						Application.m_LastFailedInstalledVersionFailureStage = (EUpdateStage)pValue->f_Integer();
+					else
+						Application.m_LastFailedInstalledVersionFailureStage = EUpdateStage::EUpdateStage_Failed;
 					
 					if 
 						(
@@ -185,13 +190,16 @@ namespace NMib::NCloud::NAppManager
 					{
 						if 
 							(
-								Name != PendingSelfUpdateName 
-								|| Application.m_LastTriedInstalledVersion != PendingSelfUpdateVersionID 
-								|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdateTime 
-								|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdateSequence
+								(
+									Name != PendingSelfUpdateName
+									|| Application.m_LastTriedInstalledVersion != PendingSelfUpdateVersionID
+									|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdateTime
+									|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdateSequence
+								)
+							 	&& (Application.m_LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion)
 							)
 						{
-							Application.m_LastFailedInstalledVersion = Application.m_LastTriedInstalledVersion; 
+							Application.m_LastFailedInstalledVersion = Application.m_LastTriedInstalledVersion;
 							Application.m_LastFailedInstalledVersionTime = Application.m_LastTriedInstalledVersionInfo.m_Time;
 							Application.m_LastFailedInstalledVersionRetrySequence = Application.m_LastTriedInstalledVersionInfo.m_RetrySequence;
 						}
@@ -246,7 +254,11 @@ namespace NMib::NCloud::NAppManager
 						Application.m_bPreventLaunch_User = pValue->f_Boolean();
 					if (auto pValue = ApplicationJSON.f_GetMember("PreventLaunchUpdate", EJSONType_Boolean))
 						Application.m_bPreventLaunch_Update = pValue->f_Boolean();
-					
+					if (auto pValue = ApplicationJSON.f_GetMember("AppManagerVersion", EJSONType_Integer))
+						Settings.m_AppManagerVersion = pValue->f_Integer();
+					else
+						Settings.m_AppManagerVersion = 0;
+
 					mp_KnownRemoteApplications[CRemoteApplicationKey{Settings}][mp_State.m_HostID];
 				}					
 			}
@@ -383,11 +395,11 @@ namespace NMib::NCloud::NAppManager
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_StopApp()
-	{	
+	{
 		auto CanDestroyFuture = mp_pCanDestroy->f_Future();
 		mp_pCanDestroy.f_Clear();
 		co_await CanDestroyFuture;
-		
+
 		co_await fp_CancelAllApplicationUpdatesOnStopAppManager();
 
 		co_await (mp_AppManagerInterface.f_Destroy() + mp_AppManagerCoordinationInterface.f_Destroy());

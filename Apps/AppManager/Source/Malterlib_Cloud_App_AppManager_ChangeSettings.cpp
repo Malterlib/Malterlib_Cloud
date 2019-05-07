@@ -71,7 +71,74 @@ namespace NMib::NCloud::NAppManager
 
 		co_return _pCommandLine->f_AddAsyncResult(Result);
 	}
-	
+
+	TCFuture<void> CAppManagerActor::fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> const &_pApplication, uint32 _OldVersion)
+	{
+		auto fOnInfo = [Name = _pApplication->m_Name](CStr const &_Info)
+			{
+				DMibLogCategory(Name);
+				DMibLog(Info, "App manager version upgrade: {}", _Info);
+			}
+		;
+
+		fOnInfo("Upgrading from {nfh} to {nfh}"_f << _OldVersion << mc_CurrentAppMangerVersion);
+
+		co_await
+			(
+				g_Dispatch(mp_FileActor) / [=, Directory = _pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]() mutable
+				{
+					if (_OldVersion < 0x101)
+					{
+						// Naming of user names changed
+
+						fsp_CreateApplicationUserGroup(_pApplication->m_Settings, fOnInfo, Directory / ".home", pUniqueUserGroup);
+
+						CStr NewOwner = pUniqueUserGroup->f_GetUser(_pApplication->m_Settings.m_RunAsUser);
+						CStr NewGroup = pUniqueUserGroup->f_GetGroup(_pApplication->m_Settings.m_RunAsGroup);
+
+						CStr OldOwner = CFile::fs_GetOwner(Directory);
+						CStr OldGroup = CFile::fs_GetGroup(Directory);
+
+						bool bChangedOwner = !NewOwner.f_IsEmpty() && NewOwner != OldOwner;
+						bool bChangedGroup = !NewGroup.f_IsEmpty() && NewGroup != OldGroup;
+
+						if (bChangedOwner || bChangedGroup)
+						{
+							for (auto &File : CFile::fs_FindFiles(Directory / "*", EFileAttrib_File | EFileAttrib_Directory, true, false))
+							{
+								if (bChangedOwner)
+								{
+									CStr CurrentOwner = CFile::fs_GetOwner(File);
+									if (CurrentOwner == OldOwner)
+										CFile::fs_SetOwner(File, NewOwner);
+								}
+
+								if (bChangedGroup)
+								{
+									CStr CurrentGroup = CFile::fs_GetGroup(File);
+									if (CurrentGroup == OldGroup)
+										CFile::fs_SetGroup(File, NewGroup);
+								}
+							}
+						}
+
+						fsp_UpdateApplicationFilePermissions(Directory, _pApplication, _pApplication->m_Files, pUniqueUserGroup);
+					}
+				}
+			)
+		;
+
+		if (_OldVersion < 0x101)
+		{
+			if (_pApplication->m_LastTriedInstalledVersionInfo.m_ExtraInfo.f_GetMemberValue("DistributedApp", false).f_Boolean())
+				_pApplication->m_Settings.m_bDistributedApp = true;
+		}
+
+		fOnInfo("Upgrading from {nfh} to {nfh} finished"_f << _OldVersion << mc_CurrentAppMangerVersion);
+
+		co_return {};
+	}
+
 	TCFuture<void> CAppManagerActor::fp_ChangeApplicationSettings
 		(
 			NStr::CStr const &_Name
@@ -250,7 +317,7 @@ namespace NMib::NCloud::NAppManager
 					g_Dispatch(mp_FileActor) / [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope, pUniqueUserGroup = mp_pUniqueUserGroup]()
 					{
 						fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
-						fsp_UpdateApplicationFiles(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
+						fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
 					}
 				)
 				+ fp_UpdateApplicationJSON(pApplication)

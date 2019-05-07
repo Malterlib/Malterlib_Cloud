@@ -39,7 +39,10 @@ namespace NMib::NCloud::NAppManager
 					}
 
 					if (!bUpdatedFiles)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "No changes found when running self update");
 						return false;
+					}
 
 					CStr Script = g_pSelfUpdateScript;
 

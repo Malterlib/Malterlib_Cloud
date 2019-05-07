@@ -76,15 +76,20 @@ namespace NMib::NCloud::NAppManager
 
 		if (Application.m_Settings.m_bSelfUpdateSource)
 		{
-			fp_AppLaunchStateChanged(_pApplication, "Self update source - waiting for update");
-
 			CAppLaunchResult Result;
 			if (_pApplication->m_bJustUpdated)
 			{
 				_pApplication->m_bJustUpdated = false;
 
-				Result.m_bQuitManager = co_await fp_SelfUpdate(_pApplication);
+				fp_AppLaunchStateChanged(_pApplication, "Self update source - running self update");
+				Result.m_bQuitManager = co_await self(&CAppManagerActor::fp_SelfUpdate, _pApplication);
+				if (Result.m_bQuitManager)
+					fp_AppLaunchStateChanged(_pApplication, "Self update source - restarting self");
+				else
+					fp_AppLaunchStateChanged(_pApplication, "Self update source - waiting for update");
 			}
+			else
+				fp_AppLaunchStateChanged(_pApplication, "Self update source - waiting for update");
 
 			_pApplication->m_bLaunched = true;
 
@@ -96,6 +101,16 @@ namespace NMib::NCloud::NAppManager
 			fp_AppLaunchStateChanged(_pApplication, "No executable");
 			_pApplication->m_bLaunched = true;
 			co_return CAppLaunchResult{};
+		}
+
+		if (Application.m_Settings.m_AppManagerVersion < mc_CurrentAppMangerVersion)
+		{
+			fp_AppLaunchStateChanged(_pApplication, "Upgrading app manager version");
+			
+			co_await self(&CAppManagerActor::fp_UpdateAppManagerApplicationVersion, _pApplication, Application.m_Settings.m_AppManagerVersion);
+
+			Application.m_Settings.m_AppManagerVersion = mc_CurrentAppMangerVersion;
+			co_await fp_UpdateApplicationJSON(_pApplication);
 		}
 
 		fp_AppLaunchStateChanged(_pApplication, "Launching");

@@ -395,7 +395,7 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 
-					fsp_UpdateApplicationFiles(OutputDirectory, pApplication, Files, pUniqueUserGroup);
+					fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Files, pUniqueUserGroup);
 				}
 			)
 		;
