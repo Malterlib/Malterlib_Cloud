@@ -48,26 +48,11 @@ Import "../../../../External/curl/Curl.MTarget"
 {
 	Property
 	{
-		MalterlibPostCopyProject "@(MalterlibAppTestPostCopyProject)"
-		{
-			&
-			{
-				MalterlibPostCopyProject ""
-				!MalterlibAppTestPostCopyProject ""
-			}
-		}
+		MalterlibTestApp true
 		MalterlibPostCopyProject "Malterlib_Cloud_CloudAPIManager"
 		{
 			!!MalterlibPostCopyProject ""
 		}
-		MalterlibPostCopyDestination "@(MalterlibAppTestPostCopyDestination)"
-		{
-			&
-			{
-				MalterlibPostCopyDestination ""
-				!MalterlibAppTestPostCopyDestination ""
-			}
-		} 
 		MalterlibUseCurl true
 		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
