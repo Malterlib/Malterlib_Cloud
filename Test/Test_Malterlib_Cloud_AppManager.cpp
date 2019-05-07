@@ -35,6 +35,7 @@ using namespace NMib::NNetwork;
 #define DTestAppManagerEnableOtherOutput 0
 
 static fp64 g_Timeout = 60.0;
+static uint32 g_CompressionLevel = 1;
 
 namespace
 {
@@ -306,27 +307,13 @@ public:
 			;
 			CCurrentActorScope CurrentActor{HelperActor};
 
-			auto fDispatchOnHelper = [&](auto _fToDispatch)
-				{
-					return
-						(
-							g_Dispatch / [&]
-							{
-								return _fToDispatch();
-							}
-						)
-						.f_CallSync(g_Timeout)
-					;
-				}
-			;
-
 			// Add initial application to version manager
 			CStr TestAppArchive = ProgramDirectory + "/TestApps/TestApp.tar.gz";
 
-			auto PackageInfo = fDispatchOnHelper([&]{ return VersionManagerHelper.f_CreatePackage(ProgramDirectory + "/TestApps/TestApp", TestAppArchive); });
+			auto PackageInfo = VersionManagerHelper.f_CreatePackage(ProgramDirectory + "/TestApps/TestApp", TestAppArchive, g_CompressionLevel).f_CallSync(g_Timeout);
 
 			PackageInfo.m_VersionInfo.m_Tags["TestTag"];
-			fDispatchOnHelper([&]{return VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);});
+			VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive).f_CallSync(g_Timeout);
 
 			// Setup trust for AppManagers
 
@@ -477,6 +464,7 @@ public:
 					CAppManagerInterface::CApplicationSettings Settings;
 					Settings.m_VersionManagerApplication = "TestApp";
 					Settings.m_AutoUpdateTags = fg_CreateSet<CStr>("TestTag");
+					Settings.m_UpdateGroup = "TestGroup";
 					Add.m_Version = PackageInfo.m_VersionID;
 
 					DMibCallActor(AppManager, CAppManagerInterface::f_Add, "TestApp", Add, Settings) > AddAppResults.f_AddResult();
@@ -485,36 +473,54 @@ public:
 			}
 
 			// Update Application
-			auto fUpdateTestApp = [&]
+			auto fUpdateTestApp = [&](TCSet<CStr> const &_Tags)
 				{
 					++PackageInfo.m_VersionID.m_VersionID.m_Revision;
-					fDispatchOnHelper([&]{return VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);});
+					PackageInfo.m_VersionInfo.m_Tags = _Tags;
+					VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive).f_CallSync(g_Timeout);
 				}
 			;
 
-			struct CUpdateNotificationsState
+			auto fTagApp = [&](CStr const &_Name, TCSet<CStr> const &_Tags)
+				{
+					CVersionManager::CChangeTags ChangeTags;
+					ChangeTags.m_AddTags = _Tags;
+					ChangeTags.m_Application = _Name;
+					ChangeTags.m_VersionID = PackageInfo.m_VersionID.m_VersionID;
+					DMibCallActor(VersionManager, CVersionManager::f_ChangeTags, fg_Move(ChangeTags)).f_CallSync(g_Timeout);
+				}
+			;
+
+			struct CApplicationKey
 			{
-				TCVector<CActorSubscription> m_Subscriptions;
-				TCSet<mint> m_InProgress;
+				auto f_Tuple() const
+				{
+					return fg_TupleReferences(m_AppName, m_iAppManager);
+				}
+
+				bool operator < (CApplicationKey const &_Right) const
+				{
+					return f_Tuple() < _Right.f_Tuple();
+				}
+
+				CStr m_AppName;
+				mint m_iAppManager;
+			};
+
+			struct CUpdateNotificationsApplicationState
+			{
+				TCSet<CApplicationKey> m_InProgress;
 				mint m_nMaxInProgress = 0;
-				TCMap<mint, CAppManagerInterface::EUpdateStage> m_LastInStage;
-				TCMap<mint, CAppManagerInterface::EUpdateStage> m_LastInStageCoordination;
-				TCMap<CAppManagerInterface::EUpdateStage, TCSet<mint>> m_InStage;
-				TCMap<CAppManagerInterface::EUpdateStage, TCSet<mint>> m_InStageCoordination;
+
+				TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStage;
+				TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStageCoordination;
+				TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStage;
+				TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStageCoordination;
+
 				TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStage;
 				TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStageCoordination;
 				TCAtomic<mint> m_nSuccess = 0;
 				TCAtomic<mint> m_nFinished = 0;
-				NThread::CEventAutoReset m_Event;
-
-				void f_Destroy()
-				{
-					TCActorResultVector<void> Destroys;
-					for (auto &Subscription : m_Subscriptions)
-						Subscription->f_Destroy() > Destroys.f_AddResult();;
-					Destroys.f_GetResults().f_CallSync();
-					f_Clear();
-				}
 
 				void f_Clear()
 				{
@@ -528,7 +534,51 @@ public:
 				}
 			};
 
+			struct CUpdateNotificationsState
+			{
+				void f_Destroy()
+				{
+					TCActorResultVector<void> Destroys;
+					for (auto &Subscription : m_Subscriptions)
+						Subscription->f_Destroy() > Destroys.f_AddResult();;
+					Destroys.f_GetResults().f_CallSync();
+					f_Clear();
+				}
+
+				void f_Clear()
+				{
+					for (auto &Application : m_Applications)
+						Application.f_Clear();
+					for (auto &AppManager : m_ApplicationsPerAppmanager)
+					{
+						for (auto &Application : AppManager)
+							Application.f_Clear();
+					}
+
+					m_AllApplications.f_Clear();
+					m_AppsInProgressPerAppManager.f_Clear();
+					m_MaxAppsInProgressPerAppManager.f_Clear();
+					m_nAppsInProgress = 0;
+					m_nMaxAppsInProgress = 0;
+					m_nMaxAppsInProgressPerAppManager = 0;
+				}
+
+				TCVector<CActorSubscription> m_Subscriptions;
+				NThread::CEventAutoReset m_Event;
+				TCMap<CStr, CUpdateNotificationsApplicationState> m_Applications;
+				TCMap<mint, TCMap<CStr, CUpdateNotificationsApplicationState>> m_ApplicationsPerAppmanager;
+				CUpdateNotificationsApplicationState m_AllApplications;
+				mint m_nAppsInProgress = 0;
+				mint m_nMaxAppsInProgress = 0;
+				TCMap<mint, zmint> m_AppsInProgressPerAppManager;
+				TCMap<mint, zmint> m_MaxAppsInProgressPerAppManager;
+				mint m_nMaxAppsInProgressPerAppManager = 0;
+			};
+
 			TCSharedPointer<CUpdateNotificationsState> pUpdateNotificationsState = fg_Construct();
+
+			pUpdateNotificationsState->m_Applications["TestApp"];
+			pUpdateNotificationsState->m_Applications["TestApp2"];
 
 			auto CleanupNotifications = g_OnScopeExit > [&]
 				{
@@ -554,40 +604,95 @@ public:
 							, g_ActorFunctor / [pUpdateNotificationsState, iAppManager]
 							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
 							{
-								auto &State = *pUpdateNotificationsState;
+								CApplicationKey ApplicationKey{_Notification.m_Application, iAppManager};
+								auto &WholeState = *pUpdateNotificationsState;
+								auto fProcessApplicationState = [&](CUpdateNotificationsApplicationState &_State)
+									{
+										if (!_Notification.m_bCoordinateWait)
+										{
+											if (auto pInStage = _State.m_LastInStage.f_FindEqual(ApplicationKey))
+												_State.m_InStage[*pInStage].f_Remove(ApplicationKey);
+											_State.m_InStage[_Notification.m_Stage][ApplicationKey];
+											_State.m_MaxInStage[_Notification.m_Stage] = fg_Max
+												(
+													_State.m_MaxInStage[_Notification.m_Stage]
+												 	, _State.m_InStage[_Notification.m_Stage].f_GetLen()
+												)
+											;
+											_State.m_LastInStage[ApplicationKey] = _Notification.m_Stage;
+										}
 
-								if (!_Notification.m_bCoordinateWait)
+										if (auto pInStage = _State.m_LastInStageCoordination.f_FindEqual(ApplicationKey))
+											_State.m_InStageCoordination[*pInStage].f_Remove(ApplicationKey);
+										_State.m_InStageCoordination[_Notification.m_Stage][ApplicationKey];
+										_State.m_MaxInStageCoordination[_Notification.m_Stage] = fg_Max
+											(
+											 	_State.m_MaxInStageCoordination[_Notification.m_Stage]
+											 	, _State.m_InStageCoordination[_Notification.m_Stage].f_GetLen()
+											)
+										;
+										_State.m_LastInStageCoordination[ApplicationKey] = _Notification.m_Stage;
+
+										if (_Notification.m_Stage == CAppManagerInterface::EUpdateStage_Failed)
+										{
+											_State.m_InProgress.f_Remove(ApplicationKey);
+											++_State.m_nFinished;
+										}
+										else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage == CAppManagerInterface::EUpdateStage_Finished)
+										{
+											_State.m_InProgress.f_Remove(ApplicationKey);
+											++_State.m_nFinished;
+											++_State.m_nSuccess;
+										}
+										else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage >= CAppManagerInterface::EUpdateStage_StopOldApp)
+										{
+											_State.m_InProgress[ApplicationKey];
+											_State.m_nMaxInProgress = fg_Max(_State.m_nMaxInProgress, _State.m_InProgress.f_GetLen());
+										}
+									}
+								;
+
+								fProcessApplicationState(WholeState.m_Applications[_Notification.m_Application]);
+								fProcessApplicationState(WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application]);
+								fProcessApplicationState(WholeState.m_AllApplications);
+								//DMibConOut2("{} {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application].m_MaxInStage);
+								//DMibConOut2("{} N {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStage);
+								//DMibConOut2("{} C {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStageCoordination);
+								//DMibConOut2("{a-,sj9} {} {vs}\n", _Notification.m_Application, CAppManagerInterface::EUpdateStage_StopOldApp, WholeState.m_AllApplications.m_MaxInStage);
+
+								WholeState.m_nAppsInProgress = 0;
+								for (auto &App : WholeState.m_Applications)
 								{
-									if (auto pInStage = State.m_LastInStage.f_FindEqual(iAppManager))
-										State.m_InStage[*pInStage].f_Remove(iAppManager);
-									State.m_InStage[_Notification.m_Stage][iAppManager];
-									State.m_MaxInStage[_Notification.m_Stage] = fg_Max(State.m_MaxInStage[_Notification.m_Stage], State.m_InStage[_Notification.m_Stage].f_GetLen());
-									State.m_LastInStage[iAppManager] = _Notification.m_Stage;
+									if (!App.m_InProgress.f_IsEmpty())
+										++WholeState.m_nAppsInProgress;
+								}
+								WholeState.m_nMaxAppsInProgress = fg_Max(WholeState.m_nAppsInProgress, WholeState.m_nMaxAppsInProgress);
+
+								WholeState.m_nMaxAppsInProgressPerAppManager = 0;
+								for (auto &AppManager : WholeState.m_ApplicationsPerAppmanager)
+								{
+									auto &iAppManager = WholeState.m_ApplicationsPerAppmanager.fs_GetKey(AppManager);
+									WholeState.m_AppsInProgressPerAppManager[iAppManager] = 0;
+									for (auto &App : AppManager)
+									{
+										if (!App.m_InProgress.f_IsEmpty())
+											++WholeState.m_AppsInProgressPerAppManager[iAppManager];
+									}
+									WholeState.m_MaxAppsInProgressPerAppManager[iAppManager] = fg_Max
+										(
+										 	WholeState.m_AppsInProgressPerAppManager[iAppManager]
+										 	, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
+										)
+									;
+									WholeState.m_nMaxAppsInProgressPerAppManager = fg_Max
+										(
+										 	WholeState.m_nMaxAppsInProgressPerAppManager
+										 	, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
+										)
+									;
 								}
 
-								if (auto pInStage = State.m_LastInStageCoordination.f_FindEqual(iAppManager))
-									State.m_InStageCoordination[*pInStage].f_Remove(iAppManager);
-								State.m_InStageCoordination[_Notification.m_Stage][iAppManager];
-								State.m_MaxInStageCoordination[_Notification.m_Stage] = fg_Max(State.m_MaxInStageCoordination[_Notification.m_Stage], State.m_InStageCoordination[_Notification.m_Stage].f_GetLen());
-								State.m_LastInStageCoordination[iAppManager] = _Notification.m_Stage;
-
-								if (_Notification.m_Stage == CAppManagerInterface::EUpdateStage_Failed)
-								{
-									State.m_InProgress.f_Remove(iAppManager);
-									++State.m_nFinished;
-								}
-								else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage == CAppManagerInterface::EUpdateStage_Finished)
-								{
-									State.m_InProgress.f_Remove(iAppManager);
-									++State.m_nFinished;
-									++State.m_nSuccess;
-								}
-								else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage >= CAppManagerInterface::EUpdateStage_StopOldApp)
-								{
-									State.m_InProgress[iAppManager];
-									State.m_nMaxInProgress = fg_Max(State.m_nMaxInProgress, State.m_InProgress.f_GetLen());
-								}
-								State.m_Event.f_Signal();
+								WholeState.m_Event.f_Signal();
 								return fg_Explicit();
 							}
 						)
@@ -604,12 +709,13 @@ public:
 				fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
 			}
 
-			auto fWaitForAllUpdated = [&]
+			auto fWaitForAllUpdated = [&](CStr const &_Application)
 				{
+					auto &ApplicationState = pUpdateNotificationsState->m_Applications[_Application];
 					NTime::CClock Clock{true};
 					while (true)
 					{
-						if (pUpdateNotificationsState->m_nFinished == nAppManagers)
+						if (ApplicationState.m_nFinished == nAppManagers)
 							break;
 						if (Clock.f_GetTime() > g_Timeout)
 							DMibError("Timed out waiting for all apps to update");
@@ -618,7 +724,7 @@ public:
 				}
 			;
 
-			auto fSetUpdateType = [&](CStr const &_UpdateType)
+			auto fSetUpdateType = [&](CStr const &_AppName, CStr const &_UpdateType)
 				{
 					PackageInfo.m_VersionInfo.m_ExtraInfo["ExecutableParameters"] = {"--update-type", _UpdateType, "--daemon-run-standalone"};
 					TCActorResultVector<void> AppCommandResults;
@@ -628,44 +734,233 @@ public:
 						CAppManagerInterface::CApplicationSettings Settings;
 						Settings.m_ExecutableParameters = {"--update-type", _UpdateType, "--daemon-run-standalone"};
 
-						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, "TestApp", ChangeSettings, Settings) > AppCommandResults.f_AddResult();
+						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, _AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
 					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
 					*pUpdateType = _UpdateType;
 				}
 			;
 
+			auto fSetUpdateGroup = [&](CStr const &_AppName, CStr const &_Group)
+				{
+					TCActorResultVector<void> AppCommandResults;
+					for (auto &AppManager : AppManagers)
+					{
+						CAppManagerInterface::CApplicationChangeSettings ChangeSettings;
+						CAppManagerInterface::CApplicationSettings Settings;
+						Settings.m_UpdateGroup = _Group;
+
+						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, _AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
+					}
+					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
+				}
+			;
+
 			{
 				DMibTestPath("Update Independent");
-				fSetUpdateType("Independent");
+				fSetUpdateType("TestApp", "Independent");
 				UpdateNotificationState.f_Clear();
-				fUpdateTestApp();
-				fWaitForAllUpdated();
+				fUpdateTestApp({"TestTag"});
+				fWaitForAllUpdated("TestApp");
 
-				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
-				DMibExpect(UpdateNotificationState.m_nMaxInProgress, >= , 1u);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
 			}
 			{
 				DMibTestPath("Update OneAtATime");
-				fSetUpdateType("OneAtATime");
+				fSetUpdateType("TestApp", "OneAtATime");
 				UpdateNotificationState.f_Clear();
-				fUpdateTestApp();
-				fWaitForAllUpdated();
+				fUpdateTestApp({"TestTag"});
+				fWaitForAllUpdated("TestApp");
 
-				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
-				DMibTest(DMibExpr(UpdateNotificationState.m_nMaxInProgress) == DMibExpr(1));
-				DMibExpect(UpdateNotificationState.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], == , 1);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, ==, 1);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1);
 			}
 			{
 				DMibTestPath("Update AllAtOnce");
-				fSetUpdateType("AllAtOnce");
+				fSetUpdateType("TestApp", "AllAtOnce");
 				UpdateNotificationState.f_Clear();
-				fUpdateTestApp();
-				fWaitForAllUpdated();
+				fUpdateTestApp({"TestTag"});
+				fWaitForAllUpdated("TestApp");
 
-				DMibExpect(UpdateNotificationState.m_nSuccess, ==, nAppManagers);
-				DMibExpect(UpdateNotificationState.m_nMaxInProgress, >= , 1u);
-				DMibExpect(UpdateNotificationState.m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], == , nAppManagers);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
+			}
+			{
+				TCActorResultVector<void> AddAppResults;
+				for (auto &AppManager : AppManagers)
+				{
+					CAppManagerInterface::CApplicationAdd Add;
+					CAppManagerInterface::CApplicationSettings Settings;
+					Settings.m_VersionManagerApplication = "TestApp";
+					Settings.m_AutoUpdateTags = fg_CreateSet<CStr>("TestTag2");
+					Settings.m_UpdateGroup = "TestGroup2";
+					Add.m_Version = PackageInfo.m_VersionID;
+
+					DMibCallActor(AppManager, CAppManagerInterface::f_Add, "TestApp2", Add, Settings) > AddAppResults.f_AddResult();
+				}
+				fg_CombineResults(AddAppResults.f_GetResults().f_CallSync(g_Timeout));
+			}
+
+			if (!NMib::NTest::fg_GroupActive("Expensive"))
+				return;
+
+			for (mint i = 0; i < 2; ++i)
+			{
+				CStr Path;
+				if (i == 0)
+				{
+					Path = "Same Update Group";
+					fSetUpdateGroup("TestApp", "TestGroup");
+					fSetUpdateGroup("TestApp2", "TestGroup");
+				}
+				else
+				{
+					Path = "Separate Update Group";
+					fSetUpdateGroup("TestApp", "TestGroup");
+					fSetUpdateGroup("TestApp2", "TestGroup2");
+				}
+				DMibTestPath(Path);
+				{
+					DMibTestPath("AllAtOnce AllAtOnce");
+					fSetUpdateType("TestApp", "AllAtOnce");
+					fSetUpdateType("TestApp2", "AllAtOnce");
+					UpdateNotificationState.f_Clear();
+					fUpdateTestApp({});
+					fTagApp("TestApp", {"TestTag", "TestTag2"});
+					fWaitForAllUpdated("TestApp");
+					fWaitForAllUpdated("TestApp2");
+
+					if (i == 0)
+						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 2u);
+					else
+						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 1u);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
+
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess, ==, nAppManagers * 2u);
+					if (i == 0)
+						DMibExpect(UpdateNotificationState.m_AllApplications.m_nMaxInProgress, ==, nAppManagers * 2u);
+					else
+						DMibExpect(UpdateNotificationState.m_AllApplications.m_nMaxInProgress, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers * 2u);
+				}
+				{
+					DMibTestPath("OneAtATime OneAtATime");
+					fSetUpdateType("TestApp", "OneAtATime");
+					fSetUpdateType("TestApp2", "OneAtATime");
+					UpdateNotificationState.f_Clear();
+					fUpdateTestApp({});
+					fTagApp("TestApp", {"TestTag", "TestTag2"});
+					fWaitForAllUpdated("TestApp");
+					fWaitForAllUpdated("TestApp2");
+
+					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 1u);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, ==, 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, ==, 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
+
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess, ==, nAppManagers * 2u);
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_nMaxInProgress, ==, 1u);
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
+				}
+				{
+					DMibTestPath("AllAtOnce OneAtATime");
+					fSetUpdateType("TestApp", "AllAtOnce");
+					fSetUpdateType("TestApp2", "OneAtATime");
+					UpdateNotificationState.f_Clear();
+					fUpdateTestApp({});
+					fTagApp("TestApp", {"TestTag", "TestTag2"});
+					fWaitForAllUpdated("TestApp");
+					fWaitForAllUpdated("TestApp2");
+
+					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, >=, 1u);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, ==, 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
+
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess, ==, nAppManagers * 2u);
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_nMaxInProgress, >=, 1u);
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], >=, 1u);
+				}
+				{
+					DMibTestPath("AllAtOnce Independent");
+					fSetUpdateType("TestApp", "AllAtOnce");
+					fSetUpdateType("TestApp2", "Independent");
+					UpdateNotificationState.f_Clear();
+					fUpdateTestApp({});
+					fTagApp("TestApp", {"TestTag"});
+					fTagApp("TestApp", {"TestTag2"});
+					fWaitForAllUpdated("TestApp");
+					fWaitForAllUpdated("TestApp2");
+
+					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
+				}
+				{
+					DMibTestPath("OneAtATime Independent");
+					fSetUpdateType("TestApp", "OneAtATime");
+					fSetUpdateType("TestApp2", "Independent");
+					UpdateNotificationState.f_Clear();
+					fUpdateTestApp({});
+					fTagApp("TestApp", {"TestTag"});
+					fTagApp("TestApp", {"TestTag2"});
+					fWaitForAllUpdated("TestApp");
+					fWaitForAllUpdated("TestApp2");
+
+					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, ==, 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
+				}
+				{
+					DMibTestPath("Independent Independent");
+					fSetUpdateType("TestApp", "Independent");
+					fSetUpdateType("TestApp2", "Independent");
+					UpdateNotificationState.f_Clear();
+					fUpdateTestApp({});
+					fTagApp("TestApp", {"TestTag"});
+					fTagApp("TestApp", {"TestTag2"});
+					fWaitForAllUpdated("TestApp");
+					fWaitForAllUpdated("TestApp2");
+
+					if (i == 0)
+						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 2u);
+					else
+						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
+
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
+				}
 			}
 		};
 	}
