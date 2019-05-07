@@ -77,7 +77,7 @@ namespace NMib::NCloud::NCloudAPIManager
 									CByteVector Data;
 									Data.f_Insert((uint8*)HMAC_Body.f_GetStr(), HMAC_Body.f_GetLen());
 
-									CByteVector Key;
+									CSecureByteVector Key;
 									Key.f_Insert((uint8*)_Params.m_TempURLKey.f_GetStr(), _Params.m_TempURLKey.f_GetLen());
 
 									auto Digest = fg_MessageAuthenication_HMAC_SHA1(Data, Key);

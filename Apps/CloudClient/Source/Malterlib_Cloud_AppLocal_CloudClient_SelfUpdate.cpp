@@ -192,7 +192,7 @@ namespace NMib::NCloud::NCloudClient
 									for (auto &File : FilesToUpdate)
 									{
 										CStr RelativePath = File.f_Extract(DestinationDirectory.f_GetLen() + 1);
-										CFile::fs_DiffCopyFileOrDirectory(File, CFile::fs_AppendPath(ProgramDirectory, RelativePath), nullptr, 0.0);
+										CFile::fs_DiffCopyFileOrDirectory(File, CFile::fs_AppendPath(ProgramDirectory, RelativePath), nullptr, {}, 0.0);
 									}
 									
 									CFile::fs_DeleteDirectoryRecursive(DestinationDirectory);									
