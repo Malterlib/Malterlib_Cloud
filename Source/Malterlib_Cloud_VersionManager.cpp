@@ -354,7 +354,10 @@ namespace NMib::NCloud
 	void CVersionManager::CStartUploadVersion::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream % fg_Move(m_Subscription);
+		if (_Stream.f_GetVersion() >= 0x106)
+			_Stream % fg_Move(m_fFinish);
+		else
+			_Stream % fg_Move(m_fFinish.f_GetSubscription());
 		_Stream % m_DeniedTags;
 	}
 	
@@ -367,8 +370,27 @@ namespace NMib::NCloud
 		_Stream % m_VersionInfo;
 		_Stream % m_QueueSize;
 		_Stream % m_Flags;
-		_Stream % m_DispatchActor;
-		_Stream % m_fStartTransfer;
+		if (_Stream.f_GetVersion() >= 0x106)
+			_Stream % fg_Move(m_fStartTransfer);
+		else
+		{
+			if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
+			{
+				NConcurrency::TCActor<> DispatchActor;
+				NFunction::TCFunctionMutable<NConcurrency::TCFuture<CStartUploadTransfer::CResult> (CStartUploadTransfer &&_Params)> fStartTransfer;
+				_Stream.f_GetStream() >> DispatchActor;
+				_Stream.f_GetStream() >> fStartTransfer;
+
+				m_fStartTransfer = {fg_Move(DispatchActor), fg_Move(fStartTransfer)};
+			}
+			else
+			{
+				_Stream.f_GetStream() << fg_Move(m_fStartTransfer.f_GetActor());
+				_Stream.f_GetStream() << fg_Move(m_fStartTransfer.f_GetFunctor());
+
+				m_fStartTransfer.f_Clear();
+			}
+		}
 	}
 	
 	template <typename tf_CStream>
@@ -386,6 +408,8 @@ namespace NMib::NCloud
 		_Stream % m_Application;
 		_Stream % m_VersionIDAndPlatform;
 		_Stream % m_TransferContext;
+		if (_Stream.f_GetVersion() >= 0x106)
+			_Stream % fg_Move(m_Subscription);
 	}
 	
 	// CNewVersionNotification

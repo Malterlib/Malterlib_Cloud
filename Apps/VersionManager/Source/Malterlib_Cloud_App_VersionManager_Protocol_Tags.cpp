@@ -187,6 +187,7 @@ namespace NMib::NCloud::NVersionManager
 						}
 
 						bool bFailed = false;
+						mint nVersions = 0;
 						for (auto &Version : *_Results)
 						{
 							if (!Version)
@@ -194,9 +195,21 @@ namespace NMib::NCloud::NVersionManager
 								Auditor.f_Error(fg_Format("Failed to save version info: {}", Version.f_GetExceptionStr()));
 								bFailed = true;
 							}
+							else
+								++nVersions;
 						}
 
-						Auditor.f_Info(fg_Format("Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}", ApplicationName, VersionID, Platform, AddTags, RemoveTags));
+						Auditor.f_Info
+							(
+								"Changed tags for {} {} {}   Removed {vs,vb}   Added {vs,vb}   affected {} versions"_f
+							 	<< ApplicationName
+							 	<< VersionID
+							 	<< Platform
+							 	<< RemoveTags
+							 	<< AddTags
+							 	<< nVersions
+							)
+						;
 
 						if (bFailed)
 							return Promise.f_SetException(DMibErrorInstance("Failed to save one or more version infos. Consult version manager log files for more info."));

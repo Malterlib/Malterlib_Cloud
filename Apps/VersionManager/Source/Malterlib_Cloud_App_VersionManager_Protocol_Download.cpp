@@ -45,20 +45,22 @@ namespace NMib::NCloud::NVersionManager
 		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
 			return Auditor.f_Exception({"Invalid version platform format", "(start download version)"});
 
+		TCSharedPointer<CStartDownloadVersion> pParams = fg_Construct(fg_Move(_Params));
+
 		TCPromise<CStartDownloadVersion::CResult> Promise;
 		pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", {"Application/ReadAll", "Application/Read/{}"_f << _Params.m_Application})
 			> Promise % "Permission denied downloading version" % Auditor /
-			[=, Params = fg_Move(_Params)](bool _bHasPermission) mutable
+			[=](bool _bHasPermission) mutable
 			{
 				if (!_bHasPermission)
 					return Promise.f_SetException(Auditor.f_AccessDenied("(Start download version)"));
 
-				auto *pApplication = pThis->mp_Applications.f_FindEqual(Params.m_Application);
+				auto *pApplication = pThis->mp_Applications.f_FindEqual(pParams->m_Application);
 				if (!pApplication)
-					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application: {}", Params.m_Application)));
-				auto *pVersion = pApplication->m_Versions.f_FindEqual(Params.m_VersionIDAndPlatform);
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such application: {}", pParams->m_Application)));
+				auto *pVersion = pApplication->m_Versions.f_FindEqual(pParams->m_VersionIDAndPlatform);
 				if (!pVersion)
-					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such version: {}", Params.m_VersionIDAndPlatform)));
+					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such version: {}", pParams->m_VersionIDAndPlatform)));
 
 				NStr::CStr DownloadID = fg_RandomID();
 
@@ -70,13 +72,13 @@ namespace NMib::NCloud::NVersionManager
 				;
 
 				CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
-				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, Params.m_Application, Params.m_VersionIDAndPlatform.f_EncodeFileName());
+				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, pParams->m_Application, pParams->m_VersionIDAndPlatform.f_EncodeFileName());
 
 				Download.m_FileTransferSend = fg_ConstructActor<CFileTransferSend>(VersionPath);
-				Download.m_Desc = fg_Format("{}", Params.m_VersionIDAndPlatform);
+				Download.m_Desc = fg_Format("{}", pParams->m_VersionIDAndPlatform);
 
-				Download.m_FileTransferSend(&CFileTransferSend::f_SendFiles, fg_Move(Params.m_TransferContext))
-					> [pThis, DownloadID, Promise, Desc = Download.m_Desc, VersionInfo = pVersion->m_VersionInfo, Auditor]
+				Download.m_FileTransferSend(&CFileTransferSend::f_SendFiles, fg_Move(pParams->m_TransferContext))
+					> [pThis, DownloadID, Promise, Desc = Download.m_Desc, VersionInfo = pVersion->m_VersionInfo, Auditor, pParams]
 					(TCAsyncResult<CActorSubscription> &&_Subscription) mutable
 					{
 						if (!_Subscription)
@@ -102,7 +104,7 @@ namespace NMib::NCloud::NVersionManager
 						if (!pDownload)
 							return;
 						auto &Download = *pDownload;
-						Download.m_FileTransferSend(&CFileTransferSend::f_GetResult) > [pThis, DownloadID, Desc, Auditor](TCAsyncResult<CFileTransferResult> &&_Result)
+						Download.m_FileTransferSend(&CFileTransferSend::f_GetResult) > [pThis, DownloadID, Desc, Auditor, pParams](TCAsyncResult<CFileTransferResult> &&_Result)
 							{
 								if (!_Result)
 									Auditor.f_Error(fg_Format("'{}' Failed to transfer version (download): {}", Desc, _Result.f_GetExceptionStr()));

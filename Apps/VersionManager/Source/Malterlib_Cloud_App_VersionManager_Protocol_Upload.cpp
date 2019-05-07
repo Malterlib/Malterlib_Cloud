@@ -102,13 +102,15 @@ namespace NMib::NCloud::NVersionManager
 				DeniedTags[Tag];
 		}
 
+		TCSharedPointer<CStartUploadVersion> pParams = fg_Construct(fg_Move(_Params));
+
 		pThis->mp_Permissions.f_HasPermissions("Upload version", Permissions)
 			> Promise % "Permission denied uploading version" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
 			{
 				if (!_HasPermissions["//Command//"])
 					return Promise.f_SetException(Auditor.f_AccessDenied("(Start upload version)"));
 
-				auto VersionInfo = _Params.m_VersionInfo;
+				auto VersionInfo = pParams->m_VersionInfo;
 
 				if (!_HasPermissions["//TagAll//"])
 				{
@@ -128,7 +130,7 @@ namespace NMib::NCloud::NVersionManager
 				CStr UploadID = fg_RandomID();
 
 				auto &Upload = pThis->mp_VersionUploads[UploadID];
-				Upload.m_Desc = fg_Format("{} - {}", _Params.m_Application, _Params.m_VersionIDAndPlatform);
+				Upload.m_Desc = fg_Format("{} - {}", pParams->m_Application, pParams->m_VersionIDAndPlatform);
 				auto pCleanup = fg_OnScopeExitShared
 					(
 						[pThis, UploadID, ThisWeak = fg_ThisActor(pThis).f_Weak(), Desc = Upload.m_Desc, Auditor]
@@ -149,16 +151,16 @@ namespace NMib::NCloud::NVersionManager
 				;
 
 				CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
-				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Params.m_VersionIDAndPlatform.f_EncodeFileName());
+				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, pParams->m_Application, pParams->m_VersionIDAndPlatform.f_EncodeFileName());
 
 				Upload.m_UploadFileAccess = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Upload version file access"));
 				Upload.m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, gc_FilePermissions, gc_FilePermissions, Upload.m_UploadFileAccess);
 
 				auto ReceiveFlags = CFileTransferReceive::EReceiveFlag_FailOnExisting;
-				if (_Params.m_Flags & CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite)
+				if (pParams->m_Flags & CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite)
 					ReceiveFlags = CFileTransferReceive::EReceiveFlag_DeleteExisting;
 
-				Upload.m_FileTransferReceive(&CFileTransferReceive::f_ReceiveFiles, _Params.m_QueueSize, ReceiveFlags)
+				Upload.m_FileTransferReceive(&CFileTransferReceive::f_ReceiveFiles, pParams->m_QueueSize, ReceiveFlags)
 					>
 					[
 						pCleanup
@@ -166,11 +168,11 @@ namespace NMib::NCloud::NVersionManager
 						, UploadID
 						, Promise
 						, Desc = Upload.m_Desc
-						, _Params
+						, pParams
 						, VersionInfo
 						, VersionPath
-						, VersionID = _Params.m_VersionIDAndPlatform
-						, ApplicationName = _Params.m_Application
+						, VersionID = pParams->m_VersionIDAndPlatform
+						, ApplicationName = pParams->m_Application
 						, DeniedTags
 						, Auditor
 					]
@@ -191,17 +193,11 @@ namespace NMib::NCloud::NVersionManager
 							return;
 						auto &Upload = *pUpload;
 
+						TCSharedPointer<TCPromise<void>> pFinishedPromise = fg_Construct();
+
 						CVersionManager::CStartUploadTransfer StartTransfer;
 						StartTransfer.m_TransferContext = fg_Move(*_FileTransferContext);
-						fg_Dispatch
-							(
-								_Params.m_DispatchActor
-								, [fStartTransfer = fg_Move(_Params.m_fStartTransfer), StartTransfer = fg_Move(StartTransfer)]() mutable
-								{
-									return fStartTransfer(fg_Move(StartTransfer));
-								}
-							)
-							> [pThis, Promise, Desc, pCleanup, UploadID, DeniedTags, Auditor]
+						pParams->m_fStartTransfer(fg_Move(StartTransfer)) > [pThis, Promise, Desc, pCleanup, UploadID, DeniedTags, Auditor, pFinishedPromise]
 							(TCAsyncResult<CVersionManager::CStartUploadTransfer::CResult> &&_Result)
 							{
 								if (!_Result)
@@ -219,10 +215,9 @@ namespace NMib::NCloud::NVersionManager
 								Upload.m_DownloadSubscription = fg_Move(_Result->m_Subscription);
 								CVersionManager::CStartUploadVersion::CResult Result;
 								Result.m_DeniedTags = DeniedTags;
-								Result.m_Subscription = fg_ActorSubscriptionAsync
+								Result.m_fFinish = g_ActorFunctor
 									(
-										fg_ThisActor(pThis)
-										, [pThis, UploadID, Desc, Auditor]() -> TCFuture<void>
+										g_ActorSubscription / [pThis, UploadID, Desc, Auditor]() -> TCFuture<void>
 										{
 											auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
 											if (!pUpload)
@@ -242,7 +237,11 @@ namespace NMib::NCloud::NVersionManager
 
 											return Promise.f_MoveFuture();
 										}
-									)
+								 	)
+									/ [pFinishedPromise]() -> TCFuture<void>
+									{
+										return pFinishedPromise->f_Future();
+									}
 								;
 								Promise.f_SetResult(fg_Move(Result));
 								pCleanup->f_Clear();
@@ -250,7 +249,8 @@ namespace NMib::NCloud::NVersionManager
 						;
 
 						Upload.m_FileTransferReceive(&CFileTransferReceive::f_GetResult)
-							> [pThis, UploadID, ApplicationName, VersionID, VersionInfo, VersionPath, Desc, Auditor](TCAsyncResult<CFileTransferResult> &&_Result)
+							> [pThis, UploadID, ApplicationName, VersionID, VersionInfo, VersionPath, Desc, Auditor, pParams, pFinishedPromise]
+							(TCAsyncResult<CFileTransferResult> &&_Result) mutable
 							{
 								if (!_Result)
 									Auditor.f_Error(fg_Format("'{}' Failed to transfer version (upload): {}", Desc, _Result.f_GetExceptionStr()));
@@ -274,7 +274,10 @@ namespace NMib::NCloud::NVersionManager
 
 								auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
 								if (!pUpload)
+								{
+									pFinishedPromise->f_SetException(DMibErrorInstance("Upload aborted"));
 									return;
+								}
 								if (pUpload->m_FileTransferReceive)
 								{
 									pUpload->m_FileTransferReceive->f_DestroyNoResult(DMibPFile, DMibPLine);
@@ -284,13 +287,17 @@ namespace NMib::NCloud::NVersionManager
 								pThis->mp_VersionUploads.f_Remove(UploadID);
 
 								if (!_Result)
+								{
+									pFinishedPromise->f_SetException(DMibErrorInstance("Upload file transfer failed"));
 									return;
+								}
 
 								pThis->fp_SaveVersionInfo(FileAccess, VersionPath, VersionInfo)
-									> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
+									> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor, pParams, pFinishedPromise](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
 									{
 										if (!_InfoWriteResult)
 										{
+											pFinishedPromise->f_SetException(DMibErrorInstance("Failed to save version info"));
 											Auditor.f_Error(fg_Format("'{}' Failed to write version info file: {}", Desc, _InfoWriteResult.f_GetExceptionStr()));
 											return;
 										}
@@ -318,6 +325,7 @@ namespace NMib::NCloud::NVersionManager
 										Application.m_VersionsByTime.f_Insert(Version);
 
 										pThis->fp_NewVersion(ApplicationName, Version);
+										pFinishedPromise->f_SetResult();
 									}
 								;
 							}

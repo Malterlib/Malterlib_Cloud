@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Concurrency/ActorSubscription>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -206,7 +207,16 @@ namespace NMib::NCloud::NAppManager
 				StartDownload.m_Application = _ApplicationName;
 				StartDownload.m_VersionIDAndPlatform = _VersionID;
 				StartDownload.m_TransferContext = fg_Move(_TransferContext);
-				
+				if (_Manager->f_InterfaceVersion() >= 0x106)
+				{
+					StartDownload.m_Subscription = g_ActorSubscription / [Promise]()
+						{
+							if (!Promise.f_IsSet())
+								Promise.f_SetException(DMibErrorInstance("VersionManager disconnected"));
+						}
+					;
+				}
+
 				DMibCallActor
 					(
 						_Manager
@@ -224,10 +234,13 @@ namespace NMib::NCloud::NAppManager
 							(TCAsyncResult<CFileTransferResult> &&_Results) mutable
 							{
 								pDownloadState->m_Subscription.f_Clear();
-								if (!_Results)
-									Promise.f_SetException(fg_Move(_Results));
-								else
-									Promise.f_SetResult(fg_Move(VersionInfo));
+								if (!Promise.f_IsSet())
+								{
+									if (!_Results)
+										Promise.f_SetException(fg_Move(_Results));
+									else
+										Promise.f_SetResult(fg_Move(VersionInfo));
+								}
 							}
 						;
 					}

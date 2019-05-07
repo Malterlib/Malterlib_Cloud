@@ -26,7 +26,7 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EMinProtocolVersion = 0x103
-			, EProtocolVersion = 0x105
+			, EProtocolVersion = 0x106
 		};
 
 		struct CVersionID : public CCloudVersion
@@ -143,7 +143,7 @@ namespace NMib::NCloud
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
 				
-				NConcurrency::CActorSubscription m_Subscription;
+				NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()> m_fFinish;
 				NContainer::TCSet<NStr::CStr> m_DeniedTags;
 			};
 			
@@ -161,8 +161,7 @@ namespace NMib::NCloud
 			CVersionInformation m_VersionInfo;
 			uint64 m_QueueSize = 8*1024*1024;
 			EFlag m_Flags = EFlag_None;
-			NConcurrency::TCActor<> m_DispatchActor;
-			NFunction::TCFunctionMutable<NConcurrency::TCFuture<CStartUploadTransfer::CResult> (CStartUploadTransfer &&_Params)> m_fStartTransfer;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CStartUploadTransfer::CResult> (CStartUploadTransfer &&_Params)> m_fStartTransfer;
 		};
 		
 		struct CStartDownloadVersion
@@ -182,6 +181,7 @@ namespace NMib::NCloud
 			NStr::CStr m_Application;
 			CVersionIDAndPlatform m_VersionIDAndPlatform;
 			CFileTransferContext m_TransferContext;
+			NConcurrency::CActorSubscription m_Subscription;
 		};
 		
 		struct CNewVersionNotification
@@ -322,7 +322,8 @@ namespace NMib::NCloud
 			) const
 		;
 		
-		NConcurrency::TCFuture<CPackageInfo> f_CreatePackage(NStr::CStr const &_SourceDirectory, NStr::CStr const &_DestinationFileName) const;
+		NConcurrency::TCFuture<CPackageInfo> f_CreatePackage(NStr::CStr const &_SourceDirectory, NStr::CStr const &_DestinationFileName, uint32 _CompressionLevel) const;
+		NConcurrency::TCFuture<CPackageInfo> f_GetPackageInfo(NStr::CStr const &_PackageFile) const;
 		NConcurrency::TCFuture<void> f_AbortAll() const;
 		
 		NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> f_GetFileActor() const;

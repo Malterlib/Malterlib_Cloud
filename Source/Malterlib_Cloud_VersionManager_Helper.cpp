@@ -51,12 +51,12 @@ namespace NMib::NCloud
 		struct CUploadState : public CState
 		{
 			TCActor<CFileTransferSend> m_UploadVersionSend;
-			CActorSubscription m_UploadVersionSubscription;
-			
+			TCActorFunctor<NConcurrency::TCFuture<void> ()> m_fFinish;
+
 			TCFuture<void> f_Abort()
 			{
 				m_UploadVersionSend.f_Clear();
-				m_UploadVersionSubscription.f_Clear();
+				m_fFinish.f_Clear();
 				if (m_UploadVersionSend)
 					return m_UploadVersionSend->f_Destroy();
 				return fg_Explicit();
@@ -66,12 +66,15 @@ namespace NMib::NCloud
 		struct CProcessLaunchState : public CState
 		{
 			TCActor<CProcessLaunchActor> m_Launch;
-			
+			TCActor<CProcessLaunchActor> m_Launch2;
+
 			TCFuture<void> f_Abort()
 			{
 				if (m_Launch)
-					return m_Launch->f_Destroy();
-				return fg_Explicit();
+					co_await m_Launch->f_Destroy();
+				if (m_Launch2)
+					co_await m_Launch2->f_Destroy();
+				co_return {};
 			}
 		};
 	}
@@ -162,8 +165,7 @@ namespace NMib::NCloud
 		StartUpload.m_QueueSize = _QueueSize ? _QueueSize : Internal.m_QueueSize;
 		StartUpload.m_Flags = _Flags;
 		
-		StartUpload.m_DispatchActor = fg_CurrentActor();
-		StartUpload.m_fStartTransfer = [pState](CVersionManager::CStartUploadTransfer &&_Params) 
+		StartUpload.m_fStartTransfer = g_ActorFunctor / [pState](CVersionManager::CStartUploadTransfer &&_Params)
 			-> TCFuture<CVersionManager::CStartUploadTransfer::CResult>
 			{
 				TCPromise<CVersionManager::CStartUploadTransfer::CResult> StartTransferPromise;
@@ -208,17 +210,28 @@ namespace NMib::NCloud
 			{
 				pCleanupAfterTimeout->f_Clear();
 				
-				pState->m_UploadVersionSubscription = fg_Move(_Result.m_Subscription);
+				pState->m_fFinish = fg_Move(_Result.m_fFinish);
 				pState->m_UploadVersionSend(&CFileTransferSend::f_GetResult) 
 					> Promise / [pState, Promise, DeniedTags = _Result.m_DeniedTags, pStateCleanup](CFileTransferResult &&_Result) mutable
 					{
-						pState->m_UploadVersionSubscription.f_Clear();
-						
 						CUploadResult Result;
 						Result.m_TransferResult = fg_Move(_Result);
 						Result.m_DeniedTags = fg_Move(DeniedTags);
-						
-						Promise.f_SetResult(fg_Move(Result));
+
+						if (pState->m_fFinish.f_GetFunctor())
+						{
+							pState->m_fFinish() > Promise / [pState, Promise, Result = fg_Move(Result)]() mutable
+								{
+									pState->m_fFinish.f_Clear();
+									Promise.f_SetResult(fg_Move(Result));
+								}
+							;
+						}
+						else
+						{
+							Promise.f_SetResult(fg_Move(Result));
+							pState->m_fFinish.f_Clear();
+						}
 					}
 				;
 			}
@@ -311,8 +324,143 @@ namespace NMib::NCloud
 		auto &Internal = *mp_pInternal;
 		return Internal.f_GetFileActor();
 	}
-	
-	TCFuture<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_CreatePackage(NStr::CStr const &_SourceDirectory, NStr::CStr const &_DestinationFileName) const
+
+	namespace
+	{
+		CVersionManagerHelper::CPackageInfo fg_ExtractPackageInfo(CEJSON const &_VersionInfoJSON)
+		{
+			CVersionManagerHelper::CPackageInfo PackageInfo;
+
+			{
+				CStr Version;
+				if (auto *pValue = _VersionInfoJSON.f_GetMember("Version", EJSONType_String))
+					Version = pValue->f_String();
+
+				CStr Error;
+				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &PackageInfo.m_VersionID.m_VersionID))
+					DMibError(fg_Format("Version identifier format is invalid: {}", Error));
+			}
+
+			{
+				CStr Platform;
+				if (auto *pValue = _VersionInfoJSON.f_GetMember("Platform", EJSONType_String))
+					Platform = pValue->f_String();
+
+				if (!CVersionManager::fs_IsValidPlatform(Platform))
+					DMibError("Invalid version platform format");
+
+				PackageInfo.m_VersionID.m_Platform = Platform;
+			}
+
+			if (auto *pValue = _VersionInfoJSON.f_GetMember("Configuration", EJSONType_String))
+				PackageInfo.m_VersionInfo.m_Configuration = pValue->f_String();
+
+			if (auto *pValue = _VersionInfoJSON.f_GetMember("ExtraInfo", EJSONType_Object))
+				PackageInfo.m_VersionInfo.m_ExtraInfo = pValue->f_Object();
+
+			return PackageInfo;
+		}
+	}
+
+	NConcurrency::TCFuture<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_GetPackageInfo(NStr::CStr const &_PackageFile) const
+	{
+		return g_DirectDispatch / [pInternal = mp_pInternal, _PackageFile]() -> TCFuture<CVersionManagerHelper::CPackageInfo>
+			{
+				auto &Internal = *pInternal;
+
+				TCSharedPointer<CProcessLaunchState, CSupportWeakTag> pState = fg_Construct();
+				pState->m_Launch = fg_ConstructActor<CProcessLaunchActor>();
+				pState->m_Launch2 = fg_ConstructActor<CProcessLaunchActor>();
+
+				CStr StateID = fg_RandomID();
+				Internal.m_States[StateID] = pState;
+
+				auto pStateCleanup = g_OnScopeExitActor > [StateID, pInternal]
+					{
+						auto &Internal = *pInternal;
+						Internal.m_States.f_Remove(StateID);
+					}
+				;
+
+				CProcessLaunchActor::CSimpleLaunch Launch
+					{
+						Internal.m_RootDirectory / "bin/bsdtar"
+						,
+						{
+							"-xqOf"
+							, _PackageFile
+							, "*VersionInfo.json"
+						}
+						, CFile::fs_GetPath(_PackageFile)
+						, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+					}
+				;
+
+				auto VersionInfoStr = (co_await pState->m_Launch(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))).f_GetStdOut();
+
+				CEJSON VersionInfo = CEJSON::fs_FromString(VersionInfoStr);
+
+				CVersionManagerHelper::CPackageInfo PackageInfo = fg_ExtractPackageInfo(VersionInfo);
+
+				CProcessLaunchActor::CSimpleLaunch LaunchList
+					{
+						Internal.m_RootDirectory / "bin/bsdtar"
+						,
+						{
+							"-tvf"
+							, _PackageFile
+						}
+						, CFile::fs_GetPath(_PackageFile)
+						, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+					}
+				;
+
+				auto ListStr = (co_await pState->m_Launch2(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))).f_GetStdOut();
+
+				CTime Newest;
+				for (auto &Line : ListStr.f_SplitLine())
+				{
+					ch8 const *pParse = Line.f_GetStr();
+
+					auto fParseField = [&]() -> CStr
+						{
+							ch8 const *pStart = pParse;
+							fg_ParseNonWhiteSpaceAndSeparators(pParse, "");
+							CStr Field(pStart, pParse - pStart);
+							fg_ParseWhiteSpace(pParse);
+							return Field;
+						}
+					;
+
+					fParseField(); // Permissions
+					fParseField(); // ?
+					fParseField(); // User
+					fParseField(); // Group
+					fParseField(); // Size
+
+					CStr Month = fParseField();
+					CStr DayOfMonth = fParseField();
+					CStr Year = fParseField();
+
+					auto FileTime = CTimeConvert::fs_CreateTime(Year.f_ToInt(int64(0)), fg_GetAscMonthNumber(Month), DayOfMonth.f_ToInt(int32(1)));
+
+					if (!Newest.f_IsValid() || FileTime > Newest)
+						Newest = FileTime;
+				}
+
+				PackageInfo.m_VersionInfo.m_Time = Newest;
+
+				co_return PackageInfo;
+			}
+		;
+	}
+
+	TCFuture<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_CreatePackage
+		(
+			NStr::CStr const &_SourceDirectory
+			, NStr::CStr const &_DestinationFileName
+			, uint32 _CompressionLevel
+		) const
 	{
 		auto &Internal = *mp_pInternal;
 		TCSharedPointer<CProcessLaunchState, CSupportWeakTag> pState = fg_Construct();
@@ -334,6 +482,8 @@ namespace NMib::NCloud
 				,
 				{
 					"--disable-copyfile"
+					, "--options"
+					, "gzip:compression-level={}"_f << _CompressionLevel
 					, "-czf"
 					, _DestinationFileName
 					, "."
@@ -359,7 +509,7 @@ namespace NMib::NCloud
 					CStr VersionInfoFile = Files[0];
 					CEJSON VersionInfoJSON = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile, true), VersionInfoFile);
 					
-					CPackageInfo PackageInfo;
+					CPackageInfo PackageInfo = fg_ExtractPackageInfo(VersionInfoJSON);
 					
 					{
 						CFile::CFindFilesOptions FindOptions{_SourceDirectory + "/*", true};
@@ -371,36 +521,8 @@ namespace NMib::NCloud
 							if (!Newest.f_IsValid() || FoundTime > Newest)
 								Newest = FoundTime;
 						}
-						PackageInfo.m_VersionInfo.m_Time = Newest;
+						PackageInfo.m_VersionInfo.m_Time = CTimeConvert::fs_FromCreateFromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
 					}
-					
-					{
-						CStr Version;
-						if (auto *pValue = VersionInfoJSON.f_GetMember("Version", EJSONType_String))
-							Version = pValue->f_String();
-						
-						CStr Error; 
-						if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &PackageInfo.m_VersionID.m_VersionID))
-							DMibError(fg_Format("Version identifier format is invalid: {}", Error));
-					}
-
-					{
-						CStr Platform;
-						if (auto *pValue = VersionInfoJSON.f_GetMember("Platform", EJSONType_String))
-							Platform = pValue->f_String();
-						
-						if (!CVersionManager::fs_IsValidPlatform(Platform))
-							DMibError("Invalid version platform format");
-						
-						PackageInfo.m_VersionID.m_Platform = Platform;
-					}
-					
-					if (auto *pValue = VersionInfoJSON.f_GetMember("Configuration", EJSONType_String))
-						PackageInfo.m_VersionInfo.m_Configuration = pValue->f_String();
-					
-					if (auto *pValue = VersionInfoJSON.f_GetMember("ExtraInfo", EJSONType_Object))
-						PackageInfo.m_VersionInfo.m_ExtraInfo = pValue->f_Object();
-					
 					return PackageInfo;
 				}
 			)
