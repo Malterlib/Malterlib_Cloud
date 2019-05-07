@@ -41,6 +41,27 @@ Property
 		!!MalterlibCloudCompatibilityTests ""
 	}
 
+	MalterlibCloudCompatibilityTestsSupported true
+	{
+		&
+		{
+			MalterlibCloudCompatibilityTests true
+			|
+			{
+				&
+				{
+					Platform "Linux2.6"
+					Architecture "x64"
+				}
+				&
+				{
+					PlatformFamily "OSX"
+					Architecture "x64"
+				}
+			}
+		}
+	}
+
 	MalterlibBinaryTestRepositories "Cloud_Linux_x64;@(MalterlibBinaryTestRepositories)"
 	{
 		&
@@ -544,11 +565,23 @@ Property
 	Property
 	{
 		MalterlibLinkWithOpenSSL true
+		TestBinariesRepoDir "../../Binaries/MalterlibTest/Cloud/@(PlatformFamily)/@(Architecture)"
 	}
 	Compile
 	{
 		!!CompileDialect "C"
 		PrefixHeader "@('Test/PCH.h'->MakeAbsolute())"
+		PreprocessorDefines "DMalterlibCloudCompatibilityTests=1;@(Compile.PreprocessorDefines)"
+		{
+			!!MalterlibCloudCompatibilityTestsSupported true
+		}
+	}
+	Property
+	{
+		MalterlibPostCopySources "@(TestBinariesRepoDir->MakeAbsolute())/~*|CloudTestBinaries;@(MalterlibPostCopySources)"
+		{
+			!!MalterlibCloudCompatibilityTestsSupported true
+		}
 	}
 }
 
@@ -856,7 +889,7 @@ Property
 
 %Group "{Malterlib}/{CloudTarBinaries}"
 {
-	%Dependency "Exe_bsdtar=Com_@(Target:Target.BaseName)_bsdtar*MalterlibPostCopyProject=@(MalterlibPostCopyProject)*MalterlibPostCopyDestination=@(MalterlibAppTestPostCopyDestination)bin/*Target.Name=Com_@(Target:Target.BaseName)_bsdtar*Target.Group=ExternalBinaries/@(Target:Target.BaseName)"
+	%Dependency "Exe_bsdtar=Com_@(Target:Target.BaseName)_bsdtar*MalterlibPostCopyProject=@(MalterlibPostCopyProject)*MalterlibPostCopyDestination=@(MalterlibPostCopyDestination)bin/*Target.Name=Com_@(Target:Target.BaseName)_bsdtar*Target.Group=ExternalBinaries/@(Target:Target.BaseName)"
 	{
 		Dependency.Link false
 	}
