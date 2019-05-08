@@ -49,11 +49,9 @@ namespace NMib::NCloud
 				
 				TCPromise<NFile::CDirectorySyncReceive::CSyncResult> Promise;
 				
-				DMibCallActor
+				_BackupManager.f_CallActor(&CBackupManager::f_DownloadBackup)
 					(
-						_BackupManager
-						, CBackupManager::f_DownloadBackup
-					 	, CBackupManager::CDownloadBackup
+					 	CBackupManager::CDownloadBackup
 						{
 							_BackupSource
 							, _PointInTime

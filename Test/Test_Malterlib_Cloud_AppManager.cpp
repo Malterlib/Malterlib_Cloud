@@ -239,7 +239,7 @@ public:
 			CDistributedActorTrustManager_Address VersionManagerServerAddress;
 
 			VersionManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/versionmanager.sock"_f << VersionManagerDirectory));
-			DMibCallActor(VersionManagerTrust, CDistributedActorTrustManagerInterface::f_AddListen, VersionManagerServerAddress).f_CallSync(g_Timeout);
+			VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(VersionManagerServerAddress).f_CallSync(g_Timeout);
 
 			static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 			auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
@@ -254,11 +254,9 @@ public:
 			;
 
 			// Add trust to cloud client
-			auto Ticket = DMibCallActor
+			auto Ticket = VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 				(
-				 	VersionManagerTrust
-				 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
-				 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{VersionManagerServerAddress}
+				 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{VersionManagerServerAddress}
 				)
 				.f_CallSync(g_Timeout)
 			;
@@ -267,22 +265,18 @@ public:
 			{
 				TCVector<CStr> Params = {"--trust-namespace-add-trusted-host", "--namespace", CVersionManager::mc_pDefaultNamespace, VersionManagerHostID};
 				CProcessLaunch::fs_LaunchTool(CloudClientDirectory + "/MalterlibCloud", Params);
-				DMibCallActor
+				VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
-						 VersionManagerTrust
-						 , CDistributedActorTrustManagerInterface::f_AddPermissions
-						 , fPermissions(CloudClientHostID, VersionManagerPermissionsForTest)
+						fPermissions(CloudClientHostID, VersionManagerPermissionsForTest)
 					)
 					.f_CallSync(g_Timeout)
 				;
 			}
 
 			// Setup trust between for VersionManager and Test
- 			DMibCallActor
+ 			VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 				(
-					 VersionManagerTrust
-					 , CDistributedActorTrustManagerInterface::f_AddPermissions
-					 , fPermissions(TestHostID, VersionManagerPermissionsForTest)
+					 fPermissions(TestHostID, VersionManagerPermissionsForTest)
 				)
 				.f_CallSync(g_Timeout)
 			;
@@ -342,7 +336,7 @@ public:
 					auto &AppManagerInfo = AllAppManagers[AppManager.m_HostID];
 					AppManagerInfo.m_pTrustInterface = AppManager.m_pTrustInterface;
 					AppManagerInfo.m_Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << AppManagerDirectory);
-					DMibCallActor(*AppManager.m_pTrustInterface, CDistributedActorTrustManagerInterface::f_AddListen, AppManagerInfo.m_Address) > ListenResults.f_AddResult();
+					AppManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(AppManagerInfo.m_Address) > ListenResults.f_AddResult();
 					++iAppManager;
 				}
 				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(g_Timeout));
@@ -357,20 +351,16 @@ public:
 				CStr AppManagerHostID = AppManager.f_GetHostID();
 				auto TrustAppManagers = AllAppManagerHosts;
 				TrustAppManagers.f_Remove(AppManagerHostID);
-				DMibCallActor
+				AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 					(
-						AppManagerTrust
-						, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
-						, fNamespaceHosts("com.malterlib/Cloud/AppManagerCoordination", TrustAppManagers)
+						fNamespaceHosts("com.malterlib/Cloud/AppManagerCoordination", TrustAppManagers)
 					)
 					> SetupTrustResults.f_AddResult()
 				;
 
-				DMibCallActor
+				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 					(
-						TrustManager
-						, CDistributedActorTrustManager::f_AllowHostsForNamespace
-						, CAppManagerInterface::mc_pDefaultNamespace
+						CAppManagerInterface::mc_pDefaultNamespace
 						, fg_CreateSet<CStr>(AppManagerHostID)
 						, c_WaitForSubscriptions
 					)
@@ -386,16 +376,14 @@ public:
 					auto pAppManagerTrustInner = AppManagerInner.m_pTrustInterface;
 
 					TCPromise<void> Promise;
-					DMibCallActor
+					AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 						(
-						 	AppManagerTrust
-						 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
-						 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{AppManager.m_Address}
+						 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{AppManager.m_Address}
 						)
 						> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 						{
 							auto &AppManagerTrustInner = *pAppManagerTrustInner;
-							DMibCallActor(AppManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
+							AppManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 						}
 					;
 					Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
@@ -413,34 +401,26 @@ public:
 
 				TCPromise<> Promise;
 
-				DMibCallActor
+				VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 					(
-					 	VersionManagerTrust
-					 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
-					 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{VersionManagerServerAddress}
+					 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{VersionManagerServerAddress}
 					)
-					+ DMibCallActor
+					+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
-						AppManagerTrust
-						, CDistributedActorTrustManagerInterface::f_AddPermissions
-						, fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
+						fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
 					)
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket, CVoidTag)
 					{
 						auto &AppManagerTrust = *pAppManagerTrust;
 						auto &VersionManagerTrust = *pVersionManagerTrust;
-						DMibCallActor(AppManagerTrust, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1)
-							+ DMibCallActor
+						AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1)
+							+ VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 							(
-								VersionManagerTrust
-								, CDistributedActorTrustManagerInterface::f_AddPermissions
-								, fPermissions(AppManagerHostID, fg_CreateMap<CStr, CPermissionRequirements>("Application/ReadAll"))
+								fPermissions(AppManagerHostID, fg_CreateMap<CStr, CPermissionRequirements>("Application/ReadAll"))
 							)
-							+ DMibCallActor
+							+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 							(
-								AppManagerTrust
-								, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
-								, fNamespaceHosts(CVersionManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(VersionManagerHostID))
+								fNamespaceHosts(CVersionManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(VersionManagerHostID))
 							)
 							> Promise / [=]()
 							{
@@ -467,7 +447,7 @@ public:
 					Settings.m_UpdateGroup = "TestGroup";
 					Add.m_Version = PackageInfo.m_VersionID;
 
-					DMibCallActor(AppManager, CAppManagerInterface::f_Add, "TestApp", Add, Settings) > AddAppResults.f_AddResult();
+					AppManager.f_CallActor(&CAppManagerInterface::f_Add)("TestApp", Add, Settings) > AddAppResults.f_AddResult();
 				}
 				fg_CombineResults(AddAppResults.f_GetResults().f_CallSync(g_Timeout));
 			}
@@ -487,7 +467,7 @@ public:
 					ChangeTags.m_AddTags = _Tags;
 					ChangeTags.m_Application = _Name;
 					ChangeTags.m_VersionID = PackageInfo.m_VersionID.m_VersionID;
-					DMibCallActor(VersionManager, CVersionManager::f_ChangeTags, fg_Move(ChangeTags)).f_CallSync(g_Timeout);
+					VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_CallSync(g_Timeout);
 				}
 			;
 
@@ -597,11 +577,9 @@ public:
 				for (auto &AppManager : AppManagers)
 				{
 					TCPromise<void> Promise;
-					DMibCallActor
+					AppManager.f_CallActor(&CAppManagerInterface::f_SubscribeUpdateNotifications)
 						(
-							AppManager
-							, CAppManagerInterface::f_SubscribeUpdateNotifications
-							, g_ActorFunctor / [pUpdateNotificationsState, iAppManager]
+							g_ActorFunctor / [pUpdateNotificationsState, iAppManager]
 							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
 							{
 								CApplicationKey ApplicationKey{_Notification.m_Application, iAppManager};
@@ -734,7 +712,7 @@ public:
 						CAppManagerInterface::CApplicationSettings Settings;
 						Settings.m_ExecutableParameters = {"--update-type", _UpdateType, "--daemon-run-standalone"};
 
-						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, _AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
+						AppManager.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
 					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
 					*pUpdateType = _UpdateType;
@@ -750,7 +728,7 @@ public:
 						CAppManagerInterface::CApplicationSettings Settings;
 						Settings.m_UpdateGroup = _Group;
 
-						DMibCallActor(AppManager, CAppManagerInterface::f_ChangeSettings, _AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
+						AppManager.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
 					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
 				}
@@ -799,7 +777,7 @@ public:
 					Settings.m_UpdateGroup = "TestGroup2";
 					Add.m_Version = PackageInfo.m_VersionID;
 
-					DMibCallActor(AppManager, CAppManagerInterface::f_Add, "TestApp2", Add, Settings) > AddAppResults.f_AddResult();
+					AppManager.f_CallActor(&CAppManagerInterface::f_Add)("TestApp2", Add, Settings) > AddAppResults.f_AddResult();
 				}
 				fg_CombineResults(AddAppResults.f_GetResults().f_CallSync(g_Timeout));
 			}

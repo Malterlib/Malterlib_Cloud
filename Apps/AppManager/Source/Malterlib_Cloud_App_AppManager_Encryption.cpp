@@ -19,13 +19,13 @@ namespace NMib::NCloud::NAppManager
 #		include "Malterlib_Cloud_App_AppManager_Encryption_CloseLinux.sh"
 	;
 #endif
-	
+
 	void CAppManagerActor::fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted)
 	{
 		_pApplication->m_bEncryptionOpened = _bEncrypted;
 		fp_UpdateApplicationDependencies();
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite)
 	{
 		auto pEncryptionApplication = _pApplication;
@@ -43,7 +43,7 @@ namespace NMib::NCloud::NAppManager
 
 		if (pEncryptionApplication->m_Settings.m_EncryptionStorage.f_IsEmpty())
 			co_return {};
-		
+
 #if !defined(DPlatformFamily_Linux)
 		co_return DMibErrorInstance("Encryption is not supported on this platform");
 #else
@@ -52,18 +52,18 @@ namespace NMib::NCloud::NAppManager
 			if (pEncryptionApplication->m_bEncryptionOpened)
 				co_return {};
 		}
-		
+
 		if (mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
 			co_return DMibErrorInstance("No key managers are connected, so key cannot be generated");
-		
+
 		CSymmetricKey Key;
 		if (_Operation != EEncryptOperation_Close)
 		{
 			auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
 			static const mint c_KeyBits = 512;
-			Key = co_await DCallActor(KeyManagerInfo.m_Actor, CKeyManager::f_RequestKey, pEncryptionApplication->m_Name, c_KeyBits / 8);
+			Key = co_await KeyManagerInfo.m_Actor.f_CallActor(&CKeyManager::f_RequestKey)(pEncryptionApplication->m_Name, c_KeyBits / 8);
 		}
-		
+
 		TCMap<CStr, CStr> Environment;
 		Environment["MibCloudApp_EncryptionStorage"] = pEncryptionApplication->m_Settings.m_EncryptionStorage;
 		Environment["MibCloudApp_EncryptionFileSystem"] = pEncryptionApplication->m_Settings.m_EncryptionFileSystem;

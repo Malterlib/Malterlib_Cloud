@@ -49,11 +49,9 @@ namespace NMib::NCloud::NAppManager
 					if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
 						co_return {};
 
-					co_await DMibCallActor
+					co_await _pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_StartBackup)
 						(
-							_pApplication->m_AppInterface
-							, CDistributedAppInterfaceClient::f_StartBackup
-							, fg_Move(_BackupInterface)
+							fg_Move(_BackupInterface)
 							, fg_Move(_ManifestFinished)
 							, _BackupRoot
 						)

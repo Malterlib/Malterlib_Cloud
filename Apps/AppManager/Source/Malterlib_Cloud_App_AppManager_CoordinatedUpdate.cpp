@@ -21,7 +21,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			 if (!RemoteAppManager.m_Actor)
 				 continue;
-			DCallActor(RemoteAppManager.m_Actor, CAppManagerCoordinationInterface::f_RemoveKnownHost, Group, Application, HostID) > ResultsVector.f_AddResult();
+			RemoteAppManager.m_Actor.f_CallActor(&CAppManagerCoordinationInterface::f_RemoveKnownHost)(Group, Application, HostID) > ResultsVector.f_AddResult();
 		}
 
 		mp_AppManagerCoordinationInterface.m_pActor->f_RemoveKnownHost(Group, Application, HostID) > ResultsVector.f_AddResult();

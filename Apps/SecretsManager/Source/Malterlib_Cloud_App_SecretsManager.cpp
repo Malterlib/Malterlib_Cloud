@@ -51,7 +51,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (!mp_pServerController)
 			DMibError("No server controller");
 
-		return DMibCallActor(mp_pServerController, CServerController::f_Test_Command, _Command, _Params);
+		return mp_pServerController.f_CallActor(&CServerController::f_Test_Command)(_Command, _Params);
 	}
 #endif
 }

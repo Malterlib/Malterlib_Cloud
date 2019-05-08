@@ -308,27 +308,23 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			CDistributedActorTrustManager_Address TunnelServerAddress;
 			{
 				TunnelServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/Tunnel.sock"_f << TunnelServerDirectory));
-				DMibCallActor(TunnelServerTrust, CDistributedActorTrustManagerInterface::f_AddListen, TunnelServerAddress).f_CallSync(g_Timeout);
+				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(TunnelServerAddress).f_CallSync(g_Timeout);
 			}
 			{
 				CDistributedActorTrustManagerInterface::CGenerateConnectionTicket GenerateTicket;
 				GenerateTicket.m_Address = TunnelServerAddress;
-				auto Ticket = DMibCallActor(TunnelServerTrust, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket, fg_Move(GenerateTicket)).f_CallSync(g_Timeout);
-				auto HostInfo = DMibCallActor(TunnelClientTrust, CDistributedActorTrustManagerInterface::f_AddClientConnection, fg_Move(Ticket.m_Ticket), g_Timeout, 1).f_CallSync(g_Timeout);
+				auto Ticket = TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)(fg_Move(GenerateTicket)).f_CallSync(g_Timeout);
+				auto HostInfo = TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(fg_Move(Ticket.m_Ticket), g_Timeout, 1).f_CallSync(g_Timeout);
 
-				DMibCallActor
+				TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 					(
-					 	TunnelClientTrust
-					 	, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
-					 	, fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID})
+					 	fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID})
 					)
 					.f_CallSync(g_Timeout)
 				;
-				DMibCallActor
+				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
-					 	TunnelServerTrust
-					 	, CDistributedActorTrustManagerInterface::f_AddPermissions
-					 	, fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll"}})
+					 	fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll"}})
 					)
 					.f_CallSync(g_Timeout)
 				;

@@ -343,23 +343,19 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				CDistributedActorTrustManager_Address Address;
 				Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << _Directory);
-				DMibCallActor(*_LaunchInfo.m_pTrustInterface, CDistributedActorTrustManagerInterface::f_AddListen, Address).f_CallSync(g_Timeout);
-				DMibCallActor
+				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(Address).f_CallSync(g_Timeout);
+				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 					(
-						TrustManager
-						, CDistributedActorTrustManager::f_AllowHostsForNamespace
-						, CAppManagerInterface::mc_pDefaultNamespace
+						CAppManagerInterface::mc_pDefaultNamespace
 						, fg_CreateSet<CStr>(_LaunchInfo.m_HostID)
 						, mc_WaitForSubscriptions
 					).f_CallSync(g_Timeout)
 				;
 				try
 				{
-					DMibCallActor
+					_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 						(
-							*_LaunchInfo.m_pTrustInterface
-							, CDistributedActorTrustManagerInterface::f_AddPermissions
-							, fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
+							fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
 						)
 						.f_CallSync(g_Timeout)
 					;
@@ -417,7 +413,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fGetAppInfo = [&](CAppManager const &_AppManager, CStr const &_Application)
 			{
-				return DMibCallActor(_AppManager.m_AppManager, CAppManagerInterface::f_GetInstalled).f_CallSync()[_Application];
+				return _AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_CallSync()[_Application];
 			}
 		;
 
@@ -489,10 +485,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				Hosts.m_Hosts[_HostID];
 				Hosts.m_Namespace = _Namespace;
 
-				DMibCallActor(*_AppManager.m_LaunchInfo.m_pTrustInterface, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace, fg_Move(Hosts)).f_CallSync(g_Timeout);
+				_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)(fg_Move(Hosts)).f_CallSync(g_Timeout);
 
 				auto Ticket = CDistributedActorTrustManagerInterface::CTrustTicket::fs_FromStringTicket(fGenerateTicket(_Executable));
-				DMibCallActor(*_AppManager.m_LaunchInfo.m_pTrustInterface, CDistributedActorTrustManagerInterface::f_AddClientConnection, Ticket, g_Timeout, -1).f_CallSync(g_Timeout);
+				_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(g_Timeout);
 			}
 		;
 
@@ -512,14 +508,13 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				VersionManagerHostID = fGetHostID(VersionManagerExecutable);
 
-				DMibCallActor
+				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 					(
-						TrustManager
-						, CDistributedActorTrustManager::f_AllowHostsForNamespace
-						, CVersionManager::mc_pDefaultNamespace
+						CVersionManager::mc_pDefaultNamespace
 						, fg_CreateSet<CStr>(VersionManagerHostID)
 						, mc_WaitForSubscriptions
-					).f_CallSync(g_Timeout)
+					)
+					.f_CallSync(g_Timeout)
 				;
 
 				TCVector<CStr> Permissions = {"Application/ListAll", "Application/ReadAll", "Application/TagAll", "Application/WriteAll"};
@@ -528,7 +523,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					CProcessLaunch::fs_LaunchTool(VersionManagerExecutable, fg_CreateVector<CStr>("--trust-permission-add-host", TestHostID, "--permission", Permission));
 
 				auto Ticket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(fGenerateTicket(VersionManagerExecutable));
-				DMibCallActor(TrustManager, CDistributedActorTrustManager::f_AddClientConnection, Ticket, g_Timeout, -1).f_CallSync(g_Timeout);
+				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(g_Timeout);
 
 				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
 			}
@@ -549,14 +544,14 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				CAppManagerInterface::CApplicationUpdate Update;
 				Update.m_Platform = _PackageInfo.m_VersionID.m_Platform;
-				DMibCallActor(_AppManager.m_AppManager, CAppManagerInterface::f_Update, _App, Update).f_CallSync(g_Timeout);
+				_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Update)(_App, Update).f_CallSync(g_Timeout);
 			}
 		;
 
 		auto fWaitVersionsAvailable = [&](CAppManager const &_AppManager, CStr const &_Application)
 			{
 				NTime::CClock Timeout{true};
-				while (DMibCallActor(_AppManager.m_AppManager, CAppManagerInterface::f_GetAvailableVersions, _Application).f_CallSync(g_Timeout).f_IsEmpty())
+				while (_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetAvailableVersions)(_Application).f_CallSync(g_Timeout).f_IsEmpty())
 				{
 					if (Timeout.f_GetTime() > g_Timeout)
 						DMibError("Timed out waiting for version manager application to become available in AppManager");
@@ -576,7 +571,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				ApplicationSettings.m_VersionManagerApplication = "AppManager";
 				ApplicationSettings.m_ExecutableParameters = TCVector<CStr>{};
 
-				DMibCallActor(_AppManager.m_AppManager, CAppManagerInterface::f_Add, "SelfUpdate", fg_Move(Add), fg_Move(ApplicationSettings)).f_CallSync(g_Timeout);
+				_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)("SelfUpdate", fg_Move(Add), fg_Move(ApplicationSettings)).f_CallSync(g_Timeout);
 			}
 		;
 
@@ -591,7 +586,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				if (_Executable)
 					ApplicationSettings.m_Executable = _Executable;
 
-				DMibCallActor(_AppManager.m_AppManager, CAppManagerInterface::f_Add, _Application, fg_Move(Add), fg_Move(ApplicationSettings)).f_CallSync(g_Timeout);
+				_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)(_Application, fg_Move(Add), fg_Move(ApplicationSettings)).f_CallSync(g_Timeout);
 			}
 		;
 
@@ -625,7 +620,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				ChangeTags.m_AddTags = _Tags;
 				ChangeTags.m_Application = _Name;
 				ChangeTags.m_VersionID = _PackageInfo.m_VersionID.m_VersionID;
-				DMibCallActor(VersionManager, CVersionManager::f_ChangeTags, fg_Move(ChangeTags)).f_CallSync(g_Timeout);
+				VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_CallSync(g_Timeout);
 			}
 		;
 

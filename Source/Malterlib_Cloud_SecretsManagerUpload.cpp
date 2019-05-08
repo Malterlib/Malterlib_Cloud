@@ -111,7 +111,7 @@ namespace NMib::NCloud
 
 							TCPromise<void> SubscriptionDestroyedPromise;
 
-							DMibCallActor(pState->m_DirectorySyncSend, CDirectorySyncSend::f_GetResult) > [pState, SubscriptionDestroyedPromise]
+							pState->m_DirectorySyncSend.f_CallActor(&CDirectorySyncSend::f_GetResult)() > [pState, SubscriptionDestroyedPromise]
 								(
 									TCAsyncResult<CDirectorySyncSend::CSyncResult> &&_Result
 								)
@@ -134,7 +134,7 @@ namespace NMib::NCloud
 						}
 					}
 				;
-				DMibCallActor(_SecretsManager, CSecretsManager::f_UploadFile, fg_Move(_ID), FileName, fg_Move(SyncInterface))
+				_SecretsManager.f_CallActor(&CSecretsManager::f_UploadFile)(fg_Move(_ID), FileName, fg_Move(SyncInterface))
 					>  [pState](TCAsyncResult<TCActorFunctorWithID<TCFuture<void> ()>> &&_Result)
 					{
 						if (!_Result)

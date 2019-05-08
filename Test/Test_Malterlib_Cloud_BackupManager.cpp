@@ -603,7 +603,7 @@ public:
 					auto &BackupManagerInfo = AllBackupManagers[BackupManager.m_HostID];
 					BackupManagerInfo.m_pTrustInterface = BackupManager.m_pTrustInterface;
 					BackupManagerInfo.m_Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/BackupManagerTest.sock"_f << BackupManagerDirectory);
-					DMibCallActor(*BackupManager.m_pTrustInterface, CDistributedActorTrustManagerInterface::f_AddListen, BackupManagerInfo.m_Address) > ListenResults.f_AddResult();
+					BackupManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(BackupManagerInfo.m_Address) > ListenResults.f_AddResult();
 					++iBackupManager;
 				}
 				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(g_Timeout));
@@ -628,23 +628,16 @@ public:
 			auto TrustBackupManagers = AllBackupManagerHosts;
 			TrustBackupManagers.f_Remove(BackupManagerHostID);
 
-			DMibCallActor
+			TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 				(
-					TrustManager
-					, CDistributedActorTrustManager::f_AllowHostsForNamespace
-					, CBackupManager::mc_pDefaultNamespace
+					CBackupManager::mc_pDefaultNamespace
 					, fg_CreateSet<CStr>(BackupManagerHostID)
 				 	, c_WaitForSubscriptions
 				)
 				> SetupTrustResults.f_AddResult()
 			;
 			
-			DMibCallActor
-				(
-					BackupManagerTrust
-					, CDistributedActorTrustManagerInterface::f_AddPermissions
-					, fPermissions(TestHostID, BackupManagerPermissionsForTest)
-				)
+			BackupManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)(fPermissions(TestHostID, BackupManagerPermissionsForTest))
 				> SetupTrustResults.f_AddResult()
 			;
 
@@ -657,16 +650,14 @@ public:
 				auto pBackupManagerTrustInner = BackupManagerInner.m_pTrustInterface;
 				
 				TCPromise<void> Promise;
-				DMibCallActor
+				BackupManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 					(
-					 	BackupManagerTrust
-					 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
-					 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{BackupManager.m_Address}
+					 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{BackupManager.m_Address}
 					)
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &BackupManagerTrustInner = *pBackupManagerTrustInner;
-						DMibCallActor(BackupManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
+						BackupManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 					}
 				;
 				Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
@@ -1459,7 +1450,7 @@ public:
 
 				NFile::CDirectoryManifestConfig ExtraManifestConfig;
 				ExtraManifestConfig.m_IncludeWildcards = {{"Dir1/^*"}};
-				DMibCallActor(BackupHelper.m_BackupInterface, CDistributedAppInterfaceBackup::f_AppendManifest, ExtraManifestConfig).f_CallSync(g_Timeout);
+				BackupHelper.m_BackupInterface.f_CallActor(&CDistributedAppInterfaceBackup::f_AppendManifest)(ExtraManifestConfig).f_CallSync(g_Timeout);
 
 				BackupFinishedSubscription->f_Destroy().f_CallSync(g_Timeout);
 
@@ -1493,7 +1484,7 @@ public:
 				DMibTestPath("Downloads");
 				CBackupClientHelper BackupHelper{TestBackupDirectory};
 
-				auto BackupSources = DMibCallActor(BackupManager, CBackupManager::f_ListBackupSources).f_CallSync(g_Timeout);
+				auto BackupSources = BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)().f_CallSync(g_Timeout);
 
 				DMibAssert(BackupSources.f_GetLen(), ==, 1);
 

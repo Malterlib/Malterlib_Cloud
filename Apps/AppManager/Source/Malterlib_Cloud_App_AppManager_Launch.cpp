@@ -35,14 +35,14 @@ namespace NMib::NCloud::NAppManager
 			_pApplication->m_LaunchState = State;
 			co_return DMibErrorInstance(fg_Format("Dependencies not satisfied: {}", State));
 		}
-		
+
 		_pApplication->m_bLaunching = true;
 		_pApplication->m_bStopped = false;
 		struct CState
 		{
 			COnScopeExitShared m_pCleanup;
 		};
-		
+
 		TCSharedPointer<CState> pState = fg_Construct();
 		pState->m_pCleanup = fg_OnScopeExitShared
 			(
@@ -58,7 +58,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		
+
 		if (_bOpenEncryption)
 		{
 			auto Result = co_await (self(&CAppManagerActor::fp_ChangeEncryption, _pApplication, EEncryptOperation_Open, false) % "Failed to open encryption").f_Wrap();
@@ -71,7 +71,7 @@ namespace NMib::NCloud::NAppManager
 				co_return Result.f_GetException();
 			}
 		}
-		
+
 		auto &Application = *_pApplication;
 
 		if (Application.m_Settings.m_bSelfUpdateSource)
@@ -106,7 +106,7 @@ namespace NMib::NCloud::NAppManager
 		if (Application.m_Settings.m_AppManagerVersion < mc_CurrentAppMangerVersion)
 		{
 			fp_AppLaunchStateChanged(_pApplication, "Upgrading app manager version");
-			
+
 			co_await self(&CAppManagerActor::fp_UpdateAppManagerApplicationVersion, _pApplication, Application.m_Settings.m_AppManagerVersion);
 
 			Application.m_Settings.m_AppManagerVersion = mc_CurrentAppMangerVersion;
@@ -170,7 +170,7 @@ namespace NMib::NCloud::NAppManager
 										}
 
 										fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)");
-										DCallActor(_pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_GetAppStartResult)
+										_pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_GetAppStartResult)()
 											.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
 											> [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
 											{
@@ -387,7 +387,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return co_await LaunchPromise;
 	}
-	
+
 	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)
 		-> TCFuture<CAppLaunchResult>
 	{
@@ -403,7 +403,7 @@ namespace NMib::NCloud::NAppManager
 							Promise.f_SetException(DMibErrorInstance("Application was deleted or shut down before app could attempt launching"));
 							return;
 						}
-						
+
 						DCheck(!_pApplication->m_bLaunching);
 						self(&CAppManagerActor::fp_LaunchAppInternal, _pApplication, _bOpenEncryption) > Promise;
 					}

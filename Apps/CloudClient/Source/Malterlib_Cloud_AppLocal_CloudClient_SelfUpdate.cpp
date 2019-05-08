@@ -28,30 +28,30 @@ namespace NMib::NCloud::NCloudClient
 					Promise.f_SetException(_Result);
 					return;
 				}
-				
-				TCSharedPointer<NContainer::TCMap<TCDistributedActor<CVersionManager>, TCVector<CVersionManager::CNewVersionNotification>>> pVersions = fg_Construct(); 
+
+				TCSharedPointer<NContainer::TCMap<TCDistributedActor<CVersionManager>, TCVector<CVersionManager::CNewVersionNotification>>> pVersions = fg_Construct();
 				TCActorResultVector<CVersionManager::CSubscribeToUpdates::CResult> SubscribeResults;
-				
+
 				for (auto &Actor : mp_VersionManagers.m_Actors)
 				{
 					CVersionManager::CSubscribeToUpdates SubscriptionParams;
-					SubscriptionParams.m_Application = "MalterlibCloud"; // All applications we have access to 
+					SubscriptionParams.m_Application = "MalterlibCloud"; // All applications we have access to
 					SubscriptionParams.m_nInitial = 1;
 					SubscriptionParams.m_DispatchActor = self;
 					SubscriptionParams.m_Platforms[DMalterlibCloudPlatform];
 					SubscriptionParams.m_Tags["ClientSelfUpdate"];
-					SubscriptionParams.m_fOnNewVersions 
+					SubscriptionParams.m_fOnNewVersions
 						= [pVersions, Actor = Actor.m_Actor, AllowDestroy = g_AllowWrongThreadDestroy]
-						(CVersionManager::CNewVersionNotifications &&_NewVersions) 
+						(CVersionManager::CNewVersionNotifications &&_NewVersions)
 						-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 						{
-							(*pVersions)[Actor].f_Insert(fg_Move(_NewVersions.m_NewVersions)); 
+							(*pVersions)[Actor].f_Insert(fg_Move(_NewVersions.m_NewVersions));
 							return fg_Explicit(CVersionManager::CNewVersionNotifications::CResult());
 						}
 					;
-					DCallActor(Actor.m_Actor, CVersionManager::f_SubscribeToUpdates, fg_Move(SubscriptionParams)) > SubscribeResults.f_AddResult();
+					Actor.m_Actor.f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams)) > SubscribeResults.f_AddResult();
 				}
-				
+
 				SubscribeResults.f_GetResults() > [Promise, pVersions](TCAsyncResult<TCVector<TCAsyncResult<CVersionManager::CSubscribeToUpdates::CResult>>> &&_Results)
 					{
 						if (!_Results)
@@ -73,18 +73,18 @@ namespace NMib::NCloud::NCloudClient
 								{
 									BestVersionTime = Version.m_VersionInfo.m_Time;
 									BestVersion = Version;
-									BestActor = pVersions->fs_GetKey(ActorVersions); 
+									BestActor = pVersions->fs_GetKey(ActorVersions);
 								}
 							}
 						}
-						
+
 						if (!BestVersionTime.f_IsValid())
 						{
 							Promise.f_SetException(DMibErrorInstance("No new version was found"));
 							return;
 						}
 
-						if 
+						if
 							(
 								BestVersion.m_VersionIDAndPlatform.m_VersionID.m_Branch == CurrentVersionInfo.m_Version.m_Branch
 								&& BestVersion.m_VersionIDAndPlatform.m_VersionID <= CurrentVersionInfo.m_Version
@@ -130,7 +130,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 		return Promise.f_MoveFuture();
 	}
-	
+
 	TCFuture<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		DMibCheck(mp_State.m_RootDirectory == CFile::fs_GetProgramDirectory());
@@ -143,12 +143,12 @@ namespace NMib::NCloud::NCloudClient
 					Promise.f_SetException(_Version);
 					return;
 				}
-				
+
 				auto &Version = *_Version;
 				CVersionManager::CVersionIDAndPlatform VersionID;
 				VersionID.m_VersionID = Version.m_VersionID;
 				VersionID.m_Platform = DMalterlibCloudPlatform;
-				CStr DestinationDirectory = CFile::fs_GetProgramDirectory() + "/SelfUpdate"; 
+				CStr DestinationDirectory = CFile::fs_GetProgramDirectory() + "/SelfUpdate";
 
 				mp_VersionManagerHelper.f_Download(Version.m_Actor, "MalterlibCloud", VersionID, DestinationDirectory)
 					> Promise / [=](CFileTransferResult &&_TransferResult)
@@ -179,14 +179,14 @@ namespace NMib::NCloud::NCloudClient
 											, LaunchParams
 										)
 									;
-									
+
 									if (!bLaunchSuccess || ExitCode != 0)
 									{
 										DMibError(fg_Format("tar ({}) failed to extract new version: {}", ExitCode, StdErr));
 									}
-									
+
 									CFile::fs_DeleteFile(PackageFile);
-									
+
 									auto FilesToUpdate = CFile::fs_FindFiles(DestinationDirectory + "/*", EFileAttrib_File, true);
 									CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 									for (auto &File : FilesToUpdate)
@@ -194,8 +194,8 @@ namespace NMib::NCloud::NCloudClient
 										CStr RelativePath = File.f_Extract(DestinationDirectory.f_GetLen() + 1);
 										CFile::fs_DiffCopyFileOrDirectory(File, CFile::fs_AppendPath(ProgramDirectory, RelativePath), nullptr, {}, 0.0);
 									}
-									
-									CFile::fs_DeleteDirectoryRecursive(DestinationDirectory);									
+
+									CFile::fs_DeleteDirectoryRecursive(DestinationDirectory);
 								}
 							)
 							> Promise % "Failed to update version" / [=]
@@ -204,12 +204,12 @@ namespace NMib::NCloud::NCloudClient
 									<< _TransferResult.m_nBytes
 									<< _TransferResult.f_BytesPerSecond()/1'000'000.0
 								;
-						
+
 								*_pCommandLine %= "Updated to version {}\n"_f << Version.m_VersionID;
-								
+
 								Promise.f_SetResult(0);
 							}
-						;			
+						;
 					}
 				;
 			}

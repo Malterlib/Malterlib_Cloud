@@ -20,11 +20,9 @@ namespace NMib::NCloud
 		)
 	{
 		TCPromise<CDirectorySyncReceive::CSyncResult> Promise;
-		DMibCallActor
+		_SecretsManager.f_CallActor(&CSecretsManager::f_DownloadFile)
 			(
-				_SecretsManager
-				, CSecretsManager::f_DownloadFile
-				, fg_Move(_ID)
+				fg_Move(_ID)
 				, g_ActorSubscription / [=]() -> TCFuture<void>
 				{
 					// Cleanup?

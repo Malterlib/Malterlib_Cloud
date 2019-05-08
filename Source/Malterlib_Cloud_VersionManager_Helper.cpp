@@ -197,12 +197,7 @@ namespace NMib::NCloud
 			}
 		;
 		
-		DMibCallActor
-			(
-				_VersionManager
-				, CVersionManager::f_UploadVersion
-				, fg_Move(StartUpload)
-			)
+		_VersionManager.f_CallActor(&CVersionManager::f_UploadVersion)(fg_Move(StartUpload))
 			.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
 			> Promise % "Failed to start upload on remote server" 
 			/ [pCleanupAfterTimeout, pState, Promise, pStateCleanup]
@@ -292,12 +287,7 @@ namespace NMib::NCloud
 					}
 				;
 
-				DMibCallActor
-					(
-						_VersionManager
-						, CVersionManager::f_DownloadVersion
-						, fg_Move(StartDownload)
-					)
+				_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
 					.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
 					> Promise % "Failed to start download on remote server" 
 					/ [pState, pCleanupAfterTimeout, Promise, pStateCleanup](CVersionManager::CStartDownloadVersion::CResult &&_Result)

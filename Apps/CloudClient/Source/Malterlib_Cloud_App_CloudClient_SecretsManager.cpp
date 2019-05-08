@@ -608,7 +608,7 @@ namespace NMib::NCloud::NCloudClient
 			 	, _pCommandLine
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_Tags)
 				{
-					return DMibCallActor(_Actor, CSecretsManager::f_EnumerateSecrets, _SemanticID, _Tags);
+					return _Actor.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(_SemanticID, _Tags);
 				}
 			 	, [](TCSet<CSecretsManager::CSecretID> *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
@@ -634,7 +634,7 @@ namespace NMib::NCloud::NCloudClient
 			 	, _pCommandLine
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_Tags)
 				{
-					return DMibCallActor(_Actor, CSecretsManager::f_GetSecretBySemanticID, *_SemanticID, _Tags);
+					return _Actor.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(*_SemanticID, _Tags);
 				}
 			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
@@ -739,7 +739,7 @@ namespace NMib::NCloud::NCloudClient
 			 	, _pCommandLine
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)
 				{
-					return DMibCallActor(_Actor, CSecretsManager::f_GetSecret, fg_TempCopy(_ID));
+					return _Actor.f_CallActor(&CSecretsManager::f_GetSecret)(fg_TempCopy(_ID));
 				}
 			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
@@ -768,7 +768,7 @@ namespace NMib::NCloud::NCloudClient
 			 	, _pCommandLine
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)
 				{
-					return DMibCallActor(_Actor, CSecretsManager::f_GetSecretProperties, fg_TempCopy(_ID));
+					return _Actor.f_CallActor(&CSecretsManager::f_GetSecretProperties)(fg_TempCopy(_ID));
 				}
 			 	, [](CSecretsManager::CSecretProperties *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)
 				{
@@ -974,13 +974,7 @@ namespace NMib::NCloud::NCloudClient
 							return;
 						}
 
-						DMibCallActor
-							(
-								pSecretsManager->m_Actor
-								, CSecretsManager::f_SetSecretProperties
-								, fg_Move(ID)
-								, fg_Move(Properties)
-							)
+						pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_SetSecretProperties)(fg_Move(ID), fg_Move(Properties))
 							.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 							>  Promise	/ [=]
 							{
@@ -1050,14 +1044,7 @@ namespace NMib::NCloud::NCloudClient
 					return;
 				}
 
-				DMibCallActor
-					(
-						pSecretsManager->m_Actor
-						, CSecretsManager::f_ModifyTags
-						, fg_Move(ID)
-					 	, fg_Move(RemoveTags)
-					 	, fg_Move(AddTags)
-					)
+				pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_ModifyTags)(fg_Move(ID), fg_Move(RemoveTags), fg_Move(AddTags))
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 					>  Promise	/ [=]
 					{
@@ -1112,14 +1099,7 @@ namespace NMib::NCloud::NCloudClient
 					return;
 				}
 
-				DMibCallActor
-					(
-						pSecretsManager->m_Actor
-						, CSecretsManager::f_SetMetadata
-						, fg_Move(ID)
-					 	, MetadataKey
-						, fg_Move(MetadataValue)
-					)
+				pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_SetMetadata)(fg_Move(ID), MetadataKey, fg_Move(MetadataValue))
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 					>  Promise	/ [=]
 					{
@@ -1161,7 +1141,7 @@ namespace NMib::NCloud::NCloudClient
 					return;
 				}
 
-				DMibCallActor(pSecretsManager->m_Actor, CSecretsManager::f_RemoveMetadata, fg_Move(ID), Key)
+				pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_RemoveMetadata)(fg_Move(ID), Key)
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 					>  Promise	/ [=]
 					{
@@ -1199,7 +1179,7 @@ namespace NMib::NCloud::NCloudClient
 					return;
 				}
 
-				DMibCallActor(pSecretsManager->m_Actor, CSecretsManager::f_RemoveSecret, fg_Move(ID))
+				pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_RemoveSecret)(fg_Move(ID))
 					.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 					>  Promise	/ [=]
 					{

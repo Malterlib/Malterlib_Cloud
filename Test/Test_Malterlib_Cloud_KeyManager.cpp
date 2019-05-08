@@ -59,8 +59,8 @@ public:
 		auto Subscription = _TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
 		TCDistributedActor<CKeyManager> KeyManager = _TestHelper.f_GetRemoteActor<CKeyManager>(Subscription);
 		
-		CSymmetricKey Key0 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);
-		CSymmetricKey Key1 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey1", 32).f_CallSync(60.0);
+		CSymmetricKey Key0 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(60.0);
+		CSymmetricKey Key1 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_CallSync(60.0);
 		auto HostID1 = _TestHelper.f_GetClientHostID();
 		
 		DMibExpect(Key0, !=, Key1);
@@ -73,8 +73,8 @@ public:
 		auto HostID2 = _TestHelper2.f_GetClientHostID();
 		TCDistributedActor<CKeyManager> KeyManager2 = _TestHelper2.f_GetRemoteActor<CKeyManager>(Subscription2);
 
-		CSymmetricKey SecondKey0 = DMibCallActor(KeyManager2, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);
-		CSymmetricKey SecondKey1 = DMibCallActor(KeyManager2, CKeyManager::f_RequestKey, "TestKey1", 32).f_CallSync(60.0);
+		CSymmetricKey SecondKey0 = KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(60.0);
+		CSymmetricKey SecondKey1 = KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_CallSync(60.0);
 		
 		DMibExpect(SecondKey0, !=, SecondKey1); 
 		DMibExpect(SecondKey0, !=, Key0); 
@@ -209,7 +209,7 @@ public:
 			CStr Subscription = TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
 			TCDistributedActor<CKeyManager> KeyManager = TestHelper.f_GetRemoteActor<CKeyManager>(Subscription);
 		
-			CSymmetricKey FirstKey = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey0", 32).f_CallSync(60.0);
+			CSymmetricKey FirstKey = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(60.0);
 			DMibExpect(FirstKey, ==, NextKey);
 			
 			{
@@ -232,8 +232,8 @@ public:
 			
 			{
 				DMibTestPath("Request key not pre created");
-				CSymmetricKey NotPreCreatedKey = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey1", 64).f_CallSync(60.0);
-				CSymmetricKey NotPreCreatedKey2 = DMibCallActor(KeyManager, CKeyManager::f_RequestKey, "TestKey2", 64).f_CallSync(60.0);
+				CSymmetricKey NotPreCreatedKey = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 64).f_CallSync(60.0);
+				CSymmetricKey NotPreCreatedKey2 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 64).f_CallSync(60.0);
 				DMibExpect(NotPreCreatedKey, !=, NotPreCreatedKey2);
 				
 				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);

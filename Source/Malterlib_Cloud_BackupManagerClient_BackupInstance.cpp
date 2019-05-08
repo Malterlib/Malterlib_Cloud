@@ -127,11 +127,9 @@ namespace NMib::NCloud::NPrivate
 		auto SyncSequence = _SyncSequence;
 		auto pRunningState = _pRunningState;
 
-		DMibCallActor
+		mp_Backup.f_CallActor(&CBackupManagerBackup::f_StartRSync)
 			(
-				mp_Backup
-				, CBackupManagerBackup::f_StartRSync
-				, RunningState.m_FileName
+				RunningState.m_FileName
 			 	, CBackupManagerBackup::CManifestFile{_PendingFile.m_ManifestFile}
 				, g_ActorFunctor
 				(
@@ -340,11 +338,9 @@ namespace NMib::NCloud::NPrivate
 			AppendData.m_Position = Position;
 			AppendData.m_Data = fg_Move(Data);
 
-			DMibCallActor
+			mp_Backup.f_CallActor(&CBackupManagerBackup::f_AppendData)
 				(
-					mp_Backup
-					, CBackupManagerBackup::f_AppendData
-					, RunningState.m_FileName
+					RunningState.m_FileName
 					, fg_Move(AppendData)
 				)
 				> [this, pRunningState = _pRunningState, ThisTime, _Promise, _Length, _pFile](TCAsyncResult<void> &&_Result)
@@ -584,11 +580,9 @@ namespace NMib::NCloud::NPrivate
 			return;
 		mp_bInitialBackupFinished = true;
 		
-		DMibCallActor
+		mp_Backup.f_CallActor(&CBackupManagerBackup::f_InitialBackupFinished)
 			(
-				mp_Backup
-				, CBackupManagerBackup::f_InitialBackupFinished
-			 	, mp_Config.m_bReportChangesInInitialFinished ? CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges : CBackupManagerBackup::EInitialBackupFinishedFlag_None
+			 	mp_Config.m_bReportChangesInInitialFinished ? CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges : CBackupManagerBackup::EInitialBackupFinishedFlag_None
 			)
 			> [this](TCAsyncResult<CBackupManagerBackup::CInitialBackupFinishedResult> &&_Result)
 			{
@@ -635,11 +629,9 @@ namespace NMib::NCloud::NPrivate
 
 		TCPromise<void> Promise;
 
-		DMibCallActor
+		mp_Backup.f_CallActor(&CBackupManagerBackup::f_StartManifestRSync)
 			(
-				mp_Backup
-				, CBackupManagerBackup::f_StartManifestRSync
-				, g_ActorFunctor
+				g_ActorFunctor
 				(
 					g_ActorSubscription / [this, Promise]() -> TCFuture<void>
 					{
@@ -743,12 +735,7 @@ namespace NMib::NCloud::NPrivate
 			}
 		;
 
-		DMibCallActor
-			(
-				mp_BackupManager
-				, CBackupManager::f_InitBackup
-				, fg_Move(InitParams)
-			)
+		mp_BackupManager.f_CallActor(&CBackupManager::f_InitBackup)(fg_Move(InitParams))
 			> [this](TCAsyncResult<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> &&_ActorInterface)
 			{
 				if (!_ActorInterface)
@@ -764,7 +751,7 @@ namespace NMib::NCloud::NPrivate
 							return fp_ReportBackupError(fg_Format("Failed to sync manifest for backup: {}", _Result.f_GetExceptionStr()), true);
 						}
 
-						DMibCallActor(mp_Backup, CBackupManagerBackup::f_StartBackup) > [this](TCAsyncResult<CBackupManagerBackup::CStartBackupResult> &&_StartResult)
+						mp_Backup.f_CallActor(&CBackupManagerBackup::f_StartBackup)() > [this](TCAsyncResult<CBackupManagerBackup::CStartBackupResult> &&_StartResult)
 							{
 								if (!_StartResult)
 								{
@@ -1025,7 +1012,7 @@ namespace NMib::NCloud::NPrivate
 						if (bFile)
 							fp_NewPendingFile(_FileName);
 
-						DMibCallActor(mp_Backup, CBackupManagerBackup::f_ManifestChange, _FileName, ManifestChange) > [=, Clock = NTime::CClock{true}](TCAsyncResult<void> &&_Result) mutable
+						mp_Backup.f_CallActor(&CBackupManagerBackup::f_ManifestChange)(_FileName, ManifestChange) > [=, Clock = NTime::CClock{true}](TCAsyncResult<void> &&_Result) mutable
 							{
 								(void)Cleanup;
 								(void)_pScope;

@@ -67,11 +67,9 @@ namespace NMib::NCloud::NAppManager
 		CStr HostID = _AppManager.f_GetHostID();
 		auto Actor = _AppManager.m_Actor;
 		
-		auto Subscription = co_await DMibCallActor
+		auto Subscription = co_await Actor.f_CallActor(&CAppManagerCoordinationInterface::f_SubscribeToAppChanges)
 			(
-				Actor
-				, CAppManagerCoordinationInterface::f_SubscribeToAppChanges
-				, g_ActorFunctor / [this, HostID, AllowDestroy = g_AllowWrongThreadDestroy]
+				g_ActorFunctor / [this, HostID, AllowDestroy = g_AllowWrongThreadDestroy]
 				(TCVector<CAppManagerCoordinationInterface::CAppChange> const &_Changes, bool _bInitial) -> TCFuture<void>
 				{
 					auto &RemoteAppManager = mp_RemoteAppManagerState[HostID];

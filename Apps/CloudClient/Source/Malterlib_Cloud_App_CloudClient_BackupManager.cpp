@@ -178,11 +178,7 @@ namespace NMib::NCloud::NCloudClient
 					if (!BackupHost.f_IsEmpty() && TrustedBackupManager.m_TrustInfo.m_HostInfo.m_HostID != BackupHost)
 						continue;
 					auto &BackupManager = TrustedBackupManager.m_Actor;
-					DMibCallActor
-						(
-							BackupManager
-							, CBackupManager::f_ListBackupSources
-						)
+					BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)()
 						.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
 						> BackupSources.f_AddResult(TrustedBackupManager.m_TrustInfo.m_HostInfo)
 					;
@@ -227,12 +223,7 @@ namespace NMib::NCloud::NCloudClient
 					if (!BackupHost.f_IsEmpty() && TrustedBackupManager.m_TrustInfo.m_HostInfo.m_HostID != BackupHost)
 						continue;
 					auto &BackupManager = TrustedBackupManager.m_Actor;
-					DMibCallActor
-						(
-							BackupManager
-							, CBackupManager::f_ListBackups
-							, BackupSource
-						)
+					BackupManager.f_CallActor(&CBackupManager::f_ListBackups)(BackupSource)
 						.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
 						> Backups.f_AddResult(TrustedBackupManager.m_TrustInfo.m_HostInfo)
 					;

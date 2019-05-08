@@ -127,7 +127,7 @@ namespace NMib::NCloud
 
 		TCActorResultMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>> TunnelResults;
 		for (auto &Actor : Internal.m_NetworkTunnelSubscription.m_Actors)
-			DMibCallActor(Actor.m_Actor, ICNetworkTunnels::f_EnumerateTunnels) > TunnelResults.f_AddResult(Actor.m_TrustInfo.m_HostInfo.m_HostID);
+			Actor.m_Actor.f_CallActor(&ICNetworkTunnels::f_EnumerateTunnels)() > TunnelResults.f_AddResult(Actor.m_TrustInfo.m_HostInfo.m_HostID);
 
 		co_return co_await TunnelResults.f_GetResults() | g_Unwrap;
 	}
@@ -206,11 +206,9 @@ namespace NMib::NCloud
 
 				auto Cleanup = g_OnScopeExitActor > fCleanupConnection;
 
-				auto OpenConnectionResult = co_await DMibCallActor
+				auto OpenConnectionResult = co_await pTunnel->m_TunnelActor.f_CallActor(&ICNetworkTunnels::f_OpenConnection)
 					(
-					 	pTunnel->m_TunnelActor
-					 	, ICNetworkTunnels::f_OpenConnection
-					 	, pTunnel->m_TunnelName
+					 	pTunnel->m_TunnelName
 					 	, g_ActorFunctor / [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](NContainer::CSecureByteVector &&_Data) -> TCFuture<void>
 					 	{
 							auto &Internal = *mp_pInternal;

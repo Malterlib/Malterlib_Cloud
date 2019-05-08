@@ -14,18 +14,18 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		fp_Init();
 	}
-	
+
 	CSecretsManagerDaemonActor::CServerController::~CServerController()
 	{
 	}
-	
+
 #if DMibConfig_Tests_Enable
 	TCFuture<CEJSON> CSecretsManagerDaemonActor::CServerController::f_Test_Command(CStr const &_Command, CEJSON const &_Params)
 	{
 		if (!mp_ServerActor)
 			DMibError("No server");
 
-		return DMibCallActor(mp_ServerActor, CSecretsManagerDaemonActor::CServer::f_Test_Command, _Command, _Params);
+		return mp_ServerActor.f_CallActor(&CSecretsManagerDaemonActor::CServer::f_Test_Command)(_Command, _Params);
 	}
 #endif
 
@@ -69,12 +69,12 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		if (mp_ServerActor || mp_AppState.m_bStoppingApp)
 			return;
-				
+
 		TCPromise<void> Promise;
 
 		static const mint c_KeyBits = 512;
 		CSymmetricKey Key;
-		DCallActor(_KeyManager, CKeyManager::f_RequestKey, "SecretsManagerDB", c_KeyBits / 8)
+		_KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("SecretsManagerDB", c_KeyBits / 8)
 			> Promise / [this, Promise, KeyManager = _KeyManager](CSymmetricKey &&_Key)
 			{
 				if (mp_ServerActor || mp_AppState.m_bStoppingApp)

@@ -364,12 +364,7 @@ namespace NMib::NCloud::NCloudClient
 					if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 						continue;
 					CVersionManager::CListApplications Command;
-					DMibCallActor
-						(
-							TrustedActor.m_Actor
-							, CVersionManager::f_ListApplications
-							, fg_Move(Command)
-						)
+					TrustedActor.m_Actor.f_CallActor(&CVersionManager::f_ListApplications)(fg_Move(Command))
 						.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
 						> Applications.f_AddResult(TrustedActor.m_TrustInfo.m_HostInfo)
 					;
@@ -416,12 +411,7 @@ namespace NMib::NCloud::NCloudClient
 						continue;
 					CVersionManager::CListVersions Options;
 					Options.m_ForApplication = Application;
-					DMibCallActor
-						(
-							TrustedVersionManager.m_Actor
-							, CVersionManager::f_ListVersions
-							, fg_Move(Options)
-						)
+					TrustedVersionManager.m_Actor.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(Options))
 						.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
 						> Versions.f_AddResult(TrustedVersionManager.m_TrustInfo.m_HostInfo)
 					;
@@ -872,12 +862,7 @@ namespace NMib::NCloud::NCloudClient
 				ChangeTags.m_RemoveTags = RemoveTags;
 				ChangeTags.m_bIncreaseRetrySequence = bRetryUpgrade;
 
-				DMibCallActor
-					(
-						pVersionManager->m_Actor
-						, CVersionManager::f_ChangeTags
-						, fg_Move(ChangeTags)
-					)
+				pVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags))
 					.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
 					> Promise % "Failed to change tags" / [=](CVersionManager::CChangeTags::CResult &&_Result)
 					{

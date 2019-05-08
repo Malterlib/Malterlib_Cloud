@@ -147,7 +147,7 @@ namespace NMib::NCloud::NAppManager
 					{
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pre-stopping application '{}'", pApplication->m_Name);
 						bRanPreStop = true;
-						PreStopFuture = DMibCallActor(pApplication->m_AppInterface, CDistributedAppInterfaceClient::f_PreStop);
+						PreStopFuture = pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_PreStop)();
 					}
 					else
 						PreStopFuture = fg_Explicit();

@@ -288,7 +288,7 @@ public:
 		// Add listen socket that secret managers can connect to
 		CDistributedActorTrustManager_Address KeyManagerServerAddress;
 		KeyManagerServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/Keymanager.sock"_f << KeyManagerDirectory);
-		DMibCallActor(KeyManagerTrust, CDistributedActorTrustManagerInterface::f_AddListen, KeyManagerServerAddress).f_CallSync(g_Timeout);
+		KeyManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(KeyManagerServerAddress).f_CallSync(g_Timeout);
 
 		TCActor<CSeparateThreadActor> HelperActor{fg_Construct(), "Test actor"};
 		auto CleanupTestActor = g_OnScopeExit > [&]
@@ -374,7 +374,7 @@ public:
 					SecretsManagerInfo.m_pTrustInterface = SecretsManager.m_pTrustInterface;
 
 					SecretsManagerInfo.m_Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/SecretsManagerTest.sock"_f << SecretsManagerDirectory);
-					DMibCallActor(*SecretsManager.m_pTrustInterface, CDistributedActorTrustManagerInterface::f_AddListen, SecretsManagerInfo.m_Address) > ListenResults.f_AddResult();
+					SecretsManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(SecretsManagerInfo.m_Address) > ListenResults.f_AddResult();
 					++iSecretsManager;
 				}
 				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(g_Timeout));
@@ -409,40 +409,32 @@ public:
 			auto TrustSecretsManagers = AllSecretsManagerHosts;
 			TrustSecretsManagers.f_Remove(SecretsManagerHostID);
 #if 0
-			DMibCallActor
+			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 				(
-					SecretsManagerTrust
-					, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
-					, fNamespaceHosts("com.malterlib/Cloud/SecretsManagerCoordination", TrustSecretsManagers)
+					fNamespaceHosts("com.malterlib/Cloud/SecretsManagerCoordination", TrustSecretsManagers)
 				)
 				> SetupTrustResults.f_AddResult()
 			;
 #endif
-			DMibCallActor
+			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 				(
-					SecretsManagerTrust
-					, CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace
-				 	, fNamespaceHosts(CKeyManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(KeyManagerHostID))
+				 	fNamespaceHosts(CKeyManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(KeyManagerHostID))
 				)
 				> SetupTrustResults.f_AddResult()
 			;
 
-			DMibCallActor
+			TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 				(
-					TrustManager
-					, CDistributedActorTrustManager::f_AllowHostsForNamespace
-					, CSecretsManager::mc_pDefaultNamespace
+					CSecretsManager::mc_pDefaultNamespace
 					, fg_CreateSet<CStr>(SecretsManagerHostID)
 				 	, c_WaitForSubscriptions
 				)
 				> SetupTrustResults.f_AddResult()
 			;
 
-			DMibCallActor
+			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 				(
-					SecretsManagerTrust
-					, CDistributedActorTrustManagerInterface::f_AddPermissions
-					, fPermissionsAdd(TestHostID, SecretsManagerPermissionsForTest)
+					fPermissionsAdd(TestHostID, SecretsManagerPermissionsForTest)
 				)
 				> SetupTrustResults.f_AddResult()
 			;
@@ -456,16 +448,14 @@ public:
 				auto pSecretsManagerTrustInner = SecretsManagerInner.m_pTrustInterface;
 				
 				TCPromise<void> Promise;
-				DMibCallActor
+				SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 					(
-					 	SecretsManagerTrust
-					 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
-					 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SecretsManager.m_Address}
+					 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SecretsManager.m_Address}
 					)
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &SecretsManagerTrustInner = *pSecretsManagerTrustInner;
-						DMibCallActor(SecretsManagerTrustInner, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
+						SecretsManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 					}
 				;
 				Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
@@ -473,16 +463,14 @@ public:
 			}
 
 			TCPromise<void> Promise;
-			DMibCallActor
+			KeyManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 				(
-				 	KeyManagerTrust
-				 	, CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket
-				 	, CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{KeyManagerServerAddress}
+				 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{KeyManagerServerAddress}
 				)
 				> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 				{
 					auto &SecretsManagerTrust = *pSecretsManagerTrust;
-					DMibCallActor(SecretsManagerTrust, CDistributedActorTrustManagerInterface::f_AddClientConnection, _Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
+					SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 				}
 			;
 			Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
@@ -547,11 +535,9 @@ public:
 			//
 			// Set up a number of secrets and send them to the manager
 			//
-			DMibCallActor
+			SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
 				(
-					SecretsManager
-					, CSecretsManager::f_SetSecretProperties
-					, CSecretsManager::CSecretID{"Folder1", "Name1"}
+					CSecretsManager::CSecretID{"Folder1", "Name1"}
 					, CSecretsManager::CSecretProperties{}
 					.f_SetSecret(fg_TempCopy(StringSecret))
 					.f_SetUserName("UserName")
@@ -566,11 +552,9 @@ public:
 				)
 				.f_CallSync(g_Timeout)
 			;
-			DMibCallActor
+			SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
 				(
-					SecretsManager
-					, CSecretsManager::f_SetSecretProperties
-					, CSecretsManager::CSecretID{"Folder1", "Name2"}
+					CSecretsManager::CSecretID{"Folder1", "Name2"}
 					, CSecretsManager::CSecretProperties{}
 					.f_SetNotes("Testing12")
 					.f_SetSecret(fg_TempCopy(ByteVectorSecret))
@@ -579,20 +563,16 @@ public:
 				)
 				.f_CallSync(g_Timeout)
 			;
-			DMibCallActor
+			SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
 				(
-					SecretsManager
-					, CSecretsManager::f_SetSecretProperties
-					, CSecretsManager::CSecretID{"Folder2", "Name1"}
+					CSecretsManager::CSecretID{"Folder2", "Name1"}
 					, CSecretsManager::CSecretProperties{}.f_SetNotes("Testing21").f_SetSecret(fg_TempCopy(FileSecret)).f_SetTags({"Shared2"}).f_SetSemanticID("Semantic2")
 				)
 				.f_CallSync(g_Timeout)
 			;
-			DMibCallActor
+			SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
 				(
-					SecretsManager
-					, CSecretsManager::f_SetSecretProperties
-					, CSecretsManager::CSecretID{"Folder2", "Name2"}
+					CSecretsManager::CSecretID{"Folder2", "Name2"}
 					, CSecretsManager::CSecretProperties{}.f_SetNotes("Testing22").f_SetMetadata("Key1", "Value1").f_SetTags({"Unique3"}).f_SetSemanticID("Semantic4")
 				)
 				.f_CallSync(g_Timeout)
@@ -600,49 +580,49 @@ public:
 
 			auto fGetSecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name) -> CSecretsManager::CSecret
 				{
-					return DMibCallActor(SecretsManager, CSecretsManager::f_GetSecret, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+					return SecretsManager.f_CallActor(&CSecretsManager::f_GetSecret)(CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
 			auto fGetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name) -> CSecretsManager::CSecretProperties
 				{
-					return DMibCallActor(SecretsManager, CSecretsManager::f_GetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+					return SecretsManager.f_CallActor(&CSecretsManager::f_GetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
 			auto fSetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties)
 				{
-					DMibCallActor(SecretsManager, CSecretsManager::f_SetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties) ).f_CallSync(g_Timeout);
+					SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties) ).f_CallSync(g_Timeout);
 				}
 			;
 			auto fGetBySemantic = [&](NStr::CStrSecure &&_SemanticID, TCSet<NStr::CStr> const &_Tags) -> CSecretsManager::CSecret
 				{
-					return DMibCallActor(SecretsManager, CSecretsManager::f_GetSecretBySemanticID, _SemanticID, _Tags).f_CallSync(g_Timeout);
+					return SecretsManager.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(_SemanticID, _Tags).f_CallSync(g_Timeout);
 				}
 			;
 			auto fEnumerateFor = [&](TCOptional<NStr::CStrSecure> _ID, TCSet<NStr::CStr> const &_Tags) -> TCSet<CSecretsManager::CSecretID>
 				{
-					return DMibCallActor(SecretsManager, CSecretsManager::f_EnumerateSecrets, _ID, _Tags).f_CallSync(g_Timeout);
+					return SecretsManager.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(_ID, _Tags).f_CallSync(g_Timeout);
 				}
 			;
 			auto fAddTagsAndGetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, TCSet<NStr::CStr> const &_RemoveTags, TCSet<NStr::CStr> const &_AddTags)
 				-> CSecretsManager::CSecretProperties
 				{
-					DMibCallActor(SecretsManager, CSecretsManager::f_ModifyTags, CSecretsManager::CSecretID{_Folder, _Name}, _RemoveTags, _AddTags).f_CallSync(g_Timeout);
+					SecretsManager.f_CallActor(&CSecretsManager::f_ModifyTags)(CSecretsManager::CSecretID{_Folder, _Name}, _RemoveTags, _AddTags).f_CallSync(g_Timeout);
 					return fGetProperties(_Folder, _Name);
 				}
 			;
 			auto fSetKeyValue = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key, CEJSON const &_Value)
 				{
-					DMibCallActor(SecretsManager, CSecretsManager::f_SetMetadata, CSecretsManager::CSecretID{_Folder, _Name}, fg_TempCopy(_Key), fg_TempCopy(_Value)).f_CallSync(g_Timeout);
+					SecretsManager.f_CallActor(&CSecretsManager::f_SetMetadata)(CSecretsManager::CSecretID{_Folder, _Name}, fg_TempCopy(_Key), fg_TempCopy(_Value)).f_CallSync(g_Timeout);
 				}
 			;
 			auto fRemoveKey = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key)
 				{
-					DMibCallActor(SecretsManager, CSecretsManager::f_RemoveMetadata, CSecretsManager::CSecretID{_Folder, _Name}, fg_TempCopy(_Key)).f_CallSync(g_Timeout);
+					SecretsManager.f_CallActor(&CSecretsManager::f_RemoveMetadata)(CSecretsManager::CSecretID{_Folder, _Name}, fg_TempCopy(_Key)).f_CallSync(g_Timeout);
 				}
 			;
 			auto fRemoveSecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)
 				{
-					DMibCallActor(SecretsManager, CSecretsManager::f_RemoveSecret, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+					SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
 
@@ -713,7 +693,7 @@ public:
 				// Check for exception for both missing folder and name
 				auto fModifySecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, TCSet<NStr::CStr> const &_Remove, TCSet<NStr::CStr> const &_Add)
 					{
-						DMibCallActor(SecretsManager, CSecretsManager::f_ModifyTags, CSecretsManager::CSecretID{_Folder, _Name}, _Remove, _Add).f_CallSync(g_Timeout);
+						SecretsManager.f_CallActor(&CSecretsManager::f_ModifyTags)(CSecretsManager::CSecretID{_Folder, _Name}, _Remove, _Add).f_CallSync(g_Timeout);
 					}
 				;
 				DMibExpectException(fModifySecret("NoMatch", "Name1", {}, {}), DMibErrorInstance("No secret matching ID: 'NoMatch/Name1'"));
@@ -794,11 +774,9 @@ public:
 				{
 					auto TimeBeforeSetPropertiesCall = NTime::CTime::fs_NowUTC();
 					NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
-					DMibCallActor
+					SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
 						(
-							SecretsManager
-							, CSecretsManager::f_SetSecretProperties
-							, CSecretsManager::CSecretID{"Test", "Test1"}
+							CSecretsManager::CSecretID{"Test", "Test1"}
 							, CSecretsManager::CSecretProperties{}
 						 )
 						.f_CallSync(g_Timeout)
@@ -817,11 +795,9 @@ public:
 					{
 						auto TimeBeforeSetPropertiesCall = NTime::CTime::fs_NowUTC();
 						NMib::NSys::fg_Thread_Sleep(NMib::NTime::NPlatform::fg_TimeRaw_Resolution());
-						DMibCallActor
+						SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
 							(
-								SecretsManager
-								, CSecretsManager::f_SetSecretProperties
-								, CSecretsManager::CSecretID{"Test", "Test1"}
+								CSecretsManager::CSecretID{"Test", "Test1"}
 								, CSecretsManager::CSecretProperties{}
 								.f_SetCreated(NTime::CTimeConvert::fs_CreateTime(1972, 2, 2))
 							 )
@@ -837,11 +813,9 @@ public:
 						DMibExpect(*Properties.m_Modified, <, TimeAfterSetPropertiesCall);
 					}
 					{
-						DMibCallActor
+						SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
 							(
-								SecretsManager
-								, CSecretsManager::f_SetSecretProperties
-								, CSecretsManager::CSecretID{"Test", "Test1"}
+								CSecretsManager::CSecretID{"Test", "Test1"}
 								, CSecretsManager::CSecretProperties{}
 								.f_SetModified(NTime::CTimeConvert::fs_CreateTime(1973, 3, 3))
 							 )
@@ -994,11 +968,9 @@ public:
 						auto pSecretsManagerTrust = SecretsManager.m_pTrustInterface;
 						auto &SecretsManagerTrust = *pSecretsManagerTrust;
 						
-						DMibCallActor
+						SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 							(
-								SecretsManagerTrust
-								, CDistributedActorTrustManagerInterface::f_AddPermissions
-								, fPermissionsAdd(TestHostID, _Permissions)
+								fPermissionsAdd(TestHostID, _Permissions)
 							)
 							.f_CallSync(g_Timeout)
 						;
@@ -1023,11 +995,9 @@ public:
 						auto pSecretsManagerTrust = SecretsManager.m_pTrustInterface;
 						auto &SecretsManagerTrust = *pSecretsManagerTrust;
 
-						DMibCallActor
+						SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_RemovePermissions)
 							(
-								SecretsManagerTrust
-								, CDistributedActorTrustManagerInterface::f_RemovePermissions
-								, fPermissionsRemove(TestHostID, Permissions)
+								fPermissionsRemove(TestHostID, Permissions)
 							)
 							.f_CallSync(g_Timeout)
 						;
@@ -1487,7 +1457,7 @@ public:
 			//
 			auto fGetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name) -> CSecretsManager::CSecretProperties
 				{
-					return DMibCallActor(SecretsManager, CSecretsManager::f_GetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+					return SecretsManager.f_CallActor(&CSecretsManager::f_GetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
 
@@ -1530,27 +1500,27 @@ public:
 
 			auto fGetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name) -> CSecretsManager::CSecretProperties
 				{
-					return DMibCallActor(SecretsManager, CSecretsManager::f_GetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+					return SecretsManager.f_CallActor(&CSecretsManager::f_GetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
 			auto fSetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties)
 				{
-					DMibCallActor(SecretsManager, CSecretsManager::f_SetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties) ).f_CallSync(g_Timeout);
+					SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties) ).f_CallSync(g_Timeout);
 				}
 			;
 			auto fSetPropertiesNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties) -> TCFuture<void>
 				{
-					return DMibCallActor(SecretsManager, CSecretsManager::f_SetSecretProperties, CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
+					return SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
 				}
 			;
 			auto fRemoveSecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)
 				{
-					DMibCallActor(SecretsManager, CSecretsManager::f_RemoveSecret, CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
+					SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
 			auto fRemoveSecretNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)  -> TCFuture<void>
 				{
-					return DMibCallActor(SecretsManager, CSecretsManager::f_RemoveSecret, CSecretsManager::CSecretID{_Folder, _Name});
+					return SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name});
 				}
 			;
 			auto fWriteFile = [&](CStr _FileName, CStr _Content)
