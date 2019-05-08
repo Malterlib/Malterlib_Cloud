@@ -1,5 +1,8 @@
 
 #include <Mib/Core/Core>
+
+#if DMalterlibCloudCompatibilityTests
+
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/Concurrency/DistributedAppInterfaceLaunch>
@@ -873,3 +876,5 @@ public:
 };
 
 DMibTestRegister(CUpdateCompatibility_Tests, Malterlib::Cloud);
+
+#endif
