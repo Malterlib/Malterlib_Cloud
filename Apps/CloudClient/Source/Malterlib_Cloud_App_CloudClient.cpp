@@ -10,7 +10,7 @@
 namespace NMib::NCloud::NCloudClient
 {
 	CCloudClientAppActor::CCloudClientAppActor()
-		: CDistributedAppActor{CDistributedAppActor_Settings{"MalterlibCloud"}}
+		: CDistributedAppActor{CDistributedAppActor_Settings{"MalterlibCloud"}.f_WaitForRemotes(true)}
 		, mp_VersionManagerHelper(mp_State.m_RootDirectory)
 	{
 	}
