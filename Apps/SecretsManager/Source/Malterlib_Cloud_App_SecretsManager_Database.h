@@ -4,7 +4,6 @@
 #pragma once
 
 #include <Mib/Core/Core>
-#include <Mib/Network/SSL>
 #include <Mib/Cloud/SecretsManager>
 
 #include "Malterlib_Cloud_App_SecretsManager.h"

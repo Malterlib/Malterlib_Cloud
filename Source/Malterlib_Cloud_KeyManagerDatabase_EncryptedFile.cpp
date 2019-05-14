@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB 
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Network/SSL>
+#include <Mib/Cryptography/SymmetricCrypto>
 
 #include "Malterlib_Cloud_KeyManagerDatabase_EncryptedFile.h"
 
@@ -12,7 +12,13 @@ namespace NMib::NCloud
 		CInternal(NStr::CStr const &_Path, NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt)
 			: m_AESContext
 			(
-			 	NNetwork::CEncryptKeyIV::fs_GenerateKeyIV(_Password, _Salt, NNetwork::CKeyDerivationSettings_PKCS5_Deprecated{NNetwork::ESSLDigest_SHA256}, NNetwork::ESSLCrypto_AES_256_CBC)
+			 	NCryptography::CEncryptKeyIV::fs_GenerateKeyIV
+			 	(
+				 	_Password
+				 	, _Salt
+				 	, NCryptography::CKeyDerivationSettings_PKCS5_Deprecated{NCryptography::EDigestType_SHA256}
+				 	, NCryptography::ECryptoType_AES_256_CBC
+				)
 			)
 			, m_Path(_Path)
 		{
@@ -83,7 +89,7 @@ namespace NMib::NCloud
 			;
 		}
 		
-		NNetwork::CEncryptAES m_AESContext;
+		NCryptography::CEncryptAES m_AESContext;
 		NStr::CStr m_Path;
 		static constexpr ch8 const *mc_pPlainTextCheck = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEF";
 		

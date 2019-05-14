@@ -1,7 +1,6 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Network/SSL>
 #include <Mib/Cryptography/EncryptedStream>
 
 #include "Malterlib_Cloud_App_SecretsManager_Database.h"
@@ -117,7 +116,7 @@ namespace NMib::NCloud::NSecretsManager
 			CSecureByteVector Salt{fsp_ComputeSalt(mp_IVSalt)};
 			CKeyExpansion KeyExpansion{mp_Key, Salt};
 
-			TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), ESSLDigest_SHA512, KeyExpansion.f_GetHMACKey(ESSLDigest_SHA512)};
+			TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), EDigestType_SHA512, KeyExpansion.f_GetHMACKey(EDigestType_SHA512)};
 
 			auto CheckBuffer = KeyExpansion.f_GetKey("SecretsManagerCheck", 32);
 
@@ -147,7 +146,7 @@ namespace NMib::NCloud::NSecretsManager
 		CSecureByteVector Salt{fsp_ComputeSalt(mp_IVSalt)};
 		CKeyExpansion KeyExpansion{mp_Key, Salt};
 
-		TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), ESSLDigest_SHA512, KeyExpansion.f_GetHMACKey(ESSLDigest_SHA512)};
+		TCBinaryStream_Encrypted<CBinaryStream *> EncryptedStream{KeyExpansion.f_GetKeyIV(), EDigestType_SHA512, KeyExpansion.f_GetHMACKey(EDigestType_SHA512)};
 		EncryptedStream.f_Open(&SubStream, NFile::EFileOpen_Read);
 
 		auto CheckBuffer = KeyExpansion.f_GetKey("SecretsManagerCheck", 32);

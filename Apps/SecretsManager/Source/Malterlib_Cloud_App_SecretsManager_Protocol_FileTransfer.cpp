@@ -134,7 +134,7 @@ namespace NMib::NCloud::NSecretsManager
 							TCUniquePointer<TCBinaryStreamFile<>> pFile = fg_Construct();
 							pFile->f_Open(_FileName, _OpenFlags, _Attributes);
 
-							NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, IV}, ESSLDigest_SHA512, HMACKey);
+							NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, IV}, EDigestType_SHA512, HMACKey);
 							pStream->f_Open(fg_Move(pFile), NFile::EFileOpen_Read);
 							return pStream;
 						}
@@ -286,9 +286,9 @@ namespace NMib::NCloud::NSecretsManager
 					Config.m_SyncFlags = CDirectorySyncReceive::ESyncFlag_None;
 
 					if (pSecretProperty->m_Key.f_IsEmpty())
-						pSecretProperty->m_Key = CEncryptKeyIV::fs_GetRandomKey(ESSLCrypto_AES_256_CBC);
-					auto IV = CEncryptKeyIV::fs_GetRandomIV(ESSLCrypto_AES_256_CBC);
-					auto HMACKey = CEncryptKeyIV::fs_GetRandomHMACKey(ESSLDigest_SHA512);
+						pSecretProperty->m_Key = CEncryptKeyIV::fs_GetRandomKey(ECryptoType_AES_256_CBC);
+					auto IV = CEncryptKeyIV::fs_GetRandomIV(ECryptoType_AES_256_CBC);
+					auto HMACKey = CEncryptKeyIV::fs_GetRandomHMACKey(EDigestType_SHA512);
 					auto NewFileName = fg_RandomID();
 
 					TCSharedPointer<bool> pNewFileClaimed = fg_Construct(false);
@@ -326,13 +326,13 @@ namespace NMib::NCloud::NSecretsManager
 
 							if (_FileType == EDirectorySyncStreamType_Source)
 							{
-								NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, OldIV}, ESSLDigest_SHA512, OldHMACKey);
+								NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, OldIV}, EDigestType_SHA512, OldHMACKey);
 								pStream->f_Open(fg_Move(pFile), NFile::EFileOpen_Read);
 								return pStream;
 							}
 							else
 							{
-								NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, IV}, ESSLDigest_SHA512, HMACKey);
+								NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, IV}, EDigestType_SHA512, HMACKey);
 								pStream->f_Open(fg_Move(pFile), NFile::EFileOpen_Write);
 								return pStream;
 							}
