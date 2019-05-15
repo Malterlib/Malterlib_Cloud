@@ -488,9 +488,10 @@ public:
 
 		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
 		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
-	
+
 		CDistributedActorTrustManager_Address ServerAddress;
-		ServerAddress.m_URL = "wss://[UNIX(666):{}/controller.sock]/"_f << fg_GetSafeUnixSocketPath(RootDirectory);
+
+		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath(RootDirectory / "controller.sock");
 		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
 	
 		CDistributedApp_LaunchHelperDependencies Dependencies;
