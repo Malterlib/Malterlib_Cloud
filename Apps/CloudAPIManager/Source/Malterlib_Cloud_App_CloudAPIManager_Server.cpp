@@ -18,16 +18,16 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 #ifdef DPlatformFamily_OSX
 		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
-		if (Path.f_Find("/opt/local/bin") < 0)
-			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/opt/local/bin:" + Path);
+		if (Path.f_Find("/usr/local/bin") < 0)
+			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/usr/local/bin:" + Path);
 #endif
 		fp_Init();
 	}
-	
+
 	CCloudAPIManagerDaemonActor::CServer::~CServer()
 	{
 	}
-	
+
 	void CCloudAPIManagerDaemonActor::CServer::fp_Init()
 	{
 		fg_ThisActor(this)(&CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs)
@@ -38,7 +38,7 @@ namespace NMib::NCloud::NCloudAPIManager
 					DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to find cloud contexts, aborting startup: {}", _ResultCloudContexts.f_GetExceptionStr());
 					return;
 				}
-				self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions) 
+				self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions)
 					> [this](TCAsyncResult<void> &&_ResultPermissions)
 					{
 						if (!_ResultPermissions)
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NCloudAPIManager
 							DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to setup permissions, aborting startup: {}", _ResultPermissions.f_GetExceptionStr());
 							return;
 						}
-						self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge)  
+						self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge)
 							> [this](TCAsyncResult<void> &&_ResultSetupDDPBridge)
 							{
 								if (!_ResultSetupDDPBridge)
@@ -62,18 +62,18 @@ namespace NMib::NCloud::NCloudAPIManager
 			}
 		;
 	}
-	
+
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions()
 	{
 		TCPromise<void> Promise;
-		
+
 		TCSet<CStr> Permissions;
-		
+
 		Permissions["ObjectStorage/GetSwiftBaseURLAll"];
 		Permissions["ObjectStorage/EnsureContainerAll"];
 		Permissions["ObjectStorage/DeleteObjectAll"];
 		Permissions["ObjectStorage/SignTempURLAll"];
-		
+
 		for (auto &CloudContext : mp_CloudContexts)
 		{
 			Permissions[fg_Format("ObjectStorage/GetSwiftBaseURL/{}", CloudContext.f_GetName())];
@@ -81,23 +81,23 @@ namespace NMib::NCloud::NCloudAPIManager
 			Permissions[fg_Format("ObjectStorage/DeleteObject/{}", CloudContext.f_GetName())];
 			Permissions[fg_Format("ObjectStorage/SignTempURL/{}", CloudContext.f_GetName())];
 		}
-		
+
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
-		
+
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("ObjectStorage/*");
-	
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
+
+		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this))
 			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
 			{
 				mp_Permissions = fg_Move(_Subscription);
 				Promise.f_SetResult();
 			}
 		;
-		
+
 		return Promise.f_MoveFuture();
 	}
-	
+
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs()
 	{
 		if (auto const *pCloudContexts = mp_AppState.m_ConfigDatabase.m_Data.f_GetMember("CloudContexts", EJSONType_Object))
@@ -116,7 +116,7 @@ namespace NMib::NCloud::NCloudAPIManager
 					CloudContext.m_KeystoneInfo.m_DomainId = KeystoneInfo["DomainId"].f_String();
 					CloudContext.m_KeystoneInfo.m_RegionName = KeystoneInfo["RegionName"].f_String();
 					CloudContext.m_KeystoneInfo.m_TenantId = KeystoneInfo["TenantId"].f_String();
-					
+
 					auto const *pSwiftStoragePolicy = Values.f_GetMember("SwiftStoragePolicy");
 					if (pSwiftStoragePolicy)
 						CloudContext.m_SwiftStoragePolicy = pSwiftStoragePolicy->f_AsString("europe");
@@ -127,10 +127,10 @@ namespace NMib::NCloud::NCloudAPIManager
 					return DMibErrorInstance(fg_Format("Unknown cloud type: {}", Type));
 			}
 		}
-		
+
 		return fg_Explicit();
 	}
-	
+
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_Destroy()
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
@@ -139,12 +139,12 @@ namespace NMib::NCloud::NCloudAPIManager
 			mp_CURLQueryActor->f_Destroy() > pCanDestroy->f_Track();
 		return pCanDestroy->f_Future();
 	}
-	
+
 	TCActor<CSeparateThreadActor> const &CCloudAPIManagerDaemonActor::CServer::fp_GetCURLQueryActor()
 	{
 		if (mp_CURLQueryActor)
 			return mp_CURLQueryActor;
-		
+
 		mp_CURLQueryActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Cloud API manager CURL query file actor"));
 		return mp_CURLQueryActor;
 	}
@@ -167,7 +167,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			Messages.f_Insert(_Error);
 			Messages.f_Insert(fg_Format("Error: ", _Exception.f_GetErrorStr()));
 		}
-	
+
 		return Messages;
 	}
 }

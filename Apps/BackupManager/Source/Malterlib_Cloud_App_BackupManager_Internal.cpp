@@ -21,11 +21,11 @@ namespace NMib::NCloud::NBackupManager
 	{
 #ifdef DPlatformFamily_OSX
 		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
-		if (Path.f_Find("/opt/local/bin") < 0)
-			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/opt/local/bin:" + Path);
+		if (Path.f_Find("/usr/local/bin") < 0)
+			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/usr/local/bin:" + Path);
 #endif
 	}
-	
+
 	CBackupManagerServer::~CBackupManagerServer()
 	{
 	}
@@ -44,7 +44,7 @@ namespace NMib::NCloud::NBackupManager
 
 		return Promise.f_MoveFuture();
 	}
-	
+
 	TCFuture<void> CBackupManagerServer::fp_SetupPermissions()
 	{
 		TCSet<CStr> Permissions;
@@ -52,14 +52,14 @@ namespace NMib::NCloud::NBackupManager
 		Permissions["Backup/ReadSelf"];
 		Permissions["Backup/ReadAll"];
 		Permissions["Backup/ListAll"];
-		
+
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
 
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("Backup/*");
-	
+
 		TCPromise<void> Promise;
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
+		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this))
 			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
 			{
 				mp_Permissions = fg_Move(_Subscription);
@@ -87,14 +87,14 @@ namespace NMib::NCloud::NBackupManager
 						}
 					)
 				;
-				
+
 				Promise.f_SetResult();
 			}
 		;
-		
+
 		return Promise.f_MoveFuture();
 	}
-	
+
 	TCFuture<void> CBackupManagerServer::fp_Destroy()
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
@@ -104,20 +104,20 @@ namespace NMib::NCloud::NBackupManager
 
 		for (auto &Download : mp_BackupDownloads)
 			Download.f_Destroy() > pCanDestroy->f_Track();
-		
+
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
-		
+
 		if (mp_QueryFileActor)
 			mp_QueryFileActor->f_Destroy() > pCanDestroy->f_Track();
-		
+
 		return pCanDestroy->f_Future();
 	}
-	
+
 	TCActor<CSeparateThreadActor> const &CBackupManagerServer::fp_GetQueryFileActor()
 	{
 		if (mp_QueryFileActor)
 			return mp_QueryFileActor;
-		
+
 		mp_QueryFileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Backup manager query file actor"));
 		return mp_QueryFileActor;
 	}

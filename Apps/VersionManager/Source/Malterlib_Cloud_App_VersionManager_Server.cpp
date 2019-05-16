@@ -18,16 +18,16 @@ namespace NMib::NCloud::NVersionManager
 	{
 #ifdef DPlatformFamily_OSX
 		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
-		if (Path.f_Find("/opt/local/bin") < 0)
-			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/opt/local/bin:" + Path);
+		if (Path.f_Find("/usr/local/bin") < 0)
+			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/usr/local/bin:" + Path);
 #endif
 		fp_Init();
 	}
-	
+
 	CVersionManagerDaemonActor::CServer::~CServer()
 	{
 	}
-	
+
 	void CVersionManagerDaemonActor::CServer::fp_Init()
 	{
 		fg_ThisActor(this)(&CVersionManagerDaemonActor::CServer::fp_FindVersions)
@@ -38,7 +38,7 @@ namespace NMib::NCloud::NVersionManager
 					DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Failed to find versions, aborting startup: {}", _ResultVersions.f_GetExceptionStr());
 					return;
 				}
-				self(&CVersionManagerDaemonActor::CServer::fp_SetupPermissions) 
+				self(&CVersionManagerDaemonActor::CServer::fp_SetupPermissions)
 					> [this](TCAsyncResult<void> &&_ResultPermissions)
 					{
 						if (!_ResultPermissions)
@@ -52,7 +52,7 @@ namespace NMib::NCloud::NVersionManager
 			}
 		;
 	}
-	
+
 	TCSet<CStr> CVersionManagerDaemonActor::CServer::fp_ApplicationSet()
 	{
 		TCSet<CStr> Return;
@@ -65,9 +65,9 @@ namespace NMib::NCloud::NVersionManager
 	TCFuture<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_EnumApplications()
 	{
 		auto QueryFileActor = fp_GetQueryFileActor();
-		
+
 		TCPromise<TCSet<CStr>> Promise;
-		
+
 		fg_Dispatch
 			(
 				QueryFileActor
@@ -94,7 +94,7 @@ namespace NMib::NCloud::NVersionManager
 		;
 		return Promise.f_MoveFuture();
 	}
-	
+
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_FindVersions()
 	{
 		TCPromise<void> Promise;
@@ -106,7 +106,7 @@ namespace NMib::NCloud::NVersionManager
 					mp_Applications[Application];
 				}
 				auto QueryFileActor = fp_GetQueryFileActor();
-				
+
 				fg_Dispatch
 					(
 						QueryFileActor
@@ -165,11 +165,11 @@ namespace NMib::NCloud::NVersionManager
 											}
 											{
 												auto Files = CFile::fs_FindFiles(VersionPath + "/*", EFileAttrib_File, true);
-												OutVersion.m_nFiles = Files.f_GetLen(); 
+												OutVersion.m_nFiles = Files.f_GetLen();
 												for (auto &File : Files)
 													OutVersion.m_nBytes += CFile::fs_GetFileSize(File);
 											}
-											
+
 											// Only use versions that has the .json file
 											Versions[VersionID] = fg_Move(OutVersion);
 										}
@@ -208,42 +208,42 @@ namespace NMib::NCloud::NVersionManager
 				;
 			}
 		;
-		
+
 		return Promise.f_MoveFuture();
 	}
-	
+
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SetupPermissions()
 	{
 		TCPromise<void> Promise;
-		
+
 		TCSet<CStr> Permissions;
 		Permissions["Application/ReadAll"];
 		Permissions["Application/ListAll"];
 		Permissions["Application/WriteAll"];
 		Permissions["Application/TagAll"];
-		
+
 		for (auto &Application : mp_Applications)
 		{
 			Permissions[fg_Format("Application/Read/{}", Application.f_GetName())];
 			Permissions[fg_Format("Application/Write/{}", Application.f_GetName())];
 		}
-		
+
 		for (auto &Tag : mp_KnownTags)
 		{
 			Permissions[fg_Format("Application/Tag/{}", Tag)];
 		}
-		
+
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
-		
+
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("Application/*");
-	
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this)) 
+
+		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this))
 			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
 			{
 				mp_Permissions = fg_Move(_Subscription);
-				
-				
+
+
 				mp_Permissions.f_OnPermissionsAdded
 					(
 						[this](CPermissionIdentifiers const &_Identity, TCMap<CStr, CPermissionRequirements> const &_AddedPermissions)
@@ -252,7 +252,7 @@ namespace NMib::NCloud::NVersionManager
 						}
 					)
 				;
-				
+
 				mp_Permissions.f_OnPermissionsRemoved
 					(
 						[this](CPermissionIdentifiers const &_Identity, TCSet<CStr> const &_RemovedPermissions)
@@ -261,14 +261,14 @@ namespace NMib::NCloud::NVersionManager
 						}
 					)
 				;
-				
+
 				Promise.f_SetResult();
 			}
 		;
-		
+
 		return Promise.f_MoveFuture();
 	}
-	
+
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_Destroy()
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
@@ -277,12 +277,12 @@ namespace NMib::NCloud::NVersionManager
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
 		return pCanDestroy->f_Future();
 	}
-	
+
 	TCActor<CSeparateThreadActor> const &CVersionManagerDaemonActor::CServer::fp_GetQueryFileActor()
 	{
 		if (mp_QueryFileActor)
 			return mp_QueryFileActor;
-		
+
 		mp_QueryFileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Version manager query file actor"));
 		return mp_QueryFileActor;
 	}
