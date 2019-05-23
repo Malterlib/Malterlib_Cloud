@@ -122,7 +122,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		;
 
 		if (NProcess::NPlatform::fg_Process_GetElevation() == EProcessElevation_IsNotElevated)
-			return;
+			DMibError("You need to be elevated to run these tests (sudo)");
 
 		[[maybe_unused]] bool bCanDoEncription = false;
 #ifdef DPlatformFamily_Linux
@@ -295,7 +295,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		auto fLaunchAppManager = [&](CStr const &_Name, CStr const &_Dir) -> CDistributedApp_LaunchInfo
 			{
 				TCVector<CStr> ExtraParams;
-				ExtraParams.f_Insert("--daemon-run-debug");
+				if (AppManagerPackageOptions.f_HasFeatureFlag("NoDaemonRunStandalone"))
+					ExtraParams.f_Insert("--daemon-run-debug");
+				else
+					ExtraParams.f_Insert("--daemon-run-standalone");
 #if DTestUpdateCompatibilityEnableOtherOutput
 				ExtraParams.f_Insert("--log-launches-to-stderr");
 #endif
@@ -382,7 +385,15 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
-		auto fInstallAppManually = [&](CAppManager const &_AppManager, CStr const &_Package, CStr const &_Executable, CStr const &_User, CStr const &_Tag)
+		auto fInstallAppManually = [&]
+			(
+				CAppManager const &_AppManager
+				, CPackageOptions const &_PackageOptions
+				, CStr const &_Package
+				, CStr const &_Executable
+				, CStr const &_User
+				, CStr const &_Tag
+			)
 			{
 				CStr PackageName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(_Package));
 				TCVector<CStr> Params = {"--application-add", "--force-overwrite", "--from-file", _Package, "--name", PackageName};
@@ -390,7 +401,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				if (_Executable)
 				{
 					Params.f_Insert({"--executable", _Executable});
-					Params.f_Insert({"--executable-parameters", "[\"--daemon-run-debug\"]"});
+					if (_PackageOptions.f_HasFeatureFlag("NoDaemonRunStandalone"))
+						Params.f_Insert({"--executable-parameters", "[\"--daemon-run-debug\"]"});
+					else
+						Params.f_Insert({"--executable-parameters", "[\"--daemon-run-standalone\"]"});
 				}
 				if (_User)
 				{
@@ -423,7 +437,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fSetupKeyManager = [&](CAppManager const &_AppManager)
 			{
-				fInstallAppManually(_AppManager, _KeyManagerPackage, "KeyManager", "MalterlibCloudKeyManager", "TestTag");
+				fInstallAppManually(_AppManager, KeyManagerPackageOptions, _KeyManagerPackage, "KeyManager", "MalterlibCloudKeyManager", "TestTag");
 				if (KeyManagerPackageOptions.f_HasFeatureFlag("NoDistributedApp"))
 					NSys::fg_Thread_Sleep(2.0f);
 
@@ -498,7 +512,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fSetupVersionManager = [&](CAppManager const &_AppManager)
 			{
-				fInstallAppManually(_AppManager, _VersionManagerPackage, "VersionManager", "MalterlibCloudVersionManager", "VersionManagerTestTag");
+				fInstallAppManually(_AppManager, VersionManagerPackageOptions, _VersionManagerPackage, "VersionManager", "MalterlibCloudVersionManager", "VersionManagerTestTag");
 				if (VersionManagerPackageOptions.f_HasFeatureFlag("NoDistributedApp"))
 					NSys::fg_Thread_Sleep(2.0f);
 
@@ -708,13 +722,16 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		fAddAppManagerApp(AppManager_AppManager, "AppManager", "AppManager", "AppManagerTestTag");
 
-		auto fUpdateApps = [&]
+		auto fUpdateApps = [&](bool _bLegacy)
 			{
 				KeyManagerPackageInfo = fUpdateApp("KeyManager", {"TestTag"});
 				fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, "Launched");
 
 				VersionManagerPackageInfo = fUpdateApp("VersionManager", {"VersionManagerTestTag"});
 				fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, "Launched");
+
+				if (_bLegacy)
+					fWaitForSignalListen(KeyManagerPackageOptions, VersionManagerPackageOptions);
 
 				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
 				try
@@ -732,10 +749,8 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 					// Update rest
 					fTagApp("AppManager", AppManagerPackageInfo, {"TestTag"});
-
 					fResubscribeAppManager(AppManager_AppManager);
 					fResubscribeAppManager(AppManager_KeyManager);
-
 					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
 					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
 				}
@@ -789,11 +804,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		{
 			DMibTestPath("Upgrade");
-			fUpdateApps();
+			fUpdateApps(true);
 		}
 		{
 			DMibTestPath("UpgradeAgain");
-			fUpdateApps();
+			fUpdateApps(false);
 		}
 		{
 			DMibTestPath("SimultaneousUpgrade1");
