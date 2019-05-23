@@ -491,9 +491,9 @@ namespace NMib::NCloud::NCloudClient
 					CFile::fs_GetProgramDirectory() / "bin/bsdtar"
 					,
 					{
-						"-xOf"
+						"-xqOf"
 						, Source
-						, "VersionInfo.json"
+						, "*VersionInfo.json"
 					}
 					, CFile::fs_GetPath(Source)
 					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode

@@ -322,9 +322,9 @@ namespace NMib::NCloud::NAppManager
 						mp_State.m_RootDirectory / "bin/bsdtar"
 						,
 						{
-							"-xOf"
+							"-xqOf"
 							, _FromLocalFile
-							, "VersionInfo.json"
+							, "*VersionInfo.json"
 						}
 						, CFile::fs_GetPath(_FromLocalFile)
 						, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
