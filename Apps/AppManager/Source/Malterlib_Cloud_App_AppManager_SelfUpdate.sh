@@ -7,17 +7,31 @@ if [[ "$3" != "Recursive" ]]; then
 	exit 0
 fi
 
+SysName=$(uname -s)
+
+function WaitForPidToExit()
+{
+	if [[ $SysName ==  Darwin* ]] ; then
+		lsof -p $1 +r 1 &>/dev/null
+	elif [[ $SysName ==  Linux* ]] ; then
+		tail --pid=$1 -f /dev/null
+	else
+		while kill -0 "$1"; do
+            sleep 0.1
+        done
+	fi
+}
+
 if [[ "$2" == "DaemonStandalone" ]]; then
-	sleep 5
+	WaitForPidToExit $AppManagerPID
 	"$1" --daemon-run-standalane &
 	disown
 elif [[ "$2" == "DaemonDebug" ]]; then
-	sleep 5
+	WaitForPidToExit $AppManagerPID
 	"$1" --daemon-run-debug &
 	disown
 elif [[ "$2" == "Daemon" ]]; then
-	# Leave time for script to exit and disown
-	sleep 0.1
+	WaitForPidToExit $PPID
 	"$1" --daemon-restart
 else
 	echo "Unknow self update type"

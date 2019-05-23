@@ -63,6 +63,8 @@ namespace NMib::NCloud::NAppManager
 					CProcessLaunchParams Params;
 					Params.m_bAllowExecutableLocate = true;
 					Params.m_WorkingDirectory = ProgramDir;
+					Params.m_bMergeEnvironment = true;
+					Params.m_Environment["AppManagerPID"] = "{}"_f << NProcess::NPlatform::fg_Process_GetCurrentUID();
 
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Running self update script");
 
@@ -108,7 +110,7 @@ namespace NMib::NCloud::NAppManager
 						{
 							DMibError(fg_Format("Self update script failed with exit code {} and reported: {}", ExitCode, fg_ConcatOutput(StdOut, StdErr)));
 						}
-						else if (bDaemonDebug)
+						else if (bDaemonDebug || bDaemonStandalone)
 							CDaemon::fs_QuitDaemon(); // Initiate application quit
 					}
 					else
