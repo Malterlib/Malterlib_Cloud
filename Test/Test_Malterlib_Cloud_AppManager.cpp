@@ -200,6 +200,7 @@ public:
 						> AppManagerLaunchesResults.f_AddResult()
 					;
 				}
+				DMibTestMark;
 				fg_CombineResults(AppManagerLaunchesResults.f_GetResults().f_CallSync());
 			}
 
@@ -227,6 +228,7 @@ public:
 			}
 
 			TCVector<CDistributedApp_LaunchInfo> AppManagerLaunches;
+			DMibTestMark;
 			for (auto &LaunchResult : AppManagerLaunchesResults.f_GetResults().f_CallSync(g_Timeout))
 				AppManagerLaunches.f_Insert(fg_Move(*LaunchResult));
 
@@ -239,6 +241,7 @@ public:
 			CDistributedActorTrustManager_Address VersionManagerServerAddress;
 
 			VersionManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/versionmanager.sock"_f << VersionManagerDirectory));
+			DMibTestMark;
 			VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(VersionManagerServerAddress).f_CallSync(g_Timeout);
 
 			static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
@@ -254,6 +257,7 @@ public:
 			;
 
 			// Add trust to cloud client
+			DMibTestMark;
 			auto Ticket = VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 				(
 				 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{VersionManagerServerAddress}
@@ -265,6 +269,7 @@ public:
 			{
 				TCVector<CStr> Params = {"--trust-namespace-add-trusted-host", "--namespace", CVersionManager::mc_pDefaultNamespace, VersionManagerHostID};
 				CProcessLaunch::fs_LaunchTool(CloudClientDirectory + "/MalterlibCloud", Params);
+				DMibTestMark;
 				VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
 						fPermissions(CloudClientHostID, VersionManagerPermissionsForTest)
@@ -274,12 +279,14 @@ public:
 			}
 
 			// Setup trust between for VersionManager and Test
+			DMibTestMark;
  			VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 				(
 					 fPermissions(TestHostID, VersionManagerPermissionsForTest)
 				)
 				.f_CallSync(g_Timeout)
 			;
+			DMibTestMark;
 			TrustManager
 				(
 					 &CDistributedActorTrustManager::f_AllowHostsForNamespace
@@ -304,9 +311,11 @@ public:
 			// Add initial application to version manager
 			CStr TestAppArchive = ProgramDirectory + "/TestApps/TestApp.tar.gz";
 
+			DMibTestMark;
 			auto PackageInfo = VersionManagerHelper.f_CreatePackage(ProgramDirectory + "/TestApps/TestApp", TestAppArchive, g_CompressionLevel).f_CallSync(g_Timeout);
 
 			PackageInfo.m_VersionInfo.m_Tags["TestTag"];
+			DMibTestMark;
 			VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive).f_CallSync(g_Timeout);
 
 			// Setup trust for AppManagers
@@ -339,6 +348,7 @@ public:
 					AppManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(AppManagerInfo.m_Address) > ListenResults.f_AddResult();
 					++iAppManager;
 				}
+				DMibTestMark;
 				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(g_Timeout));
 			}
 
@@ -431,6 +441,7 @@ public:
 				;
 				Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
 			}
+			DMibTestMark;
 			fg_CombineResults(SetupTrustResults.f_GetResults().f_CallSync(g_Timeout));
 
 			// Install app on app managers
@@ -449,11 +460,12 @@ public:
 
 					AppManager.f_CallActor(&CAppManagerInterface::f_Add)("TestApp", Add, Settings) > AddAppResults.f_AddResult();
 				}
+				DMibTestMark;
 				fg_CombineResults(AddAppResults.f_GetResults().f_CallSync(g_Timeout));
 			}
 
 			// Update Application
-			auto fUpdateTestApp = [&](TCSet<CStr> const &_Tags)
+ 			auto fUpdateTestApp = [&](TCSet<CStr> const &_Tags)
 				{
 					++PackageInfo.m_VersionID.m_VersionID.m_Revision;
 					PackageInfo.m_VersionInfo.m_Tags = _Tags;
@@ -684,6 +696,7 @@ public:
 					Promise.f_Dispatch() > AppCommandResults.f_AddResult();
 					++iAppManager;
 				}
+				DMibTestMark;
 				fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
 			}
 
@@ -738,7 +751,9 @@ public:
 				DMibTestPath("Update Independent");
 				fSetUpdateType("TestApp", "Independent");
 				UpdateNotificationState.f_Clear();
+				DMibTestMark;
 				fUpdateTestApp({"TestTag"});
+				DMibTestMark;
 				fWaitForAllUpdated("TestApp");
 
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
@@ -748,7 +763,9 @@ public:
 				DMibTestPath("Update OneAtATime");
 				fSetUpdateType("TestApp", "OneAtATime");
 				UpdateNotificationState.f_Clear();
+				DMibTestMark;
 				fUpdateTestApp({"TestTag"});
+				DMibTestMark;
 				fWaitForAllUpdated("TestApp");
 
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
@@ -759,7 +776,9 @@ public:
 				DMibTestPath("Update AllAtOnce");
 				fSetUpdateType("TestApp", "AllAtOnce");
 				UpdateNotificationState.f_Clear();
+				DMibTestMark;
 				fUpdateTestApp({"TestTag"});
+				DMibTestMark;
 				fWaitForAllUpdated("TestApp");
 
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
@@ -791,24 +810,33 @@ public:
 				if (i == 0)
 				{
 					Path = "Same Update Group";
+					DMibTestMark;
 					fSetUpdateGroup("TestApp", "TestGroup");
+					DMibTestMark;
 					fSetUpdateGroup("TestApp2", "TestGroup");
 				}
 				else
 				{
 					Path = "Separate Update Group";
+					DMibTestMark;
 					fSetUpdateGroup("TestApp", "TestGroup");
+					DMibTestMark;
 					fSetUpdateGroup("TestApp2", "TestGroup2");
 				}
 				DMibTestPath(Path);
 				{
 					DMibTestPath("AllAtOnce AllAtOnce");
 					fSetUpdateType("TestApp", "AllAtOnce");
+					DMibTestMark;
 					fSetUpdateType("TestApp2", "AllAtOnce");
 					UpdateNotificationState.f_Clear();
+					DMibTestMark;
 					fUpdateTestApp({});
+					DMibTestMark;
 					fTagApp("TestApp", {"TestTag", "TestTag2"});
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp");
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
 					if (i == 0)
@@ -834,11 +862,16 @@ public:
 				{
 					DMibTestPath("OneAtATime OneAtATime");
 					fSetUpdateType("TestApp", "OneAtATime");
+					DMibTestMark;
 					fSetUpdateType("TestApp2", "OneAtATime");
 					UpdateNotificationState.f_Clear();
+					DMibTestMark;
 					fUpdateTestApp({});
+					DMibTestMark;
 					fTagApp("TestApp", {"TestTag", "TestTag2"});
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp");
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 1u);
@@ -858,11 +891,16 @@ public:
 				{
 					DMibTestPath("AllAtOnce OneAtATime");
 					fSetUpdateType("TestApp", "AllAtOnce");
+					DMibTestMark;
 					fSetUpdateType("TestApp2", "OneAtATime");
 					UpdateNotificationState.f_Clear();
+					DMibTestMark;
 					fUpdateTestApp({});
+					DMibTestMark;
 					fTagApp("TestApp", {"TestTag", "TestTag2"});
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp");
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, >=, 1u);
@@ -882,12 +920,18 @@ public:
 				{
 					DMibTestPath("AllAtOnce Independent");
 					fSetUpdateType("TestApp", "AllAtOnce");
+					DMibTestMark;
 					fSetUpdateType("TestApp2", "Independent");
 					UpdateNotificationState.f_Clear();
+					DMibTestMark;
 					fUpdateTestApp({});
+					DMibTestMark;
 					fTagApp("TestApp", {"TestTag"});
+					DMibTestMark;
 					fTagApp("TestApp", {"TestTag2"});
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp");
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
@@ -902,12 +946,18 @@ public:
 				{
 					DMibTestPath("OneAtATime Independent");
 					fSetUpdateType("TestApp", "OneAtATime");
+					DMibTestMark;
 					fSetUpdateType("TestApp2", "Independent");
 					UpdateNotificationState.f_Clear();
+					DMibTestMark;
 					fUpdateTestApp({});
+					DMibTestMark;
 					fTagApp("TestApp", {"TestTag"});
+					DMibTestMark;
 					fTagApp("TestApp", {"TestTag2"});
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp");
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
@@ -921,12 +971,18 @@ public:
 				{
 					DMibTestPath("Independent Independent");
 					fSetUpdateType("TestApp", "Independent");
+					DMibTestMark;
 					fSetUpdateType("TestApp2", "Independent");
 					UpdateNotificationState.f_Clear();
+					DMibTestMark;
 					fUpdateTestApp({});
+					DMibTestMark;
 					fTagApp("TestApp", {"TestTag"});
+					DMibTestMark;
 					fTagApp("TestApp", {"TestTag2"});
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp");
+					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
 					if (i == 0)
