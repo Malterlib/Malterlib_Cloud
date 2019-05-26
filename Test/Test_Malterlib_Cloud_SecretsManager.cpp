@@ -1790,6 +1790,7 @@ public:
 							, DMibErrorInstance("Secret 'Sacrificial/Lamb' removed while the secret file was uploaded")
 						)
 					;
+					fSyncFileOperations("SyncFileOperations").f_CallSync(g_Timeout);
 					DMibExpect(fFindFiles().f_GetLen(), ==, 0);
 				}
 
