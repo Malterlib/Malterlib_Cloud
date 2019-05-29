@@ -63,7 +63,7 @@ namespace NMib::NCloud
 			TCDistributedActor<ICNetworkTunnels> m_TunnelActor;
 			CActorSubscription m_ListenSubscription;
 		 	TCActorFunctor<TCFuture<void> (CNetAddress const &_Address)> m_fOnConnection;
-			TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, NStr::CStr const &_Message)> m_fOnClose;
+			TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Message)> m_fOnClose;
 		 	TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Error)> m_fOnError;
 		};
 
@@ -91,7 +91,7 @@ namespace NMib::NCloud
 
 	CNetworkTunnelsClient::~CNetworkTunnelsClient() = default;
 
-	NConcurrency::TCFuture<void> CNetworkTunnelsClient::f_Start()
+	TCFuture<void> CNetworkTunnelsClient::f_Start()
 	{
 		auto &Internal = *mp_pInternal;
 		co_await Internal.f_Subscribe();
@@ -137,7 +137,7 @@ namespace NMib::NCloud
 		 	CStr const &_HostID
 		 	, ICNetworkTunnels::CNetworkTunnelName const &_TunnelName
 		 	, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address)> &&_fOnConnection
-		 	, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, NStr::CStr const &_Message)> &&_fOnClose
+		 	, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Message)> &&_fOnClose
 		 	, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Error)> &&_fOnError
 		)
 		-> TCFuture<CTunnel>
@@ -209,7 +209,7 @@ namespace NMib::NCloud
 				auto OpenConnectionResult = co_await pTunnel->m_TunnelActor.f_CallActor(&ICNetworkTunnels::f_OpenConnection)
 					(
 					 	pTunnel->m_TunnelName
-					 	, g_ActorFunctor / [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](NContainer::CSecureByteVector &&_Data) -> TCFuture<void>
+					 	, g_ActorFunctor / [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](CSecureByteVector &&_Data) -> TCFuture<void>
 					 	{
 							auto &Internal = *mp_pInternal;
 
@@ -242,7 +242,7 @@ namespace NMib::NCloud
 					 	, AllowDestroy = g_AllowWrongThreadDestroy
 					 	, fCleanupConnection = fg_Move(fCleanupConnection)
 					]
-					(EAsyncSocketStatus _Reason, NStr::CStr const &_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
+					(EAsyncSocketStatus _Reason, CStr const &_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
 					{
 						fCleanupConnection();
 
@@ -298,7 +298,7 @@ namespace NMib::NCloud
 		auto ListenResults = co_await Internal.m_SocketServer
 			(
 				&CAsyncSocketServerActor::f_StartListenAddress
-				, NContainer::TCVector<NNetwork::CNetAddress>{ListenAddress}
+				, TCVector<CNetAddress>{ListenAddress}
 				, ENetFlag_None
 				, fg_Move(Callbacks)
 				, nullptr

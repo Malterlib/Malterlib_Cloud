@@ -52,7 +52,7 @@ namespace NMib::NCloud
 
 		struct CNetworkTunnelImplementation : public ICNetworkTunnels
 		{
-			TCFuture<NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() override
+			TCFuture<TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() override
 			{
 				auto &Internal = *m_pThis->mp_pInternal;
 
@@ -60,7 +60,7 @@ namespace NMib::NCloud
 
 				TCSet<CNetworkTunnelName> Tunnels;
 
-				NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+				TCMap<CStr, TCVector<CPermissionQuery>> Permissions;
 				Permissions["//ALL//"] = {{"{}/ConnectAll"_f << Internal.m_PermissionPrefix}};
 				for (auto &Tunnel : Internal.m_NetworkTunnels)
 				{
@@ -109,7 +109,6 @@ namespace NMib::NCloud
 				if (!pTunnel)
 					co_return DMibErrorInstance("No such network tunnel");
 
-
 				auto NewConnection = co_await
 					(
 					 	Internal.m_SocketClient(&CAsyncSocketClientActor::f_Connect, pTunnel->m_Host, "", ENetAddressType_None, pTunnel->m_Port, nullptr) % AppAuditor
@@ -149,7 +148,7 @@ namespace NMib::NCloud
 
 				CAsyncSocketCallbacks SocketCallbacks;
 				SocketCallbacks.m_fOnClose = g_ActorFunctor / [fCleanupConnection, AllowDestroy = g_AllowWrongThreadDestroy]
-					(EAsyncSocketStatus _Reason, NStr::CStr const &_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
+					(EAsyncSocketStatus _Reason, CStr const &_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
 					{
 						co_await fCleanupConnection();
 						co_return {};
@@ -180,7 +179,7 @@ namespace NMib::NCloud
 					(
 						g_ActorSubscription / fCleanupConnection
 					)
-					/ [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](NContainer::CSecureByteVector &&_Data) -> TCFuture<void>
+					/ [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](CSecureByteVector &&_Data) -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
 						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
@@ -248,14 +247,11 @@ namespace NMib::NCloud
 
 	TCFuture<void> CNetworkTunnelsServer::CInternal::f_SetupPermissions()
 	{
-		TCSet<CStr> Permissions{CStr("{}/ConnectAll"_f << m_PermissionPrefix)};
-
+		TCSet<CStr> Permissions{"{}/ConnectAll"_f << m_PermissionPrefix};
 		co_await m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
 
-		TCVector<CStr> SubscribePermissions;
-		SubscribePermissions.f_Insert("{}/*"_f << m_PermissionPrefix);
-
-		m_Permissions = co_await m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(m_pThis));
+		TCVector<CStr> SubscribePermissions{"{}/*"_f << m_PermissionPrefix};
+		m_Permissions = co_await m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, fg_Move(SubscribePermissions), fg_ThisActor(m_pThis));
 
 		co_return {};
 	}
@@ -274,14 +270,14 @@ namespace NMib::NCloud
 		 	ICNetworkTunnels::CNetworkTunnelName const &_Name
 		 	, CStr const &_Host
 		 	, uint16 _Port
-		 	, NEncoding::CEJSON &&_MetaData
+		 	, CEJSON &&_MetaData
 		)
 	{
 		auto &Internal = *mp_pInternal;
 
 		auto TunnelMap = Internal.m_NetworkTunnels(_Name, CInternal::CNetworkTunnel{_Host, _Port, fg_Move(_MetaData)});
 		if (!TunnelMap.f_WasCreated())
-			co_return DMibErrorInstance("A tunnel with same name is already published");
+			co_return DMibErrorInstance("A tunnel with the same name is already published");
 
 		auto Permissions = TCSet<CStr>{fg_Format("{}/Connect/{}", Internal.m_PermissionPrefix, _Name)};
 		co_await Internal.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
