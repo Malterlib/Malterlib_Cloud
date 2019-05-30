@@ -172,7 +172,7 @@ Property
 										"	shift\r\n"\
 										"	UploadHosts=$(echo $MalterlibCloud_VersionUploadHosts | tr \";\" \"\\n\")\r\n"\
 										"	for Host in $UploadHosts; do\r\n"\
-										"		@(MalterlibCloud_CloudClientCommand) --no-self-update-check --version-manager-upload-version --host $Host --settings-file \"$SettingsFile\" --tags @(MalterlibCloud_VersionUploadCloudClientCommand_Tags)@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified) \"$FileName\" \"$@\"\r\n"\
+										"		@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --host $Host --settings-file \"$SettingsFile\" --tags @(MalterlibCloud_VersionUploadCloudClientCommand_Tags)@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified) \"$FileName\" \"$@\"\r\n"\
 										"	done\r\n"\
 										"}\r\n"\
 										"\r\n"\
@@ -766,7 +766,7 @@ Property
 		!!GeneratorFamily VisualStudio
 	}
 
-	MalterlibCloud_VersionUploadCloudClientCommand "@(MalterlibCloud_CloudClientCommand) --no-self-update-check --version-manager-upload-version --settings-file \"@(MalterlibCloudVersionInfoFileName)\" --tags @(MalterlibCloud_VersionUploadCloudClientCommand_Tags)@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified) \"@(MalterlibCloud_VersionUploadTarArchivePath)\"\r\n"\
+	MalterlibCloud_VersionUploadCloudClientCommand "@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --settings-file \"@(MalterlibCloudVersionInfoFileName)\" --tags @(MalterlibCloud_VersionUploadCloudClientCommand_Tags)@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified) \"@(MalterlibCloud_VersionUploadTarArchivePath)\"\r\n"\
 													"@(CheckErrors)\r\n"
 	{
 		!!MalterlibCloud_VersionUploadToBuildServerPath ""
