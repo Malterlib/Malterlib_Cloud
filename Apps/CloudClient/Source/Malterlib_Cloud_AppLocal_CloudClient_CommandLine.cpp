@@ -50,6 +50,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SelfUpdate(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 	}

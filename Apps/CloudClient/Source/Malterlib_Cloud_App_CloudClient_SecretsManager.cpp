@@ -85,6 +85,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_EnumerateSecrets(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -126,6 +127,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_GetSecretBySemanticID(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -144,6 +146,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_GetProperties(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -170,6 +173,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_GetSecret(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 
@@ -261,6 +265,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_SetProperties(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -294,6 +299,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_ChangeTags(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -319,6 +325,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_SetMetadata(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -342,6 +349,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_RemoveMetadata(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -359,6 +367,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_RemoveSecret(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -384,6 +393,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_Upload(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -416,6 +426,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_SecretsManager_Download(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 	}

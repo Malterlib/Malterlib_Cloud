@@ -38,6 +38,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_VersionManager_ListApplications(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -69,6 +70,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_VersionManager_ListVersions(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -197,6 +199,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_VersionManager_UploadVersion(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -257,6 +260,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_VersionManager_ChangeTags(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -311,6 +315,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_VersionManager_DownloadVersion(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 	}

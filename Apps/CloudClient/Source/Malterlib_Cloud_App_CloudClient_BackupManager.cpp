@@ -36,6 +36,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_BackupManager_ListBackupSources(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -61,6 +62,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_BackupManager_ListBackups(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -124,6 +126,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return fp_CommandLine_BackupManager_DownloadBackup(_Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 	}

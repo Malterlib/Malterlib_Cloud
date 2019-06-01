@@ -48,6 +48,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels, _Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -79,6 +80,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels, _Params, _pCommandLine);
 				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
 		;
 	}
