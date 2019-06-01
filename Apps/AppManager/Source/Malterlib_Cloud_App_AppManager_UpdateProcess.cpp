@@ -358,6 +358,7 @@ namespace NMib::NCloud::NAppManager
 					, Files = State.m_Files
 					, pApplication = State.m_pApplication
 					, pUniqueUserGroup = mp_pUniqueUserGroup
+				 	, fOnInfo = State.m_fOnInfo
 				]
 				{
 					// 3. Delete old files
@@ -395,7 +396,7 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 
-					fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Files, pUniqueUserGroup);
+					fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Files, pUniqueUserGroup, fOnInfo);
 				}
 			)
 		;

@@ -620,6 +620,7 @@ namespace NMib::NCloud::NAppManager
 			 	, TCSharedPointer<CApplication> const &_pApplication
 			 	, TCVector<CStr> const &_Files
 			 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+				, TCFunction<void (CStr const &_Info)> const &_fLogInfo
 			)
 		;
 		TCFuture<void> fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> const &_pApplication, uint32 _OldVersion);

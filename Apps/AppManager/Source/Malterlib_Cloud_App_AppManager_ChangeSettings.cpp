@@ -122,7 +122,7 @@ namespace NMib::NCloud::NAppManager
 							}
 						}
 
-						fsp_UpdateApplicationFilePermissions(Directory, _pApplication, _pApplication->m_Files, pUniqueUserGroup);
+						fsp_UpdateApplicationFilePermissions(Directory, _pApplication, _pApplication->m_Files, pUniqueUserGroup, fOnInfo);
 					}
 				}
 			)
@@ -317,7 +317,7 @@ namespace NMib::NCloud::NAppManager
 					g_Dispatch(mp_FileActor) / [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope, pUniqueUserGroup = mp_pUniqueUserGroup]()
 					{
 						fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
-						fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
+						fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 					}
 				)
 				+ fp_UpdateApplicationJSON(pApplication)

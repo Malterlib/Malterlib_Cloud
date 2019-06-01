@@ -264,6 +264,20 @@ Property
 
 Property
 {
+	MalterlibCloudVersionInfo_LowPortExecutables_Contents_Template ", \"@(Explodee)\""
+	{
+		!Explodee ""
+	}
+
+	MalterlibCloudVersionInfo_LowPortExecutables_Contents "[Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_LowPortExecutables)', ';', 'MalterlibCloudVersionInfo_LowPortExecutables_Contents_Template'))]"
+
+	MalterlibCloudVersionInfo_LowPortExecutables_Contents "@(MalterlibCloudVersionInfo_LowPortExecutables_Contents->Replace('Dummy, ', ''))"
+	MalterlibCloudVersionInfo_LowPortExecutables_Contents "@(MalterlibCloudVersionInfo_LowPortExecutables_Contents->Replace('[Dummy]', '[]'))"
+}
+
+
+Property
+{
 	MalterlibCloudVersionInfo_Backup_AddSyncFlagsWildcards_Contents_InnerTemplate ", \"@(Explodee)\""
 	{
 		!Explodee ""
@@ -374,6 +388,12 @@ Property
 	{
 		!MalterlibCloudVersionInfo_DistributedApp ""
 	}
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t, \"LowPortExecutables\": @(MalterlibCloudVersionInfo_LowPortExecutables_Contents)\n"
+	{
+		!MalterlibCloudVersionInfo_LowPortExecutables ""
+	}
+
 
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t\t, \"AppDistribution\": {\n"\

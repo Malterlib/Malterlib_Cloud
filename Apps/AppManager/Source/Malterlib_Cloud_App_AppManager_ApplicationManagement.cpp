@@ -370,6 +370,7 @@ namespace NMib::NCloud::NAppManager
 		 	, TCSharedPointer<CApplication> const &_pApplication
 		 	, TCVector<CStr> const &_Files
 		 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+			, TCFunction<void (CStr const &_Info)> const &_fLogInfo
 		)
 	{
 		auto &Settings = _pApplication->m_Settings;
@@ -396,6 +397,30 @@ namespace NMib::NCloud::NAppManager
 				fSetOwners(Directory);
 			}
 		}
+
+#ifdef DPlatformFamily_Linux
+		if (auto pLowPortExetutables = _pApplication->m_LastTriedInstalledVersionInfo.m_ExtraInfo.f_GetMember("LowPortExecutables", EJSONType_Array))
+		{
+			for (auto &Executable : pLowPortExetutables->f_Array())
+			{
+				if (!Executable.f_IsString())
+					continue;
+
+				CStr ExecutablePath = _ApplicationDir / Executable.f_String();
+				try
+				{
+					if (CFile::fs_FileExists(ExecutablePath))
+						CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+					_fLogInfo("Setup low port executable support: setcap cap_net_bind_service=ep {}"_f << ExecutablePath);
+				}
+				catch (CException const &_Exception)
+				{
+					_fLogInfo("Failed to setup low port executable support running 'setcap cap_net_bind_service=ep {}': {}"_f << ExecutablePath << _Exception);
+				}
+			}
+		}
+#endif
+
 		CFile::fs_CreateDirectory(_ApplicationDir + "/.home");
 		CFile::fs_CreateDirectory(_ApplicationDir + "/.tmp");
 		fSetOwners(_ApplicationDir + "/.home");

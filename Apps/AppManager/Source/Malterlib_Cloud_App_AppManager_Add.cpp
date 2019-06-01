@@ -303,6 +303,8 @@ namespace NMib::NCloud::NAppManager
 
 				pApplication->m_LastInstalledVersion = _VersionID;
 				pApplication->m_LastInstalledVersionInfo = _VersionInfo;
+				pApplication->m_LastTriedInstalledVersion = _VersionID;
+				pApplication->m_LastTriedInstalledVersionInfo = _VersionInfo;
 				if (mp_KnownPlatforms(_VersionID.m_Platform).f_WasCreated())
 					fp_VersionManagerResubscribeAll();
 			}
@@ -470,7 +472,7 @@ namespace NMib::NCloud::NAppManager
 							_fOnInfo(Output.f_TrimRight());
 					}
 
-					fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup);
+					fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 
 					if (!DeletePath.f_IsEmpty())
 						CFile::fs_DeleteDirectoryRecursive(DeletePath);
