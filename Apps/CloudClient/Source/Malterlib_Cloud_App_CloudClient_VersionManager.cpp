@@ -119,7 +119,7 @@ namespace NMib::NCloud::NCloudClient
 									}
 								}
 							)
-							.f_ToStringColored("    ", CDistributedAppActor::fs_ColorEnabledDefault()).f_Replace("\r\n", "\r").f_Replace("\n", "\r")
+							.f_ToStringColored(CDistributedAppActor::fs_ColorAnsiFlagsDefault(), "    ").f_Replace("\r\n", "\r").f_Replace("\n", "\r")
 						}
 						, "Application?"_=
 						{

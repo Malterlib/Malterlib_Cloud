@@ -130,15 +130,7 @@ namespace NMib::NCloud::NCloudClient
 	{
 		auto TunnelsPerHost = co_await self(&CCloudClientAppActor::fp_NetworkTunnel_Filter, _Params);
 
-		CTableRenderHelper TableRenderer
-			(
-				[&](NStr::CStr const &_Output)
-			 	{
-					*_pCommandLine += _Output;
-				}
-			 	, (_pCommandLine->m_bColorEnabled ? CTableRenderHelper::EOption_Color : CTableRenderHelper::EOption_None) | CTableRenderHelper::EOption_Rounded
-		 	)
-		;
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 
 		TableRenderer.f_AddHeadings("HostID", "Tunnel Name", "Meta Data");
 
@@ -148,7 +140,7 @@ namespace NMib::NCloud::NCloudClient
 			for (auto &Tunnel : Tunnels)
 			{
 				auto &TunnelName = Tunnels.fs_GetKey(Tunnel);
-				TableRenderer.f_AddRow(HostID, TunnelName, Tunnel.m_MetaData.f_ToStringColored("\t", _pCommandLine->m_bColorEnabled, true));
+				TableRenderer.f_AddRow(HostID, TunnelName, Tunnel.m_MetaData.f_ToStringColored(_pCommandLine->m_AnsiFlags, "\t", true));
 			}
 		}
 
@@ -200,21 +192,17 @@ namespace NMib::NCloud::NCloudClient
 						, g_ActorFunctor / [=](CNetAddress const &_Address) -> TCFuture<void>
 						{
 							CStr ActionString;
-							if (_pCommandLine->m_bColorEnabled)
-								ActionString = "{}Connected{}"_f << CAnsiEncoding::ms_StatusNormal << CAnsiEncoding::ms_Default;
-							else
-								ActionString = "Connected";
+							auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+							ActionString = "{}Connected{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
 
-							*_pCommandLine += "{} '{}': {}:{}\n"_f << ActionString<< TunnelName << _Address.f_GetString() << _Address.f_GetPort();
+							*_pCommandLine += "{} '{}': {}:{}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort();
 							return fg_Explicit();
 						}
 						, g_ActorFunctor / [=](CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void>
 						{
 							CStr ActionString;
-							if (_pCommandLine->m_bColorEnabled)
-								ActionString = "{}Closed   {}"_f << CAnsiEncoding::ms_StatusWarning << CAnsiEncoding::ms_Default;
-							else
-								ActionString = "Closed   ";
+							auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+							ActionString = "{}Closed   {}"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default();
 
 							*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Message;
 							return fg_Explicit();
@@ -222,10 +210,8 @@ namespace NMib::NCloud::NCloudClient
 						, g_ActorFunctor / [=](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void>
 					 	{
 							CStr ActionString;
-							if (_pCommandLine->m_bColorEnabled)
-								ActionString = "{}Error    {}"_f << CAnsiEncoding::ms_StatusError << CAnsiEncoding::ms_Default;
-							else
-								ActionString = "Error    ";
+							auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+							ActionString = "{}Error    {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();
 
 							*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Error;
 							return fg_Explicit();
@@ -238,15 +224,7 @@ namespace NMib::NCloud::NCloudClient
 
 		auto OpenedTunnels = co_await OpenedTunnelResults.f_GetResults() | g_Unwrap;
 
-		CTableRenderHelper TableRenderer
-			(
-				[&](NStr::CStr const &_Output)
-			 	{
-					*_pCommandLine += _Output;
-				}
-			 	, (_pCommandLine->m_bColorEnabled ? CTableRenderHelper::EOption_Color : CTableRenderHelper::EOption_None) | CTableRenderHelper::EOption_Rounded
-		 	)
-		;
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 
 		TableRenderer.f_AddHeadings("HostID", "Tunnel Name", "URL");
 
