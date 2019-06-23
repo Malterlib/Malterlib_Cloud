@@ -9,10 +9,11 @@
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Cloud/BackupManager>
-#include <Mib/Cloud/VersionManager>
-#include <Mib/Cloud/SecretsManager>
+#include <Mib/Cloud/CloudManager>
 #include <Mib/Cloud/NetworkTunnels>
 #include <Mib/Cloud/NetworkTunnelsClient>
+#include <Mib/Cloud/SecretsManager>
+#include <Mib/Cloud/VersionManager>
 
 namespace NMib::NCloud::NCloudClient
 {
@@ -96,6 +97,11 @@ namespace NMib::NCloud::NCloudClient
 		TCFuture<void> fp_NetworkTunnel_Init();
 		TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> fp_NetworkTunnel_Filter(CEJSON const &_Params);
 
+		// Cloud Manager
+		void fp_CloudManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
+		TCFuture<void> fp_CloudManager_SubscribeToServers();
+		TCFuture<uint32> fp_CommandLine_CloudManager_Status(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+
 		fp64 mp_Timeout = 0.0;
 
 		TCVector<TCActor<CProcessLaunchActor>> mp_LaunchActors;
@@ -117,5 +123,8 @@ namespace NMib::NCloud::NCloudClient
 		// Network Tunnel
 		TCVector<CActorSubscription> mp_TunnelSubscriptions;
 		TCActor<CNetworkTunnelsClient> mp_TunnelsClient;
+
+		// Cloud Manager
+		TCTrustedActorSubscription<CCloudManager> mp_CloudManagers;
 	};
 }

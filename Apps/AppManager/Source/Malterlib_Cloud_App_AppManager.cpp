@@ -327,7 +327,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		auto [KeySubscrption, VersionSubscrption] = co_await
+		auto [KeySubscription, VersionSubscription, CloudSubscription] = co_await
 			(
 				mp_State.m_TrustManager
 				(
@@ -341,13 +341,19 @@ namespace NMib::NCloud::NAppManager
 					, CVersionManager::mc_pDefaultNamespace
 					, fg_ThisActor(this)
 				)
+				+ mp_State.m_TrustManager
+				(
+					&CDistributedActorTrustManager::f_SubscribeTrustedActors<CCloudManager>
+					, CCloudManager::mc_pDefaultNamespace
+					, fg_ThisActor(this)
+				)
 			)
 		;
 
 		if (mp_State.m_bStoppingApp)
 			co_return DMibErrorInstance("Startup aborted");
 
-		mp_KeyManagerSubscription = fg_Move(KeySubscrption);
+		mp_KeyManagerSubscription = fg_Move(KeySubscription);
 		mp_KeyManagerSubscription.f_OnActor
 			(
 				[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
@@ -357,7 +363,7 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
-		mp_VersionManagerSubscription = fg_Move(VersionSubscrption);
+		mp_VersionManagerSubscription = fg_Move(VersionSubscription);
 		mp_VersionManagerSubscription.f_OnActor
 			(
 				[this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo)
@@ -372,6 +378,25 @@ namespace NMib::NCloud::NAppManager
 				[this](TCWeakDistributedActor<CActor> const &_VersionManagero)
 				{
 					fp_VersionManagerRemoved(_VersionManagero);
+				}
+			)
+		;
+
+		mp_CloudManagerSubscription = fg_Move(CloudSubscription);
+		mp_CloudManagerSubscription.f_OnActor
+			(
+				[this](TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_ActorInfo)
+				{
+					self(&CAppManagerActor::fp_CloudManagerAdded, _CloudManager, _ActorInfo) > fg_LogError("CloudManager", "Failed to add cloud manager");
+				}
+			)
+		;
+
+		mp_CloudManagerSubscription.f_OnRemoveActor
+			(
+				[this](TCWeakDistributedActor<CActor> const &_CloudManagero)
+				{
+					fp_CloudManagerRemoved(_CloudManagero);
 				}
 			)
 		;

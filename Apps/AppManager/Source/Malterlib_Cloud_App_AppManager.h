@@ -13,6 +13,7 @@
 #include <Mib/Concurrency/DistributedAppInterfaceLaunch>
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cloud/BackupManagerClient>
+#include <Mib/Cloud/CloudManager>
 #include <Mib/Security/UniqueUserGroup>
 
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
@@ -302,6 +303,17 @@ namespace NMib::NCloud::NAppManager
 		{
 			TCActor<CFileTransferReceive> m_DownloadVersionReceive;
 			CActorSubscription m_Subscription;
+		};
+
+		struct CCloudManagerState
+		{
+			TCDistributedActor<CCloudManager> const &f_GetManager() const
+			{
+				return TCMap<TCDistributedActor<CCloudManager>, CCloudManagerState>::fs_GetKey(*this);
+			}
+
+			CTrustedActorInfo m_HostInfo;
+			CActorSubscription m_RegisterSubscription;
 		};
 
 		struct CDistributedAppInterfaceServerImplementation : public CDistributedAppInterfaceServer
@@ -848,6 +860,9 @@ namespace NMib::NCloud::NAppManager
 		CStr fp_GetRunAsGroup(CApplicationSettings const &_Settings) const;
 		CStr fp_TransformUserGroup(CStr const &_UserName) const;
 
+		TCFuture<void> fp_CloudManagerAdded(TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_Info);
+		void fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> const &_CloudManager);
+
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #else
@@ -858,6 +873,7 @@ namespace NMib::NCloud::NAppManager
 		TCActor<CSeparateThreadActor> mp_FileActor;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagerSubscription;
+		TCTrustedActorSubscription<CCloudManager> mp_CloudManagerSubscription;
 		TCSet<CStr> mp_KnownPlatforms;
 		bool mp_bPendingAutoUpdate = false;
 		bool mp_bLogLaunchesToStdErr = false;
@@ -867,6 +883,8 @@ namespace NMib::NCloud::NAppManager
 
 		TCMap<CStr, CVersionManagerApplication> mp_VersionManagerApplications;
 		TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState> mp_VersionManagers;
+
+		TCMap<TCDistributedActor<CCloudManager>, CCloudManagerState> mp_CloudManagers;
 
 		TCDistributedActorInstance<CDistributedAppInterfaceServerImplementation> mp_AppInterfaceServer;
 		TCDistributedActorInstance<CAppManagerInterfaceImplementation> mp_AppManagerInterface;
