@@ -574,7 +574,6 @@ namespace NMib::NCloud::NAppManager
 		fg_RegisterTimer
 			(
 				1.0*60.0
-				, self
 				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() -> TCFuture<void>
 				{
 					if (pState->m_bWasDisconnected && pState->m_DisconnectClock.f_GetTime() >= DisconnectTimeout)
@@ -598,7 +597,6 @@ namespace NMib::NCloud::NAppManager
 		fg_OneshotTimerAbortable
 			(
 				_Timeout
-				, self
 				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]
 				{
 					if (!Promise.f_IsSet())
