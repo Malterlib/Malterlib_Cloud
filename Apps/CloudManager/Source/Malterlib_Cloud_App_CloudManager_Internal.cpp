@@ -34,7 +34,7 @@ namespace NMib::NCloud::NCloudManager
 			 	(
 				 	&CDatabaseActor::f_OpenDatabase
 				 	, mp_AppState.m_RootDirectory / "CloudManagerDatabase"
-				 	, constant_uint64(64) * 1024 * 1024 * 1024 * 1024
+				 	, constant_uint64(128) * 1024 * 1024 * 1024
 				)
 			 	% "Faild to open database"
 			)
