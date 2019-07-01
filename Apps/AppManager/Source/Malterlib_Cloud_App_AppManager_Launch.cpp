@@ -38,6 +38,7 @@ namespace NMib::NCloud::NAppManager
 
 		_pApplication->m_bLaunching = true;
 		_pApplication->m_bStopped = false;
+		_pApplication->m_bDistributedStartupFinished = false;
 		struct CState
 		{
 			COnScopeExitShared m_pCleanup;
@@ -48,7 +49,8 @@ namespace NMib::NCloud::NAppManager
 			(
 				[_pApplication]
 				{
-					_pApplication->m_AppInterface.f_Clear();
+					if (!_pApplication->m_bDistributedStartupFinished)
+						_pApplication->m_AppInterface.f_Clear();
 					_pApplication->m_bLaunching = false;
 					if (!_pApplication->m_OnLaunchFinished.f_IsEmpty())
 					{
@@ -174,6 +176,9 @@ namespace NMib::NCloud::NAppManager
 											.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
 											> [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
 											{
+												if (_pApplication->m_bLaunching)
+													_pApplication->m_bDistributedStartupFinished = true;
+
 												pState->m_pCleanup.f_Clear();
 												if (_Result)
 												{

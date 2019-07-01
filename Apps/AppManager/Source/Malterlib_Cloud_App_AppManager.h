@@ -213,6 +213,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bLaunching = false;
 			bool m_bLaunched = false;
 			bool m_bJustUpdated = false;
+			bool m_bDistributedStartupFinished = false;
 
 			TCVector<TCPromise<void>> m_OnRegisterDistributedApp;
 			TCVector<TCPromise<void>> m_OnStartedDistributedApp;

@@ -252,29 +252,17 @@ namespace NMib::NCloud::NAppManager
 			_fOnInfo("Saving application state");
 			co_await (fp_UpdateApplicationJSON(pApplication) % "Failed to save application state" % Auditor);
 
-			TCPromise<void> ChangeBackupPromise;
 			if (ChangedSettings & EApplicationSetting_BackupEnabled)
 			{
 				if (Application.m_Settings.m_bBackupEnabled)
-				{
 					fp_ApplicationStartBackup(pApplication);
-					ChangeBackupPromise.f_SetResult();
-				}
-				else
+				else if (Application.m_BackupClient)
 				{
-					if (Application.m_BackupClient)
-					{
-						Application.m_BackupClient->f_Destroy() > ChangeBackupPromise;
-						Application.m_BackupClient.f_Clear();
-					}
-					else
-						ChangeBackupPromise.f_SetResult();
+					auto DestroyFuture = Application.m_BackupClient->f_Destroy();
+					Application.m_BackupClient.f_Clear();
+					co_await (fg_Move(DestroyFuture) % "Failed to stop backup client" % Auditor);
 				}
 			}
-			else
-				ChangeBackupPromise.f_SetResult();
-
-			co_await (ChangeBackupPromise.f_Dispatch() % "Failed to stop backup client" % Auditor);
 
 			_fOnInfo("Application settings were successfully changed");
 			Auditor.f_Info("Updated application settings (No restart required)");
