@@ -126,13 +126,13 @@ namespace NMib::NCloud::NCloudManager
 				catch (CException const &_Exception)
 				{
 					DMibLogWithCategory(CloudManager, Critical, "Error saving app managers to database: {}", _Exception);
-					co_return _Exception;
+					co_return _Exception.f_ExceptionPointer();
 				}
 			}
 		}
 		catch (CException const &_Exception)
 		{
-			co_return _Exception;
+			co_return _Exception.f_ExceptionPointer();
 		}
 
 		co_return {};

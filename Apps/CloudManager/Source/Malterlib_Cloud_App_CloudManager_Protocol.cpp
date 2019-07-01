@@ -125,7 +125,7 @@ namespace NMib::NCloud::NCloudManager
 		}
 		catch (CException const &_Exception)
 		{
-			co_return _Exception;
+			co_return _Exception.f_ExceptionPointer();
 		}
 
 		Auditor.f_Info("Enum app managers");

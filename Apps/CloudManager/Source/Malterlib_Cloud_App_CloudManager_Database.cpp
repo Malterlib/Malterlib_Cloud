@@ -33,7 +33,7 @@ namespace NMib::NCloud::NCloudManager
 		catch (CException const &_Exception)
 		{
 			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", _Exception);
-			co_return _Exception;
+			co_return _Exception.f_ExceptionPointer();
 		}
 
 		co_return {};
