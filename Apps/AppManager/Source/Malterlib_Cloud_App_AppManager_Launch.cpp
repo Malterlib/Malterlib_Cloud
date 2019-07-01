@@ -144,9 +144,9 @@ namespace NMib::NCloud::NAppManager
 								if (_pApplication->m_AppInterface)
 									RegisterFuture = fg_Explicit();
 								else
-									RegisterFuture = _pApplication->m_OnRegisterDistributedApp.f_Insert().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)");
+									RegisterFuture = _pApplication->m_OnRegisterDistributedApp.f_Insert().f_Future().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)");
 
-								RegisterFuture > [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
+								fg_Move(RegisterFuture) > [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
 									{
 										if (_pApplication->m_bDeleted)
 											return;
@@ -385,7 +385,7 @@ namespace NMib::NCloud::NAppManager
 
 		_pApplication->m_ProcessLaunchSubscription = fg_Move(*LaunchSubscription);
 
-		co_return co_await LaunchPromise;
+		co_return co_await LaunchPromise.f_MoveFuture();
 	}
 
 	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)

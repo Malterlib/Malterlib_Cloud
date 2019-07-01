@@ -423,7 +423,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto CanDestroyFuture = mp_pCanDestroy->f_Future();
 		mp_pCanDestroy.f_Clear();
-		co_await CanDestroyFuture;
+		co_await fg_Move(CanDestroyFuture);
 
 		co_await fp_CancelAllApplicationUpdatesOnStopAppManager();
 

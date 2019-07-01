@@ -385,7 +385,7 @@ public:
 					HelperActor->f_BlockDestroy();
 				}
 			;
-			CCurrentActorScope CurrentActor{HelperActor};
+			CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
 			auto CloudManager = Subscriptions.f_Subscribe<CCloudManager>();
 
@@ -484,7 +484,7 @@ public:
 							AppManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 						}
 					;
-					Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
+					Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
 				}
 			}
 
@@ -547,7 +547,7 @@ public:
 						;
 					}
 				;
-				Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
+				Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
 			}
 			DMibTestMark;
 			fg_CombineResults(SetupTrustResults.f_GetResults().f_CallSync(g_Timeout));
@@ -801,7 +801,7 @@ public:
 						}
 					;
 
-					Promise.f_Dispatch() > AppCommandResults.f_AddResult();
+					Promise.f_MoveFuture() > AppCommandResults.f_AddResult();
 					++iAppManager;
 				}
 				DMibTestMark;

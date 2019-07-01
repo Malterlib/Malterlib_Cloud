@@ -28,8 +28,7 @@ namespace NMib::NCloud
 
 		if (m_bRunningRetrySubscribe)
 		{
-			TCPromise<void> FinishedPromise = m_SubscribeChangesPromises.f_Insert();
-			FinishedPromise > Promise / [this, Promise, pActive]
+			m_SubscribeChangesPromises.f_Insert().f_Future() > Promise / [this, Promise, pActive]
 				{
 					f_RetrySubscribeChanges() > Promise;
 				}

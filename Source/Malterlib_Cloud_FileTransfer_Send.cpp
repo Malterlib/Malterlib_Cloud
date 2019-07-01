@@ -108,9 +108,9 @@ namespace NMib::NCloud
 		StateChange.m_State = CFileTransferContext::CInternal::EState_Finished;
 		StateChange.m_Finished.m_nBytes = m_TransferStats.m_nTransferredBytes;
 		StateChange.m_Finished.m_nSeconds = m_TransferStats.m_Clock.f_GetTime();
-		auto Promise = m_StateCallback.f_Call(fg_TempCopy(StateChange));
+		auto Future = m_StateCallback.f_Call(fg_TempCopy(StateChange));
 		m_bDelayedFinish = true;
-		Promise > [this, Finished = StateChange.m_Finished](TCAsyncResult<CFileTransferContext::CInternal::CStateChange::CResult> &&_Result)
+		fg_Move(Future) > [this, Finished = StateChange.m_Finished](TCAsyncResult<CFileTransferContext::CInternal::CStateChange::CResult> &&_Result)
 			{
 				if (!m_Promise.f_IsSet())
 					m_Promise.f_SetResult(Finished);

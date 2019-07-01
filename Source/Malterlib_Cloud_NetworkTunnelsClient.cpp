@@ -320,7 +320,7 @@ namespace NMib::NCloud
 					{
 						TCFuture<void> DestroyFuture = (*pTunnel)->f_Destroy();
 						Internal.m_Tunnels.f_Remove(TunnelID);
-						co_await DestroyFuture;
+						co_await fg_Move(DestroyFuture);
 					}
 
 					co_return {};

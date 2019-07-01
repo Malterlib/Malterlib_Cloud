@@ -198,7 +198,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 					HelperActor->f_BlockDestroy();
 				}
 			;
-			CCurrentActorScope CurrentActor{HelperActor};
+			CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
 			for (mint i = 0; i < 5; ++i)
 			{

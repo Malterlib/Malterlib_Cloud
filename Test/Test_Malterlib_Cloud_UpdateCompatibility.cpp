@@ -138,7 +138,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
-		CCurrentActorScope CurrentActor{HelperActor};
+		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
 		CStr TestPath = "{}-{}-{}"_f
 			<< CFile::fs_GetFile(CFile::fs_GetPath(_AppManagerPackage))
@@ -483,7 +483,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				;
 
 				auto LaunchSubscription = LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, HelperActor).f_CallSync(g_Timeout);
-				LaunchFinished.f_CallSync(g_Timeout);
+				LaunchFinished.f_MoveFuture().f_CallSync(g_Timeout);
 				fAddListen(KeyManagerExecutable, true);
 
 				KeyManagerHostID = fGetHostID(KeyManagerExecutable);

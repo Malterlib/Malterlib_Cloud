@@ -42,7 +42,7 @@ namespace NMib::NCloud::NSecretsManager
 			FileSubscriptionPromise.f_SetResult();
 
 		TCPromise<void> Promise;
-		SubscriptionPromise + FileSubscriptionPromise > [=](auto &&, auto &&)
+		SubscriptionPromise.f_MoveFuture() + FileSubscriptionPromise.f_MoveFuture() > [=](auto &&, auto &&)
 			{
 				if (DirectorySend)
 					DirectorySend->f_Destroy() > Promise;

@@ -118,7 +118,7 @@ namespace NMib::NCloud::NAppManager
 				for (auto &ChildApp : m_Children)
 					ChildApp.f_Stop(EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
 				
-				auto [ChildrenCloseResults, SaveStateResult] = co_await ((ChildrenCloses.f_GetResults() + SaveStateFuture) % "Failed to stop child application");
+				auto [ChildrenCloseResults, SaveStateResult] = co_await ((ChildrenCloses.f_GetResults() + fg_Move(SaveStateFuture)) % "Failed to stop child application");
 
 				CStr ChildCloseErrors;
 				for (auto &ChildCloseResult : ChildrenCloseResults)
@@ -152,7 +152,7 @@ namespace NMib::NCloud::NAppManager
 					else
 						PreStopFuture = fg_Explicit();
 
-					auto PreStopResult = co_await PreStopFuture.f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)").f_Wrap();
+					auto PreStopResult = co_await fg_Move(PreStopFuture).f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)").f_Wrap();
 					if (!PreStopResult)
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", PreStopResult.f_GetExceptionStr());
 
@@ -163,7 +163,7 @@ namespace NMib::NCloud::NAppManager
 						auto BackupClientDestroyFuture = pApplication->m_BackupClient->f_Destroy();
 						pApplication->m_BackupClient.f_Clear();
 
-						auto DestroyBackupResult = co_await BackupClientDestroyFuture.f_Wrap();
+						auto DestroyBackupResult = co_await fg_Move(BackupClientDestroyFuture).f_Wrap();
 
 						if (!DestroyBackupResult)
 							LogError.f_Log("Error stopping application backup", DestroyBackupResult);
@@ -203,7 +203,7 @@ namespace NMib::NCloud::NAppManager
 				else
 					BackupDestroyFuture = fg_Explicit();
 
-				auto BackupDestroyResult = co_await BackupDestroyFuture.f_Wrap();
+				auto BackupDestroyResult = co_await fg_Move(BackupDestroyFuture).f_Wrap();
 				if (!BackupDestroyResult)
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", BackupDestroyResult.f_GetExceptionStr());
 

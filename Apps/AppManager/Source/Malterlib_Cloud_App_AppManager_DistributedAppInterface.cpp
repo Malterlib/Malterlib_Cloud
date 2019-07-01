@@ -64,7 +64,7 @@ namespace NMib::NCloud::NAppManager
 
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application registration lost: {}", HostInfo.f_GetDesc());
 
-						co_await DestroyFuture;
+						co_await fg_Move(DestroyFuture);
 						co_return {};
 					}
 				;

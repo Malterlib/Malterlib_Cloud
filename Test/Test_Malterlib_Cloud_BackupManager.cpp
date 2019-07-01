@@ -284,7 +284,7 @@ public:
 				).f_CallSync(g_Timeout)
 			;
 			m_BackupClient(&CBackupManagerClient::f_StartBackup).f_CallSync(g_Timeout);
-			ReceivedManifestFinished.f_CallSync(g_Timeout);
+			ReceivedManifestFinished.f_MoveFuture().f_CallSync(g_Timeout);
 
 			m_BackupInterface = fg_Move(*pBackupInterface);
 
@@ -572,7 +572,7 @@ public:
 				HelperActor->f_BlockDestroy();
 			}
 		;
-		CCurrentActorScope CurrentActor{HelperActor};
+		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
 		// Setup trust for BackupManagers
 		
@@ -661,8 +661,7 @@ public:
 						BackupManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 					}
 				;
-				Promise.f_Dispatch() > SetupTrustResults.f_AddResult();
-
+				Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
 			}
 		}
 		

@@ -183,7 +183,7 @@ namespace NMib::NCloud::NSecretsManager
 							DatabaseFuture = fg_Explicit();
 
 						DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Can destroy file actor, waiting for file and database actor destroy");
-						FileActorFuture + DatabaseFuture > [=](auto &&, auto &&)
+						fg_Move(FileActorFuture) + fg_Move(DatabaseFuture) > [=](auto &&, auto &&)
 							{
 								DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroying protocol interface");
 								mp_ProtocolInterface.f_Destroy() > [=](auto &&)
@@ -407,7 +407,7 @@ namespace NMib::NCloud::NSecretsManager
 
 						// This is used to test shutdown. We wait here while the test checks that the file has been deleted
 						// and that the future from the secrets manager destruction has not resloved set yet
-						mp_DelayDeletes.f_Insert() > [=, pCanDestroyTracker = pCanDestroyTracker](auto &&)
+ 						mp_DelayDeletes.f_Insert().f_Future() > [=, pCanDestroyTracker = pCanDestroyTracker](auto &&)
 							{
 								fp_RemoveFile(_FileName, _Auditor) > Promise / [pCanDestroyTracker, Promise]()
 									{

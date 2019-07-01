@@ -22,10 +22,8 @@ namespace NMib::NCloud::NSecretsManager
 		if (!mp_pPendingWrite)
 			return fg_Explicit();
 
-		auto WritePromise = mp_PendingWritePromises.f_Insert();
-
 		TCPromise<void> Promise;
-		WritePromise > [Promise](TCAsyncResult<void> &&_Result)
+		mp_PendingWritePromises.f_Insert().f_Future() > [Promise](TCAsyncResult<void> &&_Result)
 			{
 				Promise.f_SetResult();
 			}

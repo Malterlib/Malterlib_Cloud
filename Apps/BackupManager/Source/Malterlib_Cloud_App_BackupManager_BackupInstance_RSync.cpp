@@ -166,7 +166,7 @@ namespace NMib::NCloud::NBackupManager
 				}
 
 				TCPromise<void> Promise;
-				DestroyFuture > [=](TCAsyncResult<void> &&_Result) mutable
+				fg_Move(DestroyFuture) > [=](TCAsyncResult<void> &&_Result) mutable
 					{
 						if (bGeneralFailure)
 						{

@@ -48,7 +48,7 @@ namespace NMib::NCloud::NAppManager
 
 					pThis->mp_UpdateNotificationSubscriptions.f_Remove(SubscriptionID);
 
-					co_await DestroyFuture;
+					co_await fg_Move(DestroyFuture);
 					co_return {};
 				}
 			)
@@ -83,7 +83,7 @@ namespace NMib::NCloud::NAppManager
 					;
 				}
 			;
-			OnUpdatePromise > OnUpdateResultsVector.f_AddResult();
+			OnUpdatePromise.f_MoveFuture() > OnUpdateResultsVector.f_AddResult();
 		}
 
 		try
@@ -235,7 +235,7 @@ namespace NMib::NCloud::NAppManager
 		else
 			UpdateJSONFuture = fp_UpdateApplicationJSON(_pState->m_pApplication);
 
-		auto UpdateJSONResult = co_await UpdateJSONFuture;
+		auto UpdateJSONResult = co_await fg_Move(UpdateJSONFuture);
 
 		co_return fg_Move(UpdateJSONResult);
 	}

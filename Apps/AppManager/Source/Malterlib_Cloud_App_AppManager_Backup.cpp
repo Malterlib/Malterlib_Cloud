@@ -44,9 +44,9 @@ namespace NMib::NCloud::NAppManager
 						co_return {};
 
 					if (!_pApplication->m_AppInterface || _pApplication->m_LaunchState != "Launched")
-						co_await _pApplication->m_OnStartedDistributedApp.f_Insert();
+						co_await _pApplication->m_OnStartedDistributedApp.f_Insert().f_Future();
 
-					if (_pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
+					if (!_pApplication->m_AppInterface || _pApplication->m_AppInterface->f_InterfaceVersion() < 0x103)
 						co_return {};
 
 					co_await _pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_StartBackup)
