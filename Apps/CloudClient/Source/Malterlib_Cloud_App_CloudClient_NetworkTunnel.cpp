@@ -33,6 +33,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_= "The hosts to list tunnels for. If empty all hosts are included.\n"
 							, "Type"_= {""}
 						}
+						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 					, "Parameters"_=
 					{
@@ -65,6 +66,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_= "The hosts to open tunnels for. If empty all hosts are included.\n"
 							, "Type"_= {""}
 						}
+						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 					, "Parameters"_=
 					{
@@ -131,7 +133,6 @@ namespace NMib::NCloud::NCloudClient
 		auto TunnelsPerHost = co_await self(&CCloudClientAppActor::fp_NetworkTunnel_Filter, _Params);
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
-
 		TableRenderer.f_AddHeadings("HostID", "Tunnel Name", "Meta Data");
 
 		for (auto &Tunnels : TunnelsPerHost)
@@ -144,7 +145,7 @@ namespace NMib::NCloud::NCloudClient
 			}
 		}
 
-		TableRenderer.f_Output();
+		TableRenderer.f_Output(_Params);
 
 		co_return 0;
 	}
@@ -225,7 +226,6 @@ namespace NMib::NCloud::NCloudClient
 		auto OpenedTunnels = co_await OpenedTunnelResults.f_GetResults() | g_Unwrap;
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
-
 		TableRenderer.f_AddHeadings("HostID", "Tunnel Name", "URL");
 
 		for (auto &Tunnel : OpenedTunnels)
@@ -246,7 +246,7 @@ namespace NMib::NCloud::NCloudClient
 			TableRenderer.f_AddRow(TunnelKey.m_HostID, TunnelKey.m_TunnelName, TunnelURL);
 		}
 
-		TableRenderer.f_Output();
+		TableRenderer.f_Output(_Params);
 
 		co_await mp_AppStopPromises.f_Insert().f_Future();
 

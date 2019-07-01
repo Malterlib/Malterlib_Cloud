@@ -41,6 +41,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_= false
 							, "Description"_= "Don't output information on std out, just return the status"
 						}
+						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
@@ -217,7 +218,7 @@ namespace NMib::NCloud::NCloudClient
 		}
 
 		if (!bQuiet)
-			TableRenderer.f_Output();
+			TableRenderer.f_Output(_Params);
 
 		co_return Return;
 	}

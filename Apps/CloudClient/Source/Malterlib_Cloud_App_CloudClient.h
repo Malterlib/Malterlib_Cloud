@@ -60,11 +60,12 @@ namespace NMib::NCloud::NCloudClient
 		(
 		 	CEJSON const &_Params
 		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-			, TCFunction
+			, TCFunctionMovable
 			<
-				TCFuture<tf_CType>(TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_pSemanticID, TCSet<CStrSecure> const &_Tags)
-			> &&_fGetResult
-			, TCFunction<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, NStr::CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
+				TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_pSemanticID, TCSet<CStrSecure> const &_Tags)
+			>
+		 	&&_fGetResult
+			, TCFunctionMovable<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, NStr::CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 		);
 
 		template<typename tf_CType>
@@ -72,8 +73,8 @@ namespace NMib::NCloud::NCloudClient
 			(
 				CEJSON const &_Params
 				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-			 	, TCFunction<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
-				, TCFunction<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, NStr::CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
+			 	, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
+				, TCFunctionMovable<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, NStr::CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 			)
 		;
 
