@@ -31,16 +31,16 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerApp::fp_StopApp()
 	{	
-		if (mp_pServer)
-		{
-			DMibLogWithCategory(Mib/Cloud/CloudManager/Daemon, Info, "Shutting down");
+		if (!mp_pServer)
+			co_return {};
 
-			auto DestroyResult = co_await mp_pServer->f_Destroy().f_Wrap();
-			if (!DestroyResult)
-				DMibLogWithCategory(Mib/Cloud/CloudManager/Daemon, Error, "Failed to shut down server: {}", DestroyResult.f_GetExceptionStr());
+		DMibLogWithCategory(Mib/Cloud/CloudManager/Daemon, Info, "Shutting down");
 
-			mp_pServer = nullptr;
-		}
+		auto DestroyResult = co_await mp_pServer->f_Destroy().f_Wrap();
+		if (!DestroyResult)
+			DMibLogWithCategory(Mib/Cloud/CloudManager/Daemon, Error, "Failed to shut down server: {}", DestroyResult.f_GetExceptionStr());
+
+		mp_pServer = nullptr;
 
 		co_return {};
 	}
