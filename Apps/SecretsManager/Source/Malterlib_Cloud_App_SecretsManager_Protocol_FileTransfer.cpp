@@ -496,12 +496,12 @@ namespace NMib::NCloud::NSecretsManager
 									This.mp_Uploads.f_Remove(NewFileName);
 								}
 							)
-							/ [CheckResultPromise, AllowDestroy = g_AllowWrongThreadDestroy]() -> TCFuture<void>
+							/ [CheckResultPromise = fg_Move(CheckResultPromise), AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
 							{
 								if (!CheckResultPromise.f_IsSet())
 									CheckResultPromise.f_SetResult();
 
-								return CheckResultPromise;
+								return CheckResultPromise.f_MoveFuture();
 							}
 						)
 					;

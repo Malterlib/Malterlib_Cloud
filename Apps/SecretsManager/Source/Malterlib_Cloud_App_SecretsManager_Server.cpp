@@ -26,16 +26,16 @@ namespace NMib::NCloud::NSecretsManager
 	TCFuture<CEJSON> CSecretsManagerDaemonActor::CServer::f_Test_Command(CStr const &_Command, CEJSON const &_Params)
 	{
 		if (_Command == "UploadInitialized")
-			return mp_UploadInitialized[_Params.f_String()];
+			return mp_UploadInitialized[_Params.f_String()].f_Future();
 
 		if (_Command == "UploadCompleted")
-			return mp_UploadCompleted[_Params.f_String()];
+			return mp_UploadCompleted[_Params.f_String()].f_Future();
 
 		if (_Command == "DownloadInitialized")
-			return mp_DownloadInitialized[_Params.f_String()];
+			return mp_DownloadInitialized[_Params.f_String()].f_Future();
 
 		if (_Command == "DownloadCompleted")
-			return mp_DownloadCompleted[_Params.f_String()];
+			return mp_DownloadCompleted[_Params.f_String()].f_Future();
 
 		if (_Command == "PreviousCommandCompleted")
 			return fg_Explicit();
@@ -55,7 +55,7 @@ namespace NMib::NCloud::NSecretsManager
 		}
 
 		if (_Command == "DestroyWaitingForCanDestroy")
-			return *(mp_DestroyWaitingForCanDestroy = TCPromise<CEJSON>{});
+			return (mp_DestroyWaitingForCanDestroy = TCPromise<CEJSON>{})->f_Future();
 
 		if (_Command == "SyncFileOperations")
 			return mp_FileActor(&CSecretsManagerDaemonActor::CServer::CFileActor::f_SyncFileOperations);

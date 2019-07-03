@@ -250,6 +250,6 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		
-		return pState->m_Promise;
+		return pState->m_Promise.f_Future();
 	}
 }

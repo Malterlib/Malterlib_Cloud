@@ -239,6 +239,6 @@ namespace NMib::NCloud
 		if (Internal.m_bDoneCalled)
 			return DMibErrorInstance("The file result has already been gotten");
 		Internal.m_bDoneCalled = true;
-		return Internal.m_DonePromise;
+		return Internal.m_DonePromise.f_Future();
 	}
 }

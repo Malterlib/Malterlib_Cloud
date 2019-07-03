@@ -19,7 +19,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		TCSharedPointer<CCanDestroyTracker> pDestroyTracker = fg_Construct();
 		mp_FileActor->f_Destroy() > pDestroyTracker->f_Track();
 
-		return pDestroyTracker->m_Promise;
+		return pDestroyTracker->m_Promise.f_Future();
 	}
 
 	namespace
