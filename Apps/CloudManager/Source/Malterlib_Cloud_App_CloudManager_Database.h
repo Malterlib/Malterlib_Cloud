@@ -8,7 +8,7 @@
 
 namespace NMib::NCloud::NCloudManagerDatabase
 {
-	static constexpr uint32 gc_Version = 0x101;
+	static constexpr uint32 gc_Version = ECloudManagerProtocolVersion;
 
 	struct CAppManagerKey
 	{

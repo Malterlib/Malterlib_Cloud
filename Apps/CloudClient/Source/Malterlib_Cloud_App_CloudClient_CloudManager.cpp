@@ -41,6 +41,12 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_= false
 							, "Description"_= "Don't output information on std out, just return the status"
 						}
+						, "IncludeCloudManager?"_=
+						{
+							"Names"_= {"--include-cloud-manager", "-c"}
+							, "Default"_= false
+							, "Description"_= "Include the cloud manager column"
+						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
@@ -139,6 +145,7 @@ namespace NMib::NCloud::NCloudClient
 		CStr Host = _Params["Host"].f_String();
 
 		bool bQuiet = _Params["Quiet"].f_Boolean();
+		bool bIncludeCloudManager = _Params["IncludeCloudManager"].f_Boolean();
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
@@ -161,12 +168,27 @@ namespace NMib::NCloud::NCloudClient
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 
 		TableRenderer.f_AddDescription("App Managers");
-		TableRenderer.f_AddHeadings("Cloud Manager", "ID", "Hostname", "Location", "Last Seen", "Status");
+		TableRenderer.f_AddHeadings("Cloud Manager", "Environment", "Hostname", "Location", "ID", "Last Seen", "Status");
 		TableRenderer.f_SetMaxColumnWidth(5, 50);
 
 		uint32 Return = 0;
 
 		auto Now = CTime::fs_NowUTC();
+
+		struct CRow
+		{
+			auto f_SortTuple() const
+			{
+				return fg_TupleReferences(m_AppManagerInfo.m_Environment, m_AppManagerInfo.m_HostName, m_AppManagerInfo.m_ProgramDirectory);
+			}
+
+			CHostInfo m_HostInfo;
+			CStr m_Error;
+			CStr m_AppManagerID;
+			CCloudManager::CAppManagerDynamicInfo m_AppManagerInfo;
+		};
+
+		TCVector<CRow> Rows;
 
 		for (auto &AppManagersForHost : AppManagers)
 		{
@@ -174,48 +196,87 @@ namespace NMib::NCloud::NCloudClient
 
 			if (!AppManagersForHost)
 			{
+				Rows.f_Insert({HostInfo, AppManagersForHost.f_GetExceptionStr()});
 				Return = 1;
-				CStr ErrorString = "{}Error:{} {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default() << AppManagersForHost.f_GetExceptionStr();
-
-				TableRenderer.f_AddRow(HostInfo.f_GetDesc(), "", "", "", "", ErrorString);
 				continue;
 			}
 
 			for (auto &AppManagerInfo : *AppManagersForHost)
 			{
 				auto &AppManagerID = (*AppManagersForHost).fs_GetKey(AppManagerInfo);
-				CStr Status;
-				if (AppManagerInfo.m_bActive)
-					Status = "{}OK{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
-				else
-				{
-					if (!AppManagerInfo.m_LastConnectionError.f_IsEmpty())
-					{
-						Status = "{}{tc6}{} {}"_f
-							<< AnsiEncoding.f_StatusError()
-							<< AppManagerInfo.m_LastConnectionErrorTime
-							<< AnsiEncoding.f_Default()
-							<< AppManagerInfo.m_LastConnectionError
-						;
-					}
-					else
-						Status = "{}Missing{}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();
-
-					Return = 1;
-				}
-
-				CStr HostName = "{}{}{}"_f << AnsiEncoding.f_Foreground256(75) << AppManagerInfo.m_HostName << AnsiEncoding.f_Default();
-
-				CTimeSpan LastSeenTimespan(Now - AppManagerInfo.m_LastSeen);
-
-				CStr LastSeen = fg_FormatTimespan(LastSeenTimespan, AnsiEncoding);
-
-				if (CTimeSpanConvert(LastSeenTimespan).f_GetSeconds() >= 10)
-					LastSeen += "\n{}"_f << AppManagerInfo.m_LastSeen;
-
-				TableRenderer.f_AddRow(HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags), AppManagerID, HostName, AppManagerInfo.m_ProgramDirectory, LastSeen, Status);
+				Rows.f_Insert({HostInfo, "", AppManagerID, AppManagerInfo});
 			}
 		}
+
+		Rows.f_Sort
+			(
+				[](CRow const &_Left, CRow const &_Right)
+				{
+					return _Left.f_SortTuple() < _Right.f_SortTuple();
+				}
+			)
+		;
+
+		for (auto &Row : Rows)
+		{
+			auto &HostInfo = Row.m_HostInfo;
+
+			if (Row.m_Error)
+			{
+				Return = 1;
+				CStr ErrorString = "{}Error:{} {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default() << Row.m_Error;
+
+				TableRenderer.f_AddRow(HostInfo.f_GetDesc(), "", "", "", "", "", ErrorString);
+				continue;
+			}
+
+			auto &AppManagerID = Row.m_AppManagerID;
+			auto &AppManagerInfo = Row.m_AppManagerInfo;
+
+			CStr Status;
+			if (AppManagerInfo.m_bActive)
+				Status = "{}OK{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
+			else
+			{
+				if (!AppManagerInfo.m_LastConnectionError.f_IsEmpty())
+				{
+					Status = "{}{tc6}{} {}"_f
+						<< AnsiEncoding.f_StatusError()
+						<< AppManagerInfo.m_LastConnectionErrorTime
+						<< AnsiEncoding.f_Default()
+						<< AppManagerInfo.m_LastConnectionError
+					;
+				}
+				else
+					Status = "{}Missing{}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();
+
+				Return = 1;
+			}
+
+			CStr HostName = "{}{}{}"_f << AnsiEncoding.f_Foreground256(75) << AppManagerInfo.m_HostName << AnsiEncoding.f_Default();
+
+			CTimeSpan LastSeenTimespan(Now - AppManagerInfo.m_LastSeen);
+
+			CStr LastSeen = fg_FormatTimespan(LastSeenTimespan, AnsiEncoding);
+
+			if (CTimeSpanConvert(LastSeenTimespan).f_GetSeconds() >= 10)
+				LastSeen += "\n{}"_f << AppManagerInfo.m_LastSeen;
+
+			TableRenderer.f_AddRow
+				(
+					HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+					, AppManagerInfo.m_Environment
+					, HostName
+					, AppManagerInfo.m_ProgramDirectory
+					, AppManagerID
+					, LastSeen
+					, Status
+				)
+			;
+		}
+
+		if (!bIncludeCloudManager)
+			TableRenderer.f_RemoveColumn(0);
 
 		if (!bQuiet)
 			TableRenderer.f_Output(_Params);

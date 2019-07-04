@@ -12,6 +12,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<void> CAppManagerActor::fp_CloudManagerAdded(TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_Info)
 	{
 		CCloudManager::CAppManagerInfo Info;
+		Info.m_Environment = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("Environment", "").f_String();
 		Info.m_HostName = NProcess::NPlatform::fg_Process_GetHostName();
 		Info.m_ProgramDirectory = mp_Settings.m_RootDirectory;
 

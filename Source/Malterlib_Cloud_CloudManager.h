@@ -13,7 +13,7 @@ namespace NMib::NCloud
 	enum
 	{
 		ECloudManagerMinProtocolVersion = 0x101
-		, ECloudManagerProtocolVersion = 0x101
+		, ECloudManagerProtocolVersion = 0x102
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -40,6 +40,7 @@ namespace NMib::NCloud
 			auto f_Tuple() const;
 			bool operator == (CAppManagerInfo const &_Right) const;
 
+			NStr::CStr m_Environment;
 			NStr::CStr m_HostName;
 			NStr::CStr m_ProgramDirectory;
 		};
