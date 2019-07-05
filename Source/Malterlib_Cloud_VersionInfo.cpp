@@ -8,6 +8,8 @@
 
 namespace NMib::NCloud
 {
+	NStorage::TCAggregate<CCloudVersionInfo> g_CloudVersion = {DAggregateInit};
+
 	bool CCloudVersion::operator == (CCloudVersion const &_Right) const
 	{
 		return NStorage::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 

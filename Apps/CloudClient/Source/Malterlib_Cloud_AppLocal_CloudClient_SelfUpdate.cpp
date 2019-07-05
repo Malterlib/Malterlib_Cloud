@@ -7,7 +7,6 @@
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Process/ProcessLaunch>
-#include <CloudVersionInfo.h>
 
 #ifdef DPlatformFamily_Windows
 #include <Mib/Core/PlatformSpecific/WindowsFilePath>
@@ -59,7 +58,6 @@ namespace NMib::NCloud::NCloudClient
 							Promise.f_SetException(_Results);
 							return;
 						}
-						auto CurrentVersionInfo = fg_GetCloudVersionInfo();
 						NTime::CTime BestVersionTime;
 						CVersionManager::CNewVersionNotification BestVersion;
 						TCDistributedActor<CVersionManager> BestActor;
@@ -86,8 +84,8 @@ namespace NMib::NCloud::NCloudClient
 
 						if
 							(
-								BestVersion.m_VersionIDAndPlatform.m_VersionID.m_Branch == CurrentVersionInfo.m_Version.m_Branch
-								&& BestVersion.m_VersionIDAndPlatform.m_VersionID <= CurrentVersionInfo.m_Version
+								BestVersion.m_VersionIDAndPlatform.m_VersionID.m_Branch == (*g_CloudVersion).m_Version.m_Branch
+								&& BestVersion.m_VersionIDAndPlatform.m_VersionID <= (*g_CloudVersion).m_Version
 							)
 						{
 							Promise.f_SetException(DMibErrorInstance("No new version was found"));

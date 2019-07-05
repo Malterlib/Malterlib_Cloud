@@ -460,21 +460,25 @@ Property
 	MalterlibCloudVersionInfo "@(MalterlibCloudVersionInfo->Replace('\"Dummy\": null\\\n\t\t, ', ''))"
 	MalterlibCloudVersionInfo "@(MalterlibCloudVersionInfo->Replace('\t\t\"Dummy\": null\\\n', ''))"
 
-	MalterlibCloudVersionInfoCppFileName "@(GeneratedDirectory)CloudVersionInfo.h"
+	MalterlibCloudVersionInfoCppFileName "@(GeneratedDirectory)CloudVersionInfo.cpp"
 
 	MalterlibCloudVersionInfoCpp	"#include <Mib/Cloud/VersionInfo>\n"\
 									"namespace\n"\
 									"{\n"\
-									"	NMib::NCloud::CCloudVersionInfo fg_GetCloudVersionInfo()\n"\
+									"	struct CRegisterCloudVersion\n"\
 									"	{\n"\
-									"		return NMib::NCloud::fg_ParseVersionInfo\n"\
-									"			(\n"\
+									"		CRegisterCloudVersion()\n"\
+									"		{\n"\
+									"			(*NMib::NCloud::g_CloudVersion) = NMib::NCloud::fg_ParseVersionInfo\n"\
+									"				(\n"\
 									"R\"-----(\n"\
 									"@(MalterlibCloudVersionInfo)"\
 									")-----\"\n"\
-									"			)\n"\
-									"		;\n"\
-									"	}\n"\
+									"				)\n"\
+									"			;\n"\
+									"		}\n"\
+									"	};\n"\
+									"	assure_used CRegisterCloudVersion g_VersioInfo;\n"\
 									"}\n"
 }
 
