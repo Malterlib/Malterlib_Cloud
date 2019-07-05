@@ -7,13 +7,14 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/ActorInterface>
 #include <Mib/Cloud/AppManager>
+#include <Mib/Cloud/VersionInfo>
 
 namespace NMib::NCloud
 {
 	enum
 	{
 		ECloudManagerMinProtocolVersion = 0x101
-		, ECloudManagerProtocolVersion = 0x102
+		, ECloudManagerProtocolVersion = 0x103
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -43,6 +44,9 @@ namespace NMib::NCloud
 			NStr::CStr m_Environment;
 			NStr::CStr m_HostName;
 			NStr::CStr m_ProgramDirectory;
+			CCloudVersion m_Version;
+			NStr::CStr m_Platform;
+			NStr::CStr m_PlatformFamily;
 		};
 
 		struct CAppManagerDynamicInfo : public CAppManagerInfo

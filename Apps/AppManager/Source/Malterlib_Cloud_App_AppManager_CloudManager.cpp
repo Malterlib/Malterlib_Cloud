@@ -14,6 +14,9 @@ namespace NMib::NCloud::NAppManager
 		CCloudManager::CAppManagerInfo Info;
 		Info.m_Environment = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("Environment", "").f_String();
 		Info.m_HostName = NProcess::NPlatform::fg_Process_GetHostName();
+		Info.m_Platform = DMibStringize(DPlatform);
+		Info.m_PlatformFamily = DMibStringize(DPlatformFamily);
+  		Info.m_Version = (*g_CloudVersion).m_Version;
 		Info.m_ProgramDirectory = mp_Settings.m_RootDirectory;
 
 		auto Subscription = co_await _CloudManager.f_CallActor(&CCloudManager::f_RegisterAppManager)(mp_AppManagerInterface.m_Actor->f_ShareInterface<CAppManagerInterface>(), fg_Move(Info));

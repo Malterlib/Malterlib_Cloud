@@ -168,7 +168,7 @@ namespace NMib::NCloud::NCloudClient
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 
 		TableRenderer.f_AddDescription("App Managers");
-		TableRenderer.f_AddHeadings("Cloud Manager", "Environment", "Hostname", "Location", "ID", "Last Seen", "Status");
+		TableRenderer.f_AddHeadings("Cloud Manager", "Environment", "Hostname", "Location", "Platform", "Version", "ID", "Last Seen", "Status");
 		TableRenderer.f_SetMaxColumnWidth(5, 50);
 
 		uint32 Return = 0;
@@ -268,6 +268,8 @@ namespace NMib::NCloud::NCloudClient
 					, AppManagerInfo.m_Environment
 					, HostName
 					, AppManagerInfo.m_ProgramDirectory
+				 	, AppManagerInfo.m_PlatformFamily
+				 	, AppManagerInfo.m_Version
 					, AppManagerID
 					, LastSeen
 					, Status
