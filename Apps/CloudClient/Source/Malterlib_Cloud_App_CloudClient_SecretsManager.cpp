@@ -530,6 +530,8 @@ namespace NMib::NCloud::NCloudClient
 			, TCFunctionMovable<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 		)
 	{
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+
 		bool bBinaryAsBase64 = true;
 		if (auto pValue = _Params.f_GetMember("BinaryAsBase64"))
 			bBinaryAsBase64 = pValue->f_Boolean();
@@ -580,7 +582,13 @@ namespace NMib::NCloud::NCloudClient
 		{
 			if (!Result)
 			{
-				*_pCommandLine %= "Failed getting secrets for this host: {}\n"_f << Result.f_GetExceptionStr();
+				auto &HostInfo = Results.fs_GetKey(Result);
+				*_pCommandLine %= "{}Failed getting secrets for host{} '{}': {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+					<< Result.f_GetExceptionStr()
+				;
 				continue;
 			}
 
@@ -668,6 +676,8 @@ namespace NMib::NCloud::NCloudClient
 			, TCFunctionMovable<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
 		)
 	{
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
 		CStr Error;
@@ -705,7 +715,13 @@ namespace NMib::NCloud::NCloudClient
 		{
 			if (!Result)
 			{
-				*_pCommandLine %= "Failed getting secrets for this host: {}\n"_f << Result.f_GetExceptionStr();
+				auto &HostInfo = Results.fs_GetKey(Result);
+				*_pCommandLine %= "{}Failed getting secrets for host{} '{}': {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+					<< Result.f_GetExceptionStr()
+				;
 				continue;
 			}
 

@@ -25,6 +25,14 @@ namespace NMib::NCloud::NCloudClient
 				, "Description"_= "Limit query to only specified host ID."
 			}
 		;
+		auto IncludeHost = "IncludeHost?"_=
+			{
+				"Names"_= {"--include-host"}
+				, "Default"_= false
+				, "Description"_= "Include version manager host in output.\n"
+			}
+		;
+
 		_Section.f_RegisterCommand
 			(
 				{
@@ -33,6 +41,7 @@ namespace NMib::NCloud::NCloudClient
 					, "Options"_=
 					{
 						VersionManagerHost
+						, IncludeHost
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
@@ -51,6 +60,7 @@ namespace NMib::NCloud::NCloudClient
 					, "Options"_=
 					{
 						VersionManagerHost
+						, IncludeHost
 						, "Verbose?"_=
 						{
 							"Names"_= {"--verbose", "-v"}
@@ -356,7 +366,8 @@ namespace NMib::NCloud::NCloudClient
 	{
 		TCPromise<uint32> Promise;
 		CStr Host = _Params["VersionManagerHost"].f_String();
-		
+		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
+
 		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
 		TCActorResultMap<CHostInfo, CVersionManager::CListApplications::CResult> Applications;
@@ -372,6 +383,7 @@ namespace NMib::NCloud::NCloudClient
 			;
 		}
 
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("Host", "Application");
 
@@ -382,12 +394,20 @@ namespace NMib::NCloud::NCloudClient
 			CStr HostDescription = HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags);
 			if (!Result)
 			{
-				TableRenderer.f_AddRow(HostDescription, "Failed getting applicatinos for this host: {}\n"_f << Result.f_GetExceptionStr());
+				*_pCommandLine %= "{}Failed getting applications for host{} '{}': {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+					<< Result.f_GetExceptionStr()
+				;
 				continue;
 			}
 			for (auto &Application : Result->m_Applications)
 				TableRenderer.f_AddRow(HostDescription, Application);
 		}
+
+		if (!bIncludeHost)
+			TableRenderer.f_RemoveColumn(0);
 
 		TableRenderer.f_Output(_Params);
 
@@ -401,6 +421,7 @@ namespace NMib::NCloud::NCloudClient
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		bool bVerbose = _Params["Verbose"].f_Boolean();
+		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 		
 		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 		TCActorResultMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
@@ -419,18 +440,65 @@ namespace NMib::NCloud::NCloudClient
 
 		auto Results = co_await Versions.f_GetResults();
 
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
-		TableRenderer.f_AddHeadings("Host", "Application", "Version", "Platform", "Config", "Time", "Tags", "Retry", "Size", "Files", "Extra");
+		TableRenderer.f_AddHeadings("Host", "Application", "Version", "Platforms", "Config", "Time", "Tags", "Retry", "Size", "Files", "Extra");
+
+		struct CRow
+		{
+			bool operator < (CRow const &_Right) const
+			{
+				return m_VersionInformation.m_Time < _Right.m_VersionInformation.m_Time;
+			}
+
+			CHostInfo m_HostInfo;
+			CStr m_Application;
+			CVersionManager::CVersionIDAndPlatform m_VersionID;
+			CVersionManager::CVersionInformation m_VersionInformation;
+		};
+
+		struct CUniqueVersionKey
+		{
+			auto f_Tuple() const
+			{
+				return fg_TupleReferences(m_Application, m_VersionID);
+			}
+
+			bool operator < (CUniqueVersionKey const &_Right) const
+			{
+				return f_Tuple() < _Right.f_Tuple();
+			}
+
+			CStr m_Application;
+			CVersionManager::CVersionID m_VersionID;
+		};
+
+		struct CVersionPlatforms
+		{
+			bool operator < (CVersionPlatforms const &_Right) const
+			{
+				return m_EndTime < _Right.m_EndTime;
+			}
+
+			TCVector<CRow> m_Rows;
+			CTime m_StartTime = CTime::fs_EndOfTime();
+			CTime m_EndTime = CTime::fs_StartOfTime();
+		};
+
+		TCMap<CUniqueVersionKey, CVersionPlatforms> VersionMap;
 
 		for (auto &Result : Results)
 		{
 			auto &HostInfo = Results.fs_GetKey(Result);
-			auto HostDescription = HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags);
 			if (!Result)
 			{
-				CStr Error = "Failed getting versions for this host: {}\n"_f << Result.f_GetExceptionStr();
-				TableRenderer.f_AddRow(HostDescription, Error, "", "", "", "", "", "", "");
+				*_pCommandLine %= "{}Failed getting versions for host{} '{}': {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+					<< Result.f_GetExceptionStr()
+				;
 				continue;
 			}
 			for (auto &Versions : Result->m_Versions)
@@ -439,33 +507,61 @@ namespace NMib::NCloud::NCloudClient
 				for (auto &Version : Versions)
 				{
 					auto &VersionID = Versions.fs_GetKey(Version);
-					CStr ExtraInfo;
-					if (bVerbose)
-						ExtraInfo = Version.m_ExtraInfo.f_ToString("    ");
-
-					TableRenderer.f_AddRow
-						(
-						 	HostDescription
-						 	, Application
-							, VersionID.m_VersionID
-						 	, VersionID.m_Platform
-						 	, Version.m_Configuration
-							, "{tc6}"_f << Version.m_Time.f_ToLocal()
-							, "{vs,vb,a-}"_f << Version.m_Tags
-						 	, Version.m_RetrySequence
-						 	, "{ns }\n"_f << Version.m_nBytes
-						 	, Version.m_nFiles
-						 	, ExtraInfo
-						)
-					;
+					CUniqueVersionKey Key{Application, VersionID.m_VersionID};
+					auto &VersionPlatforms = VersionMap[Key];
+					VersionPlatforms.m_Rows.f_Insert(CRow{HostInfo, Application, VersionID, Version});
 				}
 			}
+		}
+
+		TCVector<CVersionPlatforms> VersionPlatforms;
+
+		for (auto &Version : VersionMap)
+		{
+			Version.m_Rows.f_Sort();
+			VersionPlatforms.f_Insert(Version);
+		}
+
+		VersionPlatforms.f_Sort();
+
+		for (auto &Version : VersionPlatforms)
+		{
+			for (auto &Row : Version.m_Rows)
+			{
+				auto &HostInfo = Row.m_HostInfo;
+				auto &Application = Row.m_Application;
+				auto &VersionID = Row.m_VersionID;
+				auto &Version = Row.m_VersionInformation;
+				auto HostDescription = HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags);
+
+				CStr ExtraInfo;
+				if (bVerbose)
+					ExtraInfo = Version.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ");
+
+				TableRenderer.f_AddRow
+					(
+						HostDescription
+						, Application
+						, VersionID.m_VersionID
+						, VersionID.m_Platform
+						, Version.m_Configuration
+						, "{tc6}"_f << Version.m_Time.f_ToLocal()
+						, "{vs,vb,a-}"_f << Version.m_Tags
+						, Version.m_RetrySequence
+						, "{ns }"_f << Version.m_nBytes
+						, Version.m_nFiles
+						, ExtraInfo
+					)
+				;
+			}
+			TableRenderer.f_ForceRowSeparator();
 		}
 
 		if (!bVerbose)
 			TableRenderer.f_RemoveColumn(10);
 
-		TableRenderer.f_SortColumn(5);
+		if (!bIncludeHost)
+			TableRenderer.f_RemoveColumn(0);
 
 		TableRenderer.f_Output(_Params);
 

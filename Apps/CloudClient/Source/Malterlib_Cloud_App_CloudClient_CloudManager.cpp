@@ -169,6 +169,7 @@ namespace NMib::NCloud::NCloudClient
 
 		TableRenderer.f_AddDescription("App Managers");
 		TableRenderer.f_AddHeadings("Cloud Manager", "Environment", "Hostname", "Location", "Platform", "Version", "ID", "Last Seen", "Status");
+		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
 		TableRenderer.f_SetMaxColumnWidth(5, 50);
 
 		uint32 Return = 0;
@@ -183,7 +184,6 @@ namespace NMib::NCloud::NCloudClient
 			}
 
 			CHostInfo m_HostInfo;
-			CStr m_Error;
 			CStr m_AppManagerID;
 			CCloudManager::CAppManagerDynamicInfo m_AppManagerInfo;
 		};
@@ -196,7 +196,12 @@ namespace NMib::NCloud::NCloudClient
 
 			if (!AppManagersForHost)
 			{
-				Rows.f_Insert({HostInfo, AppManagersForHost.f_GetExceptionStr()});
+				*_pCommandLine %= "{}Failed getting app managers for host{} '{}': {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+					<< AppManagersForHost.f_GetExceptionStr()
+				;
 				Return = 1;
 				continue;
 			}
@@ -204,7 +209,7 @@ namespace NMib::NCloud::NCloudClient
 			for (auto &AppManagerInfo : *AppManagersForHost)
 			{
 				auto &AppManagerID = (*AppManagersForHost).fs_GetKey(AppManagerInfo);
-				Rows.f_Insert({HostInfo, "", AppManagerID, AppManagerInfo});
+				Rows.f_Insert({HostInfo, AppManagerID, AppManagerInfo});
 			}
 		}
 
@@ -220,16 +225,6 @@ namespace NMib::NCloud::NCloudClient
 		for (auto &Row : Rows)
 		{
 			auto &HostInfo = Row.m_HostInfo;
-
-			if (Row.m_Error)
-			{
-				Return = 1;
-				CStr ErrorString = "{}Error:{} {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default() << Row.m_Error;
-
-				TableRenderer.f_AddRow(HostInfo.f_GetDesc(), "", "", "", "", "", ErrorString);
-				continue;
-			}
-
 			auto &AppManagerID = Row.m_AppManagerID;
 			auto &AppManagerInfo = Row.m_AppManagerInfo;
 

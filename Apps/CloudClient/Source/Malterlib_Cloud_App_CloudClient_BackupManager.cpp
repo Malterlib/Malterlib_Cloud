@@ -23,6 +23,13 @@ namespace NMib::NCloud::NCloudClient
 				, "Description"_= "Limit backup query to only specified host ID."
 			}
 		;
+		auto IncludeHost = "IncludeHost?"_=
+			{
+				"Names"_= {"--include-host"}
+				, "Default"_= false
+				, "Description"_= "Include version manager host in output.\n"
+			}
+		;
 		_Section.f_RegisterCommand
 			(
 				{
@@ -31,6 +38,7 @@ namespace NMib::NCloud::NCloudClient
 					, "Options"_=
 					{
 						OptionalBackupHost
+						, IncludeHost
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
@@ -49,6 +57,7 @@ namespace NMib::NCloud::NCloudClient
 					, "Options"_=
 					{
 						OptionalBackupHost
+						, IncludeHost
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 					, "Parameters"_= 
@@ -166,7 +175,8 @@ namespace NMib::NCloud::NCloudClient
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
-		
+		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
+
 		co_await self(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers");
 
 		TCActorResultMap<CHostInfo, TCVector<CStr>> BackupSources;
@@ -185,6 +195,7 @@ namespace NMib::NCloud::NCloudClient
 
 		TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> Results = co_await BackupSources.f_GetResults();
 
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("Host", "Source");
 
@@ -193,12 +204,20 @@ namespace NMib::NCloud::NCloudClient
 			auto &HostInfo = Results.fs_GetKey(Result);
 			if (!Result)
 			{
-				TableRenderer.f_AddRow(HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags), "Failed getting backup sources for this host: {}\n"_f << Result.f_GetExceptionStr());
+				*_pCommandLine %= "{}Failed getting backup sources for host{} '{}': {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+					<< Result.f_GetExceptionStr()
+				;
 				continue;
 			}
 			for (auto &Source : *Result)
 				TableRenderer.f_AddRow(HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags), Source);
 		}
+
+		if (!bIncludeHost)
+			TableRenderer.f_RemoveColumn(0);
 
 		TableRenderer.f_Output(_Params);
 
@@ -209,7 +228,8 @@ namespace NMib::NCloud::NCloudClient
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
-		
+		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
+
 		co_await self(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers");
 		TCActorResultMap<CHostInfo, TCMap<CStr, CBackupManager::CBackupInfo>> Backups;
 
@@ -226,6 +246,7 @@ namespace NMib::NCloud::NCloudClient
 
 		TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CBackupManager::CBackupInfo>>> Results = co_await Backups.f_GetResults();
 
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("Host", "Source", "Earliest", "Latest", "Snapshots");
 
@@ -234,7 +255,12 @@ namespace NMib::NCloud::NCloudClient
 			auto &HostInfo = Results.fs_GetKey(Result);
 			if (!Result)
 			{
-				TableRenderer.f_AddRow(HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags), "Failed getting backups for this host: {}\n"_f << Result.f_GetExceptionStr(), "", "", "");
+				*_pCommandLine %= "{}Failed getting backups for host{} '{}': {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+					<< Result.f_GetExceptionStr()
+				;
 				continue;
 			}
 			for (auto &BackupInfo : *Result)
@@ -255,6 +281,9 @@ namespace NMib::NCloud::NCloudClient
 				;
 			}
 		}
+
+		if (!bIncludeHost)
+			TableRenderer.f_RemoveColumn(0);
 
 		TableRenderer.f_Output(_Params);
 
