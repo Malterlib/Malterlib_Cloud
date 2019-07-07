@@ -29,11 +29,12 @@ namespace NMib::NCloud::NAppManager
 		if (!_pApplication->m_ProcessLaunch.f_IsEmpty() || _pApplication->m_bLaunched)
 			co_return DMibErrorInstance("Application is already launched");
 
-		CStr State;
-		if (!_pApplication->f_DependenciesSatisfied(State))
+		CStr Status;
+		CAppManagerInterface::EStatusSeverity Severity;
+		if (!_pApplication->f_DependenciesSatisfied(Status, Severity))
 		{
-			_pApplication->m_LaunchState = State;
-			co_return DMibErrorInstance(fg_Format("Dependencies not satisfied: {}", State));
+			_pApplication->f_SetLaunchStatus(Status, Severity);
+			co_return DMibErrorInstance(fg_Format("Dependencies not satisfied: {}", Status));
 		}
 
 		_pApplication->m_bLaunching = true;
@@ -66,7 +67,7 @@ namespace NMib::NCloud::NAppManager
 			auto Result = co_await (self(&CAppManagerActor::fp_ChangeEncryption, _pApplication, EEncryptOperation_Open, false) % "Failed to open encryption").f_Wrap();
 			if (!Result)
 			{
-				fp_AppLaunchStateChanged(_pApplication, Result.f_GetExceptionStr());
+				fp_AppLaunchStateChanged(_pApplication, Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
 				if (!_pApplication->m_bStopped && !_pApplication->m_bDeleted)
 					fp_ScheduleRelaunchApp(_pApplication);
 
@@ -83,15 +84,15 @@ namespace NMib::NCloud::NAppManager
 			{
 				_pApplication->m_bJustUpdated = false;
 
-				fp_AppLaunchStateChanged(_pApplication, "Self update source - running self update");
+				fp_AppLaunchStateChanged(_pApplication, "Self update source - running self update", CAppManagerInterface::EStatusSeverity_Warning);
 				Result.m_bQuitManager = co_await self(&CAppManagerActor::fp_SelfUpdate, _pApplication);
 				if (Result.m_bQuitManager)
-					fp_AppLaunchStateChanged(_pApplication, "Self update source - restarting self");
+					fp_AppLaunchStateChanged(_pApplication, "Self update source - restarting self", CAppManagerInterface::EStatusSeverity_Warning);
 				else
-					fp_AppLaunchStateChanged(_pApplication, "Self update source - waiting for update");
+					fp_AppLaunchStateChanged(_pApplication, "Self update source - waiting for update", CAppManagerInterface::EStatusSeverity_None);
 			}
 			else
-				fp_AppLaunchStateChanged(_pApplication, "Self update source - waiting for update");
+				fp_AppLaunchStateChanged(_pApplication, "Self update source - waiting for update", CAppManagerInterface::EStatusSeverity_None);
 
 			_pApplication->m_bLaunched = true;
 
@@ -100,14 +101,14 @@ namespace NMib::NCloud::NAppManager
 
 		if (Application.m_Settings.m_Executable.f_IsEmpty())
 		{
-			fp_AppLaunchStateChanged(_pApplication, "No executable");
+			fp_AppLaunchStateChanged(_pApplication, "No executable", CAppManagerInterface::EStatusSeverity_None);
 			_pApplication->m_bLaunched = true;
 			co_return CAppLaunchResult{};
 		}
 
 		if (Application.m_Settings.m_AppManagerVersion < mc_CurrentAppMangerVersion)
 		{
-			fp_AppLaunchStateChanged(_pApplication, "Upgrading app manager version");
+			fp_AppLaunchStateChanged(_pApplication, "Upgrading app manager version", CAppManagerInterface::EStatusSeverity_Warning);
 
 			co_await self(&CAppManagerActor::fp_UpdateAppManagerApplicationVersion, _pApplication, Application.m_Settings.m_AppManagerVersion);
 
@@ -115,7 +116,7 @@ namespace NMib::NCloud::NAppManager
 			co_await fp_UpdateApplicationJSON(_pApplication);
 		}
 
-		fp_AppLaunchStateChanged(_pApplication, "Launching");
+		fp_AppLaunchStateChanged(_pApplication, "Launching", CAppManagerInterface::EStatusSeverity_Warning);
 
 		if (Application.m_Settings.m_bBackupEnabled && !Application.m_BackupClient)
 			fp_ApplicationStartBackup(_pApplication);
@@ -139,7 +140,7 @@ namespace NMib::NCloud::NAppManager
 						{
 							if (_pApplication->m_Settings.m_bDistributedApp)
 							{
-								fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)");
+								fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)", CAppManagerInterface::EStatusSeverity_Warning);
 
 								TCFuture<void> RegisterFuture;
 
@@ -164,14 +165,20 @@ namespace NMib::NCloud::NAppManager
 													, _Result.f_GetExceptionStr()
 												)
 											;
-											fp_AppLaunchStateChanged(_pApplication, "Launched (app register failed: '{}')"_f << _Result.f_GetExceptionStr());
+											fp_AppLaunchStateChanged
+												(
+												 	_pApplication
+												 	, "Launched (app register failed: '{}')"_f << _Result.f_GetExceptionStr()
+												 	, CAppManagerInterface::EStatusSeverity_Error
+												)
+											;
 
 											if (!LaunchPromise.f_IsSet())
 												LaunchPromise.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
 											return;
 										}
 
-										fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)");
+										fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)", CAppManagerInterface::EStatusSeverity_Warning);
 										_pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_GetAppStartResult)()
 											.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
 											> [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
@@ -186,7 +193,7 @@ namespace NMib::NCloud::NAppManager
 														fOnStartedDistributedApp.f_SetResult();
 													_pApplication->m_OnStartedDistributedApp.f_Clear();
 
-													fp_AppLaunchStateChanged(_pApplication, "Launched");
+													fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
 													if (!LaunchPromise.f_IsSet())
 														LaunchPromise.f_SetResult(CAppLaunchResult{});
 												}
@@ -201,7 +208,13 @@ namespace NMib::NCloud::NAppManager
 															, _Result.f_GetExceptionStr()
 														)
 													;
-													fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Result.f_GetExceptionStr());
+													fp_AppLaunchStateChanged
+														(
+														 	_pApplication
+														 	, "Launched (app startup failed: '{}')"_f << _Result.f_GetExceptionStr()
+														 	, CAppManagerInterface::EStatusSeverity_Error
+														)
+													;
 
 													if (!LaunchPromise.f_IsSet())
 														LaunchPromise.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
@@ -213,7 +226,7 @@ namespace NMib::NCloud::NAppManager
 								return;
 							}
 							pState->m_pCleanup.f_Clear();
-							fp_AppLaunchStateChanged(_pApplication, "Launched");
+							fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
 							if (!LaunchPromise.f_IsSet())
 								LaunchPromise.f_SetResult(CAppLaunchResult{});
 						}
@@ -224,7 +237,7 @@ namespace NMib::NCloud::NAppManager
 							if (!_pApplication->m_bStopped)
 								fp_ScheduleRelaunchApp(_pApplication);
 
-							fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", LaunchError));
+							fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", LaunchError), CAppManagerInterface::EStatusSeverity_Error);
 							pState->m_pCleanup.f_Clear();
 							if (!LaunchPromise.f_IsSet())
 								LaunchPromise.f_SetException(DMibErrorInstance(LaunchError));
@@ -251,11 +264,20 @@ namespace NMib::NCloud::NAppManager
 											, _pApplication->m_LastStdErr
 											, _pApplication->m_LastError
 										)
+									 	, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_None : CAppManagerInterface::EStatusSeverity_Error
 									)
 								;
 							}
 							else
-								fp_AppLaunchStateChanged(_pApplication, fg_Format("{}Exited with {}", RelaunchInfo, ExitStatus));
+							{
+								fp_AppLaunchStateChanged
+									(
+									 	_pApplication
+									 	, fg_Format("{}Exited with {}", RelaunchInfo, ExitStatus)
+									 	, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_None : CAppManagerInterface::EStatusSeverity_Error
+									)
+								;
+							}
 
 							if (!LaunchPromise.f_IsSet())
 								LaunchPromise.f_SetException(DMibErrorInstance(fg_Format("Launch exited with '{}' before fully launched", ExitStatus)));
@@ -356,7 +378,7 @@ namespace NMib::NCloud::NAppManager
 						)
 					;
 
-					fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Error);
+					fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Error, CAppManagerInterface::EStatusSeverity_Error);
 
 					if (!LaunchPromise.f_IsSet())
 						LaunchPromise.f_SetResult(CAppLaunchResult{_Error});

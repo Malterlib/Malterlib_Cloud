@@ -164,13 +164,15 @@ namespace NMib::NCloud::NAppManager
 			bool f_NeedsEncryption() const;
 			bool f_IsChildApp() const;
 			bool f_IsInProgress() const;
-			bool f_DependenciesSatisfied(CStr &o_State) const;
+			bool f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity) const;
 			bool f_IsLaunched() const;
 
 			TCVector<TCSharedPointer<CApplication>> f_GetDependents() const;
 
 			EDistributedAppUpdateType f_GetUpdateType() const;
 			CAppManagerCoordinationInterface::CAppInfo f_GetRemoteAppInfo() const;
+
+			void f_SetLaunchStatus(CStr const &_LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity);
 
 			CStr const m_Name;
 
@@ -220,7 +222,8 @@ namespace NMib::NCloud::NAppManager
 
 			TCLinkedList<TCFunction <void (bool _bAborted)>> m_OnLaunchFinished;
 
-			CStr m_LaunchState;
+			CStr m_LaunchStatus;
+			CAppManagerInterface::EStatusSeverity m_LaunchStatusSeverity;
 			CStr m_LastStdErr;
 			CStr m_LastError;
 
@@ -818,7 +821,7 @@ namespace NMib::NCloud::NAppManager
 		void fp_SendRemovedAppToRemoteAppManagers(TCSharedPointer<CApplication> const &_pApplication);
 		void fp_BroadcastRemoteAppChange(CAppManagerCoordinationInterface::CAppChange &&_Change);
 
-		void fp_AppLaunchStateChanged(TCSharedPointer<CApplication> const &_pApplication, CStr const &_State);
+		void fp_AppLaunchStateChanged(TCSharedPointer<CApplication> const &_pApplication, CStr const &_State, CAppManagerInterface::EStatusSeverity _Severity);
 		void fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted);
 
 		TCFuture<void> fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);

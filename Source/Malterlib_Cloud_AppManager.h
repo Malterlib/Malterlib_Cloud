@@ -19,7 +19,7 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EMinProtocolVersion = 0x107
-			, EProtocolVersion = 0x109
+			, EProtocolVersion = 0x110
 		};
 		
 		CAppManagerInterface();
@@ -41,6 +41,13 @@ namespace NMib::NCloud
 			, EUpdateStage_StartNewApp				= 0xa0000
 			, EUpdateStage_PostLaunch				= 0xb0000
 			, EUpdateStage_Finished					= 0xc0000
+		};
+
+		enum EStatusSeverity
+		{
+			EStatusSeverity_None
+			, EStatusSeverity_Warning
+			, EStatusSeverity_Error
 		};
 		
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
@@ -134,6 +141,7 @@ namespace NMib::NCloud
 			
 			// State
 			NStr::CStr m_Status;
+			EStatusSeverity m_StatusSeverity = EStatusSeverity_None;
 
 			// Immutable
 			NStr::CStr m_EncryptionStorage;

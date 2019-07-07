@@ -110,6 +110,8 @@ namespace NMib::NCloud
 	void CAppManagerInterface::CApplicationInfo::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Status;
+		if (_Stream.f_GetVersion() >= 0x110)
+			_Stream % m_StatusSeverity;
 		_Stream % m_EncryptionStorage;
 		_Stream % m_EncryptionFileSystem;
 		_Stream % m_ParentApplication;

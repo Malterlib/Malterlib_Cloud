@@ -329,10 +329,14 @@ namespace NMib::NCloud::NAppManager
 			pApplication->m_bPreventLaunch_DelayAfterFailure = false;
 
 		CStr DependenciesMessage;
-		if (!pApplication->f_DependenciesSatisfied(DependenciesMessage))
+		CAppManagerInterface::EStatusSeverity Severity;
+		if (!pApplication->f_DependenciesSatisfied(DependenciesMessage, Severity))
 		{
 			_fOnInfo(fg_Format("Application settings were successfully changed. Launch skipped because of missing dependencies: {}", DependenciesMessage));
 			Auditor.f_Info("Updated application settings");
+
+			pApplication->f_SetLaunchStatus(DependenciesMessage, Severity);
+
 			co_return {};
 		}
 

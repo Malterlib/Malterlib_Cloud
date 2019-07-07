@@ -464,12 +464,15 @@ namespace NMib::NCloud::NAppManager
 			co_return pException;
 
 		CStr Message;
-		if (!State.m_pApplication->f_DependenciesSatisfied(Message))
+		CAppManagerInterface::EStatusSeverity Severity;
+		if (!State.m_pApplication->f_DependenciesSatisfied(Message, Severity))
 		{
 			if (State.m_VersionID.f_IsValid())
 				State.m_fOnInfo(fg_Format("Application was successfully updated to version {}. Launch skipped because of missing dependency: {}", State.m_VersionID, Message));
 			else
 				State.m_fOnInfo(fg_Format("Application was successfully updated. Launch skipped because of missing dependency: {}", Message));
+
+			State.m_pApplication->f_SetLaunchStatus(Message, Severity);
 
 			co_return false;
 		}

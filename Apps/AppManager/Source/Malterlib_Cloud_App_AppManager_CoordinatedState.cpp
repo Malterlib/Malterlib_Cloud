@@ -237,6 +237,12 @@ namespace NMib::NCloud::NAppManager
 		return m_RegisterInfo.m_UpdateType;
 	}
 
+	void CAppManagerActor::CApplication::f_SetLaunchStatus(CStr const &_LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity)
+	{
+		m_LaunchStatus = _LaunchStatus;
+		m_LaunchStatusSeverity = _Severity;
+	}
+
 	CAppManagerCoordinationInterface::CAppInfo CAppManagerActor::CApplication::f_GetRemoteAppInfo() const
 	{
 		CAppManagerCoordinationInterface::CAppInfo AppInfo;

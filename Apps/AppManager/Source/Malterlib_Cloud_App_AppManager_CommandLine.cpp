@@ -3,6 +3,8 @@
 
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
+#include <Mib/CommandLine/TableRenderer>
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -553,18 +555,25 @@ namespace NMib::NCloud::NAppManager
 					, "Description"_= "List applications."
 					, "Options"_=
 					{
-						"Verbose?"_= 
+						"Verbose?"_=
 						{
 							"Names"_= {"--verbose", "-v"}
 							, "Default"_= false
-							, "Description"_= "Display more extensive information about the applications." 
+							, "Description"_= "Display more extensive information about the applications."
 						}
-						, "Name?"_= 
+						, "ExtraVerbose?"_=
+						{
+							"Names"_= {"--extra-verbose", "-vv"}
+							, "Default"_= false
+							, "Description"_= "Display even more extensive information about the applications."
+						}
+						, "Name?"_=
 						{
 							"Names"_= {"--name"}
 							, "Default"_= "" 
 							, "Description"_= "Unique name of the application to list. Leave empty to list all applications." 
 						}
+						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
@@ -593,6 +602,7 @@ namespace NMib::NCloud::NAppManager
 							, "Description"_= "The application to list versions for.\n"
 								"Leave empty to list all applications.\n" 
 						}
+						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)

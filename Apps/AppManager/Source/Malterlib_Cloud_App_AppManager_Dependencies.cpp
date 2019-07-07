@@ -19,23 +19,26 @@ namespace NMib::NCloud::NAppManager
 		return Return;
 	}
 	
-	bool CAppManagerActor::CApplication::f_DependenciesSatisfied(CStr &o_State) const
+	bool CAppManagerActor::CApplication::f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity) const
 	{
 		if (m_bPreventLaunch_User)
 		{
 			o_State = "Prevented launch because application was previously manually stopped";
+			o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
 			return false;
 		}
 
 		if (m_bPreventLaunch_Update)
 		{
 			o_State = "Prevented launch because update previously failed";
+			o_Severity = CAppManagerInterface::EStatusSeverity_Error;
 			return false;
 		}
 		
 		if (m_bPreventLaunch_DelayAfterFailure)
 		{
 			o_State = "Prevented launch because of previous failure";
+			o_Severity = CAppManagerInterface::EStatusSeverity_Error;
 			return false;
 		}
 
@@ -44,12 +47,14 @@ namespace NMib::NCloud::NAppManager
 			if (!m_pParentApplication)
 			{
 				o_State = "Parent application does not exist";
+				o_Severity = CAppManagerInterface::EStatusSeverity_Error;
 				return false;
 			}
 			
 			if (f_NeedsEncryption() && !m_pParentApplication->m_bEncryptionOpened)
 			{
 				o_State = "Parent application encryption not yet opened";
+				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
 				return false;
 			}
 		}
@@ -58,6 +63,7 @@ namespace NMib::NCloud::NAppManager
 			if (m_pThis->mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
 			{
 				o_State = "Waiting for key manager to become available";
+				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
 				return false;
 			}
 		}
@@ -68,11 +74,13 @@ namespace NMib::NCloud::NAppManager
 			if (!pDependencyApplication)
 			{
 				o_State = fg_Format("Dependent application '{}' does not exists", Dependency);
+				o_Severity = CAppManagerInterface::EStatusSeverity_Error;
 				return false;
 			}
-			if ((*pDependencyApplication)->m_LaunchState != "Launched")
+			if ((*pDependencyApplication)->m_LaunchStatus != "Launched")
 			{
-				o_State = fg_Format("Dependent application '{}' not yet launched: {}", Dependency, (*pDependencyApplication)->m_LaunchState);
+				o_State = fg_Format("Dependent application '{}' not yet launched: {}", Dependency, (*pDependencyApplication)->m_LaunchStatus);
+				o_Severity = (*pDependencyApplication)->m_LaunchStatusSeverity;
 				return false;
 			}
 		}
@@ -87,23 +95,25 @@ namespace NMib::NCloud::NAppManager
 		if (Application.f_IsInProgress())
 			return false;
 		
-		CStr State;
-		if (!Application.f_DependenciesSatisfied(State))
+		CStr Status;
+		CAppManagerInterface::EStatusSeverity Severity;
+		if (!Application.f_DependenciesSatisfied(Status, Severity))
 		{
 			if (!Application.f_IsLaunched())
 			{
-				Application.m_LaunchState = State; // Don't recursively call update application dependencies
+				// Don't recursively call update application dependencies
+				Application.f_SetLaunchStatus(Status, Severity);
 				return false;
 			}
 			
 			if (Application.m_Settings.m_bStopOnDependencyFailure)
 			{
-				Application.f_Stop(EStopFlag_AutoStart) > [_pApplication, State](TCAsyncResult<uint32> &&_Result)
+				Application.f_Stop(EStopFlag_AutoStart) > [_pApplication, Status, Severity](TCAsyncResult<uint32> &&_Result)
 					{
 						auto &Application = *_pApplication;
 						if (_Result)
 						{
-							Application.m_LaunchState = fg_Format("Stopped because dependency failed: {}", State);
+							Application.f_SetLaunchStatus("Stopped because dependency failed: {}"_f << Status, Severity);
 							return;
 						}
 						
@@ -116,8 +126,8 @@ namespace NMib::NCloud::NAppManager
 								, _Result.f_GetExceptionStr()
 							)
 						;
-						
-						Application.m_LaunchState = fg_Format("Failed to stop (when dependency failed): {}", _Result.f_GetExceptionStr());
+
+						Application.f_SetLaunchStatus("Failed to stop (when dependency failed): {}"_f << _Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
 					}
 				;
 			}
@@ -145,8 +155,8 @@ namespace NMib::NCloud::NAppManager
 				
 				auto &Application = *_pApplication; 
 				
-				if (Application.m_LaunchState.f_IsEmpty())
-					fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", _Result.f_GetExceptionStr()));
+				if (Application.m_LaunchStatus.f_IsEmpty())
+					fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", _Result.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
 				
 				DMibLogWithCategory
 					(

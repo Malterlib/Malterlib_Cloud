@@ -3,6 +3,7 @@
 
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
+#include <Mib/CommandLine/TableRenderer>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -46,7 +47,8 @@ namespace NMib::NCloud::NAppManager
 			auto &OutApplication = OutputApplications[Application.m_Name];
 			auto &Settings = Application.m_Settings;
 
-			OutApplication.m_Status = Application.m_LaunchState;
+			OutApplication.m_Status = Application.m_LaunchStatus;
+			OutApplication.m_StatusSeverity = Application.m_LaunchStatusSeverity;
 			OutApplication.m_EncryptionStorage = Settings.m_EncryptionStorage;
 			OutApplication.m_EncryptionFileSystem = Settings.m_EncryptionFileSystem;
 			OutApplication.m_ParentApplication = Settings.m_ParentApplication;
@@ -137,7 +139,13 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
+		bool bExtraVerbose = _Params["ExtraVerbose"].f_Boolean();
 		CStr Name = _Params["Name"].f_String();
+
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+		TableRenderer.f_AddHeadings("Application", "Update", "Version", "Status", "Other", "Backup", "Script", "Extra Info");
+
 		TCMap<CStr, CAppManagerInterface::CApplicationInfo> ApplicationInfo = co_await mp_AppManagerInterface.m_pActor->self(&CAppManagerInterfaceImplementation::f_GetInstalled);
 		for (auto &Application : ApplicationInfo)
 		{
@@ -145,59 +153,141 @@ namespace NMib::NCloud::NAppManager
 			if (!Name.f_IsEmpty() && ApplicationName != Name)
 				continue;
 
-			CStr ApplicationInfo;
-			ApplicationInfo += "{}{\n}"_f << ApplicationName;
-			if (bVerbose)
-			{
-				ApplicationInfo += "                       Status: {}{\n}{\n}"_f << Application.m_Status;
-				ApplicationInfo += "           Encryption storage: {}{\n}"_f << Application.m_EncryptionStorage;
-				ApplicationInfo += "       Encryption file system: {}{\n}"_f << Application.m_EncryptionFileSystem;
-				ApplicationInfo += "           Parent application: {}{\n}"_f << Application.m_ParentApplication;
-				ApplicationInfo += "                 Dependencies: {vs}{\n}"_f << Application.m_Dependencies;
-				ApplicationInfo += "   Stop on dependency failure: {}{\n}"_f << (Application.m_bStopOnDependencyFailure ? "true" : "false");
-				ApplicationInfo += "           Self update source: {}{\n}{\n}"_f << (Application.m_bSelfUpdateSource ? "true" : "false");
-				ApplicationInfo += "                   Executable: {}{\n}"_f << Application.m_Executable;
-				ApplicationInfo += "                   Parameters: {vs,vb}{\n}"_f << Application.m_Parameters;
-				ApplicationInfo += "                  Run as user: {}{\n}"_f << Application.m_RunAsUser;
-				ApplicationInfo += "                 Run as group: {}{\n}"_f << Application.m_RunAsGroup;
-				ApplicationInfo += "        Run as user has shell: {}{\n}"_f << (Application.m_bRunAsUserHasShell ? "true" : "false");
-				ApplicationInfo += "              Distributed app: {}{\n}{\n}"_f << (Application.m_bDistributedApp ? "true" : "false");
-
-				ApplicationInfo += "               Backup enabled: {}{\n}"_f << (Application.m_bBackupEnabled ? "true" : "false");
-				ApplicationInfo += "     Backup include wildcards: {vs}{\n}"_f << Application.m_Backup_IncludeWildcards;
-				ApplicationInfo += "     Backup exclude wildcards: {vs}{\n}"_f << Application.m_Backup_ExcludeWildcards;
-				ApplicationInfo += "        Backup add sync flags: {vs}{\n}"_f << Application.m_Backup_AddSyncFlagsWildcards;
-				ApplicationInfo += "     Backup remove sync flags: {vs}{\n}"_f << Application.m_Backup_RemoveSyncFlagsWildcards;
-				ApplicationInfo += "        Backup interval hours: {}{\n}{\n}"_f << CTimeSpanConvert(Application.m_Backup_NewBackupInterval).f_GetHoursFloat();
-
-				ApplicationInfo += "                  Auto update: {}{\n}"_f << (!Application.m_AutoUpdateTags.f_IsEmpty() ? "true" : "false");
-				ApplicationInfo += "             Auto update tags: {vs}{\n}"_f << Application.m_AutoUpdateTags;
-				ApplicationInfo += "         Auto update branches: {vs}{\n}{\n}"_f << Application.m_AutoUpdateBranches;
-
-				ApplicationInfo += "            Pre update script: {}{\n}"_f << Application.m_UpdateScriptPreUpdate;
-				ApplicationInfo += "           Post update script: {}{\n}"_f << Application.m_UpdateScriptPostUpdate;
-				ApplicationInfo += "    Post launch update script: {}{\n}"_f << Application.m_UpdateScriptPostLaunch;
-				ApplicationInfo += "       On error update script: {}{\n}{\n}"_f << Application.m_UpdateScriptOnError;
-
-				ApplicationInfo += "     Version application name: {}{\n}"_f << Application.m_VersionManagerApplication;
-				ApplicationInfo += "                 Update group: {}{\n}"_f << Application.m_UpdateGroup;
-				ApplicationInfo += "                      Version: {}{\n}"_f << Application.m_Version;
-				ApplicationInfo += "                 Version time: {}{\n}"_f << Application.m_VersionInfo.m_Time.f_ToLocal();
-				ApplicationInfo += "               Version config: {}{\n}"_f << Application.m_VersionInfo.m_Configuration;
-				ApplicationInfo += "                 Version size: {}{\n}"_f << Application.m_VersionInfo.m_nBytes;
-				ApplicationInfo += "                Version files: {}{\n}"_f << Application.m_VersionInfo.m_nFiles;
-
-				if (Application.m_VersionInfo.m_ExtraInfo.f_IsObject())
+			auto fSyntaxHighlight = [&](auto const &_Value)
 				{
-					CStr InfoString = Application.m_VersionInfo.m_ExtraInfo.f_ToString("    ");
-					CStr FirstLine = fg_GetStrLineSep(InfoString);
-					ApplicationInfo += "                Version extra: {}{\n}"_f << FirstLine;
-					while (!InfoString.f_IsEmpty())
-						ApplicationInfo += "                               {}{\n}"_f << fg_GetStrLineSep(InfoString);
+					return CEJSON(_Value).f_ToStringColored(_pCommandLine->m_AnsiFlags, nullptr);
 				}
+			;
+
+			auto fAddProperty = [&](CStr &o_String, CStr const &_Property, auto const &_Value)
+				{
+					o_String += "{}{}:{} "_f << AnsiEncoding.f_Prompt() << _Property << AnsiEncoding.f_Default();
+					o_String += CStr::fs_ToStr(_Value);
+					o_String += "\n";
+				}
+			;
+
+			auto fAddHeading = [&](CStr &o_String, CStr const &_Heading)
+				{
+					if (!o_String.f_IsEmpty())
+						o_String += "\n";
+					o_String += "{}{}{}\n"_f << AnsiEncoding.f_Bold() << _Heading << AnsiEncoding.f_Default();
+				}
+			;
+
+			CStr Other;
+
+			{
+				CStr Type = "App";
+				if (Application.m_bSelfUpdateSource)
+					Type = "Self Update Source";
+				else if (Application.m_Executable.f_IsEmpty())
+					Type = "Container";
+				else if (Application.m_bDistributedApp)
+					Type = "Distributed App";
+
+				fAddProperty(Other, "Type", Type);
 			}
-			*_pCommandLine += ApplicationInfo;
+
+			fAddHeading(Other, "Encryption");
+			fAddProperty(Other, "Storage", Application.m_EncryptionStorage);
+			fAddProperty(Other, "File system", Application.m_EncryptionFileSystem);
+
+			fAddHeading(Other, "Depend");
+			fAddProperty(Other, "Parent application", Application.m_ParentApplication);
+			fAddProperty(Other, "Dependencies", "{vs}"_f << Application.m_Dependencies);
+			fAddProperty(Other, "Stop on dependency failure", fSyntaxHighlight(Application.m_bStopOnDependencyFailure));
+
+			fAddHeading(Other, "Launch");
+			fAddProperty(Other, "Executable", Application.m_Executable);
+			fAddProperty(Other, "Parameters", "{vs}"_f << Application.m_Parameters);
+			fAddProperty(Other, "User", Application.m_RunAsUser);
+			fAddProperty(Other, "Group", Application.m_RunAsGroup);
+			fAddProperty(Other, "User has shell", fSyntaxHighlight(Application.m_bRunAsUserHasShell));
+
+			CStr Backup;
+			fAddProperty(Backup, "Enabled", fSyntaxHighlight(Application.m_bBackupEnabled));
+			fAddProperty(Backup, "Interval", "{} h"_f << CTimeSpanConvert(Application.m_Backup_NewBackupInterval).f_GetHoursFloat());
+
+			fAddHeading(Backup, "Wildcards");
+			fAddProperty(Backup, "Include", "{}"_f << Application.m_Backup_IncludeWildcards);
+			fAddProperty(Backup, "Exclude", "{}"_f << Application.m_Backup_ExcludeWildcards);
+
+			fAddHeading(Backup, "Sync Flags");
+			fAddProperty(Backup, "Add", "{}"_f << Application.m_Backup_AddSyncFlagsWildcards);
+			fAddProperty(Backup, "Remove", "{}"_f << Application.m_Backup_RemoveSyncFlagsWildcards);
+
+			CStr Update;
+
+			if (Application.m_AutoUpdateTags.f_IsEmpty())
+				Update = "Manual Update";
+			else
+				Update = "Auto Update";
+
+			if (bExtraVerbose)
+			{
+				Update += "\n\n";
+				fAddProperty(Update, "Tags", Application.m_AutoUpdateTags);
+				fAddProperty(Update, "Branches", Application.m_AutoUpdateBranches);
+				fAddProperty(Update, "Update Group", Application.m_UpdateGroup);
+			}
+			else if (bVerbose)
+			{
+				Update += "\n\n";
+				fAddProperty(Update, "Tags", "{vs}"_f << Application.m_AutoUpdateTags);
+				fAddProperty(Update, "Branches", "{vs}"_f << Application.m_AutoUpdateBranches);
+				fAddProperty(Update, "Update Group", Application.m_UpdateGroup);
+			}
+
+			CStr Script;
+			fAddProperty(Script, "Pre Update", Application.m_UpdateScriptPreUpdate);
+			fAddProperty(Script, "Post Update", Application.m_UpdateScriptPostUpdate);
+			fAddProperty(Script, "Post Launch Update", Application.m_UpdateScriptPostLaunch);
+			fAddProperty(Script, "On Error Update", Application.m_UpdateScriptOnError);
+
+			CStr Version;
+			Version = "{}"_f << Application.m_Version;
+			if (bExtraVerbose || bVerbose)
+			{
+				Version += "\n\n";
+				fAddProperty(Version, "Application", Application.m_VersionManagerApplication);
+				fAddProperty(Version, "Time", Application.m_VersionInfo.m_Time.f_ToLocal());
+				fAddProperty(Version, "Config", Application.m_VersionInfo.m_Configuration);
+				fAddProperty(Version, "Size", "{ns }"_f << Application.m_VersionInfo.m_nBytes);
+				fAddProperty(Version, "Files", Application.m_VersionInfo.m_nFiles);
+			}
+
+			CStr Status;
+			if (Application.m_StatusSeverity == CAppManagerInterface::EStatusSeverity_Error)
+				Status = AnsiEncoding.f_StatusError(Application.m_Status);
+			else if (Application.m_StatusSeverity == CAppManagerInterface::EStatusSeverity_Warning)
+				Status = AnsiEncoding.f_StatusWarning(Application.m_Status);
+			else
+				Status = AnsiEncoding.f_StatusNormal(Application.m_Status);
+
+			TableRenderer.f_AddRow
+				(
+				 	ApplicationName
+				 	, Update
+				 	, Version
+				 	, Status
+				 	, Other
+				 	, Backup
+				 	, Script
+				 	, Application.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ")
+				)
+			;
 		}
+
+		if (!bExtraVerbose)
+		{
+			TableRenderer.f_RemoveColumn(7);
+			TableRenderer.f_RemoveColumn(6);
+			TableRenderer.f_RemoveColumn(5);
+			TableRenderer.f_RemoveColumn(4);
+		}
+
+		TableRenderer.f_Output(_Params);
 
 		co_return 0;
 	}
@@ -205,104 +295,43 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
-	
 		CAppManagerInterface::CVersionsAvailableForUpdate Results = co_await
 			mp_AppManagerInterface.m_pActor->self(&CAppManagerInterfaceImplementation::f_GetAvailableVersions, _Params["Application"].f_String())
 		;
-		
-		smint LongestApplication = fg_StrLen("Application");
-		smint LongestVersion = fg_StrLen("Version");
-		smint LongestPlatform = fg_StrLen("Platform");
-		smint LongestConfig = fg_StrLen("Config");
-		smint LongestTime = fg_StrLen("Time");
-		smint LongestSize = fg_StrLen("Size");
-		smint LongestFiles = fg_StrLen("Files");
-		smint LongestTags = fg_StrLen("Tags");
-		smint LongestRetrySequence = fg_StrLen("RetrySequence");
 
-		for (auto &Versions : Results)
-		{
-			LongestApplication = fg_Max(LongestApplication, Results.fs_GetKey(Versions).f_GetLen());
-			for (auto &Version : Versions)
-			{
-				LongestVersion = fg_Max(LongestVersion, fg_Format("{}", Version.m_VersionID.m_VersionID).f_GetLen());
-				LongestPlatform = fg_Max(LongestPlatform, fg_Format("{}", Version.m_VersionID.m_Platform).f_GetLen());
-				LongestConfig = fg_Max(LongestConfig, Version.m_VersionInfo.m_Configuration.f_GetLen());
-				LongestTime = fg_Max(LongestTime, fg_Format("{tc6}", Version.m_VersionInfo.m_Time.f_ToLocal()).f_GetLen());
-				LongestSize = fg_Max(LongestSize, fg_Format("{ns }", Version.m_VersionInfo.m_nBytes).f_GetLen());
-				LongestFiles = fg_Max(LongestFiles, fg_Format("{}", Version.m_VersionInfo.m_nFiles).f_GetLen());
-				LongestTags = fg_Max(LongestTags, fg_Format("{vs,vb}", Version.m_VersionInfo.m_Tags).f_GetLen());
-				LongestRetrySequence = fg_Max(LongestFiles, fg_Format("{}", Version.m_VersionInfo.m_RetrySequence).f_GetLen());
-			}
-		}
-
-		auto fOutputLine = [&]
-			(
-				auto const &_Application
-				, auto const &_Version
-				, auto const &_Platform
-				, auto const &_Config
-				, auto const &_Time
-				, auto const &_Size
-				, auto const &_Files
-				, auto const &_Tags
-				, auto const &_RetrySequence
-			)
-			{
-				*_pCommandLine += "{sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*,a-}   {sj*}   {sj*}   {sj*,a-}   {sj*,a-}\n"_f
-					<< _Application
-					<< LongestApplication
-					<< _Version
-					<< LongestVersion
-					<< _Platform
-					<< LongestPlatform
-					<< _Config
-					<< LongestConfig
-					<< _Time
-					<< LongestTime
-					<< _Size
-					<< LongestSize
-					<< _Files
-					<< LongestFiles
-					<< _Tags
-					<< LongestTags
-					<< _RetrySequence
-					<< LongestRetrySequence
-				;
-			}
-		;
-
-		fOutputLine("Application", "Version", "Platform", "Config", "Time", "Size", "Files", "Tags", "RetrySequence");
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+		TableRenderer.f_AddHeadings("Application", "Version", "Platform", "Config", "Time", "Size", "Files", "Tags", "Retry", "Extra Info");
+		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
+		TableRenderer.f_SetAlignRight(5);
+		TableRenderer.f_SetAlignRight(6);
+		TableRenderer.f_SetAlignRight(8);
 
 		for (auto &Versions : Results)
 		{
 			auto &ApplicationName = Results.fs_GetKey(Versions);
 			for (auto &Version : Versions)
 			{
-				fOutputLine
+				TableRenderer.f_AddRow
 					(
 						ApplicationName
 						, Version.m_VersionID.m_VersionID
 						, Version.m_VersionID.m_Platform
 						, Version.m_VersionInfo.m_Configuration
-						, fg_Format("{tc6}", Version.m_VersionInfo.m_Time.f_ToLocal())
-						, fg_Format("{ns }", Version.m_VersionInfo.m_nBytes)
-						, fg_Format("{}", Version.m_VersionInfo.m_nFiles)
-						, fg_Format("{vs,vb}", Version.m_VersionInfo.m_Tags)
-						, fg_Format("{}", Version.m_VersionInfo.m_RetrySequence)
+						, "{tc6}"_f << Version.m_VersionInfo.m_Time.f_ToLocal()
+						, "{ns }"_f << Version.m_VersionInfo.m_nBytes
+						, "{}"_f << Version.m_VersionInfo.m_nFiles
+						, "{vs,vb}"_f << Version.m_VersionInfo.m_Tags
+						, "{}"_f << Version.m_VersionInfo.m_RetrySequence
+						, Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ")
 					)
 				;
-				if (bVerbose && Version.m_VersionInfo.m_ExtraInfo.f_IsObject() && Version.m_VersionInfo.m_ExtraInfo.f_Object().f_OrderedIterator())
-				{
-					CStr JSONString = Version.m_VersionInfo.m_ExtraInfo.f_ToString("    ");
-					while (!JSONString.f_IsEmpty())
-					{
-						CStr Line = fg_GetStrLineSep(JSONString);
-						*_pCommandLine += "{}\n"_f << Line;
-					}
-				}
 			}
 		}
+
+ 		if (!bVerbose)
+			TableRenderer.f_RemoveColumn(9);
+
+		TableRenderer.f_Output(_Params);
 
 		co_return 0;
 	}
