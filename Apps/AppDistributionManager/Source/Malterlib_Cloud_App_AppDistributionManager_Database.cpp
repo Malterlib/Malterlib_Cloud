@@ -38,7 +38,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			for (auto &Tag : pValue->f_Array())
 			{
 				if (!CVersionManager::fs_IsValidTag(Tag.f_String()))
-					DMibError("'{}' is not a valid tag"_f << pValue->f_String());
+					DMibError("'{}' is not a valid tag"_f << Tag.f_String());
 				o_Settings.m_Tags[Tag.f_String()];
 			}
 		}
@@ -48,7 +48,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			for (auto &Platform : pValue->f_Array())
 			{
 				if (!CVersionManager::fs_IsValidPlatform(Platform.f_String()))
-					DMibError("'{}' is not a valid platform"_f << pValue->f_String());
+					DMibError("'{}' is not a valid platform"_f << Platform.f_String());
 				o_Settings.m_Platforms[Platform.f_String()];
 			}
 		}
@@ -58,7 +58,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			for (auto &Branch : pValue->f_Array())
 			{
 				if (!CVersionManager::fs_IsValidBranch(Branch.f_String(), true))
-					DMibError("'{}' is not a valid branch"_f << pValue->f_String());
+					DMibError("'{}' is not a valid branch"_f << Branch.f_String());
 				o_Settings.m_BranchWildcards[Branch.f_String()];
 			}
 		}

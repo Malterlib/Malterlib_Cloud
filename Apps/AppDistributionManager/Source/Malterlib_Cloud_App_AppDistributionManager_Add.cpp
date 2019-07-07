@@ -18,16 +18,16 @@ namespace NMib::NCloud::NAppDistributionManager
 		}
 		catch (CException const &_Exception)
 		{
-			return Auditor.f_Exception(_Exception.f_GetErrorStr());
+			co_return Auditor.f_Exception(_Exception.f_GetErrorStr());
 		}
 
 		CStr Name = _Params.f_GetMemberValue("Distribution", Settings.m_VersionManagerApplication).f_String();
 
 		if (!fg_IsValidHostname(Name))
-			return Auditor.f_Exception("'{}' is not a valid distribution name"_f << Name);
+			co_return Auditor.f_Exception("'{}' is not a valid distribution name"_f << Name);
 
 		if (mp_Distributions.f_FindEqual(Name))
-			return Auditor.f_Exception("Distribution '{}' already exists"_f << Name);
+			co_return Auditor.f_Exception("Distribution '{}' already exists"_f << Name);
 
 		auto &Distribution = mp_Distributions[Name];
 
@@ -35,16 +35,12 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		fp_SaveState(Distribution);
 
-		TCPromise<uint32> Promise;
-		mp_State.m_StateDatabase.f_Save() > Promise % "[Add distribution] Failed to save state" % Auditor / [Promise, Name, Auditor]() mutable
-			{
-				Auditor.f_Info("Added distribution '{}'"_f << Name);
-				Promise.f_SetResult();
-			}
-		;
-
 		fp_AutoUpdate_Update();
 
-		return Promise.f_MoveFuture();
+		co_await (mp_State.m_StateDatabase.f_Save() % "[Add distribution] Failed to save state" % Auditor);
+
+		Auditor.f_Info("Added distribution '{}'"_f << Name);
+
+		co_return 0;
 	}
 }

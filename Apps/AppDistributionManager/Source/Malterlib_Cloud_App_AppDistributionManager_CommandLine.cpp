@@ -3,6 +3,8 @@
 
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
+#include <Mib/CommandLine/TableRenderer>
+
 #include "Malterlib_Cloud_App_AppDistributionManager.h"
 
 namespace NMib::NCloud::NAppDistributionManager
@@ -118,7 +120,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_DistributionAdd(_Params, _pCommandLine);
+					return self(&CAppDistributionManagerActor::fp_CommandLine_DistributionAdd, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -145,7 +147,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_DistributionChangeSettings(_Params, _pCommandLine);
+					return self(&CAppDistributionManagerActor::fp_CommandLine_DistributionChangeSettings, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -169,11 +171,12 @@ namespace NMib::NCloud::NAppDistributionManager
 							, "Default"_= "" 
 							, "Description"_= "Unique name of the distribution to list. Leave empty to list all distributions."
 						}
+						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_DistributionEnum(_Params, _pCommandLine);
+					return self(&CAppDistributionManagerActor::fp_CommandLine_DistributionEnum, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -193,7 +196,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_DistributionRemove(_Params, _pCommandLine);
+					return self(&CAppDistributionManagerActor::fp_CommandLine_DistributionRemove, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -217,11 +220,12 @@ namespace NMib::NCloud::NAppDistributionManager
 							, "Description"_= "The application to list versions for.\n"
 							"Leave empty to list all applications.\n"
 						}
+						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_ApplicationListAvailableVersions(_Params, _pCommandLine);
+					return self(&CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions, _Params, _pCommandLine);
 				}
 			)
 		;

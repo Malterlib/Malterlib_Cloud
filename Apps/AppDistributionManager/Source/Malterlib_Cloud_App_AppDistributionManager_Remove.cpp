@@ -14,7 +14,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		CStr Name = _Params["Distribution"].f_String();
 		
 		if (!mp_Distributions.f_FindEqual(Name))
-			return Auditor.f_Exception(fg_Format("No such distribution '{}'", Name));
+			co_return Auditor.f_Exception(fg_Format("No such distribution '{}'", Name));
 
 		mp_Distributions.f_Remove(Name);
 
@@ -24,17 +24,12 @@ namespace NMib::NCloud::NAppDistributionManager
 				pDistributionState->f_RemoveMember(Name);
 		}
 
-		TCPromise<uint32> Promise;
-
-		mp_State.m_StateDatabase.f_Save() > Promise % "[Remove distribution] Failed to save state" % Auditor / [Promise, Name, Auditor]() mutable
-			{
-				Auditor.f_Info(fg_Format("Removed distribution '{}'", Name));
-				Promise.f_SetResult();
-			}
-		;
-
 		fp_AutoUpdate_Update();
 
-		return Promise.f_MoveFuture();
+		co_await (mp_State.m_StateDatabase.f_Save() % "[Remove distribution] Failed to save state" % Auditor);
+
+		Auditor.f_Info(fg_Format("Removed distribution '{}'", Name));
+
+		co_return 0;
 	}
 }

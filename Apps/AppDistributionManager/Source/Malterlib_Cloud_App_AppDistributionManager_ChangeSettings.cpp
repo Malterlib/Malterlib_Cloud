@@ -19,10 +19,10 @@ namespace NMib::NCloud::NAppDistributionManager
 		CStr Name = _Params["Distribution"].f_String();
 
 		if (!fg_IsValidHostname(Name))
-			return Auditor.f_Exception("'{}' is not a valid distribution name"_f << Name);
+			co_return Auditor.f_Exception("'{}' is not a valid distribution name"_f << Name);
 
 		if (!mp_Distributions.f_FindEqual(Name))
-			return Auditor.f_Exception("Distribution '{}' does not exist"_f << Name);
+			co_return Auditor.f_Exception("Distribution '{}' does not exist"_f << Name);
 
 		auto &Distribution = mp_Distributions[Name];
 
@@ -34,26 +34,22 @@ namespace NMib::NCloud::NAppDistributionManager
 		}
 		catch (CException const &_Exception)
 		{
-			return Auditor.f_Exception(_Exception.f_GetErrorStr());
+			co_return Auditor.f_Exception(_Exception.f_GetErrorStr());
 		}
 
 		if (Distribution.m_Settings == Settings)
-			return Auditor.f_Exception("No setting changed");
+			co_return Auditor.f_Exception("No setting changed");
 
 		Distribution.m_Settings = fg_Move(Settings);
 
 		fp_SaveState(Distribution);
 
-		TCPromise<uint32> Promise;
-		mp_State.m_StateDatabase.f_Save() > Promise % "[Change distribution settings] Failed to save state" % Auditor / [Promise, Name, Auditor]() mutable
-			{
-				Auditor.f_Info("Changed distribution settings '{}'"_f << Name);
-				Promise.f_SetResult();
-			}
-		;
-
 		fp_AutoUpdate_Update();
 
-		return Promise.f_MoveFuture();
+		co_await (mp_State.m_StateDatabase.f_Save() % "[Change distribution settings] Failed to save state" % Auditor);
+
+		Auditor.f_Info("Changed distribution settings '{}'"_f << Name);
+
+		co_return 0;
 	}
 }
