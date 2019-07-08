@@ -510,6 +510,8 @@ namespace NMib::NCloud::NCloudClient
 					CUniqueVersionKey Key{Application, VersionID.m_VersionID};
 					auto &VersionPlatforms = VersionMap[Key];
 					VersionPlatforms.m_Rows.f_Insert(CRow{HostInfo, Application, VersionID, Version});
+					VersionPlatforms.m_StartTime = fg_Min(VersionPlatforms.m_StartTime, Version.m_Time);
+					VersionPlatforms.m_EndTime = fg_Max(VersionPlatforms.m_EndTime, Version.m_Time);
 				}
 			}
 		}
