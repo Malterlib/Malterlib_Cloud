@@ -861,7 +861,7 @@ public:
 				auto AppManagers = CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_CallSync(g_Timeout);
 				DMibExpect(AppManagers.f_GetLen(), ==, nAppManagers);
 
-				NStr::CStr HostName = NProcess::NPlatform::fg_Process_GetHostName();
+				NStr::CStr HostName = NProcess::NPlatform::fg_Process_GetFullyQualiedHostName();
 				TCSet<CStr> ExpectedAppManagers;
 				for (auto &Info : AllAppManagers)
 					ExpectedAppManagers[("{}/{}:{}"_f << Info.m_HostID << HostName << (Info.m_RootDirectory)).f_GetStr()];
