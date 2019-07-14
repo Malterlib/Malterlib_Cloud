@@ -200,7 +200,7 @@ namespace NMib::NCloud
 										Cache.m_File.f_Open
 											(
 											 	FilePath
-											 	, EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareRead
+											 	, EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll
 											 	, Attributes | EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid
 											)
 										;

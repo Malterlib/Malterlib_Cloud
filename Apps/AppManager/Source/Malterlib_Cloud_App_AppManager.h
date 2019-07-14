@@ -549,8 +549,8 @@ namespace NMib::NCloud::NAppManager
 			TCSharedPointer<CApplication> m_pApplication;
 			TCFunction<void (CStr const &_Info)> m_fOnInfo;
 			TCFunction <void ()> m_fUpdateVersionInfo;
-			COnScopeExitShared m_pDownloadDirectoryCleanup;
-			COnScopeExitShared m_pTemporaryDirectoryCleanup;
+			CActorSubscription m_DownloadDirectoryCleanup;
+			CActorSubscription m_TemporaryDirectoryCleanup;
 			COnScopeExitShared m_pInProgressScope;
 			COnScopeExitShared m_pCleanupStateMap;
 			CStr m_SourcePath;

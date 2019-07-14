@@ -3,6 +3,8 @@
 
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
+#include <Mib/Concurrency/ActorSubscription>
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 #ifdef DPlatformFamily_Windows
@@ -310,8 +312,25 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		CStr DeletePath;
+		TCSharedPointer<CStr> pDeletePath = fg_Construct();
 		CStr SourcePath;
+
+		auto CleanupDownload = g_ActorSubscription(mp_FileActor) / [pDeletePath]
+			{
+				if (!*pDeletePath)
+					return;
+				try
+				{
+					if (CFile::fs_FileExists(*pDeletePath))
+						CFile::fs_DeleteDirectoryRecursive(*pDeletePath);
+				}
+				catch (CExceptionFile const &_Exception)
+				{
+					(void)_Exception;
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up version download: {}", _Exception);
+				}
+			}
+		;
 
 		if (!_FromLocalFile.f_IsEmpty() || bNullApplication)
 		{
@@ -407,7 +426,7 @@ namespace NMib::NCloud::NAppManager
 		}
 		else
 		{
-			CStr DownloadDirectory = Directory + "/TempVersionDownload";
+			CStr DownloadDirectory = "{}/TempVersionDownload/{}"_f << Directory << fg_RandomID();
 			_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
 			auto VersionInfo = co_await
 				(
@@ -424,7 +443,7 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception(_Exception.f_GetErrorStr());
 			}
 
-			DeletePath = DownloadDirectory;
+			*pDeletePath = DownloadDirectory;
 			SourcePath = DownloadDirectory;
 		}
 
@@ -453,8 +472,8 @@ namespace NMib::NCloud::NAppManager
 						TCSet<CStr> AllowExist;
 						AllowExist[Directory + "/lost+found"];
 						AllowExist[Directory + "/.home"];
-						if (!DeletePath.f_IsEmpty())
-							AllowExist[DeletePath];
+						if (!pDeletePath->f_IsEmpty())
+							AllowExist[CFile::fs_GetPath(*pDeletePath)];
 						CStr Output = fsp_UnpackApplication
 							(
 							 	RootDirectory
@@ -474,8 +493,8 @@ namespace NMib::NCloud::NAppManager
 
 					fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 
-					if (!DeletePath.f_IsEmpty())
-						CFile::fs_DeleteDirectoryRecursive(DeletePath);
+					if (!pDeletePath->f_IsEmpty())
+						CFile::fs_DeleteDirectoryRecursive(*pDeletePath);
 
 					return Files;
 				}
@@ -501,6 +520,9 @@ namespace NMib::NCloud::NAppManager
 		pApplication->m_LastInstalledVersionInfoFinished = pApplication->m_LastInstalledVersionInfo;
 
 		co_await (fp_UpdateApplicationJSON(pApplication) % "Failed to save state" % Auditor);
+
+		if (CleanupDownload)
+			co_await CleanupDownload->f_Destroy();
 
 		pApplication->m_bJustUpdated = true;
 		CAppLaunchResult AppLaunchResult = co_await (fp_LaunchApp(pApplication, false) % "Failed to launch app. Will retry periodically" % Auditor);

@@ -4,6 +4,8 @@
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/LogError>
+#include <Mib/Concurrency/ActorSubscription>
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -143,19 +145,21 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
-		CStr DownloadDirectory = fg_Format("{}/TempVersionDownload", State.m_pApplication->f_GetDirectory());
+		CStr DownloadDirectory = fg_Format("{}/TempVersionDownload/{}", State.m_pApplication->f_GetDirectory(), fg_RandomID());
 		State.m_SourcePath = DownloadDirectory;
 		State.m_AllowSourceExist[DownloadDirectory];
 
-		State.m_pDownloadDirectoryCleanup = g_OnScopeExitActor(mp_FileActor) > [DownloadDirectory]
+		State.m_DownloadDirectoryCleanup = g_ActorSubscription(mp_FileActor) / [DownloadDirectory]
 			{
 				try
 				{
 					if (CFile::fs_FileExists(DownloadDirectory))
 						CFile::fs_DeleteDirectoryRecursive(DownloadDirectory);
 				}
-				catch (CExceptionFile const &)
+				catch (CExceptionFile const &_Exception)
 				{
+					(void)_Exception;
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up version download: {}", _Exception);
 				}
 			}
 		;
@@ -233,7 +237,7 @@ namespace NMib::NCloud::NAppManager
 
 		CStr TemporaryDirectory = fg_Format("{}/TempVersion", State.m_pApplication->f_GetDirectory());
 
-		State.m_pTemporaryDirectoryCleanup = g_OnScopeExitActor(mp_FileActor) > [TemporaryDirectory]
+		State.m_TemporaryDirectoryCleanup = g_ActorSubscription(mp_FileActor) / [TemporaryDirectory]
 			{
 				try
 				{
@@ -401,8 +405,12 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
-		State.m_pDownloadDirectoryCleanup.f_Clear();
-		State.m_pTemporaryDirectoryCleanup.f_Clear();
+		if (State.m_DownloadDirectoryCleanup)
+			co_await State.m_DownloadDirectoryCleanup->f_Destroy();
+		if (State.m_TemporaryDirectoryCleanup)
+			co_await State.m_TemporaryDirectoryCleanup->f_Destroy();
+		State.m_DownloadDirectoryCleanup.f_Clear();
+		State.m_TemporaryDirectoryCleanup.f_Clear();
 		
 		co_return {};
 	}
