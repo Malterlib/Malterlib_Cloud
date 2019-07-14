@@ -870,10 +870,6 @@ Property
 
 	MalterlibCloud_VersionUploadTarArchivePath "@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application)@(MalterlibCloudVersionInfo_PackageSuffix).tar.gz"
 	MalterlibCloud_VersionUploadTarArchivePathTar "@(MalterlibCloud_VersionUploadTarArchivePath)"
-	MalterlibCloud_VersionUploadTarArchivePathTar "@(MalterlibCloud_VersionUploadTarArchivePath->ParseFormatString('{}:{}','/{0,cl}{1}'))"
-	{
-		!!PlatformFamily Windows // For MinGW
-	}
 
 	MalterlibPostBuildScript_Last "@(MalterlibPostBuildScript_Last)"\
 					"[ -e \"@(MalterlibCloud_VersionUploadTempPath)\" ] && rm -rf \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
@@ -881,7 +877,7 @@ Property
 					"@(MalterlibCloud_VersionUploadCopyTempContents)\r\n"\
 					"pushd \"@(MalterlibCloud_VersionUploadTempPath)\" > /dev/null\r\n"\
 					"@(CheckErrors)\r\n"\
-					"tar @(TarOptions) -czf \"@(MalterlibCloud_VersionUploadTarArchivePathTar)\" .\r\n"\
+					"bsdtar @(TarOptions) -czf \"@(MalterlibCloud_VersionUploadTarArchivePathTar)\" .\r\n"\
 					"@(CheckErrors)\r\n"\
 					"popd > /dev/null\r\n"\
 					"@(CheckErrors)\r\n"\
@@ -900,8 +896,7 @@ Property
 					"@(MalterlibCloud_VersionUploadCopyTempContents)\r\n"\
 					"pushd \"@(MalterlibCloud_VersionUploadTempPath)\"\r\n"\
 					"@(CheckErrors)\r\n"\
-					"pwd\"\r\n"\
-					"tar @(TarOptions) -czf \"@(MalterlibCloud_VersionUploadTarArchivePathTar)\" .\r\n"\
+					"bsdtar @(TarOptions) -czf \"@(MalterlibCloud_VersionUploadTarArchivePathTar)\" .\r\n"\
 					"@(CheckErrors)\r\n"\
 					"popd\r\n"\
 					"@(CheckErrors)\r\n"\
