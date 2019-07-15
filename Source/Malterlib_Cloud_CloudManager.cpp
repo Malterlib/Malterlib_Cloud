@@ -11,6 +11,7 @@ namespace NMib::NCloud
 	{
 		DMibPublishActorFunction(CCloudManager::f_RegisterAppManager);
 		DMibPublishActorFunction(CCloudManager::f_EnumAppManagers);
+		DMibPublishActorFunction(CCloudManager::f_EnumApplications);
 	}
 
 	CCloudManager::~CCloudManager() = default;
@@ -18,5 +19,10 @@ namespace NMib::NCloud
 	bool CCloudManager::CAppManagerInfo::operator == (CAppManagerInfo const &_Right) const
 	{
 		return f_Tuple() == _Right.f_Tuple();
+	}
+
+	bool CCloudManager::CApplicationKey::operator < (CApplicationKey const &_Right) const
+	{
+		return f_Tuple() < _Right.f_Tuple();
 	}
 }

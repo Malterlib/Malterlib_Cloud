@@ -34,6 +34,28 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 	};
+
+	struct CApplicationKey
+	{
+		static constexpr ch8 mc_Prefix[] = "App";
+
+		CStr m_Prefix;
+		CStr m_AppManagerHostID;
+		CStr m_Application;
+
+		template <typename tf_CStream>
+		void f_FeedLexicograpic(tf_CStream &_Stream) const;
+		template <typename tf_CStream>
+		void f_ConsumeLexicographic(tf_CStream &_Stream);
+	};
+
+	struct CApplicationValue
+	{
+		CAppManagerInterface::CApplicationInfo m_ApplicationInfo;
+
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+	};
 }
 
 #include "Malterlib_Cloud_App_CloudManager_Database.hpp"

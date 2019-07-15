@@ -14,7 +14,7 @@ namespace NMib::NCloud
 	enum
 	{
 		ECloudManagerMinProtocolVersion = 0x101
-		, ECloudManagerProtocolVersion = 0x103
+		, ECloudManagerProtocolVersion = 0x104
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -62,6 +62,26 @@ namespace NMib::NCloud
 			bool m_bActive = false;
 		};
 
+		struct CApplicationKey
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			auto f_Tuple() const;
+			bool operator < (CApplicationKey const &_Right) const;
+
+			NStr::CStr m_AppManagerID;
+			NStr::CStr m_Name;
+		};
+
+		struct CApplicationInfo
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			CAppManagerInterface::CApplicationInfo m_ApplicationInfo;
+		};
+
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_RegisterAppManager
 			(
 			 	NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
@@ -70,6 +90,7 @@ namespace NMib::NCloud
 			= 0
 		;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() = 0;
+		virtual NConcurrency::TCFuture<NContainer::TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() = 0;
 
 		CCloudManager();
 		~CCloudManager();

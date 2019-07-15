@@ -33,6 +33,7 @@ using namespace NMib::NStorage;
 using namespace NMib::NEncoding;
 using namespace NMib::NAtomic;
 using namespace NMib::NNetwork;
+using namespace NMib::NTest;
 
 #define DTestAppManagerEnableLogging 0
 #define DTestAppManagerEnableOtherOutput 0
@@ -512,10 +513,15 @@ public:
 					(
 						fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
 					)
+					+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+					(
+						fPermissions(CloudManagerHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/Command/ApplicationSubscribeChanges", "AppManager/AppAll"))
+					)
 					> Promise / [=]
 					(
 					 	CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_VersionManagerTicket
 					 	, CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_CloudManagerTicket
+					 	, CVoidTag
 					 	, CVoidTag
 					)
 					{
@@ -859,6 +865,9 @@ public:
 				DMibTestPath("CloudManager");
 
 				auto AppManagers = CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_CallSync(g_Timeout);
+				NTime::CClock Clock{true};
+				while (AppManagers.f_GetLen() < nAppManagers && Clock.f_GetTime() < g_Timeout)
+					AppManagers = CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_CallSync(g_Timeout);
 				DMibExpect(AppManagers.f_GetLen(), ==, nAppManagers);
 
 				NStr::CStr HostName = NProcess::NPlatform::fg_Process_GetFullyQualiedHostName();
@@ -871,6 +880,18 @@ public:
 					ActualAppManagers[("{}/{}:{}"_f << AppManagers.fs_GetKey(AppManager) << AppManager.m_HostName << AppManager.m_ProgramDirectory).f_GetStr()];
 
 				DMibExpect(ActualAppManagers, ==, ExpectedAppManagers);
+
+				auto Applications = CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)().f_CallSync(g_Timeout);
+				while (Applications.f_GetLen() < nAppManagers && Clock.f_GetTime() < g_Timeout)
+					Applications = CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)().f_CallSync(g_Timeout);
+				DMibExpect(Applications.f_GetLen(), ==, nAppManagers);
+
+				for (auto &Application : Applications)
+				{
+					auto &ApplicationKey = Applications.fs_GetKey(Application);
+					DMibExpect(ApplicationKey.m_Name, ==, "TestApp")(ETestFlag_Aggregated);
+					DMibExpect(Application.m_ApplicationInfo.m_Status, ==, "Launched")(ETestFlag_Aggregated);
+				}
 			}
 			{
 				DMibTestPath("Update Independent");

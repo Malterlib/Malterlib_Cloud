@@ -29,6 +29,7 @@ namespace NMib::NCloud::NCloudManager
 		{
 			TCFuture<TCActorSubscriptionWithID<>> f_RegisterAppManager(TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager, CAppManagerInfo &&_AppManagerInfo) override;
 			TCFuture<TCMap<CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() override;
+			TCFuture<TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() override;
 
 			CCloudManagerServer *m_pThis;
 		};
@@ -45,6 +46,7 @@ namespace NMib::NCloud::NCloudManager
 			NCloudManagerDatabase::CAppManagerValue m_Data;
 			CStr m_UniqueHostID;
 			mint m_RegisterSequence = 0;
+			CActorSubscription m_ChangeNotificationsSubscription;
 		};
 
 		TCFuture<void> fp_Destroy() override;
@@ -53,6 +55,7 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_SetupMonitor();
 		TCFuture<void> fp_UpdateAppManagerState();
 		TCFuture<void> fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data);
+		TCFuture<void> fp_ProcessApplicationChanges(CStr const &_AppManagerID, TCVector<CAppManagerInterface::CChangeNotification> &&_Changes, bool _bInitial);
 
 		TCDistributedActorInstance<CCloudManagerImplementation> mp_ProtocolInterface;
 		CDistributedAppState &mp_AppState;

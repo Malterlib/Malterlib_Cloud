@@ -27,6 +27,60 @@ namespace NMib::NCloud::NCloudManager
 		return mp_ProtocolInterface.f_Publish<CCloudManager>(mp_AppState.m_DistributionManager, this, CCloudManager::mc_pDefaultNamespace);
 	}
 
+	TCFuture<void> CCloudManagerServer::fp_ProcessApplicationChanges(CStr const &_AppManagerID, TCVector<CAppManagerInterface::CChangeNotification> &&_Changes, bool _bInitial)
+	{
+		try
+		{
+			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
+			{
+				if (_bInitial)
+				{
+					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _AppManagerID); ApplicationCursor;)
+						ApplicationCursor.f_Delete();
+				}
+
+				auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+				for (auto &Change : _Changes)
+				{
+					CApplicationKey Key{CApplicationKey::mc_Prefix, _AppManagerID, Change.m_Application};
+					if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Remove>())
+					{
+						if (WriteCursor.f_FindEqual(Key))
+							WriteCursor.f_Delete();
+						continue;
+					}
+
+					CApplicationValue Value;
+					if (WriteCursor.f_FindEqual(Key))
+						Value = WriteCursor.f_Value<CApplicationValue>();
+
+					if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>())
+						Value.m_ApplicationInfo = Change.m_Change.f_GetAsType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>().m_Info;
+					else if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Status>())
+					{
+						auto &ChangeValue = Change.m_Change.f_GetAsType<CAppManagerInterface::CApplicationChange_Status>();
+						Value.m_ApplicationInfo.m_Status = ChangeValue.m_Status;
+						Value.m_ApplicationInfo.m_StatusSeverity = ChangeValue.m_StatusSeverity;
+					}
+					else
+					{
+						DMibNeverGetHere;
+					}
+
+					WriteCursor.f_Upsert(Key, Value);
+				}
+			}
+			co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
+		}
+		catch (CException const &_Exception)
+		{
+			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", _Exception);
+			co_return _Exception.f_ExceptionPointer();
+		}
+
+		co_return {};
+	}
+
 	TCFuture<TCActorSubscriptionWithID<>> CCloudManagerServer::CCloudManagerImplementation::f_RegisterAppManager
 		(
 		 	TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
@@ -75,11 +129,37 @@ namespace NMib::NCloud::NCloudManager
 		AppManager.m_UniqueHostID = UniqueHostID;
 		AppManager.m_RegisterSequence = RegisterSequence;
 
+		auto ChangeNotificationsSubscription = co_await AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeChangeNotifications)
+			(
+			 	g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
+			 	(TCVector<CAppManagerInterface::CChangeNotification> &&_Changes, bool _bInitial) -> NConcurrency::TCFuture<void>
+				{
+					auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+					if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+						co_return {};
+
+					co_await pThis->self(&CCloudManagerServer::fp_ProcessApplicationChanges, AppManagerID, fg_Move(_Changes), _bInitial);
+
+					co_return {};
+				}
+			)
+		;
+
+		auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+		if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+			co_return {};
+
+		pAppManager->m_ChangeNotificationsSubscription = fg_Move(ChangeNotificationsSubscription);
+
 		Auditor.f_Info("App manager registered");
 
 		co_return g_ActorSubscription / [pThis, RegisterSequence, AppManagerID, DatabaseKey]() -> TCFuture<void>
 			{
 				auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+
+				if (pAppManager && pAppManager->m_ChangeNotificationsSubscription)
+					co_await pAppManager->m_ChangeNotificationsSubscription->f_Destroy();
+
 				if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
 					co_return {};
 
@@ -132,6 +212,41 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		Auditor.f_Info("Enum app managers");
+
+		co_return fg_Move(Return);
+	}
+
+	auto CCloudManagerServer::CCloudManagerImplementation::f_EnumApplications() -> TCFuture<TCMap<CApplicationKey, CApplicationInfo>>
+	{
+		auto pThis = m_pThis;
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Enum applications", {"CloudManager/ReadAll"}))
+			co_return Auditor.f_AccessDenied("(Enum applications)");
+
+		TCMap<CApplicationKey, CApplicationInfo> Return;
+
+		try
+		{
+			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
+
+			for (auto Applications = ReadTransaction.m_Transaction.f_ReadCursor(NCloudManagerDatabase::CApplicationKey::mc_Prefix); Applications; ++Applications)
+			{
+				auto Key = Applications.f_Key<NCloudManagerDatabase::CApplicationKey>();
+				auto Value = Applications.f_Value<CApplicationValue>();
+
+				CApplicationKey ApplicationKey{Key.m_AppManagerHostID, Key.m_Application};
+
+				auto &OutApplication = Return[ApplicationKey];
+				OutApplication.m_ApplicationInfo = Value.m_ApplicationInfo;
+			}
+		}
+		catch (CException const &_Exception)
+		{
+			co_return _Exception.f_ExceptionPointer();
+		}
+
+		Auditor.f_Info("Enum applications");
 
 		co_return fg_Move(Return);
 	}

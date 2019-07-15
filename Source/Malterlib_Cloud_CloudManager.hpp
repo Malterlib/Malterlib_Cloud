@@ -35,4 +35,28 @@ namespace NMib::NCloud
 		_Stream % m_LastConnectionErrorTime;
 		_Stream % m_bActive;
 	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CApplicationKey::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_AppManagerID;
+		_Stream % m_Name;
+	}
+
+	inline auto CCloudManager::CApplicationKey::f_Tuple() const
+	{
+		return NStorage::fg_TupleReferences(m_AppManagerID, m_Name);
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CApplicationInfo::f_Stream(tf_CStream &_Stream)
+	{
+		uint32 AppManagerInterfaceVersion = 0x110;
+		static_assert(CAppManagerInterface::EProtocolVersion == 0x110, "Add a new version mapping");
+
+		{
+			DMibBinaryStreamVersion(_Stream, AppManagerInterfaceVersion);
+			_Stream % m_ApplicationInfo;
+		}
+	}
 }
