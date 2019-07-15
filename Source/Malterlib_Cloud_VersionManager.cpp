@@ -140,15 +140,6 @@ namespace NMib::NCloud
 	
 	// CVersionID
 	
-	template <typename tf_CStream>
-	void CVersionManager::CVersionID::f_Stream(tf_CStream &_Stream)
-	{
-		_Stream % m_Branch;
-		_Stream % m_Major;
-		_Stream % m_Minor;
-		_Stream % m_Revision;
-	}
-	
 	CStr CVersionManager::CVersionID::f_EncodeFileName() const
 	{
 		return fg_Format("{}_{}.{}.{}", m_Branch.f_ReplaceChar('/', '_'), m_Major, m_Minor, m_Revision);
@@ -196,13 +187,6 @@ namespace NMib::NCloud
 	
 	// CVersionIDAndPlatform
 
-	template <typename tf_CStream>
-	void CVersionManager::CVersionIDAndPlatform::f_Stream(tf_CStream &_Stream)
-	{
-		_Stream % m_VersionID;
-		_Stream % m_Platform;
-	}
-	
 	CStr CVersionManager::CVersionIDAndPlatform::f_EncodeFileName() const
 	{
 		return fg_Format("{}/{}", m_VersionID.f_EncodeFileName(), m_Platform);
@@ -285,19 +269,6 @@ namespace NMib::NCloud
 		if (auto *pValue = _JSON.f_GetMember("RetrySequence", NEncoding::EJSONType_Integer))
 			Ret.m_RetrySequence = pValue->f_Integer();
 		return Ret;
-	}
-	
-	template <typename tf_CStream>
-	void CVersionManager::CVersionInformation::f_Stream(tf_CStream &_Stream)
-	{
-		_Stream % m_Time;
-		_Stream % m_Configuration;
-		_Stream % m_Tags;
-		_Stream % m_ExtraInfo;
-		_Stream % m_nFiles;
-		_Stream % m_nBytes;
-		if (_Stream.f_GetVersion() >= 0x105)
-			_Stream % m_RetrySequence;
 	}
 	
 	// CListApplications
