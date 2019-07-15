@@ -33,6 +33,9 @@ namespace NMib::NCloud::NCloudManager
 		 	, CAppManagerInfo &&_AppManagerInfo
 		)
 	{
+		if (!_AppManager)
+			co_return DMibErrorInstance("Invalid app manager");
+
 		auto pThis = m_pThis;
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 		auto Auditor = pThis->mp_AppState.f_Auditor(CallingHostInfo);

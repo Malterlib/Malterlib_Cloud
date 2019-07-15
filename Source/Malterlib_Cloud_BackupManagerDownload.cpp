@@ -68,6 +68,9 @@ namespace NMib::NCloud
 					> Promise % "Failed to start download on remote server"
 					/ [=, Config = fg_Move(Config)](TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> &&_SyncClient) mutable
 					{
+						if (!_SyncClient)
+							return Promise.f_SetException(DMibErrorInstance("Invalid sync client"));
+
 						pState->m_DownloadBackupReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(Config), fg_Move(_SyncClient));
 						
 						pState->m_DownloadBackupReceive(&NFile::CDirectorySyncReceive::f_PerformSync)

@@ -15,6 +15,9 @@ namespace NMib::NCloud::NAppManager
 			, CRegisterInfo const &_RegisterInfo
 		)
 	{
+		if (!_ClientInterface)
+			co_return DMibErrorInstance("Invalid client interface");
+
 		auto pThis = m_pThis;
 		
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();

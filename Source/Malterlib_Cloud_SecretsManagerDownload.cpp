@@ -29,8 +29,11 @@ namespace NMib::NCloud
 					return fg_Explicit();
 				}
 			)
-			>  Promise	/ [=] (TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Downloader) mutable
+			> Promise / [=](TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Downloader) mutable
 			{
+				if (!_Downloader)
+					return Promise.f_SetException(DMibErrorInstance("Invalid downloader"));
+
 				auto UploadReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(_Config), fg_Move(_Downloader));
 
 				UploadReceive(&NFile::CDirectorySyncReceive::f_PerformSync) > Promise;

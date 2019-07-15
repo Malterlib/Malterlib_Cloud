@@ -37,6 +37,9 @@ namespace NMib::NCloud::NAppManager
 					, NStr::CStr const &_BackupRoot
 				) -> TCFuture<TCActorSubscriptionWithID<>>
 				{
+					if (!_BackupInterface)
+						co_return DMibErrorInstance("Invalid backup interface");
+
 					if (_pApplication->m_bDeleted)
 						co_return {};
 

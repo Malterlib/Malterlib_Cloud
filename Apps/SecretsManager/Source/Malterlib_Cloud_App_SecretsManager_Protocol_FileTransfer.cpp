@@ -250,6 +250,9 @@ namespace NMib::NCloud::NSecretsManager
 		 )
 		-> TCFuture<NConcurrency::TCActorFunctorWithID<TCFuture<void> ()>>
 	{
+		if (!_Uploader)
+			return DMibErrorInstance("Invalid uploader");
+
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
