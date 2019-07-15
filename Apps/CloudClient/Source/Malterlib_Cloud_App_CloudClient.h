@@ -116,7 +116,22 @@ namespace NMib::NCloud::NCloudClient
 		// Cloud Manager
 		void fp_CloudManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_CloudManager_SubscribeToServers();
-		TCFuture<uint32> fp_CommandLine_CloudManager_Status(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManager_Status(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine, ECloudManagerStatusFlag _Flags);
+		TCFuture<uint32> fp_CommandLine_CloudManager_Status_AppManagers
+			(
+				CEJSON const &_Params
+				, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> const &_AppManagers
+				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			)
+		;
+		TCFuture<uint32> fp_CommandLine_CloudManager_Status_Applications
+			(
+				CEJSON const &_Params
+				, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> const &_Applications
+				, TCMap<CStr, CCloudManagerAppManagerInfo> const &_AppManagerInfos
+				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			)
+		;
 
 		fp64 mp_Timeout = 0.0;
 

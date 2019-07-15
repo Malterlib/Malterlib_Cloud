@@ -22,6 +22,21 @@ namespace NMib::NCloud::NCloudClient
 				, "Description"_= "Limit cloud managers to only specified host ID."
 			}
 		;
+		auto QuietOption = "Quiet?"_=
+			{
+				"Names"_= {"--quiet", "-q"}
+				, "Default"_= false
+				, "Description"_= "Don't output information on std out, just return the status"
+			}
+		;
+		auto IncludeCloudManagerOption = "IncludeCloudManager?"_=
+			{
+				"Names"_= {"--include-cloud-manager", "-c"}
+				, "Default"_= false
+				, "Description"_= "Include the cloud manager column"
+			}
+		;
+
 		_Section.f_RegisterCommand
 			(
 				{
@@ -35,24 +50,66 @@ namespace NMib::NCloud::NCloudClient
 					, "Options"_=
 					{
 						OptionalHost
-						, "Quiet?"_=
-						{
-							"Names"_= {"--quiet", "-q"}
-							, "Default"_= false
-							, "Description"_= "Don't output information on std out, just return the status"
-						}
-						, "IncludeCloudManager?"_=
-						{
-							"Names"_= {"--include-cloud-manager", "-c"}
-							, "Default"_= false
-							, "Description"_= "Include the cloud manager column"
-						}
+						, QuietOption
+						, IncludeCloudManagerOption
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine);
+					auto ReportFor = ECloudManagerStatusFlag_Applications | ECloudManagerStatusFlag_AppManagers;
+					return self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
+				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+			)
+		;
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--cloud-manager-app-manager-status"}
+					, "Description"_= "List the status for app managers controlled by the Cloud Manager"
+					, "Status"_=
+					{
+						"0"_= "The status of all app managers is OK"
+						, "1"_= "One or more app managers has an error status"
+					}
+					, "Options"_=
+					{
+						OptionalHost
+						, QuietOption
+						, IncludeCloudManagerOption
+						, CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					auto ReportFor = ECloudManagerStatusFlag_AppManagers;
+					return self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
+				}
+				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+			)
+		;
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--cloud-manager-application-status"}
+					, "Description"_= "List the status for applications in app managers controlled by the Cloud Manager"
+					, "Status"_=
+					{
+						"0"_= "The status of all applications is OK"
+						, "1"_= "One or more applications has an error status"
+					}
+					, "Options"_=
+					{
+						OptionalHost
+						, QuietOption
+						, CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					auto ReportFor = ECloudManagerStatusFlag_Applications;
+					return self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -137,32 +194,52 @@ namespace NMib::NCloud::NCloudClient
 				;
 			}
 		}
-	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
-	{
-		TCPromise<uint32> Promise;
-		CStr Host = _Params["Host"].f_String();
-
-		bool bQuiet = _Params["Quiet"].f_Boolean();
-		bool bIncludeCloudManager = _Params["IncludeCloudManager"].f_Boolean();
-
-		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
-
-		TCActorResultMap<CHostInfo, TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>> AppManagersResults;
-
-		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		CStr fg_FormatApplicationStatusSeverity(CStr const &_Status, CAppManagerInterface::EStatusSeverity _Severity, CAnsiEncoding const &_AnsiEncoding)
 		{
-			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
-				continue;
-			auto &CloudManager = TrustedCloudManager.m_Actor;
-			CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)()
-				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
-				> AppManagersResults.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
-			;
+			switch (_Severity)
+			{
+			case CAppManagerInterface::EStatusSeverity_None: return "{}{}{}"_f << _AnsiEncoding.f_StatusNormal() << _Status << _AnsiEncoding.f_Default();
+			case CAppManagerInterface::EStatusSeverity_Warning: return "{}{}{}"_f << _AnsiEncoding.f_StatusWarning() << _Status << _AnsiEncoding.f_Default();
+			case CAppManagerInterface::EStatusSeverity_Error: return "{}{}{}"_f << _AnsiEncoding.f_StatusError() << _Status << _AnsiEncoding.f_Default();
+			default: return _Status;
+			}
 		}
 
-		auto AppManagers = co_await AppManagersResults.f_GetResults();
+		template <typename tf_CInfo>
+		CStr fg_FormatAppManagerStatus(tf_CInfo const &_Info, CAnsiEncoding const &_AnsiEncoding)
+		{
+			CStr Status;
+			if (_Info.m_bActive)
+				Status = "{}OK{}"_f << _AnsiEncoding.f_StatusNormal() << _AnsiEncoding.f_Default();
+			else
+			{
+				if (!_Info.m_LastConnectionError.f_IsEmpty())
+				{
+					Status = "{}{tc6}{} {}"_f
+						<< _AnsiEncoding.f_StatusError()
+						<< _Info.m_LastConnectionErrorTime
+						<< _AnsiEncoding.f_Default()
+						<< _Info.m_LastConnectionError
+					;
+				}
+				else
+					Status = "{}Missing{}"_f << _AnsiEncoding.f_StatusError() << _AnsiEncoding.f_Default();
+			}
+			return Status;
+		}
+
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers
+		(
+			CEJSON const &_Params
+			, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> const &_AppManagers
+			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+		)
+	{
+		bool bQuiet = _Params["Quiet"].f_Boolean();
+		bool bIncludeCloudManager = _Params["IncludeCloudManager"].f_Boolean();
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
@@ -190,9 +267,9 @@ namespace NMib::NCloud::NCloudClient
 
 		TCVector<CRow> Rows;
 
-		for (auto &AppManagersForHost : AppManagers)
+		for (auto &AppManagersForHost : _AppManagers)
 		{
-			auto &HostInfo = AppManagers.fs_GetKey(AppManagersForHost);
+			auto &HostInfo = _AppManagers.fs_GetKey(AppManagersForHost);
 
 			if (!AppManagersForHost)
 			{
@@ -222,38 +299,28 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 
+		CStr LastEnvironment;
+
 		for (auto &Row : Rows)
 		{
 			auto &HostInfo = Row.m_HostInfo;
 			auto &AppManagerID = Row.m_AppManagerID;
 			auto &AppManagerInfo = Row.m_AppManagerInfo;
 
-			CStr Status;
-			if (AppManagerInfo.m_bActive)
-				Status = "{}OK{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
-			else
+			if (AppManagerInfo.m_Environment != LastEnvironment)
 			{
-				if (!AppManagerInfo.m_LastConnectionError.f_IsEmpty())
-				{
-					Status = "{}{tc6}{} {}"_f
-						<< AnsiEncoding.f_StatusError()
-						<< AppManagerInfo.m_LastConnectionErrorTime
-						<< AnsiEncoding.f_Default()
-						<< AppManagerInfo.m_LastConnectionError
-					;
-				}
-				else
-					Status = "{}Missing{}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();
-
-				Return = 1;
+				TableRenderer.f_ForceRowSeparator();
+				LastEnvironment = AppManagerInfo.m_Environment;
 			}
 
-			CStr HostName = "{}{}{}"_f << AnsiEncoding.f_Foreground256(75) << AppManagerInfo.m_HostName << AnsiEncoding.f_Default();
+			if (!AppManagerInfo.m_bActive)
+				Return = 1;
 
+			CStr Status = fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding);
+			CStr HostName = "{}{}{}"_f << AnsiEncoding.f_Foreground256(75) << AppManagerInfo.m_HostName << AnsiEncoding.f_Default();
 			CTimeSpan LastSeenTimespan(Now - AppManagerInfo.m_LastSeen);
 
 			CStr LastSeen = fg_FormatTimespan(LastSeenTimespan, AnsiEncoding);
-
 			if (CTimeSpanConvert(LastSeenTimespan).f_GetSeconds() >= 10)
 				LastSeen += "\n{}"_f << AppManagerInfo.m_LastSeen;
 
@@ -279,5 +346,205 @@ namespace NMib::NCloud::NCloudClient
 			TableRenderer.f_Output(_Params);
 
 		co_return Return;
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_Applications
+		(
+			CEJSON const &_Params
+			, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> const &_Applications
+			, TCMap<CStr, CCloudManagerAppManagerInfo> const &_AppManagerInfos
+			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+		)
+	{
+		bool bQuiet = _Params["Quiet"].f_Boolean();
+
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+
+		TableRenderer.f_AddDescription("Applications");
+		TableRenderer.f_AddHeadings("Environment", "App Manager", "Name", "Application", "Auto Update Tags", "Version", "Status");
+		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
+		TableRenderer.f_SetMaxColumnWidth(5, 50);
+
+		uint32 Return = 0;
+
+		struct CRow
+		{
+			auto f_SortTuple() const
+			{
+				return fg_TupleReferences
+					(
+					 	m_AppManagerInfo.m_Environment
+					 	, m_AppManagerInfo.m_HostName
+					 	, m_AppManagerInfo.m_ProgramDirectory
+					 	, m_ApplicationKey.m_AppManagerID
+					 	, m_ApplicationKey.m_Name
+					)
+				;
+			}
+
+			CCloudManagerAppManagerInfo m_AppManagerInfo;
+			CHostInfo m_HostInfo;
+			CCloudManager::CApplicationKey m_ApplicationKey;
+			CCloudManager::CApplicationInfo m_ApplicationInfo;
+		};
+
+		TCVector<CRow> Rows;
+
+		for (auto &ApplicationsForHost : _Applications)
+		{
+			auto &HostInfo = _Applications.fs_GetKey(ApplicationsForHost);
+
+			if (!ApplicationsForHost)
+			{
+				*_pCommandLine %= "{}Failed getting applications for host{} '{}': {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+					<< ApplicationsForHost.f_GetExceptionStr()
+				;
+				Return = 1;
+				continue;
+			}
+
+			for (auto &ApplicationInfo : *ApplicationsForHost)
+			{
+				auto &ApplicationKey = (*ApplicationsForHost).fs_GetKey(ApplicationInfo);
+				CCloudManagerAppManagerInfo AppManagerInfo;
+				if (auto pAppManagerInfo = _AppManagerInfos.f_FindEqual(ApplicationKey.m_AppManagerID))
+					AppManagerInfo = *pAppManagerInfo;
+				else
+					AppManagerInfo = {"Unknown"};
+
+				Rows.f_Insert({AppManagerInfo, HostInfo, ApplicationKey, ApplicationInfo});
+			}
+		}
+
+		Rows.f_Sort
+			(
+				[](CRow const &_Left, CRow const &_Right)
+				{
+					return _Left.f_SortTuple() < _Right.f_SortTuple();
+				}
+			)
+		;
+
+		CStr LastEnvironment;
+
+		for (auto &Row : Rows)
+		{
+			auto &ApplicationKey = Row.m_ApplicationKey;
+			auto &ApplicationInfo = Row.m_ApplicationInfo.m_ApplicationInfo;
+			auto &AppManagerInfo = Row.m_AppManagerInfo;
+
+			if (ApplicationInfo.m_StatusSeverity > CAppManagerInterface::EStatusSeverity_None || !AppManagerInfo.m_bActive)
+				Return = 1;
+
+			if (AppManagerInfo.m_Environment != LastEnvironment)
+			{
+				TableRenderer.f_ForceRowSeparator();
+				LastEnvironment = AppManagerInfo.m_Environment;
+			}
+
+			CStr AutoUpdate;
+			if (ApplicationInfo.m_AutoUpdateTags.f_IsEmpty())
+				AutoUpdate = "{}Manual Update{}"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default();
+			else
+				AutoUpdate = "{vs,vb}"_f << ApplicationInfo.m_AutoUpdateTags;
+
+			CStr ApplicationStatus = fg_FormatApplicationStatusSeverity(ApplicationInfo.m_Status, ApplicationInfo.m_StatusSeverity, AnsiEncoding);
+			CStr Status;
+			if (!AppManagerInfo.m_bActive)
+				Status = "App Manager: {}\n\n{}"_f << fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding) << ApplicationStatus;
+			else
+				Status = ApplicationStatus;
+
+			TableRenderer.f_AddRow
+				(
+					AppManagerInfo.m_Environment
+				 	, "{}{}{}:{}"_f << AnsiEncoding.f_Foreground256(75) << AppManagerInfo.m_HostName << AnsiEncoding.f_Default() << AppManagerInfo.m_ProgramDirectory
+					, ApplicationKey.m_Name
+					, ApplicationInfo.m_VersionManagerApplication
+				 	, AutoUpdate
+					, ApplicationInfo.m_Version.m_VersionID
+				 	, Status
+				)
+			;
+		}
+
+		if (!bQuiet)
+			TableRenderer.f_Output(_Params);
+
+		co_return Return;
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status
+		(
+		 	CEJSON const &_Params
+		 	, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+		 	, ECloudManagerStatusFlag _Flags
+		)
+	{
+		TCPromise<uint32> Promise;
+		CStr Host = _Params["Host"].f_String();
+
+		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
+
+		TCActorResultMap<CHostInfo, TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>> AppManagersResults;
+		TCActorResultMap<CHostInfo, TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>> ApplicationsResults;
+
+		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		{
+			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
+				continue;
+			auto &CloudManager = TrustedCloudManager.m_Actor;
+			CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)()
+				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+				> AppManagersResults.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+			;
+			if (_Flags & ECloudManagerStatusFlag_Applications)
+			{
+				CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)()
+					.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+					> ApplicationsResults.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+				;
+			}
+		}
+
+		auto AppManagers = co_await AppManagersResults.f_GetResults();
+
+		uint32 ReturnAppManagers = 0;
+		if (_Flags & ECloudManagerStatusFlag_AppManagers)
+			ReturnAppManagers = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers, _Params, AppManagers, _pCommandLine);
+
+		uint32 ReturnApplications = 0;
+		if (_Flags & ECloudManagerStatusFlag_Applications)
+		{
+			auto Applications = co_await ApplicationsResults.f_GetResults();
+
+			TCMap<CStr, CCloudManagerAppManagerInfo> AppManagerInfos;
+
+			for (auto &AppManagersForHost : AppManagers)
+			{
+				if (!AppManagersForHost)
+					continue;
+
+				for (auto &AppManagerInfo : *AppManagersForHost)
+				{
+					auto &AppManagerID = (*AppManagersForHost).fs_GetKey(AppManagerInfo);
+					auto &OutInfo = AppManagerInfos[AppManagerID];
+					OutInfo.m_Environment = AppManagerInfo.m_Environment;
+					OutInfo.m_ProgramDirectory = AppManagerInfo.m_ProgramDirectory;
+					OutInfo.m_HostName = AppManagerInfo.m_HostName;
+					OutInfo.m_bActive = AppManagerInfo.m_bActive;
+					OutInfo.m_LastConnectionErrorTime = AppManagerInfo.m_LastConnectionErrorTime;
+					OutInfo.m_LastConnectionError = AppManagerInfo.m_LastConnectionError;
+				}
+			}
+
+			ReturnApplications = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status_Applications, _Params, Applications, AppManagerInfos, _pCommandLine);
+		}
+
+		co_return fg_Max(ReturnAppManagers, ReturnApplications);
 	}
 }
