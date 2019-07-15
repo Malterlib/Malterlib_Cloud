@@ -8,6 +8,46 @@
 
 namespace NMib::NCloud::NAppManager
 {
+	CAppManagerInterface::CApplicationInfo CAppManagerActor::fp_GetApplicationInfo(CApplication const &_Application)
+	{
+		auto &Settings = _Application.m_Settings;
+
+		CAppManagerInterface::CApplicationInfo OutApplication;
+
+		OutApplication.m_Status = _Application.m_LaunchStatus;
+		OutApplication.m_StatusSeverity = _Application.m_LaunchStatusSeverity;
+		OutApplication.m_EncryptionStorage = Settings.m_EncryptionStorage;
+		OutApplication.m_EncryptionFileSystem = Settings.m_EncryptionFileSystem;
+		OutApplication.m_ParentApplication = Settings.m_ParentApplication;
+		OutApplication.m_Version = _Application.m_LastInstalledVersion;
+		OutApplication.m_VersionInfo = _Application.m_LastInstalledVersionInfo;
+		OutApplication.m_VersionManagerApplication = Settings.m_VersionManagerApplication;
+		OutApplication.m_Executable = Settings.m_Executable;
+		OutApplication.m_Parameters = Settings.m_ExecutableParameters;
+		OutApplication.m_RunAsUser = Settings.m_RunAsUser;
+		OutApplication.m_RunAsGroup = Settings.m_RunAsGroup;
+		OutApplication.m_bRunAsUserHasShell = Settings.m_bRunAsUserHasShell;
+		OutApplication.m_Backup_IncludeWildcards = Settings.m_Backup_IncludeWildcards;
+		OutApplication.m_Backup_ExcludeWildcards = Settings.m_Backup_ExcludeWildcards;
+		OutApplication.m_Backup_AddSyncFlagsWildcards = Settings.m_Backup_AddSyncFlagsWildcards;
+		OutApplication.m_Backup_RemoveSyncFlagsWildcards = Settings.m_Backup_RemoveSyncFlagsWildcards;
+		OutApplication.m_Backup_NewBackupInterval = Settings.m_Backup_NewBackupInterval;
+		OutApplication.m_AutoUpdateTags = Settings.m_AutoUpdateTags;
+		OutApplication.m_AutoUpdateBranches = Settings.m_AutoUpdateBranches;
+		OutApplication.m_UpdateScriptPreUpdate = Settings.m_UpdateScripts.m_PreUpdate;
+		OutApplication.m_UpdateScriptPostUpdate = Settings.m_UpdateScripts.m_PostUpdate;
+		OutApplication.m_UpdateScriptPostLaunch = Settings.m_UpdateScripts.m_PostLaunch;
+		OutApplication.m_UpdateScriptOnError = Settings.m_UpdateScripts.m_OnError;
+		OutApplication.m_bSelfUpdateSource = Settings.m_bSelfUpdateSource;
+		OutApplication.m_UpdateGroup = Settings.m_UpdateGroup;
+		OutApplication.m_bDistributedApp = Settings.m_bDistributedApp;
+		OutApplication.m_Dependencies = Settings.m_Dependencies;
+		OutApplication.m_bStopOnDependencyFailure = Settings.m_bStopOnDependencyFailure;
+		OutApplication.m_bBackupEnabled = Settings.m_bBackupEnabled;
+
+		return OutApplication;
+	}
+
 	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_GetInstalled() -> TCFuture<TCMap<CStr, CApplicationInfo>>
 	{
 		auto pThis = m_pThis;
@@ -44,39 +84,7 @@ namespace NMib::NCloud::NAppManager
 			if (!pHasPermission || !*pHasPermission)
 				continue;
 
-			auto &OutApplication = OutputApplications[Application.m_Name];
-			auto &Settings = Application.m_Settings;
-
-			OutApplication.m_Status = Application.m_LaunchStatus;
-			OutApplication.m_StatusSeverity = Application.m_LaunchStatusSeverity;
-			OutApplication.m_EncryptionStorage = Settings.m_EncryptionStorage;
-			OutApplication.m_EncryptionFileSystem = Settings.m_EncryptionFileSystem;
-			OutApplication.m_ParentApplication = Settings.m_ParentApplication;
-			OutApplication.m_Version = Application.m_LastInstalledVersion;
-			OutApplication.m_VersionInfo = Application.m_LastInstalledVersionInfo;
-			OutApplication.m_VersionManagerApplication = Settings.m_VersionManagerApplication;
-			OutApplication.m_Executable = Settings.m_Executable;
-			OutApplication.m_Parameters = Settings.m_ExecutableParameters;
-			OutApplication.m_RunAsUser = Settings.m_RunAsUser;
-			OutApplication.m_RunAsGroup = Settings.m_RunAsGroup;
-			OutApplication.m_bRunAsUserHasShell = Settings.m_bRunAsUserHasShell;
-			OutApplication.m_Backup_IncludeWildcards = Settings.m_Backup_IncludeWildcards;
-			OutApplication.m_Backup_ExcludeWildcards = Settings.m_Backup_ExcludeWildcards;
-			OutApplication.m_Backup_AddSyncFlagsWildcards = Settings.m_Backup_AddSyncFlagsWildcards;
-			OutApplication.m_Backup_RemoveSyncFlagsWildcards = Settings.m_Backup_RemoveSyncFlagsWildcards;
-			OutApplication.m_Backup_NewBackupInterval = Settings.m_Backup_NewBackupInterval;
-			OutApplication.m_AutoUpdateTags = Settings.m_AutoUpdateTags;
-			OutApplication.m_AutoUpdateBranches = Settings.m_AutoUpdateBranches;
-			OutApplication.m_UpdateScriptPreUpdate = Settings.m_UpdateScripts.m_PreUpdate;
-			OutApplication.m_UpdateScriptPostUpdate = Settings.m_UpdateScripts.m_PostUpdate;
-			OutApplication.m_UpdateScriptPostLaunch = Settings.m_UpdateScripts.m_PostLaunch;
-			OutApplication.m_UpdateScriptOnError = Settings.m_UpdateScripts.m_OnError;
-			OutApplication.m_bSelfUpdateSource = Settings.m_bSelfUpdateSource;
-			OutApplication.m_UpdateGroup = Settings.m_UpdateGroup;
-			OutApplication.m_bDistributedApp = Settings.m_bDistributedApp;
-			OutApplication.m_Dependencies = Settings.m_Dependencies;
-			OutApplication.m_bStopOnDependencyFailure = Settings.m_bStopOnDependencyFailure;
-			OutApplication.m_bBackupEnabled = Settings.m_bBackupEnabled;
+			OutputApplications[Application.m_Name] = pThis->fp_GetApplicationInfo(Application);
 		}
 
 		Auditor.f_Info("Enum applications");

@@ -21,6 +21,7 @@ namespace NMib::NCloud::NAppManager
 			fp_NewRemoteKnownApplication(RemoteKey, mp_State.m_HostID);
 		
 		fp_SendAppToRemoteAppManagers(_pApplication);
+		fp_SendAppChange_AddedOrChanged(*_pApplication);
 		
 		if (_pApplication->f_IsChildApp())
 			return; // Parent cannot have parents
@@ -318,14 +319,16 @@ namespace NMib::NCloud::NAppManager
 
 		fp_PublishCoordinationInterface() > LogError("Failed to publish coordination interface");
 		fp_SubscribeCoordinationInterface() > LogError("Failed to subscribe to coordination interface");
-		fp_SetupAppManagerInterfacePermissions() > LogError("Failed to setup permissions") / [this, LogError]()
-			{
-				if (mp_State.m_bStoppingApp)
-					return;
 
-				fp_PublishAppManagerInterface() > LogError("Failed to publish app manager interface");
-			}
-		;
+		co_await (fp_SetupAppManagerInterfacePermissions() % "Failed to setup permissions");
+
+		if (mp_State.m_bStoppingApp)
+			co_return DMibErrorInstance("Startup aborted");
+
+		co_await (fp_PublishAppManagerInterface() % "Failed to publish app manager interface");
+
+		if (mp_State.m_bStoppingApp)
+			co_return DMibErrorInstance("Startup aborted");
 
 		auto [KeySubscription, VersionSubscription, CloudSubscription] = co_await
 			(

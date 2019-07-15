@@ -249,6 +249,9 @@ namespace NMib::NCloud::NAppManager
 			Application.m_Settings = NewSettings;
 			if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
 				fp_OnAppUpdateInfoChange(pApplication);
+
+			fp_SendAppChange_AddedOrChanged(Application);
+
 			_fOnInfo("Saving application state");
 			co_await (fp_UpdateApplicationJSON(pApplication) % "Failed to save application state" % Auditor);
 
@@ -297,6 +300,8 @@ namespace NMib::NCloud::NAppManager
 		if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
 			fp_OnAppUpdateInfoChange(pApplication);
 
+		fp_SendAppChange_AddedOrChanged(*pApplication);
+
 		_fOnInfo("Saving application state and update application files");
 
 		auto [Result, UpdateJSONResults] = co_await
@@ -335,7 +340,7 @@ namespace NMib::NCloud::NAppManager
 			_fOnInfo(fg_Format("Application settings were successfully changed. Launch skipped because of missing dependencies: {}", DependenciesMessage));
 			Auditor.f_Info("Updated application settings");
 
-			pApplication->f_SetLaunchStatus(DependenciesMessage, Severity);
+			fp_SetAppLaunchStatus(pApplication, DependenciesMessage, Severity);
 
 			co_return {};
 		}

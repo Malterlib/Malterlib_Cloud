@@ -253,7 +253,7 @@ namespace NMib::NCloud::NAppManager
 	
 	void CAppManagerActor::fp_AppLaunchStateChanged(TCSharedPointer<CApplication> const &_pApplication, CStr const &_State, CAppManagerInterface::EStatusSeverity _Severity)
 	{
-		_pApplication->f_SetLaunchStatus(_State, _Severity);
+		fp_SetAppLaunchStatus(_pApplication, _State, _Severity);
 		fp_UpdateApplicationDependencies();
 	}
 }

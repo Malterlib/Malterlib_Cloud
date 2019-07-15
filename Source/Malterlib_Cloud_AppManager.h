@@ -7,6 +7,7 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Encoding/EJSON>
 #include <Mib/Storage/Optional>
+#include <Mib/Storage/Variant>
 #include <Mib/Cloud/BackupManager>
 #include "Malterlib_Cloud_VersionManager.h"
 
@@ -49,7 +50,14 @@ namespace NMib::NCloud
 			, EStatusSeverity_Warning
 			, EStatusSeverity_Error
 		};
-		
+
+		enum EApplicationChange
+		{
+			EApplicationChange_AddOrChangeInfo
+			, EApplicationChange_Remove
+			, EApplicationChange_Status
+		};
+
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
 		{
 			template <typename tf_CStream>
@@ -194,7 +202,7 @@ namespace NMib::NCloud
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NStr::CStr m_Application;
 			NStr::CStr m_Message; // Currently only for EUpdateStage_Failed
 			CVersionIDAndPlatform m_VersionID;
@@ -202,7 +210,7 @@ namespace NMib::NCloud
 			EUpdateStage m_Stage = EUpdateStage_Failed;
 			bool m_bCoordinateWait = false; // When set the stage has not yet been reached, the group is coordinating the update
 		};
-		
+
 		struct CApplicationAdd
 		{
 			template <typename tf_CStream>
@@ -241,7 +249,48 @@ namespace NMib::NCloud
 		};
 		
 		using CVersionsAvailableForUpdate = NContainer::TCMap<NStr::CStr, NContainer::TCVector<CApplicationVersion>>;
-		
+
+		struct CApplicationChange_AddOrChangeInfo
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			CApplicationInfo m_Info;
+		};
+
+		struct CApplicationChange_Remove
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+		};
+
+		struct CApplicationChange_Status
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStr m_Status;
+			EStatusSeverity m_StatusSeverity = EStatusSeverity_None;
+		};
+
+		using CApplicationChange = NStorage::TCStreamableVariant
+			<
+				EApplicationChange
+				, NStorage::TCMember<CApplicationChange_AddOrChangeInfo, EApplicationChange_AddOrChangeInfo>
+				, NStorage::TCMember<CApplicationChange_Remove, EApplicationChange_Remove>
+				, NStorage::TCMember<CApplicationChange_Status, EApplicationChange_Status>
+			>
+		;
+
+		struct CChangeNotification
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStr m_Application;
+			CApplicationChange m_Change;
+		};
+
 		virtual NConcurrency::TCFuture<CVersionsAvailableForUpdate> f_GetAvailableVersions
 			(
 				NStr::CStr const &_Application	/// Leave empty to list versions for all version manager applications know by the AppManager. By default app manager will only subscribe to 
@@ -269,10 +318,18 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CApplicationInfo>> f_GetInstalled() = 0;
 		virtual auto f_SubscribeUpdateNotifications(NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CUpdateNotification const &_Notification)> &&_fOnNotification)
 			-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0
-		; 
+		;
+		virtual auto f_SubscribeChangeNotifications
+			(
+			 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::TCVector<CChangeNotification> &&_Notifications, bool _bInitial)> &&_fOnNotification
+			)
+			-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0
+		;
 	};
 }
 
 #ifndef DMibPNoShortCuts
 	using namespace NMib::NCloud;
 #endif
+
+#include "Malterlib_Cloud_AppManager.hpp"

@@ -102,18 +102,18 @@ namespace NMib::NCloud::NAppManager
 			if (!Application.f_IsLaunched())
 			{
 				// Don't recursively call update application dependencies
-				Application.f_SetLaunchStatus(Status, Severity);
+				fp_SetAppLaunchStatus(_pApplication, Status, Severity);
 				return false;
 			}
 			
 			if (Application.m_Settings.m_bStopOnDependencyFailure)
 			{
-				Application.f_Stop(EStopFlag_AutoStart) > [_pApplication, Status, Severity](TCAsyncResult<uint32> &&_Result)
+				Application.f_Stop(EStopFlag_AutoStart) > [this, _pApplication, Status, Severity](TCAsyncResult<uint32> &&_Result)
 					{
 						auto &Application = *_pApplication;
 						if (_Result)
 						{
-							Application.f_SetLaunchStatus("Stopped because dependency failed: {}"_f << Status, Severity);
+							fp_SetAppLaunchStatus(_pApplication, "Stopped because dependency failed: {}"_f << Status, Severity);
 							return;
 						}
 						
@@ -127,7 +127,7 @@ namespace NMib::NCloud::NAppManager
 							)
 						;
 
-						Application.f_SetLaunchStatus("Failed to stop (when dependency failed): {}"_f << _Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+						fp_SetAppLaunchStatus(_pApplication, "Failed to stop (when dependency failed): {}"_f << _Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
 					}
 				;
 			}

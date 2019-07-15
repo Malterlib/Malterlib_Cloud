@@ -33,7 +33,7 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerInterface::EStatusSeverity Severity;
 		if (!_pApplication->f_DependenciesSatisfied(Status, Severity))
 		{
-			_pApplication->f_SetLaunchStatus(Status, Severity);
+			fp_SetAppLaunchStatus(_pApplication, Status, Severity);
 			co_return DMibErrorInstance(fg_Format("Dependencies not satisfied: {}", Status));
 		}
 

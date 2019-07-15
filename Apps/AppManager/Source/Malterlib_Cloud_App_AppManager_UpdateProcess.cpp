@@ -429,11 +429,21 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
+		bool bSettingsChange = false;
 		if (State.m_pNewSettings)
+		{
 			State.m_pApplication->m_Settings = *State.m_pNewSettings;
+			bSettingsChange = true;
+		}
 
 		if (State.m_fUpdateVersionInfo)
+		{
 			State.m_fUpdateVersionInfo();
+			bSettingsChange = true;
+		}
+
+		if (bSettingsChange)
+			fp_SendAppChange_AddedOrChanged(*State.m_pApplication);
 
 		State.m_pApplication->m_bPreventLaunch_Update = false;
 
@@ -480,7 +490,7 @@ namespace NMib::NCloud::NAppManager
 			else
 				State.m_fOnInfo(fg_Format("Application was successfully updated. Launch skipped because of missing dependency: {}", Message));
 
-			State.m_pApplication->f_SetLaunchStatus(Message, Severity);
+			fp_SetAppLaunchStatus(State.m_pApplication, Message, Severity);
 
 			co_return false;
 		}

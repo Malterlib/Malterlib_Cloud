@@ -237,10 +237,11 @@ namespace NMib::NCloud::NAppManager
 		return m_RegisterInfo.m_UpdateType;
 	}
 
-	void CAppManagerActor::CApplication::f_SetLaunchStatus(CStr const &_LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity)
+	void CAppManagerActor::fp_SetAppLaunchStatus(TCSharedPointer<CApplication> const &_pApplication, CStr const &_LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity)
 	{
-		m_LaunchStatus = _LaunchStatus;
-		m_LaunchStatusSeverity = _Severity;
+		_pApplication->m_LaunchStatus = _LaunchStatus;
+		_pApplication->m_LaunchStatusSeverity = _Severity;
+		fp_SendAppChange_Status(*_pApplication);
 	}
 
 	CAppManagerCoordinationInterface::CAppInfo CAppManagerActor::CApplication::f_GetRemoteAppInfo() const
@@ -321,7 +322,7 @@ namespace NMib::NCloud::NAppManager
 	void CAppManagerActor::fp_OnAppUpdateInfoChange(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		fp_SendAppToRemoteAppManagers(_pApplication);
-		fp_OnAppUpdateInfoChange(); // Process our own changes		
+		fp_OnAppUpdateInfoChange(); // Process our own changes
 	}
 	
 	void CAppManagerActor::fp_SendInitialInfoToRemoteAppManager(CRemoteAppManager &_AppManager)

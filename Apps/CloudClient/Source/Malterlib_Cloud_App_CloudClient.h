@@ -23,6 +23,21 @@ namespace NMib::NCloud::NCloudClient
 		~CCloudClientAppActor();
 		
 	protected:
+		struct CCloudManagerAppManagerInfo
+		{
+			CStr m_HostName;
+			CStr m_ProgramDirectory;
+			CStr m_Environment;
+			CStr m_LastConnectionError;
+			CTime m_LastConnectionErrorTime;
+			bool m_bActive;
+		};
+
+		enum ECloudManagerStatusFlag
+		{
+			ECloudManagerStatusFlag_AppManagers = DBit(0)
+			, ECloudManagerStatusFlag_Applications = DBit(1)
+		};
 		
 		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
 		TCFuture<void> fp_StopApp() override;

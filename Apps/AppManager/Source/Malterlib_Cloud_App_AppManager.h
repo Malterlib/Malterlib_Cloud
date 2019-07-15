@@ -172,8 +172,6 @@ namespace NMib::NCloud::NAppManager
 			EDistributedAppUpdateType f_GetUpdateType() const;
 			CAppManagerCoordinationInterface::CAppInfo f_GetRemoteAppInfo() const;
 
-			void f_SetLaunchStatus(CStr const &_LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity);
-
 			CStr const m_Name;
 
 			CApplicationSettings m_Settings;
@@ -359,6 +357,12 @@ namespace NMib::NCloud::NAppManager
 			auto f_SubscribeUpdateNotifications(NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CUpdateNotification const &_Notification)> &&_fOnNotification)
 				-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override
 			;
+			auto f_SubscribeChangeNotifications
+				(
+				 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (TCVector<CChangeNotification> &&_Notifications, bool _bInitial)> &&_fOnNotification
+				)
+				-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override
+			;
 
 			CAppManagerActor *m_pThis = nullptr;
 		};
@@ -366,6 +370,12 @@ namespace NMib::NCloud::NAppManager
 		struct CUpdateNotificationSubscription
 		{
 			TCActorFunctor<NConcurrency::TCFuture<void> (CAppManagerInterface::CUpdateNotification const &_Notification)> m_fOnUpdate;
+			CCallingHostInfo m_CallingHostInfo;
+		};
+
+		struct CChangeNotificationSubscription
+		{
+			TCActorFunctor<NConcurrency::TCFuture<void> (TCVector<CAppManagerInterface::CChangeNotification> &&_Notification, bool _bInitial)> m_fOnChange;
 			CCallingHostInfo m_CallingHostInfo;
 		};
 
@@ -810,6 +820,13 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		TCFuture<void> fp_SendChangeNotifications(CAppManagerInterface::CChangeNotification _Notification);
+		CAppManagerInterface::CApplicationInfo fp_GetApplicationInfo(CApplication const &_Application);
+		void fp_SendInitialChangeNotifications(CChangeNotificationSubscription const &_Subscription);
+		void fp_SendAppChange_AddedOrChanged(CApplication const &_Application);
+		void fp_SendAppChange_Removed(CApplication const &_Application);
+		void fp_SendAppChange_Status(CApplication const &_Application);
+
 		TCFuture<void> fp_PublishCoordinationInterface();
 		TCFuture<void> fp_SubscribeCoordinationInterface();
 		TCFuture<void> fp_NewRemoteAppManager(CRemoteAppManager &_AppManager);
@@ -823,6 +840,7 @@ namespace NMib::NCloud::NAppManager
 
 		void fp_AppLaunchStateChanged(TCSharedPointer<CApplication> const &_pApplication, CStr const &_State, CAppManagerInterface::EStatusSeverity _Severity);
 		void fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted);
+		void fp_SetAppLaunchStatus(TCSharedPointer<CApplication> const &_pApplication, CStr const &_LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity);
 
 		TCFuture<void> fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		TCFuture<void> fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
@@ -897,6 +915,7 @@ namespace NMib::NCloud::NAppManager
 		CTrustedPermissionSubscription mp_Permissions;
 
 		TCMap<CStr, CUpdateNotificationSubscription> mp_UpdateNotificationSubscriptions;
+		TCMap<CStr, CChangeNotificationSubscription> mp_ChangeNotificationSubscriptions;
 		TCTrustedActorSubscription<CAppManagerCoordinationInterface> mp_RemoteAppManagers;
 
 		TCMap<CStr, CRemoteAppManager> mp_RemoteAppManagerState;

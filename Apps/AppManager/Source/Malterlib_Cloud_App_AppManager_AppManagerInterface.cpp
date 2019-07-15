@@ -26,6 +26,7 @@ namespace NMib::NCloud::NAppManager
 		Permissions["AppManager/Command/ApplicationStop"];
 		Permissions["AppManager/Command/ApplicationRestart"];
 		Permissions["AppManager/Command/ApplicationSubscribeUpdates"];
+		Permissions["AppManager/Command/ApplicationSubscribeChanges"];
 
 		Permissions["AppManager/AppAll"];
 		
