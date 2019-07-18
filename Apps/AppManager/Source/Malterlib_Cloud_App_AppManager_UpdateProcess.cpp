@@ -145,16 +145,17 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
-		CStr DownloadDirectory = fg_Format("{}/TempVersionDownload/{}", State.m_pApplication->f_GetDirectory(), fg_RandomID());
+		CStr DownloadDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersionDownload";
+		CStr DownloadDirectory = DownloadDirectoryRoot / fg_RandomID();
 		State.m_SourcePath = DownloadDirectory;
-		State.m_AllowSourceExist[DownloadDirectory];
+		State.m_AllowSourceExist[DownloadDirectoryRoot];
 
-		State.m_DownloadDirectoryCleanup = g_ActorSubscription(mp_FileActor) / [DownloadDirectory]
+		State.m_DownloadDirectoryCleanup = g_ActorSubscription(mp_FileActor) / [DownloadDirectoryRoot]
 			{
 				try
 				{
-					if (CFile::fs_FileExists(DownloadDirectory))
-						CFile::fs_DeleteDirectoryRecursive(DownloadDirectory);
+					if (CFile::fs_FileExists(DownloadDirectoryRoot))
+						CFile::fs_DeleteDirectoryRecursive(DownloadDirectoryRoot);
 				}
 				catch (CExceptionFile const &_Exception)
 				{
@@ -235,17 +236,20 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
-		CStr TemporaryDirectory = fg_Format("{}/TempVersion", State.m_pApplication->f_GetDirectory());
-
-		State.m_TemporaryDirectoryCleanup = g_ActorSubscription(mp_FileActor) / [TemporaryDirectory]
+		CStr TemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "{}/TempVersion";
+		CStr TemporaryDirectory = TemporaryDirectoryRoot / fg_RandomID();
+		State.m_TempraryPath = TemporaryDirectory;
+		State.m_TemporaryDirectoryCleanup = g_ActorSubscription(mp_FileActor) / [TemporaryDirectoryRoot]
 			{
 				try
 				{
-					if (CFile::fs_FileExists(TemporaryDirectory))
-						CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
+					if (CFile::fs_FileExists(TemporaryDirectoryRoot))
+						CFile::fs_DeleteDirectoryRecursive(TemporaryDirectoryRoot);
 				}
-				catch (CExceptionFile const &)
+				catch (CExceptionFile const &_Exception)
 				{
+					(void)_Exception;
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up temp unpack: {}", _Exception);
 				}
 			}
 		;
@@ -277,8 +281,16 @@ namespace NMib::NCloud::NAppManager
 					}
 
 					// Cleanup any old crash version
-					if (CFile::fs_FileExists(TemporaryDirectory))
-						CFile::fs_DeleteDirectoryRecursive(TemporaryDirectory);
+					try
+					{
+						if (CFile::fs_FileExists(TemporaryDirectoryRoot))
+							CFile::fs_DeleteDirectoryRecursive(TemporaryDirectoryRoot);
+					}
+					catch (CExceptionFile const &_Exception)
+					{
+						(void)_Exception;
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up old temp unpack: {}", _Exception);
+					}
 
 					TCVector<CStr> Files;
 					CStr Output = fsp_UnpackApplication(RootDirectory, SourcePath, TemporaryDirectory, ApplicationName, Settings, Files, AllowSourceExist, false, pUniqueUserGroup);
@@ -357,7 +369,7 @@ namespace NMib::NCloud::NAppManager
 				[
 					=
 					, OutputDirectory = State.m_pApplication->f_GetDirectory()
-					, TemporaryDirectory = fg_Format("{}/TempVersion", State.m_pApplication->f_GetDirectory())
+					, TemporaryDirectory = State.m_TempraryPath
 					, OldFiles = State.m_pApplication->m_Files
 					, Files = State.m_Files
 					, pApplication = State.m_pApplication

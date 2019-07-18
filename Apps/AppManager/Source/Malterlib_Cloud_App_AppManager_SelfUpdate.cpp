@@ -28,6 +28,11 @@ namespace NMib::NCloud::NAppManager
 				{
 					CStr ProgramDir = CFile::fs_GetProgramDirectory();
 					CStr ProgramPath = CFile::fs_GetProgramPath();
+					
+					CFile::CFindFilesOptions FindFilesOptions(SourceDir / "*", true);
+					FindFilesOptions.m_AttribMask = EFileAttrib_File;
+					FindFilesOptions.m_ExcludePatterns = {SourceDir / "TempVersion", SourceDir / "TempVersionDownload", SourceDir / ".tmp", SourceDir / ".home"};
+
 					auto Files = CFile::fs_FindFiles(SourceDir + "/*", EFileAttrib_File, true);
 					bool bUpdatedFiles = false;
 					for (auto &File : Files)

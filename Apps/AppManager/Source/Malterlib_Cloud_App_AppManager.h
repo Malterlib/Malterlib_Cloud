@@ -564,6 +564,7 @@ namespace NMib::NCloud::NAppManager
 			COnScopeExitShared m_pInProgressScope;
 			COnScopeExitShared m_pCleanupStateMap;
 			CStr m_SourcePath;
+			CStr m_TempraryPath;
 			TCSharedPointer<CApplicationSettings> m_pNewSettings;
 			TCSet<CStr> m_AllowSourceExist;
 			CAppManagerInterface::CVersionIDAndPlatform m_VersionID;

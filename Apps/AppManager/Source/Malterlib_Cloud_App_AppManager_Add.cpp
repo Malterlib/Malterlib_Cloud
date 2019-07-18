@@ -426,7 +426,8 @@ namespace NMib::NCloud::NAppManager
 		}
 		else
 		{
-			CStr DownloadDirectory = "{}/TempVersionDownload/{}"_f << Directory << fg_RandomID();
+			CStr DownloadDirectoryRoot = Directory / "TempVersionDownload";
+			CStr DownloadDirectory = DownloadDirectoryRoot / fg_RandomID();
 			_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
 			auto VersionInfo = co_await
 				(
@@ -443,7 +444,7 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception(_Exception.f_GetErrorStr());
 			}
 
-			*pDeletePath = DownloadDirectory;
+			*pDeletePath = DownloadDirectoryRoot;
 			SourcePath = DownloadDirectory;
 		}
 
@@ -472,8 +473,9 @@ namespace NMib::NCloud::NAppManager
 						TCSet<CStr> AllowExist;
 						AllowExist[Directory + "/lost+found"];
 						AllowExist[Directory + "/.home"];
+						AllowExist[Directory + "/.tmp"];
 						if (!pDeletePath->f_IsEmpty())
-							AllowExist[CFile::fs_GetPath(*pDeletePath)];
+							AllowExist[*pDeletePath];
 						CStr Output = fsp_UnpackApplication
 							(
 							 	RootDirectory
@@ -493,9 +495,6 @@ namespace NMib::NCloud::NAppManager
 
 					fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 
-					if (!pDeletePath->f_IsEmpty())
-						CFile::fs_DeleteDirectoryRecursive(*pDeletePath);
-
 					return Files;
 				}
 				% "Failed to unpack application" % Auditor
@@ -507,6 +506,9 @@ namespace NMib::NCloud::NAppManager
 			if (pApplicationsState->f_GetMember(pApplication->m_Name))
 				co_return Auditor.f_Exception(fg_Format("Application with name '{}' already exists", pApplication->m_Name));
 		}
+
+		if (CleanupDownload)
+			co_await CleanupDownload->f_Destroy();
 
 		pApplication->m_Files = fg_Move(Files);
 
@@ -520,9 +522,6 @@ namespace NMib::NCloud::NAppManager
 		pApplication->m_LastInstalledVersionInfoFinished = pApplication->m_LastInstalledVersionInfo;
 
 		co_await (fp_UpdateApplicationJSON(pApplication) % "Failed to save state" % Auditor);
-
-		if (CleanupDownload)
-			co_await CleanupDownload->f_Destroy();
 
 		pApplication->m_bJustUpdated = true;
 		CAppLaunchResult AppLaunchResult = co_await (fp_LaunchApp(pApplication, false) % "Failed to launch app. Will retry periodically" % Auditor);
