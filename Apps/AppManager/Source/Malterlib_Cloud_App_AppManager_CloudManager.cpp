@@ -19,6 +19,10 @@ namespace NMib::NCloud::NAppManager
   		Info.m_Version = (*g_CloudVersion).m_Version;
 		Info.m_ProgramDirectory = mp_Settings.m_RootDirectory;
 
+		NMib::NProcess::CVersionInfo VersionInfo;
+		NProcess::NPlatform::fg_Process_GetVersionInfo(CFile::fs_GetProgramPath(), VersionInfo);
+		Info.m_VersionDate = VersionInfo.m_BuildTime;
+
 		auto Subscription = co_await _CloudManager.f_CallActor(&CCloudManager::f_RegisterAppManager)(mp_AppManagerInterface.m_Actor->f_ShareInterface<CAppManagerInterface>(), fg_Move(Info));
 
 		auto &NewManager = mp_CloudManagers[_CloudManager];

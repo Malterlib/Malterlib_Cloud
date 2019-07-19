@@ -245,7 +245,7 @@ namespace NMib::NCloud::NCloudClient
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 
 		TableRenderer.f_AddDescription("App Managers");
-		TableRenderer.f_AddHeadings("Cloud Manager", "Environment", "Hostname", "Location", "Platform", "Version", "ID", "Last Seen", "Status");
+		TableRenderer.f_AddHeadings("Cloud Manager", "Environment", "Hostname", "Location", "Platform", "Version", "Date", "ID", "Last Seen", "Status");
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
 		TableRenderer.f_SetMaxColumnWidth(5, 50);
 
@@ -332,6 +332,7 @@ namespace NMib::NCloud::NCloudClient
 					, AppManagerInfo.m_ProgramDirectory
 				 	, AppManagerInfo.m_PlatformFamily
 				 	, AppManagerInfo.m_Version
+				 	, "{td}"_f << AppManagerInfo.m_VersionDate
 					, AppManagerID
 					, LastSeen
 					, Status
@@ -362,7 +363,7 @@ namespace NMib::NCloud::NCloudClient
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 
 		TableRenderer.f_AddDescription("Applications");
-		TableRenderer.f_AddHeadings("Environment", "App Manager", "Name", "Application", "Auto Update Tags", "Version", "Status");
+		TableRenderer.f_AddHeadings("Environment", "App Manager", "Name", "Application", "Auto Update Tags", "Version", "Date", "Status");
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
 		TableRenderer.f_SetMaxColumnWidth(5, 50);
 
@@ -467,6 +468,7 @@ namespace NMib::NCloud::NCloudClient
 					, ApplicationInfo.m_VersionManagerApplication
 				 	, AutoUpdate
 					, ApplicationInfo.m_Version.m_VersionID
+				 	, "{td}"_f << ApplicationInfo.m_VersionInfo.m_Time
 				 	, Status
 				)
 			;

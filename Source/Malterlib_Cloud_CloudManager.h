@@ -14,7 +14,7 @@ namespace NMib::NCloud
 	enum
 	{
 		ECloudManagerMinProtocolVersion = 0x101
-		, ECloudManagerProtocolVersion = 0x104
+		, ECloudManagerProtocolVersion = 0x105
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -45,6 +45,7 @@ namespace NMib::NCloud
 			NStr::CStr m_HostName;
 			NStr::CStr m_ProgramDirectory;
 			CCloudVersion m_Version;
+			NTime::CTime m_VersionDate;
 			NStr::CStr m_Platform;
 			NStr::CStr m_PlatformFamily;
 		};

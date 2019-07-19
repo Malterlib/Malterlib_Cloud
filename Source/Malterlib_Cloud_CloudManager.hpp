@@ -18,11 +18,13 @@ namespace NMib::NCloud
 			_Stream % m_Platform;
 			_Stream % m_PlatformFamily;
 		}
+		if (_Stream.f_GetVersion() >= 0x105)
+			_Stream % m_VersionDate;
 	}
 
 	inline auto CCloudManager::CAppManagerInfo::f_Tuple() const
 	{
-		return NStorage::fg_TupleReferences(m_Environment, m_HostName, m_ProgramDirectory, m_Version, m_Platform, m_PlatformFamily);
+		return NStorage::fg_TupleReferences(m_Environment, m_HostName, m_ProgramDirectory, m_VersionDate, m_Version, m_Platform, m_PlatformFamily);
 	}
 
 	template <typename tf_CStream>
