@@ -236,7 +236,8 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
-		CStr TemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "{}/TempVersion";
+		CStr TemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersion";
+		CStr BuggyTemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "{}";
 		CStr TemporaryDirectory = TemporaryDirectoryRoot / fg_RandomID();
 		State.m_TempraryPath = TemporaryDirectory;
 		State.m_TemporaryDirectoryCleanup = g_ActorSubscription(mp_FileActor) / [TemporaryDirectoryRoot]
@@ -285,6 +286,8 @@ namespace NMib::NCloud::NAppManager
 					{
 						if (CFile::fs_FileExists(TemporaryDirectoryRoot))
 							CFile::fs_DeleteDirectoryRecursive(TemporaryDirectoryRoot);
+						if (CFile::fs_FileExists(BuggyTemporaryDirectoryRoot))
+							CFile::fs_DeleteDirectoryRecursive(BuggyTemporaryDirectoryRoot);
 					}
 					catch (CExceptionFile const &_Exception)
 					{
@@ -417,10 +420,10 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
-		if (State.m_DownloadDirectoryCleanup)
-			co_await State.m_DownloadDirectoryCleanup->f_Destroy();
 		if (State.m_TemporaryDirectoryCleanup)
 			co_await State.m_TemporaryDirectoryCleanup->f_Destroy();
+		if (State.m_DownloadDirectoryCleanup)
+			co_await State.m_DownloadDirectoryCleanup->f_Destroy();
 		State.m_DownloadDirectoryCleanup.f_Clear();
 		State.m_TemporaryDirectoryCleanup.f_Clear();
 		

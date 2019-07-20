@@ -33,13 +33,14 @@ namespace NMib::NCloud::NAppManager
 					FindFilesOptions.m_AttribMask = EFileAttrib_File;
 					FindFilesOptions.m_ExcludePatterns = {SourceDir / "TempVersion", SourceDir / "TempVersionDownload", SourceDir / ".tmp", SourceDir / ".home"};
 
-					auto Files = CFile::fs_FindFiles(SourceDir + "/*", EFileAttrib_File, true);
+					auto Files = CFile::fs_FindFiles(FindFilesOptions);
+
 					bool bUpdatedFiles = false;
 					for (auto &File : Files)
 					{
-						CStr RelativePath = File.f_Extract(SourceDir.f_GetLen() + 1);
+						CStr RelativePath = File.m_Path.f_Extract(SourceDir.f_GetLen() + 1);
 						CStr Source = CFile::fs_AppendPath(ProgramDir, RelativePath);
-						if (CFile::fs_DiffCopyFileOrDirectory(File, CFile::fs_AppendPath(ProgramDir, RelativePath), nullptr, {}, 0.0))
+						if (CFile::fs_DiffCopyFileOrDirectory(File.m_Path, CFile::fs_AppendPath(ProgramDir, RelativePath), nullptr, {}, 0.0))
 							bUpdatedFiles = true;
 					}
 
