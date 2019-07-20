@@ -47,6 +47,9 @@ namespace NMib::NCloud::NCloudManager
 			CStr m_UniqueHostID;
 			mint m_RegisterSequence = 0;
 			CActorSubscription m_ChangeNotificationsSubscription;
+			bool m_bUpdatedOnce = false;;
+			bool m_bFiltered = false;
+			bool m_bAccessDenied = false;
 		};
 
 		TCFuture<void> fp_Destroy() override;
@@ -55,7 +58,9 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_SetupMonitor();
 		TCFuture<void> fp_UpdateAppManagerState();
 		TCFuture<void> fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data);
-		TCFuture<void> fp_ProcessApplicationChanges(CStr const &_AppManagerID, TCVector<CAppManagerInterface::CChangeNotification> &&_Changes, bool _bInitial);
+		TCFuture<void> fp_ProcessApplicationChanges(CStr const &_AppManagerID, CAppManagerInterface::COnChangeNotificationParams &&_Params);
+		TCFuture<void> fp_ChangeOtherErrors(CStr const &_AppManagerID, mint _RegisterSequence, TCSet<CStr> const &_Remove, TCMap<CStr, CStr> const &_Add);
+		TCFuture<void> fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied);
 
 		TCDistributedActorInstance<CCloudManagerImplementation> mp_ProtocolInterface;
 		CDistributedAppState &mp_AppState;

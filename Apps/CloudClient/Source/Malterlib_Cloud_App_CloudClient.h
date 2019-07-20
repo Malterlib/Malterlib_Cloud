@@ -25,11 +25,14 @@ namespace NMib::NCloud::NCloudClient
 	protected:
 		struct CCloudManagerAppManagerInfo
 		{
+			bool f_HasErrors() const;
+
 			CStr m_HostName;
 			CStr m_ProgramDirectory;
 			CStr m_Environment;
 			CStr m_LastConnectionError;
 			CTime m_LastConnectionErrorTime;
+			TCMap<CStr, CStr> m_OtherErrors;
 			bool m_bActive;
 		};
 

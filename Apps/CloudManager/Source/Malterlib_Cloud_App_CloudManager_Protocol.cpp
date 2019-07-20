@@ -27,20 +27,92 @@ namespace NMib::NCloud::NCloudManager
 		return mp_ProtocolInterface.f_Publish<CCloudManager>(mp_AppState.m_DistributionManager, this, CCloudManager::mc_pDefaultNamespace);
 	}
 
-	TCFuture<void> CCloudManagerServer::fp_ProcessApplicationChanges(CStr const &_AppManagerID, TCVector<CAppManagerInterface::CChangeNotification> &&_Changes, bool _bInitial)
+	TCFuture<void> CCloudManagerServer::fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied)
+	{
+		auto pAppManager = mp_AppManagers.f_FindEqual(_AppManagerID);
+		if (!pAppManager || pAppManager->m_RegisterSequence != _RegisterSequence)
+			co_return {};
+
+		if (pAppManager->m_bUpdatedOnce && pAppManager->m_bFiltered == _bFiltered && pAppManager->m_bAccessDenied == _bAccessDenied)
+			co_return {};
+
+		pAppManager->m_bUpdatedOnce = true;
+		pAppManager->m_bFiltered = _bFiltered;
+		pAppManager->m_bAccessDenied = _bAccessDenied;
+
+		TCSet<CStr> RemoveErrors;
+		TCMap<CStr, CStr> Errors;
+		if (_bAccessDenied)
+			Errors["Subscribed Notifications"] = "Access denied from AppManager";
+		else if (_bFiltered)
+			Errors["Subscribed Notifications"] = "Missing application permissions in AppManager. None or only some applications will be monitored.";
+		else
+			RemoveErrors["Subscribed Notifications"];
+
+		co_await self(&CCloudManagerServer::fp_ChangeOtherErrors, _AppManagerID, _RegisterSequence, fg_Move(RemoveErrors), fg_Move(Errors));
+
+		co_return {};
+	}
+
+	TCFuture<void> CCloudManagerServer::fp_ChangeOtherErrors(CStr const &_AppManagerID, mint _RegisterSequence, TCSet<CStr> const &_Remove, TCMap<CStr, CStr> const &_Add)
 	{
 		try
 		{
 			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
 			{
-				if (_bInitial)
+				auto pAppManager = mp_AppManagers.f_FindEqual(_AppManagerID);
+
+				if (!pAppManager || pAppManager->m_RegisterSequence != _RegisterSequence)
+					co_return {};
+
+				auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+				CAppManagerKey Key{CAppManagerKey::mc_Prefix, _AppManagerID};
+
+				pAppManager->m_Data.m_OtherErrors -= _Remove;
+				for (auto &Error : _Add)
+					pAppManager->m_Data.m_OtherErrors[_Add.fs_GetKey(Error)] = Error;
+
+				WriteCursor.f_Upsert(Key, pAppManager->m_Data);
+			}
+			co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
+		}
+		catch (CException const &_Exception)
+		{
+			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", _Exception);
+			co_return _Exception.f_ExceptionPointer();
+		}
+
+		co_return {};
+	}
+
+	TCFuture<void> CCloudManagerServer::fp_ProcessApplicationChanges(CStr const &_AppManagerID, CAppManagerInterface::COnChangeNotificationParams &&_Params)
+	{
+		try
+		{
+			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
+			{
+				if (_Params.m_bInitial)
 				{
 					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _AppManagerID); ApplicationCursor;)
-						ApplicationCursor.f_Delete();
+					{
+						if (_Params.m_bFiltered || _Params.m_bAccessDenied)
+						{
+							CApplicationValue Value;
+							Value = ApplicationCursor.f_Value<CApplicationValue>();
+
+							Value.m_ApplicationInfo.m_Status = "Indeterminate status, fix permissions in app manager";
+							Value.m_ApplicationInfo.m_StatusSeverity = CAppManagerInterface::EStatusSeverity_Error;
+
+							ApplicationCursor.f_SetValue(Value);
+							++ApplicationCursor;
+						}
+						else
+							ApplicationCursor.f_Delete();
+					}
 				}
 
 				auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
-				for (auto &Change : _Changes)
+				for (auto &Change : _Params.m_Changes)
 				{
 					CApplicationKey Key{CApplicationKey::mc_Prefix, _AppManagerID, Change.m_Application};
 					if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Remove>())
@@ -132,24 +204,42 @@ namespace NMib::NCloud::NCloudManager
 		auto ChangeNotificationsSubscription = co_await AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeChangeNotifications)
 			(
 			 	g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
-			 	(TCVector<CAppManagerInterface::CChangeNotification> &&_Changes, bool _bInitial) -> NConcurrency::TCFuture<void>
+			 	(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> NConcurrency::TCFuture<void>
 				{
 					auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
 					if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
 						co_return {};
 
-					co_await pThis->self(&CCloudManagerServer::fp_ProcessApplicationChanges, AppManagerID, fg_Move(_Changes), _bInitial);
+					co_await pThis->self(&CCloudManagerServer::fp_ReportFiltered, AppManagerID, RegisterSequence, _Params.m_bFiltered, _Params.m_bAccessDenied);
+					co_await pThis->self(&CCloudManagerServer::fp_ProcessApplicationChanges, AppManagerID, fg_Move(_Params));
 
 					co_return {};
 				}
 			)
+			.f_Wrap()
 		;
 
 		auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
 		if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
 			co_return {};
 
-		pAppManager->m_ChangeNotificationsSubscription = fg_Move(ChangeNotificationsSubscription);
+		if (ChangeNotificationsSubscription)
+		{
+			pAppManager->m_ChangeNotificationsSubscription = fg_Move(*ChangeNotificationsSubscription);
+			co_await pThis->self(&CCloudManagerServer::fp_ChangeOtherErrors, AppManagerID, RegisterSequence, TCSet<CStr>{"Subscribe Notifications"}, TCMap<CStr, CStr>{});
+		}
+		else
+		{
+			co_await pThis->self
+				(
+				 	&CCloudManagerServer::fp_ChangeOtherErrors
+				 	, AppManagerID
+				 	, RegisterSequence
+				 	, TCSet<CStr>{}
+				 	, TCMap<CStr, CStr>{{"Subscribe Notifications", ChangeNotificationsSubscription.f_GetExceptionStr()}}
+				)
+			;
+		}
 
 		Auditor.f_Info("App manager registered");
 
@@ -168,7 +258,7 @@ namespace NMib::NCloud::NCloudManager
 				Data.m_bActive = false;
 
 				auto Interface = fg_Move(pAppManager->m_Interface);
-				pThis->mp_AppManagers.f_Remove(pAppManager);
+				pThis->mp_AppManagers.f_Remove(AppManagerID);
 
 				co_await (Interface.f_Destroy() + pThis->fp_SaveAppManagerData(DatabaseKey, Data)).f_Wrap();
 
@@ -203,6 +293,7 @@ namespace NMib::NCloud::NCloudManager
 				OutAppManager.m_LastSeen = Value.m_LastSeen;
 				OutAppManager.m_LastConnectionError = Value.m_LastConnectionError;
 				OutAppManager.m_LastConnectionErrorTime = Value.m_LastConnectionErrorTime;
+				OutAppManager.m_OtherErrors = Value.m_OtherErrors;
 				OutAppManager.m_bActive = Value.m_bActive;
 			}
 		}

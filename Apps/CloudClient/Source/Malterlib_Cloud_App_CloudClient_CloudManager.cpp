@@ -209,14 +209,12 @@ namespace NMib::NCloud::NCloudClient
 		template <typename tf_CInfo>
 		CStr fg_FormatAppManagerStatus(tf_CInfo const &_Info, CAnsiEncoding const &_AnsiEncoding)
 		{
-			CStr Status;
-			if (_Info.m_bActive)
-				Status = "{}OK{}"_f << _AnsiEncoding.f_StatusNormal() << _AnsiEncoding.f_Default();
-			else
+			if (!_Info.m_bActive)
 			{
+				CStr Status;
 				if (!_Info.m_LastConnectionError.f_IsEmpty())
 				{
-					Status = "{}{tc6}{} {}"_f
+					Status = "{}Not Connected:{} {tc6} {}"_f
 						<< _AnsiEncoding.f_StatusError()
 						<< _Info.m_LastConnectionErrorTime
 						<< _AnsiEncoding.f_Default()
@@ -224,11 +222,26 @@ namespace NMib::NCloud::NCloudClient
 					;
 				}
 				else
-					Status = "{}Missing{}"_f << _AnsiEncoding.f_StatusError() << _AnsiEncoding.f_Default();
+					Status = "{}Not Connected{}"_f << _AnsiEncoding.f_StatusError() << _AnsiEncoding.f_Default();
+
+				return Status;
 			}
+
+			CStr Status = "{}Connected{}"_f << _AnsiEncoding.f_StatusNormal() << _AnsiEncoding.f_Default();
+			if (!_Info.m_OtherErrors.f_IsEmpty())
+			{
+				for (auto &Error : _Info.m_OtherErrors)
+					Status += "\n{}{}:{} {}"_f << _AnsiEncoding.f_StatusError() << _Info.m_OtherErrors.fs_GetKey(Error) << _AnsiEncoding.f_Default() << Error;
+			}
+
 			return Status;
 		}
 
+	}
+
+	bool CCloudClientAppActor::CCloudManagerAppManagerInfo::f_HasErrors() const
+	{
+		return !m_bActive || !m_OtherErrors.f_IsEmpty();
 	}
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers
@@ -313,7 +326,7 @@ namespace NMib::NCloud::NCloudClient
 				LastEnvironment = AppManagerInfo.m_Environment;
 			}
 
-			if (!AppManagerInfo.m_bActive)
+			if (AppManagerInfo.f_HasErrors())
 				Return = 1;
 
 			CStr Status = fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding);
@@ -455,8 +468,15 @@ namespace NMib::NCloud::NCloudClient
 
 			CStr ApplicationStatus = fg_FormatApplicationStatusSeverity(ApplicationInfo.m_Status, ApplicationInfo.m_StatusSeverity, AnsiEncoding);
 			CStr Status;
-			if (!AppManagerInfo.m_bActive)
-				Status = "App Manager: {}\n\n{}"_f << fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding) << ApplicationStatus;
+			if (AppManagerInfo.f_HasErrors())
+			{
+				Status = "{2}Application Status{3} (outdated)\n{}\n\n{2}App Manager{3}\n{}"_f
+					<< ApplicationStatus
+					<< fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding)
+					<< AnsiEncoding.f_Bold()
+					<< AnsiEncoding.f_Default()
+				;
+			}
 			else
 				Status = ApplicationStatus;
 
@@ -541,6 +561,7 @@ namespace NMib::NCloud::NCloudClient
 					OutInfo.m_bActive = AppManagerInfo.m_bActive;
 					OutInfo.m_LastConnectionErrorTime = AppManagerInfo.m_LastConnectionErrorTime;
 					OutInfo.m_LastConnectionError = AppManagerInfo.m_LastConnectionError;
+					OutInfo.m_OtherErrors = AppManagerInfo.m_OtherErrors;
 				}
 			}
 

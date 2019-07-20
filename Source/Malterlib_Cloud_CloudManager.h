@@ -14,7 +14,7 @@ namespace NMib::NCloud
 	enum
 	{
 		ECloudManagerMinProtocolVersion = 0x101
-		, ECloudManagerProtocolVersion = 0x105
+		, ECloudManagerProtocolVersion = 0x106
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -55,11 +55,13 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
+			bool f_HasErrors() const;
 			using CAppManagerInfo::operator =;
 
 			NTime::CTime m_LastSeen;
 			NStr::CStr m_LastConnectionError;
 			NTime::CTime m_LastConnectionErrorTime;
+			NContainer::TCMap<NStr::CStr, NStr::CStr> m_OtherErrors;
 			bool m_bActive = false;
 		};
 

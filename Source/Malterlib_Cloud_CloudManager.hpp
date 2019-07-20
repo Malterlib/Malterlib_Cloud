@@ -36,6 +36,8 @@ namespace NMib::NCloud
 		_Stream % m_LastConnectionError;
 		_Stream % m_LastConnectionErrorTime;
 		_Stream % m_bActive;
+		if (_Stream.f_GetVersion() >= 0x106)
+			_Stream % m_OtherErrors;
 	}
 
 	template <typename tf_CStream>
@@ -54,7 +56,7 @@ namespace NMib::NCloud
 	void CCloudManager::CApplicationInfo::f_Stream(tf_CStream &_Stream)
 	{
 		uint32 AppManagerInterfaceVersion = 0x110;
-		static_assert(CAppManagerInterface::EProtocolVersion == 0x110, "Add a new version mapping");
+		static_assert(CAppManagerInterface::EProtocolVersion == 0x112, "Add a new version mapping if streaming of m_ApplicationInfo changed");
 
 		{
 			DMibBinaryStreamVersion(_Stream, AppManagerInterfaceVersion);

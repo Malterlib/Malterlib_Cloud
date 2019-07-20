@@ -29,6 +29,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		CTime m_LastSeen;
 		CStr m_LastConnectionError;
 		CTime m_LastConnectionErrorTime;
+		TCMap<CStr, CStr> m_OtherErrors;
 		bool m_bActive = false;
 
 		template <typename tf_CStream>
