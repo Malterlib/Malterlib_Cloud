@@ -48,6 +48,7 @@ Import "../../../../External/curl/Curl.MTarget"
 {
 	Property
 	{
+		ProductName "Malterlib Cloud API Manager"
 		MalterlibTestApp true
 		MalterlibPostCopyProject "Malterlib_Cloud_CloudAPIManager"
 		{

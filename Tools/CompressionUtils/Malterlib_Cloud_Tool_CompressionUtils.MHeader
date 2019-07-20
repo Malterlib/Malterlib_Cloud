@@ -69,6 +69,7 @@
 	
 	%Target Exe_bsdtar
 	{
+		Property.ProductName "BSD Tar"
 		Target
 		{
 			LinkWithLibraries "-lacl @(Target.LinkWithLibraries)"

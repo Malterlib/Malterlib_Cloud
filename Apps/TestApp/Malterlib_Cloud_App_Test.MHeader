@@ -33,6 +33,7 @@
 {
 	Property
 	{
+		ProductName "Malterlib Cloud Test App"
 		MalterlibTestApp true
 		MalterlibPostCopyProject "Malterlib_Cloud_Test"
 		{
