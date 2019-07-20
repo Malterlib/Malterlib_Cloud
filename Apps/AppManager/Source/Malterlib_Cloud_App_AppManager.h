@@ -15,6 +15,7 @@
 #include <Mib/Cloud/BackupManagerClient>
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Security/UniqueUserGroup>
+#include <Mib/Concurrency/ActorSequencer>
 
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
 
@@ -359,7 +360,7 @@ namespace NMib::NCloud::NAppManager
 			;
 			auto f_SubscribeChangeNotifications
 				(
-				 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (TCVector<CChangeNotification> &&_Notifications, bool _bInitial)> &&_fOnNotification
+				 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
 				)
 				-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override
 			;
@@ -375,8 +376,12 @@ namespace NMib::NCloud::NAppManager
 
 		struct CChangeNotificationSubscription
 		{
-			TCActorFunctor<NConcurrency::TCFuture<void> (TCVector<CAppManagerInterface::CChangeNotification> &&_Notification, bool _bInitial)> m_fOnChange;
+			TCActorFunctor<NConcurrency::TCFuture<void> (CAppManagerInterface::COnChangeNotificationParams &&_Params)> m_fOnChange;
 			CCallingHostInfo m_CallingHostInfo;
+			TCSet<CStr> m_Filtered;
+			TCVector<TCFunctionMovable<void ()>> m_OnInitialFinished;
+			bool m_bInitialFinished = false;
+			bool m_bAccessDenied = false;
 		};
 
 		enum EEncryptOperation
@@ -821,9 +826,10 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
-		TCFuture<void> fp_SendChangeNotifications(CAppManagerInterface::CChangeNotification _Notification);
 		CAppManagerInterface::CApplicationInfo fp_GetApplicationInfo(CApplication const &_Application);
-		void fp_SendInitialChangeNotifications(CChangeNotificationSubscription const &_Subscription);
+		TCFuture<void> fp_ChangeNotifications_SendChange(CAppManagerInterface::CChangeNotification _Notification);
+		TCFuture<void> fp_ChangeNotifications_PermissionsChanged();
+		TCFuture<void> fp_ChangeNotifications_SendInitial(CStr const &_SubscriptionID);
 		void fp_SendAppChange_AddedOrChanged(CApplication const &_Application);
 		void fp_SendAppChange_Removed(CApplication const &_Application);
 		void fp_SendAppChange_Status(CApplication const &_Application);
@@ -916,8 +922,10 @@ namespace NMib::NCloud::NAppManager
 		CTrustedPermissionSubscription mp_Permissions;
 
 		TCMap<CStr, CUpdateNotificationSubscription> mp_UpdateNotificationSubscriptions;
-		TCMap<CStr, CChangeNotificationSubscription> mp_ChangeNotificationSubscriptions;
 		TCTrustedActorSubscription<CAppManagerCoordinationInterface> mp_RemoteAppManagers;
+
+		TCMap<CStr, CChangeNotificationSubscription> mp_ChangeNotificationSubscriptions;
+		TCActorSequencer<void> mp_ChangeNotificationsPermissionsChangedSequencer;
 
 		TCMap<CStr, CRemoteAppManager> mp_RemoteAppManagerState;
 		TCAVLTree<&CRemoteAppManager::m_ByActorLink, CRemoteAppManager::CCompareActor> mp_RemoteAppManagerStateByActor;

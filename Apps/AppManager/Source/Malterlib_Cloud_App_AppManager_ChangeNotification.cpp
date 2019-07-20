@@ -5,12 +5,13 @@
 
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NAppManager
 {
 	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeChangeNotifications
 		(
-		 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (TCVector<CChangeNotification> &&_Notifications, bool _bInitial)> &&_fOnNotification
+		 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
 		)
 		-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 	{
@@ -19,64 +20,121 @@ namespace NMib::NCloud::NAppManager
 		CStr SubscriptionID = fg_RandomID();
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 
-		bool bHasPermission = co_await
-			(
-				pThis->mp_Permissions.f_HasPermission("Subscribe to change notifications", {"AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeChanges"})
-			 	% "Permission denied subscribing to change notifications" % Auditor
-			)
-		;
-		if (!bHasPermission)
-			co_return Auditor.f_AccessDenied("(Subscribe to change notifications)");
-
 		auto &Subscription = pThis->mp_ChangeNotificationSubscriptions[SubscriptionID];
 		Subscription.m_fOnChange = fg_Move(_fOnNotification);
 		Subscription.m_CallingHostInfo = CallingHostInfo;
 
-		pThis->fp_SendInitialChangeNotifications(Subscription);
+		Auditor.f_Info("Subscribe to change notifications '{}'"_f << SubscriptionID);
 
-		Auditor.f_Info(fg_Format("Subscribe to change notifications '{}'", SubscriptionID));
+		auto ReturnSubscription = g_ActorSubscription / [pThis, SubscriptionID, Auditor]() -> TCFuture<void>
+			{
+				Auditor.f_Info(fg_Format("Unsubscribe from change notifications '{}'", SubscriptionID));
 
-		co_return
-			(
-				g_ActorSubscription / [pThis, SubscriptionID, Auditor]() -> TCFuture<void>
-				{
-					Auditor.f_Info(fg_Format("Unsubscribe from change notifications '{}'", SubscriptionID));
-
-					auto pChangeNotificationSubscriptions = pThis->mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
-					if (!pChangeNotificationSubscriptions)
-						co_return {};
-
-					TCFuture<void> DestroyFuture = pChangeNotificationSubscriptions->m_fOnChange.f_Destroy();
-
-					pThis->mp_ChangeNotificationSubscriptions.f_Remove(SubscriptionID);
-
-					co_await fg_Move(DestroyFuture);
+				auto pChangeNotificationSubscriptions = pThis->mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
+				if (!pChangeNotificationSubscriptions)
 					co_return {};
-				}
-			)
+
+				TCFuture<void> DestroyFuture = pChangeNotificationSubscriptions->m_fOnChange.f_Destroy();
+
+				pThis->mp_ChangeNotificationSubscriptions.f_Remove(SubscriptionID);
+
+				co_await fg_Move(DestroyFuture);
+				co_return {};
+			}
 		;
+
+		co_await pThis->self(&CAppManagerActor::fp_ChangeNotifications_SendInitial, SubscriptionID);
+
+		co_return fg_Move(ReturnSubscription);
 	}
 
-	void CAppManagerActor::fp_SendInitialChangeNotifications(CChangeNotificationSubscription const &_Subscription)
+	TCFuture<void> CAppManagerActor::fp_ChangeNotifications_SendInitial(CStr const &_SubscriptionID)
 	{
-		DRequire(_Subscription.m_fOnChange);
-		TCVector<CAppManagerInterface::CChangeNotification> Changes;
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> NamedPermissionsQueries;
+		auto pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(_SubscriptionID);
+		if (!pSubscription)
+			co_return {};
+
+		pSubscription->m_bInitialFinished = false;
+		pSubscription->m_bAccessDenied = false;
+		pSubscription->m_OnInitialFinished.f_Clear();
+
+		NamedPermissionsQueries["/Command/"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeChanges"}};
 
 		for (auto &pApplication : mp_Applications)
 		{
 			auto &Application = *pApplication;
-
-			auto &ChangeNotification = Changes.f_Insert();
-			ChangeNotification.m_Application = Application.m_Name;
-			ChangeNotification.m_Change = CAppManagerInterface::CApplicationChange_AddOrChangeInfo{fp_GetApplicationInfo(Application)};
+			NamedPermissionsQueries["/App/" + Application.m_Name] = {{"AppManager/AppAll", "AppManager/App/{}"_f << Application.m_Name}};
 		}
 
-		_Subscription.m_fOnChange(fg_Move(Changes), true) > fg_DiscardResult();
+		auto Permissions = co_await mp_Permissions.f_HasPermissions("Initial send change notifications", fg_Move(NamedPermissionsQueries), pSubscription->m_CallingHostInfo)
+			.f_Timeout(60.0, "Timed out waiting for permission in send initial change notifications {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+		;
+
+		pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(_SubscriptionID);
+		if (!pSubscription)
+			co_return {};
+
+		DRequire(pSubscription->m_fOnChange);
+
+		CAppManagerInterface::COnChangeNotificationParams NotificationParams;
+
+		auto pCommandPermission = Permissions.f_FindEqual("/Command/");
+		bool bHasPermission = pCommandPermission && *pCommandPermission;
+
+		NotificationParams.m_bInitial = true;
+		NotificationParams.m_bAccessDenied = !bHasPermission;
+
+		if (bHasPermission)
+		{
+			for (auto &pApplication : mp_Applications)
+			{
+				auto &Application = *pApplication;
+
+				if (auto pPermission = Permissions.f_FindEqual("/App/" + Application.m_Name); !pPermission || !*pPermission)
+				{
+					pSubscription->m_Filtered[Application.m_Name];
+					NotificationParams.m_bFiltered = true;
+					continue;
+				}
+
+				auto &Change = NotificationParams.m_Changes.f_Insert();
+				Change.m_Application = Application.m_Name;
+				Change.m_Change = CAppManagerInterface::CApplicationChange_AddOrChangeInfo{fp_GetApplicationInfo(Application)};
+			}
+		}
+
+		pSubscription->m_bInitialFinished = true;
+		pSubscription->m_fOnChange(fg_Move(NotificationParams)) > fg_LogError("ChangeNotifications", "Send change failed");
+
+		if (bHasPermission)
+		{
+			for (auto &fOnFinished : pSubscription->m_OnInitialFinished)
+				fOnFinished();
+		}
+		pSubscription->m_OnInitialFinished.f_Clear();
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_ChangeNotifications_PermissionsChanged()
+	{
+		return mp_ChangeNotificationsPermissionsChangedSequencer / [this]() -> TCFuture<void>
+			{
+				TCActorResultVector<void> SendInitialResults;
+				for (auto &Subscription : mp_ChangeNotificationSubscriptions)
+					self(&CAppManagerActor::fp_ChangeNotifications_SendInitial, mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription)) > SendInitialResults.f_AddResult();
+
+				co_await SendInitialResults.f_GetResults() | g_Unwrap;
+
+				co_return {};
+			}
+		;
 	}
 
 	void CAppManagerActor::fp_SendAppChange_Status(CApplication const &_Application)
 	{
-		fp_SendChangeNotifications
+		fp_ChangeNotifications_SendChange
 			(
 			 	CAppManagerInterface::CChangeNotification
 			 	{
@@ -90,7 +148,7 @@ namespace NMib::NCloud::NAppManager
 
 	void CAppManagerActor::fp_SendAppChange_AddedOrChanged(CApplication const &_Application)
 	{
-		fp_SendChangeNotifications
+		fp_ChangeNotifications_SendChange
 			(
 			 	CAppManagerInterface::CChangeNotification
 			 	{
@@ -104,7 +162,7 @@ namespace NMib::NCloud::NAppManager
 
 	void CAppManagerActor::fp_SendAppChange_Removed(CApplication const &_Application)
 	{
-		fp_SendChangeNotifications
+		fp_ChangeNotifications_SendChange
 			(
 			 	CAppManagerInterface::CChangeNotification
 			 	{
@@ -116,36 +174,78 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<void> CAppManagerActor::fp_SendChangeNotifications(CAppManagerInterface::CChangeNotification _Notification)
+	TCFuture<void> CAppManagerActor::fp_ChangeNotifications_SendChange(CAppManagerInterface::CChangeNotification _Notification)
 	{
 		TCActorResultVector<void> OnChangeResultsVector;
 
-		NContainer::TCVector<CAppManagerInterface::CChangeNotification> Notifications{_Notification};
+		CAppManagerInterface::COnChangeNotificationParams NotificationParams;
+		NotificationParams.m_Changes = {_Notification};
 
 		CStr AppPermission = fg_Format("AppManager/App/{}", _Notification.m_Application);
 
 		for (auto &Subscription : mp_ChangeNotificationSubscriptions)
 		{
-			TCPromise<void> OnChangePromise;
-			mp_Permissions.f_HasPermission("AppManager Change Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
-				.f_Timeout(60.0, "Timed out waiting for permission in OnChange callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
-				> OnChangePromise / [=, SubscriptionID = mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission) mutable
+			auto &SubscriptionID = mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription);
+			auto fSendNotification = [this, SubscriptionID, AppPermission, NotificationParams]() mutable -> TCFuture<void>
 				{
-					auto pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
-					if (!_bHasPermission || !pSubscription)
-						return OnChangePromise.f_SetResult();
+					auto *pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
+					if (!pSubscription || pSubscription->m_bAccessDenied)
+						return fg_Explicit();
 
-					pSubscription->m_fOnChange
-						(
-						 	fg_Move(Notifications)
-						 	, false
-						)
-						.f_Timeout(60.0, "Timed out waiting for OnChange callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
-						> OnChangePromise
+					auto &Subscription = *pSubscription;
+
+					TCPromise<void> OnChangePromise;
+					mp_Permissions.f_HasPermission("AppManager Change Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
+						.f_Timeout(60.0, "Timed out waiting for permission in OnChange callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
+						> OnChangePromise / [=, NotificationParams = fg_Move(NotificationParams)](bool _bHasPermission) mutable
+						{
+							auto pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
+							if (!pSubscription)
+								return OnChangePromise.f_SetResult();
+
+							bool bWasFiltered = !pSubscription->m_Filtered.f_IsEmpty();
+							{
+								auto &Change = NotificationParams.m_Changes[0];
+								auto &Application = Change.m_Application;
+								if (_bHasPermission)
+									pSubscription->m_Filtered.f_Remove(Application);
+								else
+								{
+									if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Remove>())
+										pSubscription->m_Filtered.f_Remove(Application);
+									else
+										pSubscription->m_Filtered[Application];
+									NotificationParams.m_Changes.f_Clear();
+								}
+							}
+
+							NotificationParams.m_bFiltered = !pSubscription->m_Filtered.f_IsEmpty();
+
+							if (!_bHasPermission && bWasFiltered == NotificationParams.m_bFiltered)
+								return OnChangePromise.f_SetResult();
+
+							pSubscription->m_fOnChange(fg_Move(NotificationParams))
+								.f_Timeout(60.0, "Timed out waiting for OnChange callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+								> OnChangePromise
+							;
+						}
 					;
+					return OnChangePromise.f_MoveFuture();
 				}
 			;
-			OnChangePromise.f_MoveFuture() > OnChangeResultsVector.f_AddResult();
+			if (Subscription.m_bInitialFinished)
+				fSendNotification() > OnChangeResultsVector.f_AddResult();
+			else
+			{
+				Subscription.m_OnInitialFinished.f_Insert
+					(
+						[fSendNotification = fg_Move(fSendNotification)]() mutable
+						{
+							fSendNotification() > fg_DiscardResult();
+						}
+					)
+				;
+			}
 		}
 
 		try

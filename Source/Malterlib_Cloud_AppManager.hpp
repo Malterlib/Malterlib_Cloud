@@ -170,4 +170,15 @@ namespace NMib::NCloud
 		_Stream % m_Application;
 		_Stream % m_Change;
 	}
+
+	template <typename tf_CStream>
+	void CAppManagerInterface::COnChangeNotificationParams::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Changes;
+		_Stream % m_bInitial;
+		if (_Stream.f_GetVersion() >= 0x111)
+			_Stream % m_bFiltered;
+		if (_Stream.f_GetVersion() >= 0x112)
+			_Stream % m_bAccessDenied;
+	}
 }

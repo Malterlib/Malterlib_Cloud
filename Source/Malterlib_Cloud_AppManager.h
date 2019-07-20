@@ -20,7 +20,7 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EMinProtocolVersion = 0x107
-			, EProtocolVersion = 0x110
+			, EProtocolVersion = 0x112
 		};
 		
 		CAppManagerInterface();
@@ -291,6 +291,17 @@ namespace NMib::NCloud
 			CApplicationChange m_Change;
 		};
 
+		struct COnChangeNotificationParams
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NContainer::TCVector<CChangeNotification> m_Changes;
+			bool m_bInitial = false;
+			bool m_bAccessDenied = false;
+			bool m_bFiltered = false;
+		};
+
 		virtual NConcurrency::TCFuture<CVersionsAvailableForUpdate> f_GetAvailableVersions
 			(
 				NStr::CStr const &_Application	/// Leave empty to list versions for all version manager applications know by the AppManager. By default app manager will only subscribe to 
@@ -321,7 +332,7 @@ namespace NMib::NCloud
 		;
 		virtual auto f_SubscribeChangeNotifications
 			(
-			 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::TCVector<CChangeNotification> &&_Notifications, bool _bInitial)> &&_fOnNotification
+			 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
 			)
 			-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0
 		;

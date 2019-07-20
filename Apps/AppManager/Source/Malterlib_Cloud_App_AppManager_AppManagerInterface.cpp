@@ -3,6 +3,8 @@
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
+#include <Mib/Concurrency/LogError>
+
 namespace NMib::NCloud::NAppManager
 {
 	TCFuture<void> CAppManagerActor::fp_PublishAppManagerInterface()
@@ -57,6 +59,22 @@ namespace NMib::NCloud::NAppManager
 		SubscribePermissions.f_Insert("AppManager/*");
 
 		mp_Permissions = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this));
+		auto fPermisionChanged = [=](CPermissionIdentifiers const &_Identifiers, auto const &_Permissions)
+			{
+				for (auto &PermissionRequirements : _Permissions)
+				{
+					auto &Permission = _Permissions.fs_GetKey(PermissionRequirements);
+
+					if (Permission == "AppManager/Command/ApplicationSubscribeChanges" || Permission == "AppManager/CommandAll" || Permission.f_StartsWith("AppManager/App"))
+					{
+						fp_ChangeNotifications_PermissionsChanged() > fg_LogError("CloudManager", "Failed to update change notification due to permission change");
+						break;
+					}
+				}
+			}
+		;
+		mp_Permissions.f_OnPermissionsAdded(fPermisionChanged);
+		mp_Permissions.f_OnPermissionsRemoved(fPermisionChanged);
 
 		co_return {};
 	}
