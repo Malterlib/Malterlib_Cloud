@@ -918,9 +918,13 @@ Property
 		{
 			!!MalterlibCloudTarBinDirectory ""
 		}
+		BsdTarGetereteScheme "*Target.GenerateScheme=false"
+		{
+			!!GeneratorFamily Xcode
+		}
 	}
 
-	%Dependency "Exe_bsdtar=Com_@(Target:Target.BaseName)_bsdtar*MalterlibPostCopyProject=@(MalterlibPostCopyProject)*MalterlibPostCopyDestination=@(MalterlibPostCopyDestination)@(MalterlibCloudTarBinDirectory)/*Target.Name=Com_@(Target:Target.BaseName)_bsdtar*Target.Group=ExternalBinaries/@(Target:Target.BaseName)"
+	%Dependency "Exe_bsdtar=Com_@(Target:Target.BaseName)_bsdtar*MalterlibPostCopyProject=@(MalterlibPostCopyProject)*MalterlibPostCopyDestination=@(MalterlibPostCopyDestination)@(MalterlibCloudTarBinDirectory)/*Target.Name=Com_@(Target:Target.BaseName)_bsdtar*Target.Group=ExternalBinaries/@(Target:Target.BaseName)@(BsdTarGetereteScheme)"
 	{
 		Dependency.Link false
 	}
