@@ -51,10 +51,6 @@ namespace NMib::NCloud::NAppManager
 			, fp64 _TimeSinceUpdateStart
 		)
 	{
-		CStr Script = _pApplication->m_Settings.m_UpdateScripts.f_GetScript(_Script);
-		if (Script.f_IsEmpty())
-			return fg_Explicit();
-		
 		struct CState
 		{
 			TCPromise<void> m_Promise;
@@ -63,18 +59,22 @@ namespace NMib::NCloud::NAppManager
 			CStr m_ErrorOutput;
 			CStr m_StdOutput;
 			CStr m_AllOutput;
-			
+
 			bool m_bReplied = false;
 			void f_Replied()
 			{
 				m_bReplied = true;
-				m_LaunchActor->f_DestroyNoResult(DMibPFile, DMibPLine);
+				fg_Move(m_LaunchActor).f_Destroy() > fg_DiscardResult();
 			}
 		};
-		
+		TCSharedPointer<CState> pState = fg_Construct();
+
+		CStr Script = _pApplication->m_Settings.m_UpdateScripts.f_GetScript(_Script);
+		if (Script.f_IsEmpty())
+			return pState->m_Promise <<= g_Void;
+
 		CStr Description = fg_Format("{}/{}", _pApplication->m_Name, _pApplication->m_Settings.m_UpdateScripts.f_GetName(_Script));
 		
-		TCSharedPointer<CState> pState = fg_Construct();
 		pState->m_LaunchActor = fg_ConstructActor<CProcessLaunchActor>();
 		
 		CStr FileName = CFile::fs_GetExpandedPath(Script, _pApplication->f_GetDirectory());

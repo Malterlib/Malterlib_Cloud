@@ -17,23 +17,17 @@ namespace NMib::NCloud
 	
 	TCFuture<void> CBackupManagerClient::CInternal::f_RetrySubscribeChanges()
 	{
-		if (m_pThis->mp_bDestroyed)
-			return DMibErrorInstance("Destroyed");
+		if (m_pThis->f_IsDestroyed())
+			co_return DMibErrorInstance("Destroyed");
 
 		DMibCloudBackupManagerDebugOut("Retry subscribe\n");
-
-		TCPromise<void> Promise;
 
 		auto pActive = f_MarkInstancesActive();
 
 		if (m_bRunningRetrySubscribe)
 		{
-			m_SubscribeChangesPromises.f_Insert().f_Future() > Promise / [this, Promise, pActive]
-				{
-					f_RetrySubscribeChanges() > Promise;
-				}
-			;
-			return Promise.f_MoveFuture();
+			co_await m_SubscribeChangesPromises.f_Insert().f_Future();
+			co_return co_await f_RetrySubscribeChanges();
 		}
 		
 		DMibCheck(!m_bRunningRetrySubscribe);
@@ -68,201 +62,195 @@ namespace NMib::NCloud
 				ToRemovePaths[WatchedPath.f_GetPath()];
 		}
 		
-		g_Dispatch(m_FileActor) / [PendingPaths]
-			{
-				CPendingInfo PendingInfo;
-				
-				for (auto &Path : PendingPaths)
+		CPendingInfo PendingInfo = co_await
+			(
+			 	g_Dispatch(m_FileActor) / [PendingPaths]
 				{
-					if (CFile::fs_FileExists(Path, EFileAttrib_Directory))
-						continue;
-					
-					CStr MissingPath = CFile::fs_GetPath(Path);
-					while (!MissingPath.f_IsEmpty() && !CFile::fs_FileExists(MissingPath, EFileAttrib_Directory))
-						MissingPath = CFile::fs_GetPath(MissingPath);
-					
-					if (!MissingPath.f_IsEmpty() && !PendingInfo.m_MissingPaths.f_FindEqual(MissingPath))
+					CPendingInfo PendingInfo;
+
+					for (auto &Path : PendingPaths)
 					{
-						bool bFound = false;
-						for (auto &Path : PendingInfo.m_MissingPaths)
+						if (CFile::fs_FileExists(Path, EFileAttrib_Directory))
+							continue;
+
+						CStr MissingPath = CFile::fs_GetPath(Path);
+						while (!MissingPath.f_IsEmpty() && !CFile::fs_FileExists(MissingPath, EFileAttrib_Directory))
+							MissingPath = CFile::fs_GetPath(MissingPath);
+
+						if (!MissingPath.f_IsEmpty() && !PendingInfo.m_MissingPaths.f_FindEqual(MissingPath))
 						{
-							if (MissingPath.f_StartsWith(Path))
+							bool bFound = false;
+							for (auto &Path : PendingInfo.m_MissingPaths)
 							{
-								bFound = true;
-								break;
+								if (MissingPath.f_StartsWith(Path))
+								{
+									bFound = true;
+									break;
+								}
+								else if (Path.f_StartsWith(MissingPath))
+								{
+									PendingInfo.m_MissingPaths.f_Remove(Path);
+									break;
+								}
 							}
-							else if (Path.f_StartsWith(MissingPath))
-							{
-								PendingInfo.m_MissingPaths.f_Remove(Path);
-								break;
-							}
+							if (!bFound)
+								PendingInfo.m_MissingPaths[MissingPath];
 						}
-						if (!bFound)
-							PendingInfo.m_MissingPaths[MissingPath];
+						PendingInfo.m_PendingPaths[Path];
 					}
-					PendingInfo.m_PendingPaths[Path];
+					return PendingInfo;
 				}
-				return PendingInfo;
-			}
-			> Promise / [this, Promise, PendingPaths, Cleanup, ToRemovePaths, pActive](CPendingInfo &&_PendingInfo)
-			{
-				if (m_pThis->mp_bDestroyed)
-					return;
-				
-				TCActorResultMap<CStr, CActorSubscription> SubscribeResults;
-				TCActorResultMap<CStr, CActorSubscription> SubscribeResultsMissing;
-				
-				for (auto &Path : PendingPaths)
-				{
-					if (_PendingInfo.m_PendingPaths.f_FindEqual(Path))
-						continue;
-					
-					auto *pWatchedPath = m_WatchedPaths.f_FindEqual(Path);
-					if (!pWatchedPath)
-						continue;
+			)
+		;
 
-					auto &WatchedPath = *pWatchedPath;
-					
-					EFileChange Changes = EFileChange_All & (~EFileChange_Recursive);
-					if (WatchedPath.m_bRecursive)
-						Changes |= EFileChange_Recursive;
-					
-					m_FileChangeNotificationsActor
-						(
-							&CFileChangeNotificationActor::f_RegisterForChanges
-							, Path
-							, Changes
-							, g_ActorFunctor / [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCFuture<void>
-							{
-								for (auto Notification : _Notifications)
-								{
-									Notification.m_Path = CFile::fs_AppendPath(Path, Notification.m_Path);
-									
-									if (!Notification.m_PathFrom.f_IsEmpty())
-										Notification.m_PathFrom = CFile::fs_AppendPath(Path, Notification.m_PathFrom);
-									
-#ifdef DMibCloudBackupManagerDebug
-									switch (Notification.m_Notification)
-									{
-									case EFileChangeNotification_Unknown: DMibCloudBackupManagerDebugOut("&&& Unknown {}\n", Notification.m_Path); break;
-									case EFileChangeNotification_Added: DMibCloudBackupManagerDebugOut("&&& Added {}\n", Notification.m_Path); break;
-									case EFileChangeNotification_Removed: DMibCloudBackupManagerDebugOut("&&& Removed {}\n", Notification.m_Path); break;
-									case EFileChangeNotification_Modified: DMibCloudBackupManagerDebugOut("&&& Modified {}\n", Notification.m_Path); break;
-									case EFileChangeNotification_Renamed: DMibCloudBackupManagerDebugOut("&&& Renamed {} -> {}\n", Notification.m_PathFrom, Notification.m_Path); break;
-									}
-#endif
-									f_OnFileChanged(Notification, false);
-								}
+		if (m_pThis->f_IsDestroyed())
+			co_return DMibErrorInstance("Destroyed");
 
-								return fg_Explicit();
-							}
-							, m_pThis->mp_pInternal->f_CoalesceSettings()
-						)
-						> SubscribeResults.f_AddResult(Path)
-					;
-				}
-				
-				for (auto &MissingPath : _PendingInfo.m_MissingPaths)
-				{
-					auto Mapped = m_WatchedPathsMissing(MissingPath);
-					if (!Mapped.f_WasCreated())
-						continue;
-					m_FileChangeNotificationsActor
-						(
-							&CFileChangeNotificationActor::f_RegisterForChanges
-							, MissingPath
-							, EFileChange_FileName | EFileChange_DirectoryName
-							, g_ActorFunctor / [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCFuture<void>
-							{
-								if (!m_bRerunRetrySubscribe)
-								{
-									m_bRerunRetrySubscribe = true;
-									f_RetrySubscribeChanges() > fg_DiscardResult();
-								}
+		TCActorResultMap<CStr, CActorSubscription> SubscribeResults;
+		TCActorResultMap<CStr, CActorSubscription> SubscribeResultsMissing;
 
-								return fg_Explicit();
-							}
-							, m_pThis->mp_pInternal->f_CoalesceSettings()
-						)
-						> SubscribeResultsMissing.f_AddResult(MissingPath)
-					;
-				}
-				
-				TCSet<CStr> MissingPathsToRemove;
-				for (auto &WatchedPath : m_WatchedPathsMissing)
-				{
-					auto &Path = m_WatchedPathsMissing.fs_GetKey(WatchedPath);
-					if (!_PendingInfo.m_MissingPaths.f_FindEqual(Path))
-						MissingPathsToRemove[Path];
-				}
-				
-				for (auto &ToRemove : MissingPathsToRemove)
-					m_WatchedPathsMissing.f_Remove(ToRemove);
+		for (auto &Path : PendingPaths)
+		{
+			if (PendingInfo.m_PendingPaths.f_FindEqual(Path))
+				continue;
 
-				SubscribeResults.f_GetResults()
-					+ SubscribeResultsMissing.f_GetResults()
-					> Promise / [Promise, this, Cleanup, ToRemovePaths, pActive]
-					(TCMap<CStr, TCAsyncResult<CActorSubscription>> &&_Results, TCMap<CStr, TCAsyncResult<CActorSubscription>> &&_ResultsMissing) mutable
+			auto *pWatchedPath = m_WatchedPaths.f_FindEqual(Path);
+			if (!pWatchedPath)
+				continue;
+
+			auto &WatchedPath = *pWatchedPath;
+
+			EFileChange Changes = EFileChange_All & (~EFileChange_Recursive);
+			if (WatchedPath.m_bRecursive)
+				Changes |= EFileChange_Recursive;
+
+			m_FileChangeNotificationsActor
+				(
+					&CFileChangeNotificationActor::f_RegisterForChanges
+					, Path
+					, Changes
+					, g_ActorFunctor / [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCFuture<void>
 					{
-						bool bChanged = false;
-						for (auto &Result : _Results)
+						for (auto Notification : _Notifications)
 						{
-							auto &Path = _Results.fs_GetKey(Result);
-							if (!Result)
-							{
-								DMibLogCategoryStr(m_Config.m_LogCategory);
-								DMibLog(Error, "One file change notification '{}' failed to register: {}", Path, Result.f_GetExceptionStr());
-								continue;
-							}
-							auto &WatchedPath = m_WatchedPaths[Path];
-							if (WatchedPath.m_Subscription)
-							{
-								auto Subscription = fg_Move(WatchedPath.m_Subscription);
-								Subscription->f_Destroy() > [](TCAsyncResult<void> &&_Result)
-									{
+							Notification.m_Path = CFile::fs_AppendPath(Path, Notification.m_Path);
+
+							if (!Notification.m_PathFrom.f_IsEmpty())
+								Notification.m_PathFrom = CFile::fs_AppendPath(Path, Notification.m_PathFrom);
+
 #ifdef DMibCloudBackupManagerDebug
-										if (!_Result)
-											DMibCloudBackupManagerDebugOut("FAILED to destroy watch subscription {}\n", _Result.f_GetExceptionStr());
-#endif
-									}
-								;
-							}
-							WatchedPath.m_Subscription = fg_Move(*Result);
-							WatchedPath.m_bPending = false;
-							if (m_bInitialSubscribeDone)
-								f_NewPathWatched(Path);
-							bChanged = true;
-						}
-						for (auto &Result : _ResultsMissing)
-						{
-							auto &Path = _ResultsMissing.fs_GetKey(Result);
-							if (!Result)
+							switch (Notification.m_Notification)
 							{
-								DMibLogCategoryStr(m_Config.m_LogCategory);
-								DMibLog(Error, "One file change notification for missing '{}' failed to register: {}", Path, Result.f_GetExceptionStr());
-								continue;
+							case EFileChangeNotification_Unknown: DMibCloudBackupManagerDebugOut("&&& Unknown {}\n", Notification.m_Path); break;
+							case EFileChangeNotification_Added: DMibCloudBackupManagerDebugOut("&&& Added {}\n", Notification.m_Path); break;
+							case EFileChangeNotification_Removed: DMibCloudBackupManagerDebugOut("&&& Removed {}\n", Notification.m_Path); break;
+							case EFileChangeNotification_Modified: DMibCloudBackupManagerDebugOut("&&& Modified {}\n", Notification.m_Path); break;
+							case EFileChangeNotification_Renamed: DMibCloudBackupManagerDebugOut("&&& Renamed {} -> {}\n", Notification.m_PathFrom, Notification.m_Path); break;
 							}
-							m_WatchedPathsMissing[Path].m_Subscription = fg_Move(*Result);
-							bChanged = true;
+#endif
+							f_OnFileChanged(Notification, false);
 						}
-						for (auto &Path : ToRemovePaths)
+
+						co_return {};
+					}
+					, m_pThis->mp_pInternal->f_CoalesceSettings()
+				)
+				> SubscribeResults.f_AddResult(Path)
+			;
+		}
+
+		for (auto &MissingPath : PendingInfo.m_MissingPaths)
+		{
+			auto Mapped = m_WatchedPathsMissing(MissingPath);
+			if (!Mapped.f_WasCreated())
+				continue;
+			m_FileChangeNotificationsActor
+				(
+					&CFileChangeNotificationActor::f_RegisterForChanges
+					, MissingPath
+					, EFileChange_FileName | EFileChange_DirectoryName
+					, g_ActorFunctor / [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCFuture<void>
+					{
+						if (!m_bRerunRetrySubscribe)
 						{
-							auto *pWatchedPath = m_WatchedPaths.f_FindEqual(Path);
-							if (!pWatchedPath || !pWatchedPath->m_bToBeRemoved)
-								continue;
-							m_WatchedPaths.f_Remove(Path);
+							m_bRerunRetrySubscribe = true;
+							f_RetrySubscribeChanges() > fg_DiscardResult();
 						}
 
-						if (bChanged)
-							f_RetrySubscribeChanges() > fg_DiscardResult();
+						co_return {};
+					}
+					, m_pThis->mp_pInternal->f_CoalesceSettings()
+				)
+				> SubscribeResultsMissing.f_AddResult(MissingPath)
+			;
+		}
 
-						Promise.f_SetResult();
+		TCSet<CStr> MissingPathsToRemove;
+		for (auto &WatchedPath : m_WatchedPathsMissing)
+		{
+			auto &Path = m_WatchedPathsMissing.fs_GetKey(WatchedPath);
+			if (!PendingInfo.m_MissingPaths.f_FindEqual(Path))
+				MissingPathsToRemove[Path];
+		}
+
+		for (auto &ToRemove : MissingPathsToRemove)
+			m_WatchedPathsMissing.f_Remove(ToRemove);
+
+		auto [Results, ResultsMissing] = co_await (SubscribeResults.f_GetResults() + SubscribeResultsMissing.f_GetResults());
+
+		bool bChanged = false;
+		for (auto &Result : Results)
+		{
+			auto &Path = Results.fs_GetKey(Result);
+			if (!Result)
+			{
+				DMibLogCategoryStr(m_Config.m_LogCategory);
+				DMibLog(Error, "One file change notification '{}' failed to register: {}", Path, Result.f_GetExceptionStr());
+				continue;
+			}
+			auto &WatchedPath = m_WatchedPaths[Path];
+			if (WatchedPath.m_Subscription)
+			{
+				auto Subscription = fg_Move(WatchedPath.m_Subscription);
+				Subscription->f_Destroy() > [](TCAsyncResult<void> &&_Result)
+					{
+#ifdef DMibCloudBackupManagerDebug
+						if (!_Result)
+							DMibCloudBackupManagerDebugOut("FAILED to destroy watch subscription {}\n", _Result.f_GetExceptionStr());
+#endif
 					}
 				;
 			}
-		;
-		
-		return Promise.f_MoveFuture();
+			WatchedPath.m_Subscription = fg_Move(*Result);
+			WatchedPath.m_bPending = false;
+			if (m_bInitialSubscribeDone)
+				f_NewPathWatched(Path);
+			bChanged = true;
+		}
+		for (auto &Result : ResultsMissing)
+		{
+			auto &Path = ResultsMissing.fs_GetKey(Result);
+			if (!Result)
+			{
+				DMibLogCategoryStr(m_Config.m_LogCategory);
+				DMibLog(Error, "One file change notification for missing '{}' failed to register: {}", Path, Result.f_GetExceptionStr());
+				continue;
+			}
+			m_WatchedPathsMissing[Path].m_Subscription = fg_Move(*Result);
+			bChanged = true;
+		}
+		for (auto &Path : ToRemovePaths)
+		{
+			auto *pWatchedPath = m_WatchedPaths.f_FindEqual(Path);
+			if (!pWatchedPath || !pWatchedPath->m_bToBeRemoved)
+				continue;
+			m_WatchedPaths.f_Remove(Path);
+		}
+
+		if (bChanged)
+			f_RetrySubscribeChanges() > fg_DiscardResult();
+
+		co_return {};
 	}
 
 	void CBackupManagerClient::CInternal::f_NewPathWatched(CStr const &_Path)
@@ -297,8 +285,10 @@ namespace NMib::NCloud
 
 	TCFuture<void> CBackupManagerClient::CInternal::f_SubscribeChanges()
 	{
-		if (m_pThis->mp_bDestroyed)
-			return DMibErrorInstance("Destroyed");
+		TCPromise<void> Promise;
+
+		if (m_pThis->f_IsDestroyed())
+			return Promise <<= DMibErrorInstance("Destroyed");
 		
 		auto &ManifestConfig = m_Config.m_ManifestConfig;
 
@@ -406,7 +396,7 @@ namespace NMib::NCloud
 				WatchedPath.m_bPending = false;
 		}
 
-		return f_RetrySubscribeChanges();
+		return Promise <<= f_RetrySubscribeChanges();
 	}
 	
 	bool CBackupManagerClient::CInternal::f_IsPathInManifest(CStr const &_Path, CStr &o_FileName)
@@ -580,8 +570,8 @@ namespace NMib::NCloud
 
 		auto pActive = f_MarkInstancesActive();
 
-		f_UpdateManifest(RelativePath, OriginalPath, bDirtyHint)
-			+ f_UpdateManifest(RelativePathFrom, OriginalPathFrom, bDirtyHint)
+		fg_CallSafe(this, &CInternal::f_UpdateManifest, RelativePath, OriginalPath, bDirtyHint)
+			+ fg_CallSafe(this, &CInternal::f_UpdateManifest, RelativePathFrom, OriginalPathFrom, bDirtyHint)
 			> [=](TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
 			{
 				(void)pActive;

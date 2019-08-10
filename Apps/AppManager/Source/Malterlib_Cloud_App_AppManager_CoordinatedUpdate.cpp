@@ -429,6 +429,8 @@ namespace NMib::NCloud::NAppManager
 			, bool _bIgnoreFailed
 		)
 	{
+		TCPromise<void> Promise;
+
 		CRemoteApplicationWithTypeKey RemoteKey{*_pState->m_pApplication};
 
 		TCSharedPointerSupportWeak<COnAppUpdateInfoChange> pOnAppUpdateInfoChange = fg_Construct();
@@ -441,8 +443,6 @@ namespace NMib::NCloud::NAppManager
 		};
 
 		TCSharedPointer<CState> pState = fg_Construct();
-
-		TCPromise<void> Promise;
 
 		pOnAppUpdateInfoChange->m_fOnChanged = [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() mutable
 			{
@@ -582,7 +582,7 @@ namespace NMib::NCloud::NAppManager
 							Promise.f_SetException(DErrorInstance(_DisconnectedError));
 						mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
 					}
-					return fg_Explicit();
+					co_return {};
 				}
 			)
 			> [pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)

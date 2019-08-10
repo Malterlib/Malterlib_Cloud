@@ -60,135 +60,139 @@ namespace NMib::NCloud::NBackupManager
 	TCFuture<void> CBackupInstance::fp_Destroy()
 	{
 		auto &Internal = *mp_pInternal;
-		if (!Internal.m_BackupSourceSubscription)
-			return fg_Explicit();
 
-		return Internal.m_BackupSourceSubscription->f_Destroy();
+		if (Internal.m_BackupSourceSubscription)
+			co_await Internal.m_BackupSourceSubscription->f_Destroy();
+
+		co_return {};
 	}
 	
 	auto CBackupInstance::f_StartBackup() -> TCFuture<CStartBackupResult>
 	{
 		auto &Internal = *mp_pInternal;
-		
+
 		if (!Internal.m_bManifestSyncDone)
-			return DMibErrorInstance("You need to rsync manifest with f_StartManifestRSync before starting backup");
-			
+			co_return DMibErrorInstance("You need to rsync manifest with f_StartManifestRSync before starting backup");
+
 		if (Internal.m_bBackupStarted)
-			return DMibErrorInstance("Backup already started");
-		
-		return TCFuture<CStartBackupResult>::fs_RunProtected<CExceptionFile>() / [&]()
+			co_return DMibErrorInstance("Backup already started");
+
+		try
+		{
+			auto &Internal = *mp_pInternal;
+
+			TCBinaryStreamFile<> Stream;
+			Stream.f_Open(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin"), EFileOpen_Read | EFileOpen_ShareAll);
+			Stream >> Internal.m_Manifest;
+
+			TCSet<CStr> ManifestFiles;
+			for (auto &File : Internal.m_Manifest.m_Files)
 			{
-				auto &Internal = *mp_pInternal;
-				
-				TCBinaryStreamFile<> Stream;
-				Stream.f_Open(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin"), EFileOpen_Read | EFileOpen_ShareAll);
-				Stream >> Internal.m_Manifest;
+				auto &FileName = Internal.m_Manifest.m_Files.fs_GetKey(File);
+				CStr ManifestError;
+				if (!CBackupManagerBackup::fs_ManifestFileValid(FileName, File, ManifestError))
+					DMibErrorFile("Manifest file '{}' invalid: {}"_f << FileName << ManifestError);
 
-				TCSet<CStr> ManifestFiles;
-				for (auto &File : Internal.m_Manifest.m_Files)
+				ManifestFiles[FileName];
+			}
+
+			CStartBackupResult BackupResult;
+
+			for (auto &File : Internal.m_Manifest.m_Files)
+			{
+				if (File.m_Attributes & (EFileAttrib_Directory | EFileAttrib_Link))
+					continue;
+
+				CStr FileName = Internal.f_GetCurrentPath(File.f_GetFileName());
+				CStr OldFileName = Internal.f_GetLatestPath(File.f_GetFileName());
+
+				if (!CFile::fs_FileExists(FileName))
 				{
-					auto &FileName = Internal.m_Manifest.m_Files.fs_GetKey(File);
-					CStr ManifestError;
-					if (!CBackupManagerBackup::fs_ManifestFileValid(FileName, File, ManifestError))
-						DMibErrorFile("Manifest file '{}' invalid: {}"_f << FileName << ManifestError);
+					CFile::CFileChecksumState_SHA256 ChecksumState;
 
-					ManifestFiles[FileName];
-				}
-
-				CStartBackupResult BackupResult;
-				
-				for (auto &File : Internal.m_Manifest.m_Files)
-				{
-					if (File.m_Attributes & (EFileAttrib_Directory | EFileAttrib_Link))
-						continue;
-					
-					CStr FileName = Internal.f_GetCurrentPath(File.f_GetFileName());
-					CStr OldFileName = Internal.f_GetLatestPath(File.f_GetFileName());
-					
-					if (!CFile::fs_FileExists(FileName))
+					try
 					{
-						CFile::CFileChecksumState_SHA256 ChecksumState;
-
-						try
+						if (CFile::fs_FileExists(OldFileName))
 						{
-							if (CFile::fs_FileExists(OldFileName))
+							CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
+
+							bool bDuplicatedFile = false;
+
+							if (File.m_Flags & EDirectoryManifestSyncFlag_Append)
 							{
-								CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
+								CStr SourceFileName = OldFileName;
 
-								bool bDuplicatedFile = false;
-
-								if (File.m_Flags & EDirectoryManifestSyncFlag_Append)
-								{
-									CStr SourceFileName = OldFileName;
-
-									if (CFile::fs_TryDuplicateFile(OldFileName, FileName))
-										bDuplicatedFile = true;
-									else
-									{
-										if (CFile::fs_GetFileChecksum_SHA256(SourceFileName, &ChecksumState) == File.m_Digest)
-										{
-											CFile OutFile;
-											OutFile.f_Open(FileName, EFileOpen_Write, EFileAttrib_UserRead | EFileAttrib_UserWrite);
-											ChecksumState.m_pFile->f_SetPosition(0);
-											CFile::fs_CopyFileRaw(*ChecksumState.m_pFile, OutFile);
-											continue;
-										}
-									}
-								}
+								if (CFile::fs_TryDuplicateFile(OldFileName, FileName))
+									bDuplicatedFile = true;
 								else
 								{
-									CFile::fs_CreateHardLink(OldFileName, FileName);
-									bDuplicatedFile = true;
-								}
-
-								if (bDuplicatedFile)
-								{
-									auto Cleanup = g_OnScopeExit > [&]
-										{
-											if (CFile::fs_FileExists(FileName))
-												CFile::fs_DeleteFile(FileName);
-										}
-									;
-									if (File.m_Flags & EDirectoryManifestSyncFlag_Append)
-										Cleanup.f_Clear();
-
-									if (CFile::fs_GetFileChecksum_SHA256(FileName, &ChecksumState) == File.m_Digest)
+									if (CFile::fs_GetFileChecksum_SHA256(SourceFileName, &ChecksumState) == File.m_Digest)
 									{
-										Cleanup.f_Clear();
+										CFile OutFile;
+										OutFile.f_Open(FileName, EFileOpen_Write, EFileAttrib_UserRead | EFileAttrib_UserWrite);
+										ChecksumState.m_pFile->f_SetPosition(0);
+										CFile::fs_CopyFileRaw(*ChecksumState.m_pFile, OutFile);
 										continue;
 									}
 								}
 							}
-						}
-						catch (CExceptionFile const &_Exception)
-						{
-							(void)_Exception;
-							DMibLogWithCategory(Mib/Cloud/BackupManager, Info, "Hardlink file optimization failed: {}", _Exception);
-						}
+							else
+							{
+								CFile::fs_CreateHardLink(OldFileName, FileName);
+								bDuplicatedFile = true;
+							}
 
-						BackupResult.m_FilesNotUpToDate[File.f_GetFileName()] = ChecksumState.m_Hash.f_GetDigest();
-						continue;
+							if (bDuplicatedFile)
+							{
+								auto Cleanup = g_OnScopeExit > [&]
+									{
+										if (CFile::fs_FileExists(FileName))
+											CFile::fs_DeleteFile(FileName);
+									}
+								;
+								if (File.m_Flags & EDirectoryManifestSyncFlag_Append)
+									Cleanup.f_Clear();
+
+								if (CFile::fs_GetFileChecksum_SHA256(FileName, &ChecksumState) == File.m_Digest)
+								{
+									Cleanup.f_Clear();
+									continue;
+								}
+							}
+						}
+					}
+					catch (CExceptionFile const &_Exception)
+					{
+						(void)_Exception;
+						DMibLogWithCategory(Mib/Cloud/BackupManager, Info, "Hardlink file optimization failed: {}", _Exception);
 					}
 
-					auto Hash = CFile::fs_GetFileChecksum_SHA256(FileName);
-					if (Hash == File.m_Digest)
-						continue;
-					
-					BackupResult.m_FilesNotUpToDate[File.f_GetFileName()] = Hash;
+					BackupResult.m_FilesNotUpToDate[File.f_GetFileName()] = ChecksumState.m_Hash.f_GetDigest();
+					continue;
 				}
-				
-				CFile::fs_CreateDirectory(Internal.m_BackupDirectory);
-				CFile::fs_Touch(fg_Format("{}/{tst.,tsb_}.timestamp", Internal.m_BackupDirectory, Internal.m_StartTime));
+
+				auto Hash = CFile::fs_GetFileChecksum_SHA256(FileName);
+				if (Hash == File.m_Digest)
+					continue;
+
+				BackupResult.m_FilesNotUpToDate[File.f_GetFileName()] = Hash;
+			}
+
+			CFile::fs_CreateDirectory(Internal.m_BackupDirectory);
+			CFile::fs_Touch(fg_Format("{}/{tst.,tsb_}.timestamp", Internal.m_BackupDirectory, Internal.m_StartTime));
 
 #ifdef DMibDebug
-				CFile::fs_WriteStringToFile(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.json"), Internal.m_Manifest.f_ToJSON().f_ToString());
+			CFile::fs_WriteStringToFile(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.json"), Internal.m_Manifest.f_ToJSON().f_ToString());
 #endif
 
-				Internal.m_bBackupStarted = true;
+			Internal.m_bBackupStarted = true;
 
-				return BackupResult;
-			}
-		;
+			co_return fg_Move(BackupResult);
+		}
+		catch (CExceptionFile const &)
+		{
+			co_return fg_CurrentException();
+		}
 	}
 
 	TCFuture<void> CBackupInstance::CInternal::f_CommitManifestChange(CStr const &_FileName, CManifestChange const &_Change, CStr const &_Description)
@@ -197,25 +201,19 @@ namespace NMib::NCloud::NBackupManager
 		CStr ManifestError;
 		DMibCheck(CBackupManagerBackup::fs_ManifestChangeValid(_FileName, _Change, ManifestError));
 #endif
-
 		CBackupManagerBackup::fs_ApplyManifestChange(m_Manifest, _FileName, _Change);
 
 		if (!m_bInitialBackupFinished)
-			return fg_Explicit();
+			co_return {};
 
-		TCPromise<void> Promise;
-		m_BackupSource(&CBackupSource::f_Commit, m_ID, _FileName, _Change) > [Promise, _Description](TCAsyncResult<void> &&_Result)
-			{
-				if (!_Result)
-				{
-					DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to commit file {}: {}", _Description, _Result.f_GetExceptionStr());
-					Promise.f_SetException(DMibErrorInstance("Failed to commit {} file in backup (check backup manager log)"_f << _Description));
-					return;
-				}
-				Promise.f_SetResult();
-			}
-		;
-		return Promise.f_MoveFuture();
+		auto Result = co_await m_BackupSource(&CBackupSource::f_Commit, m_ID, _FileName, _Change).f_Wrap();
+		if (!Result)
+		{
+			DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to commit file {}: {}", _Description, Result.f_GetExceptionStr());
+			co_return DMibErrorInstance("Failed to commit {} file in backup (check backup manager log)"_f << _Description);
+		}
+
+		co_return {};
 	}
 
 	TCFuture<void> CBackupInstance::CInternal::f_CommitFile(CStr const &_File, CBackupManagerBackup::CManifestFile const &_ManifestFile)
@@ -240,15 +238,16 @@ namespace NMib::NCloud::NBackupManager
 		}
 
 		if (!m_bInitialBackupFinished)
-			return fg_Explicit();
+			co_return {};
 
-		return m_BackupSource(&CBackupSource::f_Commit, m_ID, _File, fg_Move(ManifestChange));
+		co_return co_await m_BackupSource(&CBackupSource::f_Commit, m_ID, _File, fg_Move(ManifestChange));
 	}
 
 	auto CBackupInstance::f_InitialBackupFinished(EInitialBackupFinishedFlag _FinishedFlags) -> TCFuture<CInitialBackupFinishedResult>
 	{
-		auto &Internal = *mp_pInternal;
 		TCPromise<CInitialBackupFinishedResult> Promise;
+
+		auto &Internal = *mp_pInternal;
 
 		Internal.f_OnPendingQuiescence
 			(

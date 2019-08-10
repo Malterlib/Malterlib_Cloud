@@ -53,8 +53,6 @@ namespace NMib::NCloud::NAppManager
 	{
 		CStr Name = _Params["Name"].f_String();
 		
-		TCPromise<uint32> Promise;
-		
 		CStr Package;
 		CAppManagerInterface::CApplicationUpdate Update;
 		
@@ -299,8 +297,10 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_CancelAllApplicationUpdatesOnStopAppManager()
 	{
+		TCPromise<void> Promise;
+
 		if (mp_RunningUpdates.f_IsEmpty())
-			return fg_Explicit();
+			return Promise <<= g_Void;
 
 		bool bNeedCancel = false;
 		
@@ -314,7 +314,6 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
-		TCPromise<void> Promise;
 		if (bNeedCancel)
 			mp_CancelRunningUpdatesOnStopAppManagerPromise = Promise;
 		else

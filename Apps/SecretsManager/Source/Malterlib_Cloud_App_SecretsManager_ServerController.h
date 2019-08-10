@@ -29,7 +29,7 @@ namespace NMib::NCloud::NSecretsManager
 	private:
 		TCFuture<void> fp_Destroy() override;
 		void fp_Init();
-		void fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> const &_KeyManager);
+		TCFuture<void> fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> const &_KeyManager);
 		
 		TCActor<CSecretsManagerDaemonActor::CServer> mp_ServerActor;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;

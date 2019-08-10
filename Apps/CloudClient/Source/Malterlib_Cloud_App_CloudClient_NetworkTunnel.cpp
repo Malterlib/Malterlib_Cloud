@@ -47,7 +47,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -80,7 +80,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -197,7 +197,7 @@ namespace NMib::NCloud::NCloudClient
 							ActionString = "{}Connected{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
 
 							*_pCommandLine += "{} '{}': {}:{}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort();
-							return fg_Explicit();
+							co_return {};
 						}
 						, g_ActorFunctor / [=](CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void>
 						{
@@ -206,7 +206,7 @@ namespace NMib::NCloud::NCloudClient
 							ActionString = "{}Closed   {}"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default();
 
 							*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Message;
-							return fg_Explicit();
+							co_return {};
 						}
 						, g_ActorFunctor / [=](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void>
 					 	{
@@ -215,7 +215,7 @@ namespace NMib::NCloud::NCloudClient
 							ActionString = "{}Error    {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();
 
 							*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Error;
-							return fg_Explicit();
+							co_return {};
 						}
 					)
 					> OpenedTunnelResults.f_AddResult(TunnelKey)

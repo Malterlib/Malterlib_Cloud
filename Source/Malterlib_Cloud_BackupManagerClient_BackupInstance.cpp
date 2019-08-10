@@ -140,77 +140,69 @@ namespace NMib::NCloud::NPrivate
 						{
 							DMibCloudBackupManagerDebugOut("Missing pending file: {}\n", FileName);
 							pRunningState->m_pOnScopeExit.f_Clear();
-							return fg_Explicit();
+							co_return {};
 						}
 
 						auto Subscription = fg_Move(pPendingFile->m_RSyncSubscription);
 
-						TCFuture<void> DestroyFuture;
-						if (!Subscription)
-							DestroyFuture = fg_Explicit();
+						TCAsyncResult<void> DestroyResult;
+						if (Subscription)
+							DestroyResult = co_await Subscription->f_Destroy().f_Wrap();
 						else
-							DestroyFuture = Subscription->f_Destroy();
+							DestroyResult.f_SetResult();
 
-						TCPromise<void> PromiseReturn;
-						fg_Move(DestroyFuture) > [this, PromiseReturn, FileName, pRunningState, SyncFlags](TCAsyncResult<void> &&_Result)
+						if (auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName))
+						{
+							try
 							{
-								if (auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName))
-								{
-									auto fReportHashMismatch = [&]
-										{
-											fp_ReportHashMismatch(pRunningState, *pPendingFile);
-											PromiseReturn.f_SetResult();
-										}
-									;
-
-									try
-									{
-										_Result.f_Access();
-									}
-									catch (CExceptionBackupManagerHashMismatch const &_Exception)
-									{
-										(void)_Exception;
-										DMibLog(Info, "Reschedule: {}: {}", FileName, _Exception);
-										return fReportHashMismatch();
-									}
-									catch (NException::CException const &)
-									{
-									}
-
-									if (pPendingFile->m_bFinished && (SyncFlags & EDirectoryManifestSyncFlag_Append))
-									{
-										auto &RunningState = *pRunningState;
-										auto &AppendState = mp_AppendFileState[RunningState.m_FileName];
-										AppendState.m_Position = RunningState.m_ManifestFile.m_Length;
-										AppendState.m_DigestState.f_Reset();
-										RunningState.m_LimitedFile.f_SetPosition(0);
-										uint8 Buffer[16*1024];
-										for (auto Position = 0; Position < AppendState.m_Position;)
-										{
-											mint ThisTime = fg_Min(AppendState.m_Position - Position, 16*1024);
-											RunningState.m_LimitedFile.f_ConsumeBytes(Buffer, ThisTime);
-											AppendState.m_DigestState.f_AddData(Buffer, ThisTime);
-											Position += ThisTime;
-										}
-										RunningState.m_LimitedFile.f_SetPosition(0);
-										if (AppendState.m_DigestState.f_GetDigest() != RunningState.m_ManifestFile.m_Digest)
-										{
-											DMibLog(Info, "Reschedule (Append mismatch): {}", FileName);
-											AppendState.m_bDirty = true;
-											mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, pPendingFile->m_ManifestFile.m_OriginalPath) > fg_DiscardResult();
-										}
-										else
-											AppendState.m_bDirty = false;
-									}
-								}
-
-								DMibCloudBackupManagerDebugOut("RSync done clear on scope exit: {}\n", FileName);
-								pRunningState->m_pOnScopeExit.f_Clear();
-								PromiseReturn.f_SetResult(_Result);
+								DestroyResult.f_Access();
 							}
-						;
+							catch (CExceptionBackupManagerHashMismatch const &_Exception)
+							{
+								(void)_Exception;
+								DMibLog(Info, "Reschedule: {}: {}", FileName, _Exception);
 
-						return PromiseReturn.f_MoveFuture();
+								fp_ReportHashMismatch(pRunningState, *pPendingFile);
+
+								co_return {};
+							}
+							catch (NException::CException const &)
+							{
+							}
+
+							if (pPendingFile->m_bFinished && (SyncFlags & EDirectoryManifestSyncFlag_Append))
+							{
+								auto &RunningState = *pRunningState;
+								auto &AppendState = mp_AppendFileState[RunningState.m_FileName];
+								AppendState.m_Position = RunningState.m_ManifestFile.m_Length;
+								AppendState.m_DigestState.f_Reset();
+								RunningState.m_LimitedFile.f_SetPosition(0);
+								uint8 Buffer[16*1024];
+								for (auto Position = 0; Position < AppendState.m_Position;)
+								{
+									mint ThisTime = fg_Min(AppendState.m_Position - Position, 16*1024);
+									RunningState.m_LimitedFile.f_ConsumeBytes(Buffer, ThisTime);
+									AppendState.m_DigestState.f_AddData(Buffer, ThisTime);
+									Position += ThisTime;
+								}
+								RunningState.m_LimitedFile.f_SetPosition(0);
+								if (AppendState.m_DigestState.f_GetDigest() != RunningState.m_ManifestFile.m_Digest)
+								{
+									DMibLog(Info, "Reschedule (Append mismatch): {}", FileName);
+									AppendState.m_bDirty = true;
+									mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, pPendingFile->m_ManifestFile.m_OriginalPath) > fg_DiscardResult();
+								}
+								else
+									AppendState.m_bDirty = false;
+							}
+						}
+
+						DMibCloudBackupManagerDebugOut("RSync done clear on scope exit: {}\n", FileName);
+						pRunningState->m_pOnScopeExit.f_Clear();
+						if (!DestroyResult)
+							co_return DestroyResult.f_GetException();
+
+						co_return {};
 					}
 				)
 				/ [this, pRunningState, FileName](CSecureByteVector &&_Packet) mutable -> TCFuture<CSecureByteVector>
@@ -394,13 +386,13 @@ namespace NMib::NCloud::NPrivate
 
 	void CBackupManagerClient_Instance::fp_AppendSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, mint _SyncSequence)
 	{
+		TCPromise<bool> Promise;
+
 		auto &RunningState = *_pRunningState;
 
 		auto FileName = RunningState.m_FileName;
 		auto SyncSequence = _SyncSequence;
 		auto pRunningState = _pRunningState;
-
-		TCPromise<bool> Promise;
 
 		try
 		{
@@ -446,7 +438,7 @@ namespace NMib::NCloud::NPrivate
 	{
 		while (true)
 		{
-			if (mp_nRunningSyncs >= mp_nMaxRunningSyncs || mp_bDestroyed)
+			if (mp_nRunningSyncs >= mp_nMaxRunningSyncs || f_IsDestroyed())
 				return;
 
 			auto *pPendingFile = mp_PendingFilesQueue.f_Pop();
@@ -624,101 +616,95 @@ namespace NMib::NCloud::NPrivate
 		}
 		catch (CExceptionFile const &_Exception)
 		{
-			return DMibErrorInstance(fg_Format("Failed to prepare manifest rsync: {}", _Exception));
+			co_return DMibErrorInstance(fg_Format("Failed to prepare manifest rsync: {}", _Exception));
 		}
 
 		TCPromise<void> Promise;
-
-		mp_Backup.f_CallActor(&CBackupManagerBackup::f_StartManifestRSync)
+		auto Subscription = co_await mp_Backup.f_CallActor(&CBackupManagerBackup::f_StartManifestRSync)
 			(
 				g_ActorFunctor
 				(
-					g_ActorSubscription / [this, Promise]() -> TCFuture<void>
+					g_ActorSubscription / [Promise, this]() -> TCFuture<void>
 					{
 						if (!mp_pManifestSyncState)
-							return fg_Explicit();
+							co_return {};
 
 						bool bDone = mp_pManifestSyncState->m_bDone;
 
 						auto Subscription = fg_Move(mp_pManifestSyncState->m_RSyncSubscription);
 						mp_pManifestSyncState.f_Clear();
 
-						TCFuture<void> DestroyFuture;
-						if (!Subscription)
-							DestroyFuture = fg_Explicit();
-						else
-							DestroyFuture = Subscription->f_Destroy();
+						TCAsyncResult<void> DestroyResult;
+						if (Subscription)
+							DestroyResult = co_await Subscription->f_Destroy().f_Wrap();
 
-						TCPromise<void> PromiseReturn;
-						fg_Move(DestroyFuture) > [Promise, PromiseReturn, bDone](TCAsyncResult<void> &&_Result)
+						if (!Promise.f_IsSet())
+						{
+							do
 							{
-								if (!Promise.f_IsSet())
+								try
 								{
-									do
-									{
-										try
-										{
-											_Result.f_Access();
-										}
-										catch (CExceptionBackupManagerHashMismatch const &_Exception)
-										{
-											Promise.f_SetException(_Exception);
-											break;
-										}
-										catch (NException::CException const &)
-										{
-										}
-
-										if (bDone)
-											Promise.f_SetResult();
-										else
-											Promise.f_SetException(DMibErrorInstance("Manifest rsync aborted"));
-									}
-									while (false)
-										;
+									DestroyResult.f_Access();
+								}
+								catch (CExceptionBackupManagerHashMismatch const &_Exception)
+								{
+									Promise.f_SetException(_Exception);
+									break;
+								}
+								catch (NException::CException const &)
+								{
 								}
 
-								PromiseReturn.f_SetResult(_Result);
+								if (bDone)
+									Promise.f_SetResult();
+								else
+									Promise.f_SetException(DMibErrorInstance("Manifest rsync aborted"));
 							}
-						;
+							while (false)
+								;
+						}
 
-						return PromiseReturn.f_MoveFuture();
+						if (!DestroyResult)
+							co_return DestroyResult.f_GetException();
+
+						co_return {};
 					}
 				)
-				/ [this, Promise](CSecureByteVector &&_Packet) mutable -> TCFuture<CSecureByteVector>
+				/ [this](CSecureByteVector &&_Packet) mutable -> TCFuture<CSecureByteVector>
 				{
 					if (!mp_pManifestSyncState)
-						return DMibErrorInstance("Aborted");
+						co_return DMibErrorInstance("Aborted");
 
-					return TCFuture<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
-						{
-							NContainer::CSecureByteVector ToSendToClient;
-							if (mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket(_Packet, ToSendToClient))
-								mp_pManifestSyncState->m_bDone = true;
+					co_return co_await
+						(
+						 	TCFuture<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
+							{
+								NContainer::CSecureByteVector ToSendToClient;
+								if (mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket(_Packet, ToSendToClient))
+									mp_pManifestSyncState->m_bDone = true;
 
-							return ToSendToClient;
-						}
+								return ToSendToClient;
+							}
+						)
 					;
 				}
 				, pState->m_ManifestStream.f_GetLength()
 			 	, ManifestDigest
 			)
-			> [this, Promise](TCAsyncResult<TCActorSubscriptionWithID<>> &&_Subscription)
-			{
-				if (!_Subscription)
-				{
-					Promise.f_SetException(DMibErrorInstance(fg_Format("Manifest start rsync failed: ", _Subscription.f_GetExceptionStr())));
-					return;
-				}
-
-				if (!mp_pManifestSyncState)
-					return;
-
-				mp_pManifestSyncState->m_RSyncSubscription = fg_Move(*_Subscription);
-			}
+			.f_Wrap()
 		;
 
-		return Promise.f_MoveFuture();
+		if (!Subscription)
+			co_return DMibErrorInstance(fg_Format("Manifest start rsync failed: ", Subscription.f_GetExceptionStr()));
+
+		if (!mp_pManifestSyncState)
+			co_return {};
+
+		mp_pManifestSyncState->m_RSyncSubscription = fg_Move(*Subscription);
+
+		co_await Promise.f_MoveFuture();
+
+		co_return {};
 	}
 
 	void CBackupManagerClient_Instance::fp_StartBackup()
@@ -728,10 +714,11 @@ namespace NMib::NCloud::NPrivate
 		InitParams.m_BackupKey = mp_BackupKey;
 		InitParams.m_Subscription = g_ActorSubscription / [this]() -> TCFuture<void>
 			{
-				if (mp_bDestroyed || !mp_Backup)
-					return fg_Explicit();
+				if (f_IsDestroyed() || !mp_Backup)
+					co_return {};
 
-				return mp_BackupManagerClient(&CBackupManagerClient::fp_OnNotification, mp_ActorInfo.m_HostInfo, CBackupManagerClient::CNotification_BackupAborted());
+				co_await mp_BackupManagerClient(&CBackupManagerClient::fp_OnNotification, mp_ActorInfo.m_HostInfo, CBackupManagerClient::CNotification_BackupAborted());
+				co_return {};
 			}
 		;
 
@@ -1099,6 +1086,8 @@ namespace NMib::NCloud::NPrivate
 		 	, CBackupManagerClient_ChecksumState const &_ChecksumState
 		)
 	{
+		TCPromise<void> Promise;
+
 #if defined DMibContractConfigure_CheckEnabled
 		CStr ManifestError;
 		DMibCheck(CBackupManagerBackup::fs_ManifestChangeValid(_FileName, _ManifestChange, ManifestError));
@@ -1114,9 +1103,6 @@ namespace NMib::NCloud::NPrivate
 			;
 		}
 #endif
-
-		TCPromise<void> Promise;
-
 		if (mp_Backup)
 		{
 			if (mp_bBackupStarted)

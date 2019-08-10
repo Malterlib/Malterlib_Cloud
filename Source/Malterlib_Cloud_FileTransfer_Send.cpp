@@ -287,7 +287,7 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 		if (Internal.m_bCalled)
-			return DMibErrorInstance("Send files has already been called");
+			co_return DMibErrorInstance("Send files has already been called");
 		Internal.m_bCalled = true;
 
 		auto &Params = *_TransferContext.mp_pInternal;
@@ -296,7 +296,7 @@ namespace NMib::NCloud
 		{
 			CStr Error;
 			if (!CFileTransferContext::fs_IsSafeRelativePath(FileInfo.f_GetPath(), Error))
-				return DMibErrorInstance(fg_Format("Invalid relative path '{}' in file transfer manifest. Path cannot {}", FileInfo.f_GetPath(), Error));
+				co_return DMibErrorInstance(fg_Format("Invalid relative path '{}' in file transfer manifest. Path cannot {}", FileInfo.f_GetPath(), Error));
 		}
 
 		auto CleanupUpload = fg_OnScopeExitShared
@@ -328,15 +328,19 @@ namespace NMib::NCloud
 		auto StateSubscription = Internal.m_StateCallback.f_Register(Internal.m_Params.m_DispatchActor, fg_Move(Internal.m_Params.m_fStateChange));
 		Internal.fp_DetermineWhatToSend();
 
-		return fg_Explicit(fg_CombinedCallbackReference(fg_Move(UploadCallbackSubscription), fg_Move(StateSubscription)));
+		co_return fg_CombinedCallbackReference(fg_Move(UploadCallbackSubscription), fg_Move(StateSubscription));
 	}
 	
 	NConcurrency::TCFuture<CFileTransferResult> CFileTransferSend::f_GetResult()
 	{
+		NConcurrency::TCPromise<CFileTransferResult> Promise;
+
 		auto &Internal = *mp_pInternal;
 		if (Internal.m_bDoneCalled)
-			return DMibErrorInstance("The file result has already been gotten");
+			return Promise <<= DMibErrorInstance("The file result has already been gotten");
+
 		Internal.m_bDoneCalled = true;
-		return Internal.m_Promise.f_Future();
+
+		return Promise <<= Internal.m_Promise.f_Future();
 	}
 }

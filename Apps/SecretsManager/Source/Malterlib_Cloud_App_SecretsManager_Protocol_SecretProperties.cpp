@@ -101,38 +101,33 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
-		TCPromise<TCSet<CSecretID>> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/EnumerateSecrets"}};
 		fsp_AddPermissionsForMatchingSecrets(m_pThis->mp_Database.m_Secrets, _SemanticID, _TagsExclusive, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Enumerate secret in SecretsManager", Permissions)
-			> Promise % "Permission denied enumerating secrets" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(EnumerateSecrets, command)"));
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Enumerate secret in SecretsManager", Permissions) % "Permission denied enumerating secrets" % Auditor);
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(EnumerateSecrets, command)");
 
-				TCSet<CSecretID> IDs;
-				fg_CollectMatchingSecrets
-					(
-						m_pThis->mp_Database.m_Secrets
-						, _SemanticID
-						, _TagsExclusive
-						, [&] (CSecretPropertiesInternal const &_SecretProperty)
-						{
-							// Only enumerate secrets the host is allowed to see
-							auto const &ID = m_pThis->mp_Database.m_Secrets.fs_GetKey(_SecretProperty);
-							auto *pHasPermission = _HasPermissions.f_FindEqual(CStr::fs_ToStr(ID));
-							if (pHasPermission && *pHasPermission)
-								IDs[ID];
-						}
-					)
-				;
-				Promise.f_SetResult(fg_Move(IDs));
-			}
+		TCSet<CSecretID> IDs;
+		fg_CollectMatchingSecrets
+			(
+				m_pThis->mp_Database.m_Secrets
+				, _SemanticID
+				, _TagsExclusive
+				, [&] (CSecretPropertiesInternal const &_SecretProperty)
+				{
+					// Only enumerate secrets the host is allowed to see
+					auto const &ID = m_pThis->mp_Database.m_Secrets.fs_GetKey(_SecretProperty);
+					auto *pHasPermission = HasPermissions.f_FindEqual(CStr::fs_ToStr(ID));
+					if (pHasPermission && *pHasPermission)
+						IDs[ID];
+				}
+			)
 		;
-		return Promise.f_MoveFuture();
+
+		co_return fg_Move(IDs);
 	}
 
 	TCFuture<CSecretsManager::CSecret> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecret(CSecretsManager::CSecretID &&_ID)
@@ -140,7 +135,6 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
-		TCPromise<CSecretsManager::CSecret> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecret"}};
@@ -148,25 +142,21 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Get secret from SecretsManager", Permissions)
-			> Promise % "Permission denied getting secret" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(GetSecret, command)"));
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Get secret from SecretsManager", Permissions) % "Permission denied getting secret" % Auditor);
 
-				for (auto const &bHasPermission : _HasPermissions)
-				{
-					if (!bHasPermission)
-						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(GetSecret, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
-				}
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(GetSecret, command)");
 
-				if (pSecretProperty)
-					Promise.f_SetResult(pSecretProperty->m_Secret);
-				else
-					Promise.f_SetException(Auditor.f_Exception(fg_SecretIDException(_ID)));
-			}
-		;
-		return Promise.f_MoveFuture();
+		for (auto const &bHasPermission : HasPermissions)
+		{
+			if (!bHasPermission)
+				co_return Auditor.f_AccessDenied(fg_Format("(GetSecret, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+		}
+
+		if (!pSecretProperty)
+			co_return Auditor.f_Exception(fg_SecretIDException(_ID));
+
+		co_return pSecretProperty->m_Secret;
 	}
 
 	TCFuture<CSecretsManager::CSecretProperties> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretProperties(CSecretsManager::CSecretID &&_ID)
@@ -174,7 +164,6 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
-		TCPromise<CSecretsManager::CSecretProperties> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecretProperties"}};
@@ -182,43 +171,40 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions)
-			> Promise % "Permission denied getting secret properties" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		auto HasPermissions = co_await
+			(
+			 	This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions)
+			 	% "Permission denied getting secret properties"
+			 	% Auditor
+			)
+		;
+
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(GetSecretProperties, command)");
+
+		for (auto const &bHasPermission : HasPermissions)
+		{
+			if (!bHasPermission)
+				co_return Auditor.f_AccessDenied(fg_Format("(GetSecretProperties, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+		}
+
+		if (!pSecretProperty)
+			co_return Auditor.f_Exception(fg_SecretIDException(_ID));
+
+		co_return CSecretsManager::CSecretProperties
 			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(GetSecretProperties, command)"));
-
-				for (auto const &bHasPermission : _HasPermissions)
-				{
-					if (!bHasPermission)
-						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(GetSecretProperties, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
-				}
-
-				if (pSecretProperty)
-				{
-					Promise.f_SetResult
-						(
-						 	CSecretsManager::CSecretProperties
-						 	{
-								pSecretProperty->m_Secret
-								, pSecretProperty->m_UserName
-								, pSecretProperty->m_URL
-								, pSecretProperty->m_Expires
-								, pSecretProperty->m_Notes
-								, pSecretProperty->m_Metadata
-								, pSecretProperty->m_Created
-								, pSecretProperty->m_Modified
-								, pSecretProperty->m_SemanticID
-								, pSecretProperty->m_Tags
-							}
-						)
-					;
-				}
-				else
-					Promise.f_SetException(Auditor.f_Exception(fg_SecretIDException(_ID)));
+				pSecretProperty->m_Secret
+				, pSecretProperty->m_UserName
+				, pSecretProperty->m_URL
+				, pSecretProperty->m_Expires
+				, pSecretProperty->m_Notes
+				, pSecretProperty->m_Metadata
+				, pSecretProperty->m_Created
+				, pSecretProperty->m_Modified
+				, pSecretProperty->m_SemanticID
+				, pSecretProperty->m_Tags
 			}
 		;
-		return Promise.f_MoveFuture();
 	}
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretBySemanticID(CStrSecure const &_SemanticID, TCSet<CStrSecure> const &_TagsExclusive)
@@ -227,49 +213,50 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
-		TCPromise<CSecretsManager::CSecret> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecretBySemanticID"}};
 		fsp_AddPermissionsForMatchingSecrets(m_pThis->mp_Database.m_Secrets, _SemanticID, _TagsExclusive, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Get secret by semantic ID from SecretsManager", Permissions)
-			> Promise % "Permission denied getting secret by semantic ID" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(GetSecretBySemanticID, command)"));
-
-				CSecretsManager::CSecret FoundSecret;
-				int32 nFoundCount = 0;
-				fg_CollectMatchingSecrets
-					(
-						m_pThis->mp_Database.m_Secrets
-						, _SemanticID
-						, _TagsExclusive
-						, [&] (CSecretPropertiesInternal const &_SecretProperty)
-						{
-							// Only count secrets host is allowed to see
-							auto const &ID = m_pThis->mp_Database.m_Secrets.fs_GetKey(_SecretProperty);
-							auto *pHasPermission = _HasPermissions.f_FindEqual(CStr::fs_ToStr(ID));
-							if (pHasPermission && *pHasPermission)
-							{
-								++nFoundCount;
-								FoundSecret = _SecretProperty.m_Secret;
-							}
-						}
-					)
-				;
-
-				if (nFoundCount == 0)
-					return Promise.f_SetException(Auditor.f_Exception(fg_SemanticIDException("No secret", _SemanticID, _TagsExclusive)));
-
-				if (nFoundCount > 1)
-					return Promise.f_SetException(Auditor.f_Exception(fg_SemanticIDException("Multiple secrets", _SemanticID, _TagsExclusive)));
-
-				Promise.f_SetResult(FoundSecret);
-			}
+		auto HasPermissions = co_await
+			(
+			 	This.mp_Permissions.f_HasPermissions("Get secret by semantic ID from SecretsManager", Permissions)
+			 	% "Permission denied getting secret by semantic ID"
+			 	% Auditor
+			)
 		;
-		return Promise.f_MoveFuture();
+
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(GetSecretBySemanticID, command)");
+
+		CSecretsManager::CSecret FoundSecret;
+		int32 nFoundCount = 0;
+		fg_CollectMatchingSecrets
+			(
+				m_pThis->mp_Database.m_Secrets
+				, _SemanticID
+				, _TagsExclusive
+				, [&] (CSecretPropertiesInternal const &_SecretProperty)
+				{
+					// Only count secrets host is allowed to see
+					auto const &ID = m_pThis->mp_Database.m_Secrets.fs_GetKey(_SecretProperty);
+					auto *pHasPermission = HasPermissions.f_FindEqual(CStr::fs_ToStr(ID));
+					if (pHasPermission && *pHasPermission)
+					{
+						++nFoundCount;
+						FoundSecret = _SecretProperty.m_Secret;
+					}
+				}
+			)
+		;
+
+		if (nFoundCount == 0)
+			co_return Auditor.f_Exception(fg_SemanticIDException("No secret", _SemanticID, _TagsExclusive));
+
+		if (nFoundCount > 1)
+			co_return Auditor.f_Exception(fg_SemanticIDException("Multiple secrets", _SemanticID, _TagsExclusive));
+
+		co_return fg_Move(FoundSecret);
 	}
 	
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SetSecretProperties(CSecretsManager::CSecretID &&_ID, CSecretsManager::CSecretProperties &&_Secret)
@@ -282,23 +269,22 @@ namespace NMib::NCloud::NSecretsManager
 		if (_Secret.m_SemanticID)
 		{
 			if (!CSecretsManager::fs_IsValidTag(*_Secret.m_SemanticID))
-				return Auditor.f_Exception(fg_Format("Malformed Semantic ID: '{}'", *_Secret.m_SemanticID));
+				co_return Auditor.f_Exception(fg_Format("Malformed Semantic ID: '{}'", *_Secret.m_SemanticID));
 		}
 		if (_Secret.m_Tags)
 		{
 			for (auto const &Tag : *_Secret.m_Tags)
 			{
 				if (!CSecretsManager::fs_IsValidTag(Tag))
-					return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
+					co_return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
 			}
 		}
 		if (_Secret.m_Secret)
 		{
 			if (_Secret.m_Secret.f_GetTypeID() == CSecretsManager::ESecretType_File)
-				return Auditor.f_Exception(fg_Format("The secret cannot be a file secret"));
+				co_return Auditor.f_Exception(fg_Format("The secret cannot be a file secret"));
 		}
 
-		TCPromise<void> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SetSecretProperties"}};
@@ -323,89 +309,89 @@ namespace NMib::NCloud::NSecretsManager
 		else
 			fsp_AddPermissionQueryIndexedByPermission("Write", _Secret.f_GetSemanticID(), _Secret.f_GetTags(), Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions)
-			> Promise % "Permission denied setting secret properties" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(SetSecretProperties, command)"));
-
-				for (auto const &bHasPermission : _HasPermissions)
-				{
-					if (!bHasPermission)
-						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(SetSecretProperties, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
-				}
-
-				auto &This = *m_pThis;
-				auto CurrentTime = CTime::fs_NowUTC();
-				auto *pCreatedOrModified = "modified";
-
-				if (!pSecretProperty)
-				{
-					pSecretProperty = &This.mp_Database.m_Secrets[_ID];
-					pSecretProperty->m_Created = CurrentTime;
-					pCreatedOrModified = "created";
-				}
-
-				pSecretProperty->m_Modified = CurrentTime;
-
-				// Only set the members that are defined in _Secret
-				CStr RandomFileNameToUnreference;
-				if (_Secret.m_Secret)
-				{
-					if (pSecretProperty->m_Secret.f_GetTypeID() == CSecretsManager::ESecretType_File)
-					{
-						RandomFileNameToUnreference = pSecretProperty->m_RandomFileName;
-						// Keep the key, it is enough to generate a new IV for the next file
-						pSecretProperty->m_IV.f_Clear();
-						pSecretProperty->m_HMACKey.f_Clear();
-						pSecretProperty->m_RandomFileName.f_Clear();
-					}
-					pSecretProperty->m_Secret = *_Secret.m_Secret;
-				}
-				if (_Secret.m_UserName)
-					pSecretProperty->m_UserName = *_Secret.m_UserName;
-
-				if (_Secret.m_URL)
-					pSecretProperty->m_URL = *_Secret.m_URL;
-
-				if (_Secret.m_Expires)
-					pSecretProperty->m_Expires = *_Secret.m_Expires;
-
-				if (_Secret.m_Notes)
-					pSecretProperty->m_Notes = *_Secret.m_Notes;
-
-				if (_Secret.m_Metadata)
-					pSecretProperty->m_Metadata = *_Secret.m_Metadata;
-
-				if (_Secret.m_Created)
-					pSecretProperty->m_Created = *_Secret.m_Created;
-
-				if (_Secret.m_Modified)
-					pSecretProperty->m_Modified = *_Secret.m_Modified;
-
-				if (_Secret.m_SemanticID)
-				{
-					This.fp_UpdateSemanticIDs(pSecretProperty->m_SemanticID, *_Secret.m_SemanticID);
-					pSecretProperty->m_SemanticID = *_Secret.m_SemanticID;
-				}
-
-				if (_Secret.m_Tags)
-				{
-					This.fp_UpdateTags(pSecretProperty->m_Tags, *_Secret.m_Tags);
-					pSecretProperty->m_Tags = *_Secret.m_Tags;
-				}
-
-				Auditor.f_Info(fg_Format("Secret properties {} for ID '{}/{}'", pCreatedOrModified, _ID.m_Folder, _ID.m_Name));
-
-				This.fp_WriteDatabase();
-
-				if (RandomFileNameToUnreference)
-					This.fp_RemoveUnreferencedFile(RandomFileNameToUnreference, Auditor) > Promise;
-				else
-					Promise.f_SetResult();
-			}
+		auto HasPermissions = co_await
+			(
+			 	This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions)
+			 	% "Permission denied setting secret properties"
+			 	% Auditor
+			)
 		;
-		return Promise.f_MoveFuture();
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(SetSecretProperties, command)");
+
+		for (auto const &bHasPermission : HasPermissions)
+		{
+			if (!bHasPermission)
+				co_return Auditor.f_AccessDenied(fg_Format("(SetSecretProperties, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+		}
+
+		auto CurrentTime = CTime::fs_NowUTC();
+		auto *pCreatedOrModified = "modified";
+
+		if (!pSecretProperty)
+		{
+			pSecretProperty = &This.mp_Database.m_Secrets[_ID];
+			pSecretProperty->m_Created = CurrentTime;
+			pCreatedOrModified = "created";
+		}
+
+		pSecretProperty->m_Modified = CurrentTime;
+
+		// Only set the members that are defined in _Secret
+		CStr RandomFileNameToUnreference;
+		if (_Secret.m_Secret)
+		{
+			if (pSecretProperty->m_Secret.f_GetTypeID() == CSecretsManager::ESecretType_File)
+			{
+				RandomFileNameToUnreference = pSecretProperty->m_RandomFileName;
+				// Keep the key, it is enough to generate a new IV for the next file
+				pSecretProperty->m_IV.f_Clear();
+				pSecretProperty->m_HMACKey.f_Clear();
+				pSecretProperty->m_RandomFileName.f_Clear();
+			}
+			pSecretProperty->m_Secret = *_Secret.m_Secret;
+		}
+		if (_Secret.m_UserName)
+			pSecretProperty->m_UserName = *_Secret.m_UserName;
+
+		if (_Secret.m_URL)
+			pSecretProperty->m_URL = *_Secret.m_URL;
+
+		if (_Secret.m_Expires)
+			pSecretProperty->m_Expires = *_Secret.m_Expires;
+
+		if (_Secret.m_Notes)
+			pSecretProperty->m_Notes = *_Secret.m_Notes;
+
+		if (_Secret.m_Metadata)
+			pSecretProperty->m_Metadata = *_Secret.m_Metadata;
+
+		if (_Secret.m_Created)
+			pSecretProperty->m_Created = *_Secret.m_Created;
+
+		if (_Secret.m_Modified)
+			pSecretProperty->m_Modified = *_Secret.m_Modified;
+
+		if (_Secret.m_SemanticID)
+		{
+			This.fp_UpdateSemanticIDs(pSecretProperty->m_SemanticID, *_Secret.m_SemanticID);
+			pSecretProperty->m_SemanticID = *_Secret.m_SemanticID;
+		}
+
+		if (_Secret.m_Tags)
+		{
+			This.fp_UpdateTags(pSecretProperty->m_Tags, *_Secret.m_Tags);
+			pSecretProperty->m_Tags = *_Secret.m_Tags;
+		}
+
+		Auditor.f_Info(fg_Format("Secret properties {} for ID '{}/{}'", pCreatedOrModified, _ID.m_Folder, _ID.m_Name));
+
+		co_await (This.fp_WriteDatabase() % "Failed to save database" % Auditor);
+
+		if (RandomFileNameToUnreference)
+			co_await This.fp_RemoveUnreferencedFile(RandomFileNameToUnreference, Auditor);
+
+		co_return {};
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_ModifyTags
@@ -422,15 +408,15 @@ namespace NMib::NCloud::NSecretsManager
 		for (auto const &Tag : _TagsToRemove)
 		{
 			if (!CSecretsManager::fs_IsValidTag(Tag))
-				return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
+				co_return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
 		}
+
 		for (auto const &Tag : _TagsToAdd)
 		{
 			if (!CSecretsManager::fs_IsValidTag(Tag))
-				return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
+				co_return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
 		}
 
-		TCPromise<void> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/ModifyTags"}};
@@ -452,38 +438,31 @@ namespace NMib::NCloud::NSecretsManager
 				fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, CurrentTags, Permissions);
 		}
 
-		This.mp_Permissions.f_HasPermissions("Modify tags in SecretsManager", Permissions)
-			> Promise % "Permission denied modifying tags" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(ModifyTags, command)"));
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Modify tags in SecretsManager", Permissions) % "Permission denied modifying tags" % Auditor);
 
-				for (auto const &bHasPermission : _HasPermissions)
-				{
-					if (!bHasPermission)
-						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(ModifyTags, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
-				}
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(ModifyTags, command)");
 
-				if (pSecretProperty)
-				{
-					auto &This = *m_pThis;
+		for (auto const &bHasPermission : HasPermissions)
+		{
+			if (!bHasPermission)
+				co_return Auditor.f_AccessDenied(fg_Format("(ModifyTags, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+		}
 
-					This.fp_UpdateTags(_TagsToRemove, _TagsToAdd);
+		if (!pSecretProperty)
+			co_return Auditor.f_Exception(fg_SecretIDException(_ID));
 
-					pSecretProperty->m_Tags -= _TagsToRemove;
-					pSecretProperty->m_Tags += _TagsToAdd;
-					pSecretProperty->m_Modified = CTime::fs_NowUTC();
+		This.fp_UpdateTags(_TagsToRemove, _TagsToAdd);
 
-					Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+		pSecretProperty->m_Tags -= _TagsToRemove;
+		pSecretProperty->m_Tags += _TagsToAdd;
+		pSecretProperty->m_Modified = CTime::fs_NowUTC();
 
-					This.fp_WriteDatabase();
-					Promise.f_SetResult();
-				}
-				else
-					Promise.f_SetException(Auditor.f_Exception(fg_SecretIDException(_ID)));
-			}
-		;
-		return Promise.f_MoveFuture();
+		Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+
+		co_await (This.fp_WriteDatabase() % "Failed to save database" % Auditor);
+
+		co_return {};
 	}
 	
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SetMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey, CEJSON &&_Metadata)
@@ -491,7 +470,6 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
-		TCPromise<void> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SetMetadata"}};
@@ -499,34 +477,28 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Set metadata in SecretsManager", Permissions)
-			> Promise % "Permission denied setting meta data" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(SetMetadata, command)"));
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Set metadata in SecretsManager", Permissions) % "Permission denied setting meta data" % Auditor);
 
-				for (auto const &bHasPermission : _HasPermissions)
-				{
-					if (!bHasPermission)
-						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(SetMetadata, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
-				}
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(SetMetadata, command)");
 
-				if (pSecretProperty)
-				{
-					auto &This = *m_pThis;
-					pSecretProperty->m_Metadata[_MetadataKey] = _Metadata;
-					pSecretProperty->m_Modified = CTime::fs_NowUTC();
+		for (auto const &bHasPermission : HasPermissions)
+		{
+			if (!bHasPermission)
+				co_return Auditor.f_AccessDenied(fg_Format("(SetMetadata, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+		}
 
-					Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+		if (!pSecretProperty)
+			co_return Auditor.f_Exception(fg_SecretIDException(_ID));
 
-					This.fp_WriteDatabase();
-					Promise.f_SetResult();
-				}
-				else
-					Promise.f_SetException(Auditor.f_Exception(fg_SecretIDException(_ID)));
-			}
-		;
-		return Promise.f_MoveFuture();
+		pSecretProperty->m_Metadata[_MetadataKey] = _Metadata;
+		pSecretProperty->m_Modified = CTime::fs_NowUTC();
+
+		Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+
+		co_await (This.fp_WriteDatabase() % "Failed to save database" % Auditor);
+
+		co_return {};
 	}
 	
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_RemoveMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey)
@@ -534,7 +506,6 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
-		TCPromise<void> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/RemoveMetadata"}};
@@ -542,34 +513,28 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Remove metadata in SecretsManager", Permissions)
-			> Promise % "Permission denied removing meta data" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(RemoveMetadata, command)"));
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove metadata in SecretsManager", Permissions) % "Permission denied removing meta data" % Auditor);
 
-				for (auto const &bHasPermission : _HasPermissions)
-				{
-					if (!bHasPermission)
-						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(RemoveMetadata, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
-				}
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(RemoveMetadata, command)");
 
-				if (pSecretProperty)
-				{
-					auto &This = *m_pThis;
-					pSecretProperty->m_Metadata.f_Remove(_MetadataKey);
-					pSecretProperty->m_Modified = CTime::fs_NowUTC();
+		for (auto const &bHasPermission : HasPermissions)
+		{
+			if (!bHasPermission)
+				co_return Auditor.f_AccessDenied(fg_Format("(RemoveMetadata, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+		}
 
-					Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+		if (!pSecretProperty)
+			co_return Auditor.f_Exception(fg_SecretIDException(_ID));
 
-					This.fp_WriteDatabase();
-					Promise.f_SetResult();
-				}
-				else
-					Promise.f_SetException(Auditor.f_Exception(fg_SecretIDException(_ID)));
-			}
-		;
-		return Promise.f_MoveFuture();
+		pSecretProperty->m_Metadata.f_Remove(_MetadataKey);
+		pSecretProperty->m_Modified = CTime::fs_NowUTC();
+
+		Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+
+		co_await (This.fp_WriteDatabase() % "Failed to save database" % Auditor);
+
+		co_return {};
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_RemoveSecret(CSecretID &&_ID)
@@ -577,7 +542,6 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
-		TCPromise<void> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/RemoveSecret"}};
@@ -585,40 +549,32 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Remove secret in SecretsManager", Permissions)
-			> Promise % "Permission denied removing secret" % Auditor / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(RemoveSecret, command)"));
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove secret in SecretsManager", Permissions) % "Permission denied removing secret" % Auditor);
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(RemoveSecret, command)");
 
-				for (auto const &bHasPermission : _HasPermissions)
-				{
-					if (!bHasPermission)
-						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(RemoveSecret, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
-				}
+		for (auto const &bHasPermission : HasPermissions)
+		{
+			if (!bHasPermission)
+				co_return Auditor.f_AccessDenied(fg_Format("(RemoveSecret, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+		}
 
-				if (pSecretProperty)
-				{
-					auto &This = *m_pThis;
-					CStr RandomFileNameToUnreference;
-					if (pSecretProperty->m_Secret.f_GetTypeID() == CSecretsManager::ESecretType_File)
-						RandomFileNameToUnreference = pSecretProperty->m_RandomFileName;
+		if (!pSecretProperty)
+			co_return Auditor.f_Exception(fg_SecretIDException(_ID));
 
-					This.mp_Database.m_Secrets.f_Remove(_ID);
+		CStr RandomFileNameToUnreference;
+		if (pSecretProperty->m_Secret.f_GetTypeID() == CSecretsManager::ESecretType_File)
+			RandomFileNameToUnreference = pSecretProperty->m_RandomFileName;
 
-					Auditor.f_Info(fg_Format("Secret removed, ID: '{}/{}'", _ID.m_Folder, _ID.m_Name));
+		This.mp_Database.m_Secrets.f_Remove(_ID);
 
-					This.fp_WriteDatabase();
+		Auditor.f_Info(fg_Format("Secret removed, ID: '{}/{}'", _ID.m_Folder, _ID.m_Name));
 
-					if (RandomFileNameToUnreference)
-						This.fp_RemoveUnreferencedFile(RandomFileNameToUnreference, Auditor) > Promise;
-					else
-						Promise.f_SetResult();
-				}
-				else
-					Promise.f_SetException(Auditor.f_Exception(fg_SecretIDException(_ID)));
-			}
-		;
-		return Promise.f_MoveFuture();
+		co_await (This.fp_WriteDatabase() % "Failed to save database" % Auditor);
+
+		if (RandomFileNameToUnreference)
+			co_await This.fp_RemoveUnreferencedFile(RandomFileNameToUnreference, Auditor);
+
+		co_return {};
 	}
 }

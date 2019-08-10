@@ -343,7 +343,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_AddApplication(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_AddApplication, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -438,7 +438,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_AddApplication(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_AddApplication, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -543,7 +543,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_ChangeApplicationSettings(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_ChangeApplicationSettings, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -578,7 +578,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_EnumApplications(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_EnumApplications, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -607,7 +607,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_ListAvailableVersions(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_ListAvailableVersions, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -627,7 +627,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_RemoveApplication(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_RemoveApplication, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -657,7 +657,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_UpdateApplication(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_UpdateApplication, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -711,7 +711,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_UpdateApplication(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_UpdateApplication, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -731,7 +731,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_StopApplication(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_StopApplication, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -751,7 +751,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_RestartApplication(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_RestartApplication, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -771,7 +771,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_StartApplication(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_StartApplication, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -806,7 +806,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_UpdateApplication(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_UpdateApplication, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -818,7 +818,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_CancelAllUpdates(_Params, _pCommandLine);
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_CancelAllUpdates, _Params, _pCommandLine);
 				}
 			)
 		;

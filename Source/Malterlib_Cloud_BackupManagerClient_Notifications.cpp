@@ -33,19 +33,21 @@ namespace NMib::NCloud
 			Subscription.m_fOnNotification(Notification.m_RemoteHost, fg_TempCopy(Notification.m_Notification)) > fg_DiscardResult();
 		}
 
-		return g_Explicit = g_ActorSubscription / [this, SubscriptionID]() -> TCFuture<void>
+		co_return g_ActorSubscription / [this, SubscriptionID]() -> TCFuture<void>
 			{
 				auto &Internal = *mp_pInternal;
 
 				auto *pSubscription = Internal.m_NotificationSubscriptions.f_FindEqual(SubscriptionID);
 				if (!pSubscription)
-					return fg_Explicit();
+					co_return {};
 				
 				auto DestroyFuture = pSubscription->m_fOnNotification.f_Destroy();
 
 				Internal.m_NotificationSubscriptions.f_Remove(SubscriptionID);
 				
-				return DestroyFuture;
+				co_await fg_Move(DestroyFuture);
+
+				co_return {};
 			}
 		;
 	}
@@ -101,19 +103,21 @@ namespace NMib::NCloud
 		if (Internal.m_bInitialFinished)
 			fOnFinished() > fg_DiscardResult();
 		
-		return g_Explicit = g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCFuture<void>
+		co_return g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCFuture<void>
 			{
 				auto &Internal = *pThis->mp_pInternal;
 
 				auto *pSubscription = Internal.m_OnInitialFinishedSubscriptions.f_FindEqual(SubscriptionID);
 				if (!pSubscription)
-					return fg_Explicit();
+					co_return {};
 				
 				auto DestroyFuture = pSubscription->f_Destroy();
 
 				Internal.m_OnInitialFinishedSubscriptions.f_Remove(SubscriptionID);
 				
-				return DestroyFuture;
+				co_await fg_Move(DestroyFuture);
+
+				co_return {};
 			}
 		;
 	}
@@ -131,19 +135,21 @@ namespace NMib::NCloud
 		if (Internal.m_bStopped)
 			fOnStopped() > fg_DiscardResult();
 		
-		return g_Explicit = g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCFuture<void>
+		co_return g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCFuture<void>
 			{
 				auto &Internal = *pThis->mp_pInternal;
 
 				auto *pSubscription = Internal.m_OnBackupStoppedSubscriptions.f_FindEqual(SubscriptionID);
 				if (!pSubscription)
-					return fg_Explicit();
+					co_return {};
 				
 				auto DestroyFuture = pSubscription->f_Destroy();
 
 				Internal.m_OnBackupStoppedSubscriptions.f_Remove(SubscriptionID);
 				
-				return DestroyFuture;
+				co_await fg_Move(DestroyFuture);
+
+				co_return {};
 			}
 		;
 	}

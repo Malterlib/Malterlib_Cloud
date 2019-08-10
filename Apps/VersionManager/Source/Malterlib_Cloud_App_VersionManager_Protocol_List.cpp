@@ -42,36 +42,30 @@ namespace NMib::NCloud::NVersionManager
 	{
 		auto pThis = m_pThis;
 		
-		if (!pThis->mp_pCanDestroyTracker)
-			return DMibErrorInstance("Shutting down");
+		if (pThis->f_IsDestroyed())
+			co_return DMibErrorInstance("Shutting down");
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		NConcurrency::TCPromise<CVersionManager::CListApplications::CResult> Promise;
 		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		Auditor.f_Info("Listing applications");
 		
-		pThis->fp_FilterApplicationsByPermissions("List applications", pThis->fp_ApplicationSet())
-			> Promise % "Permission denied listing applications" % Auditor / [Promise, Auditor](TCSet<CStr> &&_Applications)
-			{
-				Auditor.f_Info(fg_Format("Listed applications: {vs,vb}", _Applications));
+		auto Applications = co_await (pThis->fp_FilterApplicationsByPermissions("List applications", pThis->fp_ApplicationSet()) % "Permission denied listing applications" % Auditor);
 
-				CVersionManager::CListApplications::CResult Results;
-				Results.m_Applications = fg_Move(_Applications);
-				Promise.f_SetResult(fg_Move(Results));
-			}
-		;
+		Auditor.f_Info("Listed applications: {vs,vb}"_f << Applications);
 
-		return Promise.f_MoveFuture();
+		CVersionManager::CListApplications::CResult Results;
+		Results.m_Applications = fg_Move(Applications);
+		co_return fg_Move(Results);
 	}
 
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListVersions(CListVersions &&_Params) -> TCFuture<CListVersions::CResult>
 	{
 		auto pThis = m_pThis;
 		
-		if (!pThis->mp_pCanDestroyTracker)
-			return DMibErrorInstance("Shutting down");
-		NConcurrency::TCPromise<CVersionManager::CListVersions::CResult> Promise;
+		if (pThis->f_IsDestroyed())
+			co_return DMibErrorInstance("Shutting down");
+
 		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -83,40 +77,36 @@ namespace NMib::NCloud::NVersionManager
 		if (!_Params.m_ForApplication.f_IsEmpty())
 		{
 			if (!CVersionManager::fs_IsValidApplicationName(_Params.m_ForApplication))
-				return Auditor.f_Exception("Invalid application format");
+				co_return Auditor.f_Exception("Invalid application format");
 			
 			Applications[_Params.m_ForApplication];
 		}
 		else
 			Applications = pThis->fp_ApplicationSet();
 
-		pThis->fp_FilterApplicationsByPermissions("List versions", Applications) > Promise % "Permission denied listing versions" % Auditor / [=](TCSet<CStr> &&_Applications)
-			{
-				if (!_Params.m_ForApplication.f_IsEmpty() && _Applications.f_IsEmpty())
-					return Promise.f_SetException(Auditor.f_AccessDenied("(List Versions)"));
+		auto FilteredApplications = co_await (pThis->fp_FilterApplicationsByPermissions("List versions", Applications) % "Permission denied listing versions" % Auditor);
 
-				CVersionManager::CListVersions::CResult Results;
-				for (auto &ApplicationName : _Applications)
-				{
-					auto *pApplication = pThis->mp_Applications.f_FindEqual(ApplicationName);
-					if (!pApplication)
-						continue;
-					auto &Application = *pApplication;
-					auto &OutVersions = Results.m_Versions[ApplicationName];
-					for (auto &Version : Application.m_Versions)
-						OutVersions[Version.f_GetIdentifier()] = Version.m_VersionInfo;
-				}
+		if (!_Params.m_ForApplication.f_IsEmpty() && FilteredApplications.f_IsEmpty())
+			co_return Auditor.f_AccessDenied("(List Versions)");
 
-				TCMap<CStr, CStr> VersionsText;
-				for (auto &Application : Results.m_Versions)
-					VersionsText[Results.m_Versions.fs_GetKey(Application)] = fg_Format("{} versions", Application.f_GetLen());
+		CVersionManager::CListVersions::CResult Results;
+		for (auto &ApplicationName : FilteredApplications)
+		{
+			auto *pApplication = pThis->mp_Applications.f_FindEqual(ApplicationName);
+			if (!pApplication)
+				continue;
+			auto &Application = *pApplication;
+			auto &OutVersions = Results.m_Versions[ApplicationName];
+			for (auto &Version : Application.m_Versions)
+				OutVersions[Version.f_GetIdentifier()] = Version.m_VersionInfo;
+		}
 
-				Auditor.f_Info(fg_Format("Listed versions: {vs,vb}", VersionsText));
+		TCMap<CStr, CStr> VersionsText;
+		for (auto &Application : Results.m_Versions)
+			VersionsText[Results.m_Versions.fs_GetKey(Application)] = fg_Format("{} versions", Application.f_GetLen());
 
-				Promise.f_SetResult(fg_Move(Results));
-			}
-		;
+		Auditor.f_Info(fg_Format("Listed versions: {vs,vb}", VersionsText));
 
-		return Promise.f_MoveFuture();
+		co_return fg_Move(Results);
 	}
 }

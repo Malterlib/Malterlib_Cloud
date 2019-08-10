@@ -12,7 +12,7 @@ namespace NMib::NCloud::NAppManager
 		m_ProcessLaunchSubscription.f_Clear();
 		m_bLaunched = false;
 	}
-	
+
 	void CAppManagerActor::CApplication::f_AbortPendingLaunches()
 	{
 		for (auto &fOnFinished : m_OnLaunchFinished)
@@ -38,7 +38,7 @@ namespace NMib::NCloud::NAppManager
 			Child.m_pParentApplication = nullptr;
 		m_Children.f_Clear();
 	}
-	
+
 	bool CAppManagerActor::CApplication::f_NeedsEncryption() const
 	{
 		if (!m_Settings.m_EncryptionStorage.f_IsEmpty())
@@ -47,31 +47,31 @@ namespace NMib::NCloud::NAppManager
 			return true;
 		return false;
 	}
-	
+
 	bool CAppManagerActor::CApplication::f_IsChildApp() const
 	{
 		return !m_Settings.m_ParentApplication.f_IsEmpty();
 	}
-	
+
 	bool CAppManagerActor::CApplication::f_IsLaunched() const
 	{
 		return m_bLaunching || !m_ProcessLaunch.f_IsEmpty() || m_bLaunched;
 	}
-	
+
 	bool CAppManagerActor::CApplication::f_IsInProgress() const
 	{
 		if (m_bOperationInProgress)
 			return true;
-		
+
 		if (m_pParentApplication && m_pParentApplication->m_bOperationInProgress)
 			return true;
-		
+
 		for (auto &Child : m_Children)
 		{
 			if (Child.m_bOperationInProgress)
 				return true;
 		}
-		
+
 		return false;
 	}
 
@@ -99,26 +99,24 @@ namespace NMib::NCloud::NAppManager
 					pApplication->m_bPreventLaunch_User = true;
 				if (_Flags & EStopFlag_PreventLaunchUpdate)
 					pApplication->m_bPreventLaunch_Update = true;
-				
-				TCFuture<void> SaveStateFuture;
+
+				TCPromise<void> SaveStatePromise;
 
 				if (_Flags & (EStopFlag_PreventLaunchUser | EStopFlag_PreventLaunchUpdate))
-					SaveStateFuture = m_pThis->fp_UpdateApplicationJSON(pApplication);
+					m_pThis->fp_UpdateApplicationJSON(pApplication) > SaveStatePromise;
 				else
-					SaveStateFuture = fg_Explicit();
-				
-				TCPromise<uint32> Promise;
-				
+					SaveStatePromise.f_SetResult();
+
 				TCActorResultVector<uint32> ChildrenCloses;
-				
+
 				// Stop all children and dependents first
 				for (auto &pDependent : f_GetDependents())
 					pDependent->f_Stop(EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
-				
+
 				for (auto &ChildApp : m_Children)
 					ChildApp.f_Stop(EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
-				
-				auto [ChildrenCloseResults, SaveStateResult] = co_await ((ChildrenCloses.f_GetResults() + fg_Move(SaveStateFuture)) % "Failed to stop child application");
+
+				auto [ChildrenCloseResults, SaveStateResult] = co_await ((ChildrenCloses.f_GetResults() + SaveStatePromise.f_MoveFuture()) % "Failed to stop child application");
 
 				CStr ChildCloseErrors;
 				for (auto &ChildCloseResult : ChildrenCloseResults)
@@ -139,31 +137,29 @@ namespace NMib::NCloud::NAppManager
 					StopResult.f_SetResult(0);
 				else
 				{
-					TCFuture<void> PreStopFuture;
-
 					bool bRanPreStop = false;
 
+					TCAsyncResult<void> PreStopResult;
 					if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= 0x103)
 					{
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pre-stopping application '{}'", pApplication->m_Name);
 						bRanPreStop = true;
-						PreStopFuture = pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_PreStop)();
+
+						PreStopResult = co_await pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_PreStop)()
+							.f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)")
+							.f_Wrap()
+						;
+						if (!PreStopResult)
+							DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", PreStopResult.f_GetExceptionStr());
 					}
 					else
-						PreStopFuture = fg_Explicit();
-
-					auto PreStopResult = co_await fg_Move(PreStopFuture).f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)").f_Wrap();
-					if (!PreStopResult)
-						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", PreStopResult.f_GetExceptionStr());
+						PreStopResult.f_SetResult();
 
 					CLogError LogError("Malterlib/Cloud/AppManager");
 
 					if (bRanPreStop && pApplication->m_BackupClient && PreStopResult)
 					{
-						auto BackupClientDestroyFuture = pApplication->m_BackupClient->f_Destroy();
-						pApplication->m_BackupClient.f_Clear();
-
-						auto DestroyBackupResult = co_await fg_Move(BackupClientDestroyFuture).f_Wrap();
+						auto DestroyBackupResult = co_await fg_Move(pApplication->m_BackupClient).f_Destroy().f_Wrap();
 
 						if (!DestroyBackupResult)
 							LogError.f_Log("Error stopping application backup", DestroyBackupResult);
@@ -194,18 +190,12 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 
-				TCFuture<void> BackupDestroyFuture;
 				if (pApplication->m_BackupClient)
 				{
-					BackupDestroyFuture = pApplication->m_BackupClient->f_Destroy();
-					pApplication->m_BackupClient.f_Clear();
+					auto BackupDestroyResult = co_await fg_Move(pApplication->m_BackupClient).f_Destroy().f_Wrap();
+					if (!BackupDestroyResult)
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", BackupDestroyResult.f_GetExceptionStr());
 				}
-				else
-					BackupDestroyFuture = fg_Explicit();
-
-				auto BackupDestroyResult = co_await fg_Move(BackupDestroyFuture).f_Wrap();
-				if (!BackupDestroyResult)
-					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", BackupDestroyResult.f_GetExceptionStr());
 
 				pApplication->m_bAutoStart = (_Flags & EStopFlag_AutoStart) != 0;
 
@@ -228,7 +218,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 	}
-	
+
 	CStr CAppManagerActor::CApplication::f_GetDirectory()
 	{
 		if (f_IsChildApp())
@@ -236,7 +226,7 @@ namespace NMib::NCloud::NAppManager
 		else
 			return fg_Format("{}/App/{}", m_pThis->mp_State.m_RootDirectory, m_Name);
 	}
-	
+
 	TCDispatchedActorCall<uint32> CAppManagerActor::CApplication::f_CloseEncryption(uint32 _Status)
 	{
 		return g_Dispatch / [this, _Status, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]() -> TCFuture<uint32>
@@ -250,7 +240,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 	}
-	
+
 	void CAppManagerActor::fp_AppLaunchStateChanged(TCSharedPointer<CApplication> const &_pApplication, CStr const &_State, CAppManagerInterface::EStatusSeverity _Severity)
 	{
 		fp_SetAppLaunchStatus(_pApplication, _State, _Severity);

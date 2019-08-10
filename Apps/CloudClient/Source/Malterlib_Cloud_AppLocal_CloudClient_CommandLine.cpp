@@ -48,7 +48,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return fp_CommandLine_SelfUpdate(_Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)

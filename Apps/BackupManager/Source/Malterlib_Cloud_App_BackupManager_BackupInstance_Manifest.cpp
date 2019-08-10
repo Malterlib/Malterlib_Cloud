@@ -13,9 +13,11 @@ namespace NMib::NCloud::NBackupManager
 		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 		)
 	{
+		TCPromise<TCActorSubscriptionWithID<>> Promise;
+
 		auto &Internal = *mp_pInternal;
 		if (Internal.m_bManifestSyncStarted)
-			return DMibErrorInstance("Manifest rsync already started");
+			return Promise <<= DMibErrorInstance("Manifest rsync already started");
 
 		Internal.m_bManifestSyncStarted = true;
 
@@ -23,22 +25,26 @@ namespace NMib::NCloud::NBackupManager
 		CStr OldFileName = CFile::fs_AppendPath(Internal.m_RootBackupDirectory, "Manifest.bin");
 		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_RandomID());
 
-		return Internal.f_StartRSyncShared
+		return Promise <<= fg_CallSafe
 			(
-				fg_Move(_fRunProtocol)
+			 	Internal
+			 	, &CInternal::f_StartRSyncShared
+				, fg_Move(_fRunProtocol)
 				, FileName
 				, OldFileName
 				, TempFileName
 				, "../Manifest.bin"
 				, _ManifestSize
 				, EDirectoryManifestSyncFlag_None
-				, Internal.m_ManifestRSyncID
+				, &Internal.m_ManifestRSyncID
 				, [this](TCAsyncResult<void> const &_Result) -> TCFuture<void>
 				{
+					TCPromise<void> Promise;
+
 					auto &Internal = *mp_pInternal;
 					if (_Result)
 						Internal.m_bManifestSyncDone = true;
-					return _Result;
+					return Promise <<= _Result;
 				}
 			 	, _ExpectedDigest
 			)
@@ -47,9 +53,11 @@ namespace NMib::NCloud::NBackupManager
 
 	TCFuture<void> CBackupInstance::f_ManifestChange(CStr const &_FileName, CManifestChange const &_Change)
 	{
+		TCPromise<void> Promise;
+
 		CStr ManifestError;
 		if (!CBackupManagerBackup::fs_ManifestChangeValid(_FileName, _Change, ManifestError))
-			return DMibErrorInstance("Manifest change for '{}' is invalid: {}"_f << _FileName << ManifestError);
+			return Promise <<= DMibErrorInstance("Manifest change for '{}' is invalid: {}"_f << _FileName << ManifestError);
 
 		auto &Internal = *mp_pInternal;
 
@@ -62,15 +70,14 @@ namespace NMib::NCloud::NBackupManager
 		case EManifestChange_Add:
 			{
 				if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
-					return fg_Move(pException);
+					return Promise <<= fg_Move(pException);
 
 				auto &SpecificChange = _Change.f_Get<EManifestChange_Add>();
 				if (SpecificChange.m_ManifestFile.f_IsFile())
-					return DMibErrorInstance("Add not valid for a file change, use rsync interface");
+					return Promise <<= DMibErrorInstance("Add not valid for a file change, use rsync interface");
 
 				DMibCloudBackupManagerDebugOut("--- Add {}\n", _FileName);
 
-				TCPromise<void> Promise;
 				Internal.f_SequenceSyncs
 					(
 					 	_FileName
@@ -84,7 +91,7 @@ namespace NMib::NCloud::NBackupManager
 
 							Internal.m_AppendStates.f_Remove(_FileName);
 
-							Internal.f_CommitManifestChange(_FileName, _Change, "add") > Promise;
+							fg_CallSafe(Internal, &CInternal::f_CommitManifestChange, _FileName, _Change, "add") > Promise;
 						}
 					)
 				;
@@ -93,16 +100,15 @@ namespace NMib::NCloud::NBackupManager
 		case EManifestChange_Change:
 			{
 				if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
-					return fg_Move(pException);
+					return Promise <<= fg_Move(pException);
 
 				auto &SpecificChange = _Change.f_Get<EManifestChange_Change>();
 
 				if (SpecificChange.m_ManifestFile.f_IsFile())
-					return DMibErrorInstance("Change not valid for a file change, use append or rsync interface");
+					return Promise <<= DMibErrorInstance("Change not valid for a file change, use append or rsync interface");
 
 				DMibCloudBackupManagerDebugOut("--- Change {}\n", _FileName);
 
-				TCPromise<void> Promise;
 				Internal.f_SequenceSyncs
 					(
 						_FileName
@@ -117,7 +123,7 @@ namespace NMib::NCloud::NBackupManager
 								return Promise.f_SetException(DMibErrorInstance("File does not exists in manifest: {}"_f << _FileName));
 
 							Internal.m_AppendStates.f_Remove(_FileName);
-							Internal.f_CommitManifestChange(_FileName, _Change, "change") > Promise;
+							fg_CallSafe(Internal, &CInternal::f_CommitManifestChange, _FileName, _Change, "change") > Promise;
 						}
 					)
 				;
@@ -126,13 +132,12 @@ namespace NMib::NCloud::NBackupManager
 		case EManifestChange_Remove:
 			{
 				if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
-					return fg_Move(pException);
+					return Promise <<= fg_Move(pException);
 
 				DMibCloudBackupManagerDebugOut("--- Remove {}\n", _FileName);
 
 				auto PendingCleanup = Internal.f_FilePending(_FileName);
 
-				TCPromise<void> Promise;
 				Internal.f_SequenceSyncs
 					(
 					 	_FileName
@@ -163,7 +168,7 @@ namespace NMib::NCloud::NBackupManager
 								}
 							}
 
-							Internal.f_CommitManifestChange(_FileName, _Change, "remove") > Promise;
+							fg_CallSafe(Internal, &CInternal::f_CommitManifestChange, _FileName, _Change, "remove") > Promise;
 						}
 					)
 				;
@@ -174,16 +179,15 @@ namespace NMib::NCloud::NBackupManager
 				auto &Change = _Change.f_Get<EManifestChange_Rename>();
 
 				if (auto pException = Internal.f_CheckFileName(Change.m_FromFileName, nullptr))
-					return fg_Move(pException);
+					return Promise <<= fg_Move(pException);
 				if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
-					return fg_Move(pException);
+					return Promise <<= fg_Move(pException);
 
 				auto PendingCleanup = Internal.f_FilePending(_FileName);
 				auto PendingCleanup2 = Internal.f_FilePending(Change.m_FromFileName);
 
 				DMibCloudBackupManagerDebugOut("--- Rename {} -> {}\n", Change.m_FromFileName, _FileName);
 
-				TCPromise<void> Promise;
 				Internal.f_SequenceMultipleSyncs
 					(
 					 	[=](COnScopeExitShared &&_pCleanup)
@@ -228,7 +232,7 @@ namespace NMib::NCloud::NBackupManager
 								}
 							}
 
-							Internal.f_CommitManifestChange(_FileName, _Change, "rename") > Promise;
+							fg_CallSafe(Internal, &CInternal::f_CommitManifestChange, _FileName, _Change, "rename") > Promise;
 						}
 					 	, {_FileName, Change.m_FromFileName}
 					)
@@ -239,6 +243,6 @@ namespace NMib::NCloud::NBackupManager
 
 		DNeverGetHere;
 
-		return fg_Explicit();
+		return Promise.f_MoveFuture();
 	}
 }

@@ -181,6 +181,8 @@ namespace NMib::NCloud::NAppManager
 			, CStr const &_DestinationDir
 		)
 	{
+		TCPromise<CVersionManager::CVersionInformation> Promise;
+		
 		auto &DownloadState = mp_Downloads.f_Insert();
 		auto pDownloadState = &DownloadState;
 		auto pCleanup = g_OnScopeExitActor > [this, pDownloadState]
@@ -188,7 +190,6 @@ namespace NMib::NCloud::NAppManager
 				mp_Downloads.f_Remove(*pDownloadState);
 			}
 		;
-		TCPromise<CVersionManager::CVersionInformation> Promise;
 
 		DownloadState.m_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>
 			(
@@ -252,6 +253,8 @@ namespace NMib::NCloud::NAppManager
 			, CStr const &_DestinationDir
 		)
 	{
+		TCPromise<CVersionManager::CVersionInformation> Promise;
+
 		TCSet<TCDistributedActor<CVersionManager>> ManagersToTrySet;
 		struct CState
 		{
@@ -278,17 +281,15 @@ namespace NMib::NCloud::NAppManager
 			for (auto &Version : pApplication->m_Versions)
 				fAddManager(Version.m_pVersionManager->f_GetManager());
 			if (ManagersToTrySet.f_IsEmpty())
-				return DMibErrorInstance("Found no version managers with this application on");
+				return Promise <<= DMibErrorInstance("Found no version managers with this application on");
 		}
 		else
 		{
 			for (auto &VersionManager : mp_VersionManagers)
 				fAddManager(VersionManager.f_GetManager());
 			if (ManagersToTrySet.f_IsEmpty())
-				return DMibErrorInstance("Found no version managers to check if application exists on");
+				return Promise <<= DMibErrorInstance("Found no version managers to check if application exists on");
 		}
-
-		TCPromise<CVersionManager::CVersionInformation> Promise;
 
 		pState->m_fContinue = [this, Promise, _ApplicationName, _VersionID, _DestinationDir](TCSharedPointer<CState> const &_pState)
 			{

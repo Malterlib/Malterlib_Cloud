@@ -58,7 +58,7 @@ namespace NMib::NCloud::NCloudClient
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_Applications | ECloudManagerStatusFlag_AppManagers;
-					return self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -84,7 +84,7 @@ namespace NMib::NCloud::NCloudClient
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_AppManagers;
-					return self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -109,7 +109,7 @@ namespace NMib::NCloud::NCloudClient
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_Applications;
-					return self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -122,8 +122,6 @@ namespace NMib::NCloud::NCloudClient
 			co_return {};
 		
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to cloud managers");
-		
-		TCPromise<void> Promise;
 		
 		auto Subscription = co_await mp_State.m_TrustManager
 			(
@@ -507,7 +505,6 @@ namespace NMib::NCloud::NCloudClient
 		 	, ECloudManagerStatusFlag _Flags
 		)
 	{
-		TCPromise<uint32> Promise;
 		CStr Host = _Params["Host"].f_String();
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");

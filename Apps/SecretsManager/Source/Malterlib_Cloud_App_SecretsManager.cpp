@@ -21,27 +21,22 @@ namespace NMib::NCloud::NSecretsManager
 	TCFuture<void> CSecretsManagerDaemonActor::fp_StartApp(CEJSON const &_Params)
 	{
 		mp_pServerController = fg_ConstructActor<CServerController>(fg_Construct(self), self, mp_State);
-		return fg_Explicit();
+		co_return {};
 	}
 	
 	TCFuture<void> CSecretsManagerDaemonActor::fp_StopApp()
 	{	
-		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
-		
 		if (mp_pServerController)
 		{
 			DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Shutting down server");
 			
-			mp_pServerController->f_Destroy() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
-				{
-					if (!_Result)
-						DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());
-					mp_pServerController = nullptr;
-				}
-			;
+			auto Result = co_await mp_pServerController.f_Destroy().f_Wrap();
+			if (!Result)
+				DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to shut down server: {}", Result.f_GetExceptionStr());
+			mp_pServerController.f_Clear();
 		}
 		
-		return pCanDestroy->f_Future();
+		co_return {};
 	}
 
 #if DMibConfig_Tests_Enable
@@ -49,9 +44,9 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		// This function is used to provoke some special cases during testing
 		if (!mp_pServerController)
-			DMibError("No server controller");
+			co_return DMibErrorInstance("No server controller");
 
-		return mp_pServerController.f_CallActor(&CServerController::f_Test_Command)(_Command, _Params);
+		co_return co_await mp_pServerController.f_CallActor(&CServerController::f_Test_Command)(_Command, _Params);
 	}
 #endif
 }

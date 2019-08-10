@@ -84,8 +84,8 @@ namespace NMib::NCloud::NBackupManager
 				, CStr const &_RelativeFileName
 				, uint64 _FileLength
 				, EDirectoryManifestSyncFlag _SyncFlags
-				, CStr &o_RSyncID
-				, TCFunctionMutable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
+				, CStr *o_pRSyncID
+				, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
 			 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 			)
 		;

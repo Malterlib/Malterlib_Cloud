@@ -28,12 +28,12 @@ namespace NMib::NCloud
 	
 	NConcurrency::TCFuture<CSymmetricKey> CKeyManager::f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize)
 	{
+		NConcurrency::TCPromise<CSymmetricKey> Promise;
+
 		auto &Internal = *mp_pInternal;
 		
 		auto ServerActor = Internal.m_ServerActor.f_Lock();
 
-		NConcurrency::TCPromise<CSymmetricKey> Promise;
-		
 		if (!ServerActor)
 		{
 			Promise.f_SetException(DMibErrorInstance("Key manager server was deleted"));

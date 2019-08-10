@@ -21,12 +21,9 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<void> CCloudClientAppActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		TCPromise<void> Promise;
-		
 		fp_ParseCommonOptions(_Params);
-		
-		Promise.f_SetResult();
-		return Promise.f_MoveFuture();				
+
+		co_return {};
 	}
 	
 	TCFuture<void> CCloudClientAppActor::fp_StopApp()
@@ -45,7 +42,7 @@ namespace NMib::NCloud::NCloudClient
 		mp_VersionManagers.f_Destroy() > Destroys.f_AddResult();
 
 		for (auto &Launch : mp_LaunchActors)
-			Launch->f_Destroy() > Destroys.f_AddResult();
+			Launch.f_Destroy() > Destroys.f_AddResult();
 
 		mp_SecretsManagers.f_Destroy() > Destroys.f_AddResult();
 		
@@ -56,11 +53,12 @@ namespace NMib::NCloud::NCloudClient
 			Subscription->f_Destroy() > Destroys.f_AddResult();
 
 		if (mp_TunnelsClient)
-			mp_TunnelsClient->f_Destroy() > Destroys.f_AddResult();
+			mp_TunnelsClient.f_Destroy() > Destroys.f_AddResult();
 
 		mp_CloudManagers.f_Destroy() > Destroys.f_AddResult();
 
 		co_await Destroys.f_GetResults();
+
 		co_return {};
 	}
 	

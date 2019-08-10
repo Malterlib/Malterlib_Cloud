@@ -69,82 +69,68 @@ namespace NMib::NCloud
 	
 	TCFuture<CDirectorySyncSend::CSyncResult> fg_UploadSecretFile
 		(
-			TCDistributedActor<CSecretsManager> const &_SecretsManager
-		 	, TCActor<CActorDistributionManager> const &_DistributionManager
-		 	, CSecretsManager::CSecretID &&_ID
-		 	, CDirectorySyncSend::CConfig &&_Config
+			TCDistributedActor<CSecretsManager> _SecretsManager
+		 	, TCActor<CActorDistributionManager> _DistributionManager
+		 	, CSecretsManager::CSecretID _ID
+		 	, CDirectorySyncSend::CConfig _Config
 			, CActorSubscription &o_Subscription
 		)
 	{
+
+		co_await ECoroutineFlag_AllowReferences;
+
 		NStorage::TCSharedPointer<CState> pState = fg_Construct();
 
 		if (!_Config.m_Manifest.f_IsOfType<CDirectoryManifestConfig>() || _Config.m_Manifest.f_Get<1>().m_IncludeWildcards.f_GetLen() != 1)
-			return DMibErrorInstance("Incorrect config. Expected a CDirectoryManifestConfig with a single file in m_IncludeWildcards");
+			co_return DMibErrorInstance("Incorrect config. Expected a CDirectoryManifestConfig with a single file in m_IncludeWildcards");
 
-		auto ProcessingActor = fg_ConcurrentActor();
-
-		o_Subscription = g_ActorSubscription(ProcessingActor) / [pState]() -> TCFuture<void>
+		o_Subscription = g_ActorSubscription / [pState]() -> TCFuture<void>
 			{
 				pState->m_bAborted = true;
 
 				if (pState->m_DirectorySyncSend)
-					return pState->m_DirectorySyncSend->f_Destroy();
+					co_await pState->m_DirectorySyncSend.f_Destroy();
 
-				return fg_Explicit();
+				co_return {};
 			}
 		;
 
-		return g_Dispatch(ProcessingActor) / [=, Config = fg_Move(_Config)]() mutable -> TCFuture<CDirectorySyncSend::CSyncResult>
+		CStr const FileName = *_Config.m_Manifest.f_Get<1>().m_IncludeWildcards.f_FindSmallestKey();
+		pState->m_DirectorySyncSend = _DistributionManager->f_ConstructActor<CDirectorySyncSend>(fg_Move(_Config));
+
+		TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
 			{
-				CStr const FileName = *Config.m_Manifest.f_Get<1>().m_IncludeWildcards.f_FindSmallestKey();
-				pState->m_DirectorySyncSend = _DistributionManager->f_ConstructActor<CDirectorySyncSend>(fg_Move(Config));
-				TCPromise<CDirectorySyncSend::CSyncResult> Promise;
-				pState->m_Promise = Promise;
+				pState->m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
+				, g_ActorSubscription / [pState]() mutable -> TCFuture<void>
+				{
+					if (pState->m_bAborted)
+						co_return DMibErrorInstance("Aborted");
 
-				TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
+					TCAsyncResult<CDirectorySyncSend::CSyncResult> Result = co_await pState->m_DirectorySyncSend.f_CallActor(&CDirectorySyncSend::f_GetResult)().f_Wrap();
+
+					if (!Result)
+						pState->f_SetException(Result);
+					else
+						pState->f_SetResult(fg_Move(*Result));
+
+					if (pState->m_DirectorySyncSend && !pState->m_bAborted)
 					{
-						pState->m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
-						, g_ActorSubscription / [pState]() mutable -> TCFuture<void>
-						{
-							if (pState->m_bAborted)
-								return DMibErrorInstance("Aborted");
-
-							TCPromise<void> SubscriptionDestroyedPromise;
-
-							pState->m_DirectorySyncSend.f_CallActor(&CDirectorySyncSend::f_GetResult)() > [pState, SubscriptionDestroyedPromise]
-								(
-									TCAsyncResult<CDirectorySyncSend::CSyncResult> &&_Result
-								)
-								{
-									if (!_Result)
-										pState->f_SetException(_Result);
-									else
-										pState->f_SetResult(fg_Move(*_Result));
-
-									if (pState->m_DirectorySyncSend && !pState->m_bAborted)
-									{
-										pState->m_DirectorySyncSend->f_Destroy() > SubscriptionDestroyedPromise;
-										pState->m_bAborted = true;
-									}
-									else
-										SubscriptionDestroyedPromise.f_SetResult();
-								}
-							;
-							return SubscriptionDestroyedPromise.f_MoveFuture();
-						}
+						pState->m_bAborted = true;
+						co_await pState->m_DirectorySyncSend.f_Destroy();
 					}
-				;
-				_SecretsManager.f_CallActor(&CSecretsManager::f_UploadFile)(fg_Move(_ID), FileName, fg_Move(SyncInterface))
-					>  [pState](TCAsyncResult<TCActorFunctorWithID<TCFuture<void> ()>> &&_Result)
-					{
-						if (!_Result)
-							pState->f_SetException(_Result);
-						else
-							pState->f_SetFunctor(fg_Move(*_Result));
-					}
-				;
-				return Promise.f_MoveFuture();
+
+					co_return {};
+				}
 			}
 		;
+
+		auto Result = co_await _SecretsManager.f_CallActor(&CSecretsManager::f_UploadFile)(fg_Move(_ID), FileName, fg_Move(SyncInterface)).f_Wrap();
+
+		if (!Result)
+			pState->f_SetException(Result);
+		else
+			pState->f_SetFunctor(fg_Move(*Result));
+
+		co_return co_await pState->m_Promise.f_Future();
 	}
 }

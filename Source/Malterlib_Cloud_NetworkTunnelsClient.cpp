@@ -39,6 +39,8 @@ namespace NMib::NCloud
 		{
 			TCFuture<void> f_Destroy()
 			{
+				TCPromise<void> Promise;
+
 				TCActorResultVector<void> Destroys;
 				if (m_ListenSubscription)
 					m_ListenSubscription->f_Destroy() > Destroys.f_AddResult();
@@ -47,12 +49,10 @@ namespace NMib::NCloud
 				m_fOnConnection.f_Destroy() > Destroys.f_AddResult();
 
 				if (m_TunnelActor)
-					m_TunnelActor->f_Destroy() > Destroys.f_AddResult();
+					fg_Move(m_TunnelActor).f_Destroy() > Destroys.f_AddResult();
 
-				TCPromise<void> Promise;
 				Destroys.f_GetResults() > Promise.f_ReceiveAny();
 
-				m_TunnelActor.f_Clear();
 				m_fOnError.f_Clear();
 				m_fOnConnection.f_Clear();
 
@@ -107,7 +107,7 @@ namespace NMib::NCloud
 		for (auto &Connection : Internal.m_Connections)
 		{
 			if (Connection.m_Socket)
-				Connection.m_Socket->f_Destroy() > Results.f_AddResult();
+				fg_Move(Connection.m_Socket).f_Destroy() > Results.f_AddResult();
 			Connection.m_fSendData.f_Destroy() > Results.f_AddResult();
 		}
 		Internal.m_Connections.f_Clear();
@@ -197,7 +197,7 @@ namespace NMib::NCloud
 							return;
 
 						if (pConnection->m_Socket)
-							pConnection->m_Socket->f_Destroy() > fg_DiscardResult();
+							fg_Move(pConnection->m_Socket).f_Destroy() > fg_DiscardResult();
 						pConnection->m_fSendData.f_Destroy() > fg_DiscardResult();
 
 						Internal.m_Connections.f_Remove(pConnection);
@@ -249,7 +249,7 @@ namespace NMib::NCloud
 						if (pTunnel->m_fOnClose)
 							pTunnel->m_fOnClose(PeerAddress, _Message) > fg_DiscardResult();
 
-						return fg_Explicit();
+						co_return {};
 					}
 				;
 
@@ -291,7 +291,7 @@ namespace NMib::NCloud
 				if (pTunnel->m_fOnError)
 					pTunnel->m_fOnError(_ConnectionInfo.m_PeerAddress, "Connection failed: {}"_f << _ConnectionInfo.m_Error) > fg_DiscardResult();
 
-				return fg_Explicit();
+				co_return {};
 			}
 		;
 
@@ -332,8 +332,6 @@ namespace NMib::NCloud
 
 	TCFuture<void> CNetworkTunnelsClient::CInternal::f_Subscribe()
 	{
-		TCPromise<void> Promise;
-
 		m_NetworkTunnelSubscription = co_await m_TrustManager
 			(
 				&CDistributedActorTrustManager::f_SubscribeTrustedActors<ICNetworkTunnels>

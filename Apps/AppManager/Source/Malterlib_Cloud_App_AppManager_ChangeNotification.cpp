@@ -188,13 +188,14 @@ namespace NMib::NCloud::NAppManager
 			auto &SubscriptionID = mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription);
 			auto fSendNotification = [this, SubscriptionID, AppPermission, NotificationParams]() mutable -> TCFuture<void>
 				{
+					TCPromise<void> OnChangePromise;
+
 					auto *pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
 					if (!pSubscription || pSubscription->m_bAccessDenied)
-						return fg_Explicit();
+						return OnChangePromise <<= g_Void;
 
 					auto &Subscription = *pSubscription;
 
-					TCPromise<void> OnChangePromise;
 					mp_Permissions.f_HasPermission("AppManager Change Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
 						.f_Timeout(60.0, "Timed out waiting for permission in OnChange callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
 						> OnChangePromise / [=, NotificationParams = fg_Move(NotificationParams)](bool _bHasPermission) mutable

@@ -70,17 +70,14 @@ namespace NMib::NCloud
 		auto &Internal = *mp_pInternal;
 		Internal.m_RootDirectory = Internal.m_BasePath;
 		if (Internal.m_bCalled)
-			return DMibErrorInstance("The file transfer context has already been gotten");
+			co_return DMibErrorInstance("The file transfer context has already been gotten");
 		Internal.m_bCalled = true;
-		
-		NConcurrency::TCPromise<CFileTransferContext> Promise;
 		
 		auto &Cache = *Internal.m_pFileCache;
 		
-		fg_Dispatch
+		CFileTransferContext::CInternal::CManifest Manifest = co_await
 			(
-				Cache.m_FileActor
-				, [RootDirectory = Internal.m_RootDirectory, _Flags]() -> CFileTransferContext::CInternal::CManifest
+			 	g_Dispatch(Cache.m_FileActor) / [RootDirectory = Internal.m_RootDirectory, _Flags]() -> CFileTransferContext::CInternal::CManifest
 				{
 					CFileTransferContext::CInternal::CManifest Manifest;
 
@@ -93,7 +90,7 @@ namespace NMib::NCloud
 						}
 						DMibError("Destination already exists but is a file");
 					}
-					
+
 					if (!CFile::fs_FileExists(RootDirectory, EFileAttrib_Directory))
 						return Manifest;
 
@@ -109,16 +106,16 @@ namespace NMib::NCloud
 								return Manifest;
 							throw;
 						}
-						
+
 						return Manifest;
 					}
-					
+
 					if (_Flags & EReceiveFlag_FailOnExisting)
 						DMibError("Directory already exists");
 
 					if (_Flags & EReceiveFlag_IgnoreExisting)
 						return Manifest;
-					
+
 					{
 						CFile::CFindFilesOptions FindOptions(RootDirectory + "/*", true);
 						FindOptions.m_AttribMask = EFileAttrib_File;
@@ -132,113 +129,116 @@ namespace NMib::NCloud
 					}
 					return Manifest;
 				}
+			 	% "Failed to generate current manifest"
 			)
-			> Promise % "Failed to generate current manifest" 
-			/ [this, Promise, _QueueSize, ThisActor = fg_ThisActor(this)]
-			(CFileTransferContext::CInternal::CManifest &&_Manifest)
+		;
+		CFileTransferContext StartDownloadResult;
+		CFileTransferContext::CInternal &StartDownload = *(StartDownloadResult.mp_pInternal);
+		StartDownload.m_Manifest = fg_Move(Manifest);
+		StartDownload.m_QueueSize = _QueueSize;
+		StartDownload.m_DispatchActor = fg_ThisActor(this);
+
+		StartDownload.m_fStateChange = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CStateChange &&_StateChange) mutable
+			-> NConcurrency::TCFuture<CFileTransferContext::CInternal::CStateChange::CResult>
 			{
-				CFileTransferContext StartDownloadResult;
-				CFileTransferContext::CInternal &StartDownload = *(StartDownloadResult.mp_pInternal);
-				StartDownload.m_Manifest = fg_Move(_Manifest);
-				StartDownload.m_QueueSize = _QueueSize;
-				StartDownload.m_DispatchActor = ThisActor; 
-				
-				StartDownload.m_fStateChange = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CStateChange &&_StateChange) mutable 
-					-> NConcurrency::TCFuture<CFileTransferContext::CInternal::CStateChange::CResult>
-					{
-						CFileTransferContext::CInternal::CStateChange::CResult Result = _StateChange.f_GetResult();
-						auto &Internal = *mp_pInternal;
-						
-						if (Internal.m_DonePromise.f_IsSet())
-							return fg_Explicit(Result);
-						
-						if (_StateChange.m_State == CFileTransferContext::CInternal::EState_Error)
-							Internal.m_DonePromise.f_SetException(DMibErrorInstance(_StateChange.m_Error));
-						else if (_StateChange.m_State == CFileTransferContext::CInternal::EState_Finished)
-							Internal.m_DonePromise.f_SetResult(_StateChange.m_Finished);
-						return fg_Explicit(Result);
-					}
-				;
-				
-				StartDownload.m_fSendPart = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CSendPart &&_Part) mutable
-					-> NConcurrency::TCFuture<CFileTransferContext::CInternal::CSendPart::CResult>
-					{
-						auto &Internal = *mp_pInternal;
-						auto &Cache = *Internal.m_pFileCache;
-						NConcurrency::TCPromise<CFileTransferContext::CInternal::CSendPart::CResult> Promise;
-						fg_Dispatch
-							(
-								Cache.m_FileActor
-								,
-							 	[
-								 	pCache = Internal.m_pFileCache
-								 	, RootDirectory = Internal.m_RootDirectory
-								 	, DownloadPart = fg_Move(_Part)
-								 	, AttributeMask = Internal.m_AttributeMask
-								 	, AttributeAdd = Internal.m_AttributeAdd
-								]
-								() mutable -> CFileTransferContext::CInternal::CSendPart::CResult
-								{
-									CStr Error;
-									if (!CFileTransferContext::fs_IsSafeRelativePath(DownloadPart.m_FilePath, Error))
-										DMibError(fg_Format("File path cannot {}", Error));
-									
-									CStr FilePath = fg_Format("{}/{}", RootDirectory, DownloadPart.m_FilePath);
-									
-									auto &Cache = *pCache;
+				TCPromise<CFileTransferContext::CInternal::CStateChange::CResult> Promise;
 
-									auto Attributes = DownloadPart.m_FileAttributes;
+				CFileTransferContext::CInternal::CStateChange::CResult Result = _StateChange.f_GetResult();
+				auto &Internal = *mp_pInternal;
 
-									if (Attributes == EFileAttrib_None)
-										Attributes = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+				if (Internal.m_DonePromise.f_IsSet())
+					return Promise <<= fg_Move(Result);
 
-									Attributes = ((Attributes & AttributeMask) | AttributeAdd);
+				if (_StateChange.m_State == CFileTransferContext::CInternal::EState_Error)
+					Internal.m_DonePromise.f_SetException(DMibErrorInstance(_StateChange.m_Error));
+				else if (_StateChange.m_State == CFileTransferContext::CInternal::EState_Finished)
+					Internal.m_DonePromise.f_SetResult(_StateChange.m_Finished);
 
-									if (Cache.m_FileName != FilePath)
-									{
-										CFile::fs_CreateDirectory(CFile::fs_GetPath(FilePath));
-										Cache.m_File.f_Open
-											(
-											 	FilePath
-											 	, EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll
-											 	, Attributes | EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid
-											)
-										;
-									}
-									
-									Cache.m_File.f_SetPosition(DownloadPart.m_FilePosition);
-									Cache.m_File.f_Write(DownloadPart.m_Data.f_GetArray(), DownloadPart.m_Data.f_GetLen());
-									
-									if (DownloadPart.m_bFinished)
-									{
-										Cache.m_File.f_SetLength(DownloadPart.m_FilePosition + DownloadPart.m_Data.f_GetLen());
-										Cache.m_File.f_SetAttributes(Attributes);
-										Cache.m_File.f_SetWriteTime(DownloadPart.m_WriteTime);
-										Cache.m_FileName.f_Clear();
-										Cache.m_File.f_Close();
-									}
-									
-									return DownloadPart.f_GetResult();
-								}
-							)
-							> Promise
-						;
-						return Promise.f_MoveFuture();
-					}
-				;
-				
-				Promise.f_SetResult(fg_Move(StartDownloadResult));
+				return Promise <<= fg_Move(Result);
 			}
 		;
-		return Promise.f_MoveFuture();
+
+		StartDownload.m_fSendPart = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CSendPart &&_Part) mutable
+			-> NConcurrency::TCFuture<CFileTransferContext::CInternal::CSendPart::CResult>
+			{
+				NConcurrency::TCPromise<CFileTransferContext::CInternal::CSendPart::CResult> Promise;
+				auto &Internal = *mp_pInternal;
+				auto &Cache = *Internal.m_pFileCache;
+				fg_Dispatch
+					(
+						Cache.m_FileActor
+						,
+						[
+							pCache = Internal.m_pFileCache
+							, RootDirectory = Internal.m_RootDirectory
+							, DownloadPart = fg_Move(_Part)
+							, AttributeMask = Internal.m_AttributeMask
+							, AttributeAdd = Internal.m_AttributeAdd
+						]
+						() mutable -> CFileTransferContext::CInternal::CSendPart::CResult
+						{
+							CStr Error;
+							if (!CFileTransferContext::fs_IsSafeRelativePath(DownloadPart.m_FilePath, Error))
+								DMibError(fg_Format("File path cannot {}", Error));
+
+							CStr FilePath = fg_Format("{}/{}", RootDirectory, DownloadPart.m_FilePath);
+
+							auto &Cache = *pCache;
+
+							auto Attributes = DownloadPart.m_FileAttributes;
+
+							if (Attributes == EFileAttrib_None)
+								Attributes = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+
+							Attributes = ((Attributes & AttributeMask) | AttributeAdd);
+
+							if (Cache.m_FileName != FilePath)
+							{
+								CFile::fs_CreateDirectory(CFile::fs_GetPath(FilePath));
+								Cache.m_File.f_Open
+									(
+										FilePath
+										, EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll
+										, Attributes | EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid
+									)
+								;
+							}
+
+							Cache.m_File.f_SetPosition(DownloadPart.m_FilePosition);
+							Cache.m_File.f_Write(DownloadPart.m_Data.f_GetArray(), DownloadPart.m_Data.f_GetLen());
+
+							if (DownloadPart.m_bFinished)
+							{
+								Cache.m_File.f_SetLength(DownloadPart.m_FilePosition + DownloadPart.m_Data.f_GetLen());
+								Cache.m_File.f_SetAttributes(Attributes);
+								Cache.m_File.f_SetWriteTime(DownloadPart.m_WriteTime);
+								Cache.m_FileName.f_Clear();
+								Cache.m_File.f_Close();
+							}
+
+							return DownloadPart.f_GetResult();
+						}
+					)
+					> Promise
+				;
+				return Promise.f_MoveFuture();
+			}
+		;
+
+		co_return fg_Move(StartDownloadResult);
 	}
 	
 	NConcurrency::TCFuture<CFileTransferResult> CFileTransferReceive::f_GetResult()
 	{
+		NConcurrency::TCPromise<CFileTransferResult> Promise;
+
 		auto &Internal = *mp_pInternal;
+
 		if (Internal.m_bDoneCalled)
-			return DMibErrorInstance("The file result has already been gotten");
+			return Promise <<= DMibErrorInstance("The file result has already been gotten");
+
 		Internal.m_bDoneCalled = true;
-		return Internal.m_DonePromise.f_Future();
+
+		return Promise <<= Internal.m_DonePromise.f_Future();
 	}
 }

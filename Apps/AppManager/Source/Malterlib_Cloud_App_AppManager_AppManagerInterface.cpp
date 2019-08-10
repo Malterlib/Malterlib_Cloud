@@ -14,6 +14,8 @@ namespace NMib::NCloud::NAppManager
 	
 	TCFuture<void> CAppManagerActor::fp_RegisterPermissions()
 	{
+		TCPromise<void> Promise;
+
 		TCSet<CStr> Permissions;
 		Permissions["AppManager/VersionAppAll"];
 		
@@ -38,19 +40,23 @@ namespace NMib::NCloud::NAppManager
 			Permissions[fg_Format("AppManager/App/{}", Application.m_Name)];
 		}
 
-		return mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
+		return Promise <<= mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_RegisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication)
 	{
+		TCPromise<void> Promise;
+
 		auto Permissions = fg_CreateSet<CStr>(fg_Format("AppManager/App/{}", _pApplication->m_Name));
-		return mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
+		return Promise <<= mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_UnregisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication)
 	{
+		TCPromise<void> Promise;
+
 		auto Permissions = fg_CreateSet<CStr>(fg_Format("AppManager/App/{}", _pApplication->m_Name));
-		return mp_State.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions));
+		return Promise <<= mp_State.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions));
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_SubscribePermissions()

@@ -179,7 +179,7 @@ public:
 				m_ChangeSubscription->f_Destroy().f_CallSync(60.0);
 
 			if (m_BackupClient)
-				m_BackupClient->f_Destroy().f_CallSync(60.0);
+				m_BackupClient.f_Destroy().f_CallSync(60.0);
 		}
 
 		template <CBackupManagerClient::ENotification tf_Notification>
@@ -208,12 +208,9 @@ public:
 						*pBackupInterface = fg_Move(_BackupInterface);
 						if (!ReceivedManifestFinished.f_IsSet())
 							ReceivedManifestFinished.f_SetResult();
-						return fg_Explicit
-							(
-								g_ActorSubscription / []
-								{
-								}
-							)
+						co_return g_ActorSubscription / []
+							{
+							}
 						;
 					}
 					, _Dependencies.m_DistributionManager
@@ -279,7 +276,7 @@ public:
 							if (Error.m_bFatal && !ReceivedManifestFinished.f_IsSet())
 								ReceivedManifestFinished.f_SetResult();
 						}
-						return fg_Explicit();
+						co_return {};
 					}
 				).f_CallSync(g_Timeout)
 			;

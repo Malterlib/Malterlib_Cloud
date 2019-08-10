@@ -23,30 +23,23 @@ namespace NMib::NCloud::NVersionManager
 
 	TCFuture<void> CVersionManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		TCPromise<void> Promise;
 		mp_pServer = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);
-		Promise.f_SetResult();
-		return Promise.f_MoveFuture();				
+		
+		co_return {};
 	}
 	
 	TCFuture<void> CVersionManagerDaemonActor::fp_StopApp()
 	{	
-		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
-		
 		if (mp_pServer)
 		{
 			DMibLogWithCategory(Mib/Cloud/VersionManager/Daemon, Info, "Shutting down");
 			
-			mp_pServer->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
-				{
-					if (!_Result)
-						DMibLogWithCategory(Mib/Cloud/VersionManager/Daemon, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());
-				}
-			;
-			mp_pServer = nullptr;
+			auto Result = co_await fg_Move(mp_pServer).f_Destroy().f_Wrap();
+			if (!Result)
+				DMibLogWithCategory(Mib/Cloud/VersionManager/Daemon, Error, "Failed to shut down server: {}", Result.f_GetExceptionStr());
 		}
 		
-		return pCanDestroy->f_Future();
+		co_return {};
 	}
 }
 

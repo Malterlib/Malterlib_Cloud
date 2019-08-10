@@ -229,14 +229,9 @@ namespace NMib::NCloud::NAppManager
 			fp_OnAppUpdateInfoChange(_pState->m_pApplication);
 		}
 
-		TCFuture<void> UpdateJSONFuture;
-		if (!bUpdatedAppInfo)
-			UpdateJSONFuture = fg_Explicit();
-		else
-			UpdateJSONFuture = fp_UpdateApplicationJSON(_pState->m_pApplication);
+		if (bUpdatedAppInfo)
+			co_await fp_UpdateApplicationJSON(_pState->m_pApplication);
 
-		auto UpdateJSONResult = co_await fg_Move(UpdateJSONFuture);
-
-		co_return fg_Move(UpdateJSONResult);
+		co_return {};
 	}
 }

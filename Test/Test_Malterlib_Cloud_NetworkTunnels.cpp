@@ -69,7 +69,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			co_await Destroys.f_GetResults();
 
 			if (m_TunnelServer)
-				co_await m_TunnelServer->f_Destroy();
+				co_await m_TunnelServer.f_Destroy();
 
 			co_return {};
 		}
@@ -109,7 +109,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			co_await Destroys.f_GetResults();
 
 			if (m_TunnelClient)
-				co_await m_TunnelClient->f_Destroy();
+				co_await m_TunnelClient.f_Destroy();
 
 			co_return {};
 		}
@@ -128,21 +128,21 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 							#if DTestNetworkTunnelEnableLogging
 								DMibConErrOut2("New connection: {}\n", _Address.f_GetString());
 							#endif
-							return fg_Explicit();
+							co_return {};
 						}
 						, g_ActorFunctor / [](CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void> // On Close
 					 	{
 							#if DTestNetworkTunnelEnableLogging
 								DMibConErrOut2("Connection from '{}' closed: {}\n", _Address.f_GetString(), _Message);
 							#endif
-							return fg_Explicit();
+							co_return {};
 						}
 						, g_ActorFunctor / [](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void> // On Error
 					 	{
 							#if DTestNetworkTunnelEnableLogging
 								DMibConErrOut2("Connection from '{}' error: {}\n", _Address.f_GetString(), _Error);
 							#endif
-							return fg_Explicit();
+							co_return {};
 						}
 					)
 				;

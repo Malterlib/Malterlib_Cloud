@@ -187,9 +187,11 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication)
 	{
+		TCPromise<void> Promise;
+
 		auto &Application = *_pApplication;
 		if (Application.m_bDeleted)
-			return DMibErrorInstance("Application has been deleted");
+			return Promise <<= DMibErrorInstance("Application has been deleted");
 		auto &Settings = Application.m_Settings;
 		
 		auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][Application.m_Name];
@@ -314,7 +316,7 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update;
 		ApplicationJSON["AppManagerVersion"] = Settings.m_AppManagerVersion;
 
-		return mp_State.m_StateDatabase.f_Save();
+		return Promise <<= mp_State.m_StateDatabase.f_Save();
 	}
 	
 	void CAppManagerActor::fsp_CreateApplicationUserGroup

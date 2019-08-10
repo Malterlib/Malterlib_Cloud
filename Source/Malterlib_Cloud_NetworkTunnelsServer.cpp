@@ -131,7 +131,7 @@ namespace NMib::NCloud
 							Internal.m_Connections.f_Remove(pConnection);
 
 							if (Connection.m_Socket)
-								co_await Connection.m_Socket->f_Destroy();
+								co_await Connection.m_Socket.f_Destroy();
 							co_await Connection.m_fSendData.f_Destroy();
 						}
 						co_return {};
@@ -235,7 +235,7 @@ namespace NMib::NCloud
 		for (auto &Connection : Internal.m_Connections)
 		{
 			if (Connection.m_Socket)
-				Connection.m_Socket->f_Destroy() > Destroys.f_AddResult();
+				fg_Move(Connection.m_Socket).f_Destroy() > Destroys.f_AddResult();
 			Connection.m_fSendData.f_Destroy() > Destroys.f_AddResult();
 		}
 		Internal.m_Connections.f_Clear();

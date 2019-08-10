@@ -85,7 +85,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -127,7 +127,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -147,7 +147,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -174,7 +174,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -266,7 +266,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -300,7 +300,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -326,7 +326,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -350,7 +350,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -368,7 +368,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -394,7 +394,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -427,7 +427,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_Download, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_Download, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -611,7 +611,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		return self
+		return g_Future <<= self
 			(
 			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_Enumerate<TCSet<CSecretsManager::CSecretID>>
 				, _Params
@@ -619,7 +619,7 @@ namespace NMib::NCloud::NCloudClient
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_Tags)
 			 	-> TCFuture<TCSet<CSecretsManager::CSecretID>>
 				{
-					return _Actor.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(_SemanticID, _Tags);
+					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(_SemanticID, _Tags);
 				}
 			 	, [](TCSet<CSecretsManager::CSecretID> *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64) -> CStr
 				{
@@ -639,14 +639,14 @@ namespace NMib::NCloud::NCloudClient
 		 	, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
 		)
 	{
-		return self
+		return g_Future <<= self
 			(
 			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_Enumerate<CSecretsManager::CSecret>
 				, _Params
 			 	, _pCommandLine
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_Tags) -> TCFuture<CSecretsManager::CSecret>
 				{
-					return _Actor.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(*_SemanticID, _Tags);
+					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(*_SemanticID, _Tags);
 				}
 			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64) -> CStr
 				{
@@ -744,14 +744,14 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		return self
+		return g_Future <<= self
 			(
 			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_Get<CSecretsManager::CSecret>
 				, _Params
 			 	, _pCommandLine
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID) -> TCFuture<CSecretsManager::CSecret>
 				{
-					return _Actor.f_CallActor(&CSecretsManager::f_GetSecret)(fg_TempCopy(_ID));
+					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecret)(fg_TempCopy(_ID));
 				}
 			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64) -> CStr
 				{
@@ -773,13 +773,14 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		return fp_CommandLine_SecretsManager_Get<CSecretsManager::CSecretProperties>
+		return g_Future <<= self
 			(
-				_Params
+			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_Get<CSecretsManager::CSecretProperties>
+				, _Params
 			 	, _pCommandLine
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID) -> TCFuture<CSecretsManager::CSecretProperties>
 				{
-					return _Actor.f_CallActor(&CSecretsManager::f_GetSecretProperties)(fg_TempCopy(_ID));
+					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecretProperties)(fg_TempCopy(_ID));
 				}
 			 	, [](CSecretsManager::CSecretProperties *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64) -> CStr
 				{

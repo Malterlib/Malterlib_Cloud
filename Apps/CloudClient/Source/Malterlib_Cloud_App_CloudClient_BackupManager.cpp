@@ -44,7 +44,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -72,7 +72,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -136,7 +136,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -292,8 +292,6 @@ namespace NMib::NCloud::NCloudClient
 	
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCPromise<uint32> Promise;
-		
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		NTime::CTime BackupTime = _Params["BackupTime"].f_Date();

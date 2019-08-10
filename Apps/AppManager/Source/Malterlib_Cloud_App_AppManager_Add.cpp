@@ -20,6 +20,8 @@ namespace NMib::NCloud::NAppManager
 			, CApplicationSettings const &_Settings
 		)
 	{
+		NConcurrency::TCPromise<void> Promise;
+
 		CAppManagerActor::CApplicationSettings ApplicationSettings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		ApplicationSettings.f_FromInterfaceAdd(_Add, ChangedSettings);
@@ -30,7 +32,7 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_ExecutableParameters;
 		}
 
-		return m_pThis->self
+		return Promise <<= m_pThis->self
 			(
 			 	&CAppManagerActor::fp_AddApplication
 				, _Name
@@ -116,8 +118,6 @@ namespace NMib::NCloud::NAppManager
 		else if (!bNullPackage)
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
 		
-		TCPromise<uint32> Promise;
-
 		auto Result = co_await self
 			(
 			 	&CAppManagerActor::fp_AddApplication

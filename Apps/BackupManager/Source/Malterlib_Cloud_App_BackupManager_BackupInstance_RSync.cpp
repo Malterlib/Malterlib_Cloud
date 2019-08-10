@@ -116,38 +116,39 @@ namespace NMib::NCloud::NBackupManager
 			, CStr const &_RelativeFileName
 			, uint64 _FileLength
 			, EDirectoryManifestSyncFlag _SyncFlags
-			, CStr &o_RSyncID
-			, TCFunctionMutable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
+			, CStr *o_pRSyncID
+			, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
 		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 		)
 	{
 		CStr RSyncID = fg_RandomID();
-		o_RSyncID = RSyncID;
+		*o_pRSyncID = RSyncID;
 		auto &RSyncContext = m_RSyncContexts[RSyncID];
 
 		RSyncContext.m_ExpectedDigest = _ExpectedDigest;
 
-		auto ActorSubscription = g_ActorSubscription / [=]() -> TCFuture<void>
+		auto ActorSubscription = g_ActorSubscription / [=, fOnDone = fg_Move(_fOnDone)]() mutable -> TCFuture<void>
 			{
-				TCFuture<void> DestroyFuture;
-
 				TCVector<CStr> TempFiles;
 
 				bool bFailedHash = false;
 				bool bGeneralFailure = false;
 
 				auto pRsyncContext = m_RSyncContexts.f_FindEqual(RSyncID);
+
+				TCPromise<void> DestroyPromise;
+
 				if (pRsyncContext)
 				{
 					bFailedHash = pRsyncContext->m_bFailedHash;
 
 					TempFiles = fg_Move(pRsyncContext->m_TempFileNames);
-					DestroyFuture = pRsyncContext->m_fRunProtocol.f_Destroy();
+					pRsyncContext->m_fRunProtocol.f_Destroy() > DestroyPromise;
 				}
 				else
 				{
 					bGeneralFailure = true;
-					DestroyFuture = fg_Explicit();
+					DestroyPromise.f_SetResult();
 				}
 
 				m_RSyncContexts.f_Remove(RSyncID);
@@ -165,39 +166,31 @@ namespace NMib::NCloud::NBackupManager
 					}
 				}
 
-				TCPromise<void> Promise;
-				fg_Move(DestroyFuture) > [=](TCAsyncResult<void> &&_Result) mutable
-					{
-						if (bGeneralFailure)
-						{
-							TCAsyncResult<void> Result;
-							Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("General failure for RSync"));
- 							_fOnDone(Result) > fg_DiscardResult();
-							Promise.f_SetException(fg_Move(Result));
-						}
-						else if (bFailedHash)
-						{
-							TCAsyncResult<void> Result;
-							Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("Digest does not match after RSync"));
-							_fOnDone(Result) > fg_DiscardResult();
-							Promise.f_SetException(fg_Move(Result));
-						}
-						else if (!_Result)
-						{
-							_fOnDone(_Result) > fg_DiscardResult();
-							Promise.f_SetException(fg_Move(_Result));
-						}
-						else
-						{
-							_fOnDone(_Result) > Promise / [Promise, _Result]()
-								{
-									Promise.f_SetResult();
-								}
-							;
-						}
-					}
-				;
-				return Promise.f_MoveFuture();
+				auto DestroyResult = co_await DestroyPromise.f_MoveFuture().f_Wrap();
+
+				if (bGeneralFailure)
+				{
+					TCAsyncResult<void> Result;
+					Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("General failure for RSync"));
+					fg_CallSafe(fg_Move(fOnDone), Result) > fg_DiscardResult();
+					co_return fg_Move(Result);
+				}
+				else if (bFailedHash)
+				{
+					TCAsyncResult<void> Result;
+					Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("Digest does not match after RSync"));
+					fg_CallSafe(fg_Move(fOnDone), Result) > fg_DiscardResult();
+					co_return fg_Move(Result);
+				}
+				else if (!DestroyResult)
+				{
+					fg_CallSafe(fg_Move(fOnDone), DestroyResult) > fg_DiscardResult();
+					co_return fg_Move(DestroyResult);
+				}
+				else
+					co_await fg_CallSafe(fg_Move(fOnDone), DestroyResult);
+
+				co_return {};
 			}
 		;
 
@@ -271,7 +264,7 @@ namespace NMib::NCloud::NBackupManager
 			)
 		;
 
-		return fg_Explicit(fg_Move(ActorSubscription));
+		co_return fg_Move(ActorSubscription);
 	}
 
 	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::f_StartRSync
@@ -283,34 +276,37 @@ namespace NMib::NCloud::NBackupManager
 	{
 		CStr ManifestError;
 		if (!CBackupManagerBackup::fs_ManifestFileValid(_FileName, _ManifestFile, ManifestError))
-			return DMibErrorInstance("Manifest change for '{}' is invalid: {}"_f << _FileName << ManifestError);
+			co_return DMibErrorInstance("Manifest change for '{}' is invalid: {}"_f << _FileName << ManifestError);
 
 		auto &Internal = *mp_pInternal;
 
 		if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
-			return fg_Move(pException);
+			co_return fg_Move(pException);
 
 		CStr FileName = Internal.f_GetCurrentPath(_FileName);
 		CStr OldFileName = Internal.f_GetLatestPath(_FileName);
 		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_RandomID());
 		CStr RSyncID;
 
-		return Internal.f_StartRSyncShared
+		co_return co_await fg_CallSafe
 			(
-				fg_Move(_fRunProtocol)
+			 	Internal
+			 	, &CInternal::f_StartRSyncShared
+				, fg_Move(_fRunProtocol)
 				, FileName
 				, OldFileName
 				, TempFileName
 				, _FileName
 				, _ManifestFile.m_Length
 				, _ManifestFile.m_Flags
-				, RSyncID
+				, &RSyncID
 				, [this, _FileName, _ManifestFile](TCAsyncResult<void> const &_Result) -> TCFuture<void>
 				{
 					auto &Internal = *mp_pInternal;
 					if (_Result)
-						return Internal.f_CommitFile(_FileName, _ManifestFile);
-					return _Result;
+						co_await fg_CallSafe(Internal, &CInternal::f_CommitFile, _FileName, _ManifestFile);
+
+					co_return _Result;
 				}
 			 	, _ManifestFile.m_Digest
 			)

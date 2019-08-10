@@ -14,31 +14,27 @@ namespace NMib::NCloud
 
 	TCFuture<CDirectorySyncReceive::CSyncResult> fg_DownloadSecretFile
 		(
-			TCDistributedActor<CSecretsManager> const &_SecretsManager
-		 	, CSecretsManager::CSecretID &&_ID
-		 	, CDirectorySyncReceive::CConfig &&_Config
+			TCDistributedActor<CSecretsManager> _SecretsManager
+		 	, CSecretsManager::CSecretID _ID
+		 	, CDirectorySyncReceive::CConfig _Config
 		)
 	{
-		TCPromise<CDirectorySyncReceive::CSyncResult> Promise;
-		_SecretsManager.f_CallActor(&CSecretsManager::f_DownloadFile)
+		TCDistributedActorInterfaceWithID<CDirectorySyncClient> Downloader = co_await _SecretsManager.f_CallActor(&CSecretsManager::f_DownloadFile)
 			(
 				fg_Move(_ID)
 				, g_ActorSubscription / [=]() -> TCFuture<void>
 				{
 					// Cleanup?
-					return fg_Explicit();
+					co_return {};
 				}
 			)
-			> Promise / [=](TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Downloader) mutable
-			{
-				if (!_Downloader)
-					return Promise.f_SetException(DMibErrorInstance("Invalid downloader"));
-
-				auto UploadReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(_Config), fg_Move(_Downloader));
-
-				UploadReceive(&NFile::CDirectorySyncReceive::f_PerformSync) > Promise;
-			}
 		;
-		return Promise.f_MoveFuture();
+
+		if (!Downloader)
+			co_return DMibErrorInstance("Invalid downloader");
+
+		auto UploadReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(_Config), fg_Move(Downloader));
+
+		co_return co_await UploadReceive(&NFile::CDirectorySyncReceive::f_PerformSync);
 	}
 }

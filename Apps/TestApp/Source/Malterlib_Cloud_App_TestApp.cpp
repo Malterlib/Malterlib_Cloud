@@ -54,12 +54,12 @@ namespace NMib::NCloud::NTest
 
 	TCFuture<void> CTestAppActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		return fg_Explicit();
+		co_return {};
 	}
 
 	TCFuture<void> CTestAppActor::fp_StopApp()
 	{
-		return fg_Explicit();
+		co_return {};
 	}
 }
 

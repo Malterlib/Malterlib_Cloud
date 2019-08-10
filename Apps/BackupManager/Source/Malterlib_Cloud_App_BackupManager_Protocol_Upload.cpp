@@ -12,55 +12,40 @@ namespace NMib::NCloud::NBackupManager
 		CTimeSpan g_BackupTimeMaxInFuture = CTimeSpanConvert::fs_CreateHourSpan(2);
 	}
 	
-	template <typename tf_CResult>
-	bool CBackupManagerServer::fp_CheckBackupKey
+	CExceptionPointer CBackupManagerServer::fp_CheckBackupKey
 		(
 			CBackupManager::CBackupKey const &_BackupKey
 			, CBackupManagerServer::CBackupKey &o_BackupKey
 			, CDistributedAppAuditor const &_Auditor
-			, NConcurrency::TCPromise<tf_CResult> &_Promise
 		)
 	{
 		if (!CBackupManager::fs_IsValidHostname(_BackupKey.m_FriendlyName))
-		{
-			_Promise.f_SetException(_Auditor.f_Exception({"Backup key friendly name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_FriendlyName)}));
-			return false;
-		}
+			return _Auditor.f_Exception({"Backup key friendly name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_FriendlyName)}).f_ExceptionPointer();
+
 		if (!CBackupManager::fs_IsValidHostname(_BackupKey.m_ID))
-		{
-			_Promise.f_SetException(_Auditor.f_Exception({"Backup key ID name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_ID)}));
-			return false;
-		}
+			return _Auditor.f_Exception({"Backup key ID name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_ID)}).f_ExceptionPointer();
+
 		if (_BackupKey.m_Time < g_MinBackupTime || _BackupKey.m_Time > CTime::fs_NowUTC() + g_BackupTimeMaxInFuture)
-		{
-			_Promise.f_SetException(_Auditor.f_Exception({"Backup key time is out of range", fg_Format("'{}'", _BackupKey.m_Time)}));
-			return false;
-		}
-		
+			return _Auditor.f_Exception({"Backup key time is out of range", fg_Format("'{}'", _BackupKey.m_Time)}).f_ExceptionPointer();
+
 		o_BackupKey.m_BackupID = _BackupKey.m_ID;
 		o_BackupKey.m_BackupTime = _BackupKey.m_Time;
-		o_BackupKey.m_BackupName = fg_Format
-			(
-				"{}_{}"
-				, _BackupKey.m_FriendlyName // This makes sure that backups can never be mixed between different hosts
-				, _Auditor.f_HostInfo().f_GetRealHostID()
-			)
+		o_BackupKey.m_BackupName = "{}_{}"_f
+			<< _BackupKey.m_FriendlyName // This makes sure that backups can never be mixed between different hosts
+			<< _Auditor.f_HostInfo().f_GetRealHostID()
 		;
 		
 		if (o_BackupKey.m_BackupName.f_GetLen() > 128)
-		{
-			_Promise.f_SetException(_Auditor.f_Exception({"Backup key friendly name is too long", fg_Format("'{}'", o_BackupKey.m_BackupName)}));
-			return false;
-		}
-		
-		return true;
+			return _Auditor.f_Exception({"Backup key friendly name is too long", fg_Format("'{}'", o_BackupKey.m_BackupName)}).f_ExceptionPointer();
+
+		return nullptr;
 	}		
 	
 	TCFuture<void> CBackupManagerServer::fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason)
 	{
 		auto *pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
 		if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != _Auditor.f_HostInfo())
-			return fg_Explicit();
+			co_return {};
 		
 		if (!pBackupInstance->m_BackupInstance)
 		{
@@ -68,9 +53,9 @@ namespace NMib::NCloud::NBackupManager
 			{
 				auto OnDestroyed = fg_Move(pBackupInstance->m_OnDestroyed);
 				for (auto &OnDestroy : OnDestroyed)
-					OnDestroy();
+					OnDestroy.f_SetResult();
 			}
-			return fg_Explicit();
+			co_return {};
 		}
 
 		CStr Message = fg_Format("Backup '{}' stopped: {}", _Key.f_GetDesc(), _Reason);
@@ -79,43 +64,37 @@ namespace NMib::NCloud::NBackupManager
 		else
 			_Auditor.f_Info(Message);
 	
-		TCPromise<void> Promise;
 		auto pCanDestroyTracker = mp_pCanDestroyTracker;
 		pBackupInstance->m_bPendingDestroy = true;
-		pBackupInstance->m_BackupInstance->f_Destroy() > [this, pCanDestroyTracker, _Key, _Auditor, Promise](TCAsyncResult<void> &&_Result)
-			{
-				if (!_Result)
-				{
-					DMibLogWithCategory
-						(
-							Mib/Cloud/BackupManager
-							, Error
-							, "Failed to destroy backup instance '{}': {}"
-							, _Key.f_GetDesc()
-						 	, _Result.f_GetExceptionStr()
-						)
-					;
-				}
-				auto *pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
-				DMibCheck(pBackupInstance);
-				if (!pBackupInstance)
-				{
-					Promise.f_SetResult();
-					return;
-				}
-				pBackupInstance->m_bPendingDestroy = false;
-				pBackupInstance->m_BackupRunningSubscription.f_Clear();
-				auto OnDestroyed = fg_Move(pBackupInstance->m_OnDestroyed);
-				if (pBackupInstance->m_OwningHost.f_HostInfo() == _Auditor.f_HostInfo())
-					mp_BackupInstances.f_Remove(pBackupInstance->f_GetKey());
-				for (auto &OnDestroy : OnDestroyed)
-					OnDestroy();
-				Promise.f_SetResult();
-			}
-		;
-		pBackupInstance->m_BackupInstance.f_Clear();
-		
-		return Promise.f_MoveFuture();
+		auto DestroyResult = co_await fg_Move(pBackupInstance->m_BackupInstance).f_Destroy().f_Wrap();
+
+		if (!DestroyResult)
+		{
+			DMibLogWithCategory
+				(
+					Mib/Cloud/BackupManager
+					, Error
+					, "Failed to destroy backup instance '{}': {}"
+					, _Key.f_GetDesc()
+					, DestroyResult.f_GetExceptionStr()
+				)
+			;
+		}
+
+		pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
+		DMibCheck(pBackupInstance);
+		if (!pBackupInstance)
+			co_return {};
+
+		pBackupInstance->m_bPendingDestroy = false;
+		pBackupInstance->m_BackupRunningSubscription.f_Clear();
+		auto OnDestroyed = fg_Move(pBackupInstance->m_OnDestroyed);
+		if (pBackupInstance->m_OwningHost.f_HostInfo() == _Auditor.f_HostInfo())
+			mp_BackupInstances.f_Remove(pBackupInstance->f_GetKey());
+		for (auto &OnDestroy : OnDestroyed)
+			OnDestroy.f_SetResult();
+
+		co_return {};
 	}
 
 	auto CBackupManagerServer::CBackupManagerImplementation::f_InitBackup(CBackupManager::CInitBackup &&_Params)
@@ -124,129 +103,98 @@ namespace NMib::NCloud::NBackupManager
 		auto pThis = m_pThis;
 		
 		if (pThis->f_IsDestroyed())
-			return DMibErrorInstance("Shutting down");
+			co_return DMibErrorInstance("Shutting down");
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		auto CallingHostID = fg_GetCallingHostID();
 			
-		NConcurrency::TCPromise<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> Promise;
-		
 		CBackupManagerServer::CBackupKey BackupKey;
-		if (!pThis->fp_CheckBackupKey(_Params.m_BackupKey, BackupKey, Auditor, Promise))
-			return Promise.f_MoveFuture();
+		if (auto pException = pThis->fp_CheckBackupKey(_Params.m_BackupKey, BackupKey, Auditor))
+			co_return fg_Move(pException);
 		
-		pThis->mp_Permissions.f_HasPermission("Start backup", {"Backup/WriteSelf"})
-			> Promise % "Permission denied starting backup" % Auditor /
-			[
-			 	=
-				, Subscription = fg_Move(_Params.m_Subscription)
-				, SourceBackupKey = _Params.m_BackupKey
-				, Flags = _Params.m_Flags
-			]
-			(bool _bHasPermission) mutable
-			{
-				if (!_bHasPermission)
-					return Promise.f_SetException(Auditor.f_AccessDenied("(Start backup)"));
+		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Start backup", {"Backup/WriteSelf"}) % "Permission denied starting backup" % Auditor);
+		if (!bHasPermission)
+			co_return Auditor.f_AccessDenied("(Start backup)");
 
-				CStr BackupPermission = fg_Format("Backup/Read/{}", BackupKey.m_BackupName);
-				pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_CreateSet(BackupPermission)) > fg_DiscardResult();
+		CStr BackupPermission = fg_Format("Backup/Read/{}", BackupKey.m_BackupName);
+		pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_CreateSet(BackupPermission)) > fg_DiscardResult();
 
-				Auditor.f_Info(fg_Format("Starting backup '{}'", BackupKey.f_GetDesc()));
+		Auditor.f_Info(fg_Format("Starting backup '{}'", BackupKey.f_GetDesc()));
 
-				auto NewInstance = pThis->mp_BackupInstances(BackupKey);
-				auto &Instance = *NewInstance;
+		auto NewInstance = pThis->mp_BackupInstances(BackupKey);
+		auto &Instance = *NewInstance;
 
-				Auditor.f_HostInfo().f_OnDisconnect
-					(
-						fg_ThisActor(this)
-						, [pThis, BackupKey, Auditor]
-						{
-							pThis->fp_DestroyBackupInstance(BackupKey, Auditor, true, "Actor host disconnected (restarted)") > fg_DiscardResult();
-						}
-					)
-					> [pThis, BackupKey, Auditor](TCAsyncResult<CActorSubscription> &&_Subscription)
-					{
-						if (!_Subscription || !*_Subscription)
-							return;
-						auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
-						if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
-							return;
-						pBackupInstance->m_OnDisconnectSubscrption = fg_Move(*_Subscription);
-					}
-				;
-
-				auto fInitBackupInstance =
-					[
-						pThis
-						, BackupKey
-						, Promise
-						, Auditor
-						, Subscription = fg_Move(Subscription)
-						, SourceBackupKey = SourceBackupKey
-						, Flags = Flags
-					]
-					() mutable
-					{
-						if (pThis->f_IsDestroyed())
-							return Promise.f_SetException(Auditor.f_Exception("Shutting down"));
-
-						auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
-						if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
-						{
-							Promise.f_SetException(Auditor.f_Exception("Another backup was already started taking precedence"));
-							return;
-						}
-
-						pBackupInstance->m_BackupRunningSubscription = fg_Move(Subscription);
-
-						DCheck(pBackupInstance->m_BackupInstance.f_IsEmpty());
-						pBackupInstance->m_BackupInstance = pThis->mp_AppState.m_DistributionManager->f_ConstructActor<CBackupInstance>
-							(
-								fg_Construct(fg_Format("Backup instance for '{}'", BackupKey.m_BackupName))
-								, BackupKey.m_BackupName
-								, BackupKey.m_BackupTime
-								, BackupKey.m_BackupID
-								, pThis->mp_AppState.m_RootDirectory
-								, (Flags & CBackupManager::EInitBackupFlag_ForceNew) != 0
-								, pThis->fp_CreateBackupSource(BackupKey.m_BackupName)
-							)
-						;
-
-						TCDistributedActorInterfaceWithID<CBackupManagerBackup> BackupInterface
-							{
-								pBackupInstance->m_BackupInstance->f_ShareInterface<CBackupManagerBackup>()
-								, g_ActorSubscription / [pThis, BackupKey, Auditor]() -> TCFuture<void>
-								{
-									auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
-									if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
-										return fg_Explicit();
-
-									auto &Instance = *pBackupInstance;
-
-									return pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Backup stopped remotely");
-								}
-							}
-						;
-
-						Auditor.f_Info(fg_Format("Backup initialized for '{}'", BackupKey.f_GetDesc()));
-						Promise.f_SetResult(fg_Move(BackupInterface));
-					}
-				;
-
-				if (NewInstance.f_WasCreated())
+		Auditor.f_HostInfo().f_OnDisconnect
+			(
+				fg_ThisActor(this)
+				, [pThis, BackupKey, Auditor]
 				{
-					Instance.m_OwningHost = Auditor;
-					fInitBackupInstance();
+					pThis->self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupKey, Auditor, true, "Actor host disconnected (restarted)") > fg_DiscardResult();
 				}
-				else
+			)
+			> [pThis, BackupKey, Auditor](TCAsyncResult<CActorSubscription> &&_Subscription)
+			{
+				if (!_Subscription || !*_Subscription)
+					return;
+				auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
+				if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
+					return;
+				pBackupInstance->m_OnDisconnectSubscrption = fg_Move(*_Subscription);
+			}
+		;
+
+
+		if (NewInstance.f_WasCreated())
+			Instance.m_OwningHost = Auditor;
+		else
+		{
+			auto OnDestroyedFuture = Instance.m_OnDestroyed.f_Insert().f_Future();
+			pThis->self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupKey, Instance.m_OwningHost, false, "Old host removed") > fg_DiscardResult(); // Remove old Host
+			Instance.m_OwningHost = Auditor; // Take ownership
+
+			co_await fg_Move(OnDestroyedFuture);
+		}
+
+		if (pThis->f_IsDestroyed())
+			co_return Auditor.f_Exception("Shutting down");
+
+		auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
+		if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
+			co_return Auditor.f_Exception("Another backup was already started taking precedence");
+
+		pBackupInstance->m_BackupRunningSubscription = fg_Move(_Params.m_Subscription);
+
+		DCheck(pBackupInstance->m_BackupInstance.f_IsEmpty());
+		pBackupInstance->m_BackupInstance = pThis->mp_AppState.m_DistributionManager->f_ConstructActor<CBackupInstance>
+			(
+				fg_Construct(fg_Format("Backup instance for '{}'", BackupKey.m_BackupName))
+				, BackupKey.m_BackupName
+				, BackupKey.m_BackupTime
+				, BackupKey.m_BackupID
+				, pThis->mp_AppState.m_RootDirectory
+				, (_Params.m_Flags & CBackupManager::EInitBackupFlag_ForceNew) != 0
+				, pThis->fp_CreateBackupSource(BackupKey.m_BackupName)
+			)
+		;
+
+		TCDistributedActorInterfaceWithID<CBackupManagerBackup> BackupInterface
+			{
+				pBackupInstance->m_BackupInstance->f_ShareInterface<CBackupManagerBackup>()
+				, g_ActorSubscription / [pThis, BackupKey, Auditor]() -> TCFuture<void>
 				{
-					Instance.m_OnDestroyed.f_Insert(fg_Move(fInitBackupInstance));
-					pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Old host removed") > fg_DiscardResult(); // Remove old Host
-					Instance.m_OwningHost = Auditor; // Take ownership
+					auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
+					if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())
+						co_return {};
+
+					auto &Instance = *pBackupInstance;
+
+					co_return co_await pThis->self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupKey, Instance.m_OwningHost, false, "Backup stopped remotely");
 				}
 			}
 		;
 
-		return Promise.f_MoveFuture();
+		Auditor.f_Info(fg_Format("Backup initialized for '{}'", BackupKey.f_GetDesc()));
+
+		co_return fg_Move(BackupInterface);
 	}
 }

@@ -268,22 +268,22 @@ namespace NMib::NCloud
 	
 	auto CBackupManager::f_StartBackup(CStartBackup &&_Params) -> NConcurrency::TCFuture<CStartBackup::CResult>
 	{
-		return DMibErrorInstance("Deprecated");
+		co_return DMibErrorInstance("Deprecated");
 	}
 	
 	auto CBackupManager::f_StopBackup(CStopBackup &&_Params) -> NConcurrency::TCFuture<CStopBackup::CResult>
 	{
-		return DMibErrorInstance("Deprecated");
+		co_return DMibErrorInstance("Deprecated");
 	}
 	
 	auto CBackupManager::f_UploadData(CUploadData &&_Params) -> NConcurrency::TCFuture<CUploadData::CResult>
 	{
-		return DMibErrorInstance("Deprecated");
+		co_return DMibErrorInstance("Deprecated");
 	}
 	
 	auto CBackupManager::f_StartDownloadBackup(CStartDownloadBackup &&_Params) -> NConcurrency::TCFuture<CStartDownloadBackup::CResult>
 	{
-		return DMibErrorInstance("Deprecated");
+		co_return DMibErrorInstance("Deprecated");
 	}
 	
 	bool CBackupManager::fs_IsValidHostname(NStr::CStr const &_String)

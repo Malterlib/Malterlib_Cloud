@@ -47,7 +47,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -81,7 +81,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -210,7 +210,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -271,7 +271,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -326,7 +326,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion, _Params, _pCommandLine);
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion, _Params, _pCommandLine);
 				}
 				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
 			)
@@ -364,7 +364,6 @@ namespace NMib::NCloud::NCloudClient
 	
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCPromise<uint32> Promise;
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 
@@ -416,8 +415,6 @@ namespace NMib::NCloud::NCloudClient
 	
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
-		TCPromise<uint32> Promise;
-		
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		bool bVerbose = _Params["Verbose"].f_Boolean();

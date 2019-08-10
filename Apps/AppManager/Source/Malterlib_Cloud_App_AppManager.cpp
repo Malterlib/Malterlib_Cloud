@@ -284,15 +284,15 @@ namespace NMib::NCloud::NAppManager
 			if (!PendingSelfUpdateName.f_IsEmpty())
 				fp_StartPendingSelfUpdateReporting(PendingSelfUpdateName, PendingSelfUpdateVersionID, PendingSelfUpdateTime, PendingSelfUpdateSequence);
 		}
-		catch (NException::CException const &_Exception)
+		catch (NException::CException const &)
 		{
-			return _Exception;
+			co_return fg_CurrentException();
 		}
 		
 		if (bChangedDatabase)
-			return fp_SaveStateDatabase();
-		else
-			return fg_Explicit();
+			co_await fp_SaveStateDatabase();
+
+		co_return {};
 	}
 	
 	void CAppManagerActor::fp_KeyManagerAvailable()
@@ -452,7 +452,7 @@ namespace NMib::NCloud::NAppManager
 			TCActorResultVector<void> Destroys;
 
 			for (auto &Launch : mp_LaunchActors)
-				Launch->f_Destroy() > Destroys.f_AddResult();
+				fg_Move(Launch).f_Destroy() > Destroys.f_AddResult();
 			mp_LaunchActors.f_Clear();
 
 			co_await Destroys.f_GetResults().f_Wrap();

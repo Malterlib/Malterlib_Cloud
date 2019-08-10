@@ -797,7 +797,7 @@ public:
 								}
 
 								WholeState.m_Event.f_Signal();
-								return fg_Explicit();
+								co_return {};
 							}
 						)
 						> Promise / [pUpdateNotificationsState, Promise](NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)

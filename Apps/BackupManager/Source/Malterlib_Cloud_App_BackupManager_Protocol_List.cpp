@@ -8,6 +8,7 @@ namespace NMib::NCloud::NBackupManager
 	TCFuture<TCVector<CStr>> CBackupManagerServer::fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources)
 	{
 		TCPromise<TCVector<CStr>> Promise;
+
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 		Permissions["//ALL//"] = {{"Backup/ListAll", "Backup/ReadAll"}};
 		for (auto &Backup : _Sources)
@@ -36,29 +37,24 @@ namespace NMib::NCloud::NBackupManager
 	{
 		auto pThis = m_pThis;
 		if (pThis->f_IsDestroyed())
-			return DMibErrorInstance("Shutting down");
+			co_return DMibErrorInstance("Shutting down");
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		NConcurrency::TCPromise<TCVector<CStr>> Promise;
 
 		Auditor.f_Info("Listing backup sources");
 		
-		pThis->fp_FilterBackupSourcesByPermissions(pThis->fp_EnumBackupSources())
-			> Promise % "Permission denied listing backup sources" % Auditor / [=](TCVector<CStr> &&_Sources)
-			{
-				Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", _Sources));
-				Promise.f_SetResult(fg_Move(_Sources));
-			}
-		;
+		auto Sources = co_await (pThis->fp_FilterBackupSourcesByPermissions(pThis->fp_EnumBackupSources()) % "Permission denied listing backup sources" % Auditor);
 
-		return Promise.f_MoveFuture();
+		Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", Sources));
+
+		co_return fg_Move(Sources);
 	}
 
 	auto CBackupManagerServer::CBackupManagerImplementation::f_ListBackups(CStr const &_ForBackupSource) -> TCFuture<TCMap<CStr, CBackupInfo>>
 	{
 		auto pThis = m_pThis;
 		if (pThis->f_IsDestroyed())
-			return DMibErrorInstance("Shutting down");
+			co_return DMibErrorInstance("Shutting down");
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
@@ -73,66 +69,57 @@ namespace NMib::NCloud::NBackupManager
 			bSingleSource = true;
 
 			if (!CBackupManager::fs_IsValidBackupSource(_ForBackupSource, nullptr, nullptr))
-				return Auditor.f_Exception({"Invalid backup source format", "(List backups)"});
+				co_return Auditor.f_Exception({"Invalid backup source format", "(List backups)"});
 
 			BackupSources.f_Insert(_ForBackupSource);
 		}
 		else
 			BackupSources = pThis->fp_EnumBackupSources();
 
-		NConcurrency::TCPromise<TCMap<CStr, CBackupInfo>> Promise;
+		auto FilteredBackupSources = co_await (pThis->fp_FilterBackupSourcesByPermissions(BackupSources) % "Permission denied listing backups" % Auditor);
+		if (bSingleSource)
+		{
+			if (FilteredBackupSources.f_IsEmpty())
+				co_return Auditor.f_AccessDenied("(List backups)");
 
-		pThis->fp_FilterBackupSourcesByPermissions(BackupSources) > Promise % "Permission denied listing backups" % Auditor / [=](TCVector<CStr> &&_BackupSources)
+			auto *pBackupSource = pThis->mp_BackupSources.f_FindEqual(_ForBackupSource);
+			if (!pBackupSource)
+				co_return Auditor.f_Exception({"No such backup source", "(List backups)"});
+		}
+
+		TCActorResultMap<CStr, CBackupInfo> BackupInfos;
+		for (auto &BackupSourceID : FilteredBackupSources)
+		{
+			auto *pBackupSource = pThis->mp_BackupSources.f_FindEqual(BackupSourceID);
+			DMibCheck(pBackupSource);
+			if (!pBackupSource)
+				continue;
+
+			(*pBackupSource)(&CBackupSource::f_GetInfo) > BackupInfos.f_AddResult(BackupSourceID);
+		}
+
+		auto FilteredBackupInfos = co_await (BackupInfos.f_GetResults() % Auditor);
+
+		TCMap<CStr, CBackupInfo> Results;
+		for (auto &BackupInfo : FilteredBackupInfos)
+		{
+			auto &BackupSource = FilteredBackupInfos.fs_GetKey(BackupInfo);
+			if (!BackupInfo)
 			{
-				if (bSingleSource)
-				{
-					if (_BackupSources.f_IsEmpty())
-						return Promise.f_SetException(Auditor.f_AccessDenied("(List backups)"));
-
-					auto *pBackupSource = pThis->mp_BackupSources.f_FindEqual(_ForBackupSource);
-					if (!pBackupSource)
-						return Promise.f_SetException(Auditor.f_Exception({"No such backup source", "(List backups)"}));
-				}
-
-				TCActorResultMap<CStr, CBackupInfo> BackupInfos;
-				for (auto &BackupSourceID : _BackupSources)
-				{
-					auto *pBackupSource = pThis->mp_BackupSources.f_FindEqual(BackupSourceID);
-					DMibCheck(pBackupSource);
-					if (!pBackupSource)
-						continue;
-
-					(*pBackupSource)(&CBackupSource::f_GetInfo) > BackupInfos.f_AddResult(BackupSourceID);
-				}
-
-				BackupInfos.f_GetResults() > Promise % Auditor / [=](TCMap<CStr, TCAsyncResult<CBackupInfo>> &&_BackupInfos)
-					{
-						TCMap<CStr, CBackupInfo> Results;
-						for (auto &BackupInfo : _BackupInfos)
-						{
-							auto &BackupSource =_BackupInfos.fs_GetKey(BackupInfo);
-							if (!BackupInfo)
-							{
-								DMibLogWithCategory
-									(
-										Mib/Cloud/BackupManager
-										, Error
-										, "Failed to get backup info for backup source '{}': {}"
-										, BackupSource
-									 	, BackupInfo.f_GetExceptionStr()
-									)
-								;
-								continue;
-							}
-							Results[BackupSource] = fg_Move(*BackupInfo);
-						}
-
-						Promise.f_SetResult(fg_Move(Results));
-					}
+				DMibLogWithCategory
+					(
+						Mib/Cloud/BackupManager
+						, Error
+						, "Failed to get backup info for backup source '{}': {}"
+						, BackupSource
+						, BackupInfo.f_GetExceptionStr()
+					)
 				;
+				continue;
 			}
-		;
+			Results[BackupSource] = fg_Move(*BackupInfo);
+		}
 
-		return Promise.f_MoveFuture();
+		co_return fg_Move(Results);
 	}
 }

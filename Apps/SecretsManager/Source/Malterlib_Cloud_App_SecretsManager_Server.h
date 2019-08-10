@@ -54,6 +54,7 @@ namespace NMib::NCloud::NSecretsManager
 		struct CDownload
 		{
 			CDownload();
+			CDownload(CDownload &&);
 			~CDownload();
 			TCFuture<void> f_Destroy();
 
@@ -65,6 +66,7 @@ namespace NMib::NCloud::NSecretsManager
 		struct CUpload
 		{
 			CUpload();
+			CUpload(CUpload &&);
 			~CUpload();
 			TCFuture<void> f_Destroy();
 
@@ -124,7 +126,7 @@ namespace NMib::NCloud::NSecretsManager
 		TCFuture<void> fp_RemoveFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor);
 		CActorSubscription fp_ReserveFile(CStr const &_FileName);
 		TCFuture<void> fp_RemoveUnreferencedFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor);
-		void fp_WriteDatabase();
+		TCFuture<void> fp_WriteDatabase();
 
 #if DMibConfig_Tests_Enable
 		NConcurrency::TCFuture<CEJSON> f_SyncFileOperations();

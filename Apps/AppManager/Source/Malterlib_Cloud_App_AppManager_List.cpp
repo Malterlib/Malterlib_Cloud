@@ -109,7 +109,6 @@ namespace NMib::NCloud::NAppManager
 			Permissions[Name] = {CPermissionQuery{"AppManager/VersionAppAll", "AppManager/VersionApp/{}"_f << Name}.f_Description("Get versions of application {} in AppManager"_f << Name)};
 		}
 
-		TCPromise<CVersionsAvailableForUpdate> Promise;
 		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
 			(
 			 	pThis->mp_Permissions.f_HasPermissions("Enumerate versions in AppManager", Permissions) % "Permission denied enumerating versions" % Auditor

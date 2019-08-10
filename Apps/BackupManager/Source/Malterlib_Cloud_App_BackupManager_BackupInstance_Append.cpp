@@ -6,19 +6,20 @@ namespace NMib::NCloud::NBackupManager
 {
 	TCFuture<void> CBackupInstance::f_AppendData(CStr const &_FileName, CAppendData &&_Data)
 	{
+		TCPromise<void> Promise;
+
 		CStr ManifestError;
 		if (!CBackupManagerBackup::fs_ManifestFileValid(_FileName, _Data.m_ManifestFile, ManifestError))
-			return DMibErrorInstance("Manifest change for '{}' is invalid: {}"_f << _FileName << ManifestError);
+			return Promise <<= DMibErrorInstance("Manifest change for '{}' is invalid: {}"_f << _FileName << ManifestError);
 
 		auto &Internal = *mp_pInternal;
 
 		if (auto pException = Internal.f_CheckFileName(_FileName, nullptr))
-			return fg_Move(pException);
+			return Promise <<= fg_Move(pException);
 
 		if (!_Data.m_ManifestFile.f_IsFile())
-			return DMibErrorInstance("Cannot append non-file: {}"_f << _FileName);
+			return Promise <<= DMibErrorInstance("Cannot append non-file: {}"_f << _FileName);
 
-		TCPromise<void> Promise;
 		DMibCloudBackupManagerDebugOut("--- Append {}\n", _FileName);
 
 		Internal.f_SequenceSyncs

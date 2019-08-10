@@ -116,7 +116,7 @@ namespace NMib::NCloud::NAppManager
 					}
 					
 					fp_OnAppUpdateInfoChange();
-					return fg_Explicit();
+					co_return {};
 				}
 			)
 		;
@@ -147,13 +147,11 @@ namespace NMib::NCloud::NAppManager
 			{
 				auto &RemoteAppManager = pThis->mp_RemoteAppManagerState[CallingHostID];
 				if (RemoteAppManager.m_iOnChangeSubscriptionSequence != SubscriptionSequence)
-					return fg_Explicit();
+					co_return {};
 
-				TCFuture<void> DestroyFuture = RemoteAppManager.m_fOnChange.f_Destroy();
+				co_await fg_Move(RemoteAppManager.m_fOnChange).f_Destroy();
 
-				RemoteAppManager.m_fOnChange.f_Clear();
-
-				return DestroyFuture;
+				co_return {};
 			}
 		;
 	}

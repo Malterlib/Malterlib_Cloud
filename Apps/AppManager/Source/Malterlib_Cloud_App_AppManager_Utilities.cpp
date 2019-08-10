@@ -65,9 +65,9 @@ namespace NMib::NCloud::NAppManager
 	{
 		struct CState
 		{
+			TCPromise<CBashScriptOutput> m_Promise;
 			TCActor<CProcessLaunchActor> m_LaunchActor;
 			CActorSubscription m_LaunchSubscription;
-			TCPromise<CBashScriptOutput> m_Promise;
 			CStr m_ErrorOutput;
 			CStr m_StdOutput;
 			
@@ -77,7 +77,7 @@ namespace NMib::NCloud::NAppManager
 			void f_Replied()
 			{
 				m_bReplied = true;
-				m_LaunchActor->f_DestroyNoResult(DMibPFile, DMibPLine);
+				fg_Move(m_LaunchActor).f_Destroy() > fg_DiscardResult();
 			}
 		};
 		

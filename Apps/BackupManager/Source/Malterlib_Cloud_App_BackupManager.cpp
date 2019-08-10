@@ -21,30 +21,26 @@ namespace NMib::NCloud::NBackupManager
 
 	TCFuture<void> CBackupManagerApp::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		TCPromise<void> Promise;
-		mp_pServer = fg_ConstructActor<CBackupManagerServer>(fg_Construct(self), mp_State);
-		mp_pServer(&CBackupManagerServer::f_Init) > Promise;
-		return Promise.f_MoveFuture();
+		mp_Server = fg_ConstructActor<CBackupManagerServer>(fg_Construct(self), mp_State);
+
+		co_await mp_Server(&CBackupManagerServer::f_Init);
+
+		co_return {};
 	}
 	
 	TCFuture<void> CBackupManagerApp::fp_StopApp()
 	{	
-		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
-		
-		if (mp_pServer)
+		if (mp_Server)
 		{
 			DMibLogWithCategory(Mib/Cloud/BackupManager/Daemon, Info, "Shutting down");
 			
-			mp_pServer->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
-				{
-					if (!_Result)
-						DMibLogWithCategory(Mib/Cloud/BackupManager/Daemon, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());
-				}
-			;
-			mp_pServer = nullptr;
+			auto Result = co_await fg_Move(mp_Server).f_Destroy().f_Wrap();
+
+			if (!Result)
+				DMibLogWithCategory(Mib/Cloud/BackupManager/Daemon, Error, "Failed to shut down server: {}", Result.f_GetExceptionStr());
 		}
 		
-		return pCanDestroy->f_Future();
+		co_return {};
 	}
 }
 

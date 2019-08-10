@@ -52,7 +52,7 @@ namespace NMib::NCloud::NBackupManager
 			}
 
 			TCDistributedActor<CBackupInstance> m_BackupInstance;
-			TCLinkedList<TCFunctionMovable<void ()>> m_OnDestroyed;
+			TCLinkedList<TCPromise<void>> m_OnDestroyed;
 			CDistributedAppAuditor m_OwningHost;
 			CActorSubscription m_OnDisconnectSubscrption;
 			CActorSubscription m_BackupRunningSubscription;
@@ -107,13 +107,11 @@ namespace NMib::NCloud::NBackupManager
 
 		TCFuture<void> fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason);
 
-		template <typename tf_CResult>
-		bool fp_CheckBackupKey
+		CExceptionPointer fp_CheckBackupKey
 			(
 				CBackupManager::CBackupKey const &_BackupKey
 				, CBackupKey &o_BackupKey
 				, CDistributedAppAuditor const &_Auditor
-				, TCPromise<tf_CResult> &_Promise
 			)
 		;
 

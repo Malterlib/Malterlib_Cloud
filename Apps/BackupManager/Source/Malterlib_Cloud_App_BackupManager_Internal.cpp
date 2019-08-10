@@ -32,17 +32,14 @@ namespace NMib::NCloud::NBackupManager
 
 	TCFuture<void> CBackupManagerServer::f_Init()
 	{
-		TCPromise<void> Promise;
-		fp_SetupPermissions() + fp_EnumBackupSourcesFromDisk() > Promise % "Failed to setup permissions or enum backup sources" / [=](CVoidTag, TCVector<CStr> &&_BackupSources)
-			{
-				for (auto &BackupSource : _BackupSources)
-					fp_CreateBackupSource(BackupSource);
+		auto [Permission, BackupSources] = co_await ((fp_SetupPermissions() + fp_EnumBackupSourcesFromDisk()) % "Failed to setup permissions or enum backup sources");
 
-				fp_Publish() > Promise % "Failed to publish";
-			}
-		;
+		for (auto &BackupSource : BackupSources)
+			fp_CreateBackupSource(BackupSource);
 
-		return Promise.f_MoveFuture();
+		co_await (fp_Publish() % "Failed to publish");
+
+		co_return {};
 	}
 
 	TCFuture<void> CBackupManagerServer::fp_SetupPermissions()
@@ -53,64 +50,64 @@ namespace NMib::NCloud::NBackupManager
 		Permissions["Backup/ReadAll"];
 		Permissions["Backup/ListAll"];
 
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);
 
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("Backup/*");
 
-		TCPromise<void> Promise;
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this))
-			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
-			{
-				mp_Permissions = fg_Move(_Subscription);
-				mp_Permissions.f_OnPermissionsAdded
-					(
-					 	[this](CPermissionIdentifiers const &_Identity, NContainer::TCMap<NStr::CStr, CPermissionRequirements> const &_Permissions)
-						{
-							if (!mp_ProtocolInterface.m_Publication.f_IsValid())
-								return;
-							if (!_Permissions.f_FindEqual("Backup/WriteSelf"))
-								return;
-							mp_ProtocolInterface.m_Publication.f_Republish(_Identity.f_GetHostID()); // Force clients to reconnect
-						}
-					)
-				;
-				mp_Permissions.f_OnPermissionsRemoved
-					(
-					 	[this](CPermissionIdentifiers const &_Identity, NContainer::TCSet<NStr::CStr> const &_Permissions)
-						{
-							if (!mp_ProtocolInterface.m_Publication.f_IsValid())
-								return;
-							if (!_Permissions.f_FindEqual("Backup/WriteSelf"))
-								return;
-							mp_ProtocolInterface.m_Publication.f_Republish(_Identity.f_GetHostID()); // Force clients to reconnect
-						}
-					)
-				;
+		mp_Permissions = co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this));
 
-				Promise.f_SetResult();
-			}
+		mp_Permissions.f_OnPermissionsAdded
+			(
+				[this](CPermissionIdentifiers const &_Identity, NContainer::TCMap<NStr::CStr, CPermissionRequirements> const &_Permissions)
+				{
+					if (!mp_ProtocolInterface.m_Publication.f_IsValid())
+						return;
+					if (!_Permissions.f_FindEqual("Backup/WriteSelf"))
+						return;
+					mp_ProtocolInterface.m_Publication.f_Republish(_Identity.f_GetHostID()); // Force clients to reconnect
+				}
+			)
 		;
 
-		return Promise.f_MoveFuture();
+		mp_Permissions.f_OnPermissionsRemoved
+			(
+				[this](CPermissionIdentifiers const &_Identity, NContainer::TCSet<NStr::CStr> const &_Permissions)
+				{
+					if (!mp_ProtocolInterface.m_Publication.f_IsValid())
+						return;
+					if (!_Permissions.f_FindEqual("Backup/WriteSelf"))
+						return;
+					mp_ProtocolInterface.m_Publication.f_Republish(_Identity.f_GetHostID()); // Force clients to reconnect
+				}
+			)
+		;
+
+		co_return {};
 	}
 
 	TCFuture<void> CBackupManagerServer::fp_Destroy()
 	{
-		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
+		auto CanDestroyFuture = mp_pCanDestroyTracker->f_Future();
+		mp_pCanDestroyTracker.f_Clear();
+
+		TCActorResultVector<void> Destroys;
+		fg_Move(CanDestroyFuture) > Destroys.f_AddResult();
 
 		for (auto &BackupInstance : mp_BackupInstances)
-			fp_DestroyBackupInstance(BackupInstance.f_GetKey(), BackupInstance.m_OwningHost, true, "Backup Manager shutting down") > pCanDestroy->f_Track();
+			self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupInstance.f_GetKey(), BackupInstance.m_OwningHost, true, "Backup Manager shutting down") > Destroys.f_AddResult();
 
 		for (auto &Download : mp_BackupDownloads)
-			Download.f_Destroy() > pCanDestroy->f_Track();
+			Download.f_Destroy() > Destroys.f_AddResult();
 
-		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
+		mp_ProtocolInterface.f_Destroy() > Destroys.f_AddResult();
 
 		if (mp_QueryFileActor)
-			mp_QueryFileActor->f_Destroy() > pCanDestroy->f_Track();
+			mp_QueryFileActor.f_Destroy() > Destroys.f_AddResult();
 
-		return pCanDestroy->f_Future();
+		co_await Destroys.f_GetResults();
+
+		co_return {};
 	}
 
 	TCActor<CSeparateThreadActor> const &CBackupManagerServer::fp_GetQueryFileActor()

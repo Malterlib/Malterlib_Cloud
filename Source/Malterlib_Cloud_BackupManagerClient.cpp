@@ -41,7 +41,7 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 		if (Internal.m_bStarted)
-			return DMibErrorInstance("Backup already started");
+			co_return DMibErrorInstance("Backup already started");
 
 		try
 		{
@@ -49,14 +49,14 @@ namespace NMib::NCloud
 		}
 		catch (NException::CException const &_Exception)
 		{
-			return _Exception;
+			co_return _Exception.f_ExceptionPointer();
 		}
 
 		Internal.m_bStarted = true;
 
 		Internal.f_RunBackup();
 
-		return fg_Explicit();
+		co_return {};
 	}
 
 
@@ -67,7 +67,7 @@ namespace NMib::NCloud
 		{
 			TCActorResultVector<void> RunningInstancesDestroys;
 			for (auto &BackupInstance : Internal.m_RunningBackupInstances)
-				BackupInstance.m_Instance->f_Destroy() > RunningInstancesDestroys.f_AddResult();
+				BackupInstance.m_Instance.f_Destroy() > RunningInstancesDestroys.f_AddResult();
 
 			Internal.m_RunningBackupInstances.f_Clear();
 
@@ -98,7 +98,7 @@ namespace NMib::NCloud
 				}
 			)
 		;
-		co_await Internal.m_FileActor->f_Destroy();
+		co_await Internal.m_FileActor.f_Destroy();
 		co_await Internal.m_BackupInterface.f_Destroy();
 
 		co_return {};
@@ -132,7 +132,7 @@ namespace NMib::NCloud
 	{
 		f_SubscribeChanges() > [this](TCAsyncResult<void> &&_Result)
 			{
-				if (m_pThis->mp_bDestroyed)
+				if (m_pThis->f_IsDestroyed())
 					return;
 
 				if (!_Result)
@@ -178,7 +178,7 @@ namespace NMib::NCloud
 					}
 					> [this](TCAsyncResult<TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>> &&_Manifest)
 					{
-						if (m_pThis->mp_bDestroyed)
+						if (m_pThis->f_IsDestroyed())
 							return;
 
 						if (!_Manifest)

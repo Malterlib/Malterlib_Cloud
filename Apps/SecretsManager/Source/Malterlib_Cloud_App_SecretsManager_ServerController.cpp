@@ -23,9 +23,9 @@ namespace NMib::NCloud::NSecretsManager
 	TCFuture<CEJSON> CSecretsManagerDaemonActor::CServerController::f_Test_Command(CStr const &_Command, CEJSON const &_Params)
 	{
 		if (!mp_ServerActor)
-			DMibError("No server");
+			co_return DMibErrorInstance("No server");
 
-		return mp_ServerActor.f_CallActor(&CSecretsManagerDaemonActor::CServer::f_Test_Command)(_Command, _Params);
+		co_return co_await mp_ServerActor.f_CallActor(&CSecretsManagerDaemonActor::CServer::f_Test_Command)(_Command, _Params);
 	}
 #endif
 
@@ -57,7 +57,7 @@ namespace NMib::NCloud::NSecretsManager
 					(
 						[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
 						{
-							fp_KeyManagerAvailable(_KeyManager);
+							self(&CServerController::fp_KeyManagerAvailable, _KeyManager) > fg_DiscardResult();
 						}
 					)
 				;
@@ -65,69 +65,64 @@ namespace NMib::NCloud::NSecretsManager
 		;
 	}
 
-	void CSecretsManagerDaemonActor::CServerController::fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> const &_KeyManager)
+	TCFuture<void> CSecretsManagerDaemonActor::CServerController::fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> const &_KeyManager)
 	{
 		if (mp_ServerActor || mp_AppState.m_bStoppingApp)
-			return;
-
-		TCPromise<void> Promise;
+			co_return {};
 
 		static const mint c_KeyBits = 512;
-		CSymmetricKey Key;
-		_KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("SecretsManagerDB", c_KeyBits / 8)
-			> Promise / [this, Promise, KeyManager = _KeyManager](CSymmetricKey &&_Key)
+		CSymmetricKey Key = co_await _KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("SecretsManagerDB", c_KeyBits / 8);
+
+		if (mp_ServerActor || mp_AppState.m_bStoppingApp)
+			co_return {};
+
+		DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Keymanager available, reading database");
+
+		CStr DatabasePath = mp_AppState.m_RootDirectory + "/SecretsManagerDB.enc";
+		auto DatabaseActor = fg_ConstructActor<CSecretsManagerServerDatabase>(fg_Construct("SecretsManager Database"), DatabasePath, fg_Move(Key));
+
+		mp_PendingDatabases[DatabaseActor];
+
+		auto Cleanup = g_OnScopeExitActor > [this, DatabaseActorWeak = DatabaseActor.f_Weak()]() -> TCFuture<void>
 			{
-				if (mp_ServerActor || mp_AppState.m_bStoppingApp)
-					return;
+				auto DatabaseActor = DatabaseActorWeak.f_Lock();
 
-				DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Keymanager available, reading database");
+				if (!DatabaseActor || !mp_PendingDatabases.f_FindEqual(DatabaseActorWeak))
+				{
+					mp_PendingDatabases.f_Remove(DatabaseActorWeak);
+					co_return {};
+				}
 
-				CStr DatabasePath = mp_AppState.m_RootDirectory + "/SecretsManagerDB.enc";
-				auto DatabaseActor = fg_ConstructActor<CSecretsManagerServerDatabase>(fg_Construct("SecretsManager Database"), DatabasePath, _Key);
-
-				mp_PendingDatabases[DatabaseActor];
-
-				auto Cleanup = g_OnScopeExitActor > [this, DatabaseActorWeak = DatabaseActor.f_Weak()]
-					{
-						auto DatabaseActor = DatabaseActorWeak.f_Lock();
-
-						if (!DatabaseActor || !mp_PendingDatabases.f_FindEqual(DatabaseActorWeak))
-						{
-							mp_PendingDatabases.f_Remove(DatabaseActorWeak);
-							return;
-						}
-
-						DatabaseActor->f_Destroy() > [this, DatabaseActorWeak](auto &&)
-							{
-								mp_PendingDatabases.f_Remove(DatabaseActorWeak);
-							}
-						;
-					}
-				;
-
-				DatabaseActor(&CSecretsManagerServerDatabase::f_Initialize) > [this, Cleanup, DatabaseActorWeak = DatabaseActor.f_Weak()](TCAsyncResult<void> &&_Result)
-					{
-						if (!_Result)
-						{
-							DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to read database: {}", _Result.f_GetExceptionStr());
-							return;
-						}
-
-						if (mp_ServerActor || mp_AppState.m_bStoppingApp)
-							return;
-
-						auto DatabaseActor = DatabaseActorWeak.f_Lock();
-						if (!DatabaseActor)
-							return;
-
-						DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Database initialized, starting server");
-
-						mp_PendingDatabases.f_Remove(DatabaseActorWeak);
-						mp_ServerActor = fg_ConstructActor<CSecretsManagerDaemonActor::CServer>(fg_Construct(mp_Delegator), mp_AppState, DatabaseActor);
-					}
-				;
+				co_await fg_Move(DatabaseActor).f_Destroy().f_Wrap();
+				mp_PendingDatabases.f_Remove(DatabaseActorWeak);
+				co_return {};
 			}
 		;
+
+		auto DatabaseActorWeak = DatabaseActor.f_Weak();
+		auto Result = co_await fg_Move(DatabaseActor)(&CSecretsManagerServerDatabase::f_Initialize).f_Wrap();
+
+		DMibFastCheck(!DatabaseActor);
+
+		if (!Result)
+		{
+			DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to read database: {}", Result.f_GetExceptionStr());
+			co_return {};
+		}
+
+		if (mp_ServerActor || mp_AppState.m_bStoppingApp)
+			co_return {};
+
+		DatabaseActor = DatabaseActorWeak.f_Lock();
+		if (!DatabaseActor)
+			co_return {};
+
+		DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Database initialized, starting server");
+
+		mp_PendingDatabases.f_Remove(DatabaseActorWeak);
+		mp_ServerActor = fg_ConstructActor<CSecretsManagerDaemonActor::CServer>(fg_Construct(mp_Delegator), mp_AppState, fg_Move(DatabaseActor));
+
+		co_return {};
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServerController::fp_Destroy()
@@ -135,14 +130,14 @@ namespace NMib::NCloud::NSecretsManager
 		TCActorResultVector<void> Destroys;
 
 		if (mp_ServerActor)
-			mp_ServerActor->f_Destroy() > Destroys.f_AddResult();
+			mp_ServerActor.f_Destroy() > Destroys.f_AddResult();
 
 		for (auto Database : mp_PendingDatabases)
-			Database->f_Destroy() > Destroys.f_AddResult();
+			fg_Move(Database).f_Destroy() > Destroys.f_AddResult();
 		mp_PendingDatabases.f_Clear();
 
-		TCPromise<void> Promise;
-		Destroys.f_GetResults() > Promise.f_ReceiveAny();
-		return Promise.f_MoveFuture();
+		co_await Destroys.f_GetResults();
+
+		co_return {};
 	}
 }

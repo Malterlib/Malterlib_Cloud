@@ -25,7 +25,7 @@ namespace NMib::NCloud
 					(
 						[this](TCDistributedActor<CBackupManager> const &_Actor, CTrustedActorInfo const &_ActorInfo)
 						{
-							if (m_pThis->mp_bDestroyed)
+							if (m_pThis->f_IsDestroyed())
 								return;
 							auto &BackupInstance = m_RunningBackupInstances[_Actor].m_Instance = fg_Construct
 								(
@@ -47,9 +47,9 @@ namespace NMib::NCloud
 								return;
 
 							if (m_pCanDestroyTracker)
-								pInstance->m_Instance->f_Destroy() > m_pCanDestroyTracker->f_Track();
+								pInstance->m_Instance.f_Destroy() > m_pCanDestroyTracker->f_Track();
 							else
-								pInstance->m_Instance->f_Destroy() > fg_DiscardResult();
+								pInstance->m_Instance.f_Destroy() > fg_DiscardResult();
 							
 							m_RunningBackupInstances.f_Remove(_Actor);
 						}

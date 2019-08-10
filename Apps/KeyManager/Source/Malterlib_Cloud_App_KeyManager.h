@@ -29,7 +29,7 @@ namespace NMib::NCloud::NKeyManager
 
 		TCActor<CKeyManagerServer> mp_ServerActor;
 		TCActor<CKeyManagerServerDatabase_EncryptedFile> mp_DatabaseActor;
-		TCUniquePointer<TCActorCallOnce<void, NStr::CStrSecure>> mp_pProvidePasswordOnce;
+		TCUniquePointer<TCActorCallOnce<void, NStr::CStrSecure &&>> mp_pProvidePasswordOnce;
 		bool mp_bDatabaseDecrypted = false;
 	};
 }

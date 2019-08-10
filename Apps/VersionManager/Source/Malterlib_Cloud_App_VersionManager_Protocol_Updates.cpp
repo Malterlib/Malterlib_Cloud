@@ -146,6 +146,8 @@ namespace NMib::NCloud::NVersionManager
 	
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr const &_ApplicationName, CSubscription const &_Subscription)
 	{
+		TCPromise<void> Promise;
+		
 		auto fSendInitialForApplication = [&](CStr const &_Application) -> TCFuture<TCVector<CVersionManager::CNewVersionNotification>>
 			{
 				TCPromise<TCVector<CVersionManager::CNewVersionNotification>> Promise;
@@ -195,7 +197,6 @@ namespace NMib::NCloud::NVersionManager
 		else if (auto *pApplication = mp_Applications.f_FindEqual(_ApplicationName))
 			fSendInitialForApplication(mp_Applications.fs_GetKey(pApplication)) > NewVersionNotificationResults.f_AddResult();
 		
-		TCPromise<void> Promise;
 		NewVersionNotificationResults.f_GetResults()
 			> Promise / [this, Promise, _ApplicationName, SubscriptionID = _Subscription.f_GetSubscriptionID()]
 			(TCVector<TCAsyncResult<TCVector<CVersionManager::CNewVersionNotification>>> &&_Results)
@@ -246,9 +247,9 @@ namespace NMib::NCloud::NVersionManager
 			pSubscription = &pThis->mp_VersionSubscriptions[_Params.m_Application][SubscriptionID];
 
 		if (!_Params.m_DispatchActor)
-			return DMibErrorInstance("m_DispatchActor required");
+			co_return DMibErrorInstance("m_DispatchActor required");
 		if (!_Params.m_fOnNewVersions)
-			return DMibErrorInstance("m_fOnNewVersions required");
+			co_return DMibErrorInstance("m_fOnNewVersions required");
 
 		auto &Subscription = *pSubscription;
 		Subscription.m_DispatchActor = fg_Move(_Params.m_DispatchActor);
@@ -259,46 +260,40 @@ namespace NMib::NCloud::NVersionManager
 		Subscription.m_nInitial = _Params.m_nInitial;
 			
 		CVersionManager::CSubscribeToUpdates::CResult Result;
-		Result.m_Subscription = fg_ActorSubscription
-			(
-				self
-				, [pThis, ApplicationName = _Params.m_Application, SubscriptionID]
+		Result.m_Subscription = g_ActorSubscription / [pThis, ApplicationName = _Params.m_Application, SubscriptionID]() -> TCFuture<void>
+			{
+				if (ApplicationName.f_IsEmpty())
 				{
-					if (ApplicationName.f_IsEmpty())
-					{
-						pThis->mp_GlobalVersionSubscriptions.f_Remove(SubscriptionID);
-						return;
-					}
-					auto *pSubscription = pThis->mp_VersionSubscriptions.f_FindEqual(ApplicationName);
-					if (!pSubscription)
-						return;
-					pSubscription->f_Remove(SubscriptionID);
-					if (pSubscription->f_IsEmpty())
-						pThis->mp_VersionSubscriptions.f_Remove(pSubscription);
+					pThis->mp_GlobalVersionSubscriptions.f_Remove(SubscriptionID);
+					co_return {};
 				}
-			)
+
+				auto *pSubscription = pThis->mp_VersionSubscriptions.f_FindEqual(ApplicationName);
+				if (!pSubscription)
+					co_return {};
+
+				pSubscription->f_Remove(SubscriptionID);
+				if (pSubscription->f_IsEmpty())
+					pThis->mp_VersionSubscriptions.f_Remove(pSubscription);
+
+				co_return {};
+			}
 		;
 		
 		if (!_Params.m_nInitial)
-			return fg_Explicit(fg_Move(Result));
+			co_return fg_Move(Result);
 
-		TCPromise<CSubscribeToUpdates::CResult> Promise;
-		pThis->fp_SendSubscriptionInitial(_Params.m_Application, Subscription)
-			> Promise / [Promise, DispatchActor = Subscription.m_DispatchActor, Result = fg_Move(Result)] () mutable
-			{
-				if (DispatchActor.f_IsEmpty())
-					return Promise.f_SetResult(fg_Move(Result));
+		auto DispatchActor = Subscription.m_DispatchActor;
 
-				// Because versions are dispatched through m_DispatchActor we need to dispatch the result to get correct ordering
-				g_Dispatch(DispatchActor) / [Promise, Result = fg_Move(Result)]() mutable
-					{
-						Promise.f_SetResult(fg_Move(Result));
-					}
-					> fg_DiscardResult()
-				;
-			}
-		;
-		return Promise.f_MoveFuture();
+		co_await pThis->fp_SendSubscriptionInitial(_Params.m_Application, Subscription);
+
+		if (DispatchActor.f_IsEmpty())
+			co_return fg_Move(Result);
+
+		// Because versions are dispatched through m_DispatchActor we need to dispatch the result to get correct ordering
+		co_await fg_ContinueRunningOnActor(DispatchActor);
+
+		co_return fg_Move(Result);
 	}
 }
 

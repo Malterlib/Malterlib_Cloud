@@ -14,7 +14,6 @@ namespace NMib::NCloud::NVersionManager
 {
 	CVersionManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState)
 		: mp_AppState(_AppState)
-		, mp_pCanDestroyTracker(fg_Construct())
 	{
 #ifdef DPlatformFamily_OSX
 		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
@@ -61,12 +60,11 @@ namespace NMib::NCloud::NVersionManager
 		return Return;
 	}
 
-
 	TCFuture<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_EnumApplications()
 	{
-		auto QueryFileActor = fp_GetQueryFileActor();
-
 		TCPromise<TCSet<CStr>> Promise;
+
+		auto QueryFileActor = fp_GetQueryFileActor();
 
 		fg_Dispatch
 			(
@@ -97,125 +95,107 @@ namespace NMib::NCloud::NVersionManager
 
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_FindVersions()
 	{
-		TCPromise<void> Promise;
+		auto Applications = co_await self(&CVersionManagerDaemonActor::CServer::fp_EnumApplications);
+		for (auto &Application : Applications)
+			mp_Applications[Application];
+		auto QueryFileActor = fp_GetQueryFileActor();
 
-		self(&CVersionManagerDaemonActor::CServer::fp_EnumApplications) > Promise / [this, Promise](TCSet<CStr> &&_Applications)
-			{
-				for (auto &Application : _Applications)
+		auto Result = co_await
+			(
+			 	g_Dispatch(QueryFileActor) /
+			 	[Applications, RootDirectory = mp_AppState.m_RootDirectory]()
+			 	-> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>
 				{
-					mp_Applications[Application];
-				}
-				auto QueryFileActor = fp_GetQueryFileActor();
-
-				fg_Dispatch
-					(
-						QueryFileActor
-						, [_Applications, RootDirectory = mp_AppState.m_RootDirectory]() -> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>
+					CStr ApplicationDirectory = RootDirectory + "/Applications";
+					NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>> VersionsPerApplication;
+					for (auto &Application : Applications)
+					{
+						auto &Versions = VersionsPerApplication[Application];
+						CStr ApplicationPath = fg_Format("{}/{}", ApplicationDirectory, Application);
+						CFile::CFindFilesOptions FindOptions(ApplicationPath + "/*", false);
+						FindOptions.m_AttribMask = EFileAttrib_Directory;
+						auto FoundFiles = CFile::fs_FindFiles(FindOptions);
+						for (auto &File : FoundFiles)
 						{
-							CStr ApplicationDirectory = RootDirectory + "/Applications";
-							NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>> VersionsPerApplication;
-							for (auto &Application : _Applications)
+							CStr Version = CVersionManager::CVersionID::fs_DecodeFileName(File.m_Path.f_Extract(ApplicationPath.f_GetLen() + 1));
+							CVersionManager::CVersionIDAndPlatform VersionID;
+							CStr Error;
+							if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
+								continue;
+							CStr VersionIDPath = fg_Format("{}/{}", ApplicationPath, VersionID.m_VersionID.f_EncodeFileName());
+							CFile::CFindFilesOptions FindOptions(VersionIDPath + "/*", false);
+							FindOptions.m_AttribMask = EFileAttrib_Directory;
+							auto FoundFiles = CFile::fs_FindFiles(FindOptions);
+							for (auto &File : FoundFiles)
 							{
-								auto &Versions = VersionsPerApplication[Application];
-								CStr ApplicationPath = fg_Format("{}/{}", ApplicationDirectory, Application);
-								CFile::CFindFilesOptions FindOptions(ApplicationPath + "/*", false);
-								FindOptions.m_AttribMask = EFileAttrib_Directory;
-								auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-								for (auto &File : FoundFiles)
+								CStr Platform = File.m_Path.f_Extract(VersionIDPath.f_GetLen() + 1);
+								if (!CVersionManager::fs_IsValidPlatform(Platform))
+									continue;
+								VersionID.m_Platform = Platform;
+								try
 								{
-									CStr Version = CVersionManager::CVersionID::fs_DecodeFileName(File.m_Path.f_Extract(ApplicationPath.f_GetLen() + 1));
-									CVersionManager::CVersionIDAndPlatform VersionID;
-									CStr Error;
-									if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
-										continue;
-									CStr VersionIDPath = fg_Format("{}/{}", ApplicationPath, VersionID.m_VersionID.f_EncodeFileName());
-									CFile::CFindFilesOptions FindOptions(VersionIDPath + "/*", false);
-									FindOptions.m_AttribMask = EFileAttrib_Directory;
-									auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-									for (auto &File : FoundFiles)
+									CStr VersionPath = fg_Format("{}/{}", ApplicationPath, VersionID.f_EncodeFileName());
+									CStr VersionInfoPath = fg_Format("{}.json", VersionPath);
+									CVersionManager::CVersionInformation OutVersion;
+									if (CFile::fs_FileExists(VersionInfoPath))
 									{
-										CStr Platform = File.m_Path.f_Extract(VersionIDPath.f_GetLen() + 1);
-										if (!CVersionManager::fs_IsValidPlatform(Platform))
-											continue;
-										VersionID.m_Platform = Platform;
-										try
+										CEJSON ApplicationInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoPath), VersionInfoPath);
+										if (auto pValue = ApplicationInfo.f_GetMember("Time", EEJSONType_Date))
+											OutVersion.m_Time = pValue->f_Date();
+										if (auto pValue = ApplicationInfo.f_GetMember("Configuration", EJSONType_String))
+											OutVersion.m_Configuration = pValue->f_String();
+										if (auto pValue = ApplicationInfo.f_GetMember("ExtraInfo", EJSONType_Object))
+											OutVersion.m_ExtraInfo = *pValue;
+										if (auto pValue = ApplicationInfo.f_GetMember("Tags", EJSONType_Array))
 										{
-											CStr VersionPath = fg_Format("{}/{}", ApplicationPath, VersionID.f_EncodeFileName());
-											CStr VersionInfoPath = fg_Format("{}.json", VersionPath);
-											CVersionManager::CVersionInformation OutVersion;
-											if (CFile::fs_FileExists(VersionInfoPath))
+											for (auto &Value : pValue->f_Array())
 											{
-												CEJSON ApplicationInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoPath), VersionInfoPath);
-												if (auto pValue = ApplicationInfo.f_GetMember("Time", EEJSONType_Date))
-													OutVersion.m_Time = pValue->f_Date();
-												if (auto pValue = ApplicationInfo.f_GetMember("Configuration", EJSONType_String))
-													OutVersion.m_Configuration = pValue->f_String();
-												if (auto pValue = ApplicationInfo.f_GetMember("ExtraInfo", EJSONType_Object))
-													OutVersion.m_ExtraInfo = *pValue;
-												if (auto pValue = ApplicationInfo.f_GetMember("Tags", EJSONType_Array))
-												{
-													for (auto &Value : pValue->f_Array())
-													{
-														if (Value.f_IsString())
-															OutVersion.m_Tags[Value.f_String()];
-													}
-												}
-												if (auto pValue = ApplicationInfo.f_GetMember("RetrySequence", EJSONType_Integer))
-													OutVersion.m_RetrySequence = pValue->f_Integer();
+												if (Value.f_IsString())
+													OutVersion.m_Tags[Value.f_String()];
 											}
-											{
-												auto Files = CFile::fs_FindFiles(VersionPath + "/*", EFileAttrib_File, true);
-												OutVersion.m_nFiles = Files.f_GetLen();
-												for (auto &File : Files)
-													OutVersion.m_nBytes += CFile::fs_GetFileSize(File);
-											}
-
-											// Only use versions that has the .json file
-											Versions[VersionID] = fg_Move(OutVersion);
 										}
-										catch (NException::CException const &_Exception)
-										{
-											DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Internal error reading version info: {}", _Exception.f_GetErrorStr());
-										}
+										if (auto pValue = ApplicationInfo.f_GetMember("RetrySequence", EJSONType_Integer))
+											OutVersion.m_RetrySequence = pValue->f_Integer();
 									}
+									{
+										auto Files = CFile::fs_FindFiles(VersionPath + "/*", EFileAttrib_File, true);
+										OutVersion.m_nFiles = Files.f_GetLen();
+										for (auto &File : Files)
+											OutVersion.m_nBytes += CFile::fs_GetFileSize(File);
+									}
+
+									// Only use versions that has the .json file
+									Versions[VersionID] = fg_Move(OutVersion);
+								}
+								catch (NException::CException const &_Exception)
+								{
+									DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Internal error reading version info: {}", _Exception.f_GetErrorStr());
 								}
 							}
-							return VersionsPerApplication;
 						}
-					)
-					> [this, Promise]
-					(TCAsyncResult<NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>> &&_Result)
-					{
-						if (!_Result)
-						{
-							Promise.f_SetException(_Result);
-							return;
-						}
-						auto &Result = *_Result;
-						for (auto &ApplicationVersions : Result)
-						{
-							auto &Application = mp_Applications[Result.fs_GetKey(ApplicationVersions)];
-							for (auto &Version : ApplicationVersions)
-							{
-								auto &OutVersion = Application.m_Versions[ApplicationVersions.fs_GetKey(Version)];
-								OutVersion.m_VersionInfo = Version;
-								Application.m_VersionsByTime.f_Insert(OutVersion);
-								mp_KnownTags += Version.m_Tags;
-							}
-						}
-						Promise.f_SetResult();
 					}
-				;
-			}
+					return VersionsPerApplication;
+				}
+			)
 		;
 
-		return Promise.f_MoveFuture();
+		for (auto &ApplicationVersions : Result)
+		{
+			auto &Application = mp_Applications[Result.fs_GetKey(ApplicationVersions)];
+			for (auto &Version : ApplicationVersions)
+			{
+				auto &OutVersion = Application.m_Versions[ApplicationVersions.fs_GetKey(Version)];
+				OutVersion.m_VersionInfo = Version;
+				Application.m_VersionsByTime.f_Insert(OutVersion);
+				mp_KnownTags += Version.m_Tags;
+			}
+		}
+
+		co_return {};
 	}
 
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SetupPermissions()
 	{
-		TCPromise<void> Promise;
-
 		TCSet<CStr> Permissions;
 		Permissions["Application/ReadAll"];
 		Permissions["Application/ListAll"];
@@ -233,49 +213,42 @@ namespace NMib::NCloud::NVersionManager
 			Permissions[fg_Format("Application/Tag/{}", Tag)];
 		}
 
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);;
 
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("Application/*");
 
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this))
-			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
-			{
-				mp_Permissions = fg_Move(_Subscription);
+		mp_Permissions = co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this));
 
-
-				mp_Permissions.f_OnPermissionsAdded
-					(
-						[this](CPermissionIdentifiers const &_Identity, TCMap<CStr, CPermissionRequirements> const &_AddedPermissions)
-						{
-							fp_UpdateSubscriptionsForChangedPermissions(_Identity);
-						}
-					)
-				;
-
-				mp_Permissions.f_OnPermissionsRemoved
-					(
-						[this](CPermissionIdentifiers const &_Identity, TCSet<CStr> const &_RemovedPermissions)
-						{
-							fp_UpdateSubscriptionsForChangedPermissions(_Identity);
-						}
-					)
-				;
-
-				Promise.f_SetResult();
-			}
+		mp_Permissions.f_OnPermissionsAdded
+			(
+				[this](CPermissionIdentifiers const &_Identity, TCMap<CStr, CPermissionRequirements> const &_AddedPermissions)
+				{
+					fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+				}
+			)
 		;
 
-		return Promise.f_MoveFuture();
+		mp_Permissions.f_OnPermissionsRemoved
+			(
+				[this](CPermissionIdentifiers const &_Identity, TCSet<CStr> const &_RemovedPermissions)
+				{
+					fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+				}
+			)
+		;
+
+		co_return {};
 	}
 
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_Destroy()
 	{
-		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
+		co_await mp_ProtocolInterface.f_Destroy();
+
 		if (mp_QueryFileActor)
-			mp_QueryFileActor->f_Destroy() > pCanDestroy->f_Track();
-		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
-		return pCanDestroy->f_Future();
+			co_await mp_QueryFileActor.f_Destroy();
+
+		co_return {};
 	}
 
 	TCActor<CSeparateThreadActor> const &CVersionManagerDaemonActor::CServer::fp_GetQueryFileActor()

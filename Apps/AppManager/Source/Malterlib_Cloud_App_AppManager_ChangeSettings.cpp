@@ -12,11 +12,13 @@ namespace NMib::NCloud::NAppManager
 			, CApplicationSettings const &_Settings
 		)
 	{
+		NConcurrency::TCPromise<void> Promise;
+
 		CAppManagerActor::CApplicationSettings ApplicationSettings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		ApplicationSettings.f_FromInterfaceSettings(_Settings, ChangedSettings);
 
-		return m_pThis->self
+		return Promise <<= m_pThis->self
 			(
 				&CAppManagerActor::fp_ChangeApplicationSettings
 				, _Name
@@ -48,8 +50,6 @@ namespace NMib::NCloud::NAppManager
 			if (!Settings.f_ParseSettings(_Params, ChangedSettings, Error, false))
 				co_return DMibErrorInstance(Error);
 		}
-
-		TCPromise<uint32> Promise;
 
 		auto Result = co_await self
 			(
@@ -260,11 +260,7 @@ namespace NMib::NCloud::NAppManager
 				if (Application.m_Settings.m_bBackupEnabled)
 					fp_ApplicationStartBackup(pApplication);
 				else if (Application.m_BackupClient)
-				{
-					auto DestroyFuture = Application.m_BackupClient->f_Destroy();
-					Application.m_BackupClient.f_Clear();
-					co_await (fg_Move(DestroyFuture) % "Failed to stop backup client" % Auditor);
-				}
+					co_await (fg_Move(Application.m_BackupClient).f_Destroy() % "Failed to stop backup client" % Auditor);
 			}
 
 			_fOnInfo("Application settings were successfully changed");

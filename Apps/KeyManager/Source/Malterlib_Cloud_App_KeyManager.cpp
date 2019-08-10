@@ -24,10 +24,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		TCPromise<void> Promise;
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Warning, "Waiting for user to provide password");
-		Promise.f_SetResult();
-		return Promise.f_MoveFuture();
+		co_return {};
 	}
 
 	void CKeyManagerDaemonActor::fp_DatabaseDecrypted()
@@ -40,39 +38,24 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<void> CKeyManagerDaemonActor::fp_StopApp()
 	{
-		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
-
 		if (mp_ServerActor || mp_DatabaseActor)
 			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down");
 
 		if (mp_ServerActor)
 		{
 			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server");
-			mp_ServerActor->f_Destroy() > [this, pCanDestroy](TCAsyncResult<void> &&_Result)
-				{
-					DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server shut down");
-					if (mp_DatabaseActor)
-					{
-						DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
-						mp_DatabaseActor->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
-							{
-								DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server database shut down");
-							}
-						;
-						mp_DatabaseActor = nullptr;
-					}
-				}
-			;
-			mp_ServerActor = nullptr;
-		}
-		else if (mp_DatabaseActor)
-		{
-			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
-			mp_DatabaseActor->f_Destroy() > pCanDestroy->f_Track();
-			mp_DatabaseActor = nullptr;
+			co_await fg_Move(mp_ServerActor).f_Destroy().f_Wrap();
+			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server shut down");
 		}
 
-		return pCanDestroy->f_Future();
+		if (mp_DatabaseActor)
+		{
+			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
+			co_await fg_Move(mp_DatabaseActor).f_Destroy().f_Wrap();
+			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server database shut down");
+		}
+
+		co_return {};
 	}
 }
 

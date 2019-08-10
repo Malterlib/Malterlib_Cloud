@@ -142,14 +142,18 @@ namespace NMib::NCloud::NAppManager
 							{
 								fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)", CAppManagerInterface::EStatusSeverity_Warning);
 
-								TCFuture<void> RegisterFuture;
+								TCPromise<void> RegisterPromise;
 
 								if (_pApplication->m_AppInterface)
-									RegisterFuture = fg_Explicit();
+									RegisterPromise.f_SetResult();
 								else
-									RegisterFuture = _pApplication->m_OnRegisterDistributedApp.f_Insert().f_Future().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)");
+								{
+									_pApplication->m_OnRegisterDistributedApp.f_Insert().f_Future().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)")
+										> RegisterPromise
+									;
+								}
 
-								fg_Move(RegisterFuture) > [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
+								RegisterPromise.f_MoveFuture() > [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
 									{
 										if (_pApplication->m_bDeleted)
 											return;
@@ -418,9 +422,10 @@ namespace NMib::NCloud::NAppManager
 	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)
 		-> TCFuture<CAppLaunchResult>
 	{
+		TCPromise<CAppLaunchResult> Promise;
+
 		if (_pApplication->m_bLaunching)
 		{
-			TCPromise<CAppLaunchResult> Promise;
 			_pApplication->m_OnLaunchFinished.f_Insert
 				(
 					[this, Promise, _pApplication, _bOpenEncryption](bool _bAborted)
@@ -438,6 +443,7 @@ namespace NMib::NCloud::NAppManager
 			;
 			return Promise.f_MoveFuture();
 		}
-		return self(&CAppManagerActor::fp_LaunchAppInternal, _pApplication, _bOpenEncryption);
+
+		return Promise <<= self(&CAppManagerActor::fp_LaunchAppInternal, _pApplication, _bOpenEncryption);
 	}
 }

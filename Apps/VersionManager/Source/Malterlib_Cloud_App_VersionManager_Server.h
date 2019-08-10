@@ -153,8 +153,6 @@ namespace NMib::NCloud::NVersionManager
 
 		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
 
-		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker;
-
 		TCDistributedActorInstance<CVersionManagerImplementation> mp_ProtocolInterface;
 
 		CDistributedAppState &mp_AppState;

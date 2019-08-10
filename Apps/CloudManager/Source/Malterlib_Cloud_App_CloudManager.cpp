@@ -23,24 +23,22 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerApp::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		mp_pServer = fg_ConstructActor<CCloudManagerServer>(fg_Construct(self), mp_State);
-		co_await mp_pServer(&CCloudManagerServer::f_Init);
+		mp_Server = fg_ConstructActor<CCloudManagerServer>(fg_Construct(self), mp_State);
+		co_await mp_Server(&CCloudManagerServer::f_Init);
 
 		co_return {};
 	}
 
 	TCFuture<void> CCloudManagerApp::fp_StopApp()
 	{	
-		if (!mp_pServer)
+		if (!mp_Server)
 			co_return {};
 
 		DMibLogWithCategory(Mib/Cloud/CloudManager/Daemon, Info, "Shutting down");
 
-		auto DestroyResult = co_await mp_pServer->f_Destroy().f_Wrap();
+		auto DestroyResult = co_await fg_Move(mp_Server).f_Destroy().f_Wrap();
 		if (!DestroyResult)
 			DMibLogWithCategory(Mib/Cloud/CloudManager/Daemon, Error, "Failed to shut down server: {}", DestroyResult.f_GetExceptionStr());
-
-		mp_pServer = nullptr;
 
 		co_return {};
 	}

@@ -340,7 +340,7 @@ public:
 			LaunchedPromise.f_MoveFuture().f_CallSync(g_Timeout);
 			KeyManagerCommandLine(&CProcessLaunchActor::f_SendStdIn, "Password\n").f_CallSync(g_Timeout);
 			ExitedPromise.f_MoveFuture().f_CallSync(g_Timeout);
-			KeyManagerCommandLine->f_Destroy().f_CallSync(g_Timeout);
+			KeyManagerCommandLine.f_Destroy().f_CallSync(g_Timeout);
 		}
 
 		// Setup trust for SecretsManagers
@@ -1510,7 +1510,7 @@ public:
 			;
 			auto fSetPropertiesNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties) -> TCFuture<void>
 				{
-					return SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
+					return g_Future <<= SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
 				}
 			;
 			auto fRemoveSecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)
@@ -1520,7 +1520,7 @@ public:
 			;
 			auto fRemoveSecretNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)  -> TCFuture<void>
 				{
-					return SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name});
+					return g_Future <<= SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name});
 				}
 			;
 			auto fWriteFile = [&](CStr _FileName, CStr _Content)
@@ -1563,6 +1563,7 @@ public:
 				)
 				-> TCFuture<uint32>
 				{
+					TCPromise<uint32> Promise;
 
 					CDirectorySyncSend::CConfig Config(CFile::fs_AppendPath(_BasePath, _FileName));
 					Config.m_FileOptions.m_fOpenStream = [pOpenEvent = _pOpenEvent, pCloseEvent = _pCloseEvent]
@@ -1580,7 +1581,6 @@ public:
 						}
 					;
 
-					TCPromise<uint32> Promise;
 					fg_UploadSecretFile
 						(
 						 	SecretsManager

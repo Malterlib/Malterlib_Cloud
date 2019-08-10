@@ -20,15 +20,10 @@ namespace NMib::NCloud::NSecretsManager
 	TCFuture<void> CSecretsManagerServerDatabase::fp_Destroy()
 	{
 		if (!mp_pPendingWrite)
-			return fg_Explicit();
+			co_return {};
 
-		TCPromise<void> Promise;
-		mp_PendingWritePromises.f_Insert().f_Future() > [Promise](TCAsyncResult<void> &&_Result)
-			{
-				Promise.f_SetResult();
-			}
-		;
-		return Promise.f_MoveFuture();
+		co_await mp_PendingWritePromises.f_Insert().f_Future().f_Wrap();
+		co_return {};
 	}
 
 	CSecureByteVector CSecretsManagerServerDatabase::fsp_ComputeSalt(CSecretsDatabaseIV const &_Salt)

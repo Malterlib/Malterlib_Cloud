@@ -26,18 +26,18 @@ public:
 		
 		TCFuture<void> f_Initialize()
 		{
-			return fg_Explicit();
+			co_return {};
 		}
 		
 		TCFuture<void> f_WriteDatabase(CDatabase const &_Database)
 		{
 			m_Database = _Database;
-			return fg_Explicit();
+			co_return {};
 		}
 		
 		TCFuture<CDatabase> f_ReadDatabase()
 		{
-			return fg_Explicit(m_Database);
+			co_return m_Database;
 		}
 	};
 	

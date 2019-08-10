@@ -13,70 +13,52 @@ namespace NMib::NCloud::NSecretsManager
 {
 	using CEncryptedStream = TCBinaryStream_Encrypted<NStorage::TCUniquePointer<NStream::CBinaryStream>>;
 
-	CSecretsManagerDaemonActor::CServer::CDownload::CDownload()
-	{
-	}
+	CSecretsManagerDaemonActor::CServer::CDownload::CDownload() = default;
+	CSecretsManagerDaemonActor::CServer::CDownload::CDownload(CDownload &&) = default;
 
 	CSecretsManagerDaemonActor::CServer::CDownload::~CDownload()
 	{
 		if (m_DirectorySyncSend)
-		{
-			m_DirectorySyncSend->f_DestroyNoResult(DMibPFile, DMibPLine);
-			m_DirectorySyncSend.f_Clear();
-		}
+			fg_Move(m_DirectorySyncSend).f_Destroy() > fg_DiscardResult();
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CDownload::f_Destroy()
 	{
-		auto DirectorySend = fg_Move(m_DirectorySyncSend);
-		TCPromise<void> SubscriptionPromise;
-		if (m_Subscription)
-			m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > SubscriptionPromise;
-		else
-			SubscriptionPromise.f_SetResult();
+		auto This = co_await fg_MoveThis(*this);
 
-		TCPromise<void> FileSubscriptionPromise;
-		if (m_FileSubscription)
-			m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > FileSubscriptionPromise;
-		else
-			FileSubscriptionPromise.f_SetResult();
+		TCActorResultVector<void> Destroys;
 
-		TCPromise<void> Promise;
-		SubscriptionPromise.f_MoveFuture() + FileSubscriptionPromise.f_MoveFuture() > [=](auto &&, auto &&)
-			{
-				if (DirectorySend)
-					DirectorySend->f_Destroy() > Promise;
-				else
-					Promise.f_SetResult();
-			}
-		;
+		auto DirectorySend = fg_Move(This.m_DirectorySyncSend);
+		if (This.m_Subscription)
+			This.m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > Destroys.f_AddResult();
 
-		return Promise.f_MoveFuture();
+		if (This.m_FileSubscription)
+			This.m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > Destroys.f_AddResult();
+
+		co_await Destroys.f_GetResults();
+
+		if (DirectorySend)
+			co_await fg_Move(DirectorySend).f_Destroy();
+
+		co_return {};
 	}
 
-	CSecretsManagerDaemonActor::CServer::CUpload::CUpload()
-	{
-	}
+	CSecretsManagerDaemonActor::CServer::CUpload::CUpload() = default;
+	CSecretsManagerDaemonActor::CServer::CUpload::CUpload(CUpload &&) = default;
 
 	CSecretsManagerDaemonActor::CServer::CUpload::~CUpload()
 	{
 		if (m_DirectorySyncReceive)
-		{
-			m_DirectorySyncReceive->f_DestroyNoResult(DMibPFile, DMibPLine);
-			m_DirectorySyncReceive.f_Clear();
-		}
+			fg_Move(m_DirectorySyncReceive).f_Destroy() > fg_DiscardResult();
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CUpload::f_Destroy()
 	{
-		auto DirectoryReceive = fg_Move(m_DirectorySyncReceive);
-		TCPromise<void> Promise;
-		if (DirectoryReceive)
-			DirectoryReceive->f_Destroy() > Promise;
-		else
-			Promise.f_SetResult();
+		auto This = co_await fg_MoveThis(*this);
 
-		return Promise.f_MoveFuture();
+		if (This.m_DirectorySyncReceive)
+			co_await fg_Move(This.m_DirectorySyncReceive).f_Destroy();
+		co_return {};
 	}
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_DownloadFile(CSecretID &&_ID, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
@@ -85,7 +67,6 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
-		TCPromise<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/DownloadFile"}};
@@ -93,153 +74,140 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Download file from SecretsManager", Permissions)
-			> Promise % "Permission denied downloading file" % Auditor / [=, Subscription = fg_Move(_Subscription)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Download file from SecretsManager", Permissions) % "Permission denied downloading file" % Auditor);
+
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(DownloadFile, command)");
+
+		for (auto const &bHasPermission : HasPermissions)
+		{
+			if (!bHasPermission)
+				co_return Auditor.f_AccessDenied(fg_Format("(DownloadFile, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+		}
+
+		pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID);
+		if (!pSecretProperty)
+			co_return Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name));
+
+		CStr Permission;
+		if (pSecretProperty->m_Secret.f_GetTypeID() != CSecretsManager::ESecretType_File)
+			co_return Auditor.f_Exception(fg_Format("Secret '{}' does not contain a file secret", _ID));
+
+		CDirectoryManifest Manifest;
+		auto &ManifestFile = pSecretProperty->m_Secret.f_Get<CSecretsManager::ESecretType_File>().m_Manifest;
+		Manifest.m_Files[ManifestFile.m_OriginalPath] = ManifestFile;
+
+		CDirectorySyncSend::CConfig Config;
+		Config.m_BasePath = This.mp_AppState.m_RootDirectory + "/SecretsManagerFiles";
+		Config.m_Manifest = fg_Move(Manifest);
+		Config.m_FileOptions.m_fOpenStream = [Key = pSecretProperty->m_Key, IV = pSecretProperty->m_IV, HMACKey = pSecretProperty->m_HMACKey]
+			(
+				CStr const &_FileName
+				, EDirectorySyncStreamType _FileType
+				, EFileOpen _OpenFlags
+				, EFileAttrib _Attributes
+			)
+			-> NStorage::TCUniquePointer<NStream::CBinaryStream>
 			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(DownloadFile, command)"));
+				DRequire(_FileType == EDirectorySyncStreamType_Source);
 
-				for (auto const &bHasPermission : _HasPermissions)
-				{
-					if (!bHasPermission)
-						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(DownloadFile, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
-				}
+				TCUniquePointer<TCBinaryStreamFile<>> pFile = fg_Construct();
+				pFile->f_Open(_FileName, _OpenFlags, _Attributes);
 
-				auto &This = *m_pThis;
-
-				if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
-				{
-					CStr Permission;
-					if (pSecretProperty->m_Secret.f_GetTypeID() != CSecretsManager::ESecretType_File)
-						return Promise.f_SetException(Auditor.f_Exception(fg_Format("Secret '{}' does not contain a file secret", _ID)));
-
-					CDirectoryManifest Manifest;
-					auto &ManifestFile = pSecretProperty->m_Secret.f_Get<CSecretsManager::ESecretType_File>().m_Manifest;
-					Manifest.m_Files[ManifestFile.m_OriginalPath] = ManifestFile;
-
-					CDirectorySyncSend::CConfig Config;
-					Config.m_BasePath = This.mp_AppState.m_RootDirectory + "/SecretsManagerFiles";
-					Config.m_Manifest = fg_Move(Manifest);
-					Config.m_FileOptions.m_fOpenStream = [Key = pSecretProperty->m_Key, IV = pSecretProperty->m_IV, HMACKey = pSecretProperty->m_HMACKey]
-						(
-							CStr const &_FileName
-							, EDirectorySyncStreamType _FileType
-							, EFileOpen _OpenFlags
-							, EFileAttrib _Attributes
-						)
-						-> NStorage::TCUniquePointer<NStream::CBinaryStream>
-						{
-							DRequire(_FileType == EDirectorySyncStreamType_Source);
-
-							TCUniquePointer<TCBinaryStreamFile<>> pFile = fg_Construct();
-							pFile->f_Open(_FileName, _OpenFlags, _Attributes);
-
-							NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, IV}, EDigestType_SHA512, HMACKey);
-							pStream->f_Open(fg_Move(pFile), NFile::EFileOpen_Read);
-							return pStream;
-						}
-					;
-
-					Config.m_FileOptions.m_fTransformFilePath = [RandomFileName = pSecretProperty->m_RandomFileName, DownloadFile = ManifestFile.m_OriginalPath]
-						(
-							CStr const &_BasePath
-							, CStr const &_FileName
-							, EDirectorySyncStreamType _Type
-						)
-						-> CStr
-						{
-							if (_FileName != DownloadFile)
-								DMibError("Unexpected file name in file manifest");
-
-							if (_Type != EDirectorySyncStreamType_Source)
-								DMibError("Unsupported sync file type");
-
-							return CFile::fs_AppendPath(_BasePath, RandomFileName);
-						}
-					;
-					auto DownloadID = fg_RandomID();
-					auto &Download = This.mp_Downloads[DownloadID];
-					Download.m_DirectorySyncSend = This.mp_AppState.m_DistributionManager->f_ConstructActor<CDirectorySyncSend>(fg_Move(Config));
-					Download.m_Subscription = fg_Move(Subscription);
-					Download.m_FileSubscription = This.fp_ReserveFile(pSecretProperty->m_RandomFileName);
-
-		#if DMibConfig_Tests_Enable
-					if (auto *pPromise = This.mp_DownloadInitialized.f_FindEqual(_ID.m_Name))
-					{
-						pPromise->f_SetResult();	// Tell the test that the download has reserved the file
-						This.mp_DownloadInitialized.f_Remove(pPromise);
-					}
-		#endif
-
-					TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
-						{
-							Download.m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
-							, g_ActorSubscription / [=, pThis = m_pThis, DownloadFile = ManifestFile.m_OriginalPath]() -> TCFuture<void>
-							{
-								auto *pDownload = pThis->mp_Downloads.f_FindEqual(DownloadID);
-								if (!pDownload)
-									return fg_Explicit();
-
-								auto &Download = *pDownload;
-
-								if (!Download.m_DirectorySyncSend)
-								{
-									pThis->mp_Downloads.f_Remove(DownloadID);
-									return Auditor.f_Exception("Sync aborted");
-								}
-
-								TCPromise<void> Promise;
-								Download.m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult) > [=](TCAsyncResult<CDirectorySyncSend::CSyncResult> &&_Result)
-									{
-										pThis->mp_Downloads.f_Remove(DownloadID);
-										if (!_Result)
-											Promise.f_SetException(Auditor.f_Exception({"Error getting result for directory sync send", _Result.f_GetExceptionStr()}));
-										else
-										{
-											auto &Result = *_Result;
-											Promise.f_SetResult();
-											if (Result.m_Stats.m_nSyncedFiles <= 1)
-												Auditor.f_Info("Download of '{}' from '{}' finished without transferring any content"_f << DownloadFile << _ID);
-											else
-											{
-												Auditor.f_Info
-													(
-														"Download of '{}' from '{}' finished transferring: {ns } incoming bytes at {fe2} MB/s    {ns } outgoing bytes at {fe2} MB/s"_f
-														<< DownloadFile
-														<< _ID
-														<< Result.m_Stats.m_IncomingBytes
-														<< Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
-														<< Result.m_Stats.m_OutgoingBytes
-														<< Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
-													)
-												;
-											}
-										}
-		#if DMibConfig_Tests_Enable
-										if (auto *pPromise = pThis->mp_DownloadCompleted.f_FindEqual(_ID.m_Name))
-										{
-											pThis->f_SyncFileOperations() > *pPromise / [Promise = *pPromise]
-												{
-													Promise.f_SetResult();	// Tell the test the transfer has completed and any file ops should have completed
-												}
-											;
-											pThis->mp_DownloadCompleted.f_Remove(pPromise);
-										}
-		#endif
-									}
-								;
-								return Promise.f_MoveFuture();
-							}
-						}
-					;
-					Promise.f_SetResult(fg_Move(SyncInterface));
-				}
-				else
-					Promise.f_SetException(Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name)));
+				NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, IV}, EDigestType_SHA512, HMACKey);
+				pStream->f_Open(fg_Move(pFile), NFile::EFileOpen_Read);
+				return pStream;
 			}
 		;
 
-		return Promise.f_MoveFuture();
+		Config.m_FileOptions.m_fTransformFilePath = [RandomFileName = pSecretProperty->m_RandomFileName, DownloadFile = ManifestFile.m_OriginalPath]
+			(
+				CStr const &_BasePath
+				, CStr const &_FileName
+				, EDirectorySyncStreamType _Type
+			)
+			-> CStr
+			{
+				if (_FileName != DownloadFile)
+					DMibError("Unexpected file name in file manifest");
+
+				if (_Type != EDirectorySyncStreamType_Source)
+					DMibError("Unsupported sync file type");
+
+				return CFile::fs_AppendPath(_BasePath, RandomFileName);
+			}
+		;
+		auto DownloadID = fg_RandomID();
+		auto &Download = This.mp_Downloads[DownloadID];
+		Download.m_DirectorySyncSend = This.mp_AppState.m_DistributionManager->f_ConstructActor<CDirectorySyncSend>(fg_Move(Config));
+		Download.m_Subscription = fg_Move(_Subscription);
+		Download.m_FileSubscription = This.fp_ReserveFile(pSecretProperty->m_RandomFileName);
+
+#if DMibConfig_Tests_Enable
+		if (auto *pPromise = This.mp_DownloadInitialized.f_FindEqual(_ID.m_Name))
+		{
+			pPromise->f_SetResult();	// Tell the test that the download has reserved the file
+			This.mp_DownloadInitialized.f_Remove(pPromise);
+		}
+#endif
+
+		TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncInterface
+			{
+				Download.m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
+				, g_ActorSubscription / [=, pThis = m_pThis, DownloadFile = ManifestFile.m_OriginalPath]() -> TCFuture<void>
+				{
+					auto *pDownload = pThis->mp_Downloads.f_FindEqual(DownloadID);
+					if (!pDownload)
+						co_return {};
+
+					auto &Download = *pDownload;
+
+					if (!Download.m_DirectorySyncSend)
+					{
+						pThis->mp_Downloads.f_Remove(DownloadID);
+						co_return Auditor.f_Exception("Sync aborted");
+					}
+
+					auto GetResultResults = co_await Download.m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult).f_Wrap();
+#if DMibConfig_Tests_Enable
+					if (auto *pPromise = pThis->mp_DownloadCompleted.f_FindEqual(_ID.m_Name))
+					{
+						pThis->f_SyncFileOperations() > *pPromise / [Promise = *pPromise]
+							{
+								Promise.f_SetResult();	// Tell the test the transfer has completed and any file ops should have completed
+							}
+						;
+						pThis->mp_DownloadCompleted.f_Remove(pPromise);
+					}
+#endif
+					pThis->mp_Downloads.f_Remove(DownloadID);
+					if (!GetResultResults)
+						co_return Auditor.f_Exception({"Error getting result for directory sync send", GetResultResults.f_GetExceptionStr()});
+
+					auto &Result = *GetResultResults;
+
+					if (Result.m_Stats.m_nSyncedFiles <= 1)
+						Auditor.f_Info("Download of '{}' from '{}' finished without transferring any content"_f << DownloadFile << _ID);
+					else
+					{
+						Auditor.f_Info
+							(
+								"Download of '{}' from '{}' finished transferring: {ns } incoming bytes at {fe2} MB/s    {ns } outgoing bytes at {fe2} MB/s"_f
+								<< DownloadFile
+								<< _ID
+								<< Result.m_Stats.m_IncomingBytes
+								<< Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+								<< Result.m_Stats.m_OutgoingBytes
+								<< Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
+							)
+						;
+					}
+
+					co_return {};
+				}
+			}
+		;
+		co_return fg_Move(SyncInterface);
 	}
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_UploadFile
@@ -251,15 +219,14 @@ namespace NMib::NCloud::NSecretsManager
 		-> TCFuture<NConcurrency::TCActorFunctorWithID<TCFuture<void> ()>>
 	{
 		if (!_Uploader)
-			return DMibErrorInstance("Invalid uploader");
+			co_return DMibErrorInstance("Invalid uploader");
 
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
 		if (_FileName.f_FindChars("*^?[]") != -1)
-			return Auditor.f_Exception("The file name cannot contain any of the characters: '^*?[]'");
+			co_return Auditor.f_Exception("The file name cannot contain any of the characters: '^*?[]'");
 
-		TCPromise<NConcurrency::TCActorFunctorWithID<TCFuture<void> ()>> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/UploadFile"}};
@@ -267,252 +234,240 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty)
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
 
-		This.mp_Permissions.f_HasPermissions("Upload file to SecretsManager", Permissions)
-			> Promise % "Permission denied uploading file" % Auditor / [=, Uploader = fg_Move(_Uploader)](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions) mutable
-			{
-				if (!_HasPermissions["Command"])
-					return Promise.f_SetException(Auditor.f_AccessDenied("(UploadFile, command)"));
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Upload file to SecretsManager", Permissions) % "Permission denied uploading file" % Auditor);
 
-				for (auto const &bHasPermission : _HasPermissions)
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(UploadFile, command)");
+
+		for (auto const &bHasPermission : HasPermissions)
+		{
+			if (!bHasPermission)
+				co_return Auditor.f_AccessDenied(fg_Format("(UploadFile, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+		}
+
+		pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID);
+		if (!pSecretProperty)
+			co_return Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name));
+
+		CDirectorySyncReceive::CConfig Config;
+		Config.m_PreviousBasePath = Config.m_BasePath = m_pThis->mp_AppState.m_RootDirectory + "/SecretsManagerFiles";
+		Config.m_SyncFlags = CDirectorySyncReceive::ESyncFlag_None;
+
+		if (pSecretProperty->m_Key.f_IsEmpty())
+			pSecretProperty->m_Key = CEncryptKeyIV::fs_GetRandomKey(ECryptoType_AES_256_CBC);
+		auto IV = CEncryptKeyIV::fs_GetRandomIV(ECryptoType_AES_256_CBC);
+		auto HMACKey = CEncryptKeyIV::fs_GetRandomHMACKey(EDigestType_SHA512);
+		auto NewFileName = fg_RandomID();
+
+		TCSharedPointer<bool> pNewFileClaimed = fg_Construct(false);
+
+		TCSharedPointer<CActorSubscription> pCleanupFile = fg_Construct
+			(
+				g_ActorSubscription / [=, pThis = m_pThis, pCanDestroy = This.mp_pCanDestroyFileActorTracker]
 				{
-					if (!bHasPermission)
-						return Promise.f_SetException(Auditor.f_AccessDenied(fg_Format("(UploadFile, no permission for '{}')", _HasPermissions.fs_GetKey(bHasPermission))));
+					if (!*pNewFileClaimed)
+						pThis->fp_RemoveFile(NewFileName, Auditor) > fg_DiscardResult();
+				}
+			)
+		;
+
+		Config.m_FileOptions.m_fOpenStream = [IV, Key = pSecretProperty->m_Key, OldIV = pSecretProperty->m_IV, OldHMACKey = pSecretProperty->m_HMACKey, HMACKey]
+			(
+				CStr const &_FileName
+				, EDirectorySyncStreamType _FileType
+				, EFileOpen _OpenFlags
+				, EFileAttrib _Attributes
+			)
+			-> NStorage::TCUniquePointer<NStream::CBinaryStream>
+			{
+				if (_FileType & EDirectorySyncStreamType_Manifest)
+				{
+					// The secrets manager is only transfering a single file, the manifest file will be small, so we use a memory stream
+					TCUniquePointer<CBinaryStreamMemory<>> pStream = fg_Construct();
+					return pStream;
 				}
 
-				TCPromise<void> CheckResultPromise;
+				TCUniquePointer<TCBinaryStreamFile<>> pFile = fg_Construct();
+				pFile->f_Open(_FileName, _OpenFlags, _Attributes);
 
-				auto &This = *m_pThis;
-				if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
+				DCheck(_FileType == EDirectorySyncStreamType_Source || _FileType == EDirectorySyncStreamType_Destination);
+
+				if (_FileType == EDirectorySyncStreamType_Source)
 				{
-					CDirectorySyncReceive::CConfig Config;
-					Config.m_PreviousBasePath = Config.m_BasePath = m_pThis->mp_AppState.m_RootDirectory + "/SecretsManagerFiles";
-					Config.m_SyncFlags = CDirectorySyncReceive::ESyncFlag_None;
-
-					if (pSecretProperty->m_Key.f_IsEmpty())
-						pSecretProperty->m_Key = CEncryptKeyIV::fs_GetRandomKey(ECryptoType_AES_256_CBC);
-					auto IV = CEncryptKeyIV::fs_GetRandomIV(ECryptoType_AES_256_CBC);
-					auto HMACKey = CEncryptKeyIV::fs_GetRandomHMACKey(EDigestType_SHA512);
-					auto NewFileName = fg_RandomID();
-
-					TCSharedPointer<bool> pNewFileClaimed = fg_Construct(false);
-
-					TCSharedPointer<CActorSubscription> pCleanupFile = fg_Construct
-						(
-							g_ActorSubscription / [=, pThis = m_pThis, pCanDestroy = This.mp_pCanDestroyFileActorTracker]
-							{
-								if (!*pNewFileClaimed)
-									pThis->fp_RemoveFile(NewFileName, Auditor) > fg_DiscardResult();
-							}
-						)
-					;
-
-					Config.m_FileOptions.m_fOpenStream = [IV, Key = pSecretProperty->m_Key, OldIV = pSecretProperty->m_IV, OldHMACKey = pSecretProperty->m_HMACKey, HMACKey]
-						(
-							CStr const &_FileName
-							, EDirectorySyncStreamType _FileType
-							, EFileOpen _OpenFlags
-							, EFileAttrib _Attributes
-						)
-						-> NStorage::TCUniquePointer<NStream::CBinaryStream>
-						{
-							if (_FileType & EDirectorySyncStreamType_Manifest)
-							{
-								// The secrets manager is only transfering a single file, the manifest file will be small, so we use a memory stream
-								TCUniquePointer<CBinaryStreamMemory<>> pStream = fg_Construct();
-								return pStream;
-							}
-
-							TCUniquePointer<TCBinaryStreamFile<>> pFile = fg_Construct();
-							pFile->f_Open(_FileName, _OpenFlags, _Attributes);
-
-							DCheck(_FileType == EDirectorySyncStreamType_Source || _FileType == EDirectorySyncStreamType_Destination);
-
-							if (_FileType == EDirectorySyncStreamType_Source)
-							{
-								NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, OldIV}, EDigestType_SHA512, OldHMACKey);
-								pStream->f_Open(fg_Move(pFile), NFile::EFileOpen_Read);
-								return pStream;
-							}
-							else
-							{
-								NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, IV}, EDigestType_SHA512, HMACKey);
-								pStream->f_Open(fg_Move(pFile), NFile::EFileOpen_Write);
-								return pStream;
-							}
-						}
-					;
-					Config.m_FileOptions.m_fTransformFilePath = [UploadFileName = _FileName, OldFileName = pSecretProperty->m_RandomFileName, NewFileName]
-						(
-							CStr const &_BasePath
-							, CStr const &_FileName
-							, EDirectorySyncStreamType _Type
-						)
-						-> CStr
-						{
-							if (_FileName == UploadFileName)
-							{
-								if (_Type == EDirectorySyncStreamType_Source)
-								{
-									if (OldFileName)
-										return CFile::fs_AppendPath(_BasePath, OldFileName);
-									else
-										return CFile::fs_AppendPath(_BasePath, fg_RandomID());
-								}
-								if (_Type == EDirectorySyncStreamType_Destination)
-									return CFile::fs_AppendPath(_BasePath, NewFileName);
-							}
-
-							if (_Type & EDirectorySyncStreamType_Manifest)
-								// The "<Internal>" prefix is a marker for the in memory streams for manifest files.
-								return CFile::fs_AppendPath(CStr{"<Internal>"}, _FileName);
-
-							return CFile::fs_AppendPath(_BasePath, _FileName);
-						}
-					;
-
-					auto &Upload = This.mp_Uploads[NewFileName];
-					Upload.m_DirectorySyncReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(Config), fg_Move(Uploader));
-
-					Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync)
-						>
-						[=, OldFileName = _FileName, SavedSecret = pSecretProperty->m_Secret]
-						(TCAsyncResult<CDirectorySyncReceive::CSyncResult> &&_Result) mutable
-						{
-							auto &This = *m_pThis;
-
-		#if DMibConfig_Tests_Enable
-							auto CleanupTest = g_OnScopeExit > [&]
-								{
-									if (auto *pPromise = This.mp_UploadCompleted.f_FindEqual(OldFileName))
-									{
-										pPromise->f_SetResult();	// Tell the test the transfer has completed
-										This.mp_UploadCompleted.f_Remove(pPromise);
-									}
-								}
-							;
-		#endif
-							auto Cleanup = NConcurrency::g_ActorSubscription / [this, NewFileName]
-								{
-									auto &This = *m_pThis;
-									This.mp_Uploads.f_Remove(NewFileName);
-								}
-							;
-
-							if (!_Result)
-							{
-								CheckResultPromise.f_SetException
-									(
-										Auditor.f_Exception({"Internal error. Check SecretsManager.Log for details.", fg_Format("UploadFile - sync failed: {}", _Result.f_GetExceptionStr())})
-									)
-								;
-								return;
-							}
-
-							auto &Result = *_Result;
-
-							if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
-							{
-								if (pSecretProperty->m_Secret != SavedSecret)
-								{
-
-									(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
-										{
-											// For the problem with two competing simultaneous uploads we chose to let the one that completes first win.
-											// Another alternative would have been to lock the secret during an upload and disallow other operations during the upload,
-											// but with that solution we would have to handle problems with disconnects and transfers timing out to avoid ending up with
-											// locked secrets. This way we also handle the case when someone changes the secret to a string or binary secret during upload.
-											// We can just remove the uploaded file and report an error.
-											CStr Error = "The secret property in secret '{}' was changed while the secret file was uploaded. Please check and upload again."_f << _ID;
-											CheckResultPromise.f_SetException(Auditor.f_Exception(Error));
-										}
-									;
-									return;
-								}
-
-								if (Result.m_Manifest.m_Files.f_GetLen() == 1)
-								{
-									*pNewFileClaimed = true;
-									This.fp_RemoveUnreferencedFile(pSecretProperty->m_RandomFileName, Auditor) > fg_DiscardResult();
-									auto ManifestFile = *Result.m_Manifest.m_Files.f_FindAny();
-									pSecretProperty->m_Secret = CSecretsManager::CSecret{CSecretsManager::CSecretFile{ManifestFile}};
-									pSecretProperty->m_Modified = CTime::fs_NowUTC();
-									pSecretProperty->m_IV = fg_Move(IV);
-									pSecretProperty->m_HMACKey = fg_Move(HMACKey);
-									pSecretProperty->m_RandomFileName = fg_Move(NewFileName);
-
-									This.fp_WriteDatabase();
-
-									if (Result.m_Stats.m_nSyncedFiles <= 1)
-										Auditor.f_Info("Upload of '{}' for '{}' finished without conent changes"_f << ManifestFile.m_OriginalPath << _ID);
-									else
-									{
-										Auditor.f_Info
-											(
-												"Upload of '{}' for '{}' finished transferring: {ns } incoming bytes at {fe2} MB/s    {ns } outgoing bytes at {fe2} MB/s"_f
-												<< ManifestFile.m_OriginalPath
-												<< _ID
-												<< Result.m_Stats.m_IncomingBytes
-												<< Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
-												<< Result.m_Stats.m_OutgoingBytes
-												<< Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
-											)
-										;
-									}
-
-								}
-								else
-								{
-									(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
-										{
-											CStr Error = "{} files in the manifest? This was unexpected"_f << Result.m_Manifest.m_Files.f_GetLen();
-											CheckResultPromise.f_SetException(Auditor.f_Exception(Error));
-										}
-									;
-								}
-							}
-							else
-							{
-								// The secret was removed while the file was transferred. Ooops.
-								(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
-									{
-										CheckResultPromise.f_SetException(Auditor.f_Exception("Secret '{}' removed while the secret file was uploaded"_f << _ID));
-									}
-								;
-							}
-						}
-					;
-
-		#if DMibConfig_Tests_Enable
-					if (auto *pPromise = This.mp_UploadInitialized.f_FindEqual(_FileName))
-					{
-						pPromise->f_SetResult();	// Tell the test the transfer has been initialized (SaveSecret has been set so we know if it has changed when the transfer completes)
-						This.mp_UploadInitialized.f_Remove(pPromise);
-					}
-		#endif
-					Promise.f_SetResult
-						(
-							g_ActorFunctor
-							(
-								g_ActorSubscription / [this, NewFileName, AllowDestroy = g_AllowWrongThreadDestroy]
-								{
-									auto &This = *m_pThis;
-									This.mp_Uploads.f_Remove(NewFileName);
-								}
-							)
-							/ [CheckResultPromise = fg_Move(CheckResultPromise), AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
-							{
-								if (!CheckResultPromise.f_IsSet())
-									CheckResultPromise.f_SetResult();
-
-								return CheckResultPromise.f_MoveFuture();
-							}
-						)
-					;
+					NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, OldIV}, EDigestType_SHA512, OldHMACKey);
+					pStream->f_Open(fg_Move(pFile), NFile::EFileOpen_Read);
+					return pStream;
 				}
 				else
-					Promise.f_SetException(Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name)));
+				{
+					NStorage::TCUniquePointer<CEncryptedStream> pStream = fg_Construct<CEncryptedStream>(CEncryptKeyIV{Key, IV}, EDigestType_SHA512, HMACKey);
+					pStream->f_Open(fg_Move(pFile), NFile::EFileOpen_Write);
+					return pStream;
+				}
 			}
 		;
-		return Promise.f_MoveFuture();
+		Config.m_FileOptions.m_fTransformFilePath = [UploadFileName = _FileName, OldFileName = pSecretProperty->m_RandomFileName, NewFileName]
+			(
+				CStr const &_BasePath
+				, CStr const &_FileName
+				, EDirectorySyncStreamType _Type
+			)
+			-> CStr
+			{
+				if (_FileName == UploadFileName)
+				{
+					if (_Type == EDirectorySyncStreamType_Source)
+					{
+						if (OldFileName)
+							return CFile::fs_AppendPath(_BasePath, OldFileName);
+						else
+							return CFile::fs_AppendPath(_BasePath, fg_RandomID());
+					}
+					if (_Type == EDirectorySyncStreamType_Destination)
+						return CFile::fs_AppendPath(_BasePath, NewFileName);
+				}
+
+				if (_Type & EDirectorySyncStreamType_Manifest)
+					// The "<Internal>" prefix is a marker for the in memory streams for manifest files.
+					return CFile::fs_AppendPath(CStr{"<Internal>"}, _FileName);
+
+				return CFile::fs_AppendPath(_BasePath, _FileName);
+			}
+		;
+
+		auto &Upload = This.mp_Uploads[NewFileName];
+		Upload.m_DirectorySyncReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(Config), fg_Move(_Uploader));
+
+		TCPromise<void> CheckResultPromise;
+
+		Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync) > [=, OldFileName = _FileName, SavedSecret = pSecretProperty->m_Secret]
+			(TCAsyncResult<CDirectorySyncReceive::CSyncResult> &&_Result) mutable
+			{
+				auto &This = *m_pThis;
+
+#if DMibConfig_Tests_Enable
+				auto CleanupTest = g_OnScopeExit > [&]
+					{
+						if (auto *pPromise = This.mp_UploadCompleted.f_FindEqual(OldFileName))
+						{
+							pPromise->f_SetResult();	// Tell the test the transfer has completed
+							This.mp_UploadCompleted.f_Remove(pPromise);
+						}
+					}
+				;
+#endif
+				auto Cleanup = NConcurrency::g_ActorSubscription / [this, NewFileName]
+					{
+						auto &This = *m_pThis;
+						This.mp_Uploads.f_Remove(NewFileName);
+					}
+				;
+
+				if (!_Result)
+				{
+					CheckResultPromise.f_SetException
+						(
+							Auditor.f_Exception({"Internal error. Check SecretsManager.Log for details.", fg_Format("UploadFile - sync failed: {}", _Result.f_GetExceptionStr())})
+						)
+					;
+					return;
+				}
+
+				auto &Result = *_Result;
+
+				if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
+				{
+					if (pSecretProperty->m_Secret != SavedSecret)
+					{
+
+						(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
+							{
+								// For the problem with two competing simultaneous uploads we chose to let the one that completes first win.
+								// Another alternative would have been to lock the secret during an upload and disallow other operations during the upload,
+								// but with that solution we would have to handle problems with disconnects and transfers timing out to avoid ending up with
+								// locked secrets. This way we also handle the case when someone changes the secret to a string or binary secret during upload.
+								// We can just remove the uploaded file and report an error.
+								CStr Error = "The secret property in secret '{}' was changed while the secret file was uploaded. Please check and upload again."_f << _ID;
+								CheckResultPromise.f_SetException(Auditor.f_Exception(Error));
+							}
+						;
+						return;
+					}
+
+					if (Result.m_Manifest.m_Files.f_GetLen() == 1)
+					{
+						*pNewFileClaimed = true;
+						This.fp_RemoveUnreferencedFile(pSecretProperty->m_RandomFileName, Auditor) > fg_DiscardResult();
+						auto ManifestFile = *Result.m_Manifest.m_Files.f_FindAny();
+						pSecretProperty->m_Secret = CSecretsManager::CSecret{CSecretsManager::CSecretFile{ManifestFile}};
+						pSecretProperty->m_Modified = CTime::fs_NowUTC();
+						pSecretProperty->m_IV = fg_Move(IV);
+						pSecretProperty->m_HMACKey = fg_Move(HMACKey);
+						pSecretProperty->m_RandomFileName = fg_Move(NewFileName);
+
+						This.fp_WriteDatabase() > CheckResultPromise % "Falied to write database" / [=]
+							{
+								if (Result.m_Stats.m_nSyncedFiles <= 1)
+									Auditor.f_Info("Upload of '{}' for '{}' finished without conent changes"_f << ManifestFile.m_OriginalPath << _ID);
+								else
+								{
+									Auditor.f_Info
+										(
+											"Upload of '{}' for '{}' finished transferring: {ns } incoming bytes at {fe2} MB/s    {ns } outgoing bytes at {fe2} MB/s"_f
+											<< ManifestFile.m_OriginalPath
+											<< _ID
+											<< Result.m_Stats.m_IncomingBytes
+											<< Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+											<< Result.m_Stats.m_OutgoingBytes
+											<< Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
+										)
+									;
+								}
+								CheckResultPromise.f_SetResult();
+							}
+						;
+					}
+					else
+					{
+						(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
+							{
+								CStr Error = "{} files in the manifest? This was unexpected"_f << Result.m_Manifest.m_Files.f_GetLen();
+								CheckResultPromise.f_SetException(Auditor.f_Exception(Error));
+							}
+						;
+					}
+				}
+				else
+				{
+					// The secret was removed while the file was transferred. Ooops.
+					(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
+						{
+							CheckResultPromise.f_SetException(Auditor.f_Exception("Secret '{}' removed while the secret file was uploaded"_f << _ID));
+						}
+					;
+				}
+			}
+		;
+
+#if DMibConfig_Tests_Enable
+		if (auto *pPromise = This.mp_UploadInitialized.f_FindEqual(_FileName))
+		{
+			pPromise->f_SetResult();	// Tell the test the transfer has been initialized (SaveSecret has been set so we know if it has changed when the transfer completes)
+			This.mp_UploadInitialized.f_Remove(pPromise);
+		}
+#endif
+		co_return g_ActorFunctor
+			(
+				g_ActorSubscription / [this, NewFileName, AllowDestroy = g_AllowWrongThreadDestroy]
+				{
+					auto &This = *m_pThis;
+					This.mp_Uploads.f_Remove(NewFileName);
+				}
+			)
+			/ [CheckResultPromise = fg_Move(CheckResultPromise), AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
+			{
+				co_return co_await CheckResultPromise.f_MoveFuture();
+			}
+		;
 	}
  }
