@@ -38,7 +38,10 @@
 	Import.CMake_Variables "ENABLE_LZMA=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_BZip2=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_EXPAT=0;@(Import.CMake_Variables)"
-
+	Import.CMake_Variables "HAVE_LIBRICHACL=0;HAVE_ARC4RANDOM_BUF=0;HAVE__CTIME64_S=0;HAVE_READPASSPHRASE=0;@(Import.CMake_Variables)"
+	{
+		!!PlatformFamily Linux
+	}
 	Import.CMake_Variables "HAVE_LZMA_STREAM_ENCODER_MT=0;@(Import.CMake_Variables)"
 	{
 		!!PlatformFamily OSX
