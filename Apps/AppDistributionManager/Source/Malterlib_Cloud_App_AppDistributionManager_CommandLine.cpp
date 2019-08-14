@@ -120,7 +120,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CAppDistributionManagerActor::fp_CommandLine_DistributionAdd, _Params, _pCommandLine);
+					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionAdd, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -147,7 +147,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CAppDistributionManagerActor::fp_CommandLine_DistributionChangeSettings, _Params, _pCommandLine);
+					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionChangeSettings, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -176,7 +176,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CAppDistributionManagerActor::fp_CommandLine_DistributionEnum, _Params, _pCommandLine);
+					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionEnum, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -196,7 +196,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CAppDistributionManagerActor::fp_CommandLine_DistributionRemove, _Params, _pCommandLine);
+					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionRemove, _Params, _pCommandLine);
 				}
 			)
 		;
@@ -225,7 +225,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return self(&CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions, _Params, _pCommandLine);
+					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions, _Params, _pCommandLine);
 				}
 			)
 		;

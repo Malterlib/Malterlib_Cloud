@@ -82,15 +82,13 @@ namespace NMib::NCloud::NAppDistributionManager
 		CVersionManager::CSubscribeToUpdates SubscriptionParams;
 		SubscriptionParams.m_Application = CStr(); // All applications we have access to
 		SubscriptionParams.m_nInitial = 32;
-		SubscriptionParams.m_DispatchActor = self;
-		SubscriptionParams.m_fOnNewVersions
-			= [this, Actor = _VersionManagerState.f_GetManager().f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
+		SubscriptionParams.m_fOnNewVersions = g_ActorFunctor / [this, Actor = _VersionManagerState.f_GetManager().f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
 			(CVersionManager::CNewVersionNotifications &&_NewVersions)
 			-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 			{
 				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
 				if (!pManager)
-					return DMibErrorInstance("Manager gone");
+					co_return DMibErrorInstance("Manager gone");
 				auto &Manager = *pManager;
 
 				if (_NewVersions.m_bFullResend)
@@ -107,7 +105,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 				fp_AutoUpdate_Update();
 
-				return fg_Explicit(CVersionManager::CNewVersionNotifications::CResult());
+				co_return CVersionManager::CNewVersionNotifications::CResult();
 			}
 		;
 
@@ -244,6 +242,8 @@ namespace NMib::NCloud::NAppDistributionManager
 		)
 		-> TCFuture<CVersionInformation>
 	{
+		TCPromise<CVersionInformation> Promise;
+
 		TCSet<TCDistributedActor<CVersionManager>> ManagersToTrySet;
 		struct CState
 		{
@@ -269,17 +269,15 @@ namespace NMib::NCloud::NAppDistributionManager
 			for (auto &Version : pApplication->m_Versions)
 				fAddManager(Version.m_pVersionManager->f_GetManager());
 			if (ManagersToTrySet.f_IsEmpty())
-				return DMibErrorInstance("Found no version managers with this application on");
+				return Promise <<= DMibErrorInstance("Found no version managers with this application on");
 		}
 		else
 		{
 			for (auto &VersionManager : mp_VersionManagers)
 				fAddManager(VersionManager.f_GetManager());
 			if (ManagersToTrySet.f_IsEmpty())
-				return DMibErrorInstance("Found no version managers to check if application exists on");
+				return Promise <<= DMibErrorInstance("Found no version managers to check if application exists on");
 		}
-
-		TCPromise<CVersionInformation> Promise;
 
 		pState->m_fContinue = [this, Promise, _ApplicationName, _VersionID, _DestinationDir](TCSharedPointer<CState> const &_pState)
 			{

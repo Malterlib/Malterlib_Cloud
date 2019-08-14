@@ -109,10 +109,7 @@ namespace NMib::NCloud::NVersionManager
 			CCallingHostInfo m_CallingHostInfo;
 			TCSet<CStr> m_Platforms;
 			TCSet<CStr> m_Tags;
-			TCActor<> m_DispatchActor;
-			TCFunctionMutable<NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult> (CVersionManager::CNewVersionNotifications &&_VersionInfo)>
-				m_fOnNewVersions
-			;
+			TCActorFunctor<NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult> (CVersionManager::CNewVersionNotifications &&_VersionInfo)> m_fOnNewVersions;
 
 			void f_SendVersions(CVersionManager::CNewVersionNotifications const &_NewVersionNotification) const;
 		};

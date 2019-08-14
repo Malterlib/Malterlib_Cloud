@@ -35,8 +35,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			_CloudContext.m_bLastWasError = false;
 			_CloudContext.m_pGetToken = fg_Construct
 				(
-					self
-					, [this, KeystoneInfo = _CloudContext.m_KeystoneInfo, Name = _CloudContext.f_GetName()]() -> TCFuture<COpenStackServiceInfo>
+					g_ActorFunctor / [this, KeystoneInfo = _CloudContext.m_KeystoneInfo, Name = _CloudContext.f_GetName()]() -> TCFuture<COpenStackServiceInfo>
 					{
 						TCPromise<COpenStackServiceInfo> Promise;
 

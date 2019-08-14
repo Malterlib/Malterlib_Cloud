@@ -6,6 +6,7 @@
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
 #include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_CloudAPIManager.h"
 #include "Malterlib_Cloud_App_CloudAPIManager_Server.h"
@@ -21,52 +22,26 @@ namespace NMib::NCloud::NCloudAPIManager
 		if (Path.f_Find("/usr/local/bin") < 0)
 			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/usr/local/bin:" + Path);
 #endif
-		fp_Init();
+		self(&CServer::fp_Init) > fg_LogError("CloudAPIManager", "Failed to initialize server");
 	}
 
 	CCloudAPIManagerDaemonActor::CServer::~CServer()
 	{
 	}
 
-	void CCloudAPIManagerDaemonActor::CServer::fp_Init()
+	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_Init()
 	{
-		fg_ThisActor(this)(&CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs)
-			> [this](TCAsyncResult<void> &&_ResultCloudContexts)
-			{
-				if (!_ResultCloudContexts)
-				{
-					DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to find cloud contexts, aborting startup: {}", _ResultCloudContexts.f_GetExceptionStr());
-					return;
-				}
-				self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions)
-					> [this](TCAsyncResult<void> &&_ResultPermissions)
-					{
-						if (!_ResultPermissions)
-						{
-							DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to setup permissions, aborting startup: {}", _ResultPermissions.f_GetExceptionStr());
-							return;
-						}
-						self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge)
-							> [this](TCAsyncResult<void> &&_ResultSetupDDPBridge)
-							{
-								if (!_ResultSetupDDPBridge)
-								{
-									DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to setup DDP bridge, aborting startup: {}", _ResultSetupDDPBridge.f_GetExceptionStr());
-									return;
-								}
-								fp_Publish();
-							}
-						;
-					}
-				;
-			}
-		;
+		co_await (self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs) % "Failed to find cloud contexts, aborting startup");
+		co_await (self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions) % "Failed to setup permissions, aborting startup");
+		co_await (self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge) % "Failed to setup DDP bridge, aborting startup");
+
+		fp_Publish();
+
+		co_return {};
 	}
 
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions()
 	{
-		TCPromise<void> Promise;
-
 		TCSet<CStr> Permissions;
 
 		Permissions["ObjectStorage/GetSwiftBaseURLAll"];
@@ -82,20 +57,14 @@ namespace NMib::NCloud::NCloudAPIManager
 			Permissions[fg_Format("ObjectStorage/SignTempURL/{}", CloudContext.f_GetName())];
 		}
 
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions).f_Wrap();
 
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("ObjectStorage/*");
 
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this))
-			> Promise / [this, Promise](CTrustedPermissionSubscription &&_Subscription)
-			{
-				mp_Permissions = fg_Move(_Subscription);
-				Promise.f_SetResult();
-			}
-		;
+		mp_Permissions = co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this));
 
-		return Promise.f_MoveFuture();
+		co_return {};
 	}
 
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs()
@@ -124,11 +93,11 @@ namespace NMib::NCloud::NCloudAPIManager
 						CloudContext.m_SwiftStoragePolicy = "europe";
 				}
 				else
-					return DMibErrorInstance(fg_Format("Unknown cloud type: {}", Type));
+					co_return DMibErrorInstance(fg_Format("Unknown cloud type: {}", Type));
 			}
 		}
 
-		return fg_Explicit();
+		co_return {};
 	}
 
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_Destroy()
@@ -136,7 +105,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
 		if (mp_CURLQueryActor)
-			mp_CURLQueryActor->f_Destroy() > pCanDestroy->f_Track();
+			mp_CURLQueryActor.f_Destroy() > pCanDestroy->f_Track();
 		return pCanDestroy->f_Future();
 	}
 

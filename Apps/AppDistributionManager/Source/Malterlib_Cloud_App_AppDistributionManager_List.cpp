@@ -32,7 +32,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		Auditor.f_Info("Enum distribution versions");
 
-		return fg_Explicit(fg_Move(Versions));
+		co_return fg_Move(Versions);
 	}
 
 	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionEnum(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)

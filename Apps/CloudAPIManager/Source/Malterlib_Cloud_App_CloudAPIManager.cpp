@@ -31,22 +31,13 @@ namespace NMib::NCloud::NCloudAPIManager
 	
 	TCFuture<void> CCloudAPIManagerDaemonActor::fp_StopApp()
 	{	
-		TCSharedPointer<CCanDestroyTracker> pCanDestroy = fg_Construct();
-		
 		if (mp_pServer)
 		{
 			DMibLogWithCategory(Mib/Cloud/CloudAPIManager/Daemon, Info, "Shutting down");
-			
-			mp_pServer->f_Destroy() > [pCanDestroy](TCAsyncResult<void> &&_Result)
-				{
-					if (!_Result)
-						DMibLogWithCategory(Mib/Cloud/CloudAPIManager/Daemon, Error, "Failed to shut down server: {}", _Result.f_GetExceptionStr());
-				}
-			;
-			mp_pServer = nullptr;
+			co_await (fg_Move(mp_pServer).f_Destroy() % "Failed to shut down server");
 		}
-		
-		return pCanDestroy->f_Future();
+
+		co_return {};
 	}
 }
 

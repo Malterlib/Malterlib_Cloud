@@ -26,7 +26,7 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EMinProtocolVersion = 0x103
-			, EProtocolVersion = 0x106
+			, EProtocolVersion = 0x107
 		};
 
 		struct CVersionID : public CCloudVersion
@@ -216,7 +216,7 @@ namespace NMib::NCloud
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
 				
-				NConcurrency::CActorSubscription m_Subscription;
+				NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
 			};
 
 			template <typename tf_CStream>
@@ -225,8 +225,7 @@ namespace NMib::NCloud
 			NStr::CStr m_Application; /// Leave empty to subscribe to all applications
 			NContainer::TCSet<NStr::CStr> m_Platforms; /// Leave empty to subscribe to all platforms
 			NContainer::TCSet<NStr::CStr> m_Tags; /// Leave empty to subscribe to all tags
-			NConcurrency::TCActor<> m_DispatchActor;
-			NFunction::TCFunctionMutable<NConcurrency::TCFuture<CNewVersionNotifications::CResult> (CNewVersionNotifications &&_VersionInfo)> m_fOnNewVersions;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CNewVersionNotifications::CResult> (CNewVersionNotifications &&_VersionInfo)> m_fOnNewVersions;
 			uint32 m_nInitial = 10;
 		};
 

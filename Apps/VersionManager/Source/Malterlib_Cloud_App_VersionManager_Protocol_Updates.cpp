@@ -115,16 +115,7 @@ namespace NMib::NCloud::NVersionManager
 	
 	void CVersionManagerDaemonActor::CServer::CSubscription::f_SendVersions(CVersionManager::CNewVersionNotifications const &_NewVersionNotifications) const
 	{
-		fg_Dispatch
-			(
-				m_DispatchActor
-				, [fOnNewVersions = m_fOnNewVersions, NewVersionNotifications = _NewVersionNotifications]() mutable
-				{
-					return fOnNewVersions(fg_Move(NewVersionNotifications));
-				}
-			)
-			> fg_DiscardResult()
-		;
+		m_fOnNewVersions(_NewVersionNotifications) > fg_DiscardResult();
 	}
 
 	void CVersionManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity)
@@ -246,13 +237,10 @@ namespace NMib::NCloud::NVersionManager
 		else
 			pSubscription = &pThis->mp_VersionSubscriptions[_Params.m_Application][SubscriptionID];
 
-		if (!_Params.m_DispatchActor)
-			co_return DMibErrorInstance("m_DispatchActor required");
 		if (!_Params.m_fOnNewVersions)
 			co_return DMibErrorInstance("m_fOnNewVersions required");
 
 		auto &Subscription = *pSubscription;
-		Subscription.m_DispatchActor = fg_Move(_Params.m_DispatchActor);
 		Subscription.m_fOnNewVersions = fg_Move(_Params.m_fOnNewVersions);
 		Subscription.m_CallingHostInfo = fg_GetCallingHostInfo();
 		Subscription.m_Tags = _Params.m_Tags;
@@ -283,15 +271,21 @@ namespace NMib::NCloud::NVersionManager
 		if (!_Params.m_nInitial)
 			co_return fg_Move(Result);
 
-		auto DispatchActor = Subscription.m_DispatchActor;
-
+		auto ApplicationName = _Params.m_Application;
 		co_await pThis->fp_SendSubscriptionInitial(_Params.m_Application, Subscription);
 
-		if (DispatchActor.f_IsEmpty())
-			co_return fg_Move(Result);
+		{
+			CSubscription const *pSubscription = pThis->fp_GetSubscription(ApplicationName, SubscriptionID);
 
-		// Because versions are dispatched through m_DispatchActor we need to dispatch the result to get correct ordering
-		co_await fg_ContinueRunningOnActor(DispatchActor);
+			if (!pSubscription)
+				co_return fg_Move(Result);
+
+			auto DispatchActor = pSubscription->m_fOnNewVersions.f_GetActor();
+
+			// Because versions are dispatched through m_DispatchActor we need to dispatch the result to get correct ordering
+			if (DispatchActor)
+				co_await fg_ContinueRunningOnActor(fg_Move(DispatchActor));
+		}
 
 		co_return fg_Move(Result);
 	}

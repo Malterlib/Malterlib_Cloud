@@ -418,8 +418,27 @@ namespace NMib::NCloud
 	{
 		_Stream % m_Application;
 		_Stream % m_Platforms;
-		_Stream % m_DispatchActor;
-		_Stream % m_fOnNewVersions;
+		if (_Stream.f_GetVersion() >= 0x107)
+			_Stream % fg_Move(m_fOnNewVersions);
+		else
+		{
+			if constexpr (tf_CStream::mc_bConsume)
+			{
+				NConcurrency::TCActor<> DispatchActor;
+				NFunction::TCFunctionMutable<NConcurrency::TCFuture<CNewVersionNotifications::CResult> (CNewVersionNotifications &&_VersionInfo)> fOnNewVersions;
+
+				_Stream.f_GetStream() >> DispatchActor;
+				_Stream.f_GetStream() >> fOnNewVersions;
+
+				m_fOnNewVersions = {fg_Move(DispatchActor), fg_Move(fOnNewVersions)};
+			}
+			else
+			{
+				_Stream.f_GetStream() << fg_Move(m_fOnNewVersions.f_GetActor());
+				_Stream.f_GetStream() << fg_Move(m_fOnNewVersions.f_GetFunctor());
+			}
+		}
+
 		_Stream % m_nInitial;
 		if (_Stream.f_GetVersion() >= 0x104)
 			_Stream % m_Tags;

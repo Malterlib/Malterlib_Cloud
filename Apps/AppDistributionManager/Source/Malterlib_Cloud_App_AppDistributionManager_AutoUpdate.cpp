@@ -132,9 +132,16 @@ namespace NMib::NCloud::NAppDistributionManager
 
 				auto CleanupDeploy = g_OnScopeExitActor > [=]
 					{
+						auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
+
+						if (!pDistribution)
+							return;
+
+						auto &Distribution = *pDistribution;
+
 						TCActorResultVector<void> Destroys;
 						for (auto &RunningDeploy : Distribution.m_RunningDeploys[VersionID])
-							RunningDeploy->f_Destroy() > Destroys.f_AddResult();
+							RunningDeploy.f_Destroy() > Destroys.f_AddResult();
 						Destroys.f_GetResults() > [=](TCAsyncResult<TCVector<TCAsyncResult<void>>> &&)
 							{
 								auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
@@ -165,10 +172,12 @@ namespace NMib::NCloud::NAppDistributionManager
 
 				mp_DistributeSequencer / [=]() -> TCFuture<TCSet<CStr>>
 					{
+						TCPromise<TCSet<CStr>> Promise;
+
 						if (!mp_Distributions.f_FindEqual(DistributionName))
-							return DMibErrorInstance("Distribution no longer exists");
+							return Promise <<= DMibErrorInstance("Distribution no longer exists");
 						if (mp_State.m_bStoppingApp)
-							return DMibErrorInstance("Stopping app");
+							return Promise <<= DMibErrorInstance("Stopping app");
 
 						auto CleanupDownload = g_OnScopeExitActor > [=]
 							{
@@ -201,8 +210,7 @@ namespace NMib::NCloud::NAppDistributionManager
 							}
 						;
 
-						TCPromise<TCSet<CStr>> Promise;
-						fp_DownloadApplication(VersionManagerApplicationName, VersionID, DownloadDirectory)
+						self(&CAppDistributionManagerActor::fp_DownloadApplication, VersionManagerApplicationName, VersionID, DownloadDirectory)
 							> Promise
 							% ("Failed to download '{}' ({}) version '{}'"_f << DistributionName << VersionManagerApplicationName << VersionID)
 							/ [=](CVersionInformation &&_VersionInformation)

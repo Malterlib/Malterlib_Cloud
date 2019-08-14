@@ -28,11 +28,9 @@ namespace NMib::NCloud::NCloudClient
 			CVersionManager::CSubscribeToUpdates SubscriptionParams;
 			SubscriptionParams.m_Application = "MalterlibCloud"; // All applications we have access to
 			SubscriptionParams.m_nInitial = 1;
-			SubscriptionParams.m_DispatchActor = self;
 			SubscriptionParams.m_Platforms[DMalterlibCloudPlatform];
 			SubscriptionParams.m_Tags["ClientSelfUpdate"];
-			SubscriptionParams.m_fOnNewVersions
-				= [pVersions, Actor = Actor.m_Actor, AllowDestroy = g_AllowWrongThreadDestroy]
+			SubscriptionParams.m_fOnNewVersions = g_ActorFunctor / [pVersions, Actor = Actor.m_Actor, AllowDestroy = g_AllowWrongThreadDestroy]
 				(CVersionManager::CNewVersionNotifications &&_NewVersions)
 				-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 				{

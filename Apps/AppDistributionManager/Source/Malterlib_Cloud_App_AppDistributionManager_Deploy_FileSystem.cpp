@@ -16,10 +16,9 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	TCFuture<void> CDeployDestination_FileSystem::fp_Destroy()
 	{
-		TCSharedPointer<CCanDestroyTracker> pDestroyTracker = fg_Construct();
-		mp_FileActor->f_Destroy() > pDestroyTracker->f_Track();
+		co_await mp_FileActor.f_Destroy();
 
-		return pDestroyTracker->m_Promise.f_Future();
+		co_return {};
 	}
 
 	namespace
@@ -78,264 +77,269 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	TCFuture<void> CDeployDestination_FileSystem::f_Deploy(CDeployInfo const &_DeployInfo)
 	{
-		return g_Dispatch(mp_FileActor) / [=]() -> void
-			{
-				CStr TempDirectory = CFile::fs_GetProgramDirectory() / "Temp" / fg_RandomID();
-				CStr TempFile = TempDirectory / "TempFile";
+		co_await
+			(
+				g_Dispatch(mp_FileActor) / [=]() -> void
+				{
+					CStr TempDirectory = CFile::fs_GetProgramDirectory() / "Temp" / fg_RandomID();
+					CStr TempFile = TempDirectory / "TempFile";
 
-				CFile::fs_CreateDirectory(TempDirectory);
+					CFile::fs_CreateDirectory(TempDirectory);
 
-				auto Cleanup = g_OnScopeExit > [&]
-					{
-						try
+					auto Cleanup = g_OnScopeExit > [&]
 						{
-							if (CFile::fs_FileExists(TempDirectory))
-								CFile::fs_DeleteDirectoryRecursive(TempDirectory);
+							try
+							{
+								if (CFile::fs_FileExists(TempDirectory))
+									CFile::fs_DeleteDirectoryRecursive(TempDirectory);
+							}
+							catch (CExceptionFile const &)
+							{
+							}
 						}
-						catch (CExceptionFile const &)
+					;
+
+					CStr DownloadFile;
+
+					CEJSON Files = EJSONType_Object;
+
+					CStr DestinationDirectory;
+
+					if (_DeployInfo.m_bElectron)
+					{
+						DestinationDirectory = CFile::fs_GetProgramDirectory() / "Distribution" / _DeployInfo.m_Renamed;
+						CFile::fs_CreateDirectory(DestinationDirectory);
+
+						CProcessLaunchParams LaunchParams;
+						LaunchParams.m_WorkingDirectory = TempDirectory;
+						CProcessLaunch::fs_LaunchTool
+							(
+								"tar"
+								,
+								{
+									"--no-same-owner"
+	#if !defined(DPlatformFamily_OSX)
+									, "--pax-option=delete=SCHILY.*,delete=LIBARCHIVE.*"
+	#endif
+									, "-xf"
+									, _DeployInfo.m_SourceFile
+
+								}
+								, LaunchParams
+							)
+						;
+						auto DistributionFiles = CFile::fs_FindFiles(TempDirectory / "*");
+						for (auto &File : DistributionFiles)
 						{
+							if (CFile::fs_GetFile(File).f_StartsWith("."))
+								continue;
+
+							CStr RelativePath = CFile::fs_MakePathRelative(File, TempDirectory);
+							CStr Destination = DestinationDirectory / RelativePath;
+							CStr RelativeDestination = _DeployInfo.m_Renamed / RelativePath;
+							auto Extension = CFile::fs_GetExtension(Destination);
+
+							auto &OutputFileInfo = Files[RelativeDestination];
+
+							OutputFileInfo =
+								{
+									"Digest"_= fg_GetDigest(File)
+									, "Size"_= CFile::fs_GetFileSize(File)
+								}
+							;
+
+							if (Extension == "AppImage")
+							{
+								CFile ReadFile;
+								ReadFile.f_Open(File, EFileOpen_Read | EFileOpen_ShareAll);
+								uint32 Size = 0;
+								ReadFile.f_SetPositionFromEnd(-4);
+								ReadFile.f_Read(&Size, sizeof(Size));
+								Size = fg_ByteSwapBE(Size);
+								OutputFileInfo["BlockMapSize"] = Size;
+							}
+
+							if (CFile::fs_FileExists(Destination))
+								CFile::fs_AtomicReplaceFile(File, Destination);
+							else
+								CFile::fs_RenameFile(File, Destination);
+
+							if (Extension == "exe" || Extension == "dmg" || Extension == "AppImage")
+								DownloadFile = RelativeDestination;
 						}
 					}
-				;
-
-				CStr DownloadFile;
-
-				CEJSON Files = EJSONType_Object;
-
-				CStr DestinationDirectory;
-
-				if (_DeployInfo.m_bElectron)
-				{
-					DestinationDirectory = CFile::fs_GetProgramDirectory() / "Distribution" / _DeployInfo.m_Renamed;
-					CFile::fs_CreateDirectory(DestinationDirectory);
-
-					CProcessLaunchParams LaunchParams;
-					LaunchParams.m_WorkingDirectory = TempDirectory;
-					CProcessLaunch::fs_LaunchTool
-						(
-						 	"tar"
-						 	,
-						 	{
-								"--no-same-owner"
-#if !defined(DPlatformFamily_OSX)
-								, "--pax-option=delete=SCHILY.*,delete=LIBARCHIVE.*"
-#endif
-								, "-xf"
-								, _DeployInfo.m_SourceFile
-
-							}
-						 	, LaunchParams
-						)
-					;
-					auto DistributionFiles = CFile::fs_FindFiles(TempDirectory / "*");
-					for (auto &File : DistributionFiles)
+					else
 					{
-						if (CFile::fs_GetFile(File).f_StartsWith("."))
-							continue;
+						CStr DestinationFile = CFile::fs_GetProgramDirectory() / "Distribution" / _DeployInfo.m_Renamed;
+						DestinationDirectory = CFile::fs_GetPath(DestinationFile);
+						CFile::fs_CreateDirectory(DestinationDirectory);
 
-						CStr RelativePath = CFile::fs_MakePathRelative(File, TempDirectory);
-						CStr Destination = DestinationDirectory / RelativePath;
-						CStr RelativeDestination = _DeployInfo.m_Renamed / RelativePath;
-						auto Extension = CFile::fs_GetExtension(Destination);
-
-						auto &OutputFileInfo = Files[RelativeDestination];
-
-						OutputFileInfo =
+						Files[_DeployInfo.m_Renamed] =
 							{
-								"Digest"_= fg_GetDigest(File)
-								, "Size"_= CFile::fs_GetFileSize(File)
+								"Digest"_= fg_GetDigest(_DeployInfo.m_SourceFile)
+								, "Size"_= CFile::fs_GetFileSize(_DeployInfo.m_SourceFile)
 							}
 						;
 
-						if (Extension == "AppImage")
-						{
-							CFile ReadFile;
-							ReadFile.f_Open(File, EFileOpen_Read | EFileOpen_ShareAll);
-							uint32 Size = 0;
-							ReadFile.f_SetPositionFromEnd(-4);
-							ReadFile.f_Read(&Size, sizeof(Size));
-							Size = fg_ByteSwapBE(Size);
-							OutputFileInfo["BlockMapSize"] = Size;
-						}
+						if (!CFile::fs_TryDuplicateFile(_DeployInfo.m_SourceFile, TempFile))
+							CFile::fs_CopyFile(_DeployInfo.m_SourceFile, TempFile);
 
-						if (CFile::fs_FileExists(Destination))
-							CFile::fs_AtomicReplaceFile(File, Destination);
+						if (CFile::fs_FileExists(DestinationFile))
+							CFile::fs_AtomicReplaceFile(TempFile, DestinationFile);
 						else
-							CFile::fs_RenameFile(File, Destination);
+							CFile::fs_RenameFile(TempFile, DestinationFile);
 
-						if (Extension == "exe" || Extension == "dmg" || Extension == "AppImage")
-							DownloadFile = RelativeDestination;
+						DownloadFile = _DeployInfo.m_Renamed;
 					}
-				}
-				else
-				{
-					CStr DestinationFile = CFile::fs_GetProgramDirectory() / "Distribution" / _DeployInfo.m_Renamed;
-					DestinationDirectory = CFile::fs_GetPath(DestinationFile);
-					CFile::fs_CreateDirectory(DestinationDirectory);
 
-					Files[_DeployInfo.m_Renamed] =
-						{
-							"Digest"_= fg_GetDigest(_DeployInfo.m_SourceFile)
-							, "Size"_= CFile::fs_GetFileSize(_DeployInfo.m_SourceFile)
-						}
-					;
-
-					if (!CFile::fs_TryDuplicateFile(_DeployInfo.m_SourceFile, TempFile))
-						CFile::fs_CopyFile(_DeployInfo.m_SourceFile, TempFile);
-
-					if (CFile::fs_FileExists(DestinationFile))
-						CFile::fs_AtomicReplaceFile(TempFile, DestinationFile);
-					else
-						CFile::fs_RenameFile(TempFile, DestinationFile);
-
-					DownloadFile = _DeployInfo.m_Renamed;
-				}
-
-				CEJSON LatestRelease;
-				{
-					CStr DatabaseFile = DestinationDirectory / "Releases.json";
-					CEJSON Database;
-					if (CFile::fs_FileExists(DatabaseFile))
-						Database = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(DatabaseFile, true), DatabaseFile);
-
-					auto &Releases = Database["Releases"];
-
-					CStr ReleaseNotes;
-
-					if (auto pAppDistribution = _DeployInfo.m_Version.m_VersionInfo.m_ExtraInfo.f_GetMember("AppDistribution", EJSONType_Object))
+					CEJSON LatestRelease;
 					{
-						if (auto pReleaseNotes = pAppDistribution->f_GetMember("ReleaseNotes", EJSONType_String))
-							ReleaseNotes = pReleaseNotes->f_String();
-					}
+						CStr DatabaseFile = DestinationDirectory / "Releases.json";
+						CEJSON Database;
+						if (CFile::fs_FileExists(DatabaseFile))
+							Database = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(DatabaseFile, true), DatabaseFile);
 
-					CStr VersionString = "{}.{}.{}"_f
-						<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Major
-						<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Minor
-						<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Revision
-					;
+						auto &Releases = Database["Releases"];
 
-					CEJSON NewRelease =
+						CStr ReleaseNotes;
+
+						if (auto pAppDistribution = _DeployInfo.m_Version.m_VersionInfo.m_ExtraInfo.f_GetMember("AppDistribution", EJSONType_Object))
 						{
-							"Path"_= DownloadFile
-							, "Version"_= _DeployInfo.m_Version.m_VersionID.f_ToJSON()
-							, "VersionString"_= VersionString
-							, "Time"_= _DeployInfo.m_Version.m_VersionInfo.m_Time
-							, "TimeUnixMilliSeconds"_= CTimeConvert(_DeployInfo.m_Version.m_VersionInfo.m_Time).f_UnixMilliseconds()
-							, "TimeString"_= "{}"_f << _DeployInfo.m_Version.m_VersionInfo.m_Time
-							, "ReleaseNotes"_= "{}"_f << ReleaseNotes
-							, "Files"_= fg_TempCopy(Files)
+							if (auto pReleaseNotes = pAppDistribution->f_GetMember("ReleaseNotes", EJSONType_String))
+								ReleaseNotes = pReleaseNotes->f_String();
 						}
-					;
 
-					bool bFoundRelease = false;
-					for (auto &Release : Releases.f_Array())
-					{
-						if (Release["Version"] == NewRelease["Version"])
-						{
-							bFoundRelease = true;
-							Release = NewRelease;
-							break;
-						}
-					}
+						CStr VersionString = "{}.{}.{}"_f
+							<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Major
+							<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Minor
+							<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Revision
+						;
 
-					if (!bFoundRelease)
-						Releases.f_Array().f_InsertFirst(NewRelease);
-
-					Releases.f_Array().f_Sort
-						(
-						 	[](CEJSON const &_Left, CEJSON const &_Right) -> bool
-						 	{
-								return CParsedVersion::fs_Parse(_Right["VersionString"].f_String()) < CParsedVersion::fs_Parse(_Left["VersionString"].f_String());
+						CEJSON NewRelease =
+							{
+								"Path"_= DownloadFile
+								, "Version"_= _DeployInfo.m_Version.m_VersionID.f_ToJSON()
+								, "VersionString"_= VersionString
+								, "Time"_= _DeployInfo.m_Version.m_VersionInfo.m_Time
+								, "TimeUnixMilliSeconds"_= CTimeConvert(_DeployInfo.m_Version.m_VersionInfo.m_Time).f_UnixMilliseconds()
+								, "TimeString"_= "{}"_f << _DeployInfo.m_Version.m_VersionInfo.m_Time
+								, "ReleaseNotes"_= "{}"_f << ReleaseNotes
+								, "Files"_= fg_TempCopy(Files)
 							}
-						)
-					;
+						;
 
-					LatestRelease = Releases.f_Array()[0];
-					Database["LatestRelease"] = LatestRelease;
-
-					CFile::fs_WriteStringToFile(TempFile, Database.f_ToString(), false);
-
-					if (CFile::fs_FileExists(DatabaseFile))
-						CFile::fs_AtomicReplaceFile(TempFile, DatabaseFile);
-					else
-						CFile::fs_RenameFile(TempFile, DatabaseFile);
-
-					{
-						CStr LatestReleaseFile = DestinationDirectory / "Latest.json";
-						CFile::fs_WriteStringToFile(TempFile, LatestRelease.f_ToString(), false);
-
-						if (CFile::fs_FileExists(LatestReleaseFile))
-							CFile::fs_AtomicReplaceFile(TempFile, LatestReleaseFile);
-						else
-							CFile::fs_RenameFile(TempFile, LatestReleaseFile);
-					}
-				}
-
-				{
-					CStr LatestHTMLRedirect = "<meta HTTP-EQUIV=\"REFRESH\" content=\"0; url={}\">\n"_f << CFile::fs_GetFile(LatestRelease["Path"].f_String());
-					CStr LatestHTMLRedirectFile = DestinationDirectory / "Latest.html";
-					CFile::fs_WriteStringToFile(TempFile, LatestHTMLRedirect, false);
-
-					if (CFile::fs_FileExists(LatestHTMLRedirectFile))
-						CFile::fs_AtomicReplaceFile(TempFile, LatestHTMLRedirectFile);
-					else
-						CFile::fs_RenameFile(TempFile, LatestHTMLRedirectFile);
-				}
-
-				if (_DeployInfo.m_bElectron)
-				{
-					CStr LatestContents = "version: {}\n"_f << LatestRelease["VersionString"].f_String();
-					LatestContents += "files:\n";
-
-					CStr ReleaseFileName;
-					CStr ReleaseDigest;
-					for (auto &File : LatestRelease["Files"].f_Object())
-					{
-						CStr FileName = File.f_Name();
-						auto &FileValue = File.f_Value();
-						CStr Extension = CFile::fs_GetExtension(FileName);
-						auto Digest = fg_Base64Encode(FileValue["Digest"].f_Binary());
-
-						if (Extension == "blockmap")
-							continue;
-
-						LatestContents += "  - url: {}\n"_f << CFile::fs_GetFile(FileName);
-						LatestContents += "    sha512: {}\n"_f << Digest;
-						LatestContents += "    size: {}\n"_f << FileValue["Size"].f_Integer();
-
-						if (auto pValue = FileValue.f_GetMember("BlockMapSize"))
-							LatestContents += "    blockMapSize: {}\n"_f << pValue->f_Integer();
-
-						if (Extension == "exe" || Extension == "AppImage" || Extension == "dmg")
+						bool bFoundRelease = false;
+						for (auto &Release : Releases.f_Array())
 						{
-							ReleaseFileName = FileName;
-							ReleaseDigest = Digest;
+							if (Release["Version"] == NewRelease["Version"])
+							{
+								bFoundRelease = true;
+								Release = NewRelease;
+								break;
+							}
+						}
+
+						if (!bFoundRelease)
+							Releases.f_Array().f_InsertFirst(NewRelease);
+
+						Releases.f_Array().f_Sort
+							(
+								[](CEJSON const &_Left, CEJSON const &_Right) -> bool
+								{
+									return CParsedVersion::fs_Parse(_Right["VersionString"].f_String()) < CParsedVersion::fs_Parse(_Left["VersionString"].f_String());
+								}
+							)
+						;
+
+						LatestRelease = Releases.f_Array()[0];
+						Database["LatestRelease"] = LatestRelease;
+
+						CFile::fs_WriteStringToFile(TempFile, Database.f_ToString(), false);
+
+						if (CFile::fs_FileExists(DatabaseFile))
+							CFile::fs_AtomicReplaceFile(TempFile, DatabaseFile);
+						else
+							CFile::fs_RenameFile(TempFile, DatabaseFile);
+
+						{
+							CStr LatestReleaseFile = DestinationDirectory / "Latest.json";
+							CFile::fs_WriteStringToFile(TempFile, LatestRelease.f_ToString(), false);
+
+							if (CFile::fs_FileExists(LatestReleaseFile))
+								CFile::fs_AtomicReplaceFile(TempFile, LatestReleaseFile);
+							else
+								CFile::fs_RenameFile(TempFile, LatestReleaseFile);
 						}
 					}
 
-					LatestContents += "path: {}\n"_f << ReleaseFileName;
-					LatestContents += "sha512: {}\n"_f << ReleaseDigest;
-					LatestContents += "releaseDate: '{}'\n"_f << fg_EncodeElectronTime(LatestRelease["Time"].f_Date());
+					{
+						CStr LatestHTMLRedirect = "<meta HTTP-EQUIV=\"REFRESH\" content=\"0; url={}\">\n"_f << CFile::fs_GetFile(LatestRelease["Path"].f_String());
+						CStr LatestHTMLRedirectFile = DestinationDirectory / "Latest.html";
+						CFile::fs_WriteStringToFile(TempFile, LatestHTMLRedirect, false);
 
-					CStr LatestFileName;
+						if (CFile::fs_FileExists(LatestHTMLRedirectFile))
+							CFile::fs_AtomicReplaceFile(TempFile, LatestHTMLRedirectFile);
+						else
+							CFile::fs_RenameFile(TempFile, LatestHTMLRedirectFile);
+					}
 
-					if (_DeployInfo.m_ElectronPlatform == "Windows")
-						LatestFileName = DestinationDirectory / "latest.yml";
-					else if (_DeployInfo.m_ElectronPlatform == "Linux")
-						LatestFileName = DestinationDirectory / "latest-linux.yml";
-					else if (_DeployInfo.m_ElectronPlatform == "macOS")
-						LatestFileName = DestinationDirectory / "latest-mac.yml";
-					else
-						DMibError("Unknown electron platform: {}"_f << _DeployInfo.m_ElectronPlatform);
+					if (_DeployInfo.m_bElectron)
+					{
+						CStr LatestContents = "version: {}\n"_f << LatestRelease["VersionString"].f_String();
+						LatestContents += "files:\n";
 
-					CFile::fs_WriteStringToFile(TempFile, LatestContents, false);
+						CStr ReleaseFileName;
+						CStr ReleaseDigest;
+						for (auto &File : LatestRelease["Files"].f_Object())
+						{
+							CStr FileName = File.f_Name();
+							auto &FileValue = File.f_Value();
+							CStr Extension = CFile::fs_GetExtension(FileName);
+							auto Digest = fg_Base64Encode(FileValue["Digest"].f_Binary());
 
-					if (CFile::fs_FileExists(LatestFileName))
-						CFile::fs_AtomicReplaceFile(TempFile, LatestFileName);
-					else
-						CFile::fs_RenameFile(TempFile, LatestFileName);
+							if (Extension == "blockmap")
+								continue;
+
+							LatestContents += "  - url: {}\n"_f << CFile::fs_GetFile(FileName);
+							LatestContents += "    sha512: {}\n"_f << Digest;
+							LatestContents += "    size: {}\n"_f << FileValue["Size"].f_Integer();
+
+							if (auto pValue = FileValue.f_GetMember("BlockMapSize"))
+								LatestContents += "    blockMapSize: {}\n"_f << pValue->f_Integer();
+
+							if (Extension == "exe" || Extension == "AppImage" || Extension == "dmg")
+							{
+								ReleaseFileName = FileName;
+								ReleaseDigest = Digest;
+							}
+						}
+
+						LatestContents += "path: {}\n"_f << ReleaseFileName;
+						LatestContents += "sha512: {}\n"_f << ReleaseDigest;
+						LatestContents += "releaseDate: '{}'\n"_f << fg_EncodeElectronTime(LatestRelease["Time"].f_Date());
+
+						CStr LatestFileName;
+
+						if (_DeployInfo.m_ElectronPlatform == "Windows")
+							LatestFileName = DestinationDirectory / "latest.yml";
+						else if (_DeployInfo.m_ElectronPlatform == "Linux")
+							LatestFileName = DestinationDirectory / "latest-linux.yml";
+						else if (_DeployInfo.m_ElectronPlatform == "macOS")
+							LatestFileName = DestinationDirectory / "latest-mac.yml";
+						else
+							DMibError("Unknown electron platform: {}"_f << _DeployInfo.m_ElectronPlatform);
+
+						CFile::fs_WriteStringToFile(TempFile, LatestContents, false);
+
+						if (CFile::fs_FileExists(LatestFileName))
+							CFile::fs_AtomicReplaceFile(TempFile, LatestFileName);
+						else
+							CFile::fs_RenameFile(TempFile, LatestFileName);
+					}
 				}
-			}
+			)
 		;
+
+		co_return {};
 	}
 }

@@ -68,7 +68,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 	private:
 		TCFuture<void> fp_Destroy() override;
-		void fp_Init();
+		TCFuture<void> fp_Init();
 		void fp_Publish();
 
 		TCFuture<void> fp_SetupCloudContexs();

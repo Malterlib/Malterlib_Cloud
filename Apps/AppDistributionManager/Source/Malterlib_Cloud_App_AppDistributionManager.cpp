@@ -70,19 +70,15 @@ namespace NMib::NCloud::NAppDistributionManager
 			for (auto &RunningDeploys : Distribution.m_RunningDeploys)
 			{
 				for (auto &RunningDeploy : RunningDeploys)
-					RunningDeploy->f_Destroy() > DistributionDestroys.f_AddResult();
+					RunningDeploy.f_Destroy() > DistributionDestroys.f_AddResult();
 			}
 		}
 
-		TCPromise<void> Promise;
-		
-		DistributionDestroys.f_GetResults() > [=](auto &&)
-			{
-				mp_FileActor->f_Destroy() > Promise;
-			}
-		;
+		co_await DistributionDestroys.f_GetResults();
 
-		return Promise.f_MoveFuture();
+		co_await mp_FileActor.f_Destroy();
+
+		co_return {};
 	}
 
 	TCActor<CDeployDestination> CAppDistributionManagerActor::fp_CreateDeploy(EDeployDestination _Type)

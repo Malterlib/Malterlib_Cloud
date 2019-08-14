@@ -18,35 +18,32 @@ namespace NMib::NCloud::NCloudAPIManager
 		auto pThis = m_pThis;
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		
-		TCPromise<CCloudAPIManager::CGetSwiftBaseURL::CResult> Promise;
-		
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
-			return Auditor.f_Exception("Cloud context format not valid");
+			co_return Auditor.f_Exception("Cloud context format not valid");
 		
-		pThis->mp_Permissions.f_HasPermission("Get swift base URL", {"ObjectStorage/GetSwiftBaseURLAll", fg_Format("ObjectStorage/GetSwiftBaseURL/{}", _Params.m_CloudContext)})
-			> Promise % "Permission denied getting swift base URL" % Auditor / [=](bool _bHasPermission)
-			{
-				if (!_bHasPermission)
-					return Promise.f_SetException(Auditor.f_AccessDenied("(Get Swift base URL)"));
-
-				auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
-				if (!pCloudContext)
-					return Promise.f_SetException(Auditor.f_Exception(fg_Format("No such cloud context: {}", _Params.m_CloudContext)));
-
-				pThis->fp_GetOpenStackServiceInfo(*pCloudContext) > Promise / [Promise, _Params](COpenStackServiceInfo &&_ServiceInfo)
-					{
-						if (!_ServiceInfo.m_URLs.f_Exists("swift"))
-							return Promise.f_SetException(DMibImpExceptionInstance(CExceptionCloudAPI, "Swift service not available"));
-
-						CCloudAPIManager::CGetSwiftBaseURL::CResult Result;
-						Result.m_BaseURL = _ServiceInfo.m_URLs["swift"];
-						Promise.f_SetResult(Result);
-					}
-				;
-			}
+		bool bHasPermission = co_await
+			(
+			 	pThis->mp_Permissions.f_HasPermission("Get swift base URL", {"ObjectStorage/GetSwiftBaseURLAll", fg_Format("ObjectStorage/GetSwiftBaseURL/{}", _Params.m_CloudContext)})
+			 	% "Permission denied getting swift base URL"
+			 	% Auditor
+			)
 		;
+		if (!bHasPermission)
+			co_return Auditor.f_AccessDenied("(Get Swift base URL)");
 
-		return Promise.f_MoveFuture();
+		auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
+		if (!pCloudContext)
+			co_return Auditor.f_Exception(fg_Format("No such cloud context: {}", _Params.m_CloudContext));
+
+		auto ServiceInfo = co_await pThis->fp_GetOpenStackServiceInfo(*pCloudContext);
+
+		if (!ServiceInfo.m_URLs.f_Exists("swift"))
+			co_return DMibImpExceptionInstance(CExceptionCloudAPI, "Swift service not available");
+
+		CCloudAPIManager::CGetSwiftBaseURL::CResult Result;
+		Result.m_BaseURL = ServiceInfo.m_URLs["swift"];
+
+		co_return fg_Move(Result);
 	}
 }
 
