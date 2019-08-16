@@ -55,6 +55,8 @@ namespace NMib::NCloud::NPrivate
 
 	TCFuture<void> CBackupManagerClient_Instance::fp_Destroy()
 	{
+		TCPromise<void> Promise;
+
 		auto pCanDestroyTracker = fg_Move(mp_pCanDestroyTracker);
 		DMibCheck(pCanDestroyTracker);
 
@@ -64,7 +66,7 @@ namespace NMib::NCloud::NPrivate
 		if (mp_pManifestSyncState && mp_pManifestSyncState->m_RSyncSubscription)
 			mp_pManifestSyncState->m_RSyncSubscription->f_Destroy() > pCanDestroyTracker->f_Track();
 
-		return pCanDestroyTracker->f_Future();
+		return Promise <<= pCanDestroyTracker->f_Future();
 	}
 
 	void CBackupManagerClient_Instance::fp_BackupNotification(CBackupManagerClient::CNotification &&_Notification)
