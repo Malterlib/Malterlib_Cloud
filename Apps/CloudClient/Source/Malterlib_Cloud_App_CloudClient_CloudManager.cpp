@@ -214,8 +214,8 @@ namespace NMib::NCloud::NCloudClient
 				{
 					Status = "{}Not Connected:{} {tc6} {}"_f
 						<< _AnsiEncoding.f_StatusError()
-						<< _Info.m_LastConnectionErrorTime
 						<< _AnsiEncoding.f_Default()
+						<< _Info.m_LastConnectionErrorTime
 						<< _Info.m_LastConnectionError
 					;
 				}
