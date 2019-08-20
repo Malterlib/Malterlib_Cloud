@@ -102,11 +102,14 @@ namespace NMib::NCloud::NCloudAPIManager
 
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_Destroy()
 	{
+		TCPromise<void> Promise;
+
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
 		if (mp_CURLQueryActor)
 			mp_CURLQueryActor.f_Destroy() > pCanDestroy->f_Track();
-		return pCanDestroy->f_Future();
+
+		return Promise <<= pCanDestroy->f_Future();
 	}
 
 	TCActor<CSeparateThreadActor> const &CCloudAPIManagerDaemonActor::CServer::fp_GetCURLQueryActor()
