@@ -115,14 +115,14 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 	}
-	
+
 	TCFuture<void> CCloudClientAppActor::fp_CloudManager_SubscribeToServers()
 	{
 		if (!mp_CloudManagers.f_IsEmpty())
 			co_return {};
-		
+
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to cloud managers");
-		
+
 		auto Subscription = co_await mp_State.m_TrustManager
 			(
 				&CDistributedActorTrustManager::f_SubscribeTrustedActors<NCloud::CCloudManager>
@@ -256,7 +256,7 @@ namespace NMib::NCloud::NCloudClient
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 
 		TableRenderer.f_AddDescription("App Managers");
-		TableRenderer.f_AddHeadings("Cloud Manager", "Environment", "Hostname", "Location", "Platform", "Version", "Date", "ID", "Last Seen", "Status");
+		TableRenderer.f_AddHeadings("Cloud Manager", "Environment", "Hostname", "Location", "Platform", "Version", "ID", "Last Seen", "Status");
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
 		TableRenderer.f_SetMaxColumnWidth(5, 50);
 
@@ -335,6 +335,15 @@ namespace NMib::NCloud::NCloudClient
 			if (CTimeSpanConvert(LastSeenTimespan).f_GetSeconds() >= 10)
 				LastSeen += "\n{}"_f << AppManagerInfo.m_LastSeen;
 
+			CStr Version = "{}{}{} {}{td}{}"_f
+				<< AnsiEncoding.f_Foreground256(221)
+				<< AppManagerInfo.m_Version
+				<< AnsiEncoding.f_Default()
+				<< AnsiEncoding.f_Foreground256(248)
+				<< AppManagerInfo.m_VersionDate
+				<< AnsiEncoding.f_Default()
+			;
+
 			TableRenderer.f_AddRow
 				(
 					HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -342,8 +351,7 @@ namespace NMib::NCloud::NCloudClient
 					, HostName
 					, AppManagerInfo.m_ProgramDirectory
 				 	, AppManagerInfo.m_PlatformFamily
-				 	, AppManagerInfo.m_Version
-				 	, "{td}"_f << AppManagerInfo.m_VersionDate
+				 	, Version
 					, AppManagerID
 					, LastSeen
 					, Status
@@ -374,7 +382,20 @@ namespace NMib::NCloud::NCloudClient
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 
 		TableRenderer.f_AddDescription("Applications");
-		TableRenderer.f_AddHeadings("Environment", "App Manager", "Name", "Application", "Auto Update Tags", "Version", "Date", "Status");
+		TableRenderer.f_AddHeadings
+			(
+			 	"Environment"
+			 	, "App Manager"
+			 	, "Name"
+			 	, "Application"
+			 	, "Update [Tags]"
+			 	, "Version"
+			 	, "Failed Version"
+			 	, "Should Have Version"
+			 	, "Newer Version Available"
+			 	, "Status"
+			)
+		;
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
 		TableRenderer.f_SetMaxColumnWidth(5, 50);
 
@@ -443,6 +464,10 @@ namespace NMib::NCloud::NCloudClient
 
 		CStr LastEnvironment;
 
+		bool bHasFailedVersion = false;
+		bool bHasWantVersion = false;
+		bool bHasNewestVersion = false;
+
 		for (auto &Row : Rows)
 		{
 			auto &ApplicationKey = Row.m_ApplicationKey;
@@ -459,10 +484,10 @@ namespace NMib::NCloud::NCloudClient
 			}
 
 			CStr AutoUpdate;
-			if (ApplicationInfo.m_AutoUpdateTags.f_IsEmpty())
-				AutoUpdate = "{}Manual Update{}"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default();
+			if (!ApplicationInfo.m_bAutoUpdate)
+				AutoUpdate = "{}Manual{} [{vs,vb}]"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default() << ApplicationInfo.m_UpdateTags;
 			else
-				AutoUpdate = "{vs,vb}"_f << ApplicationInfo.m_AutoUpdateTags;
+				AutoUpdate = "{}Auto  {} [{vs,vb}]"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default() << ApplicationInfo.m_UpdateTags;
 
 			CStr ApplicationStatus = fg_FormatApplicationStatusSeverity(ApplicationInfo.m_Status, ApplicationInfo.m_StatusSeverity, AnsiEncoding);
 			CStr Status;
@@ -478,6 +503,65 @@ namespace NMib::NCloud::NCloudClient
 			else
 				Status = ApplicationStatus;
 
+			CStr Version = "{}{}{} {}{td}{}"_f
+				<< AnsiEncoding.f_Foreground256(221)
+				<< ApplicationInfo.m_Version.m_VersionID
+				<< AnsiEncoding.f_Default()
+				<< AnsiEncoding.f_Foreground256(248)
+				<< ApplicationInfo.m_VersionInfo.m_Time
+				<< AnsiEncoding.f_Default()
+			;
+
+			CStr FailedVersion;
+			if (ApplicationInfo.m_FailedVersion.f_IsValid())
+			{
+				FailedVersion = "{}{}{} {}{td}{}\n{}"_f
+					<< AnsiEncoding.f_StatusError()
+					<< ApplicationInfo.m_FailedVersion.m_VersionID
+					<< AnsiEncoding.f_Default()
+					<< AnsiEncoding.f_Foreground256(248)
+					<< ApplicationInfo.m_VersionInfo.m_Time
+					<< AnsiEncoding.f_Default()
+					<< ApplicationInfo.m_FailedVersionError
+				;
+				Return = 1;
+				bHasFailedVersion = true;
+			}
+
+			CStr WantVersion;
+			if (ApplicationInfo.m_WantVersion.f_IsValid() && ApplicationInfo.m_WantVersion != ApplicationInfo.m_Version && ApplicationInfo.m_WantVersion != ApplicationInfo.m_FailedVersion)
+			{
+				WantVersion = "{}{}{} {}{td}{}"_f
+					<< AnsiEncoding.f_StatusWarning()
+					<< ApplicationInfo.m_WantVersion.m_VersionID
+					<< AnsiEncoding.f_Default()
+					<< AnsiEncoding.f_Foreground256(248)
+					<< ApplicationInfo.m_WantVersionInfo.m_Time
+					<< AnsiEncoding.f_Default()
+				;
+				bHasWantVersion = true;
+			}
+
+			CStr NewestVersion;
+			if
+				(
+				 	ApplicationInfo.m_NewestUnconditionalVersion.f_IsValid()
+				 	&& ApplicationInfo.m_NewestUnconditionalVersion != ApplicationInfo.m_Version
+				 	&& ApplicationInfo.m_NewestUnconditionalVersion != ApplicationInfo.m_WantVersion
+				 	&& ApplicationInfo.m_NewestUnconditionalVersion != ApplicationInfo.m_FailedVersion
+				)
+			{
+				NewestVersion = "{}{}{} {}{td}{}"_f
+					<< AnsiEncoding.f_Foreground256(208)
+					<< ApplicationInfo.m_NewestUnconditionalVersion.m_VersionID
+					<< AnsiEncoding.f_Default()
+					<< AnsiEncoding.f_Foreground256(248)
+					<< ApplicationInfo.m_NewestUnconditionalVersionInfo.m_Time
+					<< AnsiEncoding.f_Default()
+				;
+				bHasNewestVersion = true;
+			}
+
 			TableRenderer.f_AddRow
 				(
 					AppManagerInfo.m_Environment
@@ -485,11 +569,23 @@ namespace NMib::NCloud::NCloudClient
 					, ApplicationKey.m_Name
 					, ApplicationInfo.m_VersionManagerApplication
 				 	, AutoUpdate
-					, ApplicationInfo.m_Version.m_VersionID
-				 	, "{td}"_f << ApplicationInfo.m_VersionInfo.m_Time
+					, Version
+				 	, FailedVersion
+					, WantVersion
+					, NewestVersion
 				 	, Status
 				)
 			;
+		}
+
+		if (CTableRenderHelper::fs_ParseOutputTypeOption(_Params) == CTableRenderHelper::EOutputType_HumanReadable)
+		{
+			if (!bHasNewestVersion)
+				TableRenderer.f_RemoveColumn(8);
+			if (!bHasWantVersion)
+				TableRenderer.f_RemoveColumn(7);
+			if (!bHasFailedVersion)
+				TableRenderer.f_RemoveColumn(6);
 		}
 
 		if (!bQuiet)
