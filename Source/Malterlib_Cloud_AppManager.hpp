@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -43,8 +43,17 @@ namespace NMib::NCloud
 		_Stream % m_Backup_RemoveSyncFlagsWildcards;
 		_Stream % m_Backup_NewBackupInterval;
 
-		_Stream % m_AutoUpdateTags;
-		_Stream % m_AutoUpdateBranches;
+		_Stream % m_UpdateTags;
+		_Stream % m_UpdateBranches;
+
+		if (_Stream.f_GetVersion() >= 0x114)
+			_Stream % m_bAutoUpdate;
+		else if constexpr (tf_CStream::mc_bConsume)
+		{
+			if (m_UpdateTags)
+				m_bAutoUpdate = !(*m_UpdateTags).f_IsEmpty();
+		}
+
 		_Stream % m_UpdateScriptPreUpdate;
 		_Stream % m_UpdateScriptPostUpdate;
 		_Stream % m_UpdateScriptPostLaunch;
@@ -86,9 +95,24 @@ namespace NMib::NCloud
 		_Stream % m_EncryptionStorage;
 		_Stream % m_EncryptionFileSystem;
 		_Stream % m_ParentApplication;
+
 		_Stream % m_Version;
 		_Stream % m_VersionInfo;
 		_Stream % m_VersionManagerApplication;
+
+		if (_Stream.f_GetVersion() >= 0x114)
+		{
+			_Stream % m_FailedVersion;
+			_Stream % m_FailedVersionInfo;
+			_Stream % m_FailedVersionError;
+
+			_Stream % m_NewestUnconditionalVersion;
+			_Stream % m_NewestUnconditionalVersionInfo;
+
+			_Stream % m_WantVersion;
+			_Stream % m_WantVersionInfo;
+		}
+
 		_Stream % m_Executable;
 		_Stream % m_Parameters;
 		_Stream % m_RunAsUser;
@@ -102,8 +126,14 @@ namespace NMib::NCloud
 		_Stream % m_Backup_RemoveSyncFlagsWildcards;
 		_Stream % m_Backup_NewBackupInterval;
 
-		_Stream % m_AutoUpdateTags;
-		_Stream % m_AutoUpdateBranches;
+		_Stream % m_UpdateTags;
+		_Stream % m_UpdateBranches;
+
+		if (_Stream.f_GetVersion() >= 0x114)
+			_Stream % m_bAutoUpdate;
+		else if constexpr (tf_CStream::mc_bConsume)
+			m_bAutoUpdate = !m_UpdateTags.f_IsEmpty();
+
 		_Stream % m_UpdateScriptPreUpdate;
 		_Stream % m_UpdateScriptPostUpdate;
 		_Stream % m_UpdateScriptPostLaunch;

@@ -579,8 +579,9 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				fWaitVersionsAvailable(_AppManager, "AppManager");
 				CAppManagerInterface::CApplicationAdd Add;
 				CAppManagerInterface::CApplicationSettings ApplicationSettings;
-				ApplicationSettings.m_AutoUpdateTags = TCSet<CStr>{_Tag};
-				ApplicationSettings.m_AutoUpdateBranches = TCSet<CStr>{"*"};
+				ApplicationSettings.m_bAutoUpdate = true;
+				ApplicationSettings.m_UpdateTags = TCSet<CStr>{_Tag};
+				ApplicationSettings.m_UpdateBranches = TCSet<CStr>{"*"};
 				ApplicationSettings.m_bSelfUpdateSource = true;
 				ApplicationSettings.m_VersionManagerApplication = "AppManager";
 				ApplicationSettings.m_ExecutableParameters = TCVector<CStr>{};
@@ -594,8 +595,9 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				fWaitVersionsAvailable(_AppManager, "AppManager");
 				CAppManagerInterface::CApplicationAdd Add;
 				CAppManagerInterface::CApplicationSettings ApplicationSettings;
-				ApplicationSettings.m_AutoUpdateTags = TCSet<CStr>{_Tag};
-				ApplicationSettings.m_AutoUpdateBranches = TCSet<CStr>{"*"};
+				ApplicationSettings.m_bAutoUpdate = true;
+				ApplicationSettings.m_UpdateTags = TCSet<CStr>{_Tag};
+				ApplicationSettings.m_UpdateBranches = TCSet<CStr>{"*"};
 				ApplicationSettings.m_VersionManagerApplication = _Application;
 				if (_Executable)
 					ApplicationSettings.m_Executable = _Executable;

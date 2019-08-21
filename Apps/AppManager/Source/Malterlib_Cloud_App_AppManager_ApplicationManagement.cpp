@@ -216,19 +216,28 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJSON();
 		ApplicationJSON["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJSON();
 		ApplicationJSON["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJSON();
+		ApplicationJSON["LastTriedInstalledVersionError"] = Application.m_LastTriedInstalledVersionError;
+
+		ApplicationJSON["WantVersion"] = Application.m_WantVersion.f_ToJSON();
+		ApplicationJSON["WantVersionInfo"] = Application.m_WantVersionInfo.f_ToJSON();
+		ApplicationJSON["NewestUnconditionalVersion"] = Application.m_NewestUnconditionalVersion.f_ToJSON();
+		ApplicationJSON["NewestUnconditionalVersionInfo"] = Application.m_NewestUnconditionalVersionInfo.f_ToJSON();
+
 		ApplicationJSON["LastFailedInstalledVersionFailureStage"] = (uint32)Application.m_LastFailedInstalledVersionFailureStage;
 		ApplicationJSON["AutoUpdate"] = Settings.m_bAutoUpdate;
 
 		{
-			auto &Array = ApplicationJSON["AutoUpdateTags"].f_Array();
+			ApplicationJSON.f_RemoveMember("AutoUpdateTags");
+			auto &Array = ApplicationJSON["UpdateTags"].f_Array();
 			Array.f_Clear();
-			for (auto &Tag : Settings.m_AutoUpdateTags)
+			for (auto &Tag : Settings.m_UpdateTags)
 				Array.f_Insert(Tag);
 		}
 		{
-			auto &Array = ApplicationJSON["AutoUpdateBranches"].f_Array();
+			ApplicationJSON.f_RemoveMember("AutoUpdateBranches");
+			auto &Array = ApplicationJSON["UpdateBranches"].f_Array();
 			Array.f_Clear();
-			for (auto &Branch : Settings.m_AutoUpdateBranches)
+			for (auto &Branch : Settings.m_UpdateBranches)
 				Array.f_Insert(Branch);
 		}
 		{

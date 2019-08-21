@@ -203,13 +203,15 @@ namespace NMib::NCloud::NAppManager
 				Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
 				Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo;
 				bUpdatedAppInfo = true;
+
+				fp_SendAppChange_AddedOrChanged(*_pState->m_pApplication);
 			}
 			else if (_Stage == EUpdateStage::EUpdateStage_Failed)
 			{
+				bUpdatedAppInfo = true;
 				if (Application.m_LastFailedInstalledVersionFailureStage != Application.m_UpdateStage)
 				{
 					Application.m_LastFailedInstalledVersionFailureStage = Application.m_UpdateStage;
-					bUpdatedAppInfo = true;
 				}
 				if (Application.m_UpdateStage > EUpdateStage::EUpdateStage_DownloadVersion)
 				{
@@ -222,8 +224,10 @@ namespace NMib::NCloud::NAppManager
 					Application.m_LastTriedInstalledVersion = _pState->m_VersionID;
 					Application.m_LastTriedInstalledVersionInfo.m_Time = _pState->m_VersionTime;
 					Application.m_LastTriedInstalledVersionInfo.m_RetrySequence = _pState->m_VersionRetrySequence;
-					bUpdatedAppInfo = true;
 				}
+				Application.m_LastTriedInstalledVersionError = _Message;
+
+				fp_SendAppChange_AddedOrChanged(*_pState->m_pApplication);
 			}
 			Application.m_UpdateStage = _Stage;
 			fp_OnAppUpdateInfoChange(_pState->m_pApplication);

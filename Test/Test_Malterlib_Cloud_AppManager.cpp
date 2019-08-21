@@ -568,7 +568,8 @@ public:
 					CAppManagerInterface::CApplicationAdd Add;
 					CAppManagerInterface::CApplicationSettings Settings;
 					Settings.m_VersionManagerApplication = "TestApp";
-					Settings.m_AutoUpdateTags = fg_CreateSet<CStr>("TestTag");
+					Settings.m_bAutoUpdate = true;
+					Settings.m_UpdateTags = fg_CreateSet<CStr>("TestTag");
 					Settings.m_UpdateGroup = "TestGroup";
 					Add.m_Version = PackageInfo.m_VersionID;
 
@@ -938,7 +939,8 @@ public:
 					CAppManagerInterface::CApplicationAdd Add;
 					CAppManagerInterface::CApplicationSettings Settings;
 					Settings.m_VersionManagerApplication = "TestApp";
-					Settings.m_AutoUpdateTags = fg_CreateSet<CStr>("TestTag2");
+					Settings.m_bAutoUpdate = true;
+					Settings.m_UpdateTags = fg_CreateSet<CStr>("TestTag2");
 					Settings.m_UpdateGroup = "TestGroup2";
 					Add.m_Version = PackageInfo.m_VersionID;
 

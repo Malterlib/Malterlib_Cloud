@@ -180,32 +180,33 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_DistributedApp;
 			m_bDistributedApp = pValue->f_Boolean();
 		}
-		
-		if (auto *pValue = _Params.f_GetMember("AutoUpdateTags"))
+
+		if (auto *pValue = _Params.f_GetMember("AutoUpdate"))
 		{
-			o_ChangedSettings |= EApplicationSetting_AutoUpdateTags;
-			m_bAutoUpdate = false;
-			m_AutoUpdateTags.f_Clear();
-			if (pValue->f_IsArray())
+			o_ChangedSettings |= EApplicationSetting_AutoUpdate;
+			m_bAutoUpdate = pValue->f_Boolean();
+		}
+
+		if (auto *pValue = _Params.f_GetMember("UpdateTags"))
+		{
+			o_ChangedSettings |= EApplicationSetting_UpdateTags;
+			m_UpdateTags.f_Clear();
+			for (auto &TagJSON : pValue->f_Array())
 			{
-				m_bAutoUpdate = true;
-				for (auto &TagJSON : pValue->f_Array())
+				auto &Tag = TagJSON.f_String();
+				if (!CVersionManager::fs_IsValidTag(Tag))
 				{
-					auto &Tag = TagJSON.f_String();
-					if (!CVersionManager::fs_IsValidTag(Tag))
-					{
-						o_Error = fg_Format("'{}' is not a valid tag", Tag);
-						return false;
-					}
-					m_AutoUpdateTags[Tag];
+					o_Error = fg_Format("'{}' is not a valid tag", Tag);
+					return false;
 				}
+				m_UpdateTags[Tag];
 			}
 		}
 		
-		if (auto *pValue = _Params.f_GetMember("AutoUpdateBranches"))
+		if (auto *pValue = _Params.f_GetMember("UpdateBranches"))
 		{
-			o_ChangedSettings |= EApplicationSetting_AutoUpdateBranches;
-			m_AutoUpdateBranches.f_Clear();
+			o_ChangedSettings |= EApplicationSetting_UpdateBranches;
+			m_UpdateBranches.f_Clear();
 			for (auto &BranchJSON : pValue->f_Array())
 			{
 				auto &Branch = BranchJSON.f_String();
@@ -214,7 +215,7 @@ namespace NMib::NCloud::NAppManager
 					o_Error = fg_Format("'{}' is not a valid branch or wildcard", Branch);
 					return false;
 				}
-				m_AutoUpdateBranches[Branch];
+				m_UpdateBranches[Branch];
 			}
 		}
 		
@@ -284,13 +285,12 @@ namespace NMib::NCloud::NAppManager
 			m_bDistributedApp = _Source.m_bDistributedApp;
 		if (_ChangedSettings & EApplicationSetting_VersionManagerApplication)
 			m_VersionManagerApplication = _Source.m_VersionManagerApplication;
-		if (_ChangedSettings & EApplicationSetting_AutoUpdateTags)
-		{
+		if (_ChangedSettings & EApplicationSetting_AutoUpdate)
 			m_bAutoUpdate = _Source.m_bAutoUpdate;
-			m_AutoUpdateTags = _Source.m_AutoUpdateTags;
-		}
-		if (_ChangedSettings & EApplicationSetting_AutoUpdateBranches)
-			m_AutoUpdateBranches = _Source.m_AutoUpdateBranches;
+		if (_ChangedSettings & EApplicationSetting_UpdateTags)
+			m_UpdateTags = _Source.m_UpdateTags;
+		if (_ChangedSettings & EApplicationSetting_UpdateBranches)
+			m_UpdateBranches = _Source.m_UpdateBranches;
 		if (_ChangedSettings & EApplicationSetting_UpdateScript_PreUpdate)
 			m_UpdateScripts.m_PreUpdate = _Source.m_UpdateScripts.m_PreUpdate;
 		if (_ChangedSettings & EApplicationSetting_UpdateScript_PostUpdate)
@@ -392,10 +392,12 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_DistributedApp;
 		if (m_VersionManagerApplication != _Other.m_VersionManagerApplication)
 			ChangedSettings |= EApplicationSetting_VersionManagerApplication;
-		if (m_bAutoUpdate != _Other.m_bAutoUpdate || m_AutoUpdateTags != _Other.m_AutoUpdateTags)
-			ChangedSettings |= EApplicationSetting_AutoUpdateTags;
-		if (m_AutoUpdateBranches != _Other.m_AutoUpdateBranches)
-			ChangedSettings |= EApplicationSetting_AutoUpdateBranches;
+		if (m_bAutoUpdate != _Other.m_bAutoUpdate)
+			ChangedSettings |= EApplicationSetting_AutoUpdate;
+		if (m_UpdateTags != _Other.m_UpdateTags)
+			ChangedSettings |= EApplicationSetting_UpdateTags;
+		if (m_UpdateBranches != _Other.m_UpdateBranches)
+			ChangedSettings |= EApplicationSetting_UpdateBranches;
 		if (m_UpdateScripts.m_PreUpdate != _Other.m_UpdateScripts.m_PreUpdate)
 			ChangedSettings |= EApplicationSetting_UpdateScript_PreUpdate;
 		if (m_UpdateScripts.m_PostUpdate != _Other.m_UpdateScripts.m_PostUpdate)
@@ -513,16 +515,20 @@ namespace NMib::NCloud::NAppManager
 			m_bDistributedApp = *_Settings.m_bDistributedApp; 
 			o_ChangedSettings |= EApplicationSetting_DistributedApp;
 		}
-		if (_Settings.m_AutoUpdateTags)
+		if (_Settings.m_bAutoUpdate)
 		{
-			m_AutoUpdateTags = *_Settings.m_AutoUpdateTags;
-			m_bAutoUpdate = !m_AutoUpdateTags.f_IsEmpty();
-			o_ChangedSettings |= EApplicationSetting_AutoUpdateTags;
+			m_bAutoUpdate = *_Settings.m_bAutoUpdate;
+			o_ChangedSettings |= EApplicationSetting_AutoUpdate;
 		}
-		if (_Settings.m_AutoUpdateBranches)
+		if (_Settings.m_UpdateTags)
 		{
-			m_AutoUpdateBranches = *_Settings.m_AutoUpdateBranches; 
-			o_ChangedSettings |= EApplicationSetting_AutoUpdateBranches;
+			m_UpdateTags = *_Settings.m_UpdateTags;
+			o_ChangedSettings |= EApplicationSetting_UpdateTags;
+		}
+		if (_Settings.m_UpdateBranches)
+		{
+			m_UpdateBranches = *_Settings.m_UpdateBranches;
+			o_ChangedSettings |= EApplicationSetting_UpdateBranches;
 		}
 		if (_Settings.m_UpdateScriptPreUpdate)
 		{

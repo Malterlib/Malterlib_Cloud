@@ -58,8 +58,8 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_RunAsUser = DBit(2)
 			, EApplicationSetting_RunAsGroup = DBit(3)
 			, EApplicationSetting_VersionManagerApplication = DBit(4)
-			, EApplicationSetting_AutoUpdateTags = DBit(5)
-			, EApplicationSetting_AutoUpdateBranches = DBit(6)
+			, EApplicationSetting_UpdateTags = DBit(5)
+			, EApplicationSetting_UpdateBranches = DBit(6)
 			, EApplicationSetting_UpdateScript_PreUpdate = DBit(7)
 			, EApplicationSetting_UpdateScript_PostUpdate = DBit(8)
 			, EApplicationSetting_UpdateScript_PostLaunch = DBit(9)
@@ -80,6 +80,7 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_BackupEnabled = DBit(24)
 			, EApplicationSetting_RunAsUserPassword = DBit(25)
 			, EApplicationSetting_RunAsUserHasShell = DBit(26)
+			, EApplicationSetting_AutoUpdate = DBit(27)
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
 			| EApplicationSetting_ExecutableParameters
@@ -122,8 +123,8 @@ namespace NMib::NCloud::NAppManager
 			TCSet<CStr> m_Dependencies;
 			CStr m_VersionManagerApplication;
 			CStr m_UpdateGroup;
-			TCSet<CStr> m_AutoUpdateTags;
-			TCSet<CStr> m_AutoUpdateBranches;
+			TCSet<CStr> m_UpdateTags;
+			TCSet<CStr> m_UpdateBranches;
 			CUpdateScripts m_UpdateScripts;
 #ifdef DPlatformFamily_Windows
 			CStrSecure m_RunAsUserPassword;
@@ -192,6 +193,13 @@ namespace NMib::NCloud::NAppManager
 
 			CVersionManager::CVersionIDAndPlatform m_LastTriedInstalledVersion;
 			CVersionManager::CVersionInformation m_LastTriedInstalledVersionInfo;
+			CStr m_LastTriedInstalledVersionError;
+
+			CVersionManager::CVersionIDAndPlatform m_WantVersion;
+			CVersionManager::CVersionInformation m_WantVersionInfo;
+
+			CVersionManager::CVersionIDAndPlatform m_NewestUnconditionalVersion;
+			CVersionManager::CVersionInformation m_NewestUnconditionalVersionInfo;
 
 			CVersionManager::CVersionIDAndPlatform m_LastFailedInstalledVersion;
 			CTime m_LastFailedInstalledVersionTime;
@@ -788,6 +796,17 @@ namespace NMib::NCloud::NAppManager
 
 		void fp_AutoUpdate_Update();
 
+		bool fp_VersionIsNewer
+			(
+			 	CVersionManager::CVersionIDAndPlatform const &_LeftVersion
+			 	, CVersionManager::CVersionInformation const &_LeftVersionInfo
+			 	, CVersionManager::CVersionIDAndPlatform const &_RightVersion
+			 	, CVersionManager::CVersionInformation const &_RightVersionInfo
+				, TCSet<CStr> const &_RequiredTags
+				, TCSet<CStr> const &_AllowedBranches
+			)
+		;
+
 		CVersionManager::CVersionIDAndPlatform fp_FindVersion
 			(
 				TCSharedPointer<CApplication> const &_pApplication
@@ -797,6 +816,9 @@ namespace NMib::NCloud::NAppManager
 				, CStr &o_Error
 				, EFindVersionFlag _Flags
 				, CVersionManager::CVersionInformation &o_VersionInfo
+			 	, CVersionManager::CVersionIDAndPlatform &o_NewestUnconditionalVersion
+			 	, CVersionManager::CVersionInformation &o_NewestUnconditionalVersionInfo
+			 	, bool &o_bNewestUnconditionalVersionChanged
 			)
 		;
 

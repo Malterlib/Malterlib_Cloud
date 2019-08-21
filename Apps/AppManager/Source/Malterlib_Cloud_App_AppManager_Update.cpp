@@ -174,8 +174,8 @@ namespace NMib::NCloud::NAppManager
 			if (!CVersionManager::fs_IsValidPlatform(Platform))
 				co_return Auditor.f_Exception("Invalid version platform format");
 
-			auto RequiredTags = pApplication->m_Settings.m_AutoUpdateTags;
-			auto AllowedBranches = pApplication->m_Settings.m_AutoUpdateBranches;
+			auto RequiredTags = pApplication->m_Settings.m_UpdateTags;
+			auto AllowedBranches = pApplication->m_Settings.m_UpdateBranches;
 
 			if (_Update.m_RequireTags)
 			{
@@ -202,9 +202,44 @@ namespace NMib::NCloud::NAppManager
 			else
 			{
 				CStr Error;
-				VersionID = fp_FindVersion(pApplication, RequiredTags, AllowedBranches, Platform, Error, EFindVersionFlag_RetryFailed, VersionInfo);
+				bool bVersionsChanged = false;
+				CVersionManager::CVersionIDAndPlatform NewestUnconditionalVersion;
+				CVersionManager::CVersionInformation NewestUnconditionalVersionInfo;
+
+				VersionID = fp_FindVersion
+					(
+						pApplication
+						, RequiredTags
+						, AllowedBranches
+						, Platform
+						, Error
+						, EFindVersionFlag_RetryFailed
+						, VersionInfo
+						, NewestUnconditionalVersion
+						, NewestUnconditionalVersionInfo
+						, bVersionsChanged
+					)
+				;
+
 				if (!VersionID.f_IsValid())
 					co_return Auditor.f_Exception(Error);
+
+				if (VersionID != pApplication->m_WantVersion || VersionInfo != pApplication->m_WantVersionInfo)
+				{
+					bVersionsChanged = true;
+					pApplication->m_WantVersion = VersionID;
+					pApplication->m_WantVersionInfo = VersionInfo;
+				}
+
+				if (bVersionsChanged)
+				{
+					pApplication->m_NewestUnconditionalVersion = NewestUnconditionalVersion;
+					pApplication->m_NewestUnconditionalVersionInfo = NewestUnconditionalVersionInfo;
+
+					fp_SendAppChange_AddedOrChanged(*pApplication);
+
+					co_await fp_UpdateApplicationJSON(pApplication);
+				}
 			}
 		}
 

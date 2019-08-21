@@ -20,7 +20,7 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EMinProtocolVersion = 0x107
-			, EProtocolVersion = 0x112
+			, EProtocolVersion = 0x114
 		};
 		
 		CAppManagerInterface();
@@ -123,8 +123,9 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag>> m_Backup_RemoveSyncFlagsWildcards;
 			NStorage::TCOptional<NTime::CTimeSpan> m_Backup_NewBackupInterval;
 			
-			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_AutoUpdateTags;
-			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_AutoUpdateBranches; // Are wild cards
+			NStorage::TCOptional<bool> m_bAutoUpdate;
+			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_UpdateTags;
+			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_UpdateBranches; // Are wild cards
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPreUpdate;
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPostUpdate;
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPostLaunch;
@@ -159,7 +160,17 @@ namespace NMib::NCloud
 			// Updatable
 			CVersionIDAndPlatform m_Version;
 			CVersionInformation m_VersionInfo;
-			
+
+			CVersionIDAndPlatform m_FailedVersion;
+			CVersionInformation m_FailedVersionInfo;
+			NStr::CStr m_FailedVersionError;
+
+			CVersionIDAndPlatform m_WantVersion;
+			CVersionInformation m_WantVersionInfo;
+
+			CVersionIDAndPlatform m_NewestUnconditionalVersion;
+			CVersionInformation m_NewestUnconditionalVersionInfo;
+
 			// Changable
 			NStr::CStr m_VersionManagerApplication;
 			NStr::CStr m_UpdateGroup;
@@ -175,8 +186,9 @@ namespace NMib::NCloud
 			NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
 			NTime::CTimeSpan m_Backup_NewBackupInterval;
 			
-			NContainer::TCSet<NStr::CStr> m_AutoUpdateTags;
-			NContainer::TCSet<NStr::CStr> m_AutoUpdateBranches;
+			bool m_bAutoUpdate = false;
+			NContainer::TCSet<NStr::CStr> m_UpdateTags;
+			NContainer::TCSet<NStr::CStr> m_UpdateBranches;
 			NStr::CStr m_UpdateScriptPreUpdate;
 			NStr::CStr m_UpdateScriptPostUpdate;
 			NStr::CStr m_UpdateScriptPostLaunch;

@@ -210,6 +210,7 @@ namespace NMib::NCloud::NAppManager
 		State.m_bSetLastTried = true;
 		Application.m_LastTriedInstalledVersion = State.m_VersionID;
 		Application.m_LastTriedInstalledVersionInfo = VersionInfo;
+		Application.m_LastTriedInstalledVersionError.f_Clear();
 
 		State.m_fUpdateVersionInfo = [pApplication = State.m_pApplication, VersionID = State.m_VersionID, VersionInfo]
 			{

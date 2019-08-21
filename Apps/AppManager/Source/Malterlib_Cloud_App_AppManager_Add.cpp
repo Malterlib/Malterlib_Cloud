@@ -219,15 +219,19 @@ namespace NMib::NCloud::NAppManager
 				{
 					CStr Error;
 					CVersionManager::CVersionInformation VersionInfo;
+					bool bNewestUnconditionalVersionChanged = false;
 					VersionID = CAppManagerActor::fp_FindVersion
 						(
 							pApplication
-							, pApplication->m_Settings.m_AutoUpdateTags
-							, pApplication->m_Settings.m_AutoUpdateBranches
+							, pApplication->m_Settings.m_UpdateTags
+							, pApplication->m_Settings.m_UpdateBranches
 							, Platform
 							, Error
 							, EFindVersionFlag_ForAdd
 							, VersionInfo
+						 	, pApplication->m_NewestUnconditionalVersion
+						 	, pApplication->m_NewestUnconditionalVersionInfo
+						 	, bNewestUnconditionalVersionChanged
 						)
 					;
 
@@ -307,6 +311,7 @@ namespace NMib::NCloud::NAppManager
 				pApplication->m_LastInstalledVersionInfo = _VersionInfo;
 				pApplication->m_LastTriedInstalledVersion = _VersionID;
 				pApplication->m_LastTriedInstalledVersionInfo = _VersionInfo;
+
 				if (mp_KnownPlatforms(_VersionID.m_Platform).f_WasCreated())
 					fp_VersionManagerResubscribeAll();
 			}

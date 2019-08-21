@@ -167,20 +167,28 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		auto AddOption_AutoUpdateTags = "AutoUpdateTags?"_=
+		auto AddOption_AutoUpdate = "AutoUpdate?"_=
 			{
-				"Names"_= {"--auto-update-tags"}
-				, "Default"_= false
-				, "Type"_= COneOfType{CEJSON{""}, COneOf{false}}
-				, "Description"_= "Auto update the application when new versions become available that has all these these tags."
+				"Names"_= {"--auto-update"}
+				, "Default"_= true
+				, "Description"_= "Automatically update the application."
 			}
 		;
-		auto AddOption_AutoUpdateBranches = "AutoUpdateBranches?"_=
+
+		auto AddOption_UpdateTags = "UpdateTags?"_=
 			{
-				"Names"_= {"--auto-update-branches"}
+				"Names"_= {"--update-tags"}
+				, "Default"_= _[_]
+				, "Type"_= CEJSON{""}
+				, "Description"_= "When updating the application require these tags on the version to update to."
+			}
+		;
+		auto AddOption_UpdateBranches = "UpdateBranches?"_=
+			{
+				"Names"_= {"--update-branches"}
 				, "Default"_= _[_]
 				, "Type"_= {""}
-				, "Description"_= "Auto update the application only for versions from these branches.\n"
+				, "Description"_= "Update the application only for versions from these branches.\n"
 				"Leave empty to allow any branch.\n"
 				"Branches can be matched with wildcards.\n"
 			}
@@ -315,8 +323,9 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_BackupAddSyncFlagsWildcards 
 						, SettingsOption_BackupRemoveSyncFlagsWildcards 
 						, SettingsOption_BackupNewBackupIntervalHours
-						, AddOption_AutoUpdateTags
-						, AddOption_AutoUpdateBranches
+						, AddOption_AutoUpdate
+						, AddOption_UpdateTags
+						, AddOption_UpdateBranches
 						, AddOption_UpdateScriptPreUpdate
 						, AddOption_UpdateScriptPostUpdate
 						, AddOption_UpdateScriptPostLaunch
@@ -419,8 +428,9 @@ namespace NMib::NCloud::NAppManager
 							, "Description"_= "Hidden"
 							, "Default"_= true
 						}
-						, AddOption_AutoUpdateTags
-						, AddOption_AutoUpdateBranches
+						, AddOption_AutoUpdate
+						, AddOption_UpdateTags
+						, AddOption_UpdateBranches
 						, AddOption_UpdateScriptPreUpdate
 						, AddOption_UpdateScriptPostUpdate
 						, AddOption_UpdateScriptPostLaunch
@@ -476,18 +486,24 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_BackupExcludeWildcards 
 						, SettingsOption_BackupAddSyncFlagsWildcards 
 						, SettingsOption_BackupRemoveSyncFlagsWildcards 
-						, SettingsOption_BackupNewBackupIntervalHours 
-						, "AutoUpdateTags?"_= 
+						, SettingsOption_BackupNewBackupIntervalHours
+						, "AutoUpdate?"_=
 						{
-							"Names"_= {"--auto-update-tags"}
-							, "Type"_= COneOfType{CEJSON{""}, COneOf{false}} 
-							, "Description"_= "Auto update the application when new versions become available that has all these these tags."
+							"Names"_= {"--auto-update"}
+							, "Type"_= true
+							, "Description"_= "Automatically update the application."
 						}
-						, "AutoUpdateBranches?"_= 
+						, "UpdateTags?"_=
 						{
-							"Names"_= {"--auto-update-branches"}
+							"Names"_= {"--update-tags"}
+							, "Type"_= CEJSON{""} 
+							, "Description"_= "When updating the application require these tags on the version to update to."
+						}
+						, "UpdateBranches?"_= 
+						{
+							"Names"_= {"--update-branches"}
 							, "Type"_= {""} 
-							, "Description"_= "Auto update the application only for versions from these branches.\n"
+							, "Description"_= "Update the application only for versions from these branches.\n"
 							"Leave empty to allow any branch\n"
 						}
 						, "VersionManagerApplication?"_= 

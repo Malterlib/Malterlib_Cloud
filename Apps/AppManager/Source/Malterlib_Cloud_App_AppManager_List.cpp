@@ -16,33 +16,72 @@ namespace NMib::NCloud::NAppManager
 
 		OutApplication.m_Status = _Application.m_LaunchStatus;
 		OutApplication.m_StatusSeverity = _Application.m_LaunchStatusSeverity;
+
 		OutApplication.m_EncryptionStorage = Settings.m_EncryptionStorage;
 		OutApplication.m_EncryptionFileSystem = Settings.m_EncryptionFileSystem;
+
 		OutApplication.m_ParentApplication = Settings.m_ParentApplication;
+
 		OutApplication.m_Version = _Application.m_LastInstalledVersion;
 		OutApplication.m_VersionInfo = _Application.m_LastInstalledVersionInfo;
+
+		if
+			(
+				fp_VersionIsNewer
+				(
+					_Application.m_LastTriedInstalledVersion
+					, _Application.m_LastTriedInstalledVersionInfo
+					, OutApplication.m_Version
+					, OutApplication.m_VersionInfo
+					, _Application.m_Settings.m_UpdateTags
+					, _Application.m_Settings.m_UpdateBranches
+				)
+			)
+		{
+			OutApplication.m_FailedVersion = _Application.m_LastTriedInstalledVersion;
+			OutApplication.m_FailedVersionInfo = _Application.m_LastTriedInstalledVersionInfo;
+			OutApplication.m_FailedVersionError = _Application.m_LastTriedInstalledVersionError;
+		}
+
+		OutApplication.m_WantVersion = _Application.m_WantVersion;
+		OutApplication.m_WantVersionInfo = _Application.m_WantVersionInfo;
+
+		OutApplication.m_NewestUnconditionalVersion = _Application.m_NewestUnconditionalVersion;
+		OutApplication.m_NewestUnconditionalVersionInfo = _Application.m_NewestUnconditionalVersionInfo;
+
 		OutApplication.m_VersionManagerApplication = Settings.m_VersionManagerApplication;
+
 		OutApplication.m_Executable = Settings.m_Executable;
 		OutApplication.m_Parameters = Settings.m_ExecutableParameters;
 		OutApplication.m_RunAsUser = Settings.m_RunAsUser;
 		OutApplication.m_RunAsGroup = Settings.m_RunAsGroup;
 		OutApplication.m_bRunAsUserHasShell = Settings.m_bRunAsUserHasShell;
+
 		OutApplication.m_Backup_IncludeWildcards = Settings.m_Backup_IncludeWildcards;
 		OutApplication.m_Backup_ExcludeWildcards = Settings.m_Backup_ExcludeWildcards;
 		OutApplication.m_Backup_AddSyncFlagsWildcards = Settings.m_Backup_AddSyncFlagsWildcards;
 		OutApplication.m_Backup_RemoveSyncFlagsWildcards = Settings.m_Backup_RemoveSyncFlagsWildcards;
 		OutApplication.m_Backup_NewBackupInterval = Settings.m_Backup_NewBackupInterval;
-		OutApplication.m_AutoUpdateTags = Settings.m_AutoUpdateTags;
-		OutApplication.m_AutoUpdateBranches = Settings.m_AutoUpdateBranches;
+
+		OutApplication.m_bAutoUpdate = Settings.m_bAutoUpdate;
+		OutApplication.m_UpdateTags = Settings.m_UpdateTags;
+		OutApplication.m_UpdateBranches = Settings.m_UpdateBranches;
+
 		OutApplication.m_UpdateScriptPreUpdate = Settings.m_UpdateScripts.m_PreUpdate;
 		OutApplication.m_UpdateScriptPostUpdate = Settings.m_UpdateScripts.m_PostUpdate;
 		OutApplication.m_UpdateScriptPostLaunch = Settings.m_UpdateScripts.m_PostLaunch;
 		OutApplication.m_UpdateScriptOnError = Settings.m_UpdateScripts.m_OnError;
+
 		OutApplication.m_bSelfUpdateSource = Settings.m_bSelfUpdateSource;
+
 		OutApplication.m_UpdateGroup = Settings.m_UpdateGroup;
+
 		OutApplication.m_bDistributedApp = Settings.m_bDistributedApp;
+
 		OutApplication.m_Dependencies = Settings.m_Dependencies;
+
 		OutApplication.m_bStopOnDependencyFailure = Settings.m_bStopOnDependencyFailure;
+
 		OutApplication.m_bBackupEnabled = Settings.m_bBackupEnabled;
 
 		return OutApplication;
@@ -54,7 +93,7 @@ namespace NMib::NCloud::NAppManager
 		auto Auditor = pThis->f_Auditor();
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
-		
+
 		Permissions["//Command//"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationEnum"}};
 
 		for (auto &pApplication : m_pThis->mp_Applications)
@@ -90,12 +129,12 @@ namespace NMib::NCloud::NAppManager
 		Auditor.f_Info("Enum applications");
 		co_return fg_Move(OutputApplications);
 	}
-	
+
 	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_GetAvailableVersions(CStr const &_Application) -> TCFuture<CVersionsAvailableForUpdate>
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
-		
+
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["//Command//"] = {{"AppManager/CommandAll", "AppManager/Command/VersionEnum"}};
@@ -142,7 +181,7 @@ namespace NMib::NCloud::NAppManager
 		Auditor.f_Info("Enum versions available for update");
 		co_return fg_Move(Versions);
 	}
-	
+
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
@@ -224,25 +263,20 @@ namespace NMib::NCloud::NAppManager
 			fAddProperty(Backup, "Add", "{}"_f << Application.m_Backup_AddSyncFlagsWildcards);
 			fAddProperty(Backup, "Remove", "{}"_f << Application.m_Backup_RemoveSyncFlagsWildcards);
 
-			CStr Update;
-
-			if (Application.m_AutoUpdateTags.f_IsEmpty())
-				Update = "Manual Update";
-			else
-				Update = "Auto Update";
+			CStr Update = Application.m_bAutoUpdate ? "Auto Update" : "Manual Update";
 
 			if (bExtraVerbose)
 			{
 				Update += "\n\n";
-				fAddProperty(Update, "Tags", Application.m_AutoUpdateTags);
-				fAddProperty(Update, "Branches", Application.m_AutoUpdateBranches);
+				fAddProperty(Update, "Tags", Application.m_UpdateTags);
+				fAddProperty(Update, "Branches", Application.m_UpdateBranches);
 				fAddProperty(Update, "Update Group", Application.m_UpdateGroup);
 			}
 			else if (bVerbose)
 			{
 				Update += "\n\n";
-				fAddProperty(Update, "Tags", "{vs}"_f << Application.m_AutoUpdateTags);
-				fAddProperty(Update, "Branches", "{vs}"_f << Application.m_AutoUpdateBranches);
+				fAddProperty(Update, "Tags", "{vs}"_f << Application.m_UpdateTags);
+				fAddProperty(Update, "Branches", "{vs}"_f << Application.m_UpdateBranches);
 				fAddProperty(Update, "Update Group", Application.m_UpdateGroup);
 			}
 
@@ -298,7 +332,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();

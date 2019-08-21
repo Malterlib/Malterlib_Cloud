@@ -176,6 +176,18 @@ namespace NMib::NCloud::NAppManager
 						Application.m_LastTriedInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
 					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionInfo", EJSONType_Object))
 						Application.m_LastTriedInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionError", EJSONType_String))
+						Application.m_LastTriedInstalledVersionError = pValue->f_String();
+
+					if (auto pValue = ApplicationJSON.f_GetMember("NewestUnconditionalVersion", EJSONType_Object))
+						Application.m_NewestUnconditionalVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+					if (auto pValue = ApplicationJSON.f_GetMember("NewestUnconditionalVersionInfo", EJSONType_Object))
+						Application.m_NewestUnconditionalVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+
+					if (auto pValue = ApplicationJSON.f_GetMember("WantVersion", EJSONType_Object))
+						Application.m_WantVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+					if (auto pValue = ApplicationJSON.f_GetMember("WantVersionInfo", EJSONType_Object))
+						Application.m_WantVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
 
 					if (auto pValue = ApplicationJSON.f_GetMember("LastFailedInstalledVersionFailureStage", EJSONType_Integer))
 						Application.m_LastFailedInstalledVersionFailureStage = (EUpdateStage)pValue->f_Integer();
@@ -208,15 +220,29 @@ namespace NMib::NCloud::NAppManager
 						
 					if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdate", EJSONType_Boolean))
 						Settings.m_bAutoUpdate = pValue->f_Boolean();
-					if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdateTags", EJSONType_Array))
+
 					{
-						for (auto &Tag : pValue->f_Array())
-							Settings.m_AutoUpdateTags[Tag.f_String()];
+						auto pValue = ApplicationJSON.f_GetMember("UpdateTags", EJSONType_Array);
+						if (!pValue)
+							pValue = ApplicationJSON.f_GetMember("AutoUpdateTags", EJSONType_Array);
+
+						if (pValue)
+						{
+							for (auto &Tag : pValue->f_Array())
+								Settings.m_UpdateTags[Tag.f_String()];
+						}
 					}
-					if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdateBranches", EJSONType_Array))
+
 					{
-						for (auto &Tag : pValue->f_Array())
-							Settings.m_AutoUpdateBranches[Tag.f_String()];
+						auto pValue = ApplicationJSON.f_GetMember("UpdateBranches", EJSONType_Array);
+						if (!pValue)
+							pValue = ApplicationJSON.f_GetMember("AutoUpdateBranches", EJSONType_Array);
+
+						if (pValue)
+						{
+							for (auto &Tag : pValue->f_Array())
+								Settings.m_UpdateBranches[Tag.f_String()];
+						}
 					}
 					if (auto pValue = ApplicationJSON.f_GetMember("UpdateScripts", EJSONType_Object))
 					{
