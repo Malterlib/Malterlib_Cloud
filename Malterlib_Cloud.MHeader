@@ -18,7 +18,7 @@ Import "Tools/*/*.MHeader"
 			}
 			%File "Include/Mib/Cloud/^*"
 		}
-		%File "Source/*"
+		%File "Source/^*"
 		%Group Documentation
 		{
 			%File "Documentation/*"

@@ -6,7 +6,6 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ActorCallbackManager>
 #include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Concurrency/DistributedDaemon>
 #include <Mib/File/ChangeNotificationActor>
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Cloud/FileTransfer>

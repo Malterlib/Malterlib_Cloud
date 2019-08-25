@@ -5,7 +5,6 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Concurrency/DistributedDaemon>
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/Cloud/KeyManager>
 #include <Mib/Cloud/VersionManager>

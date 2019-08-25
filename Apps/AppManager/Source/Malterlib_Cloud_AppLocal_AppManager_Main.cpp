@@ -3,6 +3,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Core/Application>
+#include <Mib/Concurrency/DistributedDaemon>
 
 #ifdef DPlatformFamily_Windows
 #include <Windows.h>
