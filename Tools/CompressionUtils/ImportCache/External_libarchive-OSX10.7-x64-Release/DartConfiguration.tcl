@@ -11,7 +11,7 @@ BuildDirectory: .
 CostDataFile: 
 
 # Site is something like machine.domain, i.e. pragmatic.crd
-Site: erikmbp07-3.local
+Site: erikimacpro01.local
 
 # Build name is osname-revision-compiler, i.e. Linux-2.4.2-2smp-c++
 BuildName: Darwin-clang++
@@ -62,7 +62,7 @@ UpdateOptions:
 UpdateType: git
 
 # Compiler info
-Compiler: /CompiledFiles/Dependencies/llvm/8.0/build/main/bin/clang++
+Compiler: /CompiledFiles/Dependencies/llvm/9.0/build/main/bin/clang++
 CompilerVersion: 
 
 # Dynamic analysis (MemCheck)
