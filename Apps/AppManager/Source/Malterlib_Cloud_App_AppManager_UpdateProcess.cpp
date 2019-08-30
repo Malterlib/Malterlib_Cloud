@@ -349,7 +349,7 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
-		co_await fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PreUpdate, CStr{}, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime());
+		co_await fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PreUpdate, State.m_TempraryPath, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime());
 		co_return {};
 	}
 	
