@@ -121,9 +121,6 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
-		if (NProcess::NPlatform::fg_Process_GetElevation() == EProcessElevation_IsNotElevated)
-			DMibError("You need to be elevated to run these tests (sudo)");
-
 		[[maybe_unused]] bool bCanDoEncription = false;
 #ifdef DPlatformFamily_Linux
 		bCanDoEncription = true;
@@ -140,13 +137,9 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
-		CStr TestPath = "{}-{}-{}"_f
-			<< CFile::fs_GetFile(CFile::fs_GetPath(_AppManagerPackage))
-			<< CFile::fs_GetFile(CFile::fs_GetPath(_VersionManagerPackage))
-			<< CFile::fs_GetFile(CFile::fs_GetPath(_KeyManagerPackage))
-		;
-
-		DMibTestPath(TestPath);
+		DMibExpectTrue(CFile::fs_FileExists(_AppManagerPackage));
+		DMibExpectTrue(CFile::fs_FileExists(_VersionManagerPackage));
+		DMibExpectTrue(CFile::fs_FileExists(_KeyManagerPackage));
 
 		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 
@@ -401,18 +394,19 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				if (_Executable)
 				{
 					Params.f_Insert({"--executable", _Executable});
-					if (_PackageOptions.f_HasFeatureFlag("NoDaemonRunStandalone"))
-						Params.f_Insert({"--executable-parameters", "[\"--daemon-run-debug\"]"});
-					else
-						Params.f_Insert({"--executable-parameters", "[\"--daemon-run-standalone\"]"});
+					Params.f_Insert({"--executable-parameters", "[\"--daemon-run-standalone\"]"});
 				}
+
 				if (_User)
 				{
 					Params.f_Insert({"--run-as-user", _User});
 					Params.f_Insert({"--run-as-group", _User});
 				}
 
-				Params.f_Insert({"--auto-update-tags", "[\"{}\"]"_f << _Tag, "--auto-update-branches", "[\"*\"]"});
+				if (AppManagerPackageOptions.f_HasFeatureFlag("OldAutoUpdate"))
+					Params.f_Insert({"--auto-update-tags", "[\"{}\"]"_f << _Tag, "--auto-update-branches", "[\"*\"]"});
+				else
+					Params.f_Insert({"--auto-update", "--update-tags", "[\"{}\"]"_f << _Tag, "--update-branches", "[\"*\"]"});
 
 				CProcessLaunch::fs_LaunchTool(_AppManager.m_RootPath / "AppManager", Params, _AppManager.m_RootPath);
 				CProcessLaunch::fs_LaunchTool
@@ -438,8 +432,6 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		auto fSetupKeyManager = [&](CAppManager const &_AppManager)
 			{
 				fInstallAppManually(_AppManager, KeyManagerPackageOptions, _KeyManagerPackage, "KeyManager", "MalterlibCloudKeyManager", "TestTag");
-				if (KeyManagerPackageOptions.f_HasFeatureFlag("NoDistributedApp"))
-					NSys::fg_Thread_Sleep(2.0f);
 
 				DMibAssert(fGetAppInfo(_AppManager, "KeyManager").m_Status, ==, "Launched");
 
@@ -452,17 +444,16 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pStdErr, pStdOut, KeyManagerPassword](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
 					{
 						if (_OutputType == EProcessLaunchOutputType_StdErr)
-							*pStdErr += _Output;
-						else
 						{
-							*pStdOut += _Output;
-							if (pStdOut->f_Find("Type password for key database: ") >= 0)
+							*pStdErr += _Output;
+							if (pStdErr->f_Find("Type password for key database: ") >= 0)
 							{
-								pStdOut->f_Clear();
+								pStdErr->f_Clear();
 								LaunchActor(&CProcessLaunchActor::f_SendStdIn, KeyManagerPassword + "\n\n\n\n") > fg_DiscardResult();
 							}
 						}
-
+						else
+							*pStdOut += _Output;
 					}
 				;
 				SimpleLaunch.m_bWholeLineOutput = false;
@@ -493,7 +484,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		auto fSetupAppManagerConnection = [&](CAppManager const &_AppManager, CStr const &_Executable, CStr const &_Namespace, TCVector<CStr> const &_Permissions, CStr const &_HostID)
 			{
 				for (auto &Permission : _Permissions)
-					CProcessLaunch::fs_LaunchTool(_Executable, fg_CreateVector<CStr>("--trust-permission-add-host", _AppManager.m_LaunchInfo.m_HostID, "--permission", Permission));
+					CProcessLaunch::fs_LaunchTool(_Executable, fg_CreateVector<CStr>("--trust-permission-add", "--host", _AppManager.m_LaunchInfo.m_HostID, Permission));
 
 				CDistributedActorTrustManagerInterface::CChangeNamespaceHosts Hosts;
 				Hosts.m_Hosts[_HostID];
@@ -513,8 +504,6 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		auto fSetupVersionManager = [&](CAppManager const &_AppManager)
 			{
 				fInstallAppManually(_AppManager, VersionManagerPackageOptions, _VersionManagerPackage, "VersionManager", "MalterlibCloudVersionManager", "VersionManagerTestTag");
-				if (VersionManagerPackageOptions.f_HasFeatureFlag("NoDistributedApp"))
-					NSys::fg_Thread_Sleep(2.0f);
 
 				DMibAssert(fGetAppInfo(_AppManager, "VersionManager").m_Status, ==, "Launched");
 
@@ -534,7 +523,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				TCVector<CStr> Permissions = {"Application/ListAll", "Application/ReadAll", "Application/TagAll", "Application/WriteAll"};
 
 				for (auto &Permission : Permissions)
-					CProcessLaunch::fs_LaunchTool(VersionManagerExecutable, fg_CreateVector<CStr>("--trust-permission-add-host", TestHostID, "--permission", Permission));
+					CProcessLaunch::fs_LaunchTool(VersionManagerExecutable, fg_CreateVector<CStr>("--trust-permission-add", "--host", TestHostID, Permission));
 
 				auto Ticket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(fGenerateTicket(VersionManagerExecutable));
 				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(g_Timeout);
@@ -551,14 +540,6 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				VersionManagerHelper.f_Upload(VersionManager, PackageName, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, _Package).f_CallSync(g_Timeout);
 				return PackageInfo;
-			}
-		;
-
-		auto fUpdateManualApp = [&](CAppManager const &_AppManager, CStr const &_App, CVersionManagerHelper::CPackageInfo const &_PackageInfo)
-			{
-				CAppManagerInterface::CApplicationUpdate Update;
-				Update.m_Platform = _PackageInfo.m_VersionID.m_Platform;
-				_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Update)(_App, Update).f_CallSync(g_Timeout);
 			}
 		;
 
@@ -606,19 +587,27 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
+		TCMap<CStr, CVersionManagerHelper::CPackageInfo> AppPackageInfos;
+		TCSet<CStr> DoneInitPackageInfo;
+
 		auto fUpdateApp = [&](CStr const &_Name, TCSet<CStr> const &_Tags)
 			{
-				CStr AppArchive = "{}/TestApps/{}.tar.gz"_f << ProgramDirectory << _Name;
+				CStr AppArchive = "{}/TestApps/Dynamic/{}.tar.gz"_f << ProgramDirectory << _Name;
 
 				{
 					CStr VersionInfoFile = "{}/TestApps/{}/{}VersionInfo.json"_f << ProgramDirectory << _Name << _Name;
 					CEJSON VersionInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
 					CVersionManager::CVersionID VersionID;
-					CStr Error;
-					CVersionManager::fs_IsValidVersionIdentifier(VersionInfo.f_GetMemberValue("Version", "").f_String(), Error, &VersionID);
+					if (DoneInitPackageInfo(_Name).f_WasCreated())
+						VersionID = AppPackageInfos[_Name].m_VersionID.m_VersionID;
+					else
+					{
+						CStr Error;
+						CVersionManager::fs_IsValidVersionIdentifier(VersionInfo.f_GetMemberValue("Version", "").f_String(), Error, &VersionID);
+					}
 					++VersionID.m_Revision;
 					VersionInfo["Version"] = CStr::fs_ToStr(VersionID);
-					CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString());
+					CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString(), false);
 				}
 
 				auto PackageInfo = VersionManagerHelper.f_CreatePackage("{}/TestApps/{}"_f << ProgramDirectory << _Name, AppArchive, g_CompressionLevel).f_CallSync(g_Timeout);
@@ -674,13 +663,6 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
-		auto fWaitForSignalListen = [&](auto const & ...p_PackageOptions)
-			{
-				if ((... || p_PackageOptions.f_HasFeatureFlag("NeedDelaySignal")))
-					NSys::fg_Thread_Sleep(10.0f);
-			}
-		;
-
 		fSetupAppManager(KeyManagerDir);
 		fSetupAppManager(VersionManagerDir);
 		fSetupAppManager(AppManagerDir);
@@ -701,15 +683,14 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		fSetupAppManagerConnection(AppManager_AppManager, VersionManagerExecutable, "com.malterlib/Cloud/VersionManager", {"Application/ReadAll"}, VersionManagerHostID);
 
 		auto AppManagerPackageInfo = fUploadPackage(_AppManagerPackage, {"TestTag", "VersionManagerTestTag", "AppManagerTestTag"});
+		AppPackageInfos["AppManager"] = AppManagerPackageInfo;
 		auto KeyManagerPackageInfo = fUploadPackage(_KeyManagerPackage, {"TestTag"});
+		AppPackageInfos["KeyManager"] = KeyManagerPackageInfo;
 		auto VersionManagerPackageInfo = fUploadPackage(_VersionManagerPackage, {"VersionManagerTestTag"});
+		AppPackageInfos["VersionManager"] = VersionManagerPackageInfo;
 
-		fWaitForSignalListen(KeyManagerPackageOptions, VersionManagerPackageOptions);
-
-		fUpdateManualApp(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo);
 		fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, "Launched");
 
-		fUpdateManualApp(AppManager_VersionManager, "VersionManager", KeyManagerPackageInfo);
 		fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, "Launched");
 
 		VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
@@ -724,16 +705,13 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		fAddAppManagerApp(AppManager_AppManager, "AppManager", "AppManager", "AppManagerTestTag");
 
-		auto fUpdateApps = [&](bool _bLegacy)
+		auto fUpdateApps = [&]()
 			{
 				KeyManagerPackageInfo = fUpdateApp("KeyManager", {"TestTag"});
 				fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, "Launched");
 
 				VersionManagerPackageInfo = fUpdateApp("VersionManager", {"VersionManagerTestTag"});
 				fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, "Launched");
-
-				if (_bLegacy)
-					fWaitForSignalListen(KeyManagerPackageOptions, VersionManagerPackageOptions);
 
 				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
 				try
@@ -806,11 +784,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		{
 			DMibTestPath("Upgrade");
-			fUpdateApps(true);
+			fUpdateApps();
 		}
 		{
 			DMibTestPath("UpgradeAgain");
-			fUpdateApps(false);
+			fUpdateApps();
 		}
 		{
 			DMibTestPath("SimultaneousUpgrade1");
@@ -842,45 +820,108 @@ public:
 
 	void f_DoTests()
 	{
-		DMibTestSuite(NTest::CTestCategory("General") << NTest::CTestGroup("SuperUser"))
+		DMibTestCategory(NTest::CTestCategory("General") << NTest::CTestGroup("SuperUser"))
 		{
-#ifdef DPlatformFamily_Windows
-			AllocConsole();
-			SetConsoleCtrlHandler
-				(
-					nullptr
-					, true
-				)
-			;
-#endif
-#if DTestUpdateCompatibilityEnableLogging
-			fg_GetSys()->f_AddStdErrLogger();
-#endif
 			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 
-			TCMap<CStr, TCVector<CStr>> OldPackages;
+			TCMap<CStr, TCVector<CStr>> Packages;
+
+			CStr BinaryDirectory = ProgramDirectory / "TestApps/VersionManager";
+
+			bool bDoneInit = false;
+
+			TCSet<CStr> InitializedLatestPackages;
+			
+			auto fInit = [&](CStr const &_AppManager, CStr const &_VersionManager, CStr const &_KeyManager)
+				{
+					if (!bDoneInit)
+					{
+						bDoneInit = true;
+#ifdef DPlatformFamily_Windows
+						AllocConsole();
+						SetConsoleCtrlHandler
+							(
+								nullptr
+								, true
+							)
+						;
+#endif
+#if DTestUpdateCompatibilityEnableLogging
+						fg_GetSys()->f_AddStdErrLogger();
+#endif
+						CFile::fs_CreateDirectory("{}/TestApps/Latest"_f << ProgramDirectory);
+						CFile::fs_CreateDirectory("{}/TestApps/Dynamic"_f << ProgramDirectory);
+					}
+
+					auto fInitPackage = [&](CStr const &_PackagePath)
+						{
+							CStr Version = CFile::fs_GetFile(CFile::fs_GetPath(_PackagePath));
+							if (Version != "Latest")
+								return;
+
+							CStr AppName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(_PackagePath));
+							if (!InitializedLatestPackages(AppName).f_WasCreated())
+								return;
+
+							CStr VersionInfoFile = "{}/TestApps/{}/{}VersionInfo.json"_f << ProgramDirectory << AppName << AppName;
+							CEJSON VersionInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
+							CVersionManager::CVersionID VersionID;
+							CStr Error;
+							CVersionManager::fs_IsValidVersionIdentifier(VersionInfo.f_GetMemberValue("Version", "").f_String(), Error, &VersionID);
+							++VersionID.m_Revision;
+							VersionInfo["Version"] = CStr::fs_ToStr(VersionID);
+							CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString(), false);
+
+							TCActor<CSeparateThreadActor> HelperActor{fg_Construct(), "Test actor"};
+							CCurrentlyProcessingActorScope CurrentActor{HelperActor};
+
+							CVersionManagerHelper VersionManagerHelper(BinaryDirectory);
+
+							VersionManagerHelper.f_CreatePackage("{}/TestApps/{}"_f << ProgramDirectory << AppName, _PackagePath, g_CompressionLevel).f_CallSync(g_Timeout);
+						}
+					;
+
+					fInitPackage(_AppManager);
+					fInitPackage(_VersionManager);
+					fInitPackage(_KeyManager);
+				}
+			;
 
 			for (auto &AppDir : CFile::fs_FindFiles(ProgramDirectory / "CloudTestBinaries/*", EFileAttrib_Directory))
 			{
-				CStr App = CFile::fs_GetFile(AppDir);
+				CStr AppName = CFile::fs_GetFile(AppDir);
 				for (auto &PackagePath : CFile::fs_FindFiles(AppDir / "*.tar.gz", EFileAttrib_File, true))
-					OldPackages[App].f_Insert(PackagePath);
+					Packages[AppName].f_Insert(PackagePath);
+
+				CStr AppArchive = "{}/TestApps/Latest/{}.tar.gz"_f << ProgramDirectory << AppName;
+				Packages[AppName].f_Insert(AppArchive);
 			}
 
-			auto &OldAppManagers = OldPackages["AppManager"];
-			auto &OldVersionManagers = OldPackages["VersionManager"];
-			auto &OldKeyManagers = OldPackages["KeyManager"];
+			auto &AppManagers = Packages["AppManager"];
+			auto &VersionManagers = Packages["VersionManager"];
+			auto &KeyManagers = Packages["KeyManager"];
 
-			DMibAssertFalse(OldAppManagers.f_IsEmpty());
-			DMibAssertFalse(OldVersionManagers.f_IsEmpty());
-			DMibAssertFalse(OldKeyManagers.f_IsEmpty());
-
-			for (auto &OldAppManager : OldAppManagers)
+			for (auto &AppManager : AppManagers)
 			{
-				for (auto &OldVersionManager : OldVersionManagers)
+				for (auto &VersionManager : VersionManagers)
 				{
-					for (auto &OldKeyManager : OldKeyManagers)
-						fp_RunUpgradeTests(OldAppManager, OldVersionManager, OldKeyManager);
+					for (auto &KeyManager : KeyManagers)
+					{
+						CStr TestPath = "{}-{}-{}"_f
+							<< CFile::fs_GetFile(CFile::fs_GetPath(AppManager))
+							<< CFile::fs_GetFile(CFile::fs_GetPath(VersionManager))
+							<< CFile::fs_GetFile(CFile::fs_GetPath(KeyManager))
+						;
+
+						DMibTestSuite(TestPath)
+						{
+							if (NProcess::NPlatform::fg_Process_GetElevation() == EProcessElevation_IsNotElevated)
+								DMibError("You need to be elevated to run these tests (sudo)");
+
+							fInit(AppManager, VersionManager, KeyManager);
+							fp_RunUpgradeTests(AppManager, VersionManager, KeyManager);
+						};
+					}
 				}
 			}
 		};
