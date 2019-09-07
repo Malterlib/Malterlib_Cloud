@@ -168,6 +168,14 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 		{
 			Compile.Type None
 		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8_private.h"
+		{
+			Compile.Type None
+		}
 		%File "../../../../../../External/libarchive/libarchive/archive_ppmd7.c"
 		{
 			Compile.Type C
@@ -361,6 +369,10 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 			Compile.Type C
 		}
 		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar5.c"
 		{
 			Compile.Type C
 		}
@@ -601,6 +613,14 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 			Compile.Type None
 		}
 		%File "../../../../../../External/libarchive/libarchive/xxhash.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2sp_ref.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2s_ref.c"
 		{
 			Compile.Type C
 		}
@@ -783,6 +803,14 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 		{
 			Compile.Type None
 		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8_private.h"
+		{
+			Compile.Type None
+		}
 		%File "../../../../../../External/libarchive/libarchive/archive_ppmd7.c"
 		{
 			Compile.Type C
@@ -976,6 +1004,10 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 			Compile.Type C
 		}
 		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar5.c"
 		{
 			Compile.Type C
 		}
@@ -1216,6 +1248,14 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 			Compile.Type None
 		}
 		%File "../../../../../../External/libarchive/libarchive/xxhash.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2sp_ref.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2s_ref.c"
 		{
 			Compile.Type C
 		}

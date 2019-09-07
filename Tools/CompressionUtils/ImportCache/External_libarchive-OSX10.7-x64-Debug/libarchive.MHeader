@@ -4,7 +4,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type C
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/opt/local/include'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType Normal
@@ -168,6 +168,14 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 		{
 			Compile.Type None
 		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8_private.h"
+		{
+			Compile.Type None
+		}
 		%File "../../../../../../External/libarchive/libarchive/archive_ppmd7.c"
 		{
 			Compile.Type C
@@ -361,6 +369,10 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 			Compile.Type C
 		}
 		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar5.c"
 		{
 			Compile.Type C
 		}
@@ -604,6 +616,14 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 		{
 			Compile.Type C
 		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2sp_ref.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2s_ref.c"
+		{
+			Compile.Type C
+		}
 		%File "../../../../../../External/libarchive/libarchive/archive_disk_acl_darwin.c"
 		{
 			Compile.Type C
@@ -619,7 +639,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type C
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/opt/local/include'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;archive_EXPORTS;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType Normal
@@ -783,6 +803,14 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 		{
 			Compile.Type None
 		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8_private.h"
+		{
+			Compile.Type None
+		}
 		%File "../../../../../../External/libarchive/libarchive/archive_ppmd7.c"
 		{
 			Compile.Type C
@@ -976,6 +1004,10 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 			Compile.Type C
 		}
 		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar5.c"
 		{
 			Compile.Type C
 		}
@@ -1219,6 +1251,14 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 		{
 			Compile.Type C
 		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2sp_ref.c"
+		{
+			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2s_ref.c"
+		{
+			Compile.Type C
+		}
 		%File "../../../../../../External/libarchive/libarchive/archive_disk_acl_darwin.c"
 		{
 			Compile.Type C
@@ -1234,7 +1274,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type C
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('/opt/local/include'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType Normal

@@ -11,7 +11,7 @@ BuildDirectory: .
 CostDataFile: 
 
 # Site is something like machine.domain, i.e. pragmatic.crd
-Site: erikimacpro01.local
+Site: erikmbp07.local
 
 # Build name is osname-revision-compiler, i.e. Linux-2.4.2-2smp-c++
 BuildName: Linux-clang++
@@ -76,7 +76,7 @@ MemoryCheckCommandOptions:
 MemoryCheckSuppressionFile: 
 
 # Coverage
-CoverageCommand: /Users/erik/Library/Developer/Toolchains/Malterlib.xctoolchaingcov
+CoverageCommand: gcov
 CoverageExtraFlags: -l
 
 # Cluster commands
