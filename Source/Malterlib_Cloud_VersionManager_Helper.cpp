@@ -407,7 +407,7 @@ namespace NMib::NCloud
 						Internal.m_RootDirectory / "bin/bsdtar"
 						,
 						{
-							"-tvf"
+							"-tvvf"
 							, _PackageFile
 						}
 						, CFile::fs_GetPath(_PackageFile)
@@ -438,17 +438,17 @@ namespace NMib::NCloud
 					fParseField(); // Group
 					fParseField(); // Size
 
-					CStr Month = fParseField();
-					CStr DayOfMonth = fParseField();
-					CStr Year = fParseField();
+					CStr UnixSeconds = fParseField();
+					CStr NanoSeconds = fParseField();
 
-					auto FileTime = CTimeConvert::fs_CreateTime(Year.f_ToInt(int64(0)), fg_GetAscMonthNumber(Month), DayOfMonth.f_ToInt(int32(1)));
+					auto FileTime = CTimeConvert::fs_FromCreateFromUnixSeconds(UnixSeconds.f_ToInt(int64(0)));
+					FileTime.f_SetFraction(fp64(NanoSeconds.f_ToInt(int32(0))) / fp64(1'000'000'000.0));
 
 					if (!Newest.f_IsValid() || FileTime > Newest)
 						Newest = FileTime;
 				}
 
-				PackageInfo.m_VersionInfo.m_Time = Newest;
+				PackageInfo.m_VersionInfo.m_Time = CTimeConvert::fs_FromCreateFromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
 
 				co_return PackageInfo;
 			}
