@@ -60,7 +60,7 @@ namespace NMib::NCloud::NCloudClient
 					auto ReportFor = ECloudManagerStatusFlag_Applications | ECloudManagerStatusFlag_AppManagers;
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -86,7 +86,7 @@ namespace NMib::NCloud::NCloudClient
 					auto ReportFor = ECloudManagerStatusFlag_AppManagers;
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -111,7 +111,7 @@ namespace NMib::NCloud::NCloudClient
 					auto ReportFor = ECloudManagerStatusFlag_Applications;
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 	}

@@ -49,7 +49,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications, _Params, _pCommandLine);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -83,7 +83,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions, _Params, _pCommandLine);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -132,7 +132,7 @@ namespace NMib::NCloud::NCloudClient
 									}
 								}
 							)
-							.f_ToStringColored(CDistributedAppActor::fs_ColorAnsiFlagsDefault(), "    ").f_Replace("\r\n", "\r").f_Replace("\n", "\r")
+							.f_ToStringColored(CCommandLineDefaults::fs_ColorAnsiFlagsDefault(), "    ").f_Replace("\r\n", "\r").f_Replace("\n", "\r")
 						}
 						, "Application?"_=
 						{
@@ -212,7 +212,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion, _Params, _pCommandLine);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -273,7 +273,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags, _Params, _pCommandLine);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -328,7 +328,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion, _Params, _pCommandLine);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 	}

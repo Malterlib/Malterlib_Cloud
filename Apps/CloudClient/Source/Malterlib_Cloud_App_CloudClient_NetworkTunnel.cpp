@@ -49,7 +49,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels, _Params, _pCommandLine);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 		_Section.f_RegisterCommand
@@ -82,7 +82,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels, _Params, _pCommandLine);
 				}
-				, CDistributedAppCommandLineSpecification::ECommandFlag_WaitForRemotes
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 	}
