@@ -315,13 +315,13 @@ typedef uint64_t uintmax_t;
 /* #undef ARCHIVE_XATTR_LINUX */
 
 /* Version number of bsdcpio */
-#define BSDCPIO_VERSION_STRING "3.3.3"
+#define BSDCPIO_VERSION_STRING "3.4.0"
 
 /* Version number of bsdtar */
-#define BSDTAR_VERSION_STRING "3.3.3"
+#define BSDTAR_VERSION_STRING "3.4.0"
 
 /* Version number of bsdcat */
-#define BSDCAT_VERSION_STRING "3.3.3"
+#define BSDCAT_VERSION_STRING "3.4.0"
 
 /* Define to 1 if you have the `acl_create_entry' function. */
 /* #undef HAVE_ACL_CREATE_ENTRY */
@@ -679,6 +679,12 @@ typedef uint64_t uintmax_t;
 
 /* Define to 1 if you have the `bz2' library (-lbz2). */
 /* #undef HAVE_LIBBZ2 */
+
+/* Define to 1 if you have the `b2' library (-lb2). */
+/* #undef HAVE_LIBB2 */
+
+/* Define to 1 if you have the <blake2.h> header file. */
+/* #undef HAVE_BLAKE2_H */
 
 /* Define to 1 if you have the `charset' library (-lcharset). */
 /* #undef HAVE_LIBCHARSET */
@@ -1105,6 +1111,9 @@ typedef uint64_t uintmax_t;
 /* Define to 1 if you have the <unistd.h> header file. */
 /* #undef HAVE_UNISTD_H */
 
+/* Define to 1 if you have the `unlinkat' function. */
+/* #undef HAVE_UNLINKAT */
+
 /* Define to 1 if you have the `unsetenv' function. */
 /* #undef HAVE_UNSETENV */
 
@@ -1208,10 +1217,10 @@ typedef uint64_t uintmax_t;
 #define ICONV_CONST 
 
 /* Version number of libarchive as a single integer */
-#define LIBARCHIVE_VERSION_NUMBER "3003003"
+#define LIBARCHIVE_VERSION_NUMBER "3004000"
 
 /* Version number of libarchive */
-#define LIBARCHIVE_VERSION_STRING "3.3.3"
+#define LIBARCHIVE_VERSION_STRING "3.4.0"
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing
    slash. */
@@ -1265,7 +1274,7 @@ typedef uint64_t uintmax_t;
 #endif /* SAFE_TO_DEFINE_EXTENSIONS */
 
 /* Version number of package */
-#define VERSION "3.3.3"
+#define VERSION "3.4.0"
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 /* #undef _FILE_OFFSET_BITS */
