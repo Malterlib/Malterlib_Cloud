@@ -410,7 +410,19 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void CVersionManager::CSubscribeToUpdates::CResult::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream % fg_Move(m_Subscription);
+		if (_Stream.f_GetVersion() >= 0x107)
+			_Stream % fg_Move(m_Subscription);
+		else
+		{
+			if constexpr (tf_CStream::mc_bConsume)
+			{
+				NConcurrency::CActorSubscription Subscription;
+				_Stream % Subscription;
+				m_Subscription = fg_Move(Subscription);
+			}
+			else
+				_Stream % fg_Move(m_Subscription).f_GetSubscription();
+		}
 	}
 	
 	template <typename tf_CStream>
