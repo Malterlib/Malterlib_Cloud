@@ -664,7 +664,7 @@ Property
 
 Property
 {
-	MalterlibCloud_CloudClientExecutable "" // User(Cloud Debug)=/Deploy/Malterlib_Cloud/MalterlibCloud: Configure client executable to test local deploy to version manager
+	MalterlibCloud_CloudClientExecutable "" // User(Cloud Debug)=/opt/Deploy/Malterlib_Cloud/MalterlibCloud: Configure client executable to test local deploy to version manager
 	{
 		!!MalterlibCloud_CloudClientExecutable ""
 	}
@@ -812,7 +812,8 @@ Property
 		}
 	}
 
-	MalterlibCloud_VersionUploadCloudClientCommand 	"MTool PostCopy \"@(MalterlibCloud_VersionUploadTarArchivePath)\" \"Config=@(MalterlibPostCopyConfigFile)\" \"Project=SimulateBuildServerStore\" \"OutFolder=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)\"\r\n"\
+	MalterlibCloud_VersionUploadCloudClientCommand	"@(ScriptExport) \"MalterlibDeployRoot=@(MalterlibDeployRoot)\"\r\n"\
+													"MTool PostCopy \"@(MalterlibCloud_VersionUploadTarArchivePath)\" \"Config=@(MalterlibPostCopyConfigFile)\" \"Project=SimulateBuildServerStore\" \"OutFolder=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)\"\r\n"\
 													"@(CheckErrors)\r\n"\
 													"MTool PostCopy \"@(MalterlibCloudVersionInfoFileName)\" \"Config=@(MalterlibPostCopyConfigFile)\" \"Project=SimulateBuildServerStore\" \"OutFolder=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)\"\r\n"\
 													"@(CheckErrors)\r\n"

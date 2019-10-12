@@ -62,7 +62,7 @@ UpdateOptions:
 UpdateType: git
 
 # Compiler info
-Compiler: /CompiledFiles/Dependencies/llvm/9.0/build/main/bin/clang++
+Compiler: /opt/CompiledFiles/Dependencies/llvm/9.0/build/main/bin/clang++
 CompilerVersion: 
 
 # Dynamic analysis (MemCheck)
