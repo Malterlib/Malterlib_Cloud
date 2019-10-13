@@ -418,7 +418,7 @@ namespace NMib::NCloud
 				auto ListStr = (co_await pState->m_Launch2(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))).f_GetStdOut();
 
 				CTime Newest;
-				for (auto &Line : ListStr.f_SplitLine())
+				for (auto &Line : ListStr.f_SplitLine<true>())
 				{
 					ch8 const *pParse = Line.f_GetStr();
 
