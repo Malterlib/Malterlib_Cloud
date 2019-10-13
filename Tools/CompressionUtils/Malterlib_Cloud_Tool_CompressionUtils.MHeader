@@ -67,7 +67,7 @@
 	{
 		!!CompileDialect C
 		PrefixHeader ""
-		PreprocessorDefines "HAVE_ZLIB_H=1;@(Compile.PreprocessorDefines)"
+		PreprocessorDefines "ARCHIVE_CRYPTO_MD5_OPENSSL=1;HAVE_ZLIB_H=1;@(Compile.PreprocessorDefines)"
 		Warnings Off
 		{
 			!!PlatformFamily Windows
