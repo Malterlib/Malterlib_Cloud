@@ -611,12 +611,19 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_= false
 							, "Description"_= "Display more extensive information about the versions." 
 						}
-						, "Application?"_= 
+						, "Application?"_=
 						{
 							"Names"_= {"--application"}
 							, "Default"_= ""
 							, "Description"_= "The application to list versions for.\n"
-								"Leave empty to list all applications.\n" 
+								"Leave empty to list all applications.\n"
+						}
+						, "ExtraPlatforms?"_=
+						{
+							"Names"_= {"--platforms"}
+							, "Type"_= {""}
+							, "Default"_= _[_]
+							, "Description"_= "Add non-default platforms you want to include in the list.\n"
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}

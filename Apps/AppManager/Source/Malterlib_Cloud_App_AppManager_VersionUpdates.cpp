@@ -77,8 +77,10 @@ namespace NMib::NCloud::NAppManager
 	{
 	}
 
-	void CAppManagerActor::fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState)
+	TCFuture<void> CAppManagerActor::fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState)
 	{
+		co_await ECoroutineFlag_AllowReferences;
+
 		_VersionManagerState.m_Subscription.f_Clear();
 
 		CVersionManager::CSubscribeToUpdates SubscriptionParams;
@@ -125,45 +127,50 @@ namespace NMib::NCloud::NAppManager
 
 		mint SubscribeSequence = ++_VersionManagerState.m_SubscribeSequence;
 
-		_VersionManagerState.f_GetManager().f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams))
-			> [this, SubscribeSequence, Actor = _VersionManagerState.f_GetManager().f_Weak()](TCAsyncResult<CVersionManager::CSubscribeToUpdates::CResult> &&_Result)
+		auto Actor = _VersionManagerState.f_GetManager().f_Weak();
+		auto Subscription = co_await _VersionManagerState.f_GetManager().f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams)).f_Wrap();
+		auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
+		if (!Subscription)
+		{
+			CStr ErrorMessage = fg_Format("Error subscribing to version updates: {}", Subscription.f_GetExceptionStr());
+			if (pManager)
 			{
-				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
-				if (!_Result)
-				{
-					CStr ErrorMessage = fg_Format("Error subscribing to version updates: {}", _Result.f_GetExceptionStr());
-					if (pManager)
-					{
-						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "<{}> {}", pManager->m_HostInfo.m_HostInfo, ErrorMessage);
-						mp_VersionManagers.f_Remove(pManager);
-					}
-					else
-						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "{}", ErrorMessage);
-					return;
-				}
-				if (!pManager)
-					return;
-
-				if (SubscribeSequence != pManager->m_SubscribeSequence)
-					return;
-
-				auto &Manager = *pManager;
-				Manager.m_Subscription = fg_Move(_Result->m_Subscription);
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "<{}> {}", pManager->m_HostInfo.m_HostInfo, ErrorMessage);
+				mp_VersionManagers.f_Remove(pManager);
 			}
-		;
+			else
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "{}", ErrorMessage);
+			co_return {};
+		}
+
+		if (!pManager)
+			co_return {};
+
+		if (SubscribeSequence != pManager->m_SubscribeSequence)
+			co_return{};
+
+		auto &Manager = *pManager;
+		Manager.m_Subscription = fg_Move(Subscription->m_Subscription);
+
+		co_return {};
 	}
 
-	void CAppManagerActor::fp_VersionManagerResubscribeAll()
+	TCFuture<void> CAppManagerActor::fp_VersionManagerResubscribeAll()
 	{
+		TCActorResultVector<void> Results;
 		for (auto &Manager : mp_VersionManagers)
-			fp_VersionManagerSubscribe(Manager);
+			fp_VersionManagerSubscribe(Manager) > Results.f_AddResult();
+
+		co_await Results.f_GetResults() | g_Unwrap;
+
+		co_return {};
 	}
 
 	void CAppManagerActor::fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info)
 	{
 		auto &NewManager = mp_VersionManagers[_VersionManager];
 		NewManager.m_HostInfo = _Info;
-		fp_VersionManagerSubscribe(NewManager);
+		fp_VersionManagerSubscribe(NewManager) > fg_DiscardResult();
 	}
 
 	void CAppManagerActor::fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager)

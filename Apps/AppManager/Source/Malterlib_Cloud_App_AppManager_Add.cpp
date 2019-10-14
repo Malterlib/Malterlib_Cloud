@@ -217,6 +217,8 @@ namespace NMib::NCloud::NAppManager
 				}
 				else
 				{
+					if (mp_KnownPlatforms(Platform).f_WasCreated())
+						co_await fp_VersionManagerResubscribeAll();
 					CStr Error;
 					CVersionManager::CVersionInformation VersionInfo;
 					bool bNewestUnconditionalVersionChanged = false;
@@ -313,7 +315,7 @@ namespace NMib::NCloud::NAppManager
 				pApplication->m_LastTriedInstalledVersionInfo = _VersionInfo;
 
 				if (mp_KnownPlatforms(_VersionID.m_Platform).f_WasCreated())
-					fp_VersionManagerResubscribeAll();
+					fp_VersionManagerResubscribeAll() > fg_DiscardResult();
 			}
 		;
 

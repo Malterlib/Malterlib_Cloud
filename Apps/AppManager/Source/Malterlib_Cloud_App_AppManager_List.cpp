@@ -340,6 +340,18 @@ namespace NMib::NCloud::NAppManager
 			mp_AppManagerInterface.m_pActor->self(&CAppManagerInterfaceImplementation::f_GetAvailableVersions, _Params["Application"].f_String())
 		;
 
+		{
+			bool bPlatformsChanged = false;
+			for (auto &Platform : _Params["ExtraPlatforms"].f_Array())
+			{
+				if (mp_KnownPlatforms(Platform.f_String()).f_WasCreated())
+					bPlatformsChanged = true;
+			}
+
+			if (bPlatformsChanged)
+				co_await fp_VersionManagerResubscribeAll();
+		}
+
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("Application", "Version", "Platform", "Config", "Time", "Size", "Files", "Tags", "Retry", "Extra Info");
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);

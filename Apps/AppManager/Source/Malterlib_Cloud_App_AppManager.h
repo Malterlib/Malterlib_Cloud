@@ -771,8 +771,8 @@ namespace NMib::NCloud::NAppManager
 		CStr fp_GetApplicationStopErrors(TCAsyncResult<uint32> const &_Result, CStr const &_Name);
 		void fp_KeyManagerAvailable();
 
-		void fp_VersionManagerResubscribeAll();
-		void fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState);
+		TCFuture<void> fp_VersionManagerResubscribeAll();
+		TCFuture<void> fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState);
 		void fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info);
 		void fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
 
