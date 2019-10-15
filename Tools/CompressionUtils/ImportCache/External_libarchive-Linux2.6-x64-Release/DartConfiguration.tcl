@@ -20,7 +20,7 @@ BuildName: Linux-clang++
 LabelsForSubprojects: 
 
 # Submission information
-SubmitURL: http://my.cdash.org
+SubmitURL: http://my.cdash.org/submit.php?project=libarchive
 
 # Dashboard start time
 NightlyStartTime: 01:00:00 UTC
