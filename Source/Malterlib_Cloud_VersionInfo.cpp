@@ -8,7 +8,7 @@
 
 namespace NMib::NCloud
 {
-	NStorage::TCAggregate<CCloudVersionInfo> g_CloudVersion = {DAggregateInit};
+	constinit NStorage::TCAggregate<CCloudVersionInfo> g_CloudVersion = {DAggregateInit};
 
 	bool CCloudVersion::operator == (CCloudVersion const &_Right) const
 	{
