@@ -643,7 +643,7 @@ public:
 				DMibExpect(*Properties.m_Created, ==, NTime::CTimeConvert::fs_CreateTime(1972, 2, 2));
 				DMibExpect(*Properties.m_Modified, ==, NTime::CTimeConvert::fs_CreateTime(1973, 3, 3));
 				DMibExpect(*Properties.m_SemanticID, ==, "Semantic1");
-				DMibExpect(*Properties.m_Tags, ==, (TCSet<NStr::CStr>{{"Shared1", "Unique1"}}));
+				DMibExpect(*Properties.m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
 				
 				DMibExpect(*fGetProperties("Folder1", "Name2").m_Notes, ==, "Testing12");
 				DMibExpect(*fGetProperties("Folder2", "Name1").m_Notes, ==, "Testing21");
@@ -671,24 +671,24 @@ public:
 				DMibTestPath("Test ModifyTags");
 
 				// Verify that we have the tags that we inserted in the secret properties
-				DMibExpect(*fGetProperties("Folder1", "Name1").m_Tags, ==, (TCSet<NStr::CStr>{{"Shared1", "Unique1"}}));
-				DMibExpect(*fGetProperties("Folder1", "Name2").m_Tags, ==, (TCSet<NStr::CStr>{{"Shared1", "Shared2", "Unique2"}}));
-				DMibExpect(*fGetProperties("Folder2", "Name1").m_Tags, ==, (TCSet<NStr::CStr>{{"Shared2"}}));
+				DMibExpect(*fGetProperties("Folder1", "Name1").m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
+				DMibExpect(*fGetProperties("Folder1", "Name2").m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Shared2", "Unique2"}}));
+				DMibExpect(*fGetProperties("Folder2", "Name1").m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared2"}}));
 				
 				// No op
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {},            {}                      )).m_Tags, ==, (TCSet<NStr::CStr>{{"Shared1", "Unique1"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {},            {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
 				// Add tags
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {},            {{"Added"}}             )).m_Tags, ==, (TCSet<NStr::CStr>{{"Shared1", "Unique1", "Added"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {},            {{"Added"}}             )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1", "Added"}}));
 				// Remove
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Shared1"}}, {}                      )).m_Tags, ==, (TCSet<NStr::CStr>{{"Unique1", "Added"}}));
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Unique1"}}, {}                      )).m_Tags, ==, (TCSet<NStr::CStr>{{"Added"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Shared1"}}, {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Added"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Unique1"}}, {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Added"}}));
 				// Remove and Add
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}},   {{"Shared1", "Unique1"}})).m_Tags, ==, (TCSet<NStr::CStr>{{"Shared1", "Unique1"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}},   {{"Shared1", "Unique1"}})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
 				// Remove non-present tag
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}},   {}                      )).m_Tags, ==, (TCSet<NStr::CStr>{{"Shared1", "Unique1"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}},   {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
 	
 				// Add to Secret with no existing tags
-				DMibExpect(*(fAddTagsAndGetProperties("Folder2", "Name2", {},            {{"Unique3"}}           )).m_Tags, ==, TCSet<NStr::CStr>{{"Unique3"}});
+				DMibExpect(*(fAddTagsAndGetProperties("Folder2", "Name2", {},            {{"Unique3"}}           )).m_Tags, ==, TCSet<NStr::CStrSecure>{{"Unique3"}});
 
 				// Check for exception for both missing folder and name
 				auto fModifySecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, TCSet<NStr::CStr> const &_Remove, TCSet<NStr::CStr> const &_Add)
@@ -1292,7 +1292,7 @@ public:
 				fAddPermissions(Needed2);
 
 				// Check that access is permitted
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Extra"}}, {})).m_Tags, ==, (TCSet<NStr::CStr>{{"Unique1", "Shared1"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Extra"}}, {})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Shared1"}}));
 
 				for (auto const &Permission : Needed)
 				{
@@ -1306,20 +1306,20 @@ public:
 				}
 
 				// Check that access is permitted again
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {}, {"Extra"})).m_Tags, ==, (TCSet<NStr::CStr>{{"Unique1", "Shared1", "Extra"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {}, {"Extra"})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Shared1", "Extra"}}));
 
 				// We cannot remove all tags without NoTag permission
 				DMibExpectException(fAddTagsAndGetProperties("Folder1", "Name1", {{"Unique1", "Shared1", "Extra"}}, {}), DMibErrorInstance("Access denied"));
 				fAddPermission("SecretsManager/Write/SemanticID/Semantic1/NoTag");
 				fAddPermission("SecretsManager/Read/SemanticID/Semantic1/NoTag");
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {"Unique1", "Shared1", "Extra"}, {})).m_Tags, ==, (TCSet<NStr::CStr>{}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {"Unique1", "Shared1", "Extra"}, {})).m_Tags, ==, (TCSet<NStr::CStrSecure>{}));
 				fRemovePermissions({"SecretsManager/Write/SemanticID/Semantic1/NoTag", "SecretsManager/Read/SemanticID/Semantic1/NoTag"});
 
 				// Same here, we cannot add tags from the NoTags state without that permission
 				DMibExpectException(fAddTagsAndGetProperties("Folder1", "Name1", {}, {"Unique1", "Shared1"}), DMibErrorInstance("Access denied"));
 				fAddPermission("SecretsManager/Write/SemanticID/Semantic1/NoTag");
 				fAddPermission("SecretsManager/Read/SemanticID/Semantic1/NoTag");
-				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {}, {"Unique1", "Shared1"})).m_Tags, ==, (TCSet<NStr::CStr>{{"Unique1", "Shared1"}}));
+				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {}, {"Unique1", "Shared1"})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Shared1"}}));
 
 				fRemovePermissionsMap(Needed);
 				fRemovePermissionsMap(Needed2);
@@ -1477,7 +1477,7 @@ public:
 				DMibExpect(*Properties.m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{}));
 				DMibExpect(*Properties.m_Created, ==, NTime::CTimeConvert::fs_CreateTime(1972, 2, 2));
 				DMibExpect(*Properties.m_SemanticID, ==, "Semantic1");
-				DMibExpect(*Properties.m_Tags, ==, (TCSet<NStr::CStr>{{"Shared1", "Unique1"}}));
+				DMibExpect(*Properties.m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
 
 				DMibExpect(*fGetProperties("Folder1", "Name2").m_Notes, ==, "Testing12");
 				DMibExpect(*fGetProperties("Folder2", "Name1").m_Notes, ==, "Testing21");
