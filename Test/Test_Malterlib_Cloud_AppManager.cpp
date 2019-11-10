@@ -38,7 +38,7 @@ using namespace NMib::NTest;
 #define DTestAppManagerEnableLogging 0
 #define DTestAppManagerEnableOtherOutput 0
 
-static fp64 g_Timeout = 60.0;
+static fp64 g_Timeout = 120.0;
 static uint32 g_CompressionLevel = 1;
 
 namespace
