@@ -1061,6 +1061,9 @@ namespace NMib::NCloud::NPrivate
 										}
 										break;
 									}
+								case CBackupManagerBackup::EManifestChange_Add:
+								case CBackupManagerBackup::EManifestChange_Change:
+									break;
 								}
 
 								if (!fSyncFile(ManifestChange))

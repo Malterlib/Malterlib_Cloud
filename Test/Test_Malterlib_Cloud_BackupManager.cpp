@@ -77,6 +77,7 @@ public:
 				case CBackupManagerClient::ENotification_Quiescent: Desc = "Quiescent {}"_f << nNotifications; break;
 				case CBackupManagerClient::ENotification_Unquiescent: Desc = "Unquiescent {}"_f << nNotifications; break;
 				case CBackupManagerClient::ENotification_InitialFinished: Desc = "InitialFinished {}"_f << nNotifications; break;
+				case CBackupManagerClient::ENotification_None: DMibNeverGetHere; break;
 				}
 				Unclaimed[Desc];
 			}
