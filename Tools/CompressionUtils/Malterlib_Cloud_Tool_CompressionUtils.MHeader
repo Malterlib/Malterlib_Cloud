@@ -5,7 +5,7 @@
 {
 	Repository
 	{
-		Type External
+		Type "External"
 		Remotes "upstream=https://github.com/libarchive/libarchive.git;@(Repository.Remotes)"
 	}
 }
@@ -16,7 +16,7 @@
 
 	Property
 	{
-		!!PlatformFamily Windows
+		!!PlatformFamily "Windows"
 
 		MalterlibWindowsNtVersion "_WIN32_WINNT_WIN7"
 		MalterlibWindowsVersion "NTDDI_WIN7"
@@ -40,19 +40,19 @@
 	Import.CMake_Variables "ENABLE_EXPAT=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "HAVE_LIBRICHACL=0;HAVE_ARC4RANDOM_BUF=0;HAVE__CTIME64_S=0;HAVE_READPASSPHRASE=0;@(Import.CMake_Variables)"
 	{
-		!!PlatformFamily Linux
+		!!PlatformFamily "Linux"
 	}
 	Import.CMake_Variables "HAVE_LZMA_STREAM_ENCODER_MT=0;@(Import.CMake_Variables)"
 	{
-		!!PlatformFamily OSX
+		!!PlatformFamily "OSX"
 	}
 
 	Import.CMake_Variables "CMAKE_BUILD_WITH_INSTALL_RPATH=ON;@(Import.CMake_Variables)"
 	{
 		&
 		{
-			PlatformFamily Linux
-			!HostPlatformFamily Linux 
+			PlatformFamily "Linux"
+			!HostPlatformFamily "Linux" 
 		}
 	}
 
@@ -65,30 +65,30 @@
 	}
 	Compile
 	{
-		!!CompileDialect C
+		!!CompileDialect "C"
 		PrefixHeader ""
 		PreprocessorDefines "ARCHIVE_CRYPTO_MD5_OPENSSL=1;HAVE_ZLIB_H=1;@(Compile.PreprocessorDefines)"
-		Warnings Off
+		Warnings "Off"
 		{
-			!!PlatformFamily Windows
+			!!PlatformFamily "Windows"
 		}
 	}
 	
-	%Target Exe_bsdtar
+	%Target "Exe_bsdtar"
 	{
 		Property.ProductName "BSD Tar"
 		Target
 		{
 			LinkWithLibraries "-lacl @(Target.LinkWithLibraries)"
 			{
-				!!PlatformFamily Linux
+				!!PlatformFamily "Linux"
 			}
 		}
-		%Group Source
+		%Group "Source"
 		{
 			%File "Source/AllowInvalidExit.cpp"
 			{
-				!!PlatformFamily Windows
+				!!PlatformFamily "Windows"
 			}
 		}
 		%Dependency "Lib_Malterlib"

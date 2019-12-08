@@ -13,11 +13,11 @@ Import "../../../../External/curl/Curl.MTarget"
 	}
 	Target
 	{
-		Type StaticLibrary
-		BaseName Malterlib_Cloud_CloudAPIManager
-		Group Apps
+		Type "StaticLibrary"
+		BaseName "Malterlib_Cloud_CloudAPIManager"
+		Group "Apps"
 	}
-	%Group Source
+	%Group "Source"
 	{
 		%File "Source/Malterlib_Cloud_App_*"
 	}
@@ -65,10 +65,10 @@ Import "../../../../External/curl/Curl.MTarget"
 	{
 		DebuggerCommandArguments "--daemon-run-debug"
 		BaseFileName "CloudAPIManager"
-		Group Apps
+		Group "Apps"
 	}
 	
-	%Group Source
+	%Group "Source"
 	{
 		%File "Source/Malterlib_Cloud_AppLocal_*"
 	}

@@ -10,11 +10,11 @@
 	}
 	Target
 	{
-		Type StaticLibrary
-		BaseName Malterlib_Cloud_VersionManager
-		Group Apps
+		Type "StaticLibrary"
+		BaseName "Malterlib_Cloud_VersionManager"
+		Group "Apps"
 	}
-	%Group Source
+	%Group "Source"
 	{
 		%File "Source/Malterlib_Cloud_App_*"
 	}
@@ -50,10 +50,10 @@
 	{
 		DebuggerCommandArguments "--daemon-run-debug"
 		BaseFileName "VersionManager"
-		Group Apps
+		Group "Apps"
 		ExtraGroups "{Malterlib}/{CloudTarBinaries};@(Target.ExtraGroups)"
 	}
-	%Group Source
+	%Group "Source"
 	{
 		%File "Source/Malterlib_Cloud_AppLocal_*"
 	}

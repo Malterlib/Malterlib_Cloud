@@ -10,11 +10,11 @@
 	}
 	Target
 	{
-		Type StaticLibrary
-		BaseName Malterlib_Cloud_CloudClient
-		Group Apps
+		Type "StaticLibrary"
+		BaseName "Malterlib_Cloud_CloudClient"
+		Group "Apps"
 	}
-	%Group Source
+	%Group "Source"
 	{
 		%File "Source/Malterlib_Cloud_App_*"
 	}
@@ -48,10 +48,10 @@
 	Target
 	{
 		BaseFileName "MalterlibCloud"
-		Group Apps
+		Group "Apps"
 		ExtraGroups "{Malterlib}/{CloudTarBinaries};@(Target.ExtraGroups)"
 	}
-	%Group Source
+	%Group "Source"
 	{
 		%File "Source/Malterlib_Cloud_AppLocal_*"
 	}

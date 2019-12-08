@@ -8,9 +8,9 @@ Import "Tools/*/*.MHeader"
 %Group "{Malterlib}/{Lib_Malterlib_Cloud}"
 {
 	Property.MalterlibConcurrency_DistributedActors true
-	%Group Cloud
+	%Group "Cloud"
 	{
-		%Group Include
+		%Group "Include"
 		{
 			Compile.Type "C++"
 			{
@@ -19,16 +19,16 @@ Import "Tools/*/*.MHeader"
 			%File "Include/Mib/Cloud/^*"
 		}
 		%File "Source/^*"
-		%Group Documentation
+		%Group "Documentation"
 		{
 			%File "Documentation/*"
 		}
 	}
-	%Dependency Lib_Malterlib_Web
+	%Dependency "Lib_Malterlib_Web"
 	{
 		Dependency.Indirect true
 	}
-	%Dependency Lib_Malterlib_Concurrency
+	%Dependency "Lib_Malterlib_Concurrency"
 	{
 		Dependency.Indirect true
 	}
@@ -203,7 +203,7 @@ Property
 										"	UploadToVersionManager \"$FileName\" \"${TempDirectory}TempVersionInfo.json\"\r\n"\
 										"}\r\n"
 	{
-		!HostPlatformFamily Windows
+		!HostPlatformFamily "Windows"
 		!!ScriptWindowsBash true
 	}
 
@@ -222,7 +222,7 @@ Property
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards "*/.tmp;@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards)"
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards "*/.DS_Store;@(MalterlibCloudVersionInfo_Backup_ExcludeWildcards)"
 	{
-		!!PlatformFamily OSX
+		!!PlatformFamily "OSX"
 	}
 }
 
@@ -494,7 +494,7 @@ Property
 			Executable false
 			UnixLineEnds true
 			UnicodeBOM false
-			MalterlibCloudTarget_FileIdentity VersionInfoFile
+			MalterlibCloudTarget_FileIdentity "VersionInfoFile"
 			{
 				!!MalterlibCloudTarget true
 			}
@@ -509,7 +509,7 @@ Property
 			Executable false
 			UnixLineEnds true
 			UnicodeBOM true
-			MalterlibCloudTarget_FileIdentityCpp VersionInfoFileCpp
+			MalterlibCloudTarget_FileIdentityCpp "VersionInfoFileCpp"
 			{
 				!!MalterlibCloudTarget true
 			}
@@ -550,7 +550,7 @@ Compile
 {
 	&
 	{
-		CompileDialect C
+		CompileDialect "C"
 		|
 		{
 			MalterlibCloudTarget true
@@ -656,7 +656,7 @@ Property
 		}
 	}
 
-	%Group Apps
+	%Group "Apps"
 	{
 		%Target "@(Malterlib_Cloud_App_Targets)"
 	}
@@ -751,7 +751,7 @@ Property
 		&
 		{
 			!Explodee ""
-			!GeneratorFamily VisualStudio
+			!GeneratorFamily "VisualStudio"
 		}
 	}
 	MalterlibCloud_VersionUploadTagsTemplate	", \"^\"\"@(Explodee)\"^\"\""
@@ -759,7 +759,7 @@ Property
 		&
 		{
 			!Explodee ""
-			GeneratorFamily VisualStudio
+			GeneratorFamily "VisualStudio"
 		}
 	}
 	MalterlibCloud_VersionUploadTagsContents "$first@(Builtin.Function->ExplodeList('@(MalterlibCloud_VersionUploadTags)', ';', 'MalterlibCloud_VersionUploadTagsTemplate'))"
@@ -787,11 +787,11 @@ Property
 
 	MalterlibCloud_VersionUploadCloudClientCommand_Tags "'[@(MalterlibCloud_VersionUploadTagsContents)]'"
 	{
-		!GeneratorFamily VisualStudio
+		!GeneratorFamily "VisualStudio"
 	}
 	MalterlibCloud_VersionUploadCloudClientCommand_Tags "\"[@(MalterlibCloud_VersionUploadTagsContents)]\""
 	{
-		!!GeneratorFamily VisualStudio
+		!!GeneratorFamily "VisualStudio"
 	}
 
 	MalterlibCloud_VersionUploadCloudClientCommand "@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --settings-file \"@(MalterlibCloudVersionInfoFileName)\" --tags @(MalterlibCloud_VersionUploadCloudClientCommand_Tags)@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified) \"@(MalterlibCloud_VersionUploadTarArchivePath)\"\r\n"\
@@ -887,7 +887,7 @@ Property
 		&
 		{
 			MalterilbCloud_DoVersionManagerUpload true
-			!GeneratorFamily VisualStudio
+			!GeneratorFamily "VisualStudio"
 		}
 	}
 
@@ -906,7 +906,7 @@ Property
 		&
 		{
 			MalterilbCloud_DoVersionManagerUpload true
-			GeneratorFamily VisualStudio
+			GeneratorFamily "VisualStudio"
 		}
 	}
 }
@@ -921,7 +921,7 @@ Property
 		}
 		BsdTarGetereteScheme "*Target.GenerateScheme=false"
 		{
-			!!GeneratorFamily Xcode
+			!!GeneratorFamily "Xcode"
 		}
 	}
 
