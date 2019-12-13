@@ -337,6 +337,18 @@ Property
 	MalterlibCloudVersionInfo_AppDistribution_ReleaseNotes_Escaped "@(MalterlibCloudVersionInfo_AppDistribution_ReleaseNotes->Replace('@(NewLine)','\\\\n'))"
 }
 
+Property
+{
+	MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents_Template ", \"@(Explodee)\": \"@(@(Explodee))\""
+	{
+		!Explodee ""
+	}
+
+	MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents "{Dummy@(Builtin.Function->ExplodeList('@(MalterlibCloudVersionInfo_UpdateScriptEnvironment)', ';', 'MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents_Template'))}"
+
+	MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents "@(MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents->Replace('Dummy, ', ''))"
+	MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents "@(MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents->Replace('{Dummy}', '{}'))"
+}
 
 Property
 {
@@ -450,6 +462,12 @@ Property
 
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t\t}\n"
+
+	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
+								"\t\t, \"UpdateScriptEnvironment\": @(MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents)\n"
+	{
+		!MalterlibCloudVersionInfo_UpdateScriptEnvironment ""
+	}
 
 	MalterlibCloudVersionInfo	"@(MalterlibCloudVersionInfo)"\
 								"\t}\n"\

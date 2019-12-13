@@ -219,13 +219,35 @@ namespace NMib::NCloud::NAppManager
 		
 		if (_pVersionInformation)
 		{
-			LaunchParams.m_Environment["MalterlibCloud_Time"] = fg_Format("{}", _pVersionInformation->m_Time.f_ToLocal());
-			LaunchParams.m_Environment["MalterlibCloud_Configuration"] = fg_Format("{}", _pVersionInformation->m_Configuration);
-			LaunchParams.m_Environment["MalterlibCloud_Tags"] = fg_Format("{vs,vb}", _pVersionInformation->m_Tags);
-			LaunchParams.m_Environment["MalterlibCloud_RetrySequence"] = fg_Format("{vs,vb}", _pVersionInformation->m_RetrySequence);
-			LaunchParams.m_Environment["MalterlibCloud_ExtraInfo"] = _pVersionInformation->m_ExtraInfo.f_ToString("");
-			LaunchParams.m_Environment["MalterlibCloud_NumFiles"] = fg_Format("{}", _pVersionInformation->m_nFiles);
-			LaunchParams.m_Environment["MalterlibCloud_NumBytes"] = fg_Format("{}", _pVersionInformation->m_nBytes);
+			LaunchParams.m_Environment["MalterlibCloud_Time"] = "{}"_f << _pVersionInformation->m_Time.f_ToLocal();
+			LaunchParams.m_Environment["MalterlibCloud_Configuration"] = "{}"_f << _pVersionInformation->m_Configuration;
+			LaunchParams.m_Environment["MalterlibCloud_Tags"] = "{vs,vb}"_f << _pVersionInformation->m_Tags;
+			LaunchParams.m_Environment["MalterlibCloud_RetrySequence"] = "{}"_f << _pVersionInformation->m_RetrySequence;
+			LaunchParams.m_Environment["MalterlibCloud_ExtraInfo"] = _pVersionInformation->m_ExtraInfo.f_ToString(nullptr);
+			LaunchParams.m_Environment["MalterlibCloud_NumFiles"] = "{}"_f << _pVersionInformation->m_nFiles;
+			LaunchParams.m_Environment["MalterlibCloud_NumBytes"] = "{}"_f << _pVersionInformation->m_nBytes;
+
+			if (auto pUpdateScriptEnv = _pVersionInformation->m_ExtraInfo.f_GetMember("UpdateScriptEnvironment", EJSONType_Object))
+			{
+				for (auto &Member : pUpdateScriptEnv->f_Object())
+				{
+					if (!Member.f_Value().f_IsString())
+					{
+						DMibLogWithCategory
+							(
+								Malterlib/Cloud/AppManager
+								, Info
+								, "[{}] Invalid type in UpdateScriptEnvironment.{}"
+								, Description
+								, Member.f_Name()
+							)
+						;
+						continue;
+					}
+
+					LaunchParams.m_Environment[Member.f_Name()] = Member.f_Value().f_String();
+				}
+			}
 		}
 		
 		LaunchParams.m_bMergeEnvironment = true;
