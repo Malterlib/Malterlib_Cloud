@@ -60,7 +60,7 @@ namespace NMib::NCloud::NCloudClient
 						, IncludeHost
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
-					, "Parameters"_= 
+					, "Parameters"_=
 					{
 						"BackupSource?"_=
 						{
@@ -90,7 +90,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= {"--host"}
 							, "Default"_= ""
 							, "Description"_= "The host ID of the host to download the backup from."
-						}					
+						}
 						, "BackupSource"_=
 						{
 							"Names"_= {"--source"}
@@ -116,15 +116,21 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_= false
 							, "Description"_= "Set owner and group on the files downloaded.\n"
 						}
+						, "FindClosestSnapshot?"_=
+						{
+							"Names"_= {"--find-closest-snapshot"}
+							, "Default"_= false
+							, "Description"_= "Find the closest snapshot before the specified backup time.\n"
+						}
 						, "CurrentDirectory?"_=
 						{
 							"Names"_= _[_]
 							, "Default"_= CFile::fs_GetCurrentDirectory()
 							, "Hidden"_= true
 							, "Description"_= "Internal hidden option to forward current directory."
-						}					
+						}
 					}
-					, "Parameters"_= 
+					, "Parameters"_=
 					{
 						"BackupTime?"_=
 						{
@@ -142,14 +148,14 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 	}
-	
+
 	TCFuture<void> CCloudClientAppActor::fp_BackupManager_SubscribeToServers()
 	{
 		if (!mp_BackupManagers.f_IsEmpty())
 			co_return {};
-		
+
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to backup managers");
-		
+
 		auto Subscription = co_await mp_State.m_TrustManager
 			(
 				&CDistributedActorTrustManager::f_SubscribeTrustedActors<NCloud::CBackupManager>
@@ -223,7 +229,7 @@ namespace NMib::NCloud::NCloudClient
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
@@ -289,33 +295,54 @@ namespace NMib::NCloud::NCloudClient
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
-		NTime::CTime BackupTime = _Params["BackupTime"].f_Date();
+		CTime BackupTime = _Params["BackupTime"].f_Date();
 		CStr Destination;
 		if (auto *pValue = _Params.f_GetMember("Destination"))
 			Destination = CFile::fs_GetExpandedPath(pValue->f_String(), _Params["CurrentDirectory"].f_String());
 		uint64 QueueSize = _Params["BackupQueueSize"].f_Integer();
 		if (QueueSize < 128*1024)
 			QueueSize = 128*1024;
-		
+
 		bool bSetOwner = _Params["SetOwner"].f_Boolean();
-		
+		bool bFindClosestSnapshot = _Params["FindClosestSnapshot"].f_Boolean();
+
 		if (BackupSource.f_IsEmpty())
 			co_return DMibErrorInstance("Backup source must be specified");
 
 		if (!CBackupManager::fs_IsValidBackupSource(BackupSource, nullptr, nullptr))
 			co_return DMibErrorInstance("Backup source name format is invalid");
-		
+
 		co_await self(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers");
 
 		CStr Error;
 		auto *pBackupManager = mp_BackupManagers.f_GetOneActor(BackupHost, Error);
 		if (!pBackupManager)
 			co_return DMibErrorInstance(fg_Format("Error selecting backup manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error));
+
+		if (bFindClosestSnapshot && BackupTime.f_IsValid())
+		{
+			auto Backups = co_await (pBackupManager->m_Actor.f_CallActor(&CBackupManager::f_ListBackups)(BackupSource) % "Failed to list backups");
+
+			CTime BestMatch;
+			for (auto &BackupInfo : Backups)
+			{
+				for (auto &SnapshotTime : BackupInfo.m_Snapshots)
+				{
+					if (SnapshotTime <= BackupTime && (!BestMatch.f_IsValid() || SnapshotTime > BestMatch))
+						BestMatch = SnapshotTime;
+				}
+			}
+
+			if (!BestMatch.f_IsValid())
+				co_return DMibErrorInstance("Cloud not find a matching backup that was before the specified time: {} UTC"_f << BackupTime);
+
+			BackupTime = BestMatch;
+		}
 
 		CStr BasePath;
 		if (!Destination.f_IsEmpty())
