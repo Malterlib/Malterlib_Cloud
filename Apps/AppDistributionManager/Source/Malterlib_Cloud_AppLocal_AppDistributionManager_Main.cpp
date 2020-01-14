@@ -17,38 +17,10 @@ class CAppDistributionManager : public CApplication
 {
 	aint f_Main()
 	{
-#ifdef DPlatformFamily_Windows
-		AllocConsole();
-		fg_GetSys()->f_SetEnvironmentVariable("Path", "c:\\Program Files\\Git\\usr\\bin;{}"_f << fg_GetSys()->f_GetEnvironmentVariable("Path"));
-		NSys::fg_Process_SetEnvironmentVariable_Unsafe("Path", "c:\\Program Files\\Git\\usr\\bin;{}"_f << fg_GetSys()->f_GetEnvironmentVariable("Path"));
-#endif
-
-		CStr ProgramDirectory = NFile::CFile::fs_GetProgramDirectory();
-#ifdef DPlatformFamily_Windows
-		CStr DefaultProgramDirectory = "c:/M";
-#else
-		CStr DefaultProgramDirectory = "/M";
-#endif
-
-		CStr DefaultDaemonName = "MalterlibCloudAppDistributionManager";
-		CStr Description = "Malterlib Cloud App Manager";
-
-		if (ProgramDirectory != DefaultProgramDirectory)
-		{
-			NCryptography::CHash_SHA256 Hash;
-
-			CStr Salt = "MalterlibAppDistributionManagerDaemoName";
-
-			Hash.f_AddData(Salt.f_GetStr(), Salt.f_GetLen());
-			Hash.f_AddData(ProgramDirectory.f_GetStr(), ProgramDirectory.f_GetLen());
-			DefaultDaemonName = "MalterlibCloudAppDistributionManager_{}"_f << Hash.f_GetDigest().f_GetString().f_Left(16);
-			Description = "Malterlib Cloud App Manager [{}]"_f << ProgramDirectory;
-		}
-
 		NConcurrency::CDistributedDaemon Daemon
 			{
-				DefaultDaemonName
-				, Description
+				"MalterlibCloudAppDistributionManager"
+				, "Malterlib Cloud App Distribution Manager"
 				, "Manages distributed cloud apps running on one host"
 				, []
 				{
@@ -58,7 +30,7 @@ class CAppDistributionManager : public CApplication
 		;
 
 		return Daemon.f_Run();
-	}	
+	}
 };
 
 DAppImplement(CAppDistributionManager);
