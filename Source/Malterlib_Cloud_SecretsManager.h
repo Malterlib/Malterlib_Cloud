@@ -164,7 +164,11 @@ namespace NMib::NCloud
 			bool operator == (CSecretProperties const &_Right) const;
 		};
 
+		static bool fs_IsValidFolder(NStr::CStr const &_Folder);
+		static bool fs_IsValidName(NStr::CStr const &_Name);
 		static bool fs_IsValidTag(NStr::CStr const &_Tag);
+		static bool fs_IsValidSemanticID(NStr::CStr const &_SemanticID);
+		static bool fs_IsValidSemanticIDWildcard(NStr::CStr const &_SemanticID);
 
 		virtual NConcurrency::TCFuture<NContainer::TCSet<CSecretID>> f_EnumerateSecrets
 			(

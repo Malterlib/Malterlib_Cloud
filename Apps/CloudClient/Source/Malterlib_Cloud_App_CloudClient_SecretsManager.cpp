@@ -37,7 +37,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					"Type"_= ""
 					, "Description"_= "Specify secret ID.\n"
-					"The ID is specified as Folder/Name with folder and name adhering to RFC 1123 (hostname)"
+					"The ID is specified as Folder/Name with folder and name adhering to RFC 1123 (hostname). Additionally for Folder / is allowed, and for Name # is allowed"
 				}
 			}
 		;
@@ -69,8 +69,8 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Names"_= {"--semantic-id"}
 							, "Default"_= ""
-							, "Description"_= "Limit query to secrets having the specified semantic ID.\n"
-							"The semantic ID must adhere to RFC 1123 (hostname)"
+							, "Description"_= "Limit query to secrets having the specified semantic ID wildcard.\n"
+							"The semantic ID must adhere to RFC 1123 (hostname) and additionally # is allowed as well as * and ? for wildcard."
 						}
 						, "Tags?"_=
 						{
@@ -121,7 +121,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Type"_= ""
 							, "Description"_= "Get the secret with the specified semantic ID.\n"
-							"The semantic ID must adhere to RFC 1123 (hostname)"
+							"The semantic ID must adhere to RFC 1123 (hostname) and additionally # is allowed."
 						}
 					}
 				}
@@ -258,7 +258,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= {"--semantic-id"}
 							, "Type"_= ""
 							, "Description"_= "The semantic ID to set.\n"
-							"The semantic ID must adhere to RFC 1123 (hostname)"
+							"The semantic ID must adhere to RFC 1123 (hostname) and additionally # is allowed."
 						}
 						, BinaryAsBase64
 					}
@@ -438,16 +438,16 @@ namespace NMib::NCloud::NCloudClient
 	{
 		if (auto const &ID = _Params["ID"].f_String())
 		{
-			aint SeparatorPosition = fg_StrFindChar(ID, '/');
+			aint SeparatorPosition = fg_StrFindCharReverse(ID, '/');
 			if (SeparatorPosition > 0)
 			{
 				o_ID = {ID.f_Left(SeparatorPosition), ID.f_Extract(SeparatorPosition + 1)};
-				if (!CSecretsManager::fs_IsValidTag(o_ID.m_Folder))
+				if (!CSecretsManager::fs_IsValidFolder(o_ID.m_Folder))
 				{
 					o_Error = fg_Format("'{}' is not a valid Folder", o_ID.m_Folder);
 					return true;
 				}
-				if (!CSecretsManager::fs_IsValidTag(o_ID.m_Name))
+				if (!CSecretsManager::fs_IsValidName(o_ID.m_Name))
 				{
 					o_Error = fg_Format("'{}' is not a valid Name", o_ID.m_Name);
 					return true;
@@ -545,7 +545,7 @@ namespace NMib::NCloud::NCloudClient
 		TCOptional<CStrSecure> SemanticID;
 		if (auto ID = _Params["SemanticID"].f_String())
 		{
-			if (!CSecretsManager::fs_IsValidTag(ID))
+			if (!CSecretsManager::fs_IsValidSemanticID(ID))
 				co_return DMibErrorInstance(fg_Format("'{}' is not a valid Semantic ID", ID));
 			SemanticID = ID;
 		}
@@ -878,7 +878,7 @@ namespace NMib::NCloud::NCloudClient
 		{
 			auto ID = pValue->f_String();
 
-			if (!CSecretsManager::fs_IsValidTag(ID))
+			if (!CSecretsManager::fs_IsValidSemanticID(ID))
 				co_return DMibErrorInstance(fg_Format("'{}' is not a valid SemanticID", ID));
 
 			Properties.f_SetSemanticID(ID);

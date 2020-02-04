@@ -26,9 +26,29 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CSecretsManager::f_UploadFile);
 	}
 
+	bool CSecretsManager::fs_IsValidFolder(NStr::CStr const &_Folder)
+	{
+		return NNetwork::fg_IsValidHostname(_Folder, "/");
+	}
+
+	bool CSecretsManager::fs_IsValidName(NStr::CStr const &_Name)
+	{
+		return NNetwork::fg_IsValidHostname(_Name, "#");
+	}
+
 	bool CSecretsManager::fs_IsValidTag(CStr const &_Tag)
 	{
 		return NNetwork::fg_IsValidHostname(_Tag);
+	}
+
+	bool CSecretsManager::fs_IsValidSemanticID(NStr::CStr const &_SemanticID)
+	{
+		return NNetwork::fg_IsValidHostname(_SemanticID, "#");
+	}
+
+	bool CSecretsManager::fs_IsValidSemanticIDWildcard(NStr::CStr const &_SemanticID)
+	{
+		return NNetwork::fg_IsValidHostname(_SemanticID, "#", "*?");
 	}
 
 	auto CSecretsManager::CSecretProperties::f_SetSecret(CSecret &&_Secret) && -> CSecretProperties &&

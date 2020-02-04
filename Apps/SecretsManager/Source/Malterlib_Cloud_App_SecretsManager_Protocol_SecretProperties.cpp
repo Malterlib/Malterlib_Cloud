@@ -31,7 +31,7 @@ namespace NMib::NCloud::NSecretsManager
 		{
 			for (auto const &SecretProperty : _Secrets)
 			{
-				if (_SemanticID && *_SemanticID != SecretProperty.m_SemanticID)
+				if (_SemanticID && fg_StrMatchWildcard(SecretProperty.m_SemanticID.f_GetStr(), _SemanticID->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted)
 					continue;
 
 				if (!fg_HasAllTagsSet(SecretProperty.m_Tags, _TagsExclusive))
@@ -60,6 +60,17 @@ namespace NMib::NCloud::NSecretsManager
 				}
 			}
 			return fg_Format("{} matching Semantic ID: '{}'{}", _Error, _SemanticID, TagsString);
+		}
+
+		CExceptionPointer fg_ValidateID(CSecretsManager::CSecretID const &_ID, CDistributedAppAuditor const &_Auditor)
+		{
+			if (!CSecretsManager::fs_IsValidFolder(_ID.m_Folder))
+				return _Auditor.f_Exception(fg_Format("Malformed folder: '{}'", _ID.m_Folder)).f_ExceptionPointer();
+
+			if (!CSecretsManager::fs_IsValidName(_ID.m_Name))
+				return _Auditor.f_Exception(fg_Format("Malformed name: '{}'", _ID.m_Name)).f_ExceptionPointer();
+
+			return nullptr;
 		}
 	}
 
@@ -101,6 +112,9 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
+		if (_SemanticID && !CSecretsManager::fs_IsValidSemanticIDWildcard(*_SemanticID))
+			co_return Auditor.f_Exception(fg_Format("Malformed semantic ID: '{}'", *_SemanticID));
+
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/EnumerateSecrets"}};
@@ -135,6 +149,9 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
+		if (auto pError = fg_ValidateID(_ID, Auditor))
+			co_return fg_Move(pError);
+
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/GetSecret"}};
@@ -163,6 +180,9 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
+
+		if (auto pError = fg_ValidateID(_ID, Auditor))
+			co_return fg_Move(pError);
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
@@ -212,6 +232,9 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
+
+		if (!CSecretsManager::fs_IsValidSemanticID(_SemanticID))
+			co_return Auditor.f_Exception(fg_Format("Malformed semantic ID: '{}'", _SemanticID));
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
@@ -265,10 +288,13 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
+		if (auto pError = fg_ValidateID(_ID, Auditor))
+			co_return fg_Move(pError);
+
 		// Check the correctness of Semantic ID and Tags before we use them to match permissions
 		if (_Secret.m_SemanticID)
 		{
-			if (!CSecretsManager::fs_IsValidTag(*_Secret.m_SemanticID))
+			if (!CSecretsManager::fs_IsValidSemanticID(*_Secret.m_SemanticID))
 				co_return Auditor.f_Exception(fg_Format("Malformed Semantic ID: '{}'", *_Secret.m_SemanticID));
 		}
 		if (_Secret.m_Tags)
@@ -404,6 +430,9 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
+		if (auto pError = fg_ValidateID(_ID, Auditor))
+			co_return fg_Move(pError);
+
 		// Check the correctness of Semantic ID and Tags before we use them to match permissions
 		for (auto const &Tag : _TagsToRemove)
 		{
@@ -470,6 +499,9 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
+		if (auto pError = fg_ValidateID(_ID, Auditor))
+			co_return fg_Move(pError);
+
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SetMetadata"}};
@@ -506,6 +538,9 @@ namespace NMib::NCloud::NSecretsManager
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
 
+		if (auto pError = fg_ValidateID(_ID, Auditor))
+			co_return fg_Move(pError);
+
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/RemoveMetadata"}};
@@ -541,6 +576,9 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
+
+		if (auto pError = fg_ValidateID(_ID, Auditor))
+			co_return fg_Move(pError);
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
