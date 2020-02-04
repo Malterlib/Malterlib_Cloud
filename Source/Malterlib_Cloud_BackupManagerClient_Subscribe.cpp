@@ -40,7 +40,7 @@ namespace NMib::NCloud
 				;
 				m_BackupManagers.f_OnRemoveActor
 					(
-						[this](TCWeakDistributedActor<CActor> const &_Actor)
+						[this](TCWeakDistributedActor<CActor> const &_Actor, CTrustedActorInfo &&_ActorInfo)
 						{
 							auto *pInstance = m_RunningBackupInstances.f_FindEqual(_Actor);
 							if (!pInstance)

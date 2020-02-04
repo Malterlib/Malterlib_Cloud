@@ -36,7 +36,7 @@ namespace NMib::NCloud::NAppManager
 
 		mp_RemoteAppManagers.f_OnRemoveActor
 			(
-				[this](TCWeakDistributedActor<CActor> const &_RemovedActor)
+				[this](TCWeakDistributedActor<CActor> const &_RemovedActor, CTrustedActorInfo &&_ActorInfo)
 				{
 					auto pActor = mp_RemoteAppManagerStateByActor.f_FindEqual(_RemovedActor);
 					if (!pActor)

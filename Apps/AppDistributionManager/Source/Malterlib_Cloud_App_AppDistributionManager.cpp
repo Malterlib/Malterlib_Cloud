@@ -45,9 +45,9 @@ namespace NMib::NCloud::NAppDistributionManager
 						;
 						mp_VersionManagerSubscription.f_OnRemoveActor
 							(
-								[this](TCWeakDistributedActor<CActor> const &_VersionManagero)
+								[this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo)
 								{
-									fp_VersionManagerRemoved(_VersionManagero);
+									fp_VersionManagerRemoved(_VersionManager);
 								}
 							)
 						;

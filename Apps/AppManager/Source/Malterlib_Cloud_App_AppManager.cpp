@@ -404,9 +404,9 @@ namespace NMib::NCloud::NAppManager
 
 		mp_VersionManagerSubscription.f_OnRemoveActor
 			(
-				[this](TCWeakDistributedActor<CActor> const &_VersionManagero)
+				[this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo)
 				{
-					fp_VersionManagerRemoved(_VersionManagero);
+					fp_VersionManagerRemoved(_VersionManager);
 				}
 			)
 		;
@@ -423,9 +423,9 @@ namespace NMib::NCloud::NAppManager
 
 		mp_CloudManagerSubscription.f_OnRemoveActor
 			(
-				[this](TCWeakDistributedActor<CActor> const &_CloudManagero)
+				[this](TCWeakDistributedActor<CActor> const &_CloudManager, CTrustedActorInfo &&_ActorInfo)
 				{
-					fp_CloudManagerRemoved(_CloudManagero);
+					fp_CloudManagerRemoved(_CloudManager);
 				}
 			)
 		;
