@@ -20,14 +20,14 @@ BuildName: Win32-ninja
 LabelsForSubprojects: 
 
 # Submission information
-SubmitURL: http://my.cdash.org
+SubmitURL: http://my.cdash.org/submit.php?project=libarchive
 
 # Dashboard start time
 NightlyStartTime: 01:00:00 UTC
 
 # Commands for the build/test/submit cycle
-ConfigureCommand: "../../../../../../BuildSystem/SafeMib/Binaries/MToolCMake.exe" "../../../../../../External/libarchive"
-MakeCommand: x:\Source\Malterlib\BuildSystem\SafeMib\Binaries\MToolCMake.exe --build . --config "${CTEST_CONFIGURATION_TYPE}"
+ConfigureCommand: "../../../../../../Binaries/Malterlib/Windows/x64/MToolCMake.exe" "../../../../../../External/libarchive"
+MakeCommand: x:\Source\Malterlib\Binaries\Malterlib\Windows\x64\MToolCMake.exe --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 
 # version control
@@ -50,7 +50,7 @@ GITUpdateOptions:
 GITUpdateCustom: 
 
 # Perforce options
-P4Command: C:/Program Files/Perforce/p4.exe
+P4Command: P4COMMAND-NOTFOUND
 P4Client: 
 P4Options: 
 P4UpdateOptions: 
