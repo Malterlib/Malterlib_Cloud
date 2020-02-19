@@ -564,6 +564,10 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 		{
 			Compile.Type C
 		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_private.h"
+		{
+			Compile.Type None
+		}
 		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_raw.c"
 		{
 			Compile.Type C
@@ -1198,6 +1202,10 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_pax.c"
 		{
 			Compile.Type C
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_private.h"
+		{
+			Compile.Type None
 		}
 		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_raw.c"
 		{
