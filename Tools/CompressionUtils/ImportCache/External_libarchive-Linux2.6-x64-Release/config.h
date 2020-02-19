@@ -1211,10 +1211,10 @@ typedef uint64_t uintmax_t;
 #define HAVE__GET_TIMEZONE 1
 
 /* Define to 1 if you have the `_gmtime64_s' function. */
-#define HAVE__GMTIME64_S 1
+/* #undef HAVE__GMTIME64_S */
 
 /* Define to 1 if you have the `_localtime64_s' function. */
-#define HAVE__LOCALTIME64_S 1
+/* #undef HAVE__LOCALTIME64_S */
 
 /* Define to 1 if you have the `_mkgmtime64' function. */
 #define HAVE__MKGMTIME64 1
