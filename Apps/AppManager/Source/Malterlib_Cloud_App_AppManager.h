@@ -337,6 +337,9 @@ namespace NMib::NCloud::NAppManager
 			;
 
 			CAppManagerActor *m_pThis = nullptr;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
 		};
 
 		struct CAppManagerInterfaceImplementation : public CAppManagerInterface
@@ -373,6 +376,9 @@ namespace NMib::NCloud::NAppManager
 			;
 
 			CAppManagerActor *m_pThis = nullptr;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
 		};
 
 		struct CUpdateNotificationSubscription
@@ -413,6 +419,9 @@ namespace NMib::NCloud::NAppManager
 			;
 
 			CAppManagerActor *m_pThis = nullptr;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
 		};
 
 		struct CRemoteAppManagerApp

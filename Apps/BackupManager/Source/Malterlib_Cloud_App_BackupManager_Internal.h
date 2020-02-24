@@ -89,6 +89,9 @@ namespace NMib::NCloud::NBackupManager
 			;
 
 			CBackupManagerServer *m_pThis;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
 		};
 
 		TCFuture<void> f_Init();

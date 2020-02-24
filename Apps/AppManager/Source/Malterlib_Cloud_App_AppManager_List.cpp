@@ -192,7 +192,7 @@ namespace NMib::NCloud::NAppManager
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("Application", "Update", "Version", "Status", "Other", "Backup", "Script", "Extra Info");
 
-		TCMap<CStr, CAppManagerInterface::CApplicationInfo> ApplicationInfo = co_await mp_AppManagerInterface.m_pActor->self(&CAppManagerInterfaceImplementation::f_GetInstalled);
+		TCMap<CStr, CAppManagerInterface::CApplicationInfo> ApplicationInfo = co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_GetInstalled);
 		for (auto &Application : ApplicationInfo)
 		{
 			auto &ApplicationName = ApplicationInfo.fs_GetKey(Application);
@@ -337,7 +337,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CAppManagerInterface::CVersionsAvailableForUpdate Results = co_await
-			mp_AppManagerInterface.m_pActor->self(&CAppManagerInterfaceImplementation::f_GetAvailableVersions, _Params["Application"].f_String())
+			mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_GetAvailableVersions, _Params["Application"].f_String())
 		;
 
 		{

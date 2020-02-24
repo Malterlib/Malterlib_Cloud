@@ -30,6 +30,9 @@ namespace NMib::NCloud::NCloudAPIManager
 			TCFuture<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) override;
 
 			CServer *m_pThis;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
 		};
 
 		struct COpenStackKeystoneInfo

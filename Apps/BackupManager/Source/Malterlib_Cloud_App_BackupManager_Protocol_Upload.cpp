@@ -126,7 +126,7 @@ namespace NMib::NCloud::NBackupManager
 
 		Auditor.f_HostInfo().f_OnDisconnect
 			(
-				fg_ThisActor(this)
+				fg_ThisActor(pThis)
 				, [pThis, BackupKey, Auditor]
 				{
 					pThis->self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupKey, Auditor, true, "Actor host disconnected (restarted)") > fg_DiscardResult();

@@ -107,6 +107,9 @@ namespace NMib::NCloud
 			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeBackupStopped(TCActorFunctorWithID<TCFuture<void> ()> &&_fOnStopped) override;
 
 			CBackupManagerClient *m_pThis = nullptr;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
 		};
 
 		struct CNotificationAndHost

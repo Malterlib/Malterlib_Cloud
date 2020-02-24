@@ -49,6 +49,9 @@ namespace NMib::NCloud::NSecretsManager
 			;
 
 			CServer *m_pThis;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
 		};
 
 		struct CDownload

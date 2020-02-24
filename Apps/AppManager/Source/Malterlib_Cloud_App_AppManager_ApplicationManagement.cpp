@@ -442,19 +442,19 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		co_await mp_AppManagerInterface.m_pActor->self(&CAppManagerInterfaceImplementation::f_Stop, _Params["Name"].f_String());
+		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Stop, _Params["Name"].f_String());
 		co_return 0;
 	}
 	
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		co_await mp_AppManagerInterface.m_pActor->self(&CAppManagerInterfaceImplementation::f_Start, _Params["Name"].f_String());
+		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Start, _Params["Name"].f_String());
 		co_return 0;
 	}
 	
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		co_await mp_AppManagerInterface.m_pActor->self(&CAppManagerInterfaceImplementation::f_Restart, _Params["Name"].f_String());
+		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Restart, _Params["Name"].f_String());
 		co_return 0;
 	}
 	

@@ -31,6 +31,9 @@ namespace NMib::NCloud::NCloudManager
 			TCFuture<TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() override;
 
 			CCloudManagerServer *m_pThis;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
 		};
 
 		TCFuture<void> f_Init();

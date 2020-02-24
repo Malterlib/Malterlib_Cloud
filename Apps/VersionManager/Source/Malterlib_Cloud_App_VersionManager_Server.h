@@ -97,6 +97,9 @@ namespace NMib::NCloud::NVersionManager
 			TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) override;
 
 			CServer *m_pThis = nullptr;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
 		};
 
 		struct CSubscription
