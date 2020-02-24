@@ -101,4 +101,21 @@ namespace NMib::NCloud
 			break;
 		}
 	}
+
+	template <typename tf_CStream>
+	void CSecretsManager::CSecretChanges::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_bFullResend;
+		_Stream % m_Changed;
+		_Stream % m_Removed;
+	}
+
+	template <typename tf_CStream>
+	void CSecretsManager::CSubscribeToChanges::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_SemanticID;
+		_Stream % m_TagsExclusive;
+
+		_Stream % fg_Move(m_fOnChanges);
+	}
 }

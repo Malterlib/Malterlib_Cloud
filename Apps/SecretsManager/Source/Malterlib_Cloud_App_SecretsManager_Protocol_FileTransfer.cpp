@@ -405,6 +405,8 @@ namespace NMib::NCloud::NSecretsManager
 						pSecretProperty->m_HMACKey = fg_Move(HMACKey);
 						pSecretProperty->m_RandomFileName = fg_Move(NewFileName);
 
+						This.fp_SecretUpdated(*pSecretProperty, false);
+
 						This.fp_WriteDatabase() > CheckResultPromise % "Falied to write database" / [=]
 							{
 								if (Result.m_Stats.m_nSyncedFiles <= 1)

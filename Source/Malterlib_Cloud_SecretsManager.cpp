@@ -24,6 +24,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CSecretsManager::f_RemoveMetadata);
 		DMibPublishActorFunction(CSecretsManager::f_RemoveSecret);
 		DMibPublishActorFunction(CSecretsManager::f_UploadFile);
+		DMibPublishActorFunction(CSecretsManager::f_SubscribeToChanges);
 	}
 
 	bool CSecretsManager::fs_IsValidFolder(NStr::CStr const &_Folder)
@@ -289,5 +290,15 @@ namespace NMib::NCloud
 	bool CSecretsManager::CSecret::operator == (CSecret const &_Right) const
 	{
 		return fg_VisitRet<bool>(NPrivate::CSecretEqualsVisitor(), *this, _Right);
+	}
+
+	auto CSecretsManager::CSecretID::fs_Parse(NStr::CStr const &_CompoundID) -> CSecretID
+	{
+		auto iLastPath = _CompoundID.f_FindCharReverse('/');
+
+		if (iLastPath >= 0)
+			return {_CompoundID.f_Left(iLastPath), _CompoundID.f_Extract(iLastPath + 1)};
+		else
+			return {"", _CompoundID};
 	}
 }

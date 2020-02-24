@@ -29,15 +29,10 @@ namespace NMib::NCloud::NSecretsManager
 				, t_CFunctor _Func
 			)
 		{
-			for (auto const &SecretProperty : _Secrets)
+			for (auto const &SecretProperties : _Secrets)
 			{
-				if (_SemanticID && fg_StrMatchWildcard(SecretProperty.m_SemanticID.f_GetStr(), _SemanticID->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted)
-					continue;
-
-				if (!fg_HasAllTagsSet(SecretProperty.m_Tags, _TagsExclusive))
-					continue;
-
-				_Func(SecretProperty);
+				if (CSecretsManagerDaemonActor::CServer::fs_MatchSecret(SecretProperties, _SemanticID, _TagsExclusive))
+					_Func(SecretProperties);
 			}
 		}
 
@@ -72,6 +67,22 @@ namespace NMib::NCloud::NSecretsManager
 
 			return nullptr;
 		}
+	}
+
+	bool CSecretsManagerDaemonActor::CServer::fs_MatchSecret
+		(
+			CSecretPropertiesInternal const &_SecretProperties
+			, TCOptional<CStrSecure> const &_SemanticID
+			, TCSet<CStrSecure> const &_TagsExclusive
+		)
+	{
+		if (_SemanticID && fg_StrMatchWildcard(_SecretProperties.m_SemanticID.f_GetStr(), _SemanticID->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted)
+			return false;
+
+		if (!fg_HasAllTagsSet(_SecretProperties.m_Tags, _TagsExclusive))
+			return false;
+
+		return true;
 	}
 
 	void CSecretsManagerDaemonActor::CServer::fsp_AddPermissionsForMatchingSecrets
@@ -114,6 +125,12 @@ namespace NMib::NCloud::NSecretsManager
 
 		if (_SemanticID && !CSecretsManager::fs_IsValidSemanticIDWildcard(*_SemanticID))
 			co_return Auditor.f_Exception(fg_Format("Malformed semantic ID: '{}'", *_SemanticID));
+
+		for (auto const &Tag : _TagsExclusive)
+		{
+			if (!CSecretsManager::fs_IsValidTag(Tag))
+				co_return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
+		}
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
@@ -176,6 +193,24 @@ namespace NMib::NCloud::NSecretsManager
 		co_return pSecretProperty->m_Secret;
 	}
 
+	CSecretsManager::CSecretProperties CSecretPropertiesInternal::f_ToSecretProperties() const
+	{
+		return CSecretsManager::CSecretProperties
+			{
+				m_Secret
+				, m_UserName
+				, m_URL
+				, m_Expires
+				, m_Notes
+				, m_Metadata
+				, m_Created
+				, m_Modified
+				, m_SemanticID
+				, m_Tags
+			}
+		;
+	}
+
 	TCFuture<CSecretsManager::CSecretProperties> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretProperties(CSecretsManager::CSecretID &&_ID)
 	{
 		auto &This = *m_pThis;
@@ -211,20 +246,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (!pSecretProperty)
 			co_return Auditor.f_Exception(fg_SecretIDException(_ID));
 
-		co_return CSecretsManager::CSecretProperties
-			{
-				pSecretProperty->m_Secret
-				, pSecretProperty->m_UserName
-				, pSecretProperty->m_URL
-				, pSecretProperty->m_Expires
-				, pSecretProperty->m_Notes
-				, pSecretProperty->m_Metadata
-				, pSecretProperty->m_Created
-				, pSecretProperty->m_Modified
-				, pSecretProperty->m_SemanticID
-				, pSecretProperty->m_Tags
-			}
-		;
+		co_return pSecretProperty->f_ToSecretProperties();
 	}
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretBySemanticID(CStrSecure const &_SemanticID, TCSet<CStrSecure> const &_TagsExclusive)
@@ -235,6 +257,12 @@ namespace NMib::NCloud::NSecretsManager
 
 		if (!CSecretsManager::fs_IsValidSemanticID(_SemanticID))
 			co_return Auditor.f_Exception(fg_Format("Malformed semantic ID: '{}'", _SemanticID));
+
+		for (auto const &Tag : _TagsExclusive)
+		{
+			if (!CSecretsManager::fs_IsValidTag(Tag))
+				co_return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
+		}
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
@@ -412,6 +440,8 @@ namespace NMib::NCloud::NSecretsManager
 
 		Auditor.f_Info(fg_Format("Secret properties {} for ID '{}/{}'", pCreatedOrModified, _ID.m_Folder, _ID.m_Name));
 
+		This.fp_SecretUpdated(*pSecretProperty, false);
+
 		co_await (This.fp_WriteDatabase() % "Failed to save database" % Auditor);
 
 		if (RandomFileNameToUnreference)
@@ -489,6 +519,8 @@ namespace NMib::NCloud::NSecretsManager
 
 		Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
 
+		This.fp_SecretUpdated(*pSecretProperty, false);
+
 		co_await (This.fp_WriteDatabase() % "Failed to save database" % Auditor);
 
 		co_return {};
@@ -527,6 +559,8 @@ namespace NMib::NCloud::NSecretsManager
 		pSecretProperty->m_Modified = CTime::fs_NowUTC();
 
 		Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
+
+		This.fp_SecretUpdated(*pSecretProperty, false);
 
 		co_await (This.fp_WriteDatabase() % "Failed to save database" % Auditor);
 
@@ -567,6 +601,8 @@ namespace NMib::NCloud::NSecretsManager
 
 		Auditor.f_Info(fg_Format("Secret properties modified for ID '{}/{}'", _ID.m_Folder, _ID.m_Name));
 
+		This.fp_SecretUpdated(*pSecretProperty, false);
+
 		co_await (This.fp_WriteDatabase() % "Failed to save database" % Auditor);
 
 		co_return {};
@@ -604,6 +640,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperty->m_Secret.f_GetTypeID() == CSecretsManager::ESecretType_File)
 			RandomFileNameToUnreference = pSecretProperty->m_RandomFileName;
 
+		This.fp_SecretUpdated(*pSecretProperty, true);
 		This.mp_Database.m_Secrets.f_Remove(_ID);
 
 		Auditor.f_Info(fg_Format("Secret removed, ID: '{}/{}'", _ID.m_Folder, _ID.m_Name));

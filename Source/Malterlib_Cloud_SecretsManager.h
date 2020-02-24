@@ -55,6 +55,8 @@ namespace NMib::NCloud
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
 
+			static CSecretID fs_Parse(NStr::CStr const &_CompoundID);
+
 			NStr::CStr m_Folder;
 			NStr::CStr m_Name;
 		};
@@ -164,6 +166,27 @@ namespace NMib::NCloud
 			bool operator == (CSecretProperties const &_Right) const;
 		};
 
+		struct CSecretChanges
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			bool m_bFullResend = false;
+			NContainer::TCMap<CSecretID, CSecretProperties> m_Changed;
+			NContainer::TCSet<CSecretID> m_Removed;
+		};
+
+		struct CSubscribeToChanges
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID; //< Limit the updates to secrets matching semantic ID wildcard
+			NContainer::TCSet<NStr::CStrSecure> m_TagsExclusive; //< Limit the updates to secrets with all tags specified
+
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CSecretChanges &&_Changes)> m_fOnChanges;
+		};
+
 		static bool fs_IsValidFolder(NStr::CStr const &_Folder);
 		static bool fs_IsValidName(NStr::CStr const &_Name);
 		static bool fs_IsValidTag(NStr::CStr const &_Tag);
@@ -203,6 +226,7 @@ namespace NMib::NCloud
 			 	, NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> &&_Uploader
 			) = 0
 		;
+		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeToChanges(CSubscribeToChanges &&_Params) = 0;
 	};
 }
 

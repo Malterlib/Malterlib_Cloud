@@ -3,10 +3,10 @@
 
 #pragma once
 
-namespace NMib::NCloud
+namespace NMib::NCloud::NSecretsManager
 {
 	template <typename tf_CStream>
-	void NSecretsManager::CSecretPropertiesInternal::f_Stream(tf_CStream &_Stream)
+	void CSecretPropertiesInternal::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Secret;
 		_Stream % m_UserName;
@@ -25,7 +25,7 @@ namespace NMib::NCloud
 	}
 
 	template <typename tf_CStream>
-	void NSecretsManager::CSecretsDatabase::f_Stream(tf_CStream &_Stream)
+	void CSecretsDatabase::f_Stream(tf_CStream &_Stream)
 	{
 		uint32 Version = ESecretsManagerDatabaseVersion;
 		_Stream % Version;
@@ -37,7 +37,7 @@ namespace NMib::NCloud
 	}
 
 	template <typename tf_CStream>
-	void NSecretsManager::CSecretsDatabaseIV::f_Stream(tf_CStream &_Stream)
+	void CSecretsDatabaseIV::f_Stream(tf_CStream &_Stream)
 	{
 		uint32 Version = ESecretsManagerDatabaseIVVersion;
 		_Stream % Version;
@@ -47,5 +47,10 @@ namespace NMib::NCloud
 
 		_Stream % m_InternalSalt;
 		_Stream % m_ExternalSalt;
+	}
+	
+	inline CSecretsManager::CSecretID const &CSecretPropertiesInternal::f_GetSecretID() const
+	{
+		return TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal>::fs_GetKey(*this);
 	}
 }

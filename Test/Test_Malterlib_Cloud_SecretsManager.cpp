@@ -625,6 +625,96 @@ public:
 					SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name}).f_CallSync(g_Timeout);
 				}
 			;
+			auto fSecretID = [](CStr const &_CompoundName)
+				{
+					return CSecretsManager::CSecretID::fs_Parse(_CompoundName);
+				}
+			;
+			auto fSecretIDSet = [&](auto &&...p_CompoundNames)
+				{
+					return TCSet<CSecretsManager::CSecretID>{fSecretID(p_CompoundNames)...};
+				}
+			;
+
+			struct CChangesState
+			{
+				NThread::CMutual m_Lock;
+				NThread::CEvent m_Event;
+				TCLinkedList<CSecretsManager::CSecretChanges> m_Changes;
+
+				CSecretsManager::CSecretChanges f_PopChanges()
+				{
+					DMibLock(m_Lock);
+					if (m_Changes.f_IsEmpty())
+					{
+						DMibUnlock(m_Lock);
+						if (m_Event.f_WaitTimeout(g_Timeout))
+							DMibError("Timed out wating for secret manager changes");
+					}
+
+					auto Return = m_Changes.f_Pop();
+					if (m_Changes.f_IsEmpty())
+						m_Event.f_ResetSignaled();
+					return Return;
+				}
+
+				mint f_GetNonFullResendNumChanges()
+				{
+					DMibLock(m_Lock);
+
+					mint nChanges = 0;
+					for (auto &Change : m_Changes)
+					{
+						if (!Change.m_bFullResend)
+							++nChanges;
+					}
+
+					return nChanges;
+				}
+
+				// Pops one non-"full resend" changes and makes sure that there are no other changes in queue
+				CSecretsManager::CSecretChanges f_PopChangesAssertOne()
+				{
+					CSecretsManager::CSecretChanges Return = f_PopChanges();
+					while (Return.m_bFullResend)
+						Return = f_PopChanges();
+
+					DMibLock(m_Lock);
+
+					CStr ChangesError;
+					if (!m_Changes.f_IsEmpty())
+						ChangesError = "Unexpected changes with changed change: {vs} removed: {vs}"_f << m_Changes.f_GetFirst().m_Changed.f_KeySet() << m_Changes.f_GetFirst().m_Removed;
+
+					DMibAssert(ChangesError, ==, "");
+
+					return Return;
+				}
+			};
+
+			TCSharedPointer<CChangesState> pChangesState = fg_Construct();
+			CActorSubscription SecretChangesSubscription;
+
+			{
+				pChangesState->m_Event.f_ResetSignaled();
+				CSecretsManager::CSubscribeToChanges ChangesSubscription;
+				ChangesSubscription.m_fOnChanges = g_ActorFunctor / [pChangesState](CSecretsManager::CSecretChanges &&_Changes) -> TCFuture<void>
+					{
+						DMibLock(pChangesState->m_Lock);
+						if (pChangesState->m_Changes.f_IsEmpty())
+							pChangesState->m_Event.f_SetSignaled();
+
+						pChangesState->m_Changes.f_Insert(fg_Move(_Changes));
+						co_return {};
+					}
+				;
+				SecretChangesSubscription = SecretsManager.f_CallActor(&CSecretsManager::f_SubscribeToChanges)(fg_Move(ChangesSubscription)).f_CallSync(g_Timeout);
+
+				auto Changes = pChangesState->f_PopChanges();
+
+				DMibExpectTrue(Changes.m_bFullResend);
+				DMibExpectTrue(Changes.m_Removed.f_IsEmpty());
+				DMibExpect(Changes.m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1", "Folder1/Name2", "Folder2/Name1", "Folder2/Name2"));
+			}
 
 			{
 				//
@@ -677,18 +767,47 @@ public:
 				
 				// No op
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {},            {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
+				{
+					DMibTestPath("Changes 1");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
 				// Add tags
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {},            {{"Added"}}             )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1", "Added"}}));
+				{
+					DMibTestPath("Changes 2");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+
+				}
 				// Remove
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Shared1"}}, {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Added"}}));
+				{
+					DMibTestPath("Changes 3");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Unique1"}}, {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Added"}}));
+				{
+					DMibTestPath("Changes 4");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
 				// Remove and Add
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}},   {{"Shared1", "Unique1"}})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
-				// Remove non-present tag
+				{
+					DMibTestPath("Changes 5");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
+ 				// Remove non-present tag
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}},   {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
-	
+				{
+					DMibTestPath("Changes 6");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
+
 				// Add to Secret with no existing tags
 				DMibExpect(*(fAddTagsAndGetProperties("Folder2", "Name2", {},            {{"Unique3"}}           )).m_Tags, ==, TCSet<NStr::CStrSecure>{{"Unique3"}});
+				{
+					DMibTestPath("Changes 7");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name2"));
+				}
 
 				// Check for exception for both missing folder and name
 				auto fModifySecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, TCSet<NStr::CStr> const &_Remove, TCSet<NStr::CStr> const &_Add)
@@ -761,10 +880,22 @@ public:
 				DMibExpect(*fGetProperties("Folder2", "Name2").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{{"Key1", "Value1"}}));
 
 				DMibExpect(*fSetKeyValueAndGet("Folder2", "Name2", "Key2", "Value2").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{{"Key1", "Value1"}, {"Key2", "Value2"}}));
-				DMibExpect(*fSetKeyValueAndGet("Folder2", "Name1", "Key3", "Value3").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{{"Key3", "Value3"}}));
+				{
+					DMibTestPath("Changes 8");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name2"));
+				}
+ 				DMibExpect(*fSetKeyValueAndGet("Folder2", "Name1", "Key3", "Value3").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{{"Key3", "Value3"}}));
+				{
+					DMibTestPath("Changes 9");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name1"));
+				}
 				DMibExpectException(fSetKeyValue("Folder1", "NoMatch", "Key3", "Value3"), DMibErrorInstance("No secret matching ID: 'Folder1/NoMatch'"));
 
 				DMibExpect(*fRemoveKeyAndGet("Folder2", "Name2", "Key1").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{{"Key2", "Value2"}}));
+				{
+					DMibTestPath("Changes 10");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name2"));
+				}
 				DMibExpectException(fRemoveKey("Folder1", "NoMatch", "Key3"), DMibErrorInstance("No secret matching ID: 'Folder1/NoMatch'"));
 			}
 			
@@ -789,6 +920,10 @@ public:
 					DMibExpect(*Properties.m_Created, >, TimeBeforeSetPropertiesCall);
 					DMibExpect(*Properties.m_Created, <, TimeAfterSetPropertiesCall);
 					DMibExpect(*Properties.m_Created, ==, *Properties.m_Modified);
+					{
+						DMibTestPath("Changes 11");
+						DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test1"));
+					}
 				}
 
 				{
@@ -811,6 +946,10 @@ public:
 						DMibExpect(*Properties.m_Created, ==, NTime::CTimeConvert::fs_CreateTime(1972, 2, 2));
 						DMibExpect(*Properties.m_Modified, >, TimeBeforeSetPropertiesCall);
 						DMibExpect(*Properties.m_Modified, <, TimeAfterSetPropertiesCall);
+						{
+							DMibTestPath("Changes 12");
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test1"));
+						}
 					}
 					{
 						SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)
@@ -825,6 +964,10 @@ public:
 						auto Properties2 = fGetProperties("Test", "Test1");
 						DMibExpect(*Properties2.m_Created, ==, NTime::CTimeConvert::fs_CreateTime(1972, 2, 2));
 						DMibExpect(*Properties2.m_Modified, ==, NTime::CTimeConvert::fs_CreateTime(1973, 3, 3));
+						{
+							DMibTestPath("Changes 13");
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test1"));
+						}
 					}
 				}
 				
@@ -910,52 +1053,74 @@ public:
 							 )
 						;
 						{
+							DMibTestPath("Changes 14");
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
+						}
+						{
 							DMibTestPath("Test SetProperties - only setting Secret");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetSecret(CSecretsManager::CSecret{"newtext"}));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 						{
 							DMibTestPath("Test SetProperties - only setting Username");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetUserName("NewUsername"));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 						{
 							DMibTestPath("Test SetProperties - only setting URL");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetURL("NewURL"));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 						{
 							DMibTestPath("Test SetProperties - only setting Expires");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetExpires(NTime::CTimeConvert::fs_CreateTime(1977, 7, 7)));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 						{
 							DMibTestPath("Test SetProperties - only setting Created");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetCreated(NTime::CTimeConvert::fs_CreateTime(1988, 8, 8)));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 						{
 							DMibTestPath("Test SetProperties - only setting Modified");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetModified(NTime::CTimeConvert::fs_CreateTime(1999, 9, 9)));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 						{
 							DMibTestPath("Test SetProperties - only setting Notes");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetNotes("NewNote"));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 						{
 							DMibTestPath("Test SetProperties - only setting Metadata");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetMetadata("c", "d"));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 						{
 							DMibTestPath("Test SetProperties - only setting SemanticID");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetSemanticID("NewSemanticID"));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 						{
 							DMibTestPath("Test SetProperties - only setting Tags");
 							fSetPropertiesTestUntouched("Test", "Test2", CSecretsManager::CSecretProperties{}.f_SetTags({"NewTag1", "NewTag2"}));
+							DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Test/Test2"));
 						}
 					}
 				}
 				{
 					fSetProperties("Removable", "Name1", CSecretsManager::CSecretProperties{}.f_SetNotes("Note"));
+					{
+						DMibTestPath("Changes 15");
+						DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Removable/Name1"));
+					}
 
 					DMibExpect(fGetSecret("Removable", "Name1"), ==, CSecretsManager::CSecret{});
 					fRemoveSecret("Removable", "Name1");
+					{
+						DMibTestPath("Changes 16");
+						DMibExpect(pChangesState->f_PopChangesAssertOne().m_Removed, ==, fSecretIDSet("Removable/Name1"));
+					}
 					DMibExpectException(fGetSecret("Removable", "Name1"), DMibErrorInstance("No secret matching ID: 'Removable/Name1'"));
 				}
 			}
@@ -977,7 +1142,7 @@ public:
 					}
 				}
 			;
-			
+
 			auto fAddPermission = [&](CStr const &_Permission)
 				{
 					fAddPermissions(fg_CreateMap<CStr, CPermissionRequirements>(fg_TempCopy(_Permission)));
@@ -1138,7 +1303,7 @@ public:
 
 					// This one is a bit strange, but the semantic ID does not work as the tags, where a subset of tags can find a matching secret.
 					// The empty semantic ID will only match secrets with an empty semantic ID
-					DMibExpectException(fGetBySemantic("", {{"Shared1", "Unique1"}}), DMibErrorInstance("No secret matching Semantic ID: '' and Tags: 'Shared1', 'Unique1'"));
+					DMibExpectException(fGetBySemantic("", {{"Shared1", "Unique1"}}), DMibErrorInstance("Malformed semantic ID: ''"));
 
 					// GetSecretBySemanticID and EnumerateSecrets will only find/enumerate secrets where we have permissions for both SemanticID and all Tags on the secret.
 					// Missing a permission should result in a no secret, regardless of whichtags we use to search for
@@ -1194,7 +1359,7 @@ public:
 				// No permissions set -> Access denied
 				DMibTestPath("Test SetProperties Command Permissions");
 				DMibExpectException(fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetNotes("Note")), DMibErrorInstance("Access denied"));
-				
+
 				auto Needed = fg_CreateMap<CStr, CPermissionRequirements>
 					(
 						"SecretsManager/Write/SemanticID/Semantic1/Tag/Shared1"
@@ -1207,6 +1372,10 @@ public:
 				
 				// Check that access is permitted
 				fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetNotes("Note"));
+				{
+					DMibTestPath("Changes 17");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
 
 				for (auto const &Permission : Needed)
 				{
@@ -1222,6 +1391,10 @@ public:
 					DMibTestPath("Test SetProperties Permissions details");
 					// Check that access is permitted again
 					fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetNotes("Note"));
+					{
+						DMibTestPath("Changes 18");
+						DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+					}
 					// Cannot set/change SemanticID without permission
 					DMibExpectException(fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetSemanticID("NoMatch")), DMibErrorInstance("Access denied"));
 					DMibExpectException(fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetSemanticID("NoMatch")), DMibErrorInstance("Access denied"));
@@ -1232,10 +1405,22 @@ public:
 					fAddPermissions({"SecretsManager/Write/SemanticID/SemanticNew/Tag/Unique1", "SecretsManager/Write/SemanticID/SemanticNew/Tag/Shared1"});
 					fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetSemanticID("SemanticNew"));
 					fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetSemanticID("Semantic1"));
+					{
+						DMibTestPath("Changes 19");
+						DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+					}
 					fRemovePermissions({"SecretsManager/Write/SemanticID/SemanticNew/Tag/Unique1", "SecretsManager/Write/SemanticID/SemanticNew/Tag/Shared1"});
 					// Check that we can change the tags
 					fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetTags({"Shared1"}));
+					{
+						DMibTestPath("Changes 20");
+						DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+					}
 					fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetTags({"Shared1", "Unique1"}));
+					{
+						DMibTestPath("Changes 21");
+						DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+					}
 
 					// Check that we cannot create a new secret with out permission for both tags and semantic ID
 					// Unset value are only allowed with the NoSemanticID and/or NoTag permissions
@@ -1293,6 +1478,10 @@ public:
 
 				// Check that access is permitted
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Extra"}}, {})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Shared1"}}));
+				{
+					DMibTestPath("Changes 22");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
 
 				for (auto const &Permission : Needed)
 				{
@@ -1307,12 +1496,20 @@ public:
 
 				// Check that access is permitted again
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {}, {"Extra"})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Shared1", "Extra"}}));
+				{
+					DMibTestPath("Changes 23");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
 
 				// We cannot remove all tags without NoTag permission
 				DMibExpectException(fAddTagsAndGetProperties("Folder1", "Name1", {{"Unique1", "Shared1", "Extra"}}, {}), DMibErrorInstance("Access denied"));
 				fAddPermission("SecretsManager/Write/SemanticID/Semantic1/NoTag");
 				fAddPermission("SecretsManager/Read/SemanticID/Semantic1/NoTag");
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {"Unique1", "Shared1", "Extra"}, {})).m_Tags, ==, (TCSet<NStr::CStrSecure>{}));
+				{
+					DMibTestPath("Changes 24");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
 				fRemovePermissions({"SecretsManager/Write/SemanticID/Semantic1/NoTag", "SecretsManager/Read/SemanticID/Semantic1/NoTag"});
 
 				// Same here, we cannot add tags from the NoTags state without that permission
@@ -1320,6 +1517,10 @@ public:
 				fAddPermission("SecretsManager/Write/SemanticID/Semantic1/NoTag");
 				fAddPermission("SecretsManager/Read/SemanticID/Semantic1/NoTag");
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {}, {"Unique1", "Shared1"})).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Unique1", "Shared1"}}));
+				{
+					DMibTestPath("Changes 25");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
+				}
 
 				fRemovePermissionsMap(Needed);
 				fRemovePermissionsMap(Needed2);
@@ -1409,6 +1610,10 @@ public:
 				fAddPermissions(NeededForTest);
 				fAddPermissions(Needed);
 				fSetProperties("Removable", "Name1", CSecretsManager::CSecretProperties{}.f_SetSemanticID("Semantic1").f_SetTags({"T1", "T2"}));
+				{
+					DMibTestPath("Changes 26");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Removable/Name1"));
+				}
 				fRemovePermissions({"SecretsManager/Command/SetSecretProperties"});
 
 
@@ -1425,6 +1630,10 @@ public:
 
 				// Check that access was granted and the secret removed
 				fRemoveSecret("Removable", "Name1");
+				{
+					DMibTestPath("Changes 27");
+					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Removed, ==, fSecretIDSet("Removable/Name1"));
+				}
 				DMibExpectException(fGetSecret("Removable", "Name1"), DMibErrorInstance("No secret matching ID: 'Removable/Name1'"));
 
 				fRemovePermissions(Needed);
@@ -1434,6 +1643,8 @@ public:
 			// Reset permissions
 			fAddPermissions(SecretsManagerPermissionsForTest);
 			DMibExpect(*fGetProperties("Folder1", "Name1").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{}));
+
+			DMibExpect(pChangesState->f_GetNonFullResendNumChanges(), ==, 0);
 		};
 
 		{

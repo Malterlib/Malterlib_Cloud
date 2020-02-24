@@ -111,6 +111,7 @@ namespace NMib::NCloud::NSecretsManager
 		Permissions["SecretsManager/Command/RemoveMetadata"];
 		Permissions["SecretsManager/Command/RemoveSecret"];
 		Permissions["SecretsManager/Command/DownloadFile"];
+		Permissions["SecretsManager/Command/SubscribeToChanges"];
 
 		Permissions["SecretsManager/Read/*/NoTag"];
 		Permissions["SecretsManager/Write/*/NoTag"];
@@ -127,12 +128,30 @@ namespace NMib::NCloud::NSecretsManager
 			Permissions[fg_Format("SecretsManager/Write/SemanticID/{}/*", mp_SemanticIDs.fs_GetKey(pSemanticID))];
 		}
 		
-		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);;
+		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);
 		
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("SecretsManager/*");
 
 		mp_Permissions = co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this));
+
+		mp_Permissions.f_OnPermissionsAdded
+			(
+				[this](CPermissionIdentifiers const &_Identity, TCMap<CStr, CPermissionRequirements> const &_AddedPermissions)
+				{
+					fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+				}
+			)
+		;
+
+		mp_Permissions.f_OnPermissionsRemoved
+			(
+				[this](CPermissionIdentifiers const &_Identity, TCSet<CStr> const &_RemovedPermissions)
+				{
+					fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+				}
+			)
+		;
 
 		co_return {};
 	}
@@ -255,22 +274,20 @@ namespace NMib::NCloud::NSecretsManager
 
 	namespace
 	{
-		template <class _InputIterator>
-		void
-		fg_SetIntersection(_InputIterator __first1, _InputIterator __first2,  TCSet<CStr> &_Result)
+		void fg_SetIntersection(TCSet<CStrSecure>::CIteratorConst &&_First, TCSet<CStrSecure>::CIteratorConst &&_Second, TCSet<CStr> &o_Result)
 		{
-			while (__first1 && __first2)
+			while (_First && _Second)
 			{
-				if (*__first1 < *__first2)
-					++__first1;
+				if (*_First < *_Second)
+					++_First;
 				else
 				{
-					if (*__first2 == *__first1)
+					if (*_Second == *_First)
 					{
-						_Result[*__first1];
-						++__first1;
+						o_Result[*_First];
+						++_First;
 					}
-					++__first2;
+					++_Second;
 				}
 			}
 		}
