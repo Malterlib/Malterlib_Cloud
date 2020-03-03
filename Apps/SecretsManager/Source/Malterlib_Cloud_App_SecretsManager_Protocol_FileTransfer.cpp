@@ -70,9 +70,9 @@ namespace NMib::NCloud::NSecretsManager
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/DownloadFile"}};
-		auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (pSecretProperty)
-			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
+		auto *pSecretProperties = This.mp_Database.m_Secrets.f_FindEqual(_ID);
+		if (pSecretProperties)
+			fsp_AddPermissionQueryIndexedByPermission("Read", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
 
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Download file from SecretsManager", Permissions) % "Permission denied downloading file" % Auditor);
 
@@ -85,22 +85,22 @@ namespace NMib::NCloud::NSecretsManager
 				co_return Auditor.f_AccessDenied(fg_Format("(DownloadFile, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
 		}
 
-		pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (!pSecretProperty)
+		pSecretProperties = This.mp_Database.m_Secrets.f_FindEqual(_ID);
+		if (!pSecretProperties)
 			co_return Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name));
 
 		CStr Permission;
-		if (pSecretProperty->m_Secret.f_GetTypeID() != CSecretsManager::ESecretType_File)
+		if (pSecretProperties->m_Secret.f_GetTypeID() != CSecretsManager::ESecretType_File)
 			co_return Auditor.f_Exception(fg_Format("Secret '{}' does not contain a file secret", _ID));
 
 		CDirectoryManifest Manifest;
-		auto &ManifestFile = pSecretProperty->m_Secret.f_Get<CSecretsManager::ESecretType_File>().m_Manifest;
+		auto &ManifestFile = pSecretProperties->m_Secret.f_Get<CSecretsManager::ESecretType_File>().m_Manifest;
 		Manifest.m_Files[ManifestFile.m_OriginalPath] = ManifestFile;
 
 		CDirectorySyncSend::CConfig Config;
 		Config.m_BasePath = This.mp_AppState.m_RootDirectory + "/SecretsManagerFiles";
 		Config.m_Manifest = fg_Move(Manifest);
-		Config.m_FileOptions.m_fOpenStream = [Key = pSecretProperty->m_Key, IV = pSecretProperty->m_IV, HMACKey = pSecretProperty->m_HMACKey]
+		Config.m_FileOptions.m_fOpenStream = [Key = pSecretProperties->m_Key, IV = pSecretProperties->m_IV, HMACKey = pSecretProperties->m_HMACKey]
 			(
 				CStr const &_FileName
 				, EDirectorySyncStreamType _FileType
@@ -120,7 +120,7 @@ namespace NMib::NCloud::NSecretsManager
 			}
 		;
 
-		Config.m_FileOptions.m_fTransformFilePath = [RandomFileName = pSecretProperty->m_RandomFileName, DownloadFile = ManifestFile.m_OriginalPath]
+		Config.m_FileOptions.m_fTransformFilePath = [RandomFileName = pSecretProperties->m_RandomFileName, DownloadFile = ManifestFile.m_OriginalPath]
 			(
 				CStr const &_BasePath
 				, CStr const &_FileName
@@ -141,7 +141,7 @@ namespace NMib::NCloud::NSecretsManager
 		auto &Download = This.mp_Downloads[DownloadID];
 		Download.m_DirectorySyncSend = This.mp_AppState.m_DistributionManager->f_ConstructActor<CDirectorySyncSend>(fg_Move(Config));
 		Download.m_Subscription = fg_Move(_Subscription);
-		Download.m_FileSubscription = This.fp_ReserveFile(pSecretProperty->m_RandomFileName);
+		Download.m_FileSubscription = This.fp_ReserveFile(pSecretProperties->m_RandomFileName);
 
 #if DMibConfig_Tests_Enable
 		if (auto *pPromise = This.mp_DownloadInitialized.f_FindEqual(_ID.m_Name))
@@ -230,9 +230,9 @@ namespace NMib::NCloud::NSecretsManager
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/UploadFile"}};
-		auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (pSecretProperty)
-			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperty->m_SemanticID, pSecretProperty->m_Tags, Permissions);
+		auto *pSecretProperties = This.mp_Database.m_Secrets.f_FindEqual(_ID);
+		if (pSecretProperties)
+			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
 
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Upload file to SecretsManager", Permissions) % "Permission denied uploading file" % Auditor);
 
@@ -245,16 +245,16 @@ namespace NMib::NCloud::NSecretsManager
 				co_return Auditor.f_AccessDenied(fg_Format("(UploadFile, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
 		}
 
-		pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID);
-		if (!pSecretProperty)
+		pSecretProperties = This.mp_Database.m_Secrets.f_FindEqual(_ID);
+		if (!pSecretProperties)
 			co_return Auditor.f_Exception(fg_Format("No secret matching ID: '{}/{}'", _ID.m_Folder, _ID.m_Name));
 
 		CDirectorySyncReceive::CConfig Config;
 		Config.m_PreviousBasePath = Config.m_BasePath = m_pThis->mp_AppState.m_RootDirectory + "/SecretsManagerFiles";
 		Config.m_SyncFlags = CDirectorySyncReceive::ESyncFlag_None;
 
-		if (pSecretProperty->m_Key.f_IsEmpty())
-			pSecretProperty->m_Key = CEncryptKeyIV::fs_GetRandomKey(ECryptoType_AES_256_CBC);
+		if (pSecretProperties->m_Key.f_IsEmpty())
+			pSecretProperties->m_Key = CEncryptKeyIV::fs_GetRandomKey(ECryptoType_AES_256_CBC);
 		auto IV = CEncryptKeyIV::fs_GetRandomIV(ECryptoType_AES_256_CBC);
 		auto HMACKey = CEncryptKeyIV::fs_GetRandomHMACKey(EDigestType_SHA512);
 		auto NewFileName = fg_RandomID();
@@ -271,7 +271,7 @@ namespace NMib::NCloud::NSecretsManager
 			)
 		;
 
-		Config.m_FileOptions.m_fOpenStream = [IV, Key = pSecretProperty->m_Key, OldIV = pSecretProperty->m_IV, OldHMACKey = pSecretProperty->m_HMACKey, HMACKey]
+		Config.m_FileOptions.m_fOpenStream = [IV, Key = pSecretProperties->m_Key, OldIV = pSecretProperties->m_IV, OldHMACKey = pSecretProperties->m_HMACKey, HMACKey]
 			(
 				CStr const &_FileName
 				, EDirectorySyncStreamType _FileType
@@ -306,7 +306,7 @@ namespace NMib::NCloud::NSecretsManager
 				}
 			}
 		;
-		Config.m_FileOptions.m_fTransformFilePath = [UploadFileName = _FileName, OldFileName = pSecretProperty->m_RandomFileName, NewFileName]
+		Config.m_FileOptions.m_fTransformFilePath = [UploadFileName = _FileName, OldFileName = pSecretProperties->m_RandomFileName, NewFileName]
 			(
 				CStr const &_BasePath
 				, CStr const &_FileName
@@ -340,7 +340,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		TCPromise<void> CheckResultPromise;
 
-		Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync) > [=, OldFileName = _FileName, SavedSecret = pSecretProperty->m_Secret]
+		Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync) > [=, OldFileName = _FileName, SavedSecret = pSecretProperties->m_Secret]
 			(TCAsyncResult<CDirectorySyncReceive::CSyncResult> &&_Result) mutable
 			{
 				auto &This = *m_pThis;
@@ -375,9 +375,9 @@ namespace NMib::NCloud::NSecretsManager
 
 				auto &Result = *_Result;
 
-				if (auto *pSecretProperty = This.mp_Database.m_Secrets.f_FindEqual(_ID))
+				if (auto *pSecretProperties = This.mp_Database.m_Secrets.f_FindEqual(_ID))
 				{
-					if (pSecretProperty->m_Secret != SavedSecret)
+					if (pSecretProperties->m_Secret != SavedSecret)
 					{
 
 						(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
@@ -397,15 +397,15 @@ namespace NMib::NCloud::NSecretsManager
 					if (Result.m_Manifest.m_Files.f_GetLen() == 1)
 					{
 						*pNewFileClaimed = true;
-						This.fp_RemoveUnreferencedFile(pSecretProperty->m_RandomFileName, Auditor) > fg_DiscardResult();
+						This.fp_RemoveUnreferencedFile(pSecretProperties->m_RandomFileName, Auditor) > fg_DiscardResult();
 						auto ManifestFile = *Result.m_Manifest.m_Files.f_FindAny();
-						pSecretProperty->m_Secret = CSecretsManager::CSecret{CSecretsManager::CSecretFile{ManifestFile}};
-						pSecretProperty->m_Modified = CTime::fs_NowUTC();
-						pSecretProperty->m_IV = fg_Move(IV);
-						pSecretProperty->m_HMACKey = fg_Move(HMACKey);
-						pSecretProperty->m_RandomFileName = fg_Move(NewFileName);
+						pSecretProperties->m_Secret = CSecretsManager::CSecret{CSecretsManager::CSecretFile{ManifestFile}};
+						pSecretProperties->m_Modified = CTime::fs_NowUTC();
+						pSecretProperties->m_IV = fg_Move(IV);
+						pSecretProperties->m_HMACKey = fg_Move(HMACKey);
+						pSecretProperties->m_RandomFileName = fg_Move(NewFileName);
 
-						This.fp_SecretUpdated(*pSecretProperty, false);
+						This.fp_SecretUpdated(*pSecretProperties, false);
 
 						This.fp_WriteDatabase() > CheckResultPromise % "Falied to write database" / [=]
 							{
