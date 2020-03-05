@@ -134,7 +134,6 @@ namespace NMib::NCloud::NAppManager
 		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
 		auto pThis = m_pThis;
-		CStr SubscriptionID = fg_RandomID();
 		CStr CallingHostID = fg_GetCallingHostID();
 
 		auto &RemoteAppManager = pThis->mp_RemoteAppManagerState[CallingHostID];

@@ -121,7 +121,7 @@ namespace NMib::NCloud::NBackupManager
 		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 		)
 	{
-		CStr RSyncID = fg_RandomID();
+		CStr RSyncID = fg_RandomID(m_RSyncContexts);
 		*o_pRSyncID = RSyncID;
 		auto &RSyncContext = m_RSyncContexts[RSyncID];
 

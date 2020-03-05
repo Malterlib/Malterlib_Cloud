@@ -72,7 +72,7 @@ namespace NMib::NCloud::NBackupManager
 		Config.m_BasePath = CheckedOutDirectory.m_Directory + "/Current";
 		Config.m_Manifest = CheckedOutDirectory.m_Directory + "/Manifest.bin";
 
-		NStr::CStr DownloadID = fg_RandomID();
+		NStr::CStr DownloadID = fg_RandomID(pThis->mp_BackupDownloads);
 
 		auto &Download = pThis->mp_BackupDownloads[DownloadID];
 

@@ -137,7 +137,7 @@ namespace NMib::NCloud::NSecretsManager
 				return CFile::fs_AppendPath(_BasePath, RandomFileName);
 			}
 		;
-		auto DownloadID = fg_RandomID();
+		auto DownloadID = fg_RandomID(This.mp_Downloads);
 		auto &Download = This.mp_Downloads[DownloadID];
 		Download.m_DirectorySyncSend = This.mp_AppState.m_DistributionManager->f_ConstructActor<CDirectorySyncSend>(fg_Move(Config));
 		Download.m_Subscription = fg_Move(_Subscription);

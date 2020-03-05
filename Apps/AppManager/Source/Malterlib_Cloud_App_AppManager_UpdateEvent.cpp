@@ -16,7 +16,6 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
-		CStr SubscriptionID = fg_RandomID();
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 
 		bool bHasPermission = co_await
@@ -28,6 +27,7 @@ namespace NMib::NCloud::NAppManager
 		if (!bHasPermission)
 			co_return Auditor.f_AccessDenied("(Subscribe to update notifications)");
 
+		CStr SubscriptionID = fg_RandomID(pThis->mp_UpdateNotificationSubscriptions);
 		auto &Subscription = pThis->mp_UpdateNotificationSubscriptions[SubscriptionID];
 		Subscription.m_fOnUpdate = fg_Move(_fOnNotification);
 		Subscription.m_CallingHostInfo = CallingHostInfo;

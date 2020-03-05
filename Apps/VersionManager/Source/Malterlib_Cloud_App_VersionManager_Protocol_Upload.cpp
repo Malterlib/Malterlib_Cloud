@@ -117,7 +117,7 @@ namespace NMib::NCloud::NVersionManager
 		// Force time to same as when saving in JSON file
 		VersionInfo.m_Time = CTimeConvert::fs_FromCreateFromUnixMilliseconds(CTimeConvert(VersionInfo.m_Time).f_UnixMilliseconds());
 
-		CStr UploadID = fg_RandomID();
+		CStr UploadID = fg_RandomID(pThis->mp_VersionUploads);
 
 		auto &Upload = pThis->mp_VersionUploads[UploadID];
 		Upload.m_Desc = fg_Format("{} - {}", pParams->m_Application, pParams->m_VersionIDAndPlatform);

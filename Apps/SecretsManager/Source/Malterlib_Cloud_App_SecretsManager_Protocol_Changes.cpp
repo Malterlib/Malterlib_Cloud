@@ -197,7 +197,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(SubscribeToChanges, command)");
 
-		CStr SubscriptionID = fg_RandomID();
+		CStr SubscriptionID = fg_RandomID(This.mp_ChangeSubscriptions);
 		auto pSubscription = &This.mp_ChangeSubscriptions[SubscriptionID];
 
 		auto OnResume2 = g_OnResume / [&]
