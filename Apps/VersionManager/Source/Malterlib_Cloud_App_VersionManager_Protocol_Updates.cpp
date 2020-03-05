@@ -230,12 +230,18 @@ namespace NMib::NCloud::NVersionManager
 	{
 		auto pThis = m_pThis;
 		
-		CStr SubscriptionID = fg_RandomID();
+		CStr SubscriptionID;
 		CSubscription *pSubscription;
 		if (_Params.m_Application.f_IsEmpty())
+		{
+			SubscriptionID = fg_RandomID(pThis->mp_GlobalVersionSubscriptions);
 			pSubscription = &pThis->mp_GlobalVersionSubscriptions[SubscriptionID];
+		}
 		else
+		{
+			SubscriptionID = fg_RandomID(pThis->mp_VersionSubscriptions[_Params.m_Application]);
 			pSubscription = &pThis->mp_VersionSubscriptions[_Params.m_Application][SubscriptionID];
+		}
 
 		if (!_Params.m_fOnNewVersions)
 			co_return DMibErrorInstance("m_fOnNewVersions required");

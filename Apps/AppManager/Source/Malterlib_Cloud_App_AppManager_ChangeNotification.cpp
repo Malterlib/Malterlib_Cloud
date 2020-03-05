@@ -17,7 +17,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
-		CStr SubscriptionID = fg_RandomID();
+		CStr SubscriptionID = fg_RandomID(pThis->mp_ChangeNotificationSubscriptions);
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 
 		auto &Subscription = pThis->mp_ChangeNotificationSubscriptions[SubscriptionID];

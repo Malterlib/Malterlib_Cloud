@@ -197,7 +197,7 @@ namespace NMib::NCloud
 			}
 		;
 
-		CStr StateID = fg_RandomID();
+		CStr StateID = fg_RandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
 		auto pStateCleanup = g_OnScopeExitActor > [StateID, pInternal = mp_pInternal]
@@ -269,7 +269,7 @@ namespace NMib::NCloud
 			)
 		;
 
-		CStr StateID = fg_RandomID();
+		CStr StateID = fg_RandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
 		auto pStateCleanup = g_OnScopeExitActor > [StateID, pInternal = mp_pInternal]
@@ -372,7 +372,7 @@ namespace NMib::NCloud
 				pState->m_Launch = fg_ConstructActor<CProcessLaunchActor>();
 				pState->m_Launch2 = fg_ConstructActor<CProcessLaunchActor>();
 
-				CStr StateID = fg_RandomID();
+				CStr StateID = fg_RandomID(Internal.m_States);
 				Internal.m_States[StateID] = pState;
 
 				auto pStateCleanup = g_OnScopeExitActor > [StateID, pInternal]
@@ -468,7 +468,7 @@ namespace NMib::NCloud
 		TCSharedPointer<CProcessLaunchState, CSupportWeakTag> pState = fg_Construct();
 		pState->m_Launch = fg_ConstructActor<CProcessLaunchActor>();
 
-		CStr StateID = fg_RandomID();
+		CStr StateID = fg_RandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
 		auto pStateCleanup = g_OnScopeExitActor > [StateID, pInternal = mp_pInternal]

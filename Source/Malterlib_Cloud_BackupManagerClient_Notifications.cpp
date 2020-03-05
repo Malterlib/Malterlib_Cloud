@@ -17,7 +17,7 @@ namespace NMib::NCloud
 		)
 	{
 		auto &Internal = *mp_pInternal;
-		CStr SubscriptionID = NCryptography::fg_RandomID();
+		CStr SubscriptionID = NCryptography::fg_RandomID(Internal.m_NotificationSubscriptions);
 		
 		auto &Subscription = Internal.m_NotificationSubscriptions[SubscriptionID];
 		
@@ -96,7 +96,7 @@ namespace NMib::NCloud
 		)
 	{
 		auto &Internal = *m_pThis->mp_pInternal;
-		CStr SubscriptionID = NCryptography::fg_RandomID();
+		CStr SubscriptionID = NCryptography::fg_RandomID(Internal.m_OnInitialFinishedSubscriptions);
 		
 		auto &fOnFinished = *Internal.m_OnInitialFinishedSubscriptions(SubscriptionID, fg_Move(_fOnInitialFinished));
 		
@@ -128,7 +128,7 @@ namespace NMib::NCloud
 		)
 	{
 		auto &Internal = *m_pThis->mp_pInternal;
-		CStr SubscriptionID = NCryptography::fg_RandomID();
+		CStr SubscriptionID = NCryptography::fg_RandomID(Internal.m_OnBackupStoppedSubscriptions);
 		
 		auto &fOnStopped = *Internal.m_OnBackupStoppedSubscriptions(SubscriptionID, fg_Move(_fOnStopped));
 		

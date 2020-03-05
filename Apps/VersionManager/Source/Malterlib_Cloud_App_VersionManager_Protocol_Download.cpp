@@ -63,7 +63,7 @@ namespace NMib::NCloud::NVersionManager
 		if (!pVersion)
 			co_return Auditor.f_Exception(fg_Format("No such version: {}", pParams->m_VersionIDAndPlatform));
 
-		NStr::CStr DownloadID = fg_RandomID();
+		NStr::CStr DownloadID = fg_RandomID(pThis->mp_VersionDownloads);
 
 		auto &Download = pThis->mp_VersionDownloads[DownloadID];
 		auto Cleanup = g_OnScopeExit > [&]

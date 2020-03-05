@@ -135,7 +135,7 @@ namespace NMib::NCloud::NBackupManager
 
 	auto CBackupSource::f_CheckOutDirectory(CTime const &_Time) -> TCFuture<CCheckedOutDirectory>
 	{
-		CStr CheckedOutID = fg_RandomID();
+		CStr CheckedOutID = fg_RandomID(mp_CheckedOutStates);
 
 		auto &State = mp_CheckedOutStates[CheckedOutID];
 		State.m_Directory = "{}/CheckedOut_{}"_f << mp_Directory << CheckedOutID;
