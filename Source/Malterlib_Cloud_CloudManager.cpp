@@ -12,6 +12,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CCloudManager::f_RegisterAppManager);
 		DMibPublishActorFunction(CCloudManager::f_EnumAppManagers);
 		DMibPublishActorFunction(CCloudManager::f_EnumApplications);
+		DMibPublishActorFunction(CCloudManager::f_RemoveAppManager);
 	}
 
 	CCloudManager::~CCloudManager() = default;

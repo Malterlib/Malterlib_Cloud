@@ -13,7 +13,7 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_SetupPermissions()
 	{
-		TCSet<CStr> Permissions{"CloudManager/RegisterAppManager", "CloudManager/ReadAll"};
+		TCSet<CStr> Permissions{"CloudManager/RegisterAppManager", "CloudManager/ReadAll", "CloudManager/RemoveAppManager"};
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
 
 		TCVector<CStr> SubscribePermissions{"CloudManager/*"};
@@ -340,5 +340,32 @@ namespace NMib::NCloud::NCloudManager
 		Auditor.f_Info("Enum applications");
 
 		co_return fg_Move(Return);
+	}
+
+	NConcurrency::TCFuture<void> CCloudManagerServer::CCloudManagerImplementation::f_RemoveAppManager(NStr::CStr const &_AppManagerHostID)
+	{
+		auto pThis = m_pThis;
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Remove app manager", {"CloudManager/RemoveAppManager"}))
+			co_return Auditor.f_AccessDenied("(Remove app manager)");
+
+		auto *pAppManager = pThis->mp_AppManagers.f_FindEqual(_AppManagerHostID);
+		if (pAppManager)
+		{
+			auto Subscription = fg_Move(pAppManager->m_ChangeNotificationsSubscription);
+			auto Interface = fg_Move(pAppManager->m_Interface);
+			pThis->mp_AppManagers.f_Remove(pAppManager);
+
+			if (Subscription)
+				co_await Subscription->f_Destroy().f_Wrap();
+
+			if (Interface)
+				co_await Interface.f_Destroy().f_Wrap();
+		}
+
+		co_await (pThis->self(&CCloudManagerServer::fp_RemoveAppManagerData, _AppManagerHostID) % Auditor);
+
+		co_return {};
 	}
 }

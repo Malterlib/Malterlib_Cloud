@@ -94,6 +94,7 @@ namespace NMib::NCloud
 		;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() = 0;
+		virtual NConcurrency::TCFuture<void> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) = 0;
 
 		CCloudManager();
 		~CCloudManager();

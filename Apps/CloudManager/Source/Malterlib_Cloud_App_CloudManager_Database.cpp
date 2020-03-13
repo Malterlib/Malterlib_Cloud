@@ -38,4 +38,34 @@ namespace NMib::NCloud::NCloudManager
 
 		co_return {};
 	}
+
+	TCFuture<void> CCloudManagerServer::fp_RemoveAppManagerData(CStr const &_HostID)
+	{
+		try
+		{
+			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
+
+			bool bFoundAppManager = false;
+			for (auto AppManagerCursor = WriteTransaction.m_Transaction.f_WriteCursor(CAppManagerKey::mc_Prefix, _HostID); AppManagerCursor;)
+			{
+				AppManagerCursor.f_Delete();
+				bFoundAppManager = true;
+			}
+
+			if (!bFoundAppManager)
+				co_return DMibErrorInstance("App manager does not exist");
+
+			for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _HostID); ApplicationCursor;)
+				ApplicationCursor.f_Delete();
+
+			co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
+		}
+		catch (CException const &_Exception)
+		{
+			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", _Exception);
+			co_return _Exception.f_ExceptionPointer();
+		}
+
+		co_return {};
+	}
 }

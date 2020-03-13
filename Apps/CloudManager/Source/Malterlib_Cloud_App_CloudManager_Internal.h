@@ -29,6 +29,7 @@ namespace NMib::NCloud::NCloudManager
 			TCFuture<TCActorSubscriptionWithID<>> f_RegisterAppManager(TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager, CAppManagerInfo &&_AppManagerInfo) override;
 			TCFuture<TCMap<CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() override;
 			TCFuture<TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() override;
+			TCFuture<void> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) override;
 
 			CCloudManagerServer *m_pThis;
 #			ifdef DMibDebug
@@ -60,6 +61,7 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_SetupMonitor();
 		TCFuture<void> fp_UpdateAppManagerState();
 		TCFuture<void> fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data);
+		TCFuture<void> fp_RemoveAppManagerData(CStr const &_HostID);
 		TCFuture<void> fp_ProcessApplicationChanges(CStr const &_AppManagerID, CAppManagerInterface::COnChangeNotificationParams &&_Params);
 		TCFuture<void> fp_ChangeOtherErrors(CStr const &_AppManagerID, mint _RegisterSequence, TCSet<CStr> const &_Remove, TCMap<CStr, CStr> const &_Add);
 		TCFuture<void> fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied);

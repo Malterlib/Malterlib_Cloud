@@ -114,6 +114,32 @@ namespace NMib::NCloud::NCloudClient
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--cloud-manager-remove-app-manager"}
+					, "Description"_= "Remove app manager from cloud manager database"
+					, "Parameters"_=
+					{
+						"AppManagerHostID"_=
+						{
+							"Type"_= ""
+							, "Description"_= "The host ID of the app manager to remove"
+						}
+					}
+					, "Options"_=
+					{
+						OptionalHost
+						, QuietOption
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager, _Params, _pCommandLine);
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
 	}
 
 	TCFuture<void> CCloudClientAppActor::fp_CloudManager_SubscribeToServers()
@@ -662,5 +688,28 @@ namespace NMib::NCloud::NCloudClient
 		}
 
 		co_return fg_Max(ReturnAppManagers, ReturnApplications);
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		CStr Host = _Params["Host"].f_String();
+		CStr AppManagerHostID = _Params["AppManagerHostID"].f_String();
+
+		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
+
+		TCActorResultVector<void> AppManagersResults;
+
+		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		{
+			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
+				continue;
+
+			auto &CloudManager = TrustedCloudManager.m_Actor;
+			(CloudManager.f_CallActor(&CCloudManager::f_RemoveAppManager)(AppManagerHostID) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+		}
+
+		co_await AppManagersResults.f_GetResults() | g_Unwrap;
+
+		co_return 0;
 	}
 }

@@ -135,6 +135,7 @@ namespace NMib::NCloud::NCloudClient
 				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			)
 		;
+		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveAppManager(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 		fp64 mp_Timeout = 0.0;
 
