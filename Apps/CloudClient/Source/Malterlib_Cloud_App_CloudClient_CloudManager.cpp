@@ -36,6 +36,42 @@ namespace NMib::NCloud::NCloudClient
 				, "Description"_= "Include the cloud manager column"
 			}
 		;
+		auto FilterStatusError = "FilterStatusError?"_=
+			{
+				"Names"_= {"--filter-status-error"}
+				, "Type"_= true
+				, "Description"_= "Include applications and app managers with error status"
+			}
+		;
+		auto FilterEnvironment = "FilterEnvironment?"_=
+			{
+				"Names"_= {"--filter-environment"}
+				, "Type"_= ""
+				, "Description"_= "Include applications and appmanagers with specified environment\n"
+				"Wildcard search."
+			}
+		;
+		auto FilterName = "FilterName?"_=
+			{
+				"Names"_= {"--filter-name"}
+				, "Type"_= ""
+				, "Description"_= "Include applications with specified application name"
+			}
+		;
+		auto FilterVersionManagerApp = "FilterVersionManagerApp?"_=
+			{
+				"Names"_= {"--filter-application"}
+				, "Type"_= ""
+				, "Description"_= "Include applications with specified version manager app name"
+			}
+		;
+		auto FilterOutOfDateVersion = "FilterOutOfDateVersion?"_=
+			{
+				"Names"_= {"--filter-out-of-date"}
+				, "Type"_= true
+				, "Description"_= "Include applications with out of date versions"
+			}
+		;
 
 		_Section.f_RegisterCommand
 			(
@@ -53,7 +89,12 @@ namespace NMib::NCloud::NCloudClient
 						, QuietOption
 						, IncludeCloudManagerOption
 						, CTableRenderHelper::fs_OutputTypeOption()
-					}
+						, FilterStatusError
+						, FilterEnvironment
+						, FilterVersionManagerApp
+						, FilterName
+						, FilterOutOfDateVersion
+ 					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
@@ -79,7 +120,9 @@ namespace NMib::NCloud::NCloudClient
 						, QuietOption
 						, IncludeCloudManagerOption
 						, CTableRenderHelper::fs_OutputTypeOption()
-					}
+						, FilterStatusError
+						, FilterEnvironment
+  					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
@@ -104,6 +147,11 @@ namespace NMib::NCloud::NCloudClient
 						OptionalHost
 						, QuietOption
 						, CTableRenderHelper::fs_OutputTypeOption()
+						, FilterStatusError
+						, FilterEnvironment
+						, FilterVersionManagerApp
+						, FilterName
+						, FilterOutOfDateVersion
 					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
@@ -278,6 +326,15 @@ namespace NMib::NCloud::NCloudClient
 		bool bQuiet = _Params["Quiet"].f_Boolean();
 		bool bIncludeCloudManager = _Params["IncludeCloudManager"].f_Boolean();
 
+		TCOptional<bool> FilterStatusError;
+		TCOptional<CStr> FilterEnvironment;
+
+		if (auto pValue = _Params.f_GetMember("FilterStatusError"))
+			FilterStatusError = pValue->f_Boolean();
+
+		if (auto pValue = _Params.f_GetMember("FilterEnvironment"))
+			FilterEnvironment = pValue->f_String();
+
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 
@@ -304,6 +361,24 @@ namespace NMib::NCloud::NCloudClient
 
 		TCVector<CRow> Rows;
 
+		auto fIsFilteredOut = [&](CCloudManager::CAppManagerDynamicInfo const &_AppManagerInfo)
+			{
+				if (FilterStatusError && *FilterStatusError && !_AppManagerInfo.f_HasErrors())
+					return true;
+
+				if
+					(
+						FilterEnvironment
+						&& fg_StrMatchWildcard(_AppManagerInfo.m_Environment.f_GetStr(), FilterEnvironment->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted
+					)
+				{
+					return true;
+				}
+
+				return false;
+			}
+		;
+
 		for (auto &AppManagersForHost : _AppManagers)
 		{
 			auto &HostInfo = _AppManagers.fs_GetKey(AppManagersForHost);
@@ -323,6 +398,10 @@ namespace NMib::NCloud::NCloudClient
 			for (auto &AppManagerInfo : *AppManagersForHost)
 			{
 				auto &AppManagerID = (*AppManagersForHost).fs_GetKey(AppManagerInfo);
+
+				if (fIsFilteredOut(AppManagerInfo))
+					continue;
+
 				Rows.f_Insert({HostInfo, AppManagerID, AppManagerInfo});
 			}
 		}
@@ -403,6 +482,26 @@ namespace NMib::NCloud::NCloudClient
 		)
 	{
 		bool bQuiet = _Params["Quiet"].f_Boolean();
+		TCOptional<bool> FilterStatusError;
+		TCOptional<CStr> FilterEnvironment;
+		TCOptional<CStr> FilterVersionManagerApp;
+		TCOptional<CStr> FilterName;
+		TCOptional<bool> FilterOutOfDateVersion;
+
+		if (auto pValue = _Params.f_GetMember("FilterStatusError"))
+			FilterStatusError = pValue->f_Boolean();
+
+		if (auto pValue = _Params.f_GetMember("FilterEnvironment"))
+			FilterEnvironment = pValue->f_String();
+
+		if (auto pValue = _Params.f_GetMember("FilterVersionManagerApp"))
+			FilterVersionManagerApp = pValue->f_String();
+
+		if (auto pValue = _Params.f_GetMember("FilterName"))
+			FilterName = pValue->f_String();
+
+		if (auto pValue = _Params.f_GetMember("FilterOutOfDateVersion"))
+			FilterOutOfDateVersion = pValue->f_Boolean();
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
@@ -450,6 +549,71 @@ namespace NMib::NCloud::NCloudClient
 
 		TCVector<CRow> Rows;
 
+		auto fHasFailedVersion = [&](CAppManagerInterface::CApplicationInfo const &_ApplicationInfo)
+			{
+				return _ApplicationInfo.m_FailedVersion.f_IsValid();
+			}
+		;
+
+		auto fShouldHaveOtherVersion = [&](CAppManagerInterface::CApplicationInfo const &_ApplicationInfo)
+			{
+				return _ApplicationInfo.m_WantVersion.f_IsValid()
+					&& _ApplicationInfo.m_WantVersion != _ApplicationInfo.m_Version
+					&& _ApplicationInfo.m_WantVersion != _ApplicationInfo.m_FailedVersion
+				;
+			}
+		;
+
+		auto fHasNewerVersion = [&](CAppManagerInterface::CApplicationInfo const &_ApplicationInfo)
+			{
+				return _ApplicationInfo.m_NewestUnconditionalVersion.f_IsValid()
+					&& _ApplicationInfo.m_NewestUnconditionalVersion != _ApplicationInfo.m_Version
+					&& _ApplicationInfo.m_NewestUnconditionalVersion != _ApplicationInfo.m_WantVersion
+					&& _ApplicationInfo.m_NewestUnconditionalVersion != _ApplicationInfo.m_FailedVersion
+				;
+			}
+		;
+
+		auto fIsFilteredOut = [&](CCloudManagerAppManagerInfo const &_AppManagerInfo, CAppManagerInterface::CApplicationInfo const &_ApplicationInfo, CStr const &_ApplicationName)
+			{
+				if (FilterStatusError && *FilterStatusError)
+				{
+					if (!_AppManagerInfo.f_HasErrors() && _ApplicationInfo.m_StatusSeverity == CAppManagerInterface::EStatusSeverity_None && _AppManagerInfo.m_bActive)
+						return true;
+				}
+
+				if
+					(
+						FilterEnvironment
+						&& fg_StrMatchWildcard(_AppManagerInfo.m_Environment.f_GetStr(), FilterEnvironment->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted
+					)
+				{
+					return true;
+				}
+
+				if (FilterVersionManagerApp && _ApplicationInfo.m_VersionManagerApplication != *FilterVersionManagerApp)
+					return true;
+
+				if (FilterName && fg_StrMatchWildcard(_ApplicationName.f_GetStr(), FilterName->f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted)
+					return true;
+
+				if (FilterOutOfDateVersion && *FilterOutOfDateVersion)
+				{
+					if
+						(
+							!fHasFailedVersion(_ApplicationInfo)
+ 							&& !fShouldHaveOtherVersion(_ApplicationInfo)
+ 							&& !fHasNewerVersion(_ApplicationInfo)
+						)
+					{
+						return true;
+					}
+				}
+
+				return false;
+			}
+		;
+
 		for (auto &ApplicationsForHost : _Applications)
 		{
 			auto &HostInfo = _Applications.fs_GetKey(ApplicationsForHost);
@@ -474,6 +638,9 @@ namespace NMib::NCloud::NCloudClient
 					AppManagerInfo = *pAppManagerInfo;
 				else
 					AppManagerInfo = {"Unknown"};
+
+				if (fIsFilteredOut(AppManagerInfo, ApplicationInfo.m_ApplicationInfo, ApplicationKey.m_Name))
+					continue;
 
 				Rows.f_Insert({AppManagerInfo, HostInfo, ApplicationKey, ApplicationInfo});
 			}
@@ -539,7 +706,7 @@ namespace NMib::NCloud::NCloudClient
 			;
 
 			CStr FailedVersion;
-			if (ApplicationInfo.m_FailedVersion.f_IsValid())
+			if (fHasFailedVersion(ApplicationInfo))
 			{
 				FailedVersion = "{}{}{} {}{td}{}\n{}"_f
 					<< AnsiEncoding.f_StatusError()
@@ -555,7 +722,7 @@ namespace NMib::NCloud::NCloudClient
 			}
 
 			CStr WantVersion;
-			if (ApplicationInfo.m_WantVersion.f_IsValid() && ApplicationInfo.m_WantVersion != ApplicationInfo.m_Version && ApplicationInfo.m_WantVersion != ApplicationInfo.m_FailedVersion)
+			if (fShouldHaveOtherVersion(ApplicationInfo))
 			{
 				WantVersion = "{}{}{} {}{td}{}"_f
 					<< AnsiEncoding.f_StatusWarning()
@@ -569,13 +736,7 @@ namespace NMib::NCloud::NCloudClient
 			}
 
 			CStr NewestVersion;
-			if
-				(
-				 	ApplicationInfo.m_NewestUnconditionalVersion.f_IsValid()
-				 	&& ApplicationInfo.m_NewestUnconditionalVersion != ApplicationInfo.m_Version
-				 	&& ApplicationInfo.m_NewestUnconditionalVersion != ApplicationInfo.m_WantVersion
-				 	&& ApplicationInfo.m_NewestUnconditionalVersion != ApplicationInfo.m_FailedVersion
-				)
+			if (fHasNewerVersion(ApplicationInfo))
 			{
 				NewestVersion = "{}{}{} {}{td}{}"_f
 					<< AnsiEncoding.f_Foreground256(208)
