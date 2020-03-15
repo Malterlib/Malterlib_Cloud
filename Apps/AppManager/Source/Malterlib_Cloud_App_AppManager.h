@@ -170,7 +170,7 @@ namespace NMib::NCloud::NAppManager
 
 			TCVector<TCSharedPointer<CApplication>> f_GetDependents() const;
 
-			EDistributedAppUpdateType f_GetUpdateType() const;
+			EDistributedAppUpdateType f_GetUpdateType(bool _bBypassCoordination) const;
 			CAppManagerCoordinationInterface::CAppInfo f_GetRemoteAppInfo() const;
 
 			CStr const m_Name;
@@ -474,15 +474,15 @@ namespace NMib::NCloud::NAppManager
 		{
 			CRemoteApplicationWithTypeKey() = default;
 
-			CRemoteApplicationWithTypeKey(CAppManagerCoordinationInterface::CAppInfo const &_AppInfo)
+			CRemoteApplicationWithTypeKey(CAppManagerCoordinationInterface::CAppInfo const &_AppInfo, bool _bBypassCoordination)
 				: CRemoteApplicationKey(_AppInfo)
-				, m_UpdateType(_AppInfo.m_UpdateType)
+				, m_UpdateType(_bBypassCoordination ? EDistributedAppUpdateType_Independent : _AppInfo.m_UpdateType)
 			{
 			}
 
-			CRemoteApplicationWithTypeKey(CApplication const &_Application)
+			CRemoteApplicationWithTypeKey(CApplication const &_Application, bool _bBypassCoordination)
 				: CRemoteApplicationKey(_Application.m_Settings)
-				, m_UpdateType(_Application.f_GetUpdateType())
+				, m_UpdateType(_Application.f_GetUpdateType(_bBypassCoordination))
 			{
 			}
 
@@ -602,6 +602,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bCancel = false;
 			bool m_bCancelOnAppManagerStop = false;
 			bool m_bSetLastTried = false;
+			bool m_bBypassCoordination = false;
 		};
 
 		struct COnAppUpdateInfoChange

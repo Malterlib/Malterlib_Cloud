@@ -64,7 +64,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 			if (Version >= 0x109)
 				AppManagerInterfaceVersion = 0x114;
 
-			static_assert(CAppManagerInterface::EProtocolVersion == 0x114, "Add a new version mapping if m_ApplicationInfo streaming changed");
+			static_assert(CAppManagerInterface::EProtocolVersion == 0x115, "Add a new version mapping if m_ApplicationInfo streaming changed");
 
 			DMibBinaryStreamVersion(_Stream, AppManagerInterfaceVersion);
 			_Stream % m_ApplicationInfo;

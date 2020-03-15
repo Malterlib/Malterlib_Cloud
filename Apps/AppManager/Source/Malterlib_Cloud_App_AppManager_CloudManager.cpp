@@ -11,6 +11,9 @@ namespace NMib::NCloud::NAppManager
 {
 	TCFuture<void> CAppManagerActor::fp_CloudManagerAdded(TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_Info)
 	{
+		if (f_IsDestroyed() || mp_State.m_bStoppingApp)
+			co_return DMibErrorInstance("Shutting down");
+
 		CCloudManager::CAppManagerInfo Info;
 		Info.m_Environment = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("Environment", "").f_String();
 		Info.m_HostName = NProcess::NPlatform::fg_Process_GetFullyQualiedHostName();

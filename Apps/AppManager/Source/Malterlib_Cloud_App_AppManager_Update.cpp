@@ -55,6 +55,7 @@ namespace NMib::NCloud::NAppManager
 		
 		CStr Package;
 		CAppManagerInterface::CApplicationUpdate Update;
+		Update.m_bBypassCoordination = true;
 		
 		if (auto *pValue = _Params.f_GetMember("Package"))
 		{
@@ -259,6 +260,7 @@ namespace NMib::NCloud::NAppManager
 		pState->m_VersionRetrySequence = VersionInfo.m_RetrySequence;
 		pState->m_RequiredTags = RequiredTags;
 		pState->m_bDryRun = bDryRun;
+		pState->m_bBypassCoordination = _Update.m_bBypassCoordination;
 		pState->m_Auditor = Auditor;
 		pState->m_bUpdateSettings = bUpdateSettings;
 		pState->m_pClock = pClock;
@@ -275,7 +277,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		pState->m_fOnInfo(fg_Format("Starting update with type '{}'", fsp_UpdateTypeToStr(pApplication->f_GetUpdateType())));
+		pState->m_fOnInfo(fg_Format("Starting update with type '{}'", fsp_UpdateTypeToStr(pApplication->f_GetUpdateType(pState->m_bBypassCoordination))));
 
 		auto Result = co_await fp_UpdateApplicationRunProcess(pState).f_Wrap();
 

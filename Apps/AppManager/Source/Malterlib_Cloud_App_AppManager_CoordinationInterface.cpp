@@ -41,6 +41,8 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_WantUpdateStage;
 		_Stream % m_UpdateType;
 		_Stream % m_UpdateStartSequence;
+		if (_Stream.f_GetVersion() >= 0x104)
+			_Stream % m_bAutoUpdate;
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppInfo);
 	

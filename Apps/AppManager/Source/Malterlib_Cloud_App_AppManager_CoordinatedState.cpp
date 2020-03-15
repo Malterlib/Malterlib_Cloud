@@ -227,8 +227,11 @@ namespace NMib::NCloud::NAppManager
 		m_AppInfos.f_Clear();
 	}
 	
-	EDistributedAppUpdateType CAppManagerActor::CApplication::f_GetUpdateType() const
+	EDistributedAppUpdateType CAppManagerActor::CApplication::f_GetUpdateType(bool _bBypassCoordination) const
 	{
+		if (_bBypassCoordination)
+			return EDistributedAppUpdateType_Independent;
+
 		if (m_Settings.m_bSelfUpdateSource)
 			return EDistributedAppUpdateType_OneAtATime;
 		
@@ -254,8 +257,9 @@ namespace NMib::NCloud::NAppManager
 		AppInfo.m_FailedVersionRetrySequence = m_LastFailedInstalledVersionRetrySequence;
 		AppInfo.m_UpdateStage = m_UpdateStage;
 		AppInfo.m_WantUpdateStage = m_WantUpdateStage;
-		AppInfo.m_UpdateType = f_GetUpdateType();
+		AppInfo.m_UpdateType = f_GetUpdateType(false);
 		AppInfo.m_UpdateStartSequence = m_UpdateStartSequence;
+		AppInfo.m_bAutoUpdate = m_Settings.m_bAutoUpdate;
 		return AppInfo;
 	}
 	

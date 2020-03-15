@@ -20,7 +20,7 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EMinProtocolVersion = 0x107
-			, EProtocolVersion = 0x114
+			, EProtocolVersion = 0x115
 		};
 		
 		CAppManagerInterface();
@@ -249,6 +249,7 @@ namespace NMib::NCloud
 			
 			bool m_bUpdateSettings = true; // Update settings from from downloaded version info
 			bool m_bDryRun = false; // Just download and extract application, don't actually update
+			bool m_bBypassCoordination = false; // Behave as if application is has independent update type
 		};
 		
 		struct CApplicationChangeSettings

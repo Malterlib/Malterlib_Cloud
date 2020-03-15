@@ -140,7 +140,7 @@ namespace NMib::NCloud::NAppManager
 				co_await fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
 			}
 
-			auto UpdateType = Application.f_GetUpdateType();
+			auto UpdateType = Application.f_GetUpdateType(_pState->m_bBypassCoordination);
 			switch (UpdateType)
 			{
 			case EDistributedAppUpdateType_AllAtOnce:

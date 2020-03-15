@@ -81,7 +81,7 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
-		CRemoteApplicationWithTypeKey OurRemoteKey{*_pState->m_pApplication};
+		CRemoteApplicationWithTypeKey OurRemoteKey{*_pState->m_pApplication, _pState->m_bBypassCoordination};
 
 		_pState->m_fOnInfo(fg_Format("Waiting for our apps '{}' turn to update", OurRemoteKey));
 
@@ -103,7 +103,13 @@ namespace NMib::NCloud::NAppManager
 						for (auto &pApplication : mp_Applications)
 						{
 							auto &Application = *pApplication;
-							FirstApplication.f_AddApplication(Application.m_WantUpdateStage, Application.m_UpdateStartSequence, CRemoteApplicationWithTypeKey(Application));
+							FirstApplication.f_AddApplication
+								(
+									Application.m_WantUpdateStage
+									, Application.m_UpdateStartSequence
+									, CRemoteApplicationWithTypeKey(Application, _pState->m_bBypassCoordination && pApplication == _pState->m_pApplication)
+								)
+							;
 #if DDebugAppTurnUpdateLogic > 1
 							ApplicationInfos.f_Insert
 								(
@@ -113,7 +119,7 @@ namespace NMib::NCloud::NAppManager
 										, mp_State.m_HostID
 										, fsp_UpdateStageToStr(Application.m_WantUpdateStage)
 										, Application.m_UpdateStartSequence
-										, CRemoteApplicationWithTypeKey{Application}
+										, CRemoteApplicationWithTypeKey(Application, _pState->m_bBypassCoordination && pApplication == _pState->m_pApplication)
 										, Application.m_Name
 									)
 								)
@@ -134,7 +140,13 @@ namespace NMib::NCloud::NAppManager
 						CFirstApplicationUpdate FirstApplication;
 						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
 						{
-							FirstApplication.f_AddApplication(AppInfo.m_AppInfo.m_WantUpdateStage, AppInfo.m_AppInfo.m_UpdateStartSequence, CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo));
+							FirstApplication.f_AddApplication
+								(
+									AppInfo.m_AppInfo.m_WantUpdateStage
+									, AppInfo.m_AppInfo.m_UpdateStartSequence
+									, CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo, false)
+								)
+							;
 #if DDebugAppTurnUpdateLogic > 1
 							ApplicationInfos.f_Insert
 								(
@@ -144,7 +156,7 @@ namespace NMib::NCloud::NAppManager
 										, RemoteAppManager.m_AppInfos.fs_GetKey(AppInfo)
 										, fsp_UpdateStageToStr(AppInfo.m_AppInfo.m_WantUpdateStage)
 										, AppInfo.m_AppInfo.m_UpdateStartSequence
-										, CRemoteApplicationWithTypeKey{AppInfo.m_AppInfo}
+										, CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo, false)
 										, RemoteAppManager.m_AppInfos.fs_GetKey(AppInfo)
 									)
 								)
@@ -215,7 +227,7 @@ namespace NMib::NCloud::NAppManager
 			, TCFunctionMutable<bool ()> _fEvalState
 		)
 	{
-		CRemoteApplicationWithTypeKey RemoteKey{*_pState->m_pApplication};
+		CRemoteApplicationWithTypeKey RemoteKey(*_pState->m_pApplication, _pState->m_bBypassCoordination);
 
 		if (!_fEvalState)
 			_pState->m_fOnInfo(fg_Format("Waiting for all before starting stage '{}'", fsp_UpdateStageToStr(_Stage)));
@@ -228,48 +240,57 @@ namespace NMib::NCloud::NAppManager
 				{
 					bool bAllInStage = true;
 
-					auto fCheckStageCondition = [&]
-						(
-							EUpdateStage _CurrentStage
-							, CVersionManager::CVersionIDAndPlatform const &_CurrentVersionID
-							, CTime const &_CurrentVersionTime
-						)
-						{
-							if (fg_IsSameVersion(_CurrentVersionID, _CurrentVersionTime, _pState->m_VersionID, _pState->m_VersionTime))
-								return true; // Already installed this version
-
-							if (_Flags & EWaitStageFlag_DisallowInProgressStates)
-							{
-								if (_CurrentStage > EUpdateStage::EUpdateStage_SyncStart)
-									return false;
-							}
-							if (_CurrentStage < _Stage)
-								return false;
-							return true;
-						}
-					;
-
-					for (auto &RemoteAppManager : mp_RemoteAppManagerState)
+					if (RemoteKey.m_UpdateType != EDistributedAppUpdateType_Independent)
 					{
-						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
+						auto fCheckStageCondition = [&]
+							(
+								EUpdateStage _CurrentStage
+								, CVersionManager::CVersionIDAndPlatform const &_CurrentVersionID
+								, CTime const &_CurrentVersionTime
+							)
+							{
+								if (fg_IsSameVersion(_CurrentVersionID, _CurrentVersionTime, _pState->m_VersionID, _pState->m_VersionTime))
+									return true; // Already installed this version
+
+								if (_Flags & EWaitStageFlag_DisallowInProgressStates)
+								{
+									if (_CurrentStage > EUpdateStage::EUpdateStage_SyncStart)
+										return false;
+								}
+								if (_CurrentStage < _Stage)
+									return false;
+								return true;
+							}
+						;
+
+						for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 						{
-							if (RemoteKey != CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo))
+							for (auto &AppInfo : RemoteAppManager.m_AppInfos)
+							{
+								if (!AppInfo.m_AppInfo.m_bAutoUpdate)
+									continue;
+								if (RemoteKey != CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo, false))
+									continue;
+								if (!fCheckStageCondition(AppInfo.m_AppInfo.m_WantUpdateStage, AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime))
+									bAllInStage = false;
+							}
+						}
+
+						// We might have several local applications with the same version manager application, so check locals as well
+						for (auto &pApplication : mp_Applications)
+						{
+							auto &Application = *pApplication;
+
+							if (!Application.m_Settings.m_bAutoUpdate)
 								continue;
-							if (!fCheckStageCondition(AppInfo.m_AppInfo.m_WantUpdateStage, AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime))
+
+							if (RemoteKey != CRemoteApplicationWithTypeKey(Application, _pState->m_bBypassCoordination && pApplication == _pState->m_pApplication))
+								continue;
+							if (!fCheckStageCondition(Application.m_WantUpdateStage, Application.m_LastInstalledVersionFinished, Application.m_LastInstalledVersionInfoFinished.m_Time))
 								bAllInStage = false;
 						}
 					}
 
-					// We might have several local applications with the same version manager application, so check locals as well
-					for (auto &pApplication : mp_Applications)
-					{
-						auto &Application = *pApplication;
-
-						if (RemoteKey != CRemoteApplicationWithTypeKey(Application))
-							continue;
-						if (!fCheckStageCondition(Application.m_WantUpdateStage, Application.m_LastInstalledVersionFinished, Application.m_LastInstalledVersionInfoFinished.m_Time))
-							bAllInStage = false;
-					}
 					if (bAllInStage)
 					{
 						if (_fEvalState && !_fEvalState())
@@ -293,7 +314,7 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
-		CRemoteApplicationWithTypeKey RemoteKey{*_pState->m_pApplication};
+		CRemoteApplicationWithTypeKey RemoteKey(*_pState->m_pApplication, _pState->m_bBypassCoordination);
 
 		// First wait for all applications to be fully ready for doing update without being dependent on version manager
 		co_await fp_Coordination_WaitForAllToReachWantUpdateStage
@@ -320,7 +341,10 @@ namespace NMib::NCloud::NAppManager
 						bool bAllFinished = true;
 						for (auto &AppInfo : RemoteAppManager.m_AppInfos)
 						{
-							if (RemoteKey != CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo))
+							if (!AppInfo.m_AppInfo.m_bAutoUpdate)
+								continue;
+
+							if (RemoteKey != CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo, false))
 								continue;
 
 							if (fg_IsSameVersion(AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime, _pState->m_VersionID, _pState->m_VersionTime))
@@ -344,7 +368,10 @@ namespace NMib::NCloud::NAppManager
 						{
 							auto &Application = *pApplication;
 
-							if (RemoteKey != CRemoteApplicationWithTypeKey(Application))
+							if (!Application.m_Settings.m_bAutoUpdate)
+								continue;
+
+							if (RemoteKey != CRemoteApplicationWithTypeKey(Application, _pState->m_bBypassCoordination && pApplication == _pState->m_pApplication))
 								continue;
 
 							if
@@ -431,7 +458,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		TCPromise<void> Promise;
 
-		CRemoteApplicationWithTypeKey RemoteKey{*_pState->m_pApplication};
+		CRemoteApplicationWithTypeKey RemoteKey(*_pState->m_pApplication, _pState->m_bBypassCoordination);
 
 		TCSharedPointerSupportWeak<COnAppUpdateInfoChange> pOnAppUpdateInfoChange = fg_Construct();
 		mp_OnAppUpdateInfoChange[pOnAppUpdateInfoChange];
@@ -488,7 +515,7 @@ namespace NMib::NCloud::NAppManager
 
 					for (auto &AppInfo : RemoteAppManager.m_AppInfos)
 					{
-						if (RemoteKey != CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo))
+						if (RemoteKey != CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo, false))
 							continue;
 
 						if (fg_IsSameVersion(AppInfo.m_AppInfo.m_VersionID, AppInfo.m_AppInfo.m_VersionTime, _pState->m_VersionID, _pState->m_VersionTime))
@@ -516,7 +543,7 @@ namespace NMib::NCloud::NAppManager
 				for (auto &pApplication : mp_Applications)
 				{
 					auto &Application = *pApplication;
-					if (RemoteKey != CRemoteApplicationWithTypeKey(Application))
+					if (RemoteKey != CRemoteApplicationWithTypeKey(Application, _pState->m_bBypassCoordination && pApplication == _pState->m_pApplication))
 						continue;
 
 					if (fg_IsSameVersion(Application.m_LastInstalledVersionFinished, Application.m_LastInstalledVersionInfoFinished.m_Time, _pState->m_VersionID, _pState->m_VersionTime))

@@ -18,7 +18,7 @@ namespace NMib::NCloud::NAppManager
 		enum : uint32
 		{
 			EMinProtocolVersion = 0x103
-			, EProtocolVersion = 0x103
+			, EProtocolVersion = 0x104
 		};
 		
 		enum EAppChange
@@ -55,6 +55,7 @@ namespace NMib::NCloud::NAppManager
 			EUpdateStage m_WantUpdateStage = EUpdateStage::EUpdateStage_None;
 			EDistributedAppUpdateType m_UpdateType = EDistributedAppUpdateType_Independent;
 			uint64 m_UpdateStartSequence = TCLimitsInt<uint64>::mc_Max;
+			bool m_bAutoUpdate = true;
 		};
 		
 		struct CAppChange_Update : public CAppInfo

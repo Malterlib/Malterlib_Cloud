@@ -167,6 +167,8 @@ namespace NMib::NCloud
 		_Stream % m_Version;
 		_Stream % m_bUpdateSettings;
 		_Stream % m_bDryRun;
+		if (_Stream.f_GetVersion() >= 0x115)
+			_Stream % m_bBypassCoordination;
 	}
 
 	template <typename tf_CStream>

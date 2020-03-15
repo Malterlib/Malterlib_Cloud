@@ -247,7 +247,7 @@ namespace NMib::NCloud::NAppManager
 		if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !_bForce)
 		{
 			Application.m_Settings = NewSettings;
-			if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
+			if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup | EApplicationSetting_AutoUpdate))
 				fp_OnAppUpdateInfoChange(pApplication);
 
 			fp_SendAppChange_AddedOrChanged(Application);
@@ -293,7 +293,7 @@ namespace NMib::NCloud::NAppManager
 			co_return Auditor.f_Exception("Application has been deleted, aborting");
 
 		pApplication->m_Settings = NewSettings;
-		if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup))
+		if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup | EApplicationSetting_AutoUpdate))
 			fp_OnAppUpdateInfoChange(pApplication);
 
 		fp_SendAppChange_AddedOrChanged(*pApplication);
