@@ -26,8 +26,8 @@ SubmitURL: http://my.cdash.org/submit.php?project=libarchive
 NightlyStartTime: 01:00:00 UTC
 
 # Commands for the build/test/submit cycle
-ConfigureCommand: "../../../../../../Binaries/Malterlib/Windows/x64/MToolCMake.exe" "../../../../../../External/libarchive"
-MakeCommand: x:\Source\Malterlib\Binaries\Malterlib\Windows\x64\MToolCMake.exe --build . --config "${CTEST_CONFIGURATION_TYPE}"
+ConfigureCommand: "../../../../../../BuildSystem/SafeMib/Binaries/MToolCMake.exe" "../../../../../../External/libarchive"
+MakeCommand: x:\Source\Malterlib\BuildSystem\SafeMib\Binaries\MToolCMake.exe --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 
 # version control
@@ -44,20 +44,20 @@ SVNOptions:
 SVNUpdateOptions: 
 
 # Git options
-GITCommand: GITCOMMAND-NOTFOUND
+GITCommand: C:/Program Files/Git/mingw64/bin/git.exe
 GITInitSubmodules: 
 GITUpdateOptions: 
 GITUpdateCustom: 
 
 # Perforce options
-P4Command: P4COMMAND-NOTFOUND
+P4Command: C:/Program Files/Perforce/p4.exe
 P4Client: 
 P4Options: 
 P4UpdateOptions: 
 P4UpdateCustom: 
 
 # Generic update command
-UpdateCommand: GITCOMMAND-NOTFOUND
+UpdateCommand: C:/Program Files/Git/mingw64/bin/git.exe
 UpdateOptions: 
 UpdateType: git
 
