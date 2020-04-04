@@ -50,7 +50,7 @@ GITUpdateOptions:
 GITUpdateCustom: 
 
 # Perforce options
-P4Command: P4COMMAND-NOTFOUND
+P4Command: p4
 P4Client: 
 P4Options: 
 P4UpdateOptions: 
@@ -62,13 +62,15 @@ UpdateOptions:
 UpdateType: git
 
 # Compiler info
-Compiler: /opt/CompiledFiles/Dependencies/llvm/9.0/build/main/bin/clang++
+Compiler: /opt/CompiledFiles/Dependencies/llvm/10.0/build/main/bin/clang++
 CompilerVersion: 
 
 # Dynamic analysis (MemCheck)
 PurifyCommand: 
 ValgrindCommand: 
 ValgrindCommandOptions: 
+DrMemoryCommand: 
+DrMemoryCommandOptions: 
 MemoryCheckType: 
 MemoryCheckSanitizerOptions: 
 MemoryCheckCommand: MEMORYCHECK_COMMAND-NOTFOUND
