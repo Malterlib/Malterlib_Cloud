@@ -156,14 +156,7 @@ namespace NMib::NCloud::NCloudClient
 
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to backup managers");
 
-		auto Subscription = co_await mp_State.m_TrustManager
-			(
-				&CDistributedActorTrustManager::f_SubscribeTrustedActors<NCloud::CBackupManager>
-				, "com.malterlib/Cloud/BackupManager"
-				, fg_ThisActor(this)
-			)
-			.f_Wrap()
-		;
+		auto Subscription = co_await mp_State.m_TrustManager->f_SubscribeTrustedActors<NCloud::CBackupManager>().f_Wrap();
 
 		if (!Subscription)
 		{

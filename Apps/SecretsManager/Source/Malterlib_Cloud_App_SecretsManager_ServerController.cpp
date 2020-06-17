@@ -33,13 +33,7 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "ServerController started");
 
-		mp_AppState.m_TrustManager
-			(
-				&CDistributedActorTrustManager::f_SubscribeTrustedActors<CKeyManager>
-				, "com.malterlib/Cloud/KeyManager"
-				, fg_ThisActor(this)
-			)
-			> [this](TCAsyncResult<TCTrustedActorSubscription<CKeyManager>> &&_KeySubscription)
+		mp_AppState.m_TrustManager->f_SubscribeTrustedActors<CKeyManager>() > [this](TCAsyncResult<TCTrustedActorSubscription<CKeyManager>> &&_KeySubscription)
 			{
 				if (mp_AppState.m_bStoppingApp)
 					return;

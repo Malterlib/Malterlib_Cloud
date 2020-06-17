@@ -332,13 +332,7 @@ namespace NMib::NCloud
 
 	TCFuture<void> CNetworkTunnelsClient::CInternal::f_Subscribe()
 	{
-		m_NetworkTunnelSubscription = co_await m_TrustManager
-			(
-				&CDistributedActorTrustManager::f_SubscribeTrustedActors<ICNetworkTunnels>
-				, ICNetworkTunnels::mc_pDefaultNamespace
-				, fg_ThisActor(m_pThis)
-			)
-		;
+		m_NetworkTunnelSubscription = co_await m_TrustManager->f_SubscribeTrustedActors<ICNetworkTunnels>();
 
 		co_return {};
 	}
