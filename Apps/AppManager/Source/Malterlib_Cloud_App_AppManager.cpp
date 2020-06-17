@@ -358,24 +358,9 @@ namespace NMib::NCloud::NAppManager
 
 		auto [KeySubscription, VersionSubscription, CloudSubscription] = co_await
 			(
-				mp_State.m_TrustManager
-				(
-					&CDistributedActorTrustManager::f_SubscribeTrustedActors<CKeyManager>
-					, CKeyManager::mc_pDefaultNamespace
-					, fg_ThisActor(this)
-				)
-				+ mp_State.m_TrustManager
-				(
-					&CDistributedActorTrustManager::f_SubscribeTrustedActors<CVersionManager>
-					, CVersionManager::mc_pDefaultNamespace
-					, fg_ThisActor(this)
-				)
-				+ mp_State.m_TrustManager
-				(
-					&CDistributedActorTrustManager::f_SubscribeTrustedActors<CCloudManager>
-					, CCloudManager::mc_pDefaultNamespace
-					, fg_ThisActor(this)
-				)
+				mp_State.m_TrustManager->f_SubscribeTrustedActors<CKeyManager>()
+				+ mp_State.m_TrustManager->f_SubscribeTrustedActors<CVersionManager>()
+				+ mp_State.m_TrustManager->f_SubscribeTrustedActors<CCloudManager>()
 			)
 		;
 

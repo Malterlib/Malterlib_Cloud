@@ -10,13 +10,7 @@ namespace NMib::NCloud::NAppManager
 {
 	TCFuture<void> CAppManagerActor::fp_SubscribeCoordinationInterface()
 	{
-		mp_RemoteAppManagers = co_await mp_State.m_TrustManager
-			(
-				&CDistributedActorTrustManager::f_SubscribeTrustedActors<CAppManagerCoordinationInterface>
-				, CAppManagerCoordinationInterface::mc_pDefaultNamespace
-				, fg_ThisActor(this)
-			)
-		;
+		mp_RemoteAppManagers = co_await mp_State.m_TrustManager->f_SubscribeTrustedActors<CAppManagerCoordinationInterface>();
 
 		mp_RemoteAppManagers.f_OnActor
 			(

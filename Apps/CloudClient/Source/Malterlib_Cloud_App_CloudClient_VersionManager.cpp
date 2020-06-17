@@ -338,15 +338,8 @@ namespace NMib::NCloud::NCloudClient
 		if (!mp_VersionManagers.f_IsEmpty())
 			co_return {};
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to version managers");
-
-		auto Subscription = co_await mp_State.m_TrustManager
-			(
-				&CDistributedActorTrustManager::f_SubscribeTrustedActors<NCloud::CVersionManager>
-				, "com.malterlib/Cloud/VersionManager"
-				, fg_ThisActor(this)
-			)
-			.f_Wrap()
-		;
+		
+		auto Subscription = co_await mp_State.m_TrustManager->f_SubscribeTrustedActors<NCloud::CVersionManager>().f_Wrap();
 
 		if (!Subscription)
 		{
