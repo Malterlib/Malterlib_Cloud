@@ -55,6 +55,9 @@ namespace NMib::NCloud::NCloudManager
 
 		co_await Destroys.f_GetResults();
 
+		if (mp_DatabaseActor)
+			co_await fg_Move(mp_DatabaseActor).f_Destroy();
+
 		co_return {};
 	}
 }

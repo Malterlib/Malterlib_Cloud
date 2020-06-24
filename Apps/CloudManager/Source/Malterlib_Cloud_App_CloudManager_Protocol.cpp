@@ -29,6 +29,13 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied)
 	{
+		auto OnResume = g_OnResume / [this]
+			{
+				if (f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		auto pAppManager = mp_AppManagers.f_FindEqual(_AppManagerID);
 		if (!pAppManager || pAppManager->m_RegisterSequence != _RegisterSequence)
 			co_return {};
@@ -56,6 +63,13 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_ChangeOtherErrors(CStr const &_AppManagerID, mint _RegisterSequence, TCSet<CStr> const &_Remove, TCMap<CStr, CStr> const &_Add)
 	{
+		auto OnResume = g_OnResume / [this]
+			{
+				if (f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		try
 		{
 			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
@@ -87,6 +101,13 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_ProcessApplicationChanges(CStr const &_AppManagerID, CAppManagerInterface::COnChangeNotificationParams &&_Params)
 	{
+		auto OnResume = g_OnResume / [this]
+			{
+				if (f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		try
 		{
 			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
@@ -163,6 +184,13 @@ namespace NMib::NCloud::NCloudManager
 			co_return DMibErrorInstance("Invalid app manager");
 
 		auto pThis = m_pThis;
+		auto OnResume = g_OnResume / [pThis]
+			{
+				if (pThis->f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 		auto Auditor = pThis->mp_AppState.f_Auditor(CallingHostInfo);
 
@@ -270,6 +298,13 @@ namespace NMib::NCloud::NCloudManager
 	auto CCloudManagerServer::CCloudManagerImplementation::f_EnumAppManagers() -> TCFuture<TCMap<CStr, CAppManagerDynamicInfo>>
 	{
 		auto pThis = m_pThis;
+		auto OnResume = g_OnResume / [pThis]
+			{
+				if (pThis->f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
 		if (!co_await pThis->mp_Permissions.f_HasPermission("Enum app managers", {"CloudManager/ReadAll"}))
@@ -310,6 +345,13 @@ namespace NMib::NCloud::NCloudManager
 	auto CCloudManagerServer::CCloudManagerImplementation::f_EnumApplications() -> TCFuture<TCMap<CApplicationKey, CApplicationInfo>>
 	{
 		auto pThis = m_pThis;
+		auto OnResume = g_OnResume / [pThis]
+			{
+				if (pThis->f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
 		if (!co_await pThis->mp_Permissions.f_HasPermission("Enum applications", {"CloudManager/ReadAll"}))
@@ -345,6 +387,13 @@ namespace NMib::NCloud::NCloudManager
 	NConcurrency::TCFuture<void> CCloudManagerServer::CCloudManagerImplementation::f_RemoveAppManager(NStr::CStr const &_AppManagerHostID)
 	{
 		auto pThis = m_pThis;
+		auto OnResume = g_OnResume / [pThis]
+			{
+				if (pThis->f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
 		if (!co_await pThis->mp_Permissions.f_HasPermission("Remove app manager", {"CloudManager/RemoveAppManager"}))

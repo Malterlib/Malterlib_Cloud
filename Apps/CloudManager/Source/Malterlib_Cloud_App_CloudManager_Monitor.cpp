@@ -14,6 +14,13 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_UpdateAppManagerState()
 	{
+		auto OnResume = g_OnResume / [this]
+			{
+				if (f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		TCActorResultMap<CStr, CActorDistributionManager::CHostState> HostStateResults;
 		for (auto &AppManager : mp_AppManagers)
 		{
@@ -145,6 +152,9 @@ namespace NMib::NCloud::NCloudManager
 			 	60.0
 			 	, [this]() -> TCFuture<void>
 			 	{
+					if (f_IsDestroyed())
+						co_return {};
+
 					try
 					{
 						co_await self(&CCloudManagerServer::fp_UpdateAppManagerState);
