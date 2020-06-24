@@ -83,6 +83,7 @@ namespace NMib::NCloud::NAppManager
 		OutApplication.m_bStopOnDependencyFailure = Settings.m_bStopOnDependencyFailure;
 
 		OutApplication.m_bBackupEnabled = Settings.m_bBackupEnabled;
+		OutApplication.m_bLaunchInProcess = Settings.m_bLaunchInProcess;
 
 		return OutApplication;
 	}
@@ -225,7 +226,9 @@ namespace NMib::NCloud::NAppManager
 
 			{
 				CStr Type = "App";
-				if (Application.m_bSelfUpdateSource)
+				if (Application.m_bLaunchInProcess)
+					Type = "In Process Distributed App";
+				else if (Application.m_bSelfUpdateSource)
 					Type = "Self Update Source";
 				else if (Application.m_Executable.f_IsEmpty())
 					Type = "Container";

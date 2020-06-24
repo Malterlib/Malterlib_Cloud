@@ -73,6 +73,15 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_= "The run as user gets created with shell access."
 			}
 		;
+		auto SettingsOption_LaunchInProcess = "LaunchInProcess?"_=
+			{
+				"Names"_= {"--launch-in-process"}
+				, "Type"_= true
+				, "Description"_= "Launch the application in the process of the AppManager.\n"
+				"This is only useful when you have populated the in app registry. See fg_AppManager_RegisterInProcessFactory."
+				" The default AppManager executable does not include any bundled applications inside the executable."
+			}
+		;
 		auto SettingsOption_DistributedApp = "DistributedApp?"_=
 			{
 				"Names"_= {"--distributed-app"}
@@ -316,6 +325,7 @@ namespace NMib::NCloud::NAppManager
 #endif
 						, SettingsOption_RunAsGroup
 						, SettingsOption_RunAsUserHasShell
+						, SettingsOption_LaunchInProcess
 						, SettingsOption_DistributedApp
 						, SettingsOption_BackupEnabled 
 						, SettingsOption_BackupIncludeWildcards 
@@ -480,6 +490,7 @@ namespace NMib::NCloud::NAppManager
 #endif
 						, SettingsOption_RunAsGroup
 						, SettingsOption_RunAsUserHasShell
+						, SettingsOption_LaunchInProcess
 						, SettingsOption_DistributedApp
 						, SettingsOption_BackupEnabled 
 						, SettingsOption_BackupIncludeWildcards 

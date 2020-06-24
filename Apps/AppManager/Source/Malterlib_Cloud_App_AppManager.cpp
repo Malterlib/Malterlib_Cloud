@@ -286,6 +286,9 @@ namespace NMib::NCloud::NAppManager
 					else
 						Settings.m_AppManagerVersion = 0;
 
+					if (auto pValue = ApplicationJSON.f_GetMember("LaunchInProcess", EJSONType_Boolean))
+						Settings.m_bLaunchInProcess = pValue->f_Boolean();
+
 					mp_KnownRemoteApplications[CRemoteApplicationKey{Settings}][mp_State.m_HostID];
 				}					
 			}

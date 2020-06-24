@@ -8,7 +8,7 @@ namespace NMib::NCloud::NAppManager
 {
 	void CAppManagerActor::CApplication::f_Clear()
 	{
-		m_ProcessLaunch.f_Clear();
+		m_ProcessLaunch.f_Set<0>();
 		m_ProcessLaunchSubscription.f_Clear();
 		m_bLaunched = false;
 	}
@@ -55,7 +55,7 @@ namespace NMib::NCloud::NAppManager
 
 	bool CAppManagerActor::CApplication::f_IsLaunched() const
 	{
-		return m_bLaunching || !m_ProcessLaunch.f_IsEmpty() || m_bLaunched;
+		return m_bLaunching || !m_ProcessLaunch.f_IsOfType<void>() || m_bLaunched;
 	}
 
 	bool CAppManagerActor::CApplication::f_IsInProgress() const
@@ -159,7 +159,7 @@ namespace NMib::NCloud::NAppManager
 							co_return DMibErrorInstance(fg_Format("Errors stopping child applications: {}", ChildCloseErrors));
 
 						TCAsyncResult<uint32> StopResult;
-						if (!pApplication->m_ProcessLaunch || bWasStopped || pApplication->m_bDeleted)
+						if (pApplication->m_ProcessLaunch.f_IsOfType<void>() || bWasStopped || pApplication->m_bDeleted)
 							StopResult.f_SetResult(0);
 						else
 						{
@@ -193,7 +193,19 @@ namespace NMib::NCloud::NAppManager
 
 							DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Stopping process '{}'", pApplication->m_Name);
 
-							StopResult = co_await pApplication->m_ProcessLaunch(&CProcessLaunchActor::f_StopProcess).f_Wrap();
+							if (pApplication->m_ProcessLaunch.f_IsOfType<TCActor<CDistributedAppInterfaceLaunchActor>>())
+								StopResult = co_await pApplication->m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInterfaceLaunchActor>>()(&CProcessLaunchActor::f_StopProcess).f_Wrap();
+							else if (pApplication->m_ProcessLaunch.f_IsOfType<TCActor<CDistributedAppInProcessActor>>())
+							{
+								auto Result = co_await pApplication->m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInProcessActor>>().f_Destroy().f_Wrap();
+								if (!Result)
+									StopResult.f_SetException(fg_Move(Result));
+								else
+									StopResult.f_SetResult(0);
+							}
+							else
+								StopResult.f_SetException(DMibErrorInstance("Application no longer running, cannot stop"));
+								
 							if (!StopResult)
 								DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", StopResult.f_GetExceptionStr());
 							else

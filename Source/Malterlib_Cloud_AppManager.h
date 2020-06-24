@@ -20,7 +20,7 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EMinProtocolVersion = 0x107
-			, EProtocolVersion = 0x115
+			, EProtocolVersion = 0x116
 		};
 		
 		CAppManagerInterface();
@@ -136,6 +136,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<bool> m_bSelfUpdateSource;
 			NStorage::TCOptional<bool> m_bStopOnDependencyFailure;
 			NStorage::TCOptional<bool> m_bBackupEnabled;
+			NStorage::TCOptional<bool> m_bLaunchInProcess;
 		};
 		
 		struct CApplicationInfo
@@ -199,6 +200,7 @@ namespace NMib::NCloud
 			bool m_bDistributedApp = false;
 			bool m_bStopOnDependencyFailure = true;
 			bool m_bBackupEnabled = false;
+			bool m_bLaunchInProcess = false;
 		};
 		
 		struct CApplicationVersion
