@@ -6,7 +6,7 @@
 namespace NMib::NCloud::NCloudManagerDatabase
 {
 	template <typename tf_CStream>
-	void CAppManagerKey::f_FeedLexicograpic(tf_CStream &_Stream) const
+	void CAppManagerKey::f_FeedLexicographic(tf_CStream &_Stream) const
 	{
 		CDatabaseValue::fs_FeedLexicographic(_Stream, m_Prefix);
 		CDatabaseValue::fs_FeedLexicographic(_Stream, m_HostID);
@@ -35,7 +35,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 	}
 
 	template <typename tf_CStream>
-	void CApplicationKey::f_FeedLexicograpic(tf_CStream &_Stream) const
+	void CApplicationKey::f_FeedLexicographic(tf_CStream &_Stream) const
 	{
 		CDatabaseValue::fs_FeedLexicographic(_Stream, m_Prefix);
 		CDatabaseValue::fs_FeedLexicographic(_Stream, m_AppManagerHostID);

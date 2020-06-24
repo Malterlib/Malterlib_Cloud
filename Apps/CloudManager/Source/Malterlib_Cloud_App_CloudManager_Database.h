@@ -18,7 +18,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		CStr m_HostID;
 
 		template <typename tf_CStream>
-		void f_FeedLexicograpic(tf_CStream &_Stream) const;
+		void f_FeedLexicographic(tf_CStream &_Stream) const;
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
 	};
@@ -45,7 +45,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		CStr m_Application;
 
 		template <typename tf_CStream>
-		void f_FeedLexicograpic(tf_CStream &_Stream) const;
+		void f_FeedLexicographic(tf_CStream &_Stream) const;
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
 	};
