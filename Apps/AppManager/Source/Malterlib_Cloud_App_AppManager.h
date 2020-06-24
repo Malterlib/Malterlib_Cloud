@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Process/ProcessLaunchActor>
+#include <Mib/Concurrency/DistributedAppInProcess>
 #include <Mib/Cloud/KeyManager>
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Concurrency/DistributedAppInterface>
@@ -80,12 +81,14 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_RunAsUserPassword = DBit(25)
 			, EApplicationSetting_RunAsUserHasShell = DBit(26)
 			, EApplicationSetting_AutoUpdate = DBit(27)
+			, EApplicationSetting_LaunchInProcess = DBit(28)
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
 			| EApplicationSetting_ExecutableParameters
 			| EApplicationSetting_RunAsUser
 			| EApplicationSetting_RunAsGroup
 			| EApplicationSetting_SelfUpdateSource
+			| EApplicationSetting_LaunchInProcess
 		};
 
 		enum EStopFlag
@@ -133,6 +136,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bSelfUpdateSource = false;
 			bool m_bStopOnDependencyFailure = true;
 			bool m_bBackupEnabled = false;
+			bool m_bLaunchInProcess = false;
 
 			bool f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
 			void f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source);
@@ -233,7 +237,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_LastStdErr;
 			CStr m_LastError;
 
-			TCActor<CDistributedAppInterfaceLaunchActor> m_ProcessLaunch;
+			TCVariant<void, TCActor<CDistributedAppInterfaceLaunchActor>, TCActor<CDistributedAppInProcessActor>> m_ProcessLaunch;
 			CActorSubscription m_ProcessLaunchSubscription;
 
 			CApplication *m_pParentApplication = nullptr;

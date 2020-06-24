@@ -4,6 +4,47 @@
 #include <Mib/Encoding/JSONShortcuts>
 #include "Malterlib_Cloud_App_AppManager.h"
 
+namespace
+{
+	struct CInProcessRegistry
+	{
+		TCFunction<TCActor<CDistributedAppActor> ()> f_GetFactory(CStr const &_ExecutablePath)
+		{
+			DMibLock(m_Lock);
+
+			if (auto pFactory = m_Factories.f_FindEqual(_ExecutablePath))
+				return *pFactory;
+
+			return nullptr;
+		}
+
+		CMutual m_Lock;
+		TCMap<CStr, TCFunction<TCActor<CDistributedAppActor> ()>> m_Factories;
+	};
+
+	TCAggregate<CInProcessRegistry> g_InProcessRegistry = {DAggregateInit};
+}
+
+namespace NMib::NCloud
+{
+	COnScopeExitShared fg_AppManager_RegisterInProcessFactory(CStr const &_ExecutablePath, TCFunction<TCActor<CDistributedAppActor> ()> &&_fDistributedAppFactory)
+	{
+		auto &Registry = *g_InProcessRegistry;
+
+		DMibLock(Registry.m_Lock);
+		Registry.m_Factories[_ExecutablePath] = fg_Move(_fDistributedAppFactory);
+
+		return g_OnScopeExitShared > [_ExecutablePath]
+			{
+				auto &Registry = *g_InProcessRegistry;
+
+				DMibLock(Registry.m_Lock);
+				Registry.m_Factories.f_Remove(_ExecutablePath);
+			}
+		;
+	}
+}
+
 namespace NMib::NCloud::NAppManager
 {
 	void CAppManagerActor::fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication)
@@ -26,7 +67,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		DCheck(!_pApplication->m_bLaunching);
 
-		if (!_pApplication->m_ProcessLaunch.f_IsEmpty() || _pApplication->m_bLaunched)
+		if (!_pApplication->m_ProcessLaunch.f_IsOfType<void>() || _pApplication->m_bLaunched)
 			co_return DMibErrorInstance("Application is already launched");
 
 		CStr Status;
@@ -123,300 +164,457 @@ namespace NMib::NCloud::NAppManager
 
 		CStr ApplicationDirectory = Application.f_GetDirectory();
 
-		TCPromise<CAppLaunchResult> LaunchPromise;
-		CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
-			(
-				fg_Format("{}/{}", ApplicationDirectory, Application.m_Settings.m_Executable)
-				, Application.m_Settings.m_ExecutableParameters
-				, ApplicationDirectory
-				, [this, _pApplication, pState, LaunchPromise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
-				{
-					if (_pApplication->m_bDeleted)
-						return;
+		if (Application.m_Settings.m_bLaunchInProcess)
+		{
+			auto fFactory = (*g_InProcessRegistry).f_GetFactory(ApplicationDirectory / Application.m_Settings.m_Executable);
 
-					switch (_State.f_GetTypeID())
-					{
-					case NProcess::EProcessLaunchState_Launched:
-						{
-							if (_pApplication->m_Settings.m_bDistributedApp)
-							{
-								fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)", CAppManagerInterface::EStatusSeverity_Warning);
-
-								TCPromise<void> RegisterPromise;
-
-								if (_pApplication->m_AppInterface)
-									RegisterPromise.f_SetResult();
-								else
-								{
-									_pApplication->m_OnRegisterDistributedApp.f_Insert().f_Future().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)")
-										> RegisterPromise
-									;
-								}
-
-								RegisterPromise.f_MoveFuture() > [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
-									{
-										if (_pApplication->m_bDeleted)
-											return;
-
-										if (!_Result)
-										{
-											DMibLogWithCategory
-												(
-													Malterlib/Cloud/AppManager
-													, Error
-													, "Launched app '{}' failed to register: {}"
-													, _pApplication->m_Name
-													, _Result.f_GetExceptionStr()
-												)
-											;
-											fp_AppLaunchStateChanged
-												(
-												 	_pApplication
-												 	, "Launched (app register failed: '{}')"_f << _Result.f_GetExceptionStr()
-												 	, CAppManagerInterface::EStatusSeverity_Error
-												)
-											;
-
-											if (!LaunchPromise.f_IsSet())
-												LaunchPromise.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
-											return;
-										}
-
-										fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)", CAppManagerInterface::EStatusSeverity_Warning);
-										_pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_GetAppStartResult)()
-											.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
-											> [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
-											{
-												if (_pApplication->m_bLaunching)
-													_pApplication->m_bDistributedStartupFinished = true;
-
-												pState->m_pCleanup.f_Clear();
-												if (_Result)
-												{
-													for (auto &fOnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
-														fOnStartedDistributedApp.f_SetResult();
-													_pApplication->m_OnStartedDistributedApp.f_Clear();
-
-													fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
-													if (!LaunchPromise.f_IsSet())
-														LaunchPromise.f_SetResult(CAppLaunchResult{});
-												}
-												else
-												{
-													DMibLogWithCategory
-														(
-															Malterlib/Cloud/AppManager
-															, Error
-															, "Launched app '{}' failed to start up: {}"
-															, _pApplication->m_Name
-															, _Result.f_GetExceptionStr()
-														)
-													;
-													fp_AppLaunchStateChanged
-														(
-														 	_pApplication
-														 	, "Launched (app startup failed: '{}')"_f << _Result.f_GetExceptionStr()
-														 	, CAppManagerInterface::EStatusSeverity_Error
-														)
-													;
-
-													if (!LaunchPromise.f_IsSet())
-														LaunchPromise.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
-												}
-											}
-										;
-									}
-								;
-								return;
-							}
-							pState->m_pCleanup.f_Clear();
-							fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
-							if (!LaunchPromise.f_IsSet())
-								LaunchPromise.f_SetResult(CAppLaunchResult{});
-						}
-						break;
-					case NProcess::EProcessLaunchState_LaunchFailed:
-						{
-							auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
-							if (!_pApplication->m_bStopped)
-								fp_ScheduleRelaunchApp(_pApplication);
-
-							fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", LaunchError), CAppManagerInterface::EStatusSeverity_Error);
-							pState->m_pCleanup.f_Clear();
-							if (!LaunchPromise.f_IsSet())
-								LaunchPromise.f_SetException(DMibErrorInstance(LaunchError));
-						}
-						break;
-					case NProcess::EProcessLaunchState_Exited:
-						{
-							auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
-
-							CStr RelaunchInfo;
-							if (!_pApplication->m_bStopped)
-								RelaunchInfo = "Waiting to retry launching.";
-
-							if (ExitStatus)
-							{
-								fp_AppLaunchStateChanged
-									(
-										_pApplication
-										, fg_Format
-										(
-											"{}Exited with {}. {}. {}."
-											, RelaunchInfo
-											, ExitStatus
-											, _pApplication->m_LastStdErr
-											, _pApplication->m_LastError
-										)
-									 	, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_None : CAppManagerInterface::EStatusSeverity_Error
-									)
-								;
-							}
-							else
-							{
-								fp_AppLaunchStateChanged
-									(
-									 	_pApplication
-									 	, fg_Format("{}Exited with {}", RelaunchInfo, ExitStatus)
-									 	, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_None : CAppManagerInterface::EStatusSeverity_Error
-									)
-								;
-							}
-
-							if (!LaunchPromise.f_IsSet())
-								LaunchPromise.f_SetException(DMibErrorInstance(fg_Format("Launch exited with '{}' before fully launched", ExitStatus)));
-
-							pState->m_pCleanup.f_Clear();
-							for (auto &Promise : _pApplication->m_OnRegisterDistributedApp)
-								Promise.f_SetException(DMibErrorInstance("Application exited"));
-							for (auto &Promise : _pApplication->m_OnStartedDistributedApp)
-								Promise.f_SetException(DMibErrorInstance("Application exited"));
-							_pApplication->m_OnRegisterDistributedApp.f_Clear();
-							_pApplication->m_OnStartedDistributedApp.f_Clear();
-
-							if (!_pApplication->m_bStopped)
-								fp_ScheduleRelaunchApp(_pApplication);
-						}
-						break;
-					}
-				}
-			)
-		;
-
-		Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
-		if (mp_bLogLaunchesToStdErr)
-			Launch.m_ToLog |= CProcessLaunchActor::ELogFlag_All | CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
-		Launch.m_LogName = _pApplication->m_Name;
-
-		auto &LaunchParams = Launch.m_Params;
-
-		LaunchParams.m_fOnOutput = [_pApplication](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
+			if (!fFactory)
 			{
-				if (_Output.f_IsEmpty())
-					return;
-				if (_OutputType == EProcessLaunchOutputType_StdErr)
-					_pApplication->m_LastStdErr = _Output.f_TrimRight();
-				else if (_OutputType != EProcessLaunchOutputType_StdOut)
-					_pApplication->m_LastError = _Output.f_TrimRight();
+				CStr Error = "Could not find app in in process registry for path: {}"_f << ApplicationDirectory / Application.m_Settings.m_Executable;
+				fp_AppLaunchStateChanged(_pApplication, Error, CAppManagerInterface::EStatusSeverity_Error);
+				if (!_pApplication->m_bStopped && !_pApplication->m_bDeleted)
+					fp_ScheduleRelaunchApp(_pApplication);
+
+				co_return DMibErrorInstance(Error);
 			}
-		;
 
-		LaunchParams.m_RunAsUser = fp_GetRunAsUser(Application.m_Settings);
-#ifdef DPlatformFamily_Windows
-		LaunchParams.m_RunAsUserPassword = Application.m_Settings.m_RunAsUserPassword;
-#endif
-		LaunchParams.m_RunAsGroup = fp_GetRunAsGroup(Application.m_Settings);
-		LaunchParams.m_Environment["HOME"] = ApplicationDirectory + "/.home";
-		LaunchParams.m_Environment["TMPDIR"] = ApplicationDirectory + "/.tmp";
-#ifdef DPlatformFamily_Windows
-		LaunchParams.m_Environment["TMP"] = ApplicationDirectory + "/.tmp";
-		LaunchParams.m_Environment["TEMP"] = ApplicationDirectory + "/.tmp";
-#endif
-		LaunchParams.m_bMergeEnvironment = true;
-		LaunchParams.m_bCreateNewProcessGroup = true;
-		LaunchParams.m_bShowLaunched = false;
-
-		Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
-			(
-				mp_State.m_LocalAddress
-				, mp_State.m_TrustManager
-				, g_ActorFunctor / [_pApplication, this]
-				(CStr const &_HostID, CCallingHostInfo const &_HostInfo, CByteVector const &_Certificate) -> TCFuture<void>
-				{
-					if (_pApplication->m_bDeleted)
-						co_return DMibErrorInstance("Application deleted");
-
-					_pApplication->m_AssociatedHostID = _HostID;
-
-					auto Result = co_await fp_UpdateApplicationJSON(_pApplication).f_Wrap();
-
-					if (!Result)
+			Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInProcessActor>
+				(
+					mp_State.m_LocalAddress
+					, mp_State.m_TrustManager
+					, g_ActorFunctor / [_pApplication, this]
+					(CStr const &_HostID, CCallingHostInfo const &_HostInfo, CByteVector const &_Certificate) -> TCFuture<void>
 					{
-						DMibLogWithCategory
-							(
-								Malterlib/Cloud/AppManager
-								, Info
-								, "Failed to update application JSON when granting connection ticket for '{}': {}"
-								, _pApplication->m_Name
-								, Result.f_GetExceptionStr()
-							)
-						;
-						co_return DMibErrorInstance("Failed to update application JSON, see AppManager log for details");
-					}
+						if (_pApplication->m_bDeleted)
+							co_return DMibErrorInstance("Application deleted");
 
-					co_return {};
-				}
-				, g_ActorFunctor / [this, _pApplication, pState, LaunchPromise](NStr::CStr const &_Error) -> TCFuture<void>
-				{
-					if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
+						_pApplication->m_AssociatedHostID = _HostID;
+
+						auto Result = co_await fp_UpdateApplicationJSON(_pApplication).f_Wrap();
+
+						if (!Result)
+						{
+							DMibLogWithCategory
+								(
+									Malterlib/Cloud/AppManager
+									, Info
+									, "Failed to update application JSON when granting connection ticket for '{}': {}"
+									, _pApplication->m_Name
+									, Result.f_GetExceptionStr()
+								)
+							;
+							co_return DMibErrorInstance("Failed to update application JSON, see AppManager log for details");
+						}
+
 						co_return {};
+					}
+					, Application.m_Name
+					, false
+				)
+			;
 
-					pState->m_pCleanup.f_Clear();
+			auto HostID = co_await Application.m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInProcessActor>>()
+				(
+					&CDistributedAppInProcessActor::f_Launch
+					, ApplicationDirectory
+					, fg_Move(fFactory)
+					, fg_TempCopy(Application.m_Settings.m_ExecutableParameters)
+				)
+				.f_Wrap()
+			;
+
+			if (!HostID)
+			{
+				fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", HostID.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
+
+				if (!_pApplication->m_bStopped)
+					fp_ScheduleRelaunchApp(_pApplication);
+
+				co_return HostID.f_GetException();
+			}
+
+			if (_pApplication->m_bDeleted)
+				co_return DMibErrorInstance("Application deleted");
+
+			if (!_pApplication->m_AppInterface)
+			{
+				auto Result
+					= co_await _pApplication->m_OnRegisterDistributedApp.f_Insert().f_Future().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)").f_Wrap()
+				;
+
+				if (_pApplication->m_bDeleted)
+					co_return {};
+
+				if (!Result)
+				{
 					DMibLogWithCategory
 						(
 							Malterlib/Cloud/AppManager
 							, Error
-							, "Launched app '{}' failed to start up before registering: {}"
+							, "Launched app '{}' failed to register: {}"
 							, _pApplication->m_Name
-							, _Error
+							, Result.f_GetExceptionStr()
+						)
+					;
+					fp_AppLaunchStateChanged
+						(
+							_pApplication
+							, "Launched (app register failed: '{}')"_f << Result.f_GetExceptionStr()
+							, CAppManagerInterface::EStatusSeverity_Error
 						)
 					;
 
-					fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Error, CAppManagerInterface::EStatusSeverity_Error);
-
-					if (!LaunchPromise.f_IsSet())
-						LaunchPromise.f_SetResult(CAppLaunchResult{_Error});
-
-					co_return {};
+					co_return {Result.f_GetExceptionStr()};
 				}
-				, Application.m_Name
-				, false
-			)
-		;
+			}
 
-		auto LaunchSubscription = co_await Application.m_ProcessLaunch
-			(
-				&CProcessLaunchActor::f_Launch
-				, Launch
-				, fg_ThisActor(this)
-			)
-			.f_Wrap()
-		;
+			if (!_pApplication->m_AppInterface)
+				co_return DMibErrorInstance("Internal error: No app interface");
 
-		if (_pApplication->m_bDeleted)
-			co_return DMibErrorInstance("Application deleted");
+			fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)", CAppManagerInterface::EStatusSeverity_Warning);
 
-		if (!LaunchSubscription)
-		{
+			auto StartResult = co_await _pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_GetAppStartResult)()
+				.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
+				.f_Wrap()
+			;
+
+			if (_pApplication->m_bDeleted)
+				co_return {};
+
+			if (_pApplication->m_bLaunching)
+				_pApplication->m_bDistributedStartupFinished = true;
+
 			pState->m_pCleanup.f_Clear();
-			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to launch app '{}': {}", _pApplication->m_Name, LaunchSubscription.f_GetExceptionStr());
-			fp_ScheduleRelaunchApp(_pApplication);
-			co_return LaunchSubscription.f_GetException();
+			if (StartResult)
+			{
+				for (auto &fOnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
+					fOnStartedDistributedApp.f_SetResult();
+				_pApplication->m_OnStartedDistributedApp.f_Clear();
+
+				fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
+			}
+			else
+			{
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Error
+						, "Launched app '{}' failed to start up: {}"
+						, _pApplication->m_Name
+						, StartResult.f_GetExceptionStr()
+					)
+				;
+				fp_AppLaunchStateChanged
+					(
+						_pApplication
+						, "Launched (app startup failed: '{}')"_f << StartResult.f_GetExceptionStr()
+						, CAppManagerInterface::EStatusSeverity_Error
+					)
+				;
+
+				co_return {StartResult.f_GetExceptionStr()};
+			}
+
+			co_return {};
 		}
+		else
+		{
 
-		_pApplication->m_ProcessLaunchSubscription = fg_Move(*LaunchSubscription);
+			TCPromise<CAppLaunchResult> LaunchPromise;
+			CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
+				(
+					ApplicationDirectory / Application.m_Settings.m_Executable
+					, Application.m_Settings.m_ExecutableParameters
+					, ApplicationDirectory
+					, [this, _pApplication, pState, LaunchPromise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+					{
+						if (_pApplication->m_bDeleted)
+							return;
 
-		co_return co_await LaunchPromise.f_MoveFuture();
+						switch (_State.f_GetTypeID())
+						{
+						case NProcess::EProcessLaunchState_Launched:
+							{
+								if (_pApplication->m_Settings.m_bDistributedApp)
+								{
+									fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)", CAppManagerInterface::EStatusSeverity_Warning);
+
+									TCPromise<void> RegisterPromise;
+
+									if (_pApplication->m_AppInterface)
+										RegisterPromise.f_SetResult();
+									else
+									{
+										_pApplication->m_OnRegisterDistributedApp.f_Insert().f_Future().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)")
+											> RegisterPromise
+										;
+									}
+
+									RegisterPromise.f_MoveFuture() > [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
+										{
+											if (_pApplication->m_bDeleted)
+												return;
+
+											if (!_Result)
+											{
+												DMibLogWithCategory
+													(
+														Malterlib/Cloud/AppManager
+														, Error
+														, "Launched app '{}' failed to register: {}"
+														, _pApplication->m_Name
+														, _Result.f_GetExceptionStr()
+													)
+												;
+												fp_AppLaunchStateChanged
+													(
+														_pApplication
+														, "Launched (app register failed: '{}')"_f << _Result.f_GetExceptionStr()
+														, CAppManagerInterface::EStatusSeverity_Error
+													)
+												;
+
+												if (!LaunchPromise.f_IsSet())
+													LaunchPromise.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
+												return;
+											}
+
+											fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)", CAppManagerInterface::EStatusSeverity_Warning);
+											_pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_GetAppStartResult)()
+												.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
+												> [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
+												{
+													if (_pApplication->m_bLaunching)
+														_pApplication->m_bDistributedStartupFinished = true;
+
+													pState->m_pCleanup.f_Clear();
+													if (_Result)
+													{
+														for (auto &fOnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
+															fOnStartedDistributedApp.f_SetResult();
+														_pApplication->m_OnStartedDistributedApp.f_Clear();
+
+														fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
+														if (!LaunchPromise.f_IsSet())
+															LaunchPromise.f_SetResult(CAppLaunchResult{});
+													}
+													else
+													{
+														DMibLogWithCategory
+															(
+																Malterlib/Cloud/AppManager
+																, Error
+																, "Launched app '{}' failed to start up: {}"
+																, _pApplication->m_Name
+																, _Result.f_GetExceptionStr()
+															)
+														;
+														fp_AppLaunchStateChanged
+															(
+																_pApplication
+																, "Launched (app startup failed: '{}')"_f << _Result.f_GetExceptionStr()
+																, CAppManagerInterface::EStatusSeverity_Error
+															)
+														;
+
+														if (!LaunchPromise.f_IsSet())
+															LaunchPromise.f_SetResult(CAppLaunchResult{_Result.f_GetExceptionStr()});
+													}
+												}
+											;
+										}
+									;
+									return;
+								}
+								pState->m_pCleanup.f_Clear();
+								fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
+								if (!LaunchPromise.f_IsSet())
+									LaunchPromise.f_SetResult(CAppLaunchResult{});
+							}
+							break;
+						case NProcess::EProcessLaunchState_LaunchFailed:
+							{
+								auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
+								if (!_pApplication->m_bStopped)
+									fp_ScheduleRelaunchApp(_pApplication);
+
+								fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", LaunchError), CAppManagerInterface::EStatusSeverity_Error);
+								pState->m_pCleanup.f_Clear();
+								if (!LaunchPromise.f_IsSet())
+									LaunchPromise.f_SetException(DMibErrorInstance(LaunchError));
+							}
+							break;
+						case NProcess::EProcessLaunchState_Exited:
+							{
+								auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
+
+								CStr RelaunchInfo;
+								if (!_pApplication->m_bStopped)
+									RelaunchInfo = "Waiting to retry launching.";
+
+								if (ExitStatus)
+								{
+									fp_AppLaunchStateChanged
+										(
+											_pApplication
+											, fg_Format
+											(
+												"{}Exited with {}. {}. {}."
+												, RelaunchInfo
+												, ExitStatus
+												, _pApplication->m_LastStdErr
+												, _pApplication->m_LastError
+											)
+											, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_None : CAppManagerInterface::EStatusSeverity_Error
+										)
+									;
+								}
+								else
+								{
+									fp_AppLaunchStateChanged
+										(
+											_pApplication
+											, fg_Format("{}Exited with {}", RelaunchInfo, ExitStatus)
+											, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_None : CAppManagerInterface::EStatusSeverity_Error
+										)
+									;
+								}
+
+								if (!LaunchPromise.f_IsSet())
+									LaunchPromise.f_SetException(DMibErrorInstance(fg_Format("Launch exited with '{}' before fully launched", ExitStatus)));
+
+								pState->m_pCleanup.f_Clear();
+								for (auto &Promise : _pApplication->m_OnRegisterDistributedApp)
+									Promise.f_SetException(DMibErrorInstance("Application exited"));
+								for (auto &Promise : _pApplication->m_OnStartedDistributedApp)
+									Promise.f_SetException(DMibErrorInstance("Application exited"));
+								_pApplication->m_OnRegisterDistributedApp.f_Clear();
+								_pApplication->m_OnStartedDistributedApp.f_Clear();
+
+								if (!_pApplication->m_bStopped)
+									fp_ScheduleRelaunchApp(_pApplication);
+							}
+							break;
+						}
+					}
+				)
+			;
+
+			Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+			if (mp_bLogLaunchesToStdErr)
+				Launch.m_ToLog |= CProcessLaunchActor::ELogFlag_All | CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
+			Launch.m_LogName = _pApplication->m_Name;
+
+			auto &LaunchParams = Launch.m_Params;
+
+			LaunchParams.m_fOnOutput = [_pApplication](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
+				{
+					if (_Output.f_IsEmpty())
+						return;
+					if (_OutputType == EProcessLaunchOutputType_StdErr)
+						_pApplication->m_LastStdErr = _Output.f_TrimRight();
+					else if (_OutputType != EProcessLaunchOutputType_StdOut)
+						_pApplication->m_LastError = _Output.f_TrimRight();
+				}
+			;
+
+			LaunchParams.m_RunAsUser = fp_GetRunAsUser(Application.m_Settings);
+	#ifdef DPlatformFamily_Windows
+			LaunchParams.m_RunAsUserPassword = Application.m_Settings.m_RunAsUserPassword;
+	#endif
+			LaunchParams.m_RunAsGroup = fp_GetRunAsGroup(Application.m_Settings);
+			LaunchParams.m_Environment["HOME"] = ApplicationDirectory + "/.home";
+			LaunchParams.m_Environment["TMPDIR"] = ApplicationDirectory + "/.tmp";
+	#ifdef DPlatformFamily_Windows
+			LaunchParams.m_Environment["TMP"] = ApplicationDirectory + "/.tmp";
+			LaunchParams.m_Environment["TEMP"] = ApplicationDirectory + "/.tmp";
+	#endif
+			LaunchParams.m_bMergeEnvironment = true;
+			LaunchParams.m_bCreateNewProcessGroup = true;
+			LaunchParams.m_bShowLaunched = false;
+
+			Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
+				(
+					mp_State.m_LocalAddress
+					, mp_State.m_TrustManager
+					, g_ActorFunctor / [_pApplication, this]
+					(CStr const &_HostID, CCallingHostInfo const &_HostInfo, CByteVector const &_Certificate) -> TCFuture<void>
+					{
+						if (_pApplication->m_bDeleted)
+							co_return DMibErrorInstance("Application deleted");
+
+						_pApplication->m_AssociatedHostID = _HostID;
+
+						auto Result = co_await fp_UpdateApplicationJSON(_pApplication).f_Wrap();
+
+						if (!Result)
+						{
+							DMibLogWithCategory
+								(
+									Malterlib/Cloud/AppManager
+									, Info
+									, "Failed to update application JSON when granting connection ticket for '{}': {}"
+									, _pApplication->m_Name
+									, Result.f_GetExceptionStr()
+								)
+							;
+							co_return DMibErrorInstance("Failed to update application JSON, see AppManager log for details");
+						}
+
+						co_return {};
+					}
+					, g_ActorFunctor / [this, _pApplication, pState, LaunchPromise](NStr::CStr const &_Error) -> TCFuture<void>
+					{
+						if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
+							co_return {};
+
+						pState->m_pCleanup.f_Clear();
+						DMibLogWithCategory
+							(
+								Malterlib/Cloud/AppManager
+								, Error
+								, "Launched app '{}' failed to start up before registering: {}"
+								, _pApplication->m_Name
+								, _Error
+							)
+						;
+
+						fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Error, CAppManagerInterface::EStatusSeverity_Error);
+
+						if (!LaunchPromise.f_IsSet())
+							LaunchPromise.f_SetResult(CAppLaunchResult{_Error});
+
+						co_return {};
+					}
+					, Application.m_Name
+					, false
+				)
+			;
+
+			auto LaunchSubscription = co_await Application.m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInterfaceLaunchActor>>()
+				(
+					&CProcessLaunchActor::f_Launch
+					, Launch
+					, fg_ThisActor(this)
+				)
+				.f_Wrap()
+			;
+
+			if (_pApplication->m_bDeleted)
+				co_return DMibErrorInstance("Application deleted");
+
+			if (!LaunchSubscription)
+			{
+				pState->m_pCleanup.f_Clear();
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to launch app '{}': {}", _pApplication->m_Name, LaunchSubscription.f_GetExceptionStr());
+				fp_ScheduleRelaunchApp(_pApplication);
+				co_return LaunchSubscription.f_GetException();
+			}
+
+			_pApplication->m_ProcessLaunchSubscription = fg_Move(*LaunchSubscription);
+
+			co_return co_await LaunchPromise.f_MoveFuture();
+		}
 	}
 
 	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)

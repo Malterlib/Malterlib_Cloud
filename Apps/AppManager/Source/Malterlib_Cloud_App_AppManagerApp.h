@@ -8,4 +8,11 @@
 namespace NMib::NCloud
 {
 	NConcurrency::TCActor<NConcurrency::CDistributedAppActor> fg_ConstructApp_AppManager();
+
+	COnScopeExitShared fg_AppManager_RegisterInProcessFactory
+		(
+			NStr::CStr const &_ExecutablePath
+			, NFunction::TCFunction<NConcurrency::TCActor<NConcurrency::CDistributedAppActor> ()> &&_fDistributedAppFactory
+		)
+	;
 }

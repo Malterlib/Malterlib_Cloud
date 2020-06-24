@@ -125,6 +125,12 @@ namespace NMib::NCloud::NAppManager
 			m_bRunAsUserHasShell = pValue->f_Boolean();
 		}
 
+		if (auto *pValue = _Params.f_GetMember("LaunchInProcess"))
+		{
+			o_ChangedSettings |= EApplicationSetting_LaunchInProcess;
+			m_bLaunchInProcess = pValue->f_Boolean();
+		}
+
 		if (auto *pValue = _Params.f_GetMember("BackupIncludeWildcards"))
 		{
 			o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
@@ -307,6 +313,8 @@ namespace NMib::NCloud::NAppManager
 			m_Dependencies = _Source.m_Dependencies;
 		if (_ChangedSettings & EApplicationSetting_StopOnDependencyFailure)
 			m_bStopOnDependencyFailure = _Source.m_bStopOnDependencyFailure;
+		if (_ChangedSettings & EApplicationSetting_LaunchInProcess)
+			m_bLaunchInProcess = _Source.m_bLaunchInProcess;
 	}
 
 	bool CAppManagerActor::CApplicationSettings::f_Validate(CStr &o_Error) const
@@ -414,6 +422,8 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_Dependencies;
 		if (m_bStopOnDependencyFailure != _Other.m_bStopOnDependencyFailure)
 			ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
+		if (m_bLaunchInProcess != _Other.m_bLaunchInProcess)
+			ChangedSettings |= EApplicationSetting_LaunchInProcess;
 
 		return ChangedSettings;
 	}
@@ -569,6 +579,11 @@ namespace NMib::NCloud::NAppManager
 		{
 			m_bStopOnDependencyFailure = *_Settings.m_bStopOnDependencyFailure; 
 			o_ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
+		}
+		if (_Settings.m_bLaunchInProcess)
+		{
+			m_bLaunchInProcess = *_Settings.m_bLaunchInProcess;
+			o_ChangedSettings |= EApplicationSetting_LaunchInProcess;
 		}
 	}
 	

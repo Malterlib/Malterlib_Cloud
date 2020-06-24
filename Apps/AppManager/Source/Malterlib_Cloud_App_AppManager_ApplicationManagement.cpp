@@ -324,6 +324,7 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["PreventLaunchUser"] = Application.m_bPreventLaunch_User; 
 		ApplicationJSON["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update;
 		ApplicationJSON["AppManagerVersion"] = Settings.m_AppManagerVersion;
+		ApplicationJSON["LaunchInProcess"] = Settings.m_bLaunchInProcess;
 
 		return Promise <<= mp_State.m_StateDatabase.f_Save();
 	}
@@ -501,7 +502,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (pApplication->f_IsInProgress())
 			co_return Auditor.f_Exception("Operation already in progress for application");
-		if (pApplication->m_ProcessLaunch)
+
+		if (!pApplication->m_ProcessLaunch.f_IsOfType<void>())
 			co_return Auditor.f_Exception("Application already started");
 
 		auto InProgressScope = pApplication->f_SetInProgress();
@@ -551,7 +553,7 @@ namespace NMib::NCloud::NAppManager
 
 		if (pApplication->f_IsInProgress())
 			co_return Auditor.f_Exception("Operation already in progress for application");
-		if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
+		if (pApplication->m_ProcessLaunch.f_IsOfType<void>() || pApplication->m_bStopped)
 			co_return Auditor.f_Exception("Application already stopped");
 
 		auto InProgressScope = pApplication->f_SetInProgress();

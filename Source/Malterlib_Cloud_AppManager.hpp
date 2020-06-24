@@ -65,6 +65,8 @@ namespace NMib::NCloud
 		_Stream % m_bDistributedApp;
 		_Stream % m_bStopOnDependencyFailure;
 		_Stream % m_bBackupEnabled;
+		if (_Stream.f_GetVersion() >= 0x116)
+			_Stream % m_bLaunchInProcess;
 	}
 
 	template <typename tf_CStream>
@@ -145,6 +147,8 @@ namespace NMib::NCloud
 		_Stream % m_bDistributedApp;
 		_Stream % m_bStopOnDependencyFailure;
 		_Stream % m_bBackupEnabled;
+		if (_Stream.f_GetVersion() >= 0x116)
+			_Stream % m_bLaunchInProcess;
 	}
 
 	template <typename tf_CStream>
