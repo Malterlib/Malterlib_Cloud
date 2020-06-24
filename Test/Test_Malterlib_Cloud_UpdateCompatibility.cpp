@@ -1,3 +1,5 @@
+// Copyright © 2020 Favro Holding AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
 
@@ -831,7 +833,7 @@ public:
 			bool bDoneInit = false;
 
 			TCSet<CStr> InitializedLatestPackages;
-			
+
 			auto fInit = [&](CStr const &_AppManager, CStr const &_VersionManager, CStr const &_KeyManager)
 				{
 					if (!bDoneInit)

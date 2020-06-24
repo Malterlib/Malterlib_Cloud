@@ -1,3 +1,6 @@
+// Copyright © 2020 Favro Holding AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Process/ProcessLaunchActor>
@@ -470,12 +473,12 @@ public:
 		CStr RootDirectory = ProgramDirectory + "/BackupManagerTests";
 
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);
-	
+
 		if (CFile::fs_FileExists(RootDirectory))
 			CFile::fs_DeleteDirectoryRecursive(RootDirectory);
 
 		CFile::fs_CreateDirectory(RootDirectory);
-	
+
 		CTrustManagerTestHelper TrustManagerState;
 		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
 		auto CleanupTrustManager = g_OnScopeExit > [&]
@@ -491,16 +494,16 @@ public:
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath(RootDirectory / "controller.sock");
 		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
-	
+
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
 		Dependencies.m_TrustManager = TrustManager;
 		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(g_Timeout);
-	
+
 		NMib::NConcurrency::CDistributedActorSecurity Security;
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CBackupManager::mc_pDefaultNamespace);
 		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(g_Timeout);
-	
+
 		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestBackupManagerEnableLogging);
 		auto Cleanup = g_OnScopeExit > [&]
 			{
@@ -537,7 +540,7 @@ public:
 		// Launch BackupManagers
 		TCActorResultVector<CDistributedApp_LaunchInfo> BackupManagerLaunchesResults;
 		TCVector<CDistributedApp_LaunchInfo> BackupManagerLaunches;
-		
+
 		auto fLaunchSecretManagers = [&]
 			{
 				BackupManagerLaunches.f_Clear();
@@ -573,7 +576,7 @@ public:
 		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
 		// Setup trust for BackupManagers
-		
+
 		struct CBackupManagerInfo
 		{
 			CStr const &f_GetHostID() const
@@ -597,7 +600,7 @@ public:
 				{
 					CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << iBackupManager;
 					CStr BackupManagerDirectory = RootDirectory + "/" + BackupManagerName;
-					
+
 					AllBackupManagerHosts[BackupManager.m_HostID];
 					auto &BackupManagerInfo = AllBackupManagers[BackupManager.m_HostID];
 					BackupManagerInfo.m_pTrustInterface = BackupManager.m_pTrustInterface;
@@ -609,7 +612,7 @@ public:
 			}
 		;
 		fSetupListen();
-		
+
 		TCActorResultVector<void> SetupTrustResults;
 
 		static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
@@ -635,7 +638,7 @@ public:
 				)
 				> SetupTrustResults.f_AddResult()
 			;
-			
+
 			BackupManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)(fPermissions(TestHostID, BackupManagerPermissionsForTest))
 				> SetupTrustResults.f_AddResult()
 			;
@@ -645,9 +648,9 @@ public:
 				CStr BackupManagerHostIDInner = BackupManagerInner.f_GetHostID();
 				if (BackupManagerHostIDInner == BackupManagerHostID)
 					continue;
-				
+
 				auto pBackupManagerTrustInner = BackupManagerInner.m_pTrustInterface;
-				
+
 				TCPromise<void> Promise;
 				BackupManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 					(
@@ -662,7 +665,7 @@ public:
 				Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
 			}
 		}
-		
+
 		SetupTrustResults.f_GetResults().f_CallSync(g_Timeout);
 
 		{
