@@ -21,6 +21,13 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data)
 	{
+		auto OnResume = g_OnResume / [this]
+			{
+				if (f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		try
 		{
 			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
@@ -41,6 +48,13 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_RemoveAppManagerData(CStr const &_HostID)
 	{
+		auto OnResume = g_OnResume / [this]
+			{
+				if (f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
 		try
 		{
 			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
