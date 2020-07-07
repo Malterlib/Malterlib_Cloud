@@ -12,7 +12,7 @@ namespace NMib::NCloud::NAppDistributionManager
 	auto CAppDistributionManagerActor::fp_GetAvailableVersions(CStr const &_Application) -> TCFuture<CVersionsAvailableForUpdate>
 	{
 		auto Auditor = f_Auditor();
-		
+
 		TCMap<CStr, TCVector<CApplicationVersion>> Versions;
 
 		for (auto &Application : mp_VersionManagerApplications)
@@ -82,7 +82,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions
 		(
 		 	CEJSON const &_Params
@@ -115,7 +115,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						, Version.m_VersionInfo.m_nFiles
 						, "{vs,vb}"_f << Version.m_VersionInfo.m_Tags
 						, Version.m_VersionInfo.m_RetrySequence
-						, Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ")
+						, Version.m_VersionInfo.m_ExtraInfo.f_IsValid() ? Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true) : ""
 					)
 				;
 			}

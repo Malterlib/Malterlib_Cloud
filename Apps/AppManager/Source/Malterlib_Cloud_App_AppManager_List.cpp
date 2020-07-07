@@ -201,7 +201,7 @@ namespace NMib::NCloud::NAppManager
 
 			auto fSyntaxHighlight = [&](auto const &_Value)
 				{
-					return CEJSON(_Value).f_ToStringColored(_pCommandLine->m_AnsiFlags, nullptr);
+					return CEJSON(_Value).f_ToStringColored(_pCommandLine->m_AnsiFlags, nullptr, true);
 				}
 			;
 
@@ -315,7 +315,7 @@ namespace NMib::NCloud::NAppManager
 				 	, Other
 				 	, Backup
 				 	, Script
-				 	, Application.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ")
+					, Application.m_VersionInfo.m_ExtraInfo.f_IsValid() ? Application.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true) : ""
 				)
 			;
 		}
@@ -375,7 +375,7 @@ namespace NMib::NCloud::NAppManager
 						, "{}"_f << Version.m_VersionInfo.m_nFiles
 						, "{vs,vb}"_f << Version.m_VersionInfo.m_Tags
 						, "{}"_f << Version.m_VersionInfo.m_RetrySequence
-						, Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ")
+						, Version.m_VersionInfo.m_ExtraInfo.f_IsValid() ? Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true) : ""
 					)
 				;
 			}

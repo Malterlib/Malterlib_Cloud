@@ -69,7 +69,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
-					, "Parameters"_= 
+					, "Parameters"_=
 					{
 						"Application?"_=
 						{
@@ -98,7 +98,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= {"--host"}
 							, "Default"_= ""
 							, "Description"_= "The host ID of the host to upload the version to."
-						}					
+						}
 						, "SettingsFileFromPackage?"_=
 						{
 							"Names"_= {"--settings-file-from-package"}
@@ -117,11 +117,11 @@ namespace NMib::NCloud::NCloudClient
 							CEJSON
 							(
 								{
-									"Application"_= "AppName"  
+									"Application"_= "AppName"
 									, "Version"_= "Branch/1.0.1"
-									, "Platform"_= DMalterlibCloudPlatform  
-									, "Configuration"_= DMibStringize(DConfig) 
-									, "ExtraInfo"_= 
+									, "Platform"_= DMalterlibCloudPlatform
+									, "Configuration"_= DMibStringize(DConfig)
+									, "ExtraInfo"_=
 									{
 										"Executable"_= "ExecutableName"
 										, "ExecutableParams"_= {"--daemon-run-standalone", "--debug"}
@@ -197,9 +197,9 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_= CFile::fs_GetCurrentDirectory()
 							, "Hidden"_= true
 							, "Description"_= "Internal hidden option to forward current directory."
-						}					
+						}
 					}
-					, "Parameters"_= 
+					, "Parameters"_=
 					{
 						"Source"_=
 						{
@@ -227,7 +227,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= {"--host"}
 							, "Default"_= ""
 							, "Description"_= "The host ID of the host to change tags for."
-						}					
+						}
 						, "Application"_=
 						{
 							"Names"_= {"--application"}
@@ -288,7 +288,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_= {"--host"}
 							, "Default"_= ""
 							, "Description"_= "The host ID of the host to download the version from."
-						}					
+						}
 						, "Application"_=
 						{
 							"Names"_= {"--application"}
@@ -315,7 +315,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_= "The amount of data to keep in flight while downloading."
 						}
 					}
-					, "Parameters"_= 
+					, "Parameters"_=
 					{
 						"DestinationDirectory?"_=
 						{
@@ -332,13 +332,13 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 	}
-	
+
 	TCFuture<void> CCloudClientAppActor::fp_VersionManager_SubscribeToServers()
 	{
 		if (!mp_VersionManagers.f_IsEmpty())
 			co_return {};
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to version managers");
-		
+
 		auto Subscription = co_await mp_State.m_TrustManager
 			(
 				&CDistributedActorTrustManager::f_SubscribeTrustedActors<NCloud::CVersionManager>
@@ -361,7 +361,7 @@ namespace NMib::NCloud::NCloudClient
 
 		co_return {};
 	}
-	
+
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
@@ -412,14 +412,14 @@ namespace NMib::NCloud::NCloudClient
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
-		
+
 		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 		TCActorResultMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
 
@@ -534,8 +534,8 @@ namespace NMib::NCloud::NCloudClient
 				auto HostDescription = HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags);
 
 				CStr ExtraInfo;
-				if (bVerbose)
-					ExtraInfo = Version.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ");
+				if (bVerbose && Version.m_ExtraInfo.f_IsValid())
+					ExtraInfo = Version.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true);
 
 				TableRenderer.f_AddRow
 					(
@@ -566,7 +566,7 @@ namespace NMib::NCloud::NCloudClient
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
@@ -786,7 +786,7 @@ namespace NMib::NCloud::NCloudClient
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
@@ -797,28 +797,28 @@ namespace NMib::NCloud::NCloudClient
 		uint64 QueueSize = _Params["TransferQueueSize"].f_Integer();
 		if (QueueSize < 128*1024)
 			QueueSize = 128*1024;
-		
+
 		if (Application.f_IsEmpty())
 			co_return DMibErrorInstance("Application must be specified");
 		if (Version.f_IsEmpty())
 			co_return DMibErrorInstance("Version must be specified");
 		if (DestinationDirectory.f_IsEmpty())
 			co_return DMibErrorInstance("Destination directory must be specified");
-		
+
 		if (!CVersionManager::fs_IsValidApplicationName(Application))
 			co_return DMibErrorInstance("Application format is invalid");
-		
+
 		CVersionManager::CVersionIDAndPlatform VersionID;
 		{
-			CStr Error; 
+			CStr Error;
 			if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
 				co_return DMibErrorInstance(fg_Format("Version identifier format is invalid: {}", Error));
 		}
 		if (!CVersionManager::fs_IsValidPlatform(Platform))
 			co_return DMibErrorInstance("Version platform format is invalid");
-		
+
 		VersionID.m_Platform = Platform;
-		
+
 		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
 		CStr Error;
@@ -844,7 +844,7 @@ namespace NMib::NCloud::NCloudClient
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
@@ -852,18 +852,18 @@ namespace NMib::NCloud::NCloudClient
 		CStr Version = _Params["Version"].f_String();
 		CStr Platform = _Params["Platform"].f_String();
 		bool bRetryUpgrade = _Params["RetryUpgrade"].f_Boolean();
-		
+
 		if (Application.f_IsEmpty())
 			co_return DMibErrorInstance("Application must be specified");
 		if (Version.f_IsEmpty())
 			co_return DMibErrorInstance("Version must be specified");
-		
+
 		if (!CVersionManager::fs_IsValidApplicationName(Application))
 			co_return DMibErrorInstance("Application format is invalid");
-		
+
 		CVersionManager::CVersionID VersionID;
 		{
-			CStr Error; 
+			CStr Error;
 			if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID))
 				co_return DMibErrorInstance(fg_Format("Version identifier format is invalid: {}", Error));
 		}
@@ -895,10 +895,10 @@ namespace NMib::NCloud::NCloudClient
 		{
 			co_return _Error.f_ExceptionPointer();
 		}
-		
+
 		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty() && !bRetryUpgrade)
 			co_return DMibErrorInstance("No changes specified. Specify tags to add and remove with --add and --remove, or specify --retry-upgrade");
-		
+
 		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
 		CStr Error;
