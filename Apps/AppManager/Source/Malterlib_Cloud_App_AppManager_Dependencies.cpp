@@ -77,7 +77,7 @@ namespace NMib::NCloud::NAppManager
 				o_Severity = CAppManagerInterface::EStatusSeverity_Error;
 				return false;
 			}
-			if ((*pDependencyApplication)->m_LaunchStatus != "Launched")
+			if ((*pDependencyApplication)->m_LaunchStatusSeverity != CAppManagerInterface::EStatusSeverity_None)
 			{
 				o_State = fg_Format("Dependent application '{}' not yet launched: {}", Dependency, (*pDependencyApplication)->m_LaunchStatus);
 				o_Severity = (*pDependencyApplication)->m_LaunchStatusSeverity;

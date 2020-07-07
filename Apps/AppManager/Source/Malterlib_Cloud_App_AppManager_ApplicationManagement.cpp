@@ -551,7 +551,7 @@ namespace NMib::NCloud::NAppManager
 
 		if (pApplication->f_IsInProgress())
 			co_return Auditor.f_Exception("Operation already in progress for application");
-		if (!pApplication->m_ProcessLaunch || pApplication->m_bStopped)
+		if (pApplication->m_bStopped)
 			co_return Auditor.f_Exception("Application already stopped");
 
 		auto InProgressScope = pApplication->f_SetInProgress();

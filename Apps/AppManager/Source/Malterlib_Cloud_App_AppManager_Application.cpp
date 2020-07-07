@@ -190,6 +190,9 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 
+				if (pApplication->m_LaunchStatusSeverity == CAppManagerInterface::EStatusSeverity_None)
+					m_pThis->fp_AppLaunchStateChanged(pApplication, "Stopped", CAppManagerInterface::EStatusSeverity_Warning);
+
 				if (pApplication->m_BackupClient)
 				{
 					auto BackupDestroyResult = co_await fg_Move(pApplication->m_BackupClient).f_Destroy().f_Wrap();

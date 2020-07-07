@@ -228,8 +228,8 @@ namespace NMib::NCloud::NAppManager
 
 			TCLinkedList<TCFunction <void (bool _bAborted)>> m_OnLaunchFinished;
 
-			CStr m_LaunchStatus;
-			CAppManagerInterface::EStatusSeverity m_LaunchStatusSeverity;
+			CStr m_LaunchStatus = "Not yet launched";
+			CAppManagerInterface::EStatusSeverity m_LaunchStatusSeverity = CAppManagerInterface::EStatusSeverity_Warning;
 			CStr m_LastStdErr;
 			CStr m_LastError;
 

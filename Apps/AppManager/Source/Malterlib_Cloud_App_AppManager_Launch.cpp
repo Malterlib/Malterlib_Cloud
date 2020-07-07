@@ -268,7 +268,7 @@ namespace NMib::NCloud::NAppManager
 											, _pApplication->m_LastStdErr
 											, _pApplication->m_LastError
 										)
-									 	, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_None : CAppManagerInterface::EStatusSeverity_Error
+									 	, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_Warning : CAppManagerInterface::EStatusSeverity_Error
 									)
 								;
 							}
@@ -278,7 +278,7 @@ namespace NMib::NCloud::NAppManager
 									(
 									 	_pApplication
 									 	, fg_Format("{}Exited with {}", RelaunchInfo, ExitStatus)
-									 	, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_None : CAppManagerInterface::EStatusSeverity_Error
+									 	, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_Warning : CAppManagerInterface::EStatusSeverity_Error
 									)
 								;
 							}
