@@ -155,8 +155,8 @@ namespace NMib::NCloud::NAppManager
 			void f_Delete();
 			void f_AbortPendingLaunches();
 
-			TCDispatchedActorCall<uint32> f_Stop(EStopFlag _Flags);
-			TCDispatchedActorCall<uint32> f_CloseEncryption(uint32 _Status);
+			TCFuture<uint32> f_Stop(EStopFlag _Flags);
+			TCFuture<uint32> f_CloseEncryption(uint32 _Status);
 
 			CStr f_GetDirectory();
 
@@ -222,6 +222,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bLaunched = false;
 			bool m_bJustUpdated = false;
 			bool m_bDistributedStartupFinished = false;
+			bool m_bPendingStop = false;
 
 			TCVector<TCPromise<void>> m_OnRegisterDistributedApp;
 			TCVector<TCPromise<void>> m_OnStartedDistributedApp;
@@ -235,6 +236,7 @@ namespace NMib::NCloud::NAppManager
 
 			TCActor<CDistributedAppInterfaceLaunchActor> m_ProcessLaunch;
 			CActorSubscription m_ProcessLaunchSubscription;
+			TCVector<TCPromise<void>> m_OnStops;
 
 			CApplication *m_pParentApplication = nullptr;
 			DLinkDS_Link(CApplication, m_ChildrenLink);

@@ -26,7 +26,7 @@ namespace NMib::NCloud::NAppManager
 				, ChangedSettings
 				, _ChangeSettings.m_bUpdateFromVersionInfo
 				, _ChangeSettings.m_bForce
-				, [](CStr const &_Info) 
+				, [](CStr const &_Info)
 				{
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Change Settings: {}", _Info);
 				}

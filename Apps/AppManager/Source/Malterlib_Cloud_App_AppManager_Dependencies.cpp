@@ -18,7 +18,7 @@ namespace NMib::NCloud::NAppManager
 
 		return Return;
 	}
-	
+
 	bool CAppManagerActor::CApplication::f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity) const
 	{
 		if (m_bPreventLaunch_User)
@@ -34,7 +34,7 @@ namespace NMib::NCloud::NAppManager
 			o_Severity = CAppManagerInterface::EStatusSeverity_Error;
 			return false;
 		}
-		
+
 		if (m_bPreventLaunch_DelayAfterFailure)
 		{
 			o_State = "Prevented launch because of previous failure";
@@ -50,11 +50,18 @@ namespace NMib::NCloud::NAppManager
 				o_Severity = CAppManagerInterface::EStatusSeverity_Error;
 				return false;
 			}
-			
+
 			if (f_NeedsEncryption() && !m_pParentApplication->m_bEncryptionOpened)
 			{
 				o_State = "Parent application encryption not yet opened";
 				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
+				return false;
+			}
+
+			if (m_pParentApplication->m_LaunchStatusSeverity != CAppManagerInterface::EStatusSeverity_None)
+			{
+				o_State = fg_Format("Parent application '{}' not yet launched: {}", m_pParentApplication->m_Name, m_pParentApplication->m_LaunchStatus);
+				o_Severity = m_pParentApplication->m_LaunchStatusSeverity;
 				return false;
 			}
 		}
@@ -67,7 +74,7 @@ namespace NMib::NCloud::NAppManager
 				return false;
 			}
 		}
-		
+
 		for (auto &Dependency : m_Settings.m_Dependencies)
 		{
 			auto pDependencyApplication = m_pThis->mp_Applications.f_FindEqual(Dependency);
@@ -84,28 +91,28 @@ namespace NMib::NCloud::NAppManager
 				return false;
 			}
 		}
-		
+
 		return true;
 	}
-	
+
 	bool CAppManagerActor::fp_AutoStartApp(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		auto &Application = *_pApplication;
-		
+
 		if (Application.f_IsInProgress())
 			return false;
-		
+
 		CStr Status;
 		CAppManagerInterface::EStatusSeverity Severity;
 		if (!Application.f_DependenciesSatisfied(Status, Severity))
 		{
-			if (!Application.f_IsLaunched())
+			if (!Application.f_IsLaunched() || Application.m_bStopped)
 			{
 				// Don't recursively call update application dependencies
 				fp_SetAppLaunchStatus(_pApplication, Status, Severity);
 				return false;
 			}
-			
+
 			if (Application.m_Settings.m_bStopOnDependencyFailure)
 			{
 				Application.f_Stop(EStopFlag_AutoStart) > [this, _pApplication, Status, Severity](TCAsyncResult<uint32> &&_Result)
@@ -116,7 +123,7 @@ namespace NMib::NCloud::NAppManager
 							fp_SetAppLaunchStatus(_pApplication, "Stopped because dependency failed: {}"_f << Status, Severity);
 							return;
 						}
-						
+
 						DMibLogWithCategory
 							(
 								Malterlib/Cloud/AppManager
@@ -136,7 +143,7 @@ namespace NMib::NCloud::NAppManager
 
 		if (Application.f_IsLaunched())
 			return true;
-		
+
 		++mp_PendingAutoLaunches;
 		auto pCleanupAutoLaunches = g_OnScopeExitActor > [this]
 			{
@@ -144,7 +151,7 @@ namespace NMib::NCloud::NAppManager
 					fp_UpdateApplicationDependencies();
 			}
 		;
-		
+
 		auto InProgressScope = Application.f_SetInProgress();
 		fp_LaunchApp(_pApplication, true) > [this, InProgressScope, _pApplication, pCleanupAutoLaunches](TCAsyncResult<CAppLaunchResult> &&_Result)
 			{
@@ -152,12 +159,12 @@ namespace NMib::NCloud::NAppManager
 					return;
 
 				fp_InitialStartupFailed(_Result.f_GetException());
-				
-				auto &Application = *_pApplication; 
-				
+
+				auto &Application = *_pApplication;
+
 				if (Application.m_LaunchStatus.f_IsEmpty())
 					fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", _Result.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
-				
+
 				DMibLogWithCategory
 					(
 						Malterlib/Cloud/AppManager
@@ -169,10 +176,10 @@ namespace NMib::NCloud::NAppManager
 				;
 			}
 		;
-		
+
 		return true;
 	}
-	
+
 	void CAppManagerActor::fp_UpdateApplicationDependencies()
 	{
 		bool bAllStarted = true;
@@ -182,7 +189,7 @@ namespace NMib::NCloud::NAppManager
 			auto &Application = *pApplication;
 			if (Application.m_bStopped && !Application.m_bAutoStart)
 				continue;
-			
+
 			if (!fp_AutoStartApp(pApplication))
 				bAllStarted = false;
 		}

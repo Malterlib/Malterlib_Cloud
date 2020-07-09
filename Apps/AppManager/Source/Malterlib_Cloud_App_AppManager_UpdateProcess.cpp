@@ -61,7 +61,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication_DeferToNextRestart
 		(
 			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
@@ -69,8 +69,8 @@ namespace NMib::NCloud::NAppManager
 		)
 	{
 		auto &Application = *_pState->m_pApplication;
-		
-		mp_State.m_StateDatabase.m_Data["PendingSelfUpdateProcess"] = 
+
+		mp_State.m_StateDatabase.m_Data["PendingSelfUpdateProcess"] =
 			{
 				"Name"_= Application.m_Name
 				, "VersionID"_= _pState->m_VersionID.f_ToJSON()
@@ -78,11 +78,11 @@ namespace NMib::NCloud::NAppManager
 				, "VersionRetrySequence"_= _pState->m_VersionRetrySequence
 			}
 		;
-		
+
 		co_await (fp_SaveStateDatabase() % "Failed save state database");
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplicationRunProcess(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
 		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_None, {});
@@ -127,19 +127,19 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication_DownloadVersion(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
 		auto &State = *_pState;
-		
+
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
-		
+
 		if (!State.m_SourcePath.f_IsEmpty())
 			co_return {}; // Already specified
 
 		State.m_fOnInfo(fg_Format("Downloading version '{}' from version managers", State.m_VersionID));
-		
+
 		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_DownloadVersion, {});
 
 		if (auto pException = State.f_CheckAbort())
@@ -222,7 +222,7 @@ namespace NMib::NCloud::NAppManager
 		co_await fp_UpdateApplicationJSON(State.m_pApplication);
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication_Unpack(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
 		auto &State = *_pState;
@@ -231,7 +231,7 @@ namespace NMib::NCloud::NAppManager
 			co_return pException;
 
 		State.m_fOnInfo("Extracting application to temporary directory");
-		
+
 		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_Unpack, {});
 
 		if (auto pException = State.f_CheckAbort())
@@ -307,16 +307,16 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication_StopOldApp(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
-		auto &State = *_pState; 
+		auto &State = *_pState;
 
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
 		State.m_fOnInfo("Stopping old application");
-		
+
 		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_StopOldApp, {});
 
 		if (auto pException = State.f_CheckAbort())
@@ -334,16 +334,16 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication_PreUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
 		auto &State = *_pState;
-		
+
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
 		State.m_fOnInfo("Pre update");
-		
+
 		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_PreUpdateScript, {});
 
 		if (auto pException = State.f_CheckAbort())
@@ -352,10 +352,10 @@ namespace NMib::NCloud::NAppManager
 		co_await fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PreUpdate, State.m_TempraryPath, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime());
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication_UpdateApplicationFiles(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
-		auto &State = *_pState; 
+		auto &State = *_pState;
 
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
@@ -427,10 +427,10 @@ namespace NMib::NCloud::NAppManager
 			co_await State.m_DownloadDirectoryCleanup->f_Destroy();
 		State.m_DownloadDirectoryCleanup.f_Clear();
 		State.m_TemporaryDirectoryCleanup.f_Clear();
-		
+
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication_SaveApplicationState(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
 		auto &State = *_pState;
@@ -466,7 +466,7 @@ namespace NMib::NCloud::NAppManager
 		co_await fp_UpdateApplicationJSON(State.m_pApplication);
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication_PostUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
 		auto &State = *_pState;
@@ -482,10 +482,10 @@ namespace NMib::NCloud::NAppManager
 		co_await fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PostUpdate, CStr{}, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime());
 		co_return {};
 	}
-	
+
 	TCFuture<bool> CAppManagerActor::fp_UpdateApplication_StartNewApp(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
-		auto &State = *_pState; 
+		auto &State = *_pState;
 
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
@@ -535,10 +535,10 @@ namespace NMib::NCloud::NAppManager
 
 		co_return AppLaunchResult.m_bQuitManager;
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication_PostLaunch(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState)
 	{
-		auto &State = *_pState; 
+		auto &State = *_pState;
 
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
