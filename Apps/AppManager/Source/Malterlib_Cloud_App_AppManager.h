@@ -929,6 +929,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_CloudManagerAdded(TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_Info);
 		void fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> const &_CloudManager);
 
+		TCSharedPointer<CApplication> fp_ApplicationFromHostID(CStr const &_HostID);
+
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #else
