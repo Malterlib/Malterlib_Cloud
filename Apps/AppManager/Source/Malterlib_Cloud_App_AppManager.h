@@ -16,6 +16,7 @@
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Security/UniqueUserGroup>
 #include <Mib/Concurrency/ActorSequencer>
+#include <Mib/Concurrency/DistributedAppSensorStoreLocal>
 
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
 
@@ -330,6 +331,7 @@ namespace NMib::NCloud::NAppManager
 
 			CTrustedActorInfo m_HostInfo;
 			CActorSubscription m_RegisterSubscription;
+			CActorSubscription m_SensorReporterSubscription;
 		};
 
 		struct CDistributedAppInterfaceServerImplementation : public CDistributedAppInterfaceServer
@@ -341,6 +343,7 @@ namespace NMib::NCloud::NAppManager
 					, CRegisterInfo const &_RegisterInfo
 				) override
 			;
+			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> f_GetSensorReporter() override;
 
 			CAppManagerActor *m_pThis = nullptr;
 #			ifdef DMibDebug
@@ -631,6 +634,16 @@ namespace NMib::NCloud::NAppManager
 			bool m_bQuitManager = false;
 		};
 
+		struct CDistributedAppSensorReporterImplementation : public CDistributedAppSensorReporter
+		{
+			TCFuture<CSensorReporter> f_OpenSensorReporter(CSensorInfo &&_SensorInfo) override;
+
+			CAppManagerActor *m_pThis;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
+		};
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
 		static CStr fsp_RunTool
@@ -652,6 +665,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<void> fp_InitApp();
 
+		TCFuture<void> fp_InitSensor();
 		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
 		TCFuture<void> fp_StopApp() override;
 		TCFuture<void> fp_ReadState();
@@ -982,6 +996,9 @@ namespace NMib::NCloud::NAppManager
 		TCSet<TCWeakPointer<CUpdateApplicationState>> mp_RunningUpdates;
 
 		TCPromise<void> mp_CancelRunningUpdatesOnStopAppManagerPromise;
+
+		TCActor<CDistributedAppSensorStoreLocal> mp_SensorStore;
+		TCDistributedActorInstance<CDistributedAppSensorReporterImplementation> mp_SensorReporterInterface;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

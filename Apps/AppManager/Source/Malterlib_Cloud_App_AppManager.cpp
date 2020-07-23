@@ -338,6 +338,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
+		co_await fp_InitSensor();
 		co_await fp_ReadState();
 
 		co_await (fp_PublishAppInterface() + fp_SetupLimits());
@@ -459,6 +460,24 @@ namespace NMib::NCloud::NAppManager
 			for (auto &Launch : mp_LaunchActors)
 				fg_Move(Launch).f_Destroy() > Destroys.f_AddResult();
 			mp_LaunchActors.f_Clear();
+
+			co_await Destroys.f_GetResults().f_Wrap();
+		}
+
+		{
+			TCActorResultVector<void> Destroys;
+
+			for (auto &CloudManager : mp_CloudManagers)
+			{
+				if (CloudManager.m_RegisterSubscription)
+					CloudManager.m_RegisterSubscription->f_Destroy() > Destroys.f_AddResult();
+				if (CloudManager.m_SensorReporterSubscription)
+					CloudManager.m_SensorReporterSubscription->f_Destroy() > Destroys.f_AddResult();
+			}
+
+			mp_SensorReporterInterface.f_Destroy() > Destroys.f_AddResult();
+
+			mp_CloudManagers.f_Clear();
 
 			co_await Destroys.f_GetResults().f_Wrap();
 		}

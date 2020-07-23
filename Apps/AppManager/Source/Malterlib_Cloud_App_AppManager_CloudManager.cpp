@@ -27,10 +27,32 @@ namespace NMib::NCloud::NAppManager
 		Info.m_VersionDate = VersionInfo.m_BuildTime;
 
 		auto Subscription = co_await _CloudManager.f_CallActor(&CCloudManager::f_RegisterAppManager)(mp_AppManagerInterface.m_Actor->f_ShareInterface<CAppManagerInterface>(), fg_Move(Info));
+		auto SensorReporter = co_await _CloudManager.f_CallActor(&CCloudManager::f_GetSensorReporter)().f_Wrap();
+
+		CActorSubscription SensorReporterSubscription;
+		if (SensorReporter)
+		{
+			auto SubscriptionResult = co_await mp_SensorStore
+				(
+					&CDistributedAppSensorStoreLocal::f_AddExtraSensorReporter
+					, fg_Move(*SensorReporter)
+					, _Info
+				)
+				.f_Wrap()
+			;
+
+			if (SubscriptionResult)
+				SensorReporterSubscription = fg_Move(*SubscriptionResult);
+			else
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to add extra sensor reporter to sensor store: {}", SubscriptionResult.f_GetExceptionStr());
+		}
+		else
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to get sensor reporter from cloud manager: {}", SensorReporter.f_GetExceptionStr());
 
 		auto &NewManager = mp_CloudManagers[_CloudManager];
 		NewManager.m_HostInfo = _Info;
 		NewManager.m_RegisterSubscription = fg_Move(Subscription);
+		NewManager.m_SensorReporterSubscription = fg_Move(SensorReporterSubscription);
 
 		co_return {};
 	}
@@ -43,6 +65,9 @@ namespace NMib::NCloud::NAppManager
 
 		if (pCloudManagerState->m_RegisterSubscription)
 			pCloudManagerState->m_RegisterSubscription->f_Destroy() > fg_DiscardResult();
+
+		if (pCloudManagerState->m_SensorReporterSubscription)
+			pCloudManagerState->m_SensorReporterSubscription->f_Destroy() > fg_DiscardResult();
 
 		mp_CloudManagers.f_Remove(_CloudManager);
 	}
