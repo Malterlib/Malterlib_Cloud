@@ -12,17 +12,17 @@ namespace NMib::NCloud::NAppManager
 		: CDistributedAppActor(CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager"))
 	{
 	}
-	
+
 	void CAppManagerActor::fp_OnApplicationAdded(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		CRemoteApplicationKey RemoteKey{_pApplication->m_Settings};
-	
+
 		if (mp_KnownRemoteApplications[RemoteKey](mp_State.m_HostID).f_WasCreated())
 			fp_NewRemoteKnownApplication(RemoteKey, mp_State.m_HostID);
-		
+
 		fp_SendAppToRemoteAppManagers(_pApplication);
 		fp_SendAppChange_AddedOrChanged(*_pApplication);
-		
+
 		if (_pApplication->f_IsChildApp())
 			return; // Parent cannot have parents
 		auto &NewApplication = *_pApplication;
@@ -35,7 +35,7 @@ namespace NMib::NCloud::NAppManager
 			NewApplication.m_Children.f_Insert(Application);
 		}
 	}
-	
+
 	void CAppManagerActor::fp_InitApplications()
 	{
 		for (auto &pApplication : mp_Applications)
@@ -54,12 +54,12 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 	}
-	
+
 	void CAppManagerActor::fp_InitialStartupFailed(CExceptionPointer const &_pException)
 	{
 		if (mp_InitialStartupResult.f_IsSet())
 			return;
-		
+
 		mp_InitialStartupResult.f_SetException(_pException);
 	}
 
@@ -68,7 +68,7 @@ namespace NMib::NCloud::NAppManager
 		bool bChangedDatabase = false;
 		try
 		{
-			CStr PendingSelfUpdateName; 
+			CStr PendingSelfUpdateName;
 			CVersionManager::CVersionIDAndPlatform PendingSelfUpdateVersionID;
 			CTime PendingSelfUpdateTime;
 			uint32 PendingSelfUpdateSequence = 0;
@@ -79,8 +79,8 @@ namespace NMib::NCloud::NAppManager
 			if (auto *pPendingSelfUpdateProcess = mp_State.m_StateDatabase.m_Data.f_GetMember("PendingSelfUpdateProcess"))
 			{
 				auto &Pending = *pPendingSelfUpdateProcess;
-				
-				PendingSelfUpdateName = Pending["Name"].f_String(); 
+
+				PendingSelfUpdateName = Pending["Name"].f_String();
 				PendingSelfUpdateVersionID = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(Pending["VersionID"]);
 				PendingSelfUpdateTime = Pending["VersionTime"].f_Date();
 				PendingSelfUpdateSequence = Pending["VersionRetrySequence"].f_Integer();
@@ -88,33 +88,33 @@ namespace NMib::NCloud::NAppManager
 				mp_State.m_StateDatabase.m_Data.f_RemoveMember("PendingSelfUpdateProcess");
 				bChangedDatabase = true;
 			}
-			
+
 			if (auto pApplication = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 			{
 				for (auto &ApplicationEntry : pApplication->f_Object())
 				{
 					CStr const &Name = ApplicationEntry.f_Name();
-					auto &ApplicationJSON = ApplicationEntry.f_Value(); 
-					
+					auto &ApplicationJSON = ApplicationEntry.f_Value();
+
 					auto &Application = *(mp_Applications[Name] = fg_Construct(Name, this));
-					
-					auto &Settings = Application.m_Settings; 
-					
-					Settings.m_Executable = ApplicationJSON["Executable"].f_String(); 
-					Settings.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String(); 
+
+					auto &Settings = Application.m_Settings;
+
+					Settings.m_Executable = ApplicationJSON["Executable"].f_String();
+					Settings.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String();
 #ifdef DPlatformFamily_Windows
 					if (auto pValue = ApplicationJSON.f_GetMember("RunAsUserPassword", EJSONType_String))
 						Settings.m_RunAsUserPassword = pValue->f_String();
 #endif
 					Settings.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String();
-					
+
 					if (auto pValue = ApplicationJSON.f_GetMember("RunAsUserHasShell", EJSONType_Boolean))
 						Settings.m_bRunAsUserHasShell = pValue->f_Boolean();
 
 					if (auto *pValue = ApplicationJSON.f_GetMember("Backup"))
 					{
 						auto &BackupJSON = *pValue;
-						
+
 						if (BackupJSON["IncludeWildcards"].f_IsArray())
 						{
 							for (auto &Wildcard : BackupJSON["IncludeWildcards"].f_Array())
@@ -137,11 +137,11 @@ namespace NMib::NCloud::NAppManager
 							Settings.m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 						for (auto &Wildcard : BackupJSON["RemoveSyncFlagsWildcards"].f_Object())
 							Settings.m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
-						
+
 						Settings.m_Backup_NewBackupInterval = CTimeSpanConvert::fs_CreateSpanFromHours(BackupJSON["NewBackupIntervalHours"].f_Float());
 						Settings.m_bBackupEnabled = BackupJSON["Enabled"].f_Boolean();
 					}
-					
+
 					if (auto pValue = ApplicationJSON.f_GetMember("DistributedApp", EJSONType_Boolean))
 						Settings.m_bDistributedApp = pValue->f_Boolean();
 					for (auto &Parameter : ApplicationJSON["Parameters"].f_Array())
@@ -161,17 +161,17 @@ namespace NMib::NCloud::NAppManager
 						Application.m_LastInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
 					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfo", EJSONType_Object))
 						Application.m_LastInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
-					
+
 					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionFinished", EJSONType_Object))
 						Application.m_LastInstalledVersionFinished = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
 					else
 						Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
-					
+
 					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfoFinished", EJSONType_Object))
 						Application.m_LastInstalledVersionInfoFinished = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
 					else
-						Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo; 
-						
+						Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo;
+
 					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersion", EJSONType_Object))
 						Application.m_LastTriedInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
 					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionInfo", EJSONType_Object))
@@ -193,15 +193,15 @@ namespace NMib::NCloud::NAppManager
 						Application.m_LastFailedInstalledVersionFailureStage = (EUpdateStage)pValue->f_Integer();
 					else
 						Application.m_LastFailedInstalledVersionFailureStage = EUpdateStage::EUpdateStage_Failed;
-					
-					if 
+
+					if
 						(
-							Application.m_LastTriedInstalledVersion != Application.m_LastInstalledVersionFinished 
+							Application.m_LastTriedInstalledVersion != Application.m_LastInstalledVersionFinished
 							|| Application.m_LastTriedInstalledVersionInfo.m_Time != Application.m_LastInstalledVersionInfoFinished.m_Time
 							|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != Application.m_LastInstalledVersionInfoFinished.m_RetrySequence
 						)
 					{
-						if 
+						if
 							(
 								(
 									Name != PendingSelfUpdateName
@@ -217,7 +217,7 @@ namespace NMib::NCloud::NAppManager
 							Application.m_LastFailedInstalledVersionRetrySequence = Application.m_LastTriedInstalledVersionInfo.m_RetrySequence;
 						}
 					}
-						
+
 					if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdate", EJSONType_Boolean))
 						Settings.m_bAutoUpdate = pValue->f_Boolean();
 
@@ -290,7 +290,7 @@ namespace NMib::NCloud::NAppManager
 						Settings.m_bLaunchInProcess = pValue->f_Boolean();
 
 					mp_KnownRemoteApplications[CRemoteApplicationKey{Settings}][mp_State.m_HostID];
-				}					
+				}
 			}
 
 			if (auto *pKnownRemoteHosts = mp_State.m_StateDatabase.m_Data.f_GetMember("KnownRemoteApplications"))
@@ -309,7 +309,7 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 			}
-			
+
 			if (!PendingSelfUpdateName.f_IsEmpty())
 				fp_StartPendingSelfUpdateReporting(PendingSelfUpdateName, PendingSelfUpdateVersionID, PendingSelfUpdateTime, PendingSelfUpdateSequence);
 		}
@@ -317,13 +317,13 @@ namespace NMib::NCloud::NAppManager
 		{
 			co_return fg_CurrentException();
 		}
-		
+
 		if (bChangedDatabase)
 			co_await fp_SaveStateDatabase();
 
 		co_return {};
 	}
-	
+
 	void CAppManagerActor::fp_KeyManagerAvailable()
 	{
 		fp_UpdateApplicationDependencies();
@@ -331,15 +331,16 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_InitApp()
 	{
+		auto OnResume = g_OnResume / [&]
+			{
+				if (mp_State.m_bStoppingApp || f_IsDestroyed())
+					DMibError("Startup aborted");
+			}
+		;
+
 		co_await fp_ReadState();
 
-		if (mp_State.m_bStoppingApp)
-			co_return DMibErrorInstance("Startup aborted");
-
 		co_await (fp_PublishAppInterface() + fp_SetupLimits());
-
-		if (mp_State.m_bStoppingApp)
-			co_return DMibErrorInstance("Startup aborted");
 
 		fp_InitApplications();
 		fp_UpdateApplicationDependencies();
@@ -350,14 +351,7 @@ namespace NMib::NCloud::NAppManager
 		fp_SubscribeCoordinationInterface() > LogError("Failed to subscribe to coordination interface");
 
 		co_await (fp_SetupAppManagerInterfacePermissions() % "Failed to setup permissions");
-
-		if (mp_State.m_bStoppingApp)
-			co_return DMibErrorInstance("Startup aborted");
-
 		co_await (fp_PublishAppManagerInterface() % "Failed to publish app manager interface");
-
-		if (mp_State.m_bStoppingApp)
-			co_return DMibErrorInstance("Startup aborted");
 
 		auto [KeySubscription, VersionSubscription, CloudSubscription] = co_await
 			(
@@ -366,9 +360,6 @@ namespace NMib::NCloud::NAppManager
 				+ mp_State.m_TrustManager->f_SubscribeTrustedActors<CCloudManager>()
 			)
 		;
-
-		if (mp_State.m_bStoppingApp)
-			co_return DMibErrorInstance("Startup aborted");
 
 		mp_KeyManagerSubscription = fg_Move(KeySubscription);
 		mp_KeyManagerSubscription.f_OnActor
@@ -435,7 +426,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return fg_Move(InitResult);
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_StopApp()
 	{
 		auto CanDestroyFuture = mp_pCanDestroy->f_Future();
