@@ -57,7 +57,12 @@ namespace NMib::NCloud::NAppManager
 			co_return DMibErrorInstance("No key managers are connected, so key cannot be generated");
 
 		CSymmetricKey Key;
-		if (_Operation != EEncryptOperation_Close)
+		if (_Operation == EEncryptOperation_Close)
+		{
+			if (pEncryptionApplication->m_DirectoryMonitorSubscription)
+				co_await fg_Exchange(pEncryptionApplication->m_DirectoryMonitorSubscription, nullptr)->f_Destroy();
+		}
+		else
 		{
 			auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
 			static const mint c_KeyBits = 512;
@@ -114,7 +119,13 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		if (_Operation == EEncryptOperation_Open || _Operation == EEncryptOperation_Setup)
+		{
+			CHostMonitor::CMonitorPathOptions PathOptions;
+			PathOptions.m_Path = pEncryptionApplication->f_GetDirectory();
+			pEncryptionApplication->m_DirectoryMonitorSubscription = co_await mp_HostMonitor(&CHostMonitor::f_MonitorPath, PathOptions);
+
 			fp_AppEncryptionStateChanged(pEncryptionApplication, true);
+		}
 		else if (_Operation == EEncryptOperation_Close)
 			fp_AppEncryptionStateChanged(pEncryptionApplication, false);
 

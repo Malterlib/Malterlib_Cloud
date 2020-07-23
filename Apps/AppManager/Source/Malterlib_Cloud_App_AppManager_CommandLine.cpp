@@ -18,15 +18,28 @@ namespace NMib::NCloud::NAppManager
 				, "Manages malterlib cloud applications by providing services such as encryption at rest and automatic updates." 
 			)
 		;
-		
+
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
-					"LogLaunchesToStdErr?"_= 
+					"LogLaunchesToStdErr?"_=
 					{
 						"Names"_= {"--log-launches-to-stderr"}
 						,"Default"_= false
 						, "Description"_= "Log application launch output to stderr."
+					}
+				}
+			)
+		;
+
+		o_CommandLine.f_RegisterGlobalOptions
+			(
+				{
+					"HostMonitorInterval?"_=
+					{
+						"Names"_= {"--host-monitor-interval"}
+						,"Type"_= 0.0
+						, "Description"_= "Override host monitor interval."
 					}
 				}
 			)

@@ -14,6 +14,7 @@
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cloud/BackupManagerClient>
 #include <Mib/Cloud/CloudManager>
+#include <Mib/Cloud/HostMonitor>
 #include <Mib/Security/UniqueUserGroup>
 #include <Mib/Concurrency/ActorSequencer>
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
@@ -250,6 +251,7 @@ namespace NMib::NCloud::NAppManager
 			CAppManagerActor *m_pThis;
 
 			TCActor<CBackupManagerClient> m_BackupClient;
+			CActorSubscription m_DirectoryMonitorSubscription;
 		};
 
 		struct CBashScriptOutput
@@ -666,6 +668,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_InitApp();
 
 		TCFuture<void> fp_InitSensor();
+		TCFuture<void> fp_InitHostMonitor();
+
 		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
 		TCFuture<void> fp_StopApp() override;
 		TCFuture<void> fp_ReadState();
@@ -999,6 +1003,10 @@ namespace NMib::NCloud::NAppManager
 
 		TCActor<CDistributedAppSensorStoreLocal> mp_SensorStore;
 		TCDistributedActorInstance<CDistributedAppSensorReporterImplementation> mp_SensorReporterInterface;
+
+		fp64 mp_HostMonitorInterval = 60.0;
+		TCActor<CHostMonitor> mp_HostMonitor;
+		CActorSubscription mp_MainDirectoryMonitorSubscription;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

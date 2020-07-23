@@ -339,6 +339,8 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		co_await fp_InitSensor();
+		co_await fp_InitHostMonitor();
+
 		co_await fp_ReadState();
 
 		co_await (fp_PublishAppInterface() + fp_SetupLimits());
@@ -416,7 +418,11 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
 		mp_bLogLaunchesToStdErr = _Params["LogLaunchesToStdErr"].f_Boolean();
-		
+		if (auto pValue = _Params.f_GetMember("HostMonitorInterval"))
+			mp_HostMonitorInterval = pValue->f_Float();
+		else
+			mp_HostMonitorInterval = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("HostMonitorInterval", mp_HostMonitorInterval).f_Float();
+
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations"));
 		mp_KnownPlatforms[DMalterlibCloudPlatform];
 
@@ -481,6 +487,12 @@ namespace NMib::NCloud::NAppManager
 
 			co_await Destroys.f_GetResults().f_Wrap();
 		}
+
+		if (mp_MainDirectoryMonitorSubscription)
+			co_await fg_Exchange(mp_MainDirectoryMonitorSubscription, nullptr)->f_Destroy();
+
+		if (mp_HostMonitor)
+			co_await fg_Move(mp_HostMonitor).f_Destroy();
 
 		co_return {};
 	}
