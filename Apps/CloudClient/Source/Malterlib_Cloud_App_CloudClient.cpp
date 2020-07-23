@@ -10,7 +10,11 @@
 namespace NMib::NCloud::NCloudClient
 {
 	CCloudClientAppActor::CCloudClientAppActor()
-		: CDistributedAppActor{CDistributedAppActor_Settings{"MalterlibCloud"}}
+		: CDistributedAppActor
+		{
+			CDistributedAppActor_Settings{"MalterlibCloud"}
+			.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_All & ~EDefaultCommandLineFunctionality_Sensor)
+		}
 		, mp_VersionManagerHelper(mp_State.m_RootDirectory)
 	{
 	}

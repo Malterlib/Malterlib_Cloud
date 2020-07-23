@@ -136,6 +136,25 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveAppManager(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>>> fp_CommandLine_CloudManager_GetSensorReaders(CStr const &_Host);
+		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> fp_CommandLine_CloudManager_GetAggregatedSensors
+			(
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
+				, CDistributedAppSensorReader_SensorFilter const &_Filter
+			)
+		;
+		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> fp_CommandLine_CloudManager_GetAggregatedSensorStatus
+			(
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
+				, CDistributedAppSensorReader_SensorFilter const &_Filter
+			)
+		;
+		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> fp_CommandLine_CloudManager_GetAggregatedSensorReadings
+			(
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
+				, CDistributedAppSensorReader_SensorReadingFilter const &_Filter
+			)
+		;
 
 		fp64 mp_Timeout = 0.0;
 

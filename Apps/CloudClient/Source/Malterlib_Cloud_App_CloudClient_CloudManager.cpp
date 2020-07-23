@@ -5,6 +5,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/DistributedAppSensorReader>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/CommandLine/TableRenderer>
 #include <Mib/CommandLine/AnsiEncoding>
@@ -15,13 +16,19 @@ namespace NMib::NCloud::NCloudClient
 {
 	void CCloudClientAppActor::fp_CloudManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section)
 	{
-		auto OptionalHost = "Host?"_=
-			{
-				"Names"_= {"--host"}
-				, "Default"_= ""
-				, "Description"_= "Limit cloud managers to only specified host ID."
-			}
+		_Section.f_RegisterSectionOptions
+			(
+				{
+					"Host?"_=
+					{
+						"Names"_= {"--host"}
+						, "Default"_= ""
+						, "Description"_= "Limit cloud managers to only specified host ID."
+					}
+				}
+			)
 		;
+
 		auto QuietOption = "Quiet?"_=
 			{
 				"Names"_= {"--quiet", "-q"}
@@ -85,8 +92,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, "Options"_=
 					{
-						OptionalHost
-						, QuietOption
+						QuietOption
 						, IncludeCloudManagerOption
 						, CTableRenderHelper::fs_OutputTypeOption()
 						, FilterStatusError
@@ -116,8 +122,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, "Options"_=
 					{
-						OptionalHost
-						, QuietOption
+						QuietOption
 						, IncludeCloudManagerOption
 						, CTableRenderHelper::fs_OutputTypeOption()
 						, FilterStatusError
@@ -144,8 +149,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, "Options"_=
 					{
-						OptionalHost
-						, QuietOption
+						QuietOption
 						, CTableRenderHelper::fs_OutputTypeOption()
 						, FilterStatusError
 						, FilterEnvironment
@@ -177,13 +181,94 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, "Options"_=
 					{
-						OptionalHost
-						, QuietOption
+						QuietOption
 					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager, _Params, _pCommandLine);
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
+
+		fp_BuildDefaultCommandLine_Sensor_Customizable
+			(
+				_Section
+				, "cloud-manager-"
+				, g_ActorFunctor / [this]
+				(
+					CEJSON const &_Params
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CDistributedAppSensorReader_SensorFilter const &_Filter
+					, ESensorOutputFlag _Flags
+					, CStr const &_TableType
+				)
+				-> TCFuture<uint32>
+				{
+					auto SensorReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders, _Params["Host"].f_String());
+					co_return co_await self
+						(
+							&CDistributedAppActor::f_CommandLine_SensorListOutput
+							, _pCommandLine
+							, co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors, SensorReaders, _Filter)
+							, _Flags
+							, _TableType
+						)
+					;
+				}
+				, g_ActorFunctor / [this]
+				(
+					CEJSON const &_Params
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CDistributedAppSensorReader_SensorFilter const &_Filter
+					, ESensorOutputFlag _Flags
+					, CStr const &_TableType
+				)
+				-> TCFuture<uint32>
+				{
+					auto SensorReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders, _Params["Host"].f_String());
+					auto SensorsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors, SensorReaders, _Filter);
+					auto ReadingsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorStatus, SensorReaders, _Filter);
+
+					co_return co_await self
+						(
+							&CDistributedAppActor::f_CommandLine_SensorReadingsOutput
+							, _pCommandLine
+							, fg_Move(ReadingsGenerator)
+							, fg_Move(SensorsGenerator)
+							, 0
+							, _Flags
+							, _TableType
+						)
+					;
+				}
+				, g_ActorFunctor / [this]
+				(
+					CEJSON const &_Params
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CDistributedAppSensorReader_SensorReadingFilter const &_Filter
+					, uint64 _MaxEntries
+					, ESensorOutputFlag _Flags
+					, CStr const &_TableType
+				)
+				-> TCFuture<uint32>
+				{
+					auto SensorReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders, _Params["Host"].f_String());
+					auto SensorsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors, SensorReaders, _Filter.m_SensorFilter);
+					auto ReadingsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorReadings, SensorReaders, _Filter);
+
+					co_return co_await self
+						(
+							&CDistributedAppActor::f_CommandLine_SensorReadingsOutput
+							, _pCommandLine
+							, fg_Move(ReadingsGenerator)
+							, fg_Move(SensorsGenerator)
+							, _MaxEntries
+							, _Flags
+							, _TableType
+						)
+					;
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -865,5 +950,235 @@ namespace NMib::NCloud::NCloudClient
 		co_await AppManagersResults.f_GetResults() | g_Unwrap;
 
 		co_return 0;
+	}
+
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders(CStr const &_Host)
+		-> TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>>>
+	{
+		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
+
+		TCActorResultMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> SensorReaders;
+
+		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		{
+			if (!_Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != _Host)
+				continue;
+			auto &CloudManager = TrustedCloudManager.m_Actor;
+			CloudManager.f_CallActor(&CCloudManager::f_GetSensorReader)()
+				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+				> SensorReaders.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+			;
+		}
+
+		co_return fg_Construct(co_await SensorReaders.f_GetResults() | g_Unwrap);
+	}
+
+	TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors
+		(
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
+			, CDistributedAppSensorReader_SensorFilter const &_Filter
+		)
+	{
+		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> SensorsResults;
+
+		for (auto &Reader : *_pSensorReaders)
+			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensors)(fg_TempCopy(_Filter), 1024) > SensorsResults.f_AddResult();
+
+		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CDistributedAppSensorReporter::CSensorInfo> SensorInfos;
+
+		auto SensorGenerators = co_await SensorsResults.f_GetResults() | g_Unwrap;
+		{
+			for (auto &SensorGenerator : SensorGenerators)
+			{
+				for co_await (auto Sensors : SensorGenerator)
+				{
+					for (auto &SensorInfo : Sensors)
+						SensorInfos[SensorInfo.f_Key()] = SensorInfo;
+				}
+			}
+		}
+
+		TCVector<CDistributedAppSensorReporter::CSensorInfo> ToYield;
+
+		for (auto &SensorInfo : SensorInfos)
+			ToYield.f_Insert(fg_Move(SensorInfo));
+
+		co_yield fg_Move(ToYield);
+
+		co_return {};
+	}
+
+	TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorStatus
+		(
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
+			, CDistributedAppSensorReader_SensorFilter const &_Filter
+		)
+	{
+		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> StatusResults;
+
+		for (auto &Reader : *_pSensorReaders)
+			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorStatus)(fg_TempCopy(_Filter), 1024) > StatusResults.f_AddResult();
+
+		auto StatusGenerators = co_await StatusResults.f_GetResults() | g_Unwrap;
+
+		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CDistributedAppSensorReader_SensorKeyAndReading> SensorStatus;
+
+		for (auto &Generator : StatusGenerators)
+		{
+			for co_await (auto Statuses : fg_Move(Generator))
+			{
+				for (auto &Status : Statuses)
+				{
+					auto pPreviousStatus = SensorStatus.f_FindEqual(Status.m_SensorInfoKey);
+					if (pPreviousStatus && Status.m_Reading.m_UniqueSequence <= pPreviousStatus->m_Reading.m_UniqueSequence)
+						continue;
+
+					SensorStatus[Status.m_SensorInfoKey] = Status;
+				}
+			}
+		}
+
+		TCVector<CDistributedAppSensorReader_SensorKeyAndReading> ToYield;
+
+		for (auto &Status : SensorStatus)
+			ToYield.f_Insert(fg_Move(Status));
+
+		co_yield fg_Move(ToYield);
+
+		co_return {};
+	}
+
+	TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorReadings
+		(
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
+			, CDistributedAppSensorReader_SensorReadingFilter const &_Filter
+		)
+	{
+		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> ReadingsResults;
+
+		for (auto &Reader : *_pSensorReaders)
+			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorReadings)(fg_TempCopy(_Filter), 1024) > ReadingsResults.f_AddResult();
+
+		auto SensorGenerators = co_await ReadingsResults.f_GetResults() | g_Unwrap;
+		if (SensorGenerators.f_IsEmpty())
+			co_return {};
+		if (SensorGenerators.f_GetLen() == 1)
+		{
+			for co_await (auto Readings : SensorGenerators.f_GetFirst())
+				co_yield fg_Move(Readings);
+			co_return {};
+		}
+
+		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>::CIterator> IteratorResults;
+
+		for (auto &Generator : SensorGenerators)
+			fg_Move(Generator).f_GetIterator() > IteratorResults.f_AddResult();
+
+		TCVector<TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>::CIterator> Iterators;
+
+		for (auto &iReadings : co_await IteratorResults.f_GetResults() | g_Unwrap)
+		{
+			Iterators.f_Insert
+				(
+					co_await
+					(
+						fg_CallSafe
+						(
+							[iReadings = fg_Move(iReadings)]() mutable -> TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>
+							{
+								for (; iReadings; co_await ++iReadings)
+								{
+									for (auto &Reading : *iReadings)
+										co_yield fg_Move(Reading);
+								}
+
+								co_return {};
+							}
+						)
+					).f_GetIterator()
+				)
+			;
+		}
+
+		auto fIsLess = [bNewestFirst = !!(_Filter.m_Flags & CDistributedAppSensorReader_SensorReadingFilter::ESensorReadingsFlag_ReportNewestFirst)]
+			(CDistributedAppSensorReader_SensorKeyAndReading const &_Left, CDistributedAppSensorReader_SensorKeyAndReading const &_Right)
+			{
+				if (bNewestFirst)
+				{
+					return fg_TupleReferences(_Right.m_Reading.m_Timestamp, _Right.m_Reading.m_UniqueSequence)
+						< fg_TupleReferences(_Left.m_Reading.m_Timestamp, _Left.m_Reading.m_UniqueSequence)
+					;
+				}
+				else
+				{
+					return fg_TupleReferences(_Left.m_Reading.m_Timestamp, _Left.m_Reading.m_UniqueSequence)
+						< fg_TupleReferences(_Right.m_Reading.m_Timestamp, _Right.m_Reading.m_UniqueSequence)
+					;
+				}
+			}
+		;
+
+		bool bAtEnd = false;
+		CDistributedAppSensorReader_SensorKeyAndReading LastReading;
+
+		auto fGetNextReading = [&]() -> TCFuture<CDistributedAppSensorReader_SensorKeyAndReading>
+			{
+				co_await ECoroutineFlag_AllowReferences;
+
+				TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>::CIterator *pBestReading = nullptr;
+
+				while (true)
+				{
+					for (auto &iReadings : Iterators)
+					{
+						if (!iReadings)
+							continue;
+
+						if (!pBestReading)
+						{
+							pBestReading = &iReadings;
+							continue;
+						}
+
+						if (fIsLess(*iReadings, **pBestReading))
+							pBestReading = &iReadings;
+					}
+
+					if (pBestReading)
+					{
+						auto ToReturn = fg_Move(**pBestReading);
+						co_await ++*pBestReading;
+
+						if (ToReturn.m_SensorInfoKey == LastReading.m_SensorInfoKey && ToReturn.m_Reading.m_UniqueSequence == LastReading.m_Reading.m_UniqueSequence)
+							continue;
+
+						co_return fg_Move(ToReturn);
+					}
+					else
+						break;
+				}
+
+				bAtEnd = true;
+				co_return {};
+			}
+		;
+
+		TCVector<CDistributedAppSensorReader_SensorKeyAndReading> ToYield;
+
+		while (true)
+		{
+			auto NextReading = co_await fGetNextReading();
+			if (bAtEnd)
+				break;
+
+			ToYield.f_Insert(fg_Move(NextReading));
+			if (ToYield.f_GetLen() >= 1024)
+				co_yield fg_Move(ToYield);
+		}
+
+		if (!ToYield.f_IsEmpty())
+			co_yield fg_Move(ToYield);
+
+		co_return {};
 	}
 }
