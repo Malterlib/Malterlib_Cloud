@@ -39,6 +39,7 @@ namespace NMib::NCloud::NCloudManager
 			 	% "Faild to open database"
 			)
 		;
+		co_await (fp_SetupSensorStore() % "Failed to setup sensor store");
 
 		co_await (fp_SetupPermissions() % "Failed to setup permissions");
 		co_await (fp_SetupMonitor() % "Failed to setup monitor");
@@ -52,8 +53,13 @@ namespace NMib::NCloud::NCloudManager
 		TCActorResultVector<void> Destroys;
 
 		mp_ProtocolInterface.f_Destroy() > Destroys.f_AddResult();
+		mp_SensorReporterInterface.f_Destroy() > Destroys.f_AddResult();
+		mp_SensorReaderInterface.f_Destroy() > Destroys.f_AddResult();
 
 		co_await Destroys.f_GetResults();
+
+		if (mp_AppSensorStore)
+			co_await fg_Move(mp_AppSensorStore).f_Destroy();
 
 		if (mp_DatabaseActor)
 			co_await fg_Move(mp_DatabaseActor).f_Destroy();

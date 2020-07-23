@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ActorCallbackManager>
 #include <Mib/Concurrency/ConcurrencyManager>
+#include <Mib/Concurrency/DistributedAppSensorStoreLocal>
 #include <Mib/File/ChangeNotificationActor>
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Cloud/FileTransfer>
@@ -30,7 +31,34 @@ namespace NMib::NCloud::NCloudManager
 			TCFuture<TCMap<CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() override;
 			TCFuture<TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() override;
 			TCFuture<void> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) override;
+			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> f_GetSensorReporter() override;
+			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> f_GetSensorReader() override;
 
+			CCloudManagerServer *m_pThis;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
+		};
+
+		struct CDistributedAppSensorReporterImplementation : public CDistributedAppSensorReporter
+		{
+			TCFuture<CSensorReporter> f_OpenSensorReporter(CSensorInfo &&_SensorInfo) override;
+
+			CCloudManagerServer *m_pThis;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
+		};
+
+		struct CDistributedAppSensorReaderImplementation : public CDistributedAppSensorReader
+		{
+			TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> f_GetSensors(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize) override;
+			auto f_GetSensorReadings(CDistributedAppSensorReader_SensorReadingFilter &&_Filter, uint32 _BatchSize)
+				-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> override
+			;
+			auto f_GetSensorStatus(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize)
+				-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> override
+			;
 			CCloudManagerServer *m_pThis;
 #			ifdef DMibDebug
 				CEmpty self; // Hide dangerous self
@@ -59,14 +87,18 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_Publish();
 		TCFuture<void> fp_SetupPermissions();
 		TCFuture<void> fp_SetupMonitor();
+		TCFuture<void> fp_SetupSensorStore();
 		TCFuture<void> fp_UpdateAppManagerState();
 		TCFuture<void> fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data);
 		TCFuture<void> fp_RemoveAppManagerData(CStr const &_HostID);
 		TCFuture<void> fp_ProcessApplicationChanges(CStr const &_AppManagerID, CAppManagerInterface::COnChangeNotificationParams &&_Params);
 		TCFuture<void> fp_ChangeOtherErrors(CStr const &_AppManagerID, mint _RegisterSequence, TCSet<CStr> const &_Remove, TCMap<CStr, CStr> const &_Add);
 		TCFuture<void> fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied);
+		static TCVector<CStr> fsp_SensorReadPermissions();
 
 		TCDistributedActorInstance<CCloudManagerImplementation> mp_ProtocolInterface;
+		TCDistributedActorInstance<CDistributedAppSensorReporterImplementation> mp_SensorReporterInterface;
+		TCDistributedActorInstance<CDistributedAppSensorReaderImplementation> mp_SensorReaderInterface;
 		CDistributedAppState &mp_AppState;
 
 		CTrustedPermissionSubscription mp_Permissions;
@@ -77,5 +109,7 @@ namespace NMib::NCloud::NCloudManager
 		TCMap<CStr, CAppManagerState> mp_AppManagers;
 
 		CActorSubscription mp_MonitorTimerSubscription;
+
+		TCActor<CDistributedAppSensorStoreLocal> mp_AppSensorStore;
 	};
 }

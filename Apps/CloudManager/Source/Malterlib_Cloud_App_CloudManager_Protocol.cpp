@@ -13,7 +13,16 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_SetupPermissions()
 	{
-		TCSet<CStr> Permissions{"CloudManager/RegisterAppManager", "CloudManager/ReadAll", "CloudManager/RemoveAppManager"};
+		TCSet<CStr> Permissions
+			{
+				"CloudManager/RegisterAppManager"
+				, "CloudManager/ReportSensorReadings"
+				, "CloudManager/ReportSensorReadingsOnBehalfOf/All"
+				, "CloudManager/ReadAll"
+				, "CloudManager/ReadSensors"
+				, "CloudManager/RemoveAppManager"
+			}
+		;
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
 
 		TCVector<CStr> SubscribePermissions{"CloudManager/*"};
@@ -24,7 +33,14 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_Publish()
 	{
-		return mp_ProtocolInterface.f_Publish<CCloudManager>(mp_AppState.m_DistributionManager, this, CCloudManager::mc_pDefaultNamespace);
+		TCActorResultVector<void> PublishResults;
+		mp_ProtocolInterface.f_Publish<CCloudManager>(mp_AppState.m_DistributionManager, this) > PublishResults.f_AddResult();
+		mp_SensorReporterInterface.f_Construct(mp_AppState.m_DistributionManager, this);
+		mp_SensorReaderInterface.f_Construct(mp_AppState.m_DistributionManager, this);
+
+		co_await PublishResults.f_GetResults() | g_Unwrap;
+
+		co_return {};
 	}
 
 	TCFuture<void> CCloudManagerServer::fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied)
@@ -232,7 +248,7 @@ namespace NMib::NCloud::NCloudManager
 		auto ChangeNotificationsSubscription = co_await AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeChangeNotifications)
 			(
 			 	g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
-			 	(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> NConcurrency::TCFuture<void>
+			 	(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> TCFuture<void>
 				{
 					auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
 					if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
@@ -384,7 +400,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Return);
 	}
 
-	NConcurrency::TCFuture<void> CCloudManagerServer::CCloudManagerImplementation::f_RemoveAppManager(NStr::CStr const &_AppManagerHostID)
+	TCFuture<void> CCloudManagerServer::CCloudManagerImplementation::f_RemoveAppManager(NStr::CStr const &_AppManagerHostID)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = g_OnResume / [pThis]
@@ -415,6 +431,62 @@ namespace NMib::NCloud::NCloudManager
 
 		co_await (pThis->self(&CCloudManagerServer::fp_RemoveAppManagerData, _AppManagerHostID) % Auditor);
 
+		Auditor.f_Info("Remove App Manager");
+
 		co_return {};
+	}
+
+	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> CCloudManagerServer::CCloudManagerImplementation::f_GetSensorReporter()
+	{
+		auto pThis = m_pThis;
+		auto OnResume = g_OnResume / [pThis]
+			{
+				if (pThis->f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor reporter", {"CloudManager/ReportSensorReadings"}))
+			co_return Auditor.f_AccessDenied("(Get sensor reporter)");
+
+		Auditor.f_Info("Get sensor reporter");
+
+		co_return TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>
+			(
+				pThis->mp_SensorReporterInterface.m_Actor->f_ShareInterface<CDistributedAppSensorReporter>()
+				, g_ActorSubscription / []
+				{
+				}
+			)
+		;
+	}
+
+	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> CCloudManagerServer::CCloudManagerImplementation::f_GetSensorReader()
+	{
+		auto pThis = m_pThis;
+		auto OnResume = g_OnResume / [pThis]
+			{
+				if (pThis->f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor reader", fsp_SensorReadPermissions()))
+			co_return Auditor.f_AccessDenied("(Get sensor reader)");
+
+		Auditor.f_Info("Get sensor reader");
+
+		co_return TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>
+			(
+				pThis->mp_SensorReaderInterface.m_Actor->f_ShareInterface<CDistributedAppSensorReader>()
+				, g_ActorSubscription / []
+				{
+				}
+			)
+		;
 	}
 }
