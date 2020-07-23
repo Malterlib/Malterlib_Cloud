@@ -12,9 +12,9 @@ namespace NMib::NCloud::NAppManager
 	{
 		mp_RemoteAppManagers = co_await mp_State.m_TrustManager->f_SubscribeTrustedActors<CAppManagerCoordinationInterface>();
 
-		mp_RemoteAppManagers.f_OnActor
+		co_await mp_RemoteAppManagers.f_OnActor
 			(
-				[this](TCDistributedActor<CAppManagerCoordinationInterface> const &_NewActor, CTrustedActorInfo const &_ActorInfo)
+				g_ActorFunctor / [this](TCDistributedActor<CAppManagerCoordinationInterface> const &_NewActor, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
 				{
 					auto &RemoteActor = mp_RemoteAppManagerState[_ActorInfo.m_HostInfo.m_HostID];
 					if (RemoteActor.m_ByActorLink.f_IsInTree())
@@ -23,20 +23,27 @@ namespace NMib::NCloud::NAppManager
 					RemoteActor.m_HostInfo = _ActorInfo;
 					mp_RemoteAppManagerStateByActor.f_Insert(RemoteActor);
 					RemoteActor.m_bInitialStateReceived = false;
-					fp_NewRemoteAppManager(RemoteActor) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to process new remote app manager");
+
+					co_await fp_NewRemoteAppManager(RemoteActor);
+
+					co_return {};
 				}
+				, "Malterlib/Cloud/AppManager"
+				, "Failed to process new remote app manager"
 			)
 		;
 
 		mp_RemoteAppManagers.f_OnRemoveActor
 			(
-				[this](TCWeakDistributedActor<CActor> const &_RemovedActor, CTrustedActorInfo &&_ActorInfo)
+				g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_RemovedActor, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
 					auto pActor = mp_RemoteAppManagerStateByActor.f_FindEqual(_RemovedActor);
 					if (!pActor)
-						return;
+						co_return {};
 					mp_RemoteAppManagerStateByActor.f_Remove(pActor);
 					mp_RemoteAppManagerState.f_Remove(pActor);
+
+					co_return {};
 				}
 			)
 		;

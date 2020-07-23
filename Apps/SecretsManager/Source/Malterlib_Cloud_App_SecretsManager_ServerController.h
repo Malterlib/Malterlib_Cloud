@@ -22,13 +22,14 @@ namespace NMib::NCloud::NSecretsManager
 		CServerController(TCActor<> const &_Delegator, CDistributedAppState &_AppState);
 		~CServerController();
 
+		TCFuture<void> f_Init();
+
 #if DMibConfig_Tests_Enable
 		TCFuture<CEJSON> f_Test_Command(CStr const &_Command, CEJSON const &_Params);
 #endif
 
 	private:
 		TCFuture<void> fp_Destroy() override;
-		void fp_Init();
 		TCFuture<void> fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> const &_KeyManager);
 		
 		TCActor<CSecretsManagerDaemonActor::CServer> mp_ServerActor;

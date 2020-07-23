@@ -17,48 +17,45 @@ namespace NMib::NCloud::NAppDistributionManager
 	{
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App distribution manager file operations"));
 		
-		TCPromise<void> Promise;
-		fp_ReadState() > Promise / [this, Promise]
+		co_await fp_ReadState();
+
+		auto OnResume = g_OnResume / [&]
 			{
 				if (mp_State.m_bStoppingApp)
-					return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
-				
-				mp_State.m_TrustManager
-					(
-						&CDistributedActorTrustManager::f_SubscribeTrustedActors<CVersionManager>
-						, CVersionManager::mc_pDefaultNamespace
-						, fg_ThisActor(this)
-					)
-					> Promise / [this, Promise](TCTrustedActorSubscription<CVersionManager> &&_VersionSubscrption)
-					{
-						if (mp_State.m_bStoppingApp)
-							return Promise.f_SetException(DMibErrorInstance("Startup aborted"));
-
-						mp_VersionManagerSubscription = fg_Move(_VersionSubscrption);
-						mp_VersionManagerSubscription.f_OnActor
-							(
-								[this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo)
-								{
-									fp_VersionManagerAdded(_VersionManager, _ActorInfo);
-								}
-							)
-						;
-						mp_VersionManagerSubscription.f_OnRemoveActor
-							(
-								[this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo)
-								{
-									fp_VersionManagerRemoved(_VersionManager);
-								}
-							)
-						;
-
-						Promise.f_SetResult();
-					}
-				;
+					DMibError("Shutting down");
 			}
 		;
 
-		return Promise.f_MoveFuture();
+		mp_VersionManagerSubscription = co_await mp_State.m_TrustManager
+			(
+				&CDistributedActorTrustManager::f_SubscribeTrustedActors<CVersionManager>
+				, CVersionManager::mc_pDefaultNamespace
+				, fg_ThisActor(this)
+			)
+		;
+
+		co_await mp_VersionManagerSubscription.f_OnActor
+			(
+				g_ActorFunctor / [this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				{
+					co_await self(&CAppDistributionManagerActor::fp_VersionManagerAdded, _VersionManager, _ActorInfo);
+
+					co_return {};
+				}
+			)
+		;
+		mp_VersionManagerSubscription.f_OnRemoveActor
+			(
+				g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				{
+					co_await self(&CAppDistributionManagerActor::fp_VersionManagerRemoved, _VersionManager);
+
+					co_return {};
+				}
+			)
+		;
+
+		co_return {};
 	}
 	
 	TCFuture<void> CAppDistributionManagerActor::fp_StopApp()

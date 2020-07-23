@@ -12,7 +12,6 @@ namespace NMib::NCloud::NSecretsManager
 		, mp_AppState(_AppState)
 		, mp_Delegator(_Delegator)
 	{
-		fp_Init();
 	}
 
 	CSecretsManagerDaemonActor::CServerController::~CServerController()
@@ -29,34 +28,39 @@ namespace NMib::NCloud::NSecretsManager
 	}
 #endif
 
-	void CSecretsManagerDaemonActor::CServerController::fp_Init()
+	TCFuture<void> CSecretsManagerDaemonActor::CServerController::f_Init()
 	{
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "ServerController started");
 
-		mp_AppState.m_TrustManager->f_SubscribeTrustedActors<CKeyManager>() > [this](TCAsyncResult<TCTrustedActorSubscription<CKeyManager>> &&_KeySubscription)
+		auto OnResume = g_OnResume / [&] 
 			{
-				if (mp_AppState.m_bStoppingApp)
-					return;
-
-				if (!_KeySubscription)
-				{
-					DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to subscribe to KeyManagers, aborting startup: {}", _KeySubscription.f_GetExceptionStr());
-					return;
-				}
-				else
-					DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Acquired KeyManager subscription");
-
-				mp_KeyManagerSubscription = fg_Move(*_KeySubscription);
-				mp_KeyManagerSubscription.f_OnActor
-					(
-						[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
-						{
-							self(&CServerController::fp_KeyManagerAvailable, _KeyManager) > fg_DiscardResult();
-						}
-					)
-				;
+				if (mp_AppState.m_bStoppingApp || f_IsDestroyed())
+					DMibError("Shutting down");
 			}
 		;
+
+		auto KeyManagerSubscription = co_await mp_AppState.m_TrustManager->f_SubscribeTrustedActors<CKeyManager>().f_Wrap();
+		
+		if (!KeyManagerSubscription)
+		{
+			DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to subscribe to KeyManagers, aborting startup: {}", KeyManagerSubscription.f_GetExceptionStr());
+			co_return {};
+		}
+		else
+			DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Acquired KeyManager subscription");
+
+		mp_KeyManagerSubscription = fg_Move(*KeyManagerSubscription);
+		co_await mp_KeyManagerSubscription.f_OnActor
+			(
+				g_ActorFunctor / [this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				{
+					co_await self(&CServerController::fp_KeyManagerAvailable, _KeyManager);
+					co_return {};
+				}
+			)
+		;
+
+		co_return {};
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServerController::fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> const &_KeyManager)
@@ -115,6 +119,8 @@ namespace NMib::NCloud::NSecretsManager
 
 		mp_PendingDatabases.f_Remove(DatabaseActorWeak);
 		mp_ServerActor = fg_ConstructActor<CSecretsManagerDaemonActor::CServer>(fg_Construct(mp_Delegator), mp_AppState, fg_Move(DatabaseActor));
+
+		co_await mp_ServerActor(&CSecretsManagerDaemonActor::CServer::f_Init);
 
 		co_return {};
 	}

@@ -803,11 +803,11 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite);
 
 		CStr fp_GetApplicationStopErrors(TCAsyncResult<uint32> const &_Result, CStr const &_Name);
-		void fp_KeyManagerAvailable();
+		TCFuture<void> fp_KeyManagerAvailable();
 
 		TCFuture<void> fp_VersionManagerResubscribeAll();
 		TCFuture<void> fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState);
-		void fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info);
+		TCFuture<void> fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info);
 		void fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
 
 		TCFuture<CVersionManager::CVersionInformation> fp_DownloadApplicationFromManager

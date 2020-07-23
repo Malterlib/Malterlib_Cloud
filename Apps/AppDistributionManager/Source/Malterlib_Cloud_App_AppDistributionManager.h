@@ -186,10 +186,9 @@ namespace NMib::NCloud::NAppDistributionManager
 		CEJSON fp_SaveSettings(CDistributionSettings const &_Settings);
 		void fp_SaveState(CDistribution const &_Distribution);
 
-		void fp_VersionManagerResubscribeAll();
-		void fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState);
-		void fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info);
-		void fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
+		TCFuture<void> fp_VersionManagerSubscribe(TCWeakDistributedActor<CVersionManager> const &_VersionManager);
+		TCFuture<void> fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info);
+		TCFuture<void> fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
 		TCFuture<CVersionsAvailableForUpdate> fp_GetAvailableVersions(CStr const &_Application);
 
 		TCFuture<CVersionInformation> fp_DownloadApplicationFromManager

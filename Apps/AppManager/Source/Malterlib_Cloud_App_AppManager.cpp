@@ -324,9 +324,10 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	void CAppManagerActor::fp_KeyManagerAvailable()
+	TCFuture<void> CAppManagerActor::fp_KeyManagerAvailable()
 	{
 		fp_UpdateApplicationDependencies();
+		co_return {};
 	}
 
 	TCFuture<void> CAppManagerActor::fp_InitApp()
@@ -365,49 +366,58 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		mp_KeyManagerSubscription = fg_Move(KeySubscription);
-		mp_KeyManagerSubscription.f_OnActor
+		co_await mp_KeyManagerSubscription.f_OnActor
 			(
-				[this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo)
+				g_ActorFunctor / [this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
 				{
-					fp_KeyManagerAvailable();
+					co_await fp_KeyManagerAvailable();
+					co_return {};
 				}
 			)
 		;
 
 		mp_VersionManagerSubscription = fg_Move(VersionSubscription);
-		mp_VersionManagerSubscription.f_OnActor
+		co_await mp_VersionManagerSubscription.f_OnActor
 			(
-				[this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo)
+				g_ActorFunctor / [this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
 				{
-					fp_VersionManagerAdded(_VersionManager, _ActorInfo);
+					co_await self(&CAppManagerActor::fp_VersionManagerAdded, _VersionManager, _ActorInfo);
+					co_return {};
 				}
 			)
 		;
 
 		mp_VersionManagerSubscription.f_OnRemoveActor
 			(
-				[this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo)
+				g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
 					fp_VersionManagerRemoved(_VersionManager);
+
+					co_return {};
 				}
 			)
 		;
 
 		mp_CloudManagerSubscription = fg_Move(CloudSubscription);
-		mp_CloudManagerSubscription.f_OnActor
+		co_await mp_CloudManagerSubscription.f_OnActor
 			(
-				[this](TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_ActorInfo)
+				g_ActorFunctor / [this](TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
 				{
-					self(&CAppManagerActor::fp_CloudManagerAdded, _CloudManager, _ActorInfo) > fg_LogError("CloudManager", "Failed to add cloud manager");
+					co_await self(&CAppManagerActor::fp_CloudManagerAdded, _CloudManager, _ActorInfo);
+					co_return {};
 				}
+				, "CloudManager"
+				, "Failed to add cloud manager"
 			)
 		;
 
 		mp_CloudManagerSubscription.f_OnRemoveActor
 			(
-				[this](TCWeakDistributedActor<CActor> const &_CloudManager, CTrustedActorInfo &&_ActorInfo)
+				g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_CloudManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
 					fp_CloudManagerRemoved(_CloudManager);
+
+					co_return {};
 				}
 			)
 		;

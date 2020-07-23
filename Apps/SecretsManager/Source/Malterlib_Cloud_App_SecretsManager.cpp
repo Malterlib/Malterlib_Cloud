@@ -21,6 +21,7 @@ namespace NMib::NCloud::NSecretsManager
 	TCFuture<void> CSecretsManagerDaemonActor::fp_StartApp(CEJSON const &_Params)
 	{
 		mp_pServerController = fg_ConstructActor<CServerController>(fg_Construct(self), self, mp_State);
+		co_await mp_pServerController(&CServerController::f_Init);
 		co_return {};
 	}
 	

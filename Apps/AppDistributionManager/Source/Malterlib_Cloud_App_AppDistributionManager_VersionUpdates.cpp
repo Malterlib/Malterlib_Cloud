@@ -75,14 +75,24 @@ namespace NMib::NCloud::NAppDistributionManager
 	{
 	}
 
-	void CAppDistributionManagerActor::fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState)
+	TCFuture<void> CAppDistributionManagerActor::fp_VersionManagerSubscribe(TCWeakDistributedActor<CVersionManager> const &_VersionManager)
 	{
-		_VersionManagerState.m_Subscription.f_Clear();
+		CVersionManagerState *pVersionManagerState;
+
+		auto OnResume = g_OnResume / [&]
+			{
+				pVersionManagerState = mp_VersionManagers.f_FindEqual(_VersionManager);
+				if (!pVersionManagerState)
+					DMibError("Version manager removed");
+			}
+		;
+
+		pVersionManagerState->m_Subscription.f_Clear();
 
 		CVersionManager::CSubscribeToUpdates SubscriptionParams;
 		SubscriptionParams.m_Application = CStr(); // All applications we have access to
 		SubscriptionParams.m_nInitial = 32;
-		SubscriptionParams.m_fOnNewVersions = g_ActorFunctor / [this, Actor = _VersionManagerState.f_GetManager().f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
+		SubscriptionParams.m_fOnNewVersions = g_ActorFunctor / [this, Actor = pVersionManagerState->f_GetManager().f_Weak(), AllowDestroy = g_AllowWrongThreadDestroy]
 			(CVersionManager::CNewVersionNotifications &&_NewVersions)
 			-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 			{
@@ -109,52 +119,37 @@ namespace NMib::NCloud::NAppDistributionManager
 			}
 		;
 
-		mint SubscribeSequence = ++_VersionManagerState.m_SubscribeSequence;
+		mint SubscribeSequence = ++pVersionManagerState->m_SubscribeSequence;
 
-		_VersionManagerState.f_GetManager().f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams))
-			> [this, SubscribeSequence, Actor = _VersionManagerState.f_GetManager().f_Weak()](TCAsyncResult<CVersionManager::CSubscribeToUpdates::CResult> &&_Result)
-			{
-				auto *pManager = mp_VersionManagers.f_FindEqual(Actor);
-				if (!_Result)
-				{
-					CStr ErrorMessage = fg_Format("Error subscribing to version updates: {}", _Result.f_GetExceptionStr());
-					if (pManager)
-					{
-						DMibLogWithCategory(Malterlib/Cloud/AppDistributionManager, Error, "<{}> {}", pManager->m_HostInfo.m_HostInfo, ErrorMessage);
-						mp_VersionManagers.f_Remove(pManager);
-					}
-					else
-						DMibLogWithCategory(Malterlib/Cloud/AppDistributionManager, Error, "{}", ErrorMessage);
-					return;
-				}
-				if (!pManager)
-					return;
+		auto Result = co_await pVersionManagerState->f_GetManager().f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams)).f_Wrap();
 
-				if (SubscribeSequence != pManager->m_SubscribeSequence)
-					return;
+		if (!Result)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppDistributionManager, Error, "Error subscribing to version updates: {}", Result.f_GetExceptionStr());
+			co_return {};
+		}
 
-				auto &Manager = *pManager;
-				Manager.m_Subscription = fg_Move(_Result->m_Subscription);
-			}
-		;
+		if (SubscribeSequence != pVersionManagerState->m_SubscribeSequence)
+			co_return {};
+
+		pVersionManagerState->m_Subscription = fg_Move(Result->m_Subscription);
+		co_return {};
 	}
 
-	void CAppDistributionManagerActor::fp_VersionManagerResubscribeAll()
-	{
-		for (auto &Manager : mp_VersionManagers)
-			fp_VersionManagerSubscribe(Manager);
-	}
-
-	void CAppDistributionManagerActor::fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info)
+	TCFuture<void> CAppDistributionManagerActor::fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info)
 	{
 		auto &NewManager = mp_VersionManagers[_VersionManager];
 		NewManager.m_HostInfo = _Info;
-		fp_VersionManagerSubscribe(NewManager);
+		co_await self(&CAppDistributionManagerActor::fp_VersionManagerSubscribe, _VersionManager.f_Weak());
+
+		co_return {};
 	}
 
-	void CAppDistributionManagerActor::fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager)
+	TCFuture<void> CAppDistributionManagerActor::fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager)
 	{
 		mp_VersionManagers.f_Remove(_VersionManager);
+
+		co_return {};
 	}
 
 	auto CAppDistributionManagerActor::fp_DownloadApplicationFromManager

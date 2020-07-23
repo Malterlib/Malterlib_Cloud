@@ -103,6 +103,8 @@ namespace NMib::NCloud::NSecretsManager
 		CServer(CDistributedAppState &_AppState, TCActor<CSecretsManagerServerDatabase> const &_DatabaseActor);
 		~CServer();
 
+		TCFuture<void> f_Init();
+
 #if DMibConfig_Tests_Enable
 		TCFuture<CEJSON> f_Test_Command(CStr const &_Command, CEJSON const &_Params);
 #endif
@@ -110,8 +112,7 @@ namespace NMib::NCloud::NSecretsManager
 
 	private:
 		TCFuture<void> fp_Destroy() override;
-		void fp_Init();
-		void fp_Publish();
+		TCFuture<void> fp_Publish();
 
 		TCFuture<void> fp_SetupPermissions();
 

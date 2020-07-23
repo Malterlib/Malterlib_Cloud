@@ -166,11 +166,13 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	void CAppManagerActor::fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info)
+	TCFuture<void> CAppManagerActor::fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info)
 	{
 		auto &NewManager = mp_VersionManagers[_VersionManager];
 		NewManager.m_HostInfo = _Info;
-		fp_VersionManagerSubscribe(NewManager) > fg_DiscardResult();
+		co_await fp_VersionManagerSubscribe(NewManager);
+
+		co_return {};
 	}
 
 	void CAppManagerActor::fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager)

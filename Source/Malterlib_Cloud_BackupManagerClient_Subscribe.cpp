@@ -23,10 +23,10 @@ namespace NMib::NCloud
 				m_BackupManagers = fg_Move(*_Subscription);
 				m_BackupManagers.f_OnActor
 					(
-						[this](TCDistributedActor<CBackupManager> const &_Actor, CTrustedActorInfo const &_ActorInfo)
+						g_ActorFunctor / [this](TCDistributedActor<CBackupManager> const &_Actor, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
 						{
 							if (m_pThis->f_IsDestroyed())
-								return;
+								co_return {};
 							auto &BackupInstance = m_RunningBackupInstances[_Actor].m_Instance = fg_Construct
 								(
 									fg_Construct(_Actor, m_Manifest, m_ChecksumState, m_Config, _ActorInfo, fg_ThisActor(m_pThis), m_BackupKey, m_bBackupFinishedStarting)
@@ -35,16 +35,19 @@ namespace NMib::NCloud
 							;
 							if (m_bBackupFinishedStarting)
 								f_BackupInstance_ReportFinishedStarting(BackupInstance);
+
+							co_return {};
 						}
 					)
+					> fg_DiscardResult();
 				;
 				m_BackupManagers.f_OnRemoveActor
 					(
-						[this](TCWeakDistributedActor<CActor> const &_Actor, CTrustedActorInfo &&_ActorInfo)
+						g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_Actor, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 						{
 							auto *pInstance = m_RunningBackupInstances.f_FindEqual(_Actor);
 							if (!pInstance)
-								return;
+								co_return {};
 
 							if (m_pCanDestroyTracker)
 								pInstance->m_Instance.f_Destroy() > m_pCanDestroyTracker->f_Track();
@@ -52,6 +55,8 @@ namespace NMib::NCloud
 								pInstance->m_Instance.f_Destroy() > fg_DiscardResult();
 							
 							m_RunningBackupInstances.f_Remove(_Actor);
+
+							co_return {};
 						}
 					)
 				;

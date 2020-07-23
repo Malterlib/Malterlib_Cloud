@@ -15,7 +15,6 @@ namespace NMib::NCloud::NSecretsManager
 		, mp_FileActor(fg_ConstructActor<CFileActor>(fg_Construct("SecretsManager FileActor")))
 		, mp_pCanDestroyFileActorTracker(fg_Construct())
 	{
-		fp_Init();
 	}
 	
 	CSecretsManagerDaemonActor::CServer::~CServer()
@@ -64,35 +63,33 @@ namespace NMib::NCloud::NSecretsManager
 	}
 #endif
 
-	void CSecretsManagerDaemonActor::CServer::fp_Init()
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::f_Init()
 	{
-		mp_DatabaseActor(&CSecretsManagerServerDatabase::f_ReadDatabase) > [this](TCAsyncResult<CSecretsDatabase> &&_Database)
-			{
-				if (!_Database)
-				{
-					DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to read database: {}", _Database.f_GetExceptionStr());
-					return;
-				}
+		auto Database = co_await mp_DatabaseActor(&CSecretsManagerServerDatabase::f_ReadDatabase).f_Wrap();
+		if (!Database)
+		{
+			DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to read database: {}", Database.f_GetExceptionStr());
+			co_return {};
+		}
 				
-				mp_Database = fg_Move(*_Database);
-				for (auto const &SecretProperties : mp_Database.m_Secrets)
-				{
-					fp_UpdateTags({}, SecretProperties.m_Tags);
-					fp_UpdateSemanticIDs("", SecretProperties.m_SemanticID);
-				}
+		mp_Database = fg_Move(*Database);
+		for (auto const &SecretProperties : mp_Database.m_Secrets)
+		{
+			fp_UpdateTags({}, SecretProperties.m_Tags);
+			fp_UpdateSemanticIDs("", SecretProperties.m_SemanticID);
+		}
 				
-				fp_SetupPermissions() > [this](TCAsyncResult<void> &&_ResultPermissions)
-					{
-						if (!_ResultPermissions)
-						{
-							DLogWithCategory(Malterlib/Cloud/SecretsManager, Error, "Failed to setup permissions, aborting startup: {}", _ResultPermissions.f_GetExceptionStr());
-							return;
-						}
-						fp_Publish();
-					}
-				;
-			}
-		;
+		auto ResultPermissions = co_await self(&CServer::fp_SetupPermissions).f_Wrap();
+
+		if (!ResultPermissions)
+		{
+			DLogWithCategory(Malterlib/Cloud/SecretsManager, Error, "Failed to setup permissions, aborting startup: {}", ResultPermissions.f_GetExceptionStr());
+			co_return {};
+		}
+
+		co_await fp_Publish();
+
+		co_return {};
 	}
 	
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_SetupPermissions()
