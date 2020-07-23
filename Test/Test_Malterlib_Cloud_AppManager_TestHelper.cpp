@@ -170,7 +170,16 @@ namespace NMib::NCloud
 						AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_CloudManagerTicket.m_Ticket, m_Timeout, -1)
 							+ CloudManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 							(
-								fs_Permissions(AppManagerHostID, TCMap<CStr, CPermissionRequirements>{{"CloudManager/RegisterAppManager"}})
+								fs_Permissions
+								(
+									AppManagerHostID
+									, TCMap<CStr, CPermissionRequirements>
+									{
+										{"CloudManager/RegisterAppManager"}
+										, {"CloudManager/ReportSensorReadings"}
+										, {"CloudManager/ReportSensorReadingsOnBehalfOf/All"}
+									}
+								)
 							)
 							+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 							(
@@ -322,6 +331,8 @@ namespace NMib::NCloud
 			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CCloudManager::mc_pDefaultNamespace);
 			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CAppManagerInterface::mc_pDefaultNamespace);
 			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CVersionManager::mc_pDefaultNamespace);
+			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CDistributedAppSensorReporter::mc_pDefaultNamespace);
+
 			Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(m_Timeout);
 
 			m_LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, (m_Options & EOption_EnableLogging | EOption_EnableOtherOutput) != EOption_None);
@@ -403,6 +414,8 @@ namespace NMib::NCloud
 				TCVector<CStr> ExtraParams;
 				if (m_Options & EOption_EnableOtherOutput)
 					ExtraParams.f_Insert("--log-launches-to-stderr");
+
+				ExtraParams.f_Insert("--host-monitor-interval=0.0"); // Disable automatic disk space monitoring update
 
 				m_LaunchHelper
 					(

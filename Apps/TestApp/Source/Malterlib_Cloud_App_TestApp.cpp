@@ -36,6 +36,59 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+
+		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
+			(
+				{
+					"Names"_= {"--generate-sensor-readings"}
+					, "Description"_= "Generates a sensor reading."
+					, "Parameters"_=
+					{
+						"NumReadings?"_=
+						{
+							"Default"_= 1
+							, "Description"_= "The number of readings to report."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					if (!mp_SensorReporter.m_fReportReadings)
+					{
+						auto SequenceSubscription = co_await mp_InitSensorReporterSequencer.f_Sequence();
+
+						if (!mp_SensorReporter.m_fReportReadings)
+						{
+							CDistributedAppSensorReporter::CSensorInfo SensorInfo;
+							SensorInfo.m_Identifier = "org.malterlib.testapp.test";
+							SensorInfo.m_Name = "Test Sensor";
+							SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Float;
+							SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_DiskSpaceDivisors();
+							mp_SensorReporter = co_await self(&CTestAppActor::fp_OpenSensorReporter, fg_Move(SensorInfo));
+
+							if (!mp_SensorReporter.m_fReportReadings)
+								co_return DMibErrorInstance("Invalid sensor reporter returned");
+						}
+					}
+
+					mint nReadings = _Params["NumReadings"].f_Integer();
+
+					TCVector<CDistributedAppSensorReporter::CSensorReading> Readings;
+					for (mint i = 0; i < nReadings; ++i)
+					{
+						CDistributedAppSensorReporter::CSensorReading SensorReading;
+						SensorReading.m_Data = fg_GetRandomFloat().f_Pow(10)*1024.0*1024.0*1024.0*1024.0*1024.0;
+						Readings.f_Insert(fg_Move(SensorReading));
+					}
+
+					co_await mp_SensorReporter.m_fReportReadings(fg_Move(Readings));
+
+					co_await fg_Move(mp_SensorReporter.m_fReportReadings).f_Destroy();
+
+					co_return 0;
+				}
+			)
+		;
 	}
 
 	void CTestAppActor::fp_PopulateAppInterfaceRegisterInfo(CDistributedAppInterfaceServer::CRegisterInfo &o_RegisterInfo, NEncoding::CEJSON const &_Params)
@@ -59,6 +112,9 @@ namespace NMib::NCloud::NTest
 
 	TCFuture<void> CTestAppActor::fp_StopApp()
 	{
+		if (mp_SensorReporter.m_fReportReadings)
+			co_await fg_Move(mp_SensorReporter.m_fReportReadings).f_Destroy();
+
 		co_return {};
 	}
 }
