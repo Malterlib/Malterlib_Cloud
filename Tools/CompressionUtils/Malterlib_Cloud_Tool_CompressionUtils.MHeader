@@ -22,7 +22,7 @@
 		MalterlibWindowsVersion "NTDDI_WIN7"
 	}
 
-	Import.CMake_FullRebuildVersion 7
+	Import.CMake_FullRebuildVersion "@(Import.CMake_FullRebuildVersion).1"
 	Import.CMake_Variables "ENABLE_TAR=1;ENABLE_TAR_SHARED=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_CPIO=0;ENABLE_CPIO=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_CAT=0;ENABLE_CAT_SHARED=0;@(Import.CMake_Variables)"

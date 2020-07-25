@@ -1,4 +1,5 @@
 /* config.h.  Generated from build/cmake/config.h.in by cmake configure */
+#define __LIBARCHIVE_CONFIG_H_INCLUDED 1
 
 /*
  * Ensure we have C99-style int64_t, etc, all defined.
@@ -315,13 +316,13 @@ typedef uint64_t uintmax_t;
 /* #undef ARCHIVE_XATTR_LINUX */
 
 /* Version number of bsdcpio */
-#define BSDCPIO_VERSION_STRING "3.3.3dev"
+#define BSDCPIO_VERSION_STRING "3.5.0"
 
 /* Version number of bsdtar */
-#define BSDTAR_VERSION_STRING "3.3.3dev"
+#define BSDTAR_VERSION_STRING "3.5.0"
 
 /* Version number of bsdcat */
-#define BSDCAT_VERSION_STRING "3.3.3dev"
+#define BSDCAT_VERSION_STRING "3.5.0"
 
 /* Define to 1 if you have the `acl_create_entry' function. */
 #define HAVE_ACL_CREATE_ENTRY 1
@@ -372,7 +373,7 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_BSDXML_H */
 
 /* Define to 1 if you have the <bzlib.h> header file. */
-#define HAVE_BZLIB_H 1
+/* #undef HAVE_BZLIB_H */
 
 /* Define to 1 if you have the `chflags' function. */
 #define HAVE_CHFLAGS 1
@@ -678,7 +679,13 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_LIBBSDXML */
 
 /* Define to 1 if you have the `bz2' library (-lbz2). */
-#define HAVE_LIBBZ2 1
+/* #undef HAVE_LIBBZ2 */
+
+/* Define to 1 if you have the `b2' library (-lb2). */
+/* #undef HAVE_LIBB2 */
+
+/* Define to 1 if you have the <blake2.h> header file. */
+/* #undef HAVE_BLAKE2_H */
 
 /* Define to 1 if you have the `charset' library (-lcharset). */
 /* #undef HAVE_LIBCHARSET */
@@ -696,13 +703,16 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_LIBLZ4 */
 
 /* Define to 1 if you have the `lzma' library (-llzma). */
-#define HAVE_LIBLZMA 1
+/* #undef HAVE_LIBLZMA */
 
 /* Define to 1 if you have the `lzmadec' library (-llzmadec). */
 /* #undef HAVE_LIBLZMADEC */
 
 /* Define to 1 if you have the `lzo2' library (-llzo2). */
 /* #undef HAVE_LIBLZO2 */
+
+/* Define to 1 if you have the `mbedcrypto' library (-lmbedcrypto). */
+/* #undef HAVE_LIBMBEDCRYPTO */
 
 /* Define to 1 if you have the `nettle' library (-lnettle). */
 /* #undef HAVE_LIBNETTLE */
@@ -714,13 +724,13 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_LIBPCREPOSIX */
 
 /* Define to 1 if you have the `xml2' library (-lxml2). */
-#define HAVE_LIBXML2 1
+/* #undef HAVE_LIBXML2 */
 
 /* Define to 1 if you have the <libxml/xmlreader.h> header file. */
-#define HAVE_LIBXML_XMLREADER_H 1
+/* #undef HAVE_LIBXML_XMLREADER_H */
 
 /* Define to 1 if you have the <libxml/xmlwriter.h> header file. */
-#define HAVE_LIBXML_XMLWRITER_H 1
+/* #undef HAVE_LIBXML_XMLWRITER_H */
 
 /* Define to 1 if you have the `z' library (-lz). */
 #define HAVE_LIBZ 1
@@ -799,7 +809,7 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE_LZMADEC_H */
 
 /* Define to 1 if you have the <lzma.h> header file. */
-#define HAVE_LZMA_H 1
+/* #undef HAVE_LZMA_H */
 
 /* Define to 1 if you have a working `lzma_stream_encoder_mt' function. */
 /* #undef HAVE_LZMA_STREAM_ENCODER_MT */
@@ -1068,6 +1078,10 @@ typedef uint64_t uintmax_t;
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
 
+
+/* Define to 1 if you have the <sys/sysmacros.h> header file. */
+/* #undef HAVE_SYS_SYSMACROS_H */
+
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
 
@@ -1100,6 +1114,9 @@ typedef uint64_t uintmax_t;
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
+
+/* Define to 1 if you have the `unlinkat' function. */
+#define HAVE_UNLINKAT 1
 
 /* Define to 1 if you have the `unsetenv' function. */
 #define HAVE_UNSETENV 1
@@ -1194,6 +1211,9 @@ typedef uint64_t uintmax_t;
 /* Define to 1 if you have the `_get_timezone' function. */
 /* #undef HAVE__GET_TIMEZONE */
 
+/* Define to 1 if you have the `_gmtime64_s' function. */
+/* #undef HAVE__GMTIME64_S */
+
 /* Define to 1 if you have the `_localtime64_s' function. */
 /* #undef HAVE__LOCALTIME64_S */
 
@@ -1204,10 +1224,10 @@ typedef uint64_t uintmax_t;
 #define ICONV_CONST 
 
 /* Version number of libarchive as a single integer */
-#define LIBARCHIVE_VERSION_NUMBER "3003003"
+#define LIBARCHIVE_VERSION_NUMBER "3005000"
 
 /* Version number of libarchive */
-#define LIBARCHIVE_VERSION_STRING "3.3.3dev"
+#define LIBARCHIVE_VERSION_STRING "3.5.0"
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing
    slash. */
@@ -1261,7 +1281,7 @@ typedef uint64_t uintmax_t;
 #endif /* SAFE_TO_DEFINE_EXTENSIONS */
 
 /* Version number of package */
-#define VERSION "3.3.3dev"
+#define VERSION "3.5.0"
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 /* #undef _FILE_OFFSET_BITS */

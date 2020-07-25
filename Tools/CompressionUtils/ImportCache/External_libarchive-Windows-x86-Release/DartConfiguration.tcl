@@ -27,7 +27,7 @@ NightlyStartTime: 01:00:00 UTC
 
 # Commands for the build/test/submit cycle
 ConfigureCommand: "../../../../../../BuildSystem/SafeMib/Binaries/MToolCMake.exe" "../../../../../../External/libarchive"
-MakeCommand: x:\Source\Malterlib\BuildSystem\SafeMib\Binaries\MToolCMake.exe --build . --config "${CTEST_CONFIGURATION_TYPE}"
+MakeCommand: x:\Source\Malterlib3\BuildSystem\SafeMib\Binaries\MToolCMake.exe --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 
 # version control

@@ -62,13 +62,15 @@ UpdateOptions:
 UpdateType: git
 
 # Compiler info
-Compiler: /opt/CompiledFiles/Dependencies/llvm/9.0/build/main/bin/clang++
+Compiler: /opt/CompiledFiles/Dependencies/llvm/11.0/build/main/bin/clang++
 CompilerVersion: 
 
 # Dynamic analysis (MemCheck)
 PurifyCommand: 
 ValgrindCommand: 
 ValgrindCommandOptions: 
+DrMemoryCommand: 
+DrMemoryCommandOptions: 
 MemoryCheckType: 
 MemoryCheckSanitizerOptions: 
 MemoryCheckCommand: MEMORYCHECK_COMMAND-NOTFOUND
