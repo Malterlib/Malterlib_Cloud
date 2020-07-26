@@ -34,7 +34,7 @@ namespace NMib::NCloud::NAppManager
 				if (!pChangeNotificationSubscriptions)
 					co_return {};
 
-				TCFuture<void> DestroyFuture = pChangeNotificationSubscriptions->m_fOnChange.f_Destroy();
+				TCFuture<void> DestroyFuture = fg_Move(pChangeNotificationSubscriptions->m_fOnChange).f_Destroy();
 
 				pThis->mp_ChangeNotificationSubscriptions.f_Remove(SubscriptionID);
 

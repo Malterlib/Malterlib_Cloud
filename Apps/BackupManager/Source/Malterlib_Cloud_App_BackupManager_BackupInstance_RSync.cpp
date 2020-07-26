@@ -67,7 +67,7 @@ namespace NMib::NCloud::NBackupManager
 				return;
 			}
 
-			_Context.m_fRunProtocol.f_Destroy() >
+			fg_Move(_Context.m_fRunProtocol).f_Destroy() >
 				[
 					RelativeFileName = _Context.m_RelativeFileName
 					, BytesTransferredIn = _Context.m_BytesTransferredIn
@@ -143,7 +143,7 @@ namespace NMib::NCloud::NBackupManager
 					bFailedHash = pRsyncContext->m_bFailedHash;
 
 					TempFiles = fg_Move(pRsyncContext->m_TempFileNames);
-					pRsyncContext->m_fRunProtocol.f_Destroy() > DestroyPromise;
+					fg_Move(pRsyncContext->m_fRunProtocol).f_Destroy() > DestroyPromise;
 				}
 				else
 				{

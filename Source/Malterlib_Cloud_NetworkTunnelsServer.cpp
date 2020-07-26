@@ -132,7 +132,7 @@ namespace NMib::NCloud
 
 							if (Connection.m_Socket)
 								co_await Connection.m_Socket.f_Destroy();
-							co_await Connection.m_fSendData.f_Destroy();
+							co_await fg_Move(Connection.m_fSendData).f_Destroy();
 						}
 						co_return {};
 					}
@@ -239,7 +239,7 @@ namespace NMib::NCloud
 		{
 			if (Connection.m_Socket)
 				fg_Move(Connection.m_Socket).f_Destroy() > Destroys.f_AddResult();
-			Connection.m_fSendData.f_Destroy() > Destroys.f_AddResult();
+			fg_Move(Connection.m_fSendData).f_Destroy() > Destroys.f_AddResult();
 		}
 		Internal.m_Connections.f_Clear();
 

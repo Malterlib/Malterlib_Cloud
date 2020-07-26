@@ -41,7 +41,7 @@ namespace NMib::NCloud
 				if (!pSubscription)
 					co_return {};
 				
-				auto DestroyFuture = pSubscription->m_fOnNotification.f_Destroy();
+				auto DestroyFuture = fg_Move(pSubscription->m_fOnNotification).f_Destroy();
 
 				Internal.m_NotificationSubscriptions.f_Remove(SubscriptionID);
 				
@@ -111,7 +111,7 @@ namespace NMib::NCloud
 				if (!pSubscription)
 					co_return {};
 				
-				auto DestroyFuture = pSubscription->f_Destroy();
+				auto DestroyFuture = fg_Move(*pSubscription).f_Destroy();
 
 				Internal.m_OnInitialFinishedSubscriptions.f_Remove(SubscriptionID);
 				
@@ -143,7 +143,7 @@ namespace NMib::NCloud
 				if (!pSubscription)
 					co_return {};
 				
-				auto DestroyFuture = pSubscription->f_Destroy();
+				auto DestroyFuture = fg_Move(*pSubscription).f_Destroy();
 
 				Internal.m_OnBackupStoppedSubscriptions.f_Remove(SubscriptionID);
 				

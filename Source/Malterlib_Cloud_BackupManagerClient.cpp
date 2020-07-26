@@ -83,7 +83,7 @@ namespace NMib::NCloud
 		{
 			TCActorResultVector<void> Destroys;
 
-			Internal.m_fOnNewBackup.f_Destroy() > Destroys.f_AddResult();
+			fg_Move(Internal.m_fOnNewBackup).f_Destroy() > Destroys.f_AddResult();
 
 			{
 				auto pTracker = fg_Move(Internal.m_pCanDestroyTracker);

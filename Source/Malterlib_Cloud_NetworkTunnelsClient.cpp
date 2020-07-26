@@ -45,16 +45,13 @@ namespace NMib::NCloud
 				if (m_ListenSubscription)
 					m_ListenSubscription->f_Destroy() > Destroys.f_AddResult();
 
-				m_fOnError.f_Destroy() > Destroys.f_AddResult();
-				m_fOnConnection.f_Destroy() > Destroys.f_AddResult();
+				fg_Move(m_fOnError).f_Destroy() > Destroys.f_AddResult();
+				fg_Move(m_fOnConnection).f_Destroy() > Destroys.f_AddResult();
 
 				if (m_TunnelActor)
 					fg_Move(m_TunnelActor).f_Destroy() > Destroys.f_AddResult();
 
 				Destroys.f_GetResults() > Promise.f_ReceiveAny();
-
-				m_fOnError.f_Clear();
-				m_fOnConnection.f_Clear();
 
 				return Promise.f_MoveFuture();
 			}
@@ -108,7 +105,7 @@ namespace NMib::NCloud
 		{
 			if (Connection.m_Socket)
 				fg_Move(Connection.m_Socket).f_Destroy() > Results.f_AddResult();
-			Connection.m_fSendData.f_Destroy() > Results.f_AddResult();
+			fg_Move(Connection.m_fSendData).f_Destroy() > Results.f_AddResult();
 		}
 		Internal.m_Connections.f_Clear();
 
@@ -198,7 +195,7 @@ namespace NMib::NCloud
 
 						if (pConnection->m_Socket)
 							fg_Move(pConnection->m_Socket).f_Destroy() > fg_DiscardResult();
-						pConnection->m_fSendData.f_Destroy() > fg_DiscardResult();
+						fg_Move(pConnection->m_fSendData).f_Destroy() > fg_DiscardResult();
 
 						Internal.m_Connections.f_Remove(pConnection);
 					}
