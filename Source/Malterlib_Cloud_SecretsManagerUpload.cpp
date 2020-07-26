@@ -9,6 +9,7 @@
 namespace NMib::NCloud
 {
 	using namespace NConcurrency;
+	using namespace NStorage;
 	using namespace NFile;
 	using namespace NStr;
 
@@ -64,7 +65,6 @@ namespace NMib::NCloud
 			bool m_bSeenException = false;
 			bool m_bAborted = false;
 		};
-
 	}
 	
 	TCFuture<CDirectorySyncSend::CSyncResult> fg_UploadSecretFile
@@ -73,10 +73,9 @@ namespace NMib::NCloud
 		 	, TCActor<CActorDistributionManager> _DistributionManager
 		 	, CSecretsManager::CSecretID _ID
 		 	, CDirectorySyncSend::CConfig _Config
-			, CActorSubscription &o_Subscription
+			, NReference::TCReference<CActorSubscription> o_Subscription
 		)
 	{
-
 		co_await ECoroutineFlag_AllowReferences;
 
 		NStorage::TCSharedPointer<CState> pState = fg_Construct();
@@ -84,7 +83,7 @@ namespace NMib::NCloud
 		if (!_Config.m_Manifest.f_IsOfType<CDirectoryManifestConfig>() || _Config.m_Manifest.f_Get<1>().m_IncludeWildcards.f_GetLen() != 1)
 			co_return DMibErrorInstance("Incorrect config. Expected a CDirectoryManifestConfig with a single file in m_IncludeWildcards");
 
-		o_Subscription = g_ActorSubscription / [pState]() -> TCFuture<void>
+		o_Subscription.f_Get() = g_ActorSubscription / [pState]() -> TCFuture<void>
 			{
 				pState->m_bAborted = true;
 

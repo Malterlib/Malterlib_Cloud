@@ -1495,7 +1495,7 @@ public:
 				Receive.m_BasePath = TestDownloadDirectory;
 
 				CActorSubscription Subscription;
-				auto DownloadResult = fg_DownloadBackup(BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), Subscription).f_CallSync(g_Timeout);
+				auto DownloadResult = fg_CallSafeDispatched(&fg_DownloadBackup, BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription)).f_CallSync(60.0);
 
 				DMibExpectTrue(BackupHelper.f_FileIsSame(TestDownloadDirectory, "Dir1/File1"));
 				DMibExpectTrue(BackupHelper.f_FileIsSame(TestDownloadDirectory, "Dir1/File2"));

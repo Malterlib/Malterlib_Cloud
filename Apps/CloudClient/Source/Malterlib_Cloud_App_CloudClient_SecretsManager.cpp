@@ -1137,7 +1137,7 @@ namespace NMib::NCloud::NCloudClient
 					, mp_State.m_DistributionManager
 					, fg_Move(ID)
 					, CDirectorySyncSend::CConfig(Filename)
-					, mp_UploadSubscription
+					, fg_Reference(mp_UploadSubscription)
 				)
 				% "Failed to transfer secret file"
 			)

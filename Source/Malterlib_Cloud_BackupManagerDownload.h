@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Cloud/BackupManager>
+#include <Mib/Storage/Reference>
 
 namespace NMib::NCloud
 {
@@ -15,7 +16,7 @@ namespace NMib::NCloud
 			, NStr::CStr _BackupSource
 			, NTime::CTime _PointInTime
 			, NFile::CDirectorySyncReceive::CConfig _SyncConfig
-			, NConcurrency::CActorSubscription &o_Subscription
+			, NStorage::NReference::TCReference<NConcurrency::CActorSubscription> o_Subscription
 		)
 	;
 }

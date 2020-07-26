@@ -363,7 +363,7 @@ namespace NMib::NCloud::NCloudClient
 					, BackupSource
 					, BackupTime
 					, fg_Move(Config)
-					, mp_DownloadBackupSubscription
+					, fg_Reference(mp_DownloadBackupSubscription)
 				)
 				% "Failed to download backup"
 			)

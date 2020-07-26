@@ -5,6 +5,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Cloud/SecretsManager>
+#include <Mib/Storage/Reference>
 
 namespace NMib::NCloud
 {
@@ -14,7 +15,7 @@ namespace NMib::NCloud
 		 	, NConcurrency::TCActor<NConcurrency::CActorDistributionManager> _DistributionManager
 		 	, CSecretsManager::CSecretID _ID
 			, NFile::CDirectorySyncSend::CConfig _Config
-			, NConcurrency::CActorSubscription &o_Subscription
+			, NStorage::NReference::TCReference<NConcurrency::CActorSubscription> o_Subscription
 		)
 	;
 }

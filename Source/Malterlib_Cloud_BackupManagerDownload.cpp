@@ -18,7 +18,7 @@ namespace NMib::NCloud
 			, CStr _BackupSource
 			, CTime _PointInTime
 			, CDirectorySyncReceive::CConfig _SyncConfig
-			, CActorSubscription &o_Subscription
+			, NReference::TCReference<CActorSubscription> o_Subscription
 		)
 	{
 		co_await ECoroutineFlag_AllowReferences;
@@ -31,7 +31,7 @@ namespace NMib::NCloud
 		
 		TCSharedPointer<CState> pState = fg_Construct();
 		
-		o_Subscription = g_ActorSubscription / [pState]() -> TCFuture<void>
+		o_Subscription.f_Get() = g_ActorSubscription / [pState]() -> TCFuture<void>
 			{
 				pState->m_bAborted = true;
 				if (pState->m_DownloadBackupReceive)

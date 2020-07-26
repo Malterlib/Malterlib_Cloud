@@ -1794,13 +1794,14 @@ public:
 						}
 					;
 
-					fg_UploadSecretFile
+					fg_CallSafeDispatched
 						(
-						 	SecretsManager
-						 	, Dependencies.m_DistributionManager
-						 	, fg_TempCopy(_ID)
-						 	, fg_Move(Config)
-						 	, o_Subscription
+							&fg_UploadSecretFile
+							, SecretsManager
+							, Dependencies.m_DistributionManager
+							, fg_TempCopy(_ID)
+							, fg_Move(Config)
+							, fg_Reference(o_Subscription)
 						)
 						> Promise / [Promise] (CDirectorySyncSend::CSyncResult &&_Result) mutable
 						{
@@ -1838,7 +1839,7 @@ public:
 						}
 					;
 
-					fg_DownloadSecretFile(SecretsManager, fg_Move(_ID), fg_Move(Config))
+					fg_CallSafeDispatched(&fg_DownloadSecretFile, SecretsManager, fg_Move(_ID), fg_Move(Config))
 						> Promise % "Failed to transfer secret file" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
 						{
 							Promise.f_SetResult(_Result.m_Stats.m_nSyncedFiles - 1); // Subtract one for the manifest file
