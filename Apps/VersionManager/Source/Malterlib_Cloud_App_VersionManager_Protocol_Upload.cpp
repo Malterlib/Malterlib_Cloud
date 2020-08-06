@@ -119,20 +119,36 @@ namespace NMib::NCloud::NVersionManager
 
 		CStr UploadID = fg_RandomID(pThis->mp_VersionUploads);
 
-		auto &Upload = pThis->mp_VersionUploads[UploadID];
-		Upload.m_Desc = fg_Format("{} - {}", pParams->m_Application, pParams->m_VersionIDAndPlatform);
-		auto pCleanup = g_OnScopeExitActor > [pThis, UploadID, Desc = Upload.m_Desc, Auditor]
+		{
+			auto &Upload = pThis->mp_VersionUploads[UploadID];
+			Upload.m_Desc = fg_Format("{} - {}", pParams->m_Application, pParams->m_VersionIDAndPlatform);
+		}
+
+		CVersionUpload *pUpload = nullptr;
+		auto OnResume = g_OnResume / [&]
+			{
+				if (pThis->f_IsDestroyed())
+					DMibError("Shutting down");
+
+				pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
+				if (!pUpload)
+					DMibError("Upload aborted");
+			}
+		;
+
+		auto pCleanup = g_OnScopeExitActor > [pThis, UploadID, Desc = pUpload->m_Desc, Auditor]
 			{
 				if (pThis->mp_VersionUploads.f_Remove(UploadID))
 					Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
 			}
 		;
 
+
 		CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
 		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, pParams->m_Application, pParams->m_VersionIDAndPlatform.f_EncodeFileName());
 
-		Upload.m_UploadFileAccess = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Upload version file access"));
-		Upload.m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, gc_FilePermissions, gc_FilePermissions, Upload.m_UploadFileAccess);
+		pUpload->m_UploadFileAccess = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Upload version file access"));
+		pUpload->m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, gc_FilePermissions, gc_FilePermissions, pUpload->m_UploadFileAccess);
 
 		auto ReceiveFlags = CFileTransferReceive::EReceiveFlag_FailOnExisting;
 		if (pParams->m_Flags & CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite)
@@ -141,9 +157,9 @@ namespace NMib::NCloud::NVersionManager
 		auto VersionID = pParams->m_VersionIDAndPlatform;
 		auto ApplicationName = pParams->m_Application;
 
-		auto Desc = Upload.m_Desc;
+		auto Desc = pUpload->m_Desc;
 
-		auto FileTransferContext = co_await Upload.m_FileTransferReceive(&CFileTransferReceive::f_ReceiveFiles, pParams->m_QueueSize, ReceiveFlags).f_Wrap();
+		auto FileTransferContext = co_await pUpload->m_FileTransferReceive(&CFileTransferReceive::f_ReceiveFiles, pParams->m_QueueSize, ReceiveFlags).f_Wrap();
 		if (!FileTransferContext)
 		{
 			CStr Error = FileTransferContext.f_GetExceptionStr();
@@ -153,10 +169,6 @@ namespace NMib::NCloud::NVersionManager
 			else
 				co_return DMibErrorInstance("Failed to receive files. See Version Manager log.");
 		}
-
-		auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
-		if (!pUpload)
-			co_return DMibErrorInstance("Upload aborted");
 
 		TCSharedPointer<TCPromise<void>> pFinishedPromise = fg_Construct();
 
@@ -171,13 +183,7 @@ namespace NMib::NCloud::NVersionManager
 				co_return DMibErrorInstance(Error);
 			}
 
-			auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
-			if (!pUpload)
-				co_return DMibErrorInstance("Upload aborted");
-
-			auto &Upload = *pUpload;
-
-			Upload.m_DownloadSubscription = fg_Move(Result->m_Subscription);
+			pUpload->m_DownloadSubscription = fg_Move(Result->m_Subscription);
 			StartUploadResult.m_DeniedTags = DeniedTags;
 			StartUploadResult.m_fFinish = g_ActorFunctor
 				(
@@ -204,7 +210,7 @@ namespace NMib::NCloud::NVersionManager
 			pCleanup->f_Clear();
 		}
 
-		Upload.m_FileTransferReceive(&CFileTransferReceive::f_GetResult)
+		pUpload->m_FileTransferReceive(&CFileTransferReceive::f_GetResult)
 			> [pThis, UploadID, ApplicationName, VersionID, VersionInfo, VersionPath, Desc, Auditor, pParams, pFinishedPromise]
 			(TCAsyncResult<CFileTransferResult> &&_Result) mutable
 			{
@@ -237,7 +243,7 @@ namespace NMib::NCloud::NVersionManager
 				if (pUpload->m_FileTransferReceive)
 					fg_Move(pUpload->m_FileTransferReceive).f_Destroy() > fg_DiscardResult();
 
-				auto FileAccess = pUpload->m_UploadFileAccess;
+				auto FileAccess = fg_Move(pUpload->m_UploadFileAccess);
 				pThis->mp_VersionUploads.f_Remove(UploadID);
 
 				if (!_Result)
@@ -285,7 +291,7 @@ namespace NMib::NCloud::NVersionManager
 			}
 		;
 
-		Auditor.f_Info(fg_Format("'{}' Starting upload of version", Upload.m_Desc));
+		Auditor.f_Info(fg_Format("'{}' Starting upload of version", Desc));
 		co_return fg_Move(StartUploadResult);;
 	}
 }
