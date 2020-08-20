@@ -162,7 +162,8 @@ namespace NMib::NCloud::NBackupManager
 					}
 					catch (CExceptionFile const &_Exception)
 					{
-						DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to cleanup tempfile for rsync: {}", _Exception);
+						[[maybe_unused]] auto &Exception = _Exception;
+						DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to cleanup tempfile for rsync: {}", Exception);
 					}
 				}
 

@@ -164,7 +164,8 @@ namespace NMib::NCloud::NBackupManager
 								}
 								catch (CExceptionFile const &_Exception)
 								{
-									DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to apply file remove locally: {}", _Exception);
+									[[maybe_unused]] auto &Exception = _Exception;
+									DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to apply file remove locally: {}", Exception);
 								}
 							}
 
@@ -228,7 +229,8 @@ namespace NMib::NCloud::NBackupManager
 								}
 								catch (CExceptionFile const &_Exception)
 								{
-									DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to apply file rename locally: {}", _Exception);
+									[[maybe_unused]] auto &Exception = _Exception;
+									DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to apply file rename locally: {}", Exception);
 								}
 							}
 

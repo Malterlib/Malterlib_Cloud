@@ -350,7 +350,9 @@ namespace NMib::NCloud::NBackupManager
 							}
 							catch (CException const &_Exception)
 							{
-								DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to delete sync directory: {}", _Exception);
+								(void)_Exception;
+								DMibLogCategory(Mib/Cloud/BackupManager);
+								DMibLog(Error, "Failed to delete sync directory: {}", _Exception);
 							}
 						}
 
@@ -419,7 +421,8 @@ namespace NMib::NCloud::NBackupManager
 							}
 							catch (NException::CException const &_Exception)
 							{
-								DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to delete unused directory after commit: {}", _Exception);
+								[[maybe_unused]] auto &Exception = _Exception;
+								DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to delete unused directory after commit: {}", Exception);
 							}
 						}
 					}
@@ -651,7 +654,8 @@ namespace NMib::NCloud::NBackupManager
 					}
 					catch (NException::CException const &_Exception)
 					{
-						DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to save manifest after append commit: {}", _Exception);
+						[[maybe_unused]] auto &Exception = _Exception;
+						DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to save manifest after append commit: {}", Exception);
 						if (!bInException)
 							throw;
 					}

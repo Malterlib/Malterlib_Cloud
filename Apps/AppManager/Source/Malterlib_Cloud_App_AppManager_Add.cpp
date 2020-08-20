@@ -333,8 +333,8 @@ namespace NMib::NCloud::NAppManager
 				}
 				catch (CExceptionFile const &_Exception)
 				{
-					(void)_Exception;
-					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up version download: {}", _Exception);
+					[[maybe_unused]] auto &Exception = _Exception;
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up version download: {}", Exception);
 				}
 			}
 		;

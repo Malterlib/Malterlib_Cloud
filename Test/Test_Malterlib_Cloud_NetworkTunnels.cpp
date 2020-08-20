@@ -295,16 +295,16 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 
 			DMibExpect(TunnelClientLaunch.m_HostID, !=, "");
 
-			static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
-			auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
+			auto WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
+			auto fPermissions = [&](auto &&_HostID, auto &&_Permissions)
 				{
-					return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, c_WaitForSubscriptions};
+					return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, WaitForSubscriptions};
 				}
 			;
 
-			auto fNamespaceHosts = [](auto &&_Namespace, auto &&_Hosts)
+			auto fNamespaceHosts = [&](auto &&_Namespace, auto &&_Hosts)
 				{
-					return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, c_WaitForSubscriptions};
+					return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, WaitForSubscriptions};
 				}
 			;
 

@@ -161,7 +161,8 @@ namespace NMib::NCloud::NCloudManager
 					}
 					catch (CException const &_Exception)
 					{
-						DMibLogWithCategory(CloudManager, Critical, "Failed to monitor state: {}", _Exception);
+						[[maybe_unused]] auto &Exception = _Exception;
+						DMibLogWithCategory(CloudManager, Critical, "Failed to monitor state: {}", Exception);
 					}
 
 					co_return {};
