@@ -139,10 +139,10 @@ namespace NMib::NCloud::NAppManager
 
 						// Stop all children and dependents first
 						for (auto &pDependent : f_GetDependents())
-							pDependent->f_Stop(EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
+							fg_CallSafe(*pDependent, &CApplication::f_Stop, EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
 
 						for (auto &ChildApp : m_Children)
-							ChildApp.f_Stop(EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
+							fg_CallSafe(ChildApp, &CApplication::f_Stop, EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
 
 						m_pThis->fp_AppLaunchStateChanged(pApplication, "Stopping", CAppManagerInterface::EStatusSeverity_Warning);
 
