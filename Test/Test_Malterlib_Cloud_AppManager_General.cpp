@@ -50,7 +50,15 @@ public:
 				{
 					++PackageInfo.m_VersionID.m_VersionID.m_Revision;
 					PackageInfo.m_VersionInfo.m_Tags = _Tags;
-					AppManagerTestHelper.m_VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive).f_CallSync(g_Timeout);
+					(
+						g_Dispatch(AppManagerTestHelper.m_HelperActor) /
+						[=, VersionManagerHelper = AppManagerTestHelper.m_VersionManagerHelper]() -> TCFuture<void>
+						{
+							co_await VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);
+							co_return {};
+						}
+					)
+					.f_CallSync(g_Timeout);
 				}
 			;
 
@@ -120,6 +128,8 @@ public:
 
 				void f_Clear()
 				{
+					DMibLock(m_Lock);
+
 					for (auto &Application : m_Applications)
 						Application.f_Clear();
 					for (auto &AppManager : m_ApplicationsPerAppmanager)
@@ -136,6 +146,7 @@ public:
 					m_nMaxAppsInProgressPerAppManager = 0;
 				}
 
+				NThread::CMutual m_Lock;
 				TCVector<CActorSubscription> m_Subscriptions;
 				NThread::CEventAutoReset m_Event;
 				TCMap<CStr, CUpdateNotificationsApplicationState> m_Applications;
@@ -176,7 +187,10 @@ public:
 							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
 							{
 								CApplicationKey ApplicationKey{_Notification.m_Application, iAppManager};
+
 								auto &WholeState = *pUpdateNotificationsState;
+								DMibLock(WholeState.m_Lock);
+
 								auto fProcessApplicationState = [&](CUpdateNotificationsApplicationState &_State)
 									{
 										if (!_Notification.m_bCoordinateWait)
@@ -339,7 +353,8 @@ public:
 				DMibTestMark;
 				fWaitForAllUpdated("TestApp");
 
-				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+				DMibLock(UpdateNotificationState.m_Lock);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
 			}
 			{
@@ -351,7 +366,8 @@ public:
 				DMibTestMark;
 				fWaitForAllUpdated("TestApp");
 
-				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+				DMibLock(UpdateNotificationState.m_Lock);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, ==, 1);
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1);
 			}
@@ -364,7 +380,8 @@ public:
 				DMibTestMark;
 				fWaitForAllUpdated("TestApp");
 
-				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+				DMibLock(UpdateNotificationState.m_Lock);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 			}
@@ -409,20 +426,21 @@ public:
 					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
+					DMibLock(UpdateNotificationState.m_Lock);
 					if (i == 0)
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 2u);
 					else
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 1u);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
-					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess, ==, nAppManagers * 2u);
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess.f_Load(), ==, nAppManagers * 2u);
 					if (i == 0)
 						DMibExpect(UpdateNotificationState.m_AllApplications.m_nMaxInProgress, ==, nAppManagers * 2u);
 					else
@@ -444,17 +462,18 @@ public:
 					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
+					DMibLock(UpdateNotificationState.m_Lock);
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 1u);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, ==, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, ==, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
 
-					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess, ==, nAppManagers * 2u);
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess.f_Load(), ==, nAppManagers * 2u);
 					DMibExpect(UpdateNotificationState.m_AllApplications.m_nMaxInProgress, ==, 1u);
 					DMibExpect(UpdateNotificationState.m_AllApplications.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
 				}
@@ -473,17 +492,18 @@ public:
 					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
+					DMibLock(UpdateNotificationState.m_Lock);
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, >=, 1u);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, ==, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
 
-					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess, ==, nAppManagers * 2u);
+					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess.f_Load(), ==, nAppManagers * 2u);
 					DMibExpect(UpdateNotificationState.m_AllApplications.m_nMaxInProgress, >=, 1u);
 					DMibExpect(UpdateNotificationState.m_AllApplications.m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], >=, 1u);
 				}
@@ -504,13 +524,14 @@ public:
 					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
+					DMibLock(UpdateNotificationState.m_Lock);
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
 				}
 				{
@@ -530,12 +551,13 @@ public:
 					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
+					DMibLock(UpdateNotificationState.m_Lock);
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, ==, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
 				}
 				{
@@ -555,14 +577,15 @@ public:
 					DMibTestMark;
 					fWaitForAllUpdated("TestApp2");
 
+					DMibLock(UpdateNotificationState.m_Lock);
 					if (i == 0)
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 2u);
 					else
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
 
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess, ==, nAppManagers);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
 				}
 			}

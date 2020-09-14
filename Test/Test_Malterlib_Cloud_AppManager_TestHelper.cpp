@@ -559,12 +559,31 @@ namespace NMib::NCloud
 
 			DMibTestMark;
 
-			m_PackageInfo = m_VersionManagerHelper.f_CreatePackage(m_ProgramDirectory + "/TestApps/TestApp", m_TestAppArchive, 1).f_CallSync(m_Timeout);
+			m_PackageInfo =
+				(
+					g_Dispatch(m_HelperActor) /
+					[VersionManagerHelper = m_VersionManagerHelper, Directory = m_ProgramDirectory + "/TestApps/TestApp", TestAppArchive = m_TestAppArchive]
+					{
+						return VersionManagerHelper.f_CreatePackage(Directory, TestAppArchive, 1);
+					}
+				)
+				.f_CallSync(m_Timeout)
+			;
 			m_PackageInfo.m_VersionInfo.m_Tags["TestTag"];
 
 			DMibTestMark;
 			if (m_Options & EOption_EnableVersionManager)
-				m_VersionManagerHelper.f_Upload(m_VersionManager, "TestApp", m_PackageInfo.m_VersionID, m_PackageInfo.m_VersionInfo, m_TestAppArchive).f_CallSync(m_Timeout);
+			{
+				(
+					g_Dispatch(m_HelperActor) /
+					[VersionManagerHelper = m_VersionManagerHelper,VersionManager = m_VersionManager, PackageInfo = m_PackageInfo, TestAppArchive = m_TestAppArchive]() -> TCFuture<void>
+					{
+						co_await VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);
+						co_return {};
+					}
+				)
+				.f_CallSync(m_Timeout);
+			}
 		}
 
 		// Setup trust for AppManagers

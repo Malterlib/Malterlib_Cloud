@@ -38,7 +38,7 @@ namespace NMib::NCloud
 		};
 
 		TCFuture<void> f_PeriodicUpdate();
-		TCFuture<void> f_PeriodicUpdate_Diskspace();
+		TCFuture<void> f_PeriodicUpdate_Diskspace(bool _bCanSkip);
 		TCFuture<void> f_PeriodicUpdate_Diskspace_UpdateMounts();
 
 		CInternal(CHostMonitor *_pThis, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore);
@@ -52,6 +52,7 @@ namespace NMib::NCloud
 		TCMap<CStr, CAutomaticMount> m_AutomaticMounts;
 		TCActorSequencerAsync<void> m_UpdatePeriodicSequencer;
 		TCActorSequencerAsync<void> m_UpdatePeriodicDiskSpaceSequencer;
+		TCVector<TCPromise<void>> m_UpdatePeriodicWaitList;
 		fp64 m_HostMonitorInterval = 60.0;
 		mint m_FileActorSequence = 0;
 		EInitFlag m_Flags = EInitFlag_None;

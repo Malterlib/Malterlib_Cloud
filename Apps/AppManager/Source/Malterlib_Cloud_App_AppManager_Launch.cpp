@@ -326,7 +326,7 @@ namespace NMib::NCloud::NAppManager
 					ApplicationDirectory / Application.m_Settings.m_Executable
 					, Application.m_Settings.m_ExecutableParameters
 					, ApplicationDirectory
-					, [this, _pApplication, pState, LaunchPromise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+					, [this, _pApplication, pState, LaunchPromise, ApplicationDirectory](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 					{
 						if (_pApplication->m_bDeleted)
 							return;
@@ -481,13 +481,31 @@ namespace NMib::NCloud::NAppManager
 								}
 
 								if (!LaunchPromise.f_IsSet())
-									LaunchPromise.f_SetException(DMibErrorInstance(fg_Format("Launch exited with '{}' before fully launched", ExitStatus)));
+								{
+									LaunchPromise.f_SetException
+										(
+											DMibErrorInstance
+											(
+												fg_Format
+												(
+													"{} exited with '{}' before fully launched:\n{}"
+													, ApplicationDirectory / _pApplication->m_Settings.m_Executable
+													, ExitStatus
+													, _pApplication->m_LastStdErr
+												)
+											)
+										)
+									;
+								}
 
 								pState->m_pCleanup.f_Clear();
+
 								for (auto &Promise : _pApplication->m_OnRegisterDistributedApp)
 									Promise.f_SetException(DMibErrorInstance("Application exited"));
+
 								for (auto &Promise : _pApplication->m_OnStartedDistributedApp)
 									Promise.f_SetException(DMibErrorInstance("Application exited"));
+
 								_pApplication->m_OnRegisterDistributedApp.f_Clear();
 								_pApplication->m_OnStartedDistributedApp.f_Clear();
 

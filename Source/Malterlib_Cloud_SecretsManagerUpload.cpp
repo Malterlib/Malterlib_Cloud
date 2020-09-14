@@ -67,7 +67,7 @@ namespace NMib::NCloud
 		};
 	}
 	
-	TCFuture<CDirectorySyncSend::CSyncResult> fg_UploadSecretFile
+	DMibSuppressUndefinedSanitizerLinux TCFuture<CDirectorySyncSend::CSyncResult> fg_UploadSecretFile
 		(
 			TCDistributedActor<CSecretsManager> _SecretsManager
 		 	, TCActor<CActorDistributionManager> _DistributionManager

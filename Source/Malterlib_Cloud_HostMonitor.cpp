@@ -63,7 +63,7 @@ namespace NMib::NCloud
 			;
 		}
 
-		co_await fg_CallSafe(*this, &CInternal::f_PeriodicUpdate_Diskspace);
+		co_await fg_CallSafe(*this, &CInternal::f_PeriodicUpdate_Diskspace, true);
 
 		co_return {};
 	}

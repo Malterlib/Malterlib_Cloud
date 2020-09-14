@@ -89,8 +89,6 @@ namespace NMib::NCloud::NCloudManager
 			Auditor.f_Info("Get sensors");
 		}
 
-		co_await fg_ContinueRunningOnActor(fg_AnyConcurrentActor());
-
 		for co_await (auto Sensor : Sensors)
 			co_yield Sensor;
 
@@ -120,8 +118,6 @@ namespace NMib::NCloud::NCloudManager
 			Auditor.f_Info("Get sensor readings");
 		}
 
-		co_await fg_ContinueRunningOnActor(fg_AnyConcurrentActor());
-
 		for co_await (auto Reading : SensorReadings)
 			co_yield Reading;
 
@@ -150,8 +146,6 @@ namespace NMib::NCloud::NCloudManager
 
 			Auditor.f_Info("Get sensor status");
 		}
-
-		co_await fg_ContinueRunningOnActor(fg_AnyConcurrentActor());
 
 		for co_await (auto Reading : SensorReadings)
 			co_yield Reading;

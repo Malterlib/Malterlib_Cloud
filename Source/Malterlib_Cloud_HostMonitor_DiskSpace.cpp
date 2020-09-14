@@ -124,7 +124,7 @@ namespace NMib::NCloud
 			}
 		}
 
-		co_await fg_CallSafe(Internal, &CInternal::f_PeriodicUpdate_Diskspace);
+		co_await fg_CallSafe(Internal, &CInternal::f_PeriodicUpdate_Diskspace, false);
 
 		co_return g_ActorSubscription / [this, Path = _Options.m_Path]() -> TCFuture<void>
 			{
@@ -200,7 +200,7 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	TCFuture<void> CHostMonitor::CInternal::f_PeriodicUpdate_Diskspace()
+	TCFuture<void> CHostMonitor::CInternal::f_PeriodicUpdate_Diskspace(bool _bCanSkip)
 	{
 		auto OnResume = g_OnResume / [&]
 			{
@@ -209,7 +209,7 @@ namespace NMib::NCloud
 			}
 		;
 
-		if (m_UpdatePeriodicDiskSpaceSequencer.f_NumWaiting() > 0)
+		if (_bCanSkip && m_UpdatePeriodicDiskSpaceSequencer.f_NumWaiting() > 0)
 			co_return {}; // Already waiting for update
 
 		auto SequenceSubscription = co_await m_UpdatePeriodicDiskSpaceSequencer.f_Sequence();

@@ -12,7 +12,7 @@ namespace NMib::NCloud
 	using namespace NTime;
 	using namespace NFile;
 
-	TCFuture<CDirectorySyncReceive::CSyncResult> fg_DownloadBackup
+	DMibSuppressUndefinedSanitizerLinux TCFuture<CDirectorySyncReceive::CSyncResult> fg_DownloadBackup
 		(
 			TCDistributedActor<CBackupManager> _BackupManager
 			, CStr _BackupSource

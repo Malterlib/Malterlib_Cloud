@@ -253,11 +253,15 @@ namespace NMib::NCloud::NVersionManager
 				}
 
 				pThis->fp_SaveVersionInfo(FileAccess, VersionPath, VersionInfo)
-					> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor, pParams, pFinishedPromise](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
+					> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor, pParams, pFinishedPromise, FileAccess](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
 					{
 						if (!_InfoWriteResult)
 						{
+#if DMibConfig_Tests_Enable
+							pFinishedPromise->f_SetException(DMibErrorInstance("Failed to save version info: {}"_f << _InfoWriteResult.f_GetExceptionStr()));
+#else
 							pFinishedPromise->f_SetException(DMibErrorInstance("Failed to save version info"));
+#endif
 							Auditor.f_Error(fg_Format("'{}' Failed to write version info file: {}", Desc, _InfoWriteResult.f_GetExceptionStr()));
 							return;
 						}
