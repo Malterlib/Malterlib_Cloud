@@ -16,6 +16,8 @@ using namespace NMib::NCloud;
 using namespace NMib::NFile;
 using namespace NMib::NStr;
 
+static fp64 g_Timeout = 60.0 * NMib::NTest::gc_TimeoutMultiplier;
+
 class CKeyManager_Tests : public NMib::NTest::CTest
 {
 public:
@@ -52,7 +54,7 @@ public:
 	{
 		CKeyManagerServerConfig Config;
 		Config.m_DatabaseActor = _Database;
-		Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
+		Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(g_Timeout);
 		//Config.m_PublicKeysForAllKeyManagers = ; TODO
 
 		TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config, fg_GetDistributionManager());
@@ -60,12 +62,12 @@ public:
 		auto Subscription = _TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
 		TCDistributedActor<CKeyManager> KeyManager = _TestHelper.f_GetRemoteActor<CKeyManager>(Subscription);
 
-		CSymmetricKey Key0 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(60.0);
-		CSymmetricKey Key1 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_CallSync(60.0);
+		CSymmetricKey Key0 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(g_Timeout);
+		CSymmetricKey Key1 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_CallSync(g_Timeout);
 		auto HostID1 = _TestHelper.f_GetClientHostID();
 
 		DMibExpect(Key0, !=, Key1);
-		auto Database = Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+		auto Database = Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 		DMibExpect(Key0, ==, Database.m_Clients[HostID1].m_Keys["TestKey0"]);
 		DMibExpect(Key1, ==, Database.m_Clients[HostID1].m_Keys["TestKey1"]);
 
@@ -74,13 +76,13 @@ public:
 		auto HostID2 = _TestHelper2.f_GetClientHostID();
 		TCDistributedActor<CKeyManager> KeyManager2 = _TestHelper2.f_GetRemoteActor<CKeyManager>(Subscription2);
 
-		CSymmetricKey SecondKey0 = KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(60.0);
-		CSymmetricKey SecondKey1 = KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_CallSync(60.0);
+		CSymmetricKey SecondKey0 = KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(g_Timeout);
+		CSymmetricKey SecondKey1 = KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_CallSync(g_Timeout);
 
 		DMibExpect(SecondKey0, !=, SecondKey1);
 		DMibExpect(SecondKey0, !=, Key0);
 		DMibExpect(SecondKey1, !=, Key1);
-		Database = Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+		Database = Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 		DMibExpect(SecondKey0, ==, Database.m_Clients[HostID2].m_Keys["TestKey0"]);
 		DMibExpect(SecondKey1, ==, Database.m_Clients[HostID2].m_Keys["TestKey1"]);
 	}
@@ -114,8 +116,8 @@ public:
 				CFile::fs_DeleteFile(DatabasePath);
 
 			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, NContainer::CSecureByteVector{});
-			DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
-			auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+			DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(g_Timeout);
+			auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 			DMibExpect(Database.m_Clients.f_GetLen(), ==, 0);
 
 			f_TestCloudKeyManager(DatabaseActor, TestHelper, TestHelper2);
@@ -123,7 +125,7 @@ public:
 			auto HostID1 = TestHelper.f_GetClientHostID();
 			auto HostID2 = TestHelper2.f_GetClientHostID();
 
-			Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+			Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 			DMibExpect(Database.m_Clients.f_GetLen(), ==, 2);
 			DMibExpect(Database.m_Clients[HostID1].m_Keys.f_GetLen(), ==, 2);
 			DMibExpect(Database.m_Clients[HostID2].m_Keys.f_GetLen(), ==, 2);
@@ -133,8 +135,8 @@ public:
 				auto DatabaseActor2
 					= fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, NContainer::CSecureByteVector{})
 				;
-				DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
-				auto Database2 = DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+				DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(g_Timeout);
+				auto Database2 = DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 
 				auto fTestDatabase = [&]
 					{
@@ -157,7 +159,7 @@ public:
 
 				{
 					DMibTestPath("After running");
-					Database2 = DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+					Database2 = DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 					fTestDatabase();
 				}
 
@@ -170,7 +172,7 @@ public:
 					DMibTest
 						(
 							DMibExpr(NMib::NTest::TCThrowsException<NException::CException>())
-							== DMibLExpr(DatabaseActor3(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0))
+							== DMibLExpr(DatabaseActor3(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(g_Timeout))
 						)
 					;
 				}
@@ -191,16 +193,16 @@ public:
 
 			CKeyManagerServerConfig Config;
 			Config.m_DatabaseActor = DatabaseActor;
-			Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(60.0);
+			Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(g_Timeout);
 
 			TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config, fg_GetDistributionManager());
-			KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_CallSync(60.0);
+			KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_CallSync(g_Timeout);
 
 			CSymmetricKey AvailableKey;
 			CSymmetricKey NextKey;
 			{
 				DMibTestPath("After initial keys pre created");
-				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibExpect(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
 				AvailableKey = Database.m_AvailableKeys[32u].f_GetFirst();
@@ -210,22 +212,22 @@ public:
 			CStr Subscription = TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
 			TCDistributedActor<CKeyManager> KeyManager = TestHelper.f_GetRemoteActor<CKeyManager>(Subscription);
 
-			CSymmetricKey FirstKey = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(60.0);
+			CSymmetricKey FirstKey = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(g_Timeout);
 			DMibExpect(FirstKey, ==, NextKey);
 
 			{
 				DMibTestPath("After first key popped");
-				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibExpect(Database.m_AvailableKeys[32u].f_GetLen(), ==, 1);
 				DMibExpect(Database.m_AvailableKeys[32u].f_GetFirst(), ==, AvailableKey);
 			}
 
-			KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_CallSync(60.0);
+			KeyManagerServer(&CKeyManagerServer::f_PreCreateKeys, 32, 2).f_CallSync(g_Timeout);
 
 			{
 				DMibTestPath("After second round of keys generated");
-				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibExpect(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
 				DMibExpect(Database.m_AvailableKeys[32u].f_GetLast(), ==, AvailableKey);
@@ -233,11 +235,11 @@ public:
 
 			{
 				DMibTestPath("Request key not pre created");
-				CSymmetricKey NotPreCreatedKey = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 64).f_CallSync(60.0);
-				CSymmetricKey NotPreCreatedKey2 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 64).f_CallSync(60.0);
+				CSymmetricKey NotPreCreatedKey = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 64).f_CallSync(g_Timeout);
+				CSymmetricKey NotPreCreatedKey2 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 64).f_CallSync(g_Timeout);
 				DMibExpect(NotPreCreatedKey, !=, NotPreCreatedKey2);
 
-				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(60.0);
+				auto Database = DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_CallSync(g_Timeout);
 				DMibExpect(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibExpect(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
 				DMibExpect(Database.m_AvailableKeys[32u].f_GetLast(), ==, AvailableKey);

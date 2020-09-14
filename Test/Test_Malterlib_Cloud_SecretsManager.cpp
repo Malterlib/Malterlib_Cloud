@@ -43,10 +43,11 @@ using namespace NMib::NAtomic;
 using namespace NMib::NEncoding;
 using namespace NMib::NStorage;
 using namespace NMib::NNetwork;
+using namespace NMib::NTest;
 
 #define DTestSecretsManagerEnableLogging 0
 
-static fp64 g_Timeout = 60.0;
+static fp64 g_Timeout = 60.0 * gc_TimeoutMultiplier;
 
 namespace
 {

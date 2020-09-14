@@ -7,7 +7,7 @@
 #include <Windows.h>
 #endif
 
-static fp64 g_Timeout = 120.0;
+static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 
 class CAppManager_Sensor_Tests : public NMib::NTest::CTest
 {

@@ -23,8 +23,9 @@ using namespace NMib::NEncoding;
 using namespace NMib::NStorage;
 using namespace NMib::NTime;
 using namespace NMib::NNetwork;
+using namespace NMib::NTest;
 
-static fp64 g_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0;
+static fp64 g_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0 * gc_TimeoutMultiplier;
 static uint16 g_TestConnectionPort = 31412;
 
 #define DTestNetworkTunnelEnableLogging 0

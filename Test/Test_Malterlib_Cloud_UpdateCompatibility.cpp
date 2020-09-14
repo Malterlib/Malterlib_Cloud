@@ -41,11 +41,12 @@ using namespace NMib::NEncoding;
 using namespace NMib::NSecurity;
 using namespace NMib::NException;
 using namespace NMib::NFunction;
+using namespace NMib::NTest;
 
 #define DTestUpdateCompatibilityEnableLogging 0
 #define DTestUpdateCompatibilityEnableOtherOutput 0
 
-static fp64 g_Timeout = 60.0;
+static fp64 g_Timeout = 60.0 * gc_TimeoutMultiplier;
 static uint32 g_CompressionLevel = 1;
 
 namespace

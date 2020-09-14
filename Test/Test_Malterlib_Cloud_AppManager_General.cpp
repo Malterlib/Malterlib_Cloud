@@ -7,7 +7,7 @@
 #include <Windows.h>
 #endif
 
-static fp64 g_Timeout = 120.0;
+static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 
 class CAppManager_General_Tests : public NMib::NTest::CTest
 {
@@ -303,7 +303,7 @@ public:
 					{
 						if (ApplicationState.m_nFinished == nAppManagers)
 							break;
-						if (Clock.f_GetTime() > g_Timeout)
+						if (Clock.f_GetTime() > g_Timeout * 4.0)
 							DMibError("Timed out waiting for all apps to update");
 						pUpdateNotificationsState->m_Event.f_WaitTimeout(10.0);
 					}

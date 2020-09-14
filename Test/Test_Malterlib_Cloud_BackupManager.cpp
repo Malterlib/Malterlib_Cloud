@@ -33,10 +33,11 @@ using namespace NMib::NEncoding;
 using namespace NMib::NStorage;
 using namespace NMib::NTime;
 using namespace NMib::NNetwork;
+using namespace NMib::NTest;
 
 #define DTestBackupManagerEnableLogging 0
 
-static fp64 g_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0;
+static fp64 g_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0 * gc_TimeoutMultiplier;
 
 class CBackupManager_Tests : public NMib::NTest::CTest
 {
@@ -177,13 +178,13 @@ public:
 		~CBackupClientHelper()
 		{
 			if (m_BackupInterface)
-				m_BackupInterface.f_Destroy().f_CallSync(60.0);
+				m_BackupInterface.f_Destroy().f_CallSync(g_Timeout);
 
 			if (m_ChangeSubscription)
-				m_ChangeSubscription->f_Destroy().f_CallSync(60.0);
+				m_ChangeSubscription->f_Destroy().f_CallSync(g_Timeout);
 
 			if (m_BackupClient)
-				m_BackupClient.f_Destroy().f_CallSync(60.0);
+				m_BackupClient.f_Destroy().f_CallSync(g_Timeout);
 		}
 
 		template <CBackupManagerClient::ENotification tf_Notification>
@@ -1495,7 +1496,7 @@ public:
 				Receive.m_BasePath = TestDownloadDirectory;
 
 				CActorSubscription Subscription;
-				auto DownloadResult = fg_CallSafeDispatched(&fg_DownloadBackup, BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription)).f_CallSync(60.0);
+				auto DownloadResult = fg_CallSafeDispatched(&fg_DownloadBackup, BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription)).f_CallSync(g_Timeout);
 
 				DMibExpectTrue(BackupHelper.f_FileIsSame(TestDownloadDirectory, "Dir1/File1"));
 				DMibExpectTrue(BackupHelper.f_FileIsSame(TestDownloadDirectory, "Dir1/File2"));
@@ -1725,7 +1726,7 @@ public:
 					}
 				}
 
-				g_Timeout = nRandomTests;
+				g_Timeout = nRandomTests * gc_TimeoutMultiplier;
 
 				COtherNotifications ActionNotifications;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Unquiescent>(ActionNotifications);
