@@ -341,7 +341,7 @@ namespace NMib::NCloud::NAppManager
 
 		if (!_FromLocalFile.f_IsEmpty() || bNullApplication)
 		{
-			if (_bSettingsFromVersionInfo && _FromLocalFile.f_EndsWith(".tar.gz"))
+			if (_bSettingsFromVersionInfo && (_FromLocalFile.f_EndsWith(".tar.gz") || _FromLocalFile.f_EndsWith(".tar")))
 			{
 				auto &LaunchActor = mp_LaunchActors.f_Insert() = fg_Construct();
 
@@ -474,7 +474,7 @@ namespace NMib::NCloud::NAppManager
 						if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
 						{
 							auto Files = CFile::fs_FindFiles(SourcePath + "/*");
-							if (Files.f_GetLen() == 1 && Files[0].f_Right(7) == ".tar.gz")
+							if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar")))
 								SourcePath = Files[0];
 						}
 						TCSet<CStr> AllowExist;

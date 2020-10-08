@@ -595,7 +595,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fUpdateApp = [&](CStr const &_Name, TCSet<CStr> const &_Tags)
 			{
-				CStr AppArchive = "{}/TestApps/Dynamic/{}.tar.gz"_f << ProgramDirectory << _Name;
+				CStr AppArchive = "{}/TestApps/Dynamic/{}.tar"_f << ProgramDirectory << _Name;
 
 				{
 					CStr VersionInfoFile = "{}/TestApps/{}/{}VersionInfo.json"_f << ProgramDirectory << _Name << _Name;

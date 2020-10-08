@@ -478,18 +478,40 @@ namespace NMib::NCloud
 			}
 		;
 
+		TCVector<CStr> Params =
+			{
+				"--disable-copyfile"
+			}
+		;
+
+		if (_CompressionLevel > 0)
+		{
+			Params.f_Insert
+				(
+					{
+						"--options"
+						, "gzip:compression-level={}"_f << _CompressionLevel
+						, "-czf"
+					}
+				)
+			;
+		}
+		else
+			Params.f_Insert({"-cf"});
+
+		Params.f_Insert
+			(
+				{
+					_DestinationFileName
+					, "."
+				}
+			)
+		;
+
 		CProcessLaunchActor::CSimpleLaunch Launch
 			{
 				Internal.m_RootDirectory / "bin/bsdtar"
-				,
-				{
-					"--disable-copyfile"
-					, "--options"
-					, "gzip:compression-level={}"_f << _CompressionLevel
-					, "-czf"
-					, _DestinationFileName
-					, "."
-				}
+				, Params
 				, _SourceDirectory
 				, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
 			}

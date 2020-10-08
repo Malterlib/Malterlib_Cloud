@@ -573,7 +573,7 @@ namespace NMib::NCloud::NCloudClient
 		TCVariant<CStr, CEJSON> SettingsFileOrSettings;
 		if (!SettingsFile.f_IsEmpty())
 			SettingsFileOrSettings = SettingsFile;
-		else if (_Params["SettingsFileFromPackage"].f_Boolean() && Source.f_EndsWith(".tar.gz"))
+		else if (_Params["SettingsFileFromPackage"].f_Boolean() && (Source.f_EndsWith(".tar.gz") || Source.f_EndsWith(".tar")))
 		{
 			// tar -xOf AppManager.tar.gz VersionInfo.json
 

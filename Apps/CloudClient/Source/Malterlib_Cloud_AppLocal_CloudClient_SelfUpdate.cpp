@@ -121,7 +121,10 @@ namespace NMib::NCloud::NCloudClient
 					uint32 ExitCode = 255;
 					CProcessLaunchParams LaunchParams;
 					LaunchParams.m_WorkingDirectory = DestinationDirectory;
-					CStr PackageFile = DestinationDirectory + "/MalterlibCloud.tar.gz";
+					CStr PackageFile = DestinationDirectory + "/MalterlibCloud.tar";
+					if (!CFile::fs_FileExists(PackageFile))
+						PackageFile = DestinationDirectory + "/MalterlibCloud.tar.gz";
+
 					bool bLaunchSuccess = CProcessLaunch::fs_LaunchBlock
 						(
 							CFile::fs_GetProgramDirectory() / "bin/bsdtar"
