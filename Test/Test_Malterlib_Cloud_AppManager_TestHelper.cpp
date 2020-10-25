@@ -197,6 +197,31 @@ namespace NMib::NCloud
 		}
 		DMibTestMark;
 		fg_CombineResults(SetupTrustResults.f_GetResults().f_CallSync(m_Timeout));
+
+		DMibTestMark;
+		for (NTime::CClock Timer(true); true; NSys::fg_Thread_Sleep(1.0))
+		{
+			bool bAllFinished = true;
+			for (auto &AppManager : m_AppManagerInfos)
+			{
+				CStr ExecutableName = AppManager.m_RootDirectory / "AppManager";
+	#ifdef DPlatformFamily_Windows
+				ExecutableName += ".exe";
+	#endif
+				CStr VersionManagers = CProcessLaunch::fs_LaunchTool(ExecutableName, {"--version-manager-list", "--no-color", "--table-type", "tab-separated"});
+				CStr CloudManagers = CProcessLaunch::fs_LaunchTool(ExecutableName, {"--cloud-manager-list", "--no-color", "--table-type", "tab-separated"});
+
+				if (VersionManagers.f_SplitLine<true>().f_GetLen() < 1 || CloudManagers.f_SplitLine<true>().f_GetLen() < 1)
+					bAllFinished = false;
+			}
+
+			if (bAllFinished)
+				break;
+
+			if (Timer.f_GetTime() > m_Timeout)
+				DMibError("Timed out waiting for version manager and cloud manager subscriptions");
+		}
+		DMibTestMark;
 	}
 
 	void CAppManagerTestHelper::f_InstallTestApp(CStr const &_Name, CStr const &_Tag, CStr const &_Group, CStr const &_VersionManagerApplication)

@@ -391,4 +391,34 @@ namespace NMib::NCloud::NAppManager
 
 		co_return 0;
 	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_VersionManagerList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+		TableRenderer.f_AddHeadings("Host");
+		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
+
+		for (auto &Manager : mp_VersionManagers)
+			TableRenderer.f_AddRow(Manager.m_HostInfo.m_HostInfo.f_GetDescColored(AnsiEncoding.f_Flags()));
+
+		TableRenderer.f_Output(_Params);
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CloudManagerList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+		auto AnsiEncoding= _pCommandLine->f_AnsiEncoding();
+		TableRenderer.f_AddHeadings("Host");
+		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
+
+		for (auto &Manager : mp_CloudManagers)
+			TableRenderer.f_AddRow(Manager.m_HostInfo.m_HostInfo.f_GetDescColored(AnsiEncoding.f_Flags()));
+
+		TableRenderer.f_Output(_Params);
+
+		co_return 0;
+	}
 }

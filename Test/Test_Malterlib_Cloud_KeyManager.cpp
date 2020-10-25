@@ -91,7 +91,7 @@ public:
 	{
 		DMibTestSuite("General")
 		{
-			uint16 Port = 31399;
+			uint16 Port = 31416;
 			CDistributedActorTestHelperCombined TestHelper{Port};
 			TestHelper.f_Init();
 

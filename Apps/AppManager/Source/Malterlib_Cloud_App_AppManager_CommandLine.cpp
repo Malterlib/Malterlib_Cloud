@@ -629,11 +629,11 @@ namespace NMib::NCloud::NAppManager
 					, "Description"_= "List versions available to update to."
 					, "Options"_=
 					{
-						"Verbose?"_= 
+						"Verbose?"_=
 						{
 							"Names"_= {"--verbose", "-v"}
 							, "Default"_= false
-							, "Description"_= "Display more extensive information about the versions." 
+							, "Description"_= "Display more extensive information about the versions."
 						}
 						, "Application?"_=
 						{
@@ -866,6 +866,52 @@ namespace NMib::NCloud::NAppManager
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_CancelAllUpdates, _Params, _pCommandLine);
+				}
+			)
+		;
+
+		auto ExternalManagement = o_CommandLine.f_AddSection("External Dependencies", "Commands to manage external dependencies");
+		ExternalManagement.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--version-manager-list"}
+					, "Description"_= "List connected version managers."
+					, "Options"_=
+					{
+						"Verbose?"_=
+						{
+							"Names"_= {"--verbose", "-v"}
+							, "Default"_= false
+							, "Description"_= "Display more extensive information."
+						}
+						, CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_VersionManagerList, _Params, _pCommandLine);
+				}
+			)
+		;
+		ExternalManagement.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--cloud-manager-list"}
+					, "Description"_= "List connected cloud managers."
+					, "Options"_=
+					{
+						"Verbose?"_=
+						{
+							"Names"_= {"--verbose", "-v"}
+							, "Default"_= false
+							, "Description"_= "Display more extensive information."
+						}
+						, CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_CloudManagerList, _Params, _pCommandLine);
 				}
 			)
 		;

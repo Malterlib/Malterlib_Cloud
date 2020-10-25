@@ -380,6 +380,7 @@ namespace NMib::NCloud::NAppManager
 											}
 
 											fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)", CAppManagerInterface::EStatusSeverity_Warning);
+											DMibFastCheck(!!_pApplication->m_AppInterface);
 											_pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_GetAppStartResult)()
 												.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
 												> [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
