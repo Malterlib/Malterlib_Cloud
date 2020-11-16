@@ -33,7 +33,6 @@ public:
 			nAppManagers = 2;
 #endif
 			AppManagerTestHelper.f_Setup(nAppManagers);
-
 			// Update Application
  			auto fUpdateTestApp = [&](TCSet<CStr> const &_Tags)
 				{
@@ -148,6 +147,52 @@ public:
 				mint m_nMaxAppsInProgressPerAppManager = 0;
 			};
 
+			auto fProcessApplicationState = [](CUpdateNotificationsApplicationState &_State, CAppManagerInterface::CUpdateNotification const &_Notification, CApplicationKey const &_ApplicationKey)
+				{
+					if (!_Notification.m_bCoordinateWait)
+					{
+						if (auto pInStage = _State.m_LastInStage.f_FindEqual(_ApplicationKey))
+							_State.m_InStage[*pInStage].f_Remove(_ApplicationKey);
+						_State.m_InStage[_Notification.m_Stage][_ApplicationKey];
+						_State.m_MaxInStage[_Notification.m_Stage] = fg_Max
+							(
+								_State.m_MaxInStage[_Notification.m_Stage]
+								, _State.m_InStage[_Notification.m_Stage].f_GetLen()
+							)
+						;
+						_State.m_LastInStage[_ApplicationKey] = _Notification.m_Stage;
+					}
+
+					if (auto pInStage = _State.m_LastInStageCoordination.f_FindEqual(_ApplicationKey))
+						_State.m_InStageCoordination[*pInStage].f_Remove(_ApplicationKey);
+					_State.m_InStageCoordination[_Notification.m_Stage][_ApplicationKey];
+					_State.m_MaxInStageCoordination[_Notification.m_Stage] = fg_Max
+						(
+							_State.m_MaxInStageCoordination[_Notification.m_Stage]
+							, _State.m_InStageCoordination[_Notification.m_Stage].f_GetLen()
+						)
+					;
+					_State.m_LastInStageCoordination[_ApplicationKey] = _Notification.m_Stage;
+
+					if (_Notification.m_Stage == CAppManagerInterface::EUpdateStage_Failed)
+					{
+						_State.m_InProgress.f_Remove(_ApplicationKey);
+						++_State.m_nFinished;
+					}
+					else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage == CAppManagerInterface::EUpdateStage_Finished)
+					{
+						_State.m_InProgress.f_Remove(_ApplicationKey);
+						++_State.m_nFinished;
+						++_State.m_nSuccess;
+					}
+					else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage >= CAppManagerInterface::EUpdateStage_StopOldApp)
+					{
+						_State.m_InProgress[_ApplicationKey];
+						_State.m_nMaxInProgress = fg_Max(_State.m_nMaxInProgress, _State.m_InProgress.f_GetLen());
+					}
+				}
+			;
+
 			TCSharedPointer<CUpdateNotificationsState> pUpdateNotificationsState = fg_Construct();
 
 			pUpdateNotificationsState->m_Applications["TestApp"];
@@ -172,7 +217,7 @@ public:
 					TCPromise<void> Promise;
 					AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeUpdateNotifications)
 						(
-							g_ActorFunctor / [pUpdateNotificationsState, iAppManager]
+							g_ActorFunctor / [pUpdateNotificationsState, iAppManager, fProcessApplicationState]
 							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
 							{
 								CApplicationKey ApplicationKey{_Notification.m_Application, iAppManager};
@@ -180,55 +225,9 @@ public:
 								auto &WholeState = *pUpdateNotificationsState;
 								DMibLock(WholeState.m_Lock);
 
-								auto fProcessApplicationState = [&](CUpdateNotificationsApplicationState &_State)
-									{
-										if (!_Notification.m_bCoordinateWait)
-										{
-											if (auto pInStage = _State.m_LastInStage.f_FindEqual(ApplicationKey))
-												_State.m_InStage[*pInStage].f_Remove(ApplicationKey);
-											_State.m_InStage[_Notification.m_Stage][ApplicationKey];
-											_State.m_MaxInStage[_Notification.m_Stage] = fg_Max
-												(
-													_State.m_MaxInStage[_Notification.m_Stage]
-												 	, _State.m_InStage[_Notification.m_Stage].f_GetLen()
-												)
-											;
-											_State.m_LastInStage[ApplicationKey] = _Notification.m_Stage;
-										}
-
-										if (auto pInStage = _State.m_LastInStageCoordination.f_FindEqual(ApplicationKey))
-											_State.m_InStageCoordination[*pInStage].f_Remove(ApplicationKey);
-										_State.m_InStageCoordination[_Notification.m_Stage][ApplicationKey];
-										_State.m_MaxInStageCoordination[_Notification.m_Stage] = fg_Max
-											(
-											 	_State.m_MaxInStageCoordination[_Notification.m_Stage]
-											 	, _State.m_InStageCoordination[_Notification.m_Stage].f_GetLen()
-											)
-										;
-										_State.m_LastInStageCoordination[ApplicationKey] = _Notification.m_Stage;
-
-										if (_Notification.m_Stage == CAppManagerInterface::EUpdateStage_Failed)
-										{
-											_State.m_InProgress.f_Remove(ApplicationKey);
-											++_State.m_nFinished;
-										}
-										else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage == CAppManagerInterface::EUpdateStage_Finished)
-										{
-											_State.m_InProgress.f_Remove(ApplicationKey);
-											++_State.m_nFinished;
-											++_State.m_nSuccess;
-										}
-										else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage >= CAppManagerInterface::EUpdateStage_StopOldApp)
-										{
-											_State.m_InProgress[ApplicationKey];
-											_State.m_nMaxInProgress = fg_Max(_State.m_nMaxInProgress, _State.m_InProgress.f_GetLen());
-										}
-									}
-								;
-
-								fProcessApplicationState(WholeState.m_Applications[_Notification.m_Application]);
-								fProcessApplicationState(WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application]);
-								fProcessApplicationState(WholeState.m_AllApplications);
+								fProcessApplicationState(WholeState.m_Applications[_Notification.m_Application], _Notification, ApplicationKey);
+								fProcessApplicationState(WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application], _Notification, ApplicationKey);
+								fProcessApplicationState(WholeState.m_AllApplications, _Notification, ApplicationKey);
 								//DMibConOut2("{} {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application].m_MaxInStage);
 								//DMibConOut2("{} N {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStage);
 								//DMibConOut2("{} C {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStageCoordination);
@@ -267,6 +266,7 @@ public:
 								}
 
 								WholeState.m_Event.f_Signal();
+
 								co_return {};
 							}
 						)

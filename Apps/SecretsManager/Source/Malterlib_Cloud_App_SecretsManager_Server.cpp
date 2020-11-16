@@ -218,7 +218,7 @@ namespace NMib::NCloud::NSecretsManager
 			, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
 		)
 	{
-		CStr SemanticPart{_SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : "NoSemanticID"};
+		CStr SemanticPart{_SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : CStr("NoSemanticID")};
 		CStr Description = fg_GetPermissionsDescription(_SemanticID, _Tags);
 
 		if (_Tags.f_IsEmpty())
@@ -250,7 +250,7 @@ namespace NMib::NCloud::NSecretsManager
 		)
 	{
 		auto &PermissionCollection = o_Permissions[CStr::fs_ToStr(_ID)];
-		CStr SemanticPart{ _SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : "NoSemanticID"};
+		CStr SemanticPart{ _SemanticID ? fg_Format("SemanticID/{}", _SemanticID) : CStr("NoSemanticID")};
 		CStr Description = fg_GetPermissionsDescription(_SemanticID, _Tags);
 
 		if (_Tags.f_IsEmpty())

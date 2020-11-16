@@ -318,7 +318,7 @@ namespace NMib::NCloud::NAppManager
 				 	, Other
 				 	, Backup
 				 	, Script
-					, Application.m_VersionInfo.m_ExtraInfo.f_IsValid() ? Application.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true) : ""
+					, Application.m_VersionInfo.m_ExtraInfo.f_IsValid() ? Application.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true) : CStr()
 				)
 			;
 		}
@@ -378,7 +378,7 @@ namespace NMib::NCloud::NAppManager
 						, "{}"_f << Version.m_VersionInfo.m_nFiles
 						, "{vs,vb}"_f << Version.m_VersionInfo.m_Tags
 						, "{}"_f << Version.m_VersionInfo.m_RetrySequence
-						, Version.m_VersionInfo.m_ExtraInfo.f_IsValid() ? Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true) : ""
+						, Version.m_VersionInfo.m_ExtraInfo.f_IsValid() ? Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true) : CStr()
 					)
 				;
 			}
