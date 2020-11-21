@@ -128,17 +128,27 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 #ifdef DPlatformFamily_Linux
 		bCanDoEncription = true;
 #endif
-		TCActor<CSeparateThreadActor> HelperActor{fg_Construct(), "Test actor"};
-		auto FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-
-		auto CleanupTestActor = g_OnScopeExit > [&]
+		TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
+		auto CleanupRunLoop = g_OnScopeExit > [&]
 			{
-				FileActor->f_BlockDestroy();
-				HelperActor->f_BlockDestroy();
+				while (pRunLoop->f_RefCountGet() > 0)
+					pRunLoop->f_WaitOnceTimeout(0.1);
 			}
 		;
-
+		TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
+		auto CleanupHelperActor = g_OnScopeExit > [&]
+			{
+				HelperActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
+			}
+		;
 		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
+
+		auto FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
+		auto CleanupTestActor = g_OnScopeExit > [&]
+			{
+				FileActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
+			}
+		;
 
 		DMibExpectTrue(CFile::fs_FileExists(_AppManagerPackage));
 		DMibExpectTrue(CFile::fs_FileExists(_VersionManagerPackage));
@@ -242,27 +252,27 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
 		auto CleanupTrustManager = g_OnScopeExit > [&]
 			{
-				TrustManager->f_BlockDestroy();
+				TrustManager->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
 		;
 
-		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
+		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(pRunLoop, g_Timeout);
 		CTrustedSubscriptionTestHelper Subscriptions{TrustManager, g_Timeout};
 
 		CDistributedActorTrustManager_Address ServerAddress;
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(pRunLoop, g_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
 		Dependencies.m_TrustManager = TrustManager;
-		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(g_Timeout);
+		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(pRunLoop, g_Timeout);
 
 		NMib::NConcurrency::CDistributedActorSecurity Security;
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CVersionManager::mc_pDefaultNamespace);
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CAppManagerInterface::mc_pDefaultNamespace);
-		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(g_Timeout);
+		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(pRunLoop, g_Timeout);
 
 		TCActor<CDistributedApp_LaunchHelper> LaunchHelper
 			= fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestUpdateCompatibilityEnableLogging || DTestUpdateCompatibilityEnableOtherOutput)
@@ -270,7 +280,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto CleanupLaunchHelper = g_OnScopeExit > [&]
 			{
-				LaunchHelper->f_BlockDestroy();
+				LaunchHelper->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
 		;
 
@@ -284,7 +294,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 						CProcessLaunch::fs_LaunchTool(BinaryDirectory / "bin/bsdtar", {"--no-same-owner", "-xf", _AppManagerPackage}, _Directory);
 					}
 				)
-				.f_CallSync(g_Timeout);
+				.f_CallSync(pRunLoop, g_Timeout);
 			}
 		;
 
@@ -298,7 +308,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 #if DTestUpdateCompatibilityEnableOtherOutput
 				ExtraParams.f_Insert("--log-launches-to-stderr");
 #endif
-				return LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, "AppManager_{}"_f << _Name, _Dir / "AppManager", fg_Move(ExtraParams)).f_CallSync(g_Timeout);
+				return LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, "AppManager_{}"_f << _Name, _Dir / "AppManager", fg_Move(ExtraParams)).f_CallSync(pRunLoop, g_Timeout);
 			}
 		;
 
@@ -342,13 +352,13 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				CDistributedActorTrustManager_Address Address;
 				Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << _Directory);
-				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(Address).f_CallSync(g_Timeout);
+				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(Address).f_CallSync(pRunLoop, g_Timeout);
 				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 					(
 						CAppManagerInterface::mc_pDefaultNamespace
 						, fg_CreateSet<CStr>(_LaunchInfo.m_HostID)
 						, mc_WaitForSubscriptions
-					).f_CallSync(g_Timeout)
+					).f_CallSync(pRunLoop, g_Timeout)
 				;
 				try
 				{
@@ -356,7 +366,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 						(
 							fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
 						)
-						.f_CallSync(g_Timeout)
+						.f_CallSync(pRunLoop, g_Timeout)
 					;
 				}
 				catch (CException const &_Exception)
@@ -476,8 +486,8 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					}
 				;
 
-				auto LaunchSubscription = LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, HelperActor).f_CallSync(g_Timeout);
-				LaunchFinished.f_MoveFuture().f_CallSync(g_Timeout);
+				auto LaunchSubscription = LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, HelperActor).f_CallSync(pRunLoop, g_Timeout);
+				LaunchFinished.f_MoveFuture().f_CallSync(pRunLoop, g_Timeout);
 				fAddListen(KeyManagerExecutable, true);
 
 				KeyManagerHostID = fGetHostID(KeyManagerExecutable);
@@ -493,10 +503,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				Hosts.m_Hosts[_HostID];
 				Hosts.m_Namespace = _Namespace;
 
-				_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)(fg_Move(Hosts)).f_CallSync(g_Timeout);
+				_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)(fg_Move(Hosts)).f_CallSync(pRunLoop, g_Timeout);
 
 				auto Ticket = CDistributedActorTrustManagerInterface::CTrustTicket::fs_FromStringTicket(fGenerateTicket(_Executable));
-				_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(g_Timeout);
+				_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(pRunLoop, g_Timeout);
 			}
 		;
 
@@ -520,7 +530,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 						, fg_CreateSet<CStr>(VersionManagerHostID)
 						, mc_WaitForSubscriptions
 					)
-					.f_CallSync(g_Timeout)
+					.f_CallSync(pRunLoop, g_Timeout)
 				;
 
 				TCVector<CStr> Permissions = {"Application/ListAll", "Application/ReadAll", "Application/TagAll", "Application/WriteAll"};
@@ -529,7 +539,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					CProcessLaunch::fs_LaunchTool(VersionManagerExecutable, fg_CreateVector<CStr>("--trust-permission-add", "--host", TestHostID, Permission));
 
 				auto Ticket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(fGenerateTicket(VersionManagerExecutable));
-				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(g_Timeout);
+				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(pRunLoop, g_Timeout);
 
 				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
 			}
@@ -537,11 +547,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fUploadPackage = [&](CStr const &_Package, TCSet<CStr> const &_Tags)
 			{
-				auto PackageInfo = VersionManagerHelper.f_GetPackageInfo(_Package).f_CallSync(g_Timeout);
+				auto PackageInfo = VersionManagerHelper.f_GetPackageInfo(_Package).f_CallSync(pRunLoop, g_Timeout);
 				PackageInfo.m_VersionInfo.m_Tags = _Tags;
 				CStr PackageName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(_Package));
 
-				VersionManagerHelper.f_Upload(VersionManager, PackageName, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, _Package).f_CallSync(g_Timeout);
+				VersionManagerHelper.f_Upload(VersionManager, PackageName, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, _Package).f_CallSync(pRunLoop, g_Timeout);
 				return PackageInfo;
 			}
 		;
@@ -549,7 +559,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		auto fWaitVersionsAvailable = [&](CAppManager const &_AppManager, CStr const &_Application)
 			{
 				NTime::CClock Timeout{true};
-				while (_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetAvailableVersions)(_Application).f_CallSync(g_Timeout).f_IsEmpty())
+				while (_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetAvailableVersions)(_Application).f_CallSync(pRunLoop, g_Timeout).f_IsEmpty())
 				{
 					if (Timeout.f_GetTime() > g_Timeout)
 						DMibError("Timed out waiting for version manager application to become available in AppManager");
@@ -570,7 +580,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				ApplicationSettings.m_VersionManagerApplication = "AppManager";
 				ApplicationSettings.m_ExecutableParameters = TCVector<CStr>{};
 
-				_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)("SelfUpdate", fg_Move(Add), fg_Move(ApplicationSettings)).f_CallSync(g_Timeout);
+				_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)("SelfUpdate", fg_Move(Add), fg_Move(ApplicationSettings)).f_CallSync(pRunLoop, g_Timeout);
 			}
 		;
 
@@ -586,7 +596,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				if (_Executable)
 					ApplicationSettings.m_Executable = _Executable;
 
-				_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)(_Application, fg_Move(Add), fg_Move(ApplicationSettings)).f_CallSync(g_Timeout);
+				_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)(_Application, fg_Move(Add), fg_Move(ApplicationSettings)).f_CallSync(pRunLoop, g_Timeout);
 			}
 		;
 
@@ -613,11 +623,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString(), false);
 				}
 
-				auto PackageInfo = VersionManagerHelper.f_CreatePackage("{}/TestApps/{}"_f << ProgramDirectory << _Name, AppArchive, g_CompressionLevel).f_CallSync(g_Timeout);
+				auto PackageInfo = VersionManagerHelper.f_CreatePackage("{}/TestApps/{}"_f << ProgramDirectory << _Name, AppArchive, g_CompressionLevel).f_CallSync(pRunLoop, g_Timeout);
 
 				PackageInfo.m_VersionInfo.m_Tags = _Tags;
 				auto Flags = CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite;
-				VersionManagerHelper.f_Upload(VersionManager, _Name, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, AppArchive, Flags).f_CallSync(g_Timeout);
+				VersionManagerHelper.f_Upload(VersionManager, _Name, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, AppArchive, Flags).f_CallSync(pRunLoop, g_Timeout);
 				return PackageInfo;
 			}
 		;
@@ -628,7 +638,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				ChangeTags.m_AddTags = _Tags;
 				ChangeTags.m_Application = _Name;
 				ChangeTags.m_VersionID = _PackageInfo.m_VersionID.m_VersionID;
-				VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_CallSync(g_Timeout);
+				VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_CallSync(pRunLoop, g_Timeout);
 			}
 		;
 
@@ -875,12 +885,24 @@ public:
 							VersionInfo["Version"] = CStr::fs_ToStr(VersionID);
 							CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString(), false);
 
-							TCActor<CSeparateThreadActor> HelperActor{fg_Construct(), "Test actor"};
+							TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
+							auto CleanupRunLoop = g_OnScopeExit > [&]
+								{
+									while (pRunLoop->f_RefCountGet() > 0)
+										pRunLoop->f_WaitOnceTimeout(0.1);
+								}
+							;
+							TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
+							auto CleanupHelperActor = g_OnScopeExit > [&]
+								{
+									HelperActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
+								}
+							;
 							CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
 							CVersionManagerHelper VersionManagerHelper(BinaryDirectory);
 
-							VersionManagerHelper.f_CreatePackage("{}/TestApps/{}"_f << ProgramDirectory << AppName, _PackagePath, g_CompressionLevel).f_CallSync(g_Timeout);
+							VersionManagerHelper.f_CreatePackage("{}/TestApps/{}"_f << ProgramDirectory << AppName, _PackagePath, g_CompressionLevel).f_CallSync(pRunLoop, g_Timeout);
 						}
 					;
 

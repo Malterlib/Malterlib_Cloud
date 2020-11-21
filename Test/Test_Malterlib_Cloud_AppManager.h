@@ -82,7 +82,8 @@ namespace NMib::NCloud
 
 		static auto constexpr mc_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 
-		TCActor<CSeparateThreadActor> m_HelperActor{fg_Construct(), "Test actor"};
+		TCSharedPointer<CDefaultRunLoop> m_pRunLoop = fg_Construct();
+		TCActor<CDispatchingActor> m_HelperActor{fg_Construct(), m_pRunLoop->f_Dispatcher()};
 		CCurrentlyProcessingActorScope m_CurrentActor{m_HelperActor};
 
 		CStr m_ProgramDirectory = CFile::fs_GetProgramDirectory();

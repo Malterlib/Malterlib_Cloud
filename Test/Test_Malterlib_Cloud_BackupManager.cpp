@@ -128,9 +128,35 @@ public:
 
 	struct CTestState
 	{
-		NThread::CMutual m_Lock;
-		NThread::CEventAutoReset m_Event;
-		TCLinkedList<CBackupManagerClient::CNotification> m_Notifications;
+		CTestState(TCSharedPointer<CDefaultRunLoop> const &_pRunLoop)
+			: m_pRunLoop(_pRunLoop)
+		{
+		}
+
+		void f_Signal()
+		{
+			DMibLock(m_Lock);
+			m_bSignalCompletion = true;
+			m_pRunLoop->f_Wake();
+		}
+
+		bool f_Wait(fp64 _Timeout)
+		{
+			while (true)
+			{
+				{
+					DMibLock(m_Lock);
+					if (m_bSignalCompletion)
+					{
+						m_bSignalCompletion = false;
+						break;
+					}
+				}
+				if (m_pRunLoop->f_WaitOnceTimeout(_Timeout))
+					return true;
+			}
+			return false;
+		}
 
 		template <CBackupManagerClient::ENotification tf_Notification>
 		auto f_WaitForNotification(COtherNotifications &o_OtherNotifications)
@@ -159,15 +185,22 @@ public:
 						}
 					}
 				}
-				if (m_Event.f_WaitTimeout(g_Timeout / 2.0))
+				if (f_Wait(g_Timeout / 2.0))
 					DMibError("Timed out waiting for backup notification");
 			}
 		}
+
+		NThread::CMutual m_Lock;
+		TCSharedPointer<CDefaultRunLoop> m_pRunLoop;
+		bool m_bSignalCompletion = false;
+		TCLinkedList<CBackupManagerClient::CNotification> m_Notifications;
 	};
 
 	struct CBackupClientHelper
 	{
-		CBackupClientHelper(CStr const &_TestBackupDirectory)
+		CBackupClientHelper(CStr const &_TestBackupDirectory, TCSharedPointer<CDefaultRunLoop> const &_pRunLoop)
+			: m_pRunLoop(_pRunLoop)
+			, m_pState(fg_Construct(_pRunLoop))
 		{
 			m_BackupConfig.m_BackupIdentifier = "Test";
 			m_BackupConfig.m_ManifestConfig.m_Root = _TestBackupDirectory;
@@ -178,13 +211,13 @@ public:
 		~CBackupClientHelper()
 		{
 			if (m_BackupInterface)
-				m_BackupInterface.f_Destroy().f_CallSync(g_Timeout);
+				m_BackupInterface.f_Destroy().f_CallSync(m_pRunLoop, g_Timeout);
 
 			if (m_ChangeSubscription)
-				m_ChangeSubscription->f_Destroy().f_CallSync(g_Timeout);
+				m_ChangeSubscription->f_Destroy().f_CallSync(m_pRunLoop, g_Timeout);
 
 			if (m_BackupClient)
-				m_BackupClient.f_Destroy().f_CallSync(g_Timeout);
+				m_BackupClient.f_Destroy().f_CallSync(m_pRunLoop, g_Timeout);
 		}
 
 		template <CBackupManagerClient::ENotification tf_Notification>
@@ -274,7 +307,7 @@ public:
 #endif
 						DMibLock(pState->m_Lock);
 						pState->m_Notifications.f_Insert(fg_Move(_Notification));
-						pState->m_Event.f_Signal();
+						pState->f_Signal();
 						if (_Notification.f_GetTypeID() == CBackupManagerClient::ENotification_BackupError)
 						{
 							auto &Error = _Notification.f_Get<CBackupManagerClient::ENotification_BackupError>();
@@ -283,10 +316,10 @@ public:
 						}
 						co_return {};
 					}
-				).f_CallSync(g_Timeout)
+				).f_CallSync(m_pRunLoop, g_Timeout)
 			;
-			m_BackupClient(&CBackupManagerClient::f_StartBackup).f_CallSync(g_Timeout);
-			ReceivedManifestFinished.f_MoveFuture().f_CallSync(g_Timeout);
+			m_BackupClient(&CBackupManagerClient::f_StartBackup).f_CallSync(m_pRunLoop, g_Timeout);
+			ReceivedManifestFinished.f_MoveFuture().f_CallSync(m_pRunLoop, g_Timeout);
 
 			m_BackupInterface = fg_Move(*pBackupInterface);
 
@@ -454,10 +487,11 @@ public:
 			return Files;
 		}
 
+		TCSharedPointer<CDefaultRunLoop> m_pRunLoop;
 		CBackupManagerClient::CConfig m_BackupConfig;
 		TCActor<CBackupManagerClient> m_BackupClient;
 		TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> m_BackupInterface;
-		TCSharedPointer<CTestState> m_pState = fg_Construct();
+		TCSharedPointer<CTestState> m_pState;
 		NConcurrency::CActorSubscription m_ChangeSubscription;
 	};
 
@@ -467,6 +501,20 @@ public:
 #if DTestBackupManagerEnableLogging
 		fg_GetSys()->f_AddStdErrLogger();
 #endif
+		TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
+		auto CleanupRunLoop = g_OnScopeExit > [&]
+			{
+				while (pRunLoop->f_RefCountGet() > 0)
+					pRunLoop->f_WaitOnceTimeout(0.1);
+			}
+		;
+		TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
+		auto CleanupHelperActor = g_OnScopeExit > [&]
+			{
+				HelperActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
+			}
+		;
+		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
 		NContainer::TCMap<NStr::CStr, CPermissionRequirements> BackupManagerPermissionsForTest = {{"Backup/WriteSelf"}, {"Backup/ReadAll"}};
 
@@ -484,31 +532,31 @@ public:
 		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
 		auto CleanupTrustManager = g_OnScopeExit > [&]
 			{
-				TrustManager->f_BlockDestroy();
+				TrustManager->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
 		;
 
-		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(g_Timeout);
+		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(pRunLoop, g_Timeout);
 		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 
 		CDistributedActorTrustManager_Address ServerAddress;
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath(RootDirectory / "controller.sock");
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(pRunLoop, g_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
 		Dependencies.m_TrustManager = TrustManager;
-		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(g_Timeout);
+		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(pRunLoop, g_Timeout);
 
 		NMib::NConcurrency::CDistributedActorSecurity Security;
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CBackupManager::mc_pDefaultNamespace);
-		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(g_Timeout);
+		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(pRunLoop, g_Timeout);
 
 		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestBackupManagerEnableLogging);
 		auto Cleanup = g_OnScopeExit > [&]
 			{
-				LaunchHelper->f_BlockDestroy();
+				LaunchHelper->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
 		;
 
@@ -562,19 +610,11 @@ public:
 						> BackupManagerLaunchesResults.f_AddResult()
 					;
 				}
-				for (auto &LaunchResult : BackupManagerLaunchesResults.f_GetResults().f_CallSync(g_Timeout))
+				for (auto &LaunchResult : BackupManagerLaunchesResults.f_GetResults().f_CallSync(pRunLoop, g_Timeout))
 					BackupManagerLaunches.f_Insert(fg_Move(*LaunchResult));
 			}
 		;
 		fLaunchSecretManagers();
-
-		TCActor<CSeparateThreadActor> HelperActor{fg_Construct(), "Test actor"};
-		auto CleanupTestActor = g_OnScopeExit > [&]
-			{
-				HelperActor->f_BlockDestroy();
-			}
-		;
-		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
 		// Setup trust for BackupManagers
 
@@ -609,7 +649,7 @@ public:
 					BackupManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(BackupManagerInfo.m_Address) > ListenResults.f_AddResult();
 					++iBackupManager;
 				}
-				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(g_Timeout));
+				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(pRunLoop, g_Timeout));
 			}
 		;
 		fSetupListen();
@@ -667,7 +707,7 @@ public:
 			}
 		}
 
-		SetupTrustResults.f_GetResults().f_CallSync(g_Timeout);
+		SetupTrustResults.f_GetResults().f_CallSync(pRunLoop, g_Timeout);
 
 		{
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
@@ -681,7 +721,7 @@ public:
 
 			CFile::fs_CreateDirectory(TestBackupDirectory);
 
-			CBackupClientHelper BackupHelper{TestBackupDirectory};
+			CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 			BackupHelper.f_CreateFile("File1", 1024);
 			BackupHelper.f_CreateFile("Dir1/File1", 1024);
@@ -719,7 +759,7 @@ public:
 			CStr ManifestPath = BackupDestination / "Manifest.bin";
 			{
 				DMibTestPath("General");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				{
 					BackupHelper.f_Start(TrustManager, Dependencies);
@@ -752,7 +792,7 @@ public:
 			}
 			{
 				DMibTestPath("Include wildcards");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^File1", {}}};
@@ -773,7 +813,7 @@ public:
 			}
 			{
 				DMibTestPath("Wildcard destinations");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^File1", "OverrideDir"}, {"Dir1/File2", "OverrideDir2"}};
@@ -817,7 +857,7 @@ public:
 			}
 			{
 				DMibTestPath("Conflicting wildcard destinations");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^File1", "OverrideDir"}, {"Dir1/File1", "OverrideDir2"}};
@@ -832,7 +872,7 @@ public:
 			}
 			{
 				DMibTestPath("Exclude wildcards");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_ExcludeWildcards = {"*File1"};
@@ -854,7 +894,7 @@ public:
 			}
 			{
 				DMibTestPath("Append RSync");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				BackupHelper.f_Start(TrustManager, Dependencies);
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
@@ -887,7 +927,7 @@ public:
 			}
 			{
 				DMibTestPath("Append semantics");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_AddSyncFlagsWildcards["*/File2"] = EDirectoryManifestSyncFlag_Append;
@@ -922,7 +962,7 @@ public:
 			}
 			{
 				DMibTestPath("Remove wildcard flags");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_AddSyncFlagsWildcards["*"] = EDirectoryManifestSyncFlag_Append;
@@ -957,7 +997,7 @@ public:
 			}
 			{
 				DMibTestPath("Renames");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*"}};
@@ -1311,7 +1351,7 @@ public:
 			}
 			{
 				DMibTestPath("Delete all");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^*"}};
@@ -1373,7 +1413,7 @@ public:
 			}
 			{
 				DMibTestPath("Adds");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*"}};
@@ -1435,7 +1475,7 @@ public:
 			}
 			{
 				DMibTestPath("Dynamic manifest changes");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"Dir2/^*"}};
@@ -1452,9 +1492,9 @@ public:
 
 				NFile::CDirectoryManifestConfig ExtraManifestConfig;
 				ExtraManifestConfig.m_IncludeWildcards = {{"Dir1/^*"}};
-				BackupHelper.m_BackupInterface.f_CallActor(&CDistributedAppInterfaceBackup::f_AppendManifest)(ExtraManifestConfig).f_CallSync(g_Timeout);
+				BackupHelper.m_BackupInterface.f_CallActor(&CDistributedAppInterfaceBackup::f_AppendManifest)(ExtraManifestConfig).f_CallSync(pRunLoop, g_Timeout);
 
-				BackupFinishedSubscription->f_Destroy().f_CallSync(g_Timeout);
+				BackupFinishedSubscription->f_Destroy().f_CallSync(pRunLoop, g_Timeout);
 
 				COtherNotifications AppendManifestNotifications;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(AppendManifestNotifications);
@@ -1484,9 +1524,9 @@ public:
 			}
 			{
 				DMibTestPath("Downloads");
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
-				auto BackupSources = BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)().f_CallSync(g_Timeout);
+				auto BackupSources = BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)().f_CallSync(pRunLoop, g_Timeout);
 
 				DMibAssert(BackupSources.f_GetLen(), ==, 1);
 
@@ -1496,7 +1536,7 @@ public:
 				Receive.m_BasePath = TestDownloadDirectory;
 
 				CActorSubscription Subscription;
-				auto DownloadResult = fg_CallSafeDispatched(&fg_DownloadBackup, BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription)).f_CallSync(g_Timeout);
+				auto DownloadResult = fg_CallSafeDispatched(&fg_DownloadBackup, BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription)).f_CallSync(pRunLoop, g_Timeout);
 
 				DMibExpectTrue(BackupHelper.f_FileIsSame(TestDownloadDirectory, "Dir1/File1"));
 				DMibExpectTrue(BackupHelper.f_FileIsSame(TestDownloadDirectory, "Dir1/File2"));

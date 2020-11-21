@@ -46,7 +46,7 @@ public:
 							co_return {};
 						}
 					)
-					.f_CallSync(g_Timeout);
+					.f_CallSync(AppManagerTestHelper.m_pRunLoop, g_Timeout);
 				}
 			;
 
@@ -56,7 +56,7 @@ public:
 					ChangeTags.m_AddTags = _Tags;
 					ChangeTags.m_Application = _Name;
 					ChangeTags.m_VersionID = PackageInfo.m_VersionID.m_VersionID;
-					VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_CallSync(g_Timeout);
+					VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_CallSync(AppManagerTestHelper.m_pRunLoop, g_Timeout);
 				}
 			;
 
@@ -105,6 +105,11 @@ public:
 
 			struct CUpdateNotificationsState
 			{
+				CUpdateNotificationsState(TCSharedPointer<CDefaultRunLoop> const &_pRunLoop)
+					: m_pRunLoop(_pRunLoop)
+				{
+				}
+
 				void f_Destroy()
 				{
 					TCActorResultVector<void> Destroys;
@@ -134,9 +139,35 @@ public:
 					m_nMaxAppsInProgressPerAppManager = 0;
 				}
 
+				void f_Signal()
+				{
+					DMibLock(m_Lock);
+					m_bSignalCompletion = true;
+					m_pRunLoop->f_Wake();
+				}
+
+				bool f_Wait()
+				{
+					while (true)
+					{
+						{
+							DMibLock(m_Lock);
+							if (m_bSignalCompletion)
+							{
+								m_bSignalCompletion = false;
+								break;
+							}
+						}
+						if (m_pRunLoop->f_WaitOnceTimeout(g_Timeout))
+							return true;
+					}
+					return false;
+				}
+
 				NThread::CMutual m_Lock;
+				TCSharedPointer<CDefaultRunLoop> m_pRunLoop;
+				bool m_bSignalCompletion = false;
 				TCVector<CActorSubscription> m_Subscriptions;
-				NThread::CEventAutoReset m_Event;
 				TCMap<CStr, CUpdateNotificationsApplicationState> m_Applications;
 				TCMap<mint, TCMap<CStr, CUpdateNotificationsApplicationState>> m_ApplicationsPerAppmanager;
 				CUpdateNotificationsApplicationState m_AllApplications;
@@ -193,7 +224,7 @@ public:
 				}
 			;
 
-			TCSharedPointer<CUpdateNotificationsState> pUpdateNotificationsState = fg_Construct();
+			TCSharedPointer<CUpdateNotificationsState> pUpdateNotificationsState = fg_Construct(AppManagerTestHelper.m_pRunLoop);
 
 			pUpdateNotificationsState->m_Applications["TestApp"];
 			pUpdateNotificationsState->m_Applications["TestApp2"];
@@ -265,7 +296,7 @@ public:
 									;
 								}
 
-								WholeState.m_Event.f_Signal();
+								WholeState.f_Signal();
 
 								co_return {};
 							}
@@ -281,7 +312,7 @@ public:
 					++iAppManager;
 				}
 				DMibTestMark;
-				fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
+				fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(AppManagerTestHelper.m_pRunLoop, g_Timeout));
 			}
 
 			auto fWaitForAllUpdated = [&](CStr const &_Application)
@@ -294,7 +325,7 @@ public:
 							break;
 						if (Clock.f_GetTime() > g_Timeout * 4.0)
 							DMibError("Timed out waiting for all apps to update");
-						pUpdateNotificationsState->m_Event.f_WaitTimeout(10.0);
+						pUpdateNotificationsState->f_Wait();
 					}
 				}
 			;
@@ -311,7 +342,7 @@ public:
 
 						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
-					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
+					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(AppManagerTestHelper.m_pRunLoop, g_Timeout));
 					*pUpdateType = _UpdateType;
 				}
 			;
@@ -327,7 +358,7 @@ public:
 
 						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
-					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(g_Timeout));
+					fg_CombineResults(AppCommandResults.f_GetResults().f_CallSync(AppManagerTestHelper.m_pRunLoop, g_Timeout));
 				}
 			;
 
@@ -335,7 +366,9 @@ public:
 
 			{
 				DMibTestPath("Update Independent");
+				DMibTestMark;
 				fSetUpdateType("TestApp", "Independent");
+				DMibTestMark;
 				UpdateNotificationState.f_Clear();
 				DMibTestMark;
 				fUpdateTestApp({"TestTag"});
@@ -348,7 +381,9 @@ public:
 			}
 			{
 				DMibTestPath("Update OneAtATime");
+				DMibTestMark;
 				fSetUpdateType("TestApp", "OneAtATime");
+				DMibTestMark;
 				UpdateNotificationState.f_Clear();
 				DMibTestMark;
 				fUpdateTestApp({"TestTag"});
@@ -362,7 +397,9 @@ public:
 			}
 			{
 				DMibTestPath("Update AllAtOnce");
+				DMibTestMark;
 				fSetUpdateType("TestApp", "AllAtOnce");
+				DMibTestMark;
 				UpdateNotificationState.f_Clear();
 				DMibTestMark;
 				fUpdateTestApp({"TestTag"});
