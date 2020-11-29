@@ -19,8 +19,16 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 #ifdef DPlatformFamily_OSX
 		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
+
+		CStr OriginalPath = Path;
+
 		if (Path.f_Find("/usr/local/bin") < 0)
-			fg_GetSys()->f_SetEnvironmentVariable("PATH", "/usr/local/bin:" + Path);
+			Path = "/usr/local/bin:" + Path;
+		if (Path.f_Find("/opt/homebrew/bin") < 0)
+			Path = "/opt/homebrew/bin:" + Path;
+
+		if (Path != OriginalPath)
+			fg_GetSys()->f_SetEnvironmentVariable("PATH", Path);
 #endif
 		self(&CServer::fp_Init) > fg_LogError("CloudAPIManager", "Failed to initialize server");
 	}
