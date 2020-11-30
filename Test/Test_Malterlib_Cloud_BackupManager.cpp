@@ -44,10 +44,13 @@ class CBackupManager_Tests : public NMib::NTest::CTest
 public:
 	void f_DoTests()
 	{
+#ifndef DPlatformFamily_Windows
+		// File change notifications are not working as expected on Windowms for now
 		DMibTestSuite("General")
 		{
 			fp_DoGeneralTests();
 		};
+#endif
 	}
 
 	struct COtherNotifications
