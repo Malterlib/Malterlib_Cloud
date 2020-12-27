@@ -38,11 +38,16 @@
 	Import.CMake_Variables "ENABLE_LZMA=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_BZip2=0;@(Import.CMake_Variables)"
 	Import.CMake_Variables "ENABLE_EXPAT=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "OPENSSL_ROOT_DIR=@('../../../../External/boringssl'->MakeAbsolute());@(Import.CMake_Variables)"
+	Import.CMake_Variables "OPENSSL_LIBRARIES=/dev/null;@(Import.CMake_Variables)"
+	Import.CMake_Variables "OPENSSL_CRYPTO_LIBRARY=/dev/null;@(Import.CMake_Variables)"
+	Import.CMake_Variables "OPENSSL_SSL_LIBRARY=/dev/null;@(Import.CMake_Variables)"
+
 	Import.CMake_Variables "HAVE_LIBRICHACL=0;HAVE_ARC4RANDOM_BUF=0;HAVE__CTIME64_S=0;HAVE_READPASSPHRASE=0;HAVE__LOCALTIME64_S=0;HAVE__GMTIME64_S=0;@(Import.CMake_Variables)"
 	{
 		!!PlatformFamily "Linux"
 	}
-	Import.CMake_Variables "HAVE_LZMA_STREAM_ENCODER_MT=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables "HAVE_LIBACL=0;HAVE_LIBRICHACL=0;HAVE_LZMA_STREAM_ENCODER_MT=0;@(Import.CMake_Variables)"
 	{
 		!!PlatformFamily "OSX"
 	}

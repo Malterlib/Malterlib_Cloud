@@ -4,7 +4,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type "C"
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('../../../../../../External/boringssl/include'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType "Normal"
@@ -643,7 +643,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type "C"
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('../../../../../../External/boringssl/include'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;archive_EXPORTS;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType "Normal"
@@ -1282,7 +1282,7 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type "C"
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
+		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('../../../../../../External/boringssl/include'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
 		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;@(Compile.PreprocessorDefines)"
 	}
 	Property.MalterlibTargetNameType "Normal"
