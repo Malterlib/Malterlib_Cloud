@@ -80,7 +80,7 @@ MemoryCheckCommandOptions:
 MemoryCheckSuppressionFile: 
 
 # Coverage
-CoverageCommand: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchaingcov
+CoverageCommand: gcov
 CoverageExtraFlags: -l
 
 # Cluster commands
