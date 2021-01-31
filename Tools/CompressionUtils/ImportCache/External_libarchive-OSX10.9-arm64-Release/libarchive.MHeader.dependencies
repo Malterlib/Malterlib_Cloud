@@ -1,5 +1,6 @@
 ../../../../../../External/libarchive/CMakeLists.txt
 ../../../../../../External/libarchive/CTestConfig.cmake
+../../../../../../External/libarchive/build/cmake/CheckFileOffsetBits.c
 ../../../../../../External/libarchive/build/cmake/CheckFileOffsetBits.cmake
 ../../../../../../External/libarchive/build/cmake/CheckFuncs.cmake
 ../../../../../../External/libarchive/build/cmake/CheckFuncs_stub.c.in

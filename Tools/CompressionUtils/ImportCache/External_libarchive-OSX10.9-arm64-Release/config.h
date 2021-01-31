@@ -181,7 +181,7 @@ typedef uint64_t uintmax_t;
 /* #undef ZLIB_WINAPI */
 
 /* Darwin ACL support */
-/* #undef ARCHIVE_ACL_DARWIN */
+#define ARCHIVE_ACL_DARWIN 1
 
 /* FreeBSD ACL support */
 /* #undef ARCHIVE_ACL_FREEBSD */

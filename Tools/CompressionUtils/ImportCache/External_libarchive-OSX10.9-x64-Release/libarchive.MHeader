@@ -628,6 +628,10 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 		{
 			Compile.Type "C"
 		}
+		%File "../../../../../../External/libarchive/libarchive/archive_disk_acl_darwin.c"
+		{
+			Compile.Type "C"
+		}
 		%File "../../../../../../External/libarchive/libarchive/archive.h"
 		{
 			Compile.Type "None"
@@ -1260,6 +1264,10 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 			Compile.Type "C"
 		}
 		%File "../../../../../../External/libarchive/libarchive/archive_blake2s_ref.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_disk_acl_darwin.c"
 		{
 			Compile.Type "C"
 		}
