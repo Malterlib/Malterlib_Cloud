@@ -141,7 +141,7 @@ namespace NMib::NCloud::NCloudClient
 			for (auto &Tunnel : Tunnels)
 			{
 				auto &TunnelName = Tunnels.fs_GetKey(Tunnel);
-				TableRenderer.f_AddRow(HostID, TunnelName, Tunnel.m_MetaData.f_ToStringColored(_pCommandLine->m_AnsiFlags, "\t", true));
+				TableRenderer.f_AddRow(HostID, TunnelName, Tunnel.m_MetaData.f_ToStringColored(_pCommandLine->m_AnsiFlags, "\t", EJSONDialectFlag_AllowUndefined));
 			}
 		}
 
