@@ -528,7 +528,7 @@ namespace NMib::NCloud::NCloudClient
 
 				CStr ExtraInfo;
 				if (bVerbose && Version.m_ExtraInfo.f_IsValid())
-					ExtraInfo = Version.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true);
+					ExtraInfo = Version.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", EJSONDialectFlag_AllowUndefined);
 
 				TableRenderer.f_AddRow
 					(

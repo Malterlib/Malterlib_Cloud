@@ -202,7 +202,7 @@ namespace NMib::NCloud::NAppManager
 
 			auto fSyntaxHighlight = [&](auto const &_Value)
 				{
-					return CEJSON(_Value).f_ToStringColored(_pCommandLine->m_AnsiFlags, nullptr, true);
+					return CEJSON(_Value).f_ToStringColored(_pCommandLine->m_AnsiFlags, nullptr, EJSONDialectFlag_AllowUndefined);
 				}
 			;
 
@@ -318,7 +318,9 @@ namespace NMib::NCloud::NAppManager
 				 	, Other
 				 	, Backup
 				 	, Script
-					, Application.m_VersionInfo.m_ExtraInfo.f_IsValid() ? Application.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true) : CStr()
+					, Application.m_VersionInfo.m_ExtraInfo.f_IsValid()
+					? Application.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", EJSONDialectFlag_AllowUndefined)
+					: CStr()
 				)
 			;
 		}
@@ -378,7 +380,9 @@ namespace NMib::NCloud::NAppManager
 						, "{}"_f << Version.m_VersionInfo.m_nFiles
 						, "{vs,vb}"_f << Version.m_VersionInfo.m_Tags
 						, "{}"_f << Version.m_VersionInfo.m_RetrySequence
-						, Version.m_VersionInfo.m_ExtraInfo.f_IsValid() ? Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", true) : CStr()
+						, Version.m_VersionInfo.m_ExtraInfo.f_IsValid()
+						? Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", EJSONDialectFlag_AllowUndefined)
+						: CStr()
 					)
 				;
 			}
