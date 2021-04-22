@@ -1,16 +1,23 @@
-Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
+Property.CMakeOutputPath_libarchive define string = "."->MakeAbsolute()
 %Target "Lib_archive_static"
 {
 	Compile
 	{
 		!!Compile.Type "C"
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('../../../../../../External/boringssl/include'->MakeAbsolute());@(Compile.SearchPath)"
-		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;@(Compile.PreprocessorDefines)"
+		SearchPath += [
+			"../../../../../../External/libarchive/libarchive"->MakeAbsolute(),
+			"."->MakeAbsolute(),
+			"../../../../../../External/boringssl/include"->MakeAbsolute()
+		]
+		PreprocessorDefines += [
+			"HAVE_CONFIG_H",
+			"LIBARCHIVE_STATIC"
+		]
 	}
 	Property.MalterlibTargetNameType "Normal"
 	Target.Group "External/libarchive"
 	{
-		!!Target.Group ""
+		!!Target.Group undefined
 	}
 	Target.Type "StaticLibrary"
 	Target.BaseName "archive_static"
@@ -643,13 +650,20 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type "C"
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('../../../../../../External/boringssl/include'->MakeAbsolute());@(Compile.SearchPath)"
-		PreprocessorDefines "HAVE_CONFIG_H;archive_EXPORTS;@(Compile.PreprocessorDefines)"
+		SearchPath += [
+			"../../../../../../External/libarchive/libarchive"->MakeAbsolute(),
+			"."->MakeAbsolute(),
+			"../../../../../../External/boringssl/include"->MakeAbsolute()
+		]
+		PreprocessorDefines += [
+			"HAVE_CONFIG_H",
+			"archive_EXPORTS"
+		]
 	}
 	Property.MalterlibTargetNameType "Normal"
 	Target.Group "External/libarchive"
 	{
-		!!Target.Group ""
+		!!Target.Group undefined
 	}
 	Target.Type "SharedDynamicLibrary"
 	Target.BaseName "archive"
@@ -1282,13 +1296,21 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type "C"
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('../../../../../../External/boringssl/include'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
-		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;@(Compile.PreprocessorDefines)"
+		SearchPath += [
+			"../../../../../../External/libarchive/libarchive"->MakeAbsolute(),
+			"."->MakeAbsolute(),
+			"../../../../../../External/boringssl/include"->MakeAbsolute(),
+			"../../../../../../External/libarchive/libarchive_fe"->MakeAbsolute()
+		]
+		PreprocessorDefines += [
+			"HAVE_CONFIG_H",
+			"LIBARCHIVE_STATIC"
+		]
 	}
 	Property.MalterlibTargetNameType "Normal"
 	Target.Group "External/libarchive"
 	{
-		!!Target.Group ""
+		!!Target.Group undefined
 	}
 	Target.Type "ConsoleExecutable"
 	Target.BaseName "bsdtar"

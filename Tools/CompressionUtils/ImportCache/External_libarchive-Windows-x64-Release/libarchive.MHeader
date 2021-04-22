@@ -1,16 +1,23 @@
-Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
+Property.CMakeOutputPath_libarchive define string = "."->MakeAbsolute()
 %Target "Dll_archive"
 {
 	Compile
 	{
 		!!Compile.Type "C"
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@(Compile.SearchPath)"
-		PreprocessorDefines "HAVE_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;archive_EXPORTS;@(Compile.PreprocessorDefines)"
+		SearchPath += [
+			"../../../../../../External/libarchive/libarchive"->MakeAbsolute(),
+			"."->MakeAbsolute()
+		]
+		PreprocessorDefines += [
+			"HAVE_CONFIG_H",
+			"_CRT_SECURE_NO_DEPRECATE",
+			"archive_EXPORTS"
+		]
 	}
 	Property.MalterlibTargetNameType "Normal"
 	Target.Group "External/libarchive"
 	{
-		!!Target.Group ""
+		!!Target.Group undefined
 	}
 	Target.Type "SharedDynamicLibrary"
 	Target.BaseName "archive"
@@ -663,13 +670,20 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type "C"
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@(Compile.SearchPath)"
-		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;_CRT_SECURE_NO_DEPRECATE;@(Compile.PreprocessorDefines)"
+		SearchPath += [
+			"../../../../../../External/libarchive/libarchive"->MakeAbsolute(),
+			"."->MakeAbsolute()
+		]
+		PreprocessorDefines += [
+			"HAVE_CONFIG_H",
+			"LIBARCHIVE_STATIC",
+			"_CRT_SECURE_NO_DEPRECATE"
+		]
 	}
 	Property.MalterlibTargetNameType "Normal"
 	Target.Group "External/libarchive"
 	{
-		!!Target.Group ""
+		!!Target.Group undefined
 	}
 	Target.Type "StaticLibrary"
 	Target.BaseName "archive_static"
@@ -1322,13 +1336,21 @@ Property.CMakeOutputPath_libarchive "@('.'->MakeAbsolute())"
 	Compile
 	{
 		!!Compile.Type "C"
-		SearchPath "@('../../../../../../External/libarchive/libarchive'->MakeAbsolute());@('.'->MakeAbsolute());@('../../../../../../External/libarchive/libarchive_fe'->MakeAbsolute());@(Compile.SearchPath)"
-		PreprocessorDefines "HAVE_CONFIG_H;LIBARCHIVE_STATIC;_CRT_SECURE_NO_DEPRECATE;@(Compile.PreprocessorDefines)"
+		SearchPath += [
+			"../../../../../../External/libarchive/libarchive"->MakeAbsolute(),
+			"."->MakeAbsolute(),
+			"../../../../../../External/libarchive/libarchive_fe"->MakeAbsolute()
+		]
+		PreprocessorDefines += [
+			"HAVE_CONFIG_H",
+			"LIBARCHIVE_STATIC",
+			"_CRT_SECURE_NO_DEPRECATE"
+		]
 	}
 	Property.MalterlibTargetNameType "Normal"
 	Target.Group "External/libarchive"
 	{
-		!!Target.Group ""
+		!!Target.Group undefined
 	}
 	Target.Type "ConsoleExecutable"
 	Target.BaseName "bsdtar"
