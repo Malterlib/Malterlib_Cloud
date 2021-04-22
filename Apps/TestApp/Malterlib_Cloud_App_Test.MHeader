@@ -37,19 +37,18 @@
 		MalterlibTestApp true
 		MalterlibPostCopyProject "Malterlib_Cloud_Test"
 		{
-			!!MalterlibPostCopyProject ""
+			!!MalterlibPostCopyProject undefined
 		}
 		MalterlibPostCopyDestination "TestApp/"
 		{
-			!!MalterlibPostCopyDestination ""
+			!!MalterlibPostCopyDestination undefined
 		}
-		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 	}
 	Target
 	{
-		DebuggerCommandArguments "--daemon-run-debug"
+		DebuggerCommandArguments ["--daemon-run-debug"]
 		BaseFileName "TestApp"
 		Group "Apps"
 	}
@@ -60,4 +59,4 @@
 	%Dependency "Lib_Malterlib_Cloud_Test"
 }
 
-Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_Test;@(Malterlib_Cloud_App_Targets)"
+Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_Test"

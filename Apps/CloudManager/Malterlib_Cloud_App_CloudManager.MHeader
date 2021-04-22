@@ -36,20 +36,19 @@
 	{
 		ProductName "Malterlib Cloud Manager"
 		MalterlibTestApp true
-		MalterlibPostCopyProject "@(MalterlibAppTestPostCopyProject)"
+		MalterlibPostCopyProject MalterlibAppTestPostCopyProject
 		{
 			&
 			{
-				MalterlibPostCopyProject ""
-				!MalterlibAppTestPostCopyProject ""
+				MalterlibPostCopyProject undefined
+				!MalterlibAppTestPostCopyProject undefined
 			}
 		}
 		MalterlibPostCopyProject "Malterlib_Cloud_CloudManager"
 		{
-			!!MalterlibPostCopyProject ""
+			!!MalterlibPostCopyProject undefined
 		}
 		MalterlibCloud_EnableVersionUpload true
-		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudCloudManager"
@@ -59,7 +58,7 @@
 	{
 		Type "ConsoleExecutable"
 		BaseFileName "CloudManager"
-		DebuggerCommandArguments "--daemon-run-debug"
+		DebuggerCommandArguments ["--daemon-run-debug"]
 		Group "Apps"
 	}
 	%Group "Source"
@@ -69,4 +68,4 @@
 	%Dependency "Lib_Malterlib_Cloud_CloudManager"
 }
 
-Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_CloudManager;@(Malterlib_Cloud_App_Targets)"
+Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_CloudManager"

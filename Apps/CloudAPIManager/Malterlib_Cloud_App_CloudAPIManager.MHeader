@@ -52,10 +52,9 @@ Import "../../../../External/curl/Curl.MTarget"
 		MalterlibTestApp true
 		MalterlibPostCopyProject "Malterlib_Cloud_CloudAPIManager"
 		{
-			!!MalterlibPostCopyProject ""
+			!!MalterlibPostCopyProject undefined
 		}
 		MalterlibUseCurl true
-		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudCloudAPIManager"
@@ -63,7 +62,7 @@ Import "../../../../External/curl/Curl.MTarget"
 	}
 	Target
 	{
-		DebuggerCommandArguments "--daemon-run-debug"
+		DebuggerCommandArguments ["--daemon-run-debug"]
 		BaseFileName "CloudAPIManager"
 		Group "Apps"
 	}
@@ -75,4 +74,4 @@ Import "../../../../External/curl/Curl.MTarget"
 	%Dependency "Lib_Malterlib_Cloud_CloudAPIManager"
 }
 
-Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_CloudAPIManager;@(Malterlib_Cloud_App_Targets)"
+Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_CloudAPIManager"

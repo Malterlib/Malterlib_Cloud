@@ -37,18 +37,17 @@
 		MalterlibTestApp true
 		MalterlibPostCopyProject "Malterlib_Cloud_AppDistributionManager"
 		{
-			!!MalterlibPostCopyProject ""
+			!!MalterlibPostCopyProject undefined
 		}
-		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudAppDistManager"
 		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudAppDistManager"
-		MalterlibCloudVersionInfo_Backup_IncludeWildcards "Distribution/^*.json;@(MalterlibCloudVersionInfo_Backup_IncludeWildcards)"
+		MalterlibCloudVersionInfo_Backup_IncludeWildcards =+ {Pattern: "Distribution/^*.json"}
 	}
 	Target
 	{
-		DebuggerCommandArguments "--daemon-run-debug"
+		DebuggerCommandArguments ["--daemon-run-debug"]
 		BaseFileName "AppDistributionManager"
 		Group "Apps"
 	}
@@ -59,4 +58,4 @@
 	%Dependency "Lib_Malterlib_Cloud_AppDistributionManager"
 }
 
-Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_AppDistributionManager;@(Malterlib_Cloud_App_Targets)"
+Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_AppDistributionManager"

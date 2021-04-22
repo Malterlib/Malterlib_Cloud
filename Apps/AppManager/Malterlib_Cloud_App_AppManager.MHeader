@@ -37,19 +37,18 @@
 		MalterlibTestApp true
 		MalterlibPostCopyProject "Malterlib_Cloud_AppManager"
 		{
-			!!MalterlibPostCopyProject ""
+			!!MalterlibPostCopyProject undefined
 		}
-		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_Executable ""
 	}
 	Target
 	{
-		DebuggerCommandArguments "--daemon-run-debug"
+		DebuggerCommandArguments ["--daemon-run-debug"]
 		BaseFileName "AppManager"
 		Group "Apps"
-		ExtraGroups "{Malterlib}/{CloudTarBinaries};@(Target.ExtraGroups)"
+		ExtraGroups =+ "{Malterlib}/{CloudTarBinaries}"
 	}
 	%Group "Source"
 	{
@@ -59,4 +58,4 @@
 	%Dependency "Lib_Malterlib_Cloud_AppManager"
 }
 
-Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_AppManager;@(Malterlib_Cloud_App_Targets)"
+Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_AppManager"

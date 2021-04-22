@@ -31,20 +31,19 @@
 	Property
 	{
 		ProductName "Malterlib Cloud Backup Manager"
-		MalterlibPostCopyProject "@(MalterlibAppTestPostCopyProject)"
+		MalterlibPostCopyProject MalterlibAppTestPostCopyProject
 		{
 			&
 			{
-				MalterlibPostCopyProject ""
-				!MalterlibAppTestPostCopyProject ""
+				MalterlibPostCopyProject undefined
+				!MalterlibAppTestPostCopyProject undefined
 			}
 		}
 		MalterlibPostCopyProject "Malterlib_Cloud_BackupManager"
 		{
-			!!MalterlibPostCopyProject ""
+			!!MalterlibPostCopyProject undefined
 		}
 		MalterlibCloud_EnableVersionUpload true
-		MalterlibLinkWithOpenSSL true
 		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudBackupManager"
@@ -54,7 +53,7 @@
 	{
 		Type "ConsoleExecutable"
 		BaseFileName "BackupManager"
-		DebuggerCommandArguments "--daemon-run-debug"
+		DebuggerCommandArguments ["--daemon-run-debug"]
 		Group "Apps"
 	}
 	%Group "Source"
@@ -64,4 +63,4 @@
 	%Dependency "Lib_Malterlib_Cloud_BackupManager"
 }
 
-Property.Malterlib_Cloud_App_Targets "Malterlib_Cloud_BackupManager;@(Malterlib_Cloud_App_Targets)"
+Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_BackupManager"

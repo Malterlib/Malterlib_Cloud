@@ -6,13 +6,13 @@
 	Repository
 	{
 		Type "External"
-		Remotes "upstream=https://github.com/libarchive/libarchive.git;@(Repository.Remotes)"
+		Remotes =+ {Name: "upstream", URL: "https://github.com/libarchive/libarchive.git"}
 	}
 }
 
 %Import "../../../../External/libarchive/CMakeLists.txt"
 {
-	Property.MalterlibLinkWithOpenSSL true
+	Property.MalterlibLinkWithBoringSSL true
 
 	Property
 	{
@@ -22,42 +22,46 @@
 		MalterlibWindowsVersion "NTDDI_WIN7"
 	}
 
-	Import.CMake_FullRebuildVersion "@(Import.CMake_FullRebuildVersion).1"
-	Import.CMake_Variables "ENABLE_TAR=1;ENABLE_TAR_SHARED=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_CPIO=0;ENABLE_CPIO=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_CAT=0;ENABLE_CAT_SHARED=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_TEST=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_COVERAGE=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_INSTALL=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_ICONV=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_LZ4=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_ZSTD=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_OPENSSL=1;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_NETTLE=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_LIBXML2=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_LZMA=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_BZip2=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "ENABLE_EXPAT=0;@(Import.CMake_Variables)"
-	Import.CMake_Variables "OPENSSL_ROOT_DIR=@('../../../../External/boringssl'->MakeAbsolute());@(Import.CMake_Variables)"
-	Import.CMake_Variables "OPENSSL_LIBRARIES=/dev/null;@(Import.CMake_Variables)"
-	Import.CMake_Variables "OPENSSL_CRYPTO_LIBRARY=/dev/null;@(Import.CMake_Variables)"
-	Import.CMake_Variables "OPENSSL_SSL_LIBRARY=/dev/null;@(Import.CMake_Variables)"
+	Import.CMake_FullRebuildVersion `@(Import.CMake_FullRebuildVersion).1`
+	Import.CMake_Variables =+ [
+		"ENABLE_TAR=1"
+		, "ENABLE_TAR_SHARED=0"
+		, "ENABLE_CPIO=0"
+		, "ENABLE_CAT=0"
+		, "ENABLE_CAT_SHARED=0"
+		, "ENABLE_TEST=0"
+		, "ENABLE_COVERAGE=0"
+		, "ENABLE_INSTALL=0"
+		, "ENABLE_ICONV=0"
+		, "ENABLE_LZ4=0"
+		, "ENABLE_ZSTD=0"
+		, "ENABLE_OPENSSL=1"
+		, "ENABLE_NETTLE=0"
+		, "ENABLE_LIBXML2=0"
+		, "ENABLE_LZMA=0"
+		, "ENABLE_BZip2=0"
+		, "ENABLE_EXPAT=0"
+		, `OPENSSL_ROOT_DIR=@("../../../../External/boringssl"->MakeAbsolute())`
+		, "OPENSSL_LIBRARIES=/dev/null"
+		, "OPENSSL_CRYPTO_LIBRARY=/dev/null"
+		, "OPENSSL_SSL_LIBRARY=/dev/null"
+	]
 
-	Import.CMake_Variables "HAVE_LIBRICHACL=0;HAVE_ARC4RANDOM_BUF=0;HAVE__CTIME64_S=0;HAVE_READPASSPHRASE=0;HAVE__LOCALTIME64_S=0;HAVE__GMTIME64_S=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables =+ ["HAVE_LIBRICHACL=0", "HAVE_ARC4RANDOM_BUF=0", "HAVE__CTIME64_S=0", "HAVE_READPASSPHRASE=0", "HAVE__LOCALTIME64_S=0", "HAVE__GMTIME64_S=0"]
 	{
 		!!PlatformFamily "Linux"
 	}
-	Import.CMake_Variables "HAVE_LIBACL=0;HAVE_LIBRICHACL=0;HAVE_LZMA_STREAM_ENCODER_MT=0;@(Import.CMake_Variables)"
+	Import.CMake_Variables =+ "HAVE_LZMA_STREAM_ENCODER_MT=0"
 	{
 		!!PlatformFamily "OSX"
 	}
 
-	Import.CMake_Variables "CMAKE_BUILD_WITH_INSTALL_RPATH=ON;@(Import.CMake_Variables)"
+	Import.CMake_Variables =+ "CMAKE_BUILD_WITH_INSTALL_RPATH=ON"
 	{
 		&
 		{
 			PlatformFamily "Linux"
-			!HostPlatformFamily "Linux" 
+			!HostPlatformFamily "Linux"
 		}
 	}
 
@@ -71,20 +75,20 @@
 	Compile
 	{
 		!!CompileDialect "C"
-		PrefixHeader ""
-		PreprocessorDefines "ARCHIVE_CRYPTO_MD5_OPENSSL=1;HAVE_ZLIB_H=1;@(Compile.PreprocessorDefines)"
+		PrefixHeader undefined
+		PreprocessorDefines += ["ARCHIVE_CRYPTO_MD5_OPENSSL=1", "HAVE_ZLIB_H=1"]
 		Warnings "Off"
 		{
 			!!PlatformFamily "Windows"
 		}
 	}
-	
+
 	%Target "Exe_bsdtar"
 	{
 		Property.ProductName "BSD Tar"
 		Target
 		{
-			LinkWithLibraries "-lacl @(Target.LinkWithLibraries)"
+			LinkWithLibraries += "-lacl"
 			{
 				!!PlatformFamily "Linux"
 			}
