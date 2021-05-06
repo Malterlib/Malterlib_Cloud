@@ -308,8 +308,7 @@ namespace NMib::NCloud
 	void CVersionManager::CStartUploadTransfer::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		operator % (_Stream, fg_Move(m_Subscription));
-		//_Stream % fg_Move(m_Subscription);
+		_Stream % fg_Move(m_Subscription);
 	}
 	
 	template <typename tf_CStream>
