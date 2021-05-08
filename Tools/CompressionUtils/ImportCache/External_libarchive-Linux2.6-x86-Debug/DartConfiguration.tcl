@@ -62,7 +62,7 @@ UpdateOptions:
 UpdateType: git
 
 # Compiler info
-Compiler: /opt/CompiledFiles/Dependencies/llvm/11.0/build/main/bin/clang++
+Compiler: /opt/Source/llvm-malterlib/build/main/bin/clang++
 CompilerVersion: 
 
 # Dynamic analysis (MemCheck)
