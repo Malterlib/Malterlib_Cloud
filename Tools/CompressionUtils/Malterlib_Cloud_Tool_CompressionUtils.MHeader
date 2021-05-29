@@ -47,7 +47,16 @@
 		, "OPENSSL_SSL_LIBRARY=/dev/null"
 	]
 
-	Import.CMake_Variables =+ ["HAVE_LIBRICHACL=0", "HAVE_ARC4RANDOM_BUF=0", "HAVE__CTIME64_S=0", "HAVE_READPASSPHRASE=0", "HAVE__LOCALTIME64_S=0", "HAVE__GMTIME64_S=0"]
+	Import.CMake_Variables =+ [
+		"HAVE_LIBRICHACL=0"
+	   , "HAVE_ARC4RANDOM_BUF=0"
+	   , "HAVE__CTIME64_S=0"
+	   , "HAVE_READPASSPHRASE=0"
+	   , "HAVE__LOCALTIME64_S=0"
+	   , "HAVE__GMTIME64_S=0"
+	   , "HAVE_UTIMENSAT=0"
+	   , "HAVE_FUTIMENS=0"
+	]
 	{
 		!!PlatformFamily "Linux"
 	}
