@@ -11,7 +11,7 @@ BuildDirectory: .
 CostDataFile: 
 
 # Site is something like machine.domain, i.e. pragmatic.crd
-Site: erikmbp08.local
+Site: erikmacpro03.local
 
 # Build name is osname-revision-compiler, i.e. Linux-2.4.2-2smp-c++
 BuildName: Linux-clang++
@@ -26,8 +26,8 @@ SubmitURL: http://my.cdash.org/submit.php?project=libarchive
 NightlyStartTime: 01:00:00 UTC
 
 # Commands for the build/test/submit cycle
-ConfigureCommand: "../../../../../../Binaries/Malterlib/OSX/arm64/MToolCMake" "../../../../../../External/libarchive"
-MakeCommand: ../../../../../../Binaries/Malterlib/OSX/arm64/MToolCMake --build . --config "${CTEST_CONFIGURATION_TYPE}"
+ConfigureCommand: "../../../../../../Binaries/Malterlib/OSX/x64/MToolCMake" "../../../../../../External/libarchive"
+MakeCommand: ../../../../../../Binaries/Malterlib/OSX/x64/MToolCMake --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 
 # version control
@@ -39,30 +39,30 @@ CVSCommand: CVSCOMMAND-NOTFOUND
 CVSUpdateOptions: -d -A -P
 
 # Subversion options
-SVNCommand: svn
+SVNCommand: /usr/local/bin/svn
 SVNOptions: 
 SVNUpdateOptions: 
 
 # Git options
-GITCommand: git
+GITCommand: /usr/local/bin/git
 GITInitSubmodules: 
 GITUpdateOptions: 
 GITUpdateCustom: 
 
 # Perforce options
-P4Command: P4COMMAND-NOTFOUND
+P4Command: /usr/local/bin/p4
 P4Client: 
 P4Options: 
 P4UpdateOptions: 
 P4UpdateCustom: 
 
 # Generic update command
-UpdateCommand: git
+UpdateCommand: /usr/local/bin/git
 UpdateOptions: 
 UpdateType: git
 
 # Compiler info
-Compiler: /opt/Source/llvm-malterlib/build/main/bin/clang++
+Compiler: /opt/CompiledFiles/Dependencies/llvm/12.0/build/main/bin/clang++
 CompilerVersion: 
 
 # Dynamic analysis (MemCheck)
