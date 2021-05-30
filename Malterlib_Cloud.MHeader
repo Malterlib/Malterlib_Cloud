@@ -274,7 +274,7 @@ Property
 
 Property
 {
-	MalterlibCloudVersionInfoFileName define string
+	MalterlibCloudVersionInfoFileName define string?
 	MalterlibCloudVersionInfoFileName `@(GeneratedDirectory)@(Target.FileName)VersionInfo.json`
 	{
 		!!Target.Type "UIExecutable"
