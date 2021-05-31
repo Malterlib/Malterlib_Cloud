@@ -62,7 +62,7 @@ UpdateOptions:
 UpdateType: git
 
 # Compiler info
-Compiler: /opt/CompiledFiles/Dependencies/llvm/11.0/build/main/bin/clang++
+Compiler: /opt/CompiledFiles/Dependencies/llvm/12.0/build/main/bin/clang++
 CompilerVersion: 
 
 # Dynamic analysis (MemCheck)
@@ -80,7 +80,7 @@ MemoryCheckCommandOptions:
 MemoryCheckSuppressionFile: 
 
 # Coverage
-CoverageCommand: gcov
+CoverageCommand: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchaingcov
 CoverageExtraFlags: -l
 
 # Cluster commands

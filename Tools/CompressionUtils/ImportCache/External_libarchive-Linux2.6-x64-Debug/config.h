@@ -394,7 +394,7 @@ typedef uint64_t uintmax_t;
 #define HAVE_CTYPE_H 1
 
 /* Define to 1 if you have the `cygwin_conv_path' function. */
-#define HAVE_CYGWIN_CONV_PATH 1
+/* #undef HAVE_CYGWIN_CONV_PATH */
 
 /* Define to 1 if you have the declaration of `ACE_GETACL', and to 0 if you
    don't. */
@@ -598,7 +598,7 @@ typedef uint64_t uintmax_t;
 #define HAVE_FTRUNCATE 1
 
 /* Define to 1 if you have the `futimens' function. */
-/* #undef HAVE_FUTIMENS */
+#define HAVE_FUTIMENS 1
 
 /* Define to 1 if you have the `futimes' function. */
 #define HAVE_FUTIMES 1
@@ -628,7 +628,7 @@ typedef uint64_t uintmax_t;
 #define HAVE_GETPWUID_R 1
 
 /* Define to 1 if you have the `getvfsbyname' function. */
-#define HAVE_GETVFSBYNAME 1
+/* #undef HAVE_GETVFSBYNAME */
 
 /* Define to 1 if you have the `getxattr' function. */
 #define HAVE_GETXATTR 1
@@ -655,7 +655,7 @@ typedef uint64_t uintmax_t;
 #define HAVE_LANGINFO_H 1
 
 /* Define to 1 if you have the `lchflags' function. */
-#define HAVE_LCHFLAGS 1
+/* #undef HAVE_LCHFLAGS */
 
 /* Define to 1 if you have the `lchmod' function. */
 /* #undef HAVE_LCHMOD */
@@ -1134,7 +1134,7 @@ typedef uint64_t uintmax_t;
 #define HAVE_UTIME 1
 
 /* Define to 1 if you have the `utimensat' function. */
-/* #undef HAVE_UTIMENSAT */
+#define HAVE_UTIMENSAT 1
 
 /* Define to 1 if you have the `utimes' function. */
 #define HAVE_UTIMES 1
@@ -1209,10 +1209,10 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE__CTIME64_S */
 
 /* Define to 1 if you have the `_fseeki64' function. */
-#define HAVE__FSEEKI64 1
+/* #undef HAVE__FSEEKI64 */
 
 /* Define to 1 if you have the `_get_timezone' function. */
-#define HAVE__GET_TIMEZONE 1
+/* #undef HAVE__GET_TIMEZONE */
 
 /* Define to 1 if you have the `_gmtime64_s' function. */
 /* #undef HAVE__GMTIME64_S */
@@ -1221,7 +1221,7 @@ typedef uint64_t uintmax_t;
 /* #undef HAVE__LOCALTIME64_S */
 
 /* Define to 1 if you have the `_mkgmtime64' function. */
-#define HAVE__MKGMTIME64 1
+/* #undef HAVE__MKGMTIME64 */
 
 /* Define as const if the declaration of iconv() needs const. */
 #define ICONV_CONST 
