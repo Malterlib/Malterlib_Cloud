@@ -48,18 +48,15 @@
 	]
 
 	Import.CMake_Variables =+ [
-		"HAVE_LIBRICHACL=0"
-	   , "HAVE_ARC4RANDOM_BUF=0"
-	   , "HAVE__CTIME64_S=0"
-	   , "HAVE_READPASSPHRASE=0"
-	   , "HAVE__LOCALTIME64_S=0"
-	   , "HAVE__GMTIME64_S=0"
-	   , "HAVE_UTIMENSAT=0"
-	   , "HAVE_FUTIMENS=0"
+		"HAVE_ZLIB_H=1"
+		, "ARCHIVE_CRYPTO_MD5_OPENSSL=1"
+		, "ARCHIVE_CRYPTO_RMD160_OPENSSL=1"
+		, "ARCHIVE_CRYPTO_SHA1_OPENSSL=1"
+		, "ARCHIVE_CRYPTO_SHA256_OPENSSL=1"
+		, "ARCHIVE_CRYPTO_SHA384_OPENSSL=1"
+		, "ARCHIVE_CRYPTO_SHA512_OPENSSL=1"
 	]
-	{
-		!!PlatformFamily "Linux"
-	}
+
 	Import.CMake_Variables =+ "HAVE_LZMA_STREAM_ENCODER_MT=0"
 	{
 		!!PlatformFamily "OSX"
@@ -85,7 +82,6 @@
 	{
 		!!CompileDialect "C"
 		PrefixHeader undefined
-		PreprocessorDefines += ["ARCHIVE_CRYPTO_MD5_OPENSSL=1", "HAVE_ZLIB_H=1"]
 		Warnings "Off"
 		{
 			!!PlatformFamily "Windows"
