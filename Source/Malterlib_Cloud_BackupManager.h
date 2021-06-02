@@ -57,10 +57,8 @@ namespace NMib::NCloud
 
 		struct CManifestFile : public NFile::CDirectoryManifestFile
 		{
-#ifdef DCompiler_MSVC_Workaround
 			CManifestFile();
 			CManifestFile(NFile::CDirectoryManifestFile const &_ManifestFile);
-#endif
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -78,10 +76,8 @@ namespace NMib::NCloud
 
 		struct CManifestChange_Change
 		{
-#ifdef DCompiler_MSVC_Workaround
 			CManifestChange_Change();
 			CManifestChange_Change(CManifestFile const &_ManifestFile);
-#endif
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);

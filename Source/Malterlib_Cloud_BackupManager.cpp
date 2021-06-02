@@ -9,14 +9,12 @@ namespace NMib::NCloud
 {
 	DMibImpErrorClassImplement(CExceptionBackupManagerHashMismatch);
 
-#ifdef DCompiler_MSVC_Workaround
 	CBackupManagerBackup::CManifestChange_Change::CManifestChange_Change() = default;
 
 	CBackupManagerBackup::CManifestChange_Change::CManifestChange_Change(CManifestFile const &_ManifestFile)
 		: m_ManifestFile(_ManifestFile)
 	{
 	}
-#endif
 
 	CBackupManagerBackup::CManifestChange_Add::CManifestChange_Add(NFile::CDirectoryManifestFile &&_ManifestFile)
 		: CManifestChange_Change{_ManifestFile}
@@ -29,14 +27,12 @@ namespace NMib::NCloud
 	{
 	}
 
-#ifdef DCompiler_MSVC_Workaround
 	CBackupManagerBackup::CManifestFile::CManifestFile() = default;
 
 	CBackupManagerBackup::CManifestFile::CManifestFile(NFile::CDirectoryManifestFile const &_ManifestFile)
 		: NFile::CDirectoryManifestFile{_ManifestFile}
 	{
 	}
-#endif
 
 	CBackupManagerBackup::CBackupManagerBackup()
 	{
