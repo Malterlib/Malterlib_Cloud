@@ -51,6 +51,10 @@ Import.CMake_CacheReplaceContents: [
 	{
 		"Find": "/usr/local/go/bin/",
 		"Replace": ""
+	},
+	{
+		"Find": "/usr/local/bin/",
+		"Replace": ""
 	}
 ]
 
@@ -103,6 +107,13 @@ Import.CMake_Variables: [
 	OPENSSL_ROOT_DIR=/External/boringssl,
 	OPENSSL_LIBRARIES=/dev/null,
 	OPENSSL_CRYPTO_LIBRARY=/dev/null,
-	OPENSSL_SSL_LIBRARY=/dev/null
+	OPENSSL_SSL_LIBRARY=/dev/null,
+	HAVE_ZLIB_H=1,
+	ARCHIVE_CRYPTO_MD5_OPENSSL=1,
+	ARCHIVE_CRYPTO_RMD160_OPENSSL=1,
+	ARCHIVE_CRYPTO_SHA1_OPENSSL=1,
+	ARCHIVE_CRYPTO_SHA256_OPENSSL=1,
+	ARCHIVE_CRYPTO_SHA384_OPENSSL=1,
+	ARCHIVE_CRYPTO_SHA512_OPENSSL=1
 ]
 
