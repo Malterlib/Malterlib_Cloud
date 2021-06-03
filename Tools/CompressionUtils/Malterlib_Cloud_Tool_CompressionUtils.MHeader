@@ -88,7 +88,7 @@
 		}
 	}
 
-	%Target "Exe_bsdtar"
+	%Target "Com_libarchive_bsdtar"
 	{
 		Property.ProductName "BSD Tar"
 		Target

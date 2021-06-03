@@ -820,7 +820,7 @@ Property
 		{
 			Name: `Com_@(Target:Target.BaseName)_bsdtar`
 			, Properties: {
-				Dependency.Target: "Exe_bsdtar"
+				Dependency.Target: "Com_libarchive_bsdtar"
 				, Dependency.TargetProperties: {
 					MalterlibPostCopyProject: MalterlibPostCopyProject
 					, MalterlibPostCopyDestination: `@(MalterlibPostCopyDestination)@(MalterlibCloudTarBinDirectory)/`
@@ -838,7 +838,7 @@ Property
 	Property
 	{
 		MalterlibCloud_VersionUploadSources =+ {
-			Pattern: GetProperty("Property", "MalterlibFinalModuleDestination", `Group:ExternalBinaries.Group:@(Target:Target.BaseName).Target:Exe_bsdtar.Target:Exe_bsdtar`)
+			Pattern: GetProperty("Property", "MalterlibFinalModuleDestination", `Group:ExternalBinaries.Group:@(Target:Target.BaseName).Target:Com_libarchive_bsdtar.Import:*.Target:Com_libarchive_bsdtar`)
 			, Destination: MalterlibCloudTarBinDirectory
 		}
 	}
