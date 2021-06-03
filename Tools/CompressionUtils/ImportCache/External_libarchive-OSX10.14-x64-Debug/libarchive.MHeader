@@ -11,7 +11,7 @@ Property.CMakeOutputPath_libarchive define string = `@('.'->MakeAbsolute())`->Ma
 	Target.Type "Tool"
 	Target.BaseName "libarchive_Nightly"
 	Target.BaseFileName "Nightly"
-	%Group "Linux2.6"
+	%Group "OSX10.14"
 	{
 		%Group "x64"
 		{
@@ -48,7 +48,7 @@ Property.CMakeOutputPath_libarchive define string = `@('.'->MakeAbsolute())`->Ma
 	Target.Type "Tool"
 	Target.BaseName "libarchive_Continuous"
 	Target.BaseFileName "Continuous"
-	%Group "Linux2.6"
+	%Group "OSX10.14"
 	{
 		%Group "x64"
 		{
@@ -85,7 +85,7 @@ Property.CMakeOutputPath_libarchive define string = `@('.'->MakeAbsolute())`->Ma
 	Target.Type "Tool"
 	Target.BaseName "libarchive_Experimental"
 	Target.BaseFileName "Experimental"
-	%Group "Linux2.6"
+	%Group "OSX10.14"
 	{
 		%Group "x64"
 		{
@@ -117,7 +117,8 @@ Property.CMakeOutputPath_libarchive define string = `@('.'->MakeAbsolute())`->Ma
 		!!Compile.Type "C"
 		SearchPath += [
 			`@('../../../../../../External/libarchive'->MakeAbsolute())/libarchive`->MakeAbsolute(),
-			`@('.'->MakeAbsolute())`->MakeAbsolute()
+			`@('.'->MakeAbsolute())`->MakeAbsolute(),
+			`@('../../../../../..'->MakeAbsolute())/External/boringssl/include`->MakeAbsolute()
 		]
 		PreprocessorDefines += [
 			"HAVE_CONFIG_H",
@@ -747,7 +748,7 @@ Property.CMakeOutputPath_libarchive define string = `@('.'->MakeAbsolute())`->Ma
 		{
 			Compile.Type "C"
 		}
-		%File `@('../../../../../../External/libarchive'->MakeAbsolute())/libarchive/archive_disk_acl_linux.c`
+		%File `@('../../../../../../External/libarchive'->MakeAbsolute())/libarchive/archive_disk_acl_darwin.c`
 		{
 			Compile.Type "C"
 		}
@@ -764,7 +765,8 @@ Property.CMakeOutputPath_libarchive define string = `@('.'->MakeAbsolute())`->Ma
 		!!Compile.Type "C"
 		SearchPath += [
 			`@('../../../../../../External/libarchive'->MakeAbsolute())/libarchive`->MakeAbsolute(),
-			`@('.'->MakeAbsolute())`->MakeAbsolute()
+			`@('.'->MakeAbsolute())`->MakeAbsolute(),
+			`@('../../../../../..'->MakeAbsolute())/External/boringssl/include`->MakeAbsolute()
 		]
 		PreprocessorDefines += [
 			"HAVE_CONFIG_H",
@@ -1394,7 +1396,7 @@ Property.CMakeOutputPath_libarchive define string = `@('.'->MakeAbsolute())`->Ma
 		{
 			Compile.Type "C"
 		}
-		%File `@('../../../../../../External/libarchive'->MakeAbsolute())/libarchive/archive_disk_acl_linux.c`
+		%File `@('../../../../../../External/libarchive'->MakeAbsolute())/libarchive/archive_disk_acl_darwin.c`
 		{
 			Compile.Type "C"
 		}
@@ -1412,6 +1414,7 @@ Property.CMakeOutputPath_libarchive define string = `@('.'->MakeAbsolute())`->Ma
 		SearchPath += [
 			`@('../../../../../../External/libarchive'->MakeAbsolute())/libarchive`->MakeAbsolute(),
 			`@('.'->MakeAbsolute())`->MakeAbsolute(),
+			`@('../../../../../..'->MakeAbsolute())/External/boringssl/include`->MakeAbsolute(),
 			`@('../../../../../../External/libarchive'->MakeAbsolute())/libarchive_fe`->MakeAbsolute()
 		]
 		PreprocessorDefines += [

@@ -14,7 +14,7 @@ CostDataFile:
 Site: erikmacpro03.local
 
 # Build name is osname-revision-compiler, i.e. Linux-2.4.2-2smp-c++
-BuildName: Linux-clang++
+BuildName: Darwin-clang++
 
 # Subprojects
 LabelsForSubprojects: 
