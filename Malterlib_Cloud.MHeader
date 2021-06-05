@@ -490,6 +490,9 @@ Property
 	{
 		!!CompileDialect "C"
 		PrefixHeader "Test/PCH.h"->MakeAbsolute()
+		{
+			!!Compile.Type "C++"
+		}
 		PreprocessorDefines += "DMalterlibCloudCompatibilityTests=1"
 		{
 			!!MalterlibCloudCompatibilityTestsSupported true
