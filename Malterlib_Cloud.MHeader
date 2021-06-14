@@ -190,7 +190,7 @@ Property
 											`	, "Platform": "$Platform"\r\n`\
 											`	, "Configuration": "Release"\r\n`\
 											`	, "ExtraInfo": {\n`\
-											`		"GitBranch": @(MalterlibGitBranch->EJSONToString())\r\n`\
+											`		"GitBranch": @((MalterlibGitBranch || "")->EJSONToString())\r\n`\
 											`		, "GitCommit": @(MalterlibGitCommit->EJSONToString())\r\n`\
 											`		, "AppDistribution": {\r\n`\
 											`			"DeployDestinations": [$MalterlibCloudVersionInfo_AppDistribution_DeployDestinations]\r\n`\
@@ -289,7 +289,7 @@ Property
 									, Platform: MalterlibCloudPlatform
 									, Configuration: MalterlibCloudVersionInfo_Configuration
 									, ExtraInfo: {
-										GitBranch: MalterlibGitBranch
+										GitBranch: (MalterlibGitBranch || "")
 										, GitCommit: MalterlibGitCommit
 										, RunAsUserHasShell: MalterlibCloudVersionInfo_RunAsUserHasShell
 										, DistributedApp: MalterlibCloudVersionInfo_DistributedApp
