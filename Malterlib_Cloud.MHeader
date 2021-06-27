@@ -640,7 +640,7 @@ Property
 		!MalterlibCloud_CloudClientExecutable undefined
 	}
 	MalterlibCloud_VersionUploadToolName define string? = "MalterlibCloud"
-	MalterlibCloud_CloudClientCommand `MTool BuildServerTool Tool=@(MalterlibCloud_VersionUploadToolName)`
+	MalterlibCloud_CloudClientCommand `@(MalterlibBuildServerCommandPrefix)MTool BuildServerTool Tool=@(MalterlibCloud_VersionUploadToolName)`
 	{
 		&
 		{
@@ -695,9 +695,9 @@ Property
 		!!MalterlibCloud_VersionUploadToBuildServerPath undefined
 	}
 
-	MalterlibCloud_VersionUploadCloudClientCommand	`MTool BuildServerPut Recursive=0 @(`Source=@(MalterlibCloud_VersionUploadTarArchivePath)`->EscapeHost()) @(`DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)`->EscapeHost())\r\n`\
+	MalterlibCloud_VersionUploadCloudClientCommand	`@(MalterlibBuildServerCommandPrefix)MTool BuildServerPut Recursive=0 @(`Source=@(MalterlibCloud_VersionUploadTarArchivePath)`->EscapeHost()) @(`DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)`->EscapeHost())\r\n`\
 													`@(CheckErrors)\r\n`\
-													`MTool BuildServerPut Recursive=0 @(`Source=@(MalterlibCloudVersionInfoFileName)`->EscapeHost()) @(`DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)`->EscapeHost())\r\n`\
+													`@(MalterlibBuildServerCommandPrefix)MTool BuildServerPut Recursive=0 @(`Source=@(MalterlibCloudVersionInfoFileName)`->EscapeHost()) @(`DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)`->EscapeHost())\r\n`\
 													`@(CheckErrors)\r\n`
 	{
 		&
