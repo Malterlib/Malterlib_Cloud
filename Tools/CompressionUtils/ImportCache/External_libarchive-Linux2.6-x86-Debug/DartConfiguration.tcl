@@ -11,7 +11,7 @@ BuildDirectory: .
 CostDataFile: 
 
 # Site is something like machine.domain, i.e. pragmatic.crd
-Site: erikmbp08.local
+Site: erikmacpro03.local
 
 # Build name is osname-revision-compiler, i.e. Linux-2.4.2-2smp-c++
 BuildName: Linux-clang++
@@ -26,8 +26,8 @@ SubmitURL: http://my.cdash.org/submit.php?project=libarchive
 NightlyStartTime: 01:00:00 UTC
 
 # Commands for the build/test/submit cycle
-ConfigureCommand: "../../../../../../Binaries/Malterlib/OSX/arm64/MToolCMake" "../../../../../../External/libarchive"
-MakeCommand: ../../../../../../Binaries/Malterlib/OSX/arm64/MToolCMake --build . --config "${CTEST_CONFIGURATION_TYPE}"
+ConfigureCommand: "../../../../../../Binaries/Malterlib/OSX/x64/MToolCMake" "../../../../../../External/libarchive"
+MakeCommand: ../../../../../../Binaries/Malterlib/OSX/x64/MToolCMake --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 
 # version control
@@ -35,11 +35,11 @@ UpdateVersionOnly:
 
 # CVS options
 # Default is "-d -P -A"
-CVSCommand: CVSCOMMAND-NOTFOUND
-CVSUpdateOptions: -d -A -P
+CVSCommand: 
+CVSUpdateOptions: 
 
 # Subversion options
-SVNCommand: svn
+SVNCommand: 
 SVNOptions: 
 SVNUpdateOptions: 
 
@@ -50,7 +50,7 @@ GITUpdateOptions:
 GITUpdateCustom: 
 
 # Perforce options
-P4Command: P4COMMAND-NOTFOUND
+P4Command: 
 P4Client: 
 P4Options: 
 P4UpdateOptions: 
@@ -80,12 +80,8 @@ MemoryCheckCommandOptions:
 MemoryCheckSuppressionFile: 
 
 # Coverage
-CoverageCommand: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchaingcov
+CoverageCommand: gcov
 CoverageExtraFlags: -l
-
-# Cluster commands
-SlurmBatchCommand: SLURM_SBATCH_COMMAND-NOTFOUND
-SlurmRunCommand: SLURM_SRUN_COMMAND-NOTFOUND
 
 # Testing options
 # TimeOut is the amount of time in seconds to wait for processes
