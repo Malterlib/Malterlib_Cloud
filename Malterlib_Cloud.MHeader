@@ -153,8 +153,7 @@ Property
 	MalterlibCloudVersionInfo_DistributedApp define bool = true
 	MalterlibCloudVersionInfo_RunAsUserHasShell define bool = false
 	MalterlibCloudVersionInfo_LowPortExecutables define [string]?
-	MalterlibCloudVersionInfo_UpdateScriptEnvironment define {...: string} = {}
-
+	MalterlibCloudVersionInfo_UpdateScriptEnvironment define [string] = []
 
 	SharedBuildSettingsScriptContents =+	`\r\n`\
 											`@(ScriptExport("MalterlibCloudVersionInfo_Version", MalterlibCloudVersionInfo_Version))\r\n`\
@@ -274,6 +273,14 @@ Property
 
 Property
 {
+	MalterlibCloudVersionInfo_UpdateScriptEnvironment_ExpectedType define string
+
+	MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents function(string _EnvVar) {...: string} = {}
+	MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents =+ { `@(_EnvVar)`: GetWithType("Property", _EnvVar, "MalterlibCloudVersionInfo_UpdateScriptEnvironment_ExpectedType") }
+}
+
+Property
+{
 	MalterlibCloudVersionInfoFileName define string?
 	MalterlibCloudVersionInfoFileName `@(GeneratedDirectory)@(Target.FileName)VersionInfo.json`
 	{
@@ -295,7 +302,7 @@ Property
 										, DistributedApp: MalterlibCloudVersionInfo_DistributedApp
 										, AppDistribution: {}
 										, Backup: {}
-										, UpdateScriptEnvironment: MalterlibCloudVersionInfo_UpdateScriptEnvironment
+										, UpdateScriptEnvironment: MalterlibCloudVersionInfo_UpdateScriptEnvironment->ForEach("MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents")
 									}
 								}
 
