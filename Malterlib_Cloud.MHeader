@@ -171,7 +171,7 @@ Property
 											`	shift\r\n`\
 											`	UploadHosts=$(echo $MalterlibCloud_VersionUploadHosts | tr ";" "\\n")\r\n`\
 											`	for Host in $UploadHosts; do\r\n`\
-											`		@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --host $Host --settings-file "$SettingsFile" --tags @(MalterlibCloud_VersionUploadTags->EJSONToString("")->EscapeHost())@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified) "$FileName" "$@@"\r\n`\
+											`		@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --host $Host --settings-file "$SettingsFile" --tags @(MalterlibCloud_VersionUploadTags->EJSONToString("")->EscapeBash())@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified) "$FileName" "$@@"\r\n`\
 											`	done\r\n`\
 											`}\r\n`\
 											`\r\n`\
