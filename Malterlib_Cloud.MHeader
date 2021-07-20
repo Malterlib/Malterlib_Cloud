@@ -664,8 +664,8 @@ Property
 	MalterlibCloud_VersionUploadDestinationDir define string = ""
 
 	MalterlibCloud_VersionUploadCopyTempTemplate function(type(CFileCopyOptionsDetailed) _CopyOptions) string = ""
-	MalterlibCloud_VersionUploadCopyTempTemplate `MTool DiffCopy @(_CopyOptions<Pattern>->EscapeHost()) @(MalterlibCloud_VersionUploadTempPath->AppendPath(MalterlibCloud_VersionUploadDestinationDir, _CopyOptions<Destination>)->EscapeHost()) "" @(_CopyOptions<Recursive> ? "1" : "0") 0 @(_CopyOptions<FindDirectory> ? "1" : "0") @(_CopyOptions<AbsoluteDestination> ? "1" : "0")\r\n`\
-												 `@(CheckErrors)\r\n`
+	MalterlibCloud_VersionUploadCopyTempTemplate =+	`MTool DiffCopy @(_CopyOptions<Pattern>->EscapeHost()) @(MalterlibCloud_VersionUploadTempPath->AppendPath(MalterlibCloud_VersionUploadDestinationDir, _CopyOptions<Destination>)->EscapeHost()) "" @(_CopyOptions<Recursive> ? "1" : "0") 0 @(_CopyOptions<FindDirectory> ? "1" : "0") @(_CopyOptions<AbsoluteDestination> ? "1" : "0")\r\n`\
+													`@(CheckErrors)\r\n`
 
 	MalterlibCloud_VersionUploadCopyTempContents define string
 	MalterlibCloud_VersionUploadCopyTempContents =+ fg_ExpandCopyOptions(MalterlibCloud_VersionUploadSources)->ForEach("MalterlibCloud_VersionUploadCopyTempTemplate")
