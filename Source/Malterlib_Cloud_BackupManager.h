@@ -17,7 +17,7 @@ namespace NMib::NCloud
 	enum
 	{
 		EBackupManagerMinProtocolVersion = 0x101
-		, EBackupManagerProtocolVersion = 0x104
+		, EBackupManagerProtocolVersion = 0x105
 	};
 
 	DMibImpErrorClassDefine(CExceptionBackupManagerHashMismatch, NException::CException);
@@ -276,6 +276,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 			
 			CBackupKey m_BackupKey;
+			uint32 m_Version = 0;
 		};
 		
 		struct CUploadData

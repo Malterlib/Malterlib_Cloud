@@ -474,6 +474,9 @@ namespace NMib::NCloud
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % m_BackupKey;
+		
+		if (_Stream.f_GetVersion() >= 0x105)
+			_Stream % m_Version;
 	}
 	DMibDistributedStreamImplement(CBackupManager::CStartBackup);
 
