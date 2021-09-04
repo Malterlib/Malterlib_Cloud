@@ -435,11 +435,6 @@ namespace NMib::NCloud
 			o_Str += NStr::CStr::CFormat("{}") << m_ID;
 	}
 
-	bool CBackupManager::CBackupID::operator < (CBackupID const &_Right) const
-	{
-		return NStorage::fg_TupleReferences(m_Time, m_ID) < NStorage::fg_TupleReferences(_Right.m_Time, _Right.m_ID);
-	}
-
 	template <typename tf_CStream>
 	void CBackupManager::CBackupID::f_Stream(tf_CStream &_Stream)
 	{

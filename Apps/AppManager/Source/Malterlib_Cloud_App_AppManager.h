@@ -456,20 +456,7 @@ namespace NMib::NCloud::NAppManager
 			{
 			}
 
-			auto f_Tuple() const
-			{
-				return fg_TupleReferences(m_Group, m_VersionManagerApplication);
-			}
-
-			bool operator < (CRemoteApplicationKey const &_Right) const
-			{
-				return f_Tuple() < _Right.f_Tuple();
-			}
-
-			bool operator == (CRemoteApplicationKey const &_Right) const
-			{
-				return f_Tuple() == _Right.f_Tuple();
-			}
+			auto operator <=> (CRemoteApplicationKey const &_Right) const = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const
@@ -502,20 +489,7 @@ namespace NMib::NCloud::NAppManager
 				return *this;
 			}
 
-			auto f_Tuple() const
-			{
-				return fg_TupleReferences(m_Group, m_VersionManagerApplication, m_UpdateType);
-			}
-
-			bool operator < (CRemoteApplicationWithTypeKey const &_Right) const
-			{
-				return f_Tuple() < _Right.f_Tuple();
-			}
-
-			bool operator == (CRemoteApplicationWithTypeKey const &_Right) const
-			{
-				return f_Tuple() == _Right.f_Tuple();
-			}
+			auto operator <=> (CRemoteApplicationWithTypeKey const &_Right) const = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const

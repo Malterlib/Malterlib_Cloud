@@ -10,19 +10,18 @@ namespace NMib::NCloud
 {
 	struct CCloudVersion
 	{
-		NStr::CStr m_Branch;
-		uint32 m_Major = 0;
-		uint32 m_Minor = 0;
-		uint32 m_Revision = 0;
-
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
 		template <typename tf_CStr>
 		void f_Format(tf_CStr &o_String) const;
 
-		bool operator == (CCloudVersion const &_Right) const;
-		bool operator < (CCloudVersion const &_Right) const;
+		auto operator <=> (CCloudVersion const &_Right) const = default;
+
+		NStr::CStr m_Branch;
+		uint32 m_Major = 0;
+		uint32 m_Minor = 0;
+		uint32 m_Revision = 0;
 	};
 	
 	struct CCloudVersionInfo

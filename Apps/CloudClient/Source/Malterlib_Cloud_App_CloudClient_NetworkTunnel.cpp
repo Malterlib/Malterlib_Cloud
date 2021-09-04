@@ -155,10 +155,7 @@ namespace NMib::NCloud::NCloudClient
 		CStr m_HostID;
 		CStr m_TunnelName;
 
-		bool operator < (CTunnelKey const &_Right) const
-		{
-			return fg_TupleReferences(m_HostID, m_TunnelName) < fg_TupleReferences(_Right.m_HostID, _Right.m_TunnelName);
-		}
+		auto operator <=> (CTunnelKey const &_Right) const = default;
 	};
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)

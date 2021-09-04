@@ -19,18 +19,8 @@ namespace NMib::NCloud
 
 	CCloudManager::~CCloudManager() = default;
 
-	bool CCloudManager::CAppManagerInfo::operator == (CAppManagerInfo const &_Right) const
-	{
-		return f_Tuple() == _Right.f_Tuple();
-	}
-
 	bool CCloudManager::CAppManagerDynamicInfo::f_HasErrors() const
 	{
 		return !m_bActive || !m_OtherErrors.f_IsEmpty();
-	}
-
-	bool CCloudManager::CApplicationKey::operator < (CApplicationKey const &_Right) const
-	{
-		return f_Tuple() < _Right.f_Tuple();
 	}
 }

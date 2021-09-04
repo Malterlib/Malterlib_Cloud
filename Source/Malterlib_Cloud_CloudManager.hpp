@@ -22,11 +22,6 @@ namespace NMib::NCloud
 			_Stream % m_VersionDate;
 	}
 
-	inline auto CCloudManager::CAppManagerInfo::f_Tuple() const
-	{
-		return NStorage::fg_TupleReferences(m_Environment, m_HostName, m_ProgramDirectory, m_VersionDate, m_Version, m_Platform, m_PlatformFamily);
-	}
-
 	template <typename tf_CStream>
 	void CCloudManager::CAppManagerDynamicInfo::f_Stream(tf_CStream &_Stream)
 	{
@@ -45,11 +40,6 @@ namespace NMib::NCloud
 	{
 		_Stream % m_AppManagerID;
 		_Stream % m_Name;
-	}
-
-	inline auto CCloudManager::CApplicationKey::f_Tuple() const
-	{
-		return NStorage::fg_TupleReferences(m_AppManagerID, m_Name);
 	}
 
 	template <typename tf_CStream>

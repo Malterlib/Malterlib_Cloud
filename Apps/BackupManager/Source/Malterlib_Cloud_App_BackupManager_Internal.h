@@ -30,10 +30,7 @@ namespace NMib::NCloud::NBackupManager
 
 			CStr f_GetDesc() const;
 
-			bool operator < (CBackupKey const &_Right) const
-			{
-				return fg_TupleReferences(m_BackupName, m_BackupTime, m_BackupID) < fg_TupleReferences(_Right.m_BackupName, _Right.m_BackupTime, _Right.m_BackupID);
-			}
+			auto operator <=> (CBackupKey const &_Right) const = default;
 		};
 
 		struct CTransferStats

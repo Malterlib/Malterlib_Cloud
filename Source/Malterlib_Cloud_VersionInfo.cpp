@@ -10,20 +10,6 @@ namespace NMib::NCloud
 {
 	constinit NStorage::TCAggregate<CCloudVersionInfo> g_CloudVersion = {DAggregateInit};
 
-	bool CCloudVersion::operator == (CCloudVersion const &_Right) const
-	{
-		return NStorage::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 
-			== NStorage::fg_TupleReferences(_Right.m_Branch, _Right.m_Major, _Right.m_Minor, _Right.m_Revision)
-		;
-	}
-	
-	bool CCloudVersion::operator < (CCloudVersion const &_Right) const
-	{
-		return NStorage::fg_TupleReferences(m_Branch, m_Major, m_Minor, m_Revision) 
-			< NStorage::fg_TupleReferences(_Right.m_Branch, _Right.m_Major, _Right.m_Minor, _Right.m_Revision)
-		;
-	}
-	
 	CCloudVersionInfo fg_ParseVersionInfo(NStr::CStr const &_String)
 	{
 		auto const JSON = NEncoding::CEJSON::fs_FromString(_String);

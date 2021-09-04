@@ -213,8 +213,9 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 			void f_Format(NStr::CStrAggregate &o_Str) const;
-			bool operator < (CBackupID const &_Right) const;
-			
+
+			auto operator <=> (CBackupID const &_Right) const = default;
+
 			NTime::CTime m_Time;
 			NStr::CStr m_ID;
 		};

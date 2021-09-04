@@ -62,15 +62,7 @@ public:
 
 			struct CApplicationKey
 			{
-				auto f_Tuple() const
-				{
-					return fg_TupleReferences(m_AppName, m_iAppManager);
-				}
-
-				bool operator < (CApplicationKey const &_Right) const
-				{
-					return f_Tuple() < _Right.f_Tuple();
-				}
+				auto operator <=> (CApplicationKey const &_Right) const = default;
 
 				CStr m_AppName;
 				mint m_iAppManager;

@@ -437,9 +437,9 @@ namespace NMib::NCloud::NCloudClient
 
 		struct CRow
 		{
-			bool operator < (CRow const &_Right) const
+			auto operator <=> (CRow const &_Right) const
 			{
-				return m_VersionInformation.m_Time < _Right.m_VersionInformation.m_Time;
+				return m_VersionInformation.m_Time <=> _Right.m_VersionInformation.m_Time;
 			}
 
 			CHostInfo m_HostInfo;
@@ -450,15 +450,7 @@ namespace NMib::NCloud::NCloudClient
 
 		struct CUniqueVersionKey
 		{
-			auto f_Tuple() const
-			{
-				return fg_TupleReferences(m_Application, m_VersionID);
-			}
-
-			bool operator < (CUniqueVersionKey const &_Right) const
-			{
-				return f_Tuple() < _Right.f_Tuple();
-			}
+			auto operator <=> (CUniqueVersionKey const &_Right) const = default;
 
 			CStr m_Application;
 			CVersionManager::CVersionID m_VersionID;
@@ -466,9 +458,9 @@ namespace NMib::NCloud::NCloudClient
 
 		struct CVersionPlatforms
 		{
-			bool operator < (CVersionPlatforms const &_Right) const
+			auto operator <=> (CVersionPlatforms const &_Right) const
 			{
-				return m_EndTime < _Right.m_EndTime;
+				return m_EndTime <=> _Right.m_EndTime;
 			}
 
 			TCVector<CRow> m_Rows;

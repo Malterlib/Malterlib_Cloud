@@ -42,8 +42,7 @@ namespace NMib::NCloud
 			NStr::CStr f_EncodeFileName() const;
 			static NStr::CStr fs_DecodeFileName(NStr::CStr const &_FileName);
 			
-			bool operator == (CVersionID const &_Right) const;
-			bool operator < (CVersionID const &_Right) const;
+			auto operator <=> (CVersionID const &_Right) const = default;
 			
 			NEncoding::CEJSON f_ToJSON() const;
 			static CVersionID fs_FromJSON(NEncoding::CEJSON const &_JSON);
@@ -61,8 +60,7 @@ namespace NMib::NCloud
 
 			NStr::CStr f_EncodeFileName() const;
 
-			bool operator == (CVersionIDAndPlatform const &_Right) const;
-			bool operator < (CVersionIDAndPlatform const &_Right) const;
+			auto operator <=> (CVersionIDAndPlatform const &_Right) const = default;
 			
 			NEncoding::CEJSON f_ToJSON() const;
 			static CVersionIDAndPlatform fs_FromJSON(NEncoding::CEJSON const &_JSON);
@@ -79,7 +77,7 @@ namespace NMib::NCloud
 			NEncoding::CEJSON f_ToJSON() const;
 			static CVersionInformation fs_FromJSON(NEncoding::CEJSON const &_JSON);
 
-			bool operator == (CVersionInformation const &_Right) const;
+			auto operator <=> (CVersionInformation const &_Right) const = default;
 
 			NTime::CTime m_Time;
 			NStr::CStr m_Configuration;

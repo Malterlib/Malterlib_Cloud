@@ -174,17 +174,7 @@ namespace NMib::NCloud
 		Ret.m_Revision = _JSON["Revision"].f_Integer();
 		return Ret;
 	}
-	
-	bool CVersionManager::CVersionID::operator == (CVersionID const &_Right) const
-	{
-		return static_cast<CCloudVersion const &>(*this) == static_cast<CCloudVersion const &>(_Right); 
-	}
-	
-	bool CVersionManager::CVersionID::operator < (CVersionID const &_Right) const
-	{
-		return static_cast<CCloudVersion const &>(*this) < static_cast<CCloudVersion const &>(_Right); 
-	}
-	
+
 	// CVersionIDAndPlatform
 
 	CStr CVersionManager::CVersionIDAndPlatform::f_EncodeFileName() const
@@ -213,28 +203,7 @@ namespace NMib::NCloud
 		return Ret;
 	}
 	
-	bool CVersionManager::CVersionIDAndPlatform::operator == (CVersionIDAndPlatform const &_Right) const
-	{
-		return NStorage::fg_TupleReferences(m_VersionID, m_Platform) 
-			== NStorage::fg_TupleReferences(_Right.m_VersionID, _Right.m_Platform)
-		;
-	}
-	
-	bool CVersionManager::CVersionIDAndPlatform::operator < (CVersionIDAndPlatform const &_Right) const
-	{
-		return NStorage::fg_TupleReferences(m_VersionID, m_Platform) 
-			< NStorage::fg_TupleReferences(_Right.m_VersionID, _Right.m_Platform)
-		;
-	}
-	
 	// CVersionInformation
-
-	bool CVersionManager::CVersionInformation::operator == (CVersionInformation const &_Right) const
-	{
-		return NStorage::fg_TupleReferences(m_Time, m_Configuration, m_Tags, m_ExtraInfo, m_RetrySequence, m_nFiles, m_nBytes)
-			== NStorage::fg_TupleReferences(_Right.m_Time, _Right.m_Configuration, _Right.m_Tags, _Right.m_ExtraInfo, _Right.m_RetrySequence, _Right.m_nFiles, _Right.m_nBytes)
-		;
-	}
 
 	NEncoding::CEJSON CVersionManager::CVersionInformation::f_ToJSON() const
 	{

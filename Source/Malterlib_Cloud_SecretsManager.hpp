@@ -7,15 +7,6 @@
 
 namespace NMib::NCloud
 {
-	inline bool CSecretsManager::CSecretID::operator < (CSecretID const &_Right) const
-	{
-		return NStorage::fg_TupleReferences(m_Folder, m_Name) < NStorage::fg_TupleReferences(_Right.m_Folder, _Right.m_Name);
-	}
-	inline bool CSecretsManager::CSecretID::operator == (CSecretID const &_Right) const
-	{
-		return NStorage::fg_TupleReferences(m_Folder, m_Name) == NStorage::fg_TupleReferences(_Right.m_Folder, _Right.m_Name);
-	}
-
 	template <typename tf_CStream>
 	void CSecretsManager::CSecretID::f_Stream(tf_CStream &_Stream)
 	{

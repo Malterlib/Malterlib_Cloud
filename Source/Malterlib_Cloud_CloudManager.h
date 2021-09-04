@@ -40,8 +40,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			auto f_Tuple() const;
-			bool operator == (CAppManagerInfo const &_Right) const;
+			auto operator <=> (CAppManagerInfo const &_Right) const = default;
 
 			NStr::CStr m_Environment;
 			NStr::CStr m_HostName;
@@ -72,8 +71,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			auto f_Tuple() const;
-			bool operator < (CApplicationKey const &_Right) const;
+			auto operator <=> (CApplicationKey const &_Right) const = default;
 
 			NStr::CStr m_AppManagerID;
 			NStr::CStr m_Name;
