@@ -95,6 +95,8 @@ Type
 
 Property
 {
+	TarCompressionOptions define string = "-z"
+
 	MalterlibCloudTargetInDependencies define bool = fg_IsTargetInDependencies("Lib_Malterlib_Cloud")
 
 	MalterlibCloudTargetLibrary define bool = false
@@ -111,6 +113,8 @@ Property
 			}
 		}
 	}
+
+	MalterlibCloudVersionInfo_PackageExtension define string = ".tar.gz"
 
 	MalterlibCloudVersionInfo_Branch define string = MalterlibFullBranch
 	MalterlibCloudVersionInfo_BranchForVersion define string = MalterlibCloudVersionInfo_Branch->Replace(' ', '')->Replace('(', '-')->Replace(')', '')
@@ -776,7 +780,7 @@ Property
 										`@(MalterlibCloud_VersionUploadCopyTempContents)\r\n`\
 										`pushd @(MalterlibCloud_VersionUploadTempPath->EscapeHost()) > /dev/null\r\n`\
 										`@(CheckErrors)\r\n`\
-										`bsdtar @(TarOptions) -czf @(MalterlibCloud_VersionUploadTarArchivePathTar->EscapeHost()) .\r\n`\
+										`bsdtar @(TarOptions) -c @(TarCompressionOptions) -f @(MalterlibCloud_VersionUploadTarArchivePathTar->EscapeHost()) .\r\n`\
 										`@(CheckErrors)\r\n`\
 										`popd > /dev/null\r\n`\
 										`@(CheckErrors)\r\n`\
@@ -794,7 +798,7 @@ Property
 										`@(MalterlibCloud_VersionUploadCopyTempContents)\r\n`\
 										`pushd @(MalterlibCloud_VersionUploadTempPath->EscapeHost())\r\n`\
 										`@(CheckErrors)\r\n`\
-										`bsdtar @(TarOptions) -czf @(MalterlibCloud_VersionUploadTarArchivePathTar->EscapeHost()) .\r\n`\
+										`bsdtar @(TarOptions) -c @(TarCompressionOptions) -f @(MalterlibCloud_VersionUploadTarArchivePathTar->EscapeHost()) .\r\n`\
 										`@(CheckErrors)\r\n`\
 										`popd\r\n`\
 										`@(CheckErrors)\r\n`\
