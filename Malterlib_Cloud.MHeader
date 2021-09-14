@@ -772,7 +772,7 @@ Property
 
 	MalterlibBuildServerPutDisabled define bool = MalterilbCloud_DoVersionManagerUpload
 
-	MalterlibCloud_VersionUploadTarArchivePath define string = `@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application)@(MalterlibCloudVersionInfo_PackageSuffix).tar.gz`
+	MalterlibCloud_VersionUploadTarArchivePath define string = `@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application)@(MalterlibCloudVersionInfo_PackageSuffix)@(MalterlibCloudVersionInfo_PackageExtension)`
 	MalterlibCloud_VersionUploadTarArchivePathTar define string = MalterlibCloud_VersionUploadTarArchivePath
 
 	MalterlibPostBuildScript_Last =+	`[ -e @(MalterlibCloud_VersionUploadTempPath->EscapeHost()) ] && rm -rf @(MalterlibCloud_VersionUploadTempPath->EscapeHost())\r\n`\
