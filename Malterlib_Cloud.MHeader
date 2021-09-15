@@ -793,12 +793,14 @@ Property
 		}
 	}
 
-	MalterlibPostBuildScript_Last =+	`IF EXIST @(MalterlibCloud_VersionUploadTempPath->EscapeHost()) rmdir /s /q @(MalterlibCloud_VersionUploadTempPath->EscapeHost())\r\n`\
-										`mkdir @(MalterlibCloud_VersionUploadTempPath->EscapeHost())\r\n`\
-										`@(MalterlibCloud_VersionUploadCopyTempContents)\r\n`\
-										`pushd @(MalterlibCloud_VersionUploadTempPath->EscapeHost())\r\n`\
+	MalterlibPostBuildScript_Last =+	`IF EXIST @(MalterlibCloud_VersionUploadTempPath->NativePath()->EscapeHost()) rmdir /s /q @(MalterlibCloud_VersionUploadTempPath->NativePath()->EscapeHost())\r\n`\
 										`@(CheckErrors)\r\n`\
-										`bsdtar @(TarOptions) -c @(TarCompressionOptions) -f @(MalterlibCloud_VersionUploadTarArchivePathTar->EscapeHost()) .\r\n`\
+										`mkdir @(MalterlibCloud_VersionUploadTempPath->NativePath()->EscapeHost())\r\n`\
+										`@(CheckErrors)\r\n`\
+										`@(MalterlibCloud_VersionUploadCopyTempContents)\r\n`\
+										`pushd @(MalterlibCloud_VersionUploadTempPath->NativePath()->EscapeHost())\r\n`\
+										`@(CheckErrors)\r\n`\
+										`bsdtar @(TarOptions) -c @(TarCompressionOptions) -f @(MalterlibCloud_VersionUploadTarArchivePathTar->NativePath()->EscapeHost()) *\r\n`\
 										`@(CheckErrors)\r\n`\
 										`popd\r\n`\
 										`@(CheckErrors)\r\n`\
