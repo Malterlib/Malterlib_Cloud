@@ -821,7 +821,7 @@ Property
 		MalterlibCloudTarBinDirectory define string = "bin"
 		BsdTarGenerateScheme define {...: any} = {}
 		BsdTarGenerateScheme =+ {
-			Target.GenerateScheme: false
+			"Target.GenerateScheme": false
 		}
 		{
 			!!GeneratorFamily "Xcode"
