@@ -128,7 +128,7 @@ Property
 			!MalterlibCloud_VersionUploadVersion undefined
 		}
 	}
-	MalterlibCloudVersionInfo_Version `@(MalterlibCloudVersionInfo_BranchForVersion)/@(ProductVersionMajor->Format("{}")).@(ProductVersionMinor->Format("{}")).@(ProductVersionRevision->Format("{}"))`
+	MalterlibCloudVersionInfo_Version Format("{}/{}.{}.{}", MalterlibCloudVersionInfo_BranchForVersion, ProductVersionMajor->AsInteger(), ProductVersionMinor->AsInteger(), ProductVersionRevision->AsInteger())
 	{
 		!!MalterlibCloudVersionInfo_Version undefined
 	}
