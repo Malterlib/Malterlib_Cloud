@@ -552,6 +552,7 @@ namespace NMib::NCloud::NAppManager
 			LaunchParams.m_bCreateNewProcessGroup = true;
 			LaunchParams.m_bShowLaunched = false;
 
+			Application.m_LaunchID = fg_RandomID();
 			Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
 				(
 					mp_State.m_LocalAddress
@@ -606,6 +607,7 @@ namespace NMib::NCloud::NAppManager
 						co_return {};
 					}
 					, Application.m_Name
+					, Application.m_LaunchID
 					, false
 				)
 			;

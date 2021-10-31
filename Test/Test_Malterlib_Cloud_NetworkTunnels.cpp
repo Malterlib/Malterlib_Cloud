@@ -7,7 +7,7 @@
 #include <Mib/Cloud/NetworkTunnelsClient>
 #include <Mib/Concurrency/DistributedActorTestHelpers>
 #include <Mib/Concurrency/DistributedTrustTestHelpers>
-#include <Mib/Concurrency/DistributedAppTestHelpers>
+#include <Mib/Concurrency/DistributedAppLaunchHelper>
 #include <Mib/Encoding/JSONShortcuts>
 
 using namespace NMib;

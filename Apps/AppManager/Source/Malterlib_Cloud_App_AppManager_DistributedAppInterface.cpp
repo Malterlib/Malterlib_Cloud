@@ -4,6 +4,7 @@
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -14,6 +15,18 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto &Application = *pApplication;
 			if (Application.m_AssociatedHostID == _HostID)
+				return pApplication;
+		}
+
+		return nullptr;
+	}
+
+	auto CAppManagerActor::fp_ApplicationFromLaunchID(CStr const &_LaunchID) -> TCSharedPointer<CApplication>
+	{
+		for (auto &pApplication : mp_Applications)
+		{
+			auto &Application = *pApplication;
+			if (Application.m_LaunchID == _LaunchID)
 				return pApplication;
 		}
 
@@ -34,7 +47,16 @@ namespace NMib::NCloud::NAppManager
 
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
 
-		auto pApplication = pThis->fp_ApplicationFromHostID(CallingHostInfo.f_GetRealHostID());
+		auto HostID = CallingHostInfo.f_GetRealHostID();
+
+		TCSharedPointer<CApplication> pApplication;
+
+		if (_RegisterInfo.m_LaunchID)
+			pApplication = pThis->fp_ApplicationFromLaunchID(*_RegisterInfo.m_LaunchID);
+
+		if (!pApplication)
+			pApplication = pThis->fp_ApplicationFromHostID(HostID);
+
 		if (!pApplication)
 		{
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application registered: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
@@ -45,15 +67,26 @@ namespace NMib::NCloud::NAppManager
 
 		Application.m_AppInterface = fg_Move(_ClientInterface);
 
-		if (Application.m_RegisterInfo != _RegisterInfo)
+		bool bApplicationJSONChanged = false;
+
+		if (Application.m_AssociatedHostID != HostID)
+		{
+			Application.m_AssociatedHostID = HostID;
+			bApplicationJSONChanged = true;
+		}
+
+		if (!Application.m_RegisterInfo.f_IsSameIgnoringLaunchID(_RegisterInfo))
 		{
 			bool bUpdateTypeChanged = _RegisterInfo.m_UpdateType != Application.m_RegisterInfo.m_UpdateType;
 			Application.m_RegisterInfo = _RegisterInfo;
 			if (bUpdateTypeChanged)
 				pThis->fp_OnAppUpdateInfoChange(pApplication);
-			pThis->fp_UpdateApplicationJSON(pApplication) > fg_DiscardResult();
+			bApplicationJSONChanged = true;
 			pThis->fp_UpdateLimits();
 		}
+
+		if (bApplicationJSONChanged)
+			pThis->fp_UpdateApplicationJSON(pApplication) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to update application JSON");
 
 		DMibLogWithCategory
 			(

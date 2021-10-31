@@ -11,7 +11,7 @@
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/DistributedAppInterface>
 #include <Mib/Concurrency/DistributedActorTrustManagerProxy>
-#include <Mib/Concurrency/DistributedAppTestHelpers>
+#include <Mib/Concurrency/DistributedAppLaunchHelper>
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Cloud/VersionManager>

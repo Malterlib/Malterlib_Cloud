@@ -10,7 +10,7 @@
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/DistributedAppInterface>
 #include <Mib/Concurrency/DistributedActorTrustManagerProxy>
-#include <Mib/Concurrency/DistributedAppTestHelpers>
+#include <Mib/Concurrency/DistributedAppLaunchHelper>
 #include <Mib/Concurrency/DistributedActorTestHelpers>
 #include <Mib/Cloud/KeyManager>
 #include <Mib/Cloud/KeyManagerServer>

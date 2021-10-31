@@ -12,7 +12,7 @@
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/DistributedAppInterface>
 #include <Mib/Concurrency/DistributedActorTrustManagerProxy>
-#include <Mib/Concurrency/DistributedAppTestHelpers>
+#include <Mib/Concurrency/DistributedAppLaunchHelper>
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cryptography/RandomID>

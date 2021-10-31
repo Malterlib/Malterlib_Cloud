@@ -184,6 +184,7 @@ namespace NMib::NCloud::NAppManager
 			CApplicationSettings m_Settings;
 
 			CStr m_AssociatedHostID;
+			CStr m_LaunchID;
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AppInterface;
 			mint m_AppInterfaceAssignSequence = 0;
 			CDistributedAppInterfaceServer::CRegisterInfo m_RegisterInfo;
@@ -924,6 +925,7 @@ namespace NMib::NCloud::NAppManager
 		void fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> const &_CloudManager);
 
 		TCSharedPointer<CApplication> fp_ApplicationFromHostID(CStr const &_HostID);
+		TCSharedPointer<CApplication> fp_ApplicationFromLaunchID(CStr const &_LaunchID);
 
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
