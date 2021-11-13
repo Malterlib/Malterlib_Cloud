@@ -1,0 +1,1388 @@
+Property.CMakeOutputPath_libarchive define string = "."->MakeAbsolute()
+%Target "Lib_archive_static"
+{
+	Compile
+	{
+		!!Compile.Type "C"
+		SearchPath += [
+			"../../../../../../External/libarchive/libarchive"->MakeAbsolute(),
+			"."->MakeAbsolute(),
+			"../../../../../../External/boringssl/include"->MakeAbsolute()
+		]
+		PreprocessorDefines += [
+			"HAVE_CONFIG_H",
+			"LIBARCHIVE_STATIC"
+		]
+	}
+	Property.MalterlibTargetNameType "Normal"
+	Target.Group "External/libarchive"
+	{
+		!!Target.Group undefined
+	}
+	Target.Type "StaticLibrary"
+	Target.BaseName "archive_static"
+	%Group "libarchive"
+	{
+		%File "../../../../../../External/libarchive/libarchive/archive_acl.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_acl_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_check_magic.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_cmdline.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_cmdline_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_crc32.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_cryptor.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_cryptor_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_digest.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_digest_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_endian.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_copy_stat.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_link_resolver.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_locale.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_sparse.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_stat.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_strmode.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_xattr.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_getdate.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_getdate.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_hmac.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_hmac_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_match.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_openssl_evp_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_openssl_hmac_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_options.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_options_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_pack_dev.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_pack_dev.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_pathmatch.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_pathmatch.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_platform.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_platform_acl.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_platform_xattr.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd7.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd7_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_random.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_random_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_rb.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_rb.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_add_passphrase.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_append_filter.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_data_into_fd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_disk_entry_from_file.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_disk_posix.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_disk_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_disk_set_standard_lookup.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_extract.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_extract2.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_open_fd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_open_file.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_open_filename.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_open_memory.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_set_format.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_set_options.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_all.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_bzip2.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_compress.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_gzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_grzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_lrzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_lz4.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_lzop.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_none.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_program.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_rpm.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_uu.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_xz.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_zstd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_7zip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_all.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_ar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_by_code.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_cab.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_cpio.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_empty.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_iso9660.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_lha.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_mtree.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar5.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_raw.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_tar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_warc.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_xar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_zip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_string.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_string.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_string_composition.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_string_sprintf.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_util.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_version_details.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_virtual.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_disk_posix.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_disk_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_disk_set_standard_lookup.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_open_fd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_open_file.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_open_filename.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_open_memory.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_b64encode.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_by_name.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_bzip2.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_compress.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_grzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_gzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_lrzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_lz4.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_lzop.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_none.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_program.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_uuencode.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_xz.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_zstd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_7zip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_ar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_by_name.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_cpio.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_cpio_newc.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_filter_by_ext.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_gnutar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_iso9660.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_mtree.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_pax.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_raw.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_shar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_ustar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_v7tar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_warc.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_xar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_zip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_options.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_passphrase.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_xxhash.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/filter_fork_posix.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/filter_fork.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/xxhash.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2sp_ref.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2s_ref.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_disk_acl_darwin.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive.h"
+		{
+			Compile.Type "None"
+		}
+	}
+}
+%Target "Dll_archive"
+{
+	Compile
+	{
+		!!Compile.Type "C"
+		SearchPath += [
+			"../../../../../../External/libarchive/libarchive"->MakeAbsolute(),
+			"."->MakeAbsolute(),
+			"../../../../../../External/boringssl/include"->MakeAbsolute()
+		]
+		PreprocessorDefines += [
+			"HAVE_CONFIG_H",
+			"archive_EXPORTS"
+		]
+	}
+	Property.MalterlibTargetNameType "Normal"
+	Target.Group "External/libarchive"
+	{
+		!!Target.Group undefined
+	}
+	Target.Type "SharedDynamicLibrary"
+	Target.BaseName "archive"
+	%Group "libarchive"
+	{
+		%File "../../../../../../External/libarchive/libarchive/archive_acl.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_acl_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_check_magic.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_cmdline.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_cmdline_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_crc32.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_cryptor.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_cryptor_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_digest.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_digest_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_endian.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_copy_stat.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_link_resolver.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_locale.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_sparse.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_stat.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_strmode.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_entry_xattr.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_getdate.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_getdate.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_hmac.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_hmac_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_match.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_openssl_evp_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_openssl_hmac_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_options.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_options_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_pack_dev.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_pack_dev.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_pathmatch.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_pathmatch.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_platform.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_platform_acl.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_platform_xattr.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd8_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd7.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_ppmd7_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_random.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_random_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_rb.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_rb.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_add_passphrase.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_append_filter.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_data_into_fd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_disk_entry_from_file.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_disk_posix.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_disk_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_disk_set_standard_lookup.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_extract.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_extract2.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_open_fd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_open_file.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_open_filename.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_open_memory.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_set_format.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_set_options.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_all.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_bzip2.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_compress.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_gzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_grzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_lrzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_lz4.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_lzop.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_none.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_program.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_rpm.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_uu.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_xz.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_filter_zstd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_7zip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_all.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_ar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_by_code.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_cab.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_cpio.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_empty.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_iso9660.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_lha.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_mtree.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_rar5.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_raw.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_tar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_warc.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_xar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_read_support_format_zip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_string.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_string.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_string_composition.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_string_sprintf.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_util.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_version_details.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_virtual.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_disk_posix.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_disk_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_disk_set_standard_lookup.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_open_fd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_open_file.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_open_filename.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_open_memory.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_b64encode.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_by_name.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_bzip2.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_compress.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_grzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_gzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_lrzip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_lz4.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_lzop.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_none.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_program.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_uuencode.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_xz.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_add_filter_zstd.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_7zip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_ar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_by_name.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_cpio.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_cpio_newc.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_filter_by_ext.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_gnutar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_iso9660.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_mtree.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_pax.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_private.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_raw.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_shar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_ustar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_v7tar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_warc.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_xar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_format_zip.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_options.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_write_set_passphrase.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_xxhash.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/filter_fork_posix.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/filter_fork.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive/xxhash.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2sp_ref.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_blake2s_ref.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive_disk_acl_darwin.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive/archive.h"
+		{
+			Compile.Type "None"
+		}
+	}
+}
+%Target "Exe_bsdtar"
+{
+	Compile
+	{
+		!!Compile.Type "C"
+		SearchPath += [
+			"../../../../../../External/libarchive/libarchive"->MakeAbsolute(),
+			"."->MakeAbsolute(),
+			"../../../../../../External/boringssl/include"->MakeAbsolute(),
+			"../../../../../../External/libarchive/libarchive_fe"->MakeAbsolute()
+		]
+		PreprocessorDefines += [
+			"HAVE_CONFIG_H",
+			"LIBARCHIVE_STATIC"
+		]
+	}
+	Property.MalterlibTargetNameType "Normal"
+	Target.Group "External/libarchive"
+	{
+		!!Target.Group undefined
+	}
+	Target.Type "ConsoleExecutable"
+	Target.BaseName "bsdtar"
+	%Group "tar"
+	{
+		%File "../../../../../../External/libarchive/tar/bsdtar.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/tar/bsdtar.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/tar/bsdtar_platform.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/tar/cmdline.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/tar/creation_set.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/tar/read.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/tar/subst.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/tar/util.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/tar/write.c"
+		{
+			Compile.Type "C"
+		}
+	}
+	%Group "libarchive_fe"
+	{
+		%File "../../../../../../External/libarchive/libarchive_fe/err.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive_fe/err.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive_fe/lafe_platform.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive_fe/line_reader.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive_fe/line_reader.h"
+		{
+			Compile.Type "None"
+		}
+		%File "../../../../../../External/libarchive/libarchive_fe/passphrase.c"
+		{
+			Compile.Type "C"
+		}
+		%File "../../../../../../External/libarchive/libarchive_fe/passphrase.h"
+		{
+			Compile.Type "None"
+		}
+	}
+	%Dependency "Lib_archive_static"
+}
