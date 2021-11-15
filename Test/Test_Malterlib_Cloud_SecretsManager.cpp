@@ -659,7 +659,7 @@ public:
 					{
 						DMibUnlock(m_Lock);
 						if (f_Wait())
-							DMibError("Timed out wating for secret manager changes");
+							DMibError("Timed out waiting for secret manager changes");
 					}
 
 					auto Return = m_Changes.f_Pop();

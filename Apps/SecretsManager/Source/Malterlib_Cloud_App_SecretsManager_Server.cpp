@@ -171,7 +171,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (mp_DestroyWaitingForCanDestroy)
 			mp_DestroyWaitingForCanDestroy->f_SetResult();
 #endif
-		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Uploads and downloads destroyed, wating for can destroy file actor");
+		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Uploads and downloads destroyed, waiting for can destroy file actor");
 		auto CanDestroyFuture = mp_pCanDestroyFileActorTracker->f_Future();
 		mp_pCanDestroyFileActorTracker.f_Clear();
 		co_await fg_Move(CanDestroyFuture).f_Wrap();

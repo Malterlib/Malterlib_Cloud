@@ -304,7 +304,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, fg_Format("Remote app manager failed before reaching '{}' stage", fsp_UpdateStageToStr(_Stage))
 				, fg_Format("Timed out waiting for other AppManagers to reach '{}' stage", fsp_UpdateStageToStr(_Stage))
-				, fg_Format("Timed out wating for remote app manager to connect while waiting for other AppManagers to reach '{}' stage", fsp_UpdateStageToStr(_Stage))
+				, fg_Format("Timed out waiting for remote app manager to connect while waiting for other AppManagers to reach '{}' stage", fsp_UpdateStageToStr(_Stage))
 				, (_Flags & EWaitStageFlag_IgnoreFailed) != 0
 			)
 		;
@@ -415,7 +415,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, "Remote app manager failed while waiting for our turn to update"
 				, "Timed out waiting for our turn to update"
-				, "Timed out wating for remote app manager to connect while waiting for our turn to update"
+				, "Timed out waiting for remote app manager to connect while waiting for our turn to update"
 				, false
 			)
 		;

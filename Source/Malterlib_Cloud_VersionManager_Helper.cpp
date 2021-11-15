@@ -441,14 +441,14 @@ namespace NMib::NCloud
 					CStr UnixSeconds = fParseField();
 					CStr NanoSeconds = fParseField();
 
-					auto FileTime = CTimeConvert::fs_FromCreateFromUnixSeconds(UnixSeconds.f_ToInt(int64(0)));
+					auto FileTime = CTimeConvert::fs_FromUnixSeconds(UnixSeconds.f_ToInt(int64(0)));
 					FileTime.f_SetFraction(fp64(NanoSeconds.f_ToInt(int32(0))) / fp64(1'000'000'000.0));
 
 					if (!Newest.f_IsValid() || FileTime > Newest)
 						Newest = FileTime;
 				}
 
-				PackageInfo.m_VersionInfo.m_Time = CTimeConvert::fs_FromCreateFromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
+				PackageInfo.m_VersionInfo.m_Time = CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
 
 				co_return PackageInfo;
 			}
@@ -544,7 +544,7 @@ namespace NMib::NCloud
 							if (!Newest.f_IsValid() || FoundTime > Newest)
 								Newest = FoundTime;
 						}
-						PackageInfo.m_VersionInfo.m_Time = CTimeConvert::fs_FromCreateFromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
+						PackageInfo.m_VersionInfo.m_Time = CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
 					}
 					return PackageInfo;
 				}
