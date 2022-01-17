@@ -66,6 +66,12 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_= "The hosts to open tunnels for. If empty all hosts are included.\n"
 							, "Type"_= {""}
 						}
+						, "Verbose?"_=
+						{
+							"Names"_= {"--verbose", "-v"}
+							, "Default"_= false
+							, "Description"_= "Log every connection.\n"
+						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 					, "Parameters"_=
@@ -165,6 +171,8 @@ namespace NMib::NCloud::NCloudClient
 		if (TunnelsPerHost.f_IsEmpty())
 			co_return DMibErrorInstance("No matching tunnels found");
 
+		bool bVerbose = _Params["Verbose"].f_Boolean();
+
 		TCActorResultMap<CTunnelKey, CNetworkTunnelsClient::CTunnel> OpenedTunnelResults;
 		TCMap<CTunnelKey, CStr> URLTemplates;
 		for (auto &Tunnels : TunnelsPerHost)
@@ -187,22 +195,30 @@ namespace NMib::NCloud::NCloudClient
 						&CNetworkTunnelsClient::f_OpenTunnel
 						, HostID
 						, TunnelName
-						, g_ActorFunctor / [=](CNetAddress const &_Address) -> TCFuture<void>
+						, g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetAddress const &_Address) mutable -> TCFuture<void>
 						{
+							if (!bVerbose && !LoggedAddresses(_Address.f_GetString()).f_WasCreated())
+								co_return {};
+
 							CStr ActionString;
 							auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 							ActionString = "{}Connected{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
 
 							*_pCommandLine += "{} '{}': {}:{}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort();
+
 							co_return {};
 						}
-						, g_ActorFunctor / [=](CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void>
+						, g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetAddress const &_Address, NStr::CStr const &_Message) mutable -> TCFuture<void>
 						{
+							if (!bVerbose && !LoggedAddresses(_Address.f_GetString()).f_WasCreated())
+								co_return {};
+
 							CStr ActionString;
 							auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 							ActionString = "{}Closed   {}"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default();
 
 							*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Message;
+
 							co_return {};
 						}
 						, g_ActorFunctor / [=](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void>
