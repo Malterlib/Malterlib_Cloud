@@ -849,9 +849,6 @@ Property
 
 	Property
 	{
-		MalterlibCloud_VersionUploadSources =+ {
-			Pattern: GetProperty("Property", "MalterlibFinalModuleDestination", `Group:ExternalBinaries.Group:@(Target:Target.BaseName).Target:Com_libarchive_bsdtar.Import:*.Target:Com_libarchive_bsdtar`)
-			, Destination: MalterlibCloudTarBinDirectory
-		}
+		MalterlibCloud_VersionUploadSources =+ GetProperty("Property", "MalterlibBuildServerPutSources", `Group:ExternalBinaries.Group:@(Target:Target.BaseName).Target:Com_libarchive_bsdtar.Import:*.Target:Com_libarchive_bsdtar`)->f_AddDestinationPrefixToCopyOptions(MalterlibCloudTarBinDirectory)
 	}
 }
