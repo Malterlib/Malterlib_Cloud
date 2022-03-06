@@ -5,8 +5,6 @@
 {
 	Property
 	{
-		MalterlibConcurrency_DistributedActors true
-		MalterlibCloudTargetLibrary true
 	}
 	Target
 	{
@@ -43,7 +41,6 @@
 		{
 			!!MalterlibPostCopyDestination undefined
 		}
-		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 	}
 	Target

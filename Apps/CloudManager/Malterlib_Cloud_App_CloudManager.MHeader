@@ -2,8 +2,6 @@
 {
 	Property
 	{
-		MalterlibConcurrency_DistributedActors true
-		MalterlibCloudTargetLibrary true
 	}
 	Target
 	{
@@ -49,7 +47,6 @@
 			!!MalterlibPostCopyProject undefined
 		}
 		MalterlibCloud_EnableVersionUpload true
-		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudCloudManager"
 		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudCloudManager"

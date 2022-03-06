@@ -7,9 +7,6 @@ Import "../../../../External/curl/Curl.MTarget"
 {
 	Property
 	{
-		MalterlibConcurrency_DistributedActors true
-		MalterlibCloudTargetLibrary true
-		MalterlibUseCurl true
 	}
 	Target
 	{
@@ -54,8 +51,6 @@ Import "../../../../External/curl/Curl.MTarget"
 		{
 			!!MalterlibPostCopyProject undefined
 		}
-		MalterlibUseCurl true
-		MalterlibConcurrency_DistributedActors true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudCloudAPIManager"
 		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudCloudAPIManager"
