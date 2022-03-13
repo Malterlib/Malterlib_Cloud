@@ -158,7 +158,7 @@ namespace NMib::NCloud::NSecretsManager
 
 	void NSecretsManager::CSecretPropertiesInternal::f_Format(CStrAggregate &o_Str) const
 	{
-		o_Str += "Username: {} URL: {} Expires: {} Notes: {} Metadata: {} Created: {} Modified: {} SemanticID: {} Tags: {}"_f
+		o_Str += "Username: {} URL: {} Expires: {} Notes: {} Metadata: {} Created: {} Modified: {} SemanticID: {} Tags: {} Immutable: {}"_f
 			<< m_UserName
 			<< m_URL
 			<< m_Expires
@@ -168,6 +168,7 @@ namespace NMib::NCloud::NSecretsManager
 			<< m_Modified
 			<< m_SemanticID
 			<< m_Tags
+			<< m_bImmutable
 		;
 	}
 }

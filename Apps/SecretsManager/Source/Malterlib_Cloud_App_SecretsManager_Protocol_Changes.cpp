@@ -31,7 +31,7 @@ namespace NMib::NCloud::NSecretsManager
 
 	bool CSecretsManagerDaemonActor::CServer::fp_SecretMatchesSubscription(CChangeSubscription const &_Subscription, CSecretPropertiesInternal const &_SecretProperties)
 	{
-		return fs_MatchSecret(_SecretProperties, _Subscription.m_SubscriptionParams.m_SemanticID, _Subscription.m_SubscriptionParams.m_TagsExclusive);
+		return fs_MatchSecret(_SecretProperties, _Subscription.m_SubscriptionParams.m_SemanticID, _Subscription.m_SubscriptionParams.m_Name, _Subscription.m_SubscriptionParams.m_TagsExclusive);
 	}
 
 	void CSecretsManagerDaemonActor::CServer::fp_SecretUpdated(CSecretPropertiesInternal const &_SecretProperties, bool _bRemoved)
@@ -120,6 +120,7 @@ namespace NMib::NCloud::NSecretsManager
 			(
 				mp_Database.m_Secrets
 				, pSubscription->m_SubscriptionParams.m_SemanticID
+				, pSubscription->m_SubscriptionParams.m_Name
 				, pSubscription->m_SubscriptionParams.m_TagsExclusive
 				, Permissions
 			)
@@ -142,8 +143,19 @@ namespace NMib::NCloud::NSecretsManager
 
 		for (auto const &SecretProperties : mp_Database.m_Secrets)
 		{
-			if (!fs_MatchSecret(SecretProperties, pSubscription->m_SubscriptionParams.m_SemanticID, pSubscription->m_SubscriptionParams.m_TagsExclusive))
+			if
+				(
+					!fs_MatchSecret
+					(
+						SecretProperties
+						, pSubscription->m_SubscriptionParams.m_SemanticID
+						, pSubscription->m_SubscriptionParams.m_Name
+						, pSubscription->m_SubscriptionParams.m_TagsExclusive
+					)
+				)
+			{
 				continue;
+			}
 
 			auto const &ID = mp_Database.m_Secrets.fs_GetKey(SecretProperties);
 			auto *pHasPermission = HasPermissions.f_FindEqual(CStr::fs_ToStr(ID));
@@ -168,6 +180,9 @@ namespace NMib::NCloud::NSecretsManager
 
 		if (_Params.m_SemanticID && !CSecretsManager::fs_IsValidSemanticIDWildcard(*_Params.m_SemanticID))
 			co_return Auditor.f_Exception(fg_Format("Malformed semantic ID: '{}'", *_Params.m_SemanticID));
+
+		if (_Params.m_Name && !CSecretsManager::fs_IsValidNameWildcard(*_Params.m_Name))
+			co_return Auditor.f_Exception(fg_Format("Malformed name: '{}'", *_Params.m_Name));
 
 		for (auto const &Tag : _Params.m_TagsExclusive)
 		{

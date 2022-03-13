@@ -609,12 +609,18 @@ public:
 			;
 			auto fGetBySemantic = [&](NStr::CStrSecure &&_SemanticID, TCSet<NStr::CStr> const &_Tags) -> CSecretsManager::CSecret
 				{
-					return SecretsManager.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(_SemanticID, _Tags).f_CallSync(pRunLoop, g_Timeout);
+					CSecretsManager::CGetSecretBySemanticID GetProperties;
+					GetProperties.m_SemanticID = _SemanticID;
+					GetProperties.m_TagsExclusive = _Tags;
+					return SecretsManager.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(GetProperties).f_CallSync(pRunLoop, g_Timeout);
 				}
 			;
 			auto fEnumerateFor = [&](TCOptional<NStr::CStrSecure> _ID, TCSet<NStr::CStr> const &_Tags) -> TCSet<CSecretsManager::CSecretID>
 				{
-					return SecretsManager.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(_ID, _Tags).f_CallSync(pRunLoop, g_Timeout);
+					CSecretsManager::CEnumerateSecrets EnumerateProperties;
+					EnumerateProperties.m_SemanticID = _ID;
+					EnumerateProperties.m_TagsExclusive = _Tags;
+					return SecretsManager.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(EnumerateProperties).f_CallSync(pRunLoop, g_Timeout);
 				}
 			;
 			auto fAddTagsAndGetProperties = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, TCSet<NStr::CStr> const &_RemoveTags, TCSet<NStr::CStr> const &_AddTags)
@@ -626,7 +632,12 @@ public:
 			;
 			auto fSetKeyValue = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key, CEJSON const &_Value)
 				{
-					SecretsManager.f_CallActor(&CSecretsManager::f_SetMetadata)(CSecretsManager::CSecretID{_Folder, _Name}, fg_TempCopy(_Key), fg_TempCopy(_Value)).f_CallSync(pRunLoop, g_Timeout);
+					CSecretsManager::CSetMetadata SetMetadata;
+					SetMetadata.m_ID = CSecretsManager::CSecretID{_Folder, _Name};
+					SetMetadata.m_Key = _Key;
+					SetMetadata.m_Value = _Value;
+
+					SecretsManager.f_CallActor(&CSecretsManager::f_SetMetadata)(SetMetadata).f_CallSync(pRunLoop, g_Timeout);
 				}
 			;
 			auto fRemoveKey = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key)
@@ -1762,7 +1773,7 @@ public:
 					SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties) ).f_CallSync(pRunLoop, g_Timeout);
 				}
 			;
-			auto fSetPropertiesNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties) -> TCFuture<void>
+			auto fSetPropertiesNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties) -> TCFuture<CSecretsManager::CSetSecretPropertiesResult>
 				{
 					return g_Future <<= SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
 				}

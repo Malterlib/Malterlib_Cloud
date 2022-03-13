@@ -7,7 +7,7 @@
 
 namespace NMib::NCloud
 {
-	DMibImpErrorClassImplement(CExceptionSecrets);
+	DMibImpErrorClassImplement(CExceptionSecretsManagerUnexpectedValue);
 
 	using namespace NStr;
 	
@@ -25,6 +25,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CSecretsManager::f_RemoveSecret);
 		DMibPublishActorFunction(CSecretsManager::f_UploadFile);
 		DMibPublishActorFunction(CSecretsManager::f_SubscribeToChanges);
+		DMibConcurrencyRegisterException(CExceptionSecretsManagerUnexpectedValue);
 	}
 
 	bool CSecretsManager::fs_IsValidFolder(NStr::CStr const &_Folder)
@@ -35,6 +36,11 @@ namespace NMib::NCloud
 	bool CSecretsManager::fs_IsValidName(NStr::CStr const &_Name)
 	{
 		return NNetwork::fg_IsValidHostname(_Name, "#");
+	}
+
+	bool CSecretsManager::fs_IsValidNameWildcard(NStr::CStr const &_Name)
+	{
+		return NNetwork::fg_IsValidHostname(_Name, "#", "*?");
 	}
 
 	bool CSecretsManager::fs_IsValidTag(CStr const &_Tag)
@@ -122,6 +128,12 @@ namespace NMib::NCloud
 		return fg_Move(*this);
 	}
 
+	auto CSecretsManager::CSecretProperties::f_SetImmutable() && -> CSecretProperties &&
+	{
+		m_Immutable = true;
+		return fg_Move(*this);
+	}
+
 	auto CSecretsManager::CSecretProperties::f_SetSecret(CSecret &&_Secret) & -> CSecretProperties &
 	{
 		m_Secret = fg_Move(_Secret);
@@ -192,6 +204,12 @@ namespace NMib::NCloud
 		return *this;
 	}
 
+	auto CSecretsManager::CSecretProperties::f_SetImmutable() & -> CSecretProperties &
+	{
+		m_Immutable = true;
+		return *this;
+	}
+
 	auto CSecretsManager::CSecretProperties::f_GetSecret() const -> CSecret const &
 	{
 		static CSecret s_Secret;
@@ -245,11 +263,17 @@ namespace NMib::NCloud
 		static NStr::CStrSecure s_SemanticID;
 		return m_SemanticID.f_Get(s_SemanticID);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_GetTags() const -> NContainer::TCSet<NStr::CStrSecure> const &
 	{
 		static NContainer::TCSet<NStr::CStrSecure> s_Tags;
 		return m_Tags.f_Get(s_Tags);
+	}
+
+	auto CSecretsManager::CSecretProperties::f_GetImmutable() const -> bool const &
+	{
+		static bool s_Immutable = false;
+		return m_Immutable.f_Get(s_Immutable);
 	}
 
 	bool CSecretsManager::CSecretProperties::operator == (CSecretsManager::CSecretProperties const &_Right) const
@@ -265,6 +289,7 @@ namespace NMib::NCloud
 				&& m_Created == _Right.m_Created
 				&& m_Modified == _Right.m_Modified
 				&& m_SemanticID == _Right.m_SemanticID
+				&& m_Immutable == _Right.m_Immutable
 			 )
 		;
 	}

@@ -337,7 +337,8 @@ namespace NMib::NCloud::NSecretsManager
 			if (--mp_SemanticIDs[_SemanticIDToRemove] == 0)
 			{
 				TCSet<CStr> Permissions;
-				Permissions[fg_Format("SecretsManager/SemanticID/{}", _SemanticIDToRemove)];
+				Permissions[fg_Format("SecretsManager/Read/SemanticID/{}/*", _SemanticIDToRemove)];
+				Permissions[fg_Format("SecretsManager/Write/SemanticID/{}/*", _SemanticIDToRemove)];
 				mp_SemanticIDs.f_Remove(_SemanticIDToRemove);
 
 				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, Permissions) > fg_DiscardResult();
@@ -349,7 +350,8 @@ namespace NMib::NCloud::NSecretsManager
 			if (++mp_SemanticIDs[_SemanticIDToAdd] == 1)
 			{
 				TCSet<CStr> Permissions;
-				Permissions[fg_Format("SecretsManager/SemanticID/{}", _SemanticIDToAdd)];
+				Permissions[fg_Format("SecretsManager/Read/SemanticID/{}/*", _SemanticIDToAdd)];
+				Permissions[fg_Format("SecretsManager/Write/SemanticID/{}/*", _SemanticIDToAdd)];
 				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
 			}
 		}

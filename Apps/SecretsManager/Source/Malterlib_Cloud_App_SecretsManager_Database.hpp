@@ -22,6 +22,8 @@ namespace NMib::NCloud::NSecretsManager
 		_Stream % m_IV;
 		_Stream % m_HMACKey;
 		_Stream % m_RandomFileName;
+		if (_Stream.f_GetVersion() >= 0x102)
+			_Stream % m_bImmutable;
 	}
 
 	template <typename tf_CStream>

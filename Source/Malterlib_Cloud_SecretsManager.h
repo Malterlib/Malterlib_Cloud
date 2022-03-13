@@ -15,14 +15,11 @@
 
 namespace NMib::NCloud
 {
-	DMibImpErrorClassDefine(CExceptionSecrets, NException::CException);
-		
-#	define DMibErrorSecrets(_Description) DMibImpError(NMib::NCloud::CExceptionSecrets, _Description)
+	DMibImpErrorClassDefine(CExceptionSecretsManagerUnexpectedValue, NException::CException);
 
-#	ifndef DMibPNoShortCuts
-#		define DErrorSecrets(_Description) DMibErrorSecrets(_Description)
-#	endif
-	
+#	define DMibErrorSecretsManagerUnexpectedValue(_Description) DMibImpError(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, _Description)
+#	define DMibErrorInstanceSecretsManagerUnexpectedValue(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, _Description)
+
 	struct CSecretsManager : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/SecretsManager";
@@ -32,7 +29,14 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EProtocolVersion_Min = 0x101
-			, EProtocolVersion_Current = 0x105
+
+			, EProtocolVersion_SupportImmutable = 0x106
+			, EProtocolVersion_SupportNameQuery = 0x106
+			, EProtocolVersion_SupportResultFlags = 0x106
+			, EProtocolVersion_SupportMapSecrets = 0x106
+			, EProtocolVersion_SupportExpectedMetadataAndModifiedTime = 0x106
+
+			, EProtocolVersion_Current = 0x106
 		};
 		
 		enum ESecretType : int32
@@ -41,6 +45,8 @@ namespace NMib::NCloud
 			, ESecretType_String
 			, ESecretType_Binary
 			, ESecretType_File
+			, ESecretType_StringMap
+			, ESecretType_BinaryMap
 		};
 		
 		struct CSecretID
@@ -78,6 +84,8 @@ namespace NMib::NCloud
 				, NStorage::TCMember<NStr::CStrSecure, ESecretType_String>
 				, NStorage::TCMember<NContainer::CSecureByteVector, ESecretType_Binary>
 				, NStorage::TCMember<CSecretFile, ESecretType_File>
+				, NStorage::TCMember<NContainer::TCMap<NStr::CStrSecure, NStr::CStrSecure>, ESecretType_StringMap>
+				, NStorage::TCMember<NContainer::TCMap<NStr::CStrSecure, NContainer::CSecureByteVector>, ESecretType_BinaryMap>
 			>
 		{
 			using CSuper = NStorage::TCStreamableVariant
@@ -87,6 +95,8 @@ namespace NMib::NCloud
 					, NStorage::TCMember<NStr::CStrSecure, ESecretType_String>
 					, NStorage::TCMember<NContainer::CSecureByteVector, ESecretType_Binary>
 					, NStorage::TCMember<CSecretFile, ESecretType_File>
+					, NStorage::TCMember<NContainer::TCMap<NStr::CStrSecure, NStr::CStrSecure>, ESecretType_StringMap>
+					, NStorage::TCMember<NContainer::TCMap<NStr::CStrSecure, NContainer::CSecureByteVector>, ESecretType_BinaryMap>
 				>
 			;
 
@@ -127,7 +137,8 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NTime::CTime> m_Modified;
 			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStrSecure>> m_Tags;
-			
+			NStorage::TCOptional<bool> m_Immutable; // Does not allow the secret to be changed after being set
+
 			CSecretProperties &&f_SetSecret(CSecret &&_Secret) &&;
 			CSecretProperties &&f_SetUserName(NStr::CStrSecure const &_UserName) &&;
 			CSecretProperties &&f_SetURL(NStr::CStrSecure const &_URL) &&;
@@ -139,6 +150,7 @@ namespace NMib::NCloud
 			CSecretProperties &&f_SetSemanticID(NStr::CStrSecure const &_SemanticID) &&;
 			CSecretProperties &&f_SetTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &&;
 			CSecretProperties &&f_AddTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &&;
+			CSecretProperties &&f_SetImmutable() &&;
 
 			CSecretProperties &f_SetSecret(CSecret &&_Secret) &;
 			CSecretProperties &f_SetUserName(NStr::CStrSecure const &_UserName) &;
@@ -151,6 +163,7 @@ namespace NMib::NCloud
 			CSecretProperties &f_SetSemanticID(NStr::CStrSecure const &_SemanticID) &;
 			CSecretProperties &f_SetTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &;
 			CSecretProperties &f_AddTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) &;
+			CSecretProperties &f_SetImmutable() &;
 
 			auto f_GetSecret() const -> CSecret const &;
 			auto f_GetUserName() const -> NStr::CStrSecure const &;
@@ -162,6 +175,10 @@ namespace NMib::NCloud
 			auto f_GetModified() const -> NTime::CTime const &;
 			auto f_GetSemanticID() const -> NStr::CStrSecure const &;
 			auto f_GetTags() const -> NContainer::TCSet<NStr::CStrSecure> const &;
+			auto f_GetImmutable() const -> bool const &;
+
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const;
 
 			bool operator == (CSecretProperties const &_Right) const;
 		};
@@ -182,27 +199,71 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID; //< Limit the updates to secrets matching semantic ID wildcard
+			NStorage::TCOptional<NStr::CStrSecure> m_Name; //< Limit the updates to secrets matching name wildcard
 			NContainer::TCSet<NStr::CStrSecure> m_TagsExclusive; //< Limit the updates to secrets with all tags specified
 
 			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CSecretChanges &&_Changes)> m_fOnChanges;
 		};
 
+		struct CEnumerateSecrets
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID;
+			NStorage::TCOptional<NStr::CStrSecure> m_Name;
+			NContainer::TCSet<NStr::CStrSecure> m_TagsExclusive;
+		};
+
+		struct CGetSecretBySemanticID
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStrSecure m_SemanticID;
+			NStorage::TCOptional<NStr::CStrSecure> m_Name;
+			NContainer::TCSet<NStr::CStrSecure> m_TagsExclusive;
+		};
+
+		enum ESetSecretPropertiesResultFlag : uint32
+		{
+			ESetSecretPropertiesResultFlag_None = 0
+			, ESetSecretPropertiesResultFlag_Created = DMibBit(0)
+			, ESetSecretPropertiesResultFlag_Updated = DMibBit(1)
+		};
+
+		struct CSetSecretPropertiesResult
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			ESetSecretPropertiesResultFlag m_Flags = ESetSecretPropertiesResultFlag_Updated; // Default for old versions of protocol
+		};
+
+		struct CSetMetadata
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			CSecretID m_ID;
+			NStr::CStrSecure m_Key;
+			NEncoding::CEJSON m_Value;
+			NStorage::TCOptional<NEncoding::CEJSON> m_ExpectedValue;
+			NStorage::TCOptional<NTime::CTime> m_ModifiedTime;
+		};
+
 		static bool fs_IsValidFolder(NStr::CStr const &_Folder);
 		static bool fs_IsValidName(NStr::CStr const &_Name);
+		static bool fs_IsValidNameWildcard(NStr::CStr const &_Name);
 		static bool fs_IsValidTag(NStr::CStr const &_Tag);
 		static bool fs_IsValidSemanticID(NStr::CStr const &_SemanticID);
 		static bool fs_IsValidSemanticIDWildcard(NStr::CStr const &_SemanticID);
 
-		virtual NConcurrency::TCFuture<NContainer::TCSet<CSecretID>> f_EnumerateSecrets
-			(
-				NStorage::TCOptional<NStr::CStrSecure> const &_SemanticID
-				, NContainer::TCSet<NStr::CStrSecure> const &_TagsExclusive
-			 ) = 0
-		;
-		virtual NConcurrency::TCFuture<void> f_SetSecretProperties(CSecretID &&_ID, CSecretProperties &&_Secret) = 0;
+		virtual NConcurrency::TCFuture<NContainer::TCSet<CSecretID>> f_EnumerateSecrets(CEnumerateSecrets const &_Options) = 0;
+		virtual NConcurrency::TCFuture<CSetSecretPropertiesResult> f_SetSecretProperties(CSecretID &&_ID, CSecretProperties &&_Secret) = 0;
 		virtual NConcurrency::TCFuture<CSecretProperties> f_GetSecretProperties(CSecretID &&_ID) = 0;
 		virtual NConcurrency::TCFuture<CSecret> f_GetSecret(CSecretID &&_ID) = 0;
-		virtual NConcurrency::TCFuture<CSecret> f_GetSecretBySemanticID(NStr::CStrSecure const &_SemanticID, NContainer::TCSet<NStr::CStrSecure> const &_TagsExclusive) = 0;
+		virtual NConcurrency::TCFuture<CSecret> f_GetSecretBySemanticID(CGetSecretBySemanticID const &_Options) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> f_DownloadFile
 			(
 			 	CSecretID &&_ID
@@ -216,7 +277,7 @@ namespace NMib::NCloud
 				, NContainer::TCSet<NStr::CStrSecure> &&_TagsToAdd
 			) = 0
 		;
-		virtual NConcurrency::TCFuture<void> f_SetMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_Metadata) = 0;
+		virtual NConcurrency::TCFuture<void> f_SetMetadata(CSetMetadata &&_SetMetaData) = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveMetadata(CSecretID &&_ID, NStr::CStrSecure const &_MetadataKey) = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveSecret(CSecretID &&_ID) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()>> f_UploadFile

@@ -39,13 +39,15 @@ namespace NMib::NCloud
 		_Stream % m_Modified;
 		_Stream % m_SemanticID;
 		_Stream % m_Tags;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportImmutable)
+			_Stream % m_Immutable;
 	}
 
 	template <typename tf_CStream>
 	void CSecretsManager::CSecretFile::f_Stream(tf_CStream &_Stream)
 	{
 		uint32 Version = 0x102;
-		DMibBinaryStreamVersion(_Stream, 0x102);
+		DMibBinaryStreamVersion(_Stream, Version);
 		m_Manifest.f_Stream(_Stream, Version);
 	}
 
@@ -90,7 +92,56 @@ namespace NMib::NCloud
 		case CSecretsManager::ESecretType_File:
 			o_Str += f_Get<CSecretsManager::ESecretType_File>().m_Manifest.m_OriginalPath;
 			break;
+
+		case CSecretsManager::ESecretType_StringMap:
+			{
+				auto &StringMap = f_Get<CSecretsManager::ESecretType_StringMap>();
+				for (auto &Value : StringMap)
+				{
+					auto &Key = StringMap.fs_GetKey(Value);
+					o_Str += typename tf_CStr::CFormat("{}: {}\n") << Key << Value;
+				}
+			}
+			break;
+
+		case CSecretsManager::ESecretType_BinaryMap:
+			{
+				auto &StringMap = f_Get<CSecretsManager::ESecretType_BinaryMap>();
+				for (auto &Value : StringMap)
+				{
+					auto &Key = StringMap.fs_GetKey(Value);
+					o_Str += typename tf_CStr::CFormat("{}: {}\n") << Key << NEncoding::fg_Base64Encode(Value);
+				}
+			}
+			break;
 		}
+	}
+
+	template <typename tf_CStr>
+	void CSecretsManager::CSecretProperties::f_Format(tf_CStr &o_Str) const
+	{
+		if (m_Secret)
+			o_Str += typename tf_CStr::CFormat("Secret: {}\n") << *m_Secret;
+		if (m_UserName)
+			o_Str += typename tf_CStr::CFormat("UserName: {}\n") << *m_UserName;
+		if (m_URL)
+			o_Str += typename tf_CStr::CFormat("URL: {}\n") << *m_URL;
+		if (m_Expires)
+			o_Str += typename tf_CStr::CFormat("Expires: {}\n") << *m_Expires;
+		if (m_Notes)
+			o_Str += typename tf_CStr::CFormat("Notes: {}\n") << *m_Notes;
+		if (m_Metadata)
+			o_Str += typename tf_CStr::CFormat("Metadata: {}\n") << *m_Metadata;
+		if (m_Created)
+			o_Str += typename tf_CStr::CFormat("Created: {}\n") << *m_Created;
+		if (m_Modified)
+			o_Str += typename tf_CStr::CFormat("Modified: {}\n") << *m_Modified;
+		if (m_SemanticID)
+			o_Str += typename tf_CStr::CFormat("SemanticID: {}\n") << *m_SemanticID;
+		if (m_Tags)
+			o_Str += typename tf_CStr::CFormat("Tags: {vs}\n") << *m_Tags;
+		if (m_Immutable)
+			o_Str += typename tf_CStr::CFormat("Immutable: {}\n") << (*m_Immutable ? "true" : "false");
 	}
 
 	template <typename tf_CStream>
@@ -105,8 +156,48 @@ namespace NMib::NCloud
 	void CSecretsManager::CSubscribeToChanges::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_SemanticID;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportNameQuery)
+			_Stream % m_Name;
 		_Stream % m_TagsExclusive;
 
 		_Stream % fg_Move(m_fOnChanges);
+	}
+
+	template <typename tf_CStream>
+	void CSecretsManager::CEnumerateSecrets::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_SemanticID;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportNameQuery)
+			_Stream % m_Name;
+		_Stream % m_TagsExclusive;
+	}
+
+	template <typename tf_CStream>
+	void CSecretsManager::CGetSecretBySemanticID::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_SemanticID;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportNameQuery)
+			_Stream % m_Name;
+		_Stream % m_TagsExclusive;
+	}
+
+	template <typename tf_CStream>
+	void CSecretsManager::CSetSecretPropertiesResult::f_Stream(tf_CStream &_Stream)
+	{
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportResultFlags)
+			_Stream % m_Flags;
+	}
+
+	template <typename tf_CStream>
+	void CSecretsManager::CSetMetadata::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_ID;
+		_Stream % m_Key;
+		_Stream % m_Value;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportExpectedMetadataAndModifiedTime)
+		{
+			_Stream % m_ExpectedValue;
+			_Stream % m_ModifiedTime;
+		}
 	}
 }

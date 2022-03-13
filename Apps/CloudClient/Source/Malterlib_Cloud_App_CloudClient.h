@@ -71,28 +71,69 @@ namespace NMib::NCloud::NCloudClient
 		void fp_SecretsManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_SecretsManager_SubscribeToServers();
 		static bool fsp_SecretsManager_GetID(CEJSON const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error);
-		static NStr::CStr fsp_SecretsManager_CheckExpect(CSecretsManager::CSecret const &_Secret, NStr::CStr _Expect, bool _bBinaryAsBase64);
+		static NStr::CStr fsp_SecretsManager_CheckExpectedFormat
+			(
+				CSecretsManager::CSecret const &_Secret
+				, NStr::CStr const &_ExpectedFormat
+				, bool _bBinaryAsBase64
+				, TCOptional<CStrSecure> const &_MapKey
+			)
+		;
+		static NStr::CStr fsp_SecretsManager_OutputSecret
+			(
+				NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+				, CSecretsManager::CSecret const &_Secret
+				, bool _bBinaryAsBase64
+				, TCOptional<CStrSecure> const &_MapKey
+			)
+		;
 
 		template<typename tf_CType>
-		TCFuture<uint32> fp_CommandLine_SecretsManager_Enumerate
+		TCFuture<uint32> fp_CommandLine_SecretsManager_EnumerateImpl
 		(
 		 	CEJSON const &_Params
 		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunctionMovable
 			<
-				TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_pSemanticID, TCSet<CStrSecure> const &_Tags)
+				TCFuture<tf_CType>
+				(
+					TCDistributedActor<CSecretsManager> const &_Actor
+					, TCOptional<CStrSecure> const &_SemanticID
+					, TCOptional<CStrSecure> const &_Name
+					, TCSet<CStrSecure> const &_Tags
+				)
 			>
 		 	&&_fGetResult
-			, TCFunctionMovable<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, NStr::CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
+			, TCFunctionMovable
+			<
+				NStr::CStr
+				(
+					tf_CType const &_Result
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, NStr::CStr const &_ExpectedFormat
+					, TCOptional<CStrSecure> const &_MapKey
+					, bool _bBinaryAsBase64
+				)
+			> &&_fOnResult
 		);
 
 		template<typename tf_CType>
-		TCFuture<uint32> fp_CommandLine_SecretsManager_Get
+		TCFuture<uint32> fp_CommandLine_SecretsManager_GetImpl
 			(
 				CEJSON const &_Params
 				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			 	, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
-				, TCFunctionMovable<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, NStr::CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
+				, TCFunctionMovable
+				<
+					NStr::CStr
+					(
+						tf_CType const &_Result
+						, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+						, NStr::CStr const &_ExpectedFormat
+						, TCOptional<CStrSecure> const &_MapKey
+						, bool _bBinaryAsBase64
+					)
+				> &&_fOnResult
 			)
 		;
 

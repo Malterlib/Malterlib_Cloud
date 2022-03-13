@@ -31,6 +31,37 @@ namespace NMib::NCloud::NCloudClient
 				, "Description"_= "Binary secrets will be read and written as base64 encoded strings."
 			}
 		;
+		auto Name = "Name?"_=
+			{
+				"Names"_= {"--name"}
+				, "Type"_= ""
+				, "Description"_= "Limit query to secrets having the specified name. Wildcard search.\n"
+			}
+		;
+		auto Tags = "Tags?"_=
+			{
+				"Names"_= {"--tags"}
+				, "Default"_= _[_]
+				, "Type"_= {""}
+				, "Description"_= "Limit query to secrets having the specified tags.\n"
+				"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
+			}
+		;
+		auto Expect = "Expect?"_=
+			{
+				"Names"_= {"--expect"}
+				, "Type"_= COneOf{"string", "binary", "file", "string_map"}
+				, "Default"_= "string"
+				, "Description"_= "Unless the secret is of the expected variant report an error.\n"
+			}
+		;
+		auto MapKey = "MapKey?"_=
+			{
+				"Names"_= {"--map-key"}
+				, "Type"_= ""
+				, "Description"_= "For map secrets, index with specified key and return the value for this key."
+			}
+		;
 		auto IDParameter = "Parameters"_=
 			{
 				"ID"_=
@@ -72,18 +103,12 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_= "Limit query to secrets having the specified semantic ID wildcard.\n"
 							"The semantic ID must adhere to RFC 1123 (hostname) and additionally # is allowed as well as * and ? for wildcard."
 						}
-						, "Tags?"_=
-						{
-							"Names"_= {"--tags"}
-							, "Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "Limit query to secrets having the specified tags.\n"
-							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
-						}
+						, Name
+						, Tags
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets, _Params, _pCommandLine);
 				}
@@ -98,22 +123,11 @@ namespace NMib::NCloud::NCloudClient
 					, "Options"_=
 					{
 						SecretsManagerHost
-						, "Tags?"_=
-						{
-							"Names"_= {"--tags"}
-							, "Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "Limit query to secrets having the specified tags.\n"
-							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
-						}
-						, "Expect?"_=
-						{
-							"Names"_= {"--expect"}
-							, "Type"_= COneOf{"string", "binary", "file"}
-							, "Default"_= "string"
-							, "Description"_= "Unless the secret is of the expected variant report an error.\n"
-						}
+						, Name
+						, Tags
+						, Expect
 						, BinaryAsBase64
+						, MapKey
 					}
 					, "Parameters"_=
 					{
@@ -125,7 +139,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID, _Params, _pCommandLine);
 				}
@@ -145,7 +159,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties, _Params, _pCommandLine);
 				}
@@ -161,18 +175,13 @@ namespace NMib::NCloud::NCloudClient
 					, "Options"_=
 					{
 						SecretsManagerHost
-						, "Expect?"_=
-						{
-							"Names"_= {"--expect"}
-							, "Type"_= COneOf{"string", "binary", "file"}
-							, "Default"_= "string"
-							, "Description"_= "Unless the secret is of the expected variant report an error.\n"
-						}
+						, Expect
 						, BinaryAsBase64
+						, MapKey
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret, _Params, _pCommandLine);
 				}
@@ -195,11 +204,13 @@ namespace NMib::NCloud::NCloudClient
 						, "Secret?"_=
 						{
 							"Names"_= {"--secret"}
-							, "Type"_= COneOf{"string", "binary"}
+							, "Type"_= COneOf{"string", "binary", "string_map", "binary_map"}
 							, "Description"_= "Set the secret.\n"
 							"The secret can be a string secret or a binary secret.\n"
 							"Specify 'string' to be prompted for a string secret.\n"
 							"Specify 'binary' for a binary secret. When --binary-as-base64 is enabled (which it is by default) you will be prompted for a base64 encoded binary secret. "
+							"Specify 'string_map' to be prompted for a map of string secrets.\n"
+							"Specify 'binary_map' to be prompted for a map of binary secrets.\n"
 							"When --binary-as-base64 is disabled, the raw binary secret must be piped or redirected to stdin\n"
 							"To set a file secret use --secrets-manager-upload-file."
 						}
@@ -264,7 +275,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties, _Params, _pCommandLine);
 				}
@@ -298,7 +309,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags, _Params, _pCommandLine);
 				}
@@ -314,17 +325,28 @@ namespace NMib::NCloud::NCloudClient
 					, "Options"_=
 					{
 						SecretsManagerHost
-						, "Metadata"_=
+						, "Key"_=
 						{
-							"Names"_= {"--metadata"}
-							, "Type"_= EJSONType_Object
-							, "Description"_= "The metadata to set.\n"
-							"The metadata is specified as a JSON object '{\"Key\" : \"Value\"}'"
+							"Names"_= {"--key"}
+							, "Type"_= ""
+							, "Description"_= "The key to set metadata for.\n"
+						}
+						, "Value"_=
+						{
+							"Names"_= {"--value"}
+							, "Type"_= fg_AnyType()
+							, "Description"_= "The value to for the metadata.\n"
+						}
+						, "ExpectedValue?"_=
+						{
+							"Names"_= {"--expected-value"}
+							, "Type"_= fg_AnyType()
+							, "Description"_= "The expected value to replace.\nIf the value is different the operation will fail.\n"
 						}
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata, _Params, _pCommandLine);
 				}
@@ -348,7 +370,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata, _Params, _pCommandLine);
 				}
@@ -366,7 +388,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret, _Params, _pCommandLine);
 				}
@@ -392,7 +414,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload, _Params, _pCommandLine);
 				}
@@ -425,7 +447,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_Download, _Params, _pCommandLine);
 				}
@@ -465,21 +487,60 @@ namespace NMib::NCloud::NCloudClient
 		return true;
 	}
 
-	CStr CCloudClientAppActor::fsp_SecretsManager_CheckExpect(CSecretsManager::CSecret const &_Secret, NStr::CStr _Expect, bool _bBinaryAsBase64)
+	CStr CCloudClientAppActor::fsp_SecretsManager_CheckExpectedFormat
+		(
+			CSecretsManager::CSecret const &_Secret
+			, NStr::CStr const &_ExpectedFormat
+			, bool _bBinaryAsBase64
+			, TCOptional<CStrSecure> const &_MapKey
+		)
 	{
-		if (_Expect)
+		if (_ExpectedFormat)
 		{
-			if (_Expect == "string" && _Secret.f_GetTypeID() != CSecretsManager::ESecretType_String && _Secret.f_GetTypeID() != CSecretsManager::ESecretType_Binary)
-				return "Only string secrets and binary secrets can be emitted in string form";
-			if (_Expect == "binary")
+			auto SecretType = _Secret.f_GetTypeID();
+
+			if (SecretType == CSecretsManager::ESecretType_BinaryMap)
 			{
-				if (_Secret.f_GetTypeID() != CSecretsManager::ESecretType_Binary)
+				if (!_bBinaryAsBase64)
+					return "Binary map secrets cannot be emitted in raw binary form. Use --binary-as-base64 to emit secrets.";
+			}
+
+			if (_MapKey)
+			{
+				if (_ExpectedFormat == "string_map")
+					return "When --map-key is used output cannot be emitted as a string_map";
+
+				if (SecretType != CSecretsManager::ESecretType_StringMap && SecretType != CSecretsManager::ESecretType_BinaryMap)
+					return "When --map-key is specified secret needs to be a string map or binary map";
+
+				if (SecretType == CSecretsManager::ESecretType_StringMap)
+					SecretType = CSecretsManager::ESecretType_String;
+				else if (SecretType == CSecretsManager::ESecretType_BinaryMap)
+					SecretType = CSecretsManager::ESecretType_Binary;
+			}
+
+			if (_ExpectedFormat == "string")
+			{
+				if (SecretType != CSecretsManager::ESecretType_String && SecretType != CSecretsManager::ESecretType_Binary)
+					return "Only string secrets and binary secrets can be emitted in string form";
+			}
+			else if (_ExpectedFormat == "string_map")
+			{
+				if (SecretType != CSecretsManager::ESecretType_StringMap && SecretType != CSecretsManager::ESecretType_BinaryMap)
+					return "Only string map secrets and binary map secrets can be emitted in string map form";
+			}
+			else if (_ExpectedFormat == "binary")
+			{
+				if (SecretType != CSecretsManager::ESecretType_Binary)
 					return "Only binary secrets can be emitted in binary form";
 				if (_bBinaryAsBase64)
 					return "Binary secrets cannot be emitted in raw binary form when --binary-as-base64 is enabled. Use --no-binary-as-base64 to emit secrets in raw binary form.";
 			}
-			if (_Expect == "file" && _Secret.f_GetTypeID() != CSecretsManager::ESecretType_File)
-				return "Only file secrets can be emitted in file form";
+			else if (_ExpectedFormat == "file")
+			{
+				if (SecretType != CSecretsManager::ESecretType_File)
+					return "Only file secrets can be emitted in file form";
+			}
 		}
 		return {};
 	}
@@ -506,8 +567,8 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	template<typename tf_CType>
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Enumerate
+	template <typename tf_CType>
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl
 		(
 		 	CEJSON const &_Params
 		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
@@ -517,10 +578,21 @@ namespace NMib::NCloud::NCloudClient
 	 			(
 				 	TCDistributedActor<CSecretsManager> const &_Actor
 				 	, TCOptional<CStrSecure> const &_SemanticID
+					, TCOptional<CStrSecure> const &_Name
 				 	, TCSet<CStrSecure> const &_Tags
 				)
 		 	> &&_fGetResult
-			, TCFunctionMovable<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
+			, TCFunctionMovable
+			<
+				NStr::CStr
+				(
+					tf_CType const &_Result
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CStr const &_ExpectedFormat
+					, TCOptional<CStrSecure> const &_MapKey
+					, bool _bBinaryAsBase64
+				)
+			> &&_fOnResult
 		)
 	{
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
@@ -538,9 +610,22 @@ namespace NMib::NCloud::NCloudClient
 		TCOptional<CStrSecure> SemanticID;
 		if (auto ID = _Params["SemanticID"].f_String())
 		{
-			if (!CSecretsManager::fs_IsValidSemanticID(ID))
+			if (!CSecretsManager::fs_IsValidSemanticIDWildcard(ID))
 				co_return DMibErrorInstance(fg_Format("'{}' is not a valid Semantic ID", ID));
 			SemanticID = ID;
+		}
+
+		TCOptional<CStrSecure> MapKey;
+		if (auto pID = _Params.f_GetMember("MapKey"))
+			MapKey = pID->f_String();
+
+		TCOptional<CStrSecure> Name;
+		if (auto pID = _Params.f_GetMember("Name"))
+		{
+			auto &ID = pID->f_String();
+			if (!CSecretsManager::fs_IsValidSemanticIDWildcard(ID))
+				co_return DMibErrorInstance(fg_Format("'{}' is not a valid Name ID", ID));
+			Name = ID;
 		}
 
 		TCSet<CStrSecure> Tags;
@@ -562,14 +647,15 @@ namespace NMib::NCloud::NCloudClient
 			if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 				continue;
 
-			_fGetResult(TrustedActor.m_Actor, SemanticID, Tags).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
+			_fGetResult(TrustedActor.m_Actor, SemanticID, Name, Tags).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 				> Secrets.f_AddResult(TrustedActor.m_TrustInfo.m_HostInfo)
 			;
 		}
 
 		TCMap<CHostInfo, TCAsyncResult<tf_CType>> Results = co_await Secrets.f_GetResults();
 
-		tf_CType *pFirstResult = nullptr;
+		tf_CType ResultToReturn;
+		bool bFirst = true;
 
 		for (auto &Result : Results)
 		{
@@ -585,15 +671,25 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 			}
 
-			if (!pFirstResult)
-				pFirstResult = &*Result;
-			else if (*pFirstResult != *Result)
-				co_return DMibErrorInstance("Data inconsistency between secrets managers. Please try again later.");
+			if (bFirst)
+			{
+				bFirst = false;
+				ResultToReturn = *Result;
+			}
+			else if (ResultToReturn != *Result)
+			{
+				if constexpr (TCIsSame<tf_CType, TCSet<CSecretsManager::CSecretID>>::mc_Value)
+					ResultToReturn += *Result;
+				else if constexpr (TCIsSame<tf_CType, CSecretsManager::CSecret>::mc_Value)
+					co_return DMibErrorInstance("Data inconsistency between secrets managers for '{}'. Please try again later.\n{}\n!=\n{}\n"_f << ResultToReturn << *Result);
+				else
+					static_assert(gc_MakeValueDependent<false, tf_CType>, "Missing support");
+			}
 		}
 
-		if (pFirstResult)
+		if (!bFirst)
 		{
-			if (auto ErrorStr = _fOnResult(pFirstResult, _pCommandLine, Expect, bBinaryAsBase64))
+			if (auto ErrorStr = _fOnResult(ResultToReturn, _pCommandLine, Expect, MapKey, bBinaryAsBase64))
 				co_return DMibErrorInstance(ErrorStr);
 		}
 		else
@@ -602,21 +698,33 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		return g_Future <<= self
 			(
-			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_Enumerate<TCSet<CSecretsManager::CSecretID>>
+			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl<TCSet<CSecretsManager::CSecretID>>
 				, _Params
 			 	, _pCommandLine
-			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_Tags)
+			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCOptional<CStrSecure> const &_Name, TCSet<CStrSecure> const &_Tags)
 			 	-> TCFuture<TCSet<CSecretsManager::CSecretID>>
 				{
-					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(_SemanticID, _Tags);
+					CSecretsManager::CEnumerateSecrets Options;
+					Options.m_SemanticID = _SemanticID;
+					Options.m_Name = _Name;
+					Options.m_TagsExclusive = _Tags;
+
+					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(fg_Move(Options));
 				}
-			 	, [](TCSet<CSecretsManager::CSecretID> *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64) -> CStr
+			 	, []
+				(
+					TCSet<CSecretsManager::CSecretID> const &_Result
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CStr const &_ExpectedFormat
+					, TCOptional<CStrSecure> const &_MapKey
+					, bool _bBinaryAsBase64
+				) -> CStr
 				{
-					for (auto &ID : *pResult)
+					for (auto &ID : _Result)
 						*_pCommandLine += "{}\n"_f << ID;
 
 					return "";
@@ -626,34 +734,94 @@ namespace NMib::NCloud::NCloudClient
 
 	}
 
+	NStr::CStr CCloudClientAppActor::fsp_SecretsManager_OutputSecret
+		(
+			TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			, CSecretsManager::CSecret const &_Secret
+			, bool _bBinaryAsBase64
+			, TCOptional<CStrSecure> const &_MapKey
+		)
+	{
+		if (_MapKey)
+		{
+			auto &MapKey = *_MapKey;
+
+			if (_Secret.f_GetTypeID() == CSecretsManager::ESecretType_BinaryMap)
+			{
+				DMibCheck(_bBinaryAsBase64);
+
+				auto &SecretsMap = _Secret.f_Get<CSecretsManager::ESecretType_BinaryMap>();
+				auto *pSecret = SecretsMap.f_FindEqual(MapKey);
+				if (!pSecret)
+					return "No secret with name '{}' exists in binary map"_f << MapKey;
+
+				if (!_bBinaryAsBase64)
+					*_pCommandLine += *pSecret;
+				else
+					*_pCommandLine += "{}\n"_f << NEncoding::fg_Base64Encode(*pSecret);
+
+				return {};
+			}
+			else if (_Secret.f_GetTypeID() == CSecretsManager::ESecretType_StringMap)
+			{
+				auto &SecretsMap = _Secret.f_Get<CSecretsManager::ESecretType_StringMap>();
+				auto *pSecret = SecretsMap.f_FindEqual(MapKey);
+				if (!pSecret)
+					return "No secret with name '{}' exists in string map"_f << MapKey;
+
+				*_pCommandLine += "{}\n"_f << *pSecret;
+
+				return {};
+			}
+			else
+				DMibNeverGetHere;
+		}
+
+		if (_Secret.f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
+			*_pCommandLine += _Secret.f_Get<CSecretsManager::ESecretType_Binary>();
+		else
+			*_pCommandLine += "{}\n"_f << _Secret;
+
+		return {};
+	}
+
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID
 		(
 		 	CEJSON const &_Params
-		 	, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 		)
 	{
 		return g_Future <<= self
 			(
-			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_Enumerate<CSecretsManager::CSecret>
+			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl<CSecretsManager::CSecret>
 				, _Params
 			 	, _pCommandLine
-			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_Tags) -> TCFuture<CSecretsManager::CSecret>
+			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCOptional<CStrSecure> const &_Name, TCSet<CStrSecure> const &_Tags)
+				-> TCFuture<CSecretsManager::CSecret>
 				{
-					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(*_SemanticID, _Tags);
-				}
-			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64) -> CStr
-				{
-					auto &Secret = *_pResult;
+					CSecretsManager::CGetSecretBySemanticID Options;
+					Options.m_SemanticID = *_SemanticID;
+					Options.m_Name = _Name;
+					Options.m_TagsExclusive = _Tags;
 
-					if (auto Error = fsp_SecretsManager_CheckExpect(Secret, _Expect, _bBinaryAsBase64))
+					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(fg_Move(Options));
+				}
+			 	, []
+				(
+					CSecretsManager::CSecret const &_Secret
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CStr const &_ExpectedFormat
+					, TCOptional<CStrSecure> const &_MapKey
+					, bool _bBinaryAsBase64
+				) -> CStr
+				{
+					if (auto Error = fsp_SecretsManager_CheckExpectedFormat(_Secret, _ExpectedFormat, _bBinaryAsBase64, _MapKey))
 						return Error;
 
-					if (Secret.f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
-						*_pCommandLine += Secret.f_Get<CSecretsManager::ESecretType_Binary>();
-					else
-						*_pCommandLine += "{}\n"_f << Secret;
+					if (auto Error = fsp_SecretsManager_OutputSecret(_pCommandLine, _Secret, _bBinaryAsBase64, _MapKey))
+						return Error;
 
-					return CStr{};
+					return {};
 				}
 			)
 		;
@@ -661,12 +829,22 @@ namespace NMib::NCloud::NCloudClient
 	}
 
 	template<typename tf_CType>
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Get
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl
 		(
 		 	CEJSON const &_Params
 		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
-			, TCFunctionMovable<NStr::CStr (tf_CType *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64)> &&_fOnResult
+			, TCFunctionMovable
+			<
+				NStr::CStr
+				(
+					tf_CType const &_Result
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CStr const &_ExpectedFormat
+					, TCOptional<CStrSecure> const &_MapKey
+					, bool _bBinaryAsBase64
+				)
+			> &&_fOnResult
 		)
 	{
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
@@ -682,6 +860,10 @@ namespace NMib::NCloud::NCloudClient
 
 		if (auto pValue = _Params.f_GetMember("Expect"))
 			Expect = pValue->f_String();
+
+		TCOptional<CStrSecure> MapKey;
+		if (auto pID = _Params.f_GetMember("MapKey"))
+			MapKey = pID->f_String();
 
 		if (fsp_SecretsManager_GetID(_Params, ID, Error))
 			co_return DMibErrorInstance(Error);
@@ -721,12 +903,12 @@ namespace NMib::NCloud::NCloudClient
 			if (!pFirstResult)
 				pFirstResult = &*Result;
 			else if (*pFirstResult != *Result)
-				co_return DMibErrorInstance("Data inconsistency between secrets managers. Please try again later.");
+				co_return DMibErrorInstance("Data inconsistency between secrets managers. Please try again later.\n{}\n!=\n{}\n"_f << *pFirstResult << *Result);
 		}
 
 		if (pFirstResult)
 		{
-			if (auto ErrorStr = _fOnResult(pFirstResult, _pCommandLine, Expect, bBinaryAsBase64))
+			if (auto ErrorStr = _fOnResult(*pFirstResult, _pCommandLine, Expect, MapKey, bBinaryAsBase64))
 				co_return DMibErrorInstance(ErrorStr);
 		}
 		else
@@ -735,74 +917,94 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		return g_Future <<= self
 			(
-			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_Get<CSecretsManager::CSecret>
+			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl<CSecretsManager::CSecret>
 				, _Params
 			 	, _pCommandLine
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID) -> TCFuture<CSecretsManager::CSecret>
 				{
 					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecret)(fg_TempCopy(_ID));
 				}
-			 	, [](CSecretsManager::CSecret *_pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64) -> CStr
+			 	, []
+				(
+					CSecretsManager::CSecret const &_Secret
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CStr const &_ExpectedFormat
+					, TCOptional<CStrSecure> const &_MapKey
+					, bool _bBinaryAsBase64
+				) -> CStr
 				{
-					auto &Secret = *_pResult;
-
-					if (auto Error = fsp_SecretsManager_CheckExpect(Secret, _Expect, _bBinaryAsBase64))
+					if (auto Error = fsp_SecretsManager_CheckExpectedFormat(_Secret, _ExpectedFormat, _bBinaryAsBase64, _MapKey))
 						return Error;
 
-					if (Secret.f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
-						*_pCommandLine += Secret.f_Get<CSecretsManager::ESecretType_Binary>();
-					else
-						*_pCommandLine += "{}\n"_f << Secret;
+					if (auto Error = fsp_SecretsManager_OutputSecret(_pCommandLine, _Secret, _bBinaryAsBase64, _MapKey))
+						return Error;
 
-					return CStr{};
+					return {};
 				}
 			)
 		;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		return g_Future <<= self
 			(
-			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_Get<CSecretsManager::CSecretProperties>
+			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl<CSecretsManager::CSecretProperties>
 				, _Params
 			 	, _pCommandLine
 			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID) -> TCFuture<CSecretsManager::CSecretProperties>
 				{
 					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecretProperties)(fg_TempCopy(_ID));
 				}
-			 	, [](CSecretsManager::CSecretProperties *pResult, TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Expect, bool _bBinaryAsBase64) -> CStr
+			 	, []
+				(
+					CSecretsManager::CSecretProperties const &_Result
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CStr const &_ExpectedFormat
+					, TCOptional<CStrSecure> const &_MapKey
+					, bool _bBinaryAsBase64
+				) -> CStr
 				{
-					auto &Result = *pResult;
-
-					if ((*Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_File)
-						*_pCommandLine += "Secret (file):   {}\n"_f << *Result.m_Secret;
-					else if ((*Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
-						*_pCommandLine += "Secret (base64): {}\n"_f << *Result.m_Secret;
+					if ((*_Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_File)
+						*_pCommandLine += "Secret (file):   {}\n"_f << *_Result.m_Secret;
+					else if ((*_Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_Binary && !_bBinaryAsBase64)
+						*_pCommandLine += "Secret (base64): {}\n"_f << *_Result.m_Secret;
 					else
-						*_pCommandLine += "Secret:          {}\n"_f << *Result.m_Secret;
-					if (*Result.m_UserName)
-						*_pCommandLine += "Username:        {}\n"_f << *Result.m_UserName;
-					if (*Result.m_URL)
-						*_pCommandLine += "URL:             {}\n"_f << *Result.m_URL;
-					if ((*Result.m_Expires).f_IsValid())
-						*_pCommandLine += "Expires:         {}\n"_f << *Result.m_Expires;
-					if (*Result.m_Notes)
-						*_pCommandLine += "Notes:           {}\n"_f << *Result.m_Notes;
-					if (!(*Result.m_Metadata).f_IsEmpty())
-						*_pCommandLine += "Metadata:\n{}"_f << *Result.m_Metadata;
-					if ((*Result.m_Created).f_IsValid())
-						*_pCommandLine += "Created:         {}\n"_f << *Result.m_Created;
-					if ((*Result.m_Modified).f_IsValid())
-						*_pCommandLine += "Modified:        {}\n"_f << *Result.m_Modified;
-					if (*Result.m_SemanticID)
-						*_pCommandLine += "SemanticID:      {}\n"_f << *Result.m_SemanticID;
-					if (!(*Result.m_Tags).f_IsEmpty())
-						*_pCommandLine += "Tags:            {vs}\n"_f << *Result.m_Tags;
+						*_pCommandLine += "Secret:          {}\n"_f << *_Result.m_Secret;
+
+					if (*_Result.m_UserName)
+						*_pCommandLine += "Username:        {}\n"_f << *_Result.m_UserName;
+
+					if (*_Result.m_URL)
+						*_pCommandLine += "URL:             {}\n"_f << *_Result.m_URL;
+
+					if ((*_Result.m_Expires).f_IsValid())
+						*_pCommandLine += "Expires:         {}\n"_f << *_Result.m_Expires;
+
+					if (*_Result.m_Notes)
+						*_pCommandLine += "Notes:           {}\n"_f << *_Result.m_Notes;
+
+					if (!(*_Result.m_Metadata).f_IsEmpty())
+						*_pCommandLine += "Metadata:\n{}"_f << *_Result.m_Metadata;
+
+					if ((*_Result.m_Created).f_IsValid())
+						*_pCommandLine += "Created:         {}\n"_f << *_Result.m_Created;
+
+					if ((*_Result.m_Modified).f_IsValid())
+						*_pCommandLine += "Modified:        {}\n"_f << *_Result.m_Modified;
+
+					if (*_Result.m_SemanticID)
+						*_pCommandLine += "SemanticID:      {}\n"_f << *_Result.m_SemanticID;
+
+					if (!(*_Result.m_Tags).f_IsEmpty())
+						*_pCommandLine += "Tags:            {vs}\n"_f << *_Result.m_Tags;
+
+					if (_Result.m_Immutable && *_Result.m_Immutable)
+						*_pCommandLine += "Immutable:            true\n";
 
 					return "";
 				}
@@ -810,7 +1012,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		bool bBinaryAsBase64 = _Params["BinaryAsBase64"].f_Boolean();
@@ -947,14 +1149,17 @@ namespace NMib::NCloud::NCloudClient
 		if (!pSecretsManager)
 			co_return DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error));
 
-		co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_SetSecretProperties)(fg_Move(ID), fg_Move(Properties))
+		auto Result = co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_SetSecretProperties)(fg_Move(ID), fg_Move(Properties))
 			.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 		;
+
+		if (!(Result.m_Flags & CSecretsManager::ESetSecretPropertiesResultFlag_Updated))
+			*_pCommandLine %= "No changes detected. Secret was not updated\n";
 
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1006,7 +1211,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1015,37 +1220,25 @@ namespace NMib::NCloud::NCloudClient
 		if (fsp_SecretsManager_GetID(_Params, ID, Error))
 			co_return DMibErrorInstance(Error);
 
-		CStrSecure MetadataKey;
-		CEJSON MetadataValue;
-		if (auto pValue = _Params.f_GetMember("Metadata"))
-		{
-			auto Object = pValue->f_Object();
-			if (auto iMetaData = Object.f_OrderedIterator())
-			{
-				MetadataKey = iMetaData->f_Name();
-				MetadataValue = iMetaData->f_Value();
-				++iMetaData;
-				if (iMetaData)
-					co_return DMibErrorInstance("Multiple key values specified");
-			}
-			else
-				co_return DMibErrorInstance("No key value specified");
-		}
-
 		co_await self(&CCloudClientAppActor::fp_SecretsManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for secrets managers");
 
 		auto *pSecretsManager = mp_SecretsManagers.f_GetOneActor(Host, Error);
 		if (!pSecretsManager)
 			co_return DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error));
 
-		co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_SetMetadata)(fg_Move(ID), MetadataKey, fg_Move(MetadataValue))
-			.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-		;
+		CSecretsManager::CSetMetadata SetMetadata;
+		SetMetadata.m_ID = ID;
+		SetMetadata.m_Key = _Params["Key"].f_String();
+		SetMetadata.m_Value = _Params["Value"];
+		if (auto *pExpectedValue = _Params.f_GetMember("ExpectedValue"))
+			SetMetadata.m_ExpectedValue = *pExpectedValue;
+
+		co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_SetMetadata)(fg_Move(SetMetadata)).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply");
 
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1071,7 +1264,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1093,7 +1286,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1161,7 +1354,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;

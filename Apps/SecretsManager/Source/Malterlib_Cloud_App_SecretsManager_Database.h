@@ -32,13 +32,14 @@ namespace NMib::NCloud::NSecretsManager
 		NContainer::CSecureByteVector m_IV;
 		NContainer::CSecureByteVector m_HMACKey;
 		NStr::CStr m_RandomFileName;
+		bool m_bImmutable = false;
 	};
 
 	struct CSecretsDatabase
 	{
 		enum
 		{
-			ESecretsManagerDatabaseVersion = 0x101
+			ESecretsManagerDatabaseVersion = 0x102
 		};
 
 		template <typename tf_CStream>

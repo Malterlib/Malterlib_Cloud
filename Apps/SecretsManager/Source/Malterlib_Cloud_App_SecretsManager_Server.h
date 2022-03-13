@@ -23,14 +23,14 @@ namespace NMib::NCloud::NSecretsManager
 
 		struct CSecretsManagerImplementation : public CSecretsManager
 		{
-			TCFuture<TCSet<CSecretID>> f_EnumerateSecrets(TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_TagsExclusive) override;
-			TCFuture<void> f_SetSecretProperties(CSecretID &&_ID, CSecretProperties &&_Secret) override;
+			TCFuture<TCSet<CSecretID>> f_EnumerateSecrets(CEnumerateSecrets const &_Options) override;
+			TCFuture<CSetSecretPropertiesResult> f_SetSecretProperties(CSecretID &&_ID, CSecretProperties &&_Secret) override;
 			TCFuture<CSecretProperties> f_GetSecretProperties(CSecretID &&_ID) override;
 			TCFuture<CSecret> f_GetSecret(CSecretID &&_ID) override;
-			TCFuture<CSecret> f_GetSecretBySemanticID(CStrSecure const &_SemanticID, TCSet<CStrSecure> const &_TagsExclusive) override;
+			TCFuture<CSecret> f_GetSecretBySemanticID(CGetSecretBySemanticID const &_Options) override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> f_DownloadFile(CSecretID &&_ID, TCActorSubscriptionWithID<> &&_Subscription) override;
 			TCFuture<void> f_ModifyTags(CSecretID &&_ID, TCSet<CStrSecure> &&_TagsToRemove, TCSet<CStrSecure> &&_TagsToAdd) override;
-			TCFuture<void> f_SetMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey, CEJSON &&_Metadata) override;
+			TCFuture<void> f_SetMetadata(CSetMetadata &&_Metadata) override;
 			TCFuture<void> f_RemoveMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey) override;
 			TCFuture<void> f_RemoveSecret(CSecretID &&_ID) override;
 			TCFuture<TCActorFunctorWithID<TCFuture<void> ()>> f_UploadFile
@@ -105,7 +105,14 @@ namespace NMib::NCloud::NSecretsManager
 #if DMibConfig_Tests_Enable
 		TCFuture<CEJSON> f_Test_Command(CStr const &_Command, CEJSON const &_Params);
 #endif
-		static bool fs_MatchSecret(CSecretPropertiesInternal const &_SecretProperties, TCOptional<CStrSecure> const &_SemanticID, TCSet<CStrSecure> const &_TagsExclusive);
+		static bool fs_MatchSecret
+			(
+				CSecretPropertiesInternal const &_SecretProperties
+				, TCOptional<CStrSecure> const &_SemanticID
+				, TCOptional<CStrSecure> const &_Name
+				, TCSet<CStrSecure> const &_TagsExclusive
+			)
+		;
 
 	private:
 		TCFuture<void> fp_Destroy() override;
@@ -134,6 +141,7 @@ namespace NMib::NCloud::NSecretsManager
 			(
 				TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal> &_Secrets
 				, TCOptional<CStrSecure> const &_SemanticID
+				, TCOptional<CStrSecure> const &_Name
 				, TCSet<CStrSecure> const &_TagsExclusive
 			 	, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
 			)
