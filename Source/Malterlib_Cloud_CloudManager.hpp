@@ -46,7 +46,7 @@ namespace NMib::NCloud
 	void CCloudManager::CApplicationInfo::f_Stream(tf_CStream &_Stream)
 	{
 		uint32 AppManagerInterfaceVersion = 0x110;
-		static_assert(CAppManagerInterface::EProtocolVersion == 0x116, "Add a new version mapping if streaming of m_ApplicationInfo changed");
+		static_assert(CAppManagerInterface::EProtocolVersion_Current == 0x116, "Add a new version mapping if streaming of m_ApplicationInfo changed");
 
 		if (_Stream.f_GetVersion() >= 0x109)
 			AppManagerInterfaceVersion = 0x114;

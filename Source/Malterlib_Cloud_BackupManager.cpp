@@ -417,7 +417,7 @@ namespace NMib::NCloud
 
 	bool CBackupManager::fs_IsValidProtocolVersion(uint32 _Version)
 	{
-		return _Version >= EMinProtocolVersion && _Version <= EProtocolVersion;
+		return _Version >= EProtocolVersion_Min && _Version <= EProtocolVersion_Current;
 	}
 
 	void CBackupManager::CBackupInfo::f_Format(NStr::CStrAggregate &o_Str) const

@@ -51,7 +51,7 @@ namespace NMib::NCloud
 	void CFileTransferContext::CInternal::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
-		m_Version = fg_Min(m_Version, EProtocolVersion);
+		m_Version = fg_Min(m_Version, EProtocolVersion_Current);
 		if (m_Version < 0x101)
 			DMibError("Invalid protocol version");
 		DMibBinaryStreamVersion(_Stream, m_Version);
@@ -105,7 +105,7 @@ namespace NMib::NCloud
 	void CFileTransferContext::CInternal::CSendPart::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
+		if (m_Version < 0x101 || m_Version > EProtocolVersion_Current)
 			DMibError("Invalid protocol version");
 		DMibBinaryStreamVersion(_Stream, m_Version);
 	}
@@ -135,7 +135,7 @@ namespace NMib::NCloud
 	void CFileTransferContext::CInternal::CSendPart::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
+		if (m_Version < 0x101 || m_Version > EProtocolVersion_Current)
 			DMibError("Invalid protocol version");
 		DMibBinaryStreamVersion(_Stream, m_Version);
 		_Stream >> m_FilePath;
@@ -184,7 +184,7 @@ namespace NMib::NCloud
 	void CFileTransferContext::CInternal::CStateChange::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
+		if (m_Version < 0x101 || m_Version > EProtocolVersion_Current)
 			DMibError("Invalid protocol version");
 		DMibBinaryStreamVersion(_Stream, m_Version);
 	}
@@ -210,7 +210,7 @@ namespace NMib::NCloud
 	void CFileTransferContext::CInternal::CStateChange::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
-		if (m_Version < 0x101 || m_Version > EProtocolVersion)
+		if (m_Version < 0x101 || m_Version > EProtocolVersion_Current)
 			DMibError("Invalid protocol version");
 		DMibBinaryStreamVersion(_Stream, m_Version);
 		_Stream >> m_State;

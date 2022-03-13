@@ -13,7 +13,7 @@ namespace NMib::NCloud
 	{
 		enum : uint32
 		{
-			EProtocolVersion = 0x101
+			EProtocolVersion_Current = 0x101
 		};
 
 		struct CSendPart
@@ -93,7 +93,7 @@ namespace NMib::NCloud
 		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream);
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
 		
-		uint32 m_Version = EProtocolVersion;
+		uint32 m_Version = EProtocolVersion_Current;
 		
 		CManifest m_Manifest;
 		uint64 m_QueueSize = 8*1024*1024;

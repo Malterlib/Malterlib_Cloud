@@ -25,8 +25,8 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EMinProtocolVersion = 0x103
-			, EProtocolVersion = 0x107
+			EProtocolVersion_Min = 0x103
+			, EProtocolVersion_Current = 0x107
 		};
 
 		struct CVersionID : public CCloudVersion

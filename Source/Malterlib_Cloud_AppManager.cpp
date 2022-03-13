@@ -33,5 +33,5 @@ namespace NMib::NCloud
 	
 	CAppManagerInterface::~CAppManagerInterface() = default;
 
-	static_assert(CVersionManager::EMinProtocolVersion <= 0x105);
+	static_assert(CVersionManager::EProtocolVersion_Min <= 0x105);
 }

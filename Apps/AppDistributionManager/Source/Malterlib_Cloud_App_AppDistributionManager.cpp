@@ -26,13 +26,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			}
 		;
 
-		mp_VersionManagerSubscription = co_await mp_State.m_TrustManager
-			(
-				&CDistributedActorTrustManager::f_SubscribeTrustedActors<CVersionManager>
-				, CVersionManager::mc_pDefaultNamespace
-				, fg_ThisActor(this)
-			)
-		;
+		mp_VersionManagerSubscription = co_await mp_State.m_TrustManager->f_SubscribeTrustedActors<CVersionManager>();
 
 		co_await mp_VersionManagerSubscription.f_OnActor
 			(

@@ -85,7 +85,7 @@ namespace NMib::NCloud
 	
 	bool CVersionManager::fs_IsValidProtocolVersion(uint32 _Version)
 	{
-		return _Version >= EMinProtocolVersion && _Version <= EProtocolVersion;
+		return _Version >= EProtocolVersion_Min && _Version <= EProtocolVersion_Current;
 	}
 	
 	bool CVersionManager::fs_IsValidVersionIdentifier(CVersionID const &_VersionID, CStr &o_Error)

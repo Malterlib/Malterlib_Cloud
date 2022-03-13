@@ -19,8 +19,8 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EMinProtocolVersion = 0x107
-			, EProtocolVersion = 0x116
+			EProtocolVersion_Min = 0x107
+			, EProtocolVersion_Current = 0x116
 		};
 		
 		CAppManagerInterface();

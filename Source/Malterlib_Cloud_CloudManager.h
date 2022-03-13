@@ -15,8 +15,8 @@ namespace NMib::NCloud
 {
 	enum
 	{
-		ECloudManagerMinProtocolVersion = 0x101
-		, ECloudManagerProtocolVersion = 0x110
+		ECloudManagerProtocolVersion_Min = 0x101
+		, ECloudManagerProtocolVersion_Current = 0x110
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -31,8 +31,8 @@ namespace NMib::NCloud
 		
 		enum : uint32
 		{
-			EMinProtocolVersion = ECloudManagerMinProtocolVersion
-			, EProtocolVersion = ECloudManagerProtocolVersion
+			EProtocolVersion_Min = ECloudManagerProtocolVersion_Min
+			, EProtocolVersion_Current = ECloudManagerProtocolVersion_Current
 		};
 
 		struct CAppManagerInfo

@@ -16,8 +16,8 @@ namespace NMib::NCloud
 {
 	enum
 	{
-		EBackupManagerMinProtocolVersion = 0x101
-		, EBackupManagerProtocolVersion = 0x105
+		EBackupManagerProtocolVersion_Min = 0x101
+		, EBackupManagerProtocolVersion_Current = 0x105
 	};
 
 	DMibImpErrorClassDefine(CExceptionBackupManagerHashMismatch, NException::CException);
@@ -37,8 +37,8 @@ namespace NMib::NCloud
 	{
 		enum : uint32 
 		{
-			EMinProtocolVersion = EBackupManagerMinProtocolVersion
-			, EProtocolVersion = EBackupManagerProtocolVersion
+			EProtocolVersion_Min = EBackupManagerProtocolVersion_Min
+			, EProtocolVersion_Current = EBackupManagerProtocolVersion_Current
 		};
 		
 		enum EManifestChange
@@ -185,8 +185,8 @@ namespace NMib::NCloud
 		
 		enum : uint32
 		{
-			EMinProtocolVersion = EBackupManagerMinProtocolVersion
-			, EProtocolVersion = EBackupManagerProtocolVersion
+			EProtocolVersion_Min = EBackupManagerProtocolVersion_Min
+			, EProtocolVersion_Current = EBackupManagerProtocolVersion_Current
 		};
 		
 		CBackupManager();

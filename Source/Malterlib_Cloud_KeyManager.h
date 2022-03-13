@@ -21,8 +21,8 @@ namespace NMib::NCloud
 		
 		enum : uint32
 		{
-			EMinProtocolVersion = 0x101
-			, EProtocolVersion = 0x101
+			EProtocolVersion_Min = 0x101
+			, EProtocolVersion_Current = 0x101
 		};
 		
 		CKeyManager(NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
