@@ -35,7 +35,12 @@ namespace NMib::NCloud::NCloudManager
 	{
 		TCActorResultVector<void> PublishResults;
 		mp_ProtocolInterface.f_Publish<CCloudManager>(mp_AppState.m_DistributionManager, this) > PublishResults.f_AddResult();
-		mp_SensorReporterInterface.f_Construct(mp_AppState.m_DistributionManager, this);
+
+		if (mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("PushlishSensorReporter", false).f_Boolean())
+			mp_SensorReporterInterface.f_Publish<CDistributedAppSensorReporter>(mp_AppState.m_DistributionManager, this) > PublishResults.f_AddResult();
+		else
+			mp_SensorReporterInterface.f_Construct(mp_AppState.m_DistributionManager, this);
+
 		mp_SensorReaderInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 
 		co_await PublishResults.f_GetResults() | g_Unwrap;
