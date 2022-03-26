@@ -14,14 +14,14 @@ class CAppManager_Sensor_Tests : public NMib::NTest::CTest
 public:
 	void f_DoTests()
 	{
-		DMibTestSuite("General")
+		DMibTestSuite("General") -> TCFuture<void>
 		{
 			CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp | CAppManagerTestHelper::EOption_EnableVersionManager;
 			//Options |= CAppManagerTestHelper::EOption_EnableLogging;
 			//Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
 			CAppManagerTestHelper AppManagerTestHelper("AppManagerSensorTests", Options, g_Timeout);
-			AppManagerTestHelper.f_Setup(1);
+			co_await AppManagerTestHelper.f_Setup(1);
 			auto &AppManagerInfo = *AppManagerTestHelper.m_AppManagerInfos.f_FindAny();
 
 			auto fRemoveDynamicReadingProperties = [](CEJSON &&_Readings)
@@ -546,6 +546,8 @@ public:
 					)
 				;
 			}
+
+			co_return {};
 		};
 	}
 };

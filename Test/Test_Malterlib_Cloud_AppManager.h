@@ -37,7 +37,7 @@ using namespace NMib::NTest;
 
 namespace NMib::NCloud
 {
-	struct CAppManagerTestHelper
+	struct CAppManagerTestHelper : CAllowUnsafeThis
 	{
 		enum EOption
 		{
@@ -75,16 +75,12 @@ namespace NMib::NCloud
 			return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, mc_WaitForSubscriptions};
 		}
 
-		void f_SetupTrust();
-		void f_InstallTestApp(CStr const &_Name = "TestApp", CStr const &_Tag = "TestTag", CStr const &_Group = "TestGroup", CStr const &_VersionManagerApplication = "TestApp");
-		void f_CheckCloudManager(mint _Sequence);
-		void f_Setup(mint _nAppManagers);
+		TCFuture<void> f_SetupTrust();
+		TCFuture<void> f_InstallTestApp(CStr _Name = "TestApp", CStr _Tag = "TestTag", CStr _Group = "TestGroup", CStr _VersionManagerApplication = "TestApp");
+		TCFuture<void> f_CheckCloudManager(mint _Sequence);
+		TCFuture<void> f_Setup(mint _nAppManagers);
 
 		static auto constexpr mc_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
-
-		TCSharedPointer<CDefaultRunLoop> m_pRunLoop = fg_Construct();
-		TCActor<CDispatchingActor> m_HelperActor{fg_Construct(), m_pRunLoop->f_Dispatcher()};
-		CCurrentlyProcessingActorScope m_CurrentActor{m_HelperActor};
 
 		CStr m_ProgramDirectory = CFile::fs_GetProgramDirectory();
 		CStr m_RootDirectory;

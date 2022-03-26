@@ -35,17 +35,14 @@ namespace NMib::NCloud
 
 	CAppManagerTestHelper::~CAppManagerTestHelper()
 	{
-		if (m_HelperActor)
-			m_HelperActor->f_BlockDestroy(m_pRunLoop->f_ActorDestroyLoop());
-
 		if (m_LaunchHelper)
-			m_LaunchHelper->f_BlockDestroy(m_pRunLoop->f_ActorDestroyLoop());
+			m_LaunchHelper->f_BlockDestroy();
 
 		if (m_TrustManager)
-			m_TrustManager->f_BlockDestroy(m_pRunLoop->f_ActorDestroyLoop());
+			m_TrustManager->f_BlockDestroy();
 	}
 
-	void CAppManagerTestHelper::f_SetupTrust()
+	TCFuture<void> CAppManagerTestHelper::f_SetupTrust()
 	{
 		TCActorResultVector<void> SetupTrustResults;
 
@@ -196,7 +193,7 @@ namespace NMib::NCloud
 			}
 		}
 		DMibTestMark;
-		fg_CombineResults(SetupTrustResults.f_GetResults().f_CallSync(m_pRunLoop, m_Timeout));
+		co_await SetupTrustResults.f_GetResults().f_Timeout(m_Timeout, "Timed out waiting for trust setup") | g_Unwrap;
 
 		DMibTestMark;
 		for (NTime::CClock Timer(true); true; NSys::fg_Thread_Sleep(1.0))
@@ -222,9 +219,11 @@ namespace NMib::NCloud
 				DMibError("Timed out waiting for version manager and cloud manager subscriptions");
 		}
 		DMibTestMark;
+
+		co_return {};
 	}
 
-	void CAppManagerTestHelper::f_InstallTestApp(CStr const &_Name, CStr const &_Tag, CStr const &_Group, CStr const &_VersionManagerApplication)
+	TCFuture<void> CAppManagerTestHelper::f_InstallTestApp(CStr _Name, CStr _Tag, CStr _Group, CStr _VersionManagerApplication)
 	{
 		TCActorResultVector<void> AddAppResults;
 		for (auto &AppManager : m_AppManagerInfos)
@@ -282,17 +281,19 @@ namespace NMib::NCloud
 			}
 		}
 		DMibTestMark;
-		fg_CombineResults(AddAppResults.f_GetResults().f_CallSync(m_pRunLoop, m_Timeout));
+		co_await AddAppResults.f_GetResults().f_Timeout(m_Timeout, "Timed out waiting for installing test apps") | g_Unwrap;
+
+		co_return {};
 	}
 
-	void CAppManagerTestHelper::f_CheckCloudManager(mint _Sequence)
+	TCFuture<void> CAppManagerTestHelper::f_CheckCloudManager(mint _Sequence)
 	{
 		DMibTestPath("CloudManager{}"_f << _Sequence);
 
-		auto AppManagers = m_CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_CallSync(m_pRunLoop, m_Timeout);
+		auto AppManagers = co_await m_CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_Timeout(m_Timeout, "Timeout");
 		NTime::CClock Clock{true};
 		while (AppManagers.f_GetLen() < m_nAppManagers && Clock.f_GetTime() < m_Timeout)
-			AppManagers = m_CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_CallSync(m_pRunLoop, m_Timeout);
+			AppManagers = co_await m_CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_Timeout(m_Timeout, "Timeout");
 		DMibExpect(AppManagers.f_GetLen(), ==, m_nAppManagers);
 
 		NStr::CStr HostName = NProcess::NPlatform::fg_Process_GetFullyQualiedHostName();
@@ -306,9 +307,9 @@ namespace NMib::NCloud
 
 		DMibExpect(ActualAppManagers, ==, ExpectedAppManagers);
 
-		auto Applications = m_CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)().f_CallSync(m_pRunLoop, m_Timeout);
+		auto Applications = co_await m_CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)().f_Timeout(m_Timeout, "Timeout");
 		while (Applications.f_GetLen() < m_nAppManagers && Clock.f_GetTime() < m_Timeout)
-			Applications = m_CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)().f_CallSync(m_pRunLoop, m_Timeout);
+			Applications = co_await m_CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)().f_Timeout(m_Timeout, "Timeout");
 		DMibExpect(Applications.f_GetLen(), ==, m_nAppManagers);
 
 		for (auto &Application : Applications)
@@ -317,9 +318,11 @@ namespace NMib::NCloud
 			DMibExpect(ApplicationKey.m_Name, ==, "TestApp")(ETestFlag_Aggregated);
 			DMibExpect(Application.m_ApplicationInfo.m_Status, ==, "Launched")(ETestFlag_Aggregated);
 		}
+
+		co_return {};
 	}
 
-	void CAppManagerTestHelper::f_Setup(mint _nAppManagers)
+	TCFuture<void> CAppManagerTestHelper::f_Setup(mint _nAppManagers)
 	{
 		m_nAppManagers = _nAppManagers;
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, m_RootDirectory, m_Timeout);
@@ -340,17 +343,17 @@ namespace NMib::NCloud
 		CFile::fs_CreateDirectory(m_RootDirectory);
 
 		m_TrustManager = m_TrustManagerState.f_TrustManager("TestHelper");
-		m_TestHostID = m_TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(m_pRunLoop, m_Timeout);
+		m_TestHostID = co_await m_TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_Timeout(m_Timeout, "Timeout");
 		m_Subscriptions = fg_Construct(m_TrustManager);
 
 		m_ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << m_RootDirectory);
-		m_TrustManager(&CDistributedActorTrustManager::f_AddListen, m_ServerAddress).f_CallSync(m_pRunLoop, m_Timeout);
+		co_await m_TrustManager(&CDistributedActorTrustManager::f_AddListen, m_ServerAddress).f_Timeout(m_Timeout, "Timeout");
 
 		{
 			CDistributedApp_LaunchHelperDependencies Dependencies;
 			Dependencies.m_Address = m_ServerAddress.m_URL;
 			Dependencies.m_TrustManager = m_TrustManager;
-			Dependencies.m_DistributionManager = m_TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(m_pRunLoop, m_Timeout);
+			Dependencies.m_DistributionManager = co_await m_TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_Timeout(m_Timeout, "Timeout");
 
 			NMib::NConcurrency::CDistributedActorSecurity Security;
 			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CCloudManager::mc_pDefaultNamespace);
@@ -358,7 +361,7 @@ namespace NMib::NCloud
 			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CVersionManager::mc_pDefaultNamespace);
 			Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CDistributedAppSensorReporter::mc_pDefaultNamespace);
 
-			Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(m_pRunLoop, m_Timeout);
+			co_await Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_Timeout(m_Timeout, "Timeout");
 
 			m_LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, (m_Options & EOption_EnableLogging | EOption_EnableOtherOutput) != EOption_None);
 		}
@@ -369,7 +372,7 @@ namespace NMib::NCloud
 			CFile::fs_CreateDirectory(m_VersionManagerDirectory);
 			CFile::fs_DiffCopyFileOrDirectory(m_ProgramDirectory + "/TestApps/VersionManager", m_VersionManagerDirectory, nullptr);
 
-			m_VersionManagerLaunch = m_LaunchHelper
+			m_VersionManagerLaunch = co_await m_LaunchHelper
 				(
 					&CDistributedApp_LaunchHelper::f_LaunchInProcess
 					, "VersionManager"
@@ -377,7 +380,7 @@ namespace NMib::NCloud
 					, &fg_ConstructApp_VersionManager
 					, NContainer::TCVector<NStr::CStr>{}
 				)
-				.f_CallSync(m_pRunLoop, m_Timeout)
+				.f_Timeout(m_Timeout, "Timeout")
 			;
 
 			DMibExpect(m_VersionManagerLaunch->m_HostID, !=, "");
@@ -389,7 +392,7 @@ namespace NMib::NCloud
 			CFile::fs_CreateDirectory(m_CloudManagerDirectory);
 			CFile::fs_DiffCopyFileOrDirectory(m_ProgramDirectory + "/TestApps/CloudManager", m_CloudManagerDirectory, nullptr);
 
-			m_CloudManagerLaunch = m_LaunchHelper
+			m_CloudManagerLaunch = co_await m_LaunchHelper
 				(
 					&CDistributedApp_LaunchHelper::f_LaunchInProcess
 					, "CloudManager"
@@ -397,7 +400,7 @@ namespace NMib::NCloud
 					, &fg_ConstructApp_CloudManager
 					, NContainer::TCVector<NStr::CStr>{}
 				)
-				.f_CallSync(m_pRunLoop, m_Timeout)
+				.f_Timeout(m_Timeout, "Timeout")
 			;
 
 			DMibExpect(m_CloudManagerLaunch->m_HostID, !=, "");
@@ -425,7 +428,7 @@ namespace NMib::NCloud
 				;
 			}
 			DMibTestMark;
-			fg_CombineResults(AppManagerLaunchesResults.f_GetResults().f_CallSync());
+			co_await AppManagerLaunchesResults.f_GetResults() | g_Unwrap;
 		}
 		{
 			// Launch AppManagers
@@ -454,7 +457,7 @@ namespace NMib::NCloud
 				;
 			}
 			DMibTestMark;
-			auto Results = AppManagerLaunchesResults.f_GetResults().f_CallSync(m_pRunLoop, m_Timeout);
+			auto Results = co_await AppManagerLaunchesResults.f_GetResults().f_Timeout(m_Timeout, "Timeout");
 			for (auto &LaunchResult : Results)
 			{
 				mint iAppManager = Results.fs_GetKey(LaunchResult);
@@ -475,7 +478,9 @@ namespace NMib::NCloud
 			// Add listen socket that app managers can connect to
 			m_VersionManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/versionmanager.sock"_f << m_VersionManagerDirectory));
 			DMibTestMark;
-			m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(m_VersionManagerServerAddress).f_CallSync(m_pRunLoop, m_Timeout);
+			co_await m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(m_VersionManagerServerAddress)
+				.f_Timeout(m_Timeout, "Timeout")
+			;
 		}
 		{
 			// Setup CloudMangaer
@@ -483,7 +488,7 @@ namespace NMib::NCloud
 			// Add listen socket that app managers can connect to
 			m_CloudManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/cloudmanager.sock"_f << m_CloudManagerDirectory));
 			DMibTestMark;
-			m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(m_CloudManagerServerAddress).f_CallSync(m_pRunLoop, m_Timeout);
+			co_await m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(m_CloudManagerServerAddress).f_Timeout(m_Timeout, "Timeout");
 		}
 		{
 			// Add trust to cloud client
@@ -491,11 +496,11 @@ namespace NMib::NCloud
 			m_CloudClientHostID = CProcessLaunch::fs_LaunchTool(m_CloudClientDirectory + "/MalterlibCloud", fg_CreateVector<CStr>("--trust-host-id")).f_Trim();
 			if (m_Options & EOption_EnableVersionManager)
 			{
-				auto Ticket = m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
+				auto Ticket = co_await m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 					(
 						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{m_VersionManagerServerAddress}
 					)
-					.f_CallSync(m_pRunLoop, m_Timeout)
+					.f_Timeout(m_Timeout, "Timeout")
 				;
 				CProcessLaunch::fs_LaunchTool
 					(
@@ -504,19 +509,19 @@ namespace NMib::NCloud
 					)
 				;
 				DMibTestMark;
-				m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+				co_await m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
 						fs_Permissions(m_CloudClientHostID, m_VersionManagerPermissionsForTest)
 					)
-					.f_CallSync(m_pRunLoop, m_Timeout)
+					.f_Timeout(m_Timeout, "Timeout")
 				;
 			}
 			{
-				auto Ticket = m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
+				auto Ticket = co_await m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 					(
 						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{m_CloudManagerServerAddress}
 					)
-					.f_CallSync(m_pRunLoop, m_Timeout)
+					.f_Timeout(m_Timeout, "Timeout")
 				;
 				CProcessLaunch::fs_LaunchTool
 					(
@@ -525,11 +530,11 @@ namespace NMib::NCloud
 					)
 				;
 				DMibTestMark;
-				m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+				co_await m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
 						fs_Permissions(m_CloudClientHostID, m_CloudManagerPermissionsForTest)
 					)
-					.f_CallSync(m_pRunLoop, m_Timeout)
+					.f_Timeout(m_Timeout, "Timeout")
 				;
 			}
 		}
@@ -537,41 +542,41 @@ namespace NMib::NCloud
 		{
 			// Setup trust between VersionManager and Test
 			DMibTestMark;
-			m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+			co_await m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 				(
 					 fs_Permissions(m_TestHostID, m_VersionManagerPermissionsForTest)
 				)
-				.f_CallSync(m_pRunLoop, m_Timeout)
+				.f_Timeout(m_Timeout, "Timeout")
 			;
 			DMibTestMark;
-			m_TrustManager
+			co_await m_TrustManager
 				(
 					&CDistributedActorTrustManager::f_AllowHostsForNamespace
 					, CVersionManager::mc_pDefaultNamespace
 					, TCSet<CStr>{m_VersionManagerHostID}
 					, mc_WaitForSubscriptions
 				)
-				.f_CallSync(m_pRunLoop, m_Timeout)
+				.f_Timeout(m_Timeout, "Timeout")
 			;
 		}
 		{
 			// Setup trust between CloudManager and Test
 			DMibTestMark;
-			m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+			co_await m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 				(
 					 fs_Permissions(m_TestHostID, m_CloudManagerPermissionsForTest)
 				)
-				.f_CallSync(m_pRunLoop, m_Timeout)
+				.f_Timeout(m_Timeout, "Timeout")
 			;
 			DMibTestMark;
-			m_TrustManager
+			co_await m_TrustManager
 				(
 					&CDistributedActorTrustManager::f_AllowHostsForNamespace
 					, CCloudManager::mc_pDefaultNamespace
 					, TCSet<CStr>{m_CloudManagerHostID}
 					, mc_WaitForSubscriptions
 				)
-				.f_CallSync(m_pRunLoop, m_Timeout)
+				.f_Timeout(m_Timeout, "Timeout")
 			;
 		}
 
@@ -584,30 +589,32 @@ namespace NMib::NCloud
 
 			DMibTestMark;
 
-			m_PackageInfo =
+			m_PackageInfo = co_await
 				(
-					g_Dispatch(m_HelperActor) /
-					[VersionManagerHelper = m_VersionManagerHelper, Directory = m_ProgramDirectory + "/TestApps/TestApp", TestAppArchive = m_TestAppArchive]
+					g_Dispatch / [VersionManagerHelper = m_VersionManagerHelper, Directory = m_ProgramDirectory + "/TestApps/TestApp", TestAppArchive = m_TestAppArchive]
 					{
 						return VersionManagerHelper.f_CreatePackage(Directory, TestAppArchive, 1);
 					}
 				)
-				.f_CallSync(m_pRunLoop, m_Timeout)
+				.f_Timeout(m_Timeout, "Timeout")
 			;
 			m_PackageInfo.m_VersionInfo.m_Tags["TestTag"];
 
 			DMibTestMark;
 			if (m_Options & EOption_EnableVersionManager)
 			{
-				(
-					g_Dispatch(m_HelperActor) /
-					[VersionManagerHelper = m_VersionManagerHelper,VersionManager = m_VersionManager, PackageInfo = m_PackageInfo, TestAppArchive = m_TestAppArchive]() -> TCFuture<void>
-					{
-						co_await VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);
-						co_return {};
-					}
-				)
-				.f_CallSync(m_pRunLoop, m_Timeout);
+				co_await
+					(
+						g_Dispatch
+						/ [VersionManagerHelper = m_VersionManagerHelper,VersionManager = m_VersionManager, PackageInfo = m_PackageInfo, TestAppArchive = m_TestAppArchive]()
+						-> TCFuture<void>
+						{
+							co_await VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);
+							co_return {};
+						}
+					)
+					.f_Timeout(m_Timeout, "Timeout")
+				;
 			}
 		}
 
@@ -618,17 +625,19 @@ namespace NMib::NCloud
 				AppManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(AppManager.m_Address) > ListenResults.f_AddResult();
 
 			DMibTestMark;
-			fg_CombineResults(ListenResults.f_GetResults().f_CallSync(m_pRunLoop, m_Timeout));
+			co_await ListenResults.f_GetResults().f_Timeout(m_Timeout, "Timeout") | g_Unwrap;
 		}
 
-		f_SetupTrust();
+		co_await f_SetupTrust();
 		for (auto &AppManager : m_Subscriptions->f_SubscribeMultiple<CAppManagerInterface>(_nAppManagers))
 		{
 			auto HostID = AppManager->f_GetHostInfo().m_RealHostID;
 			m_AppManagerInfos[HostID].m_Interface = fg_Move(AppManager);
 		}
 
-		f_InstallTestApp();
-		f_CheckCloudManager(0);
+		co_await f_InstallTestApp();
+		co_await f_CheckCloudManager(0);
+
+		co_return {};
 	}
 }
