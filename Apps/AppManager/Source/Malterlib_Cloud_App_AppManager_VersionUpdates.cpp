@@ -23,7 +23,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			m_pApplication->m_VersionsByTime.f_Remove(*this);
 			m_pApplication->m_Versions.f_Remove(*this);
-			if (m_pApplication->m_VersionsByTime.f_IsEmpty() & m_pApplication->m_Versions.f_IsEmpty())
+			if (m_pApplication->m_VersionsByTime.f_IsEmpty() && m_pApplication->m_Versions.f_IsEmpty())
 				m_pApplication->m_This.mp_VersionManagerApplications.f_Remove(m_pApplication);
 			m_pApplication = nullptr;
 		}

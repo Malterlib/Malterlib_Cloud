@@ -89,8 +89,8 @@ namespace NMib::NCloud::NCloudManager
 			Auditor.f_Info("Get sensors");
 		}
 
-		for co_await (auto Sensor : Sensors)
-			co_yield Sensor;
+		for (auto iSensor = co_await fg_Move(Sensors).f_GetIterator(); iSensor; co_await ++iSensor)
+			co_yield *iSensor;
 
 		co_return {};
 	}
@@ -118,8 +118,8 @@ namespace NMib::NCloud::NCloudManager
 			Auditor.f_Info("Get sensor readings");
 		}
 
-		for co_await (auto Reading : SensorReadings)
-			co_yield Reading;
+		for (auto iReading = co_await fg_Move(SensorReadings).f_GetIterator(); iReading; co_await ++iReading)
+			co_yield *iReading;
 
 		co_return {};
 	}
@@ -147,8 +147,8 @@ namespace NMib::NCloud::NCloudManager
 			Auditor.f_Info("Get sensor status");
 		}
 
-		for co_await (auto Reading : SensorReadings)
-			co_yield Reading;
+		for (auto iReading = co_await fg_Move(SensorReadings).f_GetIterator(); iReading; co_await ++iReading)
+			co_yield *iReading;
 
 		co_return {};
 	}

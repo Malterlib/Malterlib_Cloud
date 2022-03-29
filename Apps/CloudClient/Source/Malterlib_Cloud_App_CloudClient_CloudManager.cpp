@@ -990,9 +990,9 @@ namespace NMib::NCloud::NCloudClient
 		{
 			for (auto &SensorGenerator : SensorGenerators)
 			{
-				for co_await (auto Sensors : SensorGenerator)
+				for (auto iSensors = co_await fg_Move(SensorGenerator).f_GetIterator(); iSensors; co_await ++iSensors)
 				{
-					for (auto &SensorInfo : Sensors)
+					for (auto &SensorInfo : *iSensors)
 						SensorInfos[SensorInfo.f_Key()] = SensorInfo;
 				}
 			}
@@ -1025,9 +1025,9 @@ namespace NMib::NCloud::NCloudClient
 
 		for (auto &Generator : StatusGenerators)
 		{
-			for co_await (auto Statuses : fg_Move(Generator))
+			for (auto iStatuses = co_await fg_Move(Generator).f_GetIterator(); iStatuses; co_await ++iStatuses)
 			{
-				for (auto &Status : Statuses)
+				for (auto &Status : *iStatuses)
 				{
 					auto pPreviousStatus = SensorStatus.f_FindEqual(Status.m_SensorInfoKey);
 					if (pPreviousStatus && Status.m_Reading.m_UniqueSequence <= pPreviousStatus->m_Reading.m_UniqueSequence)
@@ -1064,8 +1064,8 @@ namespace NMib::NCloud::NCloudClient
 			co_return {};
 		if (SensorGenerators.f_GetLen() == 1)
 		{
-			for co_await (auto Readings : SensorGenerators.f_GetFirst())
-				co_yield fg_Move(Readings);
+			for (auto iReadings = co_await fg_Move(SensorGenerators.f_GetFirst()).f_GetIterator(); iReadings; co_await ++iReadings)
+				co_yield fg_Move(*iReadings);
 			co_return {};
 		}
 

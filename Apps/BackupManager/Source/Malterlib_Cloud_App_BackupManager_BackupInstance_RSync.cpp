@@ -222,7 +222,7 @@ namespace NMib::NCloud::NBackupManager
 					RSyncContext.m_RelativeFileName = _RelativeFileName;
 					RSyncContext.m_AbsoluteFileName = _FileName;
 					RSyncContext.m_FileLength = _FileLength;
-					bool bUseOld = false;
+					[[maybe_unused]] bool bUseOld = false;
 					bool bNewExists = CFile::fs_FileExists(_FileName);
 					bool bOldExists = !_OldFileName.f_IsEmpty() && CFile::fs_FileExists(_OldFileName);
 					if (bNewExists || !bOldExists)
