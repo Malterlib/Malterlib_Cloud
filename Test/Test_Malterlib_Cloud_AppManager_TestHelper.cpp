@@ -8,6 +8,11 @@
 #include "Windows.h"
 #endif
 
+namespace NMib::NCloud::NCloudManager
+{
+	extern uint64 g_MaxDatabaseSize;
+}
+
 namespace NMib::NCloud
 {
 	CStr const &CAppManagerTestHelper::CAppManagerInfo::f_GetHostID() const
@@ -391,6 +396,8 @@ namespace NMib::NCloud
 			m_CloudManagerDirectory = m_RootDirectory + "/CloudManager";
 			CFile::fs_CreateDirectory(m_CloudManagerDirectory);
 			CFile::fs_DiffCopyFileOrDirectory(m_ProgramDirectory + "/TestApps/CloudManager", m_CloudManagerDirectory, nullptr);
+
+			NCloudManager::g_MaxDatabaseSize = constant_uint64(1) * 1024 * 1024 * 1024; // Limit due to asan for example taking too much memory
 
 			m_CloudManagerLaunch = co_await m_LaunchHelper
 				(

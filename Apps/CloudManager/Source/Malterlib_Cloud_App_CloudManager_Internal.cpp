@@ -11,6 +11,8 @@
 
 namespace NMib::NCloud::NCloudManager
 {
+	constinit uint64 g_MaxDatabaseSize = constant_uint64(128) * 1024 * 1024 * 1024;
+
 	CCloudManagerServer::CCloudManagerServer(CDistributedAppState &_AppState)
 		: mp_AppState(_AppState)
 	{
@@ -42,7 +44,7 @@ namespace NMib::NCloud::NCloudManager
 			 	(
 				 	&CDatabaseActor::f_OpenDatabase
 				 	, mp_AppState.m_RootDirectory / "CloudManagerDatabase"
-				 	, constant_uint64(128) * 1024 * 1024 * 1024
+				 	, g_MaxDatabaseSize
 				)
 			 	% "Faild to open database"
 			)
