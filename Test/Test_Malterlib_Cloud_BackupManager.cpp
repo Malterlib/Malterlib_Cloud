@@ -172,7 +172,7 @@ public:
 					while (!m_Notifications.f_IsEmpty())
 					{
 						auto &Notification = m_Notifications.f_GetFirst();
-						auto Cleanup = g_OnScopeExit > [&]
+						auto Cleanup = g_OnScopeExit / [&]
 							{
 								m_Notifications.f_Remove(Notification);
 							}
@@ -505,14 +505,14 @@ public:
 		fg_GetSys()->f_AddStdErrLogger();
 #endif
 		TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
-		auto CleanupRunLoop = g_OnScopeExit > [&]
+		auto CleanupRunLoop = g_OnScopeExit / [&]
 			{
 				while (pRunLoop->f_RefCountGet() > 0)
 					pRunLoop->f_WaitOnceTimeout(0.1);
 			}
 		;
 		TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
-		auto CleanupHelperActor = g_OnScopeExit > [&]
+		auto CleanupHelperActor = g_OnScopeExit / [&]
 			{
 				HelperActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
@@ -533,7 +533,7 @@ public:
 
 		CTrustManagerTestHelper TrustManagerState;
 		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
-		auto CleanupTrustManager = g_OnScopeExit > [&]
+		auto CleanupTrustManager = g_OnScopeExit / [&]
 			{
 				TrustManager->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
@@ -557,7 +557,7 @@ public:
 		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(pRunLoop, g_Timeout);
 
 		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestBackupManagerEnableLogging);
-		auto Cleanup = g_OnScopeExit > [&]
+		auto Cleanup = g_OnScopeExit / [&]
 			{
 				LaunchHelper->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}

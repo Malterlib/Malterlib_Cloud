@@ -129,14 +129,14 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		bCanDoEncription = true;
 #endif
 		TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
-		auto CleanupRunLoop = g_OnScopeExit > [&]
+		auto CleanupRunLoop = g_OnScopeExit / [&]
 			{
 				while (pRunLoop->f_RefCountGet() > 0)
 					pRunLoop->f_WaitOnceTimeout(0.1);
 			}
 		;
 		TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
-		auto CleanupHelperActor = g_OnScopeExit > [&]
+		auto CleanupHelperActor = g_OnScopeExit / [&]
 			{
 				HelperActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
@@ -144,7 +144,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
 		auto FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-		auto CleanupTestActor = g_OnScopeExit > [&]
+		auto CleanupTestActor = g_OnScopeExit / [&]
 			{
 				FileActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
@@ -233,7 +233,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		fCleanup();
 
-		auto Cleanup = g_OnScopeExit > [&]
+		auto Cleanup = g_OnScopeExit / [&]
 			{
 				fCleanup();
 			}
@@ -250,7 +250,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		CTrustManagerTestHelper TrustManagerState;
 		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
-		auto CleanupTrustManager = g_OnScopeExit > [&]
+		auto CleanupTrustManager = g_OnScopeExit / [&]
 			{
 				TrustManager->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
@@ -278,7 +278,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			= fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestUpdateCompatibilityEnableLogging || DTestUpdateCompatibilityEnableOtherOutput)
 		;
 
-		auto CleanupLaunchHelper = g_OnScopeExit > [&]
+		auto CleanupLaunchHelper = g_OnScopeExit / [&]
 			{
 				LaunchHelper->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 			}
@@ -886,14 +886,14 @@ public:
 							CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString(), false);
 
 							TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
-							auto CleanupRunLoop = g_OnScopeExit > [&]
+							auto CleanupRunLoop = g_OnScopeExit / [&]
 								{
 									while (pRunLoop->f_RefCountGet() > 0)
 										pRunLoop->f_WaitOnceTimeout(0.1);
 								}
 							;
 							TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
-							auto CleanupHelperActor = g_OnScopeExit > [&]
+							auto CleanupHelperActor = g_OnScopeExit / [&]
 								{
 									HelperActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
 								}

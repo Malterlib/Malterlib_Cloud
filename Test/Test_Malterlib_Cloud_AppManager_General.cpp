@@ -214,7 +214,7 @@ public:
 			pUpdateNotificationsState->m_Applications["TestApp"];
 			pUpdateNotificationsState->m_Applications["TestApp2"];
 
-			auto CleanupNotifications = g_OnScopeExit > [&]
+			auto CleanupNotifications = g_OnScopeExit / [&]
 				{
 					pUpdateNotificationsState->f_Destroy();
 				}
