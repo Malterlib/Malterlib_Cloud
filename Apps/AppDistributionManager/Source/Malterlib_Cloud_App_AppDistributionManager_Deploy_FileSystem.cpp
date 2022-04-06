@@ -86,7 +86,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 					CFile::fs_CreateDirectory(TempDirectory);
 
-					auto Cleanup = g_OnScopeExit > [&]
+					auto Cleanup = g_OnScopeExit / [&]
 						{
 							try
 							{

@@ -71,7 +71,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		if (!pCurl)
 			DMibError("libcurl was not initialised");
 		
-		auto CleanupCurl = g_OnScopeExit > [&]
+		auto CleanupCurl = g_OnScopeExit / [&]
 			{
 				curl_easy_cleanup(pCurl);
 			}
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		
 		curl_slist *pHeaders = NULL;
-		auto CleanupHeaders = g_OnScopeExit > [&]
+		auto CleanupHeaders = g_OnScopeExit / [&]
 			{
 				curl_slist_free_all(pHeaders);
 			}

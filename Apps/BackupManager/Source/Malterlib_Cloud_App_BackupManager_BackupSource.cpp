@@ -401,7 +401,7 @@ namespace NMib::NCloud::NBackupManager
 		{
 			TCSet<CStr> CheckDeleteDirectories;
 
-			auto Cleanup = g_OnScopeExit > [&]
+			auto Cleanup = g_OnScopeExit / [&]
 				{
 					while (!CheckDeleteDirectories.f_IsEmpty())
 					{
@@ -644,7 +644,7 @@ namespace NMib::NCloud::NBackupManager
 
 		try
 		{
-			auto Cleanup = g_OnScopeExit > [&]
+			auto Cleanup = g_OnScopeExit / [&]
 				{
 					bool bInException = NException::fg_UncaughtExceptions();
 

@@ -79,7 +79,7 @@ namespace NMib::NCloud::NPrivate
 		{
 			_fToRun
 				(
-					g_OnScopeExitShared > []
+					g_OnScopeExitShared / []
 					{
 					}
 				)
@@ -102,7 +102,7 @@ namespace NMib::NCloud::NPrivate
 				{
 					pState->m_fToRun
 						(
-							g_OnScopeExitShared > [CleanupScopes = fg_Move(pState->m_CleanupScopes)]
+							g_OnScopeExitShared / [CleanupScopes = fg_Move(pState->m_CleanupScopes)]
 							{
 							}
 						)

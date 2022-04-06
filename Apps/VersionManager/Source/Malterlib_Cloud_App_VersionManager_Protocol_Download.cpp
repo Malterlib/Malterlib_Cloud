@@ -66,7 +66,7 @@ namespace NMib::NCloud::NVersionManager
 		NStr::CStr DownloadID = fg_RandomID(pThis->mp_VersionDownloads);
 
 		auto &Download = pThis->mp_VersionDownloads[DownloadID];
-		auto Cleanup = g_OnScopeExit > [&]
+		auto Cleanup = g_OnScopeExit / [&]
 			{
 				pThis->mp_VersionDownloads.f_Remove(DownloadID);
 			}

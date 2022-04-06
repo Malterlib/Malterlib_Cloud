@@ -34,7 +34,7 @@ namespace NMib::NCloud
 		DMibLock(Registry.m_Lock);
 		Registry.m_Factories[_ExecutablePath] = fg_Move(_fDistributedAppFactory);
 
-		return g_OnScopeExitShared > [_ExecutablePath]
+		return g_OnScopeExitShared / [_ExecutablePath]
 			{
 				auto &Registry = *g_InProcessRegistry;
 

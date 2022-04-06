@@ -346,7 +346,7 @@ namespace NMib::NCloud::NSecretsManager
 				auto &This = *m_pThis;
 
 #if DMibConfig_Tests_Enable
-				auto CleanupTest = g_OnScopeExit > [&]
+				auto CleanupTest = g_OnScopeExit / [&]
 					{
 						if (auto *pPromise = This.mp_UploadCompleted.f_FindEqual(OldFileName))
 						{

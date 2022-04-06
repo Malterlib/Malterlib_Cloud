@@ -144,7 +144,7 @@ namespace NMib::NCloud::NBackupManager
 
 							if (bDuplicatedFile)
 							{
-								auto Cleanup = g_OnScopeExit > [&]
+								auto Cleanup = g_OnScopeExit / [&]
 									{
 										if (CFile::fs_FileExists(FileName))
 											CFile::fs_DeleteFile(FileName);

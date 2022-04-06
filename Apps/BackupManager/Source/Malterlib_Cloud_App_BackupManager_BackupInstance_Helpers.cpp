@@ -42,7 +42,7 @@ namespace NMib::NCloud::NBackupManager
 		{
 			_fToRun
 				(
-					g_OnScopeExitShared > []
+					g_OnScopeExitShared / []
 					{
 					}
 				)
@@ -68,7 +68,7 @@ namespace NMib::NCloud::NBackupManager
 						{
 							pState->m_fToRun
 								(
-									g_OnScopeExitShared > [CleanupScopes = fg_Move(pState->m_CleanupScopes)]
+									g_OnScopeExitShared / [CleanupScopes = fg_Move(pState->m_CleanupScopes)]
 								 	{
 									}
 								)

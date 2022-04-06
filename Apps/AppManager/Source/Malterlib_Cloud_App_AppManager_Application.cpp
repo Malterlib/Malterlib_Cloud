@@ -121,7 +121,7 @@ namespace NMib::NCloud::NAppManager
 						pApplication->m_bPendingStop = true;
 
 						bool bSuccessfulStop = false;
-						auto Cleanup = g_OnScopeExit > [&, pApplication]
+						auto Cleanup = g_OnScopeExit / [&, pApplication]
 							{
 								pApplication->m_bPendingStop = false;
 								auto OnStops = fg_Move(pApplication->m_OnStops);
