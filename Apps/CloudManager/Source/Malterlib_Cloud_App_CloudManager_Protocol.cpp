@@ -18,8 +18,11 @@ namespace NMib::NCloud::NCloudManager
 				"CloudManager/RegisterAppManager"
 				, "CloudManager/ReportSensorReadings"
 				, "CloudManager/ReportSensorReadingsOnBehalfOf/All"
+				, "CloudManager/ReportLogEntries"
+				, "CloudManager/ReportLogEntriesOnBehalfOf/All"
 				, "CloudManager/ReadAll"
 				, "CloudManager/ReadSensors"
+				, "CloudManager/ReadLogs"
 				, "CloudManager/RemoveAppManager"
 			}
 		;
@@ -36,12 +39,17 @@ namespace NMib::NCloud::NCloudManager
 		TCActorResultVector<void> PublishResults;
 		mp_ProtocolInterface.f_Publish<CCloudManager>(mp_AppState.m_DistributionManager, this) > PublishResults.f_AddResult();
 
-		if (mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("PushlishSensorReporter", false).f_Boolean())
+		if (mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("PublishSensorReporter", false).f_Boolean())
 			mp_SensorReporterInterface.f_Publish<CDistributedAppSensorReporter>(mp_AppState.m_DistributionManager, this) > PublishResults.f_AddResult();
 		else
 			mp_SensorReporterInterface.f_Construct(mp_AppState.m_DistributionManager, this);
-
 		mp_SensorReaderInterface.f_Construct(mp_AppState.m_DistributionManager, this);
+
+		if (mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("PublishLogReporter", false).f_Boolean())
+			mp_LogReporterInterface.f_Publish<CDistributedAppLogReporter>(mp_AppState.m_DistributionManager, this) > PublishResults.f_AddResult();
+		else
+			mp_LogReporterInterface.f_Construct(mp_AppState.m_DistributionManager, this);
+		mp_LogReaderInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 
 		co_await PublishResults.f_GetResults() | g_Unwrap;
 
@@ -488,6 +496,60 @@ namespace NMib::NCloud::NCloudManager
 		co_return TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>
 			(
 				pThis->mp_SensorReaderInterface.m_Actor->f_ShareInterface<CDistributedAppSensorReader>()
+				, g_ActorSubscription / []
+				{
+				}
+			)
+		;
+	}
+
+	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> CCloudManagerServer::CCloudManagerImplementation::f_GetLogReporter()
+	{
+		auto pThis = m_pThis;
+		auto OnResume = g_OnResume / [pThis]
+			{
+				if (pThis->f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Get log reporter", {"CloudManager/ReportLogEntries"}))
+			co_return Auditor.f_AccessDenied("(Get log reporter)");
+
+		Auditor.f_Info("Get log reporter");
+
+		co_return TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>
+			(
+				pThis->mp_LogReporterInterface.m_Actor->f_ShareInterface<CDistributedAppLogReporter>()
+				, g_ActorSubscription / []
+				{
+				}
+			)
+		;
+	}
+
+	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReader>> CCloudManagerServer::CCloudManagerImplementation::f_GetLogReader()
+	{
+		auto pThis = m_pThis;
+		auto OnResume = g_OnResume / [pThis]
+			{
+				if (pThis->f_IsDestroyed())
+					DMibError("Shutting down");
+			}
+		;
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Get log reader", fsp_LogReadPermissions()))
+			co_return Auditor.f_AccessDenied("(Get log reader)");
+
+		Auditor.f_Info("Get log reader");
+
+		co_return TCDistributedActorInterfaceWithID<CDistributedAppLogReader>
+			(
+				pThis->mp_LogReaderInterface.m_Actor->f_ShareInterface<CDistributedAppLogReader>()
 				, g_ActorSubscription / []
 				{
 				}

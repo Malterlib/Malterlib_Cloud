@@ -8,6 +8,8 @@
 #include <Mib/Concurrency/ActorInterface>
 #include <Mib/Concurrency/DistributedAppSensorReporter>
 #include <Mib/Concurrency/DistributedAppSensorReader>
+#include <Mib/Concurrency/DistributedAppLogReporter>
+#include <Mib/Concurrency/DistributedAppLogReader>
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cloud/VersionInfo>
 
@@ -16,7 +18,8 @@ namespace NMib::NCloud
 	enum
 	{
 		ECloudManagerProtocolVersion_Min = 0x101
-		, ECloudManagerProtocolVersion_Current = 0x110
+		, ECloudManagerProtocolVersion_SupportLogs = 0x111
+		, ECloudManagerProtocolVersion_Current = 0x111
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -97,6 +100,8 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<void> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReporter>> f_GetSensorReporter() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReader>> f_GetSensorReader() = 0;
+		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReporter>> f_GetLogReporter() = 0;
+		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReader>> f_GetLogReader() = 0;
 
 		CCloudManager();
 		~CCloudManager();

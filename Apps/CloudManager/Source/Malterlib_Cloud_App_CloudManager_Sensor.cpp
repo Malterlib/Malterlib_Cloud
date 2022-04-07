@@ -13,7 +13,17 @@ namespace NMib::NCloud::NCloudManager
 	TCFuture<void> CCloudManagerServer::fp_SetupSensorStore()
 	{
 		mp_AppSensorStore = fg_Construct(mp_AppState.m_DistributionManager, mp_AppState.m_TrustManager);
-		co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_StartWithDatabase, fg_TempCopy(mp_DatabaseActor), "mib.lsensor");
+		co_await mp_AppSensorStore
+			(
+				&CDistributedAppSensorStoreLocal::f_StartWithDatabase
+				, fg_TempCopy(mp_DatabaseActor)
+				, mc_pDatabasePrefixSensor
+				, g_ActorFunctor / [this](NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction) -> TCFuture<NDatabase::CDatabaseActor::CTransactionWrite>
+				{
+					co_return co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(_WriteTransaction));
+				}
+			)
+		;
 
 		co_return {};
 	}

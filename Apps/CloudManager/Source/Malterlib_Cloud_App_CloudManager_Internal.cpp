@@ -38,18 +38,33 @@ namespace NMib::NCloud::NCloudManager
 	TCFuture<void> CCloudManagerServer::f_Init()
 	{
 		mp_DatabaseActor = fg_Construct(fg_Construct(), "Cloud manager database");
+		auto MaxDatabaseSize = mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("MaxDatabaseSize", g_MaxDatabaseSize).f_Integer();
 		co_await
 			(
 			 	mp_DatabaseActor
 			 	(
 				 	&CDatabaseActor::f_OpenDatabase
 				 	, mp_AppState.m_RootDirectory / "CloudManagerDatabase"
-				 	, g_MaxDatabaseSize
+				 	, MaxDatabaseSize
 				)
 			 	% "Faild to open database"
 			)
 		;
+		auto Stats = co_await (mp_DatabaseActor(&CDatabaseActor::f_GetAggregateStatistics));
+		auto TotalSizeUsed = Stats.f_GetTotalUsedSize();
+		DMibLogWithCategory
+			(
+				CloudManager
+				, Info
+				, "Database uses {fe2}% of allotted space ({ns } / {ns } bytes)"
+				, fp64(TotalSizeUsed) / fp64(MaxDatabaseSize) * 100.0
+				, TotalSizeUsed
+				, MaxDatabaseSize
+			)
+		;
+
 		co_await (fp_SetupSensorStore() % "Failed to setup sensor store");
+		co_await (fp_SetupLogStore() % "Failed to setup log store");
 
 		co_await (fp_SetupPermissions() % "Failed to setup permissions");
 		co_await (fp_SetupMonitor() % "Failed to setup monitor");
@@ -62,14 +77,25 @@ namespace NMib::NCloud::NCloudManager
 	{
 		TCActorResultVector<void> Destroys;
 
+		if (mp_MonitorTimerSubscription)
+			mp_MonitorTimerSubscription->f_Destroy() > Destroys.f_AddResult();
+
+		if (mp_CleanupTimerSubscription)
+			mp_CleanupTimerSubscription->f_Destroy() > Destroys.f_AddResult();
+
 		mp_ProtocolInterface.f_Destroy() > Destroys.f_AddResult();
 		mp_SensorReporterInterface.f_Destroy() > Destroys.f_AddResult();
 		mp_SensorReaderInterface.f_Destroy() > Destroys.f_AddResult();
+		mp_LogReporterInterface.f_Destroy() > Destroys.f_AddResult();
+		mp_LogReaderInterface.f_Destroy() > Destroys.f_AddResult();
 
 		co_await Destroys.f_GetResults();
 
 		if (mp_AppSensorStore)
 			co_await fg_Move(mp_AppSensorStore).f_Destroy();
+
+		if (mp_AppLogStore)
+			co_await fg_Move(mp_AppLogStore).f_Destroy();
 
 		if (mp_DatabaseActor)
 			co_await fg_Move(mp_DatabaseActor).f_Destroy();

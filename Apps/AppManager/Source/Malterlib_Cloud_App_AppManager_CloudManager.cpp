@@ -51,8 +51,8 @@ namespace NMib::NCloud::NAppManager
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to get sensor reporter from cloud manager: {}", SensorReporter.f_GetExceptionStr());
 		}
 
-		auto LogReporter = co_await _CloudManager.f_CallActor(&CCloudManager::f_GetLogReporter)().f_Wrap();
 		CActorSubscription LogReporterSubscription;
+		if (_CloudManager->f_InterfaceVersion() >= ECloudManagerProtocolVersion_SupportLogs)
 		{
 			auto LogReporter = co_await _CloudManager.f_CallActor(&CCloudManager::f_GetLogReporter)().f_Wrap();
 
@@ -75,7 +75,6 @@ namespace NMib::NCloud::NAppManager
 			else
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to get log reporter from cloud manager: {}", LogReporter.f_GetExceptionStr());
 		}
-
 
 		auto &NewManager = mp_CloudManagers[_CloudManager];
 		NewManager.m_HostInfo = _Info;

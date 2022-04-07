@@ -15,6 +15,8 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CCloudManager::f_RemoveAppManager);
 		DMibPublishActorFunction(CCloudManager::f_GetSensorReporter);
 		DMibPublishActorFunction(CCloudManager::f_GetSensorReader);
+		DMibPublishActorFunction(CCloudManager::f_GetLogReporter);
+		DMibPublishActorFunction(CCloudManager::f_GetLogReader);
 	}
 
 	CCloudManager::~CCloudManager() = default;
