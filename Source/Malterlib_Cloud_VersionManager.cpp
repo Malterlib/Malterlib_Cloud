@@ -293,7 +293,7 @@ namespace NMib::NCloud
 	void CVersionManager::CStartUploadVersion::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		if (_Stream.f_GetVersion() >= 0x106)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsUploadDownload)
 			_Stream % fg_Move(m_fFinish);
 		else
 			_Stream % fg_Move(m_fFinish.f_GetSubscription());
@@ -309,7 +309,7 @@ namespace NMib::NCloud
 		_Stream % m_VersionInfo;
 		_Stream % m_QueueSize;
 		_Stream % m_Flags;
-		if (_Stream.f_GetVersion() >= 0x106)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsUploadDownload)
 			_Stream % fg_Move(m_fStartTransfer);
 		else
 		{
@@ -347,7 +347,7 @@ namespace NMib::NCloud
 		_Stream % m_Application;
 		_Stream % m_VersionIDAndPlatform;
 		_Stream % m_TransferContext;
-		if (_Stream.f_GetVersion() >= 0x106)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsUploadDownload)
 			_Stream % fg_Move(m_Subscription);
 	}
 	
@@ -378,7 +378,7 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void CVersionManager::CSubscribeToUpdates::CResult::f_Stream(tf_CStream &_Stream)
 	{
-		if (_Stream.f_GetVersion() >= 0x107)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsSubscribeChanges)
 			_Stream % fg_Move(m_Subscription);
 		else
 		{
@@ -398,7 +398,7 @@ namespace NMib::NCloud
 	{
 		_Stream % m_Application;
 		_Stream % m_Platforms;
-		if (_Stream.f_GetVersion() >= 0x107)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsSubscribeChanges)
 			_Stream % fg_Move(m_fOnNewVersions);
 		else
 		{
@@ -420,7 +420,7 @@ namespace NMib::NCloud
 		}
 
 		_Stream % m_nInitial;
-		if (_Stream.f_GetVersion() >= 0x104)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportSubscribeToTags)
 			_Stream % m_Tags;
 	}
 	
@@ -440,7 +440,7 @@ namespace NMib::NCloud
 		_Stream % m_Platform;
 		_Stream % m_AddTags;
 		_Stream % m_RemoveTags;
-		if (_Stream.f_GetVersion() >= 0x105)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportIncreaseRetrySequence)
 			_Stream % m_bIncreaseRetrySequence;
 	}
 }

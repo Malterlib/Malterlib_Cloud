@@ -26,6 +26,10 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EProtocolVersion_Min = 0x103
+			, EProtocolVersion_SupportSubscribeToTags = 0x104
+			, EProtocolVersion_SupportIncreaseRetrySequence = 0x105
+			, EProtocolVersion_RefactorToActorFunctorsUploadDownload = 0x106
+			, EProtocolVersion_RefactorToActorFunctorsSubscribeChanges = 0x107
 			, EProtocolVersion_Current = 0x107
 		};
 
