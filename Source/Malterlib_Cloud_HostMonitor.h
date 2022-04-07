@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
+#include <Mib/Concurrency/DistributedAppLogStoreLocal>
 
 namespace NMib::NCloud
 {
@@ -29,7 +30,12 @@ namespace NMib::NCloud
 			fp32 m_CriticalFreePercent = 1.0; ///< Set to fp32::fs_Inf() to disable
 		};
 
-		CHostMonitor(NConcurrency::TCActor<NConcurrency::CDistributedAppSensorStoreLocal> const &_SensorStore);
+		CHostMonitor
+			(
+				NConcurrency::TCActor<NConcurrency::CDistributedAppSensorStoreLocal> const &_SensorStore
+				, NConcurrency::TCActor<NConcurrency::CDistributedAppLogStoreLocal> const &_LogStore
+			)
+		;
 		~CHostMonitor();
 
 		NConcurrency::TCFuture<void> f_Init(EInitFlag _Flags, fp64 _HostMonitorInterval);

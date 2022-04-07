@@ -41,11 +41,12 @@ namespace NMib::NCloud
 		TCFuture<void> f_PeriodicUpdate_Diskspace(bool _bCanSkip);
 		TCFuture<void> f_PeriodicUpdate_Diskspace_UpdateMounts();
 
-		CInternal(CHostMonitor *_pThis, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore);
+		CInternal(CHostMonitor *_pThis, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore, TCActor<CDistributedAppLogStoreLocal> const &_LogStore);
 
 		CHostMonitor *m_pThis;
 
 		TCActor<CDistributedAppSensorStoreLocal> m_SensorStore;
+		TCActor<CDistributedAppLogStoreLocal> m_LogStore;
 		TCActor<CSeparateThreadActor> m_FileActor;
 		CActorSubscription m_UpdateTimerSubscription;
 		TCMap<CStr, CMonitoredPath> m_MonitoredPaths;
