@@ -214,7 +214,7 @@ namespace NMib::NCloud::NAppManager
 				StartDownload.m_Application = _ApplicationName;
 				StartDownload.m_VersionIDAndPlatform = _VersionID;
 				StartDownload.m_TransferContext = fg_Move(_TransferContext);
-				if (_Manager->f_InterfaceVersion() >= 0x106)
+				if (_Manager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_RefactorToActorFunctorsUploadDownload)
 				{
 					StartDownload.m_Subscription = g_ActorSubscription / [Promise]()
 						{

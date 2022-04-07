@@ -18,6 +18,7 @@
 #include <Mib/Security/UniqueUserGroup>
 #include <Mib/Concurrency/ActorSequencer>
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
+#include <Mib/Concurrency/DistributedAppLogStoreLocal>
 
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
 
@@ -335,6 +336,7 @@ namespace NMib::NCloud::NAppManager
 			CTrustedActorInfo m_HostInfo;
 			CActorSubscription m_RegisterSubscription;
 			CActorSubscription m_SensorReporterSubscription;
+			CActorSubscription m_LogReporterSubscription;
 		};
 
 		struct CDistributedAppInterfaceServerImplementation : public CDistributedAppInterfaceServer
@@ -347,6 +349,7 @@ namespace NMib::NCloud::NAppManager
 				) override
 			;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> f_GetSensorReporter() override;
+			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> f_GetLogReporter() override;
 
 			CAppManagerActor *m_pThis = nullptr;
 #			ifdef DMibDebug
@@ -621,6 +624,16 @@ namespace NMib::NCloud::NAppManager
 #			endif
 		};
 
+		struct CDistributedAppLogReporterImplementation : public CDistributedAppLogReporter
+		{
+			TCFuture<CLogReporter> f_OpenLogReporter(CLogInfo &&_LogInfo) override;
+
+			CAppManagerActor *m_pThis;
+#			ifdef DMibDebug
+				CEmpty self; // Hide dangerous self
+#			endif
+		};
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
 		static CStr fsp_RunTool
@@ -643,6 +656,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_InitApp();
 
 		TCFuture<void> fp_InitSensor();
+		TCFuture<void> fp_InitLog();
 		TCFuture<void> fp_InitHostMonitor();
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
@@ -981,6 +995,9 @@ namespace NMib::NCloud::NAppManager
 
 		TCActor<CDistributedAppSensorStoreLocal> mp_SensorStore;
 		TCDistributedActorInstance<CDistributedAppSensorReporterImplementation> mp_SensorReporterInterface;
+
+		TCActor<CDistributedAppLogStoreLocal> mp_LogStore;
+		TCDistributedActorInstance<CDistributedAppLogReporterImplementation> mp_LogReporterInterface;
 
 		fp64 mp_HostMonitorInterval = 60.0;
 		TCActor<CHostMonitor> mp_HostMonitor;

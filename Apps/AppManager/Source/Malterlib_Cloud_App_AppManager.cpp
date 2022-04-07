@@ -340,6 +340,7 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		co_await fp_InitSensor();
+		co_await fp_InitLog();
 		co_await fp_InitHostMonitor();
 
 		co_await fp_ReadState();
@@ -489,9 +490,12 @@ namespace NMib::NCloud::NAppManager
 					CloudManager.m_RegisterSubscription->f_Destroy() > Destroys.f_AddResult();
 				if (CloudManager.m_SensorReporterSubscription)
 					CloudManager.m_SensorReporterSubscription->f_Destroy() > Destroys.f_AddResult();
+				if (CloudManager.m_LogReporterSubscription)
+					CloudManager.m_LogReporterSubscription->f_Destroy() > Destroys.f_AddResult();
 			}
 
 			mp_SensorReporterInterface.f_Destroy() > Destroys.f_AddResult();
+			mp_LogReporterInterface.f_Destroy() > Destroys.f_AddResult();
 
 			mp_CloudManagers.f_Clear();
 

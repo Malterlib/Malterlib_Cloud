@@ -144,6 +144,29 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
+	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_GetLogReporter()
+	{
+		auto pThis = m_pThis;
+
+		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
+
+		auto pApplication = pThis->fp_ApplicationFromHostID(CallingHostInfo.f_GetRealHostID());
+		if (!pApplication)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application requested log reporter: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
+			co_return DErrorInstance("Application not associated with your host");
+		}
+
+		co_return TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>
+			(
+				pThis->mp_LogReporterInterface.m_Actor->f_ShareInterface<CDistributedAppLogReporter>()
+				, g_ActorSubscription / []
+				{
+				}
+			)
+		;
+	}
+
 	TCFuture<void> CAppManagerActor::fp_PublishAppInterface()
 	{
 		return mp_AppInterfaceServer.f_Publish<CDistributedAppInterfaceServer>(mp_State.m_DistributionManager, this, CDistributedAppInterfaceServer::mc_pDefaultNamespace);

@@ -166,7 +166,7 @@ namespace NMib::NCloud::NAppManager
 							bool bRanPreStop = false;
 
 							TCAsyncResult<void> PreStopResult;
-							if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= 0x103)
+							if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= CDistributedAppInterfaceClient::EProtocolVersion_SupportPreStop)
 							{
 								DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pre-stopping application '{}'", pApplication->m_Name);
 								bRanPreStop = true;
