@@ -6,6 +6,7 @@
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/DistributedAppSensorReader>
+#include <Mib/Concurrency/DistributedAppLogReader>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/CommandLine/TableRenderer>
 #include <Mib/CommandLine/AnsiEncoding>
@@ -270,6 +271,67 @@ namespace NMib::NCloud::NCloudClient
 							, fg_Move(SensorsGenerator)
 							, _MaxEntries
 							, _Flags
+							, _TableType
+							, _Filter
+						)
+					;
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
+
+		fp_BuildDefaultCommandLine_DistributedLog_Customizable
+			(
+				_Section
+				, "cloud-manager-"
+				, g_ActorFunctor / [this]
+				(
+					CEJSON const &_Params
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CDistributedAppLogReader_LogFilter const &_Filter
+					, ELogOutputFlag _Flags
+					, uint32 _Verbosity
+					, CStr const &_TableType
+				)
+				-> TCFuture<uint32>
+				{
+					auto LogReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetLogReaders, _Params["Host"].f_String());
+					co_return co_await self
+						(
+							&CDistributedAppActor::f_CommandLine_LogListOutput
+							, _pCommandLine
+							, co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogs, LogReaders, _Filter)
+							, _Flags
+							, _Verbosity
+							, _TableType
+						)
+					;
+				}
+				, g_ActorFunctor / [this]
+				(
+					CEJSON const &_Params
+					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+					, CDistributedAppLogReader_LogEntryFilter const &_Filter
+					, uint64 _MaxEntries
+					, ELogOutputFlag _Flags
+					, uint32 _Verbosity
+					, CStr const &_TableType
+				)
+				-> TCFuture<uint32>
+				{
+					auto LogReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetLogReaders, _Params["Host"].f_String());
+					auto LogsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogs, LogReaders, _Filter.m_LogFilter);
+					auto EntriesGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogEntries, LogReaders, _Filter);
+
+					co_return co_await self
+						(
+							&CDistributedAppActor::f_CommandLine_LogEntriesOutput
+							, _pCommandLine
+							, fg_Move(EntriesGenerator)
+							, fg_Move(LogsGenerator)
+							, _MaxEntries
+							, _Flags
+							, _Verbosity
 							, _TableType
 							, _Filter
 						)
@@ -1177,6 +1239,196 @@ namespace NMib::NCloud::NCloudClient
 				break;
 
 			ToYield.f_Insert(fg_Move(NextReading));
+			if (ToYield.f_GetLen() >= 1024)
+				co_yield fg_Move(ToYield);
+		}
+
+		if (!ToYield.f_IsEmpty())
+			co_yield fg_Move(ToYield);
+
+		co_return {};
+	}
+
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetLogReaders(CStr const &_Host)
+		-> TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>>>
+	{
+		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
+
+		TCActorResultMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>> LogReaders;
+
+		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		{
+			if (!_Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != _Host)
+				continue;
+			auto &CloudManager = TrustedCloudManager.m_Actor;
+			CloudManager.f_CallActor(&CCloudManager::f_GetLogReader)()
+				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+				> LogReaders.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+			;
+		}
+
+		co_return fg_Construct(co_await LogReaders.f_GetResults() | g_Unwrap);
+	}
+
+	TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogs
+		(
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> const &_pLogReaders
+			, CDistributedAppLogReader_LogFilter const &_Filter
+		)
+	{
+		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>> LogsResults;
+
+		for (auto &Reader : *_pLogReaders)
+			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogs)(fg_TempCopy(_Filter), 1024) > LogsResults.f_AddResult();
+
+		TCMap<CDistributedAppLogReporter::CLogInfoKey, CDistributedAppLogReporter::CLogInfo> LogInfos;
+
+		auto LogGenerators = co_await LogsResults.f_GetResults() | g_Unwrap;
+		{
+			for (auto &LogGenerator : LogGenerators)
+			{
+				for (auto iLogs = co_await fg_Move(LogGenerator).f_GetIterator(); iLogs; co_await ++iLogs)
+				{
+					for (auto &LogInfo : *iLogs)
+						LogInfos[LogInfo.f_Key()] = LogInfo;
+				}
+			}
+		}
+
+		TCVector<CDistributedAppLogReporter::CLogInfo> ToYield;
+
+		for (auto &LogInfo : LogInfos)
+			ToYield.f_Insert(fg_Move(LogInfo));
+
+		co_yield fg_Move(ToYield);
+
+		co_return {};
+	}
+
+	TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogEntries
+		(
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> const &_pLogReaders
+			, CDistributedAppLogReader_LogEntryFilter const &_Filter
+		)
+	{
+		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> EntriesResults;
+
+		for (auto &Reader : *_pLogReaders)
+			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogEntries)(fg_TempCopy(_Filter), 1024) > EntriesResults.f_AddResult();
+
+		auto LogGenerators = co_await EntriesResults.f_GetResults() | g_Unwrap;
+		if (LogGenerators.f_IsEmpty())
+			co_return {};
+		if (LogGenerators.f_GetLen() == 1)
+		{
+			for (auto iEntries = co_await fg_Move(LogGenerators.f_GetFirst()).f_GetIterator(); iEntries; co_await ++iEntries)
+				co_yield fg_Move(*iEntries);
+			co_return {};
+		}
+
+		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>::CIterator> IteratorResults;
+
+		for (auto &Generator : LogGenerators)
+			fg_Move(Generator).f_GetIterator() > IteratorResults.f_AddResult();
+
+		TCVector<TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>::CIterator> Iterators;
+
+		for (auto &iEntries : co_await IteratorResults.f_GetResults() | g_Unwrap)
+		{
+			Iterators.f_Insert
+				(
+					co_await
+					(
+						fg_CallSafe
+						(
+							[iEntries = fg_Move(iEntries)]() mutable -> TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>
+							{
+								for (; iEntries; co_await ++iEntries)
+								{
+									for (auto &Entry : *iEntries)
+										co_yield fg_Move(Entry);
+								}
+
+								co_return {};
+							}
+						)
+					).f_GetIterator()
+				)
+			;
+		}
+
+		auto fIsLess = [bNewestFirst = !!(_Filter.m_Flags & CDistributedAppLogReader_LogEntryFilter::ELogEntriesFlag_ReportNewestFirst)]
+			(CDistributedAppLogReader_LogKeyAndEntry const &_Left, CDistributedAppLogReader_LogKeyAndEntry const &_Right)
+			{
+				if (bNewestFirst)
+				{
+					return fg_TupleReferences(_Right.m_Entry.m_Timestamp, _Right.m_Entry.m_UniqueSequence)
+						< fg_TupleReferences(_Left.m_Entry.m_Timestamp, _Left.m_Entry.m_UniqueSequence)
+					;
+				}
+				else
+				{
+					return fg_TupleReferences(_Left.m_Entry.m_Timestamp, _Left.m_Entry.m_UniqueSequence)
+						< fg_TupleReferences(_Right.m_Entry.m_Timestamp, _Right.m_Entry.m_UniqueSequence)
+					;
+				}
+			}
+		;
+
+		bool bAtEnd = false;
+		CDistributedAppLogReader_LogKeyAndEntry LastEntry;
+
+		auto fGetNextEntry = [&]() -> TCFuture<CDistributedAppLogReader_LogKeyAndEntry>
+			{
+				co_await ECoroutineFlag_AllowReferences;
+
+				TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>::CIterator *pBestEntry = nullptr;
+
+				while (true)
+				{
+					for (auto &iEntries : Iterators)
+					{
+						if (!iEntries)
+							continue;
+
+						if (!pBestEntry)
+						{
+							pBestEntry = &iEntries;
+							continue;
+						}
+
+						if (fIsLess(*iEntries, **pBestEntry))
+							pBestEntry = &iEntries;
+					}
+
+					if (pBestEntry)
+					{
+						auto ToReturn = fg_Move(**pBestEntry);
+						co_await ++*pBestEntry;
+
+						if (ToReturn.m_LogInfoKey == LastEntry.m_LogInfoKey && ToReturn.m_Entry.m_UniqueSequence == LastEntry.m_Entry.m_UniqueSequence)
+							continue;
+
+						co_return fg_Move(ToReturn);
+					}
+					else
+						break;
+				}
+
+				bAtEnd = true;
+				co_return {};
+			}
+		;
+
+		TCVector<CDistributedAppLogReader_LogKeyAndEntry> ToYield;
+
+		while (true)
+		{
+			auto NextEntry = co_await fGetNextEntry();
+			if (bAtEnd)
+				break;
+
+			ToYield.f_Insert(fg_Move(NextEntry));
 			if (ToYield.f_GetLen() >= 1024)
 				co_yield fg_Move(ToYield);
 		}

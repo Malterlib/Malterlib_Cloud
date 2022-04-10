@@ -136,6 +136,7 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveAppManager(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+
 		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>>> fp_CommandLine_CloudManager_GetSensorReaders(CStr const &_Host);
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> fp_CommandLine_CloudManager_GetAggregatedSensors
 			(
@@ -153,6 +154,20 @@ namespace NMib::NCloud::NCloudClient
 			(
 				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
 				, CDistributedAppSensorReader_SensorReadingFilter const &_Filter
+			)
+		;
+
+		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>>> fp_CommandLine_CloudManager_GetLogReaders(CStr const &_Host);
+		TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> fp_CommandLine_CloudManager_GetAggregatedLogs
+			(
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> const &_pLogReaders
+				, CDistributedAppLogReader_LogFilter const &_Filter
+			)
+		;
+		TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>> fp_CommandLine_CloudManager_GetAggregatedLogEntries
+			(
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> const &_pLogReaders
+				, CDistributedAppLogReader_LogEntryFilter const &_Filter
 			)
 		;
 
