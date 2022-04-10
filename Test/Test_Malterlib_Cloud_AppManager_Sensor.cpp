@@ -213,8 +213,8 @@ public:
 			auto fMerge = [](CEJSON const &_Left, CEJSON const &_Right)
 				{
 					CEJSON Return;
-					Return.f_Array().f_Insert(_Left.f_Array());
 					Return.f_Array().f_Insert(_Right.f_Array());
+					Return.f_Array().f_Insert(_Left.f_Array());
 					return Return;
 				}
 			;
@@ -228,27 +228,7 @@ public:
 						, "Identifier"_= "org.malterlib.testapp.test"
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 5
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.testapp.test"
-						, "IdentifierScope"_= ""
-						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 4
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.testapp.test"
-						, "IdentifierScope"_= ""
-						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 3,
+						, "UniqueSequence"_= 1
 					}
 					,
 					{
@@ -268,7 +248,27 @@ public:
 						, "Identifier"_= "org.malterlib.testapp.test"
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 1
+						, "UniqueSequence"_= 3,
+					}
+					,
+					{
+						"HostID"_= ""
+						, "HostName"_= ""
+						, "Application"_= ""
+						, "Identifier"_= "org.malterlib.testapp.test"
+						, "IdentifierScope"_= ""
+						, "Name"_= "Test Sensor"
+						, "UniqueSequence"_= 4
+					}
+					,
+					{
+						"HostID"_= ""
+						, "HostName"_= ""
+						, "Application"_= ""
+						, "Identifier"_= "org.malterlib.testapp.test"
+						, "IdentifierScope"_= ""
+						, "Name"_= "Test Sensor"
+						, "UniqueSequence"_= 5
 					}
 				}
 			;
@@ -279,9 +279,9 @@ public:
 						"HostID"_= ""
 						, "HostName"_= ""
 						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.freepercent"
+						, "Identifier"_= "org.malterlib.diskspace.free"
 						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Free Disk Space % ({})"_f << AppManagerInfo.m_RootDirectory
+						, "Name"_= "Free Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
 						, "UniqueSequence"_= 1
 					}
 					,
@@ -299,9 +299,9 @@ public:
 						"HostID"_= ""
 						, "HostName"_= ""
 						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.free"
+						, "Identifier"_= "org.malterlib.diskspace.freepercent"
 						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Free Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
+						, "Name"_= "Free Disk Space % ({})"_f << AppManagerInfo.m_RootDirectory
 						, "UniqueSequence"_= 1
 					}
 				}
@@ -404,7 +404,7 @@ public:
 					{
 						return CEJSON::fs_FromString
 							(
-								CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--report-newest-first", "--json"}, TestAppDirectory)
+								CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--newest", "--json"}, TestAppDirectory)
 							)
 						;
 					}
@@ -457,7 +457,7 @@ public:
 					{
 						return CEJSON::fs_FromString
 							(
-								CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--report-newest-first", "--json"}, AppManagerInfo.m_RootDirectory)
+								CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory)
 							)
 						;
 					}
@@ -514,7 +514,7 @@ public:
 					{
 						return CEJSON::fs_FromString
 							(
-								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-readings-list", "--report-newest-first", "--json"}, CloudClientDirectory)
+								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-readings-list", "--newest", "--json"}, CloudClientDirectory)
 							)
 						;
 					}

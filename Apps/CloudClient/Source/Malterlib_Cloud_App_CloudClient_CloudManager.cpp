@@ -231,6 +231,9 @@ namespace NMib::NCloud::NCloudClient
 					auto SensorsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors, SensorReaders, _Filter);
 					auto ReadingsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorStatus, SensorReaders, _Filter);
 
+					CDistributedAppSensorReader_SensorReadingFilter Filter;
+					Filter.m_Flags = CDistributedAppSensorReader_SensorReadingFilter::ESensorReadingsFlag_None;
+
 					co_return co_await self
 						(
 							&CDistributedAppActor::f_CommandLine_SensorReadingsOutput
@@ -240,6 +243,7 @@ namespace NMib::NCloud::NCloudClient
 							, 0
 							, _Flags
 							, _TableType
+							, Filter
 						)
 					;
 				}
@@ -267,6 +271,7 @@ namespace NMib::NCloud::NCloudClient
 							, _MaxEntries
 							, _Flags
 							, _TableType
+							, _Filter
 						)
 					;
 				}
