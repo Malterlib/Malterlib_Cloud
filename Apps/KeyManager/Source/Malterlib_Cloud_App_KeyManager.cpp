@@ -24,7 +24,7 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
 	{
-		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Warning, "Waiting for user to provide password");
+		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Critical, "Waiting for user to provide password");
 		co_return {};
 	}
 
