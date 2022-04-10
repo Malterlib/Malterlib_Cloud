@@ -77,7 +77,7 @@ namespace NMib::NCloud::NCloudManager
 	}
 
 	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensors(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize)
-		-> TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>
+		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> Sensors;
 		{
@@ -99,14 +99,11 @@ namespace NMib::NCloud::NCloudManager
 			Auditor.f_Info("Get sensors");
 		}
 
-		for (auto iSensor = co_await fg_Move(Sensors).f_GetIterator(); iSensor; co_await ++iSensor)
-			co_yield *iSensor;
-
-		co_return {};
+		co_return fg_Move(Sensors);
 	}
 
 	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorReadings(CDistributedAppSensorReader_SensorReadingFilter &&_Filter, uint32 _BatchSize)
-		-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>
+		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> SensorReadings;
 		{
@@ -128,14 +125,11 @@ namespace NMib::NCloud::NCloudManager
 			Auditor.f_Info("Get sensor readings");
 		}
 
-		for (auto iReading = co_await fg_Move(SensorReadings).f_GetIterator(); iReading; co_await ++iReading)
-			co_yield *iReading;
-
-		co_return {};
+		co_return fg_Move(SensorReadings);
 	}
 
 	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorStatus(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize)
-		-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>
+		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> SensorReadings;
 		{
@@ -157,9 +151,6 @@ namespace NMib::NCloud::NCloudManager
 			Auditor.f_Info("Get sensor status");
 		}
 
-		for (auto iReading = co_await fg_Move(SensorReadings).f_GetIterator(); iReading; co_await ++iReading)
-			co_yield *iReading;
-
-		co_return {};
+		co_return fg_Move(SensorReadings);
 	}
 }

@@ -55,12 +55,12 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CDistributedAppSensorReaderImplementation : public CDistributedAppSensorReader
 		{
-			TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> f_GetSensors(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize) override;
+			TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> f_GetSensors(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize) override;
 			auto f_GetSensorReadings(CDistributedAppSensorReader_SensorReadingFilter &&_Filter, uint32 _BatchSize)
-				-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> override
+				-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override
 			;
 			auto f_GetSensorStatus(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize)
-				-> TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> override
+				-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override
 			;
 			CCloudManagerServer *m_pThis;
 #			ifdef DMibDebug
