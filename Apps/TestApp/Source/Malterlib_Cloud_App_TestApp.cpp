@@ -89,6 +89,49 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
+			(
+				{
+					"Names"_= {"--generate-log-entries"}
+					, "Description"_= "Generates a log entries."
+					, "Parameters"_=
+					{
+						"NumEntries?"_=
+						{
+							"Default"_= 1
+							, "Description"_= "The number of entries to report."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					mint nEntries = _Params["NumEntries"].f_Integer();
+
+					CDistributedAppLogReporter::CLogInfo LogInfo;
+
+					LogInfo.m_Identifier = "org.malterlib.log.test";
+					LogInfo.m_IdentifierScope = "Test";
+					LogInfo.m_Name = "Malterlib Test";
+
+					auto LogReporter = co_await self(&CTestAppActor::fp_OpenLogReporter, LogInfo);
+
+					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
+
+					for (mint i = 0; i < nEntries; ++i)
+					{
+						CDistributedAppLogReporter::CLogEntry LogEntry;
+						LogEntry.m_Data.m_Message = "Test Log {}"_f << i;
+						LogEntries.f_Insert(fg_Move(LogEntry));
+					}
+
+					co_await LogReporter.m_fReportEntries(fg_Move(LogEntries));
+
+					co_await fg_Move(LogReporter.m_fReportEntries).f_Destroy();
+
+					co_return 0;
+				}
+			)
+		;
 	}
 
 	void CTestAppActor::fp_PopulateAppInterfaceRegisterInfo(CDistributedAppInterfaceServer::CRegisterInfo &o_RegisterInfo, NEncoding::CEJSON const &_Params)

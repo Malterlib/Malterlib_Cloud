@@ -180,6 +180,8 @@ namespace NMib::NCloud
 										{"CloudManager/RegisterAppManager"}
 										, {"CloudManager/ReportSensorReadings"}
 										, {"CloudManager/ReportSensorReadingsOnBehalfOf/All"}
+										, {"CloudManager/ReportLogEntries"}
+										, {"CloudManager/ReportLogEntriesOnBehalfOf/All"}
 									}
 								)
 							)
