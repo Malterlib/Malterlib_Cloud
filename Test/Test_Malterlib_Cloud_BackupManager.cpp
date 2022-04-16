@@ -44,13 +44,11 @@ class CBackupManager_Tests : public NMib::NTest::CTest
 public:
 	void f_DoTests()
 	{
-#ifndef DPlatformFamily_Windows
 		// File change notifications are not working as expected on Windowms for now
 		DMibTestSuite("General")
 		{
 			fp_DoGeneralTests();
 		};
-#endif
 	}
 
 	struct COtherNotifications
@@ -178,18 +176,23 @@ public:
 							}
 						;
 
-						if (Notification.f_GetTypeID() == tf_Notification)
-							return Notification.f_Get<tf_Notification>();
-						else
+						if constexpr (tf_Notification != CBackupManagerClient::ENotification_None)
 						{
-							++o_OtherNotifications.m_nNotifications[Notification.f_GetTypeID()];
-							o_OtherNotifications.m_Notifications.f_Insert(Notification);
-							o_OtherNotifications.m_LastNotifications[Notification.f_GetTypeID()] = Notification;
+							if (Notification.f_GetTypeID() == tf_Notification)
+								return Notification.f_Get<tf_Notification>();
 						}
+
+						++o_OtherNotifications.m_nNotifications[Notification.f_GetTypeID()];
+						o_OtherNotifications.m_Notifications.f_Insert(Notification);
+						o_OtherNotifications.m_LastNotifications[Notification.f_GetTypeID()] = Notification;
 					}
 				}
+
+				if constexpr (tf_Notification == CBackupManagerClient::ENotification_None)
+					return;
+
 				if (f_Wait(g_Timeout / 2.0))
-					DMibError("Timed out waiting for backup notification");
+					DMibError("Timed out waiting for backup notification. Other notifications {vs}"_f << o_OtherNotifications.m_Notifications);
 			}
 		}
 
@@ -350,7 +353,7 @@ public:
 		void f_CreateSymlink(CStr const &_Name, CStr const &_Destination, bool _bRelative, bool _bDirectory)
 		{
 			DMibCloudBackupManagerDebugOut("Create symlink      {} = {}\n", _Name, _Destination);
-			CFile::fs_CreateDirectory(CFile::fs_GetPath(m_BackupConfig.m_ManifestConfig.m_Root / _Name));
+			CFile::fs_CreateDirectory(CFile::fs_GetPath(m_BackupConfig.m_ManifestConfig.m_Root / _Destination));
 			CFile::fs_CreateSymbolicLink
 				(
 				 	_bRelative ? _Destination : m_BackupConfig.m_ManifestConfig.m_Root / _Destination
@@ -397,7 +400,26 @@ public:
 		void f_RenameFile(CStr const &_FromName, CStr const &_ToName)
 		{
 			DMibCloudBackupManagerDebugOut("Rename file      {} -> {}\n", _FromName, _ToName);
+		
+#ifdef DPlatformFamily_Windows
+			for (mint i = 0; i < 200; ++i)
+			{
+				try
+				{
+					CFile::fs_RenameFile(m_BackupConfig.m_ManifestConfig.m_Root / _FromName, m_BackupConfig.m_ManifestConfig.m_Root / _ToName);
+					break;
+				}
+				catch (CExceptionFile const &)
+				{
+					if (i == 199)
+						throw;
+					else
+						NSys::fg_Thread_Sleep(0.01f);
+				}
+			}
+#else
 			CFile::fs_RenameFile(m_BackupConfig.m_ManifestConfig.m_Root / _FromName, m_BackupConfig.m_ManifestConfig.m_Root / _ToName);
+#endif
 		}
 
 		void f_ModifyFile(CStr const &_Name, mint _Pos)
@@ -767,7 +789,9 @@ public:
 				{
 					BackupHelper.f_Start(TrustManager, Dependencies);
 				}
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_FileFinished), ==, 4);
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
@@ -800,8 +824,11 @@ public:
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^File1", {}}};
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(InitNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -821,8 +848,11 @@ public:
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^File1", "OverrideDir"}, {"Dir1/File2", "OverrideDir2"}};
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_FileFinished), ==, 4);
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
@@ -844,8 +874,11 @@ public:
 				COtherNotifications ActionNotifications;
 				COtherNotifications CleanupNotifications;
 
+				DMibTestMark;
 				auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+				DMibTestMark;
 
 				DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -865,8 +898,11 @@ public:
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^File1", "OverrideDir"}, {"Dir1/File1", "OverrideDir2"}};
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				auto BackupError = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_BackupError>(InitNotifications);
+				DMibTestMark;
 
 				DMibExpect(InitNotifications.f_UnclaimedNotificaions(), ==, None);
 
@@ -880,8 +916,11 @@ public:
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_ExcludeWildcards = {"*File1"};
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_FileFinished), ==, 1);
@@ -899,8 +938,11 @@ public:
 				DMibTestPath("Append RSync");
 				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_FileFinished), ==, 3);
@@ -914,8 +956,11 @@ public:
 				COtherNotifications ActionNotifications;
 				COtherNotifications CleanupNotifications;
 
+				DMibTestMark;
 				auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+				DMibTestMark;
 
 				DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -935,8 +980,11 @@ public:
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_AddSyncFlagsWildcards["*/File2"] = EDirectoryManifestSyncFlag_Append;
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(InitNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -949,8 +997,11 @@ public:
 				COtherNotifications ActionNotifications;
 				COtherNotifications CleanupNotifications;
 
+				DMibTestMark;
 				auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+				DMibTestMark;
 
 				DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -971,8 +1022,11 @@ public:
 				ManifestConfig.m_AddSyncFlagsWildcards["*"] = EDirectoryManifestSyncFlag_Append;
 				ManifestConfig.m_RemoveSyncFlagsWildcards["*/File2"] = EDirectoryManifestSyncFlag_Append;
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(InitNotifications.f_UnclaimedNotificaions(), ==, None);
 				DMibExpect(InitNotifications.f_InitialAddedFiles(), ==, None);
@@ -984,8 +1038,11 @@ public:
 				COtherNotifications ActionNotifications;
 				COtherNotifications CleanupNotifications;
 
+				DMibTestMark;
 				auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+				DMibTestMark;
 
 				DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1005,8 +1062,11 @@ public:
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*"}};
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(InitNotifications.f_UnclaimedNotificaions(), ==, None);
 				DMibExpect(InitNotifications.f_InitialAddedFiles(), ==, None);
@@ -1026,8 +1086,11 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1049,8 +1112,11 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1071,8 +1137,11 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1093,8 +1162,11 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1116,8 +1188,11 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1140,8 +1215,11 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1154,6 +1232,9 @@ public:
 
 					DMibExpectTrue(!CFile::fs_FileExists(LatestDir / "Dir1/Dir3/File1"))(NTest::ETest_FailAndStop);
 				}
+#ifndef DPlatformFamily_Windows
+				// Windows doesn't support detecting when root directory changes
+				// TODO: Listen on parent dir on Windows
 				{
 					DMibTestPath("Rename dir");
 
@@ -1162,9 +1243,13 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished0 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					auto FileFinished1 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
 					DMibExpect(CleanupNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1189,9 +1274,13 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished0 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					auto FileFinished1 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
 					DMibExpect(CleanupNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1209,6 +1298,7 @@ public:
 					DMibExpectTrue(CFile::fs_FileExists(LatestDir / "Dir1/File2"))(NTest::ETest_FailAndStop);
 					DMibExpectTrue(BackupHelper.f_FileIsSame(LatestDir, "Dir1/File2"));
 				}
+#endif
 				{
 					DMibTestPath("Switch file symlink");
 
@@ -1219,10 +1309,17 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					if (FileFinished.m_TransferStats.m_Type == CBackupManagerClient::EFileTransferType_Delete)
+					{
+						DMibTestMark;
 						FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					}
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), >=, 1u);
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Quiescent), >=, 0u);
@@ -1264,10 +1361,17 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					if (FileFinished.m_TransferStats.m_Type == CBackupManagerClient::EFileTransferType_Delete)
+					{
+						DMibTestMark;
 						FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					}
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), >=, 1u);
 					DMibExpect(ActionNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_Quiescent), >=, 0u);
@@ -1292,6 +1396,9 @@ public:
 					DMibExpectTrue(CFile::fs_FileExists(LatestDir / "Dir1/File1"))(NTest::ETest_FailAndStop);
 					DMibExpectTrue(!CFile::fs_FileExists(LatestDir / "Dir1/Symlink1"))(NTest::ETest_FailAndStop);
 				}
+#ifndef DPlatformFamily_Windows
+				// Windows doesn't support detecting when root directory changes
+				// TODO: Listen on parent dir on Windows
 				{
 					DMibTestPath("Delete watched dir");
 
@@ -1304,9 +1411,13 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished0 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					auto FileFinished1 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
 					DMibExpect(CleanupNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1331,9 +1442,13 @@ public:
 					COtherNotifications ActionNotifications;
 					COtherNotifications CleanupNotifications;
 
+					DMibTestMark;
 					auto FileFinished0 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					auto FileFinished1 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications);
+					DMibTestMark;
 					BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications);
+					DMibTestMark;
 
 					DMibExpect(ActionNotifications.f_UnclaimedNotificaions(), ==, None);
 					DMibExpect(CleanupNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1351,6 +1466,7 @@ public:
 					DMibExpectTrue(CFile::fs_FileExists(LatestDir / "Dir1/File2"))(NTest::ETest_FailAndStop);
 					DMibExpectTrue(BackupHelper.f_FileIsSame(LatestDir, "Dir1/File2"));
 				}
+#endif
 			}
 			{
 				DMibTestPath("Delete all");
@@ -1359,8 +1475,11 @@ public:
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^*"}};
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_FileFinished), ==, 2);
 				DMibExpect(InitNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1372,8 +1491,11 @@ public:
 
 				COtherNotifications ActionNotifications0;
 				COtherNotifications CleanupNotifications0;
+				DMibTestMark;
 				auto FileFinished0 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications0);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications0);
+				DMibTestMark;
 				DMibExpect(ActionNotifications0.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications0.f_UnclaimedNotificaions(), ==, None);
 				DMibExpect(CleanupNotifications0.f_UnclaimedNotificaions(), ==, None);
@@ -1382,8 +1504,11 @@ public:
 
 				COtherNotifications ActionNotifications1;
 				COtherNotifications CleanupNotifications1;
+				DMibTestMark;
 				auto FileFinished1 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications1);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications1);
+				DMibTestMark;
 				DMibExpect(ActionNotifications1.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications1.f_UnclaimedNotificaions(), ==, None);
 				DMibExpect(CleanupNotifications1.f_UnclaimedNotificaions(), ==, None);
@@ -1391,8 +1516,11 @@ public:
 				BackupHelper.f_DeleteFile("File1");
 				COtherNotifications ActionNotifications2;
 				COtherNotifications CleanupNotifications2;
+				DMibTestMark;
 				auto FileFinished2 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications2);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications2);
+				DMibTestMark;
 				DMibExpect(ActionNotifications2.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications2.f_UnclaimedNotificaions(), ==, None);
 				DMibExpect(CleanupNotifications2.f_UnclaimedNotificaions(), ==, None);
@@ -1400,8 +1528,11 @@ public:
 				BackupHelper.f_DeleteFile("Dir2/File1");
 				COtherNotifications ActionNotifications3;
 				COtherNotifications CleanupNotifications3;
+				DMibTestMark;
 				auto FileFinished3 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications3);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications3);
+				DMibTestMark;
 				DMibExpect(ActionNotifications3.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications3.f_UnclaimedNotificaions(), ==, None);
 				DMibExpect(CleanupNotifications3.f_UnclaimedNotificaions(), ==, None);
@@ -1421,8 +1552,11 @@ public:
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*"}};
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(InitNotifications.f_UnclaimedNotificaions(), ==, None);
 				DMibExpect(InitNotifications.f_InitialAddedFiles(), ==, None);
@@ -1435,8 +1569,11 @@ public:
 				BackupHelper.f_CreateFile("Dir1/File1", 1024);
 				COtherNotifications ActionNotifications0;
 				COtherNotifications CleanupNotifications0;
+				DMibTestMark;
 				auto FileFinished0 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications0);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications0);
+				DMibTestMark;
 				DMibExpect(ActionNotifications0.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications0.f_UnclaimedNotificaions(), ==, None);
 				DMibExpect(CleanupNotifications0.f_UnclaimedNotificaions(), ==, None);
@@ -1444,8 +1581,11 @@ public:
 				BackupHelper.f_CreateFile("Dir1/File2", 2048);
 				COtherNotifications ActionNotifications1;
 				COtherNotifications CleanupNotifications1;
+				DMibTestMark;
 				auto FileFinished1 = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications1);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(CleanupNotifications1);
+				DMibTestMark;
 				DMibExpect(ActionNotifications1.f_ClaimNotifications(CBackupManagerClient::ENotification_Unquiescent), ==, 1);
 				DMibExpect(ActionNotifications1.f_UnclaimedNotificaions(), ==, None);
 				DMibExpect(CleanupNotifications1.f_UnclaimedNotificaions(), ==, None);
@@ -1485,7 +1625,9 @@ public:
 
 				auto BackupFinishedSubscription = BackupHelper.f_Start(TrustManager, Dependencies);
 
+				DMibTestMark;
 				auto FileFinished = BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(InitNotifications);
+				DMibTestMark;
 				DMibExpect(InitNotifications.f_UnclaimedNotificaions(), ==, None);
 
 				DMibExpect(FileFinished.m_TransferStats.m_Type, ==, CBackupManagerClient::EFileTransferType_RSync);
@@ -1500,7 +1642,9 @@ public:
 				BackupFinishedSubscription->f_Destroy().f_CallSync(pRunLoop, g_Timeout);
 
 				COtherNotifications AppendManifestNotifications;
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(AppendManifestNotifications);
+				DMibTestMark;
 				DMibExpect(AppendManifestNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(AppendManifestNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_FileFinished), ==, 2);
 				DMibExpect(AppendManifestNotifications.f_UnclaimedNotificaions(), ==, None);
@@ -1560,20 +1704,24 @@ public:
 				DMibExpect(CFile::fs_FindFiles(BackupDestination / "Sync_*").f_GetLen(), ==, 1);
 				DMibExpect(CFile::fs_FindFiles(BackupDestination / "CheckedOut_*"), ==, TCVector<CStr>{});
 			}
-#if 0
-			// Buggy
+#ifdef DPlatformFamily_Windows
+			if (CSystem::ms_PlatformVersion >= 10'0'019043) // Below this we get access denied when renaming directories
+#endif
 			{
 				DMibTestPath("Change spree");
 
 				// Test that backup is eventually consistent
 
-				CBackupClientHelper BackupHelper{TestBackupDirectory};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_AddSyncFlagsWildcards["Dir1/*"] = EDirectoryManifestSyncFlag_Append;
 
+				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(InitNotifications);
+				DMibTestMark;
 
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_InitialFinished), ==, 1);
 				DMibExpect(InitNotifications.f_ClaimNotifications(CBackupManagerClient::ENotification_FileFinished), ==, 1);
@@ -1774,14 +1922,20 @@ public:
 				g_Timeout = nRandomTests * gc_TimeoutMultiplier;
 
 				COtherNotifications ActionNotifications;
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Unquiescent>(ActionNotifications);
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(ActionNotifications);
+				DMibTestMark;
 
 				// Wait for last file to be visibile
 				BackupHelper.f_CreateFile("FileEnd", 1024);
+				DMibTestMark;
 				while (BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_FileFinished>(ActionNotifications).m_FileName != "FileEnd")
 					;
+				DMibTestMark;
 				BackupHelper.f_WaitForNotification<CBackupManagerClient::ENotification_Quiescent>(ActionNotifications);
+				DMibTestMark;
 
 				TCSet<CStr> SourceFiles;
 				TCSet<CStr> DestinationFiles;
@@ -1831,7 +1985,6 @@ public:
 				DMibExpect(BackupHelper.f_GetManifestFiles(Manifest, EFileAttrib_Link, EFileAttrib_None), ==, SourceManifestLinks);
 
 			}
-#endif
 		}
 	}
 };
