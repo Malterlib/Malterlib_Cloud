@@ -129,7 +129,7 @@ namespace NMib::NCloud::NBackupManager
 									if (CFile::fs_GetFileChecksum_SHA256(SourceFileName, &ChecksumState) == File.m_Digest)
 									{
 										CFile OutFile;
-										OutFile.f_Open(FileName, EFileOpen_Write, EFileAttrib_UserRead | EFileAttrib_UserWrite);
+										OutFile.f_Open(FileName, EFileOpen_Write | EFileOpen_ShareAll, EFileAttrib_UserRead | EFileAttrib_UserWrite);
 										ChecksumState.m_pFile->f_SetPosition(0);
 										CFile::fs_CopyFileRaw(*ChecksumState.m_pFile, OutFile);
 										continue;

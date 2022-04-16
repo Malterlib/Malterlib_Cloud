@@ -193,7 +193,7 @@ namespace NMib::NCloud::NBackupManager
 
 		{
 			TCBinaryStreamFile<> Stream;
-			Stream.f_Open(ManifestFileName + ".tmp", EFileOpen_Write, EFileAttrib_UserRead | EFileAttrib_UserWrite);
+			Stream.f_Open(ManifestFileName + ".tmp", EFileOpen_Write | EFileOpen_ShareAll, EFileAttrib_UserRead | EFileAttrib_UserWrite);
 			Stream << mp_CurrentManifest;
 		}
 
@@ -304,7 +304,38 @@ namespace NMib::NCloud::NBackupManager
 							if (CFile::fs_GetUniqueIdentifier(FullSourcePath) != CFile::fs_GetUniqueIdentifier(FullDestinationPath))
 								CommitResult.m_Result.m_UpdatedFiles.f_Insert(FileName);
 						}
+
+#ifdef DPlatformFamily_Windows
+						for (mint i = 0; i < 200; ++i)
+						{
+							try
+							{
+								if (CFile::fs_FileExists(FullDestinationPath))
+									CFile::fs_AtomicReplaceFile(FullSourcePath, FullDestinationPath);
+								else
+									CFile::fs_RenameFile(FullSourcePath, FullDestinationPath);
+								break;
+							}
+							catch (CExceptionFile const &)
+							{
+								try
+								{
+									if (CFile::fs_FileExists(FullDestinationPath))
+										CFile::fs_DeleteFile(FullDestinationPath);
+									CFile::fs_RenameFile(FullSourcePath, FullDestinationPath);
+									break;
+								}
+								catch (CExceptionFile const&)
+								{
+									if (i == 199)
+										throw;
+									NSys::fg_Thread_Sleep(0.01f);
+								}
+							}
+						}
+#else
 						CFile::fs_AtomicReplaceFile(FullSourcePath, FullDestinationPath);
+#endif
 					}
 					else
 					{
