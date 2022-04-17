@@ -141,6 +141,7 @@ namespace NMib::NCloud
 #ifdef DMibCloudBackupManagerDebug
 							switch (Notification.m_Notification)
 							{
+							case EFileChangeNotification_Undefined: DMibCloudBackupManagerDebugOut("&&& Undefined {}\n", Notification.m_Path); break;
 							case EFileChangeNotification_Unknown: DMibCloudBackupManagerDebugOut("&&& Unknown {}\n", Notification.m_Path); break;
 							case EFileChangeNotification_Added: DMibCloudBackupManagerDebugOut("&&& Added {}\n", Notification.m_Path); break;
 							case EFileChangeNotification_Removed: DMibCloudBackupManagerDebugOut("&&& Removed {}\n", Notification.m_Path); break;
@@ -502,6 +503,7 @@ namespace NMib::NCloud
 #ifdef DMibCloudBackupManagerDebug
 		switch (Notification.m_Notification)
 		{
+		case EFileChangeNotification_Undefined: DMibCloudBackupManagerDebugOut("%%% Undefined {} {}\n", Notification.m_Path, _bDirty); break;
 		case EFileChangeNotification_Unknown: DMibCloudBackupManagerDebugOut("%%% Unknown {} {}\n", Notification.m_Path, _bDirty); break;
 		case EFileChangeNotification_Added: DMibCloudBackupManagerDebugOut("%%% Added {} {}\n", Notification.m_Path, _bDirty); break;
 		case EFileChangeNotification_Removed: DMibCloudBackupManagerDebugOut("%%% Removed {} {}\n", Notification.m_Path, _bDirty); break;
@@ -641,6 +643,7 @@ namespace NMib::NCloud
 				CStr NotificationStr;
 				switch (Notification.m_Notification)
 				{
+				case EFileChangeNotification_Undefined: NotificationStr = "Undefined"; break;
 				case EFileChangeNotification_Unknown: NotificationStr = "Unknown"; break;
 				case EFileChangeNotification_Added: NotificationStr = "Added"; break;
 				case EFileChangeNotification_Removed: NotificationStr = "Removed"; break;
