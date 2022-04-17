@@ -12,6 +12,123 @@ static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 class CAppManager_General_Tests : public NMib::NTest::CTest
 {
 public:
+	struct CApplicationKey
+	{
+		auto operator <=> (CApplicationKey const &_Right) const = default;
+
+		template <typename tf_CStr>
+		void f_Format(tf_CStr &o_Str) const
+		{
+			o_Str += typename tf_CStr::CFormat("{}:{}") << m_AppName << m_iAppManager;
+		}
+
+		CStr m_AppName;
+		mint m_iAppManager;
+	};
+
+	struct CUpdateNotificationsApplicationState
+	{
+		TCSet<CApplicationKey> m_InProgress;
+		mint m_nMaxInProgress = 0;
+
+		TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStage;
+		TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStageCoordination;
+		TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStage;
+		TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStageCoordination;
+
+		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStage;
+		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStageCoordination;
+		TCAtomic<mint> m_nSuccess = 0;
+		TCAtomic<mint> m_nFinished = 0;
+
+		template <typename tf_CStr>
+		void f_Format(tf_CStr &o_Str) const
+		{
+			o_Str += typename tf_CStr::CFormat("InProgress: {}\n") << m_InProgress;
+			o_Str += typename tf_CStr::CFormat("LastInStage: {}\n") << m_LastInStage;
+			o_Str += typename tf_CStr::CFormat("LastInStageCoordination: {}\n") << m_LastInStageCoordination;
+			o_Str += typename tf_CStr::CFormat("InStage: {}\n") << m_InStage;
+			o_Str += typename tf_CStr::CFormat("InStageCoordination: {}\n") << m_InStageCoordination;
+			o_Str += typename tf_CStr::CFormat("MaxInStage: {}\n") << m_MaxInStage;
+			o_Str += typename tf_CStr::CFormat("MaxInStageCoordination: {}\n") << m_MaxInStageCoordination;
+			o_Str += typename tf_CStr::CFormat("nSuccess: {}\n") << m_nSuccess.f_Load();
+			o_Str += typename tf_CStr::CFormat("nFinished: {}\n") << m_nFinished.f_Load();
+		}
+
+		void f_Clear()
+		{
+			m_InProgress.f_Clear();
+			m_LastInStage.f_Clear();
+			m_InStage.f_Clear();
+			m_MaxInStage.f_Clear();
+			m_nMaxInProgress = 0;
+			m_nSuccess = 0;
+			m_nFinished = 0;
+		}
+	};
+
+	struct CUpdateNotificationsState : CAllowUnsafeThis
+	{
+		CUpdateNotificationsState()
+		{
+		}
+
+		void f_Destroy()
+		{
+			TCActorResultVector<void> Destroys;
+			for (auto &Subscription : m_Subscriptions)
+				Subscription->f_Destroy() > Destroys.f_AddResult();;
+			Destroys.f_GetResults() > fg_DiscardResult();
+			f_Clear();
+		}
+
+		void f_Clear()
+		{
+			for (auto &Application : m_Applications)
+				Application.f_Clear();
+
+			for (auto &AppManager : m_ApplicationsPerAppmanager)
+			{
+				for (auto &Application : AppManager)
+					Application.f_Clear();
+			}
+
+			m_AllApplications.f_Clear();
+			m_AppsInProgressPerAppManager.f_Clear();
+			m_MaxAppsInProgressPerAppManager.f_Clear();
+			m_nAppsInProgress = 0;
+			m_nMaxAppsInProgress = 0;
+			m_nMaxAppsInProgressPerAppManager = 0;
+		}
+
+		void f_Signal()
+		{
+			m_bSignalCompletion = true;
+			auto ToWake = fg_Move(m_WaitingSignals);
+			for (auto &Promise : ToWake)
+				Promise.f_SetResult();
+		}
+
+		TCFuture<bool> f_Wait()
+		{
+			auto Future = m_WaitingSignals.f_Insert().f_Future();
+			auto Result = co_await fg_Move(Future).f_Timeout(g_Timeout, "Timeout").f_Wrap();
+			co_return !Result;
+		}
+
+		bool m_bSignalCompletion = false;
+		TCVector<CActorSubscription> m_Subscriptions;
+		TCMap<CStr, CUpdateNotificationsApplicationState> m_Applications;
+		TCMap<mint, TCMap<CStr, CUpdateNotificationsApplicationState>> m_ApplicationsPerAppmanager;
+		CUpdateNotificationsApplicationState m_AllApplications;
+		mint m_nAppsInProgress = 0;
+		mint m_nMaxAppsInProgress = 0;
+		TCMap<mint, zmint> m_AppsInProgressPerAppManager;
+		TCMap<mint, zmint> m_MaxAppsInProgressPerAppManager;
+		mint m_nMaxAppsInProgressPerAppManager = 0;
+		TCVector<TCPromise<void>> m_WaitingSignals;
+	};
+
 	void f_DoTests()
 	{
 		DMibTestSuite("Upgrades") -> TCFuture<void>
@@ -65,103 +182,6 @@ public:
 					co_return {};
 				}
 			;
-
-			struct CApplicationKey
-			{
-				auto operator <=> (CApplicationKey const &_Right) const = default;
-
-				CStr m_AppName;
-				mint m_iAppManager;
-			};
-
-			struct CUpdateNotificationsApplicationState
-			{
-				TCSet<CApplicationKey> m_InProgress;
-				mint m_nMaxInProgress = 0;
-
-				TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStage;
-				TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStageCoordination;
-				TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStage;
-				TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStageCoordination;
-
-				TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStage;
-				TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStageCoordination;
-				TCAtomic<mint> m_nSuccess = 0;
-				TCAtomic<mint> m_nFinished = 0;
-
-				void f_Clear()
-				{
-					m_InProgress.f_Clear();
-					m_LastInStage.f_Clear();
-					m_InStage.f_Clear();
-					m_MaxInStage.f_Clear();
-					m_nMaxInProgress = 0;
-					m_nSuccess = 0;
-					m_nFinished = 0;
-				}
-			};
-
-			struct CUpdateNotificationsState : CAllowUnsafeThis
-			{
-				CUpdateNotificationsState()
-				{
-				}
-
-				void f_Destroy()
-				{
-					TCActorResultVector<void> Destroys;
-					for (auto &Subscription : m_Subscriptions)
-						Subscription->f_Destroy() > Destroys.f_AddResult();;
-					Destroys.f_GetResults() > fg_DiscardResult();
-					f_Clear();
-				}
-
-				void f_Clear()
-				{
-					for (auto &Application : m_Applications)
-						Application.f_Clear();
-
-					for (auto &AppManager : m_ApplicationsPerAppmanager)
-					{
-						for (auto &Application : AppManager)
-							Application.f_Clear();
-					}
-
-					m_AllApplications.f_Clear();
-					m_AppsInProgressPerAppManager.f_Clear();
-					m_MaxAppsInProgressPerAppManager.f_Clear();
-					m_nAppsInProgress = 0;
-					m_nMaxAppsInProgress = 0;
-					m_nMaxAppsInProgressPerAppManager = 0;
-				}
-
-				void f_Signal()
-				{
-					m_bSignalCompletion = true;
-					auto ToWake = fg_Move(m_WaitingSignals);
-					for (auto &Promise : ToWake)
-						Promise.f_SetResult();
-				}
-
-				TCFuture<bool> f_Wait()
-				{
-					auto Future = m_WaitingSignals.f_Insert().f_Future();
-					auto Result = co_await fg_Move(Future).f_Timeout(g_Timeout, "Timeout").f_Wrap();
-					co_return !Result;
-				}
-
-				bool m_bSignalCompletion = false;
-				TCVector<CActorSubscription> m_Subscriptions;
-				TCMap<CStr, CUpdateNotificationsApplicationState> m_Applications;
-				TCMap<mint, TCMap<CStr, CUpdateNotificationsApplicationState>> m_ApplicationsPerAppmanager;
-				CUpdateNotificationsApplicationState m_AllApplications;
-				mint m_nAppsInProgress = 0;
-				mint m_nMaxAppsInProgress = 0;
-				TCMap<mint, zmint> m_AppsInProgressPerAppManager;
-				TCMap<mint, zmint> m_MaxAppsInProgressPerAppManager;
-				mint m_nMaxAppsInProgressPerAppManager = 0;
-				TCVector<TCPromise<void>> m_WaitingSignals;
-			};
 
 			auto fProcessApplicationState = [](CUpdateNotificationsApplicationState &_State, CAppManagerInterface::CUpdateNotification const &_Notification, CApplicationKey const &_ApplicationKey)
 				{
@@ -308,7 +328,7 @@ public:
 						if (ApplicationState.m_nFinished == nAppManagers)
 							break;
 						if (Clock.f_GetTime() > g_Timeout * 4.0)
-							DMibError("Timed out waiting for all apps to update");
+							DMibError("Timed out waiting for all apps to update.\n{}\n"_f << ApplicationState);
 						co_await pUpdateNotificationsState->f_Wait();
 					}
 
