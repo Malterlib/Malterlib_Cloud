@@ -112,7 +112,7 @@ public:
 		TCFuture<bool> f_Wait()
 		{
 			auto Future = m_WaitingSignals.f_Insert().f_Future();
-			auto Result = co_await fg_Move(Future).f_Timeout(g_Timeout, "Timeout").f_Wrap();
+			auto Result = co_await fg_Move(Future).f_Timeout(g_Timeout, "Timed out waiting for notification state").f_Wrap();
 			co_return !Result;
 		}
 
@@ -190,7 +190,7 @@ public:
 								co_return {};
 							}
 						)
-						.f_Timeout(g_Timeout, "Timeout")
+						.f_Timeout(g_Timeout, "Timed out waiting for test app to update")
 					;
 					co_return {};
 				}
@@ -202,7 +202,7 @@ public:
 					ChangeTags.m_AddTags = _Tags;
 					ChangeTags.m_Application = _Name;
 					ChangeTags.m_VersionID = PackageInfo.m_VersionID.m_VersionID;
-					co_await VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_Timeout(g_Timeout, "Timeout");
+					co_await VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_Timeout(g_Timeout, "Timed out waiting change tags to finish");
 
 					co_return {};
 				}
@@ -341,7 +341,7 @@ public:
 					++iAppManager;
 				}
 				DMibTestMark;
-				co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timeout") | g_Unwrap;
+				co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting update notification subscriptions") | g_Unwrap;
 			}
 
 			auto fWaitForAllUpdated = [&](CStr _Application) -> CUnsafeFuture
@@ -375,7 +375,7 @@ public:
 
 						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
-					co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timeout") | g_Unwrap;
+					co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for update type change") | g_Unwrap;
 					*pUpdateType = _UpdateType;
 
 					co_return {};
@@ -393,7 +393,7 @@ public:
 
 						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
-					co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timeout") | g_Unwrap;
+					co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for update group change") | g_Unwrap;
 
 					co_return {};
 				}
