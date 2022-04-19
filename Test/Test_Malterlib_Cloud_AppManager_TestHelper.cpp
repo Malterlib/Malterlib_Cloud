@@ -594,7 +594,7 @@ namespace NMib::NCloud
 		m_CloudManager = m_Subscriptions->f_Subscribe<CCloudManager>();
 
 		{
-			m_TestAppArchive = m_ProgramDirectory / "TestApps/TestApp.tar.gz";
+			m_TestAppArchive = m_RootDirectory / "TestApp.tar.gz";
 
 			DMibTestMark;
 

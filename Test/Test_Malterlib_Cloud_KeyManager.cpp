@@ -103,7 +103,7 @@ public:
 		DMibTestSuite("EncryptedFile")
 		{
 			uint16 Port = 31400;
-			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile";
+			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile.EncryptedFile";
 			CStrSecure Password = "Password";
 
 			CDistributedActorTestHelperCombined TestHelper{Port};
@@ -182,7 +182,7 @@ public:
 		{
 			uint16 Port = 31401;
 			CStrSecure Password = "Password";
-			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile";
+			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile.PreCreatedKeys";
 			if (CFile::fs_FileExists(DatabasePath))
 				CFile::fs_DeleteFile(DatabasePath);
 
