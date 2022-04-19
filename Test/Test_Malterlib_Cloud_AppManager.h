@@ -80,6 +80,14 @@ namespace NMib::NCloud
 		TCFuture<void> f_CheckCloudManager(mint _Sequence);
 		TCFuture<void> f_Setup(mint _nAppManagers);
 
+		TCFuture<NStr::CStr> f_LaunchTool
+			(
+				NStr::CStr _Executable
+				, NContainer::TCVector<NStr::CStr> _Params
+				, NStr::CStr _WorkingDir = {}
+			)
+		;
+
 		static auto constexpr mc_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 
 		CStr m_ProgramDirectory = CFile::fs_GetProgramDirectory();
