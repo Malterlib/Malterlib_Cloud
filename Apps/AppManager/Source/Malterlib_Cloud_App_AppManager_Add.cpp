@@ -26,6 +26,7 @@ namespace NMib::NCloud::NAppManager
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		ApplicationSettings.f_FromInterfaceAdd(_Add, ChangedSettings);
 		ApplicationSettings.f_FromInterfaceSettings(_Settings, ChangedSettings);
+
 		if (!_Settings.m_ExecutableParameters)
 		{
 			ApplicationSettings.m_ExecutableParameters = {"--daemon-run-standalone"};
@@ -537,6 +538,8 @@ namespace NMib::NCloud::NAppManager
 		Auditor.f_Info("Application added");
 		if (AppLaunchResult.m_StartupError)
 			_fOnInfo("Application startup failed: {}"_f << AppLaunchResult.m_StartupError);
+
+		co_await fp_SyncNotifications(_Name);
 
 		co_return {};
 	}

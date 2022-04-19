@@ -858,12 +858,15 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		CAppManagerInterface::CApplicationInfo fp_GetApplicationInfo(CApplication const &_Application);
-		TCFuture<void> fp_ChangeNotifications_SendChange(CAppManagerInterface::CChangeNotification _Notification);
+		TCFuture<void> fp_ChangeNotifications_SendChanges(TCVector<CAppManagerInterface::CChangeNotification> _Notifications, CStr _Application);
 		TCFuture<void> fp_ChangeNotifications_PermissionsChanged();
 		TCFuture<void> fp_ChangeNotifications_SendInitial(CStr const &_SubscriptionID);
 		void fp_SendAppChange_AddedOrChanged(CApplication const &_Application);
 		void fp_SendAppChange_Removed(CApplication const &_Application);
 		void fp_SendAppChange_Status(CApplication const &_Application);
+		TCFuture<void> fp_SendAppChange_Empty(CStr _ApplicationName);
+
+		TCFuture<void> fp_SyncNotifications(CStr _ApplicationName);
 
 		TCFuture<void> fp_PublishCoordinationInterface();
 		TCFuture<void> fp_SubscribeCoordinationInterface();

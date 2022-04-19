@@ -132,15 +132,30 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
+	TCFuture<void> CAppManagerActor::fp_SyncNotifications(CStr _ApplicationName)
+	{
+		// Wait 10 seconds for notifications to be delivered to all, ignore errors
+		co_await fp_SendAppChange_Empty(_ApplicationName).f_Timeout(10.0, "Timed out syncing notifications").f_Wrap();
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_SendAppChange_Empty(CStr _ApplicationName)
+	{
+		co_return co_await fp_ChangeNotifications_SendChanges({}, _ApplicationName);
+	}
+
 	void CAppManagerActor::fp_SendAppChange_Status(CApplication const &_Application)
 	{
-		fp_ChangeNotifications_SendChange
+		fp_ChangeNotifications_SendChanges
 			(
-			 	CAppManagerInterface::CChangeNotification
-			 	{
-					_Application.m_Name
-					, CAppManagerInterface::CApplicationChange_Status{_Application.m_LaunchStatus, _Application.m_LaunchStatusSeverity}
+				{
+					CAppManagerInterface::CChangeNotification
+					{
+						_Application.m_Name
+						, CAppManagerInterface::CApplicationChange_Status{_Application.m_LaunchStatus, _Application.m_LaunchStatusSeverity}
+					}
 				}
+				, _Application.m_Name
 			)
 			> fg_DiscardResult()
 		;
@@ -148,13 +163,16 @@ namespace NMib::NCloud::NAppManager
 
 	void CAppManagerActor::fp_SendAppChange_AddedOrChanged(CApplication const &_Application)
 	{
-		fp_ChangeNotifications_SendChange
+		fp_ChangeNotifications_SendChanges
 			(
-			 	CAppManagerInterface::CChangeNotification
-			 	{
-					_Application.m_Name
-					, CAppManagerInterface::CApplicationChange_AddOrChangeInfo{fp_GetApplicationInfo(_Application)}
+				{
+					CAppManagerInterface::CChangeNotification
+					{
+						_Application.m_Name
+						, CAppManagerInterface::CApplicationChange_AddOrChangeInfo{fp_GetApplicationInfo(_Application)}
+					}
 				}
+				, _Application.m_Name
 			)
 			> fg_DiscardResult()
 		;
@@ -162,31 +180,34 @@ namespace NMib::NCloud::NAppManager
 
 	void CAppManagerActor::fp_SendAppChange_Removed(CApplication const &_Application)
 	{
-		fp_ChangeNotifications_SendChange
+		fp_ChangeNotifications_SendChanges
 			(
-			 	CAppManagerInterface::CChangeNotification
-			 	{
-					_Application.m_Name
-					, CAppManagerInterface::CApplicationChange_Remove{}
+				{
+					CAppManagerInterface::CChangeNotification
+					{
+						_Application.m_Name
+						, CAppManagerInterface::CApplicationChange_Remove{}
+					}
 				}
+				, _Application.m_Name
 			)
 			> fg_DiscardResult()
 		;
 	}
 
-	TCFuture<void> CAppManagerActor::fp_ChangeNotifications_SendChange(CAppManagerInterface::CChangeNotification _Notification)
+	TCFuture<void> CAppManagerActor::fp_ChangeNotifications_SendChanges(TCVector<CAppManagerInterface::CChangeNotification> _Notifications, CStr _Application)
 	{
 		TCActorResultVector<void> OnChangeResultsVector;
 
 		CAppManagerInterface::COnChangeNotificationParams NotificationParams;
-		NotificationParams.m_Changes = {_Notification};
+		NotificationParams.m_Changes = fg_Move(_Notifications);
 
-		CStr AppPermission = fg_Format("AppManager/App/{}", _Notification.m_Application);
+		CStr AppPermission = fg_Format("AppManager/App/{}", _Application);
 
 		for (auto &Subscription : mp_ChangeNotificationSubscriptions)
 		{
 			auto &SubscriptionID = mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription);
-			auto fSendNotification = [this, SubscriptionID, AppPermission, NotificationParams]() mutable -> TCFuture<void>
+			auto fSendNotification = [this, SubscriptionID, AppPermission, NotificationParams, _Application]() mutable -> TCFuture<void>
 				{
 					TCPromise<void> OnChangePromise;
 
@@ -206,16 +227,23 @@ namespace NMib::NCloud::NAppManager
 
 							bool bWasFiltered = !pSubscription->m_Filtered.f_IsEmpty();
 							{
-								auto &Change = NotificationParams.m_Changes[0];
-								auto &Application = Change.m_Application;
 								if (_bHasPermission)
-									pSubscription->m_Filtered.f_Remove(Application);
+									pSubscription->m_Filtered.f_Remove(_Application);
 								else
 								{
-									if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Remove>())
-										pSubscription->m_Filtered.f_Remove(Application);
+									if (NotificationParams.m_Changes.f_IsEmpty())
+										pSubscription->m_Filtered[_Application];
 									else
-										pSubscription->m_Filtered[Application];
+									{
+										for (auto &Change : NotificationParams.m_Changes)
+										{
+											if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Remove>())
+												pSubscription->m_Filtered.f_Remove(_Application);
+											else
+												pSubscription->m_Filtered[_Application];
+										}
+									}
+
 									NotificationParams.m_Changes.f_Clear();
 								}
 							}

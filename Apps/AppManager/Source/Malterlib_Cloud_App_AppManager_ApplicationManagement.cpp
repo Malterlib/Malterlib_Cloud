@@ -520,6 +520,8 @@ namespace NMib::NCloud::NAppManager
 
 		Auditor.f_Info(fg_Format("Started '{}'", _Name));
 
+		co_await pThis->fp_SyncNotifications(_Name);
+
 		co_return {};
 	}
 	
@@ -570,6 +572,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (pApplication->m_bDeleted)
 			co_return Auditor.f_Exception("Application has been deleted, aborting");
+
+		co_await pThis->fp_SyncNotifications(_Name);
 
 		co_return {};
 	}
@@ -631,6 +635,9 @@ namespace NMib::NCloud::NAppManager
 			co_return Auditor.f_Exception(fg_Format("Application startup failed: {}", Result->m_StartupError));
 
 		Auditor.f_Info(fg_Format("Restarted '{}'", _Name));
+
+		co_await pThis->fp_SyncNotifications(_Name);
+
 		co_return {};
 	}
 }
