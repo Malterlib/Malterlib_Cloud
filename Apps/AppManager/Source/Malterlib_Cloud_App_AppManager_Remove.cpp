@@ -57,6 +57,9 @@ namespace NMib::NCloud::NAppManager
 		co_await (pThis->mp_State.m_StateDatabase.f_Save() % "Failed to save state" % Auditor);
 
 		Auditor.f_Info(fg_Format("Removed application '{}'", _Name));
+
+		co_await pThis->fp_SyncNotifications(_Name);
+
 		co_return {};
 	}
 

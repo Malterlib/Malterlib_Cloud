@@ -284,6 +284,9 @@ namespace NMib::NCloud::NAppManager
 		if (Result)
 		{
 			Auditor.f_Info(fg_Format("Application '{}' updated successfully", pState->m_pApplication->m_Name));
+
+			co_await fp_SyncNotifications(_Name);
+			
 			co_return {};
 		}
 

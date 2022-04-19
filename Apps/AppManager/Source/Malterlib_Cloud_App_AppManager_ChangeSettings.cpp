@@ -351,6 +351,8 @@ namespace NMib::NCloud::NAppManager
 
 		Auditor.f_Info("Updated application settings");
 
+		co_await fp_SyncNotifications(_Name);		
+
 		co_return {};
 	}
 }
