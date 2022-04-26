@@ -202,7 +202,7 @@ namespace NMib::NCloud::NVersionManager
 						co_return {};
 					}
 				)
-				/ [pFinishedPromise]() -> TCFuture<void>
+				/ [pFinishedPromise, AllowDestroy = g_AllowWrongThreadDestroy]() -> TCFuture<void>
 				{
 					return pFinishedPromise->f_Future();
 				}
