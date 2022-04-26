@@ -524,29 +524,6 @@ public:
 
 	void fp_DoGeneralTests()
 	{
-#if DTestBackupManagerEnableLogging
-		fg_GetSys()->f_AddStdErrLogger();
-		auto LogActor = NMib::NConcurrency::fg_ConstructActor<NMib::NConcurrency::CSeparateThreadActor>(fg_Construct("Log Dispatcher"));
-		fg_GetSys()->f_GetLogger().f_SetDispatcher
-			(
-				[LogActor](NFunction::TCFunctionMovable<void ()> &&_fToDispatch)
-				{
-					fg_Dispatch
-						(
-							LogActor
-							, fg_Move(_fToDispatch)
-						)
-						> fg_DiscardResult()
-					;
-				}
-			)
-		;
-		auto Cleanup2 = g_OnScopeExit / [&]
-			{
-				fg_GetSys()->f_GetLogger().f_SetDispatcher(nullptr);
-			}
-		;
-#endif
 		TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
 		auto CleanupRunLoop = g_OnScopeExit / [&]
 			{

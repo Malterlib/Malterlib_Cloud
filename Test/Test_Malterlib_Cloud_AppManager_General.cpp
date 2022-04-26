@@ -134,31 +134,9 @@ public:
 		DMibTestSuite("Upgrades") -> TCFuture<void>
 		{
 			CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_EnableVersionManager;
-#if 0
-			Options |= CAppManagerTestHelper::EOption_EnableLogging;
-			Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
-			auto LogActor = NMib::NConcurrency::fg_ConstructActor<NMib::NConcurrency::CSeparateThreadActor>(fg_Construct("Log Dispatcher"));
-			fg_GetSys()->f_GetLogger().f_SetDispatcher
-				(
-					[LogActor](NFunction::TCFunctionMovable<void ()> &&_fToDispatch)
-					{
-						fg_Dispatch
-							(
-								LogActor
-								, fg_Move(_fToDispatch)
-							)
-							> fg_DiscardResult()
-						;
-					}
-				)
-			;
-			auto Cleanup2 = g_OnScopeExit / [&]
-				{
-					fg_GetSys()->f_GetLogger().f_SetDispatcher(nullptr);
-				}
-			;
-#endif
+			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
 			CAppManagerTestHelper AppManagerTestHelper("AppManagerTests", Options, g_Timeout);
 

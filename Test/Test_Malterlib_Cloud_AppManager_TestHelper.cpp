@@ -34,8 +34,6 @@ namespace NMib::NCloud
 			)
 		;
 #endif
-		if (m_Options & EOption_EnableLogging)
-			fg_GetSys()->f_AddStdErrLogger();
 	}
 
 	CAppManagerTestHelper::~CAppManagerTestHelper()
@@ -390,7 +388,7 @@ namespace NMib::NCloud
 
 			co_await Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_Timeout(m_Timeout, "Timed out waiting for set security");
 
-			m_LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, (m_Options & EOption_EnableLogging | EOption_EnableOtherOutput) != EOption_None);
+			m_LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, (m_Options & EOption_EnableOtherOutput) != EOption_None);
 		}
 		if (m_Options & EOption_EnableVersionManager)
 		{

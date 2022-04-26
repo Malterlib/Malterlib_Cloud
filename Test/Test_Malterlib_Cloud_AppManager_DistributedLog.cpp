@@ -17,8 +17,8 @@ public:
 		DMibTestSuite("General") -> TCFuture<void>
 		{
 			CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp | CAppManagerTestHelper::EOption_EnableVersionManager;
-			//Options |= CAppManagerTestHelper::EOption_EnableLogging;
-			//Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
+			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
 			CAppManagerTestHelper AppManagerTestHelper("AppManagerDistributedLogTests", Options, g_Timeout);
 			co_await AppManagerTestHelper.f_Setup(1);

@@ -42,10 +42,9 @@ namespace NMib::NCloud
 		enum EOption
 		{
 			EOption_None = 0
-			, EOption_EnableLogging = DMibBit(0)
-			, EOption_EnableOtherOutput = DMibBit(1)
-			, EOption_EnableVersionManager = DMibBit(2)
-			, EOption_LaunchTestAppInApp = DMibBit(3)
+			, EOption_EnableOtherOutput = DMibBit(0)
+			, EOption_EnableVersionManager = DMibBit(1)
+			, EOption_LaunchTestAppInApp = DMibBit(2)
 		};
 
 		struct CAppManagerInfo
