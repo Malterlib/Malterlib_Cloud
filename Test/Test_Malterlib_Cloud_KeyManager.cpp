@@ -91,25 +91,25 @@ public:
 	{
 		DMibTestSuite("General")
 		{
-			uint16 Port = 31416;
-			CDistributedActorTestHelperCombined TestHelper{Port};
+			CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/KeyManagerGeneral";
+			CDistributedActorTestHelperCombined TestHelper{SocketPath};
 			TestHelper.f_Init();
 
-			CDistributedActorTestHelperCombined TestHelper2{Port};
+			CDistributedActorTestHelperCombined TestHelper2{SocketPath};
 			TestHelper2.f_InitClient(TestHelper);
 
 			f_TestCloudKeyManager(fg_ConstructActor<CKeyManagerServerDatabaseImpl>(), TestHelper, TestHelper2);
 		};
 		DMibTestSuite("EncryptedFile")
 		{
-			uint16 Port = 31400;
+			CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/EncryptedFile";
 			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile.EncryptedFile";
 			CStrSecure Password = "Password";
 
-			CDistributedActorTestHelperCombined TestHelper{Port};
+			CDistributedActorTestHelperCombined TestHelper{SocketPath};
 			TestHelper.f_Init();
 
-			CDistributedActorTestHelperCombined TestHelper2{Port};
+			CDistributedActorTestHelperCombined TestHelper2{SocketPath};
 			TestHelper2.f_InitClient(TestHelper);
 
 			if (CFile::fs_FileExists(DatabasePath))
@@ -180,13 +180,13 @@ public:
 		};
 		DMibTestSuite("PreCreatedKeys")
 		{
-			uint16 Port = 31401;
+			CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/PreCreatedKeys";
 			CStrSecure Password = "Password";
 			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile.PreCreatedKeys";
 			if (CFile::fs_FileExists(DatabasePath))
 				CFile::fs_DeleteFile(DatabasePath);
 
-			CDistributedActorTestHelperCombined TestHelper{Port};
+			CDistributedActorTestHelperCombined TestHelper{SocketPath};
 			TestHelper.f_Init();
 
 			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("PreCreatedKeysThread"), DatabasePath, Password, NContainer::CSecureByteVector{});
