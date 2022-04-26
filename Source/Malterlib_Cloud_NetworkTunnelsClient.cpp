@@ -73,6 +73,8 @@ namespace NMib::NCloud
 		TCActor<CAsyncSocketServerActor> m_SocketServer = fg_Construct();
 		TCMap<mint, CConnection> m_Connections;
 		TCMap<mint, TCSharedPointer<CTunnel>> m_Tunnels;
+		TCActor<NNetwork::CResolveActor> m_AddressResolver;
+
 		mint m_ConnectionID = 0;
 		mint m_TunnelID = 0;
 	};
@@ -113,6 +115,9 @@ namespace NMib::NCloud
 			Tunnel->f_Destroy() > Results.f_AddResult();
 		Internal.m_Tunnels.f_Clear();
 
+		if (Internal.m_AddressResolver)
+			fg_Move(Internal.m_AddressResolver).f_Destroy() > Results.f_AddResult();
+
 		co_await Results.f_GetResults().f_Wrap();
 
 		co_return {};
@@ -136,6 +141,7 @@ namespace NMib::NCloud
 		 	, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address)> &&_fOnConnection
 		 	, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Message)> &&_fOnClose
 		 	, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Error)> &&_fOnError
+			, CStr const &_ListenHost
 		)
 		-> TCFuture<CTunnel>
 	{
@@ -172,8 +178,6 @@ namespace NMib::NCloud
 		}
 		if (!pTunnel->m_TunnelActor)
 			co_return DMibErrorInstance("No tunnel subscription found for this host ID");
-
-		CNetAddressTCPv4 ListenAddress(CNetAddressIPv4{127, 0, 0, 1}, 0);
 
 		CAsyncSocketServerCallbacks Callbacks;
 
@@ -292,17 +296,39 @@ namespace NMib::NCloud
 			}
 		;
 
+		TCVector<CNetAddress> ListenAddresses;
+
+		CNetAddressTCPv4 DefaultListenAddress(CNetAddressIPv4{127, 0, 0, 1}, 0);
+
+		if (_ListenHost)
+		{
+			if (!Internal.m_AddressResolver)
+				Internal.m_AddressResolver = NConcurrency::fg_ConstructActor<NNetwork::CResolveActor>();
+
+			ListenAddresses.f_Insert(co_await Internal.m_AddressResolver(&NNetwork::CResolveActor::f_Resolve, _ListenHost, NNetwork::ENetAddressType_TCPv4));
+		}
+		else
+			ListenAddresses.f_Insert(DefaultListenAddress);
+
 		auto ListenResults = co_await Internal.m_SocketServer
 			(
 				&CAsyncSocketServerActor::f_StartListenAddress
-				, TCVector<CNetAddress>{ListenAddress}
+				, ListenAddresses
 				, ENetFlag_None
 				, fg_Move(Callbacks)
 				, nullptr
 			)
 		;
 
-		CNetAddressTCPv4 ReturnListenAddress{ListenAddress.f_GetIP(), ListenResults.m_ListenPorts[0]};
+		CNetAddress ReturnListenAddress;
+
+		if (_ListenHost)
+		{
+			ReturnListenAddress = ListenAddresses[0];
+			ReturnListenAddress.f_SetPort(ListenResults.m_ListenPorts[0]);
+		}
+		else
+			ReturnListenAddress = CNetAddressTCPv4{DefaultListenAddress.f_GetIP(), ListenResults.m_ListenPorts[0]};
 
 		pTunnel->m_ListenSubscription = fg_Move(ListenResults.m_Subscription);
 

@@ -24,7 +24,7 @@ namespace NMib::NCloud
 		struct CTunnel
 		{
 			NConcurrency::CActorSubscription m_Subscription;
-			NNetwork::CNetAddressTCPv4 m_ListenAddress;
+			NNetwork::CNetAddress m_ListenAddress;
 		};
 
 		NConcurrency::TCFuture<void> f_Start();
@@ -38,6 +38,7 @@ namespace NMib::NCloud
 			 	, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address)> &&_fOnConnection
 			 	, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Message)> &&_fOnClose
 			 	, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Error)> &&_fOnError
+				, NStr::CStr const &_ListenHost
 			)
 		;
 

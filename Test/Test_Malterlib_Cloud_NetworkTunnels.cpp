@@ -26,7 +26,6 @@ using namespace NMib::NNetwork;
 using namespace NMib::NTest;
 
 static fp64 g_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0 * gc_TimeoutMultiplier;
-static uint16 g_TestConnectionPort = 31412;
 
 #define DTestNetworkTunnelEnableLogging 0
 
@@ -34,7 +33,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 {
 	struct CTestNetworkTunnelServerApp : public CDistributedAppActor
 	{
-		CTestNetworkTunnelServerApp()
+		CTestNetworkTunnelServerApp(CStr const &_ListenPath)
 			: CDistributedAppActor
 			(
 				CDistributedAppActor_Settings("TestNetworkTunnelServerApp")
@@ -42,6 +41,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			 	.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
 			 	.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
 			)
+			, m_ListenPath(_ListenPath)
 		{
 		}
 
@@ -57,7 +57,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				)
 			;
 
-			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", "localhost", g_TestConnectionPort, CEJSON{}));
+			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", m_ListenPath, 0, CEJSON{}));
 
 			co_await m_TunnelServer(&CNetworkTunnelsServer::f_Start);
 
@@ -80,6 +80,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 
 		TCActor<CNetworkTunnelsServer> m_TunnelServer;
 		TCVector<CActorSubscription> m_PublishedTunnels;
+		CStr m_ListenPath;
 	};
 
 	struct CTestNetworkTunnelClientApp : public CDistributedAppActor
@@ -148,12 +149,13 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 							#endif
 							co_return {};
 						}
+						, _Params["ListenHost"].f_String()
 					)
 				;
 
 				m_TunnelSubscriptions.f_Insert(fg_Move(Tunnel.m_Subscription));
 
-				co_return {"Port"_= Tunnel.m_ListenAddress.m_Port};
+				co_return {};
 			}
 			else if (_Command == "EnumTunnels")
 			{
@@ -197,7 +199,9 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				}
 			;
 
-			CDistributedActorTestHelperCombined TestServer{g_TestConnectionPort};
+			CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/NetworkTunnelGeneral";
+
+			CDistributedActorTestHelperCombined TestServer{SocketPath};
 			TestServer.f_InitServer();
 
 			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
@@ -263,9 +267,9 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 					&CDistributedApp_LaunchHelper::f_LaunchInProcess
 					, "TunnelServer"
 					, TunnelServerDirectory
-					, []() -> TCActor<CDistributedAppActor>
+					, [Path = TestServer.f_GetListenSocketPath()]() -> TCActor<CDistributedAppActor>
 				 	{
-						return fg_Construct<CTestNetworkTunnelServerApp>();
+						return fg_Construct<CTestNetworkTunnelServerApp>(Path);
 					}
 					, NContainer::TCVector<NStr::CStr>{}
 				)
@@ -360,10 +364,18 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				)
 			;
 
-			auto TunnelListenResult = TunnelClientLaunch.f_Test_Command("OpenTunnel", {"HostID"_= TunnelServerHostID, "TunnelName"_= "TestTunnel"}).f_CallSync(pRunLoop, g_Timeout);
+			CStr TunnelSocketPath = CFile::fs_GetProgramDirectory() / "Sockets/NetworkTunnelGeneralTunnel";
 
-			CDistributedActorTestHelperCombined TestClient{(uint16)TunnelListenResult["Port"].f_Integer()};
-			TestClient.f_InitClient(TestServer);
+			auto TunnelListenResult = TunnelClientLaunch.f_Test_Command
+				(
+					"OpenTunnel"
+					, {"HostID"_= TunnelServerHostID, "TunnelName"_= "TestTunnel", "ListenHost"_= "UNIX:" + NNetwork::fg_GetSafeUnixSocketPath(TunnelSocketPath / "tests.sock")}
+				)
+				.f_CallSync(pRunLoop, g_Timeout)
+			;
+
+			CDistributedActorTestHelperCombined TestClient{TunnelSocketPath};
+ 			TestClient.f_InitClient(TestServer);
 		};
 	}
 };

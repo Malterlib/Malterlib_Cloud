@@ -66,6 +66,12 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_= "The hosts to open tunnels for. If empty all hosts are included.\n"
 							, "Type"_= {""}
 						}
+						, "ListenHost?"_=
+						{
+							"Names"_= {"--listen-host", "-l"}
+							, "Default"_= false
+							, "Description"_= "The hostname to listen on. For unix sockets prefix path with UNIX:\n"
+						}
 						, "Verbose?"_=
 						{
 							"Names"_= {"--verbose", "-v"}
@@ -172,6 +178,7 @@ namespace NMib::NCloud::NCloudClient
 			co_return DMibErrorInstance("No matching tunnels found");
 
 		bool bVerbose = _Params["Verbose"].f_Boolean();
+		CStr ListenHost = _Params["ListenHost"].f_String();
 
 		TCActorResultMap<CTunnelKey, CNetworkTunnelsClient::CTunnel> OpenedTunnelResults;
 		TCMap<CTunnelKey, CStr> URLTemplates;
@@ -230,6 +237,7 @@ namespace NMib::NCloud::NCloudClient
 							*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Error;
 							co_return {};
 						}
+						, ListenHost
 					)
 					> OpenedTunnelResults.f_AddResult(TunnelKey)
 				;
@@ -245,16 +253,15 @@ namespace NMib::NCloud::NCloudClient
 		{
 			auto &TunnelKey = OpenedTunnels.fs_GetKey(Tunnel);
 
-			auto &IP = Tunnel.m_ListenAddress.f_GetIP().m_IP;
-
-			CStr HostString = CStr("{}.{}.{}.{}"_f << IP[0] << IP[1] << IP[2] << IP[3]);
-			if (HostString == "127.0.0.1")
-				HostString = "localhost";
+			CStr HostString = Tunnel.m_ListenAddress.f_GetString(true);
 
 			CStr TunnelURL = URLTemplates[TunnelKey];
 
 			TunnelURL = TunnelURL.f_Replace("{Host}", HostString);
-			TunnelURL = TunnelURL.f_Replace("{Port}", CStr("{}"_f << Tunnel.m_ListenAddress.m_Port));
+			CStr PortString;
+			if (auto Port = Tunnel.m_ListenAddress.f_GetPort(); Port != 0)
+				PortString = "{}"_f << Port;
+			TunnelURL = TunnelURL.f_Replace("{Port}", PortString);
 
 			TableRenderer.f_AddRow(TunnelKey.m_HostID, TunnelKey.m_TunnelName, TunnelURL);
 		}

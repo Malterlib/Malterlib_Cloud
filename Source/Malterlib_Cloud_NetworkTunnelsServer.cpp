@@ -111,7 +111,7 @@ namespace NMib::NCloud
 
 				auto NewConnection = co_await
 					(
-					 	Internal.m_SocketClient(&CAsyncSocketClientActor::f_Connect, pTunnel->m_Host, "", ENetAddressType_None, pTunnel->m_Port, nullptr) % AppAuditor
+						Internal.m_SocketClient(&CAsyncSocketClientActor::f_Connect, pTunnel->m_Host, "", ENetAddressType_None, pTunnel->m_Port, nullptr) % AppAuditor
 					)
 				;
 
