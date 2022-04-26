@@ -126,10 +126,10 @@ namespace NMib::NCloud::NBackupManager
 
 		Auditor.f_HostInfo().f_OnDisconnect
 			(
-				fg_ThisActor(pThis)
-				, [pThis, BackupKey, Auditor]
+				g_ActorFunctorWeak(fg_ThisActor(pThis)) / [pThis, BackupKey, Auditor]() -> TCFuture<void>
 				{
-					pThis->self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupKey, Auditor, true, "Actor host disconnected (restarted)") > fg_DiscardResult();
+					co_await pThis->self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupKey, Auditor, true, "Actor host disconnected (restarted)");
+					co_return {};
 				}
 			)
 			> [pThis, BackupKey, Auditor](TCAsyncResult<CActorSubscription> &&_Subscription)

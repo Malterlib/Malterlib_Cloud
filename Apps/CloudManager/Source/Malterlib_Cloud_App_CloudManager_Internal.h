@@ -4,7 +4,6 @@
 #pragma once
 
 #include <Mib/Core/Core>
-#include <Mib/Concurrency/ActorCallbackManager>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
 #include <Mib/Concurrency/DistributedAppLogStoreLocal>
