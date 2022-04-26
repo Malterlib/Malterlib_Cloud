@@ -96,10 +96,7 @@ namespace NMib::NCloud::NVersionManager
 			TCFuture<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) override;
 			TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) override;
 
-			CServer *m_pThis = nullptr;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CServer);
 		};
 
 		struct CSubscription

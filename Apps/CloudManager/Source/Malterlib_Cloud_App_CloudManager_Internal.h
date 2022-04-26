@@ -37,20 +37,14 @@ namespace NMib::NCloud::NCloudManager
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> f_GetLogReporter() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReader>> f_GetLogReader() override;
 
-			CCloudManagerServer *m_pThis;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
 
 		struct CDistributedAppSensorReporterImplementation : public CDistributedAppSensorReporter
 		{
 			TCFuture<CSensorReporter> f_OpenSensorReporter(CSensorInfo &&_SensorInfo) override;
 
-			CCloudManagerServer *m_pThis;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
 
 		struct CDistributedAppSensorReaderImplementation : public CDistributedAppSensorReader
@@ -62,20 +56,15 @@ namespace NMib::NCloud::NCloudManager
 			auto f_GetSensorStatus(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize)
 				-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override
 			;
-			CCloudManagerServer *m_pThis;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+
+			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
 
 		struct CDistributedAppLogReporterImplementation : public CDistributedAppLogReporter
 		{
 			TCFuture<CLogReporter> f_OpenLogReporter(CLogInfo &&_LogInfo) override;
 
-			CCloudManagerServer *m_pThis;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
 
 		struct CDistributedAppLogReaderImplementation : public CDistributedAppLogReader
@@ -84,10 +73,8 @@ namespace NMib::NCloud::NCloudManager
 			auto f_GetLogEntries(CDistributedAppLogReader_LogEntryFilter &&_Filter, uint32 _BatchSize)
 				-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> override
 			;
-			CCloudManagerServer *m_pThis;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+
+			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
 
 		TCFuture<void> f_Init();

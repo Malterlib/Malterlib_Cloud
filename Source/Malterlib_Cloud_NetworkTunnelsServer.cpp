@@ -191,10 +191,7 @@ namespace NMib::NCloud
 				;
 			}
 
-			CNetworkTunnelsServer *m_pThis = nullptr;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CNetworkTunnelsServer);
 		};
 
 		TCFuture<void> f_SetupPermissions();

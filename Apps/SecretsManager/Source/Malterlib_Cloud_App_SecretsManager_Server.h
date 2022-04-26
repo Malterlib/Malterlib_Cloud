@@ -42,10 +42,7 @@ namespace NMib::NCloud::NSecretsManager
 			;
 			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeToChanges(CSubscribeToChanges &&_Params) override;
 
-			CServer *m_pThis;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CServer);
 		};
 
 		struct CDownload

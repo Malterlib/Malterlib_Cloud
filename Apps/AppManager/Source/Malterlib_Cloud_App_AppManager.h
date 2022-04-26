@@ -351,10 +351,7 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> f_GetSensorReporter() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> f_GetLogReporter() override;
 
-			CAppManagerActor *m_pThis = nullptr;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
 
 		struct CAppManagerInterfaceImplementation : public CAppManagerInterface
@@ -390,10 +387,7 @@ namespace NMib::NCloud::NAppManager
 				-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override
 			;
 
-			CAppManagerActor *m_pThis = nullptr;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
 
 		struct CUpdateNotificationSubscription
@@ -433,10 +427,7 @@ namespace NMib::NCloud::NAppManager
 				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
 
-			CAppManagerActor *m_pThis = nullptr;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
 
 		struct CRemoteAppManagerApp
@@ -618,20 +609,14 @@ namespace NMib::NCloud::NAppManager
 		{
 			TCFuture<CSensorReporter> f_OpenSensorReporter(CSensorInfo &&_SensorInfo) override;
 
-			CAppManagerActor *m_pThis;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
 
 		struct CDistributedAppLogReporterImplementation : public CDistributedAppLogReporter
 		{
 			TCFuture<CLogReporter> f_OpenLogReporter(CLogInfo &&_LogInfo) override;
 
-			CAppManagerActor *m_pThis;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
 
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;

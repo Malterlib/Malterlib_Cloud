@@ -85,10 +85,7 @@ namespace NMib::NCloud::NBackupManager
 				override
 			;
 
-			CBackupManagerServer *m_pThis;
-#			ifdef DMibDebug
-				CEmpty self; // Hide dangerous self
-#			endif
+			DMibDelegatedActorImplementation(CBackupManagerServer);
 		};
 
 		TCFuture<void> f_Init();
