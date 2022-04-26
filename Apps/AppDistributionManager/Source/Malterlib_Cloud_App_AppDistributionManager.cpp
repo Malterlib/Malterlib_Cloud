@@ -36,11 +36,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 					co_return {};
 				}
-			)
-		;
-		mp_VersionManagerSubscription.f_OnRemoveActor
-			(
-				g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
 					co_await self(&CAppDistributionManagerActor::fp_VersionManagerRemoved, _VersionManager);
 

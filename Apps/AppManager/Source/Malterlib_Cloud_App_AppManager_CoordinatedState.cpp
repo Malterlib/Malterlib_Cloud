@@ -28,14 +28,7 @@ namespace NMib::NCloud::NAppManager
 
 					co_return {};
 				}
-				, "Malterlib/Cloud/AppManager"
-				, "Failed to process new remote app manager"
-			)
-		;
-
-		mp_RemoteAppManagers.f_OnRemoveActor
-			(
-				g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_RemovedActor, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_RemovedActor, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
 					auto pActor = mp_RemoteAppManagerStateByActor.f_FindEqual(_RemovedActor);
 					if (!pActor)
@@ -45,6 +38,8 @@ namespace NMib::NCloud::NAppManager
 
 					co_return {};
 				}
+				, "Malterlib/Cloud/AppManager"
+				, "Failed to {} remote app manager"
 			)
 		;
 

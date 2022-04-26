@@ -374,6 +374,7 @@ namespace NMib::NCloud::NAppManager
 					co_await fp_KeyManagerAvailable();
 					co_return {};
 				}
+				, nullptr
 			)
 		;
 
@@ -385,12 +386,7 @@ namespace NMib::NCloud::NAppManager
 					co_await self(&CAppManagerActor::fp_VersionManagerAdded, _VersionManager, _ActorInfo);
 					co_return {};
 				}
-			)
-		;
-
-		mp_VersionManagerSubscription.f_OnRemoveActor
-			(
-				g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
 					fp_VersionManagerRemoved(_VersionManager);
 
@@ -407,19 +403,14 @@ namespace NMib::NCloud::NAppManager
 					co_await self(&CAppManagerActor::fp_CloudManagerAdded, _CloudManager, _ActorInfo);
 					co_return {};
 				}
-				, "CloudManager"
-				, "Failed to add cloud manager"
-			)
-		;
-
-		mp_CloudManagerSubscription.f_OnRemoveActor
-			(
-				g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_CloudManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_CloudManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
 					fp_CloudManagerRemoved(_CloudManager);
 
 					co_return {};
 				}
+				, "CloudManager"
+				, "Failed to {} cloud manager"
 			)
 		;
 

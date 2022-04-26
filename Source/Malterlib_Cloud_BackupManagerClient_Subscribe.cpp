@@ -38,12 +38,7 @@ namespace NMib::NCloud
 
 							co_return {};
 						}
-					)
-					> fg_DiscardResult();
-				;
-				m_BackupManagers.f_OnRemoveActor
-					(
-						g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_Actor, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+						, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_Actor, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 						{
 							auto *pInstance = m_RunningBackupInstances.f_FindEqual(_Actor);
 							if (!pInstance)
@@ -53,12 +48,13 @@ namespace NMib::NCloud
 								pInstance->m_Instance.f_Destroy() > m_pCanDestroyTracker->f_Track();
 							else
 								pInstance->m_Instance.f_Destroy() > fg_DiscardResult();
-							
+
 							m_RunningBackupInstances.f_Remove(_Actor);
 
 							co_return {};
 						}
 					)
+					> fg_DiscardResult();
 				;
 			}
 		;

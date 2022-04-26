@@ -57,6 +57,7 @@ namespace NMib::NCloud::NSecretsManager
 					co_await self(&CServerController::fp_KeyManagerAvailable, _KeyManager);
 					co_return {};
 				}
+				, nullptr
 			)
 		;
 
