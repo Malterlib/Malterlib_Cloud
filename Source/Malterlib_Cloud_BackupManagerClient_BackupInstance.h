@@ -54,11 +54,12 @@ namespace NMib::NCloud::NPrivate
 
 	private:
 		
-		struct CRunningSyncState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
+		struct CRunningSyncState
 		{
 			CRunningSyncState();
 			~CRunningSyncState();
 
+			CIntrusiveRefCountWithWeak m_RefCount;
 			CStr m_FileName;
 			TCBinaryStreamFile<> m_File;
 			CBinaryStreamSubStream<> m_LimitedFile;
@@ -69,8 +70,9 @@ namespace NMib::NCloud::NPrivate
 			uint32 m_PendingQueue = 0;
 		};
 		
-		struct CManifestSyncState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
+		struct CManifestSyncState
 		{
+			CIntrusiveRefCountWithWeak m_RefCount;
 			CBinaryStreamMemory<> m_ManifestStream;
 			TCUniquePointer<CRSyncServer> m_pRSyncServer;
 			CActorSubscription m_RSyncSubscription;

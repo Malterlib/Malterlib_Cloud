@@ -150,7 +150,7 @@ namespace NMib::NCloud::NAppManager
 			bool f_Validate(CStr &o_Error) const;
 		};
 
-		struct CApplication : public TCSharedPointerIntrusiveBase<>
+		struct CApplication
 		{
 			CApplication(CStr const &_Name, CAppManagerActor *_pThis)
 				: m_Name(_Name)
@@ -179,6 +179,8 @@ namespace NMib::NCloud::NAppManager
 
 			EDistributedAppUpdateType f_GetUpdateType(bool _bBypassCoordination) const;
 			CAppManagerCoordinationInterface::CAppInfo f_GetRemoteAppInfo() const;
+
+			CIntrusiveRefCount m_RefCount;
 
 			CStr const m_Name;
 
@@ -525,7 +527,7 @@ namespace NMib::NCloud::NAppManager
 			TCMap<CRemoteApplicationKey, TCSet<CStr>> m_KnownApplications;
 		};
 
-		struct CUpdateApplicationState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
+		struct CUpdateApplicationState
 		{
 			CUpdateApplicationState() = default;
 			CUpdateApplicationState(CUpdateApplicationState const &) = delete;
@@ -557,6 +559,7 @@ namespace NMib::NCloud::NAppManager
 				return false;
 			}
 
+			CIntrusiveRefCountWithWeak m_RefCount;
 			TCSharedPointer<CApplication> m_pApplication;
 			TCFunction<void (CStr const &_Info)> m_fOnInfo;
 			TCFunction <void ()> m_fUpdateVersionInfo;

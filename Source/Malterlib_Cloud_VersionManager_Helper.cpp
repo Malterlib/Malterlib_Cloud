@@ -26,10 +26,12 @@ namespace NMib::NCloud
 
 	namespace
 	{
-		struct CState : public TCSharedPointerIntrusiveBase<ESharedPointerOption_SupportWeakPointer>
+		struct CState
 		{
 			virtual ~CState() = default;
 			virtual TCFuture<void> f_Abort() = 0;
+
+			CIntrusiveRefCountWithWeak m_RefCount;
 		};
 
 		struct CDownloadState : public CState

@@ -33,9 +33,9 @@ namespace NMib::NCloud
 		auto &MonitoredPath = Internal.m_MonitoredPaths[_Options.m_Path];
 
 		bool bUpdateReporter = false;
-		++MonitoredPath.m_Refcount;
+		++MonitoredPath.m_RefCount;
 
-		if (MonitoredPath.m_Refcount == 1 || MonitoredPath.m_Options != _Options)
+		if (MonitoredPath.m_RefCount == 1 || MonitoredPath.m_Options != _Options)
 		{
 			MonitoredPath.m_Options = _Options;
 			bUpdateReporter = true;
@@ -136,7 +136,7 @@ namespace NMib::NCloud
 
 				auto &MonitoredPath = *pMonitoredPath;
 
-				if (--MonitoredPath.m_Refcount > 0)
+				if (--MonitoredPath.m_RefCount > 0)
 					co_return {};
 
 				auto DestroyResult = co_await MonitoredPath.f_Destroy().f_Wrap();

@@ -26,7 +26,7 @@ namespace NMib::NCloud
 			TCFuture<void> f_Destroy();
 
 			CMonitorPathOptions m_Options;
-			mint m_Refcount = 0;
+			mint m_RefCount = 0;
 			TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_FreeReporter;
 			TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_FreePercentReporter;
 			TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_TotalReporter;
