@@ -220,6 +220,8 @@ namespace NMib::NCloud
 		for (NTime::CClock Timer(true); true; co_await fg_Timeout(1.0))
 		{
 			bool bAllFinished = true;
+			CStr VersionManagers;
+			CStr CloudManagers;
 			for (auto &AppManager : m_AppManagerInfos)
 			{
 				CStr ExecutableName = AppManager.m_RootDirectory / "AppManager";
@@ -236,8 +238,8 @@ namespace NMib::NCloud
 			if (bAllFinished)
 				break;
 
-			if (Timer.f_GetTime() > m_Timeout)
-				DMibError("Timed out waiting for version manager and cloud manager subscriptions");
+			if (Timer.f_GetTime() > m_Timeout / 2)
+				DMibError("Timed out waiting for version manager and cloud manager subscriptions:\nVersionManagers: {vs}\nCloudManagers: {vs}"_f << VersionManagers << CloudManagers);
 		}
 		DMibTestMark;
 

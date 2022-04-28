@@ -57,13 +57,20 @@ public:
 		Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(g_Timeout);
 		//Config.m_PublicKeysForAllKeyManagers = ; TODO
 
+		DMibTestMark;
+
 		TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config, fg_GetDistributionManager());
 
+		DMibTestMark;
 		auto Subscription = _TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
+		DMibTestMark;
 		TCDistributedActor<CKeyManager> KeyManager = _TestHelper.f_GetRemoteActor<CKeyManager>(Subscription);
+		DMibTestMark;
 
 		CSymmetricKey Key0 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(g_Timeout);
+		DMibTestMark;
 		CSymmetricKey Key1 = KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_CallSync(g_Timeout);
+		DMibTestMark;
 		auto HostID1 = _TestHelper.f_GetClientHostID();
 
 		DMibExpect(Key0, !=, Key1);
@@ -74,9 +81,12 @@ public:
 		CStr Subscription2 = _TestHelper2.f_Subscribe("com.malterlib/Cloud/KeyManager");
 
 		auto HostID2 = _TestHelper2.f_GetClientHostID();
+		DMibTestMark;
 		TCDistributedActor<CKeyManager> KeyManager2 = _TestHelper2.f_GetRemoteActor<CKeyManager>(Subscription2);
+		DMibTestMark;
 
 		CSymmetricKey SecondKey0 = KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_CallSync(g_Timeout);
+		DMibTestMark;
 		CSymmetricKey SecondKey1 = KeyManager2.f_CallActor(&CKeyManager::f_RequestKey)("TestKey1", 32).f_CallSync(g_Timeout);
 
 		DMibExpect(SecondKey0, !=, SecondKey1);
@@ -155,7 +165,11 @@ public:
 					fTestDatabase();
 				}
 
+				DMibTestMark;
+
 				f_TestCloudKeyManager(DatabaseActor2, TestHelper, TestHelper2);
+
+				DMibTestMark;
 
 				{
 					DMibTestPath("After running");
