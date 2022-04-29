@@ -61,6 +61,12 @@ public:
 
 		TCActor<CKeyManagerServer> KeyManagerServer = fg_ConstructActor<CKeyManagerServer>(Config, fg_GetDistributionManager());
 
+		auto Cleanup = g_OnScopeExit / [&]
+			{
+				fg_Move(KeyManagerServer).f_Destroy().f_CallSync(g_Timeout);
+			}
+		;
+
 		DMibTestMark;
 		auto Subscription = _TestHelper.f_Subscribe("com.malterlib/Cloud/KeyManager");
 		DMibTestMark;

@@ -87,6 +87,8 @@ namespace NMib::NCloud
 		
 	protected:
 		NConcurrency::TCFuture<CSymmetricKey> fp_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize);
+
+		NConcurrency::TCFuture<void> fp_Destroy() override;
 		
 	private:
 		struct CInternal;

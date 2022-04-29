@@ -189,6 +189,15 @@ namespace NMib::NCloud
 	CKeyManagerServer::~CKeyManagerServer()
 	{
 	}
+
+	TCFuture<void> CKeyManagerServer::fp_Destroy()
+	{
+		auto &Internal = *mp_pInternal;
+
+		co_await Internal.m_KeyManagerPublication.f_Destroy();
+
+		co_return {};
+	}
 	
 	NConcurrency::TCFuture<void> CKeyManagerServer::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys)
 	{
