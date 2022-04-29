@@ -263,10 +263,12 @@ namespace NMib::NCloud::NSecretsManager
 
 		TCSharedPointer<CActorSubscription> pCleanupFile = fg_Construct
 			(
-				g_ActorSubscription / [=, pThis = m_pThis, pCanDestroy = This.mp_pCanDestroyFileActorTracker]
+				g_ActorSubscription / [=, pThis = m_pThis, pCanDestroy = This.mp_pCanDestroyFileActorTracker]() -> TCFuture<void>
 				{
 					if (!*pNewFileClaimed)
-						pThis->fp_RemoveFile(NewFileName, Auditor) > fg_DiscardResult();
+						co_await pThis->fp_RemoveFile(NewFileName, Auditor);
+
+					co_return {};
 				}
 			)
 		;
