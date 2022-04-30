@@ -24,13 +24,26 @@ public:
 			co_await AppManagerTestHelper.f_Setup(1);
 			auto &AppManagerInfo = *AppManagerTestHelper.m_AppManagerInfos.f_FindAny();
 
-			auto fRemoveDynamicEntryProperties = [](CEJSON &&_Entries)
+			auto fMakeComparable = [](CEJSON &&_Entries)
 				{
 					for (auto &Entry : _Entries.f_Array())
 					{
 						Entry.f_RemoveMember("Timestamp");
 						Entry.f_RemoveMember("Value");
 					}
+
+					// We need to sort by sequence because the system clock might change
+					_Entries.f_Array().f_Sort
+						(
+							[](CEJSON const &_Left, CEJSON const &_Right)
+							{
+								auto Left = _Left.f_GetMemberValue("UniqueSequence", 0);
+								auto Right = _Right.f_GetMemberValue("UniqueSequence", 0);
+
+								return Left < Right;
+							}
+						)
+					;
 
 					return fg_Move(_Entries);
 				}
@@ -201,7 +214,7 @@ public:
 				;
 
 				DMibExpect(fReadLogs(), ==, fSortLogs(ExpectedLogs));
-				DMibExpect(fRemoveDynamicEntryProperties(fReadLogEntries()), ==, ExpectedLogEntries);
+				DMibExpect(fMakeComparable(fReadLogEntries()), ==, ExpectedLogEntries);
 			}
 
 			auto fSetHostInfo =
@@ -247,7 +260,7 @@ public:
 				;
 
 				DMibExpect(fReadLogs(), ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
-				DMibExpect(fRemoveDynamicEntryProperties(fReadLogEntries()), ==, fSetHostInfo(ExpectedLogEntries));
+				DMibExpect(fMakeComparable(fReadLogEntries()), ==, fSetHostInfo(ExpectedLogEntries));
 			}
 
 			auto fSetHostInfoAppManager =
@@ -299,7 +312,7 @@ public:
 				DMibExpect(fReadLogs(), ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
 				DMibExpect
 					(
-						fRemoveDynamicEntryProperties(fReadLogEntries())
+						fMakeComparable(fReadLogEntries())
 						, ==
 						, fSetHostInfo(ExpectedLogEntries)
 					)

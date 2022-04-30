@@ -24,13 +24,26 @@ public:
 			co_await AppManagerTestHelper.f_Setup(1);
 			auto &AppManagerInfo = *AppManagerTestHelper.m_AppManagerInfos.f_FindAny();
 
-			auto fRemoveDynamicReadingProperties = [](CEJSON &&_Readings)
+			auto fMakeComparable = [](CEJSON &&_Readings)
 				{
 					for (auto &Reading : _Readings.f_Array())
 					{
 						Reading.f_RemoveMember("Timestamp");
 						Reading.f_RemoveMember("Value");
 					}
+
+					// We need to sort by sequence because the system clock might change
+					_Readings.f_Array().f_Sort
+						(
+							[](CEJSON const &_Left, CEJSON const &_Right)
+							{
+								auto Left = _Left.f_GetMemberValue("UniqueSequence", 0);
+								auto Right = _Right.f_GetMemberValue("UniqueSequence", 0);
+
+								return Left < Right;
+							}
+						)
+					;
 
 					return fg_Move(_Readings);
 				}
@@ -417,8 +430,8 @@ public:
 				;
 
 				DMibExpect(fReadSensors(), ==, fSortSensors(ExpectedSensors));
-				DMibExpect(fRemoveDynamicReadingProperties(fReadSensorReadings()), ==, ExpectedSensorReadings);
-				DMibExpect(fRemoveDynamicReadingProperties(fReadSensorStatus()), ==, ExpectedSensorStatus);
+				DMibExpect(fMakeComparable(fReadSensorReadings()), ==, ExpectedSensorReadings);
+				DMibExpect(fMakeComparable(fReadSensorStatus()), ==, ExpectedSensorStatus);
 			}
 
 			auto fSetHostInfo =
@@ -470,8 +483,8 @@ public:
 				;
 
 				DMibExpect(fReadSensors(), ==, fSortSensors(fMerge(ExpectedSensorsAppManager, fSetHostInfo(ExpectedSensors))));
-				DMibExpect(fRemoveDynamicReadingProperties(fReadSensorReadings()), ==, fMerge(fSetHostInfo(ExpectedSensorReadings), ExpectedSensorReadingsAppManager));
-				DMibExpect(fRemoveDynamicReadingProperties(fReadSensorStatus()), ==, fSortSensors(fMerge(fSetHostInfo(ExpectedSensorStatus), ExpectedSensorStatusAppManager)));
+				DMibExpect(fMakeComparable(fReadSensorReadings()), ==, fMerge(fSetHostInfo(ExpectedSensorReadings), ExpectedSensorReadingsAppManager));
+				DMibExpect(fSortSensors(fMakeComparable(fReadSensorStatus())), ==, fSortSensors(fMerge(fSetHostInfo(ExpectedSensorStatus), ExpectedSensorStatusAppManager)));
 			}
 
 			auto fSetHostInfoAppManager =
@@ -533,14 +546,14 @@ public:
 				DMibExpect(fReadSensors(), ==, fSortSensors(fMerge(fSetHostInfoAppManager(ExpectedSensorsAppManager), fSetHostInfo(ExpectedSensors))));
 				DMibExpect
 					(
-						fRemoveDynamicReadingProperties(fReadSensorReadings())
+						fMakeComparable(fReadSensorReadings())
 						, ==
 						, fMerge(fSetHostInfo(ExpectedSensorReadings), fSetHostInfoAppManager(ExpectedSensorReadingsAppManager))
 					)
 				;
 				DMibExpect
 					(
-						fRemoveDynamicReadingProperties(fReadSensorStatus())
+						fSortSensors(fMakeComparable(fReadSensorStatus()))
 						, ==
 						, fSortSensors(fMerge(fSetHostInfo(ExpectedSensorStatus), fSetHostInfoAppManager(ExpectedSensorStatusAppManager)))
 					)
