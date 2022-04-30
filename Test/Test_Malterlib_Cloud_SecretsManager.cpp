@@ -49,6 +49,11 @@ using namespace NMib::NTest;
 
 static fp64 g_Timeout = 60.0 * gc_TimeoutMultiplier;
 
+namespace NMib::NFile
+{
+	extern NAtomic::TCAtomic<pfp32> g_TestDirectorySyncSourceOpenDelay;
+}
+
 namespace
 {
 	// This class makes it possible to control the order of events for parallel uploads and downloads
@@ -1987,6 +1992,12 @@ public:
 
 				{
 					DMibTestPath("Secret changed during upload");
+					g_TestDirectorySyncSourceOpenDelay.f_Store(0.2f);
+					auto Cleanup = g_OnScopeExit / []
+						{
+							g_TestDirectorySyncSourceOpenDelay.f_Store(0.0f);
+						}
+					;
 					// Initiate upload, change the secret to a string secret, same error as above, remove file
 					CActorSubscription Subscription;
 					NThread::CEvent Event;
@@ -1996,6 +2007,8 @@ public:
 					auto Future = fUpload(ID, File2, RootDirectory, Subscription, &Event);
 					// Wait for secrets manager to handle the upload request
 					fg_Move(UploadInitializedFuture).f_CallSync(pRunLoop, g_Timeout);
+					// Wait a while so we reproduce the race condition with file existing during RSync
+					fg_Timeout(0.1).f_Dispatch().f_CallSync(pRunLoop, g_Timeout);
 					fSetProperties(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
 					// Flush file ops before checking number of files in the secret directory
 

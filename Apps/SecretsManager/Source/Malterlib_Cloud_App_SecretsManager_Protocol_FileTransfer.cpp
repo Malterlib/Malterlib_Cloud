@@ -381,7 +381,6 @@ namespace NMib::NCloud::NSecretsManager
 				{
 					if (pSecretProperties->m_Secret != SavedSecret)
 					{
-
 						(*pCleanupFile)->f_Destroy() > [=](TCAsyncResult<void> &&)
 							{
 								// For the problem with two competing simultaneous uploads we chose to let the one that completes first win.
