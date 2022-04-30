@@ -990,7 +990,7 @@ namespace NMib::NCloud::NAppManager
 		TCActor<CDistributedAppLogStoreLocal> mp_LogStore;
 		TCDistributedActorInstance<CDistributedAppLogReporterImplementation> mp_LogReporterInterface;
 
-		fp64 mp_HostMonitorInterval = 60.0;
+		fp64 mp_HostMonitorInterval = CHostMonitor::mc_DefaultHostMonitorInterval;
 		TCActor<CHostMonitor> mp_HostMonitor;
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
 	};

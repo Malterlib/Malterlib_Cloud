@@ -425,6 +425,21 @@ namespace NMib::NCloud::NAppManager
 		else
 			mp_HostMonitorInterval = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("HostMonitorInterval", mp_HostMonitorInterval).f_Float();
 
+		DMibFastCheck(!mp_HostMonitorInterval.f_IsInvalid());
+		if (mp_HostMonitorInterval != 0.0 && mp_HostMonitorInterval < CHostMonitor::mc_MinimumHostMonitorInterval)
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Warning
+					, "Limited HostMonitorInterval to {} seconds as this is the lowest supported"
+					, CHostMonitor::mc_MinimumHostMonitorInterval
+					, mp_HostMonitorInterval
+				)
+			;
+			mp_HostMonitorInterval = CHostMonitor::mc_MinimumHostMonitorInterval;
+		}
+
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations"));
 		mp_KnownPlatforms[DMalterlibCloudPlatform];
 

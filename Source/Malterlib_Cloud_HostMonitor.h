@@ -41,6 +41,9 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<void> f_Init(EInitFlag _Flags, fp64 _HostMonitorInterval);
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_MonitorPath(CMonitorPathOptions const &_Options);
 
+		static constexpr pfp64 mc_MinimumHostMonitorInterval = 10.0;
+		static constexpr pfp64 mc_DefaultHostMonitorInterval = 60.0;
+
 	private:
 
 		NConcurrency::TCFuture<void> fp_Destroy();

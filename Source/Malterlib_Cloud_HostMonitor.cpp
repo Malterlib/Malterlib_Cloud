@@ -25,6 +25,9 @@ namespace NMib::NCloud
 
 	TCFuture<void> CHostMonitor::f_Init(EInitFlag _Flags, fp64 _HostMonitorInterval)
 	{
+		DMibFastCheck(!_HostMonitorInterval.f_IsInvalid());
+		DMibFastCheck(_HostMonitorInterval == 0.0 || _HostMonitorInterval >= mc_MinimumHostMonitorInterval);
+
 		auto &Internal = *mp_pInternal;
 
 		Internal.m_FileActor = fg_Construct(fg_Construct(), "Host monitor file actor {}"_f << Internal.m_FileActorSequence++);

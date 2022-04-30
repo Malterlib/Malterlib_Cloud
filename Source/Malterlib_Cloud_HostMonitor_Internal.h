@@ -54,7 +54,7 @@ namespace NMib::NCloud
 		TCActorSequencerAsync<void> m_UpdatePeriodicSequencer;
 		TCActorSequencerAsync<void> m_UpdatePeriodicDiskSpaceSequencer;
 		TCVector<TCPromise<void>> m_UpdatePeriodicWaitList;
-		fp64 m_HostMonitorInterval = 60.0;
+		fp64 m_HostMonitorInterval = mc_DefaultHostMonitorInterval;
 		mint m_FileActorSequence = 0;
 		EInitFlag m_Flags = EInitFlag_None;
 	};
