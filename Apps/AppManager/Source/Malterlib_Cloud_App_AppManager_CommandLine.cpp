@@ -35,6 +35,19 @@ namespace NMib::NCloud::NAppManager
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
+					"AutoUpdateDelay?"_=
+					{
+						"Names"_= {"--auto-update-delay"}
+						,"Default"_= 15.0
+						, "Description"_= "Delay wait when receiving new versions to wait for other version managers to also send their versions."
+					}
+				}
+			)
+		;
+
+		o_CommandLine.f_RegisterGlobalOptions
+			(
+				{
 					"HostMonitorInterval?"_=
 					{
 						"Names"_= {"--host-monitor-interval"}

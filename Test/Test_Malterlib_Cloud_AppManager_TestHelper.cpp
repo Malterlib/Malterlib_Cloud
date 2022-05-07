@@ -472,6 +472,7 @@ namespace NMib::NCloud
 				if (m_Options & EOption_EnableOtherOutput)
 					ExtraParams.f_Insert("--log-launches-to-stderr");
 
+				ExtraParams.f_Insert("--auto-update-delay=1.0"); // Make auto update faster
 				ExtraParams.f_Insert("--host-monitor-interval=0.0"); // Disable automatic disk space monitoring update
 
 				m_LaunchHelper

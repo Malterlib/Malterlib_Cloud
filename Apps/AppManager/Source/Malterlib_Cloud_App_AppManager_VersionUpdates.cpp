@@ -110,16 +110,9 @@ namespace NMib::NCloud::NAppManager
 				}
 
 				if (_NewVersions.m_bFullResend)
-				{
-					// Wait 15 second for other managers to send their versions
-					fg_Timeout(15.0) > [this]
-						{
-							fp_AutoUpdate_Update();
-						}
-					;
-				}
-				else
-					fp_AutoUpdate_Update();
+					co_await fg_Timeout(mp_AutoUpdateDelay); // Wait for other managers to send their versions
+
+				fp_AutoUpdate_Update();
 
 				co_return {};
 			}

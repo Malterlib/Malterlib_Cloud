@@ -30,37 +30,46 @@ SysName=$(uname -s)
 function WaitForPidToExit()
 {
 	Log "Waiting for AppManager to exit"
+
 	if [[ $SysName ==  Darwin* ]] ; then
-		lsof -p $1 +r 1 &>/dev/null
+		if ! lsof -p $1 +r 1 2>&1 ; then
+			echo lsof exited with error
+		fi
 	elif [[ $SysName ==  Linux* ]] ; then
-		tail --pid=$1 -f /dev/null
+		if ! tail --pid=$1 -f /dev/null ; then
+			echo tail --pid exited with error
+		fi
 	else
 		while kill -0 "$1"; do
             sleep 0.1
         done
 	fi
-	Log "AppMangare exited"
+
+	Log "AppManager exited"
 }
 
 if [[ "$2" == "DaemonStandalone" ]]; then
 	WaitForPidToExit $AppManagerPID
 	Log "Launching new standalone executable"
 	"$1" --daemon-run-standalone >> "$LogFile" 2>&1 &
+	NewProcessID=$!
 	disown
 elif [[ "$2" == "DaemonDebug" ]]; then
 	WaitForPidToExit $AppManagerPID
 	Log "Launching new daemon debug executable"
 	"$1" --daemon-run-debug >> "$LogFile" 2>&1 &
+	NewProcessID=$!
 	disown
 elif [[ "$2" == "Daemon" ]]; then
 	WaitForPidToExit $PPID
 	Log "Launching new daemon executable"
 	"$1" --daemon-restart >> "$LogFile" 2>&1
+	NewProcessID=$!
 else
 	Log "Unknow self update type: $2"
 	exit 1
 fi
 
-Log "Successfully launched"
+Log "Successfully launched. New PID: $NewProcessID"
 
 )-----"

@@ -440,6 +440,8 @@ namespace NMib::NCloud::NAppManager
 			mp_HostMonitorInterval = CHostMonitor::mc_MinimumHostMonitorInterval;
 		}
 
+		mp_AutoUpdateDelay = _Params["AutoUpdateDelay"].f_Float();
+
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations"));
 		mp_KnownPlatforms[DMalterlibCloudPlatform];
 

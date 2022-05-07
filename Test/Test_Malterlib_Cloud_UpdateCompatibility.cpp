@@ -200,8 +200,8 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fCleanup = [&]
 			{
-				mint nKilled = CProcessLaunch::fs_KillProcessesInDirectory("AppManager", {}, RootDirectory, 1000.0);
-				nKilled = CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 0.5);
+				CProcessLaunch::fs_KillProcessesInDirectory("AppManager", {}, RootDirectory, 1000.0);
+				CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 0.5);
 
 				for (auto User : CreatedUsers)
 				{
@@ -305,6 +305,9 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					ExtraParams.f_Insert("--daemon-run-debug");
 				else
 					ExtraParams.f_Insert("--daemon-run-standalone");
+
+				if (!AppManagerPackageOptions.f_HasFeatureFlag("NoAutoUpdateDelay"))
+					ExtraParams.f_Insert("--auto-update-delay=1.0"); // Make auto update faster
 #if DTestUpdateCompatibilityEnableOtherOutput
 				ExtraParams.f_Insert("--log-launches-to-stderr");
 #endif
@@ -391,6 +394,13 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
+		auto fSleepKeyManager = [&]
+			{
+				if (KeyManagerPackageOptions.f_HasFeatureFlag("BuggySigTerm"))
+					NSys::fg_Thread_Sleep(1.0);
+			}
+		;
+
 		auto fInstallAppManually = [&]
 			(
 				CAppManager const &_AppManager
@@ -407,7 +417,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				if (_Executable)
 				{
 					Params.f_Insert({"--executable", _Executable});
-					Params.f_Insert({"--executable-parameters", "[\"--daemon-run-standalone\"]"});
+
+					if (_PackageOptions.f_HasFeatureFlag("NoDaemonRunStandalone"))
+						Params.f_Insert({"--executable-parameters", "[\"--daemon-run-debug\"]"});
+					else
+						Params.f_Insert({"--executable-parameters", "[\"--daemon-run-standalone\"]"});
 				}
 
 				if (_User)
@@ -429,12 +443,30 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					 	, _AppManager.m_RootPath
 					)
 				;
+
+				if (_PackageOptions.f_HasFeatureFlag("BuggySigTerm"))
+					fSleepKeyManager();
 			}
 		;
 
 		auto fGetAppInfo = [&](CAppManager const &_AppManager, CStr const &_Application)
 			{
-				return _AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_CallSync()[_Application];
+				NTime::CClock Clock;
+				CStr LastError;
+
+				while (Clock.f_GetTime() < g_Timeout)
+				{
+					try
+					{
+						return _AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_CallSync(pRunLoop, 2.0)[_Application];
+					}
+					catch (CException const &_Exception)
+					{
+						LastError = _Exception.f_GetErrorStr();
+					}
+				}
+
+				DMibError("Timed out waiting for app info. Last error: {}", LastError);
 			}
 		;
 
@@ -466,7 +498,14 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 							}
 						}
 						else
+						{
 							*pStdOut += _Output;
+							if (pStdOut->f_Find("Type password for key database: ") >= 0)
+							{
+								pStdOut->f_Clear();
+								LaunchActor(&CProcessLaunchActor::f_SendStdIn, KeyManagerPassword + "\n\n\n\n") > fg_DiscardResult();
+							}
+						}
 					}
 				;
 				SimpleLaunch.m_bWholeLineOutput = false;
@@ -491,6 +530,8 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				fAddListen(KeyManagerExecutable, true);
 
 				KeyManagerHostID = fGetHostID(KeyManagerExecutable);
+
+				fSleepKeyManager();
 			}
 		;
 
@@ -642,37 +683,80 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
-		auto fWaitForAppVersion = [&](CAppManager const &_AppManager, CStr const &_Application, CVersionManagerHelper::CPackageInfo const &_PackageInfo, CStr const &_ExpectedStatus)
+		auto fWaitForAppVersion = [&]
+			(
+				CAppManager const &_AppManager
+				, CStr const &_Application
+				, CVersionManagerHelper::CPackageInfo const &_PackageInfo
+				, TCVector<CStr> const &_ExpectedStatuses
+				, bool _bCanHaveInvalidTime = false
+			)
 			{
 				NTime::CClock Timeout{true};
 				CAppManagerInterface::CApplicationInfo AppInfo;
 				auto fVersionIsEqual = [&]
 					{
 						AppInfo = fGetAppInfo(_AppManager, _Application);
-						return AppInfo.m_Version == _PackageInfo.m_VersionID && AppInfo.m_VersionInfo.m_Time == _PackageInfo.m_VersionInfo.m_Time;
+						if (_bCanHaveInvalidTime)
+							return AppInfo.m_Version == _PackageInfo.m_VersionID;
+						else
+							return AppInfo.m_Version == _PackageInfo.m_VersionID && AppInfo.m_VersionInfo.m_Time == _PackageInfo.m_VersionInfo.m_Time;
 					}
 				;
-
 				while (!fVersionIsEqual())
 				{
 					if (Timeout.f_GetTime() > g_Timeout)
-						DMibError("Timed out waiting for application to become updated");
+					{
+						DMibError
+							(
+								"Timed out waiting for application {} at {} to become updated. {} ({}) != {} ({}). Status: {}"_f
+								<< _Application
+								<< _AppManager.m_RootPath
+								<< AppInfo.m_Version
+								<< AppInfo.m_VersionInfo.m_Time
+								<< _PackageInfo.m_VersionID
+								<< _PackageInfo.m_VersionInfo.m_Time
+								<< AppInfo.m_Status
+							)
+						;
+					}
 					NSys::fg_Thread_Sleep(0.01f);
 				}
 
 				Timeout.f_Start();
-				while (fGetAppInfo(_AppManager, _Application).m_Status != _ExpectedStatus)
+				while (true)
 				{
+					auto AppInfo = fGetAppInfo(_AppManager, _Application);
+					if (_ExpectedStatuses.f_Contains(AppInfo.m_Status) >= 0)
+						break;
+
 					if (Timeout.f_GetTime() > g_Timeout)
-						DMibError("Timed out waiting for application to start after update");
+					{
+						DMibError
+							(
+								"Timed out waiting for application {} at {} to start after update. {} != {vs}"_f
+								<< _Application
+								<< _AppManager.m_RootPath
+								<< AppInfo.m_Status
+								<< _ExpectedStatuses
+							)
+						;
+					}
+
 					NSys::fg_Thread_Sleep(0.01f);
 				}
 			}
 		;
 
+
 		auto fResubscribeAppManager = [&](CAppManager &_AppManager)
 			{
 				_AppManager.m_AppManager = Subscriptions.f_SubscribeFromHost<CAppManagerInterface>(_AppManager.m_LaunchInfo.m_HostID);
+			}
+		;
+		auto fResubscribeVersionManager = [&]()
+			{
+				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
 			}
 		;
 
@@ -685,67 +769,89 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		auto AppManager_AppManager = fInitAppManager("AppManager", AppManagerDir);
 
 		fSetupKeyManager(AppManager_KeyManager);
-
+		DMibTestMark;
 		fSetupAppManagerConnection(AppManager_VersionManager, KeyManagerExecutable, "com.malterlib/Cloud/KeyManager", {}, KeyManagerHostID);
+		DMibTestMark;
 		fSetupAppManagerConnection(AppManager_AppManager, KeyManagerExecutable, "com.malterlib/Cloud/KeyManager", {}, KeyManagerHostID);
-
+		DMibTestMark;
 		fSetupVersionManager(AppManager_VersionManager);
+		DMibTestMark;
 
 		fSetupAppManagerConnection(AppManager_KeyManager, VersionManagerExecutable, "com.malterlib/Cloud/VersionManager", {"Application/ReadAll"}, VersionManagerHostID);
+		DMibTestMark;
 		fSetupAppManagerConnection(AppManager_VersionManager, VersionManagerExecutable, "com.malterlib/Cloud/VersionManager", {"Application/ReadAll"}, VersionManagerHostID);
+		DMibTestMark;
 		fSetupAppManagerConnection(AppManager_AppManager, VersionManagerExecutable, "com.malterlib/Cloud/VersionManager", {"Application/ReadAll"}, VersionManagerHostID);
+		DMibTestMark;
 
 		auto AppManagerPackageInfo = fUploadPackage(_AppManagerPackage, {"TestTag", "VersionManagerTestTag", "AppManagerTestTag"});
 		AppPackageInfos["AppManager"] = AppManagerPackageInfo;
+		DMibTestMark;
+
 		auto KeyManagerPackageInfo = fUploadPackage(_KeyManagerPackage, {"TestTag"});
 		AppPackageInfos["KeyManager"] = KeyManagerPackageInfo;
+		DMibTestMark;
+
 		auto VersionManagerPackageInfo = fUploadPackage(_VersionManagerPackage, {"VersionManagerTestTag"});
 		AppPackageInfos["VersionManager"] = VersionManagerPackageInfo;
+		DMibTestMark;
 
-		fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, "Launched");
+		fSleepKeyManager();
+		DMibTestMark;
 
-		fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, "Launched");
+		fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"}, KeyManagerPackageOptions.f_HasFeatureFlag("InvalidPackageTime"));
+		DMibTestMark;
 
-		VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
+		fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
+		DMibTestMark;
+
+		fResubscribeVersionManager();
+		DMibTestMark;
 
 		fSetupAppManagerSelfUpdate(AppManager_KeyManager, "TestTag");
+		DMibTestMark;
 		fSetupAppManagerSelfUpdate(AppManager_AppManager, "TestTag");
+		DMibTestMark;
 		fSetupAppManagerSelfUpdate(AppManager_VersionManager, "VersionManagerTestTag");
+		DMibTestMark;
 
-		fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
-		fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
-		fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
+		fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+		DMibTestMark;
+		fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+		DMibTestMark;
+		fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+		DMibTestMark;
 
 		fAddAppManagerApp(AppManager_AppManager, "AppManager", "AppManager", "AppManagerTestTag");
 
 		auto fUpdateApps = [&]()
 			{
 				KeyManagerPackageInfo = fUpdateApp("KeyManager", {"TestTag"});
-				fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, "Launched");
+				fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"});
 
 				VersionManagerPackageInfo = fUpdateApp("VersionManager", {"VersionManagerTestTag"});
-				fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, "Launched");
+				fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 
-				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
+				fResubscribeVersionManager();
 				try
 				{
 					// Update version manager
 					AppManagerPackageInfo = fUpdateApp("AppManager", {"VersionManagerTestTag"});
 					fResubscribeAppManager(AppManager_VersionManager);
-					fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
-					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, "Launched");
-					VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
+					fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
+					fResubscribeVersionManager();
 
 					// Update app manager manager
 					fTagApp("AppManager", AppManagerPackageInfo, {"AppManagerTestTag"});
-					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, "Launched");
+					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No executable"});
 
 					// Update rest
 					fTagApp("AppManager", AppManagerPackageInfo, {"TestTag"});
 					fResubscribeAppManager(AppManager_AppManager);
 					fResubscribeAppManager(AppManager_KeyManager);
-					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
-					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
+					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 				}
 				catch (CException const &_Exception)
 				{
@@ -784,14 +890,14 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				fResubscribeAppManager(AppManager_KeyManager);
 				fResubscribeAppManager(AppManager_VersionManager);
 
-				fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
-				fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
-				fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, "Self update source - waiting for update");
-				fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, "Launched");
-				fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, "Launched");
-				fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, "Launched");
+				fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+				fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+				fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+				fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"});
+				fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
+				fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No executable"});
 
-				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
+				fResubscribeVersionManager();
 			}
 		;
 
@@ -917,7 +1023,10 @@ public:
 				CStr AppName = CFile::fs_GetFile(AppDir);
 				for (auto &PackagePath : CFile::fs_FindFiles(AppDir / "*.tar.gz", EFileAttrib_File, true))
 					Packages[AppName].f_Insert(PackagePath);
+			}
 
+			for (auto &AppName : {"KeyManager", "AppManager", "VersionManager"})
+			{
 				CStr AppArchive = "{}/TestApps/Latest/{}.tar.gz"_f << ProgramDirectory << AppName;
 				Packages[AppName].f_Insert(AppArchive);
 			}
@@ -932,7 +1041,7 @@ public:
 				{
 					for (auto &KeyManager : KeyManagers)
 					{
-						CStr TestPath = "{}-{}-{}"_f
+						CStr TestPath = "AppManager {}-VersionManager {}-KeyManager {}"_f
 							<< CFile::fs_GetFile(CFile::fs_GetPath(AppManager))
 							<< CFile::fs_GetFile(CFile::fs_GetPath(VersionManager))
 							<< CFile::fs_GetFile(CFile::fs_GetPath(KeyManager))

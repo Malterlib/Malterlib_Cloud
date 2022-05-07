@@ -948,6 +948,8 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bLogLaunchesToStdErr = false;
 		bool mp_bPendingSelfUpdateInProgress = false;
 
+		fp64 mp_AutoUpdateDelay = 15.0;
+
 		TCLinkedList<CVersionManagerDownloadState> mp_Downloads;
 
 		TCMap<CStr, CVersionManagerApplication> mp_VersionManagerApplications;
