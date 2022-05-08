@@ -20,10 +20,10 @@ namespace NMib::NCloud::NAppManager
 		auto HasPermissions = co_await (pThis->mp_Permissions.f_HasPermissions("Remove application from AppManager", Permissions) % "Permission denied removing application" % Auditor);
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(Application remove, command)");
+			co_return Auditor.f_AccessDenied("(Application remove, command)", Permissions["Command"]);
 
 		if (!HasPermissions["App"])
-			co_return Auditor.f_AccessDenied("(Application remove, app name)");
+			co_return Auditor.f_AccessDenied("(Application remove, app name)", Permissions["App"]);
 
 		auto *pApplication = pThis->mp_Applications.f_FindEqual(_Name);
 		if (!pApplication)

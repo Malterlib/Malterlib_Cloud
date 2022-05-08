@@ -79,7 +79,7 @@ namespace NMib::NCloud::NVersionManager
 
 						if (!_Result)
 						{
-							CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo);
+							CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo, {});
 							Auditor.f_Error("Errors checking permissions for subscription:  {}"_f << _Result.f_GetExceptionStr());
 							return;
 						}
@@ -200,7 +200,7 @@ namespace NMib::NCloud::NVersionManager
 				CVersionManager::CNewVersionNotifications NewVersionNotifications;
 				NewVersionNotifications.m_bFullResend = true;
 
-				CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo);
+				CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo, {});
 
 				CStr Errors;
 

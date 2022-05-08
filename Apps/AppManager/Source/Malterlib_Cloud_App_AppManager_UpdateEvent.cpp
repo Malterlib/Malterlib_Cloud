@@ -18,14 +18,16 @@ namespace NMib::NCloud::NAppManager
 		auto Auditor = pThis->f_Auditor();
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 
+		NContainer::TCVector<NStr::CStr> Permissions = {"AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeUpdates"};
+
 		bool bHasPermission = co_await
 			(
-				pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", {"AppManager/CommandAll", "AppManager/Command/ApplicationSubscribeUpdates"})
+				pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", Permissions)
 			 	% "Permission denied subscribing to update notifications" % Auditor
 			)
 		;
 		if (!bHasPermission)
-			co_return Auditor.f_AccessDenied("(Subscribe to update notifications)");
+			co_return Auditor.f_AccessDenied("(Subscribe to update notifications)", Permissions);
 
 		CStr SubscriptionID = fg_RandomID(pThis->mp_UpdateNotificationSubscriptions);
 		auto &Subscription = pThis->mp_UpdateNotificationSubscriptions[SubscriptionID];

@@ -139,10 +139,10 @@ namespace NMib::NCloud::NAppManager
 			;
 
 			if (!HasPermissions["Command"])
-				co_return Auditor.f_AccessDenied("(Application update, command)");
+				co_return Auditor.f_AccessDenied("(Application update, command)", Permissions["Command"]);
 
 			if (!HasPermissions["App"])
-				co_return Auditor.f_AccessDenied("(Application update, app name)");
+				co_return Auditor.f_AccessDenied("(Application update, app name)", Permissions["App"]);
 		}
 
 		auto pOldApplication = mp_Applications.f_FindEqual(_Name);

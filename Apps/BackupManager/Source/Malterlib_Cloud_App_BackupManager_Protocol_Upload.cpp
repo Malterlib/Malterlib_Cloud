@@ -111,10 +111,12 @@ namespace NMib::NCloud::NBackupManager
 		CBackupManagerServer::CBackupKey BackupKey;
 		if (auto pException = pThis->fp_CheckBackupKey(_Params.m_BackupKey, BackupKey, Auditor))
 			co_return fg_Move(pException);
+
+		TCVector<CStr> Permissions = {"Backup/WriteSelf"};
 		
-		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Start backup", {"Backup/WriteSelf"}) % "Permission denied starting backup" % Auditor);
+		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Start backup", Permissions) % "Permission denied starting backup" % Auditor);
 		if (!bHasPermission)
-			co_return Auditor.f_AccessDenied("(Start backup)");
+			co_return Auditor.f_AccessDenied("(Start backup)", Permissions);
 
 		CStr BackupPermission = fg_Format("Backup/Read/{}", BackupKey.m_BackupName);
 		pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_CreateSet(BackupPermission)) > fg_DiscardResult();

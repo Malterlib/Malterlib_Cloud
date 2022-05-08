@@ -113,7 +113,7 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		if (!HasPermissions["//Command//"])
-			co_return Auditor.f_AccessDenied("(Application enum)");
+			co_return Auditor.f_AccessDenied("(Application enum)", Permissions["//Command//"]);
 
 		TCMap<CStr, CApplicationInfo> OutputApplications;
 		for (auto &pApplication : pThis->mp_Applications)
@@ -156,7 +156,7 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		if (!HasPermissions["//Command//"])
-			co_return Auditor.f_AccessDenied("(Versions available for update)");
+			co_return Auditor.f_AccessDenied("(Versions available for update)", Permissions["//Command//"]);
 
 		TCMap<CStr, TCVector<CApplicationVersion>> Versions;
 

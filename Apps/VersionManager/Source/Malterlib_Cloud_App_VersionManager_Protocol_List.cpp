@@ -87,7 +87,7 @@ namespace NMib::NCloud::NVersionManager
 		auto FilteredApplications = co_await (pThis->fp_FilterApplicationsByPermissions("List versions", Applications) % "Permission denied listing versions" % Auditor);
 
 		if (!_Params.m_ForApplication.f_IsEmpty() && FilteredApplications.f_IsEmpty())
-			co_return Auditor.f_AccessDenied("(List Versions)");
+			co_return Auditor.f_AccessDenied("(List Versions)", {"Application/ReadAll", "Application/ListAll", "Application/Read/*"});
 
 		CVersionManager::CListVersions::CResult Results;
 		for (auto &ApplicationName : FilteredApplications)

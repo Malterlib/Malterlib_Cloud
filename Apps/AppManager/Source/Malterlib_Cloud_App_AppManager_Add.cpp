@@ -157,7 +157,7 @@ namespace NMib::NCloud::NAppManager
 		 	, CCallingHostInfo const &_CallingHostInfo
 		)
 	{
-		auto Auditor = f_Auditor(_CallingHostInfo);
+		auto Auditor = f_Auditor({}, _CallingHostInfo);
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
@@ -171,15 +171,15 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(Application add, command)");
+			co_return Auditor.f_AccessDenied("(Application add, command)", Permissions["Command"]);
 
 		if (!HasPermissions["App"])
-			co_return Auditor.f_AccessDenied("(Application add, app name)");
+			co_return Auditor.f_AccessDenied("(Application add, app name)", Permissions["App"]);
 
 		if (auto *pVersion = HasPermissions.f_FindEqual("Version"))
 		{
 			if (!*pVersion)
-				co_return Auditor.f_AccessDenied("(Application add, version application)");
+				co_return Auditor.f_AccessDenied("(Application add, version application)", Permissions["Version"]);
 		}
 
 		TCSharedPointer<CApplication> pApplication = fg_Construct(_Name, this);

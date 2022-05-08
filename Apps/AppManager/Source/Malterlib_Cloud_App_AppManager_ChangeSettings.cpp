@@ -150,7 +150,7 @@ namespace NMib::NCloud::NAppManager
 		 	, CCallingHostInfo const &_CallingHostInfo
 		)
 	{
-		auto Auditor = f_Auditor(_CallingHostInfo);
+		auto Auditor = f_Auditor({}, _CallingHostInfo);
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
@@ -169,15 +169,15 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(Application change settings, command)");
+			co_return Auditor.f_AccessDenied("(Application change settings, command)", Permissions["Command"]);
 
 		if (!HasPermissions["App"])
-			co_return Auditor.f_AccessDenied("(Application change settings, app name)");
+			co_return Auditor.f_AccessDenied("(Application change settings, app name)", Permissions["App"]);
 
 		if (auto *pVersion = HasPermissions.f_FindEqual("Version"))
 		{
 			if (!*pVersion)
-				co_return Auditor.f_AccessDenied("(Application change settings, version application)");
+				co_return Auditor.f_AccessDenied("(Application change settings, version application)", Permissions["Version"]);
 		}
 
 		auto *pFindApplication = mp_Applications.f_FindEqual(_Name);

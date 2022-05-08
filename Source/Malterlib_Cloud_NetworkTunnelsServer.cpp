@@ -24,7 +24,7 @@ namespace NMib::NCloud
 			 	CNetworkTunnelsServer *_pThis
 			 	, TCActor<CActorDistributionManager> const &_DistributionManager
 			 	, TCActor<CDistributedActorTrustManager> const &_TrustManager
-			 	, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo)> &&_AuditorFactory
+			 	, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
 			 	, CStr const &_LogCategory
 			 	, CStr const &_PermissionPrefix
 			)
@@ -56,7 +56,7 @@ namespace NMib::NCloud
 			{
 				auto &Internal = *m_pThis->mp_pInternal;
 
-				auto AppAuditor = Internal.m_AuditorFactory(fg_GetCallingHostInfo());
+				auto AppAuditor = Internal.m_AuditorFactory(fg_GetCallingHostInfo(), {});
 
 				TCSet<CNetworkTunnelName> Tunnels;
 
@@ -96,14 +96,14 @@ namespace NMib::NCloud
 			{
 				auto &Internal = *m_pThis->mp_pInternal;
 
-				auto AppAuditor = Internal.m_AuditorFactory(fg_GetCallingHostInfo());
+				auto AppAuditor = Internal.m_AuditorFactory(fg_GetCallingHostInfo(), {});
 
 				TCVector<CStr> Permissions = {"{}/ConnectAll"_f << Internal.m_PermissionPrefix, "{}/{}/Connect"_f << Internal.m_PermissionPrefix << _Name};
 
 				bool bHasPermisions = co_await (Internal.m_Permissions.f_HasPermission("Open connection", Permissions) % AppAuditor);
 
 				if (!bHasPermisions)
-					co_return AppAuditor.f_AccessDenied("(Download backup)");
+					co_return AppAuditor.f_AccessDenied("(Download backup)", Permissions);
 
 				auto pTunnel = Internal.m_NetworkTunnels.f_FindEqual(_Name);
 				if (!pTunnel)
@@ -202,7 +202,7 @@ namespace NMib::NCloud
 		CStr m_LogCategory;
 		CStr m_PermissionPrefix;
 
-		TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo)> m_AuditorFactory;
+		TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> m_AuditorFactory;
 		TCDistributedActorInstance<CNetworkTunnelImplementation> m_NetworkTunnelInstance;
 		CTrustedPermissionSubscription m_Permissions;
 
@@ -217,7 +217,7 @@ namespace NMib::NCloud
 		(
 		 	TCActor<CActorDistributionManager> const &_DistributionManager
 		 	, TCActor<CDistributedActorTrustManager> const &_TrustManager
-		 	, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo)> &&_AuditorFactory
+		 	, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
 		 	, CStr const &_LogCategory
 		 	, CStr const &_PermissionPrefix
 		)

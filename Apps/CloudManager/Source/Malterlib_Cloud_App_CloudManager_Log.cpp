@@ -60,7 +60,7 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		if (!co_await pThis->mp_Permissions.f_HasPermission("Open log reporter", Permissions, Auditor.f_HostInfo()))
-			co_return Auditor.f_AccessDenied("(Open log reporter)");
+			co_return Auditor.f_AccessDenied("(Open log reporter)", Permissions);
 
 		auto Key = LogInfo.f_Key();
 
@@ -91,8 +91,10 @@ namespace NMib::NCloud::NCloudManager
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();
 
-			if (!co_await pThis->mp_Permissions.f_HasPermission("Get logs", fsp_LogReadPermissions()))
-				co_return Auditor.f_AccessDenied("(Get logs)");
+			auto Permissions = fsp_LogReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Get logs", Permissions))
+				co_return Auditor.f_AccessDenied("(Get logs)", Permissions);
 
 			Logs = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_GetLogs, fg_Move(_Filter), _BatchSize);
 
@@ -117,8 +119,10 @@ namespace NMib::NCloud::NCloudManager
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();
 
-			if (!co_await pThis->mp_Permissions.f_HasPermission("Get log entries", fsp_LogReadPermissions()))
-				co_return Auditor.f_AccessDenied("(Get log entries)");
+			auto Permissions = fsp_LogReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Get log entries", Permissions))
+				co_return Auditor.f_AccessDenied("(Get log entries)", Permissions);
 
 			LogEntriesGenerator = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_GetLogEntries, fg_Move(_Filter), _BatchSize);
 

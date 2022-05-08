@@ -55,7 +55,7 @@ namespace NMib::NCloud::NBackupManager
 
 		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Start download backup", Permissions) % "Permission denied downloading backup" % Auditor);
 		if (!bHasPermission)
-			co_return Auditor.f_AccessDenied("(Download backup)");
+			co_return Auditor.f_AccessDenied("(Download backup)", Permissions);
 
 		auto pBackupSource = pThis->fp_GetBackupSource(_DownloadBackup.m_BackupSource);
 

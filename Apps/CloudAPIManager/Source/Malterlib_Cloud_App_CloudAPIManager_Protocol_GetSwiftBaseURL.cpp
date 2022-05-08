@@ -20,16 +20,18 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
 			co_return Auditor.f_Exception("Cloud context format not valid");
+
+		TCVector<CStr> Permissions = {"ObjectStorage/GetSwiftBaseURLAll", "ObjectStorage/GetSwiftBaseURL/{}"_f << _Params.m_CloudContext};
 		
 		bool bHasPermission = co_await
 			(
-			 	pThis->mp_Permissions.f_HasPermission("Get swift base URL", {"ObjectStorage/GetSwiftBaseURLAll", fg_Format("ObjectStorage/GetSwiftBaseURL/{}", _Params.m_CloudContext)})
+			 	pThis->mp_Permissions.f_HasPermission("Get swift base URL", Permissions)
 			 	% "Permission denied getting swift base URL"
 			 	% Auditor
 			)
 		;
 		if (!bHasPermission)
-			co_return Auditor.f_AccessDenied("(Get Swift base URL)");
+			co_return Auditor.f_AccessDenied("(Get Swift base URL)", Permissions);
 
 		auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
 		if (!pCloudContext)

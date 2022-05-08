@@ -139,7 +139,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Enumerate secret in SecretsManager", Permissions) % "Permission denied enumerating secrets" % Auditor);
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(EnumerateSecrets, command)");
+			co_return Auditor.f_AccessDenied("(EnumerateSecrets, command)", Permissions["Command"]);
 
 		TCSet<CSecretID> IDs;
 		fg_CollectMatchingSecrets
@@ -179,12 +179,15 @@ namespace NMib::NCloud::NSecretsManager
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Get secret from SecretsManager", Permissions) % "Permission denied getting secret" % Auditor);
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(GetSecret, command)");
+			co_return Auditor.f_AccessDenied("(GetSecret, command)", Permissions["Command"]);
 
 		for (auto const &bHasPermission : HasPermissions)
 		{
 			if (!bHasPermission)
-				co_return Auditor.f_AccessDenied(fg_Format("(GetSecret, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+			{
+				auto &PermissionKey = HasPermissions.fs_GetKey(bHasPermission);
+				co_return Auditor.f_AccessDenied(fg_Format("(GetSecret, no permission for '{}')", PermissionKey), Permissions[PermissionKey]);
+			}
 		}
 
 		if (!pSecretProperties)
@@ -235,12 +238,15 @@ namespace NMib::NCloud::NSecretsManager
 		;
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(GetSecretProperties, command)");
+			co_return Auditor.f_AccessDenied("(GetSecretProperties, command)", Permissions["Command"]);
 
 		for (auto const &bHasPermission : HasPermissions)
 		{
 			if (!bHasPermission)
-				co_return Auditor.f_AccessDenied(fg_Format("(GetSecretProperties, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+			{
+				auto &PermissionKey = HasPermissions.fs_GetKey(bHasPermission);
+				co_return Auditor.f_AccessDenied(fg_Format("(GetSecretProperties, no permission for '{}')", PermissionKey), Permissions[PermissionKey]);
+			}
 		}
 
 		if (!pSecretProperties)
@@ -278,7 +284,7 @@ namespace NMib::NCloud::NSecretsManager
 		;
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(GetSecretBySemanticID, command)");
+			co_return Auditor.f_AccessDenied("(GetSecretBySemanticID, command)", Permissions["Command"]);
 
 		CSecretsManager::CSecret FoundSecret;
 		int32 nFoundCount = 0;
@@ -371,12 +377,15 @@ namespace NMib::NCloud::NSecretsManager
 			)
 		;
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(SetSecretProperties, command)");
+			co_return Auditor.f_AccessDenied("(SetSecretProperties, command)", Permissions["Command"]);
 
 		for (auto const &bHasPermission : HasPermissions)
 		{
 			if (!bHasPermission)
-				co_return Auditor.f_AccessDenied(fg_Format("(SetSecretProperties, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+			{
+				auto &PermissionKey = HasPermissions.fs_GetKey(bHasPermission);
+				co_return Auditor.f_AccessDenied(fg_Format("(SetSecretProperties, no permission for '{}')", PermissionKey), Permissions[PermissionKey]);
+			}
 		}
 
 		auto CurrentTime = CTime::fs_NowUTC();
@@ -500,12 +509,15 @@ namespace NMib::NCloud::NSecretsManager
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Modify tags in SecretsManager", Permissions) % "Permission denied modifying tags" % Auditor);
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(ModifyTags, command)");
+			co_return Auditor.f_AccessDenied("(ModifyTags, command)", Permissions["Command"]);
 
 		for (auto const &bHasPermission : HasPermissions)
 		{
 			if (!bHasPermission)
-				co_return Auditor.f_AccessDenied(fg_Format("(ModifyTags, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+			{
+				auto &PermissionKey = HasPermissions.fs_GetKey(bHasPermission);
+				co_return Auditor.f_AccessDenied(fg_Format("(ModifyTags, no permission for '{}')", PermissionKey), Permissions[PermissionKey]);
+			}
 		}
 
 		if (!pSecretProperties)
@@ -544,12 +556,15 @@ namespace NMib::NCloud::NSecretsManager
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Set metadata in SecretsManager", Permissions) % "Permission denied setting meta data" % Auditor);
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(SetMetadata, command)");
+			co_return Auditor.f_AccessDenied("(SetMetadata, command)", Permissions["Command"]);
 
 		for (auto const &bHasPermission : HasPermissions)
 		{
 			if (!bHasPermission)
-				co_return Auditor.f_AccessDenied(fg_Format("(SetMetadata, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+			{
+				auto &PermissionKey = HasPermissions.fs_GetKey(bHasPermission);
+				co_return Auditor.f_AccessDenied(fg_Format("(SetMetadata, no permission for '{}')", PermissionKey), Permissions[PermissionKey]);
+			}
 		}
 
 		if (!pSecretProperties)
@@ -585,12 +600,15 @@ namespace NMib::NCloud::NSecretsManager
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove metadata in SecretsManager", Permissions) % "Permission denied removing meta data" % Auditor);
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(RemoveMetadata, command)");
+			co_return Auditor.f_AccessDenied("(RemoveMetadata, command)", Permissions["Command"]);
 
 		for (auto const &bHasPermission : HasPermissions)
 		{
 			if (!bHasPermission)
-				co_return Auditor.f_AccessDenied(fg_Format("(RemoveMetadata, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+			{
+				auto &PermissionKey = HasPermissions.fs_GetKey(bHasPermission);
+				co_return Auditor.f_AccessDenied(fg_Format("(RemoveMetadata, no permission for '{}')", PermissionKey), Permissions[PermissionKey]);
+			}
 		}
 
 		if (!pSecretProperties)
@@ -625,12 +643,15 @@ namespace NMib::NCloud::NSecretsManager
 
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove secret in SecretsManager", Permissions) % "Permission denied removing secret" % Auditor);
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(RemoveSecret, command)");
+			co_return Auditor.f_AccessDenied("(RemoveSecret, command)", Permissions["Command"]);
 
 		for (auto const &bHasPermission : HasPermissions)
 		{
 			if (!bHasPermission)
-				co_return Auditor.f_AccessDenied(fg_Format("(RemoveSecret, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+			{
+				auto &PermissionKey = HasPermissions.fs_GetKey(bHasPermission);
+				co_return Auditor.f_AccessDenied(fg_Format("(RemoveSecret, no permission for '{}')", PermissionKey), Permissions[PermissionKey]);
+			}
 		}
 
 		if (!pSecretProperties)

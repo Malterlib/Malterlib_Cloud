@@ -119,7 +119,7 @@ namespace NMib::NCloud::NVersionManager
 		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())
 		{
 			if (!DeniedTags.f_IsEmpty())
-				co_return Auditor.f_AccessDenied({fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags), "(Change tags)"});
+				co_return Auditor.f_AccessDenied({fg_Format("Access denied to all tags specified: {vs,vb}", DeniedTags), "(Change tags)"}, {"Application/TagAll", "Application/Tag/*"});
 
 			if (!_Params.m_bIncreaseRetrySequence)
 			{

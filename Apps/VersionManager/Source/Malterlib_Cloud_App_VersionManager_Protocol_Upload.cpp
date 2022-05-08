@@ -98,7 +98,7 @@ namespace NMib::NCloud::NVersionManager
 
 		auto HasPermissions = co_await (pThis->mp_Permissions.f_HasPermissions("Upload version", Permissions) % "Permission denied uploading version" % Auditor);
 		if (!HasPermissions["//Command//"])
-			co_return Auditor.f_AccessDenied("(Start upload version)");
+			co_return Auditor.f_AccessDenied("(Start upload version)", Permissions["//Command//"]);
 
 		auto VersionInfo = pParams->m_VersionInfo;
 

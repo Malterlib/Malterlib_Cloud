@@ -221,12 +221,14 @@ namespace NMib::NCloud::NCloudManager
 		;
 
 		auto CallingHostInfo = fg_GetCallingHostInfo();
-		auto Auditor = pThis->mp_AppState.f_Auditor(CallingHostInfo);
+		auto Auditor = pThis->mp_AppState.f_Auditor({}, CallingHostInfo);
 
 		CStr UniqueHostID = CallingHostInfo.f_GetUniqueHostID();
 
-		if (!co_await pThis->mp_Permissions.f_HasPermission("Register as app manager", {"CloudManager/RegisterAppManager"}))
-			co_return Auditor.f_AccessDenied("(Register as app manager)");
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/RegisterAppManager"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Register as app manager", Permissions))
+			co_return Auditor.f_AccessDenied("(Register as app manager)", Permissions);
 
 		CStr AppManagerID = CallingHostInfo.f_GetRealHostID();
 		CAppManagerKey DatabaseKey{CAppManagerKey::mc_Prefix, AppManagerID};
@@ -336,8 +338,10 @@ namespace NMib::NCloud::NCloudManager
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
-		if (!co_await pThis->mp_Permissions.f_HasPermission("Enum app managers", {"CloudManager/ReadAll"}))
-			co_return Auditor.f_AccessDenied("(Enum app managers)");
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/ReadAll"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Enum app managers", Permissions))
+			co_return Auditor.f_AccessDenied("(Enum app managers)", Permissions);
 
 		TCMap<CStr, CAppManagerDynamicInfo> Return;
 
@@ -383,8 +387,10 @@ namespace NMib::NCloud::NCloudManager
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
-		if (!co_await pThis->mp_Permissions.f_HasPermission("Enum applications", {"CloudManager/ReadAll"}))
-			co_return Auditor.f_AccessDenied("(Enum applications)");
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/ReadAll"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Enum applications", Permissions))
+			co_return Auditor.f_AccessDenied("(Enum applications)", Permissions);
 
 		TCMap<CApplicationKey, CApplicationInfo> Return;
 
@@ -425,8 +431,10 @@ namespace NMib::NCloud::NCloudManager
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
-		if (!co_await pThis->mp_Permissions.f_HasPermission("Remove app manager", {"CloudManager/RemoveAppManager"}))
-			co_return Auditor.f_AccessDenied("(Remove app manager)");
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/RemoveAppManager"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Remove app manager", Permissions))
+			co_return Auditor.f_AccessDenied("(Remove app manager)", Permissions);
 
 		auto *pAppManager = pThis->mp_AppManagers.f_FindEqual(_AppManagerHostID);
 		if (pAppManager)
@@ -461,8 +469,10 @@ namespace NMib::NCloud::NCloudManager
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
-		if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor reporter", {"CloudManager/ReportSensorReadings"}))
-			co_return Auditor.f_AccessDenied("(Get sensor reporter)");
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/ReportSensorReadings"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor reporter", Permissions))
+			co_return Auditor.f_AccessDenied("(Get sensor reporter)", Permissions);
 
 		Auditor.f_Info("Get sensor reporter");
 
@@ -488,8 +498,10 @@ namespace NMib::NCloud::NCloudManager
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
-		if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor reader", fsp_SensorReadPermissions()))
-			co_return Auditor.f_AccessDenied("(Get sensor reader)");
+		auto Permissions = fsp_SensorReadPermissions();
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor reader", Permissions))
+			co_return Auditor.f_AccessDenied("(Get sensor reader)", Permissions);
 
 		Auditor.f_Info("Get sensor reader");
 
@@ -515,8 +527,10 @@ namespace NMib::NCloud::NCloudManager
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
-		if (!co_await pThis->mp_Permissions.f_HasPermission("Get log reporter", {"CloudManager/ReportLogEntries"}))
-			co_return Auditor.f_AccessDenied("(Get log reporter)");
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/ReportLogEntries"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Get log reporter", Permissions))
+			co_return Auditor.f_AccessDenied("(Get log reporter)", Permissions);
 
 		Auditor.f_Info("Get log reporter");
 
@@ -542,8 +556,10 @@ namespace NMib::NCloud::NCloudManager
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
-		if (!co_await pThis->mp_Permissions.f_HasPermission("Get log reader", fsp_LogReadPermissions()))
-			co_return Auditor.f_AccessDenied("(Get log reader)");
+		auto Permissions = fsp_LogReadPermissions();
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Get log reader", Permissions))
+			co_return Auditor.f_AccessDenied("(Get log reader)", Permissions);
 
 		Auditor.f_Info("Get log reader");
 

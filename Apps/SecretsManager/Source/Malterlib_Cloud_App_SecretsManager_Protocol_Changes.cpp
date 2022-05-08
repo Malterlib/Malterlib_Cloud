@@ -63,7 +63,7 @@ namespace NMib::NCloud::NSecretsManager
 
 				if (!HasPermissions)
  				{
-					CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo);
+					CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo, {});
 					Auditor.f_Error("Errors checking permissions for subscription:  {}"_f << HasPermissions.f_GetExceptionStr());
 					co_return {};
 				}
@@ -125,7 +125,7 @@ namespace NMib::NCloud::NSecretsManager
 			)
 		;
 
-		CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo);
+		CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo, {});
 
 		auto HasPermissions = co_await
 			(
@@ -195,7 +195,7 @@ namespace NMib::NCloud::NSecretsManager
 		;
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(SubscribeToChanges, command)");
+			co_return Auditor.f_AccessDenied("(SubscribeToChanges, command)", Permissions["Command"]);
 
 		CStr SubscriptionID = fg_RandomID(This.mp_ChangeSubscriptions);
 		auto pSubscription = &This.mp_ChangeSubscriptions[SubscriptionID];

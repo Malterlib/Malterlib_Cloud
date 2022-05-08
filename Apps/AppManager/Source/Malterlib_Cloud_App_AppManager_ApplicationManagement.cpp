@@ -489,10 +489,10 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(Application start, command)");
+			co_return Auditor.f_AccessDenied("(Application start, command)", Permissions["Command"]);
 
 		if (!HasPermissions["App"])
-			co_return Auditor.f_AccessDenied("(Application start, app name)");
+			co_return Auditor.f_AccessDenied("(Application start, app name)", Permissions["App"]);
 
 		auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
 		if (!pOldApplication)
@@ -542,10 +542,10 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(Application stop, command)");
+			co_return Auditor.f_AccessDenied("(Application stop, command)", Permissions["Command"]);
 
 		if (!HasPermissions["App"])
-			co_return Auditor.f_AccessDenied("(Application stop, app name)");
+			co_return Auditor.f_AccessDenied("(Application stop, app name)", Permissions["App"]);
 
 		auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
 		if (!pOldApplication)
@@ -595,10 +595,10 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(Application restart, command)");
+			co_return Auditor.f_AccessDenied("(Application restart, command)", Permissions["Command"]);
 
 		if (!HasPermissions["App"])
-			co_return Auditor.f_AccessDenied("(Application restart, app name)");
+			co_return Auditor.f_AccessDenied("(Application restart, app name)", Permissions["App"]);
 
 		auto pOldApplication = pThis->mp_Applications.f_FindEqual(_Name);
 		if (!pOldApplication)

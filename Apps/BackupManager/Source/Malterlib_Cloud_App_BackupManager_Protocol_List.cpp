@@ -80,7 +80,7 @@ namespace NMib::NCloud::NBackupManager
 		if (bSingleSource)
 		{
 			if (FilteredBackupSources.f_IsEmpty())
-				co_return Auditor.f_AccessDenied("(List backups)");
+				co_return Auditor.f_AccessDenied("(List backups)", {"Backup/ListAll", "Backup/ReadAll", "Backup/Read/*"});
 
 			auto *pBackupSource = pThis->mp_BackupSources.f_FindEqual(_ForBackupSource);
 			if (!pBackupSource)

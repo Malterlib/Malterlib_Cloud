@@ -17,7 +17,7 @@ namespace NMib::NCloud
 			(
 			 	NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
 			 	, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
-			 	, NFunction::TCFunctionMovable<NConcurrency::CDistributedAppAuditor (NConcurrency::CCallingHostInfo const &_CallingHostInfo)> &&_AuditorFactory
+			 	, NFunction::TCFunctionMovable<NConcurrency::CDistributedAppAuditor (NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
 			 	, NStr::CStr const &_LogCategory
 			 	, NStr::CStr const &_PermissionPrefix
 			)

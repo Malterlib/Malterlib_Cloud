@@ -30,17 +30,13 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		if (!CCloudAPIManager::fs_IsValidTempURLKey(_Params.m_TempURLKey))
 			co_return Auditor.f_Exception("Temp URL key format not valid");
+
+		TCVector<CStr> Permissions = {"ObjectStorage/SignTempURLAll", fg_Format("ObjectStorage/SignTempURL/{}", _Params.m_CloudContext)};
 		
-		bool bHasPermission = co_await
-			(
-			 	pThis->mp_Permissions.f_HasPermission("Sign Temp URL", {"ObjectStorage/SignTempURLAll", fg_Format("ObjectStorage/SignTempURL/{}", _Params.m_CloudContext)})
-			 	% "Permission denied signing temp URL"
-			 	% Auditor
-			)
-		;
+		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Sign Temp URL", Permissions) % "Permission denied signing temp URL" % Auditor);
 
 		if (!bHasPermission)
-			co_return Auditor.f_AccessDenied("(Sign Temp URL)");
+			co_return Auditor.f_AccessDenied("(Sign Temp URL)", Permissions);
 
 		auto *pCloudContext = pThis->mp_CloudContexts.f_FindEqual(_Params.m_CloudContext);
 		if (!pCloudContext)

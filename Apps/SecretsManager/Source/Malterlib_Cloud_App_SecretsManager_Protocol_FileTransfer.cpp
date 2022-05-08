@@ -77,12 +77,15 @@ namespace NMib::NCloud::NSecretsManager
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Download file from SecretsManager", Permissions) % "Permission denied downloading file" % Auditor);
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(DownloadFile, command)");
+			co_return Auditor.f_AccessDenied("(DownloadFile, command)", Permissions["Command"]);
 
 		for (auto const &bHasPermission : HasPermissions)
 		{
 			if (!bHasPermission)
-				co_return Auditor.f_AccessDenied(fg_Format("(DownloadFile, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+			{
+				auto &PermissionKey = HasPermissions.fs_GetKey(bHasPermission);
+				co_return Auditor.f_AccessDenied(fg_Format("(DownloadFile, no permission for '{}')", PermissionKey), Permissions[PermissionKey]);
+			}
 		}
 
 		pSecretProperties = This.mp_Database.m_Secrets.f_FindEqual(_ID);
@@ -237,12 +240,15 @@ namespace NMib::NCloud::NSecretsManager
 		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Upload file to SecretsManager", Permissions) % "Permission denied uploading file" % Auditor);
 
 		if (!HasPermissions["Command"])
-			co_return Auditor.f_AccessDenied("(UploadFile, command)");
+			co_return Auditor.f_AccessDenied("(UploadFile, command)", Permissions["Command"]);
 
 		for (auto const &bHasPermission : HasPermissions)
 		{
 			if (!bHasPermission)
-				co_return Auditor.f_AccessDenied(fg_Format("(UploadFile, no permission for '{}')", HasPermissions.fs_GetKey(bHasPermission)));
+			{
+				auto &PermissionKey = HasPermissions.fs_GetKey(bHasPermission);
+				co_return Auditor.f_AccessDenied(fg_Format("(UploadFile, no permission for '{}')", PermissionKey), Permissions[PermissionKey]);
+			}
 		}
 
 		pSecretProperties = This.mp_Database.m_Secrets.f_FindEqual(_ID);

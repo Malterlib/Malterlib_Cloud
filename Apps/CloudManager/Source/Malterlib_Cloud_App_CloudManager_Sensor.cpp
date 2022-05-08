@@ -60,7 +60,7 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		if (!co_await pThis->mp_Permissions.f_HasPermission("Open sensor reporter", Permissions, Auditor.f_HostInfo()))
-			co_return Auditor.f_AccessDenied("(Open sensor reporter)");
+			co_return Auditor.f_AccessDenied("(Open sensor reporter)", Permissions);
 
 		auto Key = SensorInfo.f_Key();
 
@@ -91,8 +91,10 @@ namespace NMib::NCloud::NCloudManager
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();
 
-			if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensors", fsp_SensorReadPermissions()))
-				co_return Auditor.f_AccessDenied("(Get sensors)");
+			auto Permissions = fsp_SensorReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensors", Permissions))
+				co_return Auditor.f_AccessDenied("(Get sensors)", Permissions);
 
 			Sensors = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensors, fg_Move(_Filter), _BatchSize);
 
@@ -117,8 +119,10 @@ namespace NMib::NCloud::NCloudManager
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();
 
-			if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor readings", fsp_SensorReadPermissions()))
-				co_return Auditor.f_AccessDenied("(Get sensor readings)");
+			auto Permissions = fsp_SensorReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor readings", Permissions))
+				co_return Auditor.f_AccessDenied("(Get sensor readings)", Permissions);
 
 			SensorReadings = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensorReadings, fg_Move(_Filter), _BatchSize);
 
@@ -143,8 +147,10 @@ namespace NMib::NCloud::NCloudManager
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();
 
-			if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor status", fsp_SensorReadPermissions()))
-				co_return Auditor.f_AccessDenied("(Get sensor status)");
+			auto Permissions = fsp_SensorReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor status", Permissions))
+				co_return Auditor.f_AccessDenied("(Get sensor status)", Permissions);
 
 			SensorReadings = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensorStatus, fg_Move(_Filter), _BatchSize);
 

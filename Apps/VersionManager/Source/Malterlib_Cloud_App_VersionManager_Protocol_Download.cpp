@@ -45,16 +45,18 @@ namespace NMib::NCloud::NVersionManager
 
 		TCSharedPointer<CStartDownloadVersion> pParams = fg_Construct(fg_Move(_Params));
 
+		NContainer::TCVector<NStr::CStr> Permissions = {"Application/ReadAll", "Application/Read/{}"_f << _Params.m_Application};
+
 		bool bHasPermission = co_await
 			(
-			 	pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", {"Application/ReadAll", "Application/Read/{}"_f << _Params.m_Application})
+			 	pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", Permissions)
 			 	% "Permission denied downloading version"
 			 	% Auditor
 			)
 		;
 
 		if (!bHasPermission)
-			co_return Auditor.f_AccessDenied("(Start download version)");
+			co_return Auditor.f_AccessDenied("(Start download version)", Permissions);
 
 		auto *pApplication = pThis->mp_Applications.f_FindEqual(pParams->m_Application);
 		if (!pApplication)
