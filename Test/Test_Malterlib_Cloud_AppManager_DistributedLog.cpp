@@ -199,7 +199,11 @@ public:
 
 				auto fReadLogs = [&]()
 					{
-						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--log-list", "--json"}, TestAppDirectory));
+						return CEJSON::fs_FromString
+							(
+								CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}, TestAppDirectory)
+							)
+						;
 					}
 				;
 
@@ -207,7 +211,12 @@ public:
 					{
 						return CEJSON::fs_FromString
 							(
-								CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--log-entries-list", "--newest", "--json"}, TestAppDirectory)
+								CProcessLaunch::fs_LaunchTool
+								(
+									TestAppDirectory / "TestApp"
+									, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--json"}
+									, TestAppDirectory
+								)
 							)
 						;
 					}
@@ -245,7 +254,11 @@ public:
 
 				auto fReadLogs = [&]()
 					{
-						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--log-list", "--json"}, AppManagerInfo.m_RootDirectory));
+						return CEJSON::fs_FromString
+							(
+								CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}, AppManagerInfo.m_RootDirectory)
+							)
+						;
 					}
 				;
 
@@ -253,7 +266,12 @@ public:
 					{
 						return CEJSON::fs_FromString
 							(
-								CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--log-entries-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory)
+								CProcessLaunch::fs_LaunchTool
+								(
+									AppManagerPath
+									, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--json"}
+									, AppManagerInfo.m_RootDirectory
+								)
 							)
 						;
 					}
@@ -293,7 +311,7 @@ public:
 					{
 						return CEJSON::fs_FromString
 							(
-								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-log-list", "--json"}, CloudClientDirectory)
+								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-log-list", "--identifier", "org.malterlib.log.test", "--json"}, CloudClientDirectory)
 							)
 						;
 					}
@@ -303,7 +321,12 @@ public:
 					{
 						return CEJSON::fs_FromString
 							(
-								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-log-entries-list", "--newest", "--json"}, CloudClientDirectory)
+								CProcessLaunch::fs_LaunchTool
+								(
+									CloudClientPath
+									, {"--cloud-manager-log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--json"}
+									, CloudClientDirectory
+								)
 							)
 						;
 					}
