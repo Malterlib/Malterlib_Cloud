@@ -94,7 +94,7 @@ namespace NMib::NCloud::NSecretsManager
 
 			CSecretsManager::CSubscribeToChanges m_SubscriptionParams;
 
-			void f_SendChanges(CSecretsManager::CSecretChanges &&_Changes) const;
+			NConcurrency::TCFuture<void> f_SendChanges(CSecretsManager::CSecretChanges &&_Changes) const;
 		};
 
 		CServer(CDistributedAppState &_AppState, TCActor<CSecretsManagerServerDatabase> const &_DatabaseActor);

@@ -2,15 +2,16 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_SecretsManager.h"
 #include "Malterlib_Cloud_App_SecretsManager_Server.h"
 
 namespace NMib::NCloud::NSecretsManager
 {
-	void CSecretsManagerDaemonActor::CServer::CChangeSubscription::f_SendChanges(CSecretsManager::CSecretChanges &&_Changes) const
+	NConcurrency::TCFuture<void> CSecretsManagerDaemonActor::CServer::CChangeSubscription::f_SendChanges(CSecretsManager::CSecretChanges &&_Changes) const
 	{
-		m_SubscriptionParams.m_fOnChanges(fg_Move(_Changes)) > fg_DiscardResult();
+		return m_SubscriptionParams.m_fOnChanges(fg_Move(_Changes)).f_Future();
 	}
 
 	void CSecretsManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity)
@@ -165,7 +166,7 @@ namespace NMib::NCloud::NSecretsManager
 			SecretChanges.m_Changed[ID] = SecretProperties.f_ToSecretProperties();
 		}
 
-		pSubscription->f_SendChanges(fg_Move(SecretChanges));
+		co_await pSubscription->f_SendChanges(fg_Move(SecretChanges)).f_Wrap() > fg_LogError("Mib/Cloud/SecretsManager", "Failed to send changes to subscription");
 
 		co_return {};
 	}
