@@ -54,4 +54,12 @@ namespace NMib::NCloud
 		_Stream % m_RemovedFiles;
 		_Stream % m_UpdatedFiles;
 	}
+
+	template <typename tf_CStream>
+	void CBackupManager::CBackupKey::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_FriendlyName;
+		_Stream % m_Time;
+		_Stream % m_ID;
+	}
 }

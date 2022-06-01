@@ -443,15 +443,6 @@ namespace NMib::NCloud
 	}
 	DMibDistributedStreamImplement(CBackupManager::CBackupID);
 	
-	template <typename tf_CStream>
-	void CBackupManager::CBackupKey::f_Stream(tf_CStream &_Stream)
-	{
-		_Stream % m_FriendlyName;
-		_Stream % m_Time;
-		_Stream % m_ID;
-	}
-	DMibDistributedStreamImplement(CBackupManager::CBackupKey);
-	
 	// CStartBackup
 	
 	template <typename tf_CStream>
