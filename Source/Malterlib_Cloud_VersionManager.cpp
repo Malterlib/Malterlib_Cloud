@@ -41,7 +41,12 @@ namespace NMib::NCloud
 	DMibDistributedStreamImplement(CVersionManager::CChangeTags::CResult);
 	
 	CVersionManager::~CVersionManager() = default;
-	
+
+	NStr::CStr CVersionManager::CVersionIDAndPlatform::fs_ConvertFromOldPlatform(NStr::CStr const &_Platform)
+	{
+		return _Platform.f_Replace("Linux2.6", "Linux").f_Replace("OSX10.7", "macOS");
+	}
+
 	bool CVersionManager::fs_IsValidApplicationName(CStr const &_String)
 	{
 		return NNetwork::fg_IsValidHostname(_String);
@@ -397,7 +402,25 @@ namespace NMib::NCloud
 	void CVersionManager::CSubscribeToUpdates::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Application;
-		_Stream % m_Platforms;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_RenamePlatforms)
+			_Stream % m_Platforms;
+		else
+		{
+			if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
+			{
+				NContainer::TCSet<NStr::CStr> Platforms;
+				_Stream >> Platforms;
+				for (auto &Platform : Platforms)
+				{
+					m_Platforms[Platform];
+					m_Platforms[CVersionIDAndPlatform::fs_ConvertFromOldPlatform(Platform)];
+				}
+			}
+			else
+				_Stream << m_Platforms;
+		}
+
 		if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsSubscribeChanges)
 			_Stream % fg_Move(m_fOnNewVersions);
 		else

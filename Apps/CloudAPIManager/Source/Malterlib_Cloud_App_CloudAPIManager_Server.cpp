@@ -17,7 +17,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		: mp_AppState(_AppState)
 		, mp_pCanDestroyTracker(fg_Construct())
 	{
-#ifdef DPlatformFamily_OSX
+#ifdef DPlatformFamily_macOS
 		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
 
 		CStr OriginalPath = Path;

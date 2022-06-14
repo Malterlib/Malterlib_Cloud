@@ -47,12 +47,12 @@ Property
 			{
 				&
 				{
-					Platform "Linux2.6"
+					Platform "Linux"
 					Architecture "x64"
 				}
 				&
 				{
-					PlatformFamily "OSX"
+					PlatformFamily "macOS"
 					Architecture "x64"
 				}
 			}
@@ -64,17 +64,17 @@ Property
 		&
 		{
 			MalterlibCloudCompatibilityTests true
-			EnablePlatform_Linux2_6 true
+			EnablePlatform_Linux true
 			EnableArchitecture_x64 true
 		}
 	}
 
-	MalterlibBinaryTestRepositories =+ "Cloud_OSX_x64"
+	MalterlibBinaryTestRepositories =+ "Cloud_macOS_x64"
 	{
 		&
 		{
 			MalterlibCloudCompatibilityTests true
-			EnablePlatformFamily_OSX true
+			EnablePlatformFamily_macOS true
 			EnableArchitecture_x64 true
 		}
 	}
@@ -229,7 +229,7 @@ Property
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards =+ "*/.tmp"
 	MalterlibCloudVersionInfo_Backup_ExcludeWildcards =+ "*/.DS_Store"
 	{
-		!!PlatformFamily "OSX"
+		!!PlatformFamily "macOS"
 	}
 
 	MalterlibCloudVersionInfo_Backup_NewBackupInterval define int?

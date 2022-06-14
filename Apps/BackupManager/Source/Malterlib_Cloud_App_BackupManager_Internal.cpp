@@ -19,7 +19,7 @@ namespace NMib::NCloud::NBackupManager
 		, mp_pCanDestroyTracker(fg_Construct())
 		, mp_FriendlyName{NProcess::NPlatform::fg_Process_GetComputerName()}
 	{
-#ifdef DPlatformFamily_OSX
+#ifdef DPlatformFamily_macOS
 		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
 
 		CStr OriginalPath = Path;

@@ -50,7 +50,7 @@ namespace NMib::NCloud
 		_Stream % m_ExtraInfo;
 		_Stream % m_nFiles;
 		_Stream % m_nBytes;
-		if (_Stream.f_GetVersion() >= 0x105)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportIncreaseRetrySequence)
 			_Stream % m_RetrySequence;
 	}
 }

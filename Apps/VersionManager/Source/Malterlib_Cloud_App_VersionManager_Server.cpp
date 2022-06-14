@@ -15,7 +15,7 @@ namespace NMib::NCloud::NVersionManager
 	CVersionManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState)
 		: mp_AppState(_AppState)
 	{
-#ifdef DPlatformFamily_OSX
+#ifdef DPlatformFamily_macOS
 		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
 
 		CStr OriginalPath = Path;

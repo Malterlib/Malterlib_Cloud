@@ -118,7 +118,7 @@ namespace NMib::NCloud::NAppDistributionManager
 								,
 								{
 									"--no-same-owner"
-	#if !defined(DPlatformFamily_OSX)
+	#if !defined(DPlatformFamily_macOS)
 									, "--pax-option=delete=SCHILY.*,delete=LIBARCHIVE.*"
 	#endif
 									, "-xf"

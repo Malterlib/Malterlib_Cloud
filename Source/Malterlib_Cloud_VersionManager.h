@@ -30,7 +30,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_SupportIncreaseRetrySequence = 0x105
 			, EProtocolVersion_RefactorToActorFunctorsUploadDownload = 0x106
 			, EProtocolVersion_RefactorToActorFunctorsSubscribeChanges = 0x107
-			, EProtocolVersion_Current = 0x107
+			, EProtocolVersion_RenamePlatforms = 0x108
+			, EProtocolVersion_Current = 0x108
 		};
 
 		struct CVersionID : public CCloudVersion
@@ -63,6 +64,8 @@ namespace NMib::NCloud
 			bool f_IsValid() const;
 
 			NStr::CStr f_EncodeFileName() const;
+
+			static NStr::CStr fs_ConvertFromOldPlatform(NStr::CStr const &_Platform);
 
 			auto operator <=> (CVersionIDAndPlatform const &_Right) const = default;
 			

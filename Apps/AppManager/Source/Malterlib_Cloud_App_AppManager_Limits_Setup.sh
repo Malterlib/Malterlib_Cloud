@@ -2,7 +2,7 @@ R"-----(#!/bin/bash
 
 set -e
 
-if [ "$PlatformFamily" == "OSX" ]; then
+if [ "$PlatformFamily" == "macOS" ]; then
 	sysctl -w kern.maxfiles=$NumFiles
 	sysctl -w kern.maxfilesperproc=$NumFilesPerProc
 	sysctl -w kern.ipc.somaxconn=2048
