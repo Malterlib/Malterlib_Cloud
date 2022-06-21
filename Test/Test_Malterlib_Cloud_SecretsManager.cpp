@@ -1711,8 +1711,6 @@ public:
 
 			fLaunchSecretManagers();
 
-			fSetupListen();
-
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(nSecretsManagers);
 			auto SecretsManager = SecretsManagers[0];
