@@ -350,6 +350,31 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
+	TCFuture<void> CAppManagerTestHelper::f_StopCloudManager()
+	{
+		if (m_CloudManagerLaunch)
+			co_await m_CloudManagerLaunch->f_Destroy();
+		m_CloudManagerLaunch.f_Clear();
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerTestHelper::f_StartCloudManager()
+	{
+		m_CloudManagerLaunch = co_await m_LaunchHelper
+			(
+				&CDistributedApp_LaunchHelper::f_LaunchInProcess
+				, "CloudManager"
+				, m_CloudManagerDirectory
+				, &fg_ConstructApp_CloudManager
+				, NContainer::TCVector<NStr::CStr>{}
+			)
+			.f_Timeout(m_Timeout, "Timed out waiting for cloud manager launch")
+		;
+
+		co_return {};
+	}
+
 	TCFuture<void> CAppManagerTestHelper::f_Setup(mint _nAppManagers)
 	{
 		m_nAppManagers = _nAppManagers;
@@ -424,16 +449,7 @@ namespace NMib::NCloud
 
 			NCloudManager::g_MaxDatabaseSize = constant_uint64(1) * 1024 * 1024 * 1024; // Limit due to asan for example taking too much memory
 
-			m_CloudManagerLaunch = co_await m_LaunchHelper
-				(
-					&CDistributedApp_LaunchHelper::f_LaunchInProcess
-					, "CloudManager"
-					, m_CloudManagerDirectory
-					, &fg_ConstructApp_CloudManager
-					, NContainer::TCVector<NStr::CStr>{}
-				)
-				.f_Timeout(m_Timeout, "Timed out waiting for cloud manager launch")
-			;
+			co_await f_StartCloudManager();
 
 			DMibExpect(m_CloudManagerLaunch->m_HostID, !=, "");
 		}

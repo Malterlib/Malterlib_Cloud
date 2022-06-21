@@ -78,6 +78,8 @@ namespace NMib::NCloud
 		TCFuture<void> f_InstallTestApp(CStr _Name = "TestApp", CStr _Tag = "TestTag", CStr _Group = "TestGroup", CStr _VersionManagerApplication = "TestApp");
 		TCFuture<void> f_CheckCloudManager(mint _Sequence);
 		TCFuture<void> f_Setup(mint _nAppManagers);
+		TCFuture<void> f_StopCloudManager();
+		TCFuture<void> f_StartCloudManager();
 
 		TCFuture<NStr::CStr> f_LaunchTool
 			(
