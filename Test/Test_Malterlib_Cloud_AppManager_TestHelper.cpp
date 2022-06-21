@@ -54,7 +54,10 @@ namespace NMib::NCloud
 	{
 		co_return
 			(
-				co_await CProcessLaunchActor::fs_LaunchSimple(CProcessLaunchActor::CSimpleLaunch(_Executable, _Params, _WorkingDir))
+				co_await CProcessLaunchActor::fs_LaunchSimple
+				(
+					CProcessLaunchActor::CSimpleLaunch(_Executable, _Params, _WorkingDir, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode)
+				)
 				.f_Timeout(m_Timeout, "Timed out waiting for tool launch: {} {vs}"_f << _Executable << _Params)
 			)
 			.f_GetStdOut()
