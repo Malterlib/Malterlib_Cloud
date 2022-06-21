@@ -215,7 +215,7 @@ namespace NMib::NCloud
 			CStr FileName = Entry.m_FileName;
 			CStr RelativeFileName = Entry.m_RelativeFileName;
 			uint64 Position = Entry.m_Position;
-			uint64 nBytes = fg_Min(Entry.m_Size - Entry.m_Position, 64u*1024u);
+			uint64 nBytes = fg_Min(Entry.m_Size - Entry.m_Position, 64u*1024u, CActorDistributionManager::mc_HalfMaxMessageSize);
 			Entry.m_Position += nBytes;
 			bool bFinished = Entry.f_IsFinished(); 
 			if (bFinished)
