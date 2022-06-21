@@ -34,6 +34,7 @@ using namespace NMib::NEncoding;
 using namespace NMib::NAtomic;
 using namespace NMib::NNetwork;
 using namespace NMib::NTest;
+using namespace NMib::NFunction;
 
 namespace NMib::NCloud
 {

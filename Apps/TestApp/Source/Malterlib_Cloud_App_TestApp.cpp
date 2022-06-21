@@ -132,6 +132,104 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
+			(
+				{
+					"Names"_= {"--get-log-report-depth"}
+					, "Description"_= "Gets the depth of the log reporting chain."
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					CDistributedAppLogReporter::CLogInfo LogInfo;
+
+					LogInfo.m_Identifier = "org.malterlib.log.test";
+					LogInfo.m_IdentifierScope = "Test";
+					LogInfo.m_Name = "Malterlib Test";
+
+					auto LogReporter = co_await self(&CTestAppActor::fp_OpenLogReporter, LogInfo);
+
+					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
+
+					auto ReportResult = co_await LogReporter.m_fReportEntries(fg_Move(LogEntries));
+
+					co_await fg_Move(LogReporter.m_fReportEntries).f_Destroy();
+
+					co_await _pCommandLine->f_StdOut(CStrSecure::CFormat("{}\n") << ReportResult.m_ReportDepth);
+
+					co_return 0;
+				}
+			)
+		;
+		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
+			(
+				{
+					"Names"_= {"--generate-huge-log-entries"}
+					, "Description"_= "Generates a log entries."
+					, "Options"_=
+					{
+						"NumEntries?"_=
+						{
+							"Names"_= {"--num-entries"}
+							, "Default"_= 1
+							, "Description"_= "The number of entries to report."
+						}
+						, "EntrySize?"_=
+						{
+							"Names"_= {"--entry-size"}
+							, "Default"_= 1024
+							, "Description"_= "The size of the entry in bytes."
+						}
+						, "LineSize?"_=
+						{
+							"Names"_= {"--line-size"}
+							, "Default"_= 128
+							, "Description"_= "The size of the lines in bytes."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					mint nEntries = _Params["NumEntries"].f_Integer();
+					mint EntrySize = _Params["EntrySize"].f_Integer();
+					mint LineSize = _Params["LineSize"].f_Integer();
+
+					if (LineSize < 1 || LineSize > EntrySize)
+						co_return DMibErrorInstance("Invalid line size");
+
+					CDistributedAppLogReporter::CLogInfo LogInfo;
+
+					LogInfo.m_Identifier = "org.malterlib.log.test";
+					LogInfo.m_IdentifierScope = "Test";
+					LogInfo.m_Name = "Malterlib Test";
+
+					auto LogReporter = co_await self(&CTestAppActor::fp_OpenLogReporter, LogInfo);
+
+					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
+
+					for (mint i = 0; i < nEntries; ++i)
+					{
+						CDistributedAppLogReporter::CLogEntry LogEntry;
+						for (mint iData = 0; iData < EntrySize;)
+						{
+							mint ThisTime = fg_Min(EntrySize - iData, LineSize);
+							if (ThisTime >= 3)
+								LogEntry.m_Data.m_Message += "<{sj*,sf }>\n"_f << "" << (ThisTime - 3);
+							else
+								LogEntry.m_Data.m_Message += "{sj*,sf#}\n"_f << "" << (ThisTime - 1);
+
+							iData += ThisTime;
+						}
+						LogEntries.f_Insert(fg_Move(LogEntry));
+					}
+
+					co_await LogReporter.m_fReportEntries(fg_Move(LogEntries));
+
+					co_await fg_Move(LogReporter.m_fReportEntries).f_Destroy();
+
+					co_return 0;
+				}
+			)
+		;
 	}
 
 	void CTestAppActor::fp_PopulateAppInterfaceRegisterInfo(CDistributedAppInterfaceServer::CRegisterInfo &o_RegisterInfo, NEncoding::CEJSON const &_Params)

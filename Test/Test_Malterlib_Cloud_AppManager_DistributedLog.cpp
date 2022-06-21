@@ -12,7 +12,7 @@ static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 class CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 {
 public:
-	void f_DoTests()
+	void fp_TestGeneral()
 	{
 		DMibTestSuite("General") -> TCFuture<void>
 		{
@@ -189,47 +189,50 @@ public:
 			{
 				DMibTestPath("Local Store");
 
-				auto fGenerateLogEntry = [&]()
+				auto fGenerateLogEntry = g_ActorFunctor / [&]() -> TCFuture<void>
 					{
-						CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--generate-log-entries", "5"}, TestAppDirectory);
+						co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--generate-log-entries", "5"}, TestAppDirectory);
+
+						co_return {};
 					}
 				;
 
-				fGenerateLogEntry();
+				co_await fGenerateLogEntry();
 
-				auto fReadLogs = [&]()
+				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
 					{
-						return CEJSON::fs_FromString
+						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
-								CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}, TestAppDirectory)
+								TestAppDirectory / "TestApp"
+								, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}, TestAppDirectory
 							)
 						;
+						co_return CEJSON::fs_FromString(Result);
 					}
 				;
 
-				auto fReadLogEntries = [&]()
+				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
 					{
-						return CEJSON::fs_FromString
+						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
-								CProcessLaunch::fs_LaunchTool
-								(
-									TestAppDirectory / "TestApp"
-									, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--json"}
-									, TestAppDirectory
-								)
+								TestAppDirectory / "TestApp"
+								, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
+								, TestAppDirectory
 							)
 						;
+
+						co_return CEJSON::fs_FromString(Result);
 					}
 				;
 
-				DMibExpect(fReadLogs(), ==, fSortLogs(ExpectedLogs));
-				DMibExpect(fMakeComparable(fReadLogEntries()), ==, ExpectedLogEntries);
+				DMibExpect(co_await fReadLogs(), ==, fSortLogs(ExpectedLogs));
+				DMibExpect(fMakeComparable(co_await fReadLogEntries()), ==, ExpectedLogEntries);
 			}
 
 			auto fSetHostInfo =
 				[
 					&
-					, TestAppHostID = CStr(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory).f_Trim())
+					, TestAppHostID = CStr((co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim())
 					, HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName())
 				]
 				(CEJSON const &_JSON)
@@ -252,33 +255,34 @@ public:
 
 				CStr AppManagerPath = AppManagerInfo.m_RootDirectory / "AppManager";
 
-				auto fReadLogs = [&]()
+				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
 					{
-						return CEJSON::fs_FromString
+						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
-								CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}, AppManagerInfo.m_RootDirectory)
+								AppManagerPath
+								, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}
+								, AppManagerInfo.m_RootDirectory
 							)
 						;
+						co_return CEJSON::fs_FromString(Result);
 					}
 				;
 
-				auto fReadLogEntries = [&]()
+				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
 					{
-						return CEJSON::fs_FromString
+						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
-								CProcessLaunch::fs_LaunchTool
-								(
-									AppManagerPath
-									, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--json"}
-									, AppManagerInfo.m_RootDirectory
-								)
+								AppManagerPath
+								, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
+								, AppManagerInfo.m_RootDirectory
 							)
 						;
+						co_return CEJSON::fs_FromString(Result);
 					}
 				;
 
-				DMibExpect(fReadLogs(), ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
-				DMibExpect(fMakeComparable(fReadLogEntries()), ==, fSetHostInfo(ExpectedLogEntries));
+				DMibExpect(co_await fReadLogs(), ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
+				DMibExpect(fMakeComparable(co_await fReadLogEntries()), ==, fSetHostInfo(ExpectedLogEntries));
 			}
 
 			auto fSetHostInfoAppManager =
@@ -307,35 +311,36 @@ public:
 				CStr CloudClientDirectory = AppManagerTestHelper.m_RootDirectory / "MalterlibCloud";
 				CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
 
-				auto fReadLogs = [&]()
+				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
 					{
-						return CEJSON::fs_FromString
+						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
-								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-log-list", "--identifier", "org.malterlib.log.test", "--json"}, CloudClientDirectory)
+								CloudClientPath
+								, {"--cloud-manager-log-list", "--identifier", "org.malterlib.log.test", "--json"}
+								, CloudClientDirectory
 							)
 						;
+						co_return CEJSON::fs_FromString(Result);
 					}
 				;
 
-				auto fReadLogEntries = [&]()
+				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
 					{
-						return CEJSON::fs_FromString
+						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
-								CProcessLaunch::fs_LaunchTool
-								(
-									CloudClientPath
-									, {"--cloud-manager-log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--json"}
-									, CloudClientDirectory
-								)
+								CloudClientPath
+								, {"--cloud-manager-log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
+								, CloudClientDirectory
 							)
 						;
+						co_return CEJSON::fs_FromString(Result);
 					}
 				;
 
-				DMibExpect(fReadLogs(), ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
+				DMibExpect(co_await fReadLogs(), ==, fSortLogs(fSetHostInfo(ExpectedLogs)));
 				DMibExpect
 					(
-						fMakeComparable(fReadLogEntries())
+						fMakeComparable(co_await fReadLogEntries())
 						, ==
 						, fSetHostInfo(ExpectedLogEntries)
 					)
@@ -344,6 +349,250 @@ public:
 
 			co_return {};
 		};
+	}
+
+	TCFuture<void> fp_TestLimitsImpl
+		(
+			CStr _Name
+			, TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> _pGenerateEntries
+			, TCFunction<void (CEJSON const &_Entries)> _fCheckEntries, bool _bStopCloudManager
+		)
+	{
+		CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp | CAppManagerTestHelper::EOption_EnableVersionManager;
+		if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+			Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
+
+		CAppManagerTestHelper AppManagerTestHelper("AppManagerDistributedLogTests{}"_f << _Name, Options, g_Timeout);
+		co_await AppManagerTestHelper.f_Setup(1);
+		auto &AppManagerInfo = *AppManagerTestHelper.m_AppManagerInfos.f_FindAny();
+
+		auto TestAppDirectory = AppManagerInfo.m_RootDirectory / "App/TestApp";
+
+		if (_bStopCloudManager)
+			co_await AppManagerTestHelper.f_StopCloudManager();
+
+		{
+			DMibTestPath("Local Store");
+
+			co_await (*_pGenerateEntries)(TestAppDirectory, &AppManagerTestHelper);
+
+			auto LogEntries = CEJSON::fs_FromString
+				(
+					co_await AppManagerTestHelper.f_LaunchTool
+					(
+						TestAppDirectory / "TestApp"
+						, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
+						, TestAppDirectory
+					)
+				)
+			;
+			_fCheckEntries(LogEntries);
+		}
+
+		{
+			DMibTestPath("Local Store AppManager");
+
+			CStr AppManagerPath = AppManagerInfo.m_RootDirectory / "AppManager";
+
+			auto LogEntries = CEJSON::fs_FromString
+				(
+					co_await AppManagerTestHelper.f_LaunchTool
+					(
+						AppManagerPath
+						, {"--log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
+						, AppManagerInfo.m_RootDirectory
+					)
+				)
+			;
+			_fCheckEntries(LogEntries);
+		}
+
+		if (_bStopCloudManager)
+		{
+			co_await AppManagerTestHelper.f_StartCloudManager();
+			NTime::CClock Clock{true};
+			while (true)
+			{
+				try
+				{
+					auto ReportDepth =
+						(
+							co_await AppManagerTestHelper.f_LaunchTool
+							(
+								TestAppDirectory / "TestApp"
+								, {"--get-log-report-depth"}
+								, TestAppDirectory
+							)
+						).f_Trim().f_ToInt(uint32(0))
+					;
+
+					if (ReportDepth == 3)
+						break;
+				}
+				catch (NException::CException const &)
+				{
+				}
+
+				co_await fg_Timeout(0.1);
+
+				if (Clock.f_GetTime() > g_Timeout)
+					co_return DMibErrorInstance("Timeout waiting for cloud manager to be fully started");
+			}
+		}
+
+		{
+			DMibTestPath("Cloud Manager");
+
+			CStr CloudClientDirectory = AppManagerTestHelper.m_RootDirectory / "MalterlibCloud";
+			CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
+
+			auto LogEntries = CEJSON::fs_FromString
+				(
+					co_await AppManagerTestHelper.f_LaunchTool
+					(
+						CloudClientPath
+						, {"--cloud-manager-log-entries-list", "--identifier", "org.malterlib.log.test", "--newest", "--max-entries=0", "--json"}
+						, CloudClientDirectory
+					)
+				)
+			;
+			_fCheckEntries(LogEntries);
+		}
+
+		co_return {};
+	}
+
+	TCFuture<void> fp_TestLimitsImpl
+		(
+			CStr _Name
+			, TCActorFunctor<TCFuture<void> (CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper)> _fGenerateEntries
+			, TCFunction<void (CEJSON const &_Entries)> _fCheckEntries
+		)
+	{
+		TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> pGenerateEntries = fg_Construct(fg_Move(_fGenerateEntries));
+		{
+			DMibTestPath("Started CloudManager");
+			co_await fp_TestLimitsImpl(_Name + "CMStarted", pGenerateEntries, _fCheckEntries, false);
+		}
+		{
+			DMibTestPath("Stopped CloudManager");
+			co_await fp_TestLimitsImpl(_Name + "CMStopped", pGenerateEntries, _fCheckEntries, true);
+		}
+
+		co_return {};
+	}
+
+	void fp_CheckLimitedEntries(CEJSON const &_Entries, mint _LineLen, mint _TotalSize)
+	{
+		CStr AllEntries;
+		for (auto &LogEntry : _Entries.f_Array())
+			AllEntries += LogEntry["Data"]["Message"].f_String();
+
+		bool bAllLinesOk = true;
+		for (auto &Line : AllEntries.f_SplitLine())
+		{
+			if (Line.f_IsEmpty())
+				continue;
+
+			if (Line != CStr("<{sj*,sf }>"_f << "" << (_LineLen - 3)))
+				bAllLinesOk = false;
+		}
+
+		DMibExpectTrue(bAllLinesOk);
+		DMibExpect(AllEntries.f_GetLen(), ==, _TotalSize);
+	}
+
+	void fp_TestLimits()
+	{
+		DMibTestSuite("Big Entry") -> TCFuture<void>
+		{
+			mint EntrySize = CActorDistributionManager::mc_MaxMessageSize * 2;
+			mint LineSize = 256;
+
+			co_return co_await fp_TestLimitsImpl
+				(
+					"BigEntry"
+					, g_ActorFunctor / [&](CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
+					{
+						co_await _pAppManagerTestHelper->f_LaunchTool
+							(
+								_Root / "TestApp"
+								, {"--generate-huge-log-entries", "--num-entries=1", "--line-size={}"_f << LineSize, "--entry-size={}"_f << EntrySize}
+								, _Root
+							)
+						;
+
+						co_return {};
+					}
+					, [&](CEJSON const &_Entries)
+					{
+						fp_CheckLimitedEntries(_Entries, LineSize, EntrySize);
+					}
+				)
+			;
+		};
+		DMibTestSuite("Big Line") -> TCFuture<void>
+		{
+			mint EntrySize = CActorDistributionManager::mc_MaxMessageSize * 2;
+			mint LineSize = EntrySize;
+
+			co_return co_await fp_TestLimitsImpl
+				(
+					"BigLine"
+					, g_ActorFunctor / [&](CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
+					{
+						co_await _pAppManagerTestHelper->f_LaunchTool
+							(
+								_Root / "TestApp"
+								, {"--generate-huge-log-entries", "--num-entries=1", "--line-size={}"_f << LineSize, "--entry-size={}"_f << EntrySize}
+								, _Root
+							)
+						;
+
+						co_return {};
+					}
+					, [&](CEJSON const &_Entries)
+					{
+						fp_CheckLimitedEntries(_Entries, LineSize, EntrySize);
+					}
+				)
+			;
+		};
+		DMibTestSuite("Many Entries") -> TCFuture<void>
+		{
+			mint TotalSize = CActorDistributionManager::mc_MaxMessageSize * 2;
+			mint nEntries = 256;
+			mint EntrySize = TotalSize / nEntries;
+			mint LineSize = 256;
+
+			co_return co_await fp_TestLimitsImpl
+				(
+					"ManyLines"
+					, g_ActorFunctor / [&](CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
+					{
+						co_await _pAppManagerTestHelper->f_LaunchTool
+							(
+								_Root / "TestApp"
+								, {"--generate-huge-log-entries", "--num-entries={}"_f << nEntries, "--line-size={}"_f << LineSize, "--entry-size={}"_f << EntrySize}
+								, _Root
+							)
+						;
+
+						co_return {};
+					}
+					, [&](CEJSON const &_Entries)
+					{
+						fp_CheckLimitedEntries(_Entries, LineSize, TotalSize);
+					}
+				)
+			;
+		};
+	}
+
+	void f_DoTests()
+	{
+		fp_TestGeneral();
+		fp_TestLimits();
 	}
 };
 
