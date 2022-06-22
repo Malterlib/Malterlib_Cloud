@@ -179,6 +179,8 @@ public:
 
 		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 		CStr RootDirectory = ProgramDirectory + "/SecretsTests";
+		fg_TestAddCleanupPath(RootDirectory);
+
 		auto SecretsManagerPermissionsForTest = fg_CreateMap<CStr, CPermissionRequirements>("SecretsManager/CommandAll", "SecretsManager/*/*/*");
 
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);

@@ -207,6 +207,8 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 			CStr RootDirectory = ProgramDirectory + "/NetworkTunnelTests";
 
+			fg_TestAddCleanupPath(RootDirectory);
+
 			TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
 			auto CleanupHelperActor = g_OnScopeExit / [&]
 				{

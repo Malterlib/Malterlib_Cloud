@@ -25,6 +25,8 @@ namespace NMib::NCloud
 		, m_Options(_Options)
 		, m_Timeout(_Timeout)
 	{
+		fg_TestAddCleanupPath(m_RootDirectory);
+
 #ifdef DPlatformFamily_Windows
 		AllocConsole();
 		SetConsoleCtrlHandler

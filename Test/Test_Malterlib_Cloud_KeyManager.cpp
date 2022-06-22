@@ -15,6 +15,7 @@ using namespace NMib::NConcurrency;
 using namespace NMib::NCloud;
 using namespace NMib::NFile;
 using namespace NMib::NStr;
+using namespace NMib::NTest;
 
 static fp64 g_Timeout = 60.0 * NMib::NTest::gc_TimeoutMultiplier;
 
@@ -120,6 +121,8 @@ public:
 		{
 			CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/EncryptedFile";
 			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile.EncryptedFile";
+			fg_TestAddCleanupPath(DatabasePath);
+
 			CStrSecure Password = "Password";
 
 			CDistributedActorTestHelperCombined TestHelper{SocketPath};
@@ -201,8 +204,11 @@ public:
 		DMibTestSuite("PreCreatedKeys")
 		{
 			CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/PreCreatedKeys";
+
 			CStrSecure Password = "Password";
 			CStr DatabasePath = CFile::fs_GetProgramDirectory() + "/EncryptedFile.PreCreatedKeys";
+			fg_TestAddCleanupPath(DatabasePath);
+
 			if (CFile::fs_FileExists(DatabasePath))
 				CFile::fs_DeleteFile(DatabasePath);
 
