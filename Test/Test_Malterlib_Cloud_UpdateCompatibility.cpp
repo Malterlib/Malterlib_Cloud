@@ -451,7 +451,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fGetAppInfo = [&](CAppManager const &_AppManager, CStr const &_Application)
 			{
-				NTime::CClock Clock;
+				NTime::CClock Clock{true};
 				CStr LastError;
 
 				while (Clock.f_GetTime() < g_Timeout)
@@ -466,7 +466,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					}
 				}
 
-				DMibError("Timed out waiting for app info. Last error: {}", LastError);
+				DMibError("Timed out waiting for app info. Last error: {}"_f << LastError);
 			}
 		;
 
