@@ -99,30 +99,40 @@ namespace NMib::NCloud::NCloudManager
 			}
 		;
 
-		try
+		auto Result = co_await mp_DatabaseActor
+			(
+				&CDatabaseActor::f_WriteWithCompaction
+				, g_ActorFunctorWeak / [this, _AppManagerID, _RegisterSequence, _Remove, _Add]
+				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				{
+					co_await ECoroutineFlag_CaptureExceptions;
+
+					auto WriteTransaction = fg_Move(_Transaction);
+					{
+						auto pAppManager = mp_AppManagers.f_FindEqual(_AppManagerID);
+
+						if (!pAppManager || pAppManager->m_RegisterSequence != _RegisterSequence)
+							co_return CDatabaseActor::CTransactionWrite::fs_Empty();
+
+						auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+						CAppManagerKey Key{CAppManagerKey::mc_Prefix, _AppManagerID};
+
+						pAppManager->m_Data.m_OtherErrors -= _Remove;
+						for (auto &Error : _Add)
+							pAppManager->m_Data.m_OtherErrors[_Add.fs_GetKey(Error)] = Error;
+
+						WriteCursor.f_Upsert(Key, pAppManager->m_Data);
+					}
+					co_return fg_Move(WriteTransaction);
+				}
+			)
+			.f_Wrap()
+		;
+
+		if (!Result)
 		{
-			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
-			{
-				auto pAppManager = mp_AppManagers.f_FindEqual(_AppManagerID);
-
-				if (!pAppManager || pAppManager->m_RegisterSequence != _RegisterSequence)
-					co_return {};
-
-				auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
-				CAppManagerKey Key{CAppManagerKey::mc_Prefix, _AppManagerID};
-
-				pAppManager->m_Data.m_OtherErrors -= _Remove;
-				for (auto &Error : _Add)
-					pAppManager->m_Data.m_OtherErrors[_Add.fs_GetKey(Error)] = Error;
-
-				WriteCursor.f_Upsert(Key, pAppManager->m_Data);
-			}
-			co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
-		}
-		catch (CException const &_Exception)
-		{
-			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", _Exception);
-			co_return _Exception.f_ExceptionPointer();
+			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", Result.f_GetExceptionStr());
+			co_return Result.f_GetException();
 		}
 
 		co_return {};
@@ -137,67 +147,77 @@ namespace NMib::NCloud::NCloudManager
 			}
 		;
 
-		try
-		{
-			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
-			{
-				if (_Params.m_bInitial)
+		auto Result = co_await mp_DatabaseActor
+			(
+				&CDatabaseActor::f_WriteWithCompaction
+				, g_ActorFunctorWeak / [Params = fg_Move(_Params), _AppManagerID]
+				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
-					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _AppManagerID); ApplicationCursor;)
+					co_await ECoroutineFlag_CaptureExceptions;
+
+					auto WriteTransaction = fg_Move(_Transaction);
+
+					if (Params.m_bInitial)
 					{
-						if (_Params.m_bFiltered || _Params.m_bAccessDenied)
+						for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _AppManagerID); ApplicationCursor;)
 						{
-							CApplicationValue Value;
-							Value = ApplicationCursor.f_Value<CApplicationValue>();
+							if (Params.m_bFiltered || Params.m_bAccessDenied)
+							{
+								CApplicationValue Value;
+								Value = ApplicationCursor.f_Value<CApplicationValue>();
 
-							Value.m_ApplicationInfo.m_Status = "Indeterminate status, fix permissions in app manager";
-							Value.m_ApplicationInfo.m_StatusSeverity = CAppManagerInterface::EStatusSeverity_Error;
+								Value.m_ApplicationInfo.m_Status = "Indeterminate status, fix permissions in app manager";
+								Value.m_ApplicationInfo.m_StatusSeverity = CAppManagerInterface::EStatusSeverity_Error;
 
-							ApplicationCursor.f_SetValue(Value);
-							++ApplicationCursor;
+								ApplicationCursor.f_SetValue(Value);
+								++ApplicationCursor;
+							}
+							else
+								ApplicationCursor.f_Delete();
+						}
+					}
+
+					auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+					for (auto &Change : Params.m_Changes)
+					{
+						CApplicationKey Key{CApplicationKey::mc_Prefix, _AppManagerID, Change.m_Application};
+						if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Remove>())
+						{
+							if (WriteCursor.f_FindEqual(Key))
+								WriteCursor.f_Delete();
+							continue;
+						}
+
+						CApplicationValue Value;
+						if (WriteCursor.f_FindEqual(Key))
+							Value = WriteCursor.f_Value<CApplicationValue>();
+
+						if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>())
+							Value.m_ApplicationInfo = Change.m_Change.f_GetAsType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>().m_Info;
+						else if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Status>())
+						{
+							auto &ChangeValue = Change.m_Change.f_GetAsType<CAppManagerInterface::CApplicationChange_Status>();
+							Value.m_ApplicationInfo.m_Status = ChangeValue.m_Status;
+							Value.m_ApplicationInfo.m_StatusSeverity = ChangeValue.m_StatusSeverity;
 						}
 						else
-							ApplicationCursor.f_Delete();
+						{
+							DMibNeverGetHere;
+						}
+
+						WriteCursor.f_Upsert(Key, Value);
 					}
+
+					co_return fg_Move(WriteTransaction);
 				}
+			)
+			.f_Wrap()
+		;
 
-				auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
-				for (auto &Change : _Params.m_Changes)
-				{
-					CApplicationKey Key{CApplicationKey::mc_Prefix, _AppManagerID, Change.m_Application};
-					if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Remove>())
-					{
-						if (WriteCursor.f_FindEqual(Key))
-							WriteCursor.f_Delete();
-						continue;
-					}
-
-					CApplicationValue Value;
-					if (WriteCursor.f_FindEqual(Key))
-						Value = WriteCursor.f_Value<CApplicationValue>();
-
-					if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>())
-						Value.m_ApplicationInfo = Change.m_Change.f_GetAsType<CAppManagerInterface::CApplicationChange_AddOrChangeInfo>().m_Info;
-					else if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Status>())
-					{
-						auto &ChangeValue = Change.m_Change.f_GetAsType<CAppManagerInterface::CApplicationChange_Status>();
-						Value.m_ApplicationInfo.m_Status = ChangeValue.m_Status;
-						Value.m_ApplicationInfo.m_StatusSeverity = ChangeValue.m_StatusSeverity;
-					}
-					else
-					{
-						DMibNeverGetHere;
-					}
-
-					WriteCursor.f_Upsert(Key, Value);
-				}
-			}
-			co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
-		}
-		catch (CException const &_Exception)
+		if (!Result)
 		{
-			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", _Exception);
-			co_return _Exception.f_ExceptionPointer();
+			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", Result.f_GetExceptionStr());
+			co_return Result.f_GetException();
 		}
 
 		co_return {};

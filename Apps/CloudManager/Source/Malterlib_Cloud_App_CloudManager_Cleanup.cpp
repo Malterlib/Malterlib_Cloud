@@ -11,36 +11,15 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_PerformCleanup()
 	{
-		bool bForceCompact = false;
-		do
-		{
-			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
-			WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
-			if (bForceCompact)
-				co_await mp_DatabaseActor(&CDatabaseActor::f_Compact, fg_Move(WriteTransaction), 0);
-			else
-			{
-				auto Result = co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction)).f_Wrap();
-				if (!Result)
+		co_await mp_DatabaseActor
+			(
+				&CDatabaseActor::f_WriteWithCompaction
+				, g_ActorFunctorWeak / [this](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
-					if (!bForceCompact && Result.f_GetExceptionStr().f_Find("MDB_MAP_FULL") >= 0)
-					{
-						DMibLogWithCategory(LogLocalStore, Warning, "Failed to commit cleanup transaction, forcing compaction of database");
-						bForceCompact = true;
-						continue;
-					}
-					co_return Result.f_GetException();
+					co_return co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(_Transaction));
 				}
-			}
-
-			auto StaleReadersRemoved = co_await mp_DatabaseActor(&CDatabaseActor::f_CheckForStaleReaders);
-			if (StaleReadersRemoved)
-				DMibLogWithCategory(LogLocalStore, Info, "Removed {} stale readers", StaleReadersRemoved);
-
-			break;
-		}
-		while (true)
-			;
+			)
+		;
 
 		co_return {};
 	}
@@ -62,7 +41,7 @@ namespace NMib::NCloud::NCloudManager
 					auto Result = co_await fp_PerformCleanup().f_Wrap();
 
 					if (!Result)
-						DMibLogWithCategory(LogLocalStore, Error, "Failed to do nightly cleanup: {}", Result.f_GetExceptionStr());
+						DMibLogWithCategory(CloudManagerDatabase, Error, "Failed to do nightly cleanup: {}", Result.f_GetExceptionStr());
 
 					co_return {};
 				}
@@ -168,7 +147,7 @@ namespace NMib::NCloud::NCloudManager
 
 		DMibLogWithCategory
 			(
-				LogLocalStore
+				CloudManagerDatabase
 				, Info
 				, "Freed up {ns } bytes by deleting {} sensor readings and {} log entries spanning from {tc5} UTC{}{sj2,sf0}:{sj2,sf0} to {tc5} UTC{}{sj2,sf0}:{sj2,sf0}"
 				, OriginalStats.m_UsedBytes - CurrentStats.m_UsedBytes

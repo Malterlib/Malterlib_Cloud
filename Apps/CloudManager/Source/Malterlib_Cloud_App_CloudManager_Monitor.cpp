@@ -99,41 +99,51 @@ namespace NMib::NCloud::NCloudManager
 
 			if (!ToUpdateAppManagers.f_IsEmpty() || !ToClearAppManagers.f_IsEmpty())
 			{
-				try
-				{
-					auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
-					{
-						auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
-
-						for (auto &AppManager : mp_AppManagers)
+				auto Result = co_await mp_DatabaseActor
+					(
+						&CDatabaseActor::f_WriteWithCompaction
+						, g_ActorFunctorWeak / [this, ToUpdateAppManagers = fg_Move(ToUpdateAppManagers), ToClearAppManagers = fg_Move(ToClearAppManagers)]
+						(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 						{
-							if (!ToUpdateAppManagers.f_IsEmpty() && !ToUpdateAppManagers.f_Exists(AppManager.f_AppManagerID()))
-								continue;
+							co_await ECoroutineFlag_CaptureExceptions;
 
-							Cursor.f_Upsert(AppManager.f_DatabaseKey(), AppManager.m_Data);
-						}
-
-						for (auto &ToClear : ToClearAppManagers)
-						{
-							if (!Cursor.f_FindEqual(CAppManagerKey{CAppManagerKey::mc_Prefix, ToClear}))
-								continue;
-
-							auto Data = Cursor.f_Value<CAppManagerValue>();
-							if (Data.m_bActive)
+							auto WriteTransaction = fg_Move(_Transaction);
 							{
-								Data.m_bActive = false;
-								Data.m_LastConnectionErrorTime = CTime::fs_NowUTC();
-								Data.m_LastConnectionError = "Missing";
-								Cursor.f_SetValue(Data);
+								auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
+
+								for (auto &AppManager : mp_AppManagers)
+								{
+									if (!ToUpdateAppManagers.f_IsEmpty() && !ToUpdateAppManagers.f_Exists(AppManager.f_AppManagerID()))
+										continue;
+
+									Cursor.f_Upsert(AppManager.f_DatabaseKey(), AppManager.m_Data);
+								}
+
+								for (auto &ToClear : ToClearAppManagers)
+								{
+									if (!Cursor.f_FindEqual(CAppManagerKey{CAppManagerKey::mc_Prefix, ToClear}))
+										continue;
+
+									auto Data = Cursor.f_Value<CAppManagerValue>();
+									if (Data.m_bActive)
+									{
+										Data.m_bActive = false;
+										Data.m_LastConnectionErrorTime = CTime::fs_NowUTC();
+										Data.m_LastConnectionError = "Missing";
+										Cursor.f_SetValue(Data);
+									}
+								}
 							}
+							co_return fg_Move(WriteTransaction);
 						}
-					}
-					co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
-				}
-				catch (CException const &_Exception)
+					)
+					.f_Wrap()
+				;
+
+				if (!Result)
 				{
-					DMibLogWithCategory(CloudManager, Critical, "Error saving app managers to database: {}", _Exception);
-					co_return _Exception.f_ExceptionPointer();
+					DMibLogWithCategory(CloudManager, Critical, "Error saving app managers to database: {}", Result.f_GetExceptionStr());
+					co_return Result.f_GetException();
 				}
 			}
 		}

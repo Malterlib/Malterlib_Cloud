@@ -28,19 +28,30 @@ namespace NMib::NCloud::NCloudManager
 			}
 		;
 
-		try
+		auto Result = co_await mp_DatabaseActor
+			(
+				&CDatabaseActor::f_WriteWithCompaction
+				, g_ActorFunctorWeak / [Key = fg_Move(_Key), Data = fg_Move(_Data)](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				{
+					co_await ECoroutineFlag_CaptureExceptions;
+
+					auto WriteTransaction = fg_Move(_Transaction);
+
+					{
+						auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
+						Cursor.f_Upsert(Key, Data);
+					}
+
+					co_return fg_Move(WriteTransaction);
+				}
+			)
+			.f_Wrap()
+		;
+
+		if (!Result)
 		{
-			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
-			{
-				auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
-				Cursor.f_Upsert(_Key, _Data);
-			}
-			co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
-		}
-		catch (CException const &_Exception)
-		{
-			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", _Exception);
-			co_return _Exception.f_ExceptionPointer();
+			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", Result.f_GetExceptionStr());
+			co_return Result.f_GetException();
 		}
 
 		co_return {};
@@ -55,29 +66,38 @@ namespace NMib::NCloud::NCloudManager
 			}
 		;
 
-		try
+		auto Result = co_await mp_DatabaseActor
+			(
+				&CDatabaseActor::f_WriteWithCompaction
+				, g_ActorFunctorWeak / [_HostID](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				{
+					co_await ECoroutineFlag_CaptureExceptions;
+
+					auto WriteTransaction = fg_Move(_Transaction);
+
+					bool bFoundAppManager = false;
+					for (auto AppManagerCursor = WriteTransaction.m_Transaction.f_WriteCursor(CAppManagerKey::mc_Prefix, _HostID); AppManagerCursor;)
+					{
+						AppManagerCursor.f_Delete();
+						bFoundAppManager = true;
+					}
+
+					if (!bFoundAppManager)
+						co_return DMibErrorInstance("App manager does not exist");
+
+					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _HostID); ApplicationCursor;)
+						ApplicationCursor.f_Delete();
+
+					co_return fg_Move(WriteTransaction);
+				}
+			)
+			.f_Wrap()
+		;
+
+		if (!Result)
 		{
-			auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
-
-			bool bFoundAppManager = false;
-			for (auto AppManagerCursor = WriteTransaction.m_Transaction.f_WriteCursor(CAppManagerKey::mc_Prefix, _HostID); AppManagerCursor;)
-			{
-				AppManagerCursor.f_Delete();
-				bFoundAppManager = true;
-			}
-
-			if (!bFoundAppManager)
-				co_return DMibErrorInstance("App manager does not exist");
-
-			for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _HostID); ApplicationCursor;)
-				ApplicationCursor.f_Delete();
-
-			co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
-		}
-		catch (CException const &_Exception)
-		{
-			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", _Exception);
-			co_return _Exception.f_ExceptionPointer();
+			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", Result.f_GetExceptionStr());
+			co_return Result.f_GetException();
 		}
 
 		co_return {};
