@@ -555,7 +555,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				[](CRow const &_Left, CRow const &_Right)
 				{
-					return _Left.f_SortTuple() < _Right.f_SortTuple();
+					return _Left.f_SortTuple() <=> _Right.f_SortTuple();
 				}
 			)
 		;
@@ -795,7 +795,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				[](CRow const &_Left, CRow const &_Right)
 				{
-					return _Left.f_SortTuple() < _Right.f_SortTuple();
+					return _Left.f_SortTuple() <=> _Right.f_SortTuple();
 				}
 			)
 		;

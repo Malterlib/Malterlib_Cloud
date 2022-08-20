@@ -63,14 +63,13 @@ namespace NMib::NCloud::NVersionManager
 
 			struct CCompareTime
 			{
-				bool operator()(CVersion const &_Left, CVersion const &_Right) const
+				COrdering_Partial operator()(CVersion const &_Left, CVersion const &_Right) const
 				{
-					if (!_Left.m_VersionInfo.m_Time.f_IsValid() && _Right.m_VersionInfo.m_Time.f_IsValid())
-						return true;
-					else if (_Left.m_VersionInfo.m_Time.f_IsValid() && !_Right.m_VersionInfo.m_Time.f_IsValid())
-						return false;
+					if (auto Result = _Left.m_VersionInfo.m_Time.f_IsValid() <=> _Right.m_VersionInfo.m_Time.f_IsValid(); Result != 0)
+						return Result;
+
 					return NStorage::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetIdentifier())
-						< NStorage::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetIdentifier())
+						<=> NStorage::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetIdentifier())
 					;
 				}
 			};

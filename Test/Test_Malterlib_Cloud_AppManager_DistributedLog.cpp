@@ -40,7 +40,7 @@ public:
 								auto Left = _Left.f_GetMemberValue("UniqueSequence", 0);
 								auto Right = _Right.f_GetMemberValue("UniqueSequence", 0);
 
-								return Left < Right;
+								return Left <=> Right;
 							}
 						)
 					;
@@ -163,7 +163,7 @@ public:
 					CEJSON Return = _Logs;
 					Return.f_Array().f_Sort
 						(
-							[](CEJSON const &_Left, CEJSON const &_Right) -> bool
+							[](CEJSON const &_Left, CEJSON const &_Right)
 							{
 								auto fTuple = [](CEJSON const &_Value)
 									{
@@ -177,7 +177,7 @@ public:
 										;
 									}
 								;
-								return fTuple(_Left) < fTuple(_Right);
+								return fTuple(_Left) <=> fTuple(_Right);
 							}
 						)
 					;
