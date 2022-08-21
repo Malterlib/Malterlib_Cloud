@@ -136,7 +136,7 @@ namespace NMib::NCloud::NVersionManager
 			}
 		;
 
-		auto pCleanup = g_OnScopeExitActor > [pThis, UploadID, Desc = pUpload->m_Desc, Auditor]
+		auto pCleanup = g_OnScopeExitActor / [pThis, UploadID, Desc = pUpload->m_Desc, Auditor]
 			{
 				if (pThis->mp_VersionUploads.f_Remove(UploadID))
 					Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));

@@ -18,7 +18,7 @@ namespace NMib::NCloud::NBackupManager
 
 		pSequencedSync->m_Waiting.f_Pop()
 			(
-				g_OnScopeExitActor > [this, _FileName]
+				g_OnScopeExitActor / [this, _FileName]
 			 	{
 					fp_RunSequencedSyncs(_FileName);
 				}
@@ -98,7 +98,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 		++m_PendingSyncs[_FileName];
 
-		return g_OnScopeExitActor > [this, _FileName]
+		return g_OnScopeExitActor / [this, _FileName]
 			{
 				if ((--m_PendingSyncs[_FileName]) == 0)
 				{

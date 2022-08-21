@@ -145,7 +145,7 @@ namespace NMib::NCloud::NAppManager
 			return true;
 
 		++mp_PendingAutoLaunches;
-		auto pCleanupAutoLaunches = g_OnScopeExitActor > [this]
+		auto pCleanupAutoLaunches = g_OnScopeExitActor / [this]
 			{
 				if (--mp_PendingAutoLaunches == 0)
 					fp_UpdateApplicationDependencies();

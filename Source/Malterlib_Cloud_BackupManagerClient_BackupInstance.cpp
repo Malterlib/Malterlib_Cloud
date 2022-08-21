@@ -462,7 +462,7 @@ namespace NMib::NCloud::NPrivate
 			RunningState.m_ManifestFile = PendingFile.m_ManifestFile;
 
 			++mp_nRunningSyncs;
-			RunningState.m_pOnScopeExit = g_OnScopeExitActor > [this, FileName, SyncSequence]
+			RunningState.m_pOnScopeExit = g_OnScopeExitActor / [this, FileName, SyncSequence]
 				{
 					--mp_nRunningSyncs;
 
@@ -832,7 +832,7 @@ namespace NMib::NCloud::NPrivate
 			SourceFile = _FileName;
 
 		++mp_nPendingManifestChanges;
-		auto Cleanup = g_OnScopeExitActor > [this]
+		auto Cleanup = g_OnScopeExitActor / [this]
 			{
 				--mp_nPendingManifestChanges;
 				if (!mp_nPendingManifestChanges)

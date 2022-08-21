@@ -183,7 +183,7 @@ namespace NMib::NCloud::NAppManager
 		
 		auto &DownloadState = mp_Downloads.f_Insert();
 		auto pDownloadState = &DownloadState;
-		auto pCleanup = g_OnScopeExitActor > [this, pDownloadState]
+		auto pCleanup = g_OnScopeExitActor / [this, pDownloadState]
 			{
 				mp_Downloads.f_Remove(*pDownloadState);
 			}

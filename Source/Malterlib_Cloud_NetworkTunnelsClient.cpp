@@ -151,7 +151,7 @@ namespace NMib::NCloud
 		TCSharedPointer<CInternal::CTunnel> pTunnel = fg_Construct();
 
 		Internal.m_Tunnels[TunnelID] = pTunnel;
-		auto CleanupTunnel = g_OnScopeExitActor > [this, TunnelID]
+		auto CleanupTunnel = g_OnScopeExitActor / [this, TunnelID]
 			{
 				auto &Internal = *mp_pInternal;
 				auto pTunnel = Internal.m_Tunnels.f_FindEqual(TunnelID);
@@ -205,7 +205,7 @@ namespace NMib::NCloud
 					}
 				;
 
-				auto Cleanup = g_OnScopeExitActor > fCleanupConnection;
+				auto Cleanup = g_OnScopeExitActor / fCleanupConnection;
 
 				auto OpenConnectionResult = co_await pTunnel->m_TunnelActor.f_CallActor(&ICNetworkTunnels::f_OpenConnection)
 					(

@@ -193,7 +193,7 @@ namespace NMib::NCloud
 			}
 		;
 
-		auto pCleanupAfterTimeout = g_OnScopeExitActor > [pState]
+		auto pCleanupAfterTimeout = g_OnScopeExitActor / [pState]
 			{
 				(void)pState->f_Abort();
 			}
@@ -202,7 +202,7 @@ namespace NMib::NCloud
 		CStr StateID = fg_RandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
-		auto pStateCleanup = g_OnScopeExitActor > [StateID, pInternal = mp_pInternal]
+		auto pStateCleanup = g_OnScopeExitActor / [StateID, pInternal = mp_pInternal]
 			{
 				auto &Internal = *pInternal;
 				Internal.m_States.f_Remove(StateID);
@@ -274,7 +274,7 @@ namespace NMib::NCloud
 		CStr StateID = fg_RandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
-		auto pStateCleanup = g_OnScopeExitActor > [StateID, pInternal = mp_pInternal]
+		auto pStateCleanup = g_OnScopeExitActor / [StateID, pInternal = mp_pInternal]
 			{
 				auto &Internal = *pInternal;
 				Internal.m_States.f_Remove(StateID);
@@ -293,7 +293,7 @@ namespace NMib::NCloud
 				StartDownload.m_VersionIDAndPlatform = _VersionID;
 				StartDownload.m_TransferContext = fg_Move(_TransferContext);
 
-				auto pCleanupAfterTimeout = g_OnScopeExitActor > [pState]
+				auto pCleanupAfterTimeout = g_OnScopeExitActor / [pState]
 					{
 						(void)pState->f_Abort();
 					}
@@ -377,7 +377,7 @@ namespace NMib::NCloud
 				CStr StateID = fg_RandomID(Internal.m_States);
 				Internal.m_States[StateID] = pState;
 
-				auto pStateCleanup = g_OnScopeExitActor > [StateID, pInternal]
+				auto pStateCleanup = g_OnScopeExitActor / [StateID, pInternal]
 					{
 						auto &Internal = *pInternal;
 						Internal.m_States.f_Remove(StateID);
@@ -473,7 +473,7 @@ namespace NMib::NCloud
 		CStr StateID = fg_RandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
-		auto pStateCleanup = g_OnScopeExitActor > [StateID, pInternal = mp_pInternal]
+		auto pStateCleanup = g_OnScopeExitActor / [StateID, pInternal = mp_pInternal]
 			{
 				auto &Internal = *pInternal;
 				Internal.m_States.f_Remove(StateID);

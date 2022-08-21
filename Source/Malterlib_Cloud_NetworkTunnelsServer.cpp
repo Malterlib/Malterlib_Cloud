@@ -138,7 +138,7 @@ namespace NMib::NCloud
 					}
 				;
 
-				auto Cleanup = g_OnScopeExitActor > [pThis = m_pThis, fCleanupConnection]() mutable
+				auto Cleanup = g_OnScopeExitActor / [pThis = m_pThis, fCleanupConnection]() mutable
 					{
 						(pThis->self / fg_Move(fCleanupConnection)) > fg_DiscardResult();
 					}

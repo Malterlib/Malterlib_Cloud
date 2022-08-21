@@ -270,7 +270,7 @@ namespace NMib::NCloud::NAppManager
 			pApplication->m_pParentApplication->m_Children.f_Insert(*pApplication);
 		}
 
-		auto pCleanup = g_OnScopeExitActor > [pApplication]
+		auto pCleanup = g_OnScopeExitActor / [pApplication]
 			{
 				pApplication->f_Delete();
 			}

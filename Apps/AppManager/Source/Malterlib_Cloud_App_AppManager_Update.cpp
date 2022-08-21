@@ -269,7 +269,7 @@ namespace NMib::NCloud::NAppManager
 		pState->m_pInProgressScope = pApplication->f_SetInProgress();
 
 		mp_RunningUpdates[pState];
-		pState->m_pCleanupStateMap = g_OnScopeExitActor > [this, pStateWeak = pState.f_Weak()]
+		pState->m_pCleanupStateMap = g_OnScopeExitActor / [this, pStateWeak = pState.f_Weak()]
 			{
 				mp_RunningUpdates.f_Remove(pStateWeak);
 				if (mp_RunningUpdates.f_IsEmpty() && !mp_CancelRunningUpdatesOnStopAppManagerPromise.f_IsSet())

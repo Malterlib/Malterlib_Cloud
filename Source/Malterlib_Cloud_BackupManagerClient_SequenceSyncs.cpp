@@ -27,7 +27,7 @@ namespace NMib::NCloud::NPrivate
 			++pSequencedSync->m_nWriting;
 			pSequencedSync->m_WriteWaiting.f_Pop()
 				(
-					g_OnScopeExitActor > [this, _FileName]
+					g_OnScopeExitActor / [this, _FileName]
 					{
 						auto pSequencedSync = mp_SequencedSyncs.f_FindEqual(_FileName);
 						if (pSequencedSync)
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NPrivate
 			++pSequencedSync->m_nReading;
 			pSequencedSync->m_ReadWaiting.f_Pop()
 				(
-					g_OnScopeExitActor > [this, _FileName]
+					g_OnScopeExitActor / [this, _FileName]
 					{
 						auto pSequencedSync = mp_SequencedSyncs.f_FindEqual(_FileName);
 						if (pSequencedSync)

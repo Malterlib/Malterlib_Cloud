@@ -34,7 +34,7 @@ namespace NMib::NCloud
 		m_bRunningRetrySubscribe = true;
 		m_bRerunRetrySubscribe = false;
 		
-		auto Cleanup = g_OnScopeExitActor > [this]
+		auto Cleanup = g_OnScopeExitActor / [this]
 			{
 				m_bRunningRetrySubscribe = false;
 				
@@ -480,7 +480,7 @@ namespace NMib::NCloud
 		}
 
 		++m_nActive;
-		return g_OnScopeExitActor > [this]
+		return g_OnScopeExitActor / [this]
 			{
 				--m_nActive;
 				if (m_nActive)

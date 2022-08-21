@@ -82,7 +82,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		mp_PendingDatabases[DatabaseActor];
 
-		auto Cleanup = g_OnScopeExitActor > [this, DatabaseActorWeak = DatabaseActor.f_Weak()]() -> TCFuture<void>
+		auto Cleanup = g_OnScopeExitActor / [this, DatabaseActorWeak = DatabaseActor.f_Weak()]() -> TCFuture<void>
 			{
 				auto DatabaseActor = DatabaseActorWeak.f_Lock();
 
