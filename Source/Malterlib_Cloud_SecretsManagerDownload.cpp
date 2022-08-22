@@ -12,7 +12,7 @@ namespace NMib::NCloud
 	using namespace NFile;
 	using namespace NStr;
 
-	DMibSuppressUndefinedSanitizerLinux TCFuture<CDirectorySyncReceive::CSyncResult> fg_DownloadSecretFile
+	TCFuture<CDirectorySyncReceive::CSyncResult> DMibWorkaroundUBSanSectionErrors fg_DownloadSecretFile
 		(
 			TCDistributedActor<CSecretsManager> _SecretsManager
 		 	, CSecretsManager::CSecretID _ID

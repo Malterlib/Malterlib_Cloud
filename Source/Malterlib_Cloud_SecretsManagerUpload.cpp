@@ -67,7 +67,7 @@ namespace NMib::NCloud
 		};
 	}
 	
-	DMibSuppressUndefinedSanitizerLinux TCFuture<CDirectorySyncSend::CSyncResult> fg_UploadSecretFile
+	TCFuture<CDirectorySyncSend::CSyncResult> DMibWorkaroundUBSanSectionErrors fg_UploadSecretFile
 		(
 			TCDistributedActor<CSecretsManager> _SecretsManager
 		 	, TCActor<CActorDistributionManager> _DistributionManager
