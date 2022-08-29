@@ -312,6 +312,9 @@ namespace NMib::NCloud::NAppManager
 			
 			if (Application.m_RegisterInfo.m_Resources_Processes)
 				RegisterInfo["ResourcesProcesses"] = *Application.m_RegisterInfo.m_Resources_Processes;
+
+			if (Application.m_RegisterInfo.m_Resources_MaxMapCount)
+				RegisterInfo["ResourcesMaxMapCount"] = *Application.m_RegisterInfo.m_Resources_MaxMapCount;
 		}
 		{
 			auto &Array = ApplicationJSON["Dependencies"].f_Array();

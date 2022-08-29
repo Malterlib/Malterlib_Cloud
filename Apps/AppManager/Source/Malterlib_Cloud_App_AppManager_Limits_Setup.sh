@@ -16,6 +16,7 @@ elif  [ "$PlatformFamily" == "Linux" ]; then
 	sysctl -w net.core.somaxconn=2048
 	sysctl -w kernel.threads-max=$NumThreads
 	sysctl -w kernel.pid_max=$NumPids
+	sysctl -w vm.max_map_count=$MaxMapCount
     sysctl -w vm.zone_reclaim_mode=0
 
 	echo never > /sys/kernel/mm/transparent_hugepage/defrag

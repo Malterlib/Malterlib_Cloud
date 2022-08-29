@@ -267,6 +267,8 @@ namespace NMib::NCloud::NAppManager
 							Application.m_RegisterInfo.m_Resources_Threads = pValue->f_Integer();
 						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesProcesses", EJSONType_Integer))
 							Application.m_RegisterInfo.m_Resources_Processes = pValue->f_Integer();
+						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesMaxMapCount", EJSONType_Integer))
+							Application.m_RegisterInfo.m_Resources_MaxMapCount = pValue->f_Integer();
 					}
 					if (auto pValue = ApplicationJSON.f_GetMember("AssociatedHostID", EJSONType_String))
 						Application.m_AssociatedHostID = pValue->f_String();
