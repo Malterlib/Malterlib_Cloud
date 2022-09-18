@@ -541,7 +541,7 @@ public:
 		;
 		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
 
-		NContainer::TCMap<NStr::CStr, CPermissionRequirements> BackupManagerPermissionsForTest = {{"Backup/WriteSelf"}, {"Backup/ReadAll"}};
+		NContainer::TCMap<NStr::CStr, CPermissionRequirements> BackupManagerPermissionsForTest = {{"Backup/WriteSelf", {}}, {"Backup/ReadAll", {}}};
 
 		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 		CStr RootDirectory = ProgramDirectory + "/BackupManagerTests";
@@ -846,7 +846,12 @@ public:
 				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
-				ManifestConfig.m_IncludeWildcards = {{"^File1", "OverrideDir"}, {"Dir1/File2", "OverrideDir2"}};
+				ManifestConfig.m_IncludeWildcards =
+					{
+						{"^File1", CDirectoryManifestConfig::CDestination("OverrideDir")}
+						, {"Dir1/File2", CDirectoryManifestConfig::CDestination("OverrideDir2")}
+					}
+				;
 
 				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
@@ -896,7 +901,12 @@ public:
 				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
-				ManifestConfig.m_IncludeWildcards = {{"^File1", "OverrideDir"}, {"Dir1/File1", "OverrideDir2"}};
+				ManifestConfig.m_IncludeWildcards =
+					{
+						{"^File1", CDirectoryManifestConfig::CDestination("OverrideDir")}
+						, {"Dir1/File1", CDirectoryManifestConfig::CDestination("OverrideDir2")}
+					}
+				;
 
 				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
@@ -1060,7 +1070,7 @@ public:
 				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
-				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*"}};
+				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*", {}}};
 
 				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
@@ -1473,7 +1483,7 @@ public:
 				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
-				ManifestConfig.m_IncludeWildcards = {{"^*"}};
+				ManifestConfig.m_IncludeWildcards = {{"^*", {}}};
 
 				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
@@ -1550,7 +1560,7 @@ public:
 				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
-				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*"}};
+				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*", {}}};
 
 				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
@@ -1621,7 +1631,7 @@ public:
 				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
-				ManifestConfig.m_IncludeWildcards = {{"Dir2/^*"}};
+				ManifestConfig.m_IncludeWildcards = {{"Dir2/^*", {}}};
 
 				auto BackupFinishedSubscription = BackupHelper.f_Start(TrustManager, Dependencies);
 
@@ -1636,7 +1646,7 @@ public:
 				DMibExpect(FileFinished.m_TransferStats.m_nSeconds, >, 0.0);
 
 				NFile::CDirectoryManifestConfig ExtraManifestConfig;
-				ExtraManifestConfig.m_IncludeWildcards = {{"Dir1/^*"}};
+				ExtraManifestConfig.m_IncludeWildcards = {{"Dir1/^*", {}}};
 				BackupHelper.m_BackupInterface.f_CallActor(&CDistributedAppInterfaceBackup::f_AppendManifest)(ExtraManifestConfig).f_CallSync(pRunLoop, g_Timeout);
 
 				BackupFinishedSubscription->f_Destroy().f_CallSync(pRunLoop, g_Timeout);

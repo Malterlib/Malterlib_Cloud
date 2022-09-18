@@ -95,8 +95,8 @@ namespace NMib::NCloud
 		CStr m_ProgramDirectory = CFile::fs_GetProgramDirectory();
 		CStr m_RootDirectory;
 
-		TCMap<CStr, CPermissionRequirements> m_CloudManagerPermissionsForTest = {{"CloudManager/ReadAll"}};
-		TCMap<CStr, CPermissionRequirements> m_VersionManagerPermissionsForTest = {{"Application/WriteAll"}, {"Application/ReadAll"}, {"Application/TagAll"}};
+		TCMap<CStr, CPermissionRequirements> m_CloudManagerPermissionsForTest = {{"CloudManager/ReadAll", {}}};
+		TCMap<CStr, CPermissionRequirements> m_VersionManagerPermissionsForTest = {{"Application/WriteAll", {}}, {"Application/ReadAll", {}}, {"Application/TagAll", {}}};
 
 		CStr m_TestHostID;
 		CDistributedActorTrustManager_Address m_ServerAddress;

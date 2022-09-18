@@ -341,7 +341,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				;
 				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
-					 	fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll"}})
+					 	fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll", {}}})
 					)
 					.f_CallSync(pRunLoop, g_Timeout)
 				;

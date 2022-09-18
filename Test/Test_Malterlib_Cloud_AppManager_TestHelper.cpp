@@ -148,7 +148,7 @@ namespace NMib::NCloud
 						AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_VersionManagerTicket.m_Ticket, m_Timeout, -1)
 							+ VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 							(
-								fs_Permissions(AppManagerHostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll"}})
+								fs_Permissions(AppManagerHostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}})
 							)
 							+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 							(
@@ -173,11 +173,11 @@ namespace NMib::NCloud
 					)
 					+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
-						fs_Permissions(m_TestHostID, TCMap<CStr, CPermissionRequirements>{{"AppManager/VersionAppAll"}, {"AppManager/CommandAll"}, {"AppManager/AppAll"}})
+						fs_Permissions(m_TestHostID, TCMap<CStr, CPermissionRequirements>{{"AppManager/VersionAppAll", {}}, {"AppManager/CommandAll", {}}, {"AppManager/AppAll", {}}})
 					)
 					+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
-						fs_Permissions(m_CloudManagerHostID, TCMap<CStr, CPermissionRequirements>{{"AppManager/Command/ApplicationSubscribeChanges"}, {"AppManager/AppAll"}})
+						fs_Permissions(m_CloudManagerHostID, TCMap<CStr, CPermissionRequirements>{{"AppManager/Command/ApplicationSubscribeChanges", {}}, {"AppManager/AppAll", {}}})
 					)
 					> Promise / [=, CloudManagerHostID = m_CloudManagerHostID]
 					(
@@ -196,11 +196,11 @@ namespace NMib::NCloud
 									AppManagerHostID
 									, TCMap<CStr, CPermissionRequirements>
 									{
-										{"CloudManager/RegisterAppManager"}
-										, {"CloudManager/ReportSensorReadings"}
-										, {"CloudManager/ReportSensorReadingsOnBehalfOf/All"}
-										, {"CloudManager/ReportLogEntries"}
-										, {"CloudManager/ReportLogEntriesOnBehalfOf/All"}
+										{"CloudManager/RegisterAppManager", {}}
+										, {"CloudManager/ReportSensorReadings", {}}
+										, {"CloudManager/ReportSensorReadingsOnBehalfOf/All", {}}
+										, {"CloudManager/ReportLogEntries", {}}
+										, {"CloudManager/ReportLogEntriesOnBehalfOf/All", {}}
 									}
 								)
 							)

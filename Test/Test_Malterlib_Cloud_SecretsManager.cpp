@@ -1458,7 +1458,7 @@ public:
 					DMibExpectException(fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetTags({"NoMatch"})), DMibErrorInstance("Access denied"));
 					DMibExpectException(fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetTags({"NoMatch"})), DMibErrorInstance("Access denied"));
 					// Check that we can set SemanticID when we have permission
-					fAddPermissions({"SecretsManager/Write/SemanticID/SemanticNew/Tag/Unique1", "SecretsManager/Write/SemanticID/SemanticNew/Tag/Shared1"});
+					fAddPermissions({{"SecretsManager/Write/SemanticID/SemanticNew/Tag/Unique1", {}}, {"SecretsManager/Write/SemanticID/SemanticNew/Tag/Shared1", {}}});
 					fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetSemanticID("SemanticNew"));
 					fSetProperties("Folder1", "Name1", CSecretsManager::CSecretProperties{}.f_SetSemanticID("Semantic1"));
 					{
@@ -1480,7 +1480,7 @@ public:
 
 					// Check that we cannot create a new secret with out permission for both tags and semantic ID
 					// Unset value are only allowed with the NoSemanticID and/or NoTag permissions
-					fAddPermissions({"SecretsManager/Write/SemanticID/SemanticNew/Tag/TagNew"});
+					fAddPermissions({{"SecretsManager/Write/SemanticID/SemanticNew/Tag/TagNew", {}}});
 					DMibExpectException
 						(
 							 fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetSemanticID("SemanticNew").f_SetTags({"NoMatch"}))
@@ -1497,11 +1497,11 @@ public:
 					DMibExpectException(fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetSemanticID("SemanticNew")), DMibErrorInstance("Access denied"));
 					DMibExpectException(fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetTags({"TagNew"})), DMibErrorInstance("Access denied"));
 					fSetProperties("New", "New", CSecretsManager::CSecretProperties{}.f_SetSemanticID("SemanticNew").f_SetTags({"TagNew"}));
-					fAddPermissions({"SecretsManager/Write/NoSemanticID/Tag/TagNew", "SecretsManager/Write/SemanticID/SemanticNew/NoTag"});
+					fAddPermissions({{"SecretsManager/Write/NoSemanticID/Tag/TagNew", {}}, {"SecretsManager/Write/SemanticID/SemanticNew/NoTag", {}}});
 					fSetProperties("New", "New1", CSecretsManager::CSecretProperties{}.f_SetSemanticID("SemanticNew"));
 					fSetProperties("New", "New2", CSecretsManager::CSecretProperties{}.f_SetTags({"TagNew"}));
 					DMibExpectException(fSetProperties("New", "New3", CSecretsManager::CSecretProperties{}), DMibErrorInstance("Access denied"));
-					fAddPermissions({"SecretsManager/Write/NoSemanticID/NoTag"});
+					fAddPermissions({{"SecretsManager/Write/NoSemanticID/NoTag", {}}});
 					fSetProperties("New", "New4", CSecretsManager::CSecretProperties{});
 				}
 				fRemovePermissions(Needed);
