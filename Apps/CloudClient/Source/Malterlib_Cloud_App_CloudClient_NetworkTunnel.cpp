@@ -69,7 +69,7 @@ namespace NMib::NCloud::NCloudClient
 						, "ListenHost?"_=
 						{
 							"Names"_= {"--listen-host", "-l"}
-							, "Default"_= false
+							, "Default"_= ""
 							, "Description"_= "The hostname to listen on. For unix sockets prefix path with UNIX:\n"
 						}
 						, "Verbose?"_=
