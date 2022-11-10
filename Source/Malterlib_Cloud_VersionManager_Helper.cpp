@@ -47,7 +47,7 @@ namespace NMib::NCloud
 				if (This.m_DownloadVersionSubscription)
 					co_await fg_DestroySubscription(This.m_DownloadVersionSubscription);
 				if (This.m_DownloadVersionReceive)
-					co_await fg_Move(m_DownloadVersionReceive).f_Destroy();
+					co_await fg_Move(This.m_DownloadVersionReceive).f_Destroy();
 
 				co_return {};
 			}
