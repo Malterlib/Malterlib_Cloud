@@ -47,7 +47,7 @@ namespace NMib::NCloud::NSecretsManager
 			CStr TagsString;
 			if (!_Tags.f_IsEmpty())
 			{
-				TagsString += fg_Format(" and Tag{}: ", &"s"[_Tags.f_HasOneMember()]);
+				TagsString += fg_Format(" and Tag{}: ", &"s"[_Tags.f_HasOneElement()]);
 				CStr Comma;
 				for (auto const &Tag : _Tags)
 				{
