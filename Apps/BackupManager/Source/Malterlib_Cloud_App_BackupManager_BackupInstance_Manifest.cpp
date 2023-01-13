@@ -13,6 +13,8 @@ namespace NMib::NCloud::NBackupManager
 		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 		)
 	{
+		auto ProtocolVersion = fg_GetCallingHostInfo().f_GetProtocolVersion();
+
 		TCPromise<TCActorSubscriptionWithID<>> Promise;
 
 		auto &Internal = *mp_pInternal;
@@ -47,6 +49,7 @@ namespace NMib::NCloud::NBackupManager
 					return Promise <<= _Result;
 				}
 			 	, _ExpectedDigest
+				, ProtocolVersion
 			)
 		;
 	}

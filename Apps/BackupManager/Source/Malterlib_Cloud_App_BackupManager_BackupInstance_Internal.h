@@ -87,6 +87,7 @@ namespace NMib::NCloud::NBackupManager
 				, CStr *o_pRSyncID
 				, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
 			 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
+				, uint32 _ProtocolVersion
 			)
 		;
 		TCFuture<void> f_CommitFile(CStr const &_File, CBackupManagerBackup::CManifestFile const &_ManifestFile);

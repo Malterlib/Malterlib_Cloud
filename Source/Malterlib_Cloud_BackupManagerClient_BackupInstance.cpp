@@ -111,12 +111,16 @@ namespace NMib::NCloud::NPrivate
 	{
 		auto &RunningState = *_pRunningState;
 
+		ERSyncFlag RSyncFlags = ERSyncFlag_None;
+		if (mp_Backup->f_InterfaceVersion() >= EBackupManagerProtocolVersion_UseSHA256)
+			RSyncFlags |= ERSyncFlag_UseSHA256;
+
 		CStr FullPath = CFile::fs_AppendPath(mp_Config.m_ManifestConfig.m_Root, _PendingFile.m_ManifestFile.m_OriginalPath);
 		try
 		{
 			RunningState.m_File.f_Open(FullPath, EFileOpen_Read | EFileOpen_ShareAll | EFileOpen_ShareBypass | EFileOpen_NoLocalCache);
 			RunningState.m_LimitedFile.f_Open(&RunningState.m_File, 0, _PendingFile.m_ManifestFile.m_Length);
-			RunningState.m_pRSyncServer = fg_Construct(RunningState.m_LimitedFile, 8*1024*1024);
+			RunningState.m_pRSyncServer = fg_Construct(RunningState.m_LimitedFile, 8*1024*1024, RSyncFlags);
 		}
 		catch (CExceptionFile const &_Exception)
 		{
@@ -612,9 +616,13 @@ namespace NMib::NCloud::NPrivate
 		mp_pManifestSyncState = pState;
 		auto ManifestDigest = CHash_SHA256::fs_DigestFromData(pState->m_ManifestStream.f_GetVector());
 
+		ERSyncFlag RSyncFlags = ERSyncFlag_None;
+		if (mp_Backup->f_InterfaceVersion() >= EBackupManagerProtocolVersion_UseSHA256)
+			RSyncFlags |= ERSyncFlag_UseSHA256;
+
 		try
 		{
-			pState->m_pRSyncServer = fg_Construct(pState->m_ManifestStream, 8*1024*1024);
+			pState->m_pRSyncServer = fg_Construct(pState->m_ManifestStream, 8*1024*1024, RSyncFlags);
 		}
 		catch (CExceptionFile const &_Exception)
 		{

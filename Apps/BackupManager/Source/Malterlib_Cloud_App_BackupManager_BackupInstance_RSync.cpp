@@ -119,6 +119,7 @@ namespace NMib::NCloud::NBackupManager
 			, CStr *o_pRSyncID
 			, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
 		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
+			, uint32 _ProtocolVersion
 		)
 	{
 		CStr RSyncID = fg_RandomID(m_RSyncContexts);
@@ -213,7 +214,10 @@ namespace NMib::NCloud::NBackupManager
 					else if (CFile::fs_FileExists(_FileName, EFileAttrib_Link))
 						CFile::fs_DeleteFile(_FileName);
 
-					ERSyncClientFlag RSyncFlags = ERSyncClientFlag_TruncateOutput;
+					ERSyncFlag RSyncFlags = ERSyncFlag_ClientTruncateOutput;
+
+					if (_ProtocolVersion >= EBackupManagerProtocolVersion_UseSHA256)
+						RSyncFlags |= ERSyncFlag_UseSHA256;
 
 					RSyncContext.m_TempFileNames.f_Insert(_TempFileName);
 
@@ -275,6 +279,8 @@ namespace NMib::NCloud::NBackupManager
 			, FRunRSyncProtocol &&_fRunProtocol
 		)
 	{
+		auto ProtocolVersion = fg_GetCallingHostInfo().f_GetProtocolVersion();
+
 		CStr ManifestError;
 		if (!CBackupManagerBackup::fs_ManifestFileValid(_FileName, _ManifestFile, ManifestError))
 			co_return DMibErrorInstance("Manifest change for '{}' is invalid: {}"_f << _FileName << ManifestError);
@@ -310,6 +316,7 @@ namespace NMib::NCloud::NBackupManager
 					co_return _Result;
 				}
 			 	, _ManifestFile.m_Digest
+				, ProtocolVersion
 			)
 		;
 	}
