@@ -399,7 +399,10 @@ namespace NMib::NCloud::NAppManager
 						else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
 							CFile::fs_DeleteFile(FullPath);
 					}
-
+#ifdef DPlatformFamily_Windows
+					if (CSystem::ms_PlatformVersion <= 10'0'017763)
+						NSys::fg_Thread_Sleep(5.0); // Try to work around access denied below when file is renamed
+#endif
 					// 4. Move files from temporary directory to final destination
 					for (auto &File : Files)
 					{
