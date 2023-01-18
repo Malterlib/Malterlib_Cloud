@@ -20,6 +20,7 @@ Import "Apps/*/*.MHeader"
 		{
 			&
 			{
+				!MalterlibCloudVersionInfoFileName undefined
 				MalterlibCloud_EnableVersionUpload true
 				|
 				{
@@ -592,6 +593,9 @@ Property
 	Property
 	{
 		MalterlibCloud_EnableVersionUpload true
+		{
+			!!TargetIsExecutable true
+		}
 
 		MalterlibPostCopyProject "Malterlib_Cloud"
 		{
