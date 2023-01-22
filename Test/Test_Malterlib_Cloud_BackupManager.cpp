@@ -314,14 +314,14 @@ public:
 						}
 #endif
 						DMibLock(pState->m_Lock);
-						pState->m_Notifications.f_Insert(fg_Move(_Notification));
-						pState->f_Signal();
 						if (_Notification.f_GetTypeID() == CBackupManagerClient::ENotification_BackupError)
 						{
 							auto &Error = _Notification.f_Get<CBackupManagerClient::ENotification_BackupError>();
 							if (Error.m_bFatal && !ReceivedManifestFinished.f_IsSet())
 								ReceivedManifestFinished.f_SetResult();
 						}
+						pState->m_Notifications.f_Insert(fg_Move(_Notification));
+						pState->f_Signal();
 						co_return {};
 					}
 				).f_CallSync(m_pRunLoop, g_Timeout)
@@ -1747,13 +1747,22 @@ public:
 				for (auto &Symlink : DefaultSymlinks)
 					Symlinks.f_Insert(Symlink);
 
+				mint nSymlinks = Symlinks.f_GetLen();
+				DMibAssert(nSymlinks, >, 0u);
+
+				mint nFiles = Files.f_GetLen();
+				DMibAssert(nFiles, >, 0u);
+
 				mint iFileSequence = 3;
 
 				TCLinkedList<CStr> Directories = {"", "Dir1", "Dir2"};
 
+				mint nDirectories = Directories.f_GetLen();
+				DMibAssert(nDirectories, >, 0u);
+
 				auto fGetDirectory = [&]() -> CStr &
 					{
-						mint FileIndex = Random.f_GetValue(Directories.f_GetLen());
+						mint FileIndex = Random.f_GetValue(nDirectories);
 						auto iFile = Directories.f_GetIterator();
 						for (; FileIndex; --FileIndex)
 							++iFile;
@@ -1764,7 +1773,7 @@ public:
 
 				auto fGetFile = [&]() -> CStr &
 					{
-						mint FileIndex = Random.f_GetValue(Files.f_GetLen());
+						mint FileIndex = Random.f_GetValue(nFiles);
 						auto iFile = Files.f_GetIterator();
 						for (; FileIndex; --FileIndex)
 							++iFile;
@@ -1775,7 +1784,7 @@ public:
 
 				auto fGetSymlink = [&]() -> CStr &
 					{
-						mint FileIndex = Random.f_GetValue(Symlinks.f_GetLen());
+						mint FileIndex = Random.f_GetValue(nSymlinks);
 						auto iFile = Symlinks.f_GetIterator();
 						for (; FileIndex; --FileIndex)
 							++iFile;
