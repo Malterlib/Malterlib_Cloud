@@ -149,7 +149,7 @@ public:
 			mint nAppManagers = 10;
 #if DMibPPtrBits <= 32
 			nAppManagers = 2;
-#elif defined(DMibSanitizerEnabled_Address)
+#elif defined(DMibSanitizerEnabled_Address) || defined(DMibSanitizerEnabled_Thread)
 			nAppManagers = 2;
 #endif
 			co_await AppManagerTestHelper.f_Setup(nAppManagers);
