@@ -243,9 +243,9 @@ namespace NMib::NCloud
 
 								Return[Path].f_SetResult(CPathInfo{FreeSpace, TotalSpace});
 							}
-							catch (CException const &_Exception)
+							catch (CException const &)
 							{
-								Return[Path].f_SetException(_Exception.f_ExceptionPointer());
+								Return[Path].f_SetException(NException::fg_CurrentException());
 							}
 						}
 

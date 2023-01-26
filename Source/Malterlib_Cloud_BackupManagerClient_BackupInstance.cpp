@@ -159,22 +159,21 @@ namespace NMib::NCloud::NPrivate
 
 						if (auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName))
 						{
-							try
-							{
-								DestroyResult.f_Access();
-							}
-							catch (CExceptionBackupManagerHashMismatch const &_Exception)
-							{
-								(void)_Exception;
-								DMibLog(Info, "Reschedule: {}: {}", FileName, _Exception);
+							bool bHandled = NException::fg_VisitException<CExceptionBackupManagerHashMismatch>
+								(
+									DestroyResult.f_GetException()
+									, [&](CExceptionBackupManagerHashMismatch const &_Exception)
+									{
+										(void)_Exception;
+										DMibLog(Info, "Reschedule: {}: {}", FileName, _Exception);
 
-								fp_ReportHashMismatch(pRunningState, *pPendingFile);
+										fp_ReportHashMismatch(pRunningState, *pPendingFile);
+									}
+								)
+							;
 
+							if (bHandled)
 								co_return {};
-							}
-							catch (NException::CException const &)
-							{
-							}
 
 							if (pPendingFile->m_bFinished && (SyncFlags & EDirectoryManifestSyncFlag_Append))
 							{
@@ -354,20 +353,20 @@ namespace NMib::NCloud::NPrivate
 					{
 						if (pPendingFile)
 						{
-							try
-							{
-								_Result.f_Access();
-							}
-							catch (CExceptionBackupManagerHashMismatch const &)
-							{
-								DMibCloudBackupManagerDebugOut("Hash mismatch (End append): {}\n", RunningState.m_FileName);
-								fp_ReportHashMismatch(pRunningState, *pPendingFile);
-								_Promise.f_SetException(DMibErrorInstance(fg_Format("Hash mismatch appending backup data, rescheduling: {}", _Result.f_GetExceptionStr())));
+							bool bHandled = NException::fg_VisitException<CExceptionBackupManagerHashMismatch>
+								(
+									_Result.f_GetException()
+									, [&](CExceptionBackupManagerHashMismatch const &_Exception)
+									{
+										DMibCloudBackupManagerDebugOut("Hash mismatch (End append): {}\n", RunningState.m_FileName);
+										fp_ReportHashMismatch(pRunningState, *pPendingFile);
+										_Promise.f_SetException(DMibErrorInstance(fg_Format("Hash mismatch appending backup data, rescheduling: {}", _Result.f_GetExceptionStr())));
+									}
+								)
+							;
+
+							if (bHandled)
 								return;
-							}
-							catch (NException::CException const &)
-							{
-							}
 						}
 
 						_Promise.f_SetException(DMibErrorInstance(fg_Format("Error uploading append backup data: {}", _Result.f_GetExceptionStr())));
@@ -650,28 +649,12 @@ namespace NMib::NCloud::NPrivate
 
 						if (!Promise.f_IsSet())
 						{
-							do
-							{
-								try
-								{
-									DestroyResult.f_Access();
-								}
-								catch (CExceptionBackupManagerHashMismatch const &_Exception)
-								{
-									Promise.f_SetException(_Exception);
-									break;
-								}
-								catch (NException::CException const &)
-								{
-								}
-
-								if (bDone)
-									Promise.f_SetResult();
-								else
-									Promise.f_SetException(DMibErrorInstance("Manifest rsync aborted"));
-							}
-							while (false)
-								;
+							if (DestroyResult.f_HasExceptionType<CExceptionBackupManagerHashMismatch>())
+								Promise.f_SetException(DestroyResult);
+							else if (bDone)
+								Promise.f_SetResult();
+							else
+								Promise.f_SetException(DMibErrorInstance("Manifest rsync aborted"));
 						}
 
 						if (!DestroyResult)

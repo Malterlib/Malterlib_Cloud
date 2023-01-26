@@ -47,9 +47,9 @@ namespace NMib::NCloud
 		{
 			Internal.m_Config.f_Validate();
 		}
-		catch (NException::CException const &_Exception)
+		catch (NException::CException const &)
 		{
-			co_return _Exception.f_ExceptionPointer();
+			co_return NException::fg_CurrentException();
 		}
 
 		Internal.m_bStarted = true;

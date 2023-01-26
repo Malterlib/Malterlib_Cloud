@@ -385,9 +385,9 @@ namespace NMib::NCloud::NCloudManager
 				OutAppManager.m_bActive = Value.m_bActive;
 			}
 		}
-		catch (CException const &_Exception)
+		catch (CException const &)
 		{
-			co_return _Exception.f_ExceptionPointer();
+			co_return NException::fg_CurrentException();
 		}
 
 		Auditor.f_Info("Enum app managers");
@@ -429,9 +429,9 @@ namespace NMib::NCloud::NCloudManager
 				OutApplication.m_ApplicationInfo = Value.m_ApplicationInfo;
 			}
 		}
-		catch (CException const &_Exception)
+		catch (CException const &)
 		{
-			co_return _Exception.f_ExceptionPointer();
+			co_return NException::fg_CurrentException();
 		}
 
 		Auditor.f_Info("Enum applications");
