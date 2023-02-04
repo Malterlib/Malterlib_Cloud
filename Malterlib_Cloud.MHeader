@@ -510,6 +510,11 @@ Property
 
 Property
 {
+	Malterlib_Cloud_App_Targets: [type(CEntity)] = []
+}
+
+Property
+{
 	&
 	{
 		MalterlibEnableInternalTests true
@@ -582,8 +587,6 @@ Property
 		, "Lib_Malterlib_Cloud_Test"
 	]
 	MalterlibTestExtraGroups_Malterlib_Cloud: [string] = ["{Test}/{Malterlib_Cloud}"]
-
-	Malterlib_Cloud_App_Targets: [type(CEntity)] = []
 }
 
 %Workspace "Apps_Malterlib_Cloud"
