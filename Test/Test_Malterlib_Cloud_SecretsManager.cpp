@@ -2026,7 +2026,7 @@ public:
 					fSyncFileOperations("SyncFileOperations").f_CallSync(pRunLoop, g_Timeout);
 
 					auto FilesAfterSetSecret = fFindFiles();
-					DMibTest(DMibExpr(FilesAfterSetSecret.f_GetLen()) <= DMibExpr(1u) && DMibExpr(FilesAfterSetSecret) != DMibExpr(Files));
+					DMibTest(DMibExpr(FilesAfterSetSecret) != DMibExpr(Files) && DMibExpr(FilesAfterSetSecret.f_GetLen()) <= DMibExpr(1u));
 					Event.f_SetSignaled();
 					// Wait for secrets manager to start the rsync
 					fg_Move(UploadCompletedFuture).f_CallSync(pRunLoop, g_Timeout);
