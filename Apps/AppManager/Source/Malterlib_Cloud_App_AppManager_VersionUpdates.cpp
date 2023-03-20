@@ -60,12 +60,14 @@ namespace NMib::NCloud::NAppManager
 		return NStorage::fg_TupleReferences(_Left.f_GetVersionID(), pLeft) <=> NStorage::fg_TupleReferences(_Right.f_GetVersionID(), pRight);
 	}
 
-	COrdering_Partial CAppManagerActor::CVersionManagerVersion::CCompareApplication::operator()(CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const
+	COrdering_Partial CAppManagerActor::CVersionManagerVersion::CCompareApplication::operator()
+	(CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const
 	{
 		return _Left <=> _Right.f_GetVersionID();
 	}
 
-	COrdering_Partial CAppManagerActor::CVersionManagerVersion::CCompareApplication::operator()(CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const
+	COrdering_Partial CAppManagerActor::CVersionManagerVersion::CCompareApplication::operator()
+	(CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const
 	{
 		return _Left.f_GetVersionID() <=> _Right;
 	}

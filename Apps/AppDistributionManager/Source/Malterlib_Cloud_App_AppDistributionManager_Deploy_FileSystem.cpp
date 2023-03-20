@@ -25,20 +25,8 @@ namespace NMib::NCloud::NAppDistributionManager
 	{
 		struct CParsedVersion
 		{
-			bool operator < (CParsedVersion const &_Right) const
-			{
-				return fg_TupleReferences(m_Major, m_Minor, m_Revision)
-					< fg_TupleReferences(_Right.m_Major, _Right.m_Minor, _Right.m_Revision)
-				;
-			}
-
-			bool operator == (CParsedVersion const &_Right) const
-			{
-				return fg_TupleReferences(m_Major, m_Minor, m_Revision)
-					== fg_TupleReferences(_Right.m_Major, _Right.m_Minor, _Right.m_Revision)
-				;
-			}
-
+			auto operator <=> (CParsedVersion const &_Right) const = default;
+			
 			static CParsedVersion fs_Parse(CStr const &_String)
 			{
 				CParsedVersion Return;
@@ -54,7 +42,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		CByteVector fg_GetDigest(CStr const &_FileName)
 		{
 			auto Digest = CFile::fs_GetFileChecksum_SHA512(_FileName);
-			return CByteVector(Digest.f_GetData(), Digest.fs_GetSize());
+			return CByteVector(Digest.f_GetData(), Digest.mc_Size);
 		}
 
 		CStr fg_EncodeElectronTime(CTime const &_Time)
@@ -244,9 +232,9 @@ namespace NMib::NCloud::NAppDistributionManager
 
 						Releases.f_Array().f_Sort
 							(
-								[](CEJSON const &_Left, CEJSON const &_Right) -> bool
+								[](CEJSON const &_Left, CEJSON const &_Right)
 								{
-									return CParsedVersion::fs_Parse(_Right["VersionString"].f_String()) < CParsedVersion::fs_Parse(_Left["VersionString"].f_String());
+									return CParsedVersion::fs_Parse(_Right["VersionString"].f_String()) <=> CParsedVersion::fs_Parse(_Left["VersionString"].f_String());
 								}
 							)
 						;

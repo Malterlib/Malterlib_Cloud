@@ -38,36 +38,39 @@ namespace NMib::NCloud::NAppDistributionManager
 		return TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManagerVersion>::fs_GetKey(*this);
 	}
 
-	bool CAppDistributionManagerActor::CVersionManagerVersion::CCompareApplicationByTime::operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const
+	COrdering_Partial CAppDistributionManagerActor::CVersionManagerVersion::CCompareApplicationByTime::operator()
+	(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const
 	{
 		auto *pLeft = &_Left;
 		auto *pRight = &_Right;
-		if (!_Left.m_VersionInfo.m_Time.f_IsValid() && _Right.m_VersionInfo.m_Time.f_IsValid())
-			return true;
-		else if (_Left.m_VersionInfo.m_Time.f_IsValid() && !_Right.m_VersionInfo.m_Time.f_IsValid())
-			return false;
+		if (auto Result = _Left.m_VersionInfo.m_Time.f_IsValid() <=> _Right.m_VersionInfo.m_Time.f_IsValid(); Result != 0)
+			return Result;
+
 		return NStorage::fg_TupleReferences(_Left.m_VersionInfo.m_Time, _Left.f_GetVersionID(), pLeft)
-			< NStorage::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetVersionID(), pRight)
+			<=> NStorage::fg_TupleReferences(_Right.m_VersionInfo.m_Time, _Right.f_GetVersionID(), pRight)
 		;
 	}
 
-	bool CAppDistributionManagerActor::CVersionManagerVersion::CCompareApplication::operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const
+	COrdering_Partial CAppDistributionManagerActor::CVersionManagerVersion::CCompareApplication::operator()
+	(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const
 	{
 		auto *pLeft = &_Left;
 		auto *pRight = &_Right;
 		return NStorage::fg_TupleReferences(_Left.f_GetVersionID(), pLeft)
-			< NStorage::fg_TupleReferences(_Right.f_GetVersionID(), pRight)
+			<=> NStorage::fg_TupleReferences(_Right.f_GetVersionID(), pRight)
 		;
 	}
 
-	bool CAppDistributionManagerActor::CVersionManagerVersion::CCompareApplication::operator()(CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const
+	COrdering_Partial CAppDistributionManagerActor::CVersionManagerVersion::CCompareApplication::operator()
+	(CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const
 	{
-		return _Left < _Right.f_GetVersionID();
+		return _Left <=> _Right.f_GetVersionID();
 	}
 
-	bool CAppDistributionManagerActor::CVersionManagerVersion::CCompareApplication::operator()(CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const
+	COrdering_Partial CAppDistributionManagerActor::CVersionManagerVersion::CCompareApplication::operator()
+	(CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const
 	{
-		return _Left.f_GetVersionID() < _Right;
+		return _Left.f_GetVersionID() <=> _Right;
 	}
 
 	CAppDistributionManagerActor::CVersionManagerApplication::CVersionManagerApplication(CAppDistributionManagerActor &_This)
@@ -163,7 +166,7 @@ namespace NMib::NCloud::NAppDistributionManager
 	{
 		auto &DownloadState = mp_Downloads.f_Insert();
 		auto pDownloadState = &DownloadState;
-		auto pCleanup = g_OnScopeExitActor > [this, pDownloadState]
+		auto pCleanup = g_OnScopeExitActor / [this, pDownloadState]
 			{
 				mp_Downloads.f_Remove(*pDownloadState);
 			}

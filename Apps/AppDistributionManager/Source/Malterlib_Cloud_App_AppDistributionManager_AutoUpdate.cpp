@@ -130,7 +130,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				if (!Distribution.m_RunningDeploys(VersionID).f_WasCreated())
 					continue;
 
-				auto CleanupDeploy = g_OnScopeExitActor > [=]
+				auto CleanupDeploy = g_OnScopeExitActor / [=]
 					{
 						auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
 
@@ -179,7 +179,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						if (mp_State.m_bStoppingApp)
 							return Promise <<= DMibErrorInstance("Stopping app");
 
-						auto CleanupDownload = g_OnScopeExitActor > [=]
+						auto CleanupDownload = g_OnScopeExitActor / [=]
 							{
 								if (!mp_FileActor)
 									return;

@@ -97,14 +97,14 @@ namespace NMib::NCloud::NAppDistributionManager
 		{
 			struct CCompareApplicationByTime
 			{
-				bool operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
+				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
 			};
 			
 			struct CCompareApplication
 			{
-				bool operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
-				bool operator()(CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const;
-				bool operator()(CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const;
+				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
+				COrdering_Partial operator()(CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const;
+				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const;
 			};
 
 			CVersionManagerVersion(CVersionManagerState *_pVersionManager);
