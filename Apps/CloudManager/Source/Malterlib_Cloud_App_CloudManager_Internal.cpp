@@ -70,6 +70,7 @@ namespace NMib::NCloud::NCloudManager
 		co_await (fp_SetupMonitor() % "Failed to setup monitor");
 		co_await (fp_Publish() % "Failed to publish");
 
+		co_await (fp_SetupCleanup() % "Failed to setup cleanup");
 		co_return {};
 	}
 
