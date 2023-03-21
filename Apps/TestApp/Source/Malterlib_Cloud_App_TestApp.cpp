@@ -53,23 +53,15 @@ namespace NMib::NCloud::NTest
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
-					if (!mp_SensorReporter.m_fReportReadings)
-					{
-						auto SequenceSubscription = co_await mp_InitSensorReporterSequencer.f_Sequence();
+					CDistributedAppSensorReporter::CSensorInfo SensorInfo;
+					SensorInfo.m_Identifier = "org.malterlib.testapp.test";
+					SensorInfo.m_Name = "Test Sensor";
+					SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Float;
+					SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_DiskSpaceDivisors();
+					auto SensorReporter = co_await self(&CTestAppActor::fp_OpenSensorReporter, fg_Move(SensorInfo));
 
-						if (!mp_SensorReporter.m_fReportReadings)
-						{
-							CDistributedAppSensorReporter::CSensorInfo SensorInfo;
-							SensorInfo.m_Identifier = "org.malterlib.testapp.test";
-							SensorInfo.m_Name = "Test Sensor";
-							SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Float;
-							SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_DiskSpaceDivisors();
-							mp_SensorReporter = co_await self(&CTestAppActor::fp_OpenSensorReporter, fg_Move(SensorInfo));
-
-							if (!mp_SensorReporter.m_fReportReadings)
-								co_return DMibErrorInstance("Invalid sensor reporter returned");
-						}
-					}
+					if (!SensorReporter.m_fReportReadings)
+						co_return DMibErrorInstance("Invalid sensor reporter returned");
 
 					mint nReadings = _Params["NumReadings"].f_Integer();
 
@@ -81,9 +73,65 @@ namespace NMib::NCloud::NTest
 						Readings.f_Insert(fg_Move(SensorReading));
 					}
 
-					co_await mp_SensorReporter.m_fReportReadings(fg_Move(Readings));
+					co_await SensorReporter.m_fReportReadings(fg_Move(Readings));
 
-					co_await fg_Move(mp_SensorReporter.m_fReportReadings).f_Destroy();
+					co_await fg_Move(SensorReporter.m_fReportReadings).f_Destroy();
+
+					co_return 0;
+				}
+			)
+		;
+		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
+			(
+				{
+					"Names"_= {"--set-sensor-status"}
+					, "Description"_= "Set sensor status."
+					, "Parameters"_=
+					{
+						"Status"_=
+						{
+							"Type"_= COneOf{"Ok", "Info", "Warning", "Error"}
+							, "Default"_= "Info"
+							, "Description"_= "The number of readings to report."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					CDistributedAppSensorReporter::CSensorInfo SensorInfo;
+					SensorInfo.m_Identifier = "org.malterlib.testapp.test.status";
+					SensorInfo.m_Name = "Test Sensor (status)";
+					SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Status;
+
+					auto SensorReporter = co_await self(&CTestAppActor::fp_OpenSensorReporter, fg_Move(SensorInfo));
+
+					if (!SensorReporter.m_fReportReadings)
+						co_return DMibErrorInstance("Invalid sensor reporter returned");
+
+					CDistributedAppSensorReporter::CStatus Status;
+
+					auto &StatusStr = _Params["Status"].f_String();
+
+					Status.m_Description = "Test status '{}'"_f << StatusStr;
+
+					if (StatusStr == "Ok")
+						Status.m_Severity = NConcurrency::CDistributedAppSensorReporter::EStatusSeverity_Ok;
+					else if (StatusStr == "Info")
+						Status.m_Severity = NConcurrency::CDistributedAppSensorReporter::EStatusSeverity_Info;
+					else if (StatusStr == "Warning")
+						Status.m_Severity = NConcurrency::CDistributedAppSensorReporter::EStatusSeverity_Warning;
+					else if (StatusStr == "Error")
+						Status.m_Severity = NConcurrency::CDistributedAppSensorReporter::EStatusSeverity_Error;
+
+					{
+						TCVector<CDistributedAppSensorReporter::CSensorReading> Readings;
+						auto &SensorReading = Readings.f_Insert();
+						SensorReading.m_Data = fg_Move(Status);
+
+						co_await SensorReporter.m_fReportReadings(fg_Move(Readings));
+					}
+
+					co_await fg_Move(SensorReporter.m_fReportReadings).f_Destroy();
 
 					co_return 0;
 				}
@@ -253,9 +301,6 @@ namespace NMib::NCloud::NTest
 
 	TCFuture<void> CTestAppActor::fp_StopApp()
 	{
-		if (mp_SensorReporter.m_fReportReadings)
-			co_await fg_Move(mp_SensorReporter.m_fReportReadings).f_Destroy();
-
 		co_return {};
 	}
 }
