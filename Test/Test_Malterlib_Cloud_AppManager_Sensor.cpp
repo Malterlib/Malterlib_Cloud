@@ -242,6 +242,8 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
 						, "UniqueSequence"_= 1
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 					,
 					{
@@ -252,6 +254,8 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
 						, "UniqueSequence"_= 2
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 					,
 					{
@@ -261,7 +265,9 @@ public:
 						, "Identifier"_= "org.malterlib.testapp.test"
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 3,
+						, "UniqueSequence"_= 3
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 					,
 					{
@@ -272,6 +278,8 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
 						, "UniqueSequence"_= 4
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 					,
 					{
@@ -282,6 +290,8 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
 						, "UniqueSequence"_= 5
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 				}
 			;
@@ -296,6 +306,8 @@ public:
 						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
 						, "Name"_= "Free Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
 						, "UniqueSequence"_= 1
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 					,
 					{
@@ -306,6 +318,8 @@ public:
 						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
 						, "Name"_= "Total Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
 						, "UniqueSequence"_= 1
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 					,
 					{
@@ -316,6 +330,8 @@ public:
 						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
 						, "Name"_= "Free Disk Space % ({})"_f << AppManagerInfo.m_RootDirectory
 						, "UniqueSequence"_= 1
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 				}
 			;
@@ -330,6 +346,8 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
 						, "UniqueSequence"_= 5
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 				}
 			;
@@ -344,6 +362,8 @@ public:
 						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
 						, "Name"_= "Free Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
 						, "UniqueSequence"_= 1
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 					,
 					{
@@ -354,6 +374,8 @@ public:
 						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
 						, "Name"_= "Free Disk Space % ({})"_f << AppManagerInfo.m_RootDirectory
 						, "UniqueSequence"_= 1
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 					,
 					{
@@ -364,6 +386,8 @@ public:
 						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
 						, "Name"_= "Total Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
 						, "UniqueSequence"_= 1
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
 					}
 				}
 			;
@@ -425,7 +449,7 @@ public:
 
 				auto fReadSensorStatus = [&]()
 					{
-						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--json"}, TestAppDirectory));
+						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--no-only-problems", "--json"}, TestAppDirectory));
 					}
 				;
 
@@ -478,7 +502,7 @@ public:
 
 				auto fReadSensorStatus = [&]()
 					{
-						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-status", "--json"}, AppManagerInfo.m_RootDirectory));
+						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-status", "--no-only-problems", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
@@ -537,7 +561,7 @@ public:
 					{
 						return CEJSON::fs_FromString
 							(
-								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-status", "--json"}, CloudClientDirectory)
+								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-status", "--no-only-problems", "--json"}, CloudClientDirectory)
 							)
 						;
 					}

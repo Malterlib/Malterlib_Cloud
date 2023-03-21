@@ -144,7 +144,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(SensorReadings);
 	}
 
-	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorStatus(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize)
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorStatus(CDistributedAppSensorReader_SensorStatusFilter &&_Filter, uint32 _BatchSize)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> SensorReadings;

@@ -188,7 +188,7 @@ namespace NMib::NCloud::NCloudClient
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> fp_CommandLine_CloudManager_GetAggregatedSensorStatus
 			(
 				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
-				, CDistributedAppSensorReader_SensorFilter const &_Filter
+				, CDistributedAppSensorReader_SensorStatusFilter const &_Filter
 			)
 		;
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> fp_CommandLine_CloudManager_GetAggregatedSensorReadings

@@ -222,14 +222,14 @@ namespace NMib::NCloud::NCloudClient
 				(
 					CEJSON const &_Params
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-					, CDistributedAppSensorReader_SensorFilter const &_Filter
+					, CDistributedAppSensorReader_SensorStatusFilter const &_Filter
 					, ESensorOutputFlag _Flags
 					, CStr const &_TableType
 				)
 				-> TCFuture<uint32>
 				{
 					auto SensorReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders, _Params["Host"].f_String());
-					auto SensorsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors, SensorReaders, _Filter);
+					auto SensorsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors, SensorReaders, _Filter.m_SensorFilter);
 					auto ReadingsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorStatus, SensorReaders, _Filter);
 
 					CDistributedAppSensorReader_SensorReadingFilter Filter;
@@ -242,7 +242,7 @@ namespace NMib::NCloud::NCloudClient
 							, fg_Move(ReadingsGenerator)
 							, fg_Move(SensorsGenerator)
 							, 0
-							, _Flags
+							, _Flags | ESensorOutputFlag_Status
 							, _TableType
 							, Filter
 						)
@@ -1078,7 +1078,7 @@ namespace NMib::NCloud::NCloudClient
 	TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorStatus
 		(
 			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
-			, CDistributedAppSensorReader_SensorFilter const &_Filter
+			, CDistributedAppSensorReader_SensorStatusFilter const &_Filter
 		)
 	{
 		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> StatusResults;
