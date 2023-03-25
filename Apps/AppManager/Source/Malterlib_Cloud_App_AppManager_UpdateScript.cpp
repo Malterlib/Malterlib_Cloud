@@ -47,7 +47,9 @@ namespace NMib::NCloud::NAppManager
 			, EUpdateScript _Script
 			, CStr const &_Param
 			, CVersionManager::CVersionIDAndPlatform const &_VersionID
-			, CVersionManager::CVersionInformation *_pVersionInformation
+			, CVersionManager::CVersionInformation const *_pVersionInformation
+			, CVersionManager::CVersionIDAndPlatform const &_PreviousVersionID
+			, CVersionManager::CVersionInformation const &_PreviousVersionInformation
 			, fp64 _TimeSinceUpdateStart
 		)
 	{
@@ -201,32 +203,49 @@ namespace NMib::NCloud::NAppManager
 		LaunchParams.m_Environment["MalterlibCloud_TimeSinceStart"] = fg_Format("{fe1}", _TimeSinceUpdateStart);
 		LaunchParams.m_Environment["MalterlibCloud_Application"] = _pApplication->m_Name;
 		LaunchParams.m_Environment["MalterlibCloud_VersionApplication"] = _pApplication->m_Settings.m_VersionManagerApplication;
-		if (_VersionID.f_IsValid())
-		{
-			LaunchParams.m_Environment["MalterlibCloud_Version"] = CStr::fs_ToStr(_VersionID);
-			LaunchParams.m_Environment["MalterlibCloud_VersionID"] = CStr::fs_ToStr(_VersionID.m_VersionID);
-			LaunchParams.m_Environment["MalterlibCloud_VersionBranch"] = _VersionID.m_VersionID.m_Branch;
-			LaunchParams.m_Environment["MalterlibCloud_VersionMajor"] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Major);
-			LaunchParams.m_Environment["MalterlibCloud_VersionMinor"] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Minor);
-			LaunchParams.m_Environment["MalterlibCloud_VersionRevision"] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Revision);
-			LaunchParams.m_Environment["MalterlibCloud_VersionPlatform"] = _VersionID.m_Platform;
-		}
-		else
-		{
-			LaunchParams.m_Environment["MalterlibCloud_Version"] = "Unknown";
-			LaunchParams.m_Environment["MalterlibCloud_VersionID"] = "Unknown";
-		}
-		
+
+		auto fAddVersionInformation = [&](CStr const &_Prefix, CVersionManager::CVersionIDAndPlatform const &_VersionID, CVersionManager::CVersionInformation const *_pVersionInformation)
+			{
+				auto fPrefixName = [&](CStr const &_Name) -> CStr
+					{
+						return "MalterlibCloud_{}{}"_f << _Prefix << _Name;
+					}
+				;
+
+				if (_VersionID.f_IsValid())
+				{
+					LaunchParams.m_Environment[fPrefixName("Version")] = CStr::fs_ToStr(_VersionID);
+					LaunchParams.m_Environment[fPrefixName("VersionID")] = CStr::fs_ToStr(_VersionID.m_VersionID);
+					LaunchParams.m_Environment[fPrefixName("VersionBranch")] = _VersionID.m_VersionID.m_Branch;
+					LaunchParams.m_Environment[fPrefixName("VersionMajor")] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Major);
+					LaunchParams.m_Environment[fPrefixName("VersionMinor")] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Minor);
+					LaunchParams.m_Environment[fPrefixName("VersionRevision")] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Revision);
+					LaunchParams.m_Environment[fPrefixName("VersionPlatform")] = _VersionID.m_Platform;
+				}
+				else
+				{
+					LaunchParams.m_Environment[fPrefixName("Version")] = "Unknown";
+					LaunchParams.m_Environment[fPrefixName("VersionID")] = "Unknown";
+				}
+
+				if (!_pVersionInformation)
+					return;
+
+				LaunchParams.m_Environment[fPrefixName("Time")] = "{}"_f << _pVersionInformation->m_Time.f_ToLocal();
+				LaunchParams.m_Environment[fPrefixName("Configuration")] = "{}"_f << _pVersionInformation->m_Configuration;
+				LaunchParams.m_Environment[fPrefixName("Tags")] = "{vs,vb}"_f << _pVersionInformation->m_Tags;
+				LaunchParams.m_Environment[fPrefixName("RetrySequence")] = "{}"_f << _pVersionInformation->m_RetrySequence;
+				LaunchParams.m_Environment[fPrefixName("ExtraInfo")] = _pVersionInformation->m_ExtraInfo.f_ToString(nullptr);
+				LaunchParams.m_Environment[fPrefixName("NumFiles")] = "{}"_f << _pVersionInformation->m_nFiles;
+				LaunchParams.m_Environment[fPrefixName("NumBytes")] = "{}"_f << _pVersionInformation->m_nBytes;
+			}
+		;
+
+		fAddVersionInformation("", _VersionID, _pVersionInformation);
+		fAddVersionInformation("Previous", _PreviousVersionID, &_PreviousVersionInformation);
+
 		if (_pVersionInformation)
 		{
-			LaunchParams.m_Environment["MalterlibCloud_Time"] = "{}"_f << _pVersionInformation->m_Time.f_ToLocal();
-			LaunchParams.m_Environment["MalterlibCloud_Configuration"] = "{}"_f << _pVersionInformation->m_Configuration;
-			LaunchParams.m_Environment["MalterlibCloud_Tags"] = "{vs,vb}"_f << _pVersionInformation->m_Tags;
-			LaunchParams.m_Environment["MalterlibCloud_RetrySequence"] = "{}"_f << _pVersionInformation->m_RetrySequence;
-			LaunchParams.m_Environment["MalterlibCloud_ExtraInfo"] = _pVersionInformation->m_ExtraInfo.f_ToString(nullptr);
-			LaunchParams.m_Environment["MalterlibCloud_NumFiles"] = "{}"_f << _pVersionInformation->m_nFiles;
-			LaunchParams.m_Environment["MalterlibCloud_NumBytes"] = "{}"_f << _pVersionInformation->m_nBytes;
-
 			if (auto pUpdateScriptEnv = _pVersionInformation->m_ExtraInfo.f_GetMember("UpdateScriptEnvironment", EJSONType_Object))
 			{
 				for (auto &Member : pUpdateScriptEnv->f_Object())
@@ -249,7 +268,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			}
 		}
-		
+
 		LaunchParams.m_bMergeEnvironment = true;
 		LaunchParams.m_bAllowExecutableLocate = true;
 		

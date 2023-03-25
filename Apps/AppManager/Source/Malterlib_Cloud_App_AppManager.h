@@ -561,6 +561,8 @@ namespace NMib::NCloud::NAppManager
 
 			CIntrusiveRefCountWithWeak m_RefCount;
 			TCSharedPointer<CApplication> m_pApplication;
+			CVersionManager::CVersionIDAndPlatform m_LastInstalledVersion;
+			CVersionManager::CVersionInformation m_LastInstalledVersionInfo;
 			TCFunction<void (CStr const &_Info)> m_fOnInfo;
 			TCFunction <void ()> m_fUpdateVersionInfo;
 			CActorSubscription m_DownloadDirectoryCleanup;
@@ -682,7 +684,9 @@ namespace NMib::NCloud::NAppManager
 				, EUpdateScript _Script
 				, CStr const &_Param
 				, CVersionManager::CVersionIDAndPlatform const &_VersionID
-				, CVersionManager::CVersionInformation *_pVersionInformation
+				, CVersionManager::CVersionInformation const *_pVersionInformation
+				, CVersionManager::CVersionIDAndPlatform const &_PreviousVersionID
+				, CVersionManager::CVersionInformation const &_PreviousVersionInformation
 				, fp64 _TimeSinceUpdateStart
 			)
 		;

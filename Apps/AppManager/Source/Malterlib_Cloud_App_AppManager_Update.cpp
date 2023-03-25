@@ -255,6 +255,8 @@ namespace NMib::NCloud::NAppManager
 		TCSharedPointerSupportWeak<CUpdateApplicationState> pState = fg_Construct();
 		pState->m_pApplication = pApplication;
 		pState->m_fOnInfo = fg_Move(_fOnInfo);
+		pState->m_LastInstalledVersion = pApplication->m_LastInstalledVersion;
+		pState->m_LastInstalledVersionInfo = pApplication->m_LastInstalledVersionInfo;
 		pState->m_VersionID = VersionID;
 		pState->m_VersionTime = VersionInfo.m_Time;
 		pState->m_VersionRetrySequence = VersionInfo.m_RetrySequence;
@@ -301,7 +303,19 @@ namespace NMib::NCloud::NAppManager
 			{
 				if (!pApplication->m_bDeleted && bUnencrypted)
 				{
-					auto ScriptResult = co_await fp_RunUpdateScript(pApplication, EUpdateScript_OnError, Error, VersionID, pState->m_pVersionInfo.f_Get(), pClock->f_GetTime()).f_Wrap();
+					auto ScriptResult = co_await fp_RunUpdateScript
+						(
+							pApplication
+							, EUpdateScript_OnError
+							, Error
+							, VersionID
+							, pState->m_pVersionInfo.f_Get()
+							, pState->m_LastInstalledVersion
+							, pState->m_LastInstalledVersionInfo
+							, pClock->f_GetTime()
+						)
+						.f_Wrap()
+					;
 					if (!ScriptResult)
 					{
 						DMibLogWithCategory

@@ -345,7 +345,18 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
-		co_await fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PreUpdate, State.m_TempraryPath, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime());
+		co_await fp_RunUpdateScript
+			(
+				State.m_pApplication
+				, EUpdateScript_PreUpdate
+				, State.m_TempraryPath
+				, State.m_VersionID
+				, State.m_pVersionInfo.f_Get()
+				, State.m_LastInstalledVersion
+				, State.m_LastInstalledVersionInfo
+				, State.m_pClock->f_GetTime()
+			)
+		;
 		co_return {};
 	}
 
@@ -478,7 +489,18 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
-		co_await fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PostUpdate, CStr{}, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime());
+		co_await fp_RunUpdateScript
+			(
+				State.m_pApplication
+				, EUpdateScript_PostUpdate
+				, CStr{}
+				, State.m_VersionID
+				, State.m_pVersionInfo.f_Get()
+				, State.m_LastInstalledVersion
+				, State.m_LastInstalledVersionInfo
+				, State.m_pClock->f_GetTime()
+			)
+		;
 		co_return {};
 	}
 
@@ -526,6 +548,8 @@ namespace NMib::NCloud::NAppManager
 					, "Error starting updated application: {}"_f << AppLaunchResult.m_StartupError
 					, State.m_VersionID
 					, State.m_pVersionInfo.f_Get()
+					, State.m_LastInstalledVersion
+					, State.m_LastInstalledVersionInfo
 					, State.m_pClock->f_GetTime()
 				)
 				> fg_LogError("Malterlib/Cloud/AppManager", "Error script failed")
@@ -547,8 +571,17 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
-		TCAsyncResult<void> ScriptResult = co_await
-			fp_RunUpdateScript(State.m_pApplication, EUpdateScript_PostLaunch, CStr{}, State.m_VersionID, State.m_pVersionInfo.f_Get(), State.m_pClock->f_GetTime()).f_Wrap()
+		TCAsyncResult<void> ScriptResult = co_await fp_RunUpdateScript
+			(
+				State.m_pApplication
+				, EUpdateScript_PostLaunch
+				, CStr{}
+				, State.m_VersionID
+				, State.m_pVersionInfo.f_Get()
+				, State.m_LastInstalledVersion
+				, State.m_LastInstalledVersionInfo
+				, State.m_pClock->f_GetTime()
+			).f_Wrap()
 		;
 
 		if (!ScriptResult)
