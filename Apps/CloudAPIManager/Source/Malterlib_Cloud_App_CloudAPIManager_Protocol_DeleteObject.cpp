@@ -33,8 +33,8 @@ namespace NMib::NCloud::NCloudAPIManager
 		bool bHasPermission = co_await
 			(
 				pThis->mp_Permissions.f_HasPermission("Delete object from cloud API manager", Permissions)
-			 	% "Permission denied deleting object"
-			 	% Auditor
+				% "Permission denied deleting object"
+				% Auditor
 			)
 		;
 
@@ -49,7 +49,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		auto Value = co_await
 			(
-			 	(
+				(
 					g_Dispatch(pThis->fp_GetCURLQueryActor()) / [ServiceInfo = fg_Move(ServiceInfo), _Params]() -> CStr
 					{
 						NException::CDisableExceptionTraceScope DisableTracing;
@@ -69,7 +69,7 @@ namespace NMib::NCloud::NCloudAPIManager
 						return URL;
 					}
 				)
-			 	.f_Wrap()
+				.f_Wrap()
 			)
 		;
 

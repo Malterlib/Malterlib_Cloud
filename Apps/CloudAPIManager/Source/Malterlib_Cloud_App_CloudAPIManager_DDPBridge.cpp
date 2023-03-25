@@ -26,7 +26,7 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 		return NContainer::fg_CreateVector<CDistributedTrustDDPBridge::CMethod>
 			(
-			 	CDistributedTrustDDPBridge::CMethod
+				CDistributedTrustDDPBridge::CMethod
 				{
 					"getSwiftBaseURL"
 					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCFuture<NEncoding::CEJSON>

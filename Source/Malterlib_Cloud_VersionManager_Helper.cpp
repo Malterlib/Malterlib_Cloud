@@ -116,8 +116,8 @@ namespace NMib::NCloud
 
 	CVersionManagerHelper::CVersionManagerHelper
 		(
-		 	CStr const &_RootDirectory
- 			, TCActor<CSeparateThreadActor> const &_FileActor
+			CStr const &_RootDirectory
+			, TCActor<CSeparateThreadActor> const &_FileActor
 			, uint64 _QueueSize
 			, fp64 _Timeout
 		)
@@ -264,10 +264,10 @@ namespace NMib::NCloud
 
 		pState->m_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>
 			(
-			 	_DestinationDirectory
-			 	, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute | EFileAttrib_UnixAttributesValid
-			 	, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid
-			 	, Internal.f_GetFileActor()
+				_DestinationDirectory
+				, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute | EFileAttrib_UnixAttributesValid
+				, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid
+				, Internal.f_GetFileActor()
 			)
 		;
 

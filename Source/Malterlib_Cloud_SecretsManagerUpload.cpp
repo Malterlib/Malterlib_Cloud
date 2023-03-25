@@ -70,9 +70,9 @@ namespace NMib::NCloud
 	TCFuture<CDirectorySyncSend::CSyncResult> DMibWorkaroundUBSanSectionErrors fg_UploadSecretFile
 		(
 			TCDistributedActor<CSecretsManager> _SecretsManager
-		 	, TCActor<CActorDistributionManager> _DistributionManager
-		 	, CSecretsManager::CSecretID _ID
-		 	, CDirectorySyncSend::CConfig _Config
+			, TCActor<CActorDistributionManager> _DistributionManager
+			, CSecretsManager::CSecretID _ID
+			, CDirectorySyncSend::CConfig _Config
 			, NReference::TCReference<CActorSubscription> o_Subscription
 		)
 	{

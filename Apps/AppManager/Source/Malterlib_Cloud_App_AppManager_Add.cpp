@@ -35,7 +35,7 @@ namespace NMib::NCloud::NAppManager
 
 		return Promise <<= m_pThis->self
 			(
-			 	&CAppManagerActor::fp_AddApplication
+				&CAppManagerActor::fp_AddApplication
 				, _Name
 				, ApplicationSettings
 				, ChangedSettings
@@ -48,7 +48,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, CStr()
 				, _Add.m_Version
-			 	, fg_GetCallingHostInfo()
+				, fg_GetCallingHostInfo()
 			)
 		;
 	}
@@ -121,7 +121,7 @@ namespace NMib::NCloud::NAppManager
 		
 		auto Result = co_await self
 			(
-			 	&CAppManagerActor::fp_AddApplication
+				&CAppManagerActor::fp_AddApplication
 				, Name
 				, Settings
 				, ChangedSettings
@@ -135,7 +135,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, bFromFile ? Package : CStr() 
 				, VersionID
-			 	, CallingHostInfo
+				, CallingHostInfo
 			)
 			.f_Wrap()
 		;
@@ -154,7 +154,7 @@ namespace NMib::NCloud::NAppManager
 			, TCFunction<void (CStr const &_Info)> &&_fOnInfo
 			, CStr const &_FromLocalFile
 			, TCOptional<CVersionManager::CVersionIDAndPlatform> const &_Version
-		 	, CCallingHostInfo const &_CallingHostInfo
+			, CCallingHostInfo const &_CallingHostInfo
 		)
 	{
 		auto Auditor = f_Auditor({}, _CallingHostInfo);
@@ -232,9 +232,9 @@ namespace NMib::NCloud::NAppManager
 							, Error
 							, EFindVersionFlag_ForAdd
 							, VersionInfo
-						 	, pApplication->m_NewestUnconditionalVersion
-						 	, pApplication->m_NewestUnconditionalVersionInfo
-						 	, bNewestUnconditionalVersionChanged
+							, pApplication->m_NewestUnconditionalVersion
+							, pApplication->m_NewestUnconditionalVersionInfo
+							, bNewestUnconditionalVersionChanged
 						)
 					;
 
@@ -440,7 +440,7 @@ namespace NMib::NCloud::NAppManager
 			auto VersionInfo = co_await
 				(
 					self(&CAppManagerActor::fp_DownloadApplication, VersionManagerApplication, VersionID, DownloadDirectory)
-				 	% "Failed to download application from version manager" % Auditor
+					% "Failed to download application from version manager" % Auditor
 				)
 			;
 			try
@@ -486,7 +486,7 @@ namespace NMib::NCloud::NAppManager
 							AllowExist[*pDeletePath];
 						CStr Output = fsp_UnpackApplication
 							(
-							 	RootDirectory
+								RootDirectory
 								, SourcePath
 								, Directory
 								, pApplication->m_Name

@@ -118,7 +118,7 @@ namespace NMib::NCloud::NBackupManager
 			, EDirectoryManifestSyncFlag _SyncFlags
 			, CStr *o_pRSyncID
 			, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
-		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
+			, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 			, uint32 _ProtocolVersion
 		)
 	{
@@ -198,7 +198,7 @@ namespace NMib::NCloud::NBackupManager
 
 		f_SequenceSyncs
 			(
-			 	_RelativeFileName
+				_RelativeFileName
 				, [=, fRunProtocol = fg_Move(_fRunProtocol)](COnScopeExitShared &&_pCleanup) mutable
 				{
 					auto pRsyncContext = m_RSyncContexts.f_FindEqual(RSyncID);
@@ -275,7 +275,7 @@ namespace NMib::NCloud::NBackupManager
 	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::f_StartRSync
 		(
 			CStr const &_FileName
-		 	, CManifestFile const &_ManifestFile
+			, CManifestFile const &_ManifestFile
 			, FRunRSyncProtocol &&_fRunProtocol
 		)
 	{
@@ -297,8 +297,8 @@ namespace NMib::NCloud::NBackupManager
 
 		co_return co_await fg_CallSafe
 			(
-			 	Internal
-			 	, &CInternal::f_StartRSyncShared
+				Internal
+				, &CInternal::f_StartRSyncShared
 				, fg_Move(_fRunProtocol)
 				, FileName
 				, OldFileName
@@ -315,7 +315,7 @@ namespace NMib::NCloud::NBackupManager
 
 					co_return _Result;
 				}
-			 	, _ManifestFile.m_Digest
+				, _ManifestFile.m_Digest
 				, ProtocolVersion
 			)
 		;

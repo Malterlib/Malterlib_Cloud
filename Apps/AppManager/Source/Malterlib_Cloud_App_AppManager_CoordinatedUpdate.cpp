@@ -188,7 +188,7 @@ namespace NMib::NCloud::NAppManager
 #if DDebugAppTurnUpdateLogic > 1
 					DMibConOut2
 						(
-						 	"[{}, {a-,sj20}, {a-,sj8}] # {vs} - {vs} - {vs}\n"
+							"[{}, {a-,sj20}, {a-,sj8}] # {vs} - {vs} - {vs}\n"
 							, this
 							, OurRemoteKey
 							, _pState->m_pApplication->m_Name
@@ -376,12 +376,12 @@ namespace NMib::NCloud::NAppManager
 
 							if
 								(
-								 	fg_IsSameVersion
-								 	(
-									 	Application.m_LastInstalledVersionFinished
-									 	, Application.m_LastInstalledVersionInfoFinished.m_Time
-									 	, _pState->m_VersionID
-									 	, _pState->m_VersionTime
+									fg_IsSameVersion
+									(
+										Application.m_LastInstalledVersionFinished
+										, Application.m_LastInstalledVersionInfoFinished.m_Time
+										, _pState->m_VersionID
+										, _pState->m_VersionTime
 									)
 								)
 							{

@@ -90,8 +90,8 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_RegisterAppManager
 			(
-			 	NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
-			 	, CAppManagerInfo &&_AppManagerInfo
+				NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
+				, CAppManagerInfo &&_AppManagerInfo
 			)
 			= 0
 		;

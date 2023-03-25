@@ -12,7 +12,7 @@ namespace NMib::NCloud::NPrivate
 		(
 			TCDistributedActor<CBackupManager> const &_BackupManager
 			, CDirectoryManifest const &_Manifest
-		 	, TCMap<CStr, CBackupManagerClient_ChecksumState> const &_InitialChecksumState
+			, TCMap<CStr, CBackupManagerClient_ChecksumState> const &_InitialChecksumState
 			, CBackupManagerClient::CConfig const &_Config
 			, CTrustedActorInfo const &_ActorInfo
 			, TCWeakActor<CBackupManagerClient> const &_BackupManagerClient
@@ -136,7 +136,7 @@ namespace NMib::NCloud::NPrivate
 		mp_Backup.f_CallActor(&CBackupManagerBackup::f_StartRSync)
 			(
 				RunningState.m_FileName
-			 	, CBackupManagerBackup::CManifestFile{_PendingFile.m_ManifestFile}
+				, CBackupManagerBackup::CManifestFile{_PendingFile.m_ManifestFile}
 				, g_ActorFunctor
 				(
 					g_ActorSubscription / [this, pRunningState, FileName, SyncFlags = _PendingFile.m_ManifestFile.m_Flags]() -> TCFuture<void>
@@ -283,7 +283,7 @@ namespace NMib::NCloud::NPrivate
 			, TCPromise<bool> const &_Promise
 			, uint64 _Length
 			, TCSharedPointer<CAppendFileCache> const &_pFile
-		 	, bool _bForceSync
+			, bool _bForceSync
 		)
 	{
 		auto &RunningState = *_pRunningState;
@@ -579,7 +579,7 @@ namespace NMib::NCloud::NPrivate
 
 		mp_Backup.f_CallActor(&CBackupManagerBackup::f_InitialBackupFinished)
 			(
-			 	mp_Config.m_bReportChangesInInitialFinished ? CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges : CBackupManagerBackup::EInitialBackupFinishedFlag_None
+				mp_Config.m_bReportChangesInInitialFinished ? CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges : CBackupManagerBackup::EInitialBackupFinishedFlag_None
 			)
 			> [this](TCAsyncResult<CBackupManagerBackup::CInitialBackupFinishedResult> &&_Result)
 			{
@@ -670,7 +670,7 @@ namespace NMib::NCloud::NPrivate
 
 					co_return co_await
 						(
-						 	TCFuture<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
+							TCFuture<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
 							{
 								NContainer::CSecureByteVector ToSendToClient;
 								if (mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket(_Packet, ToSendToClient))
@@ -682,7 +682,7 @@ namespace NMib::NCloud::NPrivate
 					;
 				}
 				, pState->m_ManifestStream.f_GetLength()
-			 	, ManifestDigest
+				, ManifestDigest
 			)
 			.f_Wrap()
 		;
@@ -773,8 +773,8 @@ namespace NMib::NCloud::NPrivate
 												PendingFile.m_pSequenceSyncsScope = _pScope;
 												fp_ProcessBackupQueue();
 											}
-										 	, FilesToSequenceWrite
-										 	, FilesToSequenceRead
+											, FilesToSequenceWrite
+											, FilesToSequenceRead
 										)
 									;
 
@@ -850,11 +850,11 @@ namespace NMib::NCloud::NPrivate
 		case CBackupManagerBackup::EManifestChange_Rename:
 			DMibCloudBackupManagerDebugOut
 				(
-				 	"^^^ Rename {} -> {}   Write {vs}   Read {vs}\n"
-				 	, _ManifestChange.m_ManifestChange.f_Get<CBackupManagerBackup::EManifestChange_Rename>().m_FromFileName
-				 	, _FileName
-				 	, FilesToSequenceWrite
-				 	, FilesToSequenceRead
+					"^^^ Rename {} -> {}   Write {vs}   Read {vs}\n"
+					, _ManifestChange.m_ManifestChange.f_Get<CBackupManagerBackup::EManifestChange_Rename>().m_FromFileName
+					, _FileName
+					, FilesToSequenceWrite
+					, FilesToSequenceRead
 				)
 			;
 			break;
@@ -864,12 +864,12 @@ namespace NMib::NCloud::NPrivate
 		fp_SequenceMultipleSyncs
 			(
 				[
-				 	=
-				 	, ChangePromise = _ManifestChange.m_Promise
-				 	, ManifestChange = _ManifestChange.m_ManifestChange
-				 	, bDirty = _ManifestChange.m_bDirty
+					=
+					, ChangePromise = _ManifestChange.m_Promise
+					, ManifestChange = _ManifestChange.m_ManifestChange
+					, bDirty = _ManifestChange.m_bDirty
 				]
-			 	(NMib::COnScopeExitShared &&_pScope) mutable
+				(NMib::COnScopeExitShared &&_pScope) mutable
 				{
 #ifdef DMibCloudBackupManagerDebug
 					switch (ManifestChange.f_GetTypeID())
@@ -1068,18 +1068,18 @@ namespace NMib::NCloud::NPrivate
 						fSyncFile(ManifestChange);
 					}
 				}
-			 	, FilesToSequenceWrite
-			 	, FilesToSequenceRead
+				, FilesToSequenceWrite
+				, FilesToSequenceRead
 			)
 		;
 	}
 
 	TCFuture<void> CBackupManagerClient_Instance::f_ManifestChanged
 		(
-		 	CStr const &_FileName
-		 	, CBackupManagerBackup::CManifestChange const &_ManifestChange
-		 	, bool _bDirty
-		 	, CBackupManagerClient_ChecksumState const &_ChecksumState
+			CStr const &_FileName
+			, CBackupManagerBackup::CManifestChange const &_ManifestChange
+			, bool _bDirty
+			, CBackupManagerClient_ChecksumState const &_ChecksumState
 		)
 	{
 		TCPromise<void> Promise;
@@ -1092,9 +1092,9 @@ namespace NMib::NCloud::NPrivate
 			auto &File = CBackupManagerBackup::fs_ManifestFileFromChange(_ManifestChange);
 			DMibCheck
 				(
-				 	!File.f_IsFile()
-				 	|| !(File.m_Flags & EDirectoryManifestSyncFlag_Append)
-				 	|| File.m_Digest == _ChecksumState.m_DigestState.f_GetDigest()
+					!File.f_IsFile()
+					|| !(File.m_Flags & EDirectoryManifestSyncFlag_Append)
+					|| File.m_Digest == _ChecksumState.m_DigestState.f_GetDigest()
 				)
 			;
 		}

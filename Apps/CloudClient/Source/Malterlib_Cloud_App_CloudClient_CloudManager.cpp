@@ -101,7 +101,7 @@ namespace NMib::NCloud::NCloudClient
 						, FilterVersionManagerApp
 						, FilterName
 						, FilterOutOfDateVersion
- 					}
+					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
@@ -128,7 +128,7 @@ namespace NMib::NCloud::NCloudClient
 						, CTableRenderHelper::fs_OutputTypeOption()
 						, FilterStatusError
 						, FilterEnvironment
-  					}
+					}
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
@@ -600,8 +600,8 @@ namespace NMib::NCloud::NCloudClient
 					, AppManagerInfo.m_Environment
 					, HostName
 					, AppManagerInfo.m_ProgramDirectory
-				 	, AppManagerInfo.m_PlatformFamily
-				 	, Version
+					, AppManagerInfo.m_PlatformFamily
+					, Version
 					, AppManagerID
 					, LastSeen
 					, Status
@@ -654,16 +654,16 @@ namespace NMib::NCloud::NCloudClient
 		TableRenderer.f_AddDescription("Applications");
 		TableRenderer.f_AddHeadings
 			(
-			 	"Environment"
-			 	, "App Manager"
-			 	, "Name"
-			 	, "Application"
-			 	, "Update [Tags]"
-			 	, "Version"
-			 	, "Failed Version"
-			 	, "Should Have Version"
-			 	, "Newer Version Available"
-			 	, "Status"
+				"Environment"
+				, "App Manager"
+				, "Name"
+				, "Application"
+				, "Update [Tags]"
+				, "Version"
+				, "Failed Version"
+				, "Should Have Version"
+				, "Newer Version Available"
+				, "Status"
 			)
 		;
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
@@ -677,11 +677,11 @@ namespace NMib::NCloud::NCloudClient
 			{
 				return fg_TupleReferences
 					(
-					 	m_AppManagerInfo.m_Environment
-					 	, m_AppManagerInfo.m_HostName
-					 	, m_AppManagerInfo.m_ProgramDirectory
-					 	, m_ApplicationKey.m_AppManagerID
-					 	, m_ApplicationKey.m_Name
+						m_AppManagerInfo.m_Environment
+						, m_AppManagerInfo.m_HostName
+						, m_AppManagerInfo.m_ProgramDirectory
+						, m_ApplicationKey.m_AppManagerID
+						, m_ApplicationKey.m_Name
 					)
 				;
 			}
@@ -747,8 +747,8 @@ namespace NMib::NCloud::NCloudClient
 					if
 						(
 							!fHasFailedVersion(_ApplicationInfo)
- 							&& !fShouldHaveOtherVersion(_ApplicationInfo)
- 							&& !fHasNewerVersion(_ApplicationInfo)
+							&& !fShouldHaveOtherVersion(_ApplicationInfo)
+							&& !fHasNewerVersion(_ApplicationInfo)
 						)
 					{
 						return true;
@@ -897,15 +897,15 @@ namespace NMib::NCloud::NCloudClient
 			TableRenderer.f_AddRow
 				(
 					AppManagerInfo.m_Environment
-				 	, "{}{}{}:{}"_f << AnsiEncoding.f_Foreground256(75) << AppManagerInfo.m_HostName << AnsiEncoding.f_Default() << AppManagerInfo.m_ProgramDirectory
+					, "{}{}{}:{}"_f << AnsiEncoding.f_Foreground256(75) << AppManagerInfo.m_HostName << AnsiEncoding.f_Default() << AppManagerInfo.m_ProgramDirectory
 					, ApplicationKey.m_Name
 					, ApplicationInfo.m_VersionManagerApplication
-				 	, AutoUpdate
+					, AutoUpdate
 					, Version
-				 	, FailedVersion
+					, FailedVersion
 					, WantVersion
 					, NewestVersion
-				 	, Status
+					, Status
 				)
 			;
 		}
@@ -928,9 +928,9 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status
 		(
-		 	CEJSON const &_Params
-		 	, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
-		 	, ECloudManagerStatusFlag _Flags
+			CEJSON const &_Params
+			, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			, ECloudManagerStatusFlag _Flags
 		)
 	{
 		CStr Host = _Params["Host"].f_String();

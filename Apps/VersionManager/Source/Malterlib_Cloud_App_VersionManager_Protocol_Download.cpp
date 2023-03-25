@@ -49,9 +49,9 @@ namespace NMib::NCloud::NVersionManager
 
 		bool bHasPermission = co_await
 			(
-			 	pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", Permissions)
-			 	% "Permission denied downloading version"
-			 	% Auditor
+				pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", Permissions)
+				% "Permission denied downloading version"
+				% Auditor
 			)
 		;
 

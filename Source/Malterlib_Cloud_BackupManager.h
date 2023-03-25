@@ -159,9 +159,9 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_StartManifestRSync
 			(
-			 	FRunRSyncProtocol &&_fRunProtocol
-			 	, uint64 _ManifestSize
-			 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
+				FRunRSyncProtocol &&_fRunProtocol
+				, uint64 _ManifestSize
+				, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 			) = 0
 		;
 		virtual NConcurrency::TCFuture<CStartBackupResult> f_StartBackup() = 0;
@@ -170,9 +170,9 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_StartRSync
 			(
-			 	NStr::CStr const &_FileName
-			 	, CManifestFile const &_ManifestFile
-			 	, FRunRSyncProtocol &&_fRunProtocol
+				NStr::CStr const &_FileName
+				, CManifestFile const &_ManifestFile
+				, FRunRSyncProtocol &&_fRunProtocol
 			) = 0
 		;
 		virtual NConcurrency::TCFuture<void> f_AppendData(NStr::CStr const &_FileName, CAppendData &&_Data) = 0;

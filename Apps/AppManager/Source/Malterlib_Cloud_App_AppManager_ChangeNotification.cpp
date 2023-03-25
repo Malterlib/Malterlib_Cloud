@@ -11,7 +11,7 @@ namespace NMib::NCloud::NAppManager
 {
 	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeChangeNotifications
 		(
-		 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
 		)
 		-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 	{

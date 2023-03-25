@@ -15,8 +15,8 @@ namespace NMib::NCloud
 	{
 		CNetworkTunnelsClient
 			(
-			 	NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
-			 	, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
+				NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
+				, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
 			)
 		;
 		~CNetworkTunnelsClient();
@@ -33,11 +33,11 @@ namespace NMib::NCloud
 
 		NConcurrency::TCFuture<CTunnel> f_OpenTunnel
 			(
-			 	NStr::CStr const &_HostID
-			 	, ICNetworkTunnels::CNetworkTunnelName const &_TunnelName
-			 	, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address)> &&_fOnConnection
-			 	, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Message)> &&_fOnClose
-			 	, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Error)> &&_fOnError
+				NStr::CStr const &_HostID
+				, ICNetworkTunnels::CNetworkTunnelName const &_TunnelName
+				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address)> &&_fOnConnection
+				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Message)> &&_fOnClose
+				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Error)> &&_fOnError
 				, NStr::CStr const &_ListenHost
 			)
 		;

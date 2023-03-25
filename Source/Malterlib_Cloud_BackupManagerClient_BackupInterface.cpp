@@ -80,7 +80,7 @@ namespace NMib::NCloud
 
 		auto Manifest = co_await
 			(
-			 	g_Dispatch(Internal.m_FileActor) / [NewConfig = fg_Move(NewConfig), pDestroyed = Internal.m_pDestroyed]()
+				g_Dispatch(Internal.m_FileActor) / [NewConfig = fg_Move(NewConfig), pDestroyed = Internal.m_pDestroyed]()
 				-> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
 				{
 					TCMap<CStr, CFile::CFileChecksumState_SHA256> SourceAppendStates;

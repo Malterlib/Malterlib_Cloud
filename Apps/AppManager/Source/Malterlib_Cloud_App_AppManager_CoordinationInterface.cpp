@@ -59,7 +59,7 @@ namespace NMib::NCloud::NAppManager
 		CAppInfo::f_Stream(_Stream);
 		_Stream % m_Application;
 	}
- 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppChange_Update);
+	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppChange_Update);
 	
 	
 	template <typename tf_CStream>

@@ -23,7 +23,7 @@ namespace NMib::NCloud::NAppManager
 		bool bHasPermission = co_await
 			(
 				pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", Permissions)
-			 	% "Permission denied subscribing to update notifications" % Auditor
+				% "Permission denied subscribing to update notifications" % Auditor
 			)
 		;
 		if (!bHasPermission)

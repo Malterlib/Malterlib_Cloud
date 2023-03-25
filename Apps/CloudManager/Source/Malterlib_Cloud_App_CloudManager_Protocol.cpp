@@ -225,8 +225,8 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<TCActorSubscriptionWithID<>> CCloudManagerServer::CCloudManagerImplementation::f_RegisterAppManager
 		(
-		 	TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
-		 	, CAppManagerInfo &&_AppManagerInfo
+			TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
+			, CAppManagerInfo &&_AppManagerInfo
 		)
 	{
 		if (!_AppManager)
@@ -282,8 +282,8 @@ namespace NMib::NCloud::NCloudManager
 
 		auto ChangeNotificationsSubscription = co_await AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeChangeNotifications)
 			(
-			 	g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
-			 	(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> TCFuture<void>
+				g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
+				(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> TCFuture<void>
 				{
 					auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
 					if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
@@ -311,11 +311,11 @@ namespace NMib::NCloud::NCloudManager
 		{
 			co_await pThis->self
 				(
-				 	&CCloudManagerServer::fp_ChangeOtherErrors
-				 	, AppManagerID
-				 	, RegisterSequence
-				 	, TCSet<CStr>{}
-				 	, TCMap<CStr, CStr>{{"Subscribe Notifications", ChangeNotificationsSubscription.f_GetExceptionStr()}}
+					&CCloudManagerServer::fp_ChangeOtherErrors
+					, AppManagerID
+					, RegisterSequence
+					, TCSet<CStr>{}
+					, TCMap<CStr, CStr>{{"Subscribe Notifications", ChangeNotificationsSubscription.f_GetExceptionStr()}}
 				)
 			;
 		}

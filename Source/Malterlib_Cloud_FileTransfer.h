@@ -60,10 +60,10 @@ namespace NMib::NCloud
 		~CFileTransferReceive();
 		CFileTransferReceive
 			(
-			 	NStr::CStr const &_BasePath
-			 	, NFile::EFileAttrib _AttributeMask = NFile::EFileAttrib_UserRead | NFile::EFileAttrib_UserWrite | NFile::EFileAttrib_UserExecute | NFile::EFileAttrib_UnixAttributesValid
-			 	, NFile::EFileAttrib _AttributeAdd = NFile::EFileAttrib_None
-			 	, NConcurrency::TCActor<CActor> const &_FileActor = {}
+				NStr::CStr const &_BasePath
+				, NFile::EFileAttrib _AttributeMask = NFile::EFileAttrib_UserRead | NFile::EFileAttrib_UserWrite | NFile::EFileAttrib_UserExecute | NFile::EFileAttrib_UnixAttributesValid
+				, NFile::EFileAttrib _AttributeAdd = NFile::EFileAttrib_None
+				, NConcurrency::TCActor<CActor> const &_FileActor = {}
 			)
 		;
 		

@@ -77,7 +77,7 @@ namespace NMib::NCloud
 		
 		CFileTransferContext::CInternal::CManifest Manifest = co_await
 			(
-			 	g_Dispatch(Cache.m_FileActor) / [RootDirectory = Internal.m_RootDirectory, _Flags]() -> CFileTransferContext::CInternal::CManifest
+				g_Dispatch(Cache.m_FileActor) / [RootDirectory = Internal.m_RootDirectory, _Flags]() -> CFileTransferContext::CInternal::CManifest
 				{
 					CFileTransferContext::CInternal::CManifest Manifest;
 
@@ -129,7 +129,7 @@ namespace NMib::NCloud
 					}
 					return Manifest;
 				}
-			 	% "Failed to generate current manifest"
+				% "Failed to generate current manifest"
 			)
 		;
 		CFileTransferContext StartDownloadResult;

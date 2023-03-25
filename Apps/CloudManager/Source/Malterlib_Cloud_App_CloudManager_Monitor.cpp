@@ -159,9 +159,9 @@ namespace NMib::NCloud::NCloudManager
 	{
 		mp_MonitorTimerSubscription = co_await fg_RegisterTimer
 			(
-			 	60.0
-			 	, [this]() -> TCFuture<void>
-			 	{
+				60.0
+				, [this]() -> TCFuture<void>
+				{
 					if (f_IsDestroyed())
 						co_return {};
 

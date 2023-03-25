@@ -268,7 +268,7 @@ namespace NMib::NCloud::NAppManager
 					, AllowSourceExist = State.m_AllowSourceExist
 					, SourcePath = State.m_SourcePath
 					, pUniqueUserGroup = mp_pUniqueUserGroup
-				 	, RootDirectory = mp_State.m_RootDirectory
+					, RootDirectory = mp_State.m_RootDirectory
 				]
 				() mutable
 				{
@@ -378,7 +378,7 @@ namespace NMib::NCloud::NAppManager
 					, Files = State.m_Files
 					, pApplication = State.m_pApplication
 					, pUniqueUserGroup = mp_pUniqueUserGroup
-				 	, fOnInfo = State.m_fOnInfo
+					, fOnInfo = State.m_fOnInfo
 				]
 				{
 					// 3. Delete old files

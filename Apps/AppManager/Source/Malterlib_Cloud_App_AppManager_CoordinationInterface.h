@@ -32,7 +32,7 @@ namespace NMib::NCloud::NAppManager
 
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
 		{
- 			template <typename tf_CStream>
+			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
 			using CVersionManager::CVersionIDAndPlatform::CVersionIDAndPlatform;
@@ -41,7 +41,7 @@ namespace NMib::NCloud::NAppManager
 		
 		struct CAppInfo
 		{
- 			template <typename tf_CStream>
+			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
 			CStr m_Group;
@@ -60,7 +60,7 @@ namespace NMib::NCloud::NAppManager
 		
 		struct CAppChange_Update : public CAppInfo
 		{
- 			template <typename tf_CStream>
+			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 			
 			using CAppInfo::operator =;
@@ -70,7 +70,7 @@ namespace NMib::NCloud::NAppManager
 		
 		struct CAppChange_Remove
 		{
- 			template <typename tf_CStream>
+			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 			
 			CStr m_Application;
@@ -78,7 +78,7 @@ namespace NMib::NCloud::NAppManager
 
 		struct CAppChange_AddKnownHosts
 		{
- 			template <typename tf_CStream>
+			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
 			CStr m_Group;

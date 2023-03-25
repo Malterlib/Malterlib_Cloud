@@ -172,9 +172,9 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		DownloadState.m_DownloadVersionReceive = fg_ConstructActor<CFileTransferReceive>
 			(
-			 	_DestinationDir
-			 	, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_GroupRead | EFileAttrib_EveryoneRead | EFileAttrib_UnixAttributesValid
-			 	, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_GroupRead | EFileAttrib_EveryoneRead | EFileAttrib_UnixAttributesValid
+				_DestinationDir
+				, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_GroupRead | EFileAttrib_EveryoneRead | EFileAttrib_UnixAttributesValid
+				, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_GroupRead | EFileAttrib_EveryoneRead | EFileAttrib_UnixAttributesValid
 			)
 		;
 		DownloadState.m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, 16*1024*1024, CFileTransferReceive::EReceiveFlag_FailOnExisting)

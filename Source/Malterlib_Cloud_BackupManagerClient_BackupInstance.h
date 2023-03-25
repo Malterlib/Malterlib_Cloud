@@ -31,7 +31,7 @@ namespace NMib::NCloud::NPrivate
 			(
 				TCDistributedActor<CBackupManager> const &_BackupManager
 				, CDirectoryManifest const &_Manifest
-			 	, TCMap<CStr, CBackupManagerClient_ChecksumState> const &_InitialChecksumState
+				, TCMap<CStr, CBackupManagerClient_ChecksumState> const &_InitialChecksumState
 				, CBackupManagerClient::CConfig const &_Config
 				, CTrustedActorInfo const &_ActorInfo
 				, TCWeakActor<CBackupManagerClient> const &_BackupManagerClient
@@ -45,10 +45,10 @@ namespace NMib::NCloud::NPrivate
 		void f_MarkActive(bool _bActive);
 		TCFuture<void> f_ManifestChanged
 			(
-			 	CStr const &_FileName
-			 	, CBackupManagerBackup::CManifestChange const &_ManifestChange
-			 	, bool _bDirty
-			 	, CBackupManagerClient_ChecksumState const &_ChecksumState
+				CStr const &_FileName
+				, CBackupManagerBackup::CManifestChange const &_ManifestChange
+				, bool _bDirty
+				, CBackupManagerClient_ChecksumState const &_ChecksumState
 			)
 		;
 
@@ -157,7 +157,7 @@ namespace NMib::NCloud::NPrivate
 				, TCPromise<bool> const &_Promise
 				, uint64 _Length
 				, TCSharedPointer<CAppendFileCache> const &_pFile
-			 	, bool _bForceSync
+				, bool _bForceSync
 			)
 		;
 		void fp_AppendSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, mint _SyncSequence);
@@ -176,9 +176,9 @@ namespace NMib::NCloud::NPrivate
 		void fp_SequenceReadSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun);
 		void fp_SequenceMultipleSyncs
 			(
-			 	TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun
-			 	, TCVector<CStr> const &_WriteFiles
-			 	, TCVector<CStr> const &_ReadFiles
+				TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun
+				, TCVector<CStr> const &_WriteFiles
+				, TCVector<CStr> const &_ReadFiles
 			)
 		;
 		void fp_RunSequencedSyncs(CStr const &_FileName);

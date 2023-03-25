@@ -212,12 +212,12 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 						CProcessLaunch::fs_KillProcesses
 							(
-							 	[&](CProcessInfo const &_ProcessInfo)
-							 	{
+								[&](CProcessInfo const &_ProcessInfo)
+								{
 									return _ProcessInfo.m_RealUID == UID;
 								}
-							 	, EProcessInfoFlag_User
-							 	, 0.5
+								, EProcessInfoFlag_User
+								, 0.5
 							)
 						;
 					}
@@ -438,9 +438,9 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				CProcessLaunch::fs_LaunchTool(_AppManager.m_RootPath / "AppManager", Params, _AppManager.m_RootPath);
 				CProcessLaunch::fs_LaunchTool
 					(
-					 	_AppManager.m_RootPath / "AppManager"
-					 	, {"--application-change-settings", "--name", PackageName, "--version-manager-application", PackageName}
-					 	, _AppManager.m_RootPath
+						_AppManager.m_RootPath / "AppManager"
+						, {"--application-change-settings", "--name", PackageName, "--version-manager-application", PackageName}
+						, _AppManager.m_RootPath
 					)
 				;
 

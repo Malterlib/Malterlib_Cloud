@@ -248,9 +248,9 @@ namespace NMib::NCloud::NSecretsManager
 
 		auto HasPermissions = co_await
 			(
-			 	This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions)
-			 	% "Permission denied getting secret properties"
-			 	% Auditor
+				This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions)
+				% "Permission denied getting secret properties"
+				% Auditor
 			)
 		;
 
@@ -296,9 +296,9 @@ namespace NMib::NCloud::NSecretsManager
 
 		auto HasPermissions = co_await
 			(
-			 	This.mp_Permissions.f_HasPermissions("Get secret by semantic ID from SecretsManager", Permissions)
-			 	% "Permission denied getting secret by semantic ID"
-			 	% Auditor
+				This.mp_Permissions.f_HasPermissions("Get secret by semantic ID from SecretsManager", Permissions)
+				% "Permission denied getting secret by semantic ID"
+				% Auditor
 			)
 		;
 
@@ -384,7 +384,7 @@ namespace NMib::NCloud::NSecretsManager
 			{
 				fsp_AddPermissionQueryIndexedByPermission
 					(
-					 	"Write"
+						"Write"
 						, _Secret.m_SemanticID ? *_Secret.m_SemanticID : pSecretProperties->m_SemanticID
 						, _Secret.m_Tags ? *_Secret.m_Tags : pSecretProperties->m_Tags
 						, Permissions
@@ -397,9 +397,9 @@ namespace NMib::NCloud::NSecretsManager
 
 		auto HasPermissions = co_await
 			(
-			 	This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions)
-			 	% "Permission denied setting secret properties"
-			 	% Auditor
+				This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions)
+				% "Permission denied setting secret properties"
+				% Auditor
 			)
 		;
 

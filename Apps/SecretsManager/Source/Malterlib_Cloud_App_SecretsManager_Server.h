@@ -143,7 +143,7 @@ namespace NMib::NCloud::NSecretsManager
 				, TCOptional<CStrSecure> const &_SemanticID
 				, TCOptional<CStrSecure> const &_Name
 				, TCSet<CStrSecure> const &_TagsExclusive
-			 	, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
+				, TCMap<CStr, TCVector<CPermissionQuery>> &o_Permissions
 			)
 		;
 		void fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove,TCSet<CStrSecure> const &_TagsToAdd);

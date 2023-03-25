@@ -110,9 +110,9 @@ namespace NMib::NCloud::NVersionManager
 
 		auto Result = co_await
 			(
-			 	g_Dispatch(QueryFileActor) /
-			 	[Applications, RootDirectory = mp_AppState.m_RootDirectory]()
-			 	-> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>
+				g_Dispatch(QueryFileActor) /
+				[Applications, RootDirectory = mp_AppState.m_RootDirectory]()
+				-> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>
 				{
 					CStr ApplicationDirectory = RootDirectory + "/Applications";
 					NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>> VersionsPerApplication;

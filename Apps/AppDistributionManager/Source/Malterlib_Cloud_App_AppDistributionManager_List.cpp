@@ -57,18 +57,18 @@ namespace NMib::NCloud::NAppDistributionManager
 
 			TableRenderer.f_AddRow
 				(
-				 	Name
-				 	, Distribution.m_Settings.m_VersionManagerApplication
-				 	, "{vs,vb}"_f << Distribution.m_Settings.m_Tags
-				 	, "{vs,vb}"_f << Distribution.m_Settings.m_Platforms
-				 	, "{vs,vb}"_f << Distribution.m_Settings.m_BranchWildcards
-				 	, "{vs,vb}"_f << DeployDestinations
-				 	, Distribution.m_Settings.m_RenameTemplate
+					Name
+					, Distribution.m_Settings.m_VersionManagerApplication
+					, "{vs,vb}"_f << Distribution.m_Settings.m_Tags
+					, "{vs,vb}"_f << Distribution.m_Settings.m_Platforms
+					, "{vs,vb}"_f << Distribution.m_Settings.m_BranchWildcards
+					, "{vs,vb}"_f << DeployDestinations
+					, Distribution.m_Settings.m_RenameTemplate
 				)
 			;
 		}
 
- 		if (!bVerbose)
+		if (!bVerbose)
 		{
 			TableRenderer.f_RemoveColumn(6);
 			TableRenderer.f_RemoveColumn(5);
@@ -85,8 +85,8 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions
 		(
-		 	CEJSON const &_Params
-		 	, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			CEJSON const &_Params
+			, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
 		)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
@@ -123,7 +123,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			}
 		}
 
- 		if (!bVerbose)
+		if (!bVerbose)
 			TableRenderer.f_RemoveColumn(9);
 
 		TableRenderer.f_Output(_Params);

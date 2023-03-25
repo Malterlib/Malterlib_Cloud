@@ -63,7 +63,7 @@ namespace NMib::NCloud::NSecretsManager
 				;
 
 				if (!HasPermissions)
- 				{
+				{
 					CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo, {});
 					Auditor.f_Error("Errors checking permissions for subscription:  {}"_f << HasPermissions.f_GetExceptionStr());
 					co_return {};
@@ -204,9 +204,9 @@ namespace NMib::NCloud::NSecretsManager
 
 		auto HasPermissions = co_await
 			(
-			 	This.mp_Permissions.f_HasPermissions("Subscribe to changes from SecretsManager", Permissions)
-			 	% "Permission denied subscribing to changes"
-			 	% Auditor
+				This.mp_Permissions.f_HasPermissions("Subscribe to changes from SecretsManager", Permissions)
+				% "Permission denied subscribing to changes"
+				% Auditor
 			)
 		;
 

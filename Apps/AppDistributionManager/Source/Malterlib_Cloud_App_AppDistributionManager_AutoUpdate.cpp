@@ -70,10 +70,10 @@ namespace NMib::NCloud::NAppDistributionManager
 
 				if
 					(
-					 	auto *pPreviouslyDistributed = Distribution.m_DeployedVersions.f_FindEqual(VersionID)
-					 	; pPreviouslyDistributed
+						auto *pPreviouslyDistributed = Distribution.m_DeployedVersions.f_FindEqual(VersionID)
+						; pPreviouslyDistributed
 						&& pPreviouslyDistributed->m_RetrySequence == VersionInfo.m_RetrySequence
-					 	&& pPreviouslyDistributed->m_Time == VersionInfo.m_Time
+						&& pPreviouslyDistributed->m_Time == VersionInfo.m_Time
 					)
 				{
 					continue;
@@ -81,8 +81,8 @@ namespace NMib::NCloud::NAppDistributionManager
 
 				if
 					(
-					 	auto *pPreviouslyDistributed = Distribution.m_TriedDeployVersions.f_FindEqual(VersionID)
-					 	; pPreviouslyDistributed && *pPreviouslyDistributed == VersionInfo
+						auto *pPreviouslyDistributed = Distribution.m_TriedDeployVersions.f_FindEqual(VersionID)
+						; pPreviouslyDistributed && *pPreviouslyDistributed == VersionInfo
 					)
 				{
 					continue;
@@ -163,9 +163,9 @@ namespace NMib::NCloud::NAppDistributionManager
 					(
 						Malterlib/Cloud/AppDistributionManager
 						, Info
-					 	, "Downloading '{}' ({}) version '{}'"
+						, "Downloading '{}' ({}) version '{}'"
 						, DistributionName
-					 	, VersionManagerApplicationName
+						, VersionManagerApplicationName
 						, VersionID
 					)
 				;
@@ -197,11 +197,11 @@ namespace NMib::NCloud::NAppDistributionManager
 												(
 													Malterlib/Cloud/AppDistributionManager
 													, Error
-												 	, "Failed to clean up downloaded application '{}' ({}) version '{}': {}"
+													, "Failed to clean up downloaded application '{}' ({}) version '{}': {}"
 													, DistributionName
-												  	, VersionManagerApplicationName
+													, VersionManagerApplicationName
 													, VersionID
-												 	, _Result.f_GetExceptionStr()
+													, _Result.f_GetExceptionStr()
 												)
 											;
 										}
@@ -238,9 +238,9 @@ namespace NMib::NCloud::NAppDistributionManager
 										(
 											Malterlib/Cloud/AppDistributionManager
 											, Info
-										 	, "Deploying '{}' ({}) version '{}' to '{}'"
+											, "Deploying '{}' ({}) version '{}' to '{}'"
 											, DistributionName
-										 	, VersionManagerApplicationName
+											, VersionManagerApplicationName
 											, VersionID
 											, DeployDestinationName
 										)
@@ -360,11 +360,11 @@ namespace NMib::NCloud::NAppDistributionManager
 											{
 												Promise.f_SetException
 													(
-													 	DMibErrorInstance
-													 	(
+														DMibErrorInstance
+														(
 															"Successfully deployed to {vs}, but failed to deploy to some deploy destinations:\n{}"_f
-														 	<< SuccessFullDeploys
-														 	<< DeployFailures
+															<< SuccessFullDeploys
+															<< DeployFailures
 														)
 													)
 												;

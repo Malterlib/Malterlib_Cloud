@@ -70,9 +70,9 @@ namespace NMib::NCloud::NPrivate
 
 	void CBackupManagerClient_Instance::fp_SequenceMultipleSyncs
 		(
-		 	TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun
-		 	, TCVector<CStr> const &_WriteFiles
-		 	, TCVector<CStr> const &_ReadFiles
+			TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun
+			, TCVector<CStr> const &_WriteFiles
+			, TCVector<CStr> const &_ReadFiles
 		)
 	{
 		if (_WriteFiles.f_IsEmpty() && _ReadFiles.f_IsEmpty())

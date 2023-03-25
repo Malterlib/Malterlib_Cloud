@@ -266,8 +266,8 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<CSecret> f_GetSecretBySemanticID(CGetSecretBySemanticID const &_Options) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> f_DownloadFile
 			(
-			 	CSecretID &&_ID
-			 	, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription
+				CSecretID &&_ID
+				, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription
 			) = 0
 		;
 		virtual NConcurrency::TCFuture<void> f_ModifyTags
@@ -282,9 +282,9 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<void> f_RemoveSecret(CSecretID &&_ID) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()>> f_UploadFile
 			(
-			 	CSecretID &&_ID
-			 	, NStr::CStrSecure const &_FileName
-			 	, NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> &&_Uploader
+				CSecretID &&_ID
+				, NStr::CStrSecure const &_FileName
+				, NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> &&_Uploader
 			) = 0
 		;
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeToChanges(CSubscribeToChanges &&_Params) = 0;

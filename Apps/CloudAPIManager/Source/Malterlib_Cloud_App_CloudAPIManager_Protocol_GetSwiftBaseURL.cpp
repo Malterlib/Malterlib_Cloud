@@ -25,9 +25,9 @@ namespace NMib::NCloud::NCloudAPIManager
 		
 		bool bHasPermission = co_await
 			(
-			 	pThis->mp_Permissions.f_HasPermission("Get swift base URL", Permissions)
-			 	% "Permission denied getting swift base URL"
-			 	% Auditor
+				pThis->mp_Permissions.f_HasPermission("Get swift base URL", Permissions)
+				% "Permission denied getting swift base URL"
+				% Auditor
 			)
 		;
 		if (!bHasPermission)

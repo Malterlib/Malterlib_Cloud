@@ -10,7 +10,7 @@ namespace NMib::NCloud::NBackupManager
 		(
 			FRunRSyncProtocol &&_fRunProtocol
 			, uint64 _ManifestSize
-		 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
+			, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 		)
 	{
 		auto ProtocolVersion = fg_GetCallingHostInfo().f_GetProtocolVersion();
@@ -29,8 +29,8 @@ namespace NMib::NCloud::NBackupManager
 
 		return Promise <<= fg_CallSafe
 			(
-			 	Internal
-			 	, &CInternal::f_StartRSyncShared
+				Internal
+				, &CInternal::f_StartRSyncShared
 				, fg_Move(_fRunProtocol)
 				, FileName
 				, OldFileName
@@ -48,7 +48,7 @@ namespace NMib::NCloud::NBackupManager
 						Internal.m_bManifestSyncDone = true;
 					return Promise <<= _Result;
 				}
-			 	, _ExpectedDigest
+				, _ExpectedDigest
 				, ProtocolVersion
 			)
 		;
@@ -83,9 +83,9 @@ namespace NMib::NCloud::NBackupManager
 
 				Internal.f_SequenceSyncs
 					(
-					 	_FileName
-					 	, [=](COnScopeExitShared &&_pCleanup)
-					 	{
+						_FileName
+						, [=](COnScopeExitShared &&_pCleanup)
+						{
 							auto &Internal = *mp_pInternal;
 							DMibLogWithCategory(Mib/Cloud/BackupManager, DebugVerbose1, "Add manifest: {}", _FileName);
 
@@ -143,9 +143,9 @@ namespace NMib::NCloud::NBackupManager
 
 				Internal.f_SequenceSyncs
 					(
-					 	_FileName
-					 	, [Promise, _FileName, this, PendingCleanup, _Change](COnScopeExitShared &&_pCleanup)
-					 	{
+						_FileName
+						, [Promise, _FileName, this, PendingCleanup, _Change](COnScopeExitShared &&_pCleanup)
+						{
 							auto &Internal = *mp_pInternal;
 							DMibLogWithCategory(Mib/Cloud/BackupManager, DebugVerbose1, "Remove manifest: {}", _FileName);
 
@@ -194,8 +194,8 @@ namespace NMib::NCloud::NBackupManager
 
 				Internal.f_SequenceMultipleSyncs
 					(
-					 	[=](COnScopeExitShared &&_pCleanup)
-					 	{
+						[=](COnScopeExitShared &&_pCleanup)
+						{
 							auto &Internal = *mp_pInternal;
 							DMibLogWithCategory(Mib/Cloud/BackupManager, DebugVerbose1, "Rename manifest: {} -> {}", Change.m_FromFileName, _FileName);
 
@@ -239,7 +239,7 @@ namespace NMib::NCloud::NBackupManager
 
 							fg_CallSafe(Internal, &CInternal::f_CommitManifestChange, _FileName, _Change, "rename") > Promise;
 						}
-					 	, {_FileName, Change.m_FromFileName}
+						, {_FileName, Change.m_FromFileName}
 					)
 				;
 				return Promise.f_MoveFuture();

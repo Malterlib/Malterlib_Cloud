@@ -68,7 +68,7 @@ Import "Apps/*/*.MHeader"
 				GenerateFile
 				{
 					Name `@(GeneratedDirectory)CloudVersionInfo.cpp`
-					Contents 	`#include <Mib/Cloud/VersionInfo>\n`\
+					Contents	`#include <Mib/Cloud/VersionInfo>\n`\
 								`namespace\n`\
 								`{\n`\
 								`	struct CRegisterCloudVersion\n`\
@@ -379,7 +379,7 @@ Property
 	}
 
 	MalterlibCloudVersionInfo: {...: any}
-	MalterlibCloudVersionInfo 	{
+	MalterlibCloudVersionInfo	{
 									Application: MalterlibCloudVersionInfo_Application
 									, Version: MalterlibCloudVersionInfo_Version
 									, Platform: MalterlibCloudPlatform

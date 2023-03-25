@@ -45,7 +45,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		auto Value = co_await
 			(
-			 	(
+				(
 					g_Dispatch(pThis->fp_GetCURLQueryActor()) / [ServiceInfo = fg_Move(ServiceInfo), _Params, StoragePolicy]() -> CStr
 					{
 						NException::CDisableExceptionTraceScope DisableTracing;
@@ -83,7 +83,7 @@ namespace NMib::NCloud::NCloudAPIManager
 						return URL;
 					}
 				 )
-			 	.f_Wrap()
+				.f_Wrap()
 			 )
 		;
 

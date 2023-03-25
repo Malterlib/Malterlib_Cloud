@@ -271,11 +271,11 @@ namespace NMib::NCloud::NCloudClient
 
 				TableRenderer.f_AddRow
 					(
-					 	HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
-					 	, BackupSource
-					 	, "{}"_f << BackupInfo.m_Earliest
-					 	, "{}"_f << BackupInfo.m_Latest
-					 	, CStr::fs_Join(Snapshots, "\n")
+						HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
+						, BackupSource
+						, "{}"_f << BackupInfo.m_Earliest
+						, "{}"_f << BackupInfo.m_Latest
+						, CStr::fs_Join(Snapshots, "\n")
 					)
 				;
 			}

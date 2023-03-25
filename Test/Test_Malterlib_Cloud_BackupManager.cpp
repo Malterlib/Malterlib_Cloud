@@ -358,10 +358,10 @@ public:
 			CFile::fs_CreateDirectory(CFile::fs_GetPath(m_BackupConfig.m_ManifestConfig.m_Root / _Destination));
 			CFile::fs_CreateSymbolicLink
 				(
-				 	_bRelative ? _Destination : m_BackupConfig.m_ManifestConfig.m_Root / _Destination
-				 	, m_BackupConfig.m_ManifestConfig.m_Root / _Name
-				 	, _bDirectory ? EFileAttrib_Directory : EFileAttrib_File
-				 	, _bRelative ? ESymbolicLinkFlag_Relative : ESymbolicLinkFlag_None
+					_bRelative ? _Destination : m_BackupConfig.m_ManifestConfig.m_Root / _Destination
+					, m_BackupConfig.m_ManifestConfig.m_Root / _Name
+					, _bDirectory ? EFileAttrib_Directory : EFileAttrib_File
+					, _bRelative ? ESymbolicLinkFlag_Relative : ESymbolicLinkFlag_None
 				)
 			;
 		}
@@ -700,7 +700,7 @@ public:
 				(
 					CBackupManager::mc_pDefaultNamespace
 					, fg_CreateSet<CStr>(BackupManagerHostID)
-				 	, c_WaitForSubscriptions
+					, c_WaitForSubscriptions
 				)
 				> SetupTrustResults.f_AddResult()
 			;
@@ -720,7 +720,7 @@ public:
 				TCPromise<void> Promise;
 				BackupManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 					(
-					 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{BackupManager.m_Address}
+						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{BackupManager.m_Address}
 					)
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
@@ -1614,11 +1614,11 @@ public:
 				FilesInLatest.f_Sort();
 				DMibExpect
 					(
-					 	FilesInLatest
-					 	, ==
-					 	, TCVector<CStr>
-					 	(
-						 	{
+						FilesInLatest
+						, ==
+						, TCVector<CStr>
+						(
+							{
 								LatestDir / "Dir1/File1"
 								, LatestDir / "Dir1/File2"
 							}
@@ -1666,11 +1666,11 @@ public:
 				FilesInLatest.f_Sort();
 				DMibExpect
 					(
-					 	FilesInLatest
-					 	, ==
-					 	, TCVector<CStr>
-					 	(
-						 	{
+						FilesInLatest
+						, ==
+						, TCVector<CStr>
+						(
+							{
 								LatestDir / "Dir1/File1"
 								, LatestDir / "Dir1/File2"
 								, LatestDir / "Dir2/File1"
@@ -1803,7 +1803,7 @@ public:
 					case 1:
 						{
 							CStr ToAdd = fGetDirectory() / ("File{}"_f << iFileSequence++);
- 							BackupHelper.f_CreateFile(ToAdd, Random.f_GetValue(8192u) + 1);
+							BackupHelper.f_CreateFile(ToAdd, Random.f_GetValue(8192u) + 1);
 							Files.f_Insert(ToAdd);
 						}
 						break;
@@ -1820,7 +1820,7 @@ public:
 					case 24: // Create directory
 						{
 							CStr ToAdd = "Dir{}"_f << iFileSequence++;
- 							BackupHelper.f_CreateDirectory(ToAdd);
+							BackupHelper.f_CreateDirectory(ToAdd);
 							Directories.f_Insert(ToAdd);
 						}
 						break;
@@ -1892,7 +1892,7 @@ public:
 							break;
 							CStr ToAdd = fGetDirectory() / ("Symlink{}"_f << iFileSequence++);
 							bool bDirectory = Random.f_GetValue(1u);
- 							BackupHelper.f_CreateSymlink(ToAdd, bDirectory ? "Dir1" : "File1", Random.f_GetValue(1u), bDirectory);
+							BackupHelper.f_CreateSymlink(ToAdd, bDirectory ? "Dir1" : "File1", Random.f_GetValue(1u), bDirectory);
 							Symlinks.f_Insert(ToAdd);
 						}
 						break;

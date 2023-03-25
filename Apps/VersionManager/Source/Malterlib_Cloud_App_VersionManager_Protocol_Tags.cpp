@@ -106,9 +106,9 @@ namespace NMib::NCloud::NVersionManager
 
 		auto FilteredTags = co_await
 			(
-			 	fg_CallSafe(pThis, &CServer::fp_FilterTags, "Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags)
-			 	% "Access denied filtering tags by permission"
-			 	% Auditor
+				fg_CallSafe(pThis, &CServer::fp_FilterTags, "Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags)
+				% "Access denied filtering tags by permission"
+				% Auditor
 			)
 		;
 

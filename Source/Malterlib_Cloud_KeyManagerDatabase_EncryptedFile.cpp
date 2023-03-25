@@ -12,12 +12,12 @@ namespace NMib::NCloud
 		CInternal(NStr::CStr const &_Path, NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt)
 			: m_AESContext
 			(
-			 	NCryptography::CEncryptKeyIV::fs_GenerateKeyIV
-			 	(
-				 	_Password
-				 	, _Salt
-				 	, NCryptography::CKeyDerivationSettings_PKCS5_Deprecated{NCryptography::EDigestType_SHA256}
-				 	, NCryptography::ECryptoType_AES_256_CBC
+				NCryptography::CEncryptKeyIV::fs_GenerateKeyIV
+				(
+					_Password
+					, _Salt
+					, NCryptography::CKeyDerivationSettings_PKCS5_Deprecated{NCryptography::EDigestType_SHA256}
+					, NCryptography::ECryptoType_AES_256_CBC
 				)
 			)
 			, m_Path(_Path)

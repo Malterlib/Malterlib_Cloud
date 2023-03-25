@@ -24,7 +24,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCAsyncResult<bool> UpdateResult = co_await
 			(
-			 	g_Dispatch(mp_FileActor) / [SourceDir = _pApplication->f_GetDirectory()]() -> bool
+				g_Dispatch(mp_FileActor) / [SourceDir = _pApplication->f_GetDirectory()]() -> bool
 				{
 					CStr ProgramDir = CFile::fs_GetProgramDirectory();
 					CStr ProgramPath = CFile::fs_GetProgramPath();

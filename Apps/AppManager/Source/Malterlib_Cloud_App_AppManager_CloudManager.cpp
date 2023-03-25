@@ -19,7 +19,7 @@ namespace NMib::NCloud::NAppManager
 		Info.m_HostName = NProcess::NPlatform::fg_Process_GetFullyQualiedHostName();
 		Info.m_Platform = DMibStringize(DPlatform);
 		Info.m_PlatformFamily = DMibStringize(DPlatformFamily);
-  		Info.m_Version = (*g_CloudVersion).m_Version;
+		Info.m_Version = (*g_CloudVersion).m_Version;
 		Info.m_ProgramDirectory = mp_Settings.m_RootDirectory;
 
 		NMib::NProcess::CVersionInfo VersionInfo;

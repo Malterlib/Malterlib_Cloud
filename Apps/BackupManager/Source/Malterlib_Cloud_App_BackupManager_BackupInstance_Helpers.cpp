@@ -19,7 +19,7 @@ namespace NMib::NCloud::NBackupManager
 		pSequencedSync->m_Waiting.f_Pop()
 			(
 				g_OnScopeExitActor / [this, _FileName]
-			 	{
+				{
 					fp_RunSequencedSyncs(_FileName);
 				}
 			)
@@ -60,23 +60,23 @@ namespace NMib::NCloud::NBackupManager
 		{
 			f_SequenceSyncs
 				(
-				 	File
+					File
 					, [pState](COnScopeExitShared &&_pCleanup)
-				 	{
+					{
 						pState->m_CleanupScopes.f_Insert(fg_Move(_pCleanup));
 						if (--pState->m_nWaiting == 0)
 						{
 							pState->m_fToRun
 								(
 									g_OnScopeExitShared / [CleanupScopes = fg_Move(pState->m_CleanupScopes)]
-								 	{
+									{
 									}
 								)
 							;
 							pState->m_fToRun.f_Clear();
 						}
 					}
-			 	)
+				)
 			;
 		}
 	}

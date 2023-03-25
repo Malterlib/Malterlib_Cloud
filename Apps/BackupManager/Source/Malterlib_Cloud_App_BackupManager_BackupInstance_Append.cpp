@@ -24,7 +24,7 @@ namespace NMib::NCloud::NBackupManager
 
 		Internal.f_SequenceSyncs
 			(
-			 	_FileName
+				_FileName
 				, [=, Data = fg_Move(_Data)](COnScopeExitShared &&_pCleanup) mutable
 				{
 					auto &Internal = *mp_pInternal;

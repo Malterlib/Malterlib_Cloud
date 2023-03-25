@@ -30,7 +30,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Change Settings: {}", _Info);
 				}
-			 	, fg_GetCallingHostInfo()
+				, fg_GetCallingHostInfo()
 			)
 		;
 	}
@@ -53,7 +53,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto Result = co_await self
 			(
-			 	&CAppManagerActor::fp_ChangeApplicationSettings
+				&CAppManagerActor::fp_ChangeApplicationSettings
 				, Name
 				, Settings
 				, ChangedSettings
@@ -64,7 +64,7 @@ namespace NMib::NCloud::NAppManager
 					*_pCommandLine += _Info + DMibNewLine;
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{}", _Info);
 				}
-			 	, fg_GetCallingHostInfo()
+				, fg_GetCallingHostInfo()
 			)
 			.f_Wrap()
 		;
@@ -147,7 +147,7 @@ namespace NMib::NCloud::NAppManager
 			, bool _bUpdateFromVersionInfo
 			, bool _bForce
 			, TCFunction<void (CStr const &_Info)> &&_fOnInfo
-		 	, CCallingHostInfo const &_CallingHostInfo
+			, CCallingHostInfo const &_CallingHostInfo
 		)
 	{
 		auto Auditor = f_Auditor({}, _CallingHostInfo);
@@ -164,7 +164,7 @@ namespace NMib::NCloud::NAppManager
 
 		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
 			(
-			 	mp_Permissions.f_HasPermissions("Change applications settings in AppManager", Permissions, _CallingHostInfo) % "Permission denied changing application settings" % Auditor
+				mp_Permissions.f_HasPermissions("Change applications settings in AppManager", Permissions, _CallingHostInfo) % "Permission denied changing application settings" % Auditor
 			)
 		;
 

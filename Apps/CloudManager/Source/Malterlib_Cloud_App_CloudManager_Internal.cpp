@@ -41,13 +41,13 @@ namespace NMib::NCloud::NCloudManager
 		auto MaxDatabaseSize = mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("MaxDatabaseSize", g_MaxDatabaseSize).f_Integer();
 		co_await
 			(
-			 	mp_DatabaseActor
-			 	(
-				 	&CDatabaseActor::f_OpenDatabase
-				 	, mp_AppState.m_RootDirectory / "CloudManagerDatabase"
-				 	, MaxDatabaseSize
+				mp_DatabaseActor
+				(
+					&CDatabaseActor::f_OpenDatabase
+					, mp_AppState.m_RootDirectory / "CloudManagerDatabase"
+					, MaxDatabaseSize
 				)
-			 	% "Faild to open database"
+				% "Faild to open database"
 			)
 		;
 		auto Stats = co_await (mp_DatabaseActor(&CDatabaseActor::f_GetAggregateStatistics));

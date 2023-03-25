@@ -10,8 +10,8 @@ namespace NMib::NCloud::NBackupManager
 	{
 		co_return co_await
 			(
-			 	g_Dispatch(fp_GetQueryFileActor()) / [RootDirectory = mp_AppState.m_RootDirectory]
-			 	{
+				g_Dispatch(fp_GetQueryFileActor()) / [RootDirectory = mp_AppState.m_RootDirectory]
+				{
 					CStr FindPath = RootDirectory + "/Backups";
 					CFile::CFindFilesOptions FindOptions(FindPath + "/*_*", false);
 					FindOptions.m_AttribMask = EFileAttrib_Directory;
@@ -644,11 +644,11 @@ namespace NMib::NCloud::NBackupManager
 
 	TCFuture<void> CBackupSource::f_CommitAppend
 		(
-		 	CStr const &_BackupID
-		 	, CStr const &_File
-		 	, uint64 _Position
-		 	, CSecureByteVector &&_Data
-		 	, CBackupManagerBackup::CManifestChange &&_ManifestChange
+			CStr const &_BackupID
+			, CStr const &_File
+			, uint64 _Position
+			, CSecureByteVector &&_Data
+			, CBackupManagerBackup::CManifestChange &&_ManifestChange
 		)
 	{
 		CStr ManifestError;

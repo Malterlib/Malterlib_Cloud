@@ -64,7 +64,7 @@ namespace NMib::NCloud
 		
 		CPendingInfo PendingInfo = co_await
 			(
-			 	g_Dispatch(m_FileActor) / [PendingPaths]
+				g_Dispatch(m_FileActor) / [PendingPaths]
 				{
 					CPendingInfo PendingInfo;
 
@@ -596,10 +596,10 @@ namespace NMib::NCloud
 				
 				auto fSendManifestChange = [&]
 					(
-					 	CStr const &_Path
-					 	, CBackupManagerBackup::CManifestChange const &_ManifestChange
-					 	, bool _bDirty
-					 	, CBackupManagerClient_ChecksumState const &_ChecksumState
+						CStr const &_Path
+						, CBackupManagerBackup::CManifestChange const &_ManifestChange
+						, bool _bDirty
+						, CBackupManagerClient_ChecksumState const &_ChecksumState
 					)
 					{
 #if defined DMibContractConfigure_CheckEnabled
@@ -660,9 +660,9 @@ namespace NMib::NCloud
 							DMibCloudBackupManagerDebugOut("### {},{} {}.m_bRemoved {}.m_bAdded\n", Sequence, NotificationStr, RelativePathFrom, RelativePath);
 							fSendManifestChange
 								(
-								 	RelativePath, CBackupManagerBackup::CManifestChange_Rename{fg_Move(Change.m_ManifestFile), RelativePathFrom}
-								 	, Change.m_bIDChanged
-								 	, Change.m_ChecksumState
+									RelativePath, CBackupManagerBackup::CManifestChange_Rename{fg_Move(Change.m_ManifestFile), RelativePathFrom}
+									, Change.m_bIDChanged
+									, Change.m_ChecksumState
 								)
 							;
 							return;

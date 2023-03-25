@@ -341,7 +341,7 @@ namespace NMib::NCloud::NAppManager
 			else if (!m_RunAsUserPassword.f_IsEmpty())
 				return fError("For self update you cannot specify run as user password");
 #endif
- 			else if (!m_RunAsGroup.f_IsEmpty())
+			else if (!m_RunAsGroup.f_IsEmpty())
 				return fError("For self update you cannot specify run as group");
 		}
 		else

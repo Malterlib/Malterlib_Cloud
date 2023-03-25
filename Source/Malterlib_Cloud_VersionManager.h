@@ -278,7 +278,7 @@ namespace NMib::NCloud
 	{
 		CVersionManagerHelper
 			(
-			 	NStr::CStr const &_RootDirectory
+				NStr::CStr const &_RootDirectory
 				, NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> const &_FileActor = {}
 				, uint64 _QueueSize = 8*1024*1024
 				, fp64 _Timeout = 30.0

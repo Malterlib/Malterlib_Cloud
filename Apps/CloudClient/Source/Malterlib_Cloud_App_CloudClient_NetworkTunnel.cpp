@@ -229,7 +229,7 @@ namespace NMib::NCloud::NCloudClient
 							co_return {};
 						}
 						, g_ActorFunctor / [=](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void>
-					 	{
+						{
 							CStr ActionString;
 							auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 							ActionString = "{}Error    {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();

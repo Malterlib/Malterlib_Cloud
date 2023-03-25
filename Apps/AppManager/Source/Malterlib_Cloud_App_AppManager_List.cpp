@@ -108,7 +108,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto HasPermissions = co_await
 			(
-			 	pThis->mp_Permissions.f_HasPermissions("Enumerate Apps in AppManager", Permissions) % "Permission denied enumerating installed applications" % Auditor
+				pThis->mp_Permissions.f_HasPermissions("Enumerate Apps in AppManager", Permissions) % "Permission denied enumerating installed applications" % Auditor
 			)
 		;
 
@@ -151,7 +151,7 @@ namespace NMib::NCloud::NAppManager
 
 		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
 			(
-			 	pThis->mp_Permissions.f_HasPermissions("Enumerate versions in AppManager", Permissions) % "Permission denied enumerating versions" % Auditor
+				pThis->mp_Permissions.f_HasPermissions("Enumerate versions in AppManager", Permissions) % "Permission denied enumerating versions" % Auditor
 			)
 		;
 
@@ -311,13 +311,13 @@ namespace NMib::NCloud::NAppManager
 
 			TableRenderer.f_AddRow
 				(
-				 	ApplicationName
-				 	, Update
-				 	, Version
-				 	, Status
-				 	, Other
-				 	, Backup
-				 	, Script
+					ApplicationName
+					, Update
+					, Version
+					, Status
+					, Other
+					, Backup
+					, Script
 					, Application.m_VersionInfo.m_ExtraInfo.f_IsValid()
 					? Application.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", EJSONDialectFlag_AllowUndefined)
 					: CStr()
@@ -388,7 +388,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
- 		if (!bVerbose)
+		if (!bVerbose)
 			TableRenderer.f_RemoveColumn(9);
 
 		TableRenderer.f_Output(_Params);

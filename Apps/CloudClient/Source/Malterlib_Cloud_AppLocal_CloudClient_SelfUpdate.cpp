@@ -114,7 +114,7 @@ namespace NMib::NCloud::NCloudClient
 		auto TransferResult = co_await mp_VersionManagerHelper.f_Download(Version.m_Actor, "MalterlibCloud", VersionID, DestinationDirectory);
 		co_await
 			(
-			 	g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [DestinationDirectory]
+				g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [DestinationDirectory]
 				{
 					CStr StdOut;
 					CStr StdErr;
@@ -158,7 +158,7 @@ namespace NMib::NCloud::NCloudClient
 
 					CFile::fs_DeleteDirectoryRecursive(DestinationDirectory);
 				}
-			 	% "Failed to update version"
+				% "Failed to update version"
 			)
 		;
 

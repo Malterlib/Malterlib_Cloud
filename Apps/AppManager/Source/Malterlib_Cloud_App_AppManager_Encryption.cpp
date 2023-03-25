@@ -102,7 +102,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_await
 			(
-			 	self
+				self
 				(
 					&CAppManagerActor::fp_RunBashScript
 					, pScript
@@ -114,7 +114,7 @@ namespace NMib::NCloud::NAppManager
 							_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, Key) > fg_DiscardResult();
 					}
 				)
-			 	% "Failed to change encryption"
+				% "Failed to change encryption"
 			)
 		;
 

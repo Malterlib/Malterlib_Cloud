@@ -570,18 +570,18 @@ namespace NMib::NCloud::NCloudClient
 	template <typename tf_CType>
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl
 		(
-		 	CEJSON const &_Params
-		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			CEJSON const &_Params
+			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunctionMovable
-		 	<
-		 		TCFuture<tf_CType>
-	 			(
-				 	TCDistributedActor<CSecretsManager> const &_Actor
-				 	, TCOptional<CStrSecure> const &_SemanticID
+			<
+				TCFuture<tf_CType>
+				(
+					TCDistributedActor<CSecretsManager> const &_Actor
+					, TCOptional<CStrSecure> const &_SemanticID
 					, TCOptional<CStrSecure> const &_Name
-				 	, TCSet<CStrSecure> const &_Tags
+					, TCSet<CStrSecure> const &_Tags
 				)
-		 	> &&_fGetResult
+			> &&_fGetResult
 			, TCFunctionMovable
 			<
 				NStr::CStr
@@ -702,11 +702,11 @@ namespace NMib::NCloud::NCloudClient
 	{
 		return g_Future <<= self
 			(
-			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl<TCSet<CSecretsManager::CSecretID>>
+				&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl<TCSet<CSecretsManager::CSecretID>>
 				, _Params
-			 	, _pCommandLine
-			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCOptional<CStrSecure> const &_Name, TCSet<CStrSecure> const &_Tags)
-			 	-> TCFuture<TCSet<CSecretsManager::CSecretID>>
+				, _pCommandLine
+				, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCOptional<CStrSecure> const &_Name, TCSet<CStrSecure> const &_Tags)
+				-> TCFuture<TCSet<CSecretsManager::CSecretID>>
 				{
 					CSecretsManager::CEnumerateSecrets Options;
 					Options.m_SemanticID = _SemanticID;
@@ -715,7 +715,7 @@ namespace NMib::NCloud::NCloudClient
 
 					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_EnumerateSecrets)(fg_Move(Options));
 				}
-			 	, []
+				, []
 				(
 					TCSet<CSecretsManager::CSecretID> const &_Result
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
@@ -787,16 +787,16 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID
 		(
-		 	CEJSON const &_Params
-		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			CEJSON const &_Params
+			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 		)
 	{
 		return g_Future <<= self
 			(
-			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl<CSecretsManager::CSecret>
+				&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl<CSecretsManager::CSecret>
 				, _Params
-			 	, _pCommandLine
-			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCOptional<CStrSecure> const &_Name, TCSet<CStrSecure> const &_Tags)
+				, _pCommandLine
+				, [](TCDistributedActor<CSecretsManager> const &_Actor, TCOptional<CStrSecure> const &_SemanticID, TCOptional<CStrSecure> const &_Name, TCSet<CStrSecure> const &_Tags)
 				-> TCFuture<CSecretsManager::CSecret>
 				{
 					CSecretsManager::CGetSecretBySemanticID Options;
@@ -806,7 +806,7 @@ namespace NMib::NCloud::NCloudClient
 
 					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecretBySemanticID)(fg_Move(Options));
 				}
-			 	, []
+				, []
 				(
 					CSecretsManager::CSecret const &_Secret
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
@@ -831,8 +831,8 @@ namespace NMib::NCloud::NCloudClient
 	template<typename tf_CType>
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl
 		(
-		 	CEJSON const &_Params
-		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			CEJSON const &_Params
+			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
 			, TCFunctionMovable
 			<
@@ -921,14 +921,14 @@ namespace NMib::NCloud::NCloudClient
 	{
 		return g_Future <<= self
 			(
-			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl<CSecretsManager::CSecret>
+				&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl<CSecretsManager::CSecret>
 				, _Params
-			 	, _pCommandLine
-			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID) -> TCFuture<CSecretsManager::CSecret>
+				, _pCommandLine
+				, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID) -> TCFuture<CSecretsManager::CSecret>
 				{
 					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecret)(fg_TempCopy(_ID));
 				}
-			 	, []
+				, []
 				(
 					CSecretsManager::CSecret const &_Secret
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
@@ -953,14 +953,14 @@ namespace NMib::NCloud::NCloudClient
 	{
 		return g_Future <<= self
 			(
-			 	&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl<CSecretsManager::CSecretProperties>
+				&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl<CSecretsManager::CSecretProperties>
 				, _Params
-			 	, _pCommandLine
-			 	, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID) -> TCFuture<CSecretsManager::CSecretProperties>
+				, _pCommandLine
+				, [](TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID) -> TCFuture<CSecretsManager::CSecretProperties>
 				{
 					return g_Future <<= _Actor.f_CallActor(&CSecretsManager::f_GetSecretProperties)(fg_TempCopy(_ID));
 				}
-			 	, []
+				, []
 				(
 					CSecretsManager::CSecretProperties const &_Result
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
@@ -1395,7 +1395,7 @@ namespace NMib::NCloud::NCloudClient
 		NFile::CDirectorySyncReceive::CSyncResult Result = co_await
 			(
 				fg_DownloadSecretFile(pSecretsManager->m_Actor, fg_Move(ID), CDirectorySyncReceive::CConfig(Destination, Flags))
-			 	% "Failed to transfer secret file"
+				% "Failed to transfer secret file"
 			)
 		;
 

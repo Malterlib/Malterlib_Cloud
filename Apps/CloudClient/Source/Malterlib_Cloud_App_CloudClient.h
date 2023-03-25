@@ -91,8 +91,8 @@ namespace NMib::NCloud::NCloudClient
 		template<typename tf_CType>
 		TCFuture<uint32> fp_CommandLine_SecretsManager_EnumerateImpl
 		(
-		 	CEJSON const &_Params
-		 	, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			CEJSON const &_Params
+			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunctionMovable
 			<
 				TCFuture<tf_CType>
@@ -103,7 +103,7 @@ namespace NMib::NCloud::NCloudClient
 					, TCSet<CStrSecure> const &_Tags
 				)
 			>
-		 	&&_fGetResult
+			&&_fGetResult
 			, TCFunctionMovable
 			<
 				NStr::CStr
@@ -122,7 +122,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				CEJSON const &_Params
 				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-			 	, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
+				, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
 				, TCFunctionMovable
 				<
 					NStr::CStr

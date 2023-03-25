@@ -155,7 +155,7 @@ public:
 			co_await AppManagerTestHelper.f_Setup(nAppManagers);
 
 			// Update Application
- 			auto fUpdateTestApp = [&](TCSet<CStr> _Tags) -> CUnsafeFuture
+			auto fUpdateTestApp = [&](TCSet<CStr> _Tags) -> CUnsafeFuture
 				{
 					++PackageInfo.m_VersionID.m_VersionID.m_Revision;
 					PackageInfo.m_VersionInfo.m_Tags = _Tags;
@@ -291,14 +291,14 @@ public:
 									}
 									WholeState.m_MaxAppsInProgressPerAppManager[iAppManager] = fg_Max
 										(
-										 	WholeState.m_AppsInProgressPerAppManager[iAppManager]
-										 	, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
+											WholeState.m_AppsInProgressPerAppManager[iAppManager]
+											, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
 										)
 									;
 									WholeState.m_nMaxAppsInProgressPerAppManager = fg_Max
 										(
-										 	WholeState.m_nMaxAppsInProgressPerAppManager
-										 	, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
+											WholeState.m_nMaxAppsInProgressPerAppManager
+											, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
 										)
 									;
 								}

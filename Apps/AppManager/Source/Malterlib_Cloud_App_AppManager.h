@@ -45,8 +45,8 @@ namespace NMib::NCloud::NAppManager
 		struct CUpdateScripts
 		{
 			CStr m_PreUpdate;
- 			CStr m_PostUpdate;
- 			CStr m_PostLaunch;
+			CStr m_PostUpdate;
+			CStr m_PostLaunch;
 			CStr m_OnError;
 
 			CStr const &f_GetScript(EUpdateScript _Script) const;
@@ -384,7 +384,7 @@ namespace NMib::NCloud::NAppManager
 			;
 			auto f_SubscribeChangeNotifications
 				(
-				 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
+					NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
 				)
 				-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override
 			;
@@ -658,18 +658,18 @@ namespace NMib::NCloud::NAppManager
 		void fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication);
 		static void fsp_CreateApplicationUserGroup
 			(
-			 	CApplicationSettings const &_Settings
-			 	, TCFunction<void (CStr const &_Info)> const &_fLogInfo
-			 	, CStr const &_HomeDir
-			 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+				CApplicationSettings const &_Settings
+				, TCFunction<void (CStr const &_Info)> const &_fLogInfo
+				, CStr const &_HomeDir
+				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			)
 		;
 		static void fsp_UpdateApplicationFilePermissions
 			(
-			 	CStr const &_ApplicationDir
-			 	, TCSharedPointer<CApplication> const &_pApplication
-			 	, TCVector<CStr> const &_Files
-			 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+				CStr const &_ApplicationDir
+				, TCSharedPointer<CApplication> const &_pApplication
+				, TCVector<CStr> const &_Files
+				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 				, TCFunction<void (CStr const &_Info)> const &_fLogInfo
 			)
 		;
@@ -716,7 +716,7 @@ namespace NMib::NCloud::NAppManager
 				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
 				, CStr const &_FromLocalFile
 				, TCOptional<CVersionManager::CVersionIDAndPlatform> const &_Version
-			 	, CCallingHostInfo const &_CallingHostInfo
+				, CCallingHostInfo const &_CallingHostInfo
 			)
 		;
 
@@ -728,7 +728,7 @@ namespace NMib::NCloud::NAppManager
 				, bool _bUpdateFromVersionInfo
 				, bool _bForce
 				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
-			 	, CCallingHostInfo const &_CallingHostInfo
+				, CCallingHostInfo const &_CallingHostInfo
 			)
 		;
 
@@ -736,10 +736,10 @@ namespace NMib::NCloud::NAppManager
 			(
 				CStr _Name
 				, CAppManagerInterface::CApplicationUpdate _Update
-		 		, CVersionManager::CVersionInformation _VersionInfo
+				, CVersionManager::CVersionInformation _VersionInfo
 				, CStr _FromFileName
 				, TCFunction<void (CStr const &_Info)> _fOnInfo
-			 	, CCallingHostInfo _CallingHostInfo
+				, CCallingHostInfo _CallingHostInfo
 				, bool _bCheckPermissions = true
 			)
 		;
@@ -768,7 +768,7 @@ namespace NMib::NCloud::NAppManager
 		static void fsp_UpdateAttributes(CStr const &_File);
 		static CStr fsp_UnpackApplication
 			(
-			 	CStr const &_ApplicationRootDirectory
+				CStr const &_ApplicationRootDirectory
 				, CStr const &_Source
 				, CStr const &_Destination
 				, CStr const &_ApplicationName
@@ -776,7 +776,7 @@ namespace NMib::NCloud::NAppManager
 				, TCVector<CStr> &o_Files
 				, TCSet<CStr> const &_AllowExist
 				, bool _bForceInstall
-			 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			)
 		;
 		TCFuture<void> fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite);
@@ -810,10 +810,10 @@ namespace NMib::NCloud::NAppManager
 
 		bool fp_VersionIsNewer
 			(
-			 	CVersionManager::CVersionIDAndPlatform const &_LeftVersion
-			 	, CVersionManager::CVersionInformation const &_LeftVersionInfo
-			 	, CVersionManager::CVersionIDAndPlatform const &_RightVersion
-			 	, CVersionManager::CVersionInformation const &_RightVersionInfo
+				CVersionManager::CVersionIDAndPlatform const &_LeftVersion
+				, CVersionManager::CVersionInformation const &_LeftVersionInfo
+				, CVersionManager::CVersionIDAndPlatform const &_RightVersion
+				, CVersionManager::CVersionInformation const &_RightVersionInfo
 				, TCSet<CStr> const &_RequiredTags
 				, TCSet<CStr> const &_AllowedBranches
 			)
@@ -828,9 +828,9 @@ namespace NMib::NCloud::NAppManager
 				, CStr &o_Error
 				, EFindVersionFlag _Flags
 				, CVersionManager::CVersionInformation &o_VersionInfo
-			 	, CVersionManager::CVersionIDAndPlatform &o_NewestUnconditionalVersion
-			 	, CVersionManager::CVersionInformation &o_NewestUnconditionalVersionInfo
-			 	, bool &o_bNewestUnconditionalVersionChanged
+				, CVersionManager::CVersionIDAndPlatform &o_NewestUnconditionalVersion
+				, CVersionManager::CVersionInformation &o_NewestUnconditionalVersionInfo
+				, bool &o_bNewestUnconditionalVersionChanged
 			)
 		;
 
@@ -856,7 +856,7 @@ namespace NMib::NCloud::NAppManager
 				TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
 				, EUpdateStage _Stage
 				, NStr::CStr _Message
-			 	, CAppManagerInterface::CUpdateNotification _Notification
+				, CAppManagerInterface::CUpdateNotification _Notification
 			)
 		;
 

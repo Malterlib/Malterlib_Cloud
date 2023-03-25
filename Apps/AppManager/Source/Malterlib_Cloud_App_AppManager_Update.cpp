@@ -30,7 +30,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application '{}': {}", _Name, _Info);
 				}
-			 	, fg_GetCallingHostInfo()
+				, fg_GetCallingHostInfo()
 			)
 		;
 	}
@@ -102,7 +102,7 @@ namespace NMib::NCloud::NAppManager
 					*_pCommandLine += _Info + DMibNewLine;
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application '{}': {}", Name, _Info);
 				}
-			 	, fg_GetCallingHostInfo()
+				, fg_GetCallingHostInfo()
 			)
 			.f_Wrap()
 		;
@@ -117,7 +117,7 @@ namespace NMib::NCloud::NAppManager
 			, CVersionManager::CVersionInformation _VersionInfo
 			, CStr _FromFileName
 			, TCFunction<void (CStr const &_Info)> _fOnInfo
-		 	, CCallingHostInfo _CallingHostInfo
+			, CCallingHostInfo _CallingHostInfo
 			, bool _bCheckPermissions
 		)
 	{
@@ -132,9 +132,9 @@ namespace NMib::NCloud::NAppManager
 
 			auto HasPermissions = co_await
 				(
-				 	mp_Permissions.f_HasPermissions("Update application in AppManager", Permissions, _CallingHostInfo)
-				 	% "Permission denied updating application"
-				 	% Auditor
+					mp_Permissions.f_HasPermissions("Update application in AppManager", Permissions, _CallingHostInfo)
+					% "Permission denied updating application"
+					% Auditor
 				)
 			;
 

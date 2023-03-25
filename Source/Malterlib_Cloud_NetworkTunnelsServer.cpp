@@ -21,12 +21,12 @@ namespace NMib::NCloud
 	{
 		CInternal
 			(
-			 	CNetworkTunnelsServer *_pThis
-			 	, TCActor<CActorDistributionManager> const &_DistributionManager
-			 	, TCActor<CDistributedActorTrustManager> const &_TrustManager
-			 	, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
-			 	, CStr const &_LogCategory
-			 	, CStr const &_PermissionPrefix
+				CNetworkTunnelsServer *_pThis
+				, TCActor<CActorDistributionManager> const &_DistributionManager
+				, TCActor<CDistributedActorTrustManager> const &_TrustManager
+				, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
+				, CStr const &_LogCategory
+				, CStr const &_PermissionPrefix
 			)
 			: m_pThis(_pThis)
 			, m_DistributionManager(_DistributionManager)
@@ -215,11 +215,11 @@ namespace NMib::NCloud
 
 	CNetworkTunnelsServer::CNetworkTunnelsServer
 		(
-		 	TCActor<CActorDistributionManager> const &_DistributionManager
-		 	, TCActor<CDistributedActorTrustManager> const &_TrustManager
-		 	, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
-		 	, CStr const &_LogCategory
-		 	, CStr const &_PermissionPrefix
+			TCActor<CActorDistributionManager> const &_DistributionManager
+			, TCActor<CDistributedActorTrustManager> const &_TrustManager
+			, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
+			, CStr const &_LogCategory
+			, CStr const &_PermissionPrefix
 		)
 		: mp_pInternal(fg_Construct(this, _DistributionManager, _TrustManager, fg_Move(_AuditorFactory), _LogCategory, _PermissionPrefix))
 	{
@@ -267,10 +267,10 @@ namespace NMib::NCloud
 
 	TCFuture<CActorSubscription> CNetworkTunnelsServer::f_PublishNetworkTunnel
 		(
-		 	ICNetworkTunnels::CNetworkTunnelName const &_Name
-		 	, CStr const &_Host
-		 	, uint16 _Port
-		 	, CEJSON &&_MetaData
+			ICNetworkTunnels::CNetworkTunnelName const &_Name
+			, CStr const &_Host
+			, uint16 _Port
+			, CEJSON &&_MetaData
 		)
 	{
 		auto &Internal = *mp_pInternal;

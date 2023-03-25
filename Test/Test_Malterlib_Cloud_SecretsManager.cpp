@@ -434,7 +434,7 @@ public:
 #endif
 			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 				(
-				 	fNamespaceHosts(CKeyManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(KeyManagerHostID))
+					fNamespaceHosts(CKeyManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(KeyManagerHostID))
 				)
 				> SetupTrustResults.f_AddResult()
 			;
@@ -443,7 +443,7 @@ public:
 				(
 					CSecretsManager::mc_pDefaultNamespace
 					, fg_CreateSet<CStr>(SecretsManagerHostID)
-				 	, c_WaitForSubscriptions
+					, c_WaitForSubscriptions
 				)
 				> SetupTrustResults.f_AddResult()
 			;
@@ -466,7 +466,7 @@ public:
 				TCPromise<void> Promise;
 				SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 					(
-					 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SecretsManager.m_Address}
+						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SecretsManager.m_Address}
 					)
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
@@ -481,7 +481,7 @@ public:
 			TCPromise<void> Promise;
 			KeyManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
 				(
-				 	CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{KeyManagerServerAddress}
+					CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{KeyManagerServerAddress}
 				)
 				> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 				{
@@ -851,7 +851,7 @@ public:
 					DMibTestPath("Changes 5");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder1/Name1"));
 				}
- 				// Remove non-present tag
+				// Remove non-present tag
 				DMibExpect(*(fAddTagsAndGetProperties("Folder1", "Name1", {{"Added"}},   {}                      )).m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
 				{
 					DMibTestPath("Changes 6");
@@ -940,7 +940,7 @@ public:
 					DMibTestPath("Changes 8");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name2"));
 				}
- 				DMibExpect(*fSetKeyValueAndGet("Folder2", "Name1", "Key3", "Value3").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{{"Key3", "Value3"}}));
+				DMibExpect(*fSetKeyValueAndGet("Folder2", "Name1", "Key3", "Value3").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSON>{{"Key3", "Value3"}}));
 				{
 					DMibTestPath("Changes 9");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name1"));
@@ -1819,12 +1819,12 @@ public:
 
 			auto fUpload = [&]
 				(
-				 	CSecretsManager::CSecretID const &_ID
-				   	, CStr const &_FileName
-				   	, CStr const &_BasePath
-				 	, CActorSubscription &o_Subscription
-				   	, NThread::CEvent *_pOpenEvent = nullptr
-				   	, NThread::CEvent *_pCloseEvent = nullptr
+					CSecretsManager::CSecretID const &_ID
+					, CStr const &_FileName
+					, CStr const &_BasePath
+					, CActorSubscription &o_Subscription
+					, NThread::CEvent *_pOpenEvent = nullptr
+					, NThread::CEvent *_pCloseEvent = nullptr
 				)
 				-> TCFuture<uint32>
 				{
@@ -1865,11 +1865,11 @@ public:
 			;
 			auto fDownload = [&]
 				(
-				 	CSecretsManager::CSecretID _ID
-				 	, CStr const &_Outfile
-				 	, CStr const &_BasePath
-				 	, NThread::CEvent *_pOpenEvent = nullptr
-				 	, CDirectorySyncReceive::EEasyConfigFlag _Flags = CDirectorySyncReceive::EEasyConfigFlag_None
+					CSecretsManager::CSecretID _ID
+					, CStr const &_Outfile
+					, CStr const &_BasePath
+					, NThread::CEvent *_pOpenEvent = nullptr
+					, CDirectorySyncReceive::EEasyConfigFlag _Flags = CDirectorySyncReceive::EEasyConfigFlag_None
 				)
 				-> TCFuture<uint32>
 				{

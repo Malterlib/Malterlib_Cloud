@@ -296,7 +296,7 @@ namespace NMib::NCloud::NAppManager
 					{
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Auto update application '{}': {}", Name, _Info);
 					}
-				 	, fg_GetCallingHostInfo()
+					, fg_GetCallingHostInfo()
 					, false
 				)
 				> [](TCAsyncResult<> &&_Results) mutable

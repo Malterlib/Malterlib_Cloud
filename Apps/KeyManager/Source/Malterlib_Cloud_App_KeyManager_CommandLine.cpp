@@ -144,7 +144,7 @@ namespace NMib::NCloud::NKeyManager
 
 									return Promise.f_MoveFuture();
 								}
-							 	, true
+								, true
 								, "Already processing a password. Try again later."
 							)
 						;

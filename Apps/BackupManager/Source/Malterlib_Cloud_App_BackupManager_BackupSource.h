@@ -30,20 +30,20 @@ namespace NMib::NCloud::NBackupManager
 
 		TCFuture<CInitialCommitResult> f_InitialCommit
 			(
-			 	CStr const &_BackupID
-			 	, CStr const &_Directory
-			 	, CDirectoryManifest &&_Manifest
-			 	, CBackupManagerBackup::EInitialBackupFinishedFlag _FinishedFlags
+				CStr const &_BackupID
+				, CStr const &_Directory
+				, CDirectoryManifest &&_Manifest
+				, CBackupManagerBackup::EInitialBackupFinishedFlag _FinishedFlags
 			)
 		;
 		TCFuture<void> f_Commit(CStr const &_BackupID, CStr const &_File, CBackupManagerBackup::CManifestChange const &_ManifestChange);
 		TCFuture<void> f_CommitAppend
 			(
-			 	CStr const &_BackupID
-			 	, CStr const &_File
-			 	, uint64 _Position
-			 	, CSecureByteVector &&_Data
-			 	, CBackupManagerBackup::CManifestChange &&_ManifestChange
+				CStr const &_BackupID
+				, CStr const &_File
+				, uint64 _Position
+				, CSecureByteVector &&_Data
+				, CBackupManagerBackup::CManifestChange &&_ManifestChange
 			)
 		;
 

@@ -86,7 +86,7 @@ namespace NMib::NCloud::NBackupManager
 				, EDirectoryManifestSyncFlag _SyncFlags
 				, CStr *o_pRSyncID
 				, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
-			 	, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
+				, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
 				, uint32 _ProtocolVersion
 			)
 		;

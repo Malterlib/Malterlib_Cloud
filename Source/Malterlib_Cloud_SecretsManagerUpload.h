@@ -12,8 +12,8 @@ namespace NMib::NCloud
 	NConcurrency::TCFuture<NFile::CDirectorySyncSend::CSyncResult> fg_UploadSecretFile
 		(
 			NConcurrency::TCDistributedActor<CSecretsManager> _SecretsManager
-		 	, NConcurrency::TCActor<NConcurrency::CActorDistributionManager> _DistributionManager
-		 	, CSecretsManager::CSecretID _ID
+			, NConcurrency::TCActor<NConcurrency::CActorDistributionManager> _DistributionManager
+			, CSecretsManager::CSecretID _ID
 			, NFile::CDirectorySyncSend::CConfig _Config
 			, NStorage::NReference::TCReference<NConcurrency::CActorSubscription> o_Subscription
 		)

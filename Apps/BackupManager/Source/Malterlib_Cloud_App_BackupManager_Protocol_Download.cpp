@@ -64,8 +64,8 @@ namespace NMib::NCloud::NBackupManager
 
 		CBackupSource::CCheckedOutDirectory CheckedOutDirectory = co_await
 			(
-			 	(*pBackupSource)(&CBackupSource::f_CheckOutDirectory, _DownloadBackup.m_Time)
-			 	% Auditor("Internal error checking out backup for download, check BackupManager log for details")
+				(*pBackupSource)(&CBackupSource::f_CheckOutDirectory, _DownloadBackup.m_Time)
+				% Auditor("Internal error checking out backup for download, check BackupManager log for details")
 			)
 		;
 		CDirectorySyncSend::CConfig Config;

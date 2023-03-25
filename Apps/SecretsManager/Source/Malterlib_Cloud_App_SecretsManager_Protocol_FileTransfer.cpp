@@ -215,9 +215,9 @@ namespace NMib::NCloud::NSecretsManager
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_UploadFile
 		(
-		 	CSecretID &&_ID
-		 	, NStr::CStrSecure const &_FileName
-		 	, TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Uploader
+			CSecretID &&_ID
+			, NStr::CStrSecure const &_FileName
+			, TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Uploader
 		 )
 		-> TCFuture<NConcurrency::TCActorFunctorWithID<TCFuture<void> ()>>
 	{

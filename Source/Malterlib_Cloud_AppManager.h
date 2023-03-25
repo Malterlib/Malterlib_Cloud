@@ -231,7 +231,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 			
 			NStr::CStr m_ParentApplication;
-			NStr::CStr m_EncryptionStorage; 			
+			NStr::CStr m_EncryptionStorage;
 			NStr::CStr m_EncryptionFileSystem;
 			NStorage::TCOptional<CVersionIDAndPlatform> m_Version; // If not specified the latest known version will be used 
 			
@@ -347,7 +347,7 @@ namespace NMib::NCloud
 		;
 		virtual auto f_SubscribeChangeNotifications
 			(
-			 	NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
+				NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
 			)
 			-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0
 		;

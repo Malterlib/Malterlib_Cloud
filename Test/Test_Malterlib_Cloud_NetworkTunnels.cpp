@@ -37,9 +37,9 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			: CDistributedAppActor
 			(
 				CDistributedAppActor_Settings("TestNetworkTunnelServerApp")
-			 	.f_SeparateDistributionManager(true)
-			 	.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
-			 	.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
+				.f_SeparateDistributionManager(true)
+				.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
+				.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
 			)
 			, m_ListenPath(_ListenPath)
 		{
@@ -49,11 +49,11 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		{
 			m_TunnelServer = fg_Construct
 				(
-				 	mp_State.m_DistributionManager
-				 	, mp_State.m_TrustManager
-				 	, mp_State.f_AuditorFactory()
-				 	, "TestNetworkTunnelServerApp"
-				 	, "TunnelServerApp"
+					mp_State.m_DistributionManager
+					, mp_State.m_TrustManager
+					, mp_State.f_AuditorFactory()
+					, "TestNetworkTunnelServerApp"
+					, "TunnelServerApp"
 				)
 			;
 
@@ -89,9 +89,9 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			: CDistributedAppActor
 			(
 				CDistributedAppActor_Settings("TestNetworkTunnelClientApp")
-			 	.f_SeparateDistributionManager(true)
-			 	.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
-			 	.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
+				.f_SeparateDistributionManager(true)
+				.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
+				.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
 			)
 		{
 		}
@@ -125,25 +125,25 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			{
 				auto Tunnel = co_await m_TunnelClient
 					(
-					 	&CNetworkTunnelsClient::f_OpenTunnel
-					 	, _Params["HostID"].f_String()
-					 	, _Params["TunnelName"].f_String()
+						&CNetworkTunnelsClient::f_OpenTunnel
+						, _Params["HostID"].f_String()
+						, _Params["TunnelName"].f_String()
 						, g_ActorFunctor / [](CNetAddress const &_Address) -> TCFuture<void> // New connection
-					 	{
+						{
 							#if DTestNetworkTunnelEnableLogging
 								DMibConErrOut2("New connection: {}\n", _Address.f_GetString());
 							#endif
 							co_return {};
 						}
 						, g_ActorFunctor / [](CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void> // On Close
-					 	{
+						{
 							#if DTestNetworkTunnelEnableLogging
 								DMibConErrOut2("Connection from '{}' closed: {}\n", _Address.f_GetString(), _Message);
 							#endif
 							co_return {};
 						}
 						, g_ActorFunctor / [](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void> // On Error
-					 	{
+						{
 							#if DTestNetworkTunnelEnableLogging
 								DMibConErrOut2("Connection from '{}' error: {}\n", _Address.f_GetString(), _Error);
 							#endif
@@ -270,7 +270,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 					, "TunnelServer"
 					, TunnelServerDirectory
 					, [Path = TestServer.f_GetListenSocketPath()]() -> TCActor<CDistributedAppActor>
-				 	{
+					{
 						return fg_Construct<CTestNetworkTunnelServerApp>(Path);
 					}
 					, NContainer::TCVector<NStr::CStr>{}
@@ -295,7 +295,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 					, "TunnelClient"
 					, TunnelClientDirectory
 					, []() -> TCActor<CDistributedAppActor>
-				 	{
+					{
 						return fg_Construct<CTestNetworkTunnelClientApp>();
 					}
 					, NContainer::TCVector<NStr::CStr>{}
@@ -335,13 +335,13 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 
 				TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 					(
-					 	fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID})
+						fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID})
 					)
 					.f_CallSync(pRunLoop, g_Timeout)
 				;
 				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
-					 	fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll", {}}})
+						fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll", {}}})
 					)
 					.f_CallSync(pRunLoop, g_Timeout)
 				;
@@ -351,10 +351,10 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 
 			DMibExpect
 				(
-				 	Tunnels
-				 	, ==
-				 	, CEJSON
-				 	{
+					Tunnels
+					, ==
+					, CEJSON
+					{
 						"Tunnels"_=
 						{
 							_[TunnelServerHostID] =
@@ -377,7 +377,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			;
 
 			CDistributedActorTestHelperCombined TestClient{TunnelSocketPath};
- 			TestClient.f_InitClient(TestServer);
+			TestClient.f_InitClient(TestServer);
 		};
 	}
 };

@@ -51,7 +51,7 @@ namespace NMib::NCloud::NAppManager
 
 	CStr CAppManagerActor::fsp_UnpackApplication
 		(
-		 	CStr const &_ApplicationRootDirectory
+			CStr const &_ApplicationRootDirectory
 			, CStr const &_Source
 			, CStr const &_Destination
 			, CStr const &_ApplicationName
@@ -59,7 +59,7 @@ namespace NMib::NCloud::NAppManager
 			, TCVector<CStr> &o_Files
 			, TCSet<CStr> const &_AllowExist
 			, bool _bForceInstall
-		 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+			, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 		)
 	{
 		CStr Return;
@@ -102,7 +102,7 @@ namespace NMib::NCloud::NAppManager
 						}
 						return CFile::EDiffCopyChangeAction_Perform;
 					}
-				 	, {}
+					, {}
 					, 0.0
 				)
 			;
@@ -334,10 +334,10 @@ namespace NMib::NCloud::NAppManager
 	
 	void CAppManagerActor::fsp_CreateApplicationUserGroup
 		(
-		 	CApplicationSettings const &_Settings
-		 	, TCFunction<void (CStr const &_Info)> const &_fLogInfo
-		 	, CStr const &_HomeDir
-		 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+			CApplicationSettings const &_Settings
+			, TCFunction<void (CStr const &_Info)> const &_fLogInfo
+			, CStr const &_HomeDir
+			, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 		)
 	{
 		CStr Group = _pUniqueUserGroup->f_GetGroup(_Settings.m_RunAsGroup);
@@ -370,7 +370,7 @@ namespace NMib::NCloud::NAppManager
 						, User
 						, _HomeDir
 						, UserID
-					 	, _Settings.m_bRunAsUserHasShell ? NSys::EUserManagementCreateUserFlag_ShellAccess : NSys::EUserManagementCreateUserFlag_None
+						, _Settings.m_bRunAsUserHasShell ? NSys::EUserManagementCreateUserFlag_ShellAccess : NSys::EUserManagementCreateUserFlag_None
 					)
 				;
 				if (_fLogInfo)
@@ -381,10 +381,10 @@ namespace NMib::NCloud::NAppManager
 	
 	void CAppManagerActor::fsp_UpdateApplicationFilePermissions
 		(
-		 	CStr const &_ApplicationDir
-		 	, TCSharedPointer<CApplication> const &_pApplication
-		 	, TCVector<CStr> const &_Files
-		 	, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+			CStr const &_ApplicationDir
+			, TCSharedPointer<CApplication> const &_pApplication
+			, TCVector<CStr> const &_Files
+			, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			, TCFunction<void (CStr const &_Info)> const &_fLogInfo
 		)
 	{
@@ -487,7 +487,7 @@ namespace NMib::NCloud::NAppManager
 
 		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
 			(
-			 	pThis->mp_Permissions.f_HasPermissions("Start application", Permissions) % "Permission denied starting application" % Auditor
+				pThis->mp_Permissions.f_HasPermissions("Start application", Permissions) % "Permission denied starting application" % Auditor
 			)
 		;
 
@@ -540,7 +540,7 @@ namespace NMib::NCloud::NAppManager
 
 		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
 			(
-			 	pThis->mp_Permissions.f_HasPermissions("Stop application", Permissions) % "Permission denied stopping application" % Auditor
+				pThis->mp_Permissions.f_HasPermissions("Stop application", Permissions) % "Permission denied stopping application" % Auditor
 			)
 		;
 
@@ -593,7 +593,7 @@ namespace NMib::NCloud::NAppManager
 
 		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
 			(
-			 	pThis->mp_Permissions.f_HasPermissions("Restart application", Permissions) % "Permission denied restarting application" % Auditor
+				pThis->mp_Permissions.f_HasPermissions("Restart application", Permissions) % "Permission denied restarting application" % Auditor
 			)
 		;
 

@@ -209,7 +209,7 @@ namespace NMib::NCloud::NAppManager
 									|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdateTime
 									|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdateSequence
 								)
-							 	&& (Application.m_LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion)
+								&& (Application.m_LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion)
 							)
 						{
 							Application.m_LastFailedInstalledVersion = Application.m_LastTriedInstalledVersion;

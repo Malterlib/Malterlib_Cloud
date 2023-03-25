@@ -15,8 +15,8 @@ namespace NMib::NCloud
 	TCFuture<CDirectorySyncReceive::CSyncResult> DMibWorkaroundUBSanSectionErrors fg_DownloadSecretFile
 		(
 			TCDistributedActor<CSecretsManager> _SecretsManager
-		 	, CSecretsManager::CSecretID _ID
-		 	, CDirectorySyncReceive::CConfig _Config
+			, CSecretsManager::CSecretID _ID
+			, CDirectorySyncReceive::CConfig _Config
 		)
 	{
 		TCDistributedActorInterfaceWithID<CDirectorySyncClient> Downloader = co_await _SecretsManager.f_CallActor(&CSecretsManager::f_DownloadFile)

@@ -367,7 +367,7 @@ namespace NMib::NCloud::NSecretsManager
 				{
 					Promise.f_SetException
 						(
-						 	_Auditor.f_Exception({"Internal error. Check SecretsManager.log for details.", fg_Format("File removal failed: {}", _Result.f_GetExceptionStr())})
+							_Auditor.f_Exception({"Internal error. Check SecretsManager.log for details.", fg_Format("File removal failed: {}", _Result.f_GetExceptionStr())})
 						)
 					;
 				}
@@ -395,7 +395,7 @@ namespace NMib::NCloud::NSecretsManager
 					{
 						// This is used to test shutdown. We wait here while the test checks that the file has been deleted
 						// and that the future from the secrets manager destruction has not resloved set yet
- 						mp_DelayDeletes.f_Insert().f_Future() > [=, pCanDestroyTracker = pCanDestroyTracker](auto &&)
+						mp_DelayDeletes.f_Insert().f_Future() > [=, pCanDestroyTracker = pCanDestroyTracker](auto &&)
 							{
 								fp_RemoveFile(_FileName, _Auditor) > RemovePromise / [pCanDestroyTracker, RemovePromise]()
 									{

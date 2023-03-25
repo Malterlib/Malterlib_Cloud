@@ -621,7 +621,7 @@ namespace NMib::NCloud::NCloudClient
 			{
 				auto SettingsResult = co_await
 					(
-					 	g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [SettingsFile]
+						g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [SettingsFile]
 						{
 							return CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
 						}
@@ -720,7 +720,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 						return ReturnTime;
 					}
-				 	% "Failed to deduce backup time"
+					% "Failed to deduce backup time"
 				)
 			;
 		}
@@ -813,12 +813,12 @@ namespace NMib::NCloud::NCloudClient
 
 		CFileTransferResult Results = co_await mp_VersionManagerHelper.f_Download
 			(
-			 	pVersionManager->m_Actor
-			 	, Application
-			 	, VersionID
-			 	, DestinationDirectory
-			 	, CFileTransferReceive::EReceiveFlag_IgnoreExisting
-			 	, QueueSize
+				pVersionManager->m_Actor
+				, Application
+				, VersionID
+				, DestinationDirectory
+				, CFileTransferReceive::EReceiveFlag_IgnoreExisting
+				, QueueSize
 			)
 		;
 
@@ -903,7 +903,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				pVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags))
 				.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
-			 	% "Failed to change tags"
+				% "Failed to change tags"
 			)
 		;
 

@@ -251,8 +251,8 @@ namespace NMib::NCloud::NBackupManager
 
 		Internal.f_OnPendingQuiescence
 			(
-			 	[Promise, this, _FinishedFlags]
-			 	{
+				[Promise, this, _FinishedFlags]
+				{
 					// When we get here no rsyncs should be running, only appends can be queued. Guard against this by sequencing against all files in manifest
 
 					auto &Internal = *mp_pInternal;
@@ -262,8 +262,8 @@ namespace NMib::NCloud::NBackupManager
 
 					Internal.f_SequenceMultipleSyncs
 						(
-						 	[Promise, this, _FinishedFlags](COnScopeExitShared &&_pCleanup)
-						 	{
+							[Promise, this, _FinishedFlags](COnScopeExitShared &&_pCleanup)
+							{
 								auto &Internal = *mp_pInternal;
 								Internal.m_bInitialBackupFinished = true;
 								DMibLogWithCategory(Mib/Cloud/BackupManager, Info, "({} - {tc5}) Initial backup finished, committing to latest", Internal.m_Name, Internal.m_StartTime);
@@ -280,7 +280,7 @@ namespace NMib::NCloud::NBackupManager
 									}
 								;
 							}
-						 	, FilesToSynchronize
+							, FilesToSynchronize
 						)
 					;
 

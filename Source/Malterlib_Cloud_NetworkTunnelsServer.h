@@ -15,21 +15,21 @@ namespace NMib::NCloud
 	{
 		CNetworkTunnelsServer
 			(
-			 	NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
-			 	, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
-			 	, NFunction::TCFunctionMovable<NConcurrency::CDistributedAppAuditor (NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
-			 	, NStr::CStr const &_LogCategory
-			 	, NStr::CStr const &_PermissionPrefix
+				NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
+				, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
+				, NFunction::TCFunctionMovable<NConcurrency::CDistributedAppAuditor (NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
+				, NStr::CStr const &_LogCategory
+				, NStr::CStr const &_PermissionPrefix
 			)
 		;
 		~CNetworkTunnelsServer();
 
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_PublishNetworkTunnel
 			(
-			 	ICNetworkTunnels::CNetworkTunnelName const &_Name
-			 	, NStr::CStr const &_Host
-			 	, uint16 _Port
-			 	, NEncoding::CEJSON &&_MetaData
+				ICNetworkTunnels::CNetworkTunnelName const &_Name
+				, NStr::CStr const &_Host
+				, uint16 _Port
+				, NEncoding::CEJSON &&_MetaData
 			)
 		;
 
