@@ -30,7 +30,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		_Stream % m_LastConnectionError;
 		_Stream % m_LastConnectionErrorTime;
 		_Stream % m_bActive;
-		if (Version >= 0x106)
+		if (Version >= ECloudManagerProtocolVersion_AddOtherErrors)
 			_Stream % m_OtherErrors;
 	}
 
@@ -57,17 +57,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		_Stream % Version;
 		DBinaryStreamVersion(_Stream, Version);
 		{
-			uint32 AppManagerInterfaceVersion = 0;
-			if (Version >= 0x104)
-				AppManagerInterfaceVersion = 0x110;
-
-			if (Version >= 0x109)
-				AppManagerInterfaceVersion = 0x114;
-
-			if (Version >= 0x110)
-				AppManagerInterfaceVersion = 0x116;
-
-			static_assert(CAppManagerInterface::EProtocolVersion_Current == 0x116, "Add a new version mapping if m_ApplicationInfo streaming changed");
+			uint32 AppManagerInterfaceVersion = CCloudManager::fs_ProtocolVersion_CloudManagerToAppManager(Version);
 
 			DMibBinaryStreamVersion(_Stream, AppManagerInterfaceVersion);
 			_Stream % m_ApplicationInfo;

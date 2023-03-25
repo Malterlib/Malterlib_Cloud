@@ -34,7 +34,7 @@ namespace NMib::NCloud
 		_Stream % m_ExecutableParameters;
 		_Stream % m_RunAsUser;
 		_Stream % m_RunAsGroup;
-		if (_Stream.f_GetVersion() >= 0x108)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddRunAsUserHasShell)
 			_Stream % m_bRunAsUserHasShell;
 
 		_Stream % m_Backup_IncludeWildcards;
@@ -46,7 +46,7 @@ namespace NMib::NCloud
 		_Stream % m_UpdateTags;
 		_Stream % m_UpdateBranches;
 
-		if (_Stream.f_GetVersion() >= 0x114)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddAutoUpdateAndExtendAppInfo)
 			_Stream % m_bAutoUpdate;
 		else if constexpr (tf_CStream::mc_bConsume)
 		{
@@ -65,7 +65,7 @@ namespace NMib::NCloud
 		_Stream % m_bDistributedApp;
 		_Stream % m_bStopOnDependencyFailure;
 		_Stream % m_bBackupEnabled;
-		if (_Stream.f_GetVersion() >= 0x116)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchInProcess)
 			_Stream % m_bLaunchInProcess;
 	}
 
@@ -92,7 +92,7 @@ namespace NMib::NCloud
 	void CAppManagerInterface::CApplicationInfo::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Status;
-		if (_Stream.f_GetVersion() >= 0x110)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddStatusSeverity)
 			_Stream % m_StatusSeverity;
 		_Stream % m_EncryptionStorage;
 		_Stream % m_EncryptionFileSystem;
@@ -102,7 +102,7 @@ namespace NMib::NCloud
 		_Stream % m_VersionInfo;
 		_Stream % m_VersionManagerApplication;
 
-		if (_Stream.f_GetVersion() >= 0x114)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddAutoUpdateAndExtendAppInfo)
 		{
 			_Stream % m_FailedVersion;
 			_Stream % m_FailedVersionInfo;
@@ -119,7 +119,7 @@ namespace NMib::NCloud
 		_Stream % m_Parameters;
 		_Stream % m_RunAsUser;
 		_Stream % m_RunAsGroup;
-		if (_Stream.f_GetVersion() >= 0x108)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddRunAsUserHasShell)
 			_Stream % m_bRunAsUserHasShell;
 
 		_Stream % m_Backup_IncludeWildcards;
@@ -131,7 +131,7 @@ namespace NMib::NCloud
 		_Stream % m_UpdateTags;
 		_Stream % m_UpdateBranches;
 
-		if (_Stream.f_GetVersion() >= 0x114)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddAutoUpdateAndExtendAppInfo)
 			_Stream % m_bAutoUpdate;
 		else if constexpr (tf_CStream::mc_bConsume)
 			m_bAutoUpdate = !m_UpdateTags.f_IsEmpty();
@@ -147,7 +147,7 @@ namespace NMib::NCloud
 		_Stream % m_bDistributedApp;
 		_Stream % m_bStopOnDependencyFailure;
 		_Stream % m_bBackupEnabled;
-		if (_Stream.f_GetVersion() >= 0x116)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchInProcess)
 			_Stream % m_bLaunchInProcess;
 	}
 
@@ -159,7 +159,8 @@ namespace NMib::NCloud
 		_Stream % m_VersionID;
 		_Stream % m_VersionTime;
 		_Stream % m_Stage;
-		if (_Stream.f_GetVersion() >= 0x109)
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddCoordinatedWait)
 			_Stream % m_bCoordinateWait;
 	}
 
@@ -171,7 +172,7 @@ namespace NMib::NCloud
 		_Stream % m_Version;
 		_Stream % m_bUpdateSettings;
 		_Stream % m_bDryRun;
-		if (_Stream.f_GetVersion() >= 0x115)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddBypassCoordination)
 			_Stream % m_bBypassCoordination;
 	}
 
@@ -212,9 +213,9 @@ namespace NMib::NCloud
 	{
 		_Stream % m_Changes;
 		_Stream % m_bInitial;
-		if (_Stream.f_GetVersion() >= 0x111)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddFiltered)
 			_Stream % m_bFiltered;
-		if (_Stream.f_GetVersion() >= 0x112)
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddAccessDenied)
 			_Stream % m_bAccessDenied;
 	}
 }

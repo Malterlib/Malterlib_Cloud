@@ -18,6 +18,12 @@ namespace NMib::NCloud
 	enum
 	{
 		ECloudManagerProtocolVersion_Min = 0x101
+		, ECloudManagerProtocolVersion_AddEnvironment = 0x102
+		, ECloudManagerProtocolVersion_AddVersionInfo = 0x103
+		, ECloudManagerProtocolVersion_AddVersionDate = 0x105
+		, ECloudManagerProtocolVersion_AddOtherErrors = 0x106
+		, ECloudManagerProtocolVersion_AppManagerVersionIncreased1 = 0x109
+		, ECloudManagerProtocolVersion_AppManagerVersionIncreased2 = 0x110
 		, ECloudManagerProtocolVersion_SupportLogs = 0x111
 		, ECloudManagerProtocolVersion_Current = 0x111
 	};
@@ -87,6 +93,8 @@ namespace NMib::NCloud
 
 			CAppManagerInterface::CApplicationInfo m_ApplicationInfo;
 		};
+
+		static uint32 fs_ProtocolVersion_CloudManagerToAppManager(uint32 _CloudManagerVersion);
 
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_RegisterAppManager
 			(

@@ -6,19 +6,19 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void CCloudManager::CAppManagerInfo::f_Stream(tf_CStream &_Stream)
 	{
-		if (_Stream.f_GetVersion() >= 0x102)
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_AddEnvironment)
 			_Stream % m_Environment;
 
 		_Stream % m_HostName;
 		_Stream % m_ProgramDirectory;
 
-		if (_Stream.f_GetVersion() >= 0x103)
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_AddVersionInfo)
 		{
 			_Stream % m_Version;
 			_Stream % m_Platform;
 			_Stream % m_PlatformFamily;
 		}
-		if (_Stream.f_GetVersion() >= 0x105)
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_AddVersionDate)
 			_Stream % m_VersionDate;
 	}
 
@@ -31,7 +31,7 @@ namespace NMib::NCloud
 		_Stream % m_LastConnectionError;
 		_Stream % m_LastConnectionErrorTime;
 		_Stream % m_bActive;
-		if (_Stream.f_GetVersion() >= 0x106)
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_AddOtherErrors)
 			_Stream % m_OtherErrors;
 	}
 
@@ -45,17 +45,8 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void CCloudManager::CApplicationInfo::f_Stream(tf_CStream &_Stream)
 	{
-		uint32 AppManagerInterfaceVersion = 0x110;
-		static_assert(CAppManagerInterface::EProtocolVersion_Current == 0x116, "Add a new version mapping if streaming of m_ApplicationInfo changed");
-
-		if (_Stream.f_GetVersion() >= 0x109)
-			AppManagerInterfaceVersion = 0x114;
-
-		if (_Stream.f_GetVersion() >= 0x110)
-			AppManagerInterfaceVersion = 0x116;
-
 		{
-			DMibBinaryStreamVersion(_Stream, AppManagerInterfaceVersion);
+			DMibBinaryStreamVersion(_Stream, fs_ProtocolVersion_CloudManagerToAppManager(_Stream.f_GetVersion()));
 			_Stream % m_ApplicationInfo;
 		}
 	}

@@ -20,6 +20,14 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EProtocolVersion_Min = 0x107
+			, EProtocolVersion_AddRunAsUserHasShell = 0x108
+			, EProtocolVersion_AddCoordinatedWait = 0x109
+			, EProtocolVersion_AddStatusSeverity = 0x110
+			, EProtocolVersion_AddFiltered = 0x111
+			, EProtocolVersion_AddAccessDenied = 0x112
+			, EProtocolVersion_AddAutoUpdateAndExtendAppInfo = 0x114
+			, EProtocolVersion_AddBypassCoordination = 0x115
+			, EProtocolVersion_AddLaunchInProcess = 0x116
 			, EProtocolVersion_Current = 0x116
 		};
 		
