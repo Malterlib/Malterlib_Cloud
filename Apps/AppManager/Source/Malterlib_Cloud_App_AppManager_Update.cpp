@@ -255,6 +255,7 @@ namespace NMib::NCloud::NAppManager
 		TCSharedPointerSupportWeak<CUpdateApplicationState> pState = fg_Construct();
 		pState->m_pApplication = pApplication;
 		pState->m_fOnInfo = fg_Move(_fOnInfo);
+		pState->m_UniqueUpdateID = fg_RandomID();
 		pState->m_LastInstalledVersion = pApplication->m_LastInstalledVersion;
 		pState->m_LastInstalledVersionInfo = pApplication->m_LastInstalledVersionInfo;
 		pState->m_VersionID = VersionID;
@@ -266,6 +267,7 @@ namespace NMib::NCloud::NAppManager
 		pState->m_Auditor = Auditor;
 		pState->m_bUpdateSettings = bUpdateSettings;
 		pState->m_pClock = pClock;
+		pState->m_StartUpdateTime = NTime::CTime::fs_NowUTC();
 		if (!bDownloadVersion)
 			pState->m_SourcePath = _FromFileName;
 		pState->m_pInProgressScope = pApplication->f_SetInProgress();

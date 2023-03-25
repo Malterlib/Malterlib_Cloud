@@ -10,18 +10,12 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	void CAppManagerActor::fp_StartPendingSelfUpdateReporting
-		(
-			CStr const &_Name
-			, CVersionManager::CVersionIDAndPlatform const &_VersionID
-			, CTime const &_VersionTime
-			, uint32 _VersionRetrySequence
-		)
+	void CAppManagerActor::fp_StartPendingSelfUpdateReporting(CPendingSelfupdate const &_Pending)
 	{
-		auto *pApplication = mp_Applications.f_FindEqual(_Name);
+		auto *pApplication = mp_Applications.f_FindEqual(_Pending.m_Name);
 		if (!pApplication)
 		{
-			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Could not find pending self update application: {}", _Name);
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Could not find pending self update application: {}", _Pending.m_Name);
 			return;
 		}
 
@@ -35,11 +29,18 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
+		TCSharedPointer<NTime::CClock> pClock = fg_Construct(true);
+
+		pClock->f_AddOffset((_Pending.m_StartUpdateTime - CTime::fs_NowUTC()).f_GetSecondsFraction());
+
 		TCSharedPointerSupportWeak<CUpdateApplicationState> pUpdateState = fg_Construct();
 		pUpdateState->m_pApplication = *pApplication;
-		pUpdateState->m_VersionID = _VersionID;
-		pUpdateState->m_VersionTime = _VersionTime;
-		pUpdateState->m_VersionRetrySequence = _VersionRetrySequence;
+		pUpdateState->m_UniqueUpdateID = _Pending.m_UniqueUpdateID;
+		pUpdateState->m_pClock = pClock;
+		pUpdateState->m_StartUpdateTime = _Pending.m_StartUpdateTime;
+		pUpdateState->m_VersionID = _Pending.m_VersionID;
+		pUpdateState->m_VersionTime = _Pending.m_VersionTime;
+		pUpdateState->m_VersionRetrySequence = _Pending.m_VersionRetrySequence;
 		pUpdateState->m_fOnInfo = [Name = (*pApplication)->m_Name](CStr const &_Info)
 			{
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pending self update '{}': {}", Name, _Info);
@@ -76,6 +77,8 @@ namespace NMib::NCloud::NAppManager
 				, "VersionID"_= _pState->m_VersionID.f_ToJSON()
 				, "VersionTime"_= _pState->m_VersionTime
 				, "VersionRetrySequence"_= _pState->m_VersionRetrySequence
+				, "StartUpdateTime"_= _pState->m_StartUpdateTime
+				, "UniqueUpdateID"_= _pState->m_UniqueUpdateID
 			}
 		;
 

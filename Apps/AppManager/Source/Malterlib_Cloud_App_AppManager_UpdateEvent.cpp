@@ -123,6 +123,9 @@ namespace NMib::NCloud::NAppManager
 		Notification.m_VersionID = _pState->m_VersionID;
 		Notification.m_VersionTime = _pState->m_VersionTime;
 		Notification.m_Stage = _Stage;
+		Notification.m_UpdateTime = _pState->m_pClock->f_GetTime();
+		Notification.m_StartUpdateTime = _pState->m_StartUpdateTime;
+		Notification.m_UpdateID = _pState->m_UniqueUpdateID;
 		Notification.m_bCoordinateWait = true;
 
 		{

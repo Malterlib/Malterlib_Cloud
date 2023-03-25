@@ -28,7 +28,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_AddAutoUpdateAndExtendAppInfo = 0x114
 			, EProtocolVersion_AddBypassCoordination = 0x115
 			, EProtocolVersion_AddLaunchInProcess = 0x116
-			, EProtocolVersion_Current = 0x116
+			, EProtocolVersion_ExtendUpdateNotification = 0x117
+			, EProtocolVersion_Current = 0x117
 		};
 		
 		CAppManagerInterface();
@@ -225,11 +226,14 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
+			NStr::CStr m_UpdateID;
 			NStr::CStr m_Application;
 			NStr::CStr m_Message; // Currently only for EUpdateStage_Failed
 			CVersionIDAndPlatform m_VersionID;
 			NTime::CTime m_VersionTime;
+			NTime::CTime m_StartUpdateTime;
 			EUpdateStage m_Stage = EUpdateStage_Failed;
+			fp64 m_UpdateTime = 0.0;
 			bool m_bCoordinateWait = false; // When set the stage has not yet been reached, the group is coordinating the update
 		};
 

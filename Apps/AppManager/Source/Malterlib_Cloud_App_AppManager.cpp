@@ -68,10 +68,7 @@ namespace NMib::NCloud::NAppManager
 		bool bChangedDatabase = false;
 		auto CaptureScope = co_await g_CaptureExceptions;
 
-		CStr PendingSelfUpdateName;
-		CVersionManager::CVersionIDAndPlatform PendingSelfUpdateVersionID;
-		CTime PendingSelfUpdateTime;
-		uint32 PendingSelfUpdateSequence = 0;
+		CPendingSelfupdate PendingSelfUpdate;
 
 		if (auto *pUserNameTransform = mp_State.m_ConfigDatabase.m_Data.f_GetMember("UserGroupNameTransform"))
 			mp_pUniqueUserGroup->m_UserGroupNameTransform = pUserNameTransform->f_String();
@@ -80,10 +77,14 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto &Pending = *pPendingSelfUpdateProcess;
 
-			PendingSelfUpdateName = Pending["Name"].f_String();
-			PendingSelfUpdateVersionID = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(Pending["VersionID"]);
-			PendingSelfUpdateTime = Pending["VersionTime"].f_Date();
-			PendingSelfUpdateSequence = Pending["VersionRetrySequence"].f_Integer();
+			PendingSelfUpdate.m_Name = Pending["Name"].f_String();
+			PendingSelfUpdate.m_VersionID = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(Pending["VersionID"]);
+			PendingSelfUpdate.m_VersionTime = Pending["VersionTime"].f_Date();
+			PendingSelfUpdate.m_VersionRetrySequence = Pending["VersionRetrySequence"].f_Integer();
+			if (auto *pValue = Pending.f_GetMember("StartUpdateTime"))
+				PendingSelfUpdate.m_StartUpdateTime = pValue->f_Date();
+			if (auto *pValue = Pending.f_GetMember("UniqueUpdateID"))
+				PendingSelfUpdate.m_UniqueUpdateID = pValue->f_String();
 
 			mp_State.m_StateDatabase.m_Data.f_RemoveMember("PendingSelfUpdateProcess");
 			bChangedDatabase = true;
@@ -204,10 +205,10 @@ namespace NMib::NCloud::NAppManager
 					if
 						(
 							(
-								Name != PendingSelfUpdateName
-								|| Application.m_LastTriedInstalledVersion != PendingSelfUpdateVersionID
-								|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdateTime
-								|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdateSequence
+								Name != PendingSelfUpdate.m_Name
+								|| Application.m_LastTriedInstalledVersion != PendingSelfUpdate.m_VersionID
+								|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdate.m_VersionTime
+								|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdate.m_VersionRetrySequence
 							)
 							&& (Application.m_LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion)
 						)
@@ -312,8 +313,8 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
-		if (!PendingSelfUpdateName.f_IsEmpty())
-			fp_StartPendingSelfUpdateReporting(PendingSelfUpdateName, PendingSelfUpdateVersionID, PendingSelfUpdateTime, PendingSelfUpdateSequence);
+		if (!PendingSelfUpdate.m_Name.f_IsEmpty())
+			fp_StartPendingSelfUpdateReporting(PendingSelfUpdate);
 
 		if (bChangedDatabase)
 			co_await fp_SaveStateDatabase();

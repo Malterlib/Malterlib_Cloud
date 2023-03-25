@@ -579,6 +579,8 @@ namespace NMib::NCloud::NAppManager
 			TCSet<CStr> m_RequiredTags;
 			TCSharedPointer<CVersionManager::CVersionInformation> m_pVersionInfo;
 			TCSharedPointer<NTime::CClock> m_pClock;
+			CTime m_StartUpdateTime;
+			CStr m_UniqueUpdateID;
 			TCVector<CStr> m_Files;
 			CDistributedAppAuditor m_Auditor;
 			bool m_bDryRun = false;
@@ -622,6 +624,16 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<CLogReporter> f_OpenLogReporter(CLogInfo &&_LogInfo) override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
+		};
+
+		struct CPendingSelfupdate
+		{
+			CStr m_UniqueUpdateID;
+			CStr m_Name;
+			CTime m_StartUpdateTime;
+			CVersionManager::CVersionIDAndPlatform m_VersionID;
+			CTime m_VersionTime;
+			uint32 m_VersionRetrySequence = 0;
 		};
 
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
@@ -767,7 +779,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<void> fp_CancelAllApplicationUpdatesOnStopAppManager();
 
-		void fp_StartPendingSelfUpdateReporting(CStr const &_Name, CVersionManager::CVersionIDAndPlatform const &_VersionID, CTime const &_VersionTime, uint32 _VersionRetrySequence);
+		void fp_StartPendingSelfUpdateReporting(CPendingSelfupdate const &_Pending);
 
 		static void fsp_UpdateAttributes(CStr const &_File);
 		static CStr fsp_UnpackApplication

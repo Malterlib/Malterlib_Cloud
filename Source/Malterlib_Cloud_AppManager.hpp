@@ -162,6 +162,13 @@ namespace NMib::NCloud
 
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddCoordinatedWait)
 			_Stream % m_bCoordinateWait;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_ExtendUpdateNotification)
+		{
+			_Stream % m_UpdateID;
+			_Stream % m_UpdateTime;
+			_Stream % m_StartUpdateTime;
+		}
 	}
 
 	template <typename tf_CStream>
