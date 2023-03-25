@@ -5,6 +5,12 @@
 #include "Malterlib_Cloud_App_CloudManager_Internal.h"
 #include "Malterlib_Cloud_App_CloudManager_Database.h"
 
+namespace NMib::NCloud::NCloudManagerDatabase
+{
+	constexpr CStr CAppManagerKey::mc_Prefix = gc_Str<"AppMgr">;
+	constexpr CStr CApplicationKey::mc_Prefix = gc_Str<"App">;
+}
+
 namespace NMib::NCloud::NCloudManager
 {
 	constinit uint64 g_MaxDatabaseSize = constant_uint64(128) * 1024 * 1024 * 1024;
@@ -18,7 +24,7 @@ namespace NMib::NCloud::NCloudManager
 
 	CAppManagerKey CCloudManagerServer::CAppManagerState::f_DatabaseKey() const
 	{
-		return CAppManagerKey{CAppManagerKey::mc_Prefix, f_AppManagerID()};
+		return CAppManagerKey{.m_HostID = f_AppManagerID()};
 	}
 
 	TCFuture<void> CCloudManagerServer::fp_SetupDatabase()

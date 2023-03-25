@@ -126,7 +126,7 @@ namespace NMib::NCloud::NCloudManager
 							co_return CDatabaseActor::CTransactionWrite::fs_Empty();
 
 						auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
-						CAppManagerKey Key{CAppManagerKey::mc_Prefix, _AppManagerID};
+						CAppManagerKey Key{.m_HostID = _AppManagerID};
 
 						pAppManager->m_Data.m_OtherErrors -= _Remove;
 						for (auto &Error : _Add)
@@ -197,7 +197,7 @@ namespace NMib::NCloud::NCloudManager
 					auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 					for (auto &Change : Params.m_Changes)
 					{
-						CApplicationKey Key{CApplicationKey::mc_Prefix, _AppManagerID, Change.m_Application};
+						CApplicationKey Key{.m_AppManagerHostID = _AppManagerID, .m_Application = Change.m_Application};
 						if (Change.m_Change.f_IsOfType<CAppManagerInterface::CApplicationChange_Remove>())
 						{
 							if (WriteCursor.f_FindEqual(Key))
@@ -272,7 +272,7 @@ namespace NMib::NCloud::NCloudManager
 			co_return Auditor.f_AccessDenied("(Register as app manager)", Permissions);
 
 		CStr AppManagerID = CallingHostInfo.f_GetRealHostID();
-		CAppManagerKey DatabaseKey{CAppManagerKey::mc_Prefix, AppManagerID};
+		CAppManagerKey DatabaseKey{.m_HostID = AppManagerID};
 
 		CAppManagerValue Data;
 

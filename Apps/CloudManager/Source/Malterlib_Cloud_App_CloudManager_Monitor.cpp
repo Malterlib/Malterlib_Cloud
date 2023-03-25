@@ -129,7 +129,7 @@ namespace NMib::NCloud::NCloudManager
 
 								for (auto &ToClear : ToClearAppManagers)
 								{
-									if (!Cursor.f_FindEqual(CAppManagerKey{CAppManagerKey::mc_Prefix, ToClear}))
+									if (!Cursor.f_FindEqual(CAppManagerKey{.m_HostID = ToClear}))
 										continue;
 
 									auto Data = Cursor.f_Value<CAppManagerValue>();
