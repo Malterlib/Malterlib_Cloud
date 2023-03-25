@@ -317,6 +317,8 @@ namespace NMib::NCloud
 			bool m_bFiltered = false;
 		};
 
+		static NStr::CStr fs_UpdateStageToStr(EUpdateStage _Stage);
+
 		virtual NConcurrency::TCFuture<CVersionsAvailableForUpdate> f_GetAvailableVersions
 			(
 				NStr::CStr const &_Application	/// Leave empty to list versions for all version manager applications know by the AppManager. By default app manager will only subscribe to 

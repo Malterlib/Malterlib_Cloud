@@ -117,7 +117,7 @@ namespace NMib::NCloud::NAppManager
 									(
 										"{}:{}:{}:{}-{}"
 										, mp_State.m_HostID
-										, fsp_UpdateStageToStr(Application.m_WantUpdateStage)
+										, CAppManagerInterface::fs_UpdateStageToStr(Application.m_WantUpdateStage)
 										, Application.m_UpdateStartSequence
 										, CRemoteApplicationWithTypeKey(Application, _pState->m_bBypassCoordination && pApplication == _pState->m_pApplication)
 										, Application.m_Name
@@ -154,7 +154,7 @@ namespace NMib::NCloud::NAppManager
 									(
 										"{}:{}:{}:{}-{}"
 										, RemoteAppManager.m_AppInfos.fs_GetKey(AppInfo)
-										, fsp_UpdateStageToStr(AppInfo.m_AppInfo.m_WantUpdateStage)
+										, CAppManagerInterface::fs_UpdateStageToStr(AppInfo.m_AppInfo.m_WantUpdateStage)
 										, AppInfo.m_AppInfo.m_UpdateStartSequence
 										, CRemoteApplicationWithTypeKey(AppInfo.m_AppInfo, false)
 										, RemoteAppManager.m_AppInfos.fs_GetKey(AppInfo)
@@ -230,7 +230,7 @@ namespace NMib::NCloud::NAppManager
 		CRemoteApplicationWithTypeKey RemoteKey(*_pState->m_pApplication, _pState->m_bBypassCoordination);
 
 		if (!_fEvalState)
-			_pState->m_fOnInfo(fg_Format("Waiting for all before starting stage '{}'", fsp_UpdateStageToStr(_Stage)));
+			_pState->m_fOnInfo(fg_Format("Waiting for all before starting stage '{}'", CAppManagerInterface::fs_UpdateStageToStr(_Stage)));
 
 		co_await fp_Coordination_WaitForState
 			(
@@ -296,15 +296,15 @@ namespace NMib::NCloud::NAppManager
 						if (_fEvalState && !_fEvalState())
 							return false;
 						if (!_fEvalState)
-							_pState->m_fOnInfo(fg_Format("All ready to start stage '{}'", fsp_UpdateStageToStr(_Stage)));
+							_pState->m_fOnInfo(fg_Format("All ready to start stage '{}'", CAppManagerInterface::fs_UpdateStageToStr(_Stage)));
 						o_Promise.f_SetResult();
 						return true;
 					}
 					return false;
 				}
-				, fg_Format("Remote app manager failed before reaching '{}' stage", fsp_UpdateStageToStr(_Stage))
-				, fg_Format("Timed out waiting for other AppManagers to reach '{}' stage", fsp_UpdateStageToStr(_Stage))
-				, fg_Format("Timed out waiting for remote app manager to connect while waiting for other AppManagers to reach '{}' stage", fsp_UpdateStageToStr(_Stage))
+				, fg_Format("Remote app manager failed before reaching '{}' stage", CAppManagerInterface::fs_UpdateStageToStr(_Stage))
+				, fg_Format("Timed out waiting for other AppManagers to reach '{}' stage", CAppManagerInterface::fs_UpdateStageToStr(_Stage))
+				, fg_Format("Timed out waiting for remote app manager to connect while waiting for other AppManagers to reach '{}' stage", CAppManagerInterface::fs_UpdateStageToStr(_Stage))
 				, (_Flags & EWaitStageFlag_IgnoreFailed) != 0
 			)
 		;
@@ -421,28 +421,6 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		co_return {};
-	}
-
-	ch8 const *CAppManagerActor::fsp_UpdateStageToStr(EUpdateStage _Stage)
-	{
-		switch (_Stage)
-		{
-		case EUpdateStage::EUpdateStage_Failed: return "failed";
-		case EUpdateStage::EUpdateStage_None: return "none";
-		case EUpdateStage::EUpdateStage_SyncStart: return "sync start";
-		case EUpdateStage::EUpdateStage_ChangeEncryption: return "change encryption";
-		case EUpdateStage::EUpdateStage_DownloadVersion: return "download version";
-		case EUpdateStage::EUpdateStage_Unpack: return "unpack";
-		case EUpdateStage::EUpdateStage_StopOldApp: return "stop old app";
-		case EUpdateStage::EUpdateStage_PreUpdateScript: return "pre update script";
-		case EUpdateStage::EUpdateStage_UpdateApplicationFiles: return "update application files";
-		case EUpdateStage::EUpdateStage_SaveApplicationState: return "save application state";
-		case EUpdateStage::EUpdateStage_PostUpdateScript: return "post update script";
-		case EUpdateStage::EUpdateStage_StartNewApp: return "start new app";
-		case EUpdateStage::EUpdateStage_PostLaunch: return "post launch";
-		case EUpdateStage::EUpdateStage_Finished: return "finished";
-		default: DNeverGetHere; return "unknown";
-		}
 	}
 
 	TCFuture<void> CAppManagerActor::fp_Coordination_WaitForState

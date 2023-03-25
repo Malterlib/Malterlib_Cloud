@@ -908,7 +908,6 @@ namespace NMib::NCloud::NAppManager
 				, bool _bIgnoreFailed = false
 			)
 		;
-		static ch8 const *fsp_UpdateStageToStr(EUpdateStage _Stage);
 		static ch8 const *fsp_UpdateTypeToStr(EDistributedAppUpdateType _UpdateType);
 
 		TCFuture<void> fp_SetupLimits();

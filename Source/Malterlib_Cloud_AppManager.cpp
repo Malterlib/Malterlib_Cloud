@@ -34,4 +34,28 @@ namespace NMib::NCloud
 	CAppManagerInterface::~CAppManagerInterface() = default;
 
 	static_assert(CVersionManager::EProtocolVersion_Min <= 0x105);
+
+	NStr::CStr CAppManagerInterface::fs_UpdateStageToStr(EUpdateStage _Stage)
+	{
+		switch (_Stage)
+		{
+		case EUpdateStage_Failed: return NStr::gc_Str<"failed">;
+		case EUpdateStage_None: return NStr::gc_Str<"none">;
+		case EUpdateStage_SyncStart: return NStr::gc_Str<"sync start">;
+		case EUpdateStage_ChangeEncryption: return NStr::gc_Str<"change encryption">;
+		case EUpdateStage_DownloadVersion: return NStr::gc_Str<"download version">;
+		case EUpdateStage_Unpack: return NStr::gc_Str<"unpack">;
+		case EUpdateStage_StopOldApp: return NStr::gc_Str<"stop old app">;
+		case EUpdateStage_PreUpdateScript: return NStr::gc_Str<"pre update script">;
+		case EUpdateStage_UpdateApplicationFiles: return NStr::gc_Str<"update application files">;
+		case EUpdateStage_SaveApplicationState: return NStr::gc_Str<"save application state">;
+		case EUpdateStage_PostUpdateScript: return NStr::gc_Str<"post update script">;
+		case EUpdateStage_StartNewApp: return NStr::gc_Str<"start new app">;
+		case EUpdateStage_PostLaunch: return NStr::gc_Str<"post launch">;
+		case EUpdateStage_Finished: return NStr::gc_Str<"finished">;
+		}
+
+		DMibNeverGetHere;
+		return NStr::gc_Str<"unknown">;
+	}
 }
