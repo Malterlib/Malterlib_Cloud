@@ -523,6 +523,9 @@ namespace NMib::NCloud::NAppManager
 
 		CStr Message;
 		CAppManagerInterface::EStatusSeverity Severity;
+
+		State.m_pApplication->m_bPreventLaunch_DelayAfterFailure = false;
+
 		if (!State.m_pApplication->f_DependenciesSatisfied(Message, Severity))
 		{
 			if (State.m_VersionID.f_IsValid())

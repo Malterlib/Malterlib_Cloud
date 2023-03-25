@@ -322,8 +322,7 @@ namespace NMib::NCloud::NAppManager
 		if (pApplication->m_bDeleted)
 			co_return Auditor.f_Exception("Application has been deleted, aborting");
 
-		if (pApplication->m_bPreventLaunch_DelayAfterFailure)
-			pApplication->m_bPreventLaunch_DelayAfterFailure = false;
+		pApplication->m_bPreventLaunch_DelayAfterFailure = false;
 
 		CStr DependenciesMessage;
 		CAppManagerInterface::EStatusSeverity Severity;
