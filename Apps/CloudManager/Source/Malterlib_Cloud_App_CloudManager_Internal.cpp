@@ -47,7 +47,7 @@ namespace NMib::NCloud::NCloudManager
 					, mp_AppState.m_RootDirectory / "CloudManagerDatabase"
 					, MaxDatabaseSize
 				)
-				% "Faild to open database"
+				% "Failed to open database"
 			)
 		;
 		auto Stats = co_await (mp_DatabaseActor(&CDatabaseActor::f_GetAggregateStatistics));
