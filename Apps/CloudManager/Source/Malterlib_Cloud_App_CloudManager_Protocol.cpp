@@ -51,7 +51,7 @@ namespace NMib::NCloud::NCloudManager
 			mp_LogReporterInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 		mp_LogReaderInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 
-		co_await PublishResults.f_GetResults() | g_Unwrap;
+		co_await (co_await PublishResults.f_GetResults() | g_Unwrap);
 
 		co_return {};
 	}

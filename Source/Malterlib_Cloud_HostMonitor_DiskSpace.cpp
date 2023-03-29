@@ -318,7 +318,7 @@ namespace NMib::NCloud
 			}
 		}
 
-		co_await ReportResults.f_GetResults() | g_Unwrap;
+		co_await (co_await ReportResults.f_GetResults() | g_Unwrap);
 
 		co_return {};
 	}

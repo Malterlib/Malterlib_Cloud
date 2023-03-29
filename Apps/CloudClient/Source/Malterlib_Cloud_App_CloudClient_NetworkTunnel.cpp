@@ -244,7 +244,7 @@ namespace NMib::NCloud::NCloudClient
 			}
 		}
 
-		auto OpenedTunnels = co_await OpenedTunnelResults.f_GetResults() | g_Unwrap;
+		auto OpenedTunnels = co_await (co_await OpenedTunnelResults.f_GetResults() | g_Unwrap);
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("HostID", "Tunnel Name", "URL");

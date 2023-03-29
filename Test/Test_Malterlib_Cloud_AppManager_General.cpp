@@ -319,7 +319,7 @@ public:
 					++iAppManager;
 				}
 				DMibTestMark;
-				co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting update notification subscriptions") | g_Unwrap;
+				co_await (co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting update notification subscriptions") | g_Unwrap);
 			}
 
 			auto fWaitForAllUpdated = [&](CStr _Application) -> CUnsafeFuture
@@ -353,7 +353,7 @@ public:
 
 						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
-					co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for update type change") | g_Unwrap;
+					co_await (co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for update type change") | g_Unwrap);
 					*pUpdateType = _UpdateType;
 
 					co_return {};
@@ -371,7 +371,7 @@ public:
 
 						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
 					}
-					co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for update group change") | g_Unwrap;
+					co_await (co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for update group change") | g_Unwrap);
 
 					co_return {};
 				}

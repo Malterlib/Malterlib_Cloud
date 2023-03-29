@@ -26,7 +26,7 @@ namespace NMib::NCloud::NAppManager
 
 		mp_AppManagerCoordinationInterface.m_pActor->f_RemoveKnownHost(Group, Application, HostID) > ResultsVector.f_AddResult();
 
-		co_await (ResultsVector.f_GetResults() % Auditor) | (g_Unwrap % Auditor);
+		co_await (co_await (ResultsVector.f_GetResults() % Auditor) | (g_Unwrap % Auditor));
 
 		co_return 0;
 	}

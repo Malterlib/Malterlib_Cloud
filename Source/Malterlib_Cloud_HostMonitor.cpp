@@ -96,7 +96,7 @@ namespace NMib::NCloud
 			m_TotalReporter.f_Clear();
 		}
 
-		co_await Destroys.f_GetResults() | g_Unwrap;
+		co_await (co_await Destroys.f_GetResults() | g_Unwrap);
 
 		co_return {};
 	}

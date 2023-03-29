@@ -154,7 +154,7 @@ namespace NMib::NCloud::NAppManager
 		for (auto &Manager : mp_VersionManagers)
 			fp_VersionManagerSubscribe(Manager) > Results.f_AddResult();
 
-		co_await Results.f_GetResults() | g_Unwrap;
+		co_await (co_await Results.f_GetResults() | g_Unwrap);
 
 		co_return {};
 	}

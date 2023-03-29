@@ -125,7 +125,7 @@ namespace NMib::NCloud::NAppManager
 				for (auto &Subscription : mp_ChangeNotificationSubscriptions)
 					self(&CAppManagerActor::fp_ChangeNotifications_SendInitial, mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription)) > SendInitialResults.f_AddResult();
 
-				co_await SendInitialResults.f_GetResults() | g_Unwrap;
+				co_await (co_await SendInitialResults.f_GetResults() | g_Unwrap);
 
 				co_return {};
 			}

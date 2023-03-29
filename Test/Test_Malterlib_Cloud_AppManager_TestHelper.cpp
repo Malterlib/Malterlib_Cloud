@@ -219,7 +219,7 @@ namespace NMib::NCloud
 			}
 		}
 		DMibTestMark;
-		co_await SetupTrustResults.f_GetResults().f_Timeout(m_Timeout, "Timed out waiting for trust setup") | g_Unwrap;
+		co_await (co_await SetupTrustResults.f_GetResults().f_Timeout(m_Timeout, "Timed out waiting for trust setup") | g_Unwrap);
 
 		DMibTestMark;
 		for (NTime::CClock Timer(true); true; co_await fg_Timeout(1.0))
@@ -311,7 +311,7 @@ namespace NMib::NCloud
 			}
 		}
 		DMibTestMark;
-		co_await AddAppResults.f_GetResults().f_Timeout(m_Timeout, "Timed out waiting for installing test apps") | g_Unwrap;
+		co_await (co_await AddAppResults.f_GetResults().f_Timeout(m_Timeout, "Timed out waiting for installing test apps") | g_Unwrap);
 
 		co_return {};
 	}
@@ -478,7 +478,7 @@ namespace NMib::NCloud
 				;
 			}
 			DMibTestMark;
-			co_await AppManagerLaunchesResults.f_GetResults() | g_Unwrap;
+			co_await (co_await AppManagerLaunchesResults.f_GetResults() | g_Unwrap);
 		}
 		{
 			// Launch AppManagers
@@ -680,7 +680,7 @@ namespace NMib::NCloud
 				AppManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(AppManager.m_Address) > ListenResults.f_AddResult();
 
 			DMibTestMark;
-			co_await ListenResults.f_GetResults().f_Timeout(m_Timeout, "Timed out waiting for app managers add listen") | g_Unwrap;
+			co_await (co_await ListenResults.f_GetResults().f_Timeout(m_Timeout, "Timed out waiting for app managers add listen") | g_Unwrap);
 		}
 
 		DMibTestMark;

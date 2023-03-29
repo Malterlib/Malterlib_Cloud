@@ -1014,7 +1014,7 @@ namespace NMib::NCloud::NCloudClient
 			(CloudManager.f_CallActor(&CCloudManager::f_RemoveAppManager)(AppManagerHostID) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
 		}
 
-		co_await AppManagersResults.f_GetResults() | g_Unwrap;
+		co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
 
 		co_return 0;
 	}
@@ -1037,7 +1037,7 @@ namespace NMib::NCloud::NCloudClient
 			;
 		}
 
-		co_return fg_Construct(co_await SensorReaders.f_GetResults() | g_Unwrap);
+		co_return fg_Construct(co_await (co_await SensorReaders.f_GetResults() | g_Unwrap));
 	}
 
 	TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors
@@ -1053,7 +1053,7 @@ namespace NMib::NCloud::NCloudClient
 
 		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CDistributedAppSensorReporter::CSensorInfo> SensorInfos;
 
-		auto SensorGenerators = co_await SensorsResults.f_GetResults() | g_Unwrap;
+		auto SensorGenerators = co_await (co_await SensorsResults.f_GetResults() | g_Unwrap);
 		{
 			for (auto &SensorGenerator : SensorGenerators)
 			{
@@ -1086,7 +1086,7 @@ namespace NMib::NCloud::NCloudClient
 		for (auto &Reader : *_pSensorReaders)
 			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorStatus)(fg_TempCopy(_Filter), 1024) > StatusResults.f_AddResult();
 
-		auto StatusGenerators = co_await StatusResults.f_GetResults() | g_Unwrap;
+		auto StatusGenerators = co_await (co_await StatusResults.f_GetResults() | g_Unwrap);
 
 		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CDistributedAppSensorReader_SensorKeyAndReading> SensorStatus;
 
@@ -1126,7 +1126,7 @@ namespace NMib::NCloud::NCloudClient
 		for (auto &Reader : *_pSensorReaders)
 			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorReadings)(fg_TempCopy(_Filter), 1024) > ReadingsResults.f_AddResult();
 
-		auto SensorGenerators = co_await ReadingsResults.f_GetResults() | g_Unwrap;
+		auto SensorGenerators = co_await (co_await ReadingsResults.f_GetResults() | g_Unwrap);
 		if (SensorGenerators.f_IsEmpty())
 			co_return {};
 		if (SensorGenerators.f_GetLen() == 1)
@@ -1143,7 +1143,7 @@ namespace NMib::NCloud::NCloudClient
 
 		TCVector<TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>::CIterator> Iterators;
 
-		for (auto &iReadings : co_await IteratorResults.f_GetResults() | g_Unwrap)
+		for (auto &iReadings : co_await (co_await IteratorResults.f_GetResults() | g_Unwrap))
 		{
 			Iterators.f_Insert
 				(
@@ -1267,7 +1267,7 @@ namespace NMib::NCloud::NCloudClient
 			;
 		}
 
-		co_return fg_Construct(co_await LogReaders.f_GetResults() | g_Unwrap);
+		co_return fg_Construct(co_await (co_await LogReaders.f_GetResults() | g_Unwrap));
 	}
 
 	TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogs
@@ -1283,7 +1283,7 @@ namespace NMib::NCloud::NCloudClient
 
 		TCMap<CDistributedAppLogReporter::CLogInfoKey, CDistributedAppLogReporter::CLogInfo> LogInfos;
 
-		auto LogGenerators = co_await LogsResults.f_GetResults() | g_Unwrap;
+		auto LogGenerators = co_await (co_await LogsResults.f_GetResults() | g_Unwrap);
 		{
 			for (auto &LogGenerator : LogGenerators)
 			{
@@ -1316,7 +1316,7 @@ namespace NMib::NCloud::NCloudClient
 		for (auto &Reader : *_pLogReaders)
 			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogEntries)(fg_TempCopy(_Filter), 1024) > EntriesResults.f_AddResult();
 
-		auto LogGenerators = co_await EntriesResults.f_GetResults() | g_Unwrap;
+		auto LogGenerators = co_await (co_await EntriesResults.f_GetResults() | g_Unwrap);
 		if (LogGenerators.f_IsEmpty())
 			co_return {};
 		if (LogGenerators.f_GetLen() == 1)
@@ -1333,7 +1333,7 @@ namespace NMib::NCloud::NCloudClient
 
 		TCVector<TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>::CIterator> Iterators;
 
-		for (auto &iEntries : co_await IteratorResults.f_GetResults() | g_Unwrap)
+		for (auto &iEntries : co_await (co_await IteratorResults.f_GetResults() | g_Unwrap))
 		{
 			Iterators.f_Insert
 				(

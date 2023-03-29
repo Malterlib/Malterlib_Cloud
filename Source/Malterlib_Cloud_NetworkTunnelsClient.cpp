@@ -131,7 +131,7 @@ namespace NMib::NCloud
 		for (auto &Actor : Internal.m_NetworkTunnelSubscription.m_Actors)
 			Actor.m_Actor.f_CallActor(&ICNetworkTunnels::f_EnumerateTunnels)() > TunnelResults.f_AddResult(Actor.m_TrustInfo.m_HostInfo.m_HostID);
 
-		co_return co_await TunnelResults.f_GetResults() | g_Unwrap;
+		co_return co_await (co_await TunnelResults.f_GetResults() | g_Unwrap);
 	}
 
 	auto CNetworkTunnelsClient::f_OpenTunnel
