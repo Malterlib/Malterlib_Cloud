@@ -1051,7 +1051,7 @@ namespace NMib::NCloud::NCloudClient
 		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> SensorsResults;
 
 		for (auto &Reader : *_pSensorReaders)
-			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensors)(fg_TempCopy(_Filter), 1024) > SensorsResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensors)(CDistributedAppSensorReader::CGetSensors{.m_Filters = {_Filter}}) > SensorsResults.f_AddResult();
 
 		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CDistributedAppSensorReporter::CSensorInfo> SensorInfos;
 
@@ -1086,7 +1086,7 @@ namespace NMib::NCloud::NCloudClient
 		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> StatusResults;
 
 		for (auto &Reader : *_pSensorReaders)
-			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorStatus)(fg_TempCopy(_Filter), 1024) > StatusResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorStatus)(CDistributedAppSensorReader::CGetSensorStatus{.m_Filters = {_Filter}}) > StatusResults.f_AddResult();
 
 		auto StatusGenerators = co_await (co_await StatusResults.f_GetResults() | g_Unwrap);
 
@@ -1126,7 +1126,7 @@ namespace NMib::NCloud::NCloudClient
 		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> ReadingsResults;
 
 		for (auto &Reader : *_pSensorReaders)
-			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorReadings)(fg_TempCopy(_Filter), 1024) > ReadingsResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorReadings)(CDistributedAppSensorReader::CGetSensorReadings{.m_Filters = {_Filter}}) > ReadingsResults.f_AddResult();
 
 		auto SensorGenerators = co_await (co_await ReadingsResults.f_GetResults() | g_Unwrap);
 		if (SensorGenerators.f_IsEmpty())

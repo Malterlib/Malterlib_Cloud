@@ -54,12 +54,25 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CDistributedAppSensorReaderImplementation : public CDistributedAppSensorReader
 		{
-			TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> f_GetSensors(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize) override;
-			auto f_GetSensorReadings(CDistributedAppSensorReader_SensorReadingFilter &&_Filter, uint32 _BatchSize)
-				-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override
+			TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> f_GetSensors(CGetSensors &&_Params) override;
+			auto f_GetSensorReadings(CGetSensorReadings &&_Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override;
+			auto f_GetSensorStatus(CGetSensorStatus &&_Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override;
+			auto f_SubscribeSensors(TCVector<CDistributedAppSensorReader_SensorFilter> &&_Filters, TCActorFunctorWithID<TCFuture<void> (CSensorChange &&_Change)> &&_fOnChange)
+				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
-			auto f_GetSensorStatus(CDistributedAppSensorReader_SensorStatusFilter &&_Filter, uint32 _BatchSize)
-				-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override
+			auto f_SubscribeSensorReadings
+				(
+					TCVector<CDistributedAppSensorReader_SensorReadingSubscriptionFilter> &&_Filters
+					, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading &&_Reading)> &&_fOnReading
+				)
+				-> TCFuture<TCActorSubscriptionWithID<>> override
+			;
+			auto f_SubscribeSensorStatus
+				(
+					TCVector<CDistributedAppSensorReader_SensorStatusFilter> &&_Filters
+					, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading &&_Reading)> &&_fOnReading
+				)
+				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);

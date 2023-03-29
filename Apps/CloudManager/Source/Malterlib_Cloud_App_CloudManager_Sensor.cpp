@@ -80,7 +80,7 @@ namespace NMib::NCloud::NCloudManager
 		return {"CloudManager/ReadSensors", "CloudManager/ReadAll"};
 	}
 
-	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensors(CDistributedAppSensorReader_SensorFilter &&_Filter, uint32 _BatchSize)
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensors(CGetSensors &&_Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> Sensors;
@@ -104,7 +104,7 @@ namespace NMib::NCloud::NCloudManager
 			if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensors", Permissions))
 				co_return Auditor.f_AccessDenied("(Get sensors)", Permissions);
 
-			Sensors = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensors, fg_Move(_Filter), _BatchSize);
+			Sensors = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensors, fg_Move(_Params));
 
 			Auditor.f_Info("Get sensors");
 		}
@@ -112,7 +112,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Sensors);
 	}
 
-	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorReadings(CDistributedAppSensorReader_SensorReadingFilter &&_Filter, uint32 _BatchSize)
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorReadings(CGetSensorReadings &&_Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> SensorReadings;
@@ -136,7 +136,7 @@ namespace NMib::NCloud::NCloudManager
 			if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor readings", Permissions))
 				co_return Auditor.f_AccessDenied("(Get sensor readings)", Permissions);
 
-			SensorReadings = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensorReadings, fg_Move(_Filter), _BatchSize);
+			SensorReadings = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensorReadings, fg_Move(_Params));
 
 			Auditor.f_Info("Get sensor readings");
 		}
@@ -144,7 +144,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(SensorReadings);
 	}
 
-	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorStatus(CDistributedAppSensorReader_SensorStatusFilter &&_Filter, uint32 _BatchSize)
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorStatus(CGetSensorStatus &&_Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> SensorReadings;
@@ -168,11 +168,131 @@ namespace NMib::NCloud::NCloudManager
 			if (!co_await pThis->mp_Permissions.f_HasPermission("Get sensor status", Permissions))
 				co_return Auditor.f_AccessDenied("(Get sensor status)", Permissions);
 
-			SensorReadings = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensorStatus, fg_Move(_Filter), _BatchSize);
+			SensorReadings = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensorStatus, fg_Move(_Params));
 
 			Auditor.f_Info("Get sensor status");
 		}
 
 		co_return fg_Move(SensorReadings);
+	}
+
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_SubscribeSensors
+		(
+			TCVector<CDistributedAppSensorReader_SensorFilter> &&_Filters
+			, TCActorFunctorWithID<TCFuture<void> (CSensorChange &&_Change)> &&_fOnChange
+		)
+		-> TCFuture<TCActorSubscriptionWithID<>>
+	{
+		TCActorSubscriptionWithID<> Subscription;
+		{
+			auto pThis = m_pThis;
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
+			;
+
+			auto Auditor = pThis->mp_AppState.f_Auditor();
+
+			auto Permissions = fsp_SensorReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Subscribe sensors", Permissions))
+				co_return Auditor.f_AccessDenied("(Subscribe sensors)", Permissions);
+
+			Subscription = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SubscribeSensors, fg_Move(_Filters), fg_Move(_fOnChange));
+
+			Auditor.f_Info("Subscribe sensors");
+		}
+
+		co_return fg_Move(Subscription);
+	}
+
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_SubscribeSensorReadings
+		(
+			TCVector<CDistributedAppSensorReader_SensorReadingSubscriptionFilter> &&_Filters
+			, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading &&_Reading)> &&_fOnReading
+		)
+		-> TCFuture<TCActorSubscriptionWithID<>>
+	{
+		for (auto &Filter : _Filters)
+		{
+			if (Filter.m_Flags & CDistributedAppSensorReader_SensorReadingFilter::ESensorReadingsFlag_ReportNewestFirst)
+				co_return DMibErrorInstance("ESensorReadingsFlag_ReportNewestFirst is not supported for subscriptions");
+		}
+
+		TCActorSubscriptionWithID<> Subscription;
+		{
+			auto pThis = m_pThis;
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
+			;
+
+			auto Auditor = pThis->mp_AppState.f_Auditor();
+
+			auto Permissions = fsp_SensorReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Subscribe sensor readings", Permissions))
+				co_return Auditor.f_AccessDenied("(Subscribe sensor readings)", Permissions);
+
+			Subscription = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SubscribeSensorReadings, fg_Move(_Filters), fg_Move(_fOnReading));
+
+			Auditor.f_Info("Subscribe sensor readings");
+		}
+
+		co_return fg_Move(Subscription);
+	}
+
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_SubscribeSensorStatus
+		(
+			TCVector<CDistributedAppSensorReader_SensorStatusFilter> &&_Filters
+			, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading &&_Reading)> &&_fOnReading
+		)
+		-> TCFuture<TCActorSubscriptionWithID<>>
+	{
+		for (auto &Filter : _Filters)
+		{
+			if (Filter.m_Flags & CDistributedAppSensorReader_SensorReadingFilter::ESensorReadingsFlag_ReportNewestFirst)
+				co_return DMibErrorInstance("ESensorReadingsFlag_ReportNewestFirst is not supported for subscriptions");
+		}
+
+		TCActorSubscriptionWithID<> Subscription;
+		{
+			auto pThis = m_pThis;
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
+			;
+
+			auto Auditor = pThis->mp_AppState.f_Auditor();
+
+			auto Permissions = fsp_SensorReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Subscribe sensor status", Permissions))
+				co_return Auditor.f_AccessDenied("(Subscribe sensor status)", Permissions);
+
+			Subscription = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SubscribeSensorStatus, fg_Move(_Filters), fg_Move(_fOnReading));
+
+			Auditor.f_Info("Subscribe sensor status");
+		}
+
+		co_return fg_Move(Subscription);
 	}
 }
