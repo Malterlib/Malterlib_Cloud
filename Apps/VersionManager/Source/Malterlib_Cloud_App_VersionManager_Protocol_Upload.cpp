@@ -125,15 +125,20 @@ namespace NMib::NCloud::NVersionManager
 		}
 
 		CVersionUpload *pUpload = nullptr;
-		auto OnResume = g_OnResume / [&]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
 
-				pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
-				if (!pUpload)
-					DMibError("Upload aborted");
-			}
+					pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
+					if (!pUpload)
+						return DMibErrorInstance("Upload aborted");
+
+					return {};
+				}
+			)
 		;
 
 		auto pCleanup = g_OnScopeExitActor / [pThis, UploadID, Desc = pUpload->m_Desc, Auditor]

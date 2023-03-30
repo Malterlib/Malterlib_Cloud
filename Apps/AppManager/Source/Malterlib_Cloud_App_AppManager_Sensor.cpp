@@ -18,11 +18,15 @@ namespace NMib::NCloud::NAppManager
 	auto CAppManagerActor::CDistributedAppSensorReporterImplementation::f_OpenSensorReporter(CSensorInfo &&_SensorInfo) -> TCFuture<CSensorReporter>
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();

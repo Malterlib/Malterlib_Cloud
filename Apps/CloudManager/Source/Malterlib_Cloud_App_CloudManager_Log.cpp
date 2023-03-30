@@ -31,11 +31,15 @@ namespace NMib::NCloud::NCloudManager
 	auto CCloudManagerServer::CDistributedAppLogReporterImplementation::f_OpenLogReporter(CLogInfo &&_LogInfo) -> TCFuture<CLogReporter>
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -82,11 +86,15 @@ namespace NMib::NCloud::NCloudManager
 		TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> Logs;
 		{
 			auto pThis = m_pThis;
-			auto OnResume = g_OnResume / [pThis]
-				{
-					if (pThis->f_IsDestroyed())
-						DMibError("Shutting down");
-				}
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
 			;
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -110,11 +118,15 @@ namespace NMib::NCloud::NCloudManager
 		TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>> LogEntriesGenerator;
 		{
 			auto pThis = m_pThis;
-			auto OnResume = g_OnResume / [pThis]
-				{
-					if (pThis->f_IsDestroyed())
-						DMibError("Shutting down");
-				}
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
 			;
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();

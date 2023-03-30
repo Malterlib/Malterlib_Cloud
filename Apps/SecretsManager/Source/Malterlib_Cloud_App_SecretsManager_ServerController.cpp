@@ -32,11 +32,15 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "ServerController started");
 
-		auto OnResume = g_OnResume / [&] 
-			{
-				if (mp_AppState.m_bStoppingApp || f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (mp_AppState.m_bStoppingApp || f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto KeyManagerSubscription = co_await mp_AppState.m_TrustManager->f_SubscribeTrustedActors<CKeyManager>().f_Wrap();

@@ -31,11 +31,15 @@ namespace NMib::NCloud::NCloudManager
 	auto CCloudManagerServer::CDistributedAppSensorReporterImplementation::f_OpenSensorReporter(CSensorInfo &&_SensorInfo) -> TCFuture<CSensorReporter>
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -82,11 +86,15 @@ namespace NMib::NCloud::NCloudManager
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> Sensors;
 		{
 			auto pThis = m_pThis;
-			auto OnResume = g_OnResume / [pThis]
-				{
-					if (pThis->f_IsDestroyed())
-						DMibError("Shutting down");
-				}
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
 			;
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -110,11 +118,15 @@ namespace NMib::NCloud::NCloudManager
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> SensorReadings;
 		{
 			auto pThis = m_pThis;
-			auto OnResume = g_OnResume / [pThis]
-				{
-					if (pThis->f_IsDestroyed())
-						DMibError("Shutting down");
-				}
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
 			;
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -138,11 +150,15 @@ namespace NMib::NCloud::NCloudManager
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> SensorReadings;
 		{
 			auto pThis = m_pThis;
-			auto OnResume = g_OnResume / [pThis]
-				{
-					if (pThis->f_IsDestroyed())
-						DMibError("Shutting down");
-				}
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
 			;
 
 			auto Auditor = pThis->mp_AppState.f_Auditor();

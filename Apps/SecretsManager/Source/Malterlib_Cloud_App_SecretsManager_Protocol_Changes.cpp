@@ -47,15 +47,20 @@ namespace NMib::NCloud::NSecretsManager
 			{
 				CChangeSubscription const *pSubscription = nullptr;
 
-				auto OnResume = g_OnResume / [&]
-					{
-						if (f_IsDestroyed())
-							DMibError("Shutting down");
+				auto OnResume = co_await fg_OnResume
+					(
+						[&]() -> CExceptionPointer
+						{
+							if (f_IsDestroyed())
+								return DMibErrorInstance("Shutting down");
 
-						pSubscription = this->mp_ChangeSubscriptions.f_FindEqual(_SubscriptionID);
-						if (!pSubscription)
-							DMibError("Subscription no longer exists");
-					}
+							pSubscription = this->mp_ChangeSubscriptions.f_FindEqual(_SubscriptionID);
+							if (!pSubscription)
+								return DMibErrorInstance("Subscription no longer exists");
+
+							return {};
+						}
+					)
 				;
 				
 				auto HasPermissions = co_await mp_Permissions.f_HasPermissions("Send updated secrets in SecretsManager", Permissions, pSubscription->m_CallingHostInfo)
@@ -104,15 +109,20 @@ namespace NMib::NCloud::NSecretsManager
 
 		CChangeSubscription const *pSubscription = nullptr;
 
-		auto OnResume = g_OnResume / [&]
-			{
-				if (f_IsDestroyed())
-					DMibError("Shutting down");
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
 
-				pSubscription = mp_ChangeSubscriptions.f_FindEqual(_SubscriptionID);
-				if (!pSubscription)
-					DMibError("Subscription no longer exists");
-			}
+					pSubscription = mp_ChangeSubscriptions.f_FindEqual(_SubscriptionID);
+					if (!pSubscription)
+						return DMibErrorInstance("Subscription no longer exists");
+
+					return {};
+				}
+			)
 		;
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
@@ -191,11 +201,15 @@ namespace NMib::NCloud::NSecretsManager
 				co_return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
 		}
 
-		auto OnResume = g_OnResume / [&]
-			{
-				if (f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
@@ -216,12 +230,16 @@ namespace NMib::NCloud::NSecretsManager
 		CStr SubscriptionID = fg_RandomID(This.mp_ChangeSubscriptions);
 		auto pSubscription = &This.mp_ChangeSubscriptions[SubscriptionID];
 
-		auto OnResume2 = g_OnResume / [&]
-			{
-				pSubscription = This.mp_ChangeSubscriptions.f_FindEqual(SubscriptionID);
-				if (!pSubscription)
-					DMibError("Subscription no longer exists");
-			}
+		auto OnResume2 = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					pSubscription = This.mp_ChangeSubscriptions.f_FindEqual(SubscriptionID);
+					if (!pSubscription)
+						return DMibErrorInstance("Subscription no longer exists");
+					return {};
+				}
+			)
 		;
 
 		pSubscription->m_SubscriptionParams = fg_Move(_Params);

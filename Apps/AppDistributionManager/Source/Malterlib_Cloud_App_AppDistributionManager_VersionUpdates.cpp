@@ -82,12 +82,16 @@ namespace NMib::NCloud::NAppDistributionManager
 	{
 		CVersionManagerState *pVersionManagerState;
 
-		auto OnResume = g_OnResume / [&]
-			{
-				pVersionManagerState = mp_VersionManagers.f_FindEqual(_VersionManager);
-				if (!pVersionManagerState)
-					DMibError("Version manager removed");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> NException::CExceptionPointer
+				{
+					pVersionManagerState = mp_VersionManagers.f_FindEqual(_VersionManager);
+					if (!pVersionManagerState)
+						return DMibErrorInstance("Version manager removed");
+					return {};
+				}
+			)
 		;
 
 		pVersionManagerState->m_Subscription.f_Clear();

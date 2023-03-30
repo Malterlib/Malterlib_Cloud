@@ -19,11 +19,15 @@ namespace NMib::NCloud::NAppDistributionManager
 		
 		co_await fp_ReadState();
 
-		auto OnResume = g_OnResume / [&]
-			{
-				if (mp_State.m_bStoppingApp)
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> NException::CExceptionPointer
+				{
+					if (mp_State.m_bStoppingApp)
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		mp_VersionManagerSubscription = co_await mp_State.m_TrustManager->f_SubscribeTrustedActors<CVersionManager>();

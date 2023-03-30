@@ -21,17 +21,22 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data)
 	{
-		auto OnResume = g_OnResume / [this]
-			{
-				if (f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[this]() -> CExceptionPointer
+				{
+					if (f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [Key = fg_Move(_Key), Data = fg_Move(_Data)](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [Key = fg_Move(_Key), Data = fg_Move(_Data)]
+				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureExceptions;
 
@@ -59,11 +64,15 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_RemoveAppManagerData(CStr const &_HostID)
 	{
-		auto OnResume = g_OnResume / [this]
-			{
-				if (f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[this]() -> CExceptionPointer
+				{
+					if (f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Result = co_await mp_DatabaseActor

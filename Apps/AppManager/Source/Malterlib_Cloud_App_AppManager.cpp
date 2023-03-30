@@ -334,11 +334,15 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_InitApp()
 	{
-		auto OnResume = g_OnResume / [&]
-			{
-				if (mp_State.m_bStoppingApp || f_IsDestroyed())
-					DMibError("Startup aborted");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (mp_State.m_bStoppingApp || f_IsDestroyed())
+						return DMibErrorInstance("Startup aborted");
+					return {};
+				}
+			)
 		;
 
 		co_await fp_InitSensor();

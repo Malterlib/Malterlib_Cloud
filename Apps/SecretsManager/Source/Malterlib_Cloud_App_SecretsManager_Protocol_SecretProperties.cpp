@@ -623,10 +623,14 @@ namespace NMib::NCloud::NSecretsManager
 			co_return fg_Move(pError);
 
 		CSecretPropertiesInternal *pSecretProperties;
-		auto OnResume = g_OnResume / [&]
-			{
-				pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(ID);
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					pSecretProperties = m_pThis->mp_Database.m_Secrets.f_FindEqual(ID);
+					return {};
+				}
+			)
 		;
 
 		NContainer::TCMap<CStr, NContainer::TCVector<CPermissionQuery>> Permissions;

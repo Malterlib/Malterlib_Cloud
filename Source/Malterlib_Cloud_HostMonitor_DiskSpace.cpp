@@ -21,11 +21,15 @@ namespace NMib::NCloud
 
 	TCFuture<CActorSubscription> CHostMonitor::f_MonitorPath(CMonitorPathOptions const &_Options)
 	{
-		auto OnResume = g_OnResume / [&]
-			{
-				if (f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto &Internal = *mp_pInternal;
@@ -152,11 +156,15 @@ namespace NMib::NCloud
 
 	TCFuture<void> CHostMonitor::CInternal::f_PeriodicUpdate_Diskspace_UpdateMounts()
 	{
-		auto OnResume = g_OnResume / [&]
-			{
-				if (m_pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (m_pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Mounts = co_await
@@ -202,11 +210,15 @@ namespace NMib::NCloud
 
 	TCFuture<void> CHostMonitor::CInternal::f_PeriodicUpdate_Diskspace(bool _bCanSkip)
 	{
-		auto OnResume = g_OnResume / [&]
-			{
-				if (m_pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (m_pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		if (_bCanSkip && m_UpdatePeriodicDiskSpaceSequencer.f_NumWaiting() > 0)

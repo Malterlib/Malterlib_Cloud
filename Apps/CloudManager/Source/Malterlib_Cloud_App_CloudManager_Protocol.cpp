@@ -58,11 +58,15 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied)
 	{
-		auto OnResume = g_OnResume / [this]
-			{
-				if (f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[this]() -> CExceptionPointer
+				{
+					if (f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto pAppManager = mp_AppManagers.f_FindEqual(_AppManagerID);
@@ -92,11 +96,15 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_ChangeOtherErrors(CStr const &_AppManagerID, mint _RegisterSequence, TCSet<CStr> const &_Remove, TCMap<CStr, CStr> const &_Add)
 	{
-		auto OnResume = g_OnResume / [this]
-			{
-				if (f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[this]() -> CExceptionPointer
+				{
+					if (f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Result = co_await mp_DatabaseActor
@@ -140,11 +148,15 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_ProcessApplicationChanges(CStr const &_AppManagerID, CAppManagerInterface::COnChangeNotificationParams &&_Params)
 	{
-		auto OnResume = g_OnResume / [this]
-			{
-				if (f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[this]() -> CExceptionPointer
+				{
+					if (f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Result = co_await mp_DatabaseActor
@@ -233,11 +245,15 @@ namespace NMib::NCloud::NCloudManager
 			co_return DMibErrorInstance("Invalid app manager");
 
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto CallingHostInfo = fg_GetCallingHostInfo();
@@ -349,11 +365,15 @@ namespace NMib::NCloud::NCloudManager
 	auto CCloudManagerServer::CCloudManagerImplementation::f_EnumAppManagers() -> TCFuture<TCMap<CStr, CAppManagerDynamicInfo>>
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -398,11 +418,15 @@ namespace NMib::NCloud::NCloudManager
 	auto CCloudManagerServer::CCloudManagerImplementation::f_EnumApplications() -> TCFuture<TCMap<CApplicationKey, CApplicationInfo>>
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -442,11 +466,15 @@ namespace NMib::NCloud::NCloudManager
 	TCFuture<void> CCloudManagerServer::CCloudManagerImplementation::f_RemoveAppManager(NStr::CStr const &_AppManagerHostID)
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -480,11 +508,15 @@ namespace NMib::NCloud::NCloudManager
 	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> CCloudManagerServer::CCloudManagerImplementation::f_GetSensorReporter()
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -509,11 +541,15 @@ namespace NMib::NCloud::NCloudManager
 	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> CCloudManagerServer::CCloudManagerImplementation::f_GetSensorReader()
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -538,11 +574,15 @@ namespace NMib::NCloud::NCloudManager
 	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> CCloudManagerServer::CCloudManagerImplementation::f_GetLogReporter()
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
@@ -567,11 +607,15 @@ namespace NMib::NCloud::NCloudManager
 	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReader>> CCloudManagerServer::CCloudManagerImplementation::f_GetLogReader()
 	{
 		auto pThis = m_pThis;
-		auto OnResume = g_OnResume / [pThis]
-			{
-				if (pThis->f_IsDestroyed())
-					DMibError("Shutting down");
-			}
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
 		;
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
