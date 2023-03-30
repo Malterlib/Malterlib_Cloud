@@ -39,7 +39,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 		CStr Error;
 		if (!CFile::fs_IsSafeRelativePath(_FileName, Error))
-			return NException::fg_ExceptionPointer(DMibErrorInstance("The path cannot {}"_f << Error));
+			return NException::fg_MakeException(DMibErrorInstance("The path cannot {}"_f << Error));
 
 		if (!o_pManifestFile)
 			return nullptr;
@@ -49,7 +49,7 @@ namespace NMib::NCloud::NBackupManager
 		if (!pManifestFile)
 		{
 			DMibCloudBackupManagerDebugOut("NOT EXISTS: {}\n", _FileName);
-			return fg_ExceptionPointer(DMibErrorInstance("File does not exists in manifest"));
+			return fg_MakeException(DMibErrorInstance("File does not exists in manifest"));
 		}
 		
 		*o_pManifestFile = pManifestFile; 
