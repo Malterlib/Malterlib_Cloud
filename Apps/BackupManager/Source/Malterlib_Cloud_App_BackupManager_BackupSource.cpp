@@ -3,6 +3,7 @@
 #include "Malterlib_Cloud_App_BackupManager_Internal.h"
 
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NBackupManager
 {
@@ -156,8 +157,9 @@ namespace NMib::NCloud::NBackupManager
 			}
 		;
 
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
+
 			CFile::CFindFilesOptions Options{mp_LatestDirectory + "/*", true};
 			Options.m_AttribMask = EFileAttrib_File | EFileAttrib_Link;
 
@@ -179,10 +181,6 @@ namespace NMib::NCloud::NBackupManager
 			}
 
 			co_return fg_Move(Result);
-		}
-		catch (CException const &)
-		{
-			co_return fg_CurrentException();
 		}
 	}
 
@@ -428,8 +426,9 @@ namespace NMib::NCloud::NBackupManager
 			}
 		;
 
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
+
 			TCSet<CStr> CheckDeleteDirectories;
 
 			auto Cleanup = g_OnScopeExit / [&]
@@ -618,21 +617,13 @@ namespace NMib::NCloud::NBackupManager
 					break;
 				}
 			}
-			try
+
 			{
+				auto CaptureScope = co_await (g_CaptureExceptions % fg_LogError("Mib/Cloud/BackupManager", "Failed to save manifest after commit"));
 				fp_SaveManifest();
-			}
-			catch (NException::CException const &_Exception)
-			{
-				DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to save manifest after commit: {}", _Exception);
-				throw;
 			}
 
 			co_return {};
-		}
-		catch (CException const &)
-		{
-			co_return fg_CurrentException();
 		}
 	}
 
@@ -673,11 +664,13 @@ namespace NMib::NCloud::NBackupManager
 		if (!pOriginalManifestFile->f_IsFile())
 			co_return DMibErrorInstance("Original manifest file '{}' is not a file in append operation"_f << _File);
 
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
+
+			auto OriginalExceptions = NException::fg_UncaughtExceptions();
 			auto Cleanup = g_OnScopeExit / [&]
 				{
-					bool bInException = NException::fg_UncaughtExceptions();
+					bool bInException = NException::fg_UncaughtExceptions() != OriginalExceptions;
 
 					try
 					{
@@ -726,10 +719,6 @@ namespace NMib::NCloud::NBackupManager
 				}
 			}
 			co_return {};
-		}
-		catch (CException const &)
-		{
-			co_return fg_CurrentException();
 		}
 	}
 }

@@ -619,13 +619,9 @@ namespace NMib::NCloud::NPrivate
 		if (mp_Backup->f_InterfaceVersion() >= EBackupManagerProtocolVersion_UseSHA256)
 			RSyncFlags |= ERSyncFlag_UseSHA256;
 
-		try
 		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to prepare manifest rsync");
 			pState->m_pRSyncServer = fg_Construct(pState->m_ManifestStream, 8*1024*1024, RSyncFlags);
-		}
-		catch (CExceptionFile const &_Exception)
-		{
-			co_return DMibErrorInstance(fg_Format("Failed to prepare manifest rsync: {}", _Exception));
 		}
 
 		TCPromise<void> Promise;

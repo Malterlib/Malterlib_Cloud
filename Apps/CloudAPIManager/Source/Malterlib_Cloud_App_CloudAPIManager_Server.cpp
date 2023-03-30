@@ -132,21 +132,31 @@ namespace NMib::NCloud::NCloudAPIManager
 	TCVector<CStr> CCloudAPIManagerDaemonActor::CServer::fsp_AuditMessages(CStr const &_Error, CExceptionPointer _pException)
 	{
 		TCVector<CStr> Messages;
-		try
+
+		bool bHandled = false;
+		if (_pException)
 		{
-			if (_pException)
-				std::rethrow_exception(_pException);
+			bHandled = NException::fg_VisitException<CExceptionCloudAPI, CException>
+				(
+					_pException
+					, [&]<typename tf_CException>(tf_CException const &_Exception)
+					{
+						if constexpr (NTraits::TCIsSame<tf_CException, CExceptionCloudAPI>::mc_Value)
+						{
+							Messages.f_Insert(fg_Format("{}: {}", _Error, _Exception.f_GetErrorStr()));
+						}
+						else
+						{
+							Messages.f_Insert(_Error);
+							Messages.f_Insert(fg_Format("Error: ", _Exception.f_GetErrorStr()));
+						}
+					}
+				)
+			;
+		}
+
+		if (!bHandled)
 			Messages.f_Insert(_Error);
-		}
-		catch (CExceptionCloudAPI const &_Exception)
-		{
-			Messages.f_Insert(fg_Format("{}: {}", _Error, _Exception.f_GetErrorStr()));
-		}
-		catch (CException const &_Exception)
-		{
-			Messages.f_Insert(_Error);
-			Messages.f_Insert(fg_Format("Error: ", _Exception.f_GetErrorStr()));
-		}
 
 		return Messages;
 	}

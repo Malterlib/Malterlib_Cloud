@@ -443,13 +443,9 @@ namespace NMib::NCloud::NAppManager
 					% "Failed to download application from version manager" % Auditor
 				)
 			;
-			try
 			{
+				auto CaptureScope = co_await (g_CaptureExceptions % Auditor);
 				fApplyVersion(VersionID, VersionInfo);
-			}
-			catch (CException const &_Exception)
-			{
-				co_return Auditor.f_Exception(_Exception.f_GetErrorStr());
 			}
 
 			*pDeletePath = DownloadDirectoryRoot;

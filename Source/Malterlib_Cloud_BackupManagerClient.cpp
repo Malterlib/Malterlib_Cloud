@@ -43,13 +43,9 @@ namespace NMib::NCloud
 		if (Internal.m_bStarted)
 			co_return DMibErrorInstance("Backup already started");
 
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
 			Internal.m_Config.f_Validate();
-		}
-		catch (NException::CException const &)
-		{
-			co_return NException::fg_CurrentException();
 		}
 
 		Internal.m_bStarted = true;

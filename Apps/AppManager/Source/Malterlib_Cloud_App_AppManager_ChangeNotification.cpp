@@ -277,18 +277,16 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
-		try
-		{
-			co_await OnChangeResultsVector.f_GetResults();
-		}
-		catch (CException const &_Exception)
+		auto Result = co_await OnChangeResultsVector.f_GetUnwrappedResults().f_Wrap();
+
+		if (!Result)
 		{
 			DMibLogWithCategory
 				(
 					Malterlib/Cloud/AppManager
 					, Warning
 					, "Failed to send change notification: {}"
-					, _Exception
+					, Result.f_GetExceptionStr()
 				)
 			;
 		}

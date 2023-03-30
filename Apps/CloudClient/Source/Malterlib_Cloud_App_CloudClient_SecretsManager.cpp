@@ -1118,14 +1118,11 @@ namespace NMib::NCloud::NCloudClient
 					CStrSecure Encoded = co_await _pCommandLine->f_ReadPrompt(PasswordPrompt);
 
 					CSecureByteVector Decoded;
-					try
 					{
+						auto CaptureScope = co_await (g_CaptureExceptions % "Base64 decoding failed");
+
 						CDisableExceptionTraceScope Disabled;
 						fg_Base64Decode(Encoded, Decoded);
-					}
-					catch (CException const &_Exception)
-					{
-						co_return DMibErrorInstance(fg_Format("Base64 decoding failed: {}", _Exception));
 					}
 
 					Secret = CSecretsManager::CSecret{fg_Move(Decoded)};
@@ -1185,14 +1182,11 @@ namespace NMib::NCloud::NCloudClient
 		TCSet<CStrSecure> AddTags;
 		TCSet<CStrSecure> RemoveTags;
 
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
+
 			AddTags = fParseTags(_Params["AddTags"]);
 			RemoveTags = fParseTags(_Params["RemoveTags"]);
-		}
-		catch (CException const &_Error)
-		{
-			co_return _Error.f_ExceptionPointer();
 		}
 
 		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty())

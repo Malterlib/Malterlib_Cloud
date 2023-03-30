@@ -33,17 +33,14 @@ namespace NMib::NCloud::NCloudAPIManager
 					{
 						TCPromise<NEncoding::CEJSON> Promise;
 						CCloudAPIManager::CGetSwiftBaseURL Params;
-						try
 						{
+							auto CaptureScope = co_await g_CaptureExceptions;
+
 							NException::CDisableExceptionTraceScope DisableTracing;
 							auto &InputParams = _Params[0];
 							Params.m_CloudContext = InputParams["cloudContext"].f_String();
 						}
-						catch (NException::CException const &)
-						{
-							co_return fg_CurrentException();
-						}
-						
+
 						co_return (co_await fg_CallSafe(mp_ProtocolInterface.m_pActor, &CCloudAPIManagerImplementation::f_GetSwiftBaseURL, fg_Move(Params))).m_BaseURL;
 					}
 				}
@@ -56,18 +53,16 @@ namespace NMib::NCloud::NCloudAPIManager
 							co_return "Method takes 1 parameter";
 						TCPromise<NEncoding::CEJSON> Promise;
 						CCloudAPIManager::CEnsureContainer Params;
-						try
 						{
+							auto CaptureScope = co_await g_CaptureExceptions;
+
 							NException::CDisableExceptionTraceScope DisableTracing;
 							auto &InputParams = _Params[0];
 							Params.m_CloudContext = InputParams["cloudContext"].f_String(); 
 							Params.m_ContainerName = InputParams["containerName"].f_String();
 							Params.m_TempURLKey = InputParams["tempURLKey"].f_String();
 						}
-						catch (NException::CException const &)
-						{
-							co_return fg_CurrentException();
-						}
+
 						co_await fg_CallSafe(mp_ProtocolInterface.m_pActor, &CCloudAPIManagerImplementation::f_EnsureContainer, fg_Move(Params));
 
 						co_return {};
@@ -82,8 +77,9 @@ namespace NMib::NCloud::NCloudAPIManager
 							co_return "Method takes 1 parameter";
 						TCPromise<NEncoding::CEJSON> Promise;
 						CCloudAPIManager::CSignTempURL Params;
-						try
 						{
+							auto CaptureScope = co_await g_CaptureExceptions;
+
 							NException::CDisableExceptionTraceScope DisableTracing;
 							auto &InputParams = _Params[0];
 							Params.m_CloudContext = InputParams["cloudContext"].f_String();
@@ -91,10 +87,6 @@ namespace NMib::NCloud::NCloudAPIManager
 							Params.m_ContainerName = InputParams["containerName"].f_String();
 							Params.m_ObjectId = InputParams["objectId"].f_String();
 							Params.m_TempURLKey = InputParams["tempURLKey"].f_String();
-						}
-						catch (NException::CException const &)
-						{
-							co_return fg_CurrentException();
 						}
 
 						co_return (co_await fg_CallSafe(mp_ProtocolInterface.m_pActor, &CCloudAPIManagerImplementation::f_SignTempURL, fg_Move(Params))).m_SignedURL;
@@ -109,18 +101,16 @@ namespace NMib::NCloud::NCloudAPIManager
 							co_return "Method takes 1 parameter";
 						TCPromise<NEncoding::CEJSON> Promise;
 						CCloudAPIManager::CDeleteObject Params;
-						try
 						{
+							auto CaptureScope = co_await g_CaptureExceptions;
+
 							NException::CDisableExceptionTraceScope DisableTracing;
 							auto &InputParams = _Params[0];
 							Params.m_CloudContext = InputParams["cloudContext"].f_String(); 
 							Params.m_ContainerName = InputParams["containerName"].f_String();
 							Params.m_ObjectId = InputParams["objectId"].f_String();
 						}
-						catch (NException::CException const &)
-						{
-							co_return fg_CurrentException();
-						}
+						
 						co_await fg_CallSafe(mp_ProtocolInterface.m_pActor, &CCloudAPIManagerImplementation::f_DeleteObject, fg_Move(Params));
 
 						co_return {};

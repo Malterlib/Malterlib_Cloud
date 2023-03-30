@@ -66,259 +66,254 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<void> CAppManagerActor::fp_ReadState()
 	{
 		bool bChangedDatabase = false;
-		try
+		auto CaptureScope = co_await g_CaptureExceptions;
+
+		CStr PendingSelfUpdateName;
+		CVersionManager::CVersionIDAndPlatform PendingSelfUpdateVersionID;
+		CTime PendingSelfUpdateTime;
+		uint32 PendingSelfUpdateSequence = 0;
+
+		if (auto *pUserNameTransform = mp_State.m_ConfigDatabase.m_Data.f_GetMember("UserGroupNameTransform"))
+			mp_pUniqueUserGroup->m_UserGroupNameTransform = pUserNameTransform->f_String();
+
+		if (auto *pPendingSelfUpdateProcess = mp_State.m_StateDatabase.m_Data.f_GetMember("PendingSelfUpdateProcess"))
 		{
-			CStr PendingSelfUpdateName;
-			CVersionManager::CVersionIDAndPlatform PendingSelfUpdateVersionID;
-			CTime PendingSelfUpdateTime;
-			uint32 PendingSelfUpdateSequence = 0;
+			auto &Pending = *pPendingSelfUpdateProcess;
 
-			if (auto *pUserNameTransform = mp_State.m_ConfigDatabase.m_Data.f_GetMember("UserGroupNameTransform"))
-				mp_pUniqueUserGroup->m_UserGroupNameTransform = pUserNameTransform->f_String();
+			PendingSelfUpdateName = Pending["Name"].f_String();
+			PendingSelfUpdateVersionID = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(Pending["VersionID"]);
+			PendingSelfUpdateTime = Pending["VersionTime"].f_Date();
+			PendingSelfUpdateSequence = Pending["VersionRetrySequence"].f_Integer();
 
-			if (auto *pPendingSelfUpdateProcess = mp_State.m_StateDatabase.m_Data.f_GetMember("PendingSelfUpdateProcess"))
+			mp_State.m_StateDatabase.m_Data.f_RemoveMember("PendingSelfUpdateProcess");
+			bChangedDatabase = true;
+		}
+
+		if (auto pApplication = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
+		{
+			for (auto &ApplicationEntry : pApplication->f_Object())
 			{
-				auto &Pending = *pPendingSelfUpdateProcess;
+				CStr const &Name = ApplicationEntry.f_Name();
+				auto &ApplicationJSON = ApplicationEntry.f_Value();
 
-				PendingSelfUpdateName = Pending["Name"].f_String();
-				PendingSelfUpdateVersionID = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(Pending["VersionID"]);
-				PendingSelfUpdateTime = Pending["VersionTime"].f_Date();
-				PendingSelfUpdateSequence = Pending["VersionRetrySequence"].f_Integer();
+				auto &Application = *(mp_Applications[Name] = fg_Construct(Name, this));
 
-				mp_State.m_StateDatabase.m_Data.f_RemoveMember("PendingSelfUpdateProcess");
-				bChangedDatabase = true;
-			}
+				auto &Settings = Application.m_Settings;
 
-			if (auto pApplication = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
-			{
-				for (auto &ApplicationEntry : pApplication->f_Object())
-				{
-					CStr const &Name = ApplicationEntry.f_Name();
-					auto &ApplicationJSON = ApplicationEntry.f_Value();
-
-					auto &Application = *(mp_Applications[Name] = fg_Construct(Name, this));
-
-					auto &Settings = Application.m_Settings;
-
-					Settings.m_Executable = ApplicationJSON["Executable"].f_String();
-					Settings.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String();
+				Settings.m_Executable = ApplicationJSON["Executable"].f_String();
+				Settings.m_RunAsUser = ApplicationJSON["RunAsUser"].f_String();
 #ifdef DPlatformFamily_Windows
-					if (auto pValue = ApplicationJSON.f_GetMember("RunAsUserPassword", EJSONType_String))
-						Settings.m_RunAsUserPassword = pValue->f_String();
+				if (auto pValue = ApplicationJSON.f_GetMember("RunAsUserPassword", EJSONType_String))
+					Settings.m_RunAsUserPassword = pValue->f_String();
 #endif
-					Settings.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String();
+				Settings.m_RunAsGroup = ApplicationJSON["RunAsGroup"].f_String();
 
-					if (auto pValue = ApplicationJSON.f_GetMember("RunAsUserHasShell", EJSONType_Boolean))
-						Settings.m_bRunAsUserHasShell = pValue->f_Boolean();
+				if (auto pValue = ApplicationJSON.f_GetMember("RunAsUserHasShell", EJSONType_Boolean))
+					Settings.m_bRunAsUserHasShell = pValue->f_Boolean();
 
-					if (auto *pValue = ApplicationJSON.f_GetMember("Backup"))
+				if (auto *pValue = ApplicationJSON.f_GetMember("Backup"))
+				{
+					auto &BackupJSON = *pValue;
+
+					if (BackupJSON["IncludeWildcards"].f_IsArray())
 					{
-						auto &BackupJSON = *pValue;
-
-						if (BackupJSON["IncludeWildcards"].f_IsArray())
-						{
-							for (auto &Wildcard : BackupJSON["IncludeWildcards"].f_Array())
-								Settings.m_Backup_IncludeWildcards[Wildcard.f_String()];
-						}
-						else
-						{
-							for (auto &Wildcard : BackupJSON["IncludeWildcards"].f_Object())
-							{
-								auto &Destination = Settings.m_Backup_IncludeWildcards[Wildcard.f_Name()];
-								if (Wildcard.f_Value().f_IsNull())
-									Destination = CDirectoryManifestConfig::CDestination{};
-								else
-									Destination = Wildcard.f_Value().f_String();
-							}
-						}
-						for (auto &Wildcard : BackupJSON["ExcludeWildcards"].f_Array())
-							Settings.m_Backup_ExcludeWildcards[Wildcard.f_String()];
-						for (auto &Wildcard : BackupJSON["AddSyncFlagsWildcards"].f_Object())
-							Settings.m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
-						for (auto &Wildcard : BackupJSON["RemoveSyncFlagsWildcards"].f_Object())
-							Settings.m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
-
-						Settings.m_Backup_NewBackupInterval = CTimeSpanConvert::fs_CreateSpanFromHours(BackupJSON["NewBackupIntervalHours"].f_Float());
-						Settings.m_bBackupEnabled = BackupJSON["Enabled"].f_Boolean();
+						for (auto &Wildcard : BackupJSON["IncludeWildcards"].f_Array())
+							Settings.m_Backup_IncludeWildcards[Wildcard.f_String()];
 					}
-
-					if (auto pValue = ApplicationJSON.f_GetMember("DistributedApp", EJSONType_Boolean))
-						Settings.m_bDistributedApp = pValue->f_Boolean();
-					for (auto &Parameter : ApplicationJSON["Parameters"].f_Array())
-						Settings.m_ExecutableParameters.f_Insert(Parameter.f_String());
-					for (auto &File : ApplicationJSON["Files"].f_Array())
-						Application.m_Files.f_Insert(File.f_String());
-					Settings.m_EncryptionStorage = ApplicationJSON["EncryptionStorage"].f_String();
-					if (auto pValue = ApplicationJSON.f_GetMember("EncryptionFileSystem", EJSONType_String))
-						Settings.m_EncryptionFileSystem = pValue->f_String();
-					else if (!Settings.m_EncryptionStorage.f_IsEmpty())
-						Settings.m_EncryptionFileSystem = "zfs";
-					if (auto pValue = ApplicationJSON.f_GetMember("ParentApplication", EJSONType_String))
-						Settings.m_ParentApplication = pValue->f_String();
-					if (auto pValue = ApplicationJSON.f_GetMember("VersionManagerApplication", EJSONType_String))
-						Settings.m_VersionManagerApplication = pValue->f_String();
-					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersion", EJSONType_Object))
-						Application.m_LastInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
-					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfo", EJSONType_Object))
-						Application.m_LastInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
-
-					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionFinished", EJSONType_Object))
-						Application.m_LastInstalledVersionFinished = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
 					else
-						Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
+					{
+						for (auto &Wildcard : BackupJSON["IncludeWildcards"].f_Object())
+						{
+							auto &Destination = Settings.m_Backup_IncludeWildcards[Wildcard.f_Name()];
+							if (Wildcard.f_Value().f_IsNull())
+								Destination = CDirectoryManifestConfig::CDestination{};
+							else
+								Destination = Wildcard.f_Value().f_String();
+						}
+					}
+					for (auto &Wildcard : BackupJSON["ExcludeWildcards"].f_Array())
+						Settings.m_Backup_ExcludeWildcards[Wildcard.f_String()];
+					for (auto &Wildcard : BackupJSON["AddSyncFlagsWildcards"].f_Object())
+						Settings.m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
+					for (auto &Wildcard : BackupJSON["RemoveSyncFlagsWildcards"].f_Object())
+						Settings.m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 
-					if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfoFinished", EJSONType_Object))
-						Application.m_LastInstalledVersionInfoFinished = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
-					else
-						Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo;
+					Settings.m_Backup_NewBackupInterval = CTimeSpanConvert::fs_CreateSpanFromHours(BackupJSON["NewBackupIntervalHours"].f_Float());
+					Settings.m_bBackupEnabled = BackupJSON["Enabled"].f_Boolean();
+				}
 
-					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersion", EJSONType_Object))
-						Application.m_LastTriedInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
-					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionInfo", EJSONType_Object))
-						Application.m_LastTriedInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
-					if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionError", EJSONType_String))
-						Application.m_LastTriedInstalledVersionError = pValue->f_String();
+				if (auto pValue = ApplicationJSON.f_GetMember("DistributedApp", EJSONType_Boolean))
+					Settings.m_bDistributedApp = pValue->f_Boolean();
+				for (auto &Parameter : ApplicationJSON["Parameters"].f_Array())
+					Settings.m_ExecutableParameters.f_Insert(Parameter.f_String());
+				for (auto &File : ApplicationJSON["Files"].f_Array())
+					Application.m_Files.f_Insert(File.f_String());
+				Settings.m_EncryptionStorage = ApplicationJSON["EncryptionStorage"].f_String();
+				if (auto pValue = ApplicationJSON.f_GetMember("EncryptionFileSystem", EJSONType_String))
+					Settings.m_EncryptionFileSystem = pValue->f_String();
+				else if (!Settings.m_EncryptionStorage.f_IsEmpty())
+					Settings.m_EncryptionFileSystem = "zfs";
+				if (auto pValue = ApplicationJSON.f_GetMember("ParentApplication", EJSONType_String))
+					Settings.m_ParentApplication = pValue->f_String();
+				if (auto pValue = ApplicationJSON.f_GetMember("VersionManagerApplication", EJSONType_String))
+					Settings.m_VersionManagerApplication = pValue->f_String();
+				if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersion", EJSONType_Object))
+					Application.m_LastInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+				if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfo", EJSONType_Object))
+					Application.m_LastInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
 
-					if (auto pValue = ApplicationJSON.f_GetMember("NewestUnconditionalVersion", EJSONType_Object))
-						Application.m_NewestUnconditionalVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
-					if (auto pValue = ApplicationJSON.f_GetMember("NewestUnconditionalVersionInfo", EJSONType_Object))
-						Application.m_NewestUnconditionalVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+				if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionFinished", EJSONType_Object))
+					Application.m_LastInstalledVersionFinished = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+				else
+					Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
 
-					if (auto pValue = ApplicationJSON.f_GetMember("WantVersion", EJSONType_Object))
-						Application.m_WantVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
-					if (auto pValue = ApplicationJSON.f_GetMember("WantVersionInfo", EJSONType_Object))
-						Application.m_WantVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+				if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfoFinished", EJSONType_Object))
+					Application.m_LastInstalledVersionInfoFinished = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+				else
+					Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo;
 
-					if (auto pValue = ApplicationJSON.f_GetMember("LastFailedInstalledVersionFailureStage", EJSONType_Integer))
-						Application.m_LastFailedInstalledVersionFailureStage = (EUpdateStage)pValue->f_Integer();
-					else
-						Application.m_LastFailedInstalledVersionFailureStage = EUpdateStage::EUpdateStage_Failed;
+				if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersion", EJSONType_Object))
+					Application.m_LastTriedInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+				if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionInfo", EJSONType_Object))
+					Application.m_LastTriedInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+				if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionError", EJSONType_String))
+					Application.m_LastTriedInstalledVersionError = pValue->f_String();
 
+				if (auto pValue = ApplicationJSON.f_GetMember("NewestUnconditionalVersion", EJSONType_Object))
+					Application.m_NewestUnconditionalVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+				if (auto pValue = ApplicationJSON.f_GetMember("NewestUnconditionalVersionInfo", EJSONType_Object))
+					Application.m_NewestUnconditionalVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+
+				if (auto pValue = ApplicationJSON.f_GetMember("WantVersion", EJSONType_Object))
+					Application.m_WantVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+				if (auto pValue = ApplicationJSON.f_GetMember("WantVersionInfo", EJSONType_Object))
+					Application.m_WantVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+
+				if (auto pValue = ApplicationJSON.f_GetMember("LastFailedInstalledVersionFailureStage", EJSONType_Integer))
+					Application.m_LastFailedInstalledVersionFailureStage = (EUpdateStage)pValue->f_Integer();
+				else
+					Application.m_LastFailedInstalledVersionFailureStage = EUpdateStage::EUpdateStage_Failed;
+
+				if
+					(
+						Application.m_LastTriedInstalledVersion != Application.m_LastInstalledVersionFinished
+						|| Application.m_LastTriedInstalledVersionInfo.m_Time != Application.m_LastInstalledVersionInfoFinished.m_Time
+						|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != Application.m_LastInstalledVersionInfoFinished.m_RetrySequence
+					)
+				{
 					if
 						(
-							Application.m_LastTriedInstalledVersion != Application.m_LastInstalledVersionFinished
-							|| Application.m_LastTriedInstalledVersionInfo.m_Time != Application.m_LastInstalledVersionInfoFinished.m_Time
-							|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != Application.m_LastInstalledVersionInfoFinished.m_RetrySequence
+							(
+								Name != PendingSelfUpdateName
+								|| Application.m_LastTriedInstalledVersion != PendingSelfUpdateVersionID
+								|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdateTime
+								|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdateSequence
+							)
+							&& (Application.m_LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion)
 						)
 					{
-						if
-							(
-								(
-									Name != PendingSelfUpdateName
-									|| Application.m_LastTriedInstalledVersion != PendingSelfUpdateVersionID
-									|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdateTime
-									|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdateSequence
-								)
-								&& (Application.m_LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion)
-							)
-						{
-							Application.m_LastFailedInstalledVersion = Application.m_LastTriedInstalledVersion;
-							Application.m_LastFailedInstalledVersionTime = Application.m_LastTriedInstalledVersionInfo.m_Time;
-							Application.m_LastFailedInstalledVersionRetrySequence = Application.m_LastTriedInstalledVersionInfo.m_RetrySequence;
-						}
+						Application.m_LastFailedInstalledVersion = Application.m_LastTriedInstalledVersion;
+						Application.m_LastFailedInstalledVersionTime = Application.m_LastTriedInstalledVersionInfo.m_Time;
+						Application.m_LastFailedInstalledVersionRetrySequence = Application.m_LastTriedInstalledVersionInfo.m_RetrySequence;
 					}
+				}
 
-					if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdate", EJSONType_Boolean))
-						Settings.m_bAutoUpdate = pValue->f_Boolean();
+				if (auto pValue = ApplicationJSON.f_GetMember("AutoUpdate", EJSONType_Boolean))
+					Settings.m_bAutoUpdate = pValue->f_Boolean();
 
-					{
-						auto pValue = ApplicationJSON.f_GetMember("UpdateTags", EJSONType_Array);
-						if (!pValue)
-							pValue = ApplicationJSON.f_GetMember("AutoUpdateTags", EJSONType_Array);
+				{
+					auto pValue = ApplicationJSON.f_GetMember("UpdateTags", EJSONType_Array);
+					if (!pValue)
+						pValue = ApplicationJSON.f_GetMember("AutoUpdateTags", EJSONType_Array);
 
-						if (pValue)
-						{
-							for (auto &Tag : pValue->f_Array())
-								Settings.m_UpdateTags[Tag.f_String()];
-						}
-					}
-
-					{
-						auto pValue = ApplicationJSON.f_GetMember("UpdateBranches", EJSONType_Array);
-						if (!pValue)
-							pValue = ApplicationJSON.f_GetMember("AutoUpdateBranches", EJSONType_Array);
-
-						if (pValue)
-						{
-							for (auto &Tag : pValue->f_Array())
-								Settings.m_UpdateBranches[Tag.f_String()];
-						}
-					}
-					if (auto pValue = ApplicationJSON.f_GetMember("UpdateScripts", EJSONType_Object))
-					{
-						Settings.m_UpdateScripts.m_PreUpdate = (*pValue)["PreUpdate"].f_String();
-						Settings.m_UpdateScripts.m_PostUpdate = (*pValue)["PostUpdate"].f_String();
-						Settings.m_UpdateScripts.m_PostLaunch = (*pValue)["PostLaunch"].f_String();
-						Settings.m_UpdateScripts.m_OnError = (*pValue)["OnError"].f_String();
-					}
-					if (auto pValue = ApplicationJSON.f_GetMember("SelfUpdateSource", EJSONType_Boolean))
-						Settings.m_bSelfUpdateSource = pValue->f_Boolean();
-					if (auto pValue = ApplicationJSON.f_GetMember("UpdateGroup", EJSONType_String))
-						Settings.m_UpdateGroup = pValue->f_String();
-					if (auto pRegisterInfo = ApplicationJSON.f_GetMember("RegisterInfo", EJSONType_Object))
-					{
-						if (auto pValue = pRegisterInfo->f_GetMember("UpdateType", EJSONType_Integer))
-							Application.m_RegisterInfo.m_UpdateType = (EDistributedAppUpdateType)pValue->f_Integer();
-						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesFiles", EJSONType_Integer))
-							Application.m_RegisterInfo.m_Resources_Files = pValue->f_Integer();
-						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesFilesPerProcess", EJSONType_Integer))
-							Application.m_RegisterInfo.m_Resources_FilesPerProcess = pValue->f_Integer();
-						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesThreads", EJSONType_Integer))
-							Application.m_RegisterInfo.m_Resources_Threads = pValue->f_Integer();
-						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesProcesses", EJSONType_Integer))
-							Application.m_RegisterInfo.m_Resources_Processes = pValue->f_Integer();
-						if (auto pValue = pRegisterInfo->f_GetMember("ResourcesMaxMapCount", EJSONType_Integer))
-							Application.m_RegisterInfo.m_Resources_MaxMapCount = pValue->f_Integer();
-					}
-					if (auto pValue = ApplicationJSON.f_GetMember("AssociatedHostID", EJSONType_String))
-						Application.m_AssociatedHostID = pValue->f_String();
-					if (auto pValue = ApplicationJSON.f_GetMember("Dependencies", EJSONType_Array))
+					if (pValue)
 					{
 						for (auto &Tag : pValue->f_Array())
-							Settings.m_Dependencies[Tag.f_String()];
+							Settings.m_UpdateTags[Tag.f_String()];
 					}
-					if (auto pValue = ApplicationJSON.f_GetMember("StopOnDependencyFailure", EJSONType_Boolean))
-						Settings.m_bStopOnDependencyFailure = pValue->f_Boolean();
-					if (auto pValue = ApplicationJSON.f_GetMember("PreventLaunchUser", EJSONType_Boolean))
-						Application.m_bPreventLaunch_User = pValue->f_Boolean();
-					if (auto pValue = ApplicationJSON.f_GetMember("PreventLaunchUpdate", EJSONType_Boolean))
-						Application.m_bPreventLaunch_Update = pValue->f_Boolean();
-					if (auto pValue = ApplicationJSON.f_GetMember("AppManagerVersion", EJSONType_Integer))
-						Settings.m_AppManagerVersion = pValue->f_Integer();
-					else
-						Settings.m_AppManagerVersion = 0;
-
-					if (auto pValue = ApplicationJSON.f_GetMember("LaunchInProcess", EJSONType_Boolean))
-						Settings.m_bLaunchInProcess = pValue->f_Boolean();
-
-					mp_KnownRemoteApplications[CRemoteApplicationKey{Settings}][mp_State.m_HostID];
 				}
-			}
 
-			if (auto *pKnownRemoteHosts = mp_State.m_StateDatabase.m_Data.f_GetMember("KnownRemoteApplications"))
-			{
-				for (auto &Group : pKnownRemoteHosts->f_Object())
 				{
-					CRemoteApplicationKey RemoteKey;
-					RemoteKey.m_Group = Group.f_Name();
+					auto pValue = ApplicationJSON.f_GetMember("UpdateBranches", EJSONType_Array);
+					if (!pValue)
+						pValue = ApplicationJSON.f_GetMember("AutoUpdateBranches", EJSONType_Array);
 
-					for (auto &Application : Group.f_Value().f_Object())
+					if (pValue)
 					{
-						RemoteKey.m_VersionManagerApplication = Application.f_Name();
-
-						for (auto &KnownHost : Application.f_Value().f_Object())
-							mp_KnownRemoteApplications[RemoteKey][KnownHost.f_Name()];
+						for (auto &Tag : pValue->f_Array())
+							Settings.m_UpdateBranches[Tag.f_String()];
 					}
 				}
-			}
+				if (auto pValue = ApplicationJSON.f_GetMember("UpdateScripts", EJSONType_Object))
+				{
+					Settings.m_UpdateScripts.m_PreUpdate = (*pValue)["PreUpdate"].f_String();
+					Settings.m_UpdateScripts.m_PostUpdate = (*pValue)["PostUpdate"].f_String();
+					Settings.m_UpdateScripts.m_PostLaunch = (*pValue)["PostLaunch"].f_String();
+					Settings.m_UpdateScripts.m_OnError = (*pValue)["OnError"].f_String();
+				}
+				if (auto pValue = ApplicationJSON.f_GetMember("SelfUpdateSource", EJSONType_Boolean))
+					Settings.m_bSelfUpdateSource = pValue->f_Boolean();
+				if (auto pValue = ApplicationJSON.f_GetMember("UpdateGroup", EJSONType_String))
+					Settings.m_UpdateGroup = pValue->f_String();
+				if (auto pRegisterInfo = ApplicationJSON.f_GetMember("RegisterInfo", EJSONType_Object))
+				{
+					if (auto pValue = pRegisterInfo->f_GetMember("UpdateType", EJSONType_Integer))
+						Application.m_RegisterInfo.m_UpdateType = (EDistributedAppUpdateType)pValue->f_Integer();
+					if (auto pValue = pRegisterInfo->f_GetMember("ResourcesFiles", EJSONType_Integer))
+						Application.m_RegisterInfo.m_Resources_Files = pValue->f_Integer();
+					if (auto pValue = pRegisterInfo->f_GetMember("ResourcesFilesPerProcess", EJSONType_Integer))
+						Application.m_RegisterInfo.m_Resources_FilesPerProcess = pValue->f_Integer();
+					if (auto pValue = pRegisterInfo->f_GetMember("ResourcesThreads", EJSONType_Integer))
+						Application.m_RegisterInfo.m_Resources_Threads = pValue->f_Integer();
+					if (auto pValue = pRegisterInfo->f_GetMember("ResourcesProcesses", EJSONType_Integer))
+						Application.m_RegisterInfo.m_Resources_Processes = pValue->f_Integer();
+					if (auto pValue = pRegisterInfo->f_GetMember("ResourcesMaxMapCount", EJSONType_Integer))
+						Application.m_RegisterInfo.m_Resources_MaxMapCount = pValue->f_Integer();
+				}
+				if (auto pValue = ApplicationJSON.f_GetMember("AssociatedHostID", EJSONType_String))
+					Application.m_AssociatedHostID = pValue->f_String();
+				if (auto pValue = ApplicationJSON.f_GetMember("Dependencies", EJSONType_Array))
+				{
+					for (auto &Tag : pValue->f_Array())
+						Settings.m_Dependencies[Tag.f_String()];
+				}
+				if (auto pValue = ApplicationJSON.f_GetMember("StopOnDependencyFailure", EJSONType_Boolean))
+					Settings.m_bStopOnDependencyFailure = pValue->f_Boolean();
+				if (auto pValue = ApplicationJSON.f_GetMember("PreventLaunchUser", EJSONType_Boolean))
+					Application.m_bPreventLaunch_User = pValue->f_Boolean();
+				if (auto pValue = ApplicationJSON.f_GetMember("PreventLaunchUpdate", EJSONType_Boolean))
+					Application.m_bPreventLaunch_Update = pValue->f_Boolean();
+				if (auto pValue = ApplicationJSON.f_GetMember("AppManagerVersion", EJSONType_Integer))
+					Settings.m_AppManagerVersion = pValue->f_Integer();
+				else
+					Settings.m_AppManagerVersion = 0;
 
-			if (!PendingSelfUpdateName.f_IsEmpty())
-				fp_StartPendingSelfUpdateReporting(PendingSelfUpdateName, PendingSelfUpdateVersionID, PendingSelfUpdateTime, PendingSelfUpdateSequence);
+				if (auto pValue = ApplicationJSON.f_GetMember("LaunchInProcess", EJSONType_Boolean))
+					Settings.m_bLaunchInProcess = pValue->f_Boolean();
+
+				mp_KnownRemoteApplications[CRemoteApplicationKey{Settings}][mp_State.m_HostID];
+			}
 		}
-		catch (NException::CException const &)
+
+		if (auto *pKnownRemoteHosts = mp_State.m_StateDatabase.m_Data.f_GetMember("KnownRemoteApplications"))
 		{
-			co_return fg_CurrentException();
+			for (auto &Group : pKnownRemoteHosts->f_Object())
+			{
+				CRemoteApplicationKey RemoteKey;
+				RemoteKey.m_Group = Group.f_Name();
+
+				for (auto &Application : Group.f_Value().f_Object())
+				{
+					RemoteKey.m_VersionManagerApplication = Application.f_Name();
+
+					for (auto &KnownHost : Application.f_Value().f_Object())
+						mp_KnownRemoteApplications[RemoteKey][KnownHost.f_Name()];
+				}
+			}
 		}
+
+		if (!PendingSelfUpdateName.f_IsEmpty())
+			fp_StartPendingSelfUpdateReporting(PendingSelfUpdateName, PendingSelfUpdateVersionID, PendingSelfUpdateTime, PendingSelfUpdateSequence);
 
 		if (bChangedDatabase)
 			co_await fp_SaveStateDatabase();

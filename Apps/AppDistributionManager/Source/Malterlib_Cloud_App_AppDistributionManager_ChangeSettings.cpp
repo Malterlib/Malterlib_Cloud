@@ -28,13 +28,9 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		CDistributionSettings Settings = Distribution.m_Settings;
 
-		try
 		{
+			auto CaptureScope = co_await (g_CaptureExceptions % Auditor);
 			fp_ParseSettings(_Params, Settings);
-		}
-		catch (CException const &_Exception)
-		{
-			co_return Auditor.f_Exception(_Exception.f_GetErrorStr());
 		}
 
 		if (Distribution.m_Settings == Settings)

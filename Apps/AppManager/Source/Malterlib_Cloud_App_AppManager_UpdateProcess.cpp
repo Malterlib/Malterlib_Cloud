@@ -191,13 +191,9 @@ namespace NMib::NCloud::NAppManager
 			CApplicationSettings NewSettings = Application.m_Settings;
 			EApplicationSetting NewChangedSettings = EApplicationSetting_None;
 
-			try
 			{
+				auto CaptureScope = co_await (g_CaptureExceptions % "Failed to get settings from version info");
 				NewSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
-			}
-			catch (CException const &_Exception)
-			{
-				co_return DMibErrorInstance(fg_Format("Failed to get settings from version info: {}", _Exception));
 			}
 
 			CStr Error;

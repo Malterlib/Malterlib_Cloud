@@ -38,10 +38,9 @@ namespace NMib::NCloud::NCloudManager
 				, g_ActorFunctorWeak / [Key = fg_Move(_Key), Data = fg_Move(_Data)]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
-					co_await ECoroutineFlag_CaptureExceptions;
+					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
-
 					{
 						auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
 						Cursor.f_Upsert(Key, Data);
@@ -80,7 +79,7 @@ namespace NMib::NCloud::NCloudManager
 				&CDatabaseActor::f_WriteWithCompaction
 				, g_ActorFunctorWeak / [_HostID](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
-					co_await ECoroutineFlag_CaptureExceptions;
+					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
 

@@ -33,8 +33,9 @@ namespace NMib::NCloud::NCloudManager
 			mp_AppState.m_DistributionManager(&CActorDistributionManager::f_GetHostState, AppManagerID) > HostStateResults.f_AddResult(AppManagerID);
 		}
 
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
+
 			auto HostStates = co_await HostStateResults.f_GetResults();
 
 			auto Now = CTime::fs_NowUTC();
@@ -109,7 +110,7 @@ namespace NMib::NCloud::NCloudManager
 						, g_ActorFunctorWeak / [this, ToUpdateAppManagers = fg_Move(ToUpdateAppManagers), ToClearAppManagers = fg_Move(ToClearAppManagers)]
 						(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 						{
-							co_await ECoroutineFlag_CaptureExceptions;
+							co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 							auto WriteTransaction = fg_Move(_Transaction);
 							{
@@ -151,10 +152,6 @@ namespace NMib::NCloud::NCloudManager
 				}
 			}
 		}
-		catch (CException const &)
-		{
-			co_return NException::fg_CurrentException();
-		}
 
 		co_return {};
 	}
@@ -169,15 +166,19 @@ namespace NMib::NCloud::NCloudManager
 					if (f_IsDestroyed())
 						co_return {};
 
-					try
-					{
-						co_await self(&CCloudManagerServer::fp_UpdateAppManagerState);
-					}
-					catch (CException const &_Exception)
-					{
-						[[maybe_unused]] auto &Exception = _Exception;
-						DMibLogWithCategory(CloudManager, Critical, "Failed to monitor state: {}", Exception);
-					}
+					auto Result = co_await
+						(
+							self / [&]() -> TCFuture<void>
+							{
+								co_await self(&CCloudManagerServer::fp_UpdateAppManagerState);
+
+								co_return {};
+							}
+						)
+						.f_Wrap()
+					;
+					if (!Result)
+						DMibLogWithCategory(CloudManager, Critical, "Failed to monitor state: {}", Result.f_GetExceptionStr());
 
 					co_return {};
 				}

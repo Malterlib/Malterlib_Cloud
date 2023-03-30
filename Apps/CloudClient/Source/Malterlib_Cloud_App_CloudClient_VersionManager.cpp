@@ -871,14 +871,11 @@ namespace NMib::NCloud::NCloudClient
 
 		TCSet<CStr> AddTags;
 		TCSet<CStr> RemoveTags;
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
+
 			AddTags = fParseTags(_Params["AddTags"]);
 			RemoveTags = fParseTags(_Params["RemoveTags"]);
-		}
-		catch (CException const &_Error)
-		{
-			co_return _Error.f_ExceptionPointer();
 		}
 
 		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty() && !bRetryUpgrade)

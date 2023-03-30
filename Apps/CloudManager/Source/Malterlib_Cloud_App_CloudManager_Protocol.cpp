@@ -113,7 +113,7 @@ namespace NMib::NCloud::NCloudManager
 				, g_ActorFunctorWeak / [this, _AppManagerID, _RegisterSequence, _Remove, _Add]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
-					co_await ECoroutineFlag_CaptureExceptions;
+					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
 					{
@@ -165,7 +165,7 @@ namespace NMib::NCloud::NCloudManager
 				, g_ActorFunctorWeak / [Params = fg_Move(_Params), _AppManagerID]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
-					co_await ECoroutineFlag_CaptureExceptions;
+					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
 
@@ -387,8 +387,9 @@ namespace NMib::NCloud::NCloudManager
 
 		co_await (pThis->fp_UpdateAppManagerState() % Auditor);
 
-		try
 		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read app managers from database");
+
 			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
 
 			for (auto AppManagers = ReadTransaction.m_Transaction.f_ReadCursor(CAppManagerKey::mc_Prefix); AppManagers; ++AppManagers)
@@ -404,10 +405,6 @@ namespace NMib::NCloud::NCloudManager
 				OutAppManager.m_OtherErrors = Value.m_OtherErrors;
 				OutAppManager.m_bActive = Value.m_bActive;
 			}
-		}
-		catch (CException const &)
-		{
-			co_return NException::fg_CurrentException();
 		}
 
 		Auditor.f_Info("Enum app managers");
@@ -438,8 +435,9 @@ namespace NMib::NCloud::NCloudManager
 
 		TCMap<CApplicationKey, CApplicationInfo> Return;
 
-		try
 		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read applications from database");
+
 			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
 
 			for (auto Applications = ReadTransaction.m_Transaction.f_ReadCursor(NCloudManagerDatabase::CApplicationKey::mc_Prefix); Applications; ++Applications)
@@ -452,10 +450,6 @@ namespace NMib::NCloud::NCloudManager
 				auto &OutApplication = Return[ApplicationKey];
 				OutApplication.m_ApplicationInfo = Value.m_ApplicationInfo;
 			}
-		}
-		catch (CException const &)
-		{
-			co_return NException::fg_CurrentException();
 		}
 
 		Auditor.f_Info("Enum applications");
