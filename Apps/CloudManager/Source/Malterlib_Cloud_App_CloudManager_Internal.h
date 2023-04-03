@@ -96,6 +96,7 @@ namespace NMib::NCloud::NCloudManager
 
 		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_Publish();
+		TCFuture<void> fp_SetupDatabase();
 		TCFuture<void> fp_SetupPermissions();
 		TCFuture<void> fp_SetupMonitor();
 		TCFuture<void> fp_PerformCleanup();

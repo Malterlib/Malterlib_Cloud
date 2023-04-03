@@ -11,8 +11,6 @@
 
 namespace NMib::NCloud::NCloudManager
 {
-	constinit uint64 g_MaxDatabaseSize = constant_uint64(128) * 1024 * 1024 * 1024;
-
 	CCloudManagerServer::CCloudManagerServer(CDistributedAppState &_AppState)
 		: mp_AppState(_AppState)
 	{
@@ -37,31 +35,7 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::f_Init()
 	{
-		mp_DatabaseActor = fg_Construct(fg_Construct(), "Cloud manager database");
-		auto MaxDatabaseSize = mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("MaxDatabaseSize", g_MaxDatabaseSize).f_Integer();
-		co_await
-			(
-				mp_DatabaseActor
-				(
-					&CDatabaseActor::f_OpenDatabase
-					, mp_AppState.m_RootDirectory / "CloudManagerDatabase"
-					, MaxDatabaseSize
-				)
-				% "Failed to open database"
-			)
-		;
-		auto Stats = co_await (mp_DatabaseActor(&CDatabaseActor::f_GetAggregateStatistics));
-		auto TotalSizeUsed = Stats.f_GetTotalUsedSize();
-		DMibLogWithCategory
-			(
-				CloudManager
-				, Info
-				, "Database uses {fe2}% of allotted space ({ns } / {ns } bytes)"
-				, fp64(TotalSizeUsed) / fp64(MaxDatabaseSize) * 100.0
-				, TotalSizeUsed
-				, MaxDatabaseSize
-			)
-		;
+		co_await (fp_SetupDatabase() % "Failed to setup database");
 
 		co_await (fp_SetupSensorStore() % "Failed to setup sensor store");
 		co_await (fp_SetupLogStore() % "Failed to setup log store");

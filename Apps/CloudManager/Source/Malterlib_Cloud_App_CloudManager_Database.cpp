@@ -7,6 +7,8 @@
 
 namespace NMib::NCloud::NCloudManager
 {
+	constinit uint64 g_MaxDatabaseSize = constant_uint64(128) * 1024 * 1024 * 1024;
+
 	using namespace NCloudManagerDatabase;
 
 	CStr const &CCloudManagerServer::CAppManagerState::f_AppManagerID() const
@@ -17,6 +19,37 @@ namespace NMib::NCloud::NCloudManager
 	CAppManagerKey CCloudManagerServer::CAppManagerState::f_DatabaseKey() const
 	{
 		return CAppManagerKey{CAppManagerKey::mc_Prefix, f_AppManagerID()};
+	}
+
+	TCFuture<void> CCloudManagerServer::fp_SetupDatabase()
+	{
+		mp_DatabaseActor = fg_Construct(fg_Construct(), "Cloud manager database");
+		auto MaxDatabaseSize = mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("MaxDatabaseSize", g_MaxDatabaseSize).f_Integer();
+		co_await
+			(
+				mp_DatabaseActor
+				(
+					&CDatabaseActor::f_OpenDatabase
+					, mp_AppState.m_RootDirectory / "CloudManagerDatabase"
+					, MaxDatabaseSize
+				)
+				% "Failed to open database"
+			)
+		;
+		auto Stats = co_await (mp_DatabaseActor(&CDatabaseActor::f_GetAggregateStatistics));
+		auto TotalSizeUsed = Stats.f_GetTotalUsedSize();
+		DMibLogWithCategory
+			(
+				CloudManager
+				, Info
+				, "Database uses {fe2}% of allotted space ({ns } / {ns } bytes)"
+				, fp64(TotalSizeUsed) / fp64(MaxDatabaseSize) * 100.0
+				, TotalSizeUsed
+				, MaxDatabaseSize
+			)
+		;
+
+		co_return {};
 	}
 
 	TCFuture<void> CCloudManagerServer::fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data)
