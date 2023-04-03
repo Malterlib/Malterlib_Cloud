@@ -68,12 +68,14 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [Key = fg_Move(_Key), Data = fg_Move(_Data)]
+				, g_ActorFunctorWeak / [this, Key = fg_Move(_Key), Data = fg_Move(_Data)]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
-
 					auto WriteTransaction = fg_Move(_Transaction);
+					if (_bCompacting)
+						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+
 					{
 						auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
 						Cursor.f_Upsert(Key, Data);
@@ -110,11 +112,13 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [_HostID](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [this, _HostID](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
-
+				
 					auto WriteTransaction = fg_Move(_Transaction);
+					if (_bCompacting)
+						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
 
 					bool bFoundAppManager = false;
 					for (auto AppManagerCursor = WriteTransaction.m_Transaction.f_WriteCursor(CAppManagerKey::mc_Prefix, _HostID); AppManagerCursor;)

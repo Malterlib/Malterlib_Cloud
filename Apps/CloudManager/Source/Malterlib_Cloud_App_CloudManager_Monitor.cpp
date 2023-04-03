@@ -113,6 +113,9 @@ namespace NMib::NCloud::NCloudManager
 							co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 							auto WriteTransaction = fg_Move(_Transaction);
+							if (_bCompacting)
+								WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+							
 							{
 								auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
 

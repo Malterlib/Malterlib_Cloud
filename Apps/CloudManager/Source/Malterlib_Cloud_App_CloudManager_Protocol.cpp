@@ -116,6 +116,9 @@ namespace NMib::NCloud::NCloudManager
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
+					if (_bCompacting)
+						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+
 					{
 						auto pAppManager = mp_AppManagers.f_FindEqual(_AppManagerID);
 
@@ -162,12 +165,14 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [Params = fg_Move(_Params), _AppManagerID]
+				, g_ActorFunctorWeak / [this, Params = fg_Move(_Params), _AppManagerID]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
+					if (_bCompacting)
+						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
 
 					if (Params.m_bInitial)
 					{
