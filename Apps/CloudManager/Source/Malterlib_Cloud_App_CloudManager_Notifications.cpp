@@ -32,6 +32,9 @@ namespace NMib::NCloud::NCloudManager
 
 					if (Channel.f_Value().f_GetMemberValue("ReportStartup", true).f_Boolean())
 						SlackChannel.m_ReportFlags |= EType_Startup;
+
+					if (Channel.f_Value().f_GetMemberValue("ReportUpdates", true).f_Boolean())
+						SlackChannel.m_ReportFlags |= EType_Update;
 				}
 			}
 		}
@@ -46,6 +49,7 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		TCActorResultVector<void> InitResults;
+		mp_This.mp_UpdateNotifications.f_Init().f_Dispatch() % "Failed to init update notifications" > InitResults.f_AddResult();
 
 		auto InitResult = co_await InitResults.f_GetUnwrappedResults().f_Wrap();
 

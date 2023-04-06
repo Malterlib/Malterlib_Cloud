@@ -177,7 +177,16 @@ namespace NMib::NCloud
 					)
 					+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
-						fs_Permissions(m_CloudManagerHostID, TCMap<CStr, CPermissionRequirements>{{"AppManager/Command/ApplicationSubscribeChanges", {}}, {"AppManager/AppAll", {}}})
+						fs_Permissions
+						(
+							m_CloudManagerHostID
+							, TCMap<CStr, CPermissionRequirements>
+							{
+								{"AppManager/Command/ApplicationSubscribeChanges", {}}
+								, {"AppManager/Command/ApplicationSubscribeUpdates", {}}
+								, {"AppManager/AppAll", {}}
+							}
+						)
 					)
 					> Promise / [=, CloudManagerHostID = m_CloudManagerHostID]
 					(

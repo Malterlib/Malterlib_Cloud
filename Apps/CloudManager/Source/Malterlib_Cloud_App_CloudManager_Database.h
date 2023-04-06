@@ -33,6 +33,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		CStr m_LastConnectionError;
 		CTime m_LastConnectionErrorTime;
 		TCMap<CStr, CStr> m_OtherErrors;
+		uint64 m_LastSeenUpdateNotificationSequence = TCLimitsInt<uint64>::mc_Max;
 		bool m_bActive = false;
 	};
 
@@ -56,6 +57,35 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		void f_Stream(tf_CStream &_Stream);
 
 		CAppManagerInterface::CApplicationInfo m_ApplicationInfo;
+	};
+
+	struct CApplicationUpdateStateKey : public CApplicationKey
+	{
+		CApplicationUpdateStateKey()
+			: CApplicationKey{.m_Prefix = mc_Prefix}
+		{
+		}
+
+		static CStr const mc_Prefix;
+	};
+
+	struct CApplicationUpdateStateStage
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
+		fp64 m_Time = 0.0;
+	};
+
+	struct CApplicationUpdateStateValue
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
+		CStr m_LastUpdateID;
+		TCMap<CStr, CStr> m_SlackTimestamps;
+		TCMap<CAppManagerInterface::EUpdateStage, CApplicationUpdateStateStage> m_Stages;
+		uint64 m_LastUpdateSequence = 0;
 	};
 }
 

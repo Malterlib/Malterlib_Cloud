@@ -17,13 +17,14 @@
 #include "Malterlib_Cloud_App_CloudManager.h"
 #include "Malterlib_Cloud_App_CloudManager_Database.h"
 #include "Malterlib_Cloud_App_CloudManager_Notifications.h"
+#include "Malterlib_Cloud_App_CloudManager_Notifications_Updates.h"
 
 namespace NMib::NCloud::NCloudManager
 {
 	struct CCloudManagerServer : public CActor
 	{
-	public:
 		friend struct CNotifications;
+		friend struct CUpdateNotifications;
 
 		using CActorHolder = CDelegatedActorHolder;
 
@@ -94,6 +95,7 @@ namespace NMib::NCloud::NCloudManager
 			CStr m_UniqueHostID;
 			mint m_RegisterSequence = 0;
 			CActorSubscription m_ChangeNotificationsSubscription;
+			CActorSubscription m_UpdateNotificationsSubscription;
 			bool m_bUpdatedOnce = false;;
 			bool m_bFiltered = false;
 			bool m_bAccessDenied = false;
@@ -115,6 +117,7 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_ProcessApplicationChanges(CStr const &_AppManagerID, CAppManagerInterface::COnChangeNotificationParams &&_Params);
 		TCFuture<void> fp_ChangeOtherErrors(CStr const &_AppManagerID, mint _RegisterSequence, TCSet<CStr> const &_Remove, TCMap<CStr, CStr> const &_Add);
 		TCFuture<void> fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied);
+
 		static TCVector<CStr> fsp_SensorReadPermissions();
 		static TCVector<CStr> fsp_LogReadPermissions();
 
@@ -144,5 +147,6 @@ namespace NMib::NCloud::NCloudManager
 		TCActor<CDistributedAppLogStoreLocal> mp_AppLogStore;
 
 		CNotifications mp_Notifications{*this};
+		CUpdateNotifications mp_UpdateNotifications{*this};
 	};
 }

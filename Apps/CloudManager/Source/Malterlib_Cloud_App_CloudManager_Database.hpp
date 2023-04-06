@@ -32,6 +32,8 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		_Stream % m_bActive;
 		if (Version >= ECloudManagerProtocolVersion_AddOtherErrors)
 			_Stream % m_OtherErrors;
+		if (Version >= ECloudManagerProtocolVersion_AddLastSeenUpdateNotificationSequence)
+			_Stream % m_LastSeenUpdateNotificationSequence;
 	}
 
 	template <typename tf_CStream>
@@ -62,5 +64,23 @@ namespace NMib::NCloud::NCloudManagerDatabase
 			DMibBinaryStreamVersion(_Stream, AppManagerInterfaceVersion);
 			_Stream % m_ApplicationInfo;
 		}
+	}
+
+	template <typename tf_CStream>
+	void CApplicationUpdateStateStage::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Time;
+	}
+
+	template <typename tf_CStream>
+	void CApplicationUpdateStateValue::f_Stream(tf_CStream &_Stream)
+	{
+		uint32 Version = gc_Version;
+		_Stream % Version;
+
+		_Stream % m_LastUpdateID;
+		_Stream % m_LastUpdateSequence;
+		_Stream % m_SlackTimestamps;
+		_Stream % m_Stages;
 	}
 }

@@ -832,7 +832,7 @@ namespace NMib::NCloud::NCloudClient
 			CStr Status;
 			if (AppManagerInfo.f_HasErrors())
 			{
-				Status = "{2}Application Status{3} (outdated)\n{}\n\n{2}App Manager{3}\n{}"_f
+				Status = "{2}Application Status{3} (potentially outdated)\n{}\n\n{2}App Manager{3}\n{}"_f
 					<< ApplicationStatus
 					<< fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding)
 					<< AnsiEncoding.f_Bold()

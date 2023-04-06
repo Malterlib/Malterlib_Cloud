@@ -301,24 +301,46 @@ namespace NMib::NCloud::NCloudManager
 		AppManager.m_UniqueHostID = UniqueHostID;
 		AppManager.m_RegisterSequence = RegisterSequence;
 
-		auto ChangeNotificationsSubscription = co_await AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeChangeNotifications)
+		auto [ChangeNotificationsSubscription, UpdateNotificationsSubscription] = co_await
 			(
-				CAppManagerInterface::CSubscribeChangeNotifications
-				{
-					.m_fOnNotification = g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
-					(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> TCFuture<void>
+				AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeChangeNotifications)
+				(
+					CAppManagerInterface::CSubscribeChangeNotifications
 					{
-						auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
-						if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+						.m_fOnNotification = g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
+						(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> TCFuture<void>
+						{
+							auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+							if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+								co_return {};
+
+							co_await pThis->self(&CCloudManagerServer::fp_ReportFiltered, AppManagerID, RegisterSequence, _Params.m_bFiltered, _Params.m_bAccessDenied);
+							co_await pThis->self(&CCloudManagerServer::fp_ProcessApplicationChanges, AppManagerID, fg_Move(_Params));
+
 							co_return {};
-
-						co_await pThis->self(&CCloudManagerServer::fp_ReportFiltered, AppManagerID, RegisterSequence, _Params.m_bFiltered, _Params.m_bAccessDenied);
-						co_await pThis->self(&CCloudManagerServer::fp_ProcessApplicationChanges, AppManagerID, fg_Move(_Params));
-
-						co_return {};
+						}
+						, .m_bWaitForNotification = false
 					}
-					, .m_bWaitForNotification = false
-				}
+				)
+				+ AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeUpdateNotifications)
+				(
+					CAppManagerInterface::CSubscribeUpdateNotifications
+					{
+						.m_fOnNotification = g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
+						(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
+						{
+							auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+							if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+								co_return {};
+
+							co_await pThis->mp_UpdateNotifications.f_ProcessApplicationUpdateNotification(AppManagerID, _Notification);
+
+							co_return {};
+						}
+						, .m_LastSeenUniqueSequence = AppManager.m_Data.m_LastSeenUpdateNotificationSequence
+						, .m_bWaitForNotification = false
+					}
+				)
 			)
 			.f_Wrap()
 		;
@@ -345,6 +367,24 @@ namespace NMib::NCloud::NCloudManager
 			;
 		}
 
+		if (UpdateNotificationsSubscription)
+		{
+			pAppManager->m_UpdateNotificationsSubscription = fg_Move(*UpdateNotificationsSubscription);
+			co_await pThis->self(&CCloudManagerServer::fp_ChangeOtherErrors, AppManagerID, RegisterSequence, TCSet<CStr>{"Subscribe Update Notifications"}, TCMap<CStr, CStr>{});
+		}
+		else
+		{
+			co_await pThis->self
+				(
+					&CCloudManagerServer::fp_ChangeOtherErrors
+					, AppManagerID
+					, RegisterSequence
+					, TCSet<CStr>{}
+					, TCMap<CStr, CStr>{{"Subscribe Update Notifications", UpdateNotificationsSubscription.f_GetExceptionStr()}}
+				)
+			;
+		}
+
 		Auditor.f_Info("App manager registered");
 
 		co_return g_ActorSubscription / [pThis, RegisterSequence, AppManagerID, DatabaseKey]() -> TCFuture<void>
@@ -354,6 +394,14 @@ namespace NMib::NCloud::NCloudManager
 				if (pAppManager && pAppManager->m_ChangeNotificationsSubscription)
 					co_await pAppManager->m_ChangeNotificationsSubscription->f_Destroy();
 
+				pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+				if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+					co_return {};
+
+				if (pAppManager && pAppManager->m_UpdateNotificationsSubscription)
+					co_await pAppManager->m_ChangeNotificationsSubscription->f_Destroy();
+
+				pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
 				if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
 					co_return {};
 
@@ -490,12 +538,16 @@ namespace NMib::NCloud::NCloudManager
 		auto *pAppManager = pThis->mp_AppManagers.f_FindEqual(_AppManagerHostID);
 		if (pAppManager)
 		{
-			auto Subscription = fg_Move(pAppManager->m_ChangeNotificationsSubscription);
+			auto ChangeSubscription = fg_Move(pAppManager->m_ChangeNotificationsSubscription);
+			auto UpdateSubscription = fg_Move(pAppManager->m_UpdateNotificationsSubscription);
 			auto Interface = fg_Move(pAppManager->m_Interface);
 			pThis->mp_AppManagers.f_Remove(pAppManager);
 
-			if (Subscription)
-				co_await Subscription->f_Destroy().f_Wrap();
+			if (ChangeSubscription)
+				co_await ChangeSubscription->f_Destroy().f_Wrap();
+
+			if (UpdateSubscription)
+				co_await UpdateSubscription->f_Destroy().f_Wrap();
 
 			if (Interface)
 				co_await Interface.f_Destroy().f_Wrap();

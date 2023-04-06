@@ -73,6 +73,7 @@ namespace NMib::NCloud::NCloudManager
 
 		co_await Destroys.f_GetResults();
 
+		co_await mp_UpdateNotifications.f_Destroy();
 		co_await mp_Notifications.f_Destroy();
 
 		if (mp_AppSensorStore)

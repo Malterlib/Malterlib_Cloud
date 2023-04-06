@@ -9,6 +9,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 {
 	constexpr CStr CAppManagerKey::mc_Prefix = gc_Str<"AppMgr">;
 	constexpr CStr CApplicationKey::mc_Prefix = gc_Str<"App">;
+	constexpr CStr CApplicationUpdateStateKey::mc_Prefix = gc_Str<"AppUpSt">;
 }
 
 namespace NMib::NCloud::NCloudManager
@@ -137,6 +138,9 @@ namespace NMib::NCloud::NCloudManager
 						co_return DMibErrorInstance("App manager does not exist");
 
 					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _HostID); ApplicationCursor;)
+						ApplicationCursor.f_Delete();
+
+					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationUpdateStateKey::mc_Prefix, _HostID); ApplicationCursor;)
 						ApplicationCursor.f_Delete();
 
 					co_return fg_Move(WriteTransaction);
