@@ -9,10 +9,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeChangeNotifications
-		(
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
-		)
+	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeChangeNotifications(CSubscribeChangeNotifications &&_Params)
 		-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 	{
 		auto pThis = m_pThis;
@@ -21,7 +18,8 @@ namespace NMib::NCloud::NAppManager
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 
 		auto &Subscription = pThis->mp_ChangeNotificationSubscriptions[SubscriptionID];
-		Subscription.m_fOnChange = fg_Move(_fOnNotification);
+		Subscription.m_fOnChange = fg_Move(_Params.m_fOnNotification);
+		Subscription.m_bWaitForResult = _Params.m_bWaitForNotification;
 		Subscription.m_CallingHostInfo = CallingHostInfo;
 
 		Auditor.f_Info("Subscribe to change notifications '{}'"_f << SubscriptionID);
@@ -105,7 +103,7 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		pSubscription->m_bInitialFinished = true;
-		pSubscription->m_fOnChange(fg_Move(NotificationParams)) > fg_LogError("ChangeNotifications", "Send change failed");
+		pSubscription->m_fOnChange(fg_Move(NotificationParams)) > fg_LogError("ChangeNotifications", "Send initial change notification failed");
 
 		if (bHasPermission)
 		{
@@ -263,14 +261,19 @@ namespace NMib::NCloud::NAppManager
 				}
 			;
 			if (Subscription.m_bInitialFinished)
-				fSendNotification() > OnChangeResultsVector.f_AddResult();
+			{
+				if (Subscription.m_bWaitForResult)
+					fSendNotification() > OnChangeResultsVector.f_AddResult();
+				else
+					fSendNotification() > fg_LogWarning("ChangeNotifications", "Send non-waiting change notification failed");
+			}
 			else
 			{
 				Subscription.m_OnInitialFinished.f_Insert
 					(
 						[fSendNotification = fg_Move(fSendNotification)]() mutable
 						{
-							fSendNotification() > fg_DiscardResult();
+							fSendNotification() > fg_LogWarning("ChangeNotifications", "Deferred change notification failed");
 						}
 					)
 				;

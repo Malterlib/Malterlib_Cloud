@@ -256,56 +256,59 @@ public:
 					TCPromise<void> Promise;
 					AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeUpdateNotifications)
 						(
-							g_ActorFunctor / [pUpdateNotificationsState, iAppManager, fProcessApplicationState]
-							(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
+							CAppManagerInterface::CSubscribeUpdateNotifications
 							{
-								CApplicationKey ApplicationKey{_Notification.m_Application, iAppManager};
-
-								auto &WholeState = *pUpdateNotificationsState;
-
-								fProcessApplicationState(WholeState.m_Applications[_Notification.m_Application], _Notification, ApplicationKey);
-								fProcessApplicationState(WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application], _Notification, ApplicationKey);
-								fProcessApplicationState(WholeState.m_AllApplications, _Notification, ApplicationKey);
-								//DMibConOut2("{} {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application].m_MaxInStage);
-								//DMibConOut2("{} N {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStage);
-								//DMibConOut2("{} C {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStageCoordination);
-								//DMibConOut2("{a-,sj9} {} {vs}\n", _Notification.m_Application, CAppManagerInterface::EUpdateStage_StopOldApp, WholeState.m_AllApplications.m_MaxInStage);
-
-								WholeState.m_nAppsInProgress = 0;
-								for (auto &App : WholeState.m_Applications)
+								.m_fOnNotification = g_ActorFunctor / [pUpdateNotificationsState, iAppManager, fProcessApplicationState]
+								(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
 								{
-									if (!App.m_InProgress.f_IsEmpty())
-										++WholeState.m_nAppsInProgress;
-								}
-								WholeState.m_nMaxAppsInProgress = fg_Max(WholeState.m_nAppsInProgress, WholeState.m_nMaxAppsInProgress);
+									CApplicationKey ApplicationKey{_Notification.m_Application, iAppManager};
 
-								WholeState.m_nMaxAppsInProgressPerAppManager = 0;
-								for (auto &AppManager : WholeState.m_ApplicationsPerAppmanager)
-								{
-									auto &iAppManager = WholeState.m_ApplicationsPerAppmanager.fs_GetKey(AppManager);
-									WholeState.m_AppsInProgressPerAppManager[iAppManager] = 0;
-									for (auto &App : AppManager)
+									auto &WholeState = *pUpdateNotificationsState;
+
+									fProcessApplicationState(WholeState.m_Applications[_Notification.m_Application], _Notification, ApplicationKey);
+									fProcessApplicationState(WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application], _Notification, ApplicationKey);
+									fProcessApplicationState(WholeState.m_AllApplications, _Notification, ApplicationKey);
+									//DMibConOut2("{} {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application].m_MaxInStage);
+									//DMibConOut2("{} N {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStage);
+									//DMibConOut2("{} C {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStageCoordination);
+									//DMibConOut2("{a-,sj9} {} {vs}\n", _Notification.m_Application, CAppManagerInterface::EUpdateStage_StopOldApp, WholeState.m_AllApplications.m_MaxInStage);
+
+									WholeState.m_nAppsInProgress = 0;
+									for (auto &App : WholeState.m_Applications)
 									{
 										if (!App.m_InProgress.f_IsEmpty())
-											++WholeState.m_AppsInProgressPerAppManager[iAppManager];
+											++WholeState.m_nAppsInProgress;
 									}
-									WholeState.m_MaxAppsInProgressPerAppManager[iAppManager] = fg_Max
-										(
-											WholeState.m_AppsInProgressPerAppManager[iAppManager]
-											, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
-										)
-									;
-									WholeState.m_nMaxAppsInProgressPerAppManager = fg_Max
-										(
-											WholeState.m_nMaxAppsInProgressPerAppManager
-											, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
-										)
-									;
+									WholeState.m_nMaxAppsInProgress = fg_Max(WholeState.m_nAppsInProgress, WholeState.m_nMaxAppsInProgress);
+
+									WholeState.m_nMaxAppsInProgressPerAppManager = 0;
+									for (auto &AppManager : WholeState.m_ApplicationsPerAppmanager)
+									{
+										auto &iAppManager = WholeState.m_ApplicationsPerAppmanager.fs_GetKey(AppManager);
+										WholeState.m_AppsInProgressPerAppManager[iAppManager] = 0;
+										for (auto &App : AppManager)
+										{
+											if (!App.m_InProgress.f_IsEmpty())
+												++WholeState.m_AppsInProgressPerAppManager[iAppManager];
+										}
+										WholeState.m_MaxAppsInProgressPerAppManager[iAppManager] = fg_Max
+											(
+												WholeState.m_AppsInProgressPerAppManager[iAppManager]
+												, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
+											)
+										;
+										WholeState.m_nMaxAppsInProgressPerAppManager = fg_Max
+											(
+												WholeState.m_nMaxAppsInProgressPerAppManager
+												, WholeState.m_MaxAppsInProgressPerAppManager[iAppManager]
+											)
+										;
+									}
+
+									WholeState.f_Signal();
+
+									co_return {};
 								}
-
-								WholeState.f_Signal();
-
-								co_return {};
 							}
 						)
 						> Promise / [pUpdateNotificationsState, Promise](NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)

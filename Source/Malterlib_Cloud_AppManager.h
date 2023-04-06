@@ -30,7 +30,9 @@ namespace NMib::NCloud
 			, EProtocolVersion_AddLaunchInProcess = 0x116
 			, EProtocolVersion_ExtendUpdateNotification = 0x117
 			, EProtocolVersion_HostIDInApplicationInfo = 0x118
-			, EProtocolVersion_Current = 0x118
+			, EProtocolVersion_OptionalWaitForNotificationResult = 0x119
+			, EProtocolVersion_ResumableUpdateNotifications = 0x119
+			, EProtocolVersion_Current = 0x119
 		};
 		
 		CAppManagerInterface();
@@ -229,6 +231,8 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
+			uint64 m_UniqueSequence = 0;
+
 			NStr::CStr m_UpdateID;
 			NStr::CStr m_Application;
 			NStr::CStr m_Message; // Currently only for EUpdateStage_Failed
@@ -332,6 +336,25 @@ namespace NMib::NCloud
 			bool m_bFiltered = false;
 		};
 
+		struct CSubscribeUpdateNotifications
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CUpdateNotification const &_Notification)> m_fOnNotification;
+			uint64 m_LastSeenUniqueSequence = TCLimitsInt<uint64>::mc_Max;
+			bool m_bWaitForNotification = true;
+		};
+
+		struct CSubscribeChangeNotifications
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> m_fOnNotification;
+			bool m_bWaitForNotification = true;
+		};
+
 		static NStr::CStr fs_UpdateStageToStr(EUpdateStage _Stage);
 
 		virtual NConcurrency::TCFuture<CVersionsAvailableForUpdate> f_GetAvailableVersions
@@ -359,15 +382,8 @@ namespace NMib::NCloud
 		;
 
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CApplicationInfo>> f_GetInstalled() = 0;
-		virtual auto f_SubscribeUpdateNotifications(NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CUpdateNotification const &_Notification)> &&_fOnNotification)
-			-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0
-		;
-		virtual auto f_SubscribeChangeNotifications
-			(
-				NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
-			)
-			-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0
-		;
+		virtual auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications &&_Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
+		virtual auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications &&_Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
 	};
 }
 

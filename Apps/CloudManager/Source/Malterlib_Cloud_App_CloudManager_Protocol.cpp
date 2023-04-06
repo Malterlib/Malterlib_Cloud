@@ -303,17 +303,21 @@ namespace NMib::NCloud::NCloudManager
 
 		auto ChangeNotificationsSubscription = co_await AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeChangeNotifications)
 			(
-				g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
-				(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> TCFuture<void>
+				CAppManagerInterface::CSubscribeChangeNotifications
 				{
-					auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
-					if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+					.m_fOnNotification = g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
+					(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> TCFuture<void>
+					{
+						auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+						if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+							co_return {};
+
+						co_await pThis->self(&CCloudManagerServer::fp_ReportFiltered, AppManagerID, RegisterSequence, _Params.m_bFiltered, _Params.m_bAccessDenied);
+						co_await pThis->self(&CCloudManagerServer::fp_ProcessApplicationChanges, AppManagerID, fg_Move(_Params));
+
 						co_return {};
-
-					co_await pThis->self(&CCloudManagerServer::fp_ReportFiltered, AppManagerID, RegisterSequence, _Params.m_bFiltered, _Params.m_bAccessDenied);
-					co_await pThis->self(&CCloudManagerServer::fp_ProcessApplicationChanges, AppManagerID, fg_Move(_Params));
-
-					co_return {};
+					}
+					, .m_bWaitForNotification = false
 				}
 			)
 			.f_Wrap()

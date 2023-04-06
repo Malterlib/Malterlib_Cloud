@@ -172,6 +172,9 @@ namespace NMib::NCloud
 			_Stream % m_UpdateTime;
 			_Stream % m_StartUpdateTime;
 		}
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_ResumableUpdateNotifications)
+			_Stream % m_UniqueSequence;
 	}
 
 	template <typename tf_CStream>
@@ -227,5 +230,24 @@ namespace NMib::NCloud
 			_Stream % m_bFiltered;
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddAccessDenied)
 			_Stream % m_bAccessDenied;
+	}
+
+	template <typename tf_CStream>
+	void CAppManagerInterface::CSubscribeUpdateNotifications::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % fg_Move(m_fOnNotification);
+		if (_Stream.f_GetVersion() >= EProtocolVersion_OptionalWaitForNotificationResult)
+			_Stream % m_bWaitForNotification;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_ResumableUpdateNotifications)
+			_Stream % m_LastSeenUniqueSequence;
+	}
+
+	template <typename tf_CStream>
+	void CAppManagerInterface::CSubscribeChangeNotifications::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % fg_Move(m_fOnNotification);
+		if (_Stream.f_GetVersion() >= EProtocolVersion_OptionalWaitForNotificationResult)
+			_Stream % m_bWaitForNotification;
 	}
 }

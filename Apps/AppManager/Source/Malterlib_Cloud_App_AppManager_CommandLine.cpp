@@ -928,5 +928,37 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
+		ExternalManagement.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--stored-update-notifications-list"}
+					, "Description"_= "List stored update notifications."
+					, "Options"_=
+					{
+						CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_StoredUpdateNotificationList, _Params, _pCommandLine);
+				}
+			)
+		;
+		ExternalManagement.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--stored-update-notifications-clear"}
+					, "Description"_= "Clear stored update notifications."
+					, "Options"_=
+					{
+						CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_StoredUpdateNotificationClear, _Params, _pCommandLine);
+				}
+			)
+		;
 	}
 }

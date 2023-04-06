@@ -2,16 +2,17 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include "Malterlib_Cloud_App_AppManager.h"
+#include "Malterlib_Cloud_App_AppManager_Database.h"
 
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NAppManager
 {
-	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeUpdateNotifications
-		(
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CUpdateNotification const &_Notification)> &&_fOnNotification
-		) 
+	using namespace NAppManagerDatabase;
+
+	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications &&_Params)
 		-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 	{
 		auto pThis = m_pThis;
@@ -31,10 +32,27 @@ namespace NMib::NCloud::NAppManager
 
 		CStr SubscriptionID = fg_RandomID(pThis->mp_UpdateNotificationSubscriptions);
 		auto &Subscription = pThis->mp_UpdateNotificationSubscriptions[SubscriptionID];
-		Subscription.m_fOnUpdate = fg_Move(_fOnNotification);
+		Subscription.m_fOnUpdate = fg_Move(_Params.m_fOnNotification);
+		Subscription.m_bWaitForResult = _Params.m_bWaitForNotification;
 		Subscription.m_CallingHostInfo = CallingHostInfo;
 
 		Auditor.f_Info(fg_Format("Subscribe to update notifications '{}'", SubscriptionID));
+
+		if (_Params.m_LastSeenUniqueSequence != TCLimitsInt<uint64>::mc_Max)
+		{
+			pThis->fp_SendMissedUpdateNotifications(SubscriptionID, _Params.m_LastSeenUniqueSequence) > [pThis, SubscriptionID](TCAsyncResult<void> &&_Result)
+				{
+					if (!_Result)
+						_Result > fg_LogError("UpdateNotifications", "Send missed update notification failed");
+
+					auto pSubscription = pThis->mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
+					if (pSubscription)
+						pSubscription->m_bInitialFinished = true;
+				}
+			;
+		}
+		else
+			Subscription.m_bInitialFinished = true;
 
 		co_return
 			(
@@ -57,49 +75,104 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<void> CAppManagerActor::fp_SendUpdateNotifications
-		(
-			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
-			, EUpdateStage _Stage
-			, NStr::CStr _Message
-			, CAppManagerInterface::CUpdateNotification _Notification
-		 )
+	TCFuture<void> CAppManagerActor::fp_SendMissedUpdateNotifications(CStr _SubscriptionID, uint64 _LastSeenNotification)
 	{
+		CUpdateNotificationSubscription *pSubscription = nullptr;
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(_SubscriptionID);
+					if (!pSubscription)
+						return DMibErrorInstance("Subscription removed");
+					return {};
+				}
+			)
+		;
+
+		auto SequenceSubscription = co_await pSubscription->m_Sequencer.f_Sequence();
+
+		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Error reading notification data from database");
+			auto ReadTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
+
+			auto iNotification = ReadTransaction.m_Transaction.f_ReadCursor(CUpdateNotificationKey::mc_Prefix);
+			iNotification.f_FindLowerBound(CUpdateNotificationKey::mc_Prefix, _LastSeenNotification);
+
+			for (; iNotification; ++iNotification)
+			{
+				auto Key = iNotification.f_Key<CUpdateNotificationKey>();
+				if (Key.m_UniqueSequence <= _LastSeenNotification)
+					continue;
+
+				auto Value = iNotification.f_Value<CUpdateNotificationValue>();
+
+				co_await fp_SendUpdateNotification(_SubscriptionID, Value.m_Notification, false);
+			}
+		}
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_SendUpdateNotification(CStr _SubscriptionID, CAppManagerInterface::CUpdateNotification _Notification, bool _bSequence)
+	{
+		CUpdateNotificationSubscription *pSubscription = nullptr;
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(_SubscriptionID);
+					if (!pSubscription)
+						return DMibErrorInstance("Subscription removed");
+					return {};
+				}
+			)
+		;
+
+		CActorSubscription SequenceSubscription;
+		if (_bSequence && !pSubscription->m_bInitialFinished)
+			SequenceSubscription = co_await pSubscription->m_Sequencer.f_Sequence();
+
+		CStr AppPermission = fg_Format("AppManager/App/{}", _Notification.m_Application);
+
+		bool bHasPermission = co_await mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, pSubscription->m_CallingHostInfo)
+			.f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+		;
+		if (!bHasPermission)
+			co_return {};
+
+		co_await pSubscription->m_fOnUpdate(fg_Move(_Notification)).f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID());
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_SendUpdateNotifications(CAppManagerInterface::CUpdateNotification _Notification)
+	{
+		_Notification.m_UniqueSequence = co_await self(&CAppManagerActor::fp_StoreUpdateNotification, _Notification);
+
 		TCActorResultVector<void> OnUpdateResultsVector;
 
 		CStr AppPermission = fg_Format("AppManager/App/{}", _Notification.m_Application);
 
 		for (auto &Subscription : mp_UpdateNotificationSubscriptions)
 		{
-			TCPromise<void> OnUpdatePromise;
-			mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
-				.f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
-				> OnUpdatePromise / [=, SubscriptionID = mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription)](bool _bHasPermission)
-				{
-					auto pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(SubscriptionID);
-					if (!_bHasPermission || !pSubscription)
-						return OnUpdatePromise.f_SetResult();
-
-					pSubscription->m_fOnUpdate(_Notification).f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
-						> OnUpdatePromise
-					;
-				}
-			;
-			OnUpdatePromise.f_MoveFuture() > OnUpdateResultsVector.f_AddResult();
+			auto Future = fp_SendUpdateNotification(mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription), _Notification, true);
+			if (Subscription.m_bWaitForResult)
+				fg_Move(Future) > OnUpdateResultsVector.f_AddResult();
+			else
+				fg_Move(Future) > fg_LogWarning("UpdateNotifications", "Send non-waiting update notification failed");
 		}
 
-		try
-		{
-			co_await OnUpdateResultsVector.f_GetResults();
-		}
-		catch (CException const &_Exception)
+		auto Result = co_await OnUpdateResultsVector.f_GetUnwrappedResults().f_Wrap();
+
+		if (!Result)
 		{
 			DMibLogWithCategory
 				(
 					Malterlib/Cloud/AppManager
 					, Warning
 					, "Failed to send update notification: {}"
-					, _Exception
+					, Result.f_GetExceptionStr()
 				)
 			;
 		}
@@ -141,7 +214,7 @@ namespace NMib::NCloud::NAppManager
 
 			if (_Stage == EUpdateStage::EUpdateStage_SyncStart)
 			{
-				co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
+				co_await fp_SendUpdateNotifications(Notification);
 				co_await fp_Coordination_WaitForOurAppsTurnToUpdate(_pState);
 			}
 
@@ -153,7 +226,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					if (_Stage == EUpdateStage::EUpdateStage_None)
 					{
-						co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
+						co_await fp_SendUpdateNotifications(Notification);
 						co_await fp_Coordination_WaitForAllToReachWantUpdateStage
 							(
 								_pState
@@ -166,7 +239,7 @@ namespace NMib::NCloud::NAppManager
 					}
 					else if (_Stage == EUpdateStage::EUpdateStage_StopOldApp)
 					{
-						co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
+						co_await fp_SendUpdateNotifications(Notification);
 						if (UpdateType == EDistributedAppUpdateType_OneAtATime)
 							co_await fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(_pState);
 						else
@@ -199,7 +272,7 @@ namespace NMib::NCloud::NAppManager
 		bool bUpdatedAppInfo = false;
 
 		Notification.m_bCoordinateWait = false;
-		co_await fp_SendUpdateNotifications(_pState, _Stage, _Message, Notification);
+		co_await fp_SendUpdateNotifications(Notification);
 
 		if (_Stage != Application.m_UpdateStage)
 		{

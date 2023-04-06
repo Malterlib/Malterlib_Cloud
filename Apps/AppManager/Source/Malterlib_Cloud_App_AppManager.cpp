@@ -341,6 +341,8 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		co_await (fp_SetupDatabase() % "Failed to setup database");
+
 		co_await fp_InitSensor();
 		co_await fp_InitLog();
 		co_await fp_InitHostMonitor();
@@ -415,6 +417,8 @@ namespace NMib::NCloud::NAppManager
 				, "Failed to {} cloud manager"
 			)
 		;
+
+		co_await (fp_SetupDatabaseCleanup() % "Failed to setup database cleanup");
 
 		co_return {};
 	}

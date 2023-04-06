@@ -379,15 +379,8 @@ namespace NMib::NCloud::NAppManager
 
 			TCFuture<TCMap<CStr, CApplicationInfo>> f_GetInstalled() override;
 
-			auto f_SubscribeUpdateNotifications(NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CUpdateNotification const &_Notification)> &&_fOnNotification)
-				-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override
-			;
-			auto f_SubscribeChangeNotifications
-				(
-					NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> &&_fOnNotification
-				)
-				-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override
-			;
+			auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications &&_Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
+			auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications &&_Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -396,6 +389,9 @@ namespace NMib::NCloud::NAppManager
 		{
 			TCActorFunctor<NConcurrency::TCFuture<void> (CAppManagerInterface::CUpdateNotification const &_Notification)> m_fOnUpdate;
 			CCallingHostInfo m_CallingHostInfo;
+			TCActorSequencerAsync<void> m_Sequencer;
+			bool m_bInitialFinished = false;
+			bool m_bWaitForResult = true;
 		};
 
 		struct CChangeNotificationSubscription
@@ -406,6 +402,7 @@ namespace NMib::NCloud::NAppManager
 			TCVector<TCFunctionMovable<void ()>> m_OnInitialFinished;
 			bool m_bInitialFinished = false;
 			bool m_bAccessDenied = false;
+			bool m_bWaitForResult = true;
 		};
 
 		enum EEncryptOperation
@@ -867,14 +864,9 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
-		TCFuture<void> fp_SendUpdateNotifications
-			(
-				TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
-				, EUpdateStage _Stage
-				, NStr::CStr _Message
-				, CAppManagerInterface::CUpdateNotification _Notification
-			)
-		;
+		TCFuture<void> fp_SendUpdateNotifications(CAppManagerInterface::CUpdateNotification _Notification);
+		TCFuture<void> fp_SendMissedUpdateNotifications(CStr _SubscriptionID, uint64 _LastSeenNotification);
+		TCFuture<void> fp_SendUpdateNotification(CStr _SubscriptionID, CAppManagerInterface::CUpdateNotification _Notification, bool _bSequence);
 
 		CAppManagerInterface::CApplicationInfo fp_GetApplicationInfo(CApplication const &_Application);
 		TCFuture<void> fp_ChangeNotifications_SendChanges(TCVector<CAppManagerInterface::CChangeNotification> _Notifications, CStr _Application);
@@ -947,6 +939,14 @@ namespace NMib::NCloud::NAppManager
 		TCSharedPointer<CApplication> fp_ApplicationFromHostID(CStr const &_HostID);
 		TCSharedPointer<CApplication> fp_ApplicationFromLaunchID(CStr const &_LaunchID);
 
+		TCFuture<void> fp_PerformDatabaseCleanup();
+		TCFuture<void> fp_SetupDatabaseCleanup();
+		TCFuture<void> fp_SetupDatabase();
+		TCFuture<NDatabase::CDatabaseActor::CTransactionWrite> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction);
+		TCFuture<uint64> fp_StoreUpdateNotification(CAppManagerInterface::CUpdateNotification _Notification);
+		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationClear(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #else
@@ -964,6 +964,14 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bPendingSelfUpdateInProgress = false;
 
 		fp64 mp_AutoUpdateDelay = 15.0;
+
+		TCActor<CDatabaseActor> mp_DatabaseActor;
+
+		CStr mp_DatabaseUniqueKey;
+		uint64 mp_LastUpdateSequence = 0;
+
+		CActorSubscription mp_CleanupTimerSubscription;
+		uint64 mp_RetentionDays = 0;
 
 		TCLinkedList<CVersionManagerDownloadState> mp_Downloads;
 
