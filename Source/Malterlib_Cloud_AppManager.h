@@ -29,7 +29,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_AddBypassCoordination = 0x115
 			, EProtocolVersion_AddLaunchInProcess = 0x116
 			, EProtocolVersion_ExtendUpdateNotification = 0x117
-			, EProtocolVersion_Current = 0x117
+			, EProtocolVersion_HostIDInApplicationInfo = 0x118
+			, EProtocolVersion_Current = 0x118
 		};
 		
 		CAppManagerInterface();
@@ -168,6 +169,8 @@ namespace NMib::NCloud
 			NStr::CStr m_ParentApplication;
 
 			// Updatable
+			NStr::CStr m_HostID;
+			
 			CVersionIDAndPlatform m_Version;
 			CVersionInformation m_VersionInfo;
 

@@ -98,6 +98,9 @@ namespace NMib::NCloud
 		_Stream % m_EncryptionFileSystem;
 		_Stream % m_ParentApplication;
 
+		if (_Stream.f_GetVersion() >= EProtocolVersion_HostIDInApplicationInfo)
+			_Stream % m_HostID;
+
 		_Stream % m_Version;
 		_Stream % m_VersionInfo;
 		_Stream % m_VersionManagerApplication;

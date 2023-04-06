@@ -68,11 +68,13 @@ namespace NMib::NCloud::NAppManager
 		Application.m_AppInterface = fg_Move(_ClientInterface);
 
 		bool bApplicationJSONChanged = false;
+		bool bHostIDChanged = false;
 
 		if (Application.m_AssociatedHostID != HostID)
 		{
 			Application.m_AssociatedHostID = HostID;
 			bApplicationJSONChanged = true;
+			bHostIDChanged = true;
 		}
 
 		if (!Application.m_RegisterInfo.f_IsSameIgnoringLaunchID(_RegisterInfo))
@@ -84,6 +86,9 @@ namespace NMib::NCloud::NAppManager
 			bApplicationJSONChanged = true;
 			pThis->fp_UpdateLimits();
 		}
+
+		if (bHostIDChanged)
+			pThis->fp_SendAppChange_AddedOrChanged(*pApplication);
 
 		if (bApplicationJSONChanged)
 			pThis->fp_UpdateApplicationJSON(pApplication) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to update application JSON");

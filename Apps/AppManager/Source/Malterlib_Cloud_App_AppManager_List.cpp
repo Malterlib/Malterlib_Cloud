@@ -14,6 +14,8 @@ namespace NMib::NCloud::NAppManager
 
 		CAppManagerInterface::CApplicationInfo OutApplication;
 
+		OutApplication.m_HostID = _Application.m_AssociatedHostID;
+
 		OutApplication.m_Status = _Application.m_LaunchStatus;
 		OutApplication.m_StatusSeverity = _Application.m_LaunchStatusSeverity;
 

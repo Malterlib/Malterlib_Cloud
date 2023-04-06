@@ -658,6 +658,7 @@ namespace NMib::NCloud::NCloudClient
 				, "App Manager"
 				, "Name"
 				, "Application"
+				, "ID"
 				, "Update [Tags]"
 				, "Version"
 				, "Failed Version"
@@ -900,6 +901,7 @@ namespace NMib::NCloud::NCloudClient
 					, "{}{}{}:{}"_f << AnsiEncoding.f_Foreground256(75) << AppManagerInfo.m_HostName << AnsiEncoding.f_Default() << AppManagerInfo.m_ProgramDirectory
 					, ApplicationKey.m_Name
 					, ApplicationInfo.m_VersionManagerApplication
+					, ApplicationInfo.m_HostID
 					, AutoUpdate
 					, Version
 					, FailedVersion

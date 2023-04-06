@@ -30,12 +30,14 @@ namespace NMib::NCloud
 	{
 		static_assert
 			(
-				CAppManagerInterface::EProtocolVersion_Current == CAppManagerInterface::EProtocolVersion_ExtendUpdateNotification
+				CAppManagerInterface::EProtocolVersion_Current == CAppManagerInterface::EProtocolVersion_HostIDInApplicationInfo
 				, "Add a new version mapping if streaming of m_ApplicationInfo changed"
 			)
 		;
 
-		if (_CloudManagerVersion >= ECloudManagerProtocolVersion_AppManagerVersionIncreased2)
+		if (_CloudManagerVersion >= ECloudManagerProtocolVersion_AppManagerVersionIncreased3)
+			return CAppManagerInterface::EProtocolVersion_HostIDInApplicationInfo;
+		else if (_CloudManagerVersion >= ECloudManagerProtocolVersion_AppManagerVersionIncreased2)
 			return CAppManagerInterface::EProtocolVersion_AddLaunchInProcess;
 		else if (_CloudManagerVersion >= ECloudManagerProtocolVersion_AppManagerVersionIncreased1)
 			return CAppManagerInterface::EProtocolVersion_AddAutoUpdateAndExtendAppInfo;

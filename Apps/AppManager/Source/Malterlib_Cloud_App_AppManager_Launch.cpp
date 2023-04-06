@@ -188,7 +188,11 @@ namespace NMib::NCloud::NAppManager
 						if (_pApplication->m_bDeleted)
 							co_return DMibErrorInstance("Application deleted");
 
-						_pApplication->m_AssociatedHostID = _HostID;
+						if (_pApplication->m_AssociatedHostID != _HostID)
+						{
+							_pApplication->m_AssociatedHostID = _HostID;
+							fp_SendAppChange_AddedOrChanged(*_pApplication);
+						}
 
 						auto Result = co_await fp_UpdateApplicationJSON(_pApplication).f_Wrap();
 
@@ -564,6 +568,12 @@ namespace NMib::NCloud::NAppManager
 							co_return DMibErrorInstance("Application deleted");
 
 						_pApplication->m_AssociatedHostID = _HostID;
+
+						if (_pApplication->m_AssociatedHostID != _HostID)
+						{
+							_pApplication->m_AssociatedHostID = _HostID;
+							fp_SendAppChange_AddedOrChanged(*_pApplication);
+						}
 
 						auto Result = co_await fp_UpdateApplicationJSON(_pApplication).f_Wrap();
 
