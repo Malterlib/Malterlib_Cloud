@@ -11,15 +11,20 @@
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Cloud/FileTransfer>
 #include <Mib/Database/DatabaseActor>
+#include <Mib/Web/Curl>
+#include <Mib/Web/Slack>
 
 #include "Malterlib_Cloud_App_CloudManager.h"
 #include "Malterlib_Cloud_App_CloudManager_Database.h"
+#include "Malterlib_Cloud_App_CloudManager_Notifications.h"
 
 namespace NMib::NCloud::NCloudManager
 {
 	struct CCloudManagerServer : public CActor
 	{
 	public:
+		friend struct CNotifications;
+
 		using CActorHolder = CDelegatedActorHolder;
 
 		CCloudManagerServer(CDistributedAppState &_AppState);
@@ -137,5 +142,7 @@ namespace NMib::NCloud::NCloudManager
 
 		TCActor<CDistributedAppSensorStoreLocal> mp_AppSensorStore;
 		TCActor<CDistributedAppLogStoreLocal> mp_AppLogStore;
+
+		CNotifications mp_Notifications{*this};
 	};
 }

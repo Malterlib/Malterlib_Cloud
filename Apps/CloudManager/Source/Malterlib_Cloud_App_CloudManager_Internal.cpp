@@ -45,9 +45,13 @@ namespace NMib::NCloud::NCloudManager
 
 		co_await (fp_SetupPermissions() % "Failed to setup permissions");
 		co_await (fp_SetupMonitor() % "Failed to setup monitor");
-		co_await (fp_Publish() % "Failed to publish");
 
 		co_await (fp_SetupCleanup() % "Failed to setup cleanup");
+		co_await (mp_Notifications.f_Init() % "Failed to setup notifications");
+
+		// Publish last so notifications are not missed
+		co_await (fp_Publish() % "Failed to publish");
+
 		co_return {};
 	}
 
@@ -68,6 +72,8 @@ namespace NMib::NCloud::NCloudManager
 		mp_LogReaderInterface.f_Destroy() > Destroys.f_AddResult();
 
 		co_await Destroys.f_GetResults();
+
+		co_await mp_Notifications.f_Destroy();
 
 		if (mp_AppSensorStore)
 			co_await fg_Move(mp_AppSensorStore).f_Destroy();
