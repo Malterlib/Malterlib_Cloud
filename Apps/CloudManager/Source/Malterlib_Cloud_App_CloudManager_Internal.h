@@ -18,6 +18,7 @@
 #include "Malterlib_Cloud_App_CloudManager_Database.h"
 #include "Malterlib_Cloud_App_CloudManager_Notifications.h"
 #include "Malterlib_Cloud_App_CloudManager_Notifications_Updates.h"
+#include "Malterlib_Cloud_App_CloudManager_Notifications_Sensors.h"
 
 namespace NMib::NCloud::NCloudManager
 {
@@ -25,6 +26,7 @@ namespace NMib::NCloud::NCloudManager
 	{
 		friend struct CNotifications;
 		friend struct CUpdateNotifications;
+		friend struct CSensorNotifications;
 
 		using CActorHolder = CDelegatedActorHolder;
 
@@ -125,6 +127,7 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_SetupSensorStore();
 		TCFuture<void> fp_SetupLogStore();
 		TCFuture<NDatabase::CDatabaseActor::CTransactionWrite> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction);
+		TCFuture<CDatabaseActor::CTransactionWrite> fp_SaveGlobalState(CDatabaseActor::CTransactionWrite &&_Transaction);
 		TCFuture<void> fp_UpdateAppManagerState();
 		TCFuture<void> fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data);
 		TCFuture<void> fp_RemoveAppManagerData(CStr const &_HostID);
@@ -145,6 +148,8 @@ namespace NMib::NCloud::NCloudManager
 		TCDistributedActorInstance<CDistributedAppLogReaderImplementation> mp_LogReaderInterface;
 		CDistributedAppState &mp_AppState;
 
+		NCloudManagerDatabase::CCloudManagerGlobalStateValue mp_GlobalState;
+
 		CTrustedPermissionSubscription mp_Permissions;
 
 		TCActor<CDatabaseActor> mp_DatabaseActor;
@@ -162,5 +167,6 @@ namespace NMib::NCloud::NCloudManager
 
 		CNotifications mp_Notifications{*this};
 		CUpdateNotifications mp_UpdateNotifications{*this};
+		CSensorNotifications mp_SensorNotifications{*this};
 	};
 }

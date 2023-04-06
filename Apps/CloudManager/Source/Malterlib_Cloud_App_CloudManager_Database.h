@@ -6,9 +6,31 @@
 #include <Mib/Core/Core>
 #include <Mib/Database/DatabaseValue>
 
+#include <Mib/Concurrency/DistributedAppSensorLocalDatabase>
+
 namespace NMib::NCloud::NCloudManagerDatabase
 {
 	static constexpr uint32 gc_Version = ECloudManagerProtocolVersion_Current;
+
+	struct CCloudManagerGlobalStateKey
+	{
+		template <typename tf_CStream>
+		void f_FeedLexicographic(tf_CStream &_Stream) const;
+		template <typename tf_CStream>
+		void f_ConsumeLexicographic(tf_CStream &_Stream);
+
+		static CStr const mc_Prefix;
+
+		CStr m_Prefix = mc_Prefix;
+	};
+
+	struct CCloudManagerGlobalStateValue
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
+		TCMap<CStr, CStr> m_SensorProblemsSlackThread;
+	};
 
 	struct CAppManagerKey
 	{
@@ -87,6 +109,52 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		TCMap<CAppManagerInterface::EUpdateStage, CApplicationUpdateStateStage> m_Stages;
 		uint64 m_LastUpdateSequence = 0;
 	};
+
+	struct CSensorNotificationStateKey : public NSensorStoreLocalDatabase::CSensorKey
+	{
+		template <typename tf_CStream>
+		void f_FeedLexicographic(tf_CStream &_Stream) const;
+		template <typename tf_CStream>
+		void f_ConsumeLexicographic(tf_CStream &_Stream);
+
+		CSensorKey f_SensorKey() const &;
+		CSensorKey f_SensorKey() &&;
+
+		static NStr::CStr const mc_Prefix;
+	};
+
+	struct CSensorNotificationStateNotificationStatus
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
+		CDistributedAppSensorReporter::EStatusSeverity m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Info;
+		CStr m_Message;
+	};
+
+	struct CSensorNotificationStateNotification
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
+		CSensorNotificationStateNotificationStatus m_Status;
+		CSensorNotificationStateNotificationStatus m_OutdatedStatus;
+		CSensorNotificationStateNotificationStatus m_CriticalityStatus;
+	};
+
+	struct CSensorNotificationStateValue
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
+		CSensorNotificationStateNotification m_LastNotification;
+		fp64 m_TimeInProblemState = 0.0;
+		bool m_bInProblemState = false;
+		bool m_bSentAlert = false;
+	};
+
+	template <typename tf_CKey>
+	tf_CKey fg_GetSensorDatabaseKey(CDistributedAppSensorReporter::CSensorInfoKey const &_SensorInfoKey);
 }
 
 #include "Malterlib_Cloud_App_CloudManager_Database.hpp"

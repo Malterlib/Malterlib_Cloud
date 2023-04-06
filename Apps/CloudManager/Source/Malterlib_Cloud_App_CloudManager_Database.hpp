@@ -6,6 +6,27 @@
 namespace NMib::NCloud::NCloudManagerDatabase
 {
 	template <typename tf_CStream>
+	void CCloudManagerGlobalStateKey::f_FeedLexicographic(tf_CStream &_Stream) const
+	{
+		CDatabaseValue::fs_FeedLexicographic(_Stream, m_Prefix);
+	}
+
+	template <typename tf_CStream>
+	void CCloudManagerGlobalStateKey::f_ConsumeLexicographic(tf_CStream &_Stream)
+	{
+		CDatabaseValue::fs_ConsumeLexicographic(_Stream, m_Prefix);
+	}
+
+	template <typename tf_CStream>
+	void CCloudManagerGlobalStateValue::f_Stream(tf_CStream &_Stream)
+	{
+		uint32 Version = gc_Version;
+		_Stream % Version;
+		DBinaryStreamVersion(_Stream, Version);
+		_Stream % m_SensorProblemsSlackThread;
+	}
+
+	template <typename tf_CStream>
 	void CAppManagerKey::f_FeedLexicographic(tf_CStream &_Stream) const
 	{
 		CDatabaseValue::fs_FeedLexicographic(_Stream, m_Prefix);
@@ -82,5 +103,59 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		_Stream % m_LastUpdateSequence;
 		_Stream % m_SlackTimestamps;
 		_Stream % m_Stages;
+	}
+
+	template <typename tf_CKey>
+	tf_CKey fg_GetSensorDatabaseKey(CDistributedAppSensorReporter::CSensorInfoKey const &_SensorInfoKey)
+	{
+		tf_CKey Key;
+		Key.m_Prefix = tf_CKey::mc_Prefix;
+		Key.m_HostID = _SensorInfoKey.m_HostID;
+		if (_SensorInfoKey.m_Scope.f_IsOfType<CDistributedAppSensorReporter::CSensorScope_Application>())
+			Key.m_ApplicationName = _SensorInfoKey.m_Scope.f_GetAsType<CDistributedAppSensorReporter::CSensorScope_Application>().m_ApplicationName;
+		Key.m_Identifier = _SensorInfoKey.m_Identifier;
+		Key.m_IdentifierScope = _SensorInfoKey.m_IdentifierScope;
+
+		return Key;
+	}
+
+	template <typename tf_CStream>
+	void CSensorNotificationStateKey::f_FeedLexicographic(tf_CStream &_Stream) const
+	{
+		CSensorKey::f_FeedLexicographic(_Stream);
+	}
+
+	template <typename tf_CStream>
+	void CSensorNotificationStateKey::f_ConsumeLexicographic(tf_CStream &_Stream)
+	{
+		CSensorKey::f_ConsumeLexicographic(_Stream);
+	}
+
+	template <typename tf_CStream>
+	void CSensorNotificationStateNotificationStatus::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Severity;
+		_Stream % m_Message;
+	}
+
+	template <typename tf_CStream>
+	void CSensorNotificationStateNotification::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Status;
+		_Stream % m_OutdatedStatus;
+		_Stream % m_CriticalityStatus;
+	}
+
+	template <typename tf_CStream>
+	void CSensorNotificationStateValue::f_Stream(tf_CStream &_Stream)
+	{
+		uint32 Version = gc_Version;
+		_Stream % Version;
+		DBinaryStreamVersion(_Stream, Version);
+
+		_Stream % m_LastNotification;
+		_Stream % m_TimeInProblemState;
+		_Stream % m_bInProblemState;
+		_Stream % m_bSentAlert;
 	}
 }

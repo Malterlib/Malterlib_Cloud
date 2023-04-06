@@ -7,9 +7,29 @@
 
 namespace NMib::NCloud::NCloudManagerDatabase
 {
+	constexpr CStr CCloudManagerGlobalStateKey::mc_Prefix = gc_Str<"Global">;
 	constexpr CStr CAppManagerKey::mc_Prefix = gc_Str<"AppMgr">;
 	constexpr CStr CApplicationKey::mc_Prefix = gc_Str<"App">;
 	constexpr CStr CApplicationUpdateStateKey::mc_Prefix = gc_Str<"AppUpSt">;
+	constexpr CStr CSensorNotificationStateKey::mc_Prefix = gc_Str<"SensNoSt">;
+
+	auto CSensorNotificationStateKey::f_SensorKey() const & -> CSensorKey
+	{
+		CSensorKey Return = *this;
+
+		Return.m_Prefix = CSensorKey::mc_Prefix;
+
+		return Return;
+	}
+
+	auto CSensorNotificationStateKey::f_SensorKey() && -> CSensorKey
+	{
+		CSensorKey Return = fg_Move(*this);
+
+		Return.m_Prefix = CSensorKey::mc_Prefix;
+
+		return Return;
+	}
 }
 
 namespace NMib::NCloud::NCloudManager
@@ -56,7 +76,29 @@ namespace NMib::NCloud::NCloudManager
 			)
 		;
 
+		{
+			auto ReadTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
+			auto ReadCursor = ReadTransaction.m_Transaction.f_ReadCursor();
+
+			CCloudManagerGlobalStateKey Key;
+
+			if (ReadCursor.f_FindEqual(Key))
+				mp_GlobalState = ReadCursor.f_Value<CCloudManagerGlobalStateValue>();
+		}
+
 		co_return {};
+	}
+
+	TCFuture<CDatabaseActor::CTransactionWrite> CCloudManagerServer::fp_SaveGlobalState(CDatabaseActor::CTransactionWrite &&_Transaction)
+	{
+		co_await ECoroutineFlag_CaptureMalterlibExceptions;
+
+		auto WriteTransaction = fg_Move(_Transaction);
+		auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
+
+		Cursor.f_Upsert(CCloudManagerGlobalStateKey(), mp_GlobalState);
+
+		co_return fg_Move(WriteTransaction);
 	}
 
 	TCFuture<void> CCloudManagerServer::fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data)

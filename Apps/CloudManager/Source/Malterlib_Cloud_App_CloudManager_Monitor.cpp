@@ -6,6 +6,7 @@
 #include "Malterlib_Cloud_App_CloudManager_Database.h"
 
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 #include <Mib/CommandLine/AnsiEncoding>
 
 namespace NMib::NCloud::NCloudManager
@@ -174,6 +175,10 @@ namespace NMib::NCloud::NCloudManager
 							self / [&]() -> TCFuture<void>
 							{
 								co_await self(&CCloudManagerServer::fp_UpdateAppManagerState);
+								auto UpdateResult = co_await mp_SensorNotifications.f_UpdatePeriodicSensorNotifications().f_Wrap();
+
+								if (!UpdateResult)
+									UpdateResult > fg_LogError("CloudManager", "Error updating sensor notifications");
 
 								co_return {};
 							}
