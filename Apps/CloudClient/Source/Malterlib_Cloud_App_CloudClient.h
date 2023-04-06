@@ -177,6 +177,7 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveAppManager(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveSensor(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>>> fp_CommandLine_CloudManager_GetSensorReaders(CStr const &_Host);
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> fp_CommandLine_CloudManager_GetAggregatedSensors

@@ -36,7 +36,8 @@ namespace NMib::NCloud::NCloudManager
 			TCFuture<TCActorSubscriptionWithID<>> f_RegisterAppManager(TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager, CAppManagerInfo &&_AppManagerInfo) override;
 			TCFuture<TCMap<CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() override;
 			TCFuture<TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() override;
-			TCFuture<void> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) override;
+			TCFuture<void> f_RemoveAppManager(CStr const &_AppManagerHostID) override;
+			TCFuture<uint32> f_RemoveSensor(CDistributedAppSensorReporter::CSensorInfoKey &&_SensorInfoKey) override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> f_GetSensorReporter() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> f_GetSensorReader() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> f_GetLogReporter() override;

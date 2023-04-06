@@ -109,6 +109,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) = 0;
+		virtual NConcurrency::TCFuture<uint32> f_RemoveSensor(NConcurrency::CDistributedAppSensorReporter::CSensorInfoKey &&_SensorInfoKey) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReporter>> f_GetSensorReporter() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReader>> f_GetSensorReader() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReporter>> f_GetLogReporter() = 0;

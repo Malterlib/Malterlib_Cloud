@@ -192,6 +192,47 @@ namespace NMib::NCloud::NCloudClient
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--cloud-manager-remove-sensor"}
+					, "Description"_= "Remove sensor from cloud manager"
+					, "Options"_=
+					{
+						"SensorHostID?"_=
+						{
+							"Names"_= {"--sensor-host-id"}
+							, "Default"_= ""
+							, "Description"_= "The host ID of the sensor to remove"
+						}
+						, "SensorApplication?"_=
+						{
+							"Names"_= {"--sensor-application"}
+							, "Default"_= ""
+							, "Description"_= "The application of the sensor to remove"
+						}
+						, "SensorIdentifier?"_=
+						{
+							"Names"_= {"--sensor-identifier"}
+							, "Default"_= ""
+							, "Description"_= "The identifier of the sensor to remove"
+						}
+						, "SensorIdentifierScope?"_=
+						{
+							"Names"_= {"--sensor-identifier-scope"}
+							, "Default"_= ""
+							, "Description"_= "The identifier scope of the sensor to remove"
+						}
+						, QuietOption
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor, _Params, _pCommandLine);
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
 
 		fp_BuildDefaultCommandLine_Sensor_Customizable
 			(
@@ -1017,6 +1058,46 @@ namespace NMib::NCloud::NCloudClient
 		}
 
 		co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		CStr Host = _Params["Host"].f_String();
+		bool bQuiet = _Params["Quiet"].f_Boolean();
+
+		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
+
+		NConcurrency::CDistributedAppSensorReporter::CSensorInfoKey SensorInfoKey;
+
+		SensorInfoKey.m_HostID = _Params["SensorHostID"].f_String();
+		if (auto Application = _Params["SensorApplication"].f_String())
+			SensorInfoKey.m_Scope = CDistributedAppSensorReporter::CSensorScope_Application{.m_ApplicationName = Application};
+		SensorInfoKey.m_Identifier = _Params["SensorIdentifier"].f_String();
+		SensorInfoKey.m_IdentifierScope = _Params["SensorIdentifierScope"].f_String();
+
+		TCActorResultVector<uint32> AppManagersResults;
+
+		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		{
+			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
+				continue;
+
+			auto &CloudManager = TrustedCloudManager.m_Actor;
+			(CloudManager.f_CallActor(&CCloudManager::f_RemoveSensor)(SensorInfoKey) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+		}
+
+		auto AllRemoved = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+
+		if (!bQuiet)
+		{
+			uint32 nRemoved = 0;
+			for (auto &Removed : AllRemoved)
+				nRemoved += Removed;
+
+			*_pCommandLine %= "Removed {} sensors\n"_f << nRemoved;
+		}
 
 		co_return 0;
 	}

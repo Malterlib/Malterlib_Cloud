@@ -24,6 +24,7 @@ namespace NMib::NCloud::NCloudManager
 				, "CloudManager/ReadSensors"
 				, "CloudManager/ReadLogs"
 				, "CloudManager/RemoveAppManager"
+				, "CloudManager/RemoveSensor"
 			}
 		;
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
@@ -558,6 +559,34 @@ namespace NMib::NCloud::NCloudManager
 		Auditor.f_Info("Remove App Manager");
 
 		co_return {};
+	}
+
+	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveSensor(CDistributedAppSensorReporter::CSensorInfoKey &&_SensorInfoKey)
+	{
+		auto pThis = m_pThis;
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
+		;
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/RemoveSensor"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Remove sensor", Permissions))
+			co_return Auditor.f_AccessDenied("(Remove sensor)", Permissions);
+
+		auto nRemoved = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveSensors, TCSet<CDistributedAppSensorReporter::CSensorInfoKey>{fg_Move(_SensorInfoKey)});
+
+		Auditor.f_Info("Remove Sensor");
+
+		co_return nRemoved;
 	}
 
 	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> CCloudManagerServer::CCloudManagerImplementation::f_GetSensorReporter()
