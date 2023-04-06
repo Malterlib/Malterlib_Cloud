@@ -72,6 +72,8 @@ namespace NMib::NCloud::NCloudManager
 			)
 		;
 
+		co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SeenHosts, TCMap<CStr, CTime>{{_Key.m_HostID, _Data.m_LastSeen}});
+
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
@@ -116,10 +118,13 @@ namespace NMib::NCloud::NCloudManager
 			)
 		;
 
+		TCSharedPointer<TCSet<CStr>> pRemovedHostIDs = fg_Construct();
+		(*pRemovedHostIDs)[_HostID];
+
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this, _HostID](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [this, _HostID, pRemovedHostIDs](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 				
@@ -138,7 +143,12 @@ namespace NMib::NCloud::NCloudManager
 						co_return DMibErrorInstance("App manager does not exist");
 
 					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _HostID); ApplicationCursor;)
+					{
+						auto Application = ApplicationCursor.f_Value<CApplicationValue>();
+						if (Application.m_ApplicationInfo.m_HostID)
+							(*pRemovedHostIDs)[Application.m_ApplicationInfo.m_HostID];
 						ApplicationCursor.f_Delete();
+					}
 
 					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationUpdateStateKey::mc_Prefix, _HostID); ApplicationCursor;)
 						ApplicationCursor.f_Delete();
@@ -154,6 +164,8 @@ namespace NMib::NCloud::NCloudManager
 			DMibLogWithCategory(CloudManager, Critical, "Error saving app manager data to database: {}", Result.f_GetExceptionStr());
 			co_return Result.f_GetException();
 		}
+
+		co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveHosts, fg_Move(*pRemovedHostIDs));
 
 		co_return {};
 	}

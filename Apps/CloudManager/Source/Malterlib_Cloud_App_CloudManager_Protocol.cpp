@@ -163,13 +163,23 @@ namespace NMib::NCloud::NCloudManager
 			)
 		;
 
+		struct CHostChanges
+		{
+			TCSet<CStr> m_RemovedHosts;
+			TCMap<CStr, CTime> m_SeenHosts;
+		};
+
+		TCSharedPointer<CHostChanges> pHostChanges = fg_Construct();
+
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this, Params = fg_Move(_Params), _AppManagerID]
+				, g_ActorFunctorWeak / [this, Params = fg_Move(_Params), _AppManagerID, pHostChanges]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
+
+					CTime Now = CTime::fs_NowUTC();
 
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
@@ -191,7 +201,12 @@ namespace NMib::NCloud::NCloudManager
 								++ApplicationCursor;
 							}
 							else
+							{
+								auto Value = ApplicationCursor.f_Value<CApplicationValue>();
+								if (Value.m_ApplicationInfo.m_HostID)
+									pHostChanges->m_RemovedHosts[Value.m_ApplicationInfo.m_HostID];
 								ApplicationCursor.f_Delete();
+							}
 						}
 					}
 
@@ -223,6 +238,9 @@ namespace NMib::NCloud::NCloudManager
 							DMibNeverGetHere;
 						}
 
+						if (Value.m_ApplicationInfo.m_HostID)
+							pHostChanges->m_SeenHosts[Value.m_ApplicationInfo.m_HostID] = Now;
+
 						WriteCursor.f_Upsert(Key, Value);
 					}
 
@@ -231,6 +249,12 @@ namespace NMib::NCloud::NCloudManager
 			)
 			.f_Wrap()
 		;
+
+		if (!pHostChanges->m_RemovedHosts.f_IsEmpty())
+			co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveHosts, fg_Move(pHostChanges->m_RemovedHosts));
+
+		if (!pHostChanges->m_SeenHosts.f_IsEmpty())
+			co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SeenHosts, fg_Move(pHostChanges->m_SeenHosts));
 
 		if (!Result)
 		{

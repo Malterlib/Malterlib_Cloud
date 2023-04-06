@@ -96,6 +96,7 @@ public:
 						}
 						, "WarnValue"_= nullptr
 						, "CriticalValue"_= nullptr
+						, "Removed"_= false
 					}
 				}
 			;
@@ -145,6 +146,7 @@ public:
 						}
 						, "WarnValue"_= nullptr
 						, "CriticalValue"_= nullptr
+						, "Removed"_= false
 					}
 					,
 					{
@@ -174,6 +176,7 @@ public:
 							"CompareToValue"_= 1.0
 							, "Operator"_= 0
 						}
+						, "Removed"_= false
 					}
 					,
 					{
@@ -219,6 +222,7 @@ public:
 						}
 						, "WarnValue"_= nullptr
 						, "CriticalValue"_= nullptr
+						, "Removed"_= false
 					}
 				}
 			;
