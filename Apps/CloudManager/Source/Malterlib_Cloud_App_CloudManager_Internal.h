@@ -113,8 +113,8 @@ namespace NMib::NCloud::NCloudManager
 		static TCVector<CStr> fsp_SensorReadPermissions();
 		static TCVector<CStr> fsp_LogReadPermissions();
 
-		static constexpr ch8 const *mc_pDatabasePrefixLog = "mib.llog"; // llog = local log
-		static constexpr ch8 const *mc_pDatabasePrefixSensor = "mib.lsensor"; // lsensor = local sensor
+		static CStr const mc_DatabasePrefixLog;
+		static CStr const mc_DatabasePrefixSensor;
 
 		TCDistributedActorInstance<CCloudManagerImplementation> mp_ProtocolInterface;
 		TCDistributedActorInstance<CDistributedAppSensorReporterImplementation> mp_SensorReporterInterface;

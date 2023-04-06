@@ -11,6 +11,9 @@
 
 namespace NMib::NCloud::NCloudManager
 {
+	constexpr CStr const CCloudManagerServer::mc_DatabasePrefixLog = gc_Str<"mib.llog">; // llog = local log
+	constexpr CStr const CCloudManagerServer::mc_DatabasePrefixSensor = gc_Str<"mib.lsensor">; // lsensor = local sensor
+
 	CCloudManagerServer::CCloudManagerServer(CDistributedAppState &_AppState)
 		: mp_AppState(_AppState)
 	{

@@ -62,11 +62,11 @@ namespace NMib::NCloud::NCloudManager
 
 		CDistributedAppLogStoreLocal::CCleanupHelper LogHelper;
 		NTime::CTime NextLogTime;
-		bool bHasLog = LogHelper.f_Init(WriteTransaction, mc_pDatabasePrefixLog, NextLogTime);
+		bool bHasLog = LogHelper.f_Init(WriteTransaction, mc_DatabasePrefixLog, NextLogTime);
 
 		CDistributedAppSensorStoreLocal::CCleanupHelper SensorHelper;
 		NTime::CTime NextSensorTime;
-		bool bHasSensor = SensorHelper.f_Init(WriteTransaction, mc_pDatabasePrefixSensor, NextSensorTime);
+		bool bHasSensor = SensorHelper.f_Init(WriteTransaction, mc_DatabasePrefixSensor, NextSensorTime);
 
 		bool bDoRetention = mp_RetentionDays > 0;
 		NTime::CTime OldestAllowedReading = NTime::CTime::fs_NowUTC() - NTime::CTimeSpanConvert::fs_CreateDaySpan(mp_RetentionDays);
