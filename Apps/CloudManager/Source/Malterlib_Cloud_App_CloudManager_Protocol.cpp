@@ -252,10 +252,16 @@ namespace NMib::NCloud::NCloudManager
 		;
 
 		if (!pHostChanges->m_RemovedHosts.f_IsEmpty())
-			co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveHosts, fg_Move(pHostChanges->m_RemovedHosts));
+		{
+			co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveHosts, pHostChanges->m_RemovedHosts);
+			co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_RemoveHosts, pHostChanges->m_RemovedHosts);
+		}
 
 		if (!pHostChanges->m_SeenHosts.f_IsEmpty())
-			co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SeenHosts, fg_Move(pHostChanges->m_SeenHosts));
+		{
+			co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SeenHosts, pHostChanges->m_SeenHosts);
+			co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SeenHosts, pHostChanges->m_SeenHosts);
+		}
 
 		if (!Result)
 		{

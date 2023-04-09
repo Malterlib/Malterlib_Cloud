@@ -115,6 +115,7 @@ namespace NMib::NCloud::NCloudManager
 		;
 
 		co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SeenHosts, TCMap<CStr, CTime>{{_Key.m_HostID, _Data.m_LastSeen}});
+		co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SeenHosts, TCMap<CStr, CTime>{{_Key.m_HostID, _Data.m_LastSeen}});
 
 		auto Result = co_await mp_DatabaseActor
 			(
@@ -207,7 +208,8 @@ namespace NMib::NCloud::NCloudManager
 			co_return Result.f_GetException();
 		}
 
-		co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveHosts, fg_Move(*pRemovedHostIDs));
+		co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveHosts, *pRemovedHostIDs);
+		co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_RemoveHosts, *pRemovedHostIDs);
 
 		co_return {};
 	}

@@ -60,6 +60,7 @@ public:
 						, "Identifier"_= "org.malterlib.log.test"
 						, "IdentifierScope"_= "Test"
 						, "Name"_= "Malterlib Test"
+						, "Removed"_= false
 					}
 				}
 			;
