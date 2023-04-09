@@ -234,6 +234,49 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--cloud-manager-remove-log"}
+					, "Description"_= "Remove log from cloud manager"
+					, "Options"_=
+					{
+						"LogHostID?"_=
+						{
+							"Names"_= {"--log-host-id"}
+							, "Default"_= ""
+							, "Description"_= "The host ID of the log to remove"
+						}
+						, "LogApplication?"_=
+						{
+							"Names"_= {"--log-application"}
+							, "Default"_= ""
+							, "Description"_= "The application of the log to remove"
+						}
+						, "LogIdentifier?"_=
+						{
+							"Names"_= {"--log-identifier"}
+							, "Default"_= ""
+							, "Description"_= "The identifier of the log to remove"
+						}
+						, "LogIdentifierScope?"_=
+						{
+							"Names"_= {"--log-identifier-scope"}
+							, "Default"_= ""
+							, "Description"_= "The identifier scope of the log to remove"
+						}
+						, QuietOption
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog, _Params, _pCommandLine);
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
+
+
 		fp_BuildDefaultCommandLine_Sensor_Customizable
 			(
 				_Section
@@ -1086,6 +1129,46 @@ namespace NMib::NCloud::NCloudClient
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
 			(CloudManager.f_CallActor(&CCloudManager::f_RemoveSensor)(SensorInfoKey) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+		}
+
+		auto AllRemoved = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+
+		if (!bQuiet)
+		{
+			uint32 nRemoved = 0;
+			for (auto &Removed : AllRemoved)
+				nRemoved += Removed;
+
+			*_pCommandLine %= "Removed {} sensors\n"_f << nRemoved;
+		}
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		CStr Host = _Params["Host"].f_String();
+		bool bQuiet = _Params["Quiet"].f_Boolean();
+
+		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
+
+		NConcurrency::CDistributedAppLogReporter::CLogInfoKey LogInfoKey;
+
+		LogInfoKey.m_HostID = _Params["LogHostID"].f_String();
+		if (auto Application = _Params["LogApplication"].f_String())
+			LogInfoKey.m_Scope = CDistributedAppLogReporter::CLogScope_Application{.m_ApplicationName = Application};
+		LogInfoKey.m_Identifier = _Params["LogIdentifier"].f_String();
+		LogInfoKey.m_IdentifierScope = _Params["LogIdentifierScope"].f_String();
+
+		TCActorResultVector<uint32> AppManagersResults;
+
+		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		{
+			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
+				continue;
+
+			auto &CloudManager = TrustedCloudManager.m_Actor;
+			(CloudManager.f_CallActor(&CCloudManager::f_RemoveLog)(LogInfoKey) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
 		}
 
 		auto AllRemoved = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
