@@ -1362,7 +1362,7 @@ namespace NMib::NCloud::NCloudClient
 		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>> LogsResults;
 
 		for (auto &Reader : *_pLogReaders)
-			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogs)(fg_TempCopy(_Filter), 1024) > LogsResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogs)(CDistributedAppLogReader::CGetLogs{.m_Filters = {_Filter}}) > LogsResults.f_AddResult();
 
 		TCMap<CDistributedAppLogReporter::CLogInfoKey, CDistributedAppLogReporter::CLogInfo> LogInfos;
 
@@ -1397,7 +1397,7 @@ namespace NMib::NCloud::NCloudClient
 		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> EntriesResults;
 
 		for (auto &Reader : *_pLogReaders)
-			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogEntries)(fg_TempCopy(_Filter), 1024) > EntriesResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogEntries)(CDistributedAppLogReader::CGetLogEntries{.m_Filters = {_Filter}}) > EntriesResults.f_AddResult();
 
 		auto LogGenerators = co_await (co_await EntriesResults.f_GetResults() | g_Unwrap);
 		if (LogGenerators.f_IsEmpty())

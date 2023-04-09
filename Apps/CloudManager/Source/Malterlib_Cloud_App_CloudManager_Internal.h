@@ -90,9 +90,17 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CDistributedAppLogReaderImplementation : public CDistributedAppLogReader
 		{
-			TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>> f_GetLogs(CDistributedAppLogReader_LogFilter &&_Filter, uint32 _BatchSize) override;
-			auto f_GetLogEntries(CDistributedAppLogReader_LogEntryFilter &&_Filter, uint32 _BatchSize)
-				-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> override
+			TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>> f_GetLogs(CGetLogs &&_Params) override;
+			auto f_GetLogEntries(CGetLogEntries &&_Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> override;
+			auto f_SubscribeLogs(TCVector<CDistributedAppLogReader_LogFilter> &&_Filter, TCActorFunctorWithID<TCFuture<void> (CLogChange &&_Change)> &&_fOnChange)
+				-> TCFuture<TCActorSubscriptionWithID<>> override
+			;
+			auto f_SubscribeLogEntries
+				(
+					TCVector<CDistributedAppLogReader_LogEntrySubscriptionFilter> &&_Filters
+					, TCActorFunctorWithID<TCFuture<void> (CDistributedAppLogReader_LogKeyAndEntry &&_Entry)> &&_fOnEntry
+				)
+				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);

@@ -80,7 +80,7 @@ namespace NMib::NCloud::NCloudManager
 		return {"CloudManager/ReadLogs", "CloudManager/ReadAll"};
 	}
 
-	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogs(CDistributedAppLogReader_LogFilter &&_Filter, uint32 _BatchSize)
+	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogs(CGetLogs &&_Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> Logs;
@@ -104,7 +104,7 @@ namespace NMib::NCloud::NCloudManager
 			if (!co_await pThis->mp_Permissions.f_HasPermission("Get logs", Permissions))
 				co_return Auditor.f_AccessDenied("(Get logs)", Permissions);
 
-			Logs = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_GetLogs, fg_Move(_Filter), _BatchSize);
+			Logs = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_GetLogs, fg_Move(_Params));
 
 			Auditor.f_Info("Get logs");
 		}
@@ -112,7 +112,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Logs);
 	}
 
-	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogEntries(CDistributedAppLogReader_LogEntryFilter &&_Filter, uint32 _BatchSize)
+	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogEntries(CDistributedAppLogReader::CGetLogEntries &&_Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>> LogEntriesGenerator;
@@ -136,11 +136,83 @@ namespace NMib::NCloud::NCloudManager
 			if (!co_await pThis->mp_Permissions.f_HasPermission("Get log entries", Permissions))
 				co_return Auditor.f_AccessDenied("(Get log entries)", Permissions);
 
-			LogEntriesGenerator = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_GetLogEntries, fg_Move(_Filter), _BatchSize);
+			LogEntriesGenerator = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_GetLogEntries, fg_Move(_Params));
 
 			Auditor.f_Info("Get log entries");
 		}
 
 		co_return fg_Move(LogEntriesGenerator);
+	}
+
+	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_SubscribeLogs
+		(
+			NContainer::TCVector<CDistributedAppLogReader_LogFilter> &&_Filters
+			, TCActorFunctorWithID<TCFuture<void> (CLogChange &&_Change)> &&_fOnChange
+		)
+		-> TCFuture<TCActorSubscriptionWithID<>>
+	{
+		TCActorSubscriptionWithID<> Subscription;
+		{
+			auto pThis = m_pThis;
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
+			;
+
+			auto Auditor = pThis->mp_AppState.f_Auditor();
+
+			auto Permissions = fsp_LogReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Subscribe logs", Permissions))
+				co_return Auditor.f_AccessDenied("(Subscribe logs)", Permissions);
+
+			Subscription = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SubscribeLogs, fg_Move(_Filters), fg_Move(_fOnChange));
+
+			Auditor.f_Info("Subscribe logs");
+		}
+
+		co_return fg_Move(Subscription);
+	}
+
+	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_SubscribeLogEntries
+		(
+			TCVector<CDistributedAppLogReader_LogEntrySubscriptionFilter> &&_Filters
+			, TCActorFunctorWithID<TCFuture<void> (CDistributedAppLogReader_LogKeyAndEntry &&_Entry)> &&_fOnEntry
+		)
+		-> TCFuture<TCActorSubscriptionWithID<>>
+	{
+		TCActorSubscriptionWithID<> Subscription;
+		{
+			auto pThis = m_pThis;
+			auto OnResume = co_await fg_OnResume
+				(
+					[pThis]() -> CExceptionPointer
+					{
+						if (pThis->f_IsDestroyed())
+							return DMibErrorInstance("Shutting down");
+						return {};
+					}
+				)
+			;
+
+			auto Auditor = pThis->mp_AppState.f_Auditor();
+
+			auto Permissions = fsp_LogReadPermissions();
+
+			if (!co_await pThis->mp_Permissions.f_HasPermission("Subscribe log entries", Permissions))
+				co_return Auditor.f_AccessDenied("(Subscribe log entries)", Permissions);
+
+			Subscription = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SubscribeLogEntries, fg_Move(_Filters), fg_Move(_fOnEntry));
+
+			Auditor.f_Info("Subscribe log entries");
+		}
+
+		co_return fg_Move(Subscription);
 	}
 }
