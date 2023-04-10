@@ -16,6 +16,7 @@ namespace NMib::NCloud::NCloudManager
 			, EType_Startup = DMibBit(0)
 			, EType_Update = DMibBit(1)
 			, EType_Sensor = DMibBit(2)
+			, EType_Log = DMibBit(3)
 
 			, EType_Alert = DMibBitTyped(31, uint32)
 		};

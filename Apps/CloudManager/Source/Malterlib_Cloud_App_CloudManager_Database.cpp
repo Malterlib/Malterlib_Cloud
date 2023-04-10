@@ -101,6 +101,33 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(WriteTransaction);
 	}
 
+	TCFuture<void> CCloudManagerServer::fp_SaveGlobalStateWithoutTransaction()
+	{
+		auto Result = co_await mp_DatabaseActor
+			(
+				&CDatabaseActor::f_WriteWithCompaction
+				, g_ActorFunctorWeak / [this](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				{
+					co_await ECoroutineFlag_CaptureMalterlibExceptions;
+
+					auto WriteTransaction = fg_Move(_Transaction);
+					if (_bCompacting)
+						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+
+					WriteTransaction = co_await fp_SaveGlobalState(fg_Move(WriteTransaction));
+
+					co_return fg_Move(WriteTransaction);
+				}
+			)
+			.f_Wrap()
+		;
+
+		if (!Result)
+			DMibLogWithCategory(CloudManager, Critical, "Error saving global state to database: {}", Result.f_GetExceptionStr());
+
+		co_return {};
+	}
+
 	TCFuture<void> CCloudManagerServer::fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data)
 	{
 		auto OnResume = co_await fg_OnResume

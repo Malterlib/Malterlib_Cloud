@@ -24,6 +24,9 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		_Stream % Version;
 		DBinaryStreamVersion(_Stream, Version);
 		_Stream % m_SensorProblemsSlackThread;
+
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_AddLastSeenLogTimestamp)
+			_Stream % m_LastSeenLogTimestamp;
 	}
 
 	template <typename tf_CStream>
@@ -115,6 +118,20 @@ namespace NMib::NCloud::NCloudManagerDatabase
 			Key.m_ApplicationName = _SensorInfoKey.m_Scope.f_GetAsType<CDistributedAppSensorReporter::CSensorScope_Application>().m_ApplicationName;
 		Key.m_Identifier = _SensorInfoKey.m_Identifier;
 		Key.m_IdentifierScope = _SensorInfoKey.m_IdentifierScope;
+
+		return Key;
+	}
+
+	template <typename tf_CKey>
+	tf_CKey fg_GetLogDatabaseKey(CDistributedAppLogReporter::CLogInfoKey const &_LogInfoKey)
+	{
+		tf_CKey Key;
+		Key.m_Prefix = tf_CKey::mc_Prefix;
+		Key.m_HostID = _LogInfoKey.m_HostID;
+		if (_LogInfoKey.m_Scope.f_IsOfType<CDistributedAppLogReporter::CLogScope_Application>())
+			Key.m_ApplicationName = _LogInfoKey.m_Scope.f_GetAsType<CDistributedAppLogReporter::CLogScope_Application>().m_ApplicationName;
+		Key.m_Identifier = _LogInfoKey.m_Identifier;
+		Key.m_IdentifierScope = _LogInfoKey.m_IdentifierScope;
 
 		return Key;
 	}

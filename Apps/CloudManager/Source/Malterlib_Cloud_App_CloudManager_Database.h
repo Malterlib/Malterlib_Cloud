@@ -30,6 +30,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		void f_Stream(tf_CStream &_Stream);
 
 		TCMap<CStr, CStr> m_SensorProblemsSlackThread;
+		NTime::CTime m_LastSeenLogTimestamp;
 	};
 
 	struct CAppManagerKey
@@ -155,6 +156,9 @@ namespace NMib::NCloud::NCloudManagerDatabase
 
 	template <typename tf_CKey>
 	tf_CKey fg_GetSensorDatabaseKey(CDistributedAppSensorReporter::CSensorInfoKey const &_SensorInfoKey);
+
+	template <typename tf_CKey>
+	tf_CKey fg_GetLogDatabaseKey(CDistributedAppLogReporter::CLogInfoKey const &_LogInfoKey);
 }
 
 #include "Malterlib_Cloud_App_CloudManager_Database.hpp"

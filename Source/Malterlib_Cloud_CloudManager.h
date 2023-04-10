@@ -28,7 +28,8 @@ namespace NMib::NCloud
 		, ECloudManagerProtocolVersion_AppManagerVersionIncreased3 = 0x112
 		, ECloudManagerProtocolVersion_AppManagerVersionIncreased4 = 0x113
 		, ECloudManagerProtocolVersion_AddLastSeenUpdateNotificationSequence = 0x114
-		, ECloudManagerProtocolVersion_Current = 0x114
+		, ECloudManagerProtocolVersion_AddLastSeenLogTimestamp = 0x115
+		, ECloudManagerProtocolVersion_Current = 0x115
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)

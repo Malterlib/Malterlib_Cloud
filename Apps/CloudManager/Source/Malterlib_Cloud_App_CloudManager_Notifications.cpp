@@ -38,6 +38,9 @@ namespace NMib::NCloud::NCloudManager
 
 					if (Channel.f_Value().f_GetMemberValue("ReportSensors", true).f_Boolean())
 						SlackChannel.m_ReportFlags |= EType_Sensor;
+
+					if (Channel.f_Value().f_GetMemberValue("ReportLogs", true).f_Boolean())
+						SlackChannel.m_ReportFlags |= EType_Log;
 				}
 			}
 		}
@@ -54,6 +57,7 @@ namespace NMib::NCloud::NCloudManager
 		TCActorResultVector<void> InitResults;
 		mp_This.mp_UpdateNotifications.f_Init().f_Dispatch() % "Failed to init update notifications" > InitResults.f_AddResult();
 		mp_This.mp_SensorNotifications.f_Init().f_Dispatch() % "Failed to init sensor notifications" > InitResults.f_AddResult();
+		mp_This.mp_LogNotifications.f_Init().f_Dispatch() % "Failed to init log notifications" > InitResults.f_AddResult();
 
 		auto InitResult = co_await InitResults.f_GetUnwrappedResults().f_Wrap();
 
