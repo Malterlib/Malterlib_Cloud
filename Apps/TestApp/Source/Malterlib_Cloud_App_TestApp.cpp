@@ -141,7 +141,7 @@ namespace NMib::NCloud::NTest
 			(
 				{
 					"Names"_= {"--generate-log-entries"}
-					, "Description"_= "Generates a log entries."
+					, "Description"_= "Generates log entries."
 					, "Parameters"_=
 					{
 						"NumEntries?"_=
@@ -175,6 +175,48 @@ namespace NMib::NCloud::NTest
 					co_await LogReporter.m_fReportEntries(fg_Move(LogEntries));
 
 					co_await fg_Move(LogReporter.m_fReportEntries).f_Destroy();
+
+					co_return 0;
+				}
+			)
+		;
+		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
+			(
+				{
+					"Names"_= {"--generate-audit-log-entries"}
+					, "Description"_= "Generates audit log entries."
+					, "Parameters"_=
+					{
+						"NumEntries?"_=
+						{
+							"Default"_= 1
+							, "Description"_= "The number of entries to report."
+						}
+					}
+					, "Options"_=
+					{
+						"Error?"_=
+						{
+							"Names"_= {"--error"}
+							, "Default"_= false
+							, "Description"_= "Do error audit logs."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					mint nEntries = _Params["NumEntries"].f_Integer();
+					mint bError = _Params["Error"].f_Boolean();
+
+					auto Auditor = mp_State.f_Auditor();
+
+					for (mint i = 0; i < nEntries; ++i)
+					{
+						if (bError)
+							Auditor.f_Error("Test Log {}"_f << i);
+						else
+							Auditor.f_Info("Test Log {}"_f << i);
+					}
 
 					co_return 0;
 				}
