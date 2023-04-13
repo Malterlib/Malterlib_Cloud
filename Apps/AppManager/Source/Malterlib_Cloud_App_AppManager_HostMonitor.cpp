@@ -11,7 +11,7 @@ namespace NMib::NCloud::NAppManager
 {
 	TCFuture<void> CAppManagerActor::fp_InitHostMonitor()
 	{
-		mp_HostMonitor = fg_Construct(mp_SensorStore, mp_LogStore);
+		mp_HostMonitor = fg_Construct(mp_SensorStore, mp_LogStore, mp_DatabaseActor);
 
 		CHostMonitor::EInitFlag Flags = CHostMonitor::EInitFlag_None;
 

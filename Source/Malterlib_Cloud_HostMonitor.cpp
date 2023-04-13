@@ -9,16 +9,28 @@
 
 namespace NMib::NCloud
 {
-	CHostMonitor::CHostMonitor(TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore, TCActor<CDistributedAppLogStoreLocal> const &_LogStore)
-		: mp_pInternal(fg_Construct(this, _SensorStore, _LogStore))
+	CHostMonitor::CHostMonitor
+		(
+			TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore
+			, TCActor<CDistributedAppLogStoreLocal> const &_LogStore
+			, TCActor<NDatabase::CDatabaseActor> const &_Database
+		)
+		: mp_pInternal(fg_Construct(this, _SensorStore, _LogStore, _Database))
 	{
 	}
 
 	CHostMonitor::~CHostMonitor() = default;
 
-	CHostMonitor::CInternal::CInternal(CHostMonitor *_pThis, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore, TCActor<CDistributedAppLogStoreLocal> const &_LogStore)
+	CHostMonitor::CInternal::CInternal
+		(
+			CHostMonitor *_pThis
+			, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore
+			, TCActor<CDistributedAppLogStoreLocal> const &_LogStore
+			, TCActor<CDatabaseActor> const &_Database
+		)
 		: m_SensorStore(_SensorStore)
 		, m_LogStore(_LogStore)
+		, m_Database(_Database)
 		, m_pThis(_pThis)
 	{
 	}
