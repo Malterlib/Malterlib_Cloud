@@ -636,6 +636,7 @@ namespace NMib::NCloud::NAppManager
 		};
 
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
+		void fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine);
 
 		static CStr fsp_RunTool
 			(
@@ -719,6 +720,10 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_RemoveKnownHost(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		TCFuture<uint32> fp_CommandLine_CancelAllUpdates(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+
+		TCFuture<uint32> fp_CommandLine_HostMonitorConfigList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_HostMonitorConfigVersionList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_HostMonitorConfigContentsGet(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		TCFuture<void> fp_AddApplication
 			(

@@ -4,6 +4,7 @@
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/LogError>
+#include <Mib/CommandLine/TableRenderer>
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
@@ -43,5 +44,201 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		co_return {};
+	}
+
+	void CAppManagerActor::fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine)
+	{
+		auto HostMonitor = o_CommandLine.f_AddSection("Host Monitor", "Commands to manage host monitor");
+
+		HostMonitor.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--host-monitor-config-list"}
+					, "Description"_= "List monitored config files."
+					, "Options"_=
+					{
+						CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_HostMonitorConfigList, _Params, _pCommandLine);
+				}
+			)
+		;
+
+		HostMonitor.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--host-monitor-config-version-list"}
+					, "Description"_= "List monitored config files."
+					, "Parameters"_=
+					{
+						"FileName?"_=
+						{
+							"Type"_= ""
+							, "Description"_= "The name of the config file to list versions for. If not specified all files are displayed."
+						}
+					}
+					, "Options"_=
+					{
+						"Verbose?"_=
+						{
+							"Names"_= {"--verbose", "-v"}
+							, "Default"_= false
+							, "Description"_= "Display more extensive information about the config file versions."
+						}
+						, CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList, _Params, _pCommandLine);
+				}
+			)
+		;
+
+		HostMonitor.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--host-monitor-config-contents-get"}
+					, "Description"_= "List monitored config files."
+					, "Parameters"_=
+					{
+						"FileName"_=
+						{
+							"Type"_= ""
+							, "Description"_= "The name of the config file to get contents for."
+						}
+					}
+					, "Options"_=
+					{
+						"Sequence?"_=
+						{
+							"Names"_= {"--sequence", "-s"}
+							, "Type"_= 0
+							, "Description"_= "The sequence of the config file to get contents for. If not specified latest version is retrieved."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet, _Params, _pCommandLine);
+				}
+			)
+		;
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		if (!mp_HostMonitor)
+			co_return DMibErrorInstance("Host monitor not yet initialized");
+
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+		CTableRenderHelper::CColumnHelper Columns(0);
+		Columns.f_AddHeading("File name", 0);
+
+		TableRenderer.f_AddHeadings(&Columns);
+
+		auto ConfigFiles = co_await mp_HostMonitor(&CHostMonitor::f_EnumConfigFiles);
+
+		for (auto &FileName : ConfigFiles)
+			TableRenderer.f_AddRow(FileName);
+
+		TableRenderer.f_Output(_Params);
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		if (!mp_HostMonitor)
+			co_return DMibErrorInstance("Host monitor not yet initialized");
+
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+		CTableRenderHelper::CColumnHelper Columns(_Params["Verbose"].f_Boolean() ? 1 : 0);
+		Columns.f_AddHeading("File Name", 0);
+		Columns.f_AddHeading("Sequence", 0);
+		Columns.f_AddHeading("Timestamp", 0);
+		Columns.f_AddHeading("Config Type", 0);
+		Columns.f_AddHeading("Exists", 0);
+		Columns.f_AddHeading("Parse Error", 0);
+		Columns.f_AddHeading("Digest", 1);
+		Columns.f_AddHeading("Owner", 1);
+		Columns.f_AddHeading("Group", 1);
+		Columns.f_AddHeading("Size", 1);
+		Columns.f_AddHeading("Attributes", 1);
+
+		TableRenderer.f_AddHeadings(&Columns);
+
+		TCSet<CStr> ConfigFiles;
+		if (auto *pValue = _Params.f_GetMember("FileName"))
+		{
+			Columns.f_SetVerbose("File Name");
+			ConfigFiles[pValue->f_String()];
+		}
+		else
+			ConfigFiles = co_await mp_HostMonitor(&CHostMonitor::f_EnumConfigFiles);
+
+		bool bAnyNoExists = false;
+		bool bHasParseError = false;
+		for (auto &FileName : ConfigFiles)
+		{
+			auto Versions = co_await mp_HostMonitor(&CHostMonitor::f_EnumConfigFileVersions, FileName);
+			for (auto &Version : Versions)
+			{
+				auto &VersionKey = Versions.fs_GetKey(Version);
+
+				if (Version.m_UniqueProperties.m_bExists)
+					bAnyNoExists = true;
+
+				if (Version.m_UniqueProperties.m_ParseError)
+					bHasParseError = true;
+
+				TableRenderer.f_AddRow
+					(
+						VersionKey.m_FileName
+						, VersionKey.m_Sequence
+						, "{tc6}"_f << Version.m_Timestamp
+						, CDistributedAppInterfaceServer::fs_MonitorConfigTypeToString(Version.m_UniqueProperties.m_ConfigType)
+						, Version.m_UniqueProperties.m_bExists
+						, Version.m_UniqueProperties.m_Digest
+						, Version.m_UniqueProperties.m_ParseError
+						, Version.m_UniqueProperties.m_Owner
+						, Version.m_UniqueProperties.m_Group
+						, "{ns }"_f << Version.m_UniqueProperties.m_Size
+						, CStr::fs_Join(CFile::fs_AttribToJSON(Version.m_UniqueProperties.m_Attributes).f_StringArray(), ", ")
+					)
+				;
+			}
+		}
+
+		if (!bHasParseError)
+			Columns.f_SetVerbose("Parse Error");
+
+		if (!bAnyNoExists)
+			Columns.f_SetVerbose("Exists");
+
+		TableRenderer.f_Output(_Params);
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		NHostMonitor::CConfigFileVersionKey Key;
+		Key.m_FileName = _Params["FileName"].f_String();
+		if (auto *pValue = _Params.f_GetMember("Sequence"))
+			Key.m_Sequence = pValue->f_Integer();
+		else
+			Key.m_Sequence = TCLimitsInt<uint64>::mc_Max;
+
+		auto Contents = co_await mp_HostMonitor(&CHostMonitor::f_GetConfigFileContents, Key);
+
+		co_await _pCommandLine->f_StdOutBinary(Contents.m_Raw.f_ToSecure());
+
+		co_return 0;
 	}
 }

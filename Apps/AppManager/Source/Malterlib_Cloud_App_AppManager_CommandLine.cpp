@@ -960,5 +960,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
+
+		fp_BuildCommandLine_HostMonitor(o_CommandLine);
 	}
 }
