@@ -598,7 +598,6 @@ namespace NMib::NCloud::NAppManager
 						if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
 							co_return {};
 
-						pState->m_pCleanup.f_Clear();
 						DMibLogWithCategory
 							(
 								Malterlib/Cloud/AppManager
@@ -613,6 +612,8 @@ namespace NMib::NCloud::NAppManager
 
 						if (!LaunchPromise.f_IsSet())
 							LaunchPromise.f_SetResult(CAppLaunchResult{_Error});
+
+						pState->m_pCleanup.f_Clear();
 
 						co_return {};
 					}

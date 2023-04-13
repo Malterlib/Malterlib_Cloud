@@ -540,11 +540,6 @@ namespace NMib::NCloud::NAppManager
 
 		CAppLaunchResult AppLaunchResult = co_await fp_LaunchApp(State.m_pApplication, false);
 
-		if (State.m_VersionID.f_IsValid())
-			State.m_fOnInfo(fg_Format("Application was successfully updated to version {}", State.m_VersionID));
-		else
-			State.m_fOnInfo("Application was successfully updated");
-
 		if (!AppLaunchResult.m_StartupError.f_IsEmpty())
 		{
 			fp_RunUpdateScript
@@ -560,7 +555,14 @@ namespace NMib::NCloud::NAppManager
 				)
 				> fg_LogError("Malterlib/Cloud/AppManager", "Error script failed")
 			;
+			if (!AppLaunchResult.m_bQuitManager)
+				co_return DMibErrorInstance(AppLaunchResult.m_StartupError);
 		}
+
+		if (State.m_VersionID.f_IsValid())
+			State.m_fOnInfo(fg_Format("Application was successfully updated to version {}", State.m_VersionID));
+		else
+			State.m_fOnInfo("Application was successfully updated");
 
 		co_return AppLaunchResult.m_bQuitManager;
 	}
