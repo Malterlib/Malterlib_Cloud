@@ -350,6 +350,8 @@ namespace NMib::NCloud::NAppManager
 					, CRegisterInfo const &_RegisterInfo
 				) override
 			;
+			TCFuture<TCActorSubscriptionWithID<>> f_RegisterConfigFiles(CConfigFiles &&_ConfigFiles) override;
+
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> f_GetSensorReporter() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> f_GetLogReporter() override;
 
@@ -1018,6 +1020,7 @@ namespace NMib::NCloud::NAppManager
 		fp64 mp_HostMonitorInterval = CHostMonitor::mc_DefaultHostMonitorInterval;
 		TCActor<CHostMonitor> mp_HostMonitor;
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
+		CActorSubscription mp_MainConfigFileMonitorSubscription;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

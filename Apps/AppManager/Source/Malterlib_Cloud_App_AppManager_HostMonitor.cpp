@@ -20,14 +20,27 @@ namespace NMib::NCloud::NAppManager
 
 		co_await mp_HostMonitor(&CHostMonitor::f_Init, Flags, mp_HostMonitorInterval);
 
-		CHostMonitor::CMonitorPathOptions PathOptions;
-		PathOptions.m_Path = mp_State.m_RootDirectory;
+		{
+			CHostMonitor::CMonitorPathOptions PathOptions;
+			PathOptions.m_Path = mp_State.m_RootDirectory;
 
-		auto MonitorResult = co_await mp_HostMonitor(&CHostMonitor::f_MonitorPath, PathOptions).f_Wrap();
-		if (MonitorResult)
-			mp_MainDirectoryMonitorSubscription = fg_Move(*MonitorResult);
-		else
-			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to monitor main directory: {}", MonitorResult.f_GetExceptionStr());
+			auto MonitorResult = co_await mp_HostMonitor(&CHostMonitor::f_MonitorPath, PathOptions).f_Wrap();
+			if (MonitorResult)
+				mp_MainDirectoryMonitorSubscription = fg_Move(*MonitorResult);
+			else
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to monitor main directory: {}", MonitorResult.f_GetExceptionStr());
+		}
+
+		{
+			NConcurrency::CDistributedAppInterfaceServer::CConfigFiles ConfigFiles;
+			ConfigFiles.m_Files[mp_State.m_ConfigDatabase.f_GetFileName()].m_Type = NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Json;
+
+			auto ConfigResult = co_await mp_HostMonitor(&CHostMonitor::f_MonitorConfigs, fg_Move(ConfigFiles)).f_Wrap();
+			if (ConfigResult)
+				mp_MainConfigFileMonitorSubscription = fg_Move(*ConfigResult);
+			else
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to monitor config files: {}", ConfigResult.f_GetExceptionStr());
+		}
 
 		co_return {};
 	}

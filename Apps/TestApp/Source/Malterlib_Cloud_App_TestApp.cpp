@@ -322,8 +322,15 @@ namespace NMib::NCloud::NTest
 		;
 	}
 
-	void CTestAppActor::fp_PopulateAppInterfaceRegisterInfo(CDistributedAppInterfaceServer::CRegisterInfo &o_RegisterInfo, NEncoding::CEJSON const &_Params)
+	void CTestAppActor::fp_PopulateAppInterfaceInfo
+		(
+			CDistributedAppInterfaceServer::CRegisterInfo &o_RegisterInfo
+			, CDistributedAppInterfaceServer::CConfigFiles &o_ConfigFiles
+			, NEncoding::CEJSON const &_Params
+		)
 	{
+		CDistributedAppActor::fp_PopulateAppInterfaceInfo(o_RegisterInfo, o_ConfigFiles, _Params);
+
 		if (auto pValue = _Params.f_GetMember("UpdateType", EJSONType_String))
 		{
 			CStr UpdateType = pValue->f_String();

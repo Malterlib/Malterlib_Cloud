@@ -519,6 +519,9 @@ namespace NMib::NCloud::NAppManager
 		if (mp_MainDirectoryMonitorSubscription)
 			co_await fg_Exchange(mp_MainDirectoryMonitorSubscription, nullptr)->f_Destroy();
 
+		if (mp_MainConfigFileMonitorSubscription)
+			co_await fg_Exchange(mp_MainConfigFileMonitorSubscription, nullptr)->f_Destroy();
+
 		if (mp_HostMonitor)
 			co_await fg_Move(mp_HostMonitor).f_Destroy();
 

@@ -126,6 +126,28 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
+	TCFuture<TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterConfigFiles(CConfigFiles &&_ConfigFiles)
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_HostMonitor)
+			co_return {};
+
+		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
+
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Host '{}' registered config files: {}"
+				, CallingHostInfo.f_GetHostInfo().f_GetDesc()
+				, CStr::fs_ToStr(_ConfigFiles.m_Files).f_Trim()
+			)
+		;
+
+		co_return co_await pThis->mp_HostMonitor(&CHostMonitor::f_MonitorConfigs, fg_Move(_ConfigFiles));
+	}
+
 	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_GetSensorReporter()
 	{
 		auto pThis = m_pThis;
