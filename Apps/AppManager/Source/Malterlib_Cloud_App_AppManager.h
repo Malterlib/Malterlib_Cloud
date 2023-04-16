@@ -16,7 +16,7 @@
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Cloud/HostMonitor>
 #include <Mib/Security/UniqueUserGroup>
-#include <Mib/Concurrency/ActorSequencer>
+#include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
 #include <Mib/Concurrency/DistributedAppLogStoreLocal>
 
@@ -391,7 +391,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			TCActorFunctor<NConcurrency::TCFuture<void> (CAppManagerInterface::CUpdateNotification const &_Notification)> m_fOnUpdate;
 			CCallingHostInfo m_CallingHostInfo;
-			TCActorSequencerAsync<void> m_Sequencer;
+			CSequencer m_Sequencer{"AppManagerActor UpdateNotificationSubscription {}"_f << TCMap<CStr, CUpdateNotificationSubscription>::fs_GetKey(*this)};
 			bool m_bInitialFinished = false;
 			bool m_bWaitForResult = true;
 		};
@@ -997,7 +997,7 @@ namespace NMib::NCloud::NAppManager
 		TCTrustedActorSubscription<CAppManagerCoordinationInterface> mp_RemoteAppManagers;
 
 		TCMap<CStr, CChangeNotificationSubscription> mp_ChangeNotificationSubscriptions;
-		TCActorSequencer<void> mp_ChangeNotificationsPermissionsChangedSequencer;
+		CSequencer mp_ChangeNotificationsPermissionsChangedSequencer{"AppManagerActor ChangeNotificationsPermissionsChangedSequencer"};
 
 		TCMap<CStr, CRemoteAppManager> mp_RemoteAppManagerState;
 		TCAVLTree<&CRemoteAppManager::m_ByActorLink, CRemoteAppManager::CCompareActor> mp_RemoteAppManagerStateByActor;

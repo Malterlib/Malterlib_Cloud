@@ -6,7 +6,7 @@
 #include <Mib/Cloud/BackupManager>
 #include <Mib/File/RSync>
 
-#include <Mib/Concurrency/ActorSequencer>
+#include <Mib/Concurrency/ActorSequencerActor>
 
 #include "Malterlib_Cloud_BackupManagerClient.h"
 #include "Malterlib_Cloud_BackupManagerClient_Internal.h"

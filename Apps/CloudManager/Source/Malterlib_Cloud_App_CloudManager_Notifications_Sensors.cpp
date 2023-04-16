@@ -107,7 +107,7 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CSensorNotifications::f_Destroy()
 	{
-		co_await mp_UpdateSequencer.f_Abort();
+		co_await fg_Move(mp_UpdateSequencer).f_Destroy();
 
 		if (mp_SensorSubscription)
 			co_await fg_Exchange(mp_SensorSubscription, nullptr)->f_Destroy();

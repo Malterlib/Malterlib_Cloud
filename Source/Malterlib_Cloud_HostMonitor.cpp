@@ -124,7 +124,7 @@ namespace NMib::NCloud
 		if (Internal.m_UpdateTimerSubscription)
 			co_await fg_Exchange(Internal.m_UpdateTimerSubscription, nullptr)->f_Destroy();
 
-		co_await Internal.m_UpdatePeriodicSequencer.f_Abort();
+		co_await fg_Move(Internal.m_UpdatePeriodicSequencer).f_Destroy();
 
 		TCActorResultVector<void> Destroys;
 

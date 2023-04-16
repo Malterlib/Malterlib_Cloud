@@ -40,7 +40,7 @@ namespace NMib::NCloud::NCloudManager
 		CActorSubscription mp_SensorSubscription;
 		CActorSubscription mp_SensorStatusSubscription;
 
-		TCActorSequencerAsync<void> mp_UpdateSequencer;
+		CSequencer mp_UpdateSequencer{"SensorNotifications UpdateSequencer"};
 
 		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CSensorStatus> mp_SensorStatuses;
 		TCSet<CDistributedAppSensorReporter::CSensorInfoKey> mp_RemovedSensors;

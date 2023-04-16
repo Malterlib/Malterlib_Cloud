@@ -44,7 +44,7 @@ namespace NMib::NCloud::NCloudManager
 		CActorSubscription mp_LogSubscription;
 		CActorSubscription mp_LogStatusSubscription;
 
-		TCActorSequencerAsync<void> mp_UpdateSequencer;
+		CSequencer mp_UpdateSequencer{"LogNotifications UpdateSequencer"};
 
 		TCMap<CDistributedAppLogReporter::CLogInfoKey, CLogStatus> mp_LogStatuses;
 

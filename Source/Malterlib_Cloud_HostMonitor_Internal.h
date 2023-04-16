@@ -55,7 +55,7 @@ namespace NMib::NCloud
 		{
 			CDistributedAppInterfaceServer::CConfigFile m_Options;
 			CActorSubscription m_FileChangeSubscription;
-			TCActor<TCActorSequencerActor<void>> m_UpdateSequencer{fg_Construct()};
+			CSequencer m_UpdateSequencer{"HostMonitor MonitoredConfigFile UpdateSequencer {}"_f << TCMap<CStr, CMonitoredConfigFile>::fs_GetKey(*this)};
 		};
 
 		struct CMonitoredConfig
@@ -108,8 +108,8 @@ namespace NMib::NCloud
 		CActorSubscription m_UpdateTimerSubscription;
 		TCMap<CStr, CMonitoredPath> m_MonitoredPaths;
 		TCMap<CStr, CAutomaticMount> m_AutomaticMounts;
-		TCActorSequencerAsync<void> m_UpdatePeriodicSequencer;
-		TCActorSequencerAsync<void> m_UpdatePeriodicDiskSpaceSequencer;
+		CSequencer m_UpdatePeriodicSequencer{"HostMonitor UpdatePeriodicSequencer"};
+		CSequencer m_UpdatePeriodicDiskSpaceSequencer{"HostMonitor UpdatePeriodicDiskSpaceSequencer"};
 		TCVector<TCPromise<void>> m_UpdatePeriodicWaitList;
 		fp64 m_HostMonitorInterval = mc_DefaultHostMonitorInterval;
 		mint m_FileActorSequence = 0;

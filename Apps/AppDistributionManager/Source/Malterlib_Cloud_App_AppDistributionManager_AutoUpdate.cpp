@@ -170,214 +170,217 @@ namespace NMib::NCloud::NAppDistributionManager
 					)
 				;
 
-				mp_DistributeSequencer / [=]() -> TCFuture<TCSet<CStr>>
-					{
-						TCPromise<TCSet<CStr>> Promise;
+				mp_DistributeSequencer.f_RunSequenced
+					(
+						g_ActorFunctorWeak / [=](CActorSubscription &&_Subscription) -> TCFuture<TCSet<CStr>>
+						{
+							TCPromise<TCSet<CStr>> Promise;
 
-						if (!mp_Distributions.f_FindEqual(DistributionName))
-							return Promise <<= DMibErrorInstance("Distribution no longer exists");
-						if (mp_State.m_bStoppingApp)
-							return Promise <<= DMibErrorInstance("Stopping app");
+							if (!mp_Distributions.f_FindEqual(DistributionName))
+								return Promise <<= DMibErrorInstance("Distribution no longer exists");
+							if (mp_State.m_bStoppingApp)
+								return Promise <<= DMibErrorInstance("Stopping app");
 
-						auto CleanupDownload = g_OnScopeExitActor / [=]
-							{
-								if (!mp_FileActor)
-									return;
-
-								g_Dispatch(mp_FileActor) / [=]
-									{
-										if (CFile::fs_FileExists(DownloadDirectory))
-											CFile::fs_DeleteDirectoryRecursive(DownloadDirectory);
-									}
-									> [=](TCAsyncResult<void> &&_Result)
-									{
-										if (!_Result)
-										{
-											DMibLogWithCategory
-												(
-													Malterlib/Cloud/AppDistributionManager
-													, Error
-													, "Failed to clean up downloaded application '{}' ({}) version '{}': {}"
-													, DistributionName
-													, VersionManagerApplicationName
-													, VersionID
-													, _Result.f_GetExceptionStr()
-												)
-											;
-										}
-									}
-								;
-							}
-						;
-
-						self(&CAppDistributionManagerActor::fp_DownloadApplication, VersionManagerApplicationName, VersionID, DownloadDirectory)
-							> Promise
-							% ("Failed to download '{}' ({}) version '{}'"_f << DistributionName << VersionManagerApplicationName << VersionID)
-							/ [=](CVersionInformation &&_VersionInformation)
-							{
-								auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
-								if (!pDistribution)
-									return Promise.f_SetException(DMibErrorInstance("Distribution no longer exists"));
-								if (mp_State.m_bStoppingApp)
-									return Promise.f_SetException(DMibErrorInstance("Stopping app"));
-								if (_VersionInformation.m_Files.f_GetLen() != 1)
-									return Promise.f_SetException(DMibErrorInstance("Version must contain exactly 1 file. {} files found"_f << _VersionInformation.m_Files.f_GetLen()));
-
-								CStr SourceFile = _VersionInformation.m_Files[0];
-								CStr SourcePath = DownloadDirectory / SourceFile;
-
-								auto &Distribution = *pDistribution;
-								auto &RunningDeploys = Distribution.m_RunningDeploys[VersionID];
-
-								TCActorResultMap<CStr, void> DeploysResults;
-
-								for (auto &DeployDestination : DeployDestinations)
+							auto CleanupDownload = g_OnScopeExitActor / [=]
 								{
-									CStr DeployDestinationName = fsp_DeployDestinationToString(DeployDestination);
-									DMibLogWithCategory
-										(
-											Malterlib/Cloud/AppDistributionManager
-											, Info
-											, "Deploying '{}' ({}) version '{}' to '{}'"
-											, DistributionName
-											, VersionManagerApplicationName
-											, VersionID
-											, DeployDestinationName
-										)
-									;
+									if (!mp_FileActor)
+										return;
 
-									auto DeployDestinationActor = fp_CreateDeploy(DeployDestination);
-									RunningDeploys.f_Insert(DeployDestinationActor);
-
-									CDeployInfo DeployInfo;
-									DeployInfo.m_SourceFile = SourcePath;
-									DeployInfo.m_Version = ApplicationVersion;
-									DeployInfo.m_Settings = DistributionSettings;
-
-									{
-										CStr RenamedTemplate = DistributionSettings.m_RenameTemplate;
-
-										RenamedTemplate = RenamedTemplate.f_Replace("{Name", "{0");
-										RenamedTemplate = RenamedTemplate.f_Replace("{VersionAppName", "{1");
-										RenamedTemplate = RenamedTemplate.f_Replace("{PlatformFull", "{2");
-										RenamedTemplate = RenamedTemplate.f_Replace("{PlatformFamily", "{4");
-										RenamedTemplate = RenamedTemplate.f_Replace("{PlatformArchitecture", "{5");
-										RenamedTemplate = RenamedTemplate.f_Replace("{Platform", "{3");
-										RenamedTemplate = RenamedTemplate.f_Replace("{VersionBranch", "{7");
-										RenamedTemplate = RenamedTemplate.f_Replace("{VersionMajor", "{8");
-										RenamedTemplate = RenamedTemplate.f_Replace("{VersionMinor", "{9");
-										RenamedTemplate = RenamedTemplate.f_Replace("{VersionRevision", "{10");
-										RenamedTemplate = RenamedTemplate.f_Replace("{Version", "{6");
-										RenamedTemplate = RenamedTemplate.f_Replace("{FileExtension", "{13");
-										RenamedTemplate = RenamedTemplate.f_Replace("{FileName", "{12");
-										RenamedTemplate = RenamedTemplate.f_Replace("{File", "{11");
-
-										CStr ParsePlatform = ApplicationVersion.m_VersionID.m_Platform;
-										CStr Platform = fg_GetStrSep(ParsePlatform, "-");
-										if (Platform == "electron")
+									g_Dispatch(mp_FileActor) / [=]
 										{
-											DeployInfo.m_bElectron = true;
-											Platform = fg_GetStrSep(ParsePlatform, "-");
-											DeployInfo.m_ElectronPlatform = Platform;
+											if (CFile::fs_FileExists(DownloadDirectory))
+												CFile::fs_DeleteDirectoryRecursive(DownloadDirectory);
 										}
-										CStr PlatformArchitecture = fg_GetStrSep(ParsePlatform, "-");
-										ch8 const *pPlatformParse = Platform;
-										fg_ParseAlpha(pPlatformParse);
-										CStr PlatformFamily(Platform.f_GetStr(), pPlatformParse - Platform.f_GetStr());
-										if (PlatformFamily == "OSX")
-											PlatformFamily = "macOS";
-
-										CStr ParseSourceFile = SourceFile;
-										CStr SourceFileName = fg_GetStrSep(ParseSourceFile, ".");
-										CStr SourceFileExtension = ParseSourceFile;
-
-										DeployInfo.m_Renamed = CStr::CFormat(RenamedTemplate)
-											<< DistributionName
-											<< VersionManagerApplicationName
-											<< ApplicationVersion.m_VersionID.m_Platform
-											<< Platform
-											<< PlatformFamily
-											<< PlatformArchitecture
-											<< CStr("{}.{}.{}"_f << VersionID.m_VersionID.m_Major << VersionID.m_VersionID.m_Minor << VersionID.m_VersionID.m_Revision)
-											<< VersionID.m_VersionID.m_Branch
-											<< VersionID.m_VersionID.m_Major
-											<< VersionID.m_VersionID.m_Minor
-											<< VersionID.m_VersionID.m_Revision
-											<< SourceFile
-											<< SourceFileName
-											<< SourceFileExtension
-										;
-									}
-
-									DeployDestinationActor(&CDeployDestination::f_Deploy, DeployInfo)
-										> DeploysResults.f_AddResult(DeployDestinationName)
-									;
-								}
-
-								DeploysResults.f_GetResults() > [=](TCAsyncResult<TCMap<CStr, TCAsyncResult<void>>> &&_Results)
-									{
-										auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
-										if (!pDistribution)
-											return Promise.f_SetException(DMibErrorInstance("Distribution no longer exists"));
-										if (mp_State.m_bStoppingApp)
-											return Promise.f_SetException(DMibErrorInstance("Stopping app"));
-
-										auto &Distribution = *pDistribution;
-
-										// Reference cleanups at innermost
-										(void)CleanupDownload;
-										(void)CleanupDeploy;
-
-										if (!_Results)
-											return Promise.f_SetException(_Results);
-
-										CStr DeployFailures;
-										TCSet<CStr> SuccessFullDeploys;
-										for (auto &Result : *_Results)
+										> [=](TCAsyncResult<void> &&_Result)
 										{
-											CStr const &DeployDestinationName = _Results->fs_GetKey(Result);
-											if (!Result)
-												fg_AddStrSep(DeployFailures, "\tFailed to deploy to '{}': {}"_f << DeployDestinationName << Result.f_GetExceptionStr(), "\n");
-											else
-												SuccessFullDeploys[DeployDestinationName];
-										}
-
-										if (DeployFailures.f_IsEmpty())
-										{
-											Distribution.m_DeployedVersions[VersionID] = {ApplicationVersion.m_VersionInfo.m_Time, ApplicationVersion.m_VersionInfo.m_RetrySequence};
-
-											fp_SaveState(Distribution);
-
-											mp_State.m_StateDatabase.f_Save() > Promise % "Failed to save state" / [=]
-												{
-													Promise.f_SetResult(SuccessFullDeploys);
-												}
-											;
-										}
-										else
-										{
-											if (!SuccessFullDeploys.f_IsEmpty())
+											if (!_Result)
 											{
-												Promise.f_SetException
+												DMibLogWithCategory
 													(
-														DMibErrorInstance
-														(
-															"Successfully deployed to {vs}, but failed to deploy to some deploy destinations:\n{}"_f
-															<< SuccessFullDeploys
-															<< DeployFailures
-														)
+														Malterlib/Cloud/AppDistributionManager
+														, Error
+														, "Failed to clean up downloaded application '{}' ({}) version '{}': {}"
+														, DistributionName
+														, VersionManagerApplicationName
+														, VersionID
+														, _Result.f_GetExceptionStr()
 													)
 												;
 											}
-											else
-												Promise.f_SetException(DMibErrorInstance("Failed to deploy to all deploy destinations:\n{}"_f << DeployFailures));
 										}
+									;
+								}
+							;
+
+							self(&CAppDistributionManagerActor::fp_DownloadApplication, VersionManagerApplicationName, VersionID, DownloadDirectory)
+								> Promise
+								% ("Failed to download '{}' ({}) version '{}'"_f << DistributionName << VersionManagerApplicationName << VersionID)
+								/ [=, Subscription = fg_Move(_Subscription)](CVersionInformation &&_VersionInformation) mutable
+								{
+									auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
+									if (!pDistribution)
+										return Promise.f_SetException(DMibErrorInstance("Distribution no longer exists"));
+									if (mp_State.m_bStoppingApp)
+										return Promise.f_SetException(DMibErrorInstance("Stopping app"));
+									if (_VersionInformation.m_Files.f_GetLen() != 1)
+										return Promise.f_SetException(DMibErrorInstance("Version must contain exactly 1 file. {} files found"_f << _VersionInformation.m_Files.f_GetLen()));
+
+									CStr SourceFile = _VersionInformation.m_Files[0];
+									CStr SourcePath = DownloadDirectory / SourceFile;
+
+									auto &Distribution = *pDistribution;
+									auto &RunningDeploys = Distribution.m_RunningDeploys[VersionID];
+
+									TCActorResultMap<CStr, void> DeploysResults;
+
+									for (auto &DeployDestination : DeployDestinations)
+									{
+										CStr DeployDestinationName = fsp_DeployDestinationToString(DeployDestination);
+										DMibLogWithCategory
+											(
+												Malterlib/Cloud/AppDistributionManager
+												, Info
+												, "Deploying '{}' ({}) version '{}' to '{}'"
+												, DistributionName
+												, VersionManagerApplicationName
+												, VersionID
+												, DeployDestinationName
+											)
+										;
+
+										auto DeployDestinationActor = fp_CreateDeploy(DeployDestination);
+										RunningDeploys.f_Insert(DeployDestinationActor);
+
+										CDeployInfo DeployInfo;
+										DeployInfo.m_SourceFile = SourcePath;
+										DeployInfo.m_Version = ApplicationVersion;
+										DeployInfo.m_Settings = DistributionSettings;
+
+										{
+											CStr RenamedTemplate = DistributionSettings.m_RenameTemplate;
+
+											RenamedTemplate = RenamedTemplate.f_Replace("{Name", "{0");
+											RenamedTemplate = RenamedTemplate.f_Replace("{VersionAppName", "{1");
+											RenamedTemplate = RenamedTemplate.f_Replace("{PlatformFull", "{2");
+											RenamedTemplate = RenamedTemplate.f_Replace("{PlatformFamily", "{4");
+											RenamedTemplate = RenamedTemplate.f_Replace("{PlatformArchitecture", "{5");
+											RenamedTemplate = RenamedTemplate.f_Replace("{Platform", "{3");
+											RenamedTemplate = RenamedTemplate.f_Replace("{VersionBranch", "{7");
+											RenamedTemplate = RenamedTemplate.f_Replace("{VersionMajor", "{8");
+											RenamedTemplate = RenamedTemplate.f_Replace("{VersionMinor", "{9");
+											RenamedTemplate = RenamedTemplate.f_Replace("{VersionRevision", "{10");
+											RenamedTemplate = RenamedTemplate.f_Replace("{Version", "{6");
+											RenamedTemplate = RenamedTemplate.f_Replace("{FileExtension", "{13");
+											RenamedTemplate = RenamedTemplate.f_Replace("{FileName", "{12");
+											RenamedTemplate = RenamedTemplate.f_Replace("{File", "{11");
+
+											CStr ParsePlatform = ApplicationVersion.m_VersionID.m_Platform;
+											CStr Platform = fg_GetStrSep(ParsePlatform, "-");
+											if (Platform == "electron")
+											{
+												DeployInfo.m_bElectron = true;
+												Platform = fg_GetStrSep(ParsePlatform, "-");
+												DeployInfo.m_ElectronPlatform = Platform;
+											}
+											CStr PlatformArchitecture = fg_GetStrSep(ParsePlatform, "-");
+											ch8 const *pPlatformParse = Platform;
+											fg_ParseAlpha(pPlatformParse);
+											CStr PlatformFamily(Platform.f_GetStr(), pPlatformParse - Platform.f_GetStr());
+											if (PlatformFamily == "OSX")
+												PlatformFamily = "macOS";
+
+											CStr ParseSourceFile = SourceFile;
+											CStr SourceFileName = fg_GetStrSep(ParseSourceFile, ".");
+											CStr SourceFileExtension = ParseSourceFile;
+
+											DeployInfo.m_Renamed = CStr::CFormat(RenamedTemplate)
+												<< DistributionName
+												<< VersionManagerApplicationName
+												<< ApplicationVersion.m_VersionID.m_Platform
+												<< Platform
+												<< PlatformFamily
+												<< PlatformArchitecture
+												<< CStr("{}.{}.{}"_f << VersionID.m_VersionID.m_Major << VersionID.m_VersionID.m_Minor << VersionID.m_VersionID.m_Revision)
+												<< VersionID.m_VersionID.m_Branch
+												<< VersionID.m_VersionID.m_Major
+												<< VersionID.m_VersionID.m_Minor
+												<< VersionID.m_VersionID.m_Revision
+												<< SourceFile
+												<< SourceFileName
+												<< SourceFileExtension
+											;
+										}
+
+										DeployDestinationActor(&CDeployDestination::f_Deploy, DeployInfo)
+											> DeploysResults.f_AddResult(DeployDestinationName)
+										;
 									}
-								;
-							}
-						;
-						return Promise.f_MoveFuture();
-					}
+
+									DeploysResults.f_GetResults() > [=, Subscription = fg_Move(Subscription)](TCAsyncResult<TCMap<CStr, TCAsyncResult<void>>> &&_Results) mutable
+										{
+											auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
+											if (!pDistribution)
+												return Promise.f_SetException(DMibErrorInstance("Distribution no longer exists"));
+											if (mp_State.m_bStoppingApp)
+												return Promise.f_SetException(DMibErrorInstance("Stopping app"));
+
+											auto &Distribution = *pDistribution;
+
+											// Reference cleanups at innermost
+											(void)CleanupDownload;
+											(void)CleanupDeploy;
+
+											if (!_Results)
+												return Promise.f_SetException(_Results);
+
+											CStr DeployFailures;
+											TCSet<CStr> SuccessFullDeploys;
+											for (auto &Result : *_Results)
+											{
+												CStr const &DeployDestinationName = _Results->fs_GetKey(Result);
+												if (!Result)
+													fg_AddStrSep(DeployFailures, "\tFailed to deploy to '{}': {}"_f << DeployDestinationName << Result.f_GetExceptionStr(), "\n");
+												else
+													SuccessFullDeploys[DeployDestinationName];
+											}
+
+											if (DeployFailures.f_IsEmpty())
+											{
+												Distribution.m_DeployedVersions[VersionID] = {ApplicationVersion.m_VersionInfo.m_Time, ApplicationVersion.m_VersionInfo.m_RetrySequence};
+
+												fp_SaveState(Distribution);
+
+												mp_State.m_StateDatabase.f_Save() > Promise % "Failed to save state" / [=, Subscription = fg_Move(Subscription)]
+													{
+														Promise.f_SetResult(SuccessFullDeploys);
+													}
+												;
+											}
+											else
+											{
+												if (!SuccessFullDeploys.f_IsEmpty())
+												{
+													Promise.f_SetException
+														(
+															DMibErrorInstance
+															(
+																"Successfully deployed to {vs}, but failed to deploy to some deploy destinations:\n{}"_f
+																<< SuccessFullDeploys
+																<< DeployFailures
+															)
+														)
+													;
+												}
+												else
+													Promise.f_SetException(DMibErrorInstance("Failed to deploy to all deploy destinations:\n{}"_f << DeployFailures));
+											}
+										}
+									;
+								}
+							;
+							return Promise.f_MoveFuture();
+						}
+					)
 					> [=](TCAsyncResult<TCSet<CStr>> &&_SuccessFullDeploys)
 					{
 						if (!_SuccessFullDeploys)

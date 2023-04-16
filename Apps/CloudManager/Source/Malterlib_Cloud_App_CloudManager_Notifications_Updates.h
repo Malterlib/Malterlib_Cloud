@@ -48,7 +48,7 @@ namespace NMib::NCloud::NCloudManager
 
 		CCloudManagerServer &mp_This;
 
-		TCActorSequencerAsync<void> mp_ProcessSequencer;
+		CSequencer mp_ProcessSequencer{"UpdateNotifications ProcessSequencer"};
 
 		CDeferredUpdates mp_DeferredUpdates;
 

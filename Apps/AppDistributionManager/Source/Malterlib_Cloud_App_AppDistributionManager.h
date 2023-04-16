@@ -6,7 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedDaemon>
-#include <Mib/Concurrency/ActorSequencer>
+#include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Cloud/VersionManager>
 
 namespace NMib::NCloud::NAppDistributionManager
@@ -216,7 +216,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		TCActor<CSeparateThreadActor> mp_FileActor;
 
-		TCActorSequencer<TCSet<CStr>> mp_DistributeSequencer{8}; // Max 8 distributions at the same time
+		TCSequencer<TCSet<CStr>> mp_DistributeSequencer{"AppDistributionManagerActor DistributeSequencer", 8}; // Max 8 distributions at the same time
 
 		TCMap<CStr, CDistribution> mp_Distributions;
 

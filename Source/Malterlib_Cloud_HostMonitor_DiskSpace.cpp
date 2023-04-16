@@ -221,10 +221,10 @@ namespace NMib::NCloud
 			)
 		;
 
-		if (_bCanSkip && m_UpdatePeriodicDiskSpaceSequencer.f_NumWaiting() > 0)
-			co_return {}; // Already waiting for update
+		auto SequenceSubscription = co_await m_UpdatePeriodicDiskSpaceSequencer.f_TrySequence(_bCanSkip);
 
-		auto SequenceSubscription = co_await m_UpdatePeriodicDiskSpaceSequencer.f_Sequence();
+		if (!SequenceSubscription)
+			co_return {}; // Already waiting for update
 
 		if (m_Flags & EInitFlag_MonitorAllMounts)
 		{

@@ -253,7 +253,7 @@ namespace NMib::NCloud
 				break;
 
 			if (Timer.f_GetTime() > m_Timeout / 2)
-				DMibError("Timed out waiting for version manager and cloud manager subscriptions:\nVersionManagers: {vs}\nCloudManagers: {vs}"_f << VersionManagers << CloudManagers);
+				DMibError("Timed out waiting for version manager and cloud manager subscriptions:\nVersionManagers: {}\nCloudManagers: {}"_f << VersionManagers << CloudManagers);
 		}
 		DMibTestMark;
 

@@ -117,16 +117,21 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_ChangeNotifications_PermissionsChanged()
 	{
-		return mp_ChangeNotificationsPermissionsChangedSequencer / [this]() -> TCFuture<void>
-			{
-				TCActorResultVector<void> SendInitialResults;
-				for (auto &Subscription : mp_ChangeNotificationSubscriptions)
-					self(&CAppManagerActor::fp_ChangeNotifications_SendInitial, mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription)) > SendInitialResults.f_AddResult();
+		return mp_ChangeNotificationsPermissionsChangedSequencer.f_RunSequenced
+			(
+				g_ActorFunctorWeak / [this](CActorSubscription &&_Subscription) -> TCFuture<void>
+				{
+					TCActorResultVector<void> SendInitialResults;
+					for (auto &Subscription : mp_ChangeNotificationSubscriptions)
+						self(&CAppManagerActor::fp_ChangeNotifications_SendInitial, mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription)) > SendInitialResults.f_AddResult();
 
-				co_await (co_await SendInitialResults.f_GetResults() | g_Unwrap);
+					co_await (co_await SendInitialResults.f_GetResults() | g_Unwrap);
 
-				co_return {};
-			}
+					(void)_Subscription;
+
+					co_return {};
+				}
+			)
 		;
 	}
 

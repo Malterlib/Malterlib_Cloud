@@ -127,7 +127,7 @@ namespace NMib::NCloud
 
 		auto Type = pConfigFile->m_Options.m_Type;
 
-		auto SequenceSubscription = co_await pConfigFile->m_UpdateSequencer(&TCActorSequencerActor<void>::f_Sequence);
+		auto SequenceSubscription = co_await pConfigFile->m_UpdateSequencer.f_Sequence();
 
 		CConfigFileHistoryEntryValue Value;
 		Value.m_Properties.m_UniqueProperties.m_ConfigType = Type;

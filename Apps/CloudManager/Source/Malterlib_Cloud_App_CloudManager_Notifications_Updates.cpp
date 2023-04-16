@@ -29,7 +29,7 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CUpdateNotifications::f_Destroy()
 	{
-		co_await mp_ProcessSequencer.f_Abort();
+		co_await fg_Move(mp_ProcessSequencer).f_Destroy();
 
 		co_return {};
 	}
