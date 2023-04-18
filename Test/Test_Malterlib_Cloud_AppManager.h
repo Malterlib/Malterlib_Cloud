@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Process/ProcessLaunchActor>
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/DistributedAppInterfaceLaunch>
 #include <Mib/Concurrency/DistributedTrustTestHelpers>
 #include <Mib/Concurrency/ActorSubscription>
@@ -61,7 +62,6 @@ namespace NMib::NCloud
 		};
 
 		CAppManagerTestHelper(CStr const &_RootDirectory, EOption _Options, fp64 _Timeout);
-		~CAppManagerTestHelper();
 
 		template <typename tf_CHostID, typename tf_CPermissions>
 		static auto fs_Permissions(tf_CHostID &&_HostID, tf_CPermissions &&_Permissions)
@@ -81,6 +81,7 @@ namespace NMib::NCloud
 		TCFuture<void> f_Setup(mint _nAppManagers);
 		TCFuture<void> f_StopCloudManager();
 		TCFuture<void> f_StartCloudManager();
+		TCFuture<void> f_Destroy();
 
 		TCFuture<NStr::CStr> f_LaunchTool
 			(
@@ -92,45 +93,56 @@ namespace NMib::NCloud
 
 		static auto constexpr mc_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 
-		CStr m_ProgramDirectory = CFile::fs_GetProgramDirectory();
-		CStr m_RootDirectory;
+		struct CState
+		{
+			CState(CStr const &_RootDirectory, EOption _Options, fp64 _Timeout);
+			~CState();
 
-		TCMap<CStr, CPermissionRequirements> m_CloudManagerPermissionsForTest = {{"CloudManager/ReadAll", {}}};
-		TCMap<CStr, CPermissionRequirements> m_VersionManagerPermissionsForTest = {{"Application/WriteAll", {}}, {"Application/ReadAll", {}}, {"Application/TagAll", {}}};
+			CState(CState &&) = delete;
+			CState(CState const &) = delete;
 
-		CStr m_TestHostID;
-		CDistributedActorTrustManager_Address m_ServerAddress;
+			CStr m_ProgramDirectory = CFile::fs_GetProgramDirectory();
+			CStr m_RootDirectory;
 
-		CTrustManagerTestHelper m_TrustManagerState;
-		TCActor<CDistributedActorTrustManager> m_TrustManager;
-		TCOptional<CTrustedSubscriptionTestHelper> m_Subscriptions;
-		TCActor<CDistributedApp_LaunchHelper> m_LaunchHelper;
+			TCMap<CStr, CPermissionRequirements> m_CloudManagerPermissionsForTest = {{"CloudManager/ReadAll", {}}};
+			TCMap<CStr, CPermissionRequirements> m_VersionManagerPermissionsForTest = {{"Application/WriteAll", {}}, {"Application/ReadAll", {}}, {"Application/TagAll", {}}};
 
-		CVersionManagerHelper m_VersionManagerHelper{m_ProgramDirectory / "TestApps/VersionManager"};
-		CVersionManagerHelper::CPackageInfo m_PackageInfo;
+			CStr m_TestHostID;
+			CDistributedActorTrustManager_Address m_ServerAddress;
 
-		CStr m_CloudClientHostID;
-		CStr m_TestAppArchive;
+			CTrustManagerTestHelper m_TrustManagerState;
+			TCActor<CDistributedActorTrustManager> m_TrustManager;
+			TCOptional<CTrustedSubscriptionTestHelper> m_Subscriptions;
+			TCActor<CDistributedApp_LaunchHelper> m_LaunchHelper;
 
-		CStr m_VersionManagerDirectory;
-		TCOptional<CDistributedApp_LaunchInfo> m_VersionManagerLaunch;
-		CDistributedActorTrustManager_Address m_VersionManagerServerAddress;
-		CStr m_VersionManagerHostID;
-		TCDistributedActor<CVersionManager> m_VersionManager;
+			CVersionManagerHelper m_VersionManagerHelper{m_ProgramDirectory / "TestApps/VersionManager"};
+			CVersionManagerHelper::CPackageInfo m_PackageInfo;
 
-		CStr m_CloudManagerDirectory;
-		TCOptional<CDistributedApp_LaunchInfo> m_CloudManagerLaunch;
-		CStr m_CloudClientDirectory;
-		CStr m_CloudManagerHostID;
-		TCDistributedActor<CCloudManager> m_CloudManager;
-		CDistributedActorTrustManager_Address m_CloudManagerServerAddress;
+			CStr m_CloudClientHostID;
+			CStr m_TestAppArchive;
 
-		TCMap<CStr, CAppManagerInfo> m_AppManagerInfos;
-		TCSet<CStr> m_AppManagerHosts;
-		TCVector<COnScopeExitShared> m_InProcessLaunchScopes;
+			CStr m_VersionManagerDirectory;
+			TCOptional<CDistributedApp_LaunchInfo> m_VersionManagerLaunch;
+			CDistributedActorTrustManager_Address m_VersionManagerServerAddress;
+			CStr m_VersionManagerHostID;
+			TCDistributedActor<CVersionManager> m_VersionManager;
 
-		mint m_nAppManagers = 0;
-		fp64 m_Timeout = 60.0;
-		EOption m_Options = EOption_None;
+			CStr m_CloudManagerDirectory;
+			TCOptional<CDistributedApp_LaunchInfo> m_CloudManagerLaunch;
+			CStr m_CloudClientDirectory;
+			CStr m_CloudManagerHostID;
+			TCDistributedActor<CCloudManager> m_CloudManager;
+			CDistributedActorTrustManager_Address m_CloudManagerServerAddress;
+
+			TCMap<CStr, CAppManagerInfo> m_AppManagerInfos;
+			TCSet<CStr> m_AppManagerHosts;
+			TCVector<COnScopeExitShared> m_InProcessLaunchScopes;
+
+			mint m_nAppManagers = 0;
+			fp64 m_Timeout = 60.0;
+			EOption m_Options = EOption_None;
+		};
+
+		TCSharedPointer<CState> m_pState;
 	};
 }

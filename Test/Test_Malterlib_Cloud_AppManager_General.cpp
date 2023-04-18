@@ -139,11 +139,12 @@ public:
 				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
 			CAppManagerTestHelper AppManagerTestHelper("AppManagerTests", Options, g_Timeout);
+			auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
 
-			auto &PackageInfo = AppManagerTestHelper.m_PackageInfo;
-			auto &TestAppArchive = AppManagerTestHelper.m_TestAppArchive;
-			auto &VersionManager = AppManagerTestHelper.m_VersionManager;
-			auto &AppManagers = AppManagerTestHelper.m_AppManagerInfos;
+			auto &PackageInfo = AppManagerTestHelper.m_pState->m_PackageInfo;
+			auto &TestAppArchive = AppManagerTestHelper.m_pState->m_TestAppArchive;
+			auto &VersionManager = AppManagerTestHelper.m_pState->m_VersionManager;
+			auto &AppManagers = AppManagerTestHelper.m_pState->m_AppManagerInfos;
 
 			// Copy AppManagers to their directories
 			mint nAppManagers = 10;
@@ -162,7 +163,7 @@ public:
 					co_await
 						(
 							g_Dispatch /
-							[=, VersionManagerHelper = AppManagerTestHelper.m_VersionManagerHelper]() -> TCFuture<void>
+							[=, VersionManagerHelper = AppManagerTestHelper.m_pState->m_VersionManagerHelper]() -> TCFuture<void>
 							{
 								co_await VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);
 								co_return {};

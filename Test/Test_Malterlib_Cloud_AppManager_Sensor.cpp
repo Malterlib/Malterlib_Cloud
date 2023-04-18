@@ -21,8 +21,11 @@ public:
 				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
 			CAppManagerTestHelper AppManagerTestHelper("AppManagerSensorTests", Options, g_Timeout);
+
+			auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
+
 			co_await AppManagerTestHelper.f_Setup(1);
-			auto &AppManagerInfo = *AppManagerTestHelper.m_AppManagerInfos.f_FindAny();
+			auto &AppManagerInfo = *AppManagerTestHelper.m_pState->m_AppManagerInfos.f_FindAny();
 
 			auto fMakeComparable = [](CEJSON &&_Readings)
 				{
@@ -538,7 +541,7 @@ public:
 			{
 				DMibTestPath("Cloud Manager");
 
-				CStr CloudClientDirectory = AppManagerTestHelper.m_RootDirectory / "MalterlibCloud";
+				CStr CloudClientDirectory = AppManagerTestHelper.m_pState->m_RootDirectory / "MalterlibCloud";
 				CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
 
 				auto fReadSensors = [&]()
