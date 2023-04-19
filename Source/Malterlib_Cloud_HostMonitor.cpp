@@ -46,7 +46,24 @@ namespace NMib::NCloud
 		Internal.m_Flags = _Flags;
 		Internal.m_HostMonitorInterval = _HostMonitorInterval;
 
-		fg_CallSafe(Internal, &CInternal::f_PeriodicUpdate) > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to run initial periodic update");
+		if (Internal.m_HostMonitorInterval != 0.0)
+		{
+			Internal.m_UpdateTimerSubscription = co_await fg_RegisterTimer
+				(
+					Internal.m_HostMonitorInterval
+					, [this]() -> TCFuture<void>
+					{
+						auto &Internal = *mp_pInternal;
+
+						auto Result = co_await fg_CallSafe(Internal, &CInternal::f_PeriodicUpdate).f_Wrap();
+						if (!Result)
+							DMibLogWithCategory(Malterlib/Cloud/HostMonitor, Error, "Failed to run periodic update");
+
+						co_return {};
+					}
+				)
+			;
+		}
 
 		co_return {};
 	}
@@ -65,23 +82,6 @@ namespace NMib::NCloud
 		;
 
 		auto SequenceSubscription = co_await m_UpdatePeriodicSequencer.f_Sequence();
-
-		if (!m_UpdateTimerSubscription && m_HostMonitorInterval != 0.0)
-		{
-			m_UpdateTimerSubscription = co_await fg_RegisterTimer
-				(
-					m_HostMonitorInterval
-					, [this]() -> TCFuture<void>
-					{
-						auto Result = co_await fg_CallSafe(*this, &CInternal::f_PeriodicUpdate).f_Wrap();
-						if (!Result)
-							DMibLogWithCategory(Malterlib/Cloud/HostMonitor, Error, "Failed to run periodic update");
-
-						co_return {};
-					}
-				)
-			;
-		}
 
 		co_await fg_CallSafe(*this, &CInternal::f_PeriodicUpdate_Diskspace, true);
 
