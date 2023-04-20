@@ -18,7 +18,7 @@ public:
 		{
 			CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp | CAppManagerTestHelper::EOption_EnableVersionManager;
 			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
+			Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
 			CAppManagerTestHelper AppManagerTestHelper("AppManagerSensorTests", Options, g_Timeout);
 
@@ -26,13 +26,19 @@ public:
 
 			co_await AppManagerTestHelper.f_Setup(1);
 			auto &AppManagerInfo = *AppManagerTestHelper.m_pState->m_AppManagerInfos.f_FindAny();
+			auto fShouldKeepValue = [](CEJSON const &_Reading)
+				{
+					return _Reading["Identifier"].f_String().f_StartsWith("org.malterlib.testapp.test");
+				}
+			;
 
-			auto fMakeComparable = [](CEJSON &&_Readings)
+			auto fMakeComparable = [&](CEJSON &&_Readings)
 				{
 					for (auto &Reading : _Readings.f_Array())
 					{
 						Reading.f_RemoveMember("Timestamp");
-						Reading.f_RemoveMember("Value");
+						if (!fShouldKeepValue(Reading))
+							 Reading.f_RemoveMember("Value");
 					}
 
 					// We need to sort by sequence because the system clock might change
@@ -56,6 +62,21 @@ public:
 
 			CEJSON ExpectedSensors = CEJSON
 				{
+					{
+						"HostID"_= ""
+						, "HostName"_= ""
+						, "Application"_= ""
+						, "Identifier"_= "org.malterlib.testapp.test.version"
+						, "IdentifierScope"_= ""
+						, "Name"_= "Test Sensor (version)"
+						, "Type"_= 5
+						, "ExpectedReportInterval"_= nullptr
+						, "UnitDivisors"_= _[_]
+						, "WarnValue"_= nullptr
+						, "CriticalValue"_= nullptr
+						, "Removed"_= false
+					}
+					,
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -239,69 +260,56 @@ public:
 				}
 			;
 
-			CEJSON ExpectedSensorReadings = CEJSON
-				{
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.testapp.test"
-						, "IdentifierScope"_= ""
-						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 1
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.testapp.test"
-						, "IdentifierScope"_= ""
-						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 2
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.testapp.test"
-						, "IdentifierScope"_= ""
-						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 3
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.testapp.test"
-						, "IdentifierScope"_= ""
-						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 4
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.testapp.test"
-						, "IdentifierScope"_= ""
-						, "Name"_= "Test Sensor"
-						, "UniqueSequence"_= 5
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-				}
-			;
+			CEJSON ExpectedSensorReadings;
+			for (mint i = 0; i < 5; ++i)
+			{
+				ExpectedSensorReadings.f_Array().f_Insert
+					(
+						{
+							{
+								"HostID"_= ""
+								, "HostName"_= ""
+								, "Application"_= ""
+								, "Identifier"_= "org.malterlib.testapp.test"
+								, "IdentifierScope"_= ""
+								, "Name"_= "Test Sensor"
+								, "UniqueSequence"_= i + 1
+								, "Value"_= fp64(i)
+								, "OutdatedStatus"_= "Ok"
+								, "OutdatedSeconds"_= nullptr
+							}
+						}
+					)
+				;
+				ExpectedSensorReadings.f_Array().f_Insert
+					(
+						{
+							{
+								"HostID"_= ""
+								, "HostName"_= ""
+								, "Application"_= ""
+								, "Identifier"_= "org.malterlib.testapp.test.version"
+								, "IdentifierScope"_= ""
+								, "Name"_= "Test Sensor (version)"
+								, "UniqueSequence"_= i + 1
+								, "Value"_= CEJSONUserType
+								{
+									"Version"
+									,
+									{
+										"Identifier"__= "Ident",
+										"Major"__= 13,
+										"Minor"__= 3,
+										"Revision"__= i
+									}
+								}
+								, "OutdatedStatus"_= "Ok"
+								, "OutdatedSeconds"_= nullptr
+							}
+						}
+					)
+				;
+			}
 
 			CEJSON ExpectedSensorReadingsAppManager = CEJSON
 				{
@@ -353,9 +361,33 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
 						, "UniqueSequence"_= 5
+						, "Value"_= fp64(4.0)
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= nullptr
 					}
+					,
+					{
+						"HostID"_= ""
+						, "HostName"_= ""
+						, "Application"_= ""
+						, "Identifier"_= "org.malterlib.testapp.test.version"
+						, "IdentifierScope"_= ""
+						, "Name"_= "Test Sensor (version)"
+						, "UniqueSequence"_= 5
+						, "Value"_= CEJSONUserType
+						{
+							"Version"
+							,
+							{
+								"Identifier"__= "Ident",
+								"Major"__= 13,
+								"Minor"__= 3,
+								"Revision"__= 4
+							}
+						}
+						, "OutdatedStatus"_= "Ok"
+						, "OutdatedSeconds"_= nullptr
+					},
 				}
 			;
 
@@ -432,7 +464,8 @@ public:
 
 				auto fGenerateSensorReading = [&]()
 					{
-						CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--generate-sensor-readings", "5"}, TestAppDirectory);
+						CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--generate-sensor-readings", "--no-random-values", "5"}, TestAppDirectory);
+						CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--generate-sensor-readings", "--no-random-values", "--reading-type=Version", "5"}, TestAppDirectory);
 					}
 				;
 

@@ -42,6 +42,22 @@ namespace NMib::NCloud::NTest
 				{
 					"Names"_= {"--generate-sensor-readings"}
 					, "Description"_= "Generates a sensor reading."
+					, "Options"_=
+					{
+						"ReadingType?"_=
+						{
+							"Names"_= {"--reading-type"}
+							, "Type"_= COneOf{"Float", "Version"}
+							, "Default"_= "Float"
+							, "Description"_= "Do error audit logs."
+						}
+						, "RandomValues?"_=
+						{
+							"Names"_= {"--random-values"}
+							, "Default"_= true
+							, "Description"_= "Do error audit logs."
+						}
+					}
 					, "Parameters"_=
 					{
 						"NumReadings?"_=
@@ -53,11 +69,23 @@ namespace NMib::NCloud::NTest
 				}
 				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
+					bool bIsVersion = _Params["ReadingType"].f_String() == "Version";
+					bool bRandomValues = _Params["RandomValues"].f_Boolean();
+
 					CDistributedAppSensorReporter::CSensorInfo SensorInfo;
-					SensorInfo.m_Identifier = "org.malterlib.testapp.test";
-					SensorInfo.m_Name = "Test Sensor";
-					SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Float;
-					SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_DiskSpaceDivisors();
+					if (bIsVersion)
+					{
+						SensorInfo.m_Identifier = "org.malterlib.testapp.test.version";
+						SensorInfo.m_Name = "Test Sensor (version)";
+						SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Version;
+					}
+					else
+					{
+						SensorInfo.m_Identifier = "org.malterlib.testapp.test";
+						SensorInfo.m_Name = "Test Sensor";
+						SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Float;
+						SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_DiskSpaceDivisors();
+					}
 					auto SensorReporter = co_await self(&CTestAppActor::fp_OpenSensorReporter, fg_Move(SensorInfo));
 
 					if (!SensorReporter.m_fReportReadings)
@@ -69,7 +97,31 @@ namespace NMib::NCloud::NTest
 					for (mint i = 0; i < nReadings; ++i)
 					{
 						CDistributedAppSensorReporter::CSensorReading SensorReading;
-						SensorReading.m_Data = fg_GetRandomFloat().f_Pow(10)*1024.0*1024.0*1024.0*1024.0*1024.0;
+						if (bIsVersion)
+						{
+							CDistributedAppSensorReporter::CVersion Version;
+							Version.m_Identifier = "Ident";
+							if (bRandomValues)
+							{
+								Version.m_Major = fg_Random().f_GetValue<uint32>(0, 999);
+								Version.m_Minor = fg_Random().f_GetValue<uint32>(0, 999);
+								Version.m_Revision = fg_Random().f_GetValue<uint32>(0, 999);
+							}
+							else
+							{
+								Version.m_Major = 13;
+								Version.m_Minor = 3;
+								Version.m_Revision = i;
+							}
+							SensorReading.m_Data = fg_Move(Version);
+						}
+						else
+						{
+							if (bRandomValues)
+								SensorReading.m_Data = fg_GetRandomFloat().f_Pow(10)*1024.0*1024.0*1024.0*1024.0*1024.0;
+							else
+								SensorReading.m_Data = fp64(i);
+						}
 						Readings.f_Insert(fg_Move(SensorReading));
 					}
 
