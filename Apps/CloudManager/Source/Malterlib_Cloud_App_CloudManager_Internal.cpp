@@ -8,6 +8,7 @@
 #include <Mib/Network/SSL>
 #include <Mib/Network/Sockets/SSL>
 #include <Mib/Process/Platform>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NCloudManager
 {
@@ -57,35 +58,54 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_Destroy()
 	{
-		TCActorResultVector<void> Destroys;
+		NConcurrency::CLogError LogError("CloudManager");
 
-		if (mp_MonitorTimerSubscription)
-			mp_MonitorTimerSubscription->f_Destroy() > Destroys.f_AddResult();
+		co_await mp_LogNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy log notifications");;
+		co_await mp_SensorNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy sensor notifications");;
+		co_await mp_UpdateNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update notifications");;
+		co_await mp_Notifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy notifications");;
 
-		if (mp_CleanupTimerSubscription)
-			mp_CleanupTimerSubscription->f_Destroy() > Destroys.f_AddResult();
+		{
+			TCActorResultVector<void> Destroys;
 
-		mp_ProtocolInterface.f_Destroy() > Destroys.f_AddResult();
-		mp_SensorReporterInterface.f_Destroy() > Destroys.f_AddResult();
-		mp_SensorReaderInterface.f_Destroy() > Destroys.f_AddResult();
-		mp_LogReporterInterface.f_Destroy() > Destroys.f_AddResult();
-		mp_LogReaderInterface.f_Destroy() > Destroys.f_AddResult();
+			if (mp_MonitorTimerSubscription)
+				mp_MonitorTimerSubscription->f_Destroy() > Destroys.f_AddResult();
 
-		co_await Destroys.f_GetResults();
+			if (mp_CleanupTimerSubscription)
+				mp_CleanupTimerSubscription->f_Destroy() > Destroys.f_AddResult();
 
-		co_await mp_LogNotifications.f_Destroy();
-		co_await mp_SensorNotifications.f_Destroy();
-		co_await mp_UpdateNotifications.f_Destroy();
-		co_await mp_Notifications.f_Destroy();
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy remote subscriptions");
+		}
+
+		{
+			TCActorResultVector<void> Destroys;
+
+			for (auto &AppManager : mp_AppManagers)
+				AppManager.f_Destroy(*this) > Destroys.f_AddResult();
+
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy app manager subscriptions");
+		}
+
+		{
+			TCActorResultVector<void> Destroys;
+
+			mp_ProtocolInterface.f_Destroy() > Destroys.f_AddResult();
+			mp_SensorReporterInterface.f_Destroy() > Destroys.f_AddResult();
+			mp_SensorReaderInterface.f_Destroy() > Destroys.f_AddResult();
+			mp_LogReporterInterface.f_Destroy() > Destroys.f_AddResult();
+			mp_LogReaderInterface.f_Destroy() > Destroys.f_AddResult();
+
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy interfaces");
+		}
 
 		if (mp_AppSensorStore)
-			co_await fg_Move(mp_AppSensorStore).f_Destroy();
+			co_await fg_Move(mp_AppSensorStore).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app sensor store");;
 
 		if (mp_AppLogStore)
-			co_await fg_Move(mp_AppLogStore).f_Destroy();
+			co_await fg_Move(mp_AppLogStore).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app log store");;
 
 		if (mp_DatabaseActor)
-			co_await fg_Move(mp_DatabaseActor).f_Destroy();
+			co_await fg_Move(mp_DatabaseActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");;
 
 		co_return {};
 	}

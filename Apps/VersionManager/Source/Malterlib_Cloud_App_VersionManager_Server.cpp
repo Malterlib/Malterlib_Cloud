@@ -6,6 +6,7 @@
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
 #include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_VersionManager.h"
 #include "Malterlib_Cloud_App_VersionManager_Server.h"
@@ -252,10 +253,50 @@ namespace NMib::NCloud::NVersionManager
 
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_Destroy()
 	{
-		co_await mp_ProtocolInterface.f_Destroy();
+		CLogError LogError("Malterlib/Cloud/VersionManager");
+		{
+			TCActorResultVector<void> DestroyResults;
+
+			for (auto &VersionDownloads : mp_VersionDownloads)
+			{
+				if (VersionDownloads.m_FileTransferSend)
+					fg_Move(VersionDownloads.m_FileTransferSend).f_Destroy() > DestroyResults.f_AddResult();
+			}
+			mp_VersionDownloads.f_Clear();
+
+			for (auto &VersionUploads : mp_VersionUploads)
+			{
+				if (VersionUploads.m_FileTransferReceive)
+					fg_Move(VersionUploads.m_FileTransferReceive).f_Destroy() > DestroyResults.f_AddResult();
+				if (VersionUploads.m_DownloadSubscription)
+					fg_Exchange(VersionUploads.m_DownloadSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+			}
+			mp_VersionUploads.f_Clear();
+
+			auto fDestroySubscriptions = [&](TCMap<CStr, CSubscription> &o_Subscriptions)
+				{
+					for (auto &Subscription : o_Subscriptions)
+					{
+						if (Subscription.m_fOnNewVersions)
+							fg_Move(Subscription.m_fOnNewVersions).f_Destroy() > DestroyResults.f_AddResult();
+					}
+					o_Subscriptions.f_Clear();
+				}
+			;
+
+			fDestroySubscriptions(mp_GlobalVersionSubscriptions);
+
+			for (auto &Subscriptions : mp_VersionSubscriptions)
+				fDestroySubscriptions(Subscriptions);
+			mp_VersionSubscriptions.f_Clear();
+
+			co_await DestroyResults.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy version manager");
+		}
+
+		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
 
 		if (mp_QueryFileActor)
-			co_await mp_QueryFileActor.f_Destroy();
+			co_await mp_QueryFileActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy query file actor");
 
 		co_return {};
 	}

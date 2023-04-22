@@ -138,7 +138,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<void> CAppManagerActor::fp_SyncNotifications(CStr _ApplicationName)
 	{
 		// Wait 10 seconds for notifications to be delivered to all, ignore errors
-		co_await fp_SendAppChange_Empty(_ApplicationName).f_Timeout(10.0, "Timed out syncing notifications").f_Wrap();
+		(void)co_await fp_SendAppChange_Empty(_ApplicationName).f_Timeout(10.0, "Timed out syncing notifications").f_Wrap();
 		co_return {};
 	}
 

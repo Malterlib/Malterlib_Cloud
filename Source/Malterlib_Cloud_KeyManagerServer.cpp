@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_KeyManager.h"
 #include "Malterlib_Cloud_KeyManagerServer.h"
@@ -194,7 +195,12 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 
-		co_await Internal.m_KeyManagerPublication.f_Destroy();
+		CLogError LogError("Mib/Cloud/KeyManagerServer");
+
+		co_await Internal.m_KeyManagerPublication.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy key manager publication");
+
+		if (Internal.m_KeyManagerActor)
+			co_await fg_Move(Internal.m_KeyManagerActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy key manager server");
 
 		co_return {};
 	}

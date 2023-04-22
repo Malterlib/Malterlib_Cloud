@@ -3,6 +3,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/EncryptedStream>
 #include <Mib/Cloud/SecretsManagerUpload>
 
@@ -19,12 +20,14 @@ namespace NMib::NCloud::NSecretsManager
 	CSecretsManagerDaemonActor::CServer::CDownload::~CDownload()
 	{
 		if (m_DirectorySyncSend)
-			fg_Move(m_DirectorySyncSend).f_Destroy() > fg_DiscardResult();
+			fg_Move(m_DirectorySyncSend).f_Destroy() > fg_LogWarning("Mib/Cloud/SecretsManager", "Failed to destroy directory sync send in destructor");
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CDownload::f_Destroy()
 	{
 		auto This = co_await fg_MoveThis(*this);
+
+		CLogError LogError("Mib/Cloud/SecretsManager");
 
 		TCActorResultVector<void> Destroys;
 
@@ -35,10 +38,10 @@ namespace NMib::NCloud::NSecretsManager
 		if (This.m_FileSubscription)
 			This.m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > Destroys.f_AddResult();
 
-		co_await Destroys.f_GetResults();
+		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy download");
 
 		if (DirectorySend)
-			co_await fg_Move(DirectorySend).f_Destroy();
+			co_await fg_Move(DirectorySend).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy directory sync send in destroy");
 
 		co_return {};
 	}
@@ -168,7 +171,8 @@ namespace NMib::NCloud::NSecretsManager
 					if (!Download.m_DirectorySyncSend)
 					{
 						pThis->mp_Downloads.f_Remove(DownloadID);
-						co_return Auditor.f_Exception("Sync aborted");
+						Auditor.f_Exception("Sync aborted");
+						co_return {};
 					}
 
 					auto GetResultResults = co_await Download.m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult).f_Wrap();

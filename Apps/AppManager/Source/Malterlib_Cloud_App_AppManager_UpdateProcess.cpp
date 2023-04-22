@@ -47,7 +47,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		mp_InitialStartupResult.f_Future() > [this, pUpdateState, pCleanupAutoUpdate](TCAsyncResult<void> &&_Result)
+		fg_Move(mp_InitialStartupResultFuture) > [this, pUpdateState, pCleanupAutoUpdate](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 				{

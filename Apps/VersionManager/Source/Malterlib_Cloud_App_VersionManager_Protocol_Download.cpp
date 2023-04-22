@@ -26,9 +26,17 @@ namespace NMib::NCloud::NVersionManager
 	{
 		auto pThis = m_pThis;
 		
-		if (pThis->f_IsDestroyed())
-			co_return DMibErrorInstance("Shutting down");
-			
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
+		;
+
 		auto Auditor = pThis->mp_AppState.f_Auditor(); 
 		
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))

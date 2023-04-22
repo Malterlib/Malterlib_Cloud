@@ -7,6 +7,7 @@
 #include <Mib/Concurrency/DistributedActorTrustManager>
 #include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_VersionManager.h"
 #include "Malterlib_Cloud_App_VersionManager_Server.h"
@@ -16,7 +17,10 @@ namespace NMib::NCloud::NVersionManager
 	CVersionManagerDaemonActor::CServer::CVersionUpload::~CVersionUpload()
 	{
 		if (m_FileTransferReceive)
-			fg_Move(m_FileTransferReceive).f_Destroy() > fg_DiscardResult();
+			fg_Move(m_FileTransferReceive).f_Destroy() > fg_LogWarning("VersionUpload", "Failed to destroy file transfer receive in destructor");
+
+		if (m_DownloadSubscription)
+			fg_Exchange(m_DownloadSubscription, nullptr)->f_Destroy() > fg_LogWarning("VersionUpload", "Failed to destroy download subscription in destructor");
 	}
 
 	CVersionManagerDaemonActor::CServer::CVersionUpload::CVersionUpload()
@@ -62,9 +66,17 @@ namespace NMib::NCloud::NVersionManager
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_UploadVersion(CStartUploadVersion &&_Params) -> TCFuture<CStartUploadVersion::CResult>
 	{
 		auto pThis = m_pThis;
-		
-		if (pThis->f_IsDestroyed())
-			co_return DMibErrorInstance("Shutting down");
+
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
+		;
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
@@ -125,13 +137,10 @@ namespace NMib::NCloud::NVersionManager
 		}
 
 		CVersionUpload *pUpload = nullptr;
-		auto OnResume = co_await fg_OnResume
+		auto OnResume2 = co_await fg_OnResume
 			(
 				[&]() -> CExceptionPointer
 				{
-					if (pThis->f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-
 					pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
 					if (!pUpload)
 						return DMibErrorInstance("Upload aborted");
@@ -198,11 +207,18 @@ namespace NMib::NCloud::NVersionManager
 						if (!pUpload)
 							co_return {};
 
+						TCActorResultVector<void> DestroyResults;
+
 						if (pUpload->m_FileTransferReceive)
-							co_await fg_Move(pUpload->m_FileTransferReceive).f_Destroy();
+							fg_Move(pUpload->m_FileTransferReceive).f_Destroy() > DestroyResults.f_AddResult();
+
+						if (pUpload->m_DownloadSubscription)
+							fg_Exchange(pUpload->m_DownloadSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
 
 						if (pThis->mp_VersionUploads.f_Remove(UploadID))
 							Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
+
+						co_await DestroyResults.f_GetUnwrappedResults().f_Wrap() > fg_LogWarning("VersionUpload", "Failed do destroy finish start upload subscription");
 
 						co_return {};
 					}

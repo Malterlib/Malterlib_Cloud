@@ -134,7 +134,7 @@ namespace NMib::NCloud::NCloudManager
 			(
 				[this]() -> CExceptionPointer
 				{
-					if (f_IsDestroyed())
+					if (!mp_AppSensorStore || !mp_AppLogStore || !mp_DatabaseActor)
 						return DMibErrorInstance("Shutting down");
 					return {};
 				}

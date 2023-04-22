@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Cryptography/EncryptedStream>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_SecretsManager_Database.h"
 
@@ -19,10 +20,13 @@ namespace NMib::NCloud::NSecretsManager
 
 	TCFuture<void> CSecretsManagerServerDatabase::fp_Destroy()
 	{
+		CLogError LogError("Mib/Cloud/SecretsManager");
+
 		if (!mp_pPendingWrite)
 			co_return {};
 
-		co_await mp_PendingWritePromises.f_Insert().f_Future().f_Wrap();
+		co_await mp_PendingWritePromises.f_Insert().f_Future().f_Wrap() > LogError.f_Warning("Failed to destroy secret manager database write promises");
+
 		co_return {};
 	}
 

@@ -3,6 +3,7 @@
 
 #include "Malterlib_Cloud_BackupManagerDownload.h"
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud
 {
@@ -51,7 +52,7 @@ namespace NMib::NCloud
 						, g_ActorSubscription / [pState]() -> TCFuture<void>
 						{
 							if (pState->m_DownloadBackupReceive)
-								co_await fg_Move(pState->m_DownloadBackupReceive).f_Destroy().f_Wrap();
+								co_await fg_Move(pState->m_DownloadBackupReceive).f_Destroy().f_Wrap() > fg_LogWarning("", "Failed to destroy download backup receive");
 
 							co_return {};
 						}

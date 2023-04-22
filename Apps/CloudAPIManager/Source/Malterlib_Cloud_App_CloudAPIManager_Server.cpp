@@ -65,7 +65,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			Permissions[fg_Format("ObjectStorage/SignTempURL/{}", CloudContext.f_GetName())];
 		}
 
-		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions).f_Wrap();
+		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions).f_Wrap() > fg_LogError("CloudAPIManager", "Failed to register permissions");
 
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("ObjectStorage/*");

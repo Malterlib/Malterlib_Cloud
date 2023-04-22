@@ -6,6 +6,7 @@
 #include "Malterlib_Cloud_App_CloudManager_Database.h"
 
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NCloudManager
 {
@@ -272,6 +273,45 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
+	TCFuture<void> CCloudManagerServer::CAppManagerState::f_Destroy(CCloudManagerServer &_This)
+	{
+		co_await ECoroutineFlag_AllowReferences;
+
+		CAppManagerKey DatabaseKey{.m_HostID = f_AppManagerID()};
+
+		TCDistributedActorInterfaceWithID<CAppManagerInterface> Interface;
+		NCloudManagerDatabase::CAppManagerValue Data;
+		TCActorResultVector<void> DestroyResults;
+		{
+			if (m_ChangeNotificationsSubscription)
+				fg_Exchange(m_ChangeNotificationsSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+
+			if (m_UpdateNotificationsSubscription)
+				fg_Exchange(m_UpdateNotificationsSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+
+			Data = fg_Move(m_Data);
+			Data.m_LastSeen = CTime::fs_NowUTC();
+			Data.m_bActive = false;
+
+			Interface = fg_Move(m_Interface);
+		}
+
+		auto [InterfaceDestroyResult, SaveAppManagerDataDestroyResult, SubscriptionDestroyResult] = co_await
+			(Interface.f_Destroy() + _This.fp_SaveAppManagerData(DatabaseKey, fg_Move(Data)) + DestroyResults.f_GetUnwrappedResults()).f_Wrap()
+		;
+
+		if (!SubscriptionDestroyResult)
+			SubscriptionDestroyResult > fg_LogWarning("CloudManager", "Failed to destroy registered app manager subscriptions");
+
+		if (!InterfaceDestroyResult)
+			InterfaceDestroyResult > fg_LogWarning("CloudManager", "Failed to destroy registered app manager interface");
+
+		if (!SaveAppManagerDataDestroyResult)
+			SaveAppManagerDataDestroyResult > fg_LogWarning("CloudManager", "Failed to store app manager data in subscription cleanup");
+
+		co_return {};
+	}
+
 	TCFuture<TCActorSubscriptionWithID<>> CCloudManagerServer::CCloudManagerImplementation::f_RegisterAppManager
 		(
 			TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
@@ -304,6 +344,7 @@ namespace NMib::NCloud::NCloudManager
 			co_return Auditor.f_AccessDenied("(Register as app manager)", Permissions);
 
 		CStr AppManagerID = CallingHostInfo.f_GetRealHostID();
+
 		CAppManagerKey DatabaseKey{.m_HostID = AppManagerID};
 
 		CAppManagerValue Data;
@@ -311,7 +352,13 @@ namespace NMib::NCloud::NCloudManager
 		if (auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID))
 		{
 			Data = pAppManager->m_Data;
+			auto DestroyFuture = pAppManager->f_Destroy(*pThis);
+
 			pThis->mp_AppManagers.f_Remove(pAppManager); // Remove any old manager
+
+			co_await fg_Move(DestroyFuture).f_Timeout(30.0, "Timed out waiting for old app manager destruction").f_Wrap()
+				> fg_LogWarning("CloudManager", "Failed to destroy old app manager registration")
+			;
 		}
 		else
 		{
@@ -421,30 +468,14 @@ namespace NMib::NCloud::NCloudManager
 
 		co_return g_ActorSubscription / [pThis, RegisterSequence, AppManagerID, DatabaseKey]() -> TCFuture<void>
 			{
-				auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
-
-				if (pAppManager && pAppManager->m_ChangeNotificationsSubscription)
-					co_await pAppManager->m_ChangeNotificationsSubscription->f_Destroy();
-
-				pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+				CAppManagerState *pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
 				if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
-					co_return {};
+					co_return DMibErrorInstance("App Manager was removed before subscription finished");
 
-				if (pAppManager && pAppManager->m_UpdateNotificationsSubscription)
-					co_await pAppManager->m_ChangeNotificationsSubscription->f_Destroy();
-
-				pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
-				if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
-					co_return {};
-
-				auto Data = fg_Move(pAppManager->m_Data);
-				Data.m_LastSeen = CTime::fs_NowUTC();
-				Data.m_bActive = false;
-
-				auto Interface = fg_Move(pAppManager->m_Interface);
+				auto DestroyFuture = pAppManager->f_Destroy(*pThis);
 				pThis->mp_AppManagers.f_Remove(AppManagerID);
 
-				co_await (Interface.f_Destroy() + pThis->fp_SaveAppManagerData(DatabaseKey, Data)).f_Wrap();
+				co_await fg_Move(DestroyFuture);
 
 				co_return {};
 			}
@@ -567,22 +598,25 @@ namespace NMib::NCloud::NCloudManager
 		if (!co_await pThis->mp_Permissions.f_HasPermission("Remove app manager", Permissions))
 			co_return Auditor.f_AccessDenied("(Remove app manager)", Permissions);
 
+		CLogError LogError("CloudManager");
+
 		auto *pAppManager = pThis->mp_AppManagers.f_FindEqual(_AppManagerHostID);
 		if (pAppManager)
 		{
 			auto ChangeSubscription = fg_Move(pAppManager->m_ChangeNotificationsSubscription);
 			auto UpdateSubscription = fg_Move(pAppManager->m_UpdateNotificationsSubscription);
 			auto Interface = fg_Move(pAppManager->m_Interface);
+
 			pThis->mp_AppManagers.f_Remove(pAppManager);
 
 			if (ChangeSubscription)
-				co_await ChangeSubscription->f_Destroy().f_Wrap();
+				co_await ChangeSubscription->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app manager change subscription");
 
 			if (UpdateSubscription)
-				co_await UpdateSubscription->f_Destroy().f_Wrap();
+				co_await UpdateSubscription->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app manager update subscription");
 
 			if (Interface)
-				co_await Interface.f_Destroy().f_Wrap();
+				co_await Interface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app manager interface subscription");
 		}
 
 		co_await (pThis->self(&CCloudManagerServer::fp_RemoveAppManagerData, _AppManagerHostID) % Auditor);

@@ -8,6 +8,7 @@
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
 #include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_KeyManager.h"
 
@@ -38,20 +39,22 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<void> CKeyManagerDaemonActor::fp_StopApp()
 	{
+		CLogError LogError("Mib/Cloud/KeyManager/Daemon");
+
 		if (mp_ServerActor || mp_DatabaseActor)
 			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down");
 
 		if (mp_ServerActor)
 		{
 			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server");
-			co_await fg_Move(mp_ServerActor).f_Destroy().f_Wrap();
+			co_await fg_Move(mp_ServerActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy server actor");
 			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server shut down");
 		}
 
 		if (mp_DatabaseActor)
 		{
 			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Shutting down key server database");
-			co_await fg_Move(mp_DatabaseActor).f_Destroy().f_Wrap();
+			co_await fg_Move(mp_DatabaseActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");
 			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server database shut down");
 		}
 

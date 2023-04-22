@@ -3,23 +3,27 @@
 #include "Malterlib_Cloud_App_BackupManager_Internal.h"
 #include <Mib/Cryptography/Hashes/SHA>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NBackupManager
 {
 	CBackupManagerServer::CBackupDownload::~CBackupDownload()
 	{
 		if (m_DirectorySyncSend)
-			fg_Move(m_DirectorySyncSend).f_Destroy() > fg_DiscardResult();
+			fg_Move(m_DirectorySyncSend).f_Destroy() > fg_LogWarning("Mib/Cloud/SecretsManager", "Failed to destroy directory sync send in destructor");
 	}
 	
 	TCFuture<void> CBackupManagerServer::CBackupDownload::f_Destroy()
 	{
 		auto DirectorySend = fg_Move(m_DirectorySyncSend);
+
+		CLogError LogError("Mib/Cloud/BackupManager");
+
 		if (m_Subscription)
-			co_await m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for backup download to destroy").f_Wrap();
+			co_await m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for backup download to destroy").f_Wrap() > LogError.f_Warning("Failed to destroy subscription");
 
 		if (DirectorySend)
-			co_await fg_Move(DirectorySend).f_Destroy();
+			co_await fg_Move(DirectorySend).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy directory sync send in destroy");
 
 		co_return {};
 	}

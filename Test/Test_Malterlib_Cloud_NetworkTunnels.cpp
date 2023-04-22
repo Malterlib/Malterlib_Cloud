@@ -375,9 +375,6 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				)
 				.f_CallSync(pRunLoop, g_Timeout)
 			;
-
-			CDistributedActorTestHelperCombined TestClient{TunnelSocketPath};
-			TestClient.f_InitClient(TestServer);
 		};
 	}
 };

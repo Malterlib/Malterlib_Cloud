@@ -1,7 +1,9 @@
 // Copyright © 2018 Nonna Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
+#include <Mib/Concurrency/LogError>
 #include <Mib/Encoding/JSONShortcuts>
+
 #include "Malterlib_Cloud_App_AppDistributionManager.h"
 
 namespace NMib::NCloud::NAppDistributionManager
@@ -54,6 +56,8 @@ namespace NMib::NCloud::NAppDistributionManager
 	
 	TCFuture<void> CAppDistributionManagerActor::fp_StopApp()
 	{	
+		CLogError LogError("Mib/Cloud/AppDistributionManager");
+
 		TCActorResultVector<void> DistributionDestroys;
 
 		for (auto &Distribution : mp_Distributions)
@@ -65,9 +69,52 @@ namespace NMib::NCloud::NAppDistributionManager
 			}
 		}
 
-		co_await DistributionDestroys.f_GetResults();
+		co_await DistributionDestroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to stop distribution deploys");
 
-		co_await mp_FileActor.f_Destroy();
+		if (mp_FileActor)
+			co_await fg_Move(mp_FileActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to stop file actor");
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppDistributionManagerActor::fp_Destroy()
+	{
+		CLogError LogError("Mib/Cloud/AppDistributionManager");
+		{
+			auto pCanDestroy = fg_Move(mp_pCanDestroy);
+			auto DestroyFuture = fg_Exchange(pCanDestroy, nullptr)->f_Future();
+			co_await fg_Move(DestroyFuture).f_Wrap() > LogError.f_Warning("Failed to destroy can destroy");
+		}
+
+		{
+			TCActorResultVector<void> DestroyResults;
+
+			for (auto &VersionManager : mp_VersionManagers)
+			{
+				if (VersionManager.m_Subscription)
+					fg_Exchange(VersionManager.m_Subscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+			}
+			mp_VersionManagers.f_Clear();
+
+			for (auto &Download : mp_Downloads)
+			{
+				if (Download.m_DownloadVersionReceive)
+					fg_Move(Download.m_DownloadVersionReceive).f_Destroy() > DestroyResults.f_AddResult();
+
+				if (Download.m_Subscription)
+					fg_Exchange(Download.m_Subscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+			}
+			mp_Downloads.f_Clear();
+
+			co_await DestroyResults.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy app distribution manager");
+		}
+
+		co_await mp_VersionManagerSubscription.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy vesion manager subscription");
+
+		if (mp_FileActor)
+			co_await fg_Move(mp_FileActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor");
+
+		co_await CDistributedAppActor::fp_Destroy();
 
 		co_return {};
 	}

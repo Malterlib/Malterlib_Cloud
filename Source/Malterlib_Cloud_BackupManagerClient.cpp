@@ -59,6 +59,9 @@ namespace NMib::NCloud
 	NConcurrency::TCFuture<void> CBackupManagerClient::fp_Destroy()
 	{
 		auto &Internal = *mp_pInternal;
+
+		CLogError LogError(Internal.m_Config.m_LogCategory);
+
 		*Internal.m_pDestroyed = true;
 		{
 			TCActorResultVector<void> RunningInstancesDestroys;
@@ -67,14 +70,14 @@ namespace NMib::NCloud
 
 			Internal.m_RunningBackupInstances.f_Clear();
 
-			co_await RunningInstancesDestroys.f_GetResults().f_Wrap();
+			co_await RunningInstancesDestroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy running backup instances");
 		}
 		{
 			TCActorResultVector<void> StoppedNotifications;
 			for (auto &fOnStopped : Internal.m_OnBackupStoppedSubscriptions)
 				fOnStopped() > StoppedNotifications.f_AddResult();
 
-			co_await StoppedNotifications.f_GetResults().f_Wrap();
+			co_await StoppedNotifications.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy on backup stopped subscriptions");
 		}
 		{
 			TCActorResultVector<void> Destroys;
@@ -85,17 +88,19 @@ namespace NMib::NCloud
 				auto pTracker = fg_Move(Internal.m_pCanDestroyTracker);
 				pTracker->f_Future() > Destroys.f_AddResult();
 			}
-			co_await Destroys.f_GetResults().f_Wrap();
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy on on new backup subscription or destroy tracker");
 		}
 		co_await
 			(
-				g_Dispatch(Internal.m_FileActor) / [AppendStates = fg_Move(Internal.m_AppendStates)]
+				g_Dispatch(Internal.m_FileActor) / [AppendStates = fg_Move(Internal.m_AppendStates)]() mutable
 				{
+					AppendStates.f_Clear();
 				}
 			)
+			.f_Wrap() > LogError.f_Warning("Failed to destroy file append states")
 		;
-		co_await Internal.m_FileActor.f_Destroy();
-		co_await Internal.m_BackupInterface.f_Destroy();
+		co_await Internal.m_FileActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor");
+		co_await Internal.m_BackupInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy backup interface");
 
 		co_return {};
 	}

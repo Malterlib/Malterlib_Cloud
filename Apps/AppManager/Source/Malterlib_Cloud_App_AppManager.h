@@ -27,6 +27,7 @@ namespace NMib::NCloud::NAppManager
 	struct CAppManagerActor : public CDistributedAppActor
 	{
 		CAppManagerActor();
+		~CAppManagerActor();
 
 	private:
 		using EUpdateStage = CAppManagerInterface::EUpdateStage;
@@ -941,7 +942,7 @@ namespace NMib::NCloud::NAppManager
 		CStr fp_TransformUserGroup(CStr const &_UserName) const;
 
 		TCFuture<void> fp_CloudManagerAdded(TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_Info);
-		void fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> const &_CloudManager);
+		TCFuture<void> fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> const &_CloudManager);
 
 		TCSharedPointer<CApplication> fp_ApplicationFromHostID(CStr const &_HostID);
 		TCSharedPointer<CApplication> fp_ApplicationFromLaunchID(CStr const &_LaunchID);
@@ -1008,6 +1009,7 @@ namespace NMib::NCloud::NAppManager
 		TCVector<TCActor<CProcessLaunchActor>> mp_LaunchActors;
 
 		TCPromise<void> mp_InitialStartupResult;
+		TCFuture<void> mp_InitialStartupResultFuture;
 		mint mp_PendingAutoLaunches = 0;
 
 		uint64 mp_AppStageChangeSequence = 0;

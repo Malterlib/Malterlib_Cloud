@@ -11,6 +11,13 @@ namespace NMib::NCloud::NAppManager
 	CAppManagerActor::CAppManagerActor()
 		: CDistributedAppActor(CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager"))
 	{
+		mp_InitialStartupResultFuture = mp_InitialStartupResult.f_Future();
+	}
+
+	CAppManagerActor::~CAppManagerActor()
+	{
+		if (mp_InitialStartupResultFuture.f_IsValid())
+			fg_Move(mp_InitialStartupResultFuture) > fg_DiscardResult();
 	}
 
 	void CAppManagerActor::fp_OnApplicationAdded(TCSharedPointer<CApplication> const &_pApplication)
@@ -409,7 +416,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_CloudManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
-					fp_CloudManagerRemoved(_CloudManager);
+					co_await self(&CAppManagerActor::fp_CloudManagerRemoved, _CloudManager).f_Wrap() > fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to remove cloud manager");
 
 					co_return {};
 				}
@@ -461,20 +468,20 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_StopApp()
 	{
+		CLogError LogError("Malterlib/Cloud/AppManager");
+
 		auto CanDestroyFuture = mp_pCanDestroy->f_Future();
 		mp_pCanDestroy.f_Clear();
 		co_await fg_Move(CanDestroyFuture);
 
 		co_await fp_CancelAllApplicationUpdatesOnStopAppManager();
 
-		co_await (mp_AppManagerInterface.f_Destroy() + mp_AppManagerCoordinationInterface.f_Destroy());
-
 		{
 			TCActorResultVector<uint32> ApplicationStops;
 			for (auto &pApplication : mp_Applications)
 				pApplication->f_Stop(EStopFlag_CloseEncryption) > ApplicationStops.f_AddResult();
 
-			co_await ApplicationStops.f_GetResults().f_Wrap();
+			co_await ApplicationStops.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to stop applications");
 		}
 
 		for (auto &pApplication : mp_Applications)
@@ -483,8 +490,6 @@ namespace NMib::NCloud::NAppManager
 			pApplication->f_Clear();
 		}
 
-		co_await mp_AppInterfaceServer.f_Destroy().f_Wrap();
-
 		{
 			TCActorResultVector<void> Destroys;
 
@@ -492,7 +497,33 @@ namespace NMib::NCloud::NAppManager
 				fg_Move(Launch).f_Destroy() > Destroys.f_AddResult();
 			mp_LaunchActors.f_Clear();
 
-			co_await Destroys.f_GetResults().f_Wrap();
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy app launchers");
+		}
+
+		{
+			TCActorResultVector<void> Destroys;
+
+			for (auto &Subscription : mp_ChangeNotificationSubscriptions)
+			{
+				if (Subscription.m_fOnChange)
+					fg_Move(Subscription.m_fOnChange).f_Destroy() > Destroys.f_AddResult();
+			}
+			mp_ChangeNotificationSubscriptions.f_Clear();
+
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy change notification subscriptions");
+		}
+
+		{
+			TCActorResultVector<void> Destroys;
+
+			for (auto &Subscription : mp_UpdateNotificationSubscriptions)
+			{
+				if (Subscription.m_fOnUpdate)
+					fg_Move(Subscription.m_fOnUpdate).f_Destroy() > Destroys.f_AddResult();
+			}
+			mp_UpdateNotificationSubscriptions.f_Clear();
+
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy update notification subscriptions");
 		}
 
 		{
@@ -501,20 +532,37 @@ namespace NMib::NCloud::NAppManager
 			for (auto &CloudManager : mp_CloudManagers)
 			{
 				if (CloudManager.m_RegisterSubscription)
-					CloudManager.m_RegisterSubscription->f_Destroy() > Destroys.f_AddResult();
+					fg_Exchange(CloudManager.m_RegisterSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
 				if (CloudManager.m_SensorReporterSubscription)
-					CloudManager.m_SensorReporterSubscription->f_Destroy() > Destroys.f_AddResult();
+					fg_Exchange(CloudManager.m_SensorReporterSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
 				if (CloudManager.m_LogReporterSubscription)
-					CloudManager.m_LogReporterSubscription->f_Destroy() > Destroys.f_AddResult();
+					fg_Exchange(CloudManager.m_LogReporterSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
 			}
+
+			mp_CloudManagers.f_Clear();
 
 			mp_SensorReporterInterface.f_Destroy() > Destroys.f_AddResult();
 			mp_LogReporterInterface.f_Destroy() > Destroys.f_AddResult();
 
-			mp_CloudManagers.f_Clear();
-
-			co_await Destroys.f_GetResults().f_Wrap();
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy cloud managers or reporter interfaces");
 		}
+
+		{
+			auto [AppManagerInterfaceDestroyResult, AppManagerCoordinationInterfaceDestroyResult] =
+				co_await (mp_AppManagerInterface.f_Destroy() + mp_AppManagerCoordinationInterface.f_Destroy()).f_Wrap()
+			;
+			if (!AppManagerInterfaceDestroyResult)
+				AppManagerInterfaceDestroyResult > LogError.f_Warning("Failed to destroy app manager interface");
+			if (!AppManagerCoordinationInterfaceDestroyResult)
+				AppManagerCoordinationInterfaceDestroyResult > LogError.f_Warning("Failed to destroy app manager coordination interface");
+		}
+
+		co_await mp_RemoteAppManagers.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy remote app managers interface subscription");
+		co_await mp_AppInterfaceServer.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app interface server");
+
+		co_await mp_KeyManagerSubscription.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy key manager interface subscription");
+		co_await mp_VersionManagerSubscription.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy version manager interface subscription");
+		co_await mp_CloudManagerSubscription.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy cloud manager interface subscription");
 
 		if (mp_MainDirectoryMonitorSubscription)
 			co_await fg_Exchange(mp_MainDirectoryMonitorSubscription, nullptr)->f_Destroy();

@@ -117,6 +117,8 @@ namespace NMib::NCloud::NCloudManager
 			CStr const &f_AppManagerID() const;
 			NCloudManagerDatabase::CAppManagerKey f_DatabaseKey() const;
 
+			TCFuture<void> f_Destroy(CCloudManagerServer &_This);
+
 			TCDistributedActorInterfaceWithID<CAppManagerInterface> m_Interface;
 			NCloudManagerDatabase::CAppManagerValue m_Data;
 			CStr m_UniqueHostID;

@@ -167,6 +167,8 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		using CVersionsAvailableForUpdate = NContainer::TCMap<NStr::CStr, NContainer::TCVector<CApplicationVersion>>;
 
+		TCFuture<void> fp_Destroy() override;
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;

@@ -3,6 +3,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_BackupManagerClient_BackupInstance.h"
 
@@ -55,18 +56,24 @@ namespace NMib::NCloud::NPrivate
 
 	TCFuture<void> CBackupManagerClient_Instance::fp_Destroy()
 	{
-		TCPromise<void> Promise;
-
-		auto pCanDestroyTracker = fg_Move(mp_pCanDestroyTracker);
-		DMibCheck(pCanDestroyTracker);
+		CLogError LogError(mp_Config.m_LogCategory);
+		{
+			auto pCanDestroyTracker = fg_Move(mp_pCanDestroyTracker);
+			DMibCheck(pCanDestroyTracker);
+			auto DestroyFuture = fg_Exchange(pCanDestroyTracker, nullptr)->f_Future();
+			co_await fg_Move(DestroyFuture).f_Wrap() > LogError.f_Warning("Failed to destroy can destroy tracker");
+		}
 
 		mp_PendingFiles.f_Clear();
 		mp_SequencedSyncs.f_Clear();
 
+		TCActorResultVector<void> DestroyResults;
 		if (mp_pManifestSyncState && mp_pManifestSyncState->m_RSyncSubscription)
-			mp_pManifestSyncState->m_RSyncSubscription->f_Destroy() > pCanDestroyTracker->f_Track();
+			mp_pManifestSyncState->m_RSyncSubscription->f_Destroy() > DestroyResults.f_AddResult();
 
-		return Promise <<= pCanDestroyTracker->f_Future();
+		co_await DestroyResults.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy can destroy backup manager client instance");
+
+		co_return {};
 	}
 
 	void CBackupManagerClient_Instance::fp_BackupNotification(CBackupManagerClient::CNotification &&_Notification)

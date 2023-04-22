@@ -1,4 +1,6 @@
 
+#include <Mib/Concurrency/LogError>
+
 #include "Malterlib_Cloud_App_BackupManager_BackupInstance.h"
 #include "Malterlib_Cloud_App_BackupManager_BackupInstance_Internal.h"
 
@@ -61,8 +63,10 @@ namespace NMib::NCloud::NBackupManager
 	{
 		auto &Internal = *mp_pInternal;
 
+		CLogError LogError("Mib/Cloud/BackupManager");
+
 		if (Internal.m_BackupSourceSubscription)
-			co_await Internal.m_BackupSourceSubscription->f_Destroy();
+			co_await Internal.m_BackupSourceSubscription->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy backup source subscription");
 
 		co_return {};
 	}

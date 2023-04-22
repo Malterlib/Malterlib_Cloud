@@ -3,6 +3,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/LogError>
 #include <Mib/Network/AsyncSocket>
 
 #include "Malterlib_Cloud_NetworkTunnelsServer.h"
@@ -140,7 +141,7 @@ namespace NMib::NCloud
 
 				auto Cleanup = g_OnScopeExitActor / [pThis = m_pThis, fCleanupConnection]() mutable
 					{
-						(pThis->self / fg_Move(fCleanupConnection)) > fg_DiscardResult();
+						(pThis->self / fg_Move(fCleanupConnection)) > fg_LogWarning("NetworkTunnelsServer", "Failed to cleanup connection");
 					}
 				;
 
@@ -230,6 +231,7 @@ namespace NMib::NCloud
 	TCFuture<void> CNetworkTunnelsServer::fp_Destroy()
 	{
 		auto &Internal = *mp_pInternal;
+		NConcurrency::CLogError LogError("NetworkTunnelsServer");
 
 		TCActorResultVector<void> Destroys;
 		for (auto &Connection : Internal.m_Connections)
@@ -240,8 +242,8 @@ namespace NMib::NCloud
 		}
 		Internal.m_Connections.f_Clear();
 
-		co_await Destroys.f_GetResults();
-		co_await Internal.m_NetworkTunnelInstance.f_Destroy();
+		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy connections");
+		co_await Internal.m_NetworkTunnelInstance.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to network tunnel instance");
 		co_return {};
 	}
 
@@ -287,7 +289,9 @@ namespace NMib::NCloud
 				g_ActorSubscription / [this, Permissions, _Name]() mutable -> TCFuture<void>
 				{
 					auto &Internal = *mp_pInternal;
-					co_await Internal.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions)).f_Wrap();
+					co_await Internal.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions)).f_Wrap()
+						> fg_LogWarning("NetworkTunnelsServer", "Failed to desroy network tunnel publication");
+					;
 					Internal.m_NetworkTunnels.f_Remove(_Name);
 					co_return {};
 				}

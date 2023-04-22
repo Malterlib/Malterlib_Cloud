@@ -314,7 +314,7 @@ namespace NMib::NCloud
 				fg_Move(Internal.m_fUploadCallback).f_Destroy() > Destroys.f_AddResult();
 				fg_Move(Internal.m_fStateCallback).f_Destroy() > Destroys.f_AddResult();
 
-				co_await Destroys.f_GetResults();
+				co_await Destroys.f_GetUnwrappedResults();
 
 				co_return {};
 			}

@@ -121,20 +121,22 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 
-		if (Internal.m_UpdateTimerSubscription)
-			co_await fg_Exchange(Internal.m_UpdateTimerSubscription, nullptr)->f_Destroy();
+		CLogError LogError("Malterlib/Cloud/HostMonitor");
 
-		co_await fg_Move(Internal.m_UpdatePeriodicSequencer).f_Destroy();
+		if (Internal.m_UpdateTimerSubscription)
+			co_await fg_Exchange(Internal.m_UpdateTimerSubscription, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update timer subscription");
+
+		co_await fg_Move(Internal.m_UpdatePeriodicSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update periodic sequencer");
 
 		TCActorResultVector<void> Destroys;
 
 		for (auto &MonitoredPath : Internal.m_MonitoredPaths)
 			MonitoredPath.f_Destroy() > Destroys.f_AddResult();
 
-		co_await Destroys.f_GetResults();
+		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy host monitor");
 
 		if (Internal.m_FileActor)
-			co_await fg_Move(Internal.m_FileActor).f_Destroy();
+			co_await fg_Move(Internal.m_FileActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor");;
 
 		co_return {};
 	}

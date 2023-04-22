@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_SecretsManager_ServerController.h"
 
@@ -96,7 +97,7 @@ namespace NMib::NCloud::NSecretsManager
 					co_return {};
 				}
 
-				co_await fg_Move(DatabaseActor).f_Destroy().f_Wrap();
+				co_await fg_Move(DatabaseActor).f_Destroy().f_Wrap() > fg_LogWarning("Mib/Cloud/SecretsManager", "Failed to destroy database actor");
 				mp_PendingDatabases.f_Remove(DatabaseActorWeak);
 				co_return {};
 			}
@@ -134,6 +135,8 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		TCActorResultVector<void> Destroys;
 
+		CLogError LogError("Mib/Cloud/SecretsManager");
+
 		if (mp_ServerActor)
 			mp_ServerActor.f_Destroy() > Destroys.f_AddResult();
 
@@ -141,7 +144,9 @@ namespace NMib::NCloud::NSecretsManager
 			fg_Move(Database).f_Destroy() > Destroys.f_AddResult();
 		mp_PendingDatabases.f_Clear();
 
-		co_await Destroys.f_GetResults();
+		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy server actor or databases");
+
+		co_await mp_KeyManagerSubscription.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy key manager subscription");
 
 		co_return {};
 	}

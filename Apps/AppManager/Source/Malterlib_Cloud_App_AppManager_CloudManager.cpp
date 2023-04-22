@@ -26,7 +26,24 @@ namespace NMib::NCloud::NAppManager
 		NProcess::NPlatform::fg_Process_GetVersionInfo(CFile::fs_GetProgramPath(), VersionInfo);
 		Info.m_VersionDate = VersionInfo.m_BuildTime;
 
-		auto Subscription = co_await _CloudManager.f_CallActor(&CCloudManager::f_RegisterAppManager)(mp_AppManagerInterface.m_Actor->f_ShareInterface<CAppManagerInterface>(), fg_Move(Info));
+		auto Subscription = co_await _CloudManager.f_CallActor(&CCloudManager::f_RegisterAppManager)
+			(
+				TCDistributedActorInterfaceWithID<CAppManagerInterface>
+				{
+					mp_AppManagerInterface.m_Actor->f_ShareInterface<CAppManagerInterface>()
+					, g_ActorSubscription / [this, WeakCloudManager = _CloudManager.f_Weak()]() -> TCFuture<void>
+					{
+						co_await self(&CAppManagerActor::fp_CloudManagerRemoved, WeakCloudManager).f_Wrap()
+							> fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to destroy register subscription for cloud manager")
+						;
+
+						co_return {};
+					}
+				}
+				, fg_Move(Info)
+			)
+		;
+
 		CActorSubscription SensorReporterSubscription;
 		{
 			auto SensorReporter = co_await _CloudManager.f_CallActor(&CCloudManager::f_GetSensorReporter)().f_Wrap();
@@ -85,21 +102,27 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	void CAppManagerActor::fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> const &_CloudManager)
+	TCFuture<void> CAppManagerActor::fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> const &_CloudManager)
 	{
 		auto pCloudManagerState = mp_CloudManagers.f_FindEqual(_CloudManager);
 		if (!pCloudManagerState)
-			return;
+			co_return {};
+
+		TCActorResultVector<void> DestroyResults;
 
 		if (pCloudManagerState->m_RegisterSubscription)
-			pCloudManagerState->m_RegisterSubscription->f_Destroy() > fg_DiscardResult();
+			fg_Exchange(pCloudManagerState->m_RegisterSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
 
 		if (pCloudManagerState->m_SensorReporterSubscription)
-			pCloudManagerState->m_SensorReporterSubscription->f_Destroy() > fg_DiscardResult();
+			fg_Exchange(pCloudManagerState->m_SensorReporterSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
 
 		if (pCloudManagerState->m_LogReporterSubscription)
-			pCloudManagerState->m_LogReporterSubscription->f_Destroy() > fg_DiscardResult();
+			fg_Exchange(pCloudManagerState->m_LogReporterSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
 
 		mp_CloudManagers.f_Remove(_CloudManager);
+
+		co_await DestroyResults.f_GetUnwrappedResults();
+
+		co_return {};
 	}
 }

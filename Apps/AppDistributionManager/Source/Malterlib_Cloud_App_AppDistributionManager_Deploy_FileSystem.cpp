@@ -2,6 +2,8 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include "Malterlib_Cloud_App_AppDistributionManager.h"
+
+#include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Process/ProcessLaunch>
@@ -16,7 +18,9 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	TCFuture<void> CDeployDestination_FileSystem::fp_Destroy()
 	{
-		co_await mp_FileActor.f_Destroy();
+		CLogError LogError("Mib/Cloud/AppDistributionManager");
+
+		co_await mp_FileActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor in file system");
 
 		co_return {};
 	}

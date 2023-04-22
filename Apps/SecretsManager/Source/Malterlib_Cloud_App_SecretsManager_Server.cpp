@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/LogError>
 #include <Mib/File/File>
 
 #include "Malterlib_Cloud_App_SecretsManager.h"
@@ -157,6 +158,8 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroying protocol, uploads and downloads");
 
+		CLogError LogError("Mib/Cloud/SecretsManager");
+
 		TCActorResultVector<void> Results;
 
 		mp_ProtocolInterface.m_Publication.f_Destroy() > Results.f_AddResult();
@@ -166,7 +169,8 @@ namespace NMib::NCloud::NSecretsManager
 		for (auto &Download : mp_Downloads)
 			Download.f_Destroy() > Results.f_AddResult();
 
-		co_await Results.f_GetResults();
+		co_await Results.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy uploads and downloads");
+
 #if DMibConfig_Tests_Enable
 		if (mp_DestroyWaitingForCanDestroy)
 			mp_DestroyWaitingForCanDestroy->f_SetResult();
@@ -174,17 +178,17 @@ namespace NMib::NCloud::NSecretsManager
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Uploads and downloads destroyed, waiting for can destroy file actor");
 		auto CanDestroyFuture = mp_pCanDestroyFileActorTracker->f_Future();
 		mp_pCanDestroyFileActorTracker.f_Clear();
-		co_await fg_Move(CanDestroyFuture).f_Wrap();
+		co_await fg_Move(CanDestroyFuture).f_Wrap() > LogError.f_Warning("Failed to destroy can destroy file");
 
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Can destroy file actor, waiting for file and database actor destroy");
 		if (mp_DatabaseActor)
-			co_await mp_DatabaseActor.f_Destroy().f_Wrap();
+			co_await mp_DatabaseActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");
 
 		if (mp_FileActor)
-			co_await mp_FileActor.f_Destroy().f_Wrap();
+			co_await mp_FileActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor");
 
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroying protocol interface");
-		co_await mp_ProtocolInterface.f_Destroy().f_Wrap();
+		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
 
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroy finished");
 		co_return {};

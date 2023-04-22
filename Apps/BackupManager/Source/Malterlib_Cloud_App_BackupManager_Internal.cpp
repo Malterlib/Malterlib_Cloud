@@ -6,6 +6,7 @@
 #include <Mib/Network/SSL>
 #include <Mib/Network/Sockets/SSL>
 #include <Mib/Process/Platform>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NBackupManager
 {
@@ -96,6 +97,8 @@ namespace NMib::NCloud::NBackupManager
 
 	TCFuture<void> CBackupManagerServer::fp_Destroy()
 	{
+		CLogError LogError("Mib/Cloud/BackupManager");
+
 		auto CanDestroyFuture = mp_pCanDestroyTracker->f_Future();
 		mp_pCanDestroyTracker.f_Clear();
 
@@ -108,12 +111,12 @@ namespace NMib::NCloud::NBackupManager
 		for (auto &Download : mp_BackupDownloads)
 			Download.f_Destroy() > Destroys.f_AddResult();
 
-		mp_ProtocolInterface.f_Destroy() > Destroys.f_AddResult();
-
 		if (mp_QueryFileActor)
 			mp_QueryFileActor.f_Destroy() > Destroys.f_AddResult();
 
-		co_await Destroys.f_GetResults();
+		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy backup manager server");;
+
+		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
 
 		co_return {};
 	}

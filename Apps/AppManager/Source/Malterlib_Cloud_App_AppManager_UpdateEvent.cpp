@@ -116,32 +116,41 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_SendUpdateNotification(CStr _SubscriptionID, CAppManagerInterface::CUpdateNotification _Notification, bool _bSequence)
 	{
-		CUpdateNotificationSubscription *pSubscription = nullptr;
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(_SubscriptionID);
-					if (!pSubscription)
-						return DMibErrorInstance("Subscription removed");
-					return {};
-				}
-			)
-		;
+		TCFuture<void> OnUpdateFuture;
+		{
+			CUpdateNotificationSubscription *pSubscription = nullptr;
 
-		CActorSubscription SequenceSubscription;
-		if (_bSequence && !pSubscription->m_bInitialFinished)
-			SequenceSubscription = co_await pSubscription->m_Sequencer.f_Sequence();
+			auto OnResume = co_await fg_OnResume
+				(
+					[&]() -> CExceptionPointer
+					{
+						pSubscription = mp_UpdateNotificationSubscriptions.f_FindEqual(_SubscriptionID);
+						if (!pSubscription)
+							return DMibErrorInstance("Subscription removed");
+						return {};
+					}
+				)
+			;
 
-		CStr AppPermission = fg_Format("AppManager/App/{}", _Notification.m_Application);
+			CActorSubscription SequenceSubscription;
+			if (_bSequence && !pSubscription->m_bInitialFinished)
+				SequenceSubscription = co_await pSubscription->m_Sequencer.f_Sequence();
 
-		bool bHasPermission = co_await mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, pSubscription->m_CallingHostInfo)
-			.f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
-		;
-		if (!bHasPermission)
-			co_return {};
+			CStr AppPermission = fg_Format("AppManager/App/{}", _Notification.m_Application);
 
-		co_await pSubscription->m_fOnUpdate(fg_Move(_Notification)).f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID());
+			bool bHasPermission = co_await mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, pSubscription->m_CallingHostInfo)
+				.f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+			;
+
+			if (!bHasPermission)
+				co_return {};
+
+			OnUpdateFuture = pSubscription->m_fOnUpdate(fg_Move(_Notification))
+				.f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+			;
+		}
+
+		co_await fg_Move(OnUpdateFuture);
 
 		co_return {};
 	}
