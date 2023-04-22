@@ -93,11 +93,87 @@ namespace NMib::NCloud::NAppManager
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to get log reporter from cloud manager: {}", LogReporter.f_GetExceptionStr());
 		}
 
-		auto &NewManager = mp_CloudManagers[_CloudManager];
-		NewManager.m_HostInfo = _Info;
-		NewManager.m_RegisterSubscription = fg_Move(Subscription);
-		NewManager.m_SensorReporterSubscription = fg_Move(SensorReporterSubscription);
-		NewManager.m_LogReporterSubscription = fg_Move(LogReporterSubscription);
+		auto *pNewManager = &mp_CloudManagers[_CloudManager];
+		pNewManager->m_HostInfo = _Info;
+		pNewManager->m_RegisterSubscription = fg_Move(Subscription);
+		pNewManager->m_SensorReporterSubscription = fg_Move(SensorReporterSubscription);
+		pNewManager->m_LogReporterSubscription = fg_Move(LogReporterSubscription);
+
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					pNewManager = mp_CloudManagers.f_FindEqual(_CloudManager);
+					if (!pNewManager)
+						return DMibErrorInstance("Cloud manager removed");
+
+					return {};
+				}
+			)
+		;
+
+		CActorSubscription ExpectedOsVersionSubscription;
+		if (_CloudManager->f_InterfaceVersion() >= ECloudManagerProtocolVersion_SupportExpectedOsVersions)
+		{
+			CCloudManager::CSubscribeExpectedOsVersions SubscribeParams;
+			SubscribeParams.m_OsName = mp_OsName;
+			SubscribeParams.m_fVersionRangeChanged = g_ActorFunctor / [this, CloudManagerWeak = _CloudManager.f_Weak()](CCloudManager::CExpectedVersions &&_Versions) -> TCFuture<void>
+				{
+					auto pCloudManagerState = mp_CloudManagers.f_FindEqual(CloudManagerWeak);
+					if (!pCloudManagerState)
+						co_return {};
+
+					pCloudManagerState->m_ExpecteOsVersions.f_ApplyChanges(_Versions);
+
+					CCloudManager::CExpectedVersions AllExpectedVersions;
+					for (auto &State : mp_CloudManagers)
+					{
+						for (auto &Version : State.m_ExpecteOsVersions.m_Versions)
+						{
+							auto &CurrentVersion = State.m_ExpecteOsVersions.m_Versions.fs_GetKey(Version);
+							auto *pOldVersion = AllExpectedVersions.m_Versions.f_FindEqual(CurrentVersion);
+							if (pOldVersion)
+							{
+								if (*pOldVersion != Version)
+								{
+									DMibLogWithCategory
+										(
+											Malterlib/Cloud/AppManager
+											, Warning
+											, "Cloud managers have conflicting expected OS version for '{} {}'. '{}' != '{}'"
+											, mp_OsName
+											, CurrentVersion
+											, *pOldVersion
+											, Version
+										)
+									;
+								}
+							}
+							else
+								AllExpectedVersions.m_Versions[CurrentVersion] = Version;
+						}
+					}
+
+					co_await mp_HostMonitor(&CHostMonitor::f_SetExpectedOsVersions, fg_Move(AllExpectedVersions)).f_Wrap()
+						> fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to update expected OS versions in host monitor")
+					;
+
+					co_return {};
+				}
+			;
+
+			auto ExpectedOsVersionSubscriptionResult = co_await _CloudManager.f_CallActor(&CCloudManager::f_SubscribeExpectedOsVersions)(fg_Move(SubscribeParams)).f_Wrap();
+
+			if (ExpectedOsVersionSubscriptionResult)
+			{
+				if (ExpectedOsVersionSubscriptionResult)
+					ExpectedOsVersionSubscription = fg_Move(*ExpectedOsVersionSubscriptionResult);
+				else
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to subscribe to expecte OS versions: {}", ExpectedOsVersionSubscriptionResult.f_GetExceptionStr());
+			}
+		}
+
+		pNewManager->m_ExpectedOsVersionSubscription = fg_Move(ExpectedOsVersionSubscription);
 
 		co_return {};
 	}
@@ -118,6 +194,9 @@ namespace NMib::NCloud::NAppManager
 
 		if (pCloudManagerState->m_LogReporterSubscription)
 			fg_Exchange(pCloudManagerState->m_LogReporterSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+
+		if (pCloudManagerState->m_ExpectedOsVersionSubscription)
+			fg_Exchange(pCloudManagerState->m_ExpectedOsVersionSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
 
 		mp_CloudManagers.f_Remove(_CloudManager);
 

@@ -453,6 +453,26 @@ namespace NMib::NCloud::NAppManager
 			mp_HostMonitorInterval = CHostMonitor::mc_MinimumHostMonitorInterval;
 		}
 
+		if (auto pValue = _Params.f_GetMember("HostMonitorPatchInterval"))
+			mp_HostMonitorPatchInterval = pValue->f_Float();
+		else
+			mp_HostMonitorPatchInterval = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("HostMonitorPatchInterval", mp_HostMonitorPatchInterval).f_Float();
+
+		DMibFastCheck(!mp_HostMonitorPatchInterval.f_IsInvalid());
+		if (mp_HostMonitorPatchInterval != 0.0 && mp_HostMonitorPatchInterval < CHostMonitor::mc_MinimumHostMonitorPatchInterval)
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Warning
+					, "Limited HostMonitorPatchInterval to {} seconds as this is the lowest supported"
+					, CHostMonitor::mc_MinimumHostMonitorPatchInterval
+					, mp_HostMonitorPatchInterval
+				)
+			;
+			mp_HostMonitorPatchInterval = CHostMonitor::mc_MinimumHostMonitorPatchInterval;
+		}
+
 		mp_AutoUpdateDelay = _Params["AutoUpdateDelay"].f_Float();
 
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations"));
@@ -537,6 +557,8 @@ namespace NMib::NCloud::NAppManager
 					fg_Exchange(CloudManager.m_SensorReporterSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
 				if (CloudManager.m_LogReporterSubscription)
 					fg_Exchange(CloudManager.m_LogReporterSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
+				if (CloudManager.m_ExpectedOsVersionSubscription)
+					fg_Exchange(CloudManager.m_ExpectedOsVersionSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
 			}
 
 			mp_CloudManagers.f_Clear();

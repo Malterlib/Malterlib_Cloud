@@ -15,6 +15,28 @@ namespace NMib::NCloud::NHostMonitorDatabase
 
 	static constexpr uint32 gc_Version = EHostMonitorDatabaseVersion_Current;
 
+	struct CPatchStateKey
+	{
+		template <typename tf_CStream>
+		void f_FeedLexicographic(tf_CStream &_Stream) const;
+		template <typename tf_CStream>
+		void f_ConsumeLexicographic(tf_CStream &_Stream);
+
+		static CStr const mc_Prefix;
+
+		CStr m_Prefix = mc_Prefix;
+	};
+
+	struct CPatchStateValue
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
+		NTime::CTime m_ProblemStart_ExpectedOsVersionError;
+		NTime::CTime m_ProblemStart_RebootRequired;
+		NTime::CTime m_ProblemStart_SecurityPatches;
+	};
+
 	struct CConfigFileHistoryEntryKey
 	{
 		template <typename tf_CStream>

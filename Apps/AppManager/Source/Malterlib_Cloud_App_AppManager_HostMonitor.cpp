@@ -19,7 +19,13 @@ namespace NMib::NCloud::NAppManager
 		if (mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("MonitorAllMounts", false).f_Boolean())
 			Flags |= CHostMonitor::EInitFlag_MonitorAllMounts;
 
-		co_await mp_HostMonitor(&CHostMonitor::f_Init, Flags, mp_HostMonitorInterval);
+		auto InitResult = co_await mp_HostMonitor
+			(
+				&CHostMonitor::f_Init
+				, CHostMonitor::CConfig{.m_Flags = Flags, .m_Interval = mp_HostMonitorInterval, .m_PatchInterval = mp_HostMonitorPatchInterval}
+			)
+		;
+		mp_OsName = InitResult.m_OsName;
 
 		{
 			CHostMonitor::CMonitorPathOptions PathOptions;

@@ -35,22 +35,34 @@ namespace NMib::NCloud
 	{
 	}
 
-	TCFuture<void> CHostMonitor::f_Init(EInitFlag _Flags, fp64 _HostMonitorInterval)
+	auto CHostMonitor::f_Init(CConfig &&_Config) -> TCFuture<CInitResult>
 	{
-		DMibFastCheck(!_HostMonitorInterval.f_IsInvalid());
-		DMibFastCheck(_HostMonitorInterval == 0.0 || _HostMonitorInterval >= mc_MinimumHostMonitorInterval);
+		DMibFastCheck(!_Config.m_Interval.f_IsInvalid());
+		DMibFastCheck(_Config.m_Interval == 0.0 || _Config.m_Interval >= mc_MinimumHostMonitorInterval);
+
+		DMibFastCheck(!_Config.m_PatchInterval.f_IsInvalid());
+		DMibFastCheck(_Config.m_PatchInterval == 0.0 || _Config.m_PatchInterval >= mc_MinimumHostMonitorPatchInterval);
+
+		if (_Config.m_PatchInterval != 0.0 && _Config.m_PatchInterval < _Config.m_Interval)
+			co_return DMibErrorInstance("Patch interval cannot be lower than interval");
 
 		auto &Internal = *mp_pInternal;
 
 		Internal.m_FileActor = fg_Construct(fg_Construct(), "Host monitor file actor {}"_f << Internal.m_FileActorSequence++);
-		Internal.m_Flags = _Flags;
-		Internal.m_HostMonitorInterval = _HostMonitorInterval;
+		Internal.m_Config = fg_Move(_Config);
 
-		if (Internal.m_HostMonitorInterval != 0.0)
+		co_await Internal.f_SetupDatabase();
+
+		Internal.m_CurrentOsVersion = co_await Internal.f_GetOsNameAndVersion();
+
+		CInitResult Result;
+		Result.m_OsName = Internal.m_CurrentOsVersion.m_Identifier;
+
+		if (Internal.m_Config.m_Interval != 0.0 || Internal.m_Config.m_PatchInterval != 0.0)
 		{
 			Internal.m_UpdateTimerSubscription = co_await fg_RegisterTimer
 				(
-					Internal.m_HostMonitorInterval
+					Internal.m_Config.m_Interval ? Internal.m_Config.m_Interval : 60.0
 					, [this]() -> TCFuture<void>
 					{
 						auto &Internal = *mp_pInternal;
@@ -65,7 +77,10 @@ namespace NMib::NCloud
 			;
 		}
 
-		co_return {};
+		if (Internal.m_Config.m_PatchInterval != 0.0)
+			Internal.f_PeriodicUpdate_Patch(true) > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to run initial patch update");
+
+		co_return fg_Move(Result);
 	}
 
 	TCFuture<void> CHostMonitor::CInternal::f_PeriodicUpdate()
@@ -83,7 +98,12 @@ namespace NMib::NCloud
 
 		auto SequenceSubscription = co_await m_UpdatePeriodicSequencer.f_Sequence();
 
-		co_await fg_CallSafe(*this, &CInternal::f_PeriodicUpdate_Diskspace, true);
+		co_await
+			(
+				f_PeriodicUpdate_Diskspace(true)
+				+ f_PeriodicUpdate_Patch(true)
+			)
+		;
 
 		co_return {};
 	}
@@ -132,6 +152,15 @@ namespace NMib::NCloud
 
 		for (auto &MonitoredPath : Internal.m_MonitoredPaths)
 			MonitoredPath.f_Destroy() > Destroys.f_AddResult();
+
+		if (Internal.m_OsVersionReporter && Internal.m_OsVersionReporter->m_fReportReadings)
+			fg_Move(Internal.m_OsVersionReporter->m_fReportReadings).f_Destroy() > Destroys.f_AddResult();
+
+		if (Internal.m_OsVersionStatusReporter && Internal.m_OsVersionStatusReporter->m_fReportReadings)
+			fg_Move(Internal.m_OsVersionStatusReporter->m_fReportReadings).f_Destroy() > Destroys.f_AddResult();
+
+		if (Internal.m_OsPatchStatusReporter && Internal.m_OsPatchStatusReporter->m_fReportReadings)
+			fg_Move(Internal.m_OsPatchStatusReporter->m_fReportReadings).f_Destroy() > Destroys.f_AddResult();
 
 		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy host monitor");
 

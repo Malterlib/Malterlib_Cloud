@@ -7,6 +7,7 @@
 #include <Mib/Database/DatabaseActor>
 #include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Concurrency/DistributedAppInterface>
+#include <Mib/Cloud/CloudManager>
 
 namespace NMib::NCloud
 {
@@ -69,11 +70,17 @@ namespace NMib::NCloud
 			NHostMonitorDatabase::CConfigFileHistoryEntryValue m_Value;
 		};
 
+		TCFuture<CDistributedAppSensorReporter::CVersion> f_GetOsNameAndVersion();
+
 		TCFuture<void> f_SetupDatabase();
 
 		TCFuture<void> f_PeriodicUpdate();
 		TCFuture<void> f_PeriodicUpdate_Diskspace(bool _bCanSkip);
 		TCFuture<void> f_PeriodicUpdate_Diskspace_UpdateMounts();
+		TCFuture<void> f_PeriodicUpdate_Patch(bool _bCanSkip);
+		TCFuture<bool> f_PeriodicUpdate_Patch_OsVersion();
+		TCFuture<bool> f_PeriodicUpdate_Patch_ExpectedOsVersion();
+		TCFuture<bool> f_PeriodicUpdate_Patch_PatchStatus();
 
 		CExceptionPointer f_ConfigFile_CheckFilePrerequisites(CMonitoredConfigFile * &o_pConfigFile, CStr _ConfigID, CStr _FileName);
 
@@ -111,12 +118,20 @@ namespace NMib::NCloud
 		CSequencer m_UpdatePeriodicSequencer{"HostMonitor UpdatePeriodicSequencer"};
 		CSequencer m_UpdatePeriodicDiskSpaceSequencer{"HostMonitor UpdatePeriodicDiskSpaceSequencer"};
 		TCVector<TCPromise<void>> m_UpdatePeriodicWaitList;
-		fp64 m_HostMonitorInterval = mc_DefaultHostMonitorInterval;
+		CConfig m_Config;
 		mint m_FileActorSequence = 0;
-		EInitFlag m_Flags = EInitFlag_None;
 
 		TCMap<CStr, CMonitoredConfig> m_MonitoredConfigs;
 		TCActor<CFileChangeNotificationActor> m_FileChangeNotificationsActor{fg_Construct()};
 		TCOptional<CDistributedAppLogReporter::CLogReporter> m_ConfigLogReporter;
+
+		CSequencer m_UpdatePeriodicPatch{"HostMonitor UpdatePeriodicPatch"};
+		NHostMonitorDatabase::CPatchStateValue m_PatchDatabaseState;
+		TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_OsVersionReporter;
+		TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_OsVersionStatusReporter;
+		TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_OsPatchStatusReporter;
+		TCOptional<CClock> m_PatchClock;
+		CCloudManager::CExpectedVersions m_ExpectedOsVersions;
+		CDistributedAppSensorReporter::CVersion m_CurrentOsVersion;
 	};
 }

@@ -8,6 +8,7 @@
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
 #include <Mib/Concurrency/DistributedAppLogStoreLocal>
 #include <Mib/Concurrency/DistributedAppInterface>
+#include <Mib/Cloud/CloudManager>
 #include <Mib/Container/Registry>
 
 namespace NMib::NCloud::NHostMonitor
@@ -132,6 +133,26 @@ namespace NMib::NCloud
 			fp32 m_CriticalFreePercent = 1.0; ///< Set to fp32::fs_Inf() to disable
 		};
 
+		struct CConfig
+		{
+			EInitFlag m_Flags = EInitFlag_None;
+			fp64 m_Interval = mc_DefaultHostMonitorInterval;
+			fp64 m_PatchInterval = mc_DefaultHostMonitorPatchInterval;
+
+			fp64 m_ReportErrorAfter_OsVersion = 7_days;
+
+			fp64 m_ReportWarningAfter_SecurityPatch = 1_days;
+			fp64 m_ReportErrorAfter_SecurityPatch = 2_days;
+
+			fp64 m_ReportWarningAfter_RebootRequired = 1_weeks;
+			fp64 m_ReportErrorAfter_RebootRequired = 2_weeks;
+		};
+
+		struct [[nodiscard]] CInitResult
+		{
+			NStr::CStr m_OsName;
+		};
+
 		CHostMonitor
 			(
 				NConcurrency::TCActor<NConcurrency::CDistributedAppSensorStoreLocal> const &_SensorStore
@@ -141,16 +162,20 @@ namespace NMib::NCloud
 		;
 		~CHostMonitor();
 
-		NConcurrency::TCFuture<void> f_Init(EInitFlag _Flags, fp64 _HostMonitorInterval);
+		NConcurrency::TCFuture<CInitResult> f_Init(CConfig &&_Config);
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_MonitorPath(CMonitorPathOptions const &_Options);
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_MonitorConfigs(NConcurrency::CDistributedAppInterfaceServer::CConfigFiles &&_ConfigFiles);
+		NConcurrency::TCFuture<void> f_SetExpectedOsVersions(CCloudManager::CExpectedVersions &&_ExpectedOsVersions);
 
 		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_EnumConfigFiles();
 		NConcurrency::TCFuture<NContainer::TCMap<NHostMonitor::CConfigFileVersionKey, NHostMonitor::CConfigFileProperties>> f_EnumConfigFileVersions(NStr::CStr &&_File);
 		NConcurrency::TCFuture<NHostMonitor::CConfigFileContents> f_GetConfigFileContents(NHostMonitor::CConfigFileVersionKey &&_Key);
 
-		static constexpr pfp64 mc_MinimumHostMonitorInterval = 10.0;
-		static constexpr pfp64 mc_DefaultHostMonitorInterval = 60.0;
+		static constexpr pfp64 mc_MinimumHostMonitorInterval = 10_seconds;
+		static constexpr pfp64 mc_DefaultHostMonitorInterval = 60_seconds;
+
+		static constexpr pfp64 mc_MinimumHostMonitorPatchInterval = 5_minutes;
+		static constexpr pfp64 mc_DefaultHostMonitorPatchInterval = 12_hours;
 
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy();

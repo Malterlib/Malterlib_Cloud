@@ -340,6 +340,8 @@ namespace NMib::NCloud::NAppManager
 			CActorSubscription m_RegisterSubscription;
 			CActorSubscription m_SensorReporterSubscription;
 			CActorSubscription m_LogReporterSubscription;
+			CActorSubscription m_ExpectedOsVersionSubscription;
+			CCloudManager::CExpectedVersions m_ExpecteOsVersions;
 		};
 
 		struct CDistributedAppInterfaceServerImplementation : public CDistributedAppInterfaceServer
@@ -1025,9 +1027,11 @@ namespace NMib::NCloud::NAppManager
 		TCDistributedActorInstance<CDistributedAppLogReporterImplementation> mp_LogReporterInterface;
 
 		fp64 mp_HostMonitorInterval = CHostMonitor::mc_DefaultHostMonitorInterval;
+		fp64 mp_HostMonitorPatchInterval = CHostMonitor::mc_DefaultHostMonitorPatchInterval;
 		TCActor<CHostMonitor> mp_HostMonitor;
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
 		CActorSubscription mp_MainConfigFileMonitorSubscription;
+		CStr mp_OsName;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

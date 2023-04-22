@@ -8,7 +8,8 @@
 
 namespace NMib::NCloud::NHostMonitorDatabase
 {
-	constexpr NStr::CStr CConfigFileHistoryEntryKey::mc_Prefix = NStr::gc_Str<"HostMonCFHE">;
+	constexpr CStr CConfigFileHistoryEntryKey::mc_Prefix = gc_Str<"HostMonCFHE">;
+	constexpr CStr CPatchStateKey::mc_Prefix = gc_Str<"HostMonPS">;
 }
 
 namespace NMib::NCloud
@@ -17,6 +18,17 @@ namespace NMib::NCloud
 
 	TCFuture<void> CHostMonitor::CInternal::f_SetupDatabase()
 	{
+		{
+			auto Capture = co_await (g_CaptureExceptions % "Error reading patch database state");
+			auto ReadTransaction = co_await m_Database(&CDatabaseActor::f_OpenTransactionRead);
+			auto ReadCursor = ReadTransaction.m_Transaction.f_ReadCursor();
+
+			CPatchStateKey Key;
+
+			if (ReadCursor.f_FindEqual(Key))
+				m_PatchDatabaseState = ReadCursor.f_Value<CPatchStateValue>();
+		}
+
 		co_return {};
 	}
 }

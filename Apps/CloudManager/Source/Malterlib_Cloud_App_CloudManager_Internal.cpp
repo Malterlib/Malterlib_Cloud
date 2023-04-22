@@ -74,6 +74,11 @@ namespace NMib::NCloud::NCloudManager
 			if (mp_CleanupTimerSubscription)
 				mp_CleanupTimerSubscription->f_Destroy() > Destroys.f_AddResult();
 
+			for (auto &Subscription : mp_ExpectedOsVersionSubscriptions)
+				fg_Move(Subscription.m_fVersionRangeChanged).f_Destroy() > Destroys.f_AddResult();
+
+			mp_ExpectedOsVersionSubscriptions.f_Clear();
+
 			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy remote subscriptions");
 		}
 

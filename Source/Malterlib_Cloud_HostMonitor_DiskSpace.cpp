@@ -21,6 +21,11 @@ namespace NMib::NCloud
 
 	TCFuture<CActorSubscription> CHostMonitor::f_MonitorPath(CMonitorPathOptions const &_Options)
 	{
+		auto &Internal = *mp_pInternal;
+
+		if (!Internal.m_Config.m_Interval)
+			co_return {};
+
 		auto OnResume = co_await fg_OnResume
 			(
 				[&]() -> CExceptionPointer
@@ -31,8 +36,6 @@ namespace NMib::NCloud
 				}
 			)
 		;
-
-		auto &Internal = *mp_pInternal;
 
 		auto &MonitoredPath = Internal.m_MonitoredPaths[_Options.m_Path];
 
@@ -53,8 +56,8 @@ namespace NMib::NCloud
 					SensorInfo.m_Identifier = "org.malterlib.diskspace.{}"_f << _Identifier;
 					SensorInfo.m_IdentifierScope = _Options.m_Path;
 					SensorInfo.m_Name = "{} ({})"_f << _Name << _Options.m_Path;
-					if (Internal.m_HostMonitorInterval != 0.0)
-						SensorInfo.m_ExpectedReportInterval = Internal.m_HostMonitorInterval;
+					if (Internal.m_Config.m_Interval != 0.0)
+						SensorInfo.m_ExpectedReportInterval = Internal.m_Config.m_Interval;
 
 					switch (_Type)
 					{
@@ -226,7 +229,7 @@ namespace NMib::NCloud
 		if (!SequenceSubscription)
 			co_return {}; // Already waiting for update
 
-		if (m_Flags & EInitFlag_MonitorAllMounts)
+		if (m_Config.m_Flags & EInitFlag_MonitorAllMounts)
 		{
 			auto Result = co_await fg_CallSafe(*this, &CInternal::f_PeriodicUpdate_Diskspace_UpdateMounts).f_Wrap();
 			if (!Result)

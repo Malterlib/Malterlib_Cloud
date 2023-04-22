@@ -57,6 +57,19 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
+
+		o_CommandLine.f_RegisterGlobalOptions
+			(
+				{
+					"HostMonitorPatchInterval?"_=
+					{
+						"Names"_= {"--host-monitor-patch-interval"}
+						,"Type"_= 0.0
+						, "Description"_= "Override host monitor patch interval."
+					}
+				}
+			)
+		;
 		
 		auto ApplicationManagement = o_CommandLine.f_AddSection("Application Management", "Commands to manage AppManager applications");
 
