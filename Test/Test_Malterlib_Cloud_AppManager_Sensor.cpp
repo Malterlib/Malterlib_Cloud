@@ -16,9 +16,15 @@ public:
 	{
 		DMibTestSuite("General") -> TCFuture<void>
 		{
-			CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp | CAppManagerTestHelper::EOption_EnableVersionManager;
+			CAppManagerTestHelper::EOption Options
+				= CAppManagerTestHelper::EOption_LaunchTestAppInApp
+				| CAppManagerTestHelper::EOption_EnableVersionManager
+				| CAppManagerTestHelper::EOption_DisablePatchMonitoring
+				| CAppManagerTestHelper::EOption_DisableDiskMonitoring
+			;
+
 			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-			Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
+				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
 			CAppManagerTestHelper AppManagerTestHelper("AppManagerSensorTests", Options, g_Timeout);
 
@@ -125,141 +131,6 @@ public:
 				}
 			;
 
-			CEJSON ExpectedSensorsAppManager = CEJSON
-				{
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.free"
-						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Free Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
-						, "Type"_= 1
-						, "ExpectedReportInterval"_= nullptr
-						, "UnitDivisors"_= CEJSON
-						{
-							{
-								"Divisor"_= 0.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn0} B"
-							}
-							,
-							{
-								"Divisor"_= 1024.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} KiB"
-							}
-							,
-							{
-								"Divisor"_= 1048576.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} MiB"
-							}
-							,
-							{
-								"Divisor"_= 1073741824.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} GiB"
-							}
-							,
-							{
-								"Divisor"_= 1099511627776.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} TiB"
-							}
-						}
-						, "WarnValue"_= nullptr
-						, "CriticalValue"_= nullptr
-						, "Removed"_= false
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.freepercent"
-						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Free Disk Space % ({})"_f << AppManagerInfo.m_RootDirectory
-						, "Type"_= 2
-						, "ExpectedReportInterval"_= nullptr
-						, "UnitDivisors"_= CEJSON
-						{
-							{
-								"Divisor"_= 0.0,
-								"nDecimals"_= 1,
-								"UnitFormatter"_= "{fn1} %"
-							}
-						}
-						, "WarnValue"_=
-						{
-							"CompareToValue"_= 5.0
-							, "Operator"_= 0
-						}
-						, "CriticalValue"_=
-						{
-							"CompareToValue"_= 1.0
-							, "Operator"_= 0
-						}
-						, "Removed"_= false
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.total"
-						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Total Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
-						, "Type"_= 1
-						, "ExpectedReportInterval"_= nullptr
-						, "UnitDivisors"_= CEJSON
-						{
-							{
-								"Divisor"_= 0.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn0} B"
-							}
-							,
-							{
-								"Divisor"_= 1024.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} KiB"
-							}
-							,
-							{
-								"Divisor"_= 1048576.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} MiB"
-							}
-							,
-							{
-								"Divisor"_= 1073741824.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} GiB"
-							}
-							,
-							{
-								"Divisor"_= 1099511627776.0
-								, "nDecimals"_= 1
-								, "UnitFormatter"_= "{fn1} TiB"
-							}
-						}
-						, "WarnValue"_= nullptr
-						, "CriticalValue"_= nullptr
-						, "Removed"_= false
-					}
-				}
-			;
-
-			auto fMerge = [](CEJSON const &_Left, CEJSON const &_Right)
-				{
-					CEJSON Return;
-					Return.f_Array().f_Insert(_Right.f_Array());
-					Return.f_Array().f_Insert(_Left.f_Array());
-					return Return;
-				}
-			;
-
 			CEJSON ExpectedSensorReadings;
 			for (mint i = 0; i < 5; ++i)
 			{
@@ -311,46 +182,6 @@ public:
 				;
 			}
 
-			CEJSON ExpectedSensorReadingsAppManager = CEJSON
-				{
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.free"
-						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Free Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
-						, "UniqueSequence"_= 1
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.total"
-						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Total Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
-						, "UniqueSequence"_= 1
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.freepercent"
-						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Free Disk Space % ({})"_f << AppManagerInfo.m_RootDirectory
-						, "UniqueSequence"_= 1
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-				}
-			;
-
 			CEJSON ExpectedSensorStatus = CEJSON
 				{
 					{
@@ -388,46 +219,6 @@ public:
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= nullptr
 					},
-				}
-			;
-
-			CEJSON ExpectedSensorStatusAppManager = CEJSON
-				{
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.free"
-						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Free Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
-						, "UniqueSequence"_= 1
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.freepercent"
-						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Free Disk Space % ({})"_f << AppManagerInfo.m_RootDirectory
-						, "UniqueSequence"_= 1
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
-					,
-					{
-						"HostID"_= ""
-						, "HostName"_= ""
-						, "Application"_= ""
-						, "Identifier"_= "org.malterlib.diskspace.total"
-						, "IdentifierScope"_= AppManagerInfo.m_RootDirectory
-						, "Name"_= "Total Disk Space ({})"_f << AppManagerInfo.m_RootDirectory
-						, "UniqueSequence"_= 1
-						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
-					}
 				}
 			;
 
@@ -546,30 +337,10 @@ public:
 					}
 				;
 
-				DMibExpect(fReadSensors(), ==, fSortSensors(fMerge(ExpectedSensorsAppManager, fSetHostInfo(ExpectedSensors))));
-				DMibExpect(fMakeComparable(fReadSensorReadings()), ==, fMerge(fSetHostInfo(ExpectedSensorReadings), ExpectedSensorReadingsAppManager));
-				DMibExpect(fSortSensors(fMakeComparable(fReadSensorStatus())), ==, fSortSensors(fMerge(fSetHostInfo(ExpectedSensorStatus), ExpectedSensorStatusAppManager)));
+				DMibExpect(fReadSensors(), ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
+				DMibExpect(fMakeComparable(fReadSensorReadings()), ==, fSetHostInfo(ExpectedSensorReadings));
+				DMibExpect(fSortSensors(fMakeComparable(fReadSensorStatus())), ==, fSortSensors(fSetHostInfo(ExpectedSensorStatus)));
 			}
-
-			auto fSetHostInfoAppManager =
-				[
-					&
-					, AppManagerHostID = AppManagerInfo.f_GetHostID()
-					, HostName = CStr("{}@{}/AppManager"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName())
-				]
-				(CEJSON const &_JSON)
-				{
-					CEJSON Return = _JSON;
-
-					for (auto &Entry : Return.f_Array())
-					{
-						Entry["HostID"] = AppManagerHostID;
-						Entry["HostName"] = HostName;
-					}
-
-					return Return;
-				}
-			;
 
 			{
 				DMibTestPath("Cloud Manager");
@@ -607,19 +378,19 @@ public:
 					}
 				;
 
-				DMibExpect(fReadSensors(), ==, fSortSensors(fMerge(fSetHostInfoAppManager(ExpectedSensorsAppManager), fSetHostInfo(ExpectedSensors))));
+				DMibExpect(fReadSensors(), ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
 				DMibExpect
 					(
 						fMakeComparable(fReadSensorReadings())
 						, ==
-						, fMerge(fSetHostInfo(ExpectedSensorReadings), fSetHostInfoAppManager(ExpectedSensorReadingsAppManager))
+						, fSetHostInfo(ExpectedSensorReadings)
 					)
 				;
 				DMibExpect
 					(
 						fSortSensors(fMakeComparable(fReadSensorStatus()))
 						, ==
-						, fSortSensors(fMerge(fSetHostInfo(ExpectedSensorStatus), fSetHostInfoAppManager(ExpectedSensorStatusAppManager)))
+						, fSortSensors(fSetHostInfo(ExpectedSensorStatus))
 					)
 				;
 			}

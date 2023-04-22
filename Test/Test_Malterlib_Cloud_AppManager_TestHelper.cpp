@@ -552,7 +552,12 @@ namespace NMib::NCloud
 					ExtraParams.f_Insert("--log-launches-to-stderr");
 
 				ExtraParams.f_Insert("--auto-update-delay=1.0"); // Make auto update faster
-				ExtraParams.f_Insert("--host-monitor-interval=0.0"); // Disable automatic disk space monitoring update
+
+				if (State.m_Options & EOption_DisableDiskMonitoring)
+					ExtraParams.f_Insert("--host-monitor-interval=0.0");
+
+				if (State.m_Options & EOption_DisablePatchMonitoring)
+					ExtraParams.f_Insert("--host-monitor-patch-interval=0.0");
 
 				State.m_LaunchHelper
 					(
