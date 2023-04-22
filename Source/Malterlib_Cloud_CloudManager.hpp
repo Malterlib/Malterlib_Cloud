@@ -1,6 +1,8 @@
 // Copyright © 2019 Nonna Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
+#include <Mib/Database/DatabaseValue>
+
 namespace NMib::NCloud
 {
 	template <typename tf_CStream>
@@ -49,5 +51,72 @@ namespace NMib::NCloud
 			DMibBinaryStreamVersion(_Stream, fs_ProtocolVersion_CloudManagerToAppManager(_Stream.f_GetVersion()));
 			_Stream % m_ApplicationInfo;
 		}
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CVersion::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Major;
+		_Stream % m_Minor;
+		_Stream % m_Revision;
+	}
+
+	template <typename tf_CStr>
+	void CCloudManager::CVersion::f_Format(tf_CStr &o_Str) const
+	{
+		o_Str += typename tf_CStr::CFormat("{}.{}.{}") << m_Major << m_Minor << m_Revision;
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CCurrentVersion::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Major;
+		_Stream % m_Minor;
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CCurrentVersion::f_FeedLexicographic(tf_CStream &_Stream) const
+	{
+		NDatabase::CDatabaseValue::fs_FeedLexicographic(_Stream, m_Major);
+		NDatabase::CDatabaseValue::fs_FeedLexicographic(_Stream, m_Minor);
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CCurrentVersion::f_ConsumeLexicographic(tf_CStream &_Stream)
+	{
+		NDatabase::CDatabaseValue::fs_ConsumeLexicographic(_Stream, m_Major);
+		NDatabase::CDatabaseValue::fs_ConsumeLexicographic(_Stream, m_Minor);
+	}
+
+	template <typename tf_CStr>
+	void CCloudManager::CCurrentVersion::f_Format(tf_CStr &o_Str) const
+	{
+		o_Str += typename tf_CStr::CFormat("{}.{}") << m_Major << m_Minor;
+	}
+
+	template <typename tf_CStr>
+	void CCloudManager::CExpectedVersionRange::f_Format(tf_CStr &o_Str) const
+	{
+		o_Str += typename tf_CStr::CFormat("Min: {} Max: {}") << m_Min << m_Max;
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CExpectedVersionRange::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Min;
+		_Stream % m_Max;
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CExpectedVersions::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Versions;
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CSubscribeExpectedOsVersions::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_OsName;
+		_Stream % fg_Move(m_fVersionRangeChanged);
 	}
 }

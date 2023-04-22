@@ -276,6 +276,78 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--cloud-manager-expected-os-version-list"}
+					, "Description"_= "List expected os version settings"
+					, "Options"_=
+					{
+						QuietOption
+						, CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList, _Params, _pCommandLine);
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
+
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--cloud-manager-expected-os-version-set"}
+					, "Description"_= "List expected os version settings"
+					, "Options"_=
+					{
+						"OsName"_=
+						{
+							"Names"_= {"--os-name"}
+							, "Type"_= ""
+							, "Description"_= "The name of the OS to set for."
+						}
+						, "CurrentVersionMajor?"_=
+						{
+							"Names"_= {"--apply-to-version-major"}
+							, "Type"_= 0
+							, "Description"_= "The major version of the OS that this should apply for."
+						}
+						, "CurrentVersionMinor?"_=
+						{
+							"Names"_= {"--apply-to-version-minor"}
+							, "Type"_= 0
+							, "Description"_= "The minor version of the OS that this should apply for."
+						}
+						, "MinVersion?"_=
+						{
+							"Names"_= {"--min-version"}
+							, "Type"_= ""
+							, "Description"_= "The minimum version required."
+						}
+						, "MaxVersion?"_=
+						{
+							"Names"_= {"--max-version"}
+							, "Type"_= ""
+							, "Description"_= "The maximum version required."
+						}
+						, "Deprecated?"_=
+						{
+							"Names"_= {"--deprecated"}
+							, "Default"_= false
+							, "Description"_= "Deprecated the OS version, or whole OS."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet, _Params, _pCommandLine);
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
+
 
 		fp_BuildDefaultCommandLine_Sensor_Customizable
 			(
@@ -1181,6 +1253,141 @@ namespace NMib::NCloud::NCloudClient
 
 			*_pCommandLine %= "Removed {} sensors\n"_f << nRemoved;
 		}
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		CStr Host = _Params["Host"].f_String();
+		bool bQuiet = _Params["Quiet"].f_Boolean();
+
+		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
+
+		TCActorResultVector<uint32> ListResults;
+
+		TCActorResultMap<CHostInfo, TCMap<CStr, CCloudManager::CExpectedVersions>> Results;
+		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		{
+			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
+				continue;
+
+			auto &CloudManager = TrustedCloudManager.m_Actor;
+			CloudManager.f_CallActor(&CCloudManager::f_EnumExpectedOsVersions)()
+				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
+				> Results.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+			;
+		}
+
+		auto AllResults = co_await Results.f_GetUnwrappedResults();
+
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+
+		CTableRenderHelper::CColumnHelper Columns(bQuiet ? 0 : 1);
+
+		Columns.f_AddHeading("Cloud Manager", 1);
+		Columns.f_AddHeading("OS Name", 0);
+		Columns.f_AddHeading("Applies Major", 0);
+		Columns.f_AddHeading("Applies Minor", 0);
+		Columns.f_AddHeading("Min Version", 0);
+		Columns.f_AddHeading("Max Version", 0);
+
+		TableRenderer.f_AddHeadings(&Columns);
+
+		for (auto &Result : AllResults)
+		{
+			auto &HostInfo = AllResults.fs_GetKey(Result);
+
+			auto HostInfoString = HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags);
+
+			for (auto &ExpectedVersions : Result)
+			{
+				auto &OsName = Result.fs_GetKey(ExpectedVersions);
+				for (auto &Version : ExpectedVersions.m_Versions)
+				{
+					auto &CurrentVersion = ExpectedVersions.m_Versions.fs_GetKey(Version);
+
+					auto fFormatOptional = [](auto &&_Optional) -> CStr
+						{
+							if (!_Optional)
+								return {};
+							return "{}"_f << *_Optional;
+						}
+					;
+
+					TableRenderer.f_AddRow
+						(
+							HostInfoString
+							, OsName
+							, fFormatOptional(CurrentVersion.m_Major)
+							, fFormatOptional(CurrentVersion.m_Minor)
+							, fFormatOptional(Version.m_Min)
+							, fFormatOptional(Version.m_Max)
+						)
+					;
+				}
+			}
+		}
+
+		TableRenderer.f_Output(_Params);
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		CStr Host = _Params["Host"].f_String();
+
+		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
+
+		auto OsName = _Params["OsName"].f_String();
+
+		CCloudManager::CCurrentVersion CurrentVersion;
+
+		if (auto *pValue =_Params.f_GetMember("CurrentVersionMajor"))
+			CurrentVersion.m_Major = pValue->f_Integer();
+
+		if (auto *pValue =_Params.f_GetMember("CurrentVersionMinor"))
+		{
+			if (!CurrentVersion.m_Major)
+				co_return DMibErrorInstance("You have to specify --apply-to-version-major if you specify --apply-to-version-minor");
+			CurrentVersion.m_Minor = pValue->f_Integer();
+		}
+
+		CCloudManager::CExpectedVersionRange ExpectedVersion;
+		bool bDeprecated = _Params["Deprecated"].f_Boolean();
+		if (bDeprecated)
+			ExpectedVersion.f_SetDeprecated();
+
+		if (auto *pValue =_Params.f_GetMember("MinVersion"))
+		{
+			if (bDeprecated)
+				co_return DMibErrorInstance("--min-version cannoct be specified when deprecated is set");
+			ExpectedVersion.m_Min = co_await CCloudManager::CVersion::fs_ParseVersion(pValue->f_String());
+		}
+		
+		if (auto *pValue =_Params.f_GetMember("MaxVersion"))
+		{
+			if (bDeprecated)
+				co_return DMibErrorInstance("--max-version cannoct be specified when deprecated is set");
+			ExpectedVersion.m_Max = co_await CCloudManager::CVersion::fs_ParseVersion(pValue->f_String());
+		}
+
+		TCActorResultVector<void> Results;
+
+		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		{
+			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
+				continue;
+
+			auto &CloudManager = TrustedCloudManager.m_Actor;
+			(CloudManager.f_CallActor(&CCloudManager::f_SetExpectedOsVersions)(OsName, CurrentVersion, ExpectedVersion) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo))
+				> Results.f_AddResult()
+			;
+		}
+
+		co_await Results.f_GetUnwrappedResults();
 
 		co_return 0;
 	}

@@ -154,6 +154,28 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		bool m_bSentAlert = false;
 	};
 
+	struct CExpectedOsVersionKey
+	{
+		template <typename tf_CStream>
+		void f_FeedLexicographic(tf_CStream &_Stream) const;
+		template <typename tf_CStream>
+		void f_ConsumeLexicographic(tf_CStream &_Stream);
+
+		static CStr const mc_Prefix;
+
+		CStr m_Prefix = mc_Prefix;
+		CStr m_OsName;
+		CCloudManager::CCurrentVersion m_CurrentVersion;
+	};
+
+	struct CExpectedOsVersionValue
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
+		CCloudManager::CExpectedVersionRange m_ExpectedVersionRange;
+	};
+
 	template <typename tf_CKey>
 	tf_CKey fg_GetSensorDatabaseKey(CDistributedAppSensorReporter::CSensorInfoKey const &_SensorInfoKey);
 

@@ -47,6 +47,9 @@ namespace NMib::NCloud::NCloudManager
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> f_GetSensorReader() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> f_GetLogReporter() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReader>> f_GetLogReader() override;
+			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions &&_Params) override;
+	 		TCFuture<TCMap<CStr, CExpectedVersions>> f_EnumExpectedOsVersions() override;
+			TCFuture<void> f_SetExpectedOsVersions(CStr &&_OsName, CCurrentVersion &&_CurrentVersion, CExpectedVersionRange &&_ExpectedRange) override;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
@@ -130,6 +133,20 @@ namespace NMib::NCloud::NCloudManager
 			bool m_bAccessDenied = false;
 		};
 
+		struct CExpectedOsVersionSubscriptionKey
+		{
+			auto operator <=> (CExpectedOsVersionSubscriptionKey const &_Right) const = default;
+
+			CStr m_OsName;
+			mint m_ID = 0;
+		};
+
+		struct CExpectedOsVersionSubscription
+		{
+			TCActorFunctorWithID<TCFuture<void> (CCloudManager::CExpectedVersions &&_Versions)> m_fVersionRangeChanged;
+			TCVector<CCloudManager::CExpectedVersions> m_QueuedNotifications;
+		};
+
 		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_Publish();
 		TCFuture<void> fp_SetupDatabase();
@@ -183,5 +200,8 @@ namespace NMib::NCloud::NCloudManager
 		CUpdateNotifications mp_UpdateNotifications{*this};
 		CSensorNotifications mp_SensorNotifications{*this};
 		CLogNotifications mp_LogNotifications{*this};
+
+		TCMap<CExpectedOsVersionSubscriptionKey, CExpectedOsVersionSubscription> mp_ExpectedOsVersionSubscriptions;
+		mint mp_ExpectedOsVersionSubscriptionNextID = 0;
 	};
 }

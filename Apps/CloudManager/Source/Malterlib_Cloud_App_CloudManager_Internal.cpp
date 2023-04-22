@@ -80,6 +80,19 @@ namespace NMib::NCloud::NCloudManager
 		{
 			TCActorResultVector<void> Destroys;
 
+			for (auto &Subscription : mp_ExpectedOsVersionSubscriptions)
+			{
+				if (Subscription.m_fVersionRangeChanged)
+					fg_Move(Subscription.m_fVersionRangeChanged).f_Destroy() > Destroys.f_AddResult();
+			}
+			mp_ExpectedOsVersionSubscriptions.f_Clear();
+
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy expected OS version subscriptions");
+		}
+
+		{
+			TCActorResultVector<void> Destroys;
+
 			for (auto &AppManager : mp_AppManagers)
 				AppManager.f_Destroy(*this) > Destroys.f_AddResult();
 

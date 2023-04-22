@@ -27,6 +27,7 @@ namespace NMib::NCloud::NCloudManager
 				, "CloudManager/RemoveAppManager"
 				, "CloudManager/RemoveSensor"
 				, "CloudManager/RemoveLog"
+				, "CloudManager/SetExpectedOsVersion"
 			}
 		;
 		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
@@ -680,6 +681,218 @@ namespace NMib::NCloud::NCloudManager
 		Auditor.f_Info("Remove Log");
 
 		co_return nRemoved;
+	}
+
+	TCFuture<TCActorSubscriptionWithID<>> CCloudManagerServer::CCloudManagerImplementation::f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions &&_Params)
+	{
+		auto pThis = m_pThis;
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
+		;
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		if (!_Params.m_fVersionRangeChanged)
+			co_return Auditor.f_Exception("Invalid notification functor");
+
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/SubscribeExpectedOsVersions", "CloudManager/RegisterAppManager"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Subscribe expected OS versions", Permissions))
+			co_return Auditor.f_AccessDenied("(Subscribe expected os versions)", Permissions);
+
+		CExpectedOsVersionSubscriptionKey SubscriptionKey{.m_OsName = _Params.m_OsName, .m_ID = ++pThis->mp_ExpectedOsVersionSubscriptionNextID};
+
+		auto pSubscription = &pThis->mp_ExpectedOsVersionSubscriptions[SubscriptionKey];
+
+		auto OnResume2 = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					pSubscription = pThis->mp_ExpectedOsVersionSubscriptions.f_FindEqual(SubscriptionKey);
+					if (!pSubscription)
+						return DMibErrorInstance("Subscription removed");
+					return {};
+				}
+			)
+		;
+
+		CCloudManager::CExpectedVersions InitialExpectedVersions;
+		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read expected OS versions from database" % Auditor);
+
+			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
+
+			for (auto Applications = ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix, _Params.m_OsName); Applications; ++Applications)
+			{
+				auto Key = Applications.f_Key<CExpectedOsVersionKey>();
+				auto Value = Applications.f_Value<CExpectedOsVersionValue>();
+
+				InitialExpectedVersions.m_Versions[fg_Move(Key.m_CurrentVersion)] = fg_Move(Value.m_ExpectedVersionRange);
+			}
+		}
+
+		for (auto &Notification : pSubscription->m_QueuedNotifications)
+			InitialExpectedVersions.f_ApplyChanges(Notification);
+		pSubscription->m_QueuedNotifications.f_Clear();
+		pSubscription->m_fVersionRangeChanged = fg_Move(_Params.m_fVersionRangeChanged);
+
+		(void)co_await (pSubscription->m_fVersionRangeChanged(fg_Move(fg_Move(InitialExpectedVersions))) % "Error sending initial expected OsVersion" % Auditor).f_Wrap();
+
+		Auditor.f_Info("Subscribe expected OS versions for '{}'"_f << _Params.m_OsName);
+
+		co_return {};
+	}
+
+	auto CCloudManagerServer::CCloudManagerImplementation::f_EnumExpectedOsVersions() -> TCFuture<TCMap<CStr, CExpectedVersions>>
+	{
+		auto pThis = m_pThis;
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
+		;
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/ReadAll"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Enum expected OS versions", Permissions))
+			co_return Auditor.f_AccessDenied("(Enum expected os versions)", Permissions);
+
+		TCMap<CStr, CExpectedVersions> Return;
+
+		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read expected OS versions from database" % Auditor);
+
+			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
+
+			for (auto Applications = ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix); Applications; ++Applications)
+			{
+				auto Key = Applications.f_Key<CExpectedOsVersionKey>();
+				auto Value = Applications.f_Value<CExpectedOsVersionValue>();
+
+				Return[Key.m_OsName].m_Versions[Key.m_CurrentVersion] = fg_Move(Value.m_ExpectedVersionRange);
+			}
+		}
+
+		Auditor.f_Info("Enum expected OS versions");
+
+		co_return fg_Move(Return);
+	}
+
+	TCFuture<void> CCloudManagerServer::CCloudManagerImplementation::f_SetExpectedOsVersions(CStr &&_OsName, CCurrentVersion &&_CurrentVersion, CExpectedVersionRange &&_ExpectedRange)
+	{
+		auto pThis = m_pThis;
+		auto OnResume = co_await fg_OnResume
+			(
+				[pThis]() -> CExceptionPointer
+				{
+					if (pThis->f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+					return {};
+				}
+			)
+		;
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/SetExpectedOsVersion"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Set expected OS version", Permissions))
+			co_return Auditor.f_AccessDenied("(Set expected OS version)", Permissions);
+
+		TCPromise<bool> ChangedPromise;
+
+		co_await
+			(
+				pThis->mp_DatabaseActor
+				(
+					&CDatabaseActor::f_WriteWithCompaction
+					, g_ActorFunctorWeak / [pThis, _OsName, _CurrentVersion, _ExpectedRange, ChangedPromise]
+					(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+					{
+						co_await ECoroutineFlag_CaptureMalterlibExceptions;
+
+						auto WriteTransaction = fg_Move(_Transaction);
+						if (_bCompacting)
+							WriteTransaction = co_await pThis->self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+
+						CExpectedOsVersionKey Key{.m_OsName = _OsName, .m_CurrentVersion = _CurrentVersion};
+
+						bool bChanged = false;
+
+						if (!_ExpectedRange.f_IsSet())
+						{
+							if (WriteTransaction.m_Transaction.f_Exists(Key))
+							{
+								WriteTransaction.m_Transaction.f_Delete(Key);
+								bChanged = true;
+							}
+						}
+						else
+						{
+							CExpectedOsVersionValue NewValue{.m_ExpectedVersionRange = _ExpectedRange};
+							CExpectedOsVersionValue OldValue;
+							if (WriteTransaction.m_Transaction.f_Get(Key, OldValue))
+							{
+								if (OldValue.m_ExpectedVersionRange != NewValue.m_ExpectedVersionRange)
+									bChanged = true;
+							}
+
+							WriteTransaction.m_Transaction.f_Upsert(Key, NewValue);
+						}
+
+						ChangedPromise.f_SetResult(bChanged);
+
+						co_return fg_Move(WriteTransaction);
+					}
+				)
+				% "Error saving expected OS version to database"
+				% Auditor("Internal error saving to database, see logs")
+			)
+		;
+
+		Auditor.f_Info("Set expected OS version");
+
+		auto bChanged = co_await ChangedPromise.f_MoveFuture();
+
+		if (bChanged)
+		{
+			CCloudManager::CExpectedVersions ChangeData;
+			ChangeData.m_Versions[_CurrentVersion] = _ExpectedRange;
+
+			TCActorResultVector<void> NotificationResults;
+			CExpectedOsVersionSubscriptionKey Key{.m_OsName = _OsName};
+			for
+				(
+					auto iSubscription = pThis->mp_ExpectedOsVersionSubscriptions.f_GetIterator_SmallestGreaterThanEqual(Key)
+					; iSubscription && iSubscription.f_GetKey().m_OsName == _OsName
+					; ++iSubscription
+				)
+			{
+				auto &Subscription = *iSubscription;
+				if (Subscription.m_fVersionRangeChanged)
+					Subscription.m_fVersionRangeChanged(ChangeData) > NotificationResults.f_AddResult();
+				else
+					Subscription.m_QueuedNotifications.f_Insert(ChangeData);
+			}
+
+			co_await NotificationResults.f_GetUnwrappedResults().f_Wrap() > fg_LogError("CloudManager", "Error sending expected OS version notifications");
+		}
+
+		co_return {};
 	}
 
 	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> CCloudManagerServer::CCloudManagerImplementation::f_GetSensorReporter()

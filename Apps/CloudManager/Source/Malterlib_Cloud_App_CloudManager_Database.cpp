@@ -12,6 +12,8 @@ namespace NMib::NCloud::NCloudManagerDatabase
 	constexpr CStr CApplicationKey::mc_Prefix = gc_Str<"App">;
 	constexpr CStr CApplicationUpdateStateKey::mc_Prefix = gc_Str<"AppUpSt">;
 	constexpr CStr CSensorNotificationStateKey::mc_Prefix = gc_Str<"SensNoSt">;
+	constexpr CStr CExpectedOsVersionKey::mc_Prefix = gc_Str<"ExpectedOV">;
+
 
 	auto CSensorNotificationStateKey::f_SensorKey() const & -> CSensorKey
 	{

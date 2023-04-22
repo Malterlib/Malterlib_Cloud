@@ -18,6 +18,7 @@ namespace NMib::NCloud
 	enum
 	{
 		ECloudManagerProtocolVersion_Min = 0x101
+
 		, ECloudManagerProtocolVersion_AddEnvironment = 0x102
 		, ECloudManagerProtocolVersion_AddVersionInfo = 0x103
 		, ECloudManagerProtocolVersion_AddVersionDate = 0x105
@@ -29,7 +30,9 @@ namespace NMib::NCloud
 		, ECloudManagerProtocolVersion_AppManagerVersionIncreased4 = 0x113
 		, ECloudManagerProtocolVersion_AddLastSeenUpdateNotificationSequence = 0x114
 		, ECloudManagerProtocolVersion_AddLastSeenLogTimestamp = 0x115
-		, ECloudManagerProtocolVersion_Current = 0x115
+		, ECloudManagerProtocolVersion_SupportExpectedOsVersions = 0x116
+
+		, ECloudManagerProtocolVersion_Current = 0x116
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -98,6 +101,77 @@ namespace NMib::NCloud
 			CAppManagerInterface::CApplicationInfo m_ApplicationInfo;
 		};
 
+		struct CVersion
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const;
+
+			static NConcurrency::TCFuture<CVersion> fs_ParseVersion(NStr::CStr _Version);
+
+			auto operator <=> (CVersion const &_Right) const = default;
+
+			uint32 m_Major = 0;
+			uint32 m_Minor = 0;
+			uint32 m_Revision = 0;
+		};
+
+		struct CCurrentVersion
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			template <typename tf_CStream>
+			void f_FeedLexicographic(tf_CStream &_Stream) const;
+			template <typename tf_CStream>
+			void f_ConsumeLexicographic(tf_CStream &_Stream);
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const;
+
+			auto operator <=> (CCurrentVersion const &_Right) const = default;
+
+			NStorage::TCOptional<uint32> m_Major;
+			NStorage::TCOptional<uint32> m_Minor;
+		};
+
+		struct CExpectedVersionRange
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_Str) const;
+
+			auto operator <=> (CExpectedVersionRange const &_Right) const = default;
+
+			bool f_IsSet() const;
+			bool f_IsDeprecated() const;
+			void f_SetDeprecated();
+
+			NStorage::TCOptional<CVersion> m_Min;
+			NStorage::TCOptional<CVersion> m_Max;
+		};
+
+		struct CExpectedVersions
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			auto operator <=> (CExpectedVersions const &_Right) const = default;
+
+			void f_ApplyChanges(CExpectedVersions const &_Changes);
+
+			NContainer::TCMap<CCurrentVersion, CExpectedVersionRange> m_Versions;
+		};
+
+		struct CSubscribeExpectedOsVersions
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStr m_OsName;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CExpectedVersions &&_Versions)> m_fVersionRangeChanged;
+		};
+
 		static uint32 fs_ProtocolVersion_CloudManagerToAppManager(uint32 _CloudManagerVersion);
 
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_RegisterAppManager
@@ -116,6 +190,9 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReader>> f_GetSensorReader() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReporter>> f_GetLogReporter() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReader>> f_GetLogReader() = 0;
+		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions &&_Params) = 0;
+ 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CExpectedVersions>> f_EnumExpectedOsVersions() = 0;
+ 		virtual NConcurrency::TCFuture<void> f_SetExpectedOsVersions(NStr::CStr &&_OsName, CCurrentVersion &&_CurrentVersion, CExpectedVersionRange &&_ExpectedRange) = 0;
 
 		CCloudManager();
 		~CCloudManager();

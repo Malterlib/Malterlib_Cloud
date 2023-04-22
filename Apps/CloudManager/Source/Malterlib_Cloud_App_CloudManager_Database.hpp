@@ -175,4 +175,30 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		_Stream % m_bInProblemState;
 		_Stream % m_bSentAlert;
 	}
+
+	template <typename tf_CStream>
+	void CExpectedOsVersionKey::f_FeedLexicographic(tf_CStream &_Stream) const
+	{
+		CDatabaseValue::fs_FeedLexicographic(_Stream, m_Prefix);
+		CDatabaseValue::fs_FeedLexicographic(_Stream, m_OsName);
+		CDatabaseValue::fs_FeedLexicographic(_Stream, m_CurrentVersion);
+	}
+
+	template <typename tf_CStream>
+	void CExpectedOsVersionKey::f_ConsumeLexicographic(tf_CStream &_Stream)
+	{
+		CDatabaseValue::fs_ConsumeLexicographic(_Stream, m_Prefix);
+		CDatabaseValue::fs_ConsumeLexicographic(_Stream, m_OsName);
+		CDatabaseValue::fs_ConsumeLexicographic(_Stream, m_CurrentVersion);
+	}
+
+	template <typename tf_CStream>
+	void CExpectedOsVersionValue::f_Stream(tf_CStream &_Stream)
+	{
+		uint32 Version = gc_Version;
+		_Stream % Version;
+		DBinaryStreamVersion(_Stream, Version);
+
+		_Stream % m_ExpectedVersionRange;
+	}
 }
