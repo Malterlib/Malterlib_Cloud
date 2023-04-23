@@ -57,6 +57,18 @@ namespace NMib::NCloud::NCloudManager
 
 		auto TargetSize = OriginalStats.m_MapSize - fg_Min(fg_Max(OriginalStats.m_MapSize / 5, 32 * OriginalStats.m_PageSize), OriginalStats.m_MapSize / 2);
 
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (f_IsDestroyed())
+						return DMibErrorInstance("Shutting down");
+
+					return {};
+				}
+			)
+		;
+
 		auto WriteTransaction = co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_PrepareForCleanup, fg_Move(_WriteTransaction));
 		WriteTransaction = co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_PrepareForCleanup, fg_Move(WriteTransaction));
 
@@ -87,6 +99,49 @@ namespace NMib::NCloud::NCloudManager
 
 		mint nReadingsDeletedSensor = 0;
 		mint nReadingsDeletedLog = 0;
+
+		NTime::CTimeSpan UtcOffset;
+		NTime::CSystem_Time::fs_TimeGetUTCOffset(&UtcOffset);
+
+		auto UtcHourOffset = NTime::CTimeSpanConvert(UtcOffset).f_GetHours();
+		auto UtcMinuteOffset = NTime::CTimeSpanConvert(UtcOffset).f_GetMinuteOfHour();
+		ch8 const *pUtcSign = UtcHourOffset < 0 ? "-" : "+";
+		UtcHourOffset = fg_Abs(UtcHourOffset);
+
+		constexpr auto c_LogStatsEvery = 1_minutes;
+
+		CClock StatsClock(true);
+		CClock YieldClock(true);
+
+		auto fLogStats = [&, bLoggedStart = false](bool _bProgress) mutable
+			{
+				if (!bLoggedStart)
+				{
+					bLoggedStart = true;
+					DMibLogWithCategory(CloudManagerDatabase, Info, "Starting database cleanup");
+				}
+
+				DMibLogWithCategory
+					(
+						CloudManagerDatabase
+						, Info
+						, "{} up {ns } bytes by deleting {} sensor readings and {} log entries spanning from {tc5} UTC{}{sj2,sf0}:{sj2,sf0} to {tc5} UTC{}{sj2,sf0}:{sj2,sf0}"
+						, _bProgress ? "Freeing" : "Freed"
+						, OriginalStats.m_UsedBytes - CurrentStats.m_UsedBytes
+						, nReadingsDeletedSensor
+						, nReadingsDeletedLog
+						, StartTime.f_ToLocal()
+						, pUtcSign
+						, UtcHourOffset
+						, UtcMinuteOffset
+						, EndTime.f_ToLocal()
+						, pUtcSign
+						, UtcHourOffset
+						, UtcMinuteOffset
+					)
+				;
+			}
+		;
 
 		while (bHasLog || bHasSensor)
 		{
@@ -135,34 +190,21 @@ namespace NMib::NCloud::NCloudManager
 				if (EndTime.f_IsValid() && EndTime > OldestAllowedReading)
 					break;
 			}
+
+			if (YieldClock.f_GetTime() > 1.0)
+			{
+				YieldClock.f_AddOffset(1.0);
+				co_await g_Yield;
+			}
+
+			if (StatsClock.f_GetTime() > c_LogStatsEvery)
+			{
+				StatsClock.f_AddOffset(c_LogStatsEvery);
+				fLogStats(true);
+			}
 		}
 
-		NTime::CTimeSpan UtcOffset;
-		NTime::CSystem_Time::fs_TimeGetUTCOffset(&UtcOffset);
-
-		auto UtcHourOffset = NTime::CTimeSpanConvert(UtcOffset).f_GetHours();
-		auto UtcMinuteOffset = NTime::CTimeSpanConvert(UtcOffset).f_GetMinuteOfHour();
-		ch8 const *pUtcSign = UtcHourOffset < 0 ? "-" : "+";
-		UtcHourOffset = fg_Abs(UtcHourOffset);
-
-		DMibLogWithCategory
-			(
-				CloudManagerDatabase
-				, Info
-				, "Freed up {ns } bytes by deleting {} sensor readings and {} log entries spanning from {tc5} UTC{}{sj2,sf0}:{sj2,sf0} to {tc5} UTC{}{sj2,sf0}:{sj2,sf0}"
-				, OriginalStats.m_UsedBytes - CurrentStats.m_UsedBytes
-				, nReadingsDeletedSensor
-				, nReadingsDeletedLog
-				, StartTime.f_ToLocal()
-				, pUtcSign
-				, UtcHourOffset
-				, UtcMinuteOffset
-				, EndTime.f_ToLocal()
-				, pUtcSign
-				, UtcHourOffset
-				, UtcMinuteOffset
-			)
-		;
+		fLogStats(false);
 
 		co_return fg_Move(WriteTransaction);
 	}
