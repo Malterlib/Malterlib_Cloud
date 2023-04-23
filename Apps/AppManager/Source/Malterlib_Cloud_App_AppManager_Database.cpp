@@ -39,10 +39,11 @@ namespace NMib::NCloud::NAppManager
 			(
 				Malterlib/Cloud/AppManager
 				, Info
-				, "Database uses {fe2}% of allotted space ({ns } / {ns } bytes)"
+				, "Database uses {fe2}% of allotted space ({ns } / {ns } bytes). {ns } records."
 				, fp64(TotalSizeUsed) / fp64(MaxDatabaseSize) * 100.0
 				, TotalSizeUsed
 				, MaxDatabaseSize
+				, Stats.m_nDataItems
 			)
 		;
 
