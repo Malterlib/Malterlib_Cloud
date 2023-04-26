@@ -13,6 +13,20 @@ namespace NMib::NCloud::NCloudManager
 	extern uint64 g_MaxDatabaseSize;
 }
 
+namespace
+{
+	struct CInitReconnectDelay
+	{
+		CInitReconnectDelay()
+		{
+			// Override reconnect delay for whole process
+			CDistributedAppActor_Settings::fs_GetGlobalDefaultSettings().m_ReconnectDelay = 1_ms;
+		}
+	};
+
+	assure_used CInitReconnectDelay g_InitReconnectDelay;
+}
+
 namespace NMib::NCloud
 {
 	CStr const &CAppManagerTestHelper::CAppManagerInfo::f_GetHostID() const
