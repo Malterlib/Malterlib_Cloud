@@ -102,8 +102,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 		auto pThis = m_pThis;
 		
-		if (pThis->f_IsDestroyed())
-			co_return DMibErrorInstance("Shutting down");
+		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 			
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		auto CallingHostID = fg_GetCallingHostID();
@@ -156,9 +155,6 @@ namespace NMib::NCloud::NBackupManager
 
 			co_await fg_Move(OnDestroyedFuture);
 		}
-
-		if (pThis->f_IsDestroyed())
-			co_return Auditor.f_Exception("Shutting down");
 
 		auto *pBackupInstance = pThis->mp_BackupInstances.f_FindEqual(BackupKey);
 		if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != Auditor.f_HostInfo())

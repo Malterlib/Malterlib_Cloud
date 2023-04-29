@@ -57,17 +57,7 @@ namespace NMib::NCloud::NCloudManager
 
 		auto TargetSize = OriginalStats.m_MapSize - fg_Min(fg_Max(OriginalStats.m_MapSize / 5, 32 * OriginalStats.m_PageSize), OriginalStats.m_MapSize / 2);
 
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					if (f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await f_CheckDestroyedOnResume();
 
 		auto WriteTransaction = co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_PrepareForCleanup, fg_Move(_WriteTransaction));
 		WriteTransaction = co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_PrepareForCleanup, fg_Move(WriteTransaction));

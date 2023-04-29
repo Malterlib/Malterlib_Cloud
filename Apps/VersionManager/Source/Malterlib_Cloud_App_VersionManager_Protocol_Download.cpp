@@ -26,16 +26,7 @@ namespace NMib::NCloud::NVersionManager
 	{
 		auto pThis = m_pThis;
 		
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					if (pThis->f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		auto Auditor = pThis->mp_AppState.f_Auditor(); 
 		

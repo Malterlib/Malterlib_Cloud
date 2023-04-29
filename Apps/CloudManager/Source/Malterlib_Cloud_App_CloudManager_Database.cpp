@@ -180,16 +180,7 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_RemoveAppManagerData(CStr const &_HostID)
 	{
-		auto OnResume = co_await fg_OnResume
-			(
-				[this]() -> CExceptionPointer
-				{
-					if (f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await f_CheckDestroyedOnResume();
 
 		TCSharedPointer<TCSet<CStr>> pRemovedHostIDs = fg_Construct();
 		(*pRemovedHostIDs)[_HostID];

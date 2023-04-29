@@ -18,6 +18,8 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CUpdateNotifications::f_Init()
 	{
+		auto OnResume = co_await mp_This.f_CheckDestroyedOnResume();
+
 		mp_UpdateStageNotificationThreshold = fg_Const(mp_This.mp_AppState.m_ConfigDatabase.m_Data)
 			.f_GetMemberValue("UpdateStageNotificationThreshold", mp_UpdateStageNotificationThreshold)
 			.f_Float()
@@ -69,18 +71,9 @@ namespace NMib::NCloud::NCloudManager
 		if (!pAppManager)
 			co_return {};
 
-		auto SequenceSubscription = co_await mp_ProcessSequencer.f_Sequence();
+		auto OnResume = co_await mp_This.f_CheckDestroyedOnResume();
 
-		auto OnResume = co_await fg_OnResume
-			(
-				[this]() -> CExceptionPointer
-				{
-					if (mp_This.f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto SequenceSubscription = co_await mp_ProcessSequencer.f_Sequence();
 
 		TCPromise<CApplicationUpdateStateValue> StateValuePromise;
 		auto StateValueFuture = StateValuePromise.f_Future();

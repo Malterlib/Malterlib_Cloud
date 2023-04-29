@@ -85,16 +85,7 @@ namespace NMib::NCloud
 
 	TCFuture<void> CHostMonitor::CInternal::f_PeriodicUpdate()
 	{
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					if (m_pThis->f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await m_pThis->f_CheckDestroyedOnResume();
 
 		auto SequenceSubscription = co_await m_UpdatePeriodicSequencer.f_Sequence();
 

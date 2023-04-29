@@ -18,16 +18,7 @@ namespace NMib::NCloud::NAppManager
 	auto CAppManagerActor::CDistributedAppLogReporterImplementation::f_OpenLogReporter(CLogInfo &&_LogInfo) -> TCFuture<CLogReporter>
 	{
 		auto pThis = m_pThis;
-		auto OnResume = co_await fg_OnResume
-			(
-				[pThis]() -> CExceptionPointer
-				{
-					if (pThis->f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
 

@@ -19,6 +19,8 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CNotifications::f_Init()
 	{
+		auto OnResume = co_await mp_This.f_CheckDestroyedOnResume();
+
 		{
 			auto CaptureScope = co_await g_CaptureExceptions;
 

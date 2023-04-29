@@ -21,6 +21,8 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CLogNotifications::f_Init()
 	{
+		auto OnResume = co_await mp_This.f_CheckDestroyedOnResume();
+
 		mp_LastSeenTimestamp = mp_This.mp_GlobalState.m_LastSeenLogTimestamp;
 
 		auto fAddConfig = [&]() -> CAlertConfig &
@@ -277,16 +279,7 @@ namespace NMib::NCloud::NCloudManager
 		if (!mp_bSubscribedToLogs)
 			co_return {};
 
-		auto OnResume = co_await fg_OnResume
-			(
-				[this]() -> CExceptionPointer
-				{
-					if (mp_This.f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await mp_This.f_CheckDestroyedOnResume();
 
 		if (mp_bSendingSlackNotifications)
 		{

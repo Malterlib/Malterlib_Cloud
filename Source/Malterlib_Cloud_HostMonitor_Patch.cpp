@@ -132,16 +132,7 @@ namespace NMib::NCloud
 		if (!m_Config.m_PatchInterval)
 			co_return {};
 
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					if (m_pThis->f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await m_pThis->f_CheckDestroyedOnResume();
 
 		auto SequenceSubscription = co_await m_UpdatePeriodicPatch.f_Sequence();
 
@@ -189,16 +180,7 @@ namespace NMib::NCloud
 
 	TCFuture<bool> CHostMonitor::CInternal::f_PeriodicUpdate_Patch_OsVersion()
 	{
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					if (m_pThis->f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await m_pThis->f_CheckDestroyedOnResume();
 
 		CLogError LogError("Malterlib/Cloud/HostMonitor");
 
@@ -225,16 +207,7 @@ namespace NMib::NCloud
 
 	TCFuture<bool> CHostMonitor::CInternal::f_PeriodicUpdate_Patch_ExpectedOsVersion()
 	{
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					if (m_pThis->f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await m_pThis->f_CheckDestroyedOnResume();
 
 		CLogError LogError("Malterlib/Cloud/HostMonitor");
 
@@ -345,16 +318,7 @@ namespace NMib::NCloud
 		co_return {};
 #else
 
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					if (m_pThis->f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await m_pThis->f_CheckDestroyedOnResume();
 
 		CLogError LogError("Malterlib/Cloud/HostMonitor");
 

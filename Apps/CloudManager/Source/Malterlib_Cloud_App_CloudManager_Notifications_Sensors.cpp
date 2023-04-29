@@ -23,6 +23,8 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CSensorNotifications::f_Init()
 	{
+		auto OnResume = co_await mp_This.f_CheckDestroyedOnResume();
+
 		mp_SensorAlertThreshold = fg_Const(mp_This.mp_AppState.m_ConfigDatabase.m_Data).f_GetMemberValue("SensorAlertThreshold", mp_SensorAlertThreshold).f_Float();
 		{
 			auto CaptureScope = co_await (g_CaptureExceptions % "Error reading notification state from database");
@@ -197,16 +199,7 @@ namespace NMib::NCloud::NCloudManager
 		if (!mp_bSubscribedToSensors)
 			co_return {};
 
-		auto OnResume = co_await fg_OnResume
-			(
-				[this]() -> CExceptionPointer
-				{
-					if (mp_This.f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await mp_This.f_CheckDestroyedOnResume();
 
 		if (mp_bSensorsUpdating)
 		{

@@ -201,16 +201,7 @@ namespace NMib::NCloud::NSecretsManager
 				co_return Auditor.f_Exception(fg_Format("Malformed Tag: '{}'", Tag));
 		}
 
-		auto OnResume = co_await fg_OnResume
-			(
-				[&]() -> CExceptionPointer
-				{
-					if (f_IsDestroyed())
-						return DMibErrorInstance("Shutting down");
-					return {};
-				}
-			)
-		;
+		auto OnResume = co_await f_CheckDestroyedOnResume();
 
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
