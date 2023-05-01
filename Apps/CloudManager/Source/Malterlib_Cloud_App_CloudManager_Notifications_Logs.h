@@ -42,7 +42,7 @@ namespace NMib::NCloud::NCloudManager
 		TCVector<CAlertConfig> mp_AlertConfigs;
 
 		CActorSubscription mp_LogSubscription;
-		CActorSubscription mp_LogStatusSubscription;
+		CActorSubscription mp_LogEntriesSubscription;
 
 		CSequencer mp_UpdateSequencer{"LogNotifications UpdateSequencer"};
 

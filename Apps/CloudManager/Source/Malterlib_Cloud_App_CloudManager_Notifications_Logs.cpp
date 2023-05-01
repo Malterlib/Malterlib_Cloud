@@ -166,39 +166,45 @@ namespace NMib::NCloud::NCloudManager
 			)
 		;
 
-		mp_LogStatusSubscription = co_await mp_This.mp_AppLogStore
-			(
-				&CDistributedAppLogStoreLocal::f_SubscribeLogEntries
-				, fg_Move(LogEntryFilters)
-			 	, g_ActorFunctor / [this](CDistributedAppLogReader_LogKeyAndEntry &&_Entry) -> TCFuture<void>
+		CDistributedAppLogReader::CSubscribeLogEntries SubscribeLogEntriesParams;
+		SubscribeLogEntriesParams.m_Flags = CDistributedAppLogReader::ELogEntriesFlag_IncludeLastSeenSentinel;
+		SubscribeLogEntriesParams.m_Filters = fg_Move(LogEntryFilters);
+		SubscribeLogEntriesParams.m_fOnEntry = g_ActorFunctor / [this](CDistributedAppLogReader_LogKeyAndEntry &&_Entry) -> TCFuture<void>
+			{
+				CStr ThisHostID;
+				NLogStore::CFilterLogKeyContext FilterContext{.m_pTransaction = nullptr, .m_ThisHostID = ThisHostID, .m_Prefix = mp_This.mc_DatabasePrefixLog};
+
+				mp_LastSeenTimestamp = fg_Max(mp_LastSeenTimestamp, _Entry.m_Entry.m_Timestamp);
+
+				if (_Entry.f_IsLastSeenSentinel())
 				{
-					CStr ThisHostID;
-					NLogStore::CFilterLogKeyContext FilterContext{.m_pTransaction = nullptr, .m_ThisHostID = ThisHostID, .m_Prefix = mp_This.mc_DatabasePrefixLog};
+					fp_ScheduleSlackNotification();
+					co_return {};
+				}
 
-					mp_LastSeenTimestamp = fg_Max(mp_LastSeenTimestamp, _Entry.m_Entry.m_Timestamp);
+				auto DatabaseLogKey = fg_GetLogDatabaseKey<NLogStoreLocalDatabase::CLogKey>(_Entry.m_LogInfoKey);
 
-					auto DatabaseLogKey = fg_GetLogDatabaseKey<NLogStoreLocalDatabase::CLogKey>(_Entry.m_LogInfoKey);
+				for (auto &AlertConfig : mp_AlertConfigs)
+				{
+					auto *pLog = mp_LogStatuses.f_FindEqual(_Entry.m_LogInfoKey);
+					if (!NLogStore::fg_FilterLogKey(DatabaseLogKey, AlertConfig.m_Filter.m_LogFilter, FilterContext, pLog ? pLog->f_GetInfo() : nullptr))
+						continue;
 
-					for (auto &AlertConfig : mp_AlertConfigs)
-					{
-						auto *pLog = mp_LogStatuses.f_FindEqual(_Entry.m_LogInfoKey);
-						if (!NLogStore::fg_FilterLogKey(DatabaseLogKey, AlertConfig.m_Filter.m_LogFilter, FilterContext, pLog ? pLog->f_GetInfo() : nullptr))
-							continue;
+					if (!NLogStore::fg_FilterLogValue(_Entry.m_Entry.m_Data, AlertConfig.m_Filter.m_LogDataFilter))
+						continue;
 
-						if (!NLogStore::fg_FilterLogValue(_Entry.m_Entry.m_Data, AlertConfig.m_Filter.m_LogDataFilter))
-							continue;
+					AlertConfig.m_QueuedEntries.f_Insert(fg_Move(_Entry));
 
-						AlertConfig.m_QueuedEntries.f_Insert(fg_Move(_Entry));
-
-						fp_ScheduleSlackNotification();
-
-						co_return {};
-					}
+					fp_ScheduleSlackNotification();
 
 					co_return {};
 				}
-			)
+
+				co_return {};
+			}
 		;
+
+		mp_LogEntriesSubscription = co_await mp_This.mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SubscribeLogEntries, fg_Move(SubscribeLogEntriesParams));
 
 		mp_bSubscribedToLogs = true;
 
@@ -211,8 +217,8 @@ namespace NMib::NCloud::NCloudManager
 
 		if (mp_LogSubscription)
 			co_await fg_Exchange(mp_LogSubscription, nullptr)->f_Destroy();
-		if (mp_LogStatusSubscription)
-			co_await fg_Exchange(mp_LogStatusSubscription, nullptr)->f_Destroy();
+		if (mp_LogEntriesSubscription)
+			co_await fg_Exchange(mp_LogEntriesSubscription, nullptr)->f_Destroy();
 
 		co_return {};
 	}
