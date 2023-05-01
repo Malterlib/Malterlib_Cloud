@@ -144,12 +144,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Subscription);
 	}
 
-	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_SubscribeLogEntries
-		(
-			TCVector<CDistributedAppLogReader_LogEntrySubscriptionFilter> &&_Filters
-			, TCActorFunctorWithID<TCFuture<void> (CDistributedAppLogReader_LogKeyAndEntry &&_Entry)> &&_fOnEntry
-		)
-		-> TCFuture<TCActorSubscriptionWithID<>>
+	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_SubscribeLogEntries(CSubscribeLogEntries &&_Params) -> TCFuture<TCActorSubscriptionWithID<>>
 	{
 		TCActorSubscriptionWithID<> Subscription;
 		{
@@ -163,7 +158,7 @@ namespace NMib::NCloud::NCloudManager
 			if (!co_await pThis->mp_Permissions.f_HasPermission("Subscribe log entries", Permissions))
 				co_return Auditor.f_AccessDenied("(Subscribe log entries)", Permissions);
 
-			Subscription = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SubscribeLogEntries, fg_Move(_Filters), fg_Move(_fOnEntry));
+			Subscription = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SubscribeLogEntries, fg_Move(_Params));
 
 			Auditor.f_Info("Subscribe log entries");
 		}

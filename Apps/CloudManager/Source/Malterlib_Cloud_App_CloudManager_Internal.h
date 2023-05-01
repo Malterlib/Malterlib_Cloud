@@ -101,13 +101,7 @@ namespace NMib::NCloud::NCloudManager
 			auto f_SubscribeLogs(TCVector<CDistributedAppLogReader_LogFilter> &&_Filter, TCActorFunctorWithID<TCFuture<void> (CLogChange &&_Change)> &&_fOnChange)
 				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
-			auto f_SubscribeLogEntries
-				(
-					TCVector<CDistributedAppLogReader_LogEntrySubscriptionFilter> &&_Filters
-					, TCActorFunctorWithID<TCFuture<void> (CDistributedAppLogReader_LogKeyAndEntry &&_Entry)> &&_fOnEntry
-				)
-				-> TCFuture<TCActorSubscriptionWithID<>> override
-			;
+			auto f_SubscribeLogEntries(CSubscribeLogEntries &&_Params) -> TCFuture<TCActorSubscriptionWithID<>> override;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
