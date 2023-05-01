@@ -35,13 +35,13 @@ namespace NMib::NCloud::NCloudManager
 
 		mp_CleanupTimerSubscription = co_await fg_RegisterTimer
 			(
-				24.0 * 60.0 * 60.0
+				24_hours
 				, [this]() -> TCFuture<void>
 				{
 					auto Result = co_await fp_PerformCleanup().f_Wrap();
 
 					if (!Result)
-						DMibLogWithCategory(CloudManagerDatabase, Error, "Failed to do nightly cleanup: {}", Result.f_GetExceptionStr());
+						DMibLogWithCategory(CloudManagerDatabase, Error, "Failed to do daily cleanup: {}", Result.f_GetExceptionStr());
 
 					co_return {};
 				}
