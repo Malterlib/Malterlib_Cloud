@@ -101,11 +101,22 @@ namespace NMib::NCloud::NCloudManagerDatabase
 	{
 		uint32 Version = gc_Version;
 		_Stream % Version;
+		DBinaryStreamVersion(_Stream, Version);
 
 		_Stream % m_LastUpdateID;
 		_Stream % m_LastUpdateSequence;
 		_Stream % m_SlackTimestamps;
 		_Stream % m_Stages;
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_SupportDeferredUpdateNotification)
+		{
+			_Stream % m_bDeferred;
+			{
+				uint32 AppManagerInterfaceVersion = CCloudManager::fs_ProtocolVersion_CloudManagerToAppManager(_Stream.f_GetVersion());
+
+				DMibBinaryStreamVersion(_Stream, AppManagerInterfaceVersion);
+				_Stream % m_LastNotification;
+			}
+		}
 	}
 
 	template <typename tf_CKey>

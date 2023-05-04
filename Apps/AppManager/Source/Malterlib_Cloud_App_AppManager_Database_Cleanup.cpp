@@ -34,7 +34,7 @@ namespace NMib::NCloud::NAppManager
 
 		mp_CleanupTimerSubscription = co_await fg_RegisterTimer
 			(
-				24.0 * 60.0 * 60.0
+				24_hours
 				, [this]() -> TCFuture<void>
 				{
 					auto Result = co_await fp_PerformDatabaseCleanup().f_Wrap();

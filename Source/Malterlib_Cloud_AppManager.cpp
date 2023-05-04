@@ -58,4 +58,9 @@ namespace NMib::NCloud
 		DMibNeverGetHere;
 		return NStr::gc_Str<"unknown">;
 	}
+
+	bool CAppManagerInterface::CUpdateNotification::f_IsDone() const
+	{
+		return m_Stage == EUpdateStage_Failed || m_Stage == EUpdateStage_Finished;
+	}
 }

@@ -231,6 +231,8 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
+			bool f_IsDone() const;
+
 			uint64 m_UniqueSequence = 0;
 
 			NStr::CStr m_UpdateID;

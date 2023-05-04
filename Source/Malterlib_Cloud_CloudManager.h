@@ -31,8 +31,9 @@ namespace NMib::NCloud
 		, ECloudManagerProtocolVersion_AddLastSeenUpdateNotificationSequence = 0x114
 		, ECloudManagerProtocolVersion_AddLastSeenLogTimestamp = 0x115
 		, ECloudManagerProtocolVersion_SupportExpectedOsVersions = 0x116
+		, ECloudManagerProtocolVersion_SupportDeferredUpdateNotification = 0x117
 
-		, ECloudManagerProtocolVersion_Current = 0x116
+		, ECloudManagerProtocolVersion_Current = 0x117
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)

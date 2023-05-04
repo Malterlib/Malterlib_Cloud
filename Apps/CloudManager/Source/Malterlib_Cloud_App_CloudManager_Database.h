@@ -108,7 +108,9 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		CStr m_LastUpdateID;
 		TCMap<CStr, CStr> m_SlackTimestamps;
 		TCMap<CAppManagerInterface::EUpdateStage, CApplicationUpdateStateStage> m_Stages;
+		CAppManagerInterface::CUpdateNotification m_LastNotification;
 		uint64 m_LastUpdateSequence = 0;
+		bool m_bDeferred = false;
 	};
 
 	struct CSensorNotificationStateKey : public NSensorStoreLocalDatabase::CSensorKey
