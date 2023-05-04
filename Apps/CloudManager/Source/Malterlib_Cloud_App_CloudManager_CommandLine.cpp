@@ -7,6 +7,7 @@
 #include <Mib/Web/WebSocket>
 #include <Mib/Network/SSL>
 #include <Mib/Network/Sockets/SSL>
+#include <Mib/Encoding/JSONShortcuts>
 
 namespace NMib::NCloud::NCloudManager
 {
@@ -18,6 +19,33 @@ namespace NMib::NCloud::NCloudManager
 			(
 				"Malterlib Cloud Manager"
 				, "Manages cloud applications." 
+			)
+		;
+
+		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
+
+		DefaultSection.f_RegisterCommand
+			(
+				{
+					"Names"_= {"--dump-database"}
+					, "Description"_= "Dump Cloud Manager specific database entries."
+					, "Options"_=
+					{
+						"Prefix?"_=
+						{
+							"Names"_= {"--prefix", "-p"}
+							, "Default"_= ""
+							, "Description"_= "Limit output to tabels with prefix."
+						}
+					}
+				}
+				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					co_await mp_Server(&CCloudManagerServer::f_DumpDatabaseEntries, _pCommandLine, _Params["Prefix"].f_String());
+
+					co_return 0;
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
 	}

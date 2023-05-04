@@ -107,6 +107,7 @@ namespace NMib::NCloud::NCloudManager
 		};
 
 		TCFuture<void> f_Init();
+		TCFuture<void> f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Prefix);
 
 	private:
 		struct CAppManagerState

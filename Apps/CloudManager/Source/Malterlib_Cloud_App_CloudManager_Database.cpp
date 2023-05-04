@@ -5,6 +5,7 @@
 #include "Malterlib_Cloud_App_CloudManager_Internal.h"
 #include "Malterlib_Cloud_App_CloudManager_Database.h"
 
+#include <Mib/CommandLine/TableRenderer>
 #include <Mib/Encoding/ToJson>
 
 namespace NMib::NCloud::NCloudManagerDatabase
@@ -346,6 +347,67 @@ namespace NMib::NCloud::NCloudManager
 
 		co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveHosts, *pRemovedHostIDs);
 		co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_RemoveHosts, *pRemovedHostIDs);
+
+		co_return {};
+	}
+
+	namespace
+	{
+		struct CTableDumper
+		{
+			template <typename tf_CKey, typename tf_CValue, typename ...tfp_CPrefix>
+			void f_DumpTable(tfp_CPrefix && ...p_Prefix)
+			{
+				if (m_FilterPrefix && tf_CKey::mc_Prefix != m_FilterPrefix)
+					return;
+
+				for (auto iState = m_ReadTransaction.f_ReadCursor(p_Prefix...); iState; ++iState)
+				{
+					auto Key = iState.template f_Key<tf_CKey>();
+					auto Value = iState.template f_Value<tf_CValue>();
+
+					m_TableRenderer.f_AddRow
+						(
+							"{}"_f << tf_CKey::mc_Prefix
+							, Key.f_ToJson().f_ToString().f_Trim()
+							, Value.f_ToJson().f_ToString().f_Trim()
+						)
+					;
+				}
+			}
+
+			CTableRenderHelper &m_TableRenderer;
+			CDatabaseSubReadTransaction &m_ReadTransaction;
+			CStr const &m_FilterPrefix;
+		};
+	}
+
+	TCFuture<void> CCloudManagerServer::f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Prefix)
+	{
+		auto CaptureScope = co_await (g_CaptureExceptions % "Error dumping database");
+
+		auto TableRenderer = _pCommandLine->f_TableRenderer();
+
+		CTableRenderHelper::CColumnHelper Columns(0);
+
+		Columns.f_AddHeading("Prefix", 0);
+		Columns.f_AddHeading("Key", 0);
+		Columns.f_AddHeading("Value", 0);
+
+		TableRenderer.f_AddHeadings(&Columns);
+
+		auto ReadTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
+
+		CTableDumper Dumper{.m_TableRenderer = TableRenderer, .m_ReadTransaction = ReadTransaction.m_Transaction, .m_FilterPrefix = _Prefix};
+
+		Dumper.f_DumpTable<CCloudManagerGlobalStateKey, CCloudManagerGlobalStateValue>(CCloudManagerGlobalStateKey::mc_Prefix);
+		Dumper.f_DumpTable<CAppManagerKey, CAppManagerValue>(CAppManagerKey::mc_Prefix);
+		Dumper.f_DumpTable<CApplicationKey, CApplicationValue>(CApplicationKey::mc_Prefix);
+		Dumper.f_DumpTable<CApplicationUpdateStateKey, CApplicationUpdateStateValue>(CApplicationUpdateStateKey::mc_Prefix);
+		Dumper.f_DumpTable<CSensorNotificationStateKey, CSensorNotificationStateValue>(CStr(), CSensorNotificationStateKey::mc_Prefix);
+		Dumper.f_DumpTable<CExpectedOsVersionKey, CExpectedOsVersionValue>(CExpectedOsVersionKey::mc_Prefix);
+
+		TableRenderer.f_Output();
 
 		co_return {};
 	}
