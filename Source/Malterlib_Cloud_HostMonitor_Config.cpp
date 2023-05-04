@@ -522,8 +522,8 @@ namespace NMib::NCloud
 			MessageParagraphs.f_Insert
 				(
 					"Attributes changed:\n{} to\n{}"_f
-					<< CFile::fs_AttribToJSON(OldProperties.m_Attributes).f_ToString(nullptr)
-					<< CFile::fs_AttribToJSON(NewProperties.m_Attributes).f_ToString(nullptr)
+					<< CFile::fs_AttribToJson(OldProperties.m_Attributes).f_ToString(nullptr)
+					<< CFile::fs_AttribToJson(NewProperties.m_Attributes).f_ToString(nullptr)
 				)
 			;
 		}

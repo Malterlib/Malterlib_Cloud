@@ -184,7 +184,7 @@ namespace NMib::NCloud::NBackupManager
 		CFile::fs_Touch(fg_Format("{}/{tst.,tsb_}.timestamp", Internal.m_BackupDirectory, Internal.m_StartTime));
 
 #ifdef DMibDebug
-		CFile::fs_WriteStringToFile(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.json"), Internal.m_Manifest.f_ToJSON().f_ToString());
+		CFile::fs_WriteStringToFile(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.json"), Internal.m_Manifest.f_ToJson().f_ToString());
 #endif
 
 		Internal.m_bBackupStarted = true;

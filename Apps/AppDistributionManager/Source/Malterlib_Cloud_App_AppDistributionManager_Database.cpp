@@ -121,7 +121,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			{
 				auto &VersionID = _Distribution.m_DeployedVersions.fs_GetKey(VersionInfo);
 				auto &DistributedVersionJSON = DeployedVersionsJSON.f_Insert();
-				DistributedVersionJSON["Version"] = VersionID.f_ToJSON();
+				DistributedVersionJSON["Version"] = VersionID.f_ToJson();
 				DistributedVersionJSON["Time"] = VersionInfo.m_Time;
 				DistributedVersionJSON["RetrySequence"] = VersionInfo.m_RetrySequence;
 			}
@@ -152,7 +152,7 @@ namespace NMib::NCloud::NAppDistributionManager
 					{
 						for (auto &DistributedVersionJSON : pDeployedVersions->f_Array())
 						{
-							auto Version = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(DistributedVersionJSON["Version"]);
+							auto Version = CVersionManager::CVersionIDAndPlatform::fs_FromJson(DistributedVersionJSON["Version"]);
 							DeployedVersions[Version].m_Time = DistributedVersionJSON["Time"].f_Date();
 							DeployedVersions[Version].m_RetrySequence = DistributedVersionJSON["RetrySequence"].f_Integer();
 						}

@@ -215,7 +215,7 @@ namespace NMib::NCloud::NAppManager
 						, Version.m_UniqueProperties.m_Owner
 						, Version.m_UniqueProperties.m_Group
 						, "{ns }"_f << Version.m_UniqueProperties.m_Size
-						, CStr::fs_Join(CFile::fs_AttribToJSON(Version.m_UniqueProperties.m_Attributes).f_StringArray(), ", ")
+						, CStr::fs_Join(CFile::fs_AttribToJson(Version.m_UniqueProperties.m_Attributes).f_StringArray(), ", ")
 					)
 				;
 			}

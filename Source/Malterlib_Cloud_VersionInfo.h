@@ -16,6 +16,8 @@ namespace NMib::NCloud
 		template <typename tf_CStr>
 		void f_Format(tf_CStr &o_String) const;
 
+		NEncoding::CEJSON f_ToJson() const;
+
 		auto operator <=> (CCloudVersion const &_Right) const = default;
 
 		NStr::CStr m_Branch;

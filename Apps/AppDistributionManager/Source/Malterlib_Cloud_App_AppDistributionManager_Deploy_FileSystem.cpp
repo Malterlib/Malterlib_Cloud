@@ -210,7 +210,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						CEJSON NewRelease =
 							{
 								"Path"_= DownloadFile
-								, "Version"_= _DeployInfo.m_Version.m_VersionID.f_ToJSON()
+								, "Version"_= _DeployInfo.m_Version.m_VersionID.f_ToJson()
 								, "VersionString"_= VersionString
 								, "Time"_= _DeployInfo.m_Version.m_VersionInfo.m_Time
 								, "TimeUnixMilliSeconds"_= CTimeConvert(_DeployInfo.m_Version.m_VersionInfo.m_Time).f_UnixMilliseconds()

@@ -74,7 +74,7 @@ namespace NMib::NCloud::NAppManager
 		mp_State.m_StateDatabase.m_Data["PendingSelfUpdateProcess"] =
 			{
 				"Name"_= Application.m_Name
-				, "VersionID"_= _pState->m_VersionID.f_ToJSON()
+				, "VersionID"_= _pState->m_VersionID.f_ToJson()
 				, "VersionTime"_= _pState->m_VersionTime
 				, "VersionRetrySequence"_= _pState->m_VersionRetrySequence
 				, "StartUpdateTime"_= _pState->m_StartUpdateTime

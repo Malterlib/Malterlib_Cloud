@@ -210,18 +210,18 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["EncryptionFileSystem"] = Settings.m_EncryptionFileSystem;
 		ApplicationJSON["ParentApplication"] = Settings.m_ParentApplication;
 		ApplicationJSON["VersionManagerApplication"] = Settings.m_VersionManagerApplication;
-		ApplicationJSON["LastInstalledVersion"] = Application.m_LastInstalledVersion.f_ToJSON();
-		ApplicationJSON["LastInstalledVersionInfo"] = Application.m_LastInstalledVersionInfo.f_ToJSON();
-		ApplicationJSON["LastInstalledVersionFinished"] = Application.m_LastInstalledVersionFinished.f_ToJSON();
-		ApplicationJSON["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJSON();
-		ApplicationJSON["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJSON();
-		ApplicationJSON["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJSON();
+		ApplicationJSON["LastInstalledVersion"] = Application.m_LastInstalledVersion.f_ToJson();
+		ApplicationJSON["LastInstalledVersionInfo"] = Application.m_LastInstalledVersionInfo.f_ToJson();
+		ApplicationJSON["LastInstalledVersionFinished"] = Application.m_LastInstalledVersionFinished.f_ToJson();
+		ApplicationJSON["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJson();
+		ApplicationJSON["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJson();
+		ApplicationJSON["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJson();
 		ApplicationJSON["LastTriedInstalledVersionError"] = Application.m_LastTriedInstalledVersionError;
 
-		ApplicationJSON["WantVersion"] = Application.m_WantVersion.f_ToJSON();
-		ApplicationJSON["WantVersionInfo"] = Application.m_WantVersionInfo.f_ToJSON();
-		ApplicationJSON["NewestUnconditionalVersion"] = Application.m_NewestUnconditionalVersion.f_ToJSON();
-		ApplicationJSON["NewestUnconditionalVersionInfo"] = Application.m_NewestUnconditionalVersionInfo.f_ToJSON();
+		ApplicationJSON["WantVersion"] = Application.m_WantVersion.f_ToJson();
+		ApplicationJSON["WantVersionInfo"] = Application.m_WantVersionInfo.f_ToJson();
+		ApplicationJSON["NewestUnconditionalVersion"] = Application.m_NewestUnconditionalVersion.f_ToJson();
+		ApplicationJSON["NewestUnconditionalVersionInfo"] = Application.m_NewestUnconditionalVersionInfo.f_ToJson();
 
 		ApplicationJSON["LastFailedInstalledVersionFailureStage"] = (uint32)Application.m_LastFailedInstalledVersionFailureStage;
 		ApplicationJSON["AutoUpdate"] = Settings.m_bAutoUpdate;

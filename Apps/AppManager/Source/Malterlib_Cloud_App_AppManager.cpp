@@ -85,7 +85,7 @@ namespace NMib::NCloud::NAppManager
 			auto &Pending = *pPendingSelfUpdateProcess;
 
 			PendingSelfUpdate.m_Name = Pending["Name"].f_String();
-			PendingSelfUpdate.m_VersionID = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(Pending["VersionID"]);
+			PendingSelfUpdate.m_VersionID = CVersionManager::CVersionIDAndPlatform::fs_FromJson(Pending["VersionID"]);
 			PendingSelfUpdate.m_VersionTime = Pending["VersionTime"].f_Date();
 			PendingSelfUpdate.m_VersionRetrySequence = Pending["VersionRetrySequence"].f_Integer();
 			if (auto *pValue = Pending.f_GetMember("StartUpdateTime"))
@@ -166,36 +166,36 @@ namespace NMib::NCloud::NAppManager
 				if (auto pValue = ApplicationJSON.f_GetMember("VersionManagerApplication", EJSONType_String))
 					Settings.m_VersionManagerApplication = pValue->f_String();
 				if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersion", EJSONType_Object))
-					Application.m_LastInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+					Application.m_LastInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJson(*pValue);
 				if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfo", EJSONType_Object))
-					Application.m_LastInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+					Application.m_LastInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJson(*pValue);
 
 				if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionFinished", EJSONType_Object))
-					Application.m_LastInstalledVersionFinished = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+					Application.m_LastInstalledVersionFinished = CVersionManager::CVersionIDAndPlatform::fs_FromJson(*pValue);
 				else
 					Application.m_LastInstalledVersionFinished = Application.m_LastInstalledVersion;
 
 				if (auto pValue = ApplicationJSON.f_GetMember("LastInstalledVersionInfoFinished", EJSONType_Object))
-					Application.m_LastInstalledVersionInfoFinished = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+					Application.m_LastInstalledVersionInfoFinished = CVersionManager::CVersionInformation::fs_FromJson(*pValue);
 				else
 					Application.m_LastInstalledVersionInfoFinished = Application.m_LastInstalledVersionInfo;
 
 				if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersion", EJSONType_Object))
-					Application.m_LastTriedInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+					Application.m_LastTriedInstalledVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJson(*pValue);
 				if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionInfo", EJSONType_Object))
-					Application.m_LastTriedInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+					Application.m_LastTriedInstalledVersionInfo = CVersionManager::CVersionInformation::fs_FromJson(*pValue);
 				if (auto pValue = ApplicationJSON.f_GetMember("LastTriedInstalledVersionError", EJSONType_String))
 					Application.m_LastTriedInstalledVersionError = pValue->f_String();
 
 				if (auto pValue = ApplicationJSON.f_GetMember("NewestUnconditionalVersion", EJSONType_Object))
-					Application.m_NewestUnconditionalVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+					Application.m_NewestUnconditionalVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJson(*pValue);
 				if (auto pValue = ApplicationJSON.f_GetMember("NewestUnconditionalVersionInfo", EJSONType_Object))
-					Application.m_NewestUnconditionalVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+					Application.m_NewestUnconditionalVersionInfo = CVersionManager::CVersionInformation::fs_FromJson(*pValue);
 
 				if (auto pValue = ApplicationJSON.f_GetMember("WantVersion", EJSONType_Object))
-					Application.m_WantVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJSON(*pValue);
+					Application.m_WantVersion = CVersionManager::CVersionIDAndPlatform::fs_FromJson(*pValue);
 				if (auto pValue = ApplicationJSON.f_GetMember("WantVersionInfo", EJSONType_Object))
-					Application.m_WantVersionInfo = CVersionManager::CVersionInformation::fs_FromJSON(*pValue);
+					Application.m_WantVersionInfo = CVersionManager::CVersionInformation::fs_FromJson(*pValue);
 
 				if (auto pValue = ApplicationJSON.f_GetMember("LastFailedInstalledVersionFailureStage", EJSONType_Integer))
 					Application.m_LastFailedInstalledVersionFailureStage = (EUpdateStage)pValue->f_Integer();

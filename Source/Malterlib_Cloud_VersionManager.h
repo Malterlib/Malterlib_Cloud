@@ -49,8 +49,8 @@ namespace NMib::NCloud
 			
 			auto operator <=> (CVersionID const &_Right) const = default;
 			
-			NEncoding::CEJSON f_ToJSON() const;
-			static CVersionID fs_FromJSON(NEncoding::CEJSON const &_JSON);
+			NEncoding::CEJSON f_ToJson() const;
+			static CVersionID fs_FromJson(NEncoding::CEJSON const &_JSON);
 		};
 
 		struct CVersionIDAndPlatform
@@ -69,8 +69,8 @@ namespace NMib::NCloud
 
 			auto operator <=> (CVersionIDAndPlatform const &_Right) const = default;
 			
-			NEncoding::CEJSON f_ToJSON() const;
-			static CVersionIDAndPlatform fs_FromJSON(NEncoding::CEJSON const &_JSON);
+			NEncoding::CEJSON f_ToJson() const;
+			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJSON const &_JSON);
 			
 			CVersionID m_VersionID;
 			NStr::CStr m_Platform;
@@ -81,8 +81,8 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJSON f_ToJSON() const;
-			static CVersionInformation fs_FromJSON(NEncoding::CEJSON const &_JSON);
+			NEncoding::CEJSON f_ToJson() const;
+			static CVersionInformation fs_FromJson(NEncoding::CEJSON const &_JSON);
 
 			auto operator <=> (CVersionInformation const &_Right) const = default;
 
