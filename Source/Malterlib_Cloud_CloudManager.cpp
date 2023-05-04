@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/Encoding/ToJson>
 
 #include "Malterlib_Cloud_CloudManager.h"
 
@@ -52,6 +53,21 @@ namespace NMib::NCloud
 		return CAppManagerInterface::EProtocolVersion_AddStatusSeverity;
 	}
 
+	NEncoding::CEJSON CCloudManager::CAppManagerInfo::f_ToJson() const
+	{
+		using namespace NEncoding;
+
+		CEJSON Return;
+		Return["Environment"] = fg_ToJson(m_Environment);
+		Return["HostName"] = fg_ToJson(m_HostName);
+		Return["ProgramDirectory"] = fg_ToJson(m_ProgramDirectory);
+		Return["Version"] = fg_ToJson(m_Version);
+		Return["VersionDate"] = fg_ToJson(m_VersionDate);
+		Return["Platform"] = fg_ToJson(m_Platform);
+		Return["PlatformFamily"] = fg_ToJson(m_PlatformFamily);
+		return Return;
+	}
+
 	bool CCloudManager::CExpectedVersionRange::f_IsSet() const
 	{
 		return m_Min || m_Max;
@@ -66,6 +82,16 @@ namespace NMib::NCloud
 	{
 		m_Min = CVersion{.m_Major = TCLimitsInt<uint32>::mc_Max};
 		m_Max = CVersion{.m_Major = TCLimitsInt<uint32>::mc_Max};
+	}
+
+	NEncoding::CEJSON CCloudManager::CExpectedVersionRange::f_ToJson() const
+	{
+		using namespace NEncoding;
+
+		CEJSON Return;
+		Return["Min"] = fg_ToJson(m_Min);
+		Return["Max"] = fg_ToJson(m_Max);
+		return Return;
 	}
 
 	void CCloudManager::CExpectedVersions::f_ApplyChanges(CExpectedVersions const &_Changes)
@@ -127,5 +153,28 @@ namespace NMib::NCloud
 			co_return DMibErrorInstance("Failed to parse revision version");
 
 		co_return fg_Move(Version);
+	}
+
+	NEncoding::CEJSON CCloudManager::CVersion::f_ToJson() const
+	{
+		using namespace NEncoding;
+
+		CEJSON Return;
+		Return["Major"] = fg_ToJson(m_Major);
+		Return["Minor"] = fg_ToJson(m_Minor);
+		Return["Revision"] = fg_ToJson(m_Revision);
+
+		return Return;
+	}
+
+	NEncoding::CEJSON CCloudManager::CCurrentVersion::f_ToJson() const
+	{
+		using namespace NEncoding;
+
+		CEJSON Return;
+		Return["Major"] = fg_ToJson(m_Major);
+		Return["Minor"] = fg_ToJson(m_Minor);
+
+		return Return;
 	}
 }

@@ -57,6 +57,8 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
+			NEncoding::CEJSON f_ToJson() const;
+
 			auto operator <=> (CAppManagerInfo const &_Right) const = default;
 
 			NStr::CStr m_Environment;
@@ -109,6 +111,8 @@ namespace NMib::NCloud
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
 
+			NEncoding::CEJSON f_ToJson() const;
+
 			static NConcurrency::TCFuture<CVersion> fs_ParseVersion(NStr::CStr _Version);
 
 			auto operator <=> (CVersion const &_Right) const = default;
@@ -129,6 +133,8 @@ namespace NMib::NCloud
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
 
+			NEncoding::CEJSON f_ToJson() const;
+
 			auto operator <=> (CCurrentVersion const &_Right) const = default;
 
 			NStorage::TCOptional<uint32> m_Major;
@@ -141,6 +147,8 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
+
+			NEncoding::CEJSON f_ToJson() const;
 
 			auto operator <=> (CExpectedVersionRange const &_Right) const = default;
 

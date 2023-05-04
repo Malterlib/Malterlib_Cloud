@@ -5,6 +5,8 @@
 #include "Malterlib_Cloud_App_CloudManager_Internal.h"
 #include "Malterlib_Cloud_App_CloudManager_Database.h"
 
+#include <Mib/Encoding/ToJson>
+
 namespace NMib::NCloud::NCloudManagerDatabase
 {
 	constexpr CStr CCloudManagerGlobalStateKey::mc_Prefix = gc_Str<"Global">;
@@ -13,7 +15,6 @@ namespace NMib::NCloud::NCloudManagerDatabase
 	constexpr CStr CApplicationUpdateStateKey::mc_Prefix = gc_Str<"AppUpSt">;
 	constexpr CStr CSensorNotificationStateKey::mc_Prefix = gc_Str<"SensNoSt">;
 	constexpr CStr CExpectedOsVersionKey::mc_Prefix = gc_Str<"ExpectedOV">;
-
 
 	auto CSensorNotificationStateKey::f_SensorKey() const & -> CSensorKey
 	{
@@ -30,6 +31,120 @@ namespace NMib::NCloud::NCloudManagerDatabase
 
 		Return.m_Prefix = CSensorKey::mc_Prefix;
 
+		return Return;
+	}
+
+	CEJSON CCloudManagerGlobalStateKey::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["Prefix"] = fg_ToJson(m_Prefix);
+		return Return;
+	}
+
+	CEJSON CCloudManagerGlobalStateValue::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["SensorProblemsSlackThread"] = fg_ToJson(m_SensorProblemsSlackThread);
+		Return["LastSeenLogTimestamp"] = fg_ToJson(m_LastSeenLogTimestamp);
+		return Return;
+	}
+
+	CEJSON CAppManagerKey::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["Prefix"] = fg_ToJson(m_Prefix);
+		Return["HostID"] = fg_ToJson(m_HostID);
+		return Return;
+	}
+
+	CEJSON CAppManagerValue::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["Info"] = fg_ToJson(m_Info);
+		Return["LastSeen"] = fg_ToJson(m_LastSeen);
+		Return["LastConnectionError"] = fg_ToJson(m_LastConnectionError);
+		Return["LastConnectionErrorTime"] = fg_ToJson(m_LastConnectionErrorTime);
+		Return["OtherErrors"] = fg_ToJson(m_OtherErrors);
+		Return["LastSeenUpdateNotificationSequence"] = fg_ToJson(m_LastSeenUpdateNotificationSequence);
+		Return["bActive"] = fg_ToJson(m_bActive);
+		return Return;
+	}
+
+	CEJSON CApplicationKey::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["Prefix"] = fg_ToJson(m_Prefix);
+		Return["AppManagerHostID"] = fg_ToJson(m_AppManagerHostID);
+		Return["Application"] = fg_ToJson(m_Application);
+		return Return;
+	}
+
+	CEJSON CApplicationValue::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["ApplicationInfo"] = fg_ToJson(m_ApplicationInfo);
+		return Return;
+	}
+
+	CEJSON CApplicationUpdateStateStage::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["Time"] = fg_ToJson(m_Time);
+		return Return;
+	}
+
+	CEJSON CApplicationUpdateStateValue::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["LastUpdateID"] = fg_ToJson(m_LastUpdateID);
+		Return["SlackTimestamps"] = fg_ToJson(m_SlackTimestamps);
+		Return["Stages"] = fg_ToJson(m_Stages);
+		Return["LastNotification"] = fg_ToJson(m_LastNotification);
+		Return["LastUpdateSequence"] = fg_ToJson(m_LastUpdateSequence);
+		Return["bDeferred"] = fg_ToJson(m_bDeferred);
+		return Return;
+	}
+
+	CEJSON CSensorNotificationStateNotificationStatus::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["Severity"] = fg_ToJson(m_Severity);
+		Return["Message"] = fg_ToJson(m_Message);
+		return Return;
+	}
+
+	CEJSON CSensorNotificationStateNotification::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["Status"] = fg_ToJson(m_Status);
+		Return["OutdatedStatus"] = fg_ToJson(m_OutdatedStatus);
+		Return["CriticalityStatus"] = fg_ToJson(m_CriticalityStatus);
+		return Return;
+	}
+
+	CEJSON CSensorNotificationStateValue::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["LastNotification"] = fg_ToJson(m_LastNotification);
+		Return["TimeInProblemState"] = fg_ToJson(m_TimeInProblemState);
+		Return["bInProblemState"] = fg_ToJson(m_bInProblemState);
+		Return["bSentAlert"] = fg_ToJson(m_bSentAlert);
+		return Return;
+	}
+
+	CEJSON CExpectedOsVersionKey::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["Prefix"] = fg_ToJson(m_Prefix);
+		Return["OsName"] = fg_ToJson(m_OsName);
+		Return["CurrentVersion"] = fg_ToJson(m_CurrentVersion);
+		return Return;
+	}
+
+	CEJSON CExpectedOsVersionValue::f_ToJson() const
+	{
+		CEJSON Return;
+		Return["ExpectedVersionRange"] = fg_ToJson(m_ExpectedVersionRange);
 		return Return;
 	}
 }
