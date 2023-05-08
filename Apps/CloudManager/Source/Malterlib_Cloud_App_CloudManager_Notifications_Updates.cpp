@@ -49,6 +49,8 @@ namespace NMib::NCloud::NCloudManager
 							{
 								if (Value.m_LastNotification.f_IsDone())
 									iState.f_Delete();
+								else
+									++iState;
 
 								continue;
 							}
