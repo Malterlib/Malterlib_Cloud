@@ -98,7 +98,7 @@ namespace NMib::NCloud::NCloudManager
 
 		fg_Timeout(2.0) > [this]
 			{
-				// Allow time for sersors to recorrect after startup before considering their status
+				// Allow time for sensors to recorrect after startup before considering their status
 				mp_bSubscribedToSensors = true;
 				fp_SchedulePeriodicSensorNotificationsOutOfBand();
 			}
@@ -518,16 +518,16 @@ namespace NMib::NCloud::NCloudManager
 
 					for (auto &RemovedSensorKey : mp_RemovedSensors)
 					{
-						auto DatabasKey = fg_GetSensorDatabaseKey<CSensorNotificationStateKey>(RemovedSensorKey);
+						auto DatabaseKey = fg_GetSensorDatabaseKey<CSensorNotificationStateKey>(RemovedSensorKey);
 
-						if (WriteTransaction.m_Transaction.f_Exists(DatabasKey))
-							WriteTransaction.m_Transaction.f_Delete(DatabasKey);
+						if (WriteTransaction.m_Transaction.f_Exists(DatabaseKey))
+							WriteTransaction.m_Transaction.f_Delete(DatabaseKey);
 					}
 
 					for (auto &SensorStatus : mp_SensorStatuses)
 					{
-						auto DatabasKey = fg_GetSensorDatabaseKey<CSensorNotificationStateKey>(mp_SensorStatuses.fs_GetKey(SensorStatus));
-						WriteTransaction.m_Transaction.f_Upsert(DatabasKey, SensorStatus.m_State);
+						auto DatabaseKey = fg_GetSensorDatabaseKey<CSensorNotificationStateKey>(mp_SensorStatuses.fs_GetKey(SensorStatus));
+						WriteTransaction.m_Transaction.f_Upsert(DatabaseKey, SensorStatus.m_State);
 					}
 
 					co_return fg_Move(WriteTransaction);

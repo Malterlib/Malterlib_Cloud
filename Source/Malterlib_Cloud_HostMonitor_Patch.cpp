@@ -343,7 +343,7 @@ namespace NMib::NCloud
 			(
 				g_Dispatch(m_FileActor) / [=]() -> TCFuture<CFileProperties>
 				{
-					auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed read patch status from files");
+					auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed to read the patch status from file");
 
 					CStr RebootRequiredFile = "/var/run/reboot-required";
 
