@@ -20,7 +20,7 @@ namespace NMib::NCloud::NCloudManager
 				, mc_DatabasePrefixLog
 				, g_ActorFunctor / [this](NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction) -> TCFuture<NDatabase::CDatabaseActor::CTransactionWrite>
 				{
-					co_return co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(_WriteTransaction));
+					co_return fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(_WriteTransaction), fg_Construct())).m_Transaction);
 				}
 			)
 		;

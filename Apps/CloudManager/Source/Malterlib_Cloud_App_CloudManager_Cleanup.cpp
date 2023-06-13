@@ -5,21 +5,55 @@
 #include "Malterlib_Cloud_App_CloudManager_Internal.h"
 #include "Malterlib_Cloud_App_CloudManager_Database.h"
 
+#include <Mib/Concurrency/LogError>
+
 namespace NMib::NCloud::NCloudManager
 {
 	using namespace NCloudManagerDatabase;
 
+	namespace
+	{
+		constexpr static auto gc_YieldInterval = 50_ms;
+		constexpr static auto gc_MaxRunTime = 10_seconds;
+		constexpr static auto gc_LogStatsInterval = 60_seconds;
+		constexpr static auto gc_FreedPagesLimit = 10000;
+	}
+
 	TCFuture<void> CCloudManagerServer::fp_PerformCleanup()
 	{
-		co_await mp_DatabaseActor
-			(
-				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
-				{
-					co_return co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(_Transaction));
-				}
-			)
+		if (mp_bDoingCleanup)
+			co_return DMibErrorInstance("Another cleanup is already running");
+
+		auto OnResume = co_await f_CheckDestroyedOnResume();
+
+		mp_bDoingCleanup = true;
+		auto Cleanup = g_OnScopeExit / [&]
+			{
+				mp_bDoingCleanup = false;
+			}
 		;
+
+		TCSharedPointer<bool> pMoreWorkNeeded = fg_Construct(true);
+		TCSharedPointer<CCleanupState> pState = fg_Construct();
+
+		while (*pMoreWorkNeeded)
+		{
+			co_await mp_DatabaseActor
+				(
+					&CDatabaseActor::f_WriteWithCompaction
+					, g_ActorFunctorWeak / [this, pMoreWorkNeeded, pState](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+					{
+						pState->m_bForcedCompaction = _bCompacting;
+
+						auto Result = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(_Transaction), pState);
+
+						*pMoreWorkNeeded = Result.m_bMoreWork;
+
+						co_return fg_Move(Result.m_Transaction);
+					}
+				)
+			;
+		}
 
 		co_return {};
 	}
@@ -31,12 +65,13 @@ namespace NMib::NCloud::NCloudManager
 		if (!mp_RetentionDays)
 			co_return {};
 
-		co_await fp_PerformCleanup();
+		NConcurrency::CLogError LogError("CloudManagerDatabase");
+		fp_PerformCleanup() > LogError("Failed to do initial cleanup");
 
 		mp_CleanupTimerSubscription = co_await fg_RegisterTimer
 			(
 				24_hours
-				, [this]() -> TCFuture<void>
+				, [this]() mutable -> TCFuture<void>
 				{
 					auto Result = co_await fp_PerformCleanup().f_Wrap();
 
@@ -51,11 +86,70 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<NDatabase::CDatabaseActor::CTransactionWrite> CCloudManagerServer::fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction)
+	void CCloudManagerServer::CCleanupState::f_LogStartup()
 	{
-		auto OriginalStats = _WriteTransaction.m_Transaction.f_SizeStatistics();
+		if (mp_bLoggedStart)
+			return;
 
-		auto TargetSize = OriginalStats.m_MapSize - fg_Min(fg_Max(OriginalStats.m_MapSize / 5, 32 * OriginalStats.m_PageSize), OriginalStats.m_MapSize / 2);
+		mp_bLoggedStart = true;
+		DMibLogWithCategory(CloudManagerDatabase, Info, "Starting database cleanup{}",  m_bForcedCompaction ? " (Compaction)" : "");
+	}
+
+	void CCloudManagerServer::CCleanupState::f_Log(bool _bProgress)
+	{
+		auto UtcHourOffset = NTime::CTimeSpanConvert(mp_UtcOffset).f_GetHours();
+		auto UtcMinuteOffset = NTime::CTimeSpanConvert(mp_UtcOffset).f_GetMinuteOfHour();
+		ch8 const *pUtcSign = UtcHourOffset < 0 ? "-" : "+";
+		UtcHourOffset = fg_Abs(UtcHourOffset);
+
+		DMibLogWithCategory
+			(
+				CloudManagerDatabase
+				, Info
+				, "{} up {ns } bytes by deleting {} sensor readings and {} log entries spanning from {tc5} UTC{}{sj2,sf0}:{sj2,sf0} to {tc5} UTC{}{sj2,sf0}:{sj2,sf0}. "
+				"Yielded {} times. Yielded database {} times."
+				, _bProgress ? "Freeing" : "Freed"
+				, mp_OriginalStats.m_UsedBytes - mp_CurrentStats.m_UsedBytes
+				, mp_nReadingsDeletedSensor
+				, mp_nReadingsDeletedLog
+				, mp_StartTime.f_ToLocal()
+				, pUtcSign
+				, UtcHourOffset
+				, UtcMinuteOffset
+				, mp_EndTime.f_ToLocal()
+				, pUtcSign
+				, UtcHourOffset
+				, UtcMinuteOffset
+				, mp_nYields
+				, mp_nDatabaseYields
+			)
+		;
+
+	}
+
+	void CCloudManagerServer::CCleanupState::f_Initialize(NDatabase::CDatabaseActor::CTransactionWrite &_WriteTransaction)
+	{
+		if (!mp_bInitialized)
+		{
+			mp_bInitialized = true;
+
+			mp_OriginalStats = _WriteTransaction.m_Transaction.f_SizeStatistics();
+			mp_CurrentStats = mp_OriginalStats;
+
+			mp_TargetSize = mp_OriginalStats.m_MapSize - fg_Min(fg_Max(mp_OriginalStats.m_MapSize / 5, 32 * mp_OriginalStats.m_PageSize), mp_OriginalStats.m_MapSize / 2);
+
+			NTime::CSystem_Time::fs_TimeGetUTCOffset(&mp_UtcOffset);
+		}
+		else
+			mp_CurrentStats = _WriteTransaction.m_Transaction.f_SizeStatistics();
+
+		mp_MaxFreedLimit = mp_CurrentStats.m_UsedBytes - gc_FreedPagesLimit * mp_OriginalStats.m_PageSize;
+	}
+
+	auto CCloudManagerServer::fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction, TCSharedPointer<CCleanupState> &&_pState) -> TCFuture<CCleanupDatabaseResult>
+	{
+		auto &State = *_pState;
+		State.f_Initialize(_WriteTransaction);
 
 		auto OnResume = co_await f_CheckDestroyedOnResume();
 
@@ -73,65 +167,36 @@ namespace NMib::NCloud::NCloudManager
 		bool bDoRetention = mp_RetentionDays > 0;
 		NTime::CTime OldestAllowedReading = NTime::CTime::fs_NowUTC() - NTime::CTimeSpanConvert::fs_CreateDaySpan(mp_RetentionDays);
 
-		NTime::CTime StartTime = fg_Min(NextLogTime, NextSensorTime);
-		NTime::CTime EndTime = fg_Max(NextLogTime, NextSensorTime);
+		State.mp_StartTime = fg_Min(State.mp_StartTime, NextLogTime, NextSensorTime);
+		State.mp_EndTime = fg_Max(State.mp_EndTime, NextLogTime, NextSensorTime);
 
-		if (OriginalStats.m_UsedBytes < TargetSize)
+		if (State.mp_OriginalStats.m_UsedBytes < State.mp_TargetSize)
 		{
 			if (!bDoRetention)
 				co_return fg_Move(WriteTransaction);
 
-			if (StartTime.f_IsValid() && StartTime > OldestAllowedReading)
+			if (State.mp_StartTime.f_IsValid() && State.mp_StartTime > OldestAllowedReading)
 				co_return fg_Move(WriteTransaction);
 		}
 
-		auto CurrentStats = OriginalStats;
-
-		mint nReadingsDeletedSensor = 0;
-		mint nReadingsDeletedLog = 0;
-
-		NTime::CTimeSpan UtcOffset;
-		NTime::CSystem_Time::fs_TimeGetUTCOffset(&UtcOffset);
-
-		auto UtcHourOffset = NTime::CTimeSpanConvert(UtcOffset).f_GetHours();
-		auto UtcMinuteOffset = NTime::CTimeSpanConvert(UtcOffset).f_GetMinuteOfHour();
-		ch8 const *pUtcSign = UtcHourOffset < 0 ? "-" : "+";
-		UtcHourOffset = fg_Abs(UtcHourOffset);
-
-		constexpr auto c_LogStatsEvery = 1_minutes;
-
-		CClock StatsClock(true);
+		CClock RuntimeClock(true);
 		CClock YieldClock(true);
 
-		auto fLogStats = [&, bLoggedStart = false](bool _bProgress) mutable
-			{
-				if (!bLoggedStart)
-				{
-					bLoggedStart = true;
-					DMibLogWithCategory(CloudManagerDatabase, Info, "Starting database cleanup");
-				}
+		if ((bHasLog && NextLogTime.f_IsValid()) || (bHasSensor && NextSensorTime.f_IsValid()))
+			State.f_LogStartup();
 
-				DMibLogWithCategory
-					(
-						CloudManagerDatabase
-						, Info
-						, "{} up {ns } bytes by deleting {} sensor readings and {} log entries spanning from {tc5} UTC{}{sj2,sf0}:{sj2,sf0} to {tc5} UTC{}{sj2,sf0}:{sj2,sf0}"
-						, _bProgress ? "Freeing" : "Freed"
-						, OriginalStats.m_UsedBytes - CurrentStats.m_UsedBytes
-						, nReadingsDeletedSensor
-						, nReadingsDeletedLog
-						, StartTime.f_ToLocal()
-						, pUtcSign
-						, UtcHourOffset
-						, UtcMinuteOffset
-						, EndTime.f_ToLocal()
-						, pUtcSign
-						, UtcHourOffset
-						, UtcMinuteOffset
-					)
-				;
+		auto fCheckStatsLog = [&]()
+			{
+				fp64 StatsTime = State.mp_StatsClock.f_GetTime();
+				if (StatsTime > gc_LogStatsInterval)
+				{
+					State.mp_StatsClock.f_AddOffset(fp64(gc_LogStatsInterval) * (StatsTime / gc_LogStatsInterval).f_Floor());
+					State.f_Log(true);
+				}
 			}
 		;
+
+		fCheckStatsLog();
 
 		while (bHasLog || bHasSensor)
 		{
@@ -161,41 +226,60 @@ namespace NMib::NCloud::NCloudManager
 			if (bDoSensor)
 			{
 				bHasSensor = SensorHelper.f_DeleteOne(WriteTransaction, NextSensorTime);
-				EndTime = NextSensorTime;
-				++nReadingsDeletedSensor;
+				State.mp_EndTime = NextSensorTime;
+				++State.mp_nReadingsDeletedSensor;
 			}
 			else if (bDoLog)
 			{
 				bHasLog = LogHelper.f_DeleteOne(WriteTransaction, NextLogTime);
-				EndTime = NextLogTime;
-				++nReadingsDeletedLog;
+				State.mp_EndTime = NextLogTime;
+				++State.mp_nReadingsDeletedLog;
+			}
+			else
+				break;
+
+			State.mp_CurrentStats = WriteTransaction.m_Transaction.f_SizeStatistics();
+
+			if (!State.m_bForcedCompaction && State.mp_CurrentStats.m_UsedBytes < State.mp_MaxFreedLimit)
+			{
+				// Avoid pathological performance case in database
+				++State.mp_nDatabaseYields;
+				fCheckStatsLog();
+				co_return {fg_Move(WriteTransaction), true};
 			}
 
-			CurrentStats = WriteTransaction.m_Transaction.f_SizeStatistics();
-			if (CurrentStats.m_UsedBytes < TargetSize)
+			if (State.mp_CurrentStats.m_UsedBytes < State.mp_TargetSize)
 			{
 				if (!bDoRetention)
 					break;
 
-				if (EndTime.f_IsValid() && EndTime > OldestAllowedReading)
+				if (State.mp_EndTime.f_IsValid() && State.mp_EndTime > OldestAllowedReading)
 					break;
 			}
 
-			if (YieldClock.f_GetTime() > 1.0)
+			fp64 YieldTime = YieldClock.f_GetTime();
+			if (YieldTime > gc_YieldInterval)
 			{
-				YieldClock.f_AddOffset(1.0);
+				++State.mp_nYields;
+				YieldClock.f_AddOffset(fp64(gc_YieldInterval) * (YieldTime / gc_YieldInterval).f_Floor());
 				co_await g_Yield;
-			}
 
-			if (StatsClock.f_GetTime() > c_LogStatsEvery)
-			{
-				StatsClock.f_AddOffset(c_LogStatsEvery);
-				fLogStats(true);
+				fCheckStatsLog();
+
+				if (!State.m_bForcedCompaction)
+				{
+					if (RuntimeClock.f_GetTime() > gc_MaxRunTime)
+					{
+						++State.mp_nDatabaseYields;
+						co_return {fg_Move(WriteTransaction), true};
+					}
+				}
 			}
 		}
 
-		fLogStats(false);
+		if (State.mp_nReadingsDeletedSensor || State.mp_nReadingsDeletedLog)
+			State.f_Log(false);
 
-		co_return fg_Move(WriteTransaction);
+		co_return {fg_Move(WriteTransaction)};
 	}
 }

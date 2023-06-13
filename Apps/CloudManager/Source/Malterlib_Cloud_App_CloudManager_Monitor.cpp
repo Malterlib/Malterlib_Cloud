@@ -106,8 +106,8 @@ namespace NMib::NCloud::NCloudManager
 
 							auto WriteTransaction = fg_Move(_Transaction);
 							if (_bCompacting)
-								WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
-							
+								WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+
 							{
 								auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
 

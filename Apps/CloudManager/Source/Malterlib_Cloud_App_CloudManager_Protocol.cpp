@@ -103,7 +103,7 @@ namespace NMib::NCloud::NCloudManager
 
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 					{
 						auto pAppManager = mp_AppManagers.f_FindEqual(_AppManagerID);
@@ -159,7 +159,7 @@ namespace NMib::NCloud::NCloudManager
 
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 					if (Params.m_bInitial)
 					{
@@ -719,7 +719,7 @@ namespace NMib::NCloud::NCloudManager
 
 						auto WriteTransaction = fg_Move(_Transaction);
 						if (_bCompacting)
-							WriteTransaction = co_await pThis->self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+							WriteTransaction = fg_Move((co_await pThis->self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 						CExpectedOsVersionKey Key{.m_OsName = _OsName, .m_CurrentVersion = _CurrentVersion};
 

@@ -142,6 +142,42 @@ namespace NMib::NCloud::NCloudManager
 			TCVector<CCloudManager::CExpectedVersions> m_QueuedNotifications;
 		};
 
+		struct CCleanupDatabaseResult
+		{
+			NDatabase::CDatabaseActor::CTransactionWrite m_Transaction;
+			bool m_bMoreWork = false;
+		};
+
+		struct CCleanupState
+		{
+			friend struct CCloudManagerServer;
+
+			void f_LogStartup();
+			void f_Log(bool _bProgress);
+			void f_Initialize(NDatabase::CDatabaseActor::CTransactionWrite &_WriteTransaction);
+
+			bool m_bForcedCompaction = true;
+
+		private:
+			CClock mp_StatsClock{true};
+			CDatabaseSizeStatistics mp_OriginalStats;
+			CDatabaseSizeStatistics mp_CurrentStats;
+			CDatabaseOffset mp_TargetSize;
+			CDatabaseOffset mp_MaxFreedLimit;
+
+			NTime::CTime mp_StartTime;
+			NTime::CTime mp_EndTime;
+			NTime::CTimeSpan mp_UtcOffset;
+
+			mint mp_nReadingsDeletedSensor = 0;
+			mint mp_nReadingsDeletedLog = 0;
+			mint mp_nYields = 0;
+			mint mp_nDatabaseYields = 0;
+
+			bool mp_bLoggedStart = false;
+			bool mp_bInitialized = false;
+		};
+
 		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_Publish();
 		TCFuture<void> fp_SetupDatabase();
@@ -151,7 +187,7 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_SetupCleanup();
 		TCFuture<void> fp_SetupSensorStore();
 		TCFuture<void> fp_SetupLogStore();
-		TCFuture<NDatabase::CDatabaseActor::CTransactionWrite> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction);
+		TCFuture<CCleanupDatabaseResult> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction, TCSharedPointer<CCleanupState> &&_pState);
 		TCFuture<CDatabaseActor::CTransactionWrite> fp_SaveGlobalState(CDatabaseActor::CTransactionWrite &&_Transaction);
 		TCFuture<void> fp_SaveGlobalStateWithoutTransaction();
 		TCFuture<void> fp_UpdateAppManagerState();
@@ -198,5 +234,7 @@ namespace NMib::NCloud::NCloudManager
 
 		TCMap<CExpectedOsVersionSubscriptionKey, CExpectedOsVersionSubscription> mp_ExpectedOsVersionSubscriptions;
 		mint mp_ExpectedOsVersionSubscriptionNextID = 0;
+
+		bool mp_bDoingCleanup = false;
 	};
 }

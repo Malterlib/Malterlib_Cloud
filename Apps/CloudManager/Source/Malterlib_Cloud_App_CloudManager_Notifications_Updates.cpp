@@ -37,7 +37,7 @@ namespace NMib::NCloud::NCloudManager
 
 						auto WriteTransaction = fg_Move(_Transaction);
 						if (_bCompacting)
-							WriteTransaction = co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+							WriteTransaction = fg_Move((co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 						bool bHaveDeferred = false;
 						for (auto iState = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationUpdateStateKey::mc_Prefix); iState;)
@@ -164,7 +164,7 @@ namespace NMib::NCloud::NCloudManager
 
 						auto WriteTransaction = fg_Move(_Transaction);
 						if (_bCompacting)
-							WriteTransaction = co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+							WriteTransaction = fg_Move((co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 						auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
@@ -394,7 +394,7 @@ namespace NMib::NCloud::NCloudManager
 
 						auto WriteTransaction = fg_Move(_Transaction);
 						if (_bCompacting)
-							WriteTransaction = co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+							WriteTransaction = fg_Move((co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 						auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 

@@ -231,7 +231,7 @@ namespace NMib::NCloud::NCloudManager
 
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 					WriteTransaction = co_await fp_SaveGlobalState(fg_Move(WriteTransaction));
 
@@ -272,7 +272,7 @@ namespace NMib::NCloud::NCloudManager
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 					{
 						auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
@@ -310,7 +310,7 @@ namespace NMib::NCloud::NCloudManager
 				
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction));
+						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 					bool bFoundAppManager = false;
 					for (auto AppManagerCursor = WriteTransaction.m_Transaction.f_WriteCursor(CAppManagerKey::mc_Prefix, _HostID); AppManagerCursor;)
