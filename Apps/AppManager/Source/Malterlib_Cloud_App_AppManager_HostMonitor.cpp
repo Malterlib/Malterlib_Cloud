@@ -59,14 +59,14 @@ namespace NMib::NCloud::NAppManager
 		HostMonitor.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--host-monitor-config-list"}
-					, "Description"_= "List monitored config files."
-					, "Options"_=
+					"Names"_o= {"--host-monitor-config-list"}
+					, "Description"_o= "List monitored config files."
+					, "Options"_o=
 					{
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_HostMonitorConfigList, _Params, _pCommandLine);
 				}
@@ -76,28 +76,28 @@ namespace NMib::NCloud::NAppManager
 		HostMonitor.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--host-monitor-config-version-list"}
-					, "Description"_= "List monitored config files."
-					, "Parameters"_=
+					"Names"_o= {"--host-monitor-config-version-list"}
+					, "Description"_o= "List monitored config files."
+					, "Parameters"_o=
 					{
-						"FileName?"_=
+						"FileName?"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "The name of the config file to list versions for. If not specified all files are displayed."
+							"Type"_o= ""
+							, "Description"_o= "The name of the config file to list versions for. If not specified all files are displayed."
 						}
 					}
-					, "Options"_=
+					, "Options"_o=
 					{
-						"Verbose?"_=
+						"Verbose?"_o=
 						{
-							"Names"_= {"--verbose", "-v"}
-							, "Default"_= false
-							, "Description"_= "Display more extensive information about the config file versions."
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Display more extensive information about the config file versions."
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList, _Params, _pCommandLine);
 				}
@@ -107,27 +107,27 @@ namespace NMib::NCloud::NAppManager
 		HostMonitor.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--host-monitor-config-contents-get"}
-					, "Description"_= "List monitored config files."
-					, "Parameters"_=
+					"Names"_o= {"--host-monitor-config-contents-get"}
+					, "Description"_o= "List monitored config files."
+					, "Parameters"_o=
 					{
-						"FileName"_=
+						"FileName"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "The name of the config file to get contents for."
+							"Type"_o= ""
+							, "Description"_o= "The name of the config file to get contents for."
 						}
 					}
-					, "Options"_=
+					, "Options"_o=
 					{
-						"Sequence?"_=
+						"Sequence?"_o=
 						{
-							"Names"_= {"--sequence", "-s"}
-							, "Type"_= 0
-							, "Description"_= "The sequence of the config file to get contents for. If not specified latest version is retrieved."
+							"Names"_o= {"--sequence", "-s"}
+							, "Type"_o= 0
+							, "Description"_o= "The sequence of the config file to get contents for. If not specified latest version is retrieved."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet, _Params, _pCommandLine);
 				}
@@ -135,7 +135,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_HostMonitor)
 			co_return DMibErrorInstance("Host monitor not yet initialized");
@@ -157,7 +157,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_HostMonitor)
 			co_return DMibErrorInstance("Host monitor not yet initialized");
@@ -232,7 +232,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		NHostMonitor::CConfigFileVersionKey Key;
 		Key.m_FileName = _Params["FileName"].f_String();

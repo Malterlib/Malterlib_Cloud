@@ -20,78 +20,78 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterSectionOptions
 			(
 				{
-					"Host?"_=
+					"Host?"_o=
 					{
-						"Names"_= {"--host"}
-						, "Default"_= ""
-						, "Description"_= "Limit cloud managers to only specified host ID."
+						"Names"_o= {"--host"}
+						, "Default"_o= ""
+						, "Description"_o= "Limit cloud managers to only specified host ID."
 					}
 				}
 			)
 		;
 
-		auto QuietOption = "Quiet?"_=
+		auto QuietOption = "Quiet?"_o=
 			{
-				"Names"_= {"--quiet", "-q"}
-				, "Default"_= false
-				, "Description"_= "Don't output information on std out, just return the status"
+				"Names"_o= {"--quiet", "-q"}
+				, "Default"_o= false
+				, "Description"_o= "Don't output information on std out, just return the status"
 			}
 		;
-		auto IncludeCloudManagerOption = "IncludeCloudManager?"_=
+		auto IncludeCloudManagerOption = "IncludeCloudManager?"_o=
 			{
-				"Names"_= {"--include-cloud-manager", "-c"}
-				, "Default"_= false
-				, "Description"_= "Include the cloud manager column"
+				"Names"_o= {"--include-cloud-manager", "-c"}
+				, "Default"_o= false
+				, "Description"_o= "Include the cloud manager column"
 			}
 		;
-		auto FilterStatusError = "FilterStatusError?"_=
+		auto FilterStatusError = "FilterStatusError?"_o=
 			{
-				"Names"_= {"--filter-status-error"}
-				, "Type"_= true
-				, "Description"_= "Include applications and app managers with error status"
+				"Names"_o= {"--filter-status-error"}
+				, "Type"_o= true
+				, "Description"_o= "Include applications and app managers with error status"
 			}
 		;
-		auto FilterEnvironment = "FilterEnvironment?"_=
+		auto FilterEnvironment = "FilterEnvironment?"_o=
 			{
-				"Names"_= {"--filter-environment"}
-				, "Type"_= ""
-				, "Description"_= "Include applications and appmanagers with specified environment\n"
+				"Names"_o= {"--filter-environment"}
+				, "Type"_o= ""
+				, "Description"_o= "Include applications and appmanagers with specified environment\n"
 				"Wildcard search."
 			}
 		;
-		auto FilterName = "FilterName?"_=
+		auto FilterName = "FilterName?"_o=
 			{
-				"Names"_= {"--filter-name"}
-				, "Type"_= ""
-				, "Description"_= "Include applications with specified application name"
+				"Names"_o= {"--filter-name"}
+				, "Type"_o= ""
+				, "Description"_o= "Include applications with specified application name"
 			}
 		;
-		auto FilterVersionManagerApp = "FilterVersionManagerApp?"_=
+		auto FilterVersionManagerApp = "FilterVersionManagerApp?"_o=
 			{
-				"Names"_= {"--filter-application"}
-				, "Type"_= ""
-				, "Description"_= "Include applications with specified version manager app name"
+				"Names"_o= {"--filter-application"}
+				, "Type"_o= ""
+				, "Description"_o= "Include applications with specified version manager app name"
 			}
 		;
-		auto FilterOutOfDateVersion = "FilterOutOfDateVersion?"_=
+		auto FilterOutOfDateVersion = "FilterOutOfDateVersion?"_o=
 			{
-				"Names"_= {"--filter-out-of-date"}
-				, "Type"_= true
-				, "Description"_= "Include applications with out of date versions"
+				"Names"_o= {"--filter-out-of-date"}
+				, "Type"_o= true
+				, "Description"_o= "Include applications with out of date versions"
 			}
 		;
 
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cloud-manager-status"}
-					, "Description"_= "List the overall status for resources controlled by the Cloud Manager"
-					, "Status"_=
+					"Names"_o= {"--cloud-manager-status"}
+					, "Description"_o= "List the overall status for resources controlled by the Cloud Manager"
+					, "Status"_o=
 					{
-						"0"_= "The status of all resources is OK"
-						, "1"_= "One or more resources has an error status"
+						"0"_o= "The status of all resources is OK"
+						, "1"_o= "One or more resources has an error status"
 					}
-					, "Options"_=
+					, "Options"_o=
 					{
 						QuietOption
 						, IncludeCloudManagerOption
@@ -103,7 +103,7 @@ namespace NMib::NCloud::NCloudClient
 						, FilterOutOfDateVersion
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_Applications | ECloudManagerStatusFlag_AppManagers;
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
@@ -114,14 +114,14 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cloud-manager-app-manager-status"}
-					, "Description"_= "List the status for app managers controlled by the Cloud Manager"
-					, "Status"_=
+					"Names"_o= {"--cloud-manager-app-manager-status"}
+					, "Description"_o= "List the status for app managers controlled by the Cloud Manager"
+					, "Status"_o=
 					{
-						"0"_= "The status of all app managers is OK"
-						, "1"_= "One or more app managers has an error status"
+						"0"_o= "The status of all app managers is OK"
+						, "1"_o= "One or more app managers has an error status"
 					}
-					, "Options"_=
+					, "Options"_o=
 					{
 						QuietOption
 						, IncludeCloudManagerOption
@@ -130,7 +130,7 @@ namespace NMib::NCloud::NCloudClient
 						, FilterEnvironment
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_AppManagers;
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
@@ -141,14 +141,14 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cloud-manager-application-status"}
-					, "Description"_= "List the status for applications in app managers controlled by the Cloud Manager"
-					, "Status"_=
+					"Names"_o= {"--cloud-manager-application-status"}
+					, "Description"_o= "List the status for applications in app managers controlled by the Cloud Manager"
+					, "Status"_o=
 					{
-						"0"_= "The status of all applications is OK"
-						, "1"_= "One or more applications has an error status"
+						"0"_o= "The status of all applications is OK"
+						, "1"_o= "One or more applications has an error status"
 					}
-					, "Options"_=
+					, "Options"_o=
 					{
 						QuietOption
 						, CTableRenderHelper::fs_OutputTypeOption()
@@ -159,7 +159,7 @@ namespace NMib::NCloud::NCloudClient
 						, FilterOutOfDateVersion
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_Applications;
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
@@ -170,22 +170,22 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cloud-manager-remove-app-manager"}
-					, "Description"_= "Remove app manager from cloud manager database"
-					, "Parameters"_=
+					"Names"_o= {"--cloud-manager-remove-app-manager"}
+					, "Description"_o= "Remove app manager from cloud manager database"
+					, "Parameters"_o=
 					{
-						"AppManagerHostID"_=
+						"AppManagerHostID"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "The host ID of the app manager to remove"
+							"Type"_o= ""
+							, "Description"_o= "The host ID of the app manager to remove"
 						}
 					}
-					, "Options"_=
+					, "Options"_o=
 					{
 						QuietOption
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager, _Params, _pCommandLine);
 				}
@@ -195,38 +195,38 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cloud-manager-remove-sensor"}
-					, "Description"_= "Remove sensor from cloud manager"
-					, "Options"_=
+					"Names"_o= {"--cloud-manager-remove-sensor"}
+					, "Description"_o= "Remove sensor from cloud manager"
+					, "Options"_o=
 					{
-						"SensorHostID?"_=
+						"SensorHostID?"_o=
 						{
-							"Names"_= {"--sensor-host-id"}
-							, "Default"_= ""
-							, "Description"_= "The host ID of the sensor to remove"
+							"Names"_o= {"--sensor-host-id"}
+							, "Default"_o= ""
+							, "Description"_o= "The host ID of the sensor to remove"
 						}
-						, "SensorApplication?"_=
+						, "SensorApplication?"_o=
 						{
-							"Names"_= {"--sensor-application"}
-							, "Default"_= ""
-							, "Description"_= "The application of the sensor to remove"
+							"Names"_o= {"--sensor-application"}
+							, "Default"_o= ""
+							, "Description"_o= "The application of the sensor to remove"
 						}
-						, "SensorIdentifier?"_=
+						, "SensorIdentifier?"_o=
 						{
-							"Names"_= {"--sensor-identifier"}
-							, "Default"_= ""
-							, "Description"_= "The identifier of the sensor to remove"
+							"Names"_o= {"--sensor-identifier"}
+							, "Default"_o= ""
+							, "Description"_o= "The identifier of the sensor to remove"
 						}
-						, "SensorIdentifierScope?"_=
+						, "SensorIdentifierScope?"_o=
 						{
-							"Names"_= {"--sensor-identifier-scope"}
-							, "Default"_= ""
-							, "Description"_= "The identifier scope of the sensor to remove"
+							"Names"_o= {"--sensor-identifier-scope"}
+							, "Default"_o= ""
+							, "Description"_o= "The identifier scope of the sensor to remove"
 						}
 						, QuietOption
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor, _Params, _pCommandLine);
 				}
@@ -237,38 +237,38 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cloud-manager-remove-log"}
-					, "Description"_= "Remove log from cloud manager"
-					, "Options"_=
+					"Names"_o= {"--cloud-manager-remove-log"}
+					, "Description"_o= "Remove log from cloud manager"
+					, "Options"_o=
 					{
-						"LogHostID?"_=
+						"LogHostID?"_o=
 						{
-							"Names"_= {"--log-host-id"}
-							, "Default"_= ""
-							, "Description"_= "The host ID of the log to remove"
+							"Names"_o= {"--log-host-id"}
+							, "Default"_o= ""
+							, "Description"_o= "The host ID of the log to remove"
 						}
-						, "LogApplication?"_=
+						, "LogApplication?"_o=
 						{
-							"Names"_= {"--log-application"}
-							, "Default"_= ""
-							, "Description"_= "The application of the log to remove"
+							"Names"_o= {"--log-application"}
+							, "Default"_o= ""
+							, "Description"_o= "The application of the log to remove"
 						}
-						, "LogIdentifier?"_=
+						, "LogIdentifier?"_o=
 						{
-							"Names"_= {"--log-identifier"}
-							, "Default"_= ""
-							, "Description"_= "The identifier of the log to remove"
+							"Names"_o= {"--log-identifier"}
+							, "Default"_o= ""
+							, "Description"_o= "The identifier of the log to remove"
 						}
-						, "LogIdentifierScope?"_=
+						, "LogIdentifierScope?"_o=
 						{
-							"Names"_= {"--log-identifier-scope"}
-							, "Default"_= ""
-							, "Description"_= "The identifier scope of the log to remove"
+							"Names"_o= {"--log-identifier-scope"}
+							, "Default"_o= ""
+							, "Description"_o= "The identifier scope of the log to remove"
 						}
 						, QuietOption
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog, _Params, _pCommandLine);
 				}
@@ -279,15 +279,15 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cloud-manager-expected-os-version-list"}
-					, "Description"_= "List expected os version settings"
-					, "Options"_=
+					"Names"_o= {"--cloud-manager-expected-os-version-list"}
+					, "Description"_o= "List expected os version settings"
+					, "Options"_o=
 					{
 						QuietOption
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList, _Params, _pCommandLine);
 				}
@@ -298,49 +298,49 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cloud-manager-expected-os-version-set"}
-					, "Description"_= "List expected os version settings"
-					, "Options"_=
+					"Names"_o= {"--cloud-manager-expected-os-version-set"}
+					, "Description"_o= "List expected os version settings"
+					, "Options"_o=
 					{
-						"OsName"_=
+						"OsName"_o=
 						{
-							"Names"_= {"--os-name"}
-							, "Type"_= ""
-							, "Description"_= "The name of the OS to set for."
+							"Names"_o= {"--os-name"}
+							, "Type"_o= ""
+							, "Description"_o= "The name of the OS to set for."
 						}
-						, "CurrentVersionMajor?"_=
+						, "CurrentVersionMajor?"_o=
 						{
-							"Names"_= {"--apply-to-version-major"}
-							, "Type"_= 0
-							, "Description"_= "The major version of the OS that this should apply for."
+							"Names"_o= {"--apply-to-version-major"}
+							, "Type"_o= 0
+							, "Description"_o= "The major version of the OS that this should apply for."
 						}
-						, "CurrentVersionMinor?"_=
+						, "CurrentVersionMinor?"_o=
 						{
-							"Names"_= {"--apply-to-version-minor"}
-							, "Type"_= 0
-							, "Description"_= "The minor version of the OS that this should apply for."
+							"Names"_o= {"--apply-to-version-minor"}
+							, "Type"_o= 0
+							, "Description"_o= "The minor version of the OS that this should apply for."
 						}
-						, "MinVersion?"_=
+						, "MinVersion?"_o=
 						{
-							"Names"_= {"--min-version"}
-							, "Type"_= ""
-							, "Description"_= "The minimum version required."
+							"Names"_o= {"--min-version"}
+							, "Type"_o= ""
+							, "Description"_o= "The minimum version required."
 						}
-						, "MaxVersion?"_=
+						, "MaxVersion?"_o=
 						{
-							"Names"_= {"--max-version"}
-							, "Type"_= ""
-							, "Description"_= "The maximum version required."
+							"Names"_o= {"--max-version"}
+							, "Type"_o= ""
+							, "Description"_o= "The maximum version required."
 						}
-						, "Deprecated?"_=
+						, "Deprecated?"_o=
 						{
-							"Names"_= {"--deprecated"}
-							, "Default"_= false
-							, "Description"_= "Deprecated the OS version, or whole OS."
+							"Names"_o= {"--deprecated"}
+							, "Default"_o= false
+							, "Description"_o= "Deprecated the OS version, or whole OS."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet, _Params, _pCommandLine);
 				}
@@ -355,7 +355,7 @@ namespace NMib::NCloud::NCloudClient
 				, "cloud-manager-"
 				, g_ActorFunctor / [this]
 				(
-					CEJSON const &_Params
+					CEJSONSorted const &_Params
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 					, CDistributedAppSensorReader_SensorFilter const &_Filter
 					, ESensorOutputFlag _Flags
@@ -376,7 +376,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, g_ActorFunctor / [this]
 				(
-					CEJSON const &_Params
+					CEJSONSorted const &_Params
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 					, CDistributedAppSensorReader_SensorStatusFilter const &_Filter
 					, ESensorOutputFlag _Flags
@@ -406,7 +406,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, g_ActorFunctor / [this]
 				(
-					CEJSON const &_Params
+					CEJSONSorted const &_Params
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 					, CDistributedAppSensorReader_SensorReadingFilter const &_Filter
 					, uint64 _MaxEntries
@@ -442,7 +442,7 @@ namespace NMib::NCloud::NCloudClient
 				, "cloud-manager-"
 				, g_ActorFunctor / [this]
 				(
-					CEJSON const &_Params
+					CEJSONSorted const &_Params
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 					, CDistributedAppLogReader_LogFilter const &_Filter
 					, ELogOutputFlag _Flags
@@ -465,7 +465,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, g_ActorFunctor / [this]
 				(
-					CEJSON const &_Params
+					CEJSONSorted const &_Params
 					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 					, CDistributedAppLogReader_LogEntryFilter const &_Filter
 					, uint64 _MaxEntries
@@ -619,7 +619,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers
 		(
-			CEJSON const &_Params
+			CEJSONSorted const &_Params
 			, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> const &_AppManagers
 			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 		)
@@ -776,7 +776,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_Applications
 		(
-			CEJSON const &_Params
+			CEJSONSorted const &_Params
 			, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> const &_Applications
 			, TCMap<CStr, CCloudManagerAppManagerInfo> const &_AppManagerInfos
 			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
@@ -1086,7 +1086,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status
 		(
-			CEJSON const &_Params
+			CEJSONSorted const &_Params
 			, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, ECloudManagerStatusFlag _Flags
 		)
@@ -1154,7 +1154,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return fg_Max(ReturnAppManagers, ReturnApplications);
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		CStr AppManagerHostID = _Params["AppManagerHostID"].f_String();
@@ -1177,7 +1177,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1217,7 +1217,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1257,7 +1257,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1335,7 +1335,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 

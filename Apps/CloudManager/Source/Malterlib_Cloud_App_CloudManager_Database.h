@@ -19,7 +19,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		static CStr const mc_Prefix;
 
@@ -31,7 +31,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		TCMap<CStr, CStr> m_SensorProblemsSlackThread;
 		NTime::CTime m_LastSeenLogTimestamp;
@@ -44,7 +44,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		static CStr const mc_Prefix;
 
@@ -57,7 +57,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		CCloudManager::CAppManagerInfo m_Info;
 		CTime m_LastSeen;
@@ -75,7 +75,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		static CStr const mc_Prefix;
 
@@ -89,7 +89,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		CAppManagerInterface::CApplicationInfo m_ApplicationInfo;
 	};
@@ -109,7 +109,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		fp64 m_Time = 0.0;
 	};
@@ -119,7 +119,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		CStr m_LastUpdateID;
 		TCMap<CStr, CStr> m_SlackTimestamps;
@@ -147,7 +147,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		CDistributedAppSensorReporter::EStatusSeverity m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Info;
 		CStr m_Message;
@@ -158,7 +158,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		CSensorNotificationStateNotificationStatus m_Status;
 		CSensorNotificationStateNotificationStatus m_OutdatedStatus;
@@ -170,7 +170,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		CSensorNotificationStateNotification m_LastNotification;
 		fp64 m_TimeInProblemState = 0.0;
@@ -185,7 +185,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		static CStr const mc_Prefix;
 
@@ -199,7 +199,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		CEJSON f_ToJson() const;
+		CEJSONSorted f_ToJson() const;
 
 		CCloudManager::CExpectedVersionRange m_ExpectedVersionRange;
 	};

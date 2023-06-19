@@ -23,7 +23,7 @@ namespace NMib::NCloud::NSecretsManager
 	}
 	
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJSON> CSecretsManagerDaemonActor::CServer::f_Test_Command(CStr const &_Command, CEJSON const &_Params)
+	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServer::f_Test_Command(CStr const &_Command, CEJSONSorted const &_Params)
 	{
 		if (_Command == "UploadInitialized")
 			co_return co_await mp_UploadInitialized[_Params.f_String()].f_Future();
@@ -55,7 +55,7 @@ namespace NMib::NCloud::NSecretsManager
 		}
 
 		if (_Command == "DestroyWaitingForCanDestroy")
-			co_return co_await (mp_DestroyWaitingForCanDestroy = TCPromise<CEJSON>{})->f_Future();
+			co_return co_await (mp_DestroyWaitingForCanDestroy = TCPromise<CEJSONSorted>{})->f_Future();
 
 		if (_Command == "SyncFileOperations")
 			co_return co_await mp_FileActor(&CSecretsManagerDaemonActor::CServer::CFileActor::f_SyncFileOperations);
@@ -468,13 +468,13 @@ namespace NMib::NCloud::NSecretsManager
 	}
 
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJSON> CSecretsManagerDaemonActor::CServer::CFileActor::f_SyncFileOperations()
+	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServer::CFileActor::f_SyncFileOperations()
 	{
 		// This function is used for debugging concurrent operations.
 		co_return {};
 	}
 
-	TCFuture<CEJSON> CSecretsManagerDaemonActor::CServer::f_SyncFileOperations()
+	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServer::f_SyncFileOperations()
 	{
 		co_return co_await mp_FileActor(&CFileActor::f_SyncFileOperations);
 	}

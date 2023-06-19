@@ -32,13 +32,13 @@ public:
 
 			co_await AppManagerTestHelper.f_Setup(1);
 			auto &AppManagerInfo = *AppManagerTestHelper.m_pState->m_AppManagerInfos.f_FindAny();
-			auto fShouldKeepValue = [](CEJSON const &_Reading)
+			auto fShouldKeepValue = [](CEJSONSorted const &_Reading)
 				{
 					return _Reading["Identifier"].f_String().f_StartsWith("org.malterlib.testapp.test");
 				}
 			;
 
-			auto fMakeComparable = [&](CEJSON &&_Readings)
+			auto fMakeComparable = [&](CEJSONSorted &&_Readings)
 				{
 					for (auto &Reading : _Readings.f_Array())
 					{
@@ -50,7 +50,7 @@ public:
 					// We need to sort by sequence because the system clock might change
 					_Readings.f_Array().f_Sort
 						(
-							[](CEJSON const &_Left, CEJSON const &_Right)
+							[](CEJSONSorted const &_Left, CEJSONSorted const &_Right)
 							{
 								auto Left = _Left.f_GetMemberValue("UniqueSequence", 0);
 								auto Right = _Right.f_GetMemberValue("UniqueSequence", 0);
@@ -66,7 +66,7 @@ public:
 
 			auto TestAppDirectory = AppManagerInfo.m_RootDirectory / "App/TestApp";
 
-			CEJSON ExpectedSensors = CEJSON
+			CEJSONSorted ExpectedSensors = CEJSONSorted
 				{
 					{
 						"HostID"_= ""
@@ -92,7 +92,7 @@ public:
 						, "Name"_= "Test Sensor"
 						, "Type"_= 2
 						, "ExpectedReportInterval"_= nullptr
-						, "UnitDivisors"_= CEJSON
+						, "UnitDivisors"_= CEJSONSorted
 						{
 							{
 								"Divisor"_= 0.0
@@ -131,7 +131,7 @@ public:
 				}
 			;
 
-			CEJSON ExpectedSensorReadings;
+			CEJSONSorted ExpectedSensorReadings;
 			for (mint i = 0; i < 5; ++i)
 			{
 				ExpectedSensorReadings.f_Array().f_Insert
@@ -163,7 +163,7 @@ public:
 								, "IdentifierScope"_= ""
 								, "Name"_= "Test Sensor (version)"
 								, "UniqueSequence"_= i + 1
-								, "Value"_= CEJSONUserType
+								, "Value"_= CEJSONUserTypeSorted
 								{
 									"Version"
 									,
@@ -182,7 +182,7 @@ public:
 				;
 			}
 
-			CEJSON ExpectedSensorStatus = CEJSON
+			CEJSONSorted ExpectedSensorStatus = CEJSONSorted
 				{
 					{
 						"HostID"_= ""
@@ -205,7 +205,7 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor (version)"
 						, "UniqueSequence"_= 5
-						, "Value"_= CEJSONUserType
+						, "Value"_= CEJSONUserTypeSorted
 						{
 							"Version"
 							,
@@ -222,14 +222,14 @@ public:
 				}
 			;
 
-			auto fSortSensors = [&](CEJSON const &_Sensors)
+			auto fSortSensors = [&](CEJSONSorted const &_Sensors)
 				{
-					CEJSON Return = _Sensors;
+					CEJSONSorted Return = _Sensors;
 					Return.f_Array().f_Sort
 						(
-							[](CEJSON const &_Left, CEJSON const &_Right)
+							[](CEJSONSorted const &_Left, CEJSONSorted const &_Right)
 							{
-								auto fTuple = [](CEJSON const &_Value)
+								auto fTuple = [](CEJSONSorted const &_Value)
 									{
 										return fg_TupleReferences
 											(
@@ -264,13 +264,13 @@ public:
 
 				auto fReadSensors = [&]()
 					{
-						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-list", "--json"}, TestAppDirectory));
+						return CEJSONSorted::fs_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-list", "--json"}, TestAppDirectory));
 					}
 				;
 
 				auto fReadSensorReadings = [&]()
 					{
-						return CEJSON::fs_FromString
+						return CEJSONSorted::fs_FromString
 							(
 								CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--newest", "--json"}, TestAppDirectory)
 							)
@@ -280,7 +280,7 @@ public:
 
 				auto fReadSensorStatus = [&]()
 					{
-						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--no-only-problems", "--json"}, TestAppDirectory));
+						return CEJSONSorted::fs_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--no-only-problems", "--json"}, TestAppDirectory));
 					}
 				;
 
@@ -295,9 +295,9 @@ public:
 					, TestAppHostID = CStr(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory).f_Trim())
 					, HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName())
 				]
-				(CEJSON const &_JSON)
+				(CEJSONSorted const &_JSON)
 				{
-					CEJSON Return = _JSON;
+					CEJSONSorted Return = _JSON;
 
 					for (auto &Entry : Return.f_Array())
 					{
@@ -317,13 +317,13 @@ public:
 
 				auto fReadSensors = [&]()
 					{
-						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-list", "--json"}, AppManagerInfo.m_RootDirectory));
+						return CEJSONSorted::fs_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-list", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
 				auto fReadSensorReadings = [&]()
 					{
-						return CEJSON::fs_FromString
+						return CEJSONSorted::fs_FromString
 							(
 								CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory)
 							)
@@ -333,7 +333,7 @@ public:
 
 				auto fReadSensorStatus = [&]()
 					{
-						return CEJSON::fs_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-status", "--no-only-problems", "--json"}, AppManagerInfo.m_RootDirectory));
+						return CEJSONSorted::fs_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-status", "--no-only-problems", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
@@ -350,7 +350,7 @@ public:
 
 				auto fReadSensors = [&]()
 					{
-						return CEJSON::fs_FromString
+						return CEJSONSorted::fs_FromString
 							(
 								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-list", "--json"}, CloudClientDirectory)
 							)
@@ -360,7 +360,7 @@ public:
 
 				auto fReadSensorReadings = [&]()
 					{
-						return CEJSON::fs_FromString
+						return CEJSONSorted::fs_FromString
 							(
 								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-readings-list", "--newest", "--json"}, CloudClientDirectory)
 							)
@@ -370,7 +370,7 @@ public:
 
 				auto fReadSensorStatus = [&]()
 					{
-						return CEJSON::fs_FromString
+						return CEJSONSorted::fs_FromString
 							(
 								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-status", "--no-only-problems", "--json"}, CloudClientDirectory)
 							)

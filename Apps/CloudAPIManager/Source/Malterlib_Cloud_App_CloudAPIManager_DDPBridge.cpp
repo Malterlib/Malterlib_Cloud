@@ -29,9 +29,9 @@ namespace NMib::NCloud::NCloudAPIManager
 				CDistributedTrustDDPBridge::CMethod
 				{
 					"getSwiftBaseURL"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCFuture<NEncoding::CEJSON>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> const &_Params) -> TCFuture<NEncoding::CEJSONSorted>
 					{
-						TCPromise<NEncoding::CEJSON> Promise;
+						TCPromise<NEncoding::CEJSONSorted> Promise;
 						CCloudAPIManager::CGetSwiftBaseURL Params;
 						{
 							auto CaptureScope = co_await g_CaptureExceptions;
@@ -47,11 +47,11 @@ namespace NMib::NCloud::NCloudAPIManager
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIEnsureContainer"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCFuture<NEncoding::CEJSON>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> const &_Params) -> TCFuture<NEncoding::CEJSONSorted>
 					{
 						if (_Params.f_GetLen() != 1)
 							co_return "Method takes 1 parameter";
-						TCPromise<NEncoding::CEJSON> Promise;
+						TCPromise<NEncoding::CEJSONSorted> Promise;
 						CCloudAPIManager::CEnsureContainer Params;
 						{
 							auto CaptureScope = co_await g_CaptureExceptions;
@@ -71,11 +71,11 @@ namespace NMib::NCloud::NCloudAPIManager
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPISignTempURL"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCFuture<NEncoding::CEJSON>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> const &_Params) -> TCFuture<NEncoding::CEJSONSorted>
 					{
 						if (_Params.f_GetLen() != 1)
 							co_return "Method takes 1 parameter";
-						TCPromise<NEncoding::CEJSON> Promise;
+						TCPromise<NEncoding::CEJSONSorted> Promise;
 						CCloudAPIManager::CSignTempURL Params;
 						{
 							auto CaptureScope = co_await g_CaptureExceptions;
@@ -95,11 +95,11 @@ namespace NMib::NCloud::NCloudAPIManager
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIDeleteObject"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSON> const &_Params) -> TCFuture<NEncoding::CEJSON>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> const &_Params) -> TCFuture<NEncoding::CEJSONSorted>
 					{
 						if (_Params.f_GetLen() != 1)
 							co_return "Method takes 1 parameter";
-						TCPromise<NEncoding::CEJSON> Promise;
+						TCPromise<NEncoding::CEJSONSorted> Promise;
 						CCloudAPIManager::CDeleteObject Params;
 						{
 							auto CaptureScope = co_await g_CaptureExceptions;

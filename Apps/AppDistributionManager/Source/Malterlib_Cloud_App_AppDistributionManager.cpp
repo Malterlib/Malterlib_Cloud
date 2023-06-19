@@ -15,7 +15,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	CAppDistributionManagerActor::~CAppDistributionManagerActor() = default;
 
-	TCFuture<void> CAppDistributionManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CAppDistributionManagerActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
 	{
 		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App distribution manager file operations"));
 		

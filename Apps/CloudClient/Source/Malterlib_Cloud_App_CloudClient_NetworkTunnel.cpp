@@ -22,30 +22,30 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--network-tunnel-enum"}
-					, "Description"_= "List network tunnels available on remotes."
-					, "Options"_=
+					"Names"_o= {"--network-tunnel-enum"}
+					, "Description"_o= "List network tunnels available on remotes."
+					, "Options"_o=
 					{
-						"Hosts?"_=
+						"Hosts?"_o=
 						{
-							"Names"_= {"--hosts"}
-							, "Default"_= _[_]
-							, "Description"_= "The hosts to list tunnels for. If empty all hosts are included.\n"
-							, "Type"_= {""}
+							"Names"_o= {"--hosts"}
+							, "Default"_o= _[_]
+							, "Description"_o= "The hosts to list tunnels for. If empty all hosts are included.\n"
+							, "Type"_o= {""}
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"TunnelName...?"_=
+						"TunnelName...?"_o=
 						{
-							"Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "A list of wildcards for tunnel names to open tunnels to.\n"
+							"Default"_o= _[_]
+							, "Type"_o= {""}
+							, "Description"_o= "A list of wildcards for tunnel names to open tunnels to.\n"
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels, _Params, _pCommandLine);
 				}
@@ -55,42 +55,42 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--network-tunnel-open"}
-					, "Description"_= "Open network tunnels."
-					, "Options"_=
+					"Names"_o= {"--network-tunnel-open"}
+					, "Description"_o= "Open network tunnels."
+					, "Options"_o=
 					{
-						"Hosts?"_=
+						"Hosts?"_o=
 						{
-							"Names"_= {"--hosts"}
-							, "Default"_= _[_]
-							, "Description"_= "The hosts to open tunnels for. If empty all hosts are included.\n"
-							, "Type"_= {""}
+							"Names"_o= {"--hosts"}
+							, "Default"_o= _[_]
+							, "Description"_o= "The hosts to open tunnels for. If empty all hosts are included.\n"
+							, "Type"_o= {""}
 						}
-						, "ListenHost?"_=
+						, "ListenHost?"_o=
 						{
-							"Names"_= {"--listen-host", "-l"}
-							, "Default"_= ""
-							, "Description"_= "The hostname to listen on. For unix sockets prefix path with UNIX:\n"
+							"Names"_o= {"--listen-host", "-l"}
+							, "Default"_o= ""
+							, "Description"_o= "The hostname to listen on. For unix sockets prefix path with UNIX:\n"
 						}
-						, "Verbose?"_=
+						, "Verbose?"_o=
 						{
-							"Names"_= {"--verbose", "-v"}
-							, "Default"_= false
-							, "Description"_= "Log every connection.\n"
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Log every connection.\n"
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"TunnelName...?"_=
+						"TunnelName...?"_o=
 						{
-							"Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "A list of wildcards for tunnel names to open tunnels to.\n"
+							"Default"_o= _[_]
+							, "Type"_o= {""}
+							, "Description"_o= "A list of wildcards for tunnel names to open tunnels to.\n"
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels, _Params, _pCommandLine);
 				}
@@ -109,7 +109,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> CCloudClientAppActor::fp_NetworkTunnel_Filter(CEJSON const &_Params)
+	TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> CCloudClientAppActor::fp_NetworkTunnel_Filter(CEJSONSorted const &_Params)
 	{
 		co_await self(&CCloudClientAppActor::fp_NetworkTunnel_Init);
 
@@ -140,7 +140,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return fg_Move(Return);
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		auto TunnelsPerHost = co_await self(&CCloudClientAppActor::fp_NetworkTunnel_Filter, _Params);
 
@@ -170,7 +170,7 @@ namespace NMib::NCloud::NCloudClient
 		auto operator <=> (CTunnelKey const &_Right) const = default;
 	};
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		auto TunnelsPerHost = co_await self(&CCloudClientAppActor::fp_NetworkTunnel_Filter, _Params);
 

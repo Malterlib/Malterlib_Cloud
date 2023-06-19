@@ -18,12 +18,12 @@ namespace NMib::NCloud::NSecretsManager
 		struct CServerController;
 		
 	private:
-		TCFuture<void> fp_StartApp(CEJSON const &_Params) override;
+		TCFuture<void> fp_StartApp(CEJSONSorted const &_Params) override;
 		TCFuture<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
 #if DMibConfig_Tests_Enable
-		TCFuture<CEJSON> fp_Test_Command(CStr const &_Command, CEJSON const &_Params) override;
+		TCFuture<CEJSONSorted> fp_Test_Command(CStr const &_Command, CEJSONSorted const &_Params) override;
 #endif
 
 		TCActor<CServerController> mp_pServerController;

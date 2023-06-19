@@ -63,7 +63,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Remove, _Params["Name"].f_String());
 		co_return 0;

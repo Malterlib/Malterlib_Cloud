@@ -148,7 +148,7 @@ namespace NMib::NCloud::NVersionManager
 									CVersionManager::CVersionInformation OutVersion;
 									if (CFile::fs_FileExists(VersionInfoPath))
 									{
-										CEJSON ApplicationInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoPath), VersionInfoPath);
+										CEJSONSorted ApplicationInfo = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoPath), VersionInfoPath);
 										if (auto pValue = ApplicationInfo.f_GetMember("Time", EEJSONType_Date))
 											OutVersion.m_Time = pValue->f_Date();
 										if (auto pValue = ApplicationInfo.f_GetMember("Configuration", EJSONType_String))

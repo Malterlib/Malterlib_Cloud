@@ -19,7 +19,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 	}
 
-	TCFuture<void> CBackupManagerApp::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CBackupManagerApp::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
 	{
 		mp_Server = fg_ConstructActor<CBackupManagerServer>(fg_Construct(self), mp_State);
 

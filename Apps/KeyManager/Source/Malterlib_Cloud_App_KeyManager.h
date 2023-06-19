@@ -21,7 +21,7 @@ namespace NMib::NCloud::NKeyManager
 		TCFuture<uint32> f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 	private:
-		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
 		TCFuture<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 

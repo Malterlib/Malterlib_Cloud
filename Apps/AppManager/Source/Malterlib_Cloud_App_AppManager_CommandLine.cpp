@@ -22,11 +22,11 @@ namespace NMib::NCloud::NAppManager
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
-					"LogLaunchesToStdErr?"_=
+					"LogLaunchesToStdErr?"_o=
 					{
-						"Names"_= {"--log-launches-to-stderr"}
-						,"Default"_= false
-						, "Description"_= "Log application launch output to stderr."
+						"Names"_o= {"--log-launches-to-stderr"}
+						,"Default"_o= false
+						, "Description"_o= "Log application launch output to stderr."
 					}
 				}
 			)
@@ -35,11 +35,11 @@ namespace NMib::NCloud::NAppManager
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
-					"AutoUpdateDelay?"_=
+					"AutoUpdateDelay?"_o=
 					{
-						"Names"_= {"--auto-update-delay"}
-						,"Default"_= 15.0
-						, "Description"_= "Delay wait when receiving new versions to wait for other version managers to also send their versions."
+						"Names"_o= {"--auto-update-delay"}
+						,"Default"_o= 15.0
+						, "Description"_o= "Delay wait when receiving new versions to wait for other version managers to also send their versions."
 					}
 				}
 			)
@@ -48,11 +48,11 @@ namespace NMib::NCloud::NAppManager
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
-					"HostMonitorInterval?"_=
+					"HostMonitorInterval?"_o=
 					{
-						"Names"_= {"--host-monitor-interval"}
-						,"Type"_= 0.0
-						, "Description"_= "Override host monitor interval."
+						"Names"_o= {"--host-monitor-interval"}
+						,"Type"_o= 0.0
+						, "Description"_o= "Override host monitor interval."
 					}
 				}
 			)
@@ -61,11 +61,11 @@ namespace NMib::NCloud::NAppManager
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
-					"HostMonitorPatchInterval?"_=
+					"HostMonitorPatchInterval?"_o=
 					{
-						"Names"_= {"--host-monitor-patch-interval"}
-						,"Type"_= 0.0
-						, "Description"_= "Override host monitor patch interval."
+						"Names"_o= {"--host-monitor-patch-interval"}
+						,"Type"_o= 0.0
+						, "Description"_o= "Override host monitor patch interval."
 					}
 				}
 			)
@@ -73,109 +73,109 @@ namespace NMib::NCloud::NAppManager
 		
 		auto ApplicationManagement = o_CommandLine.f_AddSection("Application Management", "Commands to manage AppManager applications");
 
-		auto SettingsOption_Executable = "Executable?"_= 
+		auto SettingsOption_Executable = "Executable?"_o=
 			{
-				"Names"_= {"--executable"}
-				,"Type"_= ""
-				, "Description"_= "Start this executable when running application.\n"
+				"Names"_o= {"--executable"}
+				,"Type"_o= ""
+				, "Description"_o= "Start this executable when running application.\n"
 					"Can contain sub-path.\n"
 			}
 		;
-		auto SettingsOption_RunAsUser = "RunAsUser?"_=
+		auto SettingsOption_RunAsUser = "RunAsUser?"_o=
 			{
-				"Names"_= {"--run-as-user"}
-				, "Type"_= ""
-				, "Description"_= "Run the application as this user."
+				"Names"_o= {"--run-as-user"}
+				, "Type"_o= ""
+				, "Description"_o= "Run the application as this user."
 			}
 		;
 #ifdef DPlatformFamily_Windows
-		auto SettingsOption_RunAsUserPassword = "RunAsUserPassword?"_=
+		auto SettingsOption_RunAsUserPassword = "RunAsUserPassword?"_o=
 			{
-				"Names"_= {"--run-as-user-password"}
-				, "Type"_= ""
-				, "Description"_= "Set the password for the run as user.\n"
+				"Names"_o= {"--run-as-user-password"}
+				, "Type"_o= ""
+				, "Description"_o= "Set the password for the run as user.\n"
 				"This password is automatically set when a user is created. If you change it you can use this function to change the password used to launch the application."
 			}
 		;
 #endif
-		auto SettingsOption_RunAsGroup = "RunAsGroup?"_=
+		auto SettingsOption_RunAsGroup = "RunAsGroup?"_o=
 			{
-				"Names"_= {"--run-as-group"}
-				, "Type"_= ""
-				, "Description"_= "Run the application as this group."
+				"Names"_o= {"--run-as-group"}
+				, "Type"_o= ""
+				, "Description"_o= "Run the application as this group."
 			}
 		;
-		auto SettingsOption_RunAsUserHasShell = "RunAsUserHasShell?"_=
+		auto SettingsOption_RunAsUserHasShell = "RunAsUserHasShell?"_o=
 			{
-				"Names"_= {"--run-as-user-has-shell"}
-				, "Type"_= ""
-				, "Description"_= "The run as user gets created with shell access."
+				"Names"_o= {"--run-as-user-has-shell"}
+				, "Type"_o= ""
+				, "Description"_o= "The run as user gets created with shell access."
 			}
 		;
-		auto SettingsOption_LaunchInProcess = "LaunchInProcess?"_=
+		auto SettingsOption_LaunchInProcess = "LaunchInProcess?"_o=
 			{
-				"Names"_= {"--launch-in-process"}
-				, "Type"_= true
-				, "Description"_= "Launch the application in the process of the AppManager.\n"
+				"Names"_o= {"--launch-in-process"}
+				, "Type"_o= true
+				, "Description"_o= "Launch the application in the process of the AppManager.\n"
 				"This is only useful when you have populated the in app registry. See fg_AppManager_RegisterInProcessFactory."
 				" The default AppManager executable does not include any bundled applications inside the executable."
 			}
 		;
-		auto SettingsOption_DistributedApp = "DistributedApp?"_=
+		auto SettingsOption_DistributedApp = "DistributedApp?"_o=
 			{
-				"Names"_= {"--distributed-app"}
-				, "Type"_= true
-				, "Description"_= "Expect the app to register as a distributed app. This will cause the AppManager to wait for the app to register before."
+				"Names"_o= {"--distributed-app"}
+				, "Type"_o= true
+				, "Description"_o= "Expect the app to register as a distributed app. This will cause the AppManager to wait for the app to register before."
 					"returning from add, start and update operations."
 			}
 		;
-		auto SettingsOption_UpdateGroup = "UpdateGroup?"_= 
+		auto SettingsOption_UpdateGroup = "UpdateGroup?"_o=
 			{
-				"Names"_= {"--update-group"}
-				, "Type"_= ""
-				, "Description"_= "The group to use for coordinating updates with other AppManagers.\n"
+				"Names"_o= {"--update-group"}
+				, "Type"_o= ""
+				, "Description"_o= "The group to use for coordinating updates with other AppManagers.\n"
 			}
 		;
-		auto SettingsOption_Dependencies = "Dependencies?"_= 
+		auto SettingsOption_Dependencies = "Dependencies?"_o=
 			{
-				"Names"_= {"--dependencies"}
-				, "Type"_= {""}
-				, "Description"_= "The applications this application is dependent on.\n"
+				"Names"_o= {"--dependencies"}
+				, "Type"_o= {""}
+				, "Description"_o= "The applications this application is dependent on.\n"
 			}
 		;
-		auto SettingsOption_StopOnDependencyFailure = "StopOnDependencyFailure?"_= 
+		auto SettingsOption_StopOnDependencyFailure = "StopOnDependencyFailure?"_o=
 			{
-				"Names"_= {"--stop-on-dependency-failure"}
-				, "Type"_= true
-				, "Description"_= "If this application should automatically stop if one of it's dependencies unexpectedly exits. Defaults to true.\n"
+				"Names"_o= {"--stop-on-dependency-failure"}
+				, "Type"_o= true
+				, "Description"_o= "If this application should automatically stop if one of it's dependencies unexpectedly exits. Defaults to true.\n"
 			}
 		;
 
-		auto SettingsOption_BackupIncludeWildcards = "BackupIncludeWildcards?"_= 
+		auto SettingsOption_BackupIncludeWildcards = "BackupIncludeWildcards?"_o=
 			{
-				"Names"_= {"--backup-include-wildcards"}
-				, "Type"_= {"*"_= {COneOfType{CEJSON{""}, COneOf{nullptr}}}}
-				, "Description"_= "The wildcard file searches to include in backups.\n" 
+				"Names"_o= {"--backup-include-wildcards"}
+				, "Type"_o= {"*"_o= {COneOfType{CEJSONOrdered{""}, COneOf{nullptr}}}}
+				, "Description"_o= "The wildcard file searches to include in backups.\n"
 				"Relative to application root. Only file name can have wildcards.\n"
 				"Use ^ in the beginning of the file path to create a recursive search.\n"
 				"Example: '{\"Logs/^*\": null, \"Files/^*\": \"Files2\"}'\n"
 			}
 		;
 
-		auto SettingsOption_BackupExcludeWildcards = "BackupExcludeWildcards?"_= 
+		auto SettingsOption_BackupExcludeWildcards = "BackupExcludeWildcards?"_o=
 			{
-				"Names"_= {"--backup-exclude-wildcards"}
-				, "Type"_= {""}
-				, "Description"_= "Whe wildcard for files to exclude from backup."
+				"Names"_o= {"--backup-exclude-wildcards"}
+				, "Type"_o= {""}
+				, "Description"_o= "Whe wildcard for files to exclude from backup."
 				"Relative to application root. Evaluated after include wild cards as a filtering step.\n"
 			}
 		;
 
-		auto SettingsOption_BackupAddSyncFlagsWildcards = "BackupAddSyncFlagsWildcards?"_= 
+		auto SettingsOption_BackupAddSyncFlagsWildcards = "BackupAddSyncFlagsWildcards?"_o=
 			{
-				"Names"_= {"--backup-add-sync-flags-wildcards"}
-				, "Type"_= {"*"_= {""}}
-				, "Description"_= "Specify wildcards mapped to flags to add for files to back up.\n"
+				"Names"_o= {"--backup-add-sync-flags-wildcards"}
+				, "Type"_o= {"*"_o= {""}}
+				, "Description"_o= "Specify wildcards mapped to flags to add for files to back up.\n"
 				"Relative to application root. Flags:\n"
 				"@Indent=20\r"
 				"   Append:          Append syncing. Any changes are assumed to be append only.\r"
@@ -185,11 +185,11 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		auto SettingsOption_BackupRemoveSyncFlagsWildcards = "BackupRemoveSyncFlagsWildcards?"_= 
+		auto SettingsOption_BackupRemoveSyncFlagsWildcards = "BackupRemoveSyncFlagsWildcards?"_o=
 			{
-				"Names"_= {"--backup-remove-sync-flags-wildcards"}
-				, "Type"_= {"*"_= {""}}
-				, "Description"_= "Specify wildcards mapped to flags to remove for files to back up.\n"
+				"Names"_o= {"--backup-remove-sync-flags-wildcards"}
+				, "Type"_o= {"*"_o= {""}}
+				, "Description"_o= "Specify wildcards mapped to flags to remove for files to back up.\n"
 				"Relative to application root. Evaluated after add sync flags wildcards. Flags:\n"
 				"@Indent=20\r"
 				"   Append:          Append syncing. Any changes are assumed to be append only.\r"
@@ -199,164 +199,164 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 		
-		auto SettingsOption_BackupNewBackupIntervalHours = "BackupNewBackupIntervalHours?"_= 
+		auto SettingsOption_BackupNewBackupIntervalHours = "BackupNewBackupIntervalHours?"_o=
 			{
-				"Names"_= {"--backup-new-backup-interval"}
-				, "Type"_= 0.0
-				, "Description"_= "Number of hours interval for creating new full backup snapshots. Set to 0 to disable. Defaults to 24 hours.\n"
+				"Names"_o= {"--backup-new-backup-interval"}
+				, "Type"_o= 0.0
+				, "Description"_o= "Number of hours interval for creating new full backup snapshots. Set to 0 to disable. Defaults to 24 hours.\n"
 			}
 		;
 
-		auto SettingsOption_BackupEnabled = "BackupEnabled?"_= 
+		auto SettingsOption_BackupEnabled = "BackupEnabled?"_o=
 			{
-				"Names"_= {"--backup-enabled"}
-				, "Type"_= true
-				, "Description"_= "Enable backups for this application.\n"
+				"Names"_o= {"--backup-enabled"}
+				, "Type"_o= true
+				, "Description"_o= "Enable backups for this application.\n"
 			}
 		;
 
-		auto AddOption_AutoUpdate = "AutoUpdate?"_=
+		auto AddOption_AutoUpdate = "AutoUpdate?"_o=
 			{
-				"Names"_= {"--auto-update"}
-				, "Default"_= true
-				, "Description"_= "Automatically update the application."
+				"Names"_o= {"--auto-update"}
+				, "Default"_o= true
+				, "Description"_o= "Automatically update the application."
 			}
 		;
 
-		auto AddOption_UpdateTags = "UpdateTags?"_=
+		auto AddOption_UpdateTags = "UpdateTags?"_o=
 			{
-				"Names"_= {"--update-tags"}
-				, "Default"_= _[_]
-				, "Type"_= CEJSON{""}
-				, "Description"_= "When updating the application require these tags on the version to update to."
+				"Names"_o= {"--update-tags"}
+				, "Default"_o= _[_]
+				, "Type"_o= CEJSONOrdered{""}
+				, "Description"_o= "When updating the application require these tags on the version to update to."
 			}
 		;
-		auto AddOption_UpdateBranches = "UpdateBranches?"_=
+		auto AddOption_UpdateBranches = "UpdateBranches?"_o=
 			{
-				"Names"_= {"--update-branches"}
-				, "Default"_= _[_]
-				, "Type"_= {""}
-				, "Description"_= "Update the application only for versions from these branches.\n"
+				"Names"_o= {"--update-branches"}
+				, "Default"_o= _[_]
+				, "Type"_o= {""}
+				, "Description"_o= "Update the application only for versions from these branches.\n"
 				"Leave empty to allow any branch.\n"
 				"Branches can be matched with wildcards.\n"
 			}
 		;
-		auto AddOption_UpdateScriptPreUpdate = "UpdateScript_PreUpdate?"_=
+		auto AddOption_UpdateScriptPreUpdate = "UpdateScript_PreUpdate?"_o=
 			{
-				"Names"_= {"--update-script-pre-update"}
-				, "Default"_= ""
-				, "Description"_= "Set a script to run pre update.\n"
+				"Names"_o= {"--update-script-pre-update"}
+				, "Default"_o= ""
+				, "Description"_o= "Set a script to run pre update.\n"
 			}
 		;
-		auto AddOption_UpdateScriptPostUpdate = "UpdateScript_PostUpdate?"_=
+		auto AddOption_UpdateScriptPostUpdate = "UpdateScript_PostUpdate?"_o=
 			{
-				"Names"_= {"--update-script-post-update"}
-				, "Default"_= ""
-				, "Description"_= "Set a script to run post update.\n"
+				"Names"_o= {"--update-script-post-update"}
+				, "Default"_o= ""
+				, "Description"_o= "Set a script to run post update.\n"
 			}
 		;
-		auto AddOption_UpdateScriptPostLaunch = "UpdateScript_PostLaunch?"_=
+		auto AddOption_UpdateScriptPostLaunch = "UpdateScript_PostLaunch?"_o=
 			{
-				"Names"_= {"--update-script-post-launch"}
-				, "Default"_= ""
-				, "Description"_= "Set a script to run post launch.\n"
+				"Names"_o= {"--update-script-post-launch"}
+				, "Default"_o= ""
+				, "Description"_o= "Set a script to run post launch.\n"
 			}
 		;
-		auto AddOption_UpdateScriptOnError = "UpdateScript_OnError?"_=
+		auto AddOption_UpdateScriptOnError = "UpdateScript_OnError?"_o=
 			{
-				"Names"_= {"--update-script-on-error"}
-				, "Default"_= ""
-				, "Description"_= "Set a script to run when an error occurs during the update process.\n"
+				"Names"_o= {"--update-script-on-error"}
+				, "Default"_o= ""
+				, "Description"_o= "Set a script to run when an error occurs during the update process.\n"
 			}
 		;
 
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-add"}
-					, "Description"_= 
+					"Names"_o= {"--application-add"}
+					, "Description"_o=
 						"Adds an application.\n"
 						"By default the application will run as root."
-					, "Options"_= 
+					, "Options"_o=
 					{
-						"Name"_= 
+						"Name"_o=
 						{
-							"Names"_= {"--name"}
-							,"Default"_= ""
-							, "Description"_= "Uniquely name the application.\n"
+							"Names"_o= {"--name"}
+							,"Default"_o= ""
+							, "Description"_o= "Uniquely name the application.\n"
 							"If left empty the name defaults to the package name when installing from a Versionanager, "
 							"otherwise if --from-file or a null package is specified specifying a name is required."
 						}
-						, "FromFile?"_= 
+						, "FromFile?"_o=
 						{
-							"Names"_= {"--from-file"}
-							, "Default"_= false
-							, "Description"_= "Install the application from a local file or directory instead of downloading from version manager."
+							"Names"_o= {"--from-file"}
+							, "Default"_o= false
+							, "Description"_o= "Install the application from a local file or directory instead of downloading from version manager."
 						}
-						, "EncryptionStorage?"_= 
+						, "EncryptionStorage?"_o=
 						{
-							"Names"_= {"--encryption-storage"}
-							, "Default"_= ""
-							, "Description"_= "Select the file or device that should be the storage for encryption."
+							"Names"_o= {"--encryption-storage"}
+							, "Default"_o= ""
+							, "Description"_o= "Select the file or device that should be the storage for encryption."
 						}
-						, "EncryptionFileSystem?"_= 
+						, "EncryptionFileSystem?"_o=
 						{
-							"Names"_= {"--encryption-file-system"}
-							, "Type"_= ""
-							, "Description"_= "Select the file system to use for encryption.\n"
+							"Names"_o= {"--encryption-file-system"}
+							, "Type"_o= ""
+							, "Description"_o= "Select the file system to use for encryption.\n"
 							"Currently zfs, xfs and ext4 are supported."
 						}
-						, "ParentApplication?"_= 
+						, "ParentApplication?"_o=
 						{
-							"Names"_= {"--parent-application"}
-							, "Default"_= ""
-							, "Description"_= "Put this application as a child to another application, sharing the same root directory.\n"
+							"Names"_o= {"--parent-application"}
+							, "Default"_o= ""
+							, "Description"_o= "Put this application as a child to another application, sharing the same root directory.\n"
 							"The directory of this application will be: ParentApplicationDir/ApplicationName\n"
 						}
-						, "Version?"_= 
+						, "Version?"_o=
 						{
-							"Names"_= {"--version"}
-							,"Type"_= "" 
-							, "Description"_= "The version to install from version manager.\n"
+							"Names"_o= {"--version"}
+							,"Type"_o= ""
+							, "Description"_o= "The version to install from version manager.\n"
 								"Defaults to the latest version available.\n"
 						}
-						, "VersionManagerPlatform?"_= 
+						, "VersionManagerPlatform?"_o=
 						{
-							"Names"_= {"--platform"}
-							, "Type"_= "" 
-							, "Description"_= fg_Format
+							"Names"_o= {"--platform"}
+							, "Type"_o= ""
+							, "Description"_o= fg_Format
 							(
 								"Version manager platform used when downloading version. Defaults to the same as this executable: {}"
 								, DMalterlibCloudPlatform
 							)
 						}
-						, "ForceOverwrite?"_= 
+						, "ForceOverwrite?"_o=
 						{
-							"Names"_= {"--force-overwrite"}
-							,"Default"_= false 
-							, "Description"_= "Force zfs to overwrite storage."
+							"Names"_o= {"--force-overwrite"}
+							,"Default"_o= false
+							, "Description"_o= "Force zfs to overwrite storage."
 						}
-						, "ForceInstall?"_= 
+						, "ForceInstall?"_o=
 						{
-							"Names"_= {"--force-install"}
-							,"Default"_= false 
-							, "Description"_= "Force application install even if application directory already exists."
+							"Names"_o= {"--force-install"}
+							,"Default"_o= false
+							, "Description"_o= "Force application install even if application directory already exists."
 						}
-						, "SettingsFromVersionInfo?"_= 
+						, "SettingsFromVersionInfo?"_o=
 						{
-							"Names"_= {"--settings-from-version-info"}
-							, "Default"_= true 
-							, "Description"_= "Get settings from version info of the downloaded application."
+							"Names"_o= {"--settings-from-version-info"}
+							, "Default"_o= true
+							, "Description"_o= "Get settings from version info of the downloaded application."
 						}
 						, SettingsOption_Dependencies 
 						, SettingsOption_StopOnDependencyFailure
 						, SettingsOption_Executable
-						, "ExecutableParameters?"_= 
+						, "ExecutableParameters?"_o=
 						{
-							"Names"_= {"--executable-parameters"}
-							, "Default"_= {"--daemon-run-standalone"}
-							, "Type"_= {""} 
-							, "Description"_= "Run the application with these executable parameters."
+							"Names"_o= {"--executable-parameters"}
+							, "Default"_o= {"--daemon-run-standalone"}
+							, "Type"_o= {""}
+							, "Description"_o= "Run the application with these executable parameters."
 						}
 						, SettingsOption_RunAsUser
 #ifdef DPlatformFamily_Windows
@@ -379,27 +379,27 @@ namespace NMib::NCloud::NAppManager
 						, AddOption_UpdateScriptPostUpdate
 						, AddOption_UpdateScriptPostLaunch
 						, AddOption_UpdateScriptOnError
-						, "SelfUpdateSource?"_=
+						, "SelfUpdateSource?"_o=
 						{
-							"Names"_= {"--self-update-source"}
-							, "Default"_= false
-							, "Description"_= "Set this application as a source for self-updating the app manager.\n"
+							"Names"_o= {"--self-update-source"}
+							, "Default"_o= false
+							, "Description"_o= "Set this application as a source for self-updating the app manager.\n"
 						}
 						, SettingsOption_UpdateGroup
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"Package"_=  
+						"Package"_o=
 						{
-							"Type"_= COneOfType{COneOf{nullptr}, ""}
-							, "Description"_= "The files needed to run the application.\n"
+							"Type"_o= COneOfType{COneOf{nullptr}, ""}
+							, "Description"_o= "The files needed to run the application.\n"
 							"Can be a version manager application name, a directory, a tar.gz file or null. Will look for version manager applications"
 							" by default. Specify --from-file to look for the package on disk. Specifying null will add a application with no package. "
 							"Useful for example when you want to have an encrypted container shared between several applications."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_AddApplication, _Params, _pCommandLine);
 				}
@@ -408,74 +408,74 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-enable-self-update"}
-					, "Description"_=
+					"Names"_o= {"--application-enable-self-update"}
+					, "Description"_o=
 						"Adds an AppManager application that is used for self updating this AppManager.\n"
 						"This is a shortcut for doing --application-add with --self-update-source specified.\n"
-					, "Options"_=
+					, "Options"_o=
 					{
-						"Name"_=
+						"Name"_o=
 						{
-							"Names"_= _[_]
-							, "Hidden"_= true
-							, "Description"_= "Hidden"
-							,"Default"_= "SelfUpdate"
+							"Names"_o= _[_]
+							, "Hidden"_o= true
+							, "Description"_o= "Hidden"
+							,"Default"_o= "SelfUpdate"
 						}
-						, "FromFile?"_=
+						, "FromFile?"_o=
 						{
-							"Names"_= _[_]
-							, "Hidden"_= true
-							, "Description"_= "Hidden"
-							, "Default"_= false
+							"Names"_o= _[_]
+							, "Hidden"_o= true
+							, "Description"_o= "Hidden"
+							, "Default"_o= false
 						}
-						, "EncryptionStorage?"_=
+						, "EncryptionStorage?"_o=
 						{
-							"Names"_= _[_]
-							, "Hidden"_= true
-							, "Description"_= "Hidden"
-							, "Default"_= ""
+							"Names"_o= _[_]
+							, "Hidden"_o= true
+							, "Description"_o= "Hidden"
+							, "Default"_o= ""
 						}
-						, "ParentApplication?"_=
+						, "ParentApplication?"_o=
 						{
-							"Names"_= _[_]
-							, "Hidden"_= true
-							, "Description"_= "Hidden"
-							, "Default"_= ""
+							"Names"_o= _[_]
+							, "Hidden"_o= true
+							, "Description"_o= "Hidden"
+							, "Default"_o= ""
 						}
-						, "ForceOverwrite?"_=
+						, "ForceOverwrite?"_o=
 						{
-							"Names"_= _[_]
-							, "Hidden"_= true
-							, "Description"_= "Hidden"
-							,"Default"_= false
+							"Names"_o= _[_]
+							, "Hidden"_o= true
+							, "Description"_o= "Hidden"
+							,"Default"_o= false
 						}
-						, "ForceInstall?"_=
+						, "ForceInstall?"_o=
 						{
-							"Names"_= _[_]
-							, "Hidden"_= true
-							, "Description"_= "Hidden"
-							,"Default"_= false
+							"Names"_o= _[_]
+							, "Hidden"_o= true
+							, "Description"_o= "Hidden"
+							,"Default"_o= false
 						}
-						, "SettingsFromVersionInfo?"_=
+						, "SettingsFromVersionInfo?"_o=
 						{
-							"Names"_= _[_]
-							, "Hidden"_= true
-							, "Description"_= "Hidden"
-							, "Default"_= true
+							"Names"_o= _[_]
+							, "Hidden"_o= true
+							, "Description"_o= "Hidden"
+							, "Default"_o= true
 						}
-						, "ExecutableParameters?"_=
+						, "ExecutableParameters?"_o=
 						{
-							"Names"_= _[_]
-							, "Hidden"_= true
-							, "Description"_= "Hidden"
-							, "Default"_= _[_]
+							"Names"_o= _[_]
+							, "Hidden"_o= true
+							, "Description"_o= "Hidden"
+							, "Default"_o= _[_]
 						}
-						, "SelfUpdateSource?"_=
+						, "SelfUpdateSource?"_o=
 						{
-							"Names"_= _[_]
-							, "Hidden"_= true
-							, "Description"_= "Hidden"
-							, "Default"_= true
+							"Names"_o= _[_]
+							, "Hidden"_o= true
+							, "Description"_o= "Hidden"
+							, "Default"_o= true
 						}
 						, AddOption_AutoUpdate
 						, AddOption_UpdateTags
@@ -486,16 +486,16 @@ namespace NMib::NCloud::NAppManager
 						, AddOption_UpdateScriptOnError
 						, SettingsOption_UpdateGroup
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"Package?"_=
+						"Package?"_o=
 						{
-							"Default"_= "AppManager"
-							, "Description"_= "Package AppManager defaulted for self update."
+							"Default"_o= "AppManager"
+							, "Description"_o= "Package AppManager defaulted for self update."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_AddApplication, _Params, _pCommandLine);
 				}
@@ -504,24 +504,24 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-change-settings"}
-					, "Description"_= "Change settings for application.\n"
-					, "Options"_= 
+					"Names"_o= {"--application-change-settings"}
+					, "Description"_o= "Change settings for application.\n"
+					, "Options"_o=
 					{
-						"Name"_= 
+						"Name"_o=
 						{
-							"Names"_= {"--name"}
-							,"Type"_= ""
-							, "Description"_= "Unique name of the application to change settings for."
+							"Names"_o= {"--name"}
+							,"Type"_o= ""
+							, "Description"_o= "Unique name of the application to change settings for."
 						}
 						, SettingsOption_Dependencies 
 						, SettingsOption_StopOnDependencyFailure
 						, SettingsOption_Executable
-						, "ExecutableParameters?"_= 
+						, "ExecutableParameters?"_o=
 						{
-							"Names"_= {"--executable-parameters"}
-							, "Type"_= {""} 
-							, "Description"_= "Run the application with these executable parameters."
+							"Names"_o= {"--executable-parameters"}
+							, "Type"_o= {""}
+							, "Description"_o= "Run the application with these executable parameters."
 						}				
 						, SettingsOption_RunAsUser
 #ifdef DPlatformFamily_Windows
@@ -537,77 +537,77 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_BackupAddSyncFlagsWildcards 
 						, SettingsOption_BackupRemoveSyncFlagsWildcards 
 						, SettingsOption_BackupNewBackupIntervalHours
-						, "AutoUpdate?"_=
+						, "AutoUpdate?"_o=
 						{
-							"Names"_= {"--auto-update"}
-							, "Type"_= true
-							, "Description"_= "Automatically update the application."
+							"Names"_o= {"--auto-update"}
+							, "Type"_o= true
+							, "Description"_o= "Automatically update the application."
 						}
-						, "UpdateTags?"_=
+						, "UpdateTags?"_o=
 						{
-							"Names"_= {"--update-tags"}
-							, "Type"_= CEJSON{""} 
-							, "Description"_= "When updating the application require these tags on the version to update to."
+							"Names"_o= {"--update-tags"}
+							, "Type"_o= CEJSONOrdered{""}
+							, "Description"_o= "When updating the application require these tags on the version to update to."
 						}
-						, "UpdateBranches?"_= 
+						, "UpdateBranches?"_o=
 						{
-							"Names"_= {"--update-branches"}
-							, "Type"_= {""} 
-							, "Description"_= "Update the application only for versions from these branches.\n"
+							"Names"_o= {"--update-branches"}
+							, "Type"_o= {""}
+							, "Description"_o= "Update the application only for versions from these branches.\n"
 							"Leave empty to allow any branch\n"
 						}
-						, "VersionManagerApplication?"_= 
+						, "VersionManagerApplication?"_o=
 						{
-							"Names"_= {"--version-manager-application"}
-							, "Type"_= "" 
-							, "Description"_= "Get updates from the version manager application with this name."
+							"Names"_o= {"--version-manager-application"}
+							, "Type"_o= ""
+							, "Description"_o= "Get updates from the version manager application with this name."
 						}				
-						, "UpdateFromVersionInfo?"_= 
+						, "UpdateFromVersionInfo?"_o=
 						{
-							"Names"_= {"--update-from-version-info"}
-							, "Default"_= false 
-							, "Description"_= "Update settings from the last installed version manager application info."
+							"Names"_o= {"--update-from-version-info"}
+							, "Default"_o= false
+							, "Description"_o= "Update settings from the last installed version manager application info."
 						}				
-						, "Force?"_= 
+						, "Force?"_o=
 						{
-							"Names"_= {"--force"}
-							, "Default"_= false 
-							, "Description"_= "Force running the update process even if no settings are changed."
+							"Names"_o= {"--force"}
+							, "Default"_o= false
+							, "Description"_o= "Force running the update process even if no settings are changed."
 						}				
-						, "UpdateScript_PreUpdate?"_= 
+						, "UpdateScript_PreUpdate?"_o=
 						{
-							"Names"_= {"--update-script-pre-update"}
-							, "Type"_= ""
-							, "Description"_= "Set a script to run pre update.\n"
+							"Names"_o= {"--update-script-pre-update"}
+							, "Type"_o= ""
+							, "Description"_o= "Set a script to run pre update.\n"
 						}
-						, "UpdateScript_PostUpdate?"_= 
+						, "UpdateScript_PostUpdate?"_o=
 						{
-							"Names"_= {"--update-script-post-update"}
-							, "Type"_= ""
-							, "Description"_= "Set a script to run post update.\n"
+							"Names"_o= {"--update-script-post-update"}
+							, "Type"_o= ""
+							, "Description"_o= "Set a script to run post update.\n"
 						}
-						, "UpdateScript_PostLaunch?"_= 
+						, "UpdateScript_PostLaunch?"_o=
 						{
-							"Names"_= {"--update-script-post-launch"}
-							, "Type"_= ""
-							, "Description"_= "Set a script to run post launch.\n"
+							"Names"_o= {"--update-script-post-launch"}
+							, "Type"_o= ""
+							, "Description"_o= "Set a script to run post launch.\n"
 						}
-						, "UpdateScript_OnError?"_= 
+						, "UpdateScript_OnError?"_o=
 						{
-							"Names"_= {"--update-script-on-error"}
-							, "Type"_= ""
-							, "Description"_= "Set a script to run when an error occurs during the update process.\n"
+							"Names"_o= {"--update-script-on-error"}
+							, "Type"_o= ""
+							, "Description"_o= "Set a script to run when an error occurs during the update process.\n"
 						}
-						, "SelfUpdateSource?"_= 
+						, "SelfUpdateSource?"_o=
 						{
-							"Names"_= {"--self-update-source"}
-							, "Type"_= false
-							, "Description"_= "Set this application as a source for self-updating the app manager.\n"
+							"Names"_o= {"--self-update-source"}
+							, "Type"_o= false
+							, "Description"_o= "Set this application as a source for self-updating the app manager.\n"
 						}
 						, SettingsOption_UpdateGroup
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_ChangeApplicationSettings, _Params, _pCommandLine);
 				}
@@ -617,32 +617,32 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-list"}
-					, "Description"_= "List applications."
-					, "Options"_=
+					"Names"_o= {"--application-list"}
+					, "Description"_o= "List applications."
+					, "Options"_o=
 					{
-						"Verbose?"_=
+						"Verbose?"_o=
 						{
-							"Names"_= {"--verbose", "-v"}
-							, "Default"_= false
-							, "Description"_= "Display more extensive information about the applications."
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Display more extensive information about the applications."
 						}
-						, "ExtraVerbose?"_=
+						, "ExtraVerbose?"_o=
 						{
-							"Names"_= {"--extra-verbose", "-vv"}
-							, "Default"_= false
-							, "Description"_= "Display even more extensive information about the applications."
+							"Names"_o= {"--extra-verbose", "-vv"}
+							, "Default"_o= false
+							, "Description"_o= "Display even more extensive information about the applications."
 						}
-						, "Name?"_=
+						, "Name?"_o=
 						{
-							"Names"_= {"--name"}
-							, "Default"_= "" 
-							, "Description"_= "Unique name of the application to list. Leave empty to list all applications." 
+							"Names"_o= {"--name"}
+							, "Default"_o= ""
+							, "Description"_o= "Unique name of the application to list. Leave empty to list all applications."
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_EnumApplications, _Params, _pCommandLine);
 				}
@@ -651,34 +651,34 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-list-versions"}
-					, "Description"_= "List versions available to update to."
-					, "Options"_=
+					"Names"_o= {"--application-list-versions"}
+					, "Description"_o= "List versions available to update to."
+					, "Options"_o=
 					{
-						"Verbose?"_=
+						"Verbose?"_o=
 						{
-							"Names"_= {"--verbose", "-v"}
-							, "Default"_= false
-							, "Description"_= "Display more extensive information about the versions."
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Display more extensive information about the versions."
 						}
-						, "Application?"_=
+						, "Application?"_o=
 						{
-							"Names"_= {"--application"}
-							, "Default"_= ""
-							, "Description"_= "The application to list versions for.\n"
+							"Names"_o= {"--application"}
+							, "Default"_o= ""
+							, "Description"_o= "The application to list versions for.\n"
 								"Leave empty to list all applications.\n"
 						}
-						, "ExtraPlatforms?"_=
+						, "ExtraPlatforms?"_o=
 						{
-							"Names"_= {"--platforms"}
-							, "Type"_= {""}
-							, "Default"_= _[_]
-							, "Description"_= "Add non-default platforms you want to include in the list.\n"
+							"Names"_o= {"--platforms"}
+							, "Type"_o= {""}
+							, "Default"_o= _[_]
+							, "Description"_o= "Add non-default platforms you want to include in the list.\n"
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_ListAvailableVersions, _Params, _pCommandLine);
 				}
@@ -687,18 +687,18 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-remove"}
-					, "Description"_= "Remove the application."
-					, "Parameters"_=
+					"Names"_o= {"--application-remove"}
+					, "Description"_o= "Remove the application."
+					, "Parameters"_o=
 					{
-						"Name"_= 
+						"Name"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "The name of the application to remove."
+							"Type"_o= ""
+							, "Description"_o= "The name of the application to remove."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_RemoveApplication, _Params, _pCommandLine);
 				}
@@ -707,28 +707,28 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-update-from-file"}
-					, "Description"_= "Update the application package from file."
-					, "Options"_= 
+					"Names"_o= {"--application-update-from-file"}
+					, "Description"_o= "Update the application package from file."
+					, "Options"_o=
 					{
-						"Name"_= 
+						"Name"_o=
 						{
-							"Names"_= {"--name"}
-							,"Type"_= ""
-							, "Description"_= "Unique name of the application to update."
+							"Names"_o= {"--name"}
+							,"Type"_o= ""
+							, "Description"_o= "Unique name of the application to update."
 						}
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"Package"_=  
+						"Package"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "The files needed to run the application.\n"
+							"Type"_o= ""
+							, "Description"_o= "The files needed to run the application.\n"
 							"Can be a directory, or a tar.gz file."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_UpdateApplication, _Params, _pCommandLine);
 				}
@@ -737,52 +737,52 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-update"}
-					, "Description"_= "Update the application package from version manager."
-					, "Options"_= 
+					"Names"_o= {"--application-update"}
+					, "Description"_o= "Update the application package from version manager."
+					, "Options"_o=
 					{
-						"Name"_= 
+						"Name"_o=
 						{
-							"Names"_= {"--name"}
-							,"Type"_= ""
-							, "Description"_= "Unique name of the application to update."
+							"Names"_o= {"--name"}
+							,"Type"_o= ""
+							, "Description"_o= "Unique name of the application to update."
 						}
-						, "DryRun?"_= 
+						, "DryRun?"_o=
 						{
-							"Names"_= {"--dry-run"}
-							,"Default"_= false
-							, "Description"_= "Only list action to take, don't actually do the update."
+							"Names"_o= {"--dry-run"}
+							,"Default"_o= false
+							, "Description"_o= "Only list action to take, don't actually do the update."
 						}
-						, "UpdateSettings?"_= 
+						, "UpdateSettings?"_o=
 						{
-							"Names"_= {"--update-settings"}
-							,"Default"_= false
-							, "Description"_= "Update settings with settings from downloaded app."
+							"Names"_o= {"--update-settings"}
+							,"Default"_o= false
+							, "Description"_o= "Update settings with settings from downloaded app."
 						}
-						, "RequiredTags?"_= 
+						, "RequiredTags?"_o=
 						{
-							"Names"_= {"--require-tags"}
-							, "Type"_= {""}
-							, "Description"_= "Require these tags for the version to update to."
+							"Names"_o= {"--require-tags"}
+							, "Type"_o= {""}
+							, "Description"_o= "Require these tags for the version to update to."
 						}
-						, "VersionManagerPlatform?"_= 
+						, "VersionManagerPlatform?"_o=
 						{
-							"Names"_= {"--platform"}
-							, "Type"_= "" 
-							, "Description"_= "Version manager platform used when downloading version. Defaults to the same as last installed version."
+							"Names"_o= {"--platform"}
+							, "Type"_o= ""
+							, "Description"_o= "Version manager platform used when downloading version. Defaults to the same as last installed version."
 						}
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"Version?"_=  
+						"Version?"_o=
 						{
-							"Default"_= ""
-							, "Description"_= "The version to update to.\n"
+							"Default"_o= ""
+							, "Description"_o= "The version to update to.\n"
 							"Defaults to the latest version in the same branch.\n"
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_UpdateApplication, _Params, _pCommandLine);
 				}
@@ -791,18 +791,18 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-stop"}
-					, "Description"_= "Stop the application, keeping any encryption loaded."
-					, "Parameters"_=
+					"Names"_o= {"--application-stop"}
+					, "Description"_o= "Stop the application, keeping any encryption loaded."
+					, "Parameters"_o=
 					{
-						"Name"_= 
+						"Name"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "Unique name of the application to stop."
+							"Type"_o= ""
+							, "Description"_o= "Unique name of the application to stop."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_StopApplication, _Params, _pCommandLine);
 				}
@@ -811,18 +811,18 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-restart"}
-					, "Description"_= "Restart the application, keeping any encryption loaded."
-					, "Parameters"_=
+					"Names"_o= {"--application-restart"}
+					, "Description"_o= "Restart the application, keeping any encryption loaded."
+					, "Parameters"_o=
 					{
-						"Name"_= 
+						"Name"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "Unique name of the application to restart."
+							"Type"_o= ""
+							, "Description"_o= "Unique name of the application to restart."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_RestartApplication, _Params, _pCommandLine);
 				}
@@ -831,18 +831,18 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-start"}
-					, "Description"_= "Start the application."
-					, "Parameters"_=
+					"Names"_o= {"--application-start"}
+					, "Description"_o= "Start the application."
+					, "Parameters"_o=
 					{
-						"Name"_= 
+						"Name"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "Unique name of the application to start."
+							"Type"_o= ""
+							, "Description"_o= "Unique name of the application to start."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_StartApplication, _Params, _pCommandLine);
 				}
@@ -851,33 +851,33 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--remove-known-host"}
-					, "Description"_= "Remove known host for group and application on this AppManager and any connected remote AppManagers."
-					, "Options"_= 
+					"Names"_o= {"--remove-known-host"}
+					, "Description"_o= "Remove known host for group and application on this AppManager and any connected remote AppManagers."
+					, "Options"_o=
 					{
-						"Application"_= 
+						"Application"_o=
 						{
-							"Names"_= {"--application"}
-							,"Default"_= ""
-							, "Description"_= "The version manager application to to remove the host on. Leave empt to remove from all applications."
+							"Names"_o= {"--application"}
+							,"Default"_o= ""
+							, "Description"_o= "The version manager application to to remove the host on. Leave empt to remove from all applications."
 						}
-						, "Group"_= 
+						, "Group"_o=
 						{
-							"Names"_= {"--group"}
-							,"Default"_= ""
-							, "Description"_= "The update group to to remove the host on. Leave empt to remove from all groups."
+							"Names"_o= {"--group"}
+							,"Default"_o= ""
+							, "Description"_o= "The update group to to remove the host on. Leave empt to remove from all groups."
 						}
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"HostID"_=  
+						"HostID"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "The host ID to remove."
+							"Type"_o= ""
+							, "Description"_o= "The host ID to remove."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_UpdateApplication, _Params, _pCommandLine);
 				}
@@ -886,10 +886,10 @@ namespace NMib::NCloud::NAppManager
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cancel-all-updates"}
-					, "Description"_= "Cancel all running pending updates."
+					"Names"_o= {"--cancel-all-updates"}
+					, "Description"_o= "Cancel all running pending updates."
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_CancelAllUpdates, _Params, _pCommandLine);
 				}
@@ -900,20 +900,20 @@ namespace NMib::NCloud::NAppManager
 		ExternalManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--version-manager-list"}
-					, "Description"_= "List connected version managers."
-					, "Options"_=
+					"Names"_o= {"--version-manager-list"}
+					, "Description"_o= "List connected version managers."
+					, "Options"_o=
 					{
-						"Verbose?"_=
+						"Verbose?"_o=
 						{
-							"Names"_= {"--verbose", "-v"}
-							, "Default"_= false
-							, "Description"_= "Display more extensive information."
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Display more extensive information."
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_VersionManagerList, _Params, _pCommandLine);
 				}
@@ -922,20 +922,20 @@ namespace NMib::NCloud::NAppManager
 		ExternalManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--cloud-manager-list"}
-					, "Description"_= "List connected cloud managers."
-					, "Options"_=
+					"Names"_o= {"--cloud-manager-list"}
+					, "Description"_o= "List connected cloud managers."
+					, "Options"_o=
 					{
-						"Verbose?"_=
+						"Verbose?"_o=
 						{
-							"Names"_= {"--verbose", "-v"}
-							, "Default"_= false
-							, "Description"_= "Display more extensive information."
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Display more extensive information."
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_CloudManagerList, _Params, _pCommandLine);
 				}
@@ -944,14 +944,14 @@ namespace NMib::NCloud::NAppManager
 		ExternalManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--stored-update-notifications-list"}
-					, "Description"_= "List stored update notifications."
-					, "Options"_=
+					"Names"_o= {"--stored-update-notifications-list"}
+					, "Description"_o= "List stored update notifications."
+					, "Options"_o=
 					{
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_StoredUpdateNotificationList, _Params, _pCommandLine);
 				}
@@ -960,14 +960,14 @@ namespace NMib::NCloud::NAppManager
 		ExternalManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--stored-update-notifications-clear"}
-					, "Description"_= "Clear stored update notifications."
-					, "Options"_=
+					"Names"_o= {"--stored-update-notifications-clear"}
+					, "Description"_o= "Clear stored update notifications."
+					, "Options"_o=
 					{
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_StoredUpdateNotificationClear, _Params, _pCommandLine);
 				}

@@ -100,7 +100,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		{
 			m_PackageOptions = EJSONType_Object;
 			if (CFile::fs_FileExists(_Package + ".json"))
-				m_PackageOptions = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(_Package + ".json"));
+				m_PackageOptions = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(_Package + ".json"));
 
 			auto FeatureFlags = m_PackageOptions.f_GetMemberValue("FeatureFlags", _[_]);
 			for (auto &Flag : FeatureFlags.f_Array())
@@ -112,7 +112,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			return m_FeatureFlags.f_Exists(_Flag);
 		}
 
-		CEJSON m_PackageOptions;
+		CEJSONSorted m_PackageOptions;
 		TCSet<CStr> m_FeatureFlags;
 	};
 
@@ -650,7 +650,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				{
 					CStr VersionInfoFile = "{}/TestApps/{}/{}VersionInfo.json"_f << ProgramDirectory << _Name << _Name;
-					CEJSON VersionInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
+					CEJSONSorted VersionInfo = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
 					CVersionManager::CVersionID VersionID;
 					if (DoneInitPackageInfo(_Name).f_WasCreated())
 						VersionID = AppPackageInfos[_Name].m_VersionID.m_VersionID;
@@ -983,7 +983,7 @@ public:
 								return;
 
 							CStr VersionInfoFile = "{}/TestApps/{}/{}VersionInfo.json"_f << ProgramDirectory << AppName << AppName;
-							CEJSON VersionInfo = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
+							CEJSONSorted VersionInfo = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
 							CVersionManager::CVersionID VersionID;
 							CStr Error;
 							CVersionManager::fs_IsValidVersionIdentifier(VersionInfo.f_GetMemberValue("Version", "").f_String(), Error, &VersionID);

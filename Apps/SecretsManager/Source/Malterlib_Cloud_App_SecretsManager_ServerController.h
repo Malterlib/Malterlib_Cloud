@@ -25,7 +25,7 @@ namespace NMib::NCloud::NSecretsManager
 		TCFuture<void> f_Init();
 
 #if DMibConfig_Tests_Enable
-		TCFuture<CEJSON> f_Test_Command(CStr const &_Command, CEJSON const &_Params);
+		TCFuture<CEJSONSorted> f_Test_Command(CStr const &_Command, CEJSONSorted const &_Params);
 #endif
 
 	private:

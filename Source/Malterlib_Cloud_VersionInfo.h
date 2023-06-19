@@ -16,7 +16,7 @@ namespace NMib::NCloud
 		template <typename tf_CStr>
 		void f_Format(tf_CStr &o_String) const;
 
-		NEncoding::CEJSON f_ToJson() const;
+		NEncoding::CEJSONSorted f_ToJson() const;
 
 		auto operator <=> (CCloudVersion const &_Right) const = default;
 
@@ -32,7 +32,7 @@ namespace NMib::NCloud
 		CCloudVersion m_Version;
 		NStr::CStr m_Platform;
 		NStr::CStr m_Configuration;
-		NMib::NEncoding::CEJSON m_ExtraInfo;
+		NMib::NEncoding::CEJSONSorted m_ExtraInfo;
 
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);

@@ -132,7 +132,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStrSecure> m_URL;
 			NStorage::TCOptional<NTime::CTime> m_Expires;
 			NStorage::TCOptional<NStr::CStrSecure> m_Notes;
-			NStorage::TCOptional<NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON>> m_Metadata;
+			NStorage::TCOptional<NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSONSorted>> m_Metadata;
 			NStorage::TCOptional<NTime::CTime> m_Created;
 			NStorage::TCOptional<NTime::CTime> m_Modified;
 			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID;
@@ -144,7 +144,7 @@ namespace NMib::NCloud
 			CSecretProperties &&f_SetURL(NStr::CStrSecure const &_URL) &&;
 			CSecretProperties &&f_SetExpires(NTime::CTime const &_Expires) &&;
 			CSecretProperties &&f_SetNotes(NStr::CStrSecure const &_Notes) &&;
-			CSecretProperties &&f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_MetadataValue) &&;
+			CSecretProperties &&f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSONSorted &&_MetadataValue) &&;
 			CSecretProperties &&f_SetCreated(NTime::CTime const &_Created) &&;
 			CSecretProperties &&f_SetModified(NTime::CTime const &_Modified) &&;
 			CSecretProperties &&f_SetSemanticID(NStr::CStrSecure const &_SemanticID) &&;
@@ -157,7 +157,7 @@ namespace NMib::NCloud
 			CSecretProperties &f_SetURL(NStr::CStrSecure const &_URL) &;
 			CSecretProperties &f_SetExpires(NTime::CTime const &_Expires) &;
 			CSecretProperties &f_SetNotes(NStr::CStrSecure const &_Notes) &;
-			CSecretProperties &f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSON &&_MetadataValue) &;
+			CSecretProperties &f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSONSorted &&_MetadataValue) &;
 			CSecretProperties &f_SetCreated(NTime::CTime const &_Created) &;
 			CSecretProperties &f_SetModified(NTime::CTime const &_Modified) &;
 			CSecretProperties &f_SetSemanticID(NStr::CStrSecure const &_SemanticID) &;
@@ -170,7 +170,7 @@ namespace NMib::NCloud
 			auto f_GetURL() const -> NStr::CStrSecure const &;
 			auto f_GetExpires() const -> NTime::CTime const &;
 			auto f_GetNotes() const -> NStr::CStrSecure const &;
-			auto f_GetMetadata() const -> NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON> const &;
+			auto f_GetMetadata() const -> NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSONSorted> const &;
 			auto f_GetCreated() const -> NTime::CTime const &;
 			auto f_GetModified() const -> NTime::CTime const &;
 			auto f_GetSemanticID() const -> NStr::CStrSecure const &;
@@ -247,8 +247,8 @@ namespace NMib::NCloud
 
 			CSecretID m_ID;
 			NStr::CStrSecure m_Key;
-			NEncoding::CEJSON m_Value;
-			NStorage::TCOptional<NEncoding::CEJSON> m_ExpectedValue;
+			NEncoding::CEJSONSorted m_Value;
+			NStorage::TCOptional<NEncoding::CEJSONSorted> m_ExpectedValue;
 			NStorage::TCOptional<NTime::CTime> m_ModifiedTime;
 		};
 

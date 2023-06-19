@@ -24,7 +24,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			DMibError("Invalid deploy destination: {}"_f << _Type);
 	}
 
-	void CAppDistributionManagerActor::fp_ParseSettings(CEJSON const &_Params, CDistributionSettings &o_Settings)
+	void CAppDistributionManagerActor::fp_ParseSettings(CEJSONSorted const &_Params, CDistributionSettings &o_Settings)
 	{
 		if (auto pValue = _Params.f_GetMember("VersionManagerApplication"))
 		{
@@ -73,9 +73,9 @@ namespace NMib::NCloud::NAppDistributionManager
 		}
 	}
 
-	CEJSON CAppDistributionManagerActor::fp_SaveSettings(CDistributionSettings const &_Settings)
+	CEJSONSorted CAppDistributionManagerActor::fp_SaveSettings(CDistributionSettings const &_Settings)
 	{
-		CEJSON Distribution;
+		CEJSONSorted Distribution;
 
 		Distribution["VersionManagerApplication"] = _Settings.m_VersionManagerApplication;
 		Distribution["RenameTemplate"] = _Settings.m_RenameTemplate;

@@ -35,32 +35,32 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		return Return;
 	}
 
-	CEJSON CCloudManagerGlobalStateKey::f_ToJson() const
+	CEJSONSorted CCloudManagerGlobalStateKey::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Prefix"] = fg_ToJson(m_Prefix);
 		return Return;
 	}
 
-	CEJSON CCloudManagerGlobalStateValue::f_ToJson() const
+	CEJSONSorted CCloudManagerGlobalStateValue::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["SensorProblemsSlackThread"] = fg_ToJson(m_SensorProblemsSlackThread);
 		Return["LastSeenLogTimestamp"] = fg_ToJson(m_LastSeenLogTimestamp);
 		return Return;
 	}
 
-	CEJSON CAppManagerKey::f_ToJson() const
+	CEJSONSorted CAppManagerKey::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Prefix"] = fg_ToJson(m_Prefix);
 		Return["HostID"] = fg_ToJson(m_HostID);
 		return Return;
 	}
 
-	CEJSON CAppManagerValue::f_ToJson() const
+	CEJSONSorted CAppManagerValue::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Info"] = fg_ToJson(m_Info);
 		Return["LastSeen"] = fg_ToJson(m_LastSeen);
 		Return["LastConnectionError"] = fg_ToJson(m_LastConnectionError);
@@ -71,32 +71,32 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		return Return;
 	}
 
-	CEJSON CApplicationKey::f_ToJson() const
+	CEJSONSorted CApplicationKey::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Prefix"] = fg_ToJson(m_Prefix);
 		Return["AppManagerHostID"] = fg_ToJson(m_AppManagerHostID);
 		Return["Application"] = fg_ToJson(m_Application);
 		return Return;
 	}
 
-	CEJSON CApplicationValue::f_ToJson() const
+	CEJSONSorted CApplicationValue::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["ApplicationInfo"] = fg_ToJson(m_ApplicationInfo);
 		return Return;
 	}
 
-	CEJSON CApplicationUpdateStateStage::f_ToJson() const
+	CEJSONSorted CApplicationUpdateStateStage::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Time"] = fg_ToJson(m_Time);
 		return Return;
 	}
 
-	CEJSON CApplicationUpdateStateValue::f_ToJson() const
+	CEJSONSorted CApplicationUpdateStateValue::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["LastUpdateID"] = fg_ToJson(m_LastUpdateID);
 		Return["SlackTimestamps"] = fg_ToJson(m_SlackTimestamps);
 		Return["Stages"] = fg_ToJson(m_Stages);
@@ -106,26 +106,26 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		return Return;
 	}
 
-	CEJSON CSensorNotificationStateNotificationStatus::f_ToJson() const
+	CEJSONSorted CSensorNotificationStateNotificationStatus::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Severity"] = fg_ToJson(m_Severity);
 		Return["Message"] = fg_ToJson(m_Message);
 		return Return;
 	}
 
-	CEJSON CSensorNotificationStateNotification::f_ToJson() const
+	CEJSONSorted CSensorNotificationStateNotification::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Status"] = fg_ToJson(m_Status);
 		Return["OutdatedStatus"] = fg_ToJson(m_OutdatedStatus);
 		Return["CriticalityStatus"] = fg_ToJson(m_CriticalityStatus);
 		return Return;
 	}
 
-	CEJSON CSensorNotificationStateValue::f_ToJson() const
+	CEJSONSorted CSensorNotificationStateValue::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["LastNotification"] = fg_ToJson(m_LastNotification);
 		Return["TimeInProblemState"] = fg_ToJson(m_TimeInProblemState);
 		Return["bInProblemState"] = fg_ToJson(m_bInProblemState);
@@ -133,18 +133,18 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		return Return;
 	}
 
-	CEJSON CExpectedOsVersionKey::f_ToJson() const
+	CEJSONSorted CExpectedOsVersionKey::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Prefix"] = fg_ToJson(m_Prefix);
 		Return["OsName"] = fg_ToJson(m_OsName);
 		Return["CurrentVersion"] = fg_ToJson(m_CurrentVersion);
 		return Return;
 	}
 
-	CEJSON CExpectedOsVersionValue::f_ToJson() const
+	CEJSONSorted CExpectedOsVersionValue::f_ToJson() const
 	{
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["ExpectedVersionRange"] = fg_ToJson(m_ExpectedVersionRange);
 		return Return;
 	}

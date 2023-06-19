@@ -65,11 +65,11 @@ namespace NMib::NCloud
 		return m_Stage == EUpdateStage_Failed || m_Stage == EUpdateStage_Finished;
 	}
 
-	NEncoding::CEJSON CAppManagerInterface::CUpdateNotification::f_ToJson() const
+	NEncoding::CEJSONSorted CAppManagerInterface::CUpdateNotification::f_ToJson() const
 	{
 		using namespace NEncoding;
 
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["UniqueSequence"] = fg_ToJson(m_UniqueSequence);
 		Return["UpdateID"] = fg_ToJson(m_UpdateID);
 		Return["Application"] = fg_ToJson(m_Application);
@@ -83,11 +83,11 @@ namespace NMib::NCloud
 		return Return;
 	}
 
-	NEncoding::CEJSON CAppManagerInterface::CApplicationInfo::f_ToJson() const
+	NEncoding::CEJSONSorted CAppManagerInterface::CApplicationInfo::f_ToJson() const
 	{
 		using namespace NEncoding;
 
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Status"] = fg_ToJson(m_Status);
 		Return["StatusSeverity"] = fg_ToJson(m_StatusSeverity);
 		Return["EncryptionStorage"] = fg_ToJson(m_EncryptionStorage);

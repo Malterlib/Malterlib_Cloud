@@ -49,7 +49,7 @@ namespace NMib::NCloud::NHostMonitor
 
 		auto operator <=> (CConfigFileContents_Json const &_Right) const = default;
 
-		NEncoding::CEJSON m_Parsed;
+		NEncoding::CEJSONSorted m_Parsed;
 	};
 
 	using CConfigFileContentsParsed = NStorage::TCStreamableVariant

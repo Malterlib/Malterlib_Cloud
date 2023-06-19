@@ -16,33 +16,33 @@ namespace NMib::NCloud::NCloudClient
 {
 	void CCloudClientAppActor::fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section)
 	{
-		auto OptionalBackupHost = "BackupHost?"_=
+		auto OptionalBackupHost = "BackupHost?"_o=
 			{
-				"Names"_= {"--host"}
-				, "Default"_= ""
-				, "Description"_= "Limit backup query to only specified host ID."
+				"Names"_o= {"--host"}
+				, "Default"_o= ""
+				, "Description"_o= "Limit backup query to only specified host ID."
 			}
 		;
-		auto IncludeHost = "IncludeHost?"_=
+		auto IncludeHost = "IncludeHost?"_o=
 			{
-				"Names"_= {"--include-host"}
-				, "Default"_= false
-				, "Description"_= "Include version manager host in output.\n"
+				"Names"_o= {"--include-host"}
+				, "Default"_o= false
+				, "Description"_o= "Include version manager host in output.\n"
 			}
 		;
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--backup-manager-list-sources"}
-					, "Description"_= "List backup sources available on remote backup managers."
-					, "Options"_=
+					"Names"_o= {"--backup-manager-list-sources"}
+					, "Description"_o= "List backup sources available on remote backup managers."
+					, "Options"_o=
 					{
 						OptionalBackupHost
 						, IncludeHost
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources, _Params, _pCommandLine);
 				}
@@ -52,25 +52,25 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--backup-manager-list-backups"}
-					, "Description"_= "List backups available on remote backup managers."
-					, "Options"_=
+					"Names"_o= {"--backup-manager-list-backups"}
+					, "Description"_o= "List backups available on remote backup managers."
+					, "Options"_o=
 					{
 						OptionalBackupHost
 						, IncludeHost
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"BackupSource?"_=
+						"BackupSource?"_o=
 						{
-							"Default"_= ""
-							, "Description"_= "The backup source to list backups for.\n"
+							"Default"_o= ""
+							, "Description"_o= "The backup source to list backups for.\n"
 								"If left empty backups will be listed for all sources you have access to.\n"
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups, _Params, _pCommandLine);
 				}
@@ -80,67 +80,67 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--backup-manager-download-backup"}
-					, "Description"_= "Download a backup from remote backup manager.\n"
+					"Names"_o= {"--backup-manager-download-backup"}
+					, "Description"_o= "Download a backup from remote backup manager.\n"
 						"If a backup already exists the download will be resumed or ammended with the latest changes. Only appended files such as oplogs are supported.\n"
-					, "Options"_=
+					, "Options"_o=
 					{
-						"BackupHost?"_=
+						"BackupHost?"_o=
 						{
-							"Names"_= {"--host"}
-							, "Default"_= ""
-							, "Description"_= "The host ID of the host to download the backup from."
+							"Names"_o= {"--host"}
+							, "Default"_o= ""
+							, "Description"_o= "The host ID of the host to download the backup from."
 						}
-						, "BackupSource"_=
+						, "BackupSource"_o=
 						{
-							"Names"_= {"--source"}
-							, "Type"_= ""
-							, "Description"_= "The backup source to download from."
+							"Names"_o= {"--source"}
+							, "Type"_o= ""
+							, "Description"_o= "The backup source to download from."
 						}
-						, "BackupQueueSize?"_=
+						, "BackupQueueSize?"_o=
 						{
-							"Names"_= {"--queue-size"}
-							, "Default"_= int64(8*1024*1024)
-							, "Description"_= "The amount of data to keep in flight while downloading."
+							"Names"_o= {"--queue-size"}
+							, "Default"_o= int64(8*1024*1024)
+							, "Description"_o= "The amount of data to keep in flight while downloading."
 						}
-						, "Destination?"_=
+						, "Destination?"_o=
 						{
-							"Names"_= {"--destination"}
-							, "Type"_= ""
-							, "Description"_= "The directory to download to.\n"
+							"Names"_o= {"--destination"}
+							, "Type"_o= ""
+							, "Description"_o= "The directory to download to.\n"
 							"By default this directory will be the 'name of the source'/'backup time'"
 						}
-						, "SetOwner?"_=
+						, "SetOwner?"_o=
 						{
-							"Names"_= {"--set-owner"}
-							, "Default"_= false
-							, "Description"_= "Set owner and group on the files downloaded.\n"
+							"Names"_o= {"--set-owner"}
+							, "Default"_o= false
+							, "Description"_o= "Set owner and group on the files downloaded.\n"
 						}
-						, "FindClosestSnapshot?"_=
+						, "FindClosestSnapshot?"_o=
 						{
-							"Names"_= {"--find-closest-snapshot"}
-							, "Default"_= false
-							, "Description"_= "Find the closest snapshot before the specified backup time.\n"
+							"Names"_o= {"--find-closest-snapshot"}
+							, "Default"_o= false
+							, "Description"_o= "Find the closest snapshot before the specified backup time.\n"
 						}
-						, "CurrentDirectory?"_=
+						, "CurrentDirectory?"_o=
 						{
-							"Names"_= _[_]
-							, "Default"_= CFile::fs_GetCurrentDirectory()
-							, "Hidden"_= true
-							, "Description"_= "Internal hidden option to forward current directory."
+							"Names"_o= _[_]
+							, "Default"_o= CFile::fs_GetCurrentDirectory()
+							, "Hidden"_o= true
+							, "Description"_o= "Internal hidden option to forward current directory."
 						}
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"BackupTime?"_=
+						"BackupTime?"_o=
 						{
-							"Default"_= NTime::CTime{}
-							, "Description"_= "The time of the backup to download.\n"
+							"Default"_o= NTime::CTime{}
+							, "Description"_o= "The time of the backup to download.\n"
 								"Leave as default to download the latest backup.\n"
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup, _Params, _pCommandLine);
 				}
@@ -171,7 +171,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
@@ -223,7 +223,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
@@ -289,7 +289,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();

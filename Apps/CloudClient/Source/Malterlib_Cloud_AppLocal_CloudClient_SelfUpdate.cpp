@@ -84,7 +84,7 @@ namespace NMib::NCloud::NCloudClient
 	TCFuture<void> CCloudClientAppLocalActor::fp_PreRunCommandLine
 		(
 			 CStr const &_Command
-			 , NEncoding::CEJSON const &_Params
+			 , NEncoding::CEJSONSorted const &_Params
 			 , NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
 		)
 	{
@@ -100,7 +100,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		DMibCheck(mp_State.m_RootDirectory == CFile::fs_GetProgramDirectory());
 

@@ -430,7 +430,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
 	{
 		mp_bLogLaunchesToStdErr = _Params["LogLaunchesToStdErr"].f_Boolean();
 		if (auto pValue = _Params.f_GetMember("HostMonitorInterval"))

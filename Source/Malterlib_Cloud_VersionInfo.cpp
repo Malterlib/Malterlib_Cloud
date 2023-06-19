@@ -13,7 +13,7 @@ namespace NMib::NCloud
 
 	CCloudVersionInfo fg_ParseVersionInfo(NStr::CStr const &_String)
 	{
-		auto const JSON = NEncoding::CEJSON::fs_FromString(_String);
+		auto const JSON = NEncoding::CEJSONSorted::fs_FromString(_String);
 		CCloudVersionInfo VersionInfo;
 		
 		NStr::CStr Error;
@@ -29,11 +29,11 @@ namespace NMib::NCloud
 		return VersionInfo;
 	}
 
-	NEncoding::CEJSON CCloudVersion::f_ToJson() const
+	NEncoding::CEJSONSorted CCloudVersion::f_ToJson() const
 	{
 		using namespace NEncoding;
 		
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Branch"] = fg_ToJson(m_Branch);
 		Return["Major"] = fg_ToJson(m_Major);
 		Return["Minor"] = fg_ToJson(m_Minor);

@@ -23,7 +23,7 @@ namespace NMib::NCloud::NCloudClient
 	{
 	}
 
-	TCFuture<void> CCloudClientAppActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CCloudClientAppActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
 	{
 		fp_ParseCommonOptions(_Params);
 
@@ -66,7 +66,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 	
-	void CCloudClientAppActor::fp_ParseCommonOptions(NEncoding::CEJSON const &_Params)
+	void CCloudClientAppActor::fp_ParseCommonOptions(NEncoding::CEJSONSorted const &_Params)
 	{
 		mp_Timeout = _Params["Timeout"].f_Float();
 	}

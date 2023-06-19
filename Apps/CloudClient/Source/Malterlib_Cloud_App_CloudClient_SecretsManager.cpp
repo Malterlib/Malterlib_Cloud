@@ -17,90 +17,90 @@ namespace NMib::NCloud::NCloudClient
 {
 	void CCloudClientAppActor::fp_SecretsManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section)
 	{
-		auto SecretsManagerHost = "SecretsManagerHost?"_=
+		auto SecretsManagerHost = "SecretsManagerHost?"_o=
 			{
-				"Names"_= {"--host"}
-				, "Default"_= ""
-				, "Description"_= "Limit query to only specified host ID."
+				"Names"_o= {"--host"}
+				, "Default"_o= ""
+				, "Description"_o= "Limit query to only specified host ID."
 			}
 		;
-		auto BinaryAsBase64 = "BinaryAsBase64"_=
+		auto BinaryAsBase64 = "BinaryAsBase64"_o=
 			{
-				"Names"_= {"--binary-as-base64"}
-				, "Default"_= true
-				, "Description"_= "Binary secrets will be read and written as base64 encoded strings."
+				"Names"_o= {"--binary-as-base64"}
+				, "Default"_o= true
+				, "Description"_o= "Binary secrets will be read and written as base64 encoded strings."
 			}
 		;
-		auto Name = "Name?"_=
+		auto Name = "Name?"_o=
 			{
-				"Names"_= {"--name"}
-				, "Type"_= ""
-				, "Description"_= "Limit query to secrets having the specified name. Wildcard search.\n"
+				"Names"_o= {"--name"}
+				, "Type"_o= ""
+				, "Description"_o= "Limit query to secrets having the specified name. Wildcard search.\n"
 			}
 		;
-		auto Tags = "Tags?"_=
+		auto Tags = "Tags?"_o=
 			{
-				"Names"_= {"--tags"}
-				, "Default"_= _[_]
-				, "Type"_= {""}
-				, "Description"_= "Limit query to secrets having the specified tags.\n"
+				"Names"_o= {"--tags"}
+				, "Default"_o= _[_]
+				, "Type"_o= {""}
+				, "Description"_o= "Limit query to secrets having the specified tags.\n"
 				"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
 			}
 		;
-		auto Expect = "Expect?"_=
+		auto Expect = "Expect?"_o=
 			{
-				"Names"_= {"--expect"}
-				, "Type"_= COneOf{"string", "binary", "file", "string_map"}
-				, "Default"_= "string"
-				, "Description"_= "Unless the secret is of the expected variant report an error.\n"
+				"Names"_o= {"--expect"}
+				, "Type"_o= COneOf{"string", "binary", "file", "string_map"}
+				, "Default"_o= "string"
+				, "Description"_o= "Unless the secret is of the expected variant report an error.\n"
 			}
 		;
-		auto MapKey = "MapKey?"_=
+		auto MapKey = "MapKey?"_o=
 			{
-				"Names"_= {"--map-key"}
-				, "Type"_= ""
-				, "Description"_= "For map secrets, index with specified key and return the value for this key."
+				"Names"_o= {"--map-key"}
+				, "Type"_o= ""
+				, "Description"_o= "For map secrets, index with specified key and return the value for this key."
 			}
 		;
-		auto IDParameter = "Parameters"_=
+		auto IDParameter = "Parameters"_o=
 			{
-				"ID"_=
+				"ID"_o=
 				{
-					"Type"_= ""
-					, "Description"_= "Specify secret ID.\n"
+					"Type"_o= ""
+					, "Description"_o= "Specify secret ID.\n"
 					"The ID is specified as Folder/Name with folder and name adhering to RFC 1123 (hostname). Additionally for Folder / is allowed, and for Name # is allowed"
 				}
 			}
 		;
-		auto CurrentDirectory = "CurrentDirectory?"_=
+		auto CurrentDirectory = "CurrentDirectory?"_o=
 			{
-				"Names"_= _[_]
-				, "Default"_= CFile::fs_GetCurrentDirectory()
-				, "Hidden"_= true
-				, "Description"_= "Internal hidden option to forward current directory."
+				"Names"_o= _[_]
+				, "Default"_o= CFile::fs_GetCurrentDirectory()
+				, "Hidden"_o= true
+				, "Description"_o= "Internal hidden option to forward current directory."
 			}
 		;
-		auto Quiet = "Quiet?"_=
+		auto Quiet = "Quiet?"_o=
 			{
-				"Names"_= {"--quiet"}
-				, "Default"_= false
-				, "Description"_= "Suppress non-error output."
+				"Names"_o= {"--quiet"}
+				, "Default"_o= false
+				, "Description"_o= "Suppress non-error output."
 			}
 		;
 
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-enumerate-secrets"}
-					, "Description"_= "List the IDs of all secrets in the database."
-					, "Options"_=
+					"Names"_o= {"--secrets-manager-enumerate-secrets"}
+					, "Description"_o= "List the IDs of all secrets in the database."
+					, "Options"_o=
 					{
 						SecretsManagerHost
-						, "SemanticID?"_=
+						, "SemanticID?"_o=
 						{
-							"Names"_= {"--semantic-id"}
-							, "Default"_= ""
-							, "Description"_= "Limit query to secrets having the specified semantic ID wildcard.\n"
+							"Names"_o= {"--semantic-id"}
+							, "Default"_o= ""
+							, "Description"_o= "Limit query to secrets having the specified semantic ID wildcard.\n"
 							"The semantic ID must adhere to RFC 1123 (hostname) and additionally # is allowed as well as * and ? for wildcard."
 						}
 						, Name
@@ -108,7 +108,7 @@ namespace NMib::NCloud::NCloudClient
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets, _Params, _pCommandLine);
 				}
@@ -118,9 +118,9 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-get-secret-by-semantic-id"}
-					, "Description"_= "Get secret matching the semantic id and tags."
-					, "Options"_=
+					"Names"_o= {"--secrets-manager-get-secret-by-semantic-id"}
+					, "Description"_o= "Get secret matching the semantic id and tags."
+					, "Options"_o=
 					{
 						SecretsManagerHost
 						, Name
@@ -129,17 +129,17 @@ namespace NMib::NCloud::NCloudClient
 						, BinaryAsBase64
 						, MapKey
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"SemanticID"_=
+						"SemanticID"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "Get the secret with the specified semantic ID.\n"
+							"Type"_o= ""
+							, "Description"_o= "Get the secret with the specified semantic ID.\n"
 							"The semantic ID must adhere to RFC 1123 (hostname) and additionally # is allowed."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID, _Params, _pCommandLine);
 				}
@@ -149,9 +149,9 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-get-secret-properties"}
-					, "Description"_= "List all properties for the secret."
-					, "Options"_=
+					"Names"_o= {"--secrets-manager-get-secret-properties"}
+					, "Description"_o= "List all properties for the secret."
+					, "Options"_o=
 					{
 						SecretsManagerHost
 						, BinaryAsBase64
@@ -159,7 +159,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties, _Params, _pCommandLine);
 				}
@@ -169,10 +169,10 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-get-secret"}
-					, "Description"_= "Get secret."
-					, "Output"_= "The secret formatted acconding to --expect"
-					, "Options"_=
+					"Names"_o= {"--secrets-manager-get-secret"}
+					, "Description"_o= "Get secret."
+					, "Output"_o= "The secret formatted acconding to --expect"
+					, "Options"_o=
 					{
 						SecretsManagerHost
 						, Expect
@@ -181,7 +181,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret, _Params, _pCommandLine);
 				}
@@ -192,20 +192,20 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-set-secret-properties"}
-					, "Description"_= "Set properties for a secret.\n"
+					"Names"_o= {"--secrets-manager-set-secret-properties"}
+					, "Description"_o= "Set properties for a secret.\n"
 					"Add a new secret or change the properties of an existing secret.\n"
 					"When creating a new secret, properties that are not set on the command line will be assigned default values. "
 					"The default values will be empty except for the Created and Modified properties which will be set to the current time.\n"
 					"When an existing secret is modified, properties not specified on the command line will retain their previous values, except the Modified property.\n"
-					, "Options"_=
+					, "Options"_o=
 					{
 						SecretsManagerHost
-						, "Secret?"_=
+						, "Secret?"_o=
 						{
-							"Names"_= {"--secret"}
-							, "Type"_= COneOf{"string", "binary", "string_map", "binary_map"}
-							, "Description"_= "Set the secret.\n"
+							"Names"_o= {"--secret"}
+							, "Type"_o= COneOf{"string", "binary", "string_map", "binary_map"}
+							, "Description"_o= "Set the secret.\n"
 							"The secret can be a string secret or a binary secret.\n"
 							"Specify 'string' to be prompted for a string secret.\n"
 							"Specify 'binary' for a binary secret. When --binary-as-base64 is enabled (which it is by default) you will be prompted for a base64 encoded binary secret. "
@@ -214,68 +214,68 @@ namespace NMib::NCloud::NCloudClient
 							"When --binary-as-base64 is disabled, the raw binary secret must be piped or redirected to stdin\n"
 							"To set a file secret use --secrets-manager-upload-file."
 						}
-						, "Username?"_=
+						, "Username?"_o=
 						{
-							"Names"_= {"--username"}
-							, "Type"_= ""
-							, "Description"_= "The username to set.\n"
+							"Names"_o= {"--username"}
+							, "Type"_o= ""
+							, "Description"_o= "The username to set.\n"
 						}
-						, "URL?"_=
+						, "URL?"_o=
 						{
-							"Names"_= {"--URL"}
-							, "Type"_= ""
-							, "Description"_= "The URL to set.\n"
+							"Names"_o= {"--URL"}
+							, "Type"_o= ""
+							, "Description"_o= "The URL to set.\n"
 						}
-						, "Expires?"_=
+						, "Expires?"_o=
 						{
-							"Names"_= {"--expires"}
-							, "Type"_= CTime()
-							, "Description"_= "The time when the secret expires.\n"
+							"Names"_o= {"--expires"}
+							, "Type"_o= CTime()
+							, "Description"_o= "The time when the secret expires.\n"
 						}
-						, "Notes?"_=
+						, "Notes?"_o=
 						{
-							"Names"_= {"--notes"}
-							, "Type"_= ""
-							, "Description"_= "The notes to set.\n"
+							"Names"_o= {"--notes"}
+							, "Type"_o= ""
+							, "Description"_o= "The notes to set.\n"
 						}
-						, "Metadata?"_=
+						, "Metadata?"_o=
 						{
-							"Names"_= {"--metadata"}
-							, "Type"_= EJSONType_Object
-							, "Description"_= "The metadata to set.\n"
+							"Names"_o= {"--metadata"}
+							, "Type"_o= EJSONType_Object
+							, "Description"_o= "The metadata to set.\n"
 							"The metadata is specified as a JSON object '{\"Key\" : \"Value\" ...}'"
 						}
-						, "Created?"_=
+						, "Created?"_o=
 						{
-							"Names"_= {"--created"}
-							, "Type"_= CTime()
-							, "Description"_= "The time when the secret was created. Set automatically if not specified.\n"
+							"Names"_o= {"--created"}
+							, "Type"_o= CTime()
+							, "Description"_o= "The time when the secret was created. Set automatically if not specified.\n"
 						}
-						, "Modified?"_=
+						, "Modified?"_o=
 						{
-							"Names"_= {"--modified"}
-							, "Type"_= CTime()
-							, "Description"_= "The time when the secret was modified. Set automatically if not specified.\n"
+							"Names"_o= {"--modified"}
+							, "Type"_o= CTime()
+							, "Description"_o= "The time when the secret was modified. Set automatically if not specified.\n"
 						}
-						, "Tags?"_=
+						, "Tags?"_o=
 						{
-							"Names"_= {"--tags"}
-							, "Type"_= {""}
-							, "Description"_= "The tags to set.\n"
+							"Names"_o= {"--tags"}
+							, "Type"_o= {""}
+							, "Description"_o= "The tags to set.\n"
 							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
 						}
-						, "SemanticID?"_=
+						, "SemanticID?"_o=
 						{
-							"Names"_= {"--semantic-id"}
-							, "Type"_= ""
-							, "Description"_= "The semantic ID to set.\n"
+							"Names"_o= {"--semantic-id"}
+							, "Type"_o= ""
+							, "Description"_o= "The semantic ID to set.\n"
 							"The semantic ID must adhere to RFC 1123 (hostname) and additionally # is allowed."
 						}
 						, BinaryAsBase64
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties, _Params, _pCommandLine);
 				}
@@ -285,31 +285,31 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-change-tags"}
-					, "Description"_= "Remove or add tags from/to a secret."
-					, "Options"_=
+					"Names"_o= {"--secrets-manager-change-tags"}
+					, "Description"_o= "Remove or add tags from/to a secret."
+					, "Options"_o=
 					{
 						SecretsManagerHost
-						, "RemoveTags?"_=
+						, "RemoveTags?"_o=
 						{
-							"Names"_= {"--remove"}
-							, "Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "Remove these tags.\n"
+							"Names"_o= {"--remove"}
+							, "Default"_o= _[_]
+							, "Type"_o= {""}
+							, "Description"_o= "Remove these tags.\n"
 							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
 						}
-						, "AddTags?"_=
+						, "AddTags?"_o=
 						{
-							"Names"_= {"--add"}
-							, "Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "Add these tags.\n"
+							"Names"_o= {"--add"}
+							, "Default"_o= _[_]
+							, "Type"_o= {""}
+							, "Description"_o= "Add these tags.\n"
 							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
 						}
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags, _Params, _pCommandLine);
 				}
@@ -319,34 +319,34 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-set-metadata"}
-					, "Description"_= "Set or add metadata to a secret.\n"
+					"Names"_o= {"--secrets-manager-set-metadata"}
+					, "Description"_o= "Set or add metadata to a secret.\n"
 					"Add a new key, value pair to the secrets metadata or replace the value if the key already exists."
-					, "Options"_=
+					, "Options"_o=
 					{
 						SecretsManagerHost
-						, "Key"_=
+						, "Key"_o=
 						{
-							"Names"_= {"--key"}
-							, "Type"_= ""
-							, "Description"_= "The key to set metadata for.\n"
+							"Names"_o= {"--key"}
+							, "Type"_o= ""
+							, "Description"_o= "The key to set metadata for.\n"
 						}
-						, "Value"_=
+						, "Value"_o=
 						{
-							"Names"_= {"--value"}
-							, "Type"_= fg_AnyType()
-							, "Description"_= "The value to for the metadata.\n"
+							"Names"_o= {"--value"}
+							, "Type"_o= fg_AnyType()
+							, "Description"_o= "The value to for the metadata.\n"
 						}
-						, "ExpectedValue?"_=
+						, "ExpectedValue?"_o=
 						{
-							"Names"_= {"--expected-value"}
-							, "Type"_= fg_AnyType()
-							, "Description"_= "The expected value to replace.\nIf the value is different the operation will fail.\n"
+							"Names"_o= {"--expected-value"}
+							, "Type"_o= fg_AnyType()
+							, "Description"_o= "The expected value to replace.\nIf the value is different the operation will fail.\n"
 						}
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata, _Params, _pCommandLine);
 				}
@@ -356,21 +356,21 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-remove-metadata"}
-					, "Description"_= "Remove the metadata matching key from the secret."
-					, "Options"_=
+					"Names"_o= {"--secrets-manager-remove-metadata"}
+					, "Description"_o= "Remove the metadata matching key from the secret."
+					, "Options"_o=
 					{
 						SecretsManagerHost
-						, "Key"_=
+						, "Key"_o=
 						{
-							"Names"_= {"--key"}
-							, "Type"_= ""
-							, "Description"_= "Key of the metadata to remove.\n"
+							"Names"_o= {"--key"}
+							, "Type"_o= ""
+							, "Description"_o= "Key of the metadata to remove.\n"
 						}
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata, _Params, _pCommandLine);
 				}
@@ -380,15 +380,15 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-remove-secret"}
-					, "Description"_= "Remove the secret."
-					, "Options"_=
+					"Names"_o= {"--secrets-manager-remove-secret"}
+					, "Description"_o= "Remove the secret."
+					, "Options"_o=
 					{
 						SecretsManagerHost
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret, _Params, _pCommandLine);
 				}
@@ -398,23 +398,23 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-upload-file"}
-					, "Description"_= "Upload a file."
-					, "Options"_=
+					"Names"_o= {"--secrets-manager-upload-file"}
+					, "Description"_o= "Upload a file."
+					, "Options"_o=
 					{
 						SecretsManagerHost
-						, "SecretFile"_=
+						, "SecretFile"_o=
 						{
-							"Names"_= {"--secret-file"}
-							, "Type"_= ""
-							, "Description"_= "The secret file to set.\n"
+							"Names"_o= {"--secret-file"}
+							, "Type"_o= ""
+							, "Description"_o= "The secret file to set.\n"
 						}
 						, Quiet
 						, CurrentDirectory
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload, _Params, _pCommandLine);
 				}
@@ -424,22 +424,22 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--secrets-manager-download-file"}
-					, "Description"_= "Download a file."
-					, "Options"_=
+					"Names"_o= {"--secrets-manager-download-file"}
+					, "Description"_o= "Download a file."
+					, "Options"_o=
 					{
 						SecretsManagerHost
-						, "OutputFile?"_=
+						, "OutputFile?"_o=
 						{
-							"Names"_= {"--output-file"}
-							, "Type"_= ""
-							, "Description"_= "Filename for the downloaded file.\n"
+							"Names"_o= {"--output-file"}
+							, "Type"_o= ""
+							, "Description"_o= "Filename for the downloaded file.\n"
 						}
-						, "AllowOverwrite?"_=
+						, "AllowOverwrite?"_o=
 						{
-							"Names"_= {"--allow-overwrite"}
-							, "Default"_= false
-							, "Description"_= "Allow overwirte of destination file.\n"
+							"Names"_o= {"--allow-overwrite"}
+							, "Default"_o= false
+							, "Description"_o= "Allow overwirte of destination file.\n"
 							"Only valid when output file is specified, otherwise file overwrite is never allowed.\n"
 						}
 						, Quiet
@@ -447,7 +447,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_SecretsManager_Download, _Params, _pCommandLine);
 				}
@@ -456,7 +456,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 
-	bool CCloudClientAppActor::fsp_SecretsManager_GetID(CEJSON const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error)
+	bool CCloudClientAppActor::fsp_SecretsManager_GetID(CEJSONSorted const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error)
 	{
 		if (auto const &ID = _Params["ID"].f_String())
 		{
@@ -570,7 +570,7 @@ namespace NMib::NCloud::NCloudClient
 	template <typename tf_CType>
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl
 		(
-			CEJSON const &_Params
+			CEJSONSorted const &_Params
 			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunctionMovable
 			<
@@ -698,7 +698,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		return g_Future <<= self
 			(
@@ -787,7 +787,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID
 		(
-			CEJSON const &_Params
+			CEJSONSorted const &_Params
 			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 		)
 	{
@@ -831,7 +831,7 @@ namespace NMib::NCloud::NCloudClient
 	template<typename tf_CType>
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl
 		(
-			CEJSON const &_Params
+			CEJSONSorted const &_Params
 			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
 			, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
 			, TCFunctionMovable
@@ -917,7 +917,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		return g_Future <<= self
 			(
@@ -949,7 +949,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		return g_Future <<= self
 			(
@@ -1012,7 +1012,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		bool bBinaryAsBase64 = _Params["BinaryAsBase64"].f_Boolean();
@@ -1156,7 +1156,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1165,7 +1165,7 @@ namespace NMib::NCloud::NCloudClient
 		if (fsp_SecretsManager_GetID(_Params, ID, Error))
 			co_return DMibErrorInstance(Error);
 
-		auto fParseTags = [](CEJSON const &_Tags)
+		auto fParseTags = [](CEJSONSorted const &_Tags)
 			{
 				TCSet<CStrSecure> OutTags;
 				for (auto &TagJSON : _Tags.f_Array())
@@ -1205,7 +1205,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1232,7 +1232,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1258,7 +1258,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1280,7 +1280,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1348,7 +1348,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJSON const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJSONSorted const &_Params, TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;

@@ -24,12 +24,12 @@ namespace NMib::NCloud::NCloudClient
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
-					"Timeout?"_= 
+					"Timeout?"_o=
 					{
-						"Names"_= {"--timeout"}
-						, "Default"_= 120.0
-						, "ValidForDirectCommand"_= false
-						, "Description"_= "The number of seconds to wait for remote servers to reply to commands."
+						"Names"_o= {"--timeout"}
+						, "Default"_o= 120.0
+						, "ValidForDirectCommand"_o= false
+						, "Description"_o= "The number of seconds to wait for remote servers to reply to commands."
 					}
 				}
 			)

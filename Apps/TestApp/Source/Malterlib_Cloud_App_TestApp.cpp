@@ -27,11 +27,11 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
-					"UpdateType?"_=
+					"UpdateType?"_o=
 					{
-						"Names"_= {"--update-type"}
-						,"Type"_= COneOf{"Independent", "OneAtATime", "AllAtOnce"}
-						, "Description"_= "Override the update type for the application."
+						"Names"_o= {"--update-type"}
+						,"Type"_o= COneOf{"Independent", "OneAtATime", "AllAtOnce"}
+						, "Description"_o= "Override the update type for the application."
 					}
 				}
 			)
@@ -40,34 +40,34 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_= {"--generate-sensor-readings"}
-					, "Description"_= "Generates a sensor reading."
-					, "Options"_=
+					"Names"_o= {"--generate-sensor-readings"}
+					, "Description"_o= "Generates a sensor reading."
+					, "Options"_o=
 					{
-						"ReadingType?"_=
+						"ReadingType?"_o=
 						{
-							"Names"_= {"--reading-type"}
-							, "Type"_= COneOf{"Float", "Version"}
-							, "Default"_= "Float"
-							, "Description"_= "Do error audit logs."
+							"Names"_o= {"--reading-type"}
+							, "Type"_o= COneOf{"Float", "Version"}
+							, "Default"_o= "Float"
+							, "Description"_o= "Do error audit logs."
 						}
-						, "RandomValues?"_=
+						, "RandomValues?"_o=
 						{
-							"Names"_= {"--random-values"}
-							, "Default"_= true
-							, "Description"_= "Do error audit logs."
+							"Names"_o= {"--random-values"}
+							, "Default"_o= true
+							, "Description"_o= "Do error audit logs."
 						}
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"NumReadings?"_=
+						"NumReadings?"_o=
 						{
-							"Default"_= 1
-							, "Description"_= "The number of readings to report."
+							"Default"_o= 1
+							, "Description"_o= "The number of readings to report."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					bool bIsVersion = _Params["ReadingType"].f_String() == "Version";
 					bool bRandomValues = _Params["RandomValues"].f_Boolean();
@@ -136,19 +136,19 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_= {"--set-sensor-status"}
-					, "Description"_= "Set sensor status."
-					, "Parameters"_=
+					"Names"_o= {"--set-sensor-status"}
+					, "Description"_o= "Set sensor status."
+					, "Parameters"_o=
 					{
-						"Status"_=
+						"Status"_o=
 						{
-							"Type"_= COneOf{"Ok", "Info", "Warning", "Error"}
-							, "Default"_= "Info"
-							, "Description"_= "The number of readings to report."
+							"Type"_o= COneOf{"Ok", "Info", "Warning", "Error"}
+							, "Default"_o= "Info"
+							, "Description"_o= "The number of readings to report."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					CDistributedAppSensorReporter::CSensorInfo SensorInfo;
 					SensorInfo.m_Identifier = "org.malterlib.testapp.test.status";
@@ -192,18 +192,18 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_= {"--generate-log-entries"}
-					, "Description"_= "Generates log entries."
-					, "Parameters"_=
+					"Names"_o= {"--generate-log-entries"}
+					, "Description"_o= "Generates log entries."
+					, "Parameters"_o=
 					{
-						"NumEntries?"_=
+						"NumEntries?"_o=
 						{
-							"Default"_= 1
-							, "Description"_= "The number of entries to report."
+							"Default"_o= 1
+							, "Description"_o= "The number of entries to report."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					mint nEntries = _Params["NumEntries"].f_Integer();
 
@@ -235,27 +235,27 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_= {"--generate-audit-log-entries"}
-					, "Description"_= "Generates audit log entries."
-					, "Parameters"_=
+					"Names"_o= {"--generate-audit-log-entries"}
+					, "Description"_o= "Generates audit log entries."
+					, "Parameters"_o=
 					{
-						"NumEntries?"_=
+						"NumEntries?"_o=
 						{
-							"Default"_= 1
-							, "Description"_= "The number of entries to report."
+							"Default"_o= 1
+							, "Description"_o= "The number of entries to report."
 						}
 					}
-					, "Options"_=
+					, "Options"_o=
 					{
-						"Error?"_=
+						"Error?"_o=
 						{
-							"Names"_= {"--error"}
-							, "Default"_= false
-							, "Description"_= "Do error audit logs."
+							"Names"_o= {"--error"}
+							, "Default"_o= false
+							, "Description"_o= "Do error audit logs."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					mint nEntries = _Params["NumEntries"].f_Integer();
 					mint bError = _Params["Error"].f_Boolean();
@@ -277,10 +277,10 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_= {"--get-log-report-depth"}
-					, "Description"_= "Gets the depth of the log reporting chain."
+					"Names"_o= {"--get-log-report-depth"}
+					, "Description"_o= "Gets the depth of the log reporting chain."
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					CDistributedAppLogReporter::CLogInfo LogInfo;
 
@@ -305,31 +305,31 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_= {"--generate-huge-log-entries"}
-					, "Description"_= "Generates a log entries."
-					, "Options"_=
+					"Names"_o= {"--generate-huge-log-entries"}
+					, "Description"_o= "Generates a log entries."
+					, "Options"_o=
 					{
-						"NumEntries?"_=
+						"NumEntries?"_o=
 						{
-							"Names"_= {"--num-entries"}
-							, "Default"_= 1
-							, "Description"_= "The number of entries to report."
+							"Names"_o= {"--num-entries"}
+							, "Default"_o= 1
+							, "Description"_o= "The number of entries to report."
 						}
-						, "EntrySize?"_=
+						, "EntrySize?"_o=
 						{
-							"Names"_= {"--entry-size"}
-							, "Default"_= 1024
-							, "Description"_= "The size of the entry in bytes."
+							"Names"_o= {"--entry-size"}
+							, "Default"_o= 1024
+							, "Description"_o= "The size of the entry in bytes."
 						}
-						, "LineSize?"_=
+						, "LineSize?"_o=
 						{
-							"Names"_= {"--line-size"}
-							, "Default"_= 128
-							, "Description"_= "The size of the lines in bytes."
+							"Names"_o= {"--line-size"}
+							, "Default"_o= 128
+							, "Description"_o= "The size of the lines in bytes."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					mint nEntries = _Params["NumEntries"].f_Integer();
 					mint EntrySize = _Params["EntrySize"].f_Integer();
@@ -378,7 +378,7 @@ namespace NMib::NCloud::NTest
 		(
 			CDistributedAppInterfaceServer::CRegisterInfo &o_RegisterInfo
 			, CDistributedAppInterfaceServer::CConfigFiles &o_ConfigFiles
-			, NEncoding::CEJSON const &_Params
+			, NEncoding::CEJSONSorted const &_Params
 		)
 	{
 		CDistributedAppActor::fp_PopulateAppInterfaceInfo(o_RegisterInfo, o_ConfigFiles, _Params);
@@ -395,7 +395,7 @@ namespace NMib::NCloud::NTest
 		}
 	}
 
-	TCFuture<void> CTestAppActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CTestAppActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
 	{
 		co_return {};
 	}

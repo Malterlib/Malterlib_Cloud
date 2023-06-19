@@ -49,8 +49,8 @@ namespace NMib::NCloud
 			
 			auto operator <=> (CVersionID const &_Right) const = default;
 			
-			NEncoding::CEJSON f_ToJson() const;
-			static CVersionID fs_FromJson(NEncoding::CEJSON const &_JSON);
+			NEncoding::CEJSONSorted f_ToJson() const;
+			static CVersionID fs_FromJson(NEncoding::CEJSONSorted const &_JSON);
 		};
 
 		struct CVersionIDAndPlatform
@@ -69,8 +69,8 @@ namespace NMib::NCloud
 
 			auto operator <=> (CVersionIDAndPlatform const &_Right) const = default;
 			
-			NEncoding::CEJSON f_ToJson() const;
-			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJSON const &_JSON);
+			NEncoding::CEJSONSorted f_ToJson() const;
+			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJSONSorted const &_JSON);
 			
 			CVersionID m_VersionID;
 			NStr::CStr m_Platform;
@@ -81,15 +81,15 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJSON f_ToJson() const;
-			static CVersionInformation fs_FromJson(NEncoding::CEJSON const &_JSON);
+			NEncoding::CEJSONSorted f_ToJson() const;
+			static CVersionInformation fs_FromJson(NEncoding::CEJSONSorted const &_JSON);
 
 			auto operator <=> (CVersionInformation const &_Right) const = default;
 
 			NTime::CTime m_Time;
 			NStr::CStr m_Configuration;
 			NContainer::TCSet<NStr::CStr> m_Tags;
-			NEncoding::CEJSON m_ExtraInfo;
+			NEncoding::CEJSONSorted m_ExtraInfo;
 			uint32 m_RetrySequence = 0;
 			uint32 m_nFiles = 0; /// The version manager set this value. Ignored when uploading
 			uint64 m_nBytes = 0; /// The version manager set this value. Ignored when uploading

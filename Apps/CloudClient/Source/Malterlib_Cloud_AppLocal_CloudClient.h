@@ -18,9 +18,9 @@ namespace NMib::NCloud::NCloudClient
 		};
 		
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
-		TCFuture<void> fp_PreRunCommandLine(CStr const &_Command, NEncoding::CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) override;
+		TCFuture<void> fp_PreRunCommandLine(CStr const &_Command, NEncoding::CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) override;
 		
 		TCFuture<CSelfUpdateVersion> fp_GetSelfUpdateVersion();
-		TCFuture<uint32> fp_CommandLine_SelfUpdate(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SelfUpdate(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 	};
 }

@@ -80,7 +80,7 @@ namespace NMib::NCloud::NSecretsManager
 
 			TCFuture<void> f_Delete(CStr const &_File);
 #if DMibConfig_Tests_Enable
-			TCFuture<CEJSON> f_SyncFileOperations();
+			TCFuture<CEJSONSorted> f_SyncFileOperations();
 #endif
 		};
 
@@ -103,7 +103,7 @@ namespace NMib::NCloud::NSecretsManager
 		TCFuture<void> f_Init();
 
 #if DMibConfig_Tests_Enable
-		TCFuture<CEJSON> f_Test_Command(CStr const &_Command, CEJSON const &_Params);
+		TCFuture<CEJSONSorted> f_Test_Command(CStr const &_Command, CEJSONSorted const &_Params);
 #endif
 		static bool fs_MatchSecret
 			(
@@ -154,7 +154,7 @@ namespace NMib::NCloud::NSecretsManager
 		TCFuture<void> fp_WriteDatabase();
 
 #if DMibConfig_Tests_Enable
-		TCFuture<CEJSON> f_SyncFileOperations();
+		TCFuture<CEJSONSorted> f_SyncFileOperations();
 #endif
 
 		TCFuture<void> fp_SendSubscriptionInitial(CStr const &_SubscriptionID);
@@ -181,11 +181,11 @@ namespace NMib::NCloud::NSecretsManager
 
 #if DMibConfig_Tests_Enable
 		// The vectors below are used to synchronize "threads" during LaunchInProcess tests so certain cases can be provoked
-		TCMap<CStr, TCPromise<CEJSON>> mp_UploadInitialized;
-		TCMap<CStr, TCPromise<CEJSON>> mp_UploadCompleted;
-		TCMap<CStr, TCPromise<CEJSON>> mp_DownloadInitialized;
-		TCMap<CStr, TCPromise<CEJSON>> mp_DownloadCompleted;
-		TCOptional<TCPromise<CEJSON>> mp_DestroyWaitingForCanDestroy;
+		TCMap<CStr, TCPromise<CEJSONSorted>> mp_UploadInitialized;
+		TCMap<CStr, TCPromise<CEJSONSorted>> mp_UploadCompleted;
+		TCMap<CStr, TCPromise<CEJSONSorted>> mp_DownloadInitialized;
+		TCMap<CStr, TCPromise<CEJSONSorted>> mp_DownloadCompleted;
+		TCOptional<TCPromise<CEJSONSorted>> mp_DestroyWaitingForCanDestroy;
 		bool mp_bDelayDelete = false;
 		TCVector<TCPromise<void>> mp_DelayDeletes;
 #endif

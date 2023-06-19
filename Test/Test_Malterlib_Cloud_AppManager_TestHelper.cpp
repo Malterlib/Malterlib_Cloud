@@ -636,7 +636,7 @@ namespace NMib::NCloud
 				co_await f_LaunchTool
 					(
 						State.m_CloudClientDirectory + "/MalterlibCloud"
-						, {"--trust-connection-add", "--trusted-namespaces", CJSON{CVersionManager::mc_pDefaultNamespace}.f_ToString(nullptr), Ticket.m_Ticket.f_ToStringTicket()}
+						, {"--trust-connection-add", "--trusted-namespaces", CJSONSorted{CVersionManager::mc_pDefaultNamespace}.f_ToString(nullptr), Ticket.m_Ticket.f_ToStringTicket()}
 					)
 				;
 				DMibTestMark;
@@ -658,7 +658,7 @@ namespace NMib::NCloud
 				co_await f_LaunchTool
 					(
 						State.m_CloudClientDirectory + "/MalterlibCloud"
-						, {"--trust-connection-add", "--trusted-namespaces", CJSON{CCloudManager::mc_pDefaultNamespace}.f_ToString(nullptr), Ticket.m_Ticket.f_ToStringTicket()}
+						, {"--trust-connection-add", "--trusted-namespaces", CJSONSorted{CCloudManager::mc_pDefaultNamespace}.f_ToString(nullptr), Ticket.m_Ticket.f_ToStringTicket()}
 					)
 				;
 				DMibTestMark;

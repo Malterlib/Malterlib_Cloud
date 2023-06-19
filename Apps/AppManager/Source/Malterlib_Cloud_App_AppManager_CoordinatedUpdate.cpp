@@ -8,7 +8,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 		CStr Group = _Params["Group"].f_String();

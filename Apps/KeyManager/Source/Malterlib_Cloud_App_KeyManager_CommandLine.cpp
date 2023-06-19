@@ -31,10 +31,10 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--provide-password"}
-					, "Description"_= "Provide a password for the key database to be able to start the key manager."
+					"Names"_o= {"--provide-password"}
+					, "Description"_o= "Provide a password for the key database to be able to start the key manager."
 				}
-				, [this](CEJSON const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CKeyManagerDaemonActor::f_ProvidePassword, _pCommandLine);
 				}
@@ -43,25 +43,25 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--precreate-keys"}
-					, "Description"_= "Precreate keys of a certain size. Useful to allow backup of future keys not yet sent to a client."
-					, "Options"_=
+					"Names"_o= {"--precreate-keys"}
+					, "Description"_o= "Precreate keys of a certain size. Useful to allow backup of future keys not yet sent to a client."
+					, "Options"_o=
 					{
-						"KeySize?"_=
+						"KeySize?"_o=
 						{
-							"Names"_= {"--key-size"}
-							, "Description"_= "Set size in number of bits for the created keys."
-							, "Default"_= 512
+							"Names"_o= {"--key-size"}
+							, "Description"_o= "Set size in number of bits for the created keys."
+							, "Default"_o= 512
 						}
-						, "NumberOfKeys?"_=
+						, "NumberOfKeys?"_o=
 						{
-							"Names"_= {"--number-of-keys"}
-							, "Description"_= "Precreate this number of keys."
-							, "Default"_= 128
+							"Names"_o= {"--number-of-keys"}
+							, "Description"_o= "Precreate this number of keys."
+							, "Default"_o= 128
 						}
 					}
 				}
-				, [this](CEJSON const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CKeyManagerDaemonActor::f_PrecreateKeys, _Parameters["KeySize"].f_Integer(), _Parameters["NumberOfKeys"].f_Integer(), _pCommandLine);
 				}

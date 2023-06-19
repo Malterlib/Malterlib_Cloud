@@ -45,7 +45,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		{
 		}
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override
 		{
 			m_TunnelServer = fg_Construct
 				(
@@ -57,7 +57,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				)
 			;
 
-			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", m_ListenPath, 0, CEJSON{}));
+			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", m_ListenPath, 0, CEJSONSorted{}));
 
 			co_await m_TunnelServer(&CNetworkTunnelsServer::f_Start);
 
@@ -96,7 +96,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		{
 		}
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override
 		{
 			m_TunnelClient = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager);
 
@@ -119,7 +119,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			co_return {};
 		}
 
-		TCFuture<CEJSON> fp_Test_Command(NStr::CStr const &_Command, NEncoding::CEJSON const &_Params) override
+		TCFuture<CEJSONSorted> fp_Test_Command(NStr::CStr const &_Command, NEncoding::CEJSONSorted const &_Params) override
 		{
 			if (_Command == "OpenTunnel")
 			{
@@ -161,7 +161,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			{
 				auto Tunnels = co_await m_TunnelClient(&CNetworkTunnelsClient::f_EnumTunnels);
 
-				CEJSON Return;
+				CEJSONSorted Return;
 
 				auto &OutTunnels = Return["Tunnels"] = EJSONType_Object;
 
@@ -353,7 +353,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				(
 					Tunnels
 					, ==
-					, CEJSON
+					, CEJSONSorted
 					{
 						"Tunnels"_=
 						{

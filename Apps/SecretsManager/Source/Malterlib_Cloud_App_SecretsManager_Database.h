@@ -23,7 +23,7 @@ namespace NMib::NCloud::NSecretsManager
 		NStr::CStrSecure m_URL;
 		NTime::CTime m_Expires;
 		NStr::CStrSecure m_Notes;
-		NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSON> m_Metadata;
+		NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSONSorted> m_Metadata;
 		NTime::CTime m_Created;
 		NTime::CTime m_Modified;
 		NStr::CStrSecure m_SemanticID;

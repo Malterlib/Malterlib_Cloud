@@ -18,7 +18,7 @@ namespace NMib::NCloud::NSecretsManager
 	{
 	}
 
-	TCFuture<void> CSecretsManagerDaemonActor::fp_StartApp(CEJSON const &_Params)
+	TCFuture<void> CSecretsManagerDaemonActor::fp_StartApp(CEJSONSorted const &_Params)
 	{
 		mp_pServerController = fg_ConstructActor<CServerController>(fg_Construct(self), self, mp_State);
 		co_await mp_pServerController(&CServerController::f_Init);
@@ -41,7 +41,7 @@ namespace NMib::NCloud::NSecretsManager
 	}
 
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJSON> CSecretsManagerDaemonActor::fp_Test_Command(CStr const &_Command, CEJSON const &_Params)
+	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::fp_Test_Command(CStr const &_Command, CEJSONSorted const &_Params)
 	{
 		// This function is used to provoke some special cases during testing
 		if (!mp_pServerController)

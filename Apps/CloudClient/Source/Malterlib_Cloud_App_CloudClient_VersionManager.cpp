@@ -18,34 +18,34 @@ namespace NMib::NCloud::NCloudClient
 {
 	void CCloudClientAppActor::fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section)
 	{
-		auto VersionManagerHost = "VersionManagerHost?"_=
+		auto VersionManagerHost = "VersionManagerHost?"_o=
 			{
-				"Names"_= {"--host"}
-				, "Default"_= ""
-				, "Description"_= "Limit query to only specified host ID."
+				"Names"_o= {"--host"}
+				, "Default"_o= ""
+				, "Description"_o= "Limit query to only specified host ID."
 			}
 		;
-		auto IncludeHost = "IncludeHost?"_=
+		auto IncludeHost = "IncludeHost?"_o=
 			{
-				"Names"_= {"--include-host"}
-				, "Default"_= false
-				, "Description"_= "Include version manager host in output.\n"
+				"Names"_o= {"--include-host"}
+				, "Default"_o= false
+				, "Description"_o= "Include version manager host in output.\n"
 			}
 		;
 
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--version-manager-list-applications"}
-					, "Description"_= "List applications available on remote version managers."
-					, "Options"_=
+					"Names"_o= {"--version-manager-list-applications"}
+					, "Description"_o= "List applications available on remote version managers."
+					, "Options"_o=
 					{
 						VersionManagerHost
 						, IncludeHost
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications, _Params, _pCommandLine);
 				}
@@ -55,31 +55,31 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--version-manager-list-versions"}
-					, "Description"_= "List application versions available on remote version managers."
-					, "Options"_=
+					"Names"_o= {"--version-manager-list-versions"}
+					, "Description"_o= "List application versions available on remote version managers."
+					, "Options"_o=
 					{
 						VersionManagerHost
 						, IncludeHost
-						, "Verbose?"_=
+						, "Verbose?"_o=
 						{
-							"Names"_= {"--verbose", "-v"}
-							, "Default"_= false
-							, "Description"_= "Verbose output. Include custom JSON information.\n"
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Verbose output. Include custom JSON information.\n"
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"Application?"_=
+						"Application?"_o=
 						{
-							"Default"_= ""
-							, "Description"_= "The application to list versions for.\n"
+							"Default"_o= ""
+							, "Description"_o= "The application to list versions for.\n"
 								"If left empty versions will be listed for all applications you have access to.\n"
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions, _Params, _pCommandLine);
 				}
@@ -89,126 +89,126 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--version-manager-upload-version"}
-					, "Description"_= "Upload a version to remote version manager.\n"
-					, "Options"_=
+					"Names"_o= {"--version-manager-upload-version"}
+					, "Description"_o= "Upload a version to remote version manager.\n"
+					, "Options"_o=
 					{
-						"VersionManagerHost?"_=
+						"VersionManagerHost?"_o=
 						{
-							"Names"_= {"--host"}
-							, "Default"_= ""
-							, "Description"_= "The host ID of the host to upload the version to."
+							"Names"_o= {"--host"}
+							, "Default"_o= ""
+							, "Description"_o= "The host ID of the host to upload the version to."
 						}
-						, "SettingsFileFromPackage?"_=
+						, "SettingsFileFromPackage?"_o=
 						{
-							"Names"_= {"--settings-file-from-package"}
-							, "Default"_= true
-							, "Description"_= "If the uploaded file is a tar.gz file, look inside it for VersionInfo.json and use as settings file.\n"
+							"Names"_o= {"--settings-file-from-package"}
+							, "Default"_o= true
+							, "Description"_o= "If the uploaded file is a tar.gz file, look inside it for VersionInfo.json and use as settings file.\n"
 							"If --settings-file is specified that will override the settings file inside the uploaded package.\n"
 							"Settings in the settings file is overridden by settings specified on the command line.\n"
 						}
-						, "SettingsFile?"_=
+						, "SettingsFile?"_o=
 						{
-							"Names"_= {"--settings-file"}
-							, "Default"_= ""
-							, "Description"_= "The JSON file to read settings from.\n"
+							"Names"_o= {"--settings-file"}
+							, "Default"_o= ""
+							, "Description"_o= "The JSON file to read settings from.\n"
 							"Settings in the settings file is overridden by settings specified on the command line.\n"
 							"The format template for the settings file is:\n" +
-							CEJSON
+							CEJSONOrdered
 							(
 								{
-									"Application"_= "AppName"
-									, "Version"_= "Branch/1.0.1"
-									, "Platform"_= DMalterlibCloudPlatform
-									, "Configuration"_= DMibStringize(DConfig)
-									, "ExtraInfo"_=
+									"Application"_o= "AppName"
+									, "Version"_o= "Branch/1.0.1"
+									, "Platform"_o= DMalterlibCloudPlatform
+									, "Configuration"_o= DMibStringize(DConfig)
+									, "ExtraInfo"_o=
 									{
-										"Executable"_= "ExecutableName"
-										, "ExecutableParams"_= {"--daemon-run-standalone", "--debug"}
-										, "RunAsUser"_= "ApplicationSpecificUser"
-										, "RunAsGroup"_= "ApplicationSpecificGroup"
-										, "RunAsUserHasShell"_= false
-										, "DistributedApp"_= true
+										"Executable"_o= "ExecutableName"
+										, "ExecutableParams"_o= {"--daemon-run-standalone", "--debug"}
+										, "RunAsUser"_o= "ApplicationSpecificUser"
+										, "RunAsGroup"_o= "ApplicationSpecificGroup"
+										, "RunAsUserHasShell"_o= false
+										, "DistributedApp"_o= true
 									}
 								}
 							)
 							.f_ToStringColored(CCommandLineDefaults::fs_ColorAnsiFlagsDefault(), "    ").f_Replace("\r\n", "\r").f_Replace("\n", "\r")
 						}
-						, "Application?"_=
+						, "Application?"_o=
 						{
-							"Names"_= {"--application"}
-							, "Type"_= ""
-							, "Description"_= "The application to upload a version to."
+							"Names"_o= {"--application"}
+							, "Type"_o= ""
+							, "Description"_o= "The application to upload a version to."
 						}
-						, "Version?"_=
+						, "Version?"_o=
 						{
-							"Names"_= {"--version"}
-							, "Type"_= ""
-							, "Description"_= "The version to upload.\n"
+							"Names"_o= {"--version"}
+							, "Type"_o= ""
+							, "Description"_o= "The version to upload.\n"
 								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
 						}
-						, "Platform?"_=
+						, "Platform?"_o=
 						{
-							"Names"_= {"--platform"}
-							, "Type"_= ""
-							, "Description"_= "The platform of the version to upload.\n"
+							"Names"_o= {"--platform"}
+							, "Type"_o= ""
+							, "Description"_o= "The platform of the version to upload.\n"
 						}
-						, "Configuration?"_=
+						, "Configuration?"_o=
 						{
-							"Names"_= {"--configuration"}
-							, "Type"_= ""
-							, "Description"_= "The configuration for this build. Could be for example Debug or Release.\n"
+							"Names"_o= {"--configuration"}
+							, "Type"_o= ""
+							, "Description"_o= "The configuration for this build. Could be for example Debug or Release.\n"
 						}
-						, "ExtraInfo?"_=
+						, "ExtraInfo?"_o=
 						{
-							"Names"_= {"--info"}
-							, "Type"_= EJSONType_Object
-							, "Description"_= "EJSON formatted extra information.\n"
+							"Names"_o= {"--info"}
+							, "Type"_o= EJSONType_Object
+							, "Description"_o= "EJSON formatted extra information.\n"
 						}
-						, "Tags?"_=
+						, "Tags?"_o=
 						{
-							"Names"_= {"--tags"}
-							, "Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "The tags to apply to the version.\n"
+							"Names"_o= {"--tags"}
+							, "Default"_o= _[_]
+							, "Type"_o= {""}
+							, "Description"_o= "The tags to apply to the version.\n"
 						}
-						, "Time?"_=
+						, "Time?"_o=
 						{
-							"Names"_= {"--time"}
-							, "Default"_= CTime()
-							, "Description"_= "The time for this version.\n"
+							"Names"_o= {"--time"}
+							, "Default"_o= CTime()
+							, "Description"_o= "The time for this version.\n"
 								"By default the time will be deduced from the modification time of the directory or file uploaded.\n"
 						}
-						, "Force?"_=
+						, "Force?"_o=
 						{
-							"Names"_= {"--force"}
-							, "Default"_= false
-							, "Description"_= "Force upload even if version already exists.\n"
+							"Names"_o= {"--force"}
+							, "Default"_o= false
+							, "Description"_o= "Force upload even if version already exists.\n"
 						}
-						, "TransferQueueSize?"_=
+						, "TransferQueueSize?"_o=
 						{
-							"Names"_= {"--queue-size"}
-							, "Default"_= int64(8*1024*1024)
-							, "Description"_= "The amount of data to keep in flight while uploading."
+							"Names"_o= {"--queue-size"}
+							, "Default"_o= int64(8*1024*1024)
+							, "Description"_o= "The amount of data to keep in flight while uploading."
 						}
-						, "CurrentDirectory?"_=
+						, "CurrentDirectory?"_o=
 						{
-							"Names"_= _[_]
-							, "Default"_= CFile::fs_GetCurrentDirectory()
-							, "Hidden"_= true
-							, "Description"_= "Internal hidden option to forward current directory."
+							"Names"_o= _[_]
+							, "Default"_o= CFile::fs_GetCurrentDirectory()
+							, "Hidden"_o= true
+							, "Description"_o= "Internal hidden option to forward current directory."
 						}
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"Source"_=
+						"Source"_o=
 						{
-							"Default"_= ""
-							, "Description"_= "The file or directory to upload.\n"
+							"Default"_o= ""
+							, "Description"_o= "The file or directory to upload.\n"
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion, _Params, _pCommandLine);
 				}
@@ -218,58 +218,58 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--version-manager-change-tags"}
-					, "Description"_= "Upload a version to remote version manager\n"
-					, "Options"_=
+					"Names"_o= {"--version-manager-change-tags"}
+					, "Description"_o= "Upload a version to remote version manager\n"
+					, "Options"_o=
 					{
-						"VersionManagerHost?"_=
+						"VersionManagerHost?"_o=
 						{
-							"Names"_= {"--host"}
-							, "Default"_= ""
-							, "Description"_= "The host ID of the host to change tags for."
+							"Names"_o= {"--host"}
+							, "Default"_o= ""
+							, "Description"_o= "The host ID of the host to change tags for."
 						}
-						, "Application"_=
+						, "Application"_o=
 						{
-							"Names"_= {"--application"}
-							, "Type"_= ""
-							, "Description"_= "Change tags for this application."
+							"Names"_o= {"--application"}
+							, "Type"_o= ""
+							, "Description"_o= "Change tags for this application."
 						}
-						, "Version"_=
+						, "Version"_o=
 						{
-							"Names"_= {"--version"}
-							, "Type"_= ""
-							, "Description"_= "Change tags for this version.\n"
+							"Names"_o= {"--version"}
+							, "Type"_o= ""
+							, "Description"_o= "Change tags for this version.\n"
 								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
 						}
-						, "Platform?"_=
+						, "Platform?"_o=
 						{
-							"Names"_= {"--platform"}
-							, "Default"_= ""
-							, "Description"_= "The platform to change tags for. Leave empty to change all platforms.\n"
+							"Names"_o= {"--platform"}
+							, "Default"_o= ""
+							, "Description"_o= "The platform to change tags for. Leave empty to change all platforms.\n"
 						}
-						, "AddTags?"_=
+						, "AddTags?"_o=
 						{
-							"Names"_= {"--add"}
-							, "Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "Add these tags.\n"
+							"Names"_o= {"--add"}
+							, "Default"_o= _[_]
+							, "Type"_o= {""}
+							, "Description"_o= "Add these tags.\n"
 						}
-						, "RemoveTags?"_=
+						, "RemoveTags?"_o=
 						{
-							"Names"_= {"--remove"}
-							, "Default"_= _[_]
-							, "Type"_= {""}
-							, "Description"_= "Remove these tags.\n"
+							"Names"_o= {"--remove"}
+							, "Default"_o= _[_]
+							, "Type"_o= {""}
+							, "Description"_o= "Remove these tags.\n"
 						}
-						, "RetryUpgrade?"_=
+						, "RetryUpgrade?"_o=
 						{
-							"Names"_= {"--retry-upgrade"}
-							, "Default"_= false
-							, "Description"_= "Increase the retry sequence for this version. AppManagers will retry upgrade if it previously failed.\n"
+							"Names"_o= {"--retry-upgrade"}
+							, "Default"_o= false
+							, "Description"_o= "Increase the retry sequence for this version. AppManagers will retry upgrade if it previously failed.\n"
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags, _Params, _pCommandLine);
 				}
@@ -279,52 +279,52 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--version-manager-download-version"}
-					, "Description"_= "Download a version from remote version manager\n"
-					, "Options"_=
+					"Names"_o= {"--version-manager-download-version"}
+					, "Description"_o= "Download a version from remote version manager\n"
+					, "Options"_o=
 					{
-						"VersionManagerHost?"_=
+						"VersionManagerHost?"_o=
 						{
-							"Names"_= {"--host"}
-							, "Default"_= ""
-							, "Description"_= "The host ID of the host to download the version from."
+							"Names"_o= {"--host"}
+							, "Default"_o= ""
+							, "Description"_o= "The host ID of the host to download the version from."
 						}
-						, "Application"_=
+						, "Application"_o=
 						{
-							"Names"_= {"--application"}
-							, "Type"_= ""
-							, "Description"_= "The application to download a version from."
+							"Names"_o= {"--application"}
+							, "Type"_o= ""
+							, "Description"_o= "The application to download a version from."
 						}
-						, "Version"_=
+						, "Version"_o=
 						{
-							"Names"_= {"--version"}
-							, "Type"_= ""
-							, "Description"_= "The version to download.\n"
+							"Names"_o= {"--version"}
+							, "Type"_o= ""
+							, "Description"_o= "The version to download.\n"
 								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
 						}
-						, "Platform?"_=
+						, "Platform?"_o=
 						{
-							"Names"_= {"--platform"}
-							, "Default"_= DMalterlibCloudPlatform
-							, "Description"_= "The platform of the version to download.\n"
+							"Names"_o= {"--platform"}
+							, "Default"_o= DMalterlibCloudPlatform
+							, "Description"_o= "The platform of the version to download.\n"
 						}
-						, "TransferQueueSize?"_=
+						, "TransferQueueSize?"_o=
 						{
-							"Names"_= {"--queue-size"}
-							, "Default"_= int64(8*1024*1024)
-							, "Description"_= "The amount of data to keep in flight while downloading."
+							"Names"_o= {"--queue-size"}
+							, "Default"_o= int64(8*1024*1024)
+							, "Description"_o= "The amount of data to keep in flight while downloading."
 						}
 					}
-					, "Parameters"_=
+					, "Parameters"_o=
 					{
-						"DestinationDirectory?"_=
+						"DestinationDirectory?"_o=
 						{
-							"Default"_= mp_State.m_RootDirectory
-							, "Description"_= "The directory to download the version to."
+							"Default"_o= mp_State.m_RootDirectory
+							, "Description"_o= "The directory to download the version to."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion, _Params, _pCommandLine);
 				}
@@ -355,7 +355,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
@@ -406,7 +406,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -552,7 +552,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
 		if (Source.f_IsEmpty())
@@ -562,7 +562,7 @@ namespace NMib::NCloud::NCloudClient
 		if (!SettingsFile.f_IsEmpty())
 			SettingsFile = CFile::fs_GetFullPath(SettingsFile, _Params["CurrentDirectory"].f_String());
 
-		TCVariant<CStr, CEJSON> SettingsFileOrSettings;
+		TCVariant<CStr, CEJSONSorted> SettingsFileOrSettings;
 		if (!SettingsFile.f_IsEmpty())
 			SettingsFileOrSettings = SettingsFile;
 		else if (_Params["SettingsFileFromPackage"].f_Boolean() && (Source.f_EndsWith(".tar.gz") || Source.f_EndsWith(".tar")))
@@ -587,12 +587,12 @@ namespace NMib::NCloud::NCloudClient
 
 			auto LaunchResult = co_await LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch)).f_Wrap();
 
-			CEJSON VersionInfo = EJSONType_Object;
+			CEJSONSorted VersionInfo = EJSONType_Object;
 			if (LaunchResult)
 			{
 				try
 				{
-					VersionInfo = CEJSON::fs_FromString(LaunchResult->f_GetStdOut());
+					VersionInfo = CEJSONSorted::fs_FromString(LaunchResult->f_GetStdOut());
 				}
 				catch (CException const &_Exception)
 				{
@@ -611,8 +611,8 @@ namespace NMib::NCloud::NCloudClient
 		else
 			SettingsFileOrSettings = CStr{};
 
-		CEJSON Settings;
-		if (SettingsFileOrSettings.f_IsOfType<CEJSON>())
+		CEJSONSorted Settings;
+		if (SettingsFileOrSettings.f_IsOfType<CEJSONSorted>())
 			Settings = SettingsFileOrSettings.f_Get<1>();
 		else
 		{
@@ -623,7 +623,7 @@ namespace NMib::NCloud::NCloudClient
 					(
 						g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [SettingsFile]
 						{
-							return CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
+							return CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
 						}
 					)
 					.f_Wrap();
@@ -643,9 +643,9 @@ namespace NMib::NCloud::NCloudClient
 		CStr Version;
 		CStr Configuration;
 		CStr Platform;
-		CEJSON ExtraInfo;
+		CEJSONSorted ExtraInfo;
 
-		auto fApplySettings = [&](CEJSON const &_Settings)
+		auto fApplySettings = [&](CEJSONSorted const &_Settings)
 			{
 				if (auto *pValue = _Settings.f_GetMember("Application", EJSONType_String))
 					Application = pValue->f_String();
@@ -772,7 +772,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -830,7 +830,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -855,7 +855,7 @@ namespace NMib::NCloud::NCloudClient
 		if (!Platform.f_IsEmpty() && !CVersionManager::fs_IsValidPlatform(Platform))
 			co_return DMibErrorInstance("Version platform format is invalid");
 
-		auto fParseTags = [](CEJSON const &_Tags)
+		auto fParseTags = [](CEJSONSorted const &_Tags)
 			{
 				TCSet<CStr> OutTags;
 				for (auto &TagJSON : _Tags.f_Array())

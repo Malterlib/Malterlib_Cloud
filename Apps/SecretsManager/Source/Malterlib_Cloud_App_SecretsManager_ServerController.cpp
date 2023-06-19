@@ -20,7 +20,7 @@ namespace NMib::NCloud::NSecretsManager
 	}
 
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJSON> CSecretsManagerDaemonActor::CServerController::f_Test_Command(CStr const &_Command, CEJSON const &_Params)
+	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServerController::f_Test_Command(CStr const &_Command, CEJSONSorted const &_Params)
 	{
 		if (!mp_ServerActor)
 			co_return DMibErrorInstance("No server");

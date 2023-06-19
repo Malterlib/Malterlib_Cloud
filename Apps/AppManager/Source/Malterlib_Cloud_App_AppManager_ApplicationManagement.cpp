@@ -241,7 +241,7 @@ namespace NMib::NCloud::NAppManager
 				Array.f_Insert(Branch);
 		}
 		{
-			auto &UpdateScripts = ApplicationJSON["UpdateScripts"] = CEJSON();
+			auto &UpdateScripts = ApplicationJSON["UpdateScripts"] = CEJSONSorted();
 			UpdateScripts.f_Object();
 			UpdateScripts["PreUpdate"] = Settings.m_UpdateScripts.m_PreUpdate; 
 			UpdateScripts["PostUpdate"] = Settings.m_UpdateScripts.m_PostUpdate; 
@@ -259,10 +259,10 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 		{
-			auto &BackupJSON = ApplicationJSON["Backup"] = CEJSON();
+			auto &BackupJSON = ApplicationJSON["Backup"] = CEJSONSorted();
 			BackupJSON.f_Object();
 			{
-				auto &JSON = BackupJSON["IncludeWildcards"] = CEJSON();
+				auto &JSON = BackupJSON["IncludeWildcards"] = CEJSONSorted();
 				JSON.f_Object();
 				for (auto &Destination : Settings.m_Backup_IncludeWildcards)
 				{
@@ -281,13 +281,13 @@ namespace NMib::NCloud::NAppManager
 					JSON.f_Insert(Wildcard);
 			}
 			{
-				auto &JSON = BackupJSON["AddSyncFlagsWildcards"] = CEJSON();
+				auto &JSON = BackupJSON["AddSyncFlagsWildcards"] = CEJSONSorted();
 				JSON.f_Object();
 				for (auto &Flags : Settings.m_Backup_AddSyncFlagsWildcards)
 					JSON[Settings.m_Backup_AddSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
 			}
 			{
-				auto &JSON = BackupJSON["RemoveSyncFlagsWildcards"] = CEJSON();
+				auto &JSON = BackupJSON["RemoveSyncFlagsWildcards"] = CEJSONSorted();
 				JSON.f_Object();
 				for (auto &Flags : Settings.m_Backup_RemoveSyncFlagsWildcards)
 					JSON[Settings.m_Backup_RemoveSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
@@ -297,7 +297,7 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		{
-			auto &RegisterInfo = ApplicationJSON["RegisterInfo"] = CEJSON();
+			auto &RegisterInfo = ApplicationJSON["RegisterInfo"] = CEJSONSorted();
 			RegisterInfo.f_Object();
 			RegisterInfo["UpdateType"] = Application.m_RegisterInfo.m_UpdateType;
 			
@@ -444,19 +444,19 @@ namespace NMib::NCloud::NAppManager
 		CFile::fs_SetAttributes(_ApplicationDir, gc_RootAttributes);
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Stop, _Params["Name"].f_String());
 		co_return 0;
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Start, _Params["Name"].f_String());
 		co_return 0;
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Restart, _Params["Name"].f_String());
 		co_return 0;

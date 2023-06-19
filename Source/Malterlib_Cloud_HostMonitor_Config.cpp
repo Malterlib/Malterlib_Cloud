@@ -199,7 +199,7 @@ namespace NMib::NCloud
 								auto String = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
 								try
 								{
-									Contents.m_Parsed = CEJSON::fs_FromString(String, _FileName);
+									Contents.m_Parsed = CEJSONSorted::fs_FromString(String, _FileName);
 								}
 								catch (CException const &_Exception)
 								{
@@ -303,7 +303,7 @@ namespace NMib::NCloud
 
 	namespace
 	{
-		void fg_FindJsonDiffsRecursive(CEJSON const &_Old, CEJSON const &_New, TCVector<CStr> &o_Changed, TCVector<CStr> &o_Added, TCVector<CStr> &o_Deleted, CStr const &_Context)
+		void fg_FindJsonDiffsRecursive(CEJSONSorted const &_Old, CEJSONSorted const &_New, TCVector<CStr> &o_Changed, TCVector<CStr> &o_Added, TCVector<CStr> &o_Deleted, CStr const &_Context)
 		{
 			if (_Old == _New)
 				return;
@@ -329,8 +329,8 @@ namespace NMib::NCloud
 				break;
 			case EEJSONType_Object:
 				{
-					auto iOld = _Old.f_Object().f_SortedIterator();
-					auto iNew = _New.f_Object().f_SortedIterator();
+					auto iOld = _Old.f_Object().f_OrderedIterator();
+					auto iNew = _New.f_Object().f_OrderedIterator();
 					while (iOld || iNew)
 					{
 						while (iOld && (!iNew || iOld->f_Name() < iNew->f_Name()))
@@ -371,7 +371,7 @@ namespace NMib::NCloud
 			}
 		}
 
-		void fg_FindJsonDiffs(CEJSON const &_Old, CEJSON const &_New, TCVector<CStr> &o_Changed, TCVector<CStr> &o_Added, TCVector<CStr> &o_Deleted)
+		void fg_FindJsonDiffs(CEJSONSorted const &_Old, CEJSONSorted const &_New, TCVector<CStr> &o_Changed, TCVector<CStr> &o_Added, TCVector<CStr> &o_Deleted)
 		{
 			fg_FindJsonDiffsRecursive(_Old, _New, o_Changed, o_Added, o_Deleted, "<Root>");
 		}

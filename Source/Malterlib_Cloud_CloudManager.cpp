@@ -53,11 +53,11 @@ namespace NMib::NCloud
 		return CAppManagerInterface::EProtocolVersion_AddStatusSeverity;
 	}
 
-	NEncoding::CEJSON CCloudManager::CAppManagerInfo::f_ToJson() const
+	NEncoding::CEJSONSorted CCloudManager::CAppManagerInfo::f_ToJson() const
 	{
 		using namespace NEncoding;
 
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Environment"] = fg_ToJson(m_Environment);
 		Return["HostName"] = fg_ToJson(m_HostName);
 		Return["ProgramDirectory"] = fg_ToJson(m_ProgramDirectory);
@@ -84,11 +84,11 @@ namespace NMib::NCloud
 		m_Max = CVersion{.m_Major = TCLimitsInt<uint32>::mc_Max};
 	}
 
-	NEncoding::CEJSON CCloudManager::CExpectedVersionRange::f_ToJson() const
+	NEncoding::CEJSONSorted CCloudManager::CExpectedVersionRange::f_ToJson() const
 	{
 		using namespace NEncoding;
 
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Min"] = fg_ToJson(m_Min);
 		Return["Max"] = fg_ToJson(m_Max);
 		return Return;
@@ -155,11 +155,11 @@ namespace NMib::NCloud
 		co_return fg_Move(Version);
 	}
 
-	NEncoding::CEJSON CCloudManager::CVersion::f_ToJson() const
+	NEncoding::CEJSONSorted CCloudManager::CVersion::f_ToJson() const
 	{
 		using namespace NEncoding;
 
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Major"] = fg_ToJson(m_Major);
 		Return["Minor"] = fg_ToJson(m_Minor);
 		Return["Revision"] = fg_ToJson(m_Revision);
@@ -167,11 +167,11 @@ namespace NMib::NCloud
 		return Return;
 	}
 
-	NEncoding::CEJSON CCloudManager::CCurrentVersion::f_ToJson() const
+	NEncoding::CEJSONSorted CCloudManager::CCurrentVersion::f_ToJson() const
 	{
 		using namespace NEncoding;
 
-		CEJSON Return;
+		CEJSONSorted Return;
 		Return["Major"] = fg_ToJson(m_Major);
 		Return["Minor"] = fg_ToJson(m_Minor);
 

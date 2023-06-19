@@ -53,7 +53,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 		CStr Name = _Params["Name"].f_String();
@@ -366,15 +366,15 @@ namespace NMib::NCloud::NAppManager
 				{
 					try
 					{
-						CEJSON VersionInfoJSON = CEJSON::fs_FromString(LaunchResult->f_GetStdOut());
+						CEJSONSorted VersionInfoJSON = CEJSONSorted::fs_FromString(LaunchResult->f_GetStdOut());
 
 						CStr Application;
 						CStr Version;
 						CStr Configuration;
 						CStr Platform;
-						CEJSON ExtraInfo;
+						CEJSONSorted ExtraInfo;
 
-						auto fApplySettings = [&](CEJSON const &_Settings)
+						auto fApplySettings = [&](CEJSONSorted const &_Settings)
 							{
 								if (auto *pValue = _Settings.f_GetMember("Application", EJSONType_String))
 									Application = pValue->f_String();

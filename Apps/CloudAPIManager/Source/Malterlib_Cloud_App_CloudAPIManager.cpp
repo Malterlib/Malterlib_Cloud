@@ -21,7 +21,7 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 	}
 
-	TCFuture<void> CCloudAPIManagerDaemonActor::fp_StartApp(NEncoding::CEJSON const &_Params)
+	TCFuture<void> CCloudAPIManagerDaemonActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
 	{
 		TCPromise<void> Promise;
 		mp_pServer = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);

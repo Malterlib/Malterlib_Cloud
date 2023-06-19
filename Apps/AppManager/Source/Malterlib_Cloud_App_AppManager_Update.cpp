@@ -35,7 +35,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		for (auto &pUpdateWeak : mp_RunningUpdates)
 		{
@@ -49,7 +49,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		

@@ -48,7 +48,7 @@ namespace NMib::NCloud::NCloudAPIManager
 									
 									CStr URL(KeystoneInfo.m_IdentityURL + "auth/tokens");
 									
-									CEJSON AuthRequest =
+									CEJSONSorted AuthRequest =
 										{
 											"auth"_=
 											{
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NCloudAPIManager
 									
 									ServiceInfo.m_Token = Result.m_Headers["x-subject-token"];
 									
-									auto const JSON = CJSON::fs_FromString(Result.m_Body);
+									auto const JSON = CJSONSorted::fs_FromString(Result.m_Body);
 									auto Token = JSON["token"];
 									
 									CStr ExpiresAt = Token["expires_at"].f_String();	// Example: "2016-09-30T08:36:31.932109Z"

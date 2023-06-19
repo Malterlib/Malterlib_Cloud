@@ -35,7 +35,7 @@ namespace NMib::NCloud::NVersionManager
 		TCPromise<CSizeInfo> Promise;
 		g_Dispatch(_FileActor) / [_VersionInfo, _VersionPath]() mutable -> CSizeInfo
 			{
-				CEJSON VersionJSONInfo;
+				CEJSONSorted VersionJSONInfo;
 				CStr VersionInfoPath = fg_Format("{}.json", _VersionPath);
 
 				VersionJSONInfo["Time"] = _VersionInfo.m_Time;

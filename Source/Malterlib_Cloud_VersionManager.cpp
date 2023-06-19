@@ -155,9 +155,9 @@ namespace NMib::NCloud
 		return _FileName.f_ReplaceChar('_', '/');
 	}
 	
-	NEncoding::CEJSON CVersionManager::CVersionID::f_ToJson() const
+	NEncoding::CEJSONSorted CVersionManager::CVersionID::f_ToJson() const
 	{
-		NEncoding::CEJSON Ret;
+		NEncoding::CEJSONSorted Ret;
 		Ret["Branch"] = m_Branch;
 		Ret["Major"] = m_Major;
 		Ret["Minor"] = m_Minor;
@@ -170,7 +170,7 @@ namespace NMib::NCloud
 		return !m_Branch.f_IsEmpty();
 	}
 
-	auto CVersionManager::CVersionID::fs_FromJson(NEncoding::CEJSON const &_JSON) -> CVersionID
+	auto CVersionManager::CVersionID::fs_FromJson(NEncoding::CEJSONSorted const &_JSON) -> CVersionID
 	{
 		CVersionID Ret;
 		Ret.m_Branch = _JSON["Branch"].f_String();
@@ -187,9 +187,9 @@ namespace NMib::NCloud
 		return fg_Format("{}/{}", m_VersionID.f_EncodeFileName(), m_Platform);
 	}
 	
-	NEncoding::CEJSON CVersionManager::CVersionIDAndPlatform::f_ToJson() const
+	NEncoding::CEJSONSorted CVersionManager::CVersionIDAndPlatform::f_ToJson() const
 	{
-		NEncoding::CEJSON Ret;
+		NEncoding::CEJSONSorted Ret;
 		Ret["VersionID"] = m_VersionID.f_ToJson();
 		Ret["Platform"] = m_Platform;
 		return Ret;
@@ -200,7 +200,7 @@ namespace NMib::NCloud
 		return m_VersionID.f_IsValid() && !m_Platform.f_IsEmpty();
 	}
 
-	auto CVersionManager::CVersionIDAndPlatform::fs_FromJson(NEncoding::CEJSON const &_JSON) -> CVersionIDAndPlatform
+	auto CVersionManager::CVersionIDAndPlatform::fs_FromJson(NEncoding::CEJSONSorted const &_JSON) -> CVersionIDAndPlatform
 	{
 		CVersionIDAndPlatform Ret;
 		Ret.m_VersionID = CVersionID::fs_FromJson(_JSON["VersionID"]);
@@ -210,9 +210,9 @@ namespace NMib::NCloud
 	
 	// CVersionInformation
 
-	NEncoding::CEJSON CVersionManager::CVersionInformation::f_ToJson() const
+	NEncoding::CEJSONSorted CVersionManager::CVersionInformation::f_ToJson() const
 	{
-		NEncoding::CEJSON Ret;
+		NEncoding::CEJSONSorted Ret;
 		Ret["Time"] = m_Time;
 		Ret["Configuration"] = m_Configuration;
 		auto &TagArray = Ret["Tags"].f_Array();
@@ -226,7 +226,7 @@ namespace NMib::NCloud
 		return Ret;
 	}
 	
-	auto CVersionManager::CVersionInformation::fs_FromJson(NEncoding::CEJSON const &_JSON) -> CVersionInformation
+	auto CVersionManager::CVersionInformation::fs_FromJson(NEncoding::CEJSONSorted const &_JSON) -> CVersionInformation
 	{
 		CVersionInformation Ret;
 		Ret.m_Time = _JSON["Time"].f_Date();

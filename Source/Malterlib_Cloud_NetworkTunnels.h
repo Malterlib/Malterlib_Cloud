@@ -30,7 +30,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJSON m_MetaData;
+			NEncoding::CEJSONSorted m_MetaData;
 		};
 
 		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSecureByteVector &&_Data)>;

@@ -79,7 +79,7 @@ namespace NMib::NCloud::NAppManager
 		co_return UpdateSequence;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StoredUpdateNotificationList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StoredUpdateNotificationList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("Sequence", "Update ID", "Application", "Version", "Version Time", "Start Update", "Stage", "Update Time", "Coordinated Wait", "Message");
@@ -117,7 +117,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StoredUpdateNotificationClear(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StoredUpdateNotificationClear(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CaptureScope = co_await (g_CaptureExceptions % "Error clearing notification data in database");
 

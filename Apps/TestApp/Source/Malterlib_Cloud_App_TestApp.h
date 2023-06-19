@@ -20,11 +20,11 @@ namespace NMib::NCloud::NTest
 			(
 				CDistributedAppInterfaceServer::CRegisterInfo &o_RegisterInfo
 				, CDistributedAppInterfaceServer::CConfigFiles &o_ConfigFiles
-				, NEncoding::CEJSON const &_Params
+				, NEncoding::CEJSONSorted const &_Params
 			)
 			override
 		;
-		TCFuture<void> fp_StartApp(NEncoding::CEJSON const &_Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
 		TCFuture<void> fp_StopApp() override;
 	};
 }

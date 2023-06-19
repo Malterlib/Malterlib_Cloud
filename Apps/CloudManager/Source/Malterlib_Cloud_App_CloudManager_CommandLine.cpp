@@ -27,19 +27,19 @@ namespace NMib::NCloud::NCloudManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--dump-database"}
-					, "Description"_= "Dump Cloud Manager specific database entries."
-					, "Options"_=
+					"Names"_o= {"--dump-database"}
+					, "Description"_o= "Dump Cloud Manager specific database entries."
+					, "Options"_o=
 					{
-						"Prefix?"_=
+						"Prefix?"_o=
 						{
-							"Names"_= {"--prefix", "-p"}
-							, "Default"_= ""
-							, "Description"_= "Limit output to tabels with prefix."
+							"Names"_o= {"--prefix", "-p"}
+							, "Default"_o= ""
+							, "Description"_o= "Limit output to tabels with prefix."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
 					co_await mp_Server(&CCloudManagerServer::f_DumpDatabaseEntries, _pCommandLine, _Params["Prefix"].f_String());
 

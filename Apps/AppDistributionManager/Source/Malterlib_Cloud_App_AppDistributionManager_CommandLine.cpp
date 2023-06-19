@@ -22,37 +22,37 @@ namespace NMib::NCloud::NAppDistributionManager
 		
 		auto DistributionManagement = o_CommandLine.f_AddSection("Distribution Management", "Commands to manage AppDistributionManager distributions");
 
-		auto AddOption_Tags = "Tags?"_=
+		auto AddOption_Tags = "Tags?"_o=
 			{
-				"Names"_= {"--tags"}
-				, "Type"_= COneOfType{CEJSON{""}, COneOf{false}}
-				, "Description"_= "Distribute versions have all these these tags only.\n"
+				"Names"_o= {"--tags"}
+				, "Type"_o= COneOfType{CEJSONOrdered{""}, COneOf{false}}
+				, "Description"_o= "Distribute versions have all these these tags only.\n"
 				"If you leave tags empty no versions will be distributed.\n"
 			}
 		;
-		auto AddOption_Platforms = "Platforms?"_=
+		auto AddOption_Platforms = "Platforms?"_o=
 			{
-				"Names"_= {"--platforms"}
-				, "Type"_= COneOfType{CEJSON{""}, COneOf{false}}
-				, "Description"_= "Distribute versions from these platforms.\n"
+				"Names"_o= {"--platforms"}
+				, "Type"_o= COneOfType{CEJSONOrdered{""}, COneOf{false}}
+				, "Description"_o= "Distribute versions from these platforms.\n"
 				"Leave empty to distribute all platforms.\n"
 			}
 		;
-		auto AddOption_Branches = "BranchWildcards?"_=
+		auto AddOption_Branches = "BranchWildcards?"_o=
 			{
-				"Names"_= {"--branches"}
-				, "Type"_= {""}
-				, "Description"_= "Distribute versions from these branches.\n"
+				"Names"_o= {"--branches"}
+				, "Type"_o= {""}
+				, "Description"_o= "Distribute versions from these branches.\n"
 				"Leave empty to allow any branch.\n"
 				"Branches can be matched with wildcards.\n"
 			}
 		;
-		auto AddOption_RenameTemplate = "RenameTemplate?"_=
+		auto AddOption_RenameTemplate = "RenameTemplate?"_o=
 			{
-				"Names"_= {"--rename-template"}
-				, "Type"_= ""
-				, "Default"_= "{Name}/{PlatformFamily}/{Name}-{Version}.{FileExtension}"
-				, "Description"_= "Template to use when renaming the package for distribution.\n"
+				"Names"_o= {"--rename-template"}
+				, "Type"_o= ""
+				, "Default"_o= "{Name}/{PlatformFamily}/{Name}-{Version}.{FileExtension}"
+				, "Description"_o= "Template to use when renaming the package for distribution.\n"
 				"Leave empty to not rename distribution. Template variables:\n"
 				"@Indent=27\r"
 				"   {Name}                  The name of the distribution.\r"
@@ -76,11 +76,11 @@ namespace NMib::NCloud::NAppDistributionManager
 		auto AddOption_RenameTemplateNoDefault = fg_TempCopy(AddOption_RenameTemplate);
 		AddOption_RenameTemplateNoDefault.m_Value.f_RemoveMember("Default");
 
-		auto AddOption_DeployDestinations = "DeployDestinations?"_=
+		auto AddOption_DeployDestinations = "DeployDestinations?"_o=
 			{
-				"Names"_= {"--deploy-destinations"}
-				, "Type"_= {COneOf{"FileSystem"}}
-				, "Description"_= "The deploy destinations to deploy to.\n"
+				"Names"_o= {"--deploy-destinations"}
+				, "Type"_o= {COneOf{"FileSystem"}}
+				, "Description"_o= "The deploy destinations to deploy to.\n"
 				"Leave empty to determine deploy types from version meta data\n"
 				"Supported types:\n"
 				"@Indent=27\r"
@@ -90,25 +90,25 @@ namespace NMib::NCloud::NAppDistributionManager
 		;
 		auto AddOption_VersionManagerApplication =
 			{
-				"Names"_= {"--application"}
-				, "Type"_= ""
-				, "Description"_= "The version manager application to distribute.\n"
+				"Names"_o= {"--application"}
+				, "Type"_o= ""
+				, "Description"_o= "The version manager application to distribute.\n"
 			}
 		;
 
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--distribution-add"}
-					, "Description"_= "Adds an application distribution.\n"
-					, "Options"_=
+					"Names"_o= {"--distribution-add"}
+					, "Description"_o= "Adds an application distribution.\n"
+					, "Options"_o=
 					{
-						"VersionManagerApplication"_= AddOption_VersionManagerApplication
-						, "Distribution?"_=
+						"VersionManagerApplication"_o= AddOption_VersionManagerApplication
+						, "Distribution?"_o=
 						{
-							"Names"_= {"--distribution"}
-							, "Type"_= ""
-							, "Description"_= "The unique name you give the distribution.\n"
+							"Names"_o= {"--distribution"}
+							, "Type"_o= ""
+							, "Description"_o= "The unique name you give the distribution.\n"
 							"Defaults to the name of the version manager application."
 						}
 						, AddOption_Tags
@@ -118,7 +118,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						, AddOption_DeployDestinations
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionAdd, _Params, _pCommandLine);
 				}
@@ -127,17 +127,17 @@ namespace NMib::NCloud::NAppDistributionManager
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--distribution-change-settings"}
-					, "Description"_= "Change settings for distribution.\n"
-					, "Options"_= 
+					"Names"_o= {"--distribution-change-settings"}
+					, "Description"_o= "Change settings for distribution.\n"
+					, "Options"_o=
 					{
-						"Distribution"_=
+						"Distribution"_o=
 						{
-							"Names"_= {"--distribution"}
-							, "Type"_= ""
-							, "Description"_= "Unique name of the distribution to change settings for."
+							"Names"_o= {"--distribution"}
+							, "Type"_o= ""
+							, "Description"_o= "Unique name of the distribution to change settings for."
 						}
-						, "VersionManagerApplication?"_= AddOption_VersionManagerApplication
+						, "VersionManagerApplication?"_o= AddOption_VersionManagerApplication
 						, AddOption_Tags
 						, AddOption_Platforms
 						, AddOption_Branches
@@ -145,7 +145,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						, AddOption_DeployDestinations
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionChangeSettings, _Params, _pCommandLine);
 				}
@@ -155,26 +155,26 @@ namespace NMib::NCloud::NAppDistributionManager
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--distribution-list"}
-					, "Description"_= "List distributions."
-					, "Options"_=
+					"Names"_o= {"--distribution-list"}
+					, "Description"_o= "List distributions."
+					, "Options"_o=
 					{
-						"Verbose?"_= 
+						"Verbose?"_o=
 						{
-							"Names"_= {"--verbose", "-v"}
-							, "Default"_= false
-							, "Description"_= "Display more extensive information about the distribution."
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Display more extensive information about the distribution."
 						}
-						, "Distribution?"_=
+						, "Distribution?"_o=
 						{
-							"Names"_= {"--distribution"}
-							, "Default"_= "" 
-							, "Description"_= "Unique name of the distribution to list. Leave empty to list all distributions."
+							"Names"_o= {"--distribution"}
+							, "Default"_o= ""
+							, "Description"_o= "Unique name of the distribution to list. Leave empty to list all distributions."
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionEnum, _Params, _pCommandLine);
 				}
@@ -183,18 +183,18 @@ namespace NMib::NCloud::NAppDistributionManager
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--distribution-remove"}
-					, "Description"_= "Remove the distribution."
-					, "Parameters"_=
+					"Names"_o= {"--distribution-remove"}
+					, "Description"_o= "Remove the distribution."
+					, "Parameters"_o=
 					{
-						"Distribution"_=
+						"Distribution"_o=
 						{
-							"Type"_= ""
-							, "Description"_= "The name of the distribution to remove."
+							"Type"_o= ""
+							, "Description"_o= "The name of the distribution to remove."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionRemove, _Params, _pCommandLine);
 				}
@@ -203,27 +203,27 @@ namespace NMib::NCloud::NAppDistributionManager
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--application-list-versions"}
-					, "Description"_= "List versions available to distribute from."
-					, "Options"_=
+					"Names"_o= {"--application-list-versions"}
+					, "Description"_o= "List versions available to distribute from."
+					, "Options"_o=
 					{
-						"Verbose?"_=
+						"Verbose?"_o=
 						{
-							"Names"_= {"--verbose", "-v"}
-							, "Default"_= false
-							, "Description"_= "Display more extensive information about the versions."
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Display more extensive information about the versions."
 						}
-						, "Application?"_=
+						, "Application?"_o=
 						{
-							"Names"_= {"--application"}
-							, "Default"_= ""
-							, "Description"_= "The application to list versions for.\n"
+							"Names"_o= {"--application"}
+							, "Default"_o= ""
+							, "Description"_o= "The application to list versions for.\n"
 							"Leave empty to list all applications.\n"
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions, _Params, _pCommandLine);
 				}

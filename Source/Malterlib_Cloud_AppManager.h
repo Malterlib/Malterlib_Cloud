@@ -156,7 +156,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJSON f_ToJson() const;
+			NEncoding::CEJSONSorted f_ToJson() const;
 
 			NStr::CStr const &f_GetName()
 			{
@@ -233,7 +233,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJSON f_ToJson() const;
+			NEncoding::CEJSONSorted f_ToJson() const;
 
 			bool f_IsDone() const;
 

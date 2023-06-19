@@ -185,7 +185,7 @@ namespace NMib::NCloud::NAppManager
 		co_return fg_Move(Versions);
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		bool bExtraVerbose = _Params["ExtraVerbose"].f_Boolean();
@@ -204,7 +204,7 @@ namespace NMib::NCloud::NAppManager
 
 			auto fSyntaxHighlight = [&](auto const &_Value)
 				{
-					return CEJSON(_Value).f_ToStringColored(_pCommandLine->m_AnsiFlags, nullptr, EJSONDialectFlag_AllowUndefined);
+					return CEJSONSorted(_Value).f_ToStringColored(_pCommandLine->m_AnsiFlags, nullptr, EJSONDialectFlag_AllowUndefined);
 				}
 			;
 
@@ -340,7 +340,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CAppManagerInterface::CVersionsAvailableForUpdate Results = co_await
@@ -398,7 +398,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_VersionManagerList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_VersionManagerList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
@@ -413,7 +413,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CloudManagerList(CEJSON _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CloudManagerList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		auto AnsiEncoding= _pCommandLine->f_AnsiEncoding();

@@ -93,7 +93,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 					CStr DownloadFile;
 
-					CEJSON Files = EJSONType_Object;
+					CEJSONSorted Files = EJSONType_Object;
 
 					CStr DestinationDirectory;
 
@@ -184,12 +184,12 @@ namespace NMib::NCloud::NAppDistributionManager
 						DownloadFile = _DeployInfo.m_Renamed;
 					}
 
-					CEJSON LatestRelease;
+					CEJSONSorted LatestRelease;
 					{
 						CStr DatabaseFile = DestinationDirectory / "Releases.json";
-						CEJSON Database;
+						CEJSONSorted Database;
 						if (CFile::fs_FileExists(DatabaseFile))
-							Database = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(DatabaseFile, true), DatabaseFile);
+							Database = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(DatabaseFile, true), DatabaseFile);
 
 						auto &Releases = Database["Releases"];
 
@@ -207,7 +207,7 @@ namespace NMib::NCloud::NAppDistributionManager
 							<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Revision
 						;
 
-						CEJSON NewRelease =
+						CEJSONSorted NewRelease =
 							{
 								"Path"_= DownloadFile
 								, "Version"_= _DeployInfo.m_Version.m_VersionID.f_ToJson()
@@ -236,7 +236,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 						Releases.f_Array().f_Sort
 							(
-								[](CEJSON const &_Left, CEJSON const &_Right)
+								[](CEJSONSorted const &_Left, CEJSONSorted const &_Right)
 								{
 									return CParsedVersion::fs_Parse(_Right["VersionString"].f_String()) <=> CParsedVersion::fs_Parse(_Left["VersionString"].f_String());
 								}

@@ -17,12 +17,12 @@ namespace NMib::NCloud::NCloudClient
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
-					"SelfUpdateCheck?"_= 
+					"SelfUpdateCheck?"_o=
 					{
-						"Names"_= {"--self-update-check"}
-						, "Default"_= true
-						, "ValidForDirectCommand"_= false
-						, "Description"_= "Check if a new version of the cloud client is available when running other commands."
+						"Names"_o= {"--self-update-check"}
+						, "Default"_o= true
+						, "ValidForDirectCommand"_o= false
+						, "Description"_o= "Check if a new version of the cloud client is available when running other commands."
 					}
 				}
 			)
@@ -34,19 +34,19 @@ namespace NMib::NCloud::NCloudClient
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_= {"--self-update"}
-					, "Description"_= "Update cloud client from from connected version managers."
-					, "Options"_=
+					"Names"_o= {"--self-update"}
+					, "Description"_o= "Update cloud client from from connected version managers."
+					, "Options"_o=
 					{
-						"VersionManagerHost?"_=
+						"VersionManagerHost?"_o=
 						{
-							"Names"_= {"--host"}
-							, "Default"_= ""
-							, "Description"_= "Only look for a new version on this version manager."
+							"Names"_o= {"--host"}
+							, "Default"_o= ""
+							, "Description"_o= "Only look for a new version on this version manager."
 						}
 					}
 				}
-				, [this](CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
 					return g_Future <<= self(&CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate, _Params, _pCommandLine);
 				}

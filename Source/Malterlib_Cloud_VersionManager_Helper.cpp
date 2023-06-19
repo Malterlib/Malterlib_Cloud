@@ -329,7 +329,7 @@ namespace NMib::NCloud
 
 	namespace
 	{
-		CVersionManagerHelper::CPackageInfo fg_ExtractPackageInfo(CEJSON const &_VersionInfoJSON)
+		CVersionManagerHelper::CPackageInfo fg_ExtractPackageInfo(CEJSONSorted const &_VersionInfoJSON)
 		{
 			CVersionManagerHelper::CPackageInfo PackageInfo;
 
@@ -400,7 +400,7 @@ namespace NMib::NCloud
 
 				auto VersionInfoStr = (co_await pState->m_Launch(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))).f_GetStdOut();
 
-				CEJSON VersionInfo = CEJSON::fs_FromString(VersionInfoStr);
+				CEJSONSorted VersionInfo = CEJSONSorted::fs_FromString(VersionInfoStr);
 
 				CVersionManagerHelper::CPackageInfo PackageInfo = fg_ExtractPackageInfo(VersionInfo);
 
@@ -532,7 +532,7 @@ namespace NMib::NCloud
 						DMibError("Several VersionInfo.json file found in package source directory");
 
 					CStr VersionInfoFile = Files[0];
-					CEJSON VersionInfoJSON = CEJSON::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile, true), VersionInfoFile);
+					CEJSONSorted VersionInfoJSON = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile, true), VersionInfoFile);
 
 					CPackageInfo PackageInfo = fg_ExtractPackageInfo(VersionInfoJSON);
 

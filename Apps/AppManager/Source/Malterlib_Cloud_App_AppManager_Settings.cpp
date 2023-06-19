@@ -21,7 +21,7 @@ namespace NMib::NCloud::NAppManager
 		return mp_pUniqueUserGroup->f_GetGroup(_Settings.m_RunAsGroup);
 	}
 
-	bool CAppManagerActor::CApplicationSettings::f_ParseSettings(CEJSON const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed)
+	bool CAppManagerActor::CApplicationSettings::f_ParseSettings(CEJSONSorted const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed)
 	{
 		if (auto *pValue = _Params.f_GetMember("SelfUpdateSource"))
 		{

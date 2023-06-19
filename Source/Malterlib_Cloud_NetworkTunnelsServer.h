@@ -29,7 +29,7 @@ namespace NMib::NCloud
 				ICNetworkTunnels::CNetworkTunnelName const &_Name
 				, NStr::CStr const &_Host
 				, uint16 _Port
-				, NEncoding::CEJSON &&_MetaData
+				, NEncoding::CEJSONSorted &&_MetaData
 			)
 		;
 

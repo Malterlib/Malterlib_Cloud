@@ -27,7 +27,7 @@ public:
 			co_await AppManagerTestHelper.f_Setup(1);
 			auto &AppManagerInfo = *AppManagerTestHelper.m_pState->m_AppManagerInfos.f_FindAny();
 
-			auto fMakeComparable = [](CEJSON &&_Entries)
+			auto fMakeComparable = [](CEJSONSorted &&_Entries)
 				{
 					for (auto &Entry : _Entries.f_Array())
 					{
@@ -38,7 +38,7 @@ public:
 					// We need to sort by sequence because the system clock might change
 					_Entries.f_Array().f_Sort
 						(
-							[](CEJSON const &_Left, CEJSON const &_Right)
+							[](CEJSONSorted const &_Left, CEJSONSorted const &_Right)
 							{
 								auto Left = _Left.f_GetMemberValue("UniqueSequence", 0);
 								auto Right = _Right.f_GetMemberValue("UniqueSequence", 0);
@@ -54,7 +54,7 @@ public:
 
 			auto TestAppDirectory = AppManagerInfo.m_RootDirectory / "App/TestApp";
 
-			CEJSON ExpectedLogs = CEJSON
+			CEJSONSorted ExpectedLogs = CEJSONSorted
 				{
 					{
 						"HostID"_= ""
@@ -68,7 +68,7 @@ public:
 				}
 			;
 
-			CEJSON ExpectedLogEntries = CEJSON
+			CEJSONSorted ExpectedLogEntries = CEJSONSorted
 				{
 					{
 						"HostID"_= ""
@@ -162,14 +162,14 @@ public:
 				}
 			;
 
-			auto fSortLogs = [&](CEJSON const &_Logs)
+			auto fSortLogs = [&](CEJSONSorted const &_Logs)
 				{
-					CEJSON Return = _Logs;
+					CEJSONSorted Return = _Logs;
 					Return.f_Array().f_Sort
 						(
-							[](CEJSON const &_Left, CEJSON const &_Right)
+							[](CEJSONSorted const &_Left, CEJSONSorted const &_Right)
 							{
-								auto fTuple = [](CEJSON const &_Value)
+								auto fTuple = [](CEJSONSorted const &_Value)
 									{
 										return fg_TupleReferences
 											(
@@ -203,7 +203,7 @@ public:
 
 				co_await fGenerateLogEntry();
 
-				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
+				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
 						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
@@ -211,11 +211,11 @@ public:
 								, {"--log-list", "--identifier", "org.malterlib.log.test", "--json"}, TestAppDirectory
 							)
 						;
-						co_return CEJSON::fs_FromString(Result);
+						co_return CEJSONSorted::fs_FromString(Result);
 					}
 				;
 
-				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
+				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
 						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
@@ -225,7 +225,7 @@ public:
 							)
 						;
 
-						co_return CEJSON::fs_FromString(Result);
+						co_return CEJSONSorted::fs_FromString(Result);
 					}
 				;
 
@@ -239,9 +239,9 @@ public:
 					, TestAppHostID = CStr((co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim())
 					, HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName())
 				]
-				(CEJSON const &_JSON)
+				(CEJSONSorted const &_JSON)
 				{
-					CEJSON Return = _JSON;
+					CEJSONSorted Return = _JSON;
 
 					for (auto &Entry : Return.f_Array())
 					{
@@ -259,7 +259,7 @@ public:
 
 				CStr AppManagerPath = AppManagerInfo.m_RootDirectory / "AppManager";
 
-				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
+				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
 						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
@@ -268,11 +268,11 @@ public:
 								, AppManagerInfo.m_RootDirectory
 							)
 						;
-						co_return CEJSON::fs_FromString(Result);
+						co_return CEJSONSorted::fs_FromString(Result);
 					}
 				;
 
-				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
+				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
 						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
@@ -281,7 +281,7 @@ public:
 								, AppManagerInfo.m_RootDirectory
 							)
 						;
-						co_return CEJSON::fs_FromString(Result);
+						co_return CEJSONSorted::fs_FromString(Result);
 					}
 				;
 
@@ -295,9 +295,9 @@ public:
 					, AppManagerHostID = AppManagerInfo.f_GetHostID()
 					, HostName = CStr("{}@{}/AppManager"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName())
 				]
-				(CEJSON const &_JSON)
+				(CEJSONSorted const &_JSON)
 				{
-					CEJSON Return = _JSON;
+					CEJSONSorted Return = _JSON;
 
 					for (auto &Entry : Return.f_Array())
 					{
@@ -315,7 +315,7 @@ public:
 				CStr CloudClientDirectory = AppManagerTestHelper.m_pState->m_RootDirectory / "MalterlibCloud";
 				CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
 
-				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
+				auto fReadLogs = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
 						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
@@ -324,11 +324,11 @@ public:
 								, CloudClientDirectory
 							)
 						;
-						co_return CEJSON::fs_FromString(Result);
+						co_return CEJSONSorted::fs_FromString(Result);
 					}
 				;
 
-				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJSON>
+				auto fReadLogEntries = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
 						auto Result = co_await AppManagerTestHelper.f_LaunchTool
 							(
@@ -337,7 +337,7 @@ public:
 								, CloudClientDirectory
 							)
 						;
-						co_return CEJSON::fs_FromString(Result);
+						co_return CEJSONSorted::fs_FromString(Result);
 					}
 				;
 
@@ -359,7 +359,7 @@ public:
 		(
 			CStr _Name
 			, TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> _pGenerateEntries
-			, TCFunction<void (CEJSON const &_Entries)> _fCheckEntries, bool _bStopCloudManager
+			, TCFunction<void (CEJSONSorted const &_Entries)> _fCheckEntries, bool _bStopCloudManager
 		)
 	{
 		CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp | CAppManagerTestHelper::EOption_EnableVersionManager;
@@ -382,7 +382,7 @@ public:
 
 			co_await (*_pGenerateEntries)(TestAppDirectory, &AppManagerTestHelper);
 
-			auto LogEntries = CEJSON::fs_FromString
+			auto LogEntries = CEJSONSorted::fs_FromString
 				(
 					co_await AppManagerTestHelper.f_LaunchTool
 					(
@@ -400,7 +400,7 @@ public:
 
 			CStr AppManagerPath = AppManagerInfo.m_RootDirectory / "AppManager";
 
-			auto LogEntries = CEJSON::fs_FromString
+			auto LogEntries = CEJSONSorted::fs_FromString
 				(
 					co_await AppManagerTestHelper.f_LaunchTool
 					(
@@ -452,7 +452,7 @@ public:
 			CStr CloudClientDirectory = AppManagerTestHelper.m_pState->m_RootDirectory / "MalterlibCloud";
 			CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
 
-			auto LogEntries = CEJSON::fs_FromString
+			auto LogEntries = CEJSONSorted::fs_FromString
 				(
 					co_await AppManagerTestHelper.f_LaunchTool
 					(
@@ -472,7 +472,7 @@ public:
 		(
 			CStr _Name
 			, TCActorFunctor<TCFuture<void> (CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper)> _fGenerateEntries
-			, TCFunction<void (CEJSON const &_Entries)> _fCheckEntries
+			, TCFunction<void (CEJSONSorted const &_Entries)> _fCheckEntries
 		)
 	{
 		TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> pGenerateEntries = fg_Construct(fg_Move(_fGenerateEntries));
@@ -488,7 +488,7 @@ public:
 		co_return {};
 	}
 
-	void fp_CheckLimitedEntries(CEJSON const &_Entries, mint _LineLen, mint _TotalSize)
+	void fp_CheckLimitedEntries(CEJSONSorted const &_Entries, mint _LineLen, mint _TotalSize)
 	{
 		CStr AllEntries;
 		for (auto &LogEntry : _Entries.f_Array())
@@ -530,7 +530,7 @@ public:
 
 						co_return {};
 					}
-					, [&](CEJSON const &_Entries)
+					, [&](CEJSONSorted const &_Entries)
 					{
 						fp_CheckLimitedEntries(_Entries, LineSize, EntrySize);
 					}
@@ -557,7 +557,7 @@ public:
 
 						co_return {};
 					}
-					, [&](CEJSON const &_Entries)
+					, [&](CEJSONSorted const &_Entries)
 					{
 						fp_CheckLimitedEntries(_Entries, LineSize, EntrySize);
 					}
@@ -586,7 +586,7 @@ public:
 
 						co_return {};
 					}
-					, [&](CEJSON const &_Entries)
+					, [&](CEJSONSorted const &_Entries)
 					{
 						fp_CheckLimitedEntries(_Entries, LineSize, TotalSize);
 					}

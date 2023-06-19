@@ -12,7 +12,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		;
 	}
 
-	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionChangeSettings(CEJSON const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionChangeSettings(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 
