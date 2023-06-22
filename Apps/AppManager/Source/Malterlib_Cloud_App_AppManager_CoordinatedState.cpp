@@ -39,7 +39,7 @@ namespace NMib::NCloud::NAppManager
 					co_return {};
 				}
 				, "Malterlib/Cloud/AppManager"
-				, "Failed to {} remote app manager"
+				, "Failed to handle '{}' for remote app manager"
 			)
 		;
 

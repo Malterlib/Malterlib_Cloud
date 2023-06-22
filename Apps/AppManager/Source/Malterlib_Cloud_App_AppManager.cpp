@@ -421,7 +421,7 @@ namespace NMib::NCloud::NAppManager
 					co_return {};
 				}
 				, "CloudManager"
-				, "Failed to {} cloud manager"
+				, "Failed to handle '{}' for cloud manager"
 			)
 		;
 
