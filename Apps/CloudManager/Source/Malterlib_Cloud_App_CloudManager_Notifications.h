@@ -34,6 +34,7 @@ namespace NMib::NCloud::NCloudManager
 		{
 			NStr::CStr m_Token;
 			CStr m_AlertDestination = "!channel";
+			CStr m_IconEmoji = ":malterlib:";
 			EType m_ReportFlags = EType_None;
 		};
 		

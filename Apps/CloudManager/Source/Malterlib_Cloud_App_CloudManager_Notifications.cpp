@@ -31,6 +31,7 @@ namespace NMib::NCloud::NCloudManager
 					auto &SlackChannel = mp_SlackChannels[Channel.f_Name()];
 					SlackChannel.m_Token = Channel.f_Value()["Token"].f_String();
 					SlackChannel.m_AlertDestination = Channel.f_Value().f_GetMemberValue("AlertDestination", SlackChannel.m_AlertDestination).f_String();
+					SlackChannel.m_IconEmoji = Channel.f_Value().f_GetMemberValue("IconEmoji", SlackChannel.m_IconEmoji).f_String();
 
 					if (Channel.f_Value().f_GetMemberValue("ReportStartup", true).f_Boolean())
 						SlackChannel.m_ReportFlags |= EType_Startup;
@@ -108,8 +109,8 @@ namespace NMib::NCloud::NCloudManager
 			CSlackActor::CMessage Message = _Message;
 			Message.m_Channel = ChannelID;
 			Message.m_UserName = "Cloud Manager ({})"_f << NProcess::NPlatform::fg_Process_GetComputerName();
-			if (!Message.m_IconEmoji)
-				Message.m_IconEmoji = ":malterlib:";
+			if (!Message.m_IconEmoji && Channel.m_IconEmoji)
+				Message.m_IconEmoji = Channel.m_IconEmoji;
 
 			if (_TypeFlags & EType_Alert)
 				Message.m_Text = "<{}>"_f << Channel.m_AlertDestination;
