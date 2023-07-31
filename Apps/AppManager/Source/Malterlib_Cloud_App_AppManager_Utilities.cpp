@@ -61,6 +61,7 @@ namespace NMib::NCloud::NAppManager
 			, CStr const &_Description
 			, TCMap<CStr, CStr> const &_Environment
 			, TCFunction<void (NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)> const &_fOnStdOutput
+			, uint32 _WarningErrorStatus
 		)
 	{
 		struct CState
@@ -106,7 +107,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 			> pState->m_Promise % fg_Format("[{}] Failed to save temporary script", _Description) 
-			/ [this, FileName, _Description, _Environment, _fOnStdOutput, pState]
+			/ [this, FileName, _Description, _Environment, _fOnStdOutput, pState, _WarningErrorStatus]
 			{
 				auto fReportError = [pState, _Description](CStr const &_Error)
 					{
@@ -123,7 +124,7 @@ namespace NMib::NCloud::NAppManager
 						CProcessLaunch::fs_GetBashPath()
 						, fg_CreateVector<CStr>(FileName)
 						, mp_State.m_RootDirectory
-						, [pState, _Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+						, [pState, _Description, fReportError, _WarningErrorStatus](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 						{
 							if (!pState->m_LaunchActor)
 								return;
@@ -144,14 +145,27 @@ namespace NMib::NCloud::NAppManager
 							case NProcess::EProcessLaunchState_Exited:
 								{
 									auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
-									pState->m_Output.m_Status = ExitStatus; 
-									if (ExitStatus != 0)
+									pState->m_Output.m_Status = ExitStatus;
+									if (ExitStatus == _WarningErrorStatus)
+									{
+										DMibLogWithCategory
+											(
+												Malterlib/Cloud/AppManager
+												, Warning
+												, "[{}] Bash script exited with warning"
+												, _Description
+											)
+										;
+									}
+									else if (ExitStatus != 0)
 									{
 										auto ErrorOutput = pState->m_ErrorOutput.f_Trim();
 										if (ErrorOutput.f_IsEmpty())
 											fReportError(fg_Format("Bash script exited with error status: {}", ExitStatus));
 										else
 											fReportError(fg_Format("Bash script exited with error status: {}. Error output:{\n}{}", ExitStatus, ErrorOutput));
+
+										break;
 									}
 									else
 									{
@@ -163,11 +177,12 @@ namespace NMib::NCloud::NAppManager
 												, _Description
 											)
 										;
-										if (!pState->m_bReplied)
-										{
-											pState->m_Promise.f_SetResult(fg_Move(pState->m_Output));
-											pState->f_Replied();
-										}
+									}
+
+									if (!pState->m_bReplied)
+									{
+										pState->m_Promise.f_SetResult(fg_Move(pState->m_Output));
+										pState->f_Replied();
 									}
 								}
 								break;

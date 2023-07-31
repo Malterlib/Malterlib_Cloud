@@ -113,6 +113,7 @@ namespace NMib::NCloud::NAppManager
 						if (_Output == "PROVIDE KEY")
 							_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, Key) > fg_DiscardResult();
 					}
+					, TCLimitsInt<uint32>::mc_Max
 				)
 				% "Failed to change encryption"
 			)

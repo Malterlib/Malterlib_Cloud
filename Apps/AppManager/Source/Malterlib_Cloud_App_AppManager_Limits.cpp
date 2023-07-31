@@ -63,6 +63,7 @@ namespace NMib::NCloud::NAppManager
 					, "SetupLimits"
 					, fg_Move(Environment)
 					, nullptr
+					, 2
 				)
 				% "Failed to setup limits"
 			)

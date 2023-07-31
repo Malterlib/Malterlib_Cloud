@@ -655,6 +655,7 @@ namespace NMib::NCloud::NAppManager
 				, CStr const &_Description
 				, TCMap<CStr, CStr> const &_Environment
 				, TCFunction<void (CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)> const &_fOnStdOutput
+				, uint32 _WarningErrorStatus = TCLimitsInt<uint32>::mc_Max
 			)
 		;
 
