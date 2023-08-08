@@ -119,4 +119,80 @@ namespace NMib::NCloud
 		_Stream % m_OsName;
 		_Stream % fg_Move(m_fVersionRangeChanged);
 	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CRemoveSensor::f_Stream(tf_CStream &_Stream)
+	{
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_SupportFilterInRemoveSensorAndLog)
+			_Stream % m_Filter;
+		else
+		{
+			if constexpr (tf_CStream::mc_bConsume)
+			{
+				NConcurrency::CDistributedAppSensorReporter::CSensorInfoKey Key;
+				_Stream >> Key;
+				
+				m_Filter.m_HostID = Key.m_HostID;
+				m_Filter.m_Scope = Key.m_Scope;
+				m_Filter.m_Identifier = Key.m_Identifier;
+				m_Filter.m_IdentifierScope = Key.m_IdentifierScope;
+			}
+			else
+			{
+				NConcurrency::CDistributedAppSensorReporter::CSensorInfoKey Key;
+
+				if (m_Filter.m_HostID)
+					Key.m_HostID = *m_Filter.m_HostID;
+
+				if (m_Filter.m_Scope)
+					Key.m_Scope = *m_Filter.m_Scope;
+
+				if (m_Filter.m_Identifier)
+					Key.m_Identifier = *m_Filter.m_Identifier;
+
+				if (m_Filter.m_IdentifierScope)
+					Key.m_IdentifierScope = *m_Filter.m_IdentifierScope;
+
+				_Stream << Key;
+			}
+		}
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CRemoveLog::f_Stream(tf_CStream &_Stream)
+	{
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_SupportFilterInRemoveSensorAndLog)
+			_Stream % m_Filter;
+		else
+		{
+			if constexpr (tf_CStream::mc_bConsume)
+			{
+				NConcurrency::CDistributedAppLogReporter::CLogInfoKey Key;
+				_Stream >> Key;
+
+				m_Filter.m_HostID = Key.m_HostID;
+				m_Filter.m_Scope = Key.m_Scope;
+				m_Filter.m_Identifier = Key.m_Identifier;
+				m_Filter.m_IdentifierScope = Key.m_IdentifierScope;
+			}
+			else
+			{
+				NConcurrency::CDistributedAppLogReporter::CLogInfoKey Key;
+
+				if (m_Filter.m_HostID)
+					Key.m_HostID = *m_Filter.m_HostID;
+
+				if (m_Filter.m_Scope)
+					Key.m_Scope = *m_Filter.m_Scope;
+
+				if (m_Filter.m_Identifier)
+					Key.m_Identifier = *m_Filter.m_Identifier;
+
+				if (m_Filter.m_IdentifierScope)
+					Key.m_IdentifierScope = *m_Filter.m_IdentifierScope;
+
+				_Stream << Key;
+			}
+		}
+	}
 }

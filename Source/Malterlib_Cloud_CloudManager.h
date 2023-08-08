@@ -32,8 +32,9 @@ namespace NMib::NCloud
 		, ECloudManagerProtocolVersion_AddLastSeenLogTimestamp = 0x115
 		, ECloudManagerProtocolVersion_SupportExpectedOsVersions = 0x116
 		, ECloudManagerProtocolVersion_SupportDeferredUpdateNotification = 0x117
+		, ECloudManagerProtocolVersion_SupportFilterInRemoveSensorAndLog = 0x118
 
-		, ECloudManagerProtocolVersion_Current = 0x117
+		, ECloudManagerProtocolVersion_Current = 0x118
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -183,6 +184,22 @@ namespace NMib::NCloud
 
 		static uint32 fs_ProtocolVersion_CloudManagerToAppManager(uint32 _CloudManagerVersion);
 
+		struct CRemoveSensor
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NConcurrency::CDistributedAppSensorReader_SensorFilter m_Filter;
+		};
+
+		struct CRemoveLog
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NConcurrency::CDistributedAppLogReader_LogFilter m_Filter;
+		};
+
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_RegisterAppManager
 			(
 				NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
@@ -193,8 +210,8 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) = 0;
-		virtual NConcurrency::TCFuture<uint32> f_RemoveSensor(NConcurrency::CDistributedAppSensorReporter::CSensorInfoKey &&_SensorInfoKey) = 0;
-		virtual NConcurrency::TCFuture<uint32> f_RemoveLog(NConcurrency::CDistributedAppLogReporter::CLogInfoKey &&_LogInfoKey) = 0;
+		virtual NConcurrency::TCFuture<uint32> f_RemoveSensor(CRemoveSensor &&_RemoveSensor) = 0;
+		virtual NConcurrency::TCFuture<uint32> f_RemoveLog(CRemoveLog &&_RemoveLog) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReporter>> f_GetSensorReporter() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReader>> f_GetSensorReader() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReporter>> f_GetLogReporter() = 0;

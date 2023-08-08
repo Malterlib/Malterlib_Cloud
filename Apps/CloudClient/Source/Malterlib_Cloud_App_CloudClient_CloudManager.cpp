@@ -202,26 +202,32 @@ namespace NMib::NCloud::NCloudClient
 						"SensorHostID?"_o=
 						{
 							"Names"_o= {"--sensor-host-id"}
-							, "Default"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The host ID of the sensor to remove"
 						}
 						, "SensorApplication?"_o=
 						{
 							"Names"_o= {"--sensor-application"}
-							, "Default"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The application of the sensor to remove"
 						}
 						, "SensorIdentifier?"_o=
 						{
 							"Names"_o= {"--sensor-identifier"}
-							, "Default"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The identifier of the sensor to remove"
 						}
 						, "SensorIdentifierScope?"_o=
 						{
 							"Names"_o= {"--sensor-identifier-scope"}
-							, "Default"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The identifier scope of the sensor to remove"
+						}
+						, "Force?"_o=
+						{
+							"Names"_o= {"--force"}
+							, "Default"_o= false
+							, "Description"_o= "Force removal of all sensors when no filtering options are specified"
 						}
 						, QuietOption
 					}
@@ -244,26 +250,32 @@ namespace NMib::NCloud::NCloudClient
 						"LogHostID?"_o=
 						{
 							"Names"_o= {"--log-host-id"}
-							, "Default"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The host ID of the log to remove"
 						}
 						, "LogApplication?"_o=
 						{
 							"Names"_o= {"--log-application"}
-							, "Default"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The application of the log to remove"
 						}
 						, "LogIdentifier?"_o=
 						{
 							"Names"_o= {"--log-identifier"}
-							, "Default"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The identifier of the log to remove"
 						}
 						, "LogIdentifierScope?"_o=
 						{
 							"Names"_o= {"--log-identifier-scope"}
-							, "Default"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The identifier scope of the log to remove"
+						}
+						, "Force?"_o=
+						{
+							"Names"_o= {"--force"}
+							, "Default"_o= false
+							, "Description"_o= "Force removal of all logs when no filtering options are specified"
 						}
 						, QuietOption
 					}
@@ -1184,13 +1196,25 @@ namespace NMib::NCloud::NCloudClient
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
-		NConcurrency::CDistributedAppSensorReporter::CSensorInfoKey SensorInfoKey;
+		CCloudManager::CRemoveSensor RemoveSensor;
 
-		SensorInfoKey.m_HostID = _Params["SensorHostID"].f_String();
-		if (auto Application = _Params["SensorApplication"].f_String())
-			SensorInfoKey.m_Scope = CDistributedAppSensorReporter::CSensorScope_Application{.m_ApplicationName = Application};
-		SensorInfoKey.m_Identifier = _Params["SensorIdentifier"].f_String();
-		SensorInfoKey.m_IdentifierScope = _Params["SensorIdentifierScope"].f_String();
+		if (auto pValue = _Params.f_GetMember("SensorHostID"))
+			RemoveSensor.m_Filter.m_HostID = pValue->f_String();
+
+		if (auto pValue = _Params.f_GetMember("SensorApplication"))
+			RemoveSensor.m_Filter.m_Scope = CDistributedAppSensorReporter::CSensorScope_Application{.m_ApplicationName = pValue->f_String()};
+
+		if (auto pValue = _Params.f_GetMember("SensorIdentifier"))
+			RemoveSensor.m_Filter.m_Identifier = pValue->f_String();
+
+		if (auto pValue = _Params.f_GetMember("SensorIdentifierScope"))
+			RemoveSensor.m_Filter.m_IdentifierScope = pValue->f_String();
+
+		if (!RemoveSensor.m_Filter.m_HostID && !RemoveSensor.m_Filter.m_Scope && !RemoveSensor.m_Filter.m_Identifier && !RemoveSensor.m_Filter.m_IdentifierScope)
+		{
+			if (!_Params["Force"].f_Boolean())
+				co_return DMibErrorInstance("No filtering specified. To force removal of all sensors specify --force.");
+		}
 
 		TCActorResultVector<uint32> AppManagersResults;
 
@@ -1200,7 +1224,7 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			(CloudManager.f_CallActor(&CCloudManager::f_RemoveSensor)(SensorInfoKey) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+			(CloudManager.f_CallActor(&CCloudManager::f_RemoveSensor)(RemoveSensor) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
 		}
 
 		auto AllRemoved = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
@@ -1224,6 +1248,26 @@ namespace NMib::NCloud::NCloudClient
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
+		CCloudManager::CRemoveLog RemoveLog;
+
+		if (auto pValue = _Params.f_GetMember("LogHostID"))
+			RemoveLog.m_Filter.m_HostID = pValue->f_String();
+
+		if (auto pValue = _Params.f_GetMember("LogApplication"))
+			RemoveLog.m_Filter.m_Scope = CDistributedAppLogReporter::CLogScope_Application{.m_ApplicationName = pValue->f_String()};
+
+		if (auto pValue = _Params.f_GetMember("LogIdentifier"))
+			RemoveLog.m_Filter.m_Identifier = pValue->f_String();
+
+		if (auto pValue = _Params.f_GetMember("LogIdentifierScope"))
+			RemoveLog.m_Filter.m_IdentifierScope = pValue->f_String();
+
+		if (!RemoveLog.m_Filter.m_HostID && !RemoveLog.m_Filter.m_Scope && !RemoveLog.m_Filter.m_Identifier && !RemoveLog.m_Filter.m_IdentifierScope)
+		{
+			if (!_Params["Force"].f_Boolean())
+				co_return DMibErrorInstance("No filtering specified. To force removal of all logs specify --force.");
+		}
+		
 		NConcurrency::CDistributedAppLogReporter::CLogInfoKey LogInfoKey;
 
 		LogInfoKey.m_HostID = _Params["LogHostID"].f_String();
@@ -1240,7 +1284,7 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			(CloudManager.f_CallActor(&CCloudManager::f_RemoveLog)(LogInfoKey) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+			(CloudManager.f_CallActor(&CCloudManager::f_RemoveLog)(RemoveLog) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
 		}
 
 		auto AllRemoved = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
@@ -1251,7 +1295,7 @@ namespace NMib::NCloud::NCloudClient
 			for (auto &Removed : AllRemoved)
 				nRemoved += Removed;
 
-			*_pCommandLine %= "Removed {} sensors\n"_f << nRemoved;
+			*_pCommandLine %= "Removed {} logs\n"_f << nRemoved;
 		}
 
 		co_return 0;

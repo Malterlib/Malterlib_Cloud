@@ -564,7 +564,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveSensor(CDistributedAppSensorReporter::CSensorInfoKey &&_SensorInfoKey)
+	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveSensor(CRemoveSensor &&_RemoveSensor)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -576,14 +576,26 @@ namespace NMib::NCloud::NCloudManager
 		if (!co_await pThis->mp_Permissions.f_HasPermission("Remove sensor", Permissions))
 			co_return Auditor.f_AccessDenied("(Remove sensor)", Permissions);
 
-		auto nRemoved = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveSensors, TCSet<CDistributedAppSensorReporter::CSensorInfoKey>{fg_Move(_SensorInfoKey)});
+		CDistributedAppSensorReader::CGetSensors GetSensors;
+		GetSensors.m_Filters.f_Insert(fg_Move(_RemoveSensor.m_Filter));
+		auto Sensors = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensors, fg_Move(GetSensors));
+
+		TCSet<CDistributedAppSensorReporter::CSensorInfoKey> SensorsToRemove;
+
+		for (auto iSensor = co_await fg_Move(Sensors).f_GetIterator(); iSensor; co_await ++iSensor)
+		{
+			for (auto &Sensor : *iSensor)
+				SensorsToRemove[Sensor.f_Key()];
+		}
+
+		auto nRemoved = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveSensors, fg_Move(SensorsToRemove));
 
 		Auditor.f_Info("Remove Sensor");
 
 		co_return nRemoved;
 	}
 
-	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveLog(CDistributedAppLogReporter::CLogInfoKey &&_LogInfoKey)
+	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveLog(CRemoveLog &&_RemoveLog)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -592,10 +604,22 @@ namespace NMib::NCloud::NCloudManager
 
 		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/RemoveLog"};
 
-		if (!co_await pThis->mp_Permissions.f_HasPermission("Remove sensor", Permissions))
-			co_return Auditor.f_AccessDenied("(Remove sensor)", Permissions);
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Remove log", Permissions))
+			co_return Auditor.f_AccessDenied("(Remove log)", Permissions);
 
-		auto nRemoved = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_RemoveLogs, TCSet<CDistributedAppLogReporter::CLogInfoKey>{fg_Move(_LogInfoKey)});
+		CDistributedAppLogReader::CGetLogs GetLogs;
+		GetLogs.m_Filters.f_Insert(fg_Move(_RemoveLog.m_Filter));
+		auto Logs = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_GetLogs, fg_Move(GetLogs));
+
+		TCSet<CDistributedAppLogReporter::CLogInfoKey> LogsToRemove;
+
+		for (auto iLog = co_await fg_Move(Logs).f_GetIterator(); iLog; co_await ++iLog)
+		{
+			for (auto &Log : *iLog)
+				LogsToRemove[Log.f_Key()];
+		}
+
+		auto nRemoved = co_await pThis->mp_AppLogStore(&CDistributedAppLogStoreLocal::f_RemoveLogs, fg_Move(LogsToRemove));
 
 		Auditor.f_Info("Remove Log");
 
