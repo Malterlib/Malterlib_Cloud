@@ -199,7 +199,7 @@ namespace NMib::NCloud
 								auto String = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
 								try
 								{
-									Contents.m_Parsed = CEJSONSorted::fs_FromString(String, _FileName);
+									Contents.m_Parsed = CEJSONSorted::fs_FromString(String, _FileName, false, EJSONDialectFlag_AllowUndefined | EJSONDialectFlag_AllowInvalidFloat);
 								}
 								catch (CException const &_Exception)
 								{
