@@ -592,10 +592,21 @@ namespace NMib::NCloud::NCloudClient
 		}
 
 		template <typename tf_CInfo>
-		CStr fg_FormatAppManagerStatus(tf_CInfo const &_Info, CAnsiEncoding const &_AnsiEncoding)
+		CStr fg_FormatAppManagerStatus(tf_CInfo const &_Info, CAnsiEncoding const &_AnsiEncoding, CTime const &_Now)
 		{
 			if (!_Info.m_bActive)
 			{
+				if (_Info.m_PauseReportingFor == fp32::fs_Inf())
+					return gc_Str<"Reporting paused">;
+				else if (!_Info.m_PauseReportingFor.f_IsNan())
+				{
+					auto PausedTime = (_Now - _Info.m_LastSeen).f_GetSecondsFraction();
+					bool bIsPaused = PausedTime < _Info.m_PauseReportingFor;
+
+					if (bIsPaused)
+						return "Reporting still paused for {}"_f << fg_SecondsDurationToHumanReadable(_Info.m_PauseReportingFor - PausedTime);
+				}
+
 				CStr Status;
 				if (!_Info.m_LastConnectionError.f_IsEmpty())
 				{
@@ -624,9 +635,19 @@ namespace NMib::NCloud::NCloudClient
 
 	}
 
-	bool CCloudClientAppActor::CCloudManagerAppManagerInfo::f_HasErrors() const
+	bool CCloudClientAppActor::CCloudManagerAppManagerInfo::f_IsPaused(CTime const &_Now) const
 	{
-		return !m_bActive || !m_OtherErrors.f_IsEmpty();
+		if (m_PauseReportingFor == fp32::fs_Inf())
+			return true;
+		else if (!m_PauseReportingFor.f_IsNan() && m_LastSeen.f_IsValid())
+			return (_Now - m_LastSeen).f_GetSecondsFraction() < m_PauseReportingFor;
+
+		return false;
+	}
+
+	bool CCloudClientAppActor::CCloudManagerAppManagerInfo::f_HasErrors(CTime const &_Now) const
+	{
+		return !f_IsPaused(_Now) && (!m_bActive || !m_OtherErrors.f_IsEmpty());
 	}
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers
@@ -745,7 +766,7 @@ namespace NMib::NCloud::NCloudClient
 			if (AppManagerInfo.f_HasErrors())
 				Return = 1;
 
-			CStr Status = fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding);
+			CStr Status = fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding, Now);
 			CStr HostName = "{}{}{}"_f << AnsiEncoding.f_Foreground256(75) << AppManagerInfo.m_HostName << AnsiEncoding.f_Default();
 			CTimeSpan LastSeenTimespan(Now - AppManagerInfo.m_LastSeen);
 
@@ -818,6 +839,8 @@ namespace NMib::NCloud::NCloudClient
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+
+		CTime Now = CTime::fs_NowUTC();
 
 		TableRenderer.f_AddDescription("Applications");
 		TableRenderer.f_AddHeadings
@@ -892,7 +915,7 @@ namespace NMib::NCloud::NCloudClient
 			{
 				if (FilterStatusError && *FilterStatusError)
 				{
-					if (!_AppManagerInfo.f_HasErrors() && _ApplicationInfo.m_StatusSeverity == CAppManagerInterface::EStatusSeverity_None && _AppManagerInfo.m_bActive)
+					if (!_AppManagerInfo.f_HasErrors(Now) && _ApplicationInfo.m_StatusSeverity == CAppManagerInterface::EStatusSeverity_None && _AppManagerInfo.m_bActive)
 						return true;
 				}
 
@@ -998,11 +1021,11 @@ namespace NMib::NCloud::NCloudClient
 
 			CStr ApplicationStatus = fg_FormatApplicationStatusSeverity(ApplicationInfo.m_Status, ApplicationInfo.m_StatusSeverity, AnsiEncoding);
 			CStr Status;
-			if (AppManagerInfo.f_HasErrors())
+			if (AppManagerInfo.f_HasErrors(Now))
 			{
 				Status = "{2}Application Status{3} (potentially outdated)\n{}\n\n{2}App Manager{3}\n{}"_f
 					<< ApplicationStatus
-					<< fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding)
+					<< fg_FormatAppManagerStatus(AppManagerInfo, AnsiEncoding, Now)
 					<< AnsiEncoding.f_Bold()
 					<< AnsiEncoding.f_Default()
 				;
@@ -1154,7 +1177,9 @@ namespace NMib::NCloud::NCloudClient
 					OutInfo.m_ProgramDirectory = AppManagerInfo.m_ProgramDirectory;
 					OutInfo.m_HostName = AppManagerInfo.m_HostName;
 					OutInfo.m_bActive = AppManagerInfo.m_bActive;
+					OutInfo.m_PauseReportingFor = AppManagerInfo.m_PauseReportingFor;
 					OutInfo.m_LastConnectionErrorTime = AppManagerInfo.m_LastConnectionErrorTime;
+					OutInfo.m_LastSeen = AppManagerInfo.m_LastSeen;
 					OutInfo.m_LastConnectionError = AppManagerInfo.m_LastConnectionError;
 					OutInfo.m_OtherErrors = AppManagerInfo.m_OtherErrors;
 				}

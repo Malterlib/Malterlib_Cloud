@@ -33,8 +33,9 @@ namespace NMib::NCloud
 		, ECloudManagerProtocolVersion_SupportExpectedOsVersions = 0x116
 		, ECloudManagerProtocolVersion_SupportDeferredUpdateNotification = 0x117
 		, ECloudManagerProtocolVersion_SupportFilterInRemoveSensorAndLog = 0x118
+		, ECloudManagerProtocolVersion_SupportAppManagerCloudManagerInterface = 0x119
 
-		, ECloudManagerProtocolVersion_Current = 0x118
+		, ECloudManagerProtocolVersion_Current = 0x119
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -42,6 +43,19 @@ namespace NMib::NCloud
 #	else
 #		define DMibCloudCloudManagerDebugOut(...)  (void)0
 #	endif
+
+	struct CAppManagerCloudManagerInterface : public NConcurrency::CActor
+	{
+		enum : uint32
+		{
+			EProtocolVersion_Min = ECloudManagerProtocolVersion_Min
+			, EProtocolVersion_Current = ECloudManagerProtocolVersion_Current
+		};
+
+		CAppManagerCloudManagerInterface();
+
+		virtual NConcurrency::TCFuture<void> f_PauseReporting(fp32 _SecondsToPause) = 0;
+	};
 
 	struct CCloudManager : public NConcurrency::CActor
 	{
@@ -83,6 +97,7 @@ namespace NMib::NCloud
 			NStr::CStr m_LastConnectionError;
 			NTime::CTime m_LastConnectionErrorTime;
 			NContainer::TCMap<NStr::CStr, NStr::CStr> m_OtherErrors;
+			fp32 m_PauseReportingFor = fp32::fs_QNan();
 			bool m_bActive = false;
 		};
 
@@ -184,6 +199,14 @@ namespace NMib::NCloud
 
 		static uint32 fs_ProtocolVersion_CloudManagerToAppManager(uint32 _CloudManagerVersion);
 
+		struct CRegisterAppManagerResult
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerCloudManagerInterface> m_AppManagerCloudManagerInterface;
+		};
+
 		struct CRemoveSensor
 		{
 			template <typename tf_CStream>
@@ -200,7 +223,7 @@ namespace NMib::NCloud
 			NConcurrency::CDistributedAppLogReader_LogFilter m_Filter;
 		};
 
-		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_RegisterAppManager
+		virtual NConcurrency::TCFuture<CRegisterAppManagerResult> f_RegisterAppManager
 			(
 				NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
 				, CAppManagerInfo &&_AppManagerInfo

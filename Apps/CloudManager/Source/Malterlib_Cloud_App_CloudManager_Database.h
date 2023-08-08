@@ -65,6 +65,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		CTime m_LastConnectionErrorTime;
 		TCMap<CStr, CStr> m_OtherErrors;
 		uint64 m_LastSeenUpdateNotificationSequence = TCLimitsInt<uint64>::mc_Max;
+		fp32 m_PauseReportingFor = fp32::fs_QNan();
 		bool m_bActive = false;
 	};
 

@@ -25,15 +25,18 @@ namespace NMib::NCloud::NCloudClient
 	protected:
 		struct CCloudManagerAppManagerInfo
 		{
-			bool f_HasErrors() const;
+			bool f_HasErrors(CTime const &_Now) const;
+			bool f_IsPaused(CTime const &_Now) const;
 
 			CStr m_HostName;
 			CStr m_ProgramDirectory;
 			CStr m_Environment;
 			CStr m_LastConnectionError;
 			CTime m_LastConnectionErrorTime;
+			CTime m_LastSeen;
 			TCMap<CStr, CStr> m_OtherErrors;
-			bool m_bActive;
+			bool m_bActive = false;
+			fp32 m_PauseReportingFor = fp32::fs_QNan();
 		};
 
 		enum ECloudManagerStatusFlag

@@ -112,6 +112,7 @@ namespace NMib::NCloud::NCloudManager
 			mp_SensorReaderInterface.f_Destroy() > Destroys.f_AddResult();
 			mp_LogReporterInterface.f_Destroy() > Destroys.f_AddResult();
 			mp_LogReaderInterface.f_Destroy() > Destroys.f_AddResult();
+			mp_AppManagerCloudManagerInterface.f_Destroy() > Destroys.f_AddResult();
 
 			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy interfaces");
 		}

@@ -55,6 +55,8 @@ namespace NMib::NCloud::NCloudManager
 			mp_LogReporterInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 		mp_LogReaderInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 
+		mp_AppManagerCloudManagerInterface.f_Construct(mp_AppState.m_DistributionManager, this);
+
 		co_await (co_await PublishResults.f_GetResults() | g_Unwrap);
 
 		co_return {};
@@ -142,7 +144,8 @@ namespace NMib::NCloud::NCloudManager
 		struct CHostChanges
 		{
 			TCSet<CStr> m_RemovedHosts;
-			TCMap<CStr, CTime> m_SeenHosts;
+			TCMap<CStr, CTime> m_SeenHostsLog;
+			TCMap<CStr, CDistributedAppSensorStoreLocal::CSeenHost> m_SeenHostsSensor;
 		};
 
 		TCSharedPointer<CHostChanges> pHostChanges = fg_Construct();
@@ -215,7 +218,10 @@ namespace NMib::NCloud::NCloudManager
 						}
 
 						if (Value.m_ApplicationInfo.m_HostID)
-							pHostChanges->m_SeenHosts[Value.m_ApplicationInfo.m_HostID] = Now;
+						{
+							pHostChanges->m_SeenHostsLog[Value.m_ApplicationInfo.m_HostID] = Now;
+							pHostChanges->m_SeenHostsSensor[Value.m_ApplicationInfo.m_HostID].m_TimeSeen = Now;
+						}
 
 						WriteCursor.f_Upsert(Key, Value);
 					}
@@ -232,11 +238,11 @@ namespace NMib::NCloud::NCloudManager
 			co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_RemoveHosts, pHostChanges->m_RemovedHosts);
 		}
 
-		if (!pHostChanges->m_SeenHosts.f_IsEmpty())
-		{
-			co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SeenHosts, pHostChanges->m_SeenHosts);
-			co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SeenHosts, pHostChanges->m_SeenHosts);
-		}
+		if (!pHostChanges->m_SeenHostsSensor.f_IsEmpty())
+			co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SeenHosts, pHostChanges->m_SeenHostsSensor);
+
+		if (!pHostChanges->m_SeenHostsLog.f_IsEmpty())
+			co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SeenHosts, pHostChanges->m_SeenHostsLog);
 
 		if (!Result)
 		{
@@ -286,7 +292,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<TCActorSubscriptionWithID<>> CCloudManagerServer::CCloudManagerImplementation::f_RegisterAppManager
+	TCFuture<CCloudManager::CRegisterAppManagerResult> CCloudManagerServer::CCloudManagerImplementation::f_RegisterAppManager
 		(
 			TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
 			, CAppManagerInfo &&_AppManagerInfo
@@ -336,6 +342,7 @@ namespace NMib::NCloud::NCloudManager
 		Data.m_Info = fg_Move(_AppManagerInfo);
 		Data.m_LastSeen = CTime::fs_NowUTC();
 		Data.m_bActive = true;
+		Data.m_PauseReportingFor = fp32::fs_QNan();
 
 		co_await (pThis->fp_SaveAppManagerData(DatabaseKey, Data) % Auditor);
 
@@ -431,20 +438,88 @@ namespace NMib::NCloud::NCloudManager
 
 		Auditor.f_Info("App manager registered");
 
-		co_return g_ActorSubscription / [pThis, RegisterSequence, AppManagerID, DatabaseKey]() -> TCFuture<void>
-			{
-				CAppManagerState *pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
-				if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
-					co_return DMibErrorInstance("App Manager was removed before subscription finished");
+		co_return TCDistributedActorInterfaceWithID<CAppManagerCloudManagerInterface>
+			(
+				pThis->mp_AppManagerCloudManagerInterface.m_Actor->f_ShareInterface<CAppManagerCloudManagerInterface>()
+				, g_ActorSubscription / [pThis, RegisterSequence, AppManagerID, DatabaseKey]() -> TCFuture<void>
+				{
+					CAppManagerState *pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+					if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+						co_return DMibErrorInstance("App Manager was removed before subscription finished");
 
-				auto DestroyFuture = pAppManager->f_Destroy(*pThis);
-				pThis->mp_AppManagers.f_Remove(AppManagerID);
+					auto DestroyFuture = pAppManager->f_Destroy(*pThis);
+					pThis->mp_AppManagers.f_Remove(AppManagerID);
 
-				co_await fg_Move(DestroyFuture);
+					co_await fg_Move(DestroyFuture);
 
-				co_return {};
-			}
+					co_return {};
+				}
+			)
 		;
+	}
+
+	NConcurrency::TCFuture<void> CCloudManagerServer::CAppManagerCloudManagerInterfaceImplementation::f_PauseReporting(fp32 _SecondsToPause)
+	{
+		co_await ECoroutineFlag_AllowReferences;
+
+		auto pThis = m_pThis;
+
+		auto CallingHostInfo = fg_GetCallingHostInfo();
+		auto Auditor = pThis->mp_AppState.f_Auditor({}, CallingHostInfo);
+		CStr AppManagerID = CallingHostInfo.f_GetRealHostID();
+
+		CAppManagerState *pAppMangaerState;
+
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					pAppMangaerState = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+					if (!pAppMangaerState)
+						return DMibErrorInstance("App manager no longer registered");
+
+					return {};
+				}
+			)
+		;
+
+		CAppManagerKey DatabaseKey{.m_HostID = AppManagerID};
+
+		pAppMangaerState->m_Data.m_LastSeen = CTime::fs_NowUTC();
+		pAppMangaerState->m_Data.m_PauseReportingFor = _SecondsToPause;
+
+		TCMap<CStr, CDistributedAppSensorStoreLocal::CSeenHost> AppManagerSeenHosts;
+		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read apps from database");
+
+			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
+
+			for (auto ApplicationCursor = ReadTransaction.m_Transaction.f_ReadCursor(CApplicationKey::mc_Prefix, AppManagerID); ApplicationCursor; ++ApplicationCursor)
+			{
+				auto Application = ApplicationCursor.f_Value<CApplicationValue>();
+				if (Application.m_ApplicationInfo.m_HostID)
+					AppManagerSeenHosts[Application.m_ApplicationInfo.m_HostID].m_PauseReportingFor = _SecondsToPause;
+			}
+		}
+
+		if (!AppManagerSeenHosts.f_IsEmpty())
+		{
+			co_await pThis->mp_AppSensorStore
+				(
+					&CDistributedAppSensorStoreLocal::f_SeenHosts
+					, fg_Move(AppManagerSeenHosts)
+				)
+			;
+		}
+
+		auto SaveAppManagerDataResult = co_await pThis->fp_SaveAppManagerData(DatabaseKey, pAppMangaerState->m_Data).f_Wrap();
+
+		if (!SaveAppManagerDataResult)
+			SaveAppManagerDataResult > fg_LogWarning("CloudManager", "Failed to store app manager data when pausing reporting");
+
+		Auditor.f_Info("Paused reporting for {}"_f << fg_SecondsDurationToHumanReadable(_SecondsToPause));
+
+		co_return {};
 	}
 
 	auto CCloudManagerServer::CCloudManagerImplementation::f_EnumAppManagers() -> TCFuture<TCMap<CStr, CAppManagerDynamicInfo>>
@@ -480,6 +555,7 @@ namespace NMib::NCloud::NCloudManager
 				OutAppManager.m_LastConnectionErrorTime = Value.m_LastConnectionErrorTime;
 				OutAppManager.m_OtherErrors = Value.m_OtherErrors;
 				OutAppManager.m_bActive = Value.m_bActive;
+				OutAppManager.m_PauseReportingFor = Value.m_PauseReportingFor;
 			}
 		}
 

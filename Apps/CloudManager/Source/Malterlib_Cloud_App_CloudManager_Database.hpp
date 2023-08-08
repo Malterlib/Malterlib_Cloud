@@ -58,6 +58,8 @@ namespace NMib::NCloud::NCloudManagerDatabase
 			_Stream % m_OtherErrors;
 		if (Version >= ECloudManagerProtocolVersion_AddLastSeenUpdateNotificationSequence)
 			_Stream % m_LastSeenUpdateNotificationSequence;
+		if (Version >= ECloudManagerProtocolVersion_SupportAppManagerCloudManagerInterface)
+			_Stream % m_PauseReportingFor;
 	}
 
 	template <typename tf_CStream>

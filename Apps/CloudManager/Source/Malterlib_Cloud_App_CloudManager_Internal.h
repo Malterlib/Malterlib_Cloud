@@ -37,7 +37,7 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CCloudManagerImplementation : public CCloudManager
 		{
-			TCFuture<TCActorSubscriptionWithID<>> f_RegisterAppManager(TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager, CAppManagerInfo &&_AppManagerInfo) override;
+			TCFuture<CRegisterAppManagerResult> f_RegisterAppManager(TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager, CAppManagerInfo &&_AppManagerInfo) override;
 			TCFuture<TCMap<CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() override;
 			TCFuture<TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() override;
 			TCFuture<void> f_RemoveAppManager(CStr const &_AppManagerHostID) override;
@@ -102,6 +102,13 @@ namespace NMib::NCloud::NCloudManager
 				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
 			auto f_SubscribeLogEntries(CSubscribeLogEntries &&_Params) -> TCFuture<TCActorSubscriptionWithID<>> override;
+
+			DMibDelegatedActorImplementation(CCloudManagerServer);
+		};
+
+		struct CAppManagerCloudManagerInterfaceImplementation : public CAppManagerCloudManagerInterface
+		{
+			NConcurrency::TCFuture<void> f_PauseReporting(fp32 _SecondsToPauseFor) override;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
@@ -208,6 +215,8 @@ namespace NMib::NCloud::NCloudManager
 		TCDistributedActorInstance<CDistributedAppSensorReaderImplementation> mp_SensorReaderInterface;
 		TCDistributedActorInstance<CDistributedAppLogReporterImplementation> mp_LogReporterInterface;
 		TCDistributedActorInstance<CDistributedAppLogReaderImplementation> mp_LogReaderInterface;
+		TCDistributedActorInstance<CAppManagerCloudManagerInterfaceImplementation> mp_AppManagerCloudManagerInterface;
+
 		CDistributedAppState &mp_AppState;
 
 		NCloudManagerDatabase::CCloudManagerGlobalStateValue mp_GlobalState;
@@ -215,7 +224,6 @@ namespace NMib::NCloud::NCloudManager
 		CTrustedPermissionSubscription mp_Permissions;
 
 		TCActor<CDatabaseActor> mp_DatabaseActor;
-
 		mint mp_AppManagerRegisterSequence = 0;
 		TCMap<CStr, CAppManagerState> mp_AppManagers;
 

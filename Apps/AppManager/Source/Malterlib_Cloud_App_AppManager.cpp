@@ -77,6 +77,8 @@ namespace NMib::NCloud::NAppManager
 
 		CPendingSelfupdate PendingSelfUpdate;
 
+		mp_PauseReportingForSecondsAtShutdown = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("PauseReportingForSecondsAtShutdown", mp_PauseReportingForSecondsAtShutdown).f_Float();
+
 		if (auto *pUserNameTransform = mp_State.m_ConfigDatabase.m_Data.f_GetMember("UserGroupNameTransform"))
 			mp_pUniqueUserGroup->m_UserGroupNameTransform = pUserNameTransform->f_String();
 
@@ -486,9 +488,33 @@ namespace NMib::NCloud::NAppManager
 		co_return fg_Move(InitResult);
 	}
 
+	TCFuture<void> CAppManagerActor::fp_PauseReporting()
+	{
+		if (mp_PauseReportingForSecondsAtShutdown.f_IsNan())
+			co_return {};
+
+		TCActorResultVector<void> Results;
+
+		for (auto &CloudManager : mp_CloudManagers)
+		{
+			if (!CloudManager.m_AppManagerCloudManagerInterface)
+				continue;
+
+			CloudManager.m_AppManagerCloudManagerInterface.f_CallActor(&CAppManagerCloudManagerInterface::f_PauseReporting)(mp_PauseReportingForSecondsAtShutdown)
+				> Results.f_AddResult()
+			;
+		}
+
+		co_await Results.f_GetUnwrappedResults();
+
+		co_return {};
+	}
+
 	TCFuture<void> CAppManagerActor::fp_StopApp()
 	{
 		CLogError LogError("Malterlib/Cloud/AppManager");
+
+		co_await fp_PauseReporting().f_Wrap() > LogError.f_Warning("Failed to pause reporting at shutdown");
 
 		auto CanDestroyFuture = mp_pCanDestroy->f_Future();
 		mp_pCanDestroy.f_Clear();
@@ -528,6 +554,7 @@ namespace NMib::NCloud::NAppManager
 				if (Subscription.m_fOnChange)
 					fg_Move(Subscription.m_fOnChange).f_Destroy() > Destroys.f_AddResult();
 			}
+
 			mp_ChangeNotificationSubscriptions.f_Clear();
 
 			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy change notification subscriptions");
@@ -551,8 +578,8 @@ namespace NMib::NCloud::NAppManager
 
 			for (auto &CloudManager : mp_CloudManagers)
 			{
-				if (CloudManager.m_RegisterSubscription)
-					fg_Exchange(CloudManager.m_RegisterSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
+				if (CloudManager.m_AppManagerCloudManagerInterface)
+					fg_Move(CloudManager.m_AppManagerCloudManagerInterface).f_Destroy() > Destroys.f_AddResult();
 				if (CloudManager.m_SensorReporterSubscription)
 					fg_Exchange(CloudManager.m_SensorReporterSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
 				if (CloudManager.m_LogReporterSubscription)

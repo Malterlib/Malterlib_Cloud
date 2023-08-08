@@ -68,6 +68,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		Return["OtherErrors"] = fg_ToJson(m_OtherErrors);
 		Return["LastSeenUpdateNotificationSequence"] = fg_ToJson(m_LastSeenUpdateNotificationSequence);
 		Return["bActive"] = fg_ToJson(m_bActive);
+		Return["PauseReportingFor"] = fg_ToJson(m_PauseReportingFor);
 		return Return;
 	}
 
@@ -260,7 +261,12 @@ namespace NMib::NCloud::NCloudManager
 			)
 		;
 
-		co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SeenHosts, TCMap<CStr, CTime>{{_Key.m_HostID, _Data.m_LastSeen}});
+		co_await mp_AppSensorStore
+			(
+				&CDistributedAppSensorStoreLocal::f_SeenHosts
+				, TCMap<CStr, CDistributedAppSensorStoreLocal::CSeenHost>{{_Key.m_HostID, {_Data.m_LastSeen, _Data.m_PauseReportingFor}}}
+			)
+		;
 		co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_SeenHosts, TCMap<CStr, CTime>{{_Key.m_HostID, _Data.m_LastSeen}});
 
 		auto Result = co_await mp_DatabaseActor

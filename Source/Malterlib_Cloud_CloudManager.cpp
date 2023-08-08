@@ -27,6 +27,11 @@ namespace NMib::NCloud
 
 	CCloudManager::~CCloudManager() = default;
 
+	CAppManagerCloudManagerInterface::CAppManagerCloudManagerInterface()
+	{
+		DMibPublishActorFunction(CAppManagerCloudManagerInterface::f_PauseReporting);
+	}
+
 	bool CCloudManager::CAppManagerDynamicInfo::f_HasErrors() const
 	{
 		return !m_bActive || !m_OtherErrors.f_IsEmpty();

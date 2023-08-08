@@ -35,6 +35,8 @@ namespace NMib::NCloud
 		_Stream % m_bActive;
 		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_AddOtherErrors)
 			_Stream % m_OtherErrors;
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_SupportAppManagerCloudManagerInterface)
+			_Stream % m_PauseReportingFor;
 	}
 
 	template <typename tf_CStream>
@@ -118,6 +120,24 @@ namespace NMib::NCloud
 	{
 		_Stream % m_OsName;
 		_Stream % fg_Move(m_fVersionRangeChanged);
+	}
+
+	template <typename tf_CStream>
+	void CCloudManager::CRegisterAppManagerResult::f_Stream(tf_CStream &_Stream)
+	{
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_SupportAppManagerCloudManagerInterface)
+			_Stream % fg_Move(m_AppManagerCloudManagerInterface);
+		else
+		{
+			NConcurrency::TCActorSubscriptionWithID<> Subscription;
+			if constexpr (tf_CStream::mc_bFeed)
+				Subscription = fg_Move(m_AppManagerCloudManagerInterface.f_GetSubscription());
+
+			_Stream % fg_Move(Subscription);
+
+			if constexpr (tf_CStream::mc_bConsume)
+				m_AppManagerCloudManagerInterface.f_GetSubscription() = fg_Move(Subscription);
+		}
 	}
 
 	template <typename tf_CStream>

@@ -249,8 +249,9 @@ namespace NMib::NCloud::NCloudManager
 				auto &SensorInfoKey = mp_SensorStatuses.fs_GetKey(Sensor);
 				auto &SensorInfo = Sensor.m_Info;
 				bool bRemoved = SensorInfo.m_bRemoved;
+				bool bPaused = SensorInfo.f_IsPaused(Now, {});
 
-				if (!bRemoved && !SensorInfoKey.m_HostID.f_IsEmpty())
+				if (!SensorInfoKey.m_HostID.f_IsEmpty())
 				{
 					if (!ReadTransaction)
 						ReadTransaction = co_await mp_This.mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
@@ -261,6 +262,8 @@ namespace NMib::NCloud::NCloudManager
 					{
 						if (Value.m_bRemoved)
 							bRemoved = true;
+
+						bPaused = SensorInfo.f_IsPaused(Now, Value.m_LastSeen);
 					}
 				}
 
@@ -270,7 +273,7 @@ namespace NMib::NCloud::NCloudManager
 				auto &Reading = Sensor.m_LastReading;
 				auto CombinedStatus = Reading.f_GetCombinedStatus(&SensorInfo, Now);
 
-				if (CombinedStatus < CDistributedAppSensorReporter::EStatusSeverity_Warning || bRemoved)
+				if (CombinedStatus < CDistributedAppSensorReporter::EStatusSeverity_Warning || bRemoved || bPaused)
 				{
 					if (Sensor.m_State.m_bInProblemState)
 					{
@@ -340,7 +343,7 @@ namespace NMib::NCloud::NCloudManager
 				SlackAttachment.m_Text = "`{}`"_f << fEscape(SensorInfo.m_Name);
 				SlackAttachment.m_Footer = SensorInfo.m_HostName;
 
-				if (bRemoved)
+				if (bRemoved || bPaused)
 					;
 				else if (CombinedStatus >= CDistributedAppSensorReporter::EStatusSeverity_Error)
 					SlackAttachment.m_Color = CSlackActor::EPredefinedColor_Danger;
@@ -389,16 +392,21 @@ namespace NMib::NCloud::NCloudManager
 
 				auto fAddFields = [&](CSensorNotificationStateNotificationStatus &_Status, CSensorNotificationStateNotificationStatus &_LastStatus)
 					{
-						if (_Status.m_Severity >= CDistributedAppSensorReporter::EStatusSeverity_Warning && !bRemoved)
+						if (_Status.m_Severity >= CDistributedAppSensorReporter::EStatusSeverity_Warning && !bRemoved && !bPaused)
 							fAddField(_Status, false);
 						else if (_LastStatus.m_Severity >= CDistributedAppSensorReporter::EStatusSeverity_Warning)
 						{
 							fAddField(_LastStatus, true);
 							auto &Field = SlackAttachment.m_Fields.f_Insert();
 
-							CStr FixType = "Resolved";
+							CStr FixType;
+
 							if (bRemoved)
 								FixType = "Sensor removed";
+							else if (bPaused)
+								FixType = "Sensor paused";
+							else
+								FixType = "Resolved";
 
 							Field.m_Value = "*{0}*\n```{0} after {1}```"_f << FixType << fg_SecondsDurationToHumanReadable(Sensor.m_State.m_TimeInProblemState);
 							Field.m_bShort = true;

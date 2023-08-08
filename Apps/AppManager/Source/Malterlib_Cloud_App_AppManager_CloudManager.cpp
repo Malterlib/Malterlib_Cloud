@@ -26,7 +26,7 @@ namespace NMib::NCloud::NAppManager
 		NProcess::NPlatform::fg_Process_GetVersionInfo(CFile::fs_GetProgramPath(), VersionInfo);
 		Info.m_VersionDate = VersionInfo.m_BuildTime;
 
-		auto Subscription = co_await _CloudManager.f_CallActor(&CCloudManager::f_RegisterAppManager)
+		auto RegisterAppManagerResult = co_await _CloudManager.f_CallActor(&CCloudManager::f_RegisterAppManager)
 			(
 				TCDistributedActorInterfaceWithID<CAppManagerInterface>
 				{
@@ -95,7 +95,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto *pNewManager = &mp_CloudManagers[_CloudManager];
 		pNewManager->m_HostInfo = _Info;
-		pNewManager->m_RegisterSubscription = fg_Move(Subscription);
+		pNewManager->m_AppManagerCloudManagerInterface = fg_Move(RegisterAppManagerResult.m_AppManagerCloudManagerInterface);
 		pNewManager->m_SensorReporterSubscription = fg_Move(SensorReporterSubscription);
 		pNewManager->m_LogReporterSubscription = fg_Move(LogReporterSubscription);
 
@@ -186,8 +186,8 @@ namespace NMib::NCloud::NAppManager
 
 		TCActorResultVector<void> DestroyResults;
 
-		if (pCloudManagerState->m_RegisterSubscription)
-			fg_Exchange(pCloudManagerState->m_RegisterSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+		if (pCloudManagerState->m_AppManagerCloudManagerInterface)
+			fg_Move(pCloudManagerState->m_AppManagerCloudManagerInterface).f_Destroy() > DestroyResults.f_AddResult();
 
 		if (pCloudManagerState->m_SensorReporterSubscription)
 			fg_Exchange(pCloudManagerState->m_SensorReporterSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();

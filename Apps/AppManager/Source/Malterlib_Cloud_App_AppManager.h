@@ -337,7 +337,7 @@ namespace NMib::NCloud::NAppManager
 			}
 
 			CTrustedActorInfo m_HostInfo;
-			CActorSubscription m_RegisterSubscription;
+			TCDistributedActorInterface<CAppManagerCloudManagerInterface> m_AppManagerCloudManagerInterface;
 			CActorSubscription m_SensorReporterSubscription;
 			CActorSubscription m_LogReporterSubscription;
 			CActorSubscription m_ExpectedOsVersionSubscription;
@@ -667,6 +667,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
 		TCFuture<void> fp_StopApp() override;
+		TCFuture<void> fp_PauseReporting();
 		TCFuture<void> fp_ReadState();
 		void fp_InitApplications();
 		void fp_OnApplicationAdded(TCSharedPointer<CApplication> const &_pApplication);
@@ -970,6 +971,9 @@ namespace NMib::NCloud::NAppManager
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagerSubscription;
 		TCTrustedActorSubscription<CCloudManager> mp_CloudManagerSubscription;
 		TCSet<CStr> mp_KnownPlatforms;
+
+		fp32 mp_PauseReportingForSecondsAtShutdown = 60.0;
+
 		bool mp_bPendingAutoUpdate = false;
 		bool mp_bLogLaunchesToStdErr = false;
 		bool mp_bPendingSelfUpdateInProgress = false;

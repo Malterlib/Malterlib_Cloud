@@ -7,7 +7,23 @@
 #include <Windows.h>
 #endif
 
-static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
+namespace
+{
+	fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
+	constexpr EJSONDialectFlag gc_JsonFlags = EJSONDialectFlag_AllowUndefined | EJSONDialectFlag_AllowInvalidFloat;
+
+	CEJSONSorted fg_FromString(CStr &&_String)
+	{
+		return CEJSONSorted::fs_FromString
+			(
+				fg_Move(_String)
+				, CStr()
+				, false
+				, gc_JsonFlags
+			)
+		;
+	}
+}
 
 class CAppManager_Sensor_Tests : public NMib::NTest::CTest
 {
@@ -76,7 +92,8 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor (version)"
 						, "Type"_= 5
-						, "ExpectedReportInterval"_= nullptr
+						, "ExpectedReportInterval"_= fp64::fs_Inf()
+						, "PauseReportingFor"_= fp64::fs_QNan()
 						, "UnitDivisors"_= _[_]
 						, "WarnValue"_= nullptr
 						, "CriticalValue"_= nullptr
@@ -91,7 +108,8 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor"
 						, "Type"_= 2
-						, "ExpectedReportInterval"_= nullptr
+						, "ExpectedReportInterval"_= fp64::fs_Inf()
+						, "PauseReportingFor"_= fp64::fs_QNan()
 						, "UnitDivisors"_= CEJSONSorted
 						{
 							{
@@ -147,7 +165,7 @@ public:
 								, "UniqueSequence"_= i + 1
 								, "Value"_= fp64(i)
 								, "OutdatedStatus"_= "Ok"
-								, "OutdatedSeconds"_= nullptr
+								, "OutdatedSeconds"_= fp64::fs_Inf()
 							}
 						}
 					)
@@ -175,7 +193,7 @@ public:
 									}
 								}
 								, "OutdatedStatus"_= "Ok"
-								, "OutdatedSeconds"_= nullptr
+								, "OutdatedSeconds"_= fp64::fs_Inf()
 							}
 						}
 					)
@@ -194,7 +212,7 @@ public:
 						, "UniqueSequence"_= 5
 						, "Value"_= fp64(4.0)
 						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
+						, "OutdatedSeconds"_= fp64::fs_Inf()
 					}
 					,
 					{
@@ -217,7 +235,7 @@ public:
 							}
 						}
 						, "OutdatedStatus"_= "Ok"
-						, "OutdatedSeconds"_= nullptr
+						, "OutdatedSeconds"_= fp64::fs_Inf()
 					},
 				}
 			;
@@ -264,23 +282,19 @@ public:
 
 				auto fReadSensors = [&]()
 					{
-						return CEJSONSorted::fs_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-list", "--json"}, TestAppDirectory));
+						return fg_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-list", "--json"}, TestAppDirectory));
 					}
 				;
 
 				auto fReadSensorReadings = [&]()
 					{
-						return CEJSONSorted::fs_FromString
-							(
-								CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--newest", "--json"}, TestAppDirectory)
-							)
-						;
+						return fg_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--newest", "--json"}, TestAppDirectory));
 					}
 				;
 
 				auto fReadSensorStatus = [&]()
 					{
-						return CEJSONSorted::fs_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--no-only-problems", "--json"}, TestAppDirectory));
+						return fg_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--no-only-problems", "--json"}, TestAppDirectory));
 					}
 				;
 
@@ -317,23 +331,19 @@ public:
 
 				auto fReadSensors = [&]()
 					{
-						return CEJSONSorted::fs_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-list", "--json"}, AppManagerInfo.m_RootDirectory));
+						return fg_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-list", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
 				auto fReadSensorReadings = [&]()
 					{
-						return CEJSONSorted::fs_FromString
-							(
-								CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory)
-							)
-						;
+						return fg_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
 				auto fReadSensorStatus = [&]()
 					{
-						return CEJSONSorted::fs_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-status", "--no-only-problems", "--json"}, AppManagerInfo.m_RootDirectory));
+						return fg_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-status", "--no-only-problems", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
@@ -350,31 +360,19 @@ public:
 
 				auto fReadSensors = [&]()
 					{
-						return CEJSONSorted::fs_FromString
-							(
-								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-list", "--json"}, CloudClientDirectory)
-							)
-						;
+						return fg_FromString(CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-list", "--json"}, CloudClientDirectory));
 					}
 				;
 
 				auto fReadSensorReadings = [&]()
 					{
-						return CEJSONSorted::fs_FromString
-							(
-								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-readings-list", "--newest", "--json"}, CloudClientDirectory)
-							)
-						;
+						return fg_FromString(CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-readings-list", "--newest", "--json"}, CloudClientDirectory));
 					}
 				;
 
 				auto fReadSensorStatus = [&]()
 					{
-						return CEJSONSorted::fs_FromString
-							(
-								CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-status", "--no-only-problems", "--json"}, CloudClientDirectory)
-							)
-						;
+						return fg_FromString(CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-status", "--no-only-problems", "--json"}, CloudClientDirectory));
 					}
 				;
 
