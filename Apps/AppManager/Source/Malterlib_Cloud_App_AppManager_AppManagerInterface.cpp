@@ -65,7 +65,7 @@ namespace NMib::NCloud::NAppManager
 		SubscribePermissions.f_Insert("AppManager/*");
 
 		mp_Permissions = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this));
-		auto fPermisionChanged = [=](CPermissionIdentifiers const &_Identifiers, auto const &_Permissions)
+		auto fPermisionChanged = [=, this](CPermissionIdentifiers const &_Identifiers, auto const &_Permissions)
 			{
 				for (auto &PermissionRequirements : _Permissions)
 				{

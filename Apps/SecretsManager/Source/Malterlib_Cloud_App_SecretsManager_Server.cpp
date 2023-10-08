@@ -392,14 +392,14 @@ namespace NMib::NCloud::NSecretsManager
 		{
 			DCheck(!pReservedFile->m_fPendingDelete);
 			TCPromise<void> RemovePromise;
-			pReservedFile->m_fPendingDelete = [=, pCanDestroyTracker = mp_pCanDestroyFileActorTracker]()
+			pReservedFile->m_fPendingDelete = [=, this, pCanDestroyTracker = mp_pCanDestroyFileActorTracker]()
 				{
 #if DMibConfig_Tests_Enable
 					if (mp_bDelayDelete)
 					{
 						// This is used to test shutdown. We wait here while the test checks that the file has been deleted
 						// and that the future from the secrets manager destruction has not resloved set yet
-						mp_DelayDeletes.f_Insert().f_Future() > [=, pCanDestroyTracker = pCanDestroyTracker](auto &&)
+						mp_DelayDeletes.f_Insert().f_Future() > [=, this, pCanDestroyTracker = pCanDestroyTracker](auto &&)
 							{
 								fp_RemoveFile(_FileName, _Auditor) > RemovePromise / [pCanDestroyTracker, RemovePromise]()
 									{

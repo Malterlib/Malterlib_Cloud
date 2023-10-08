@@ -574,7 +574,7 @@ namespace NMib::NCloud
 
 		fg_CallSafe(this, &CInternal::f_UpdateManifest, RelativePath, OriginalPath, bDirtyHint)
 			+ fg_CallSafe(this, &CInternal::f_UpdateManifest, RelativePathFrom, OriginalPathFrom, bDirtyHint)
-			> [=](TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
+			> [=, this](TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
 			{
 				(void)pActive;
 				DMibCheck(Sequence > m_LastSeenNotificationSequence);

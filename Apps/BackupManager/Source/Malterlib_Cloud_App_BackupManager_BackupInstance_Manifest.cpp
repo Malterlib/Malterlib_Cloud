@@ -84,7 +84,7 @@ namespace NMib::NCloud::NBackupManager
 				Internal.f_SequenceSyncs
 					(
 						_FileName
-						, [=](COnScopeExitShared &&_pCleanup)
+						, [=, this](COnScopeExitShared &&_pCleanup)
 						{
 							auto &Internal = *mp_pInternal;
 							DMibLogWithCategory(Mib/Cloud/BackupManager, DebugVerbose1, "Add manifest: {}", _FileName);
@@ -115,7 +115,7 @@ namespace NMib::NCloud::NBackupManager
 				Internal.f_SequenceSyncs
 					(
 						_FileName
-						, [=](COnScopeExitShared &&_pCleanup)
+						, [=, this](COnScopeExitShared &&_pCleanup)
 						{
 							auto &Internal = *mp_pInternal;
 							DMibLogWithCategory(Mib/Cloud/BackupManager, DebugVerbose1, "Change manifest: {}", _FileName);
@@ -194,7 +194,7 @@ namespace NMib::NCloud::NBackupManager
 
 				Internal.f_SequenceMultipleSyncs
 					(
-						[=](COnScopeExitShared &&_pCleanup)
+						[=, this](COnScopeExitShared &&_pCleanup)
 						{
 							auto &Internal = *mp_pInternal;
 							DMibLogWithCategory(Mib/Cloud/BackupManager, DebugVerbose1, "Rename manifest: {} -> {}", Change.m_FromFileName, _FileName);

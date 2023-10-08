@@ -222,7 +222,7 @@ namespace NMib::NCloud::NAppManager
 
 					mp_Permissions.f_HasPermission("AppManager Change Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
 						.f_Timeout(60.0, "Timed out waiting for permission in OnChange callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
-						> OnChangePromise / [=, NotificationParams = fg_Move(NotificationParams)](bool _bHasPermission) mutable
+						> OnChangePromise / [=, this, NotificationParams = fg_Move(NotificationParams)](bool _bHasPermission) mutable
 						{
 							auto pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
 							if (!pSubscription)

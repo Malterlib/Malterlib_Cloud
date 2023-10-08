@@ -352,7 +352,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		TCPromise<void> CheckResultPromise;
 
-		Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync) > [=, OldFileName = _FileName, SavedSecret = pSecretProperties->m_Secret]
+		Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync) > [=, this, OldFileName = _FileName, SavedSecret = pSecretProperties->m_Secret]
 			(TCAsyncResult<CDirectorySyncReceive::CSyncResult> &&_Result) mutable
 			{
 				auto &This = *m_pThis;

@@ -265,7 +265,7 @@ namespace NMib::NCloud::NBackupManager
 								Internal.m_bInitialBackupFinished = true;
 								DMibLogWithCategory(Mib/Cloud/BackupManager, Info, "({} - {tc5}) Initial backup finished, committing to latest", Internal.m_Name, Internal.m_StartTime);
 								Internal.m_BackupSource(&CBackupSource::f_InitialCommit, Internal.m_ID, Internal.f_GetCurrentPath(""), fg_TempCopy(Internal.m_Manifest), _FinishedFlags)
-									> Promise / [=](CBackupSource::CInitialCommitResult &&_Result)
+									> Promise / [=, this](CBackupSource::CInitialCommitResult &&_Result)
 									{
 										(void)_pCleanup;
 										auto &Internal = *mp_pInternal;

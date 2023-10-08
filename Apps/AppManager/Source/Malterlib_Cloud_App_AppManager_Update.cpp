@@ -301,7 +301,7 @@ namespace NMib::NCloud::NAppManager
 		else
 			fp_OnUpdateEvent(pState, EUpdateStage::EUpdateStage_Failed, Error) > fg_DiscardResult();
 
-		self / [=, bUnencrypted = pState->m_bUnencrypted]() -> TCFuture<void>
+		self / [=, this, bUnencrypted = pState->m_bUnencrypted]() -> TCFuture<void>
 			{
 				if (!pApplication->m_bDeleted && bUnencrypted)
 				{

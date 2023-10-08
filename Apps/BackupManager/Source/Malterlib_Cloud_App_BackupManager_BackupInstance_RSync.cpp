@@ -128,7 +128,7 @@ namespace NMib::NCloud::NBackupManager
 
 		RSyncContext.m_ExpectedDigest = _ExpectedDigest;
 
-		auto ActorSubscription = g_ActorSubscription / [=, fOnDone = fg_Move(_fOnDone)]() mutable -> TCFuture<void>
+		auto ActorSubscription = g_ActorSubscription / [=, this, fOnDone = fg_Move(_fOnDone)]() mutable -> TCFuture<void>
 			{
 				TCVector<CStr> TempFiles;
 
@@ -199,7 +199,7 @@ namespace NMib::NCloud::NBackupManager
 		f_SequenceSyncs
 			(
 				_RelativeFileName
-				, [=, fRunProtocol = fg_Move(_fRunProtocol)](COnScopeExitShared &&_pCleanup) mutable
+				, [=, this, fRunProtocol = fg_Move(_fRunProtocol)](COnScopeExitShared &&_pCleanup) mutable
 				{
 					auto pRsyncContext = m_RSyncContexts.f_FindEqual(RSyncID);
 					if (!pRsyncContext)

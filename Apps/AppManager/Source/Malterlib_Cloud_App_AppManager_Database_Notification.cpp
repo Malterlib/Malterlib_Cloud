@@ -21,7 +21,7 @@ namespace NMib::NCloud::NAppManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [=, Notification = fg_Move(_Notification)]
+				, g_ActorFunctorWeak / [=, this, Notification = fg_Move(_Notification)]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;

@@ -421,7 +421,7 @@ namespace NMib::NCloud::NPrivate
 			return;
 		}
 
-		Promise.f_MoveFuture() > [=](TCAsyncResult<bool> &&_Result)
+		Promise.f_MoveFuture() > [=, this](TCAsyncResult<bool> &&_Result)
 			{
 				if (!_Result)
 				{
@@ -768,7 +768,7 @@ namespace NMib::NCloud::NPrivate
 
 									fp_SequenceMultipleSyncs
 										(
-											[=, ManifestFile = *pManifestFile](NMib::COnScopeExitShared &&_pScope) mutable
+											[=, this, ManifestFile = *pManifestFile](NMib::COnScopeExitShared &&_pScope) mutable
 											{
 												auto &PendingFile = mp_PendingFiles[FileName];
 												mp_PendingFilesQueue.f_Insert(PendingFile);
@@ -868,6 +868,7 @@ namespace NMib::NCloud::NPrivate
 			(
 				[
 					=
+					, this
 					, ChangePromise = _ManifestChange.m_Promise
 					, ManifestChange = _ManifestChange.m_ManifestChange
 					, bDirty = _ManifestChange.m_bDirty
@@ -947,7 +948,7 @@ namespace NMib::NCloud::NPrivate
 						return;
 					}
 
-					auto fSyncFile = [=](CBackupManagerBackup::CManifestChange const &_ManifestChange) -> bool
+					auto fSyncFile = [=, this](CBackupManagerBackup::CManifestChange const &_ManifestChange) -> bool
 						{
 #if defined DMibContractConfigure_CheckEnabled
 							CStr ManifestError;
@@ -995,7 +996,8 @@ namespace NMib::NCloud::NPrivate
 						if (bFile)
 							fp_NewPendingFile(_FileName);
 
-						mp_Backup.f_CallActor(&CBackupManagerBackup::f_ManifestChange)(_FileName, ManifestChange) > [=, Clock = NTime::CClock{true}](TCAsyncResult<void> &&_Result) mutable
+						mp_Backup.f_CallActor(&CBackupManagerBackup::f_ManifestChange)(_FileName, ManifestChange)
+							> [=, this, Clock = NTime::CClock{true}](TCAsyncResult<void> &&_Result) mutable
 							{
 								(void)Cleanup;
 								(void)_pScope;

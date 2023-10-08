@@ -186,10 +186,10 @@ public:
 									"Version"
 									,
 									{
-										"Identifier"__= "Ident",
-										"Major"__= 13,
-										"Minor"__= 3,
-										"Revision"__= i
+										"Identifier"_j= "Ident",
+										"Major"_j= 13,
+										"Minor"_j= 3,
+										"Revision"_j= i
 									}
 								}
 								, "OutdatedStatus"_= "Ok"
@@ -228,10 +228,10 @@ public:
 							"Version"
 							,
 							{
-								"Identifier"__= "Ident",
-								"Major"__= 13,
-								"Minor"__= 3,
-								"Revision"__= 4
+								"Identifier"_j= "Ident",
+								"Major"_j= 13,
+								"Minor"_j= 3,
+								"Revision"_j= 4
 							}
 						}
 						, "OutdatedStatus"_= "Ok"

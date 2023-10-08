@@ -144,7 +144,7 @@ namespace NMib::NCloud
 					(
 						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{AppManager.m_Address}
 					)
-					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
+					> Promise / [=, this](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &State = *m_pState;
 						auto &AppManagerTrustInner = *pAppManagerTrustInner;
@@ -173,7 +173,7 @@ namespace NMib::NCloud
 					(
 						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{State.m_VersionManagerServerAddress}
 					)
-					> Promise / [=, VersionManagerHostID = State.m_VersionManagerHostID]
+					> Promise / [=, this, VersionManagerHostID = State.m_VersionManagerHostID]
 					(
 						CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_VersionManagerTicket
 					)
@@ -224,7 +224,7 @@ namespace NMib::NCloud
 							}
 						)
 					)
-					> Promise / [=, CloudManagerHostID = State.m_CloudManagerHostID]
+					> Promise / [=, this, CloudManagerHostID = State.m_CloudManagerHostID]
 					(
 						CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_CloudManagerTicket
 						, CVoidTag

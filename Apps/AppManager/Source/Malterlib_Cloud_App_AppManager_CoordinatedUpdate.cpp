@@ -91,7 +91,7 @@ namespace NMib::NCloud::NAppManager
 				, EUpdateStage::EUpdateStage_SyncStart
 				, 60.0*60.0
 				, EWaitStageFlag_None
-				, [=]() -> bool
+				, [=, this]() -> bool
 				{
 					TCMap<CRemoteApplicationWithTypeKey, zmint> WinningApplications;
 					TCSet<CRemoteApplicationWithTypeKey> InProgressApplications;
@@ -236,7 +236,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				_pState
 				, _Timeout
-				, [=](TCPromise<void> &o_Promise) mutable -> bool
+				, [=, this](TCPromise<void> &o_Promise) mutable -> bool
 				{
 					bool bAllInStage = true;
 
@@ -333,7 +333,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				_pState
 				, 60.0*60.0
-				, [=](TCPromise<void> &o_Promise) -> bool
+				, [=, this](TCPromise<void> &o_Promise) -> bool
 				{
 					CStr SmallestHostID = mp_State.m_HostID;
 					for (auto &RemoteAppManager : mp_RemoteAppManagerState)
@@ -449,7 +449,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCSharedPointer<CState> pState = fg_Construct();
 
-		pOnAppUpdateInfoChange->m_fOnChanged = [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() mutable
+		pOnAppUpdateInfoChange->m_fOnChanged = [=, this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() mutable
 			{
 				auto pOnAppUpdateInfoChange = pOnAppUpdateInfoChangeWeak.f_Lock();
 				if (!pOnAppUpdateInfoChange)
@@ -579,7 +579,7 @@ namespace NMib::NCloud::NAppManager
 		fg_RegisterTimer
 			(
 				1.0*60.0
-				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() -> TCFuture<void>
+				, [=, this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() -> TCFuture<void>
 				{
 					if (pState->m_bWasDisconnected && pState->m_DisconnectClock.f_GetTime() >= DisconnectTimeout)
 					{
@@ -602,7 +602,7 @@ namespace NMib::NCloud::NAppManager
 		fg_OneshotTimerAbortable
 			(
 				_Timeout
-				, [=, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]
+				, [=, this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]
 				{
 					if (!Promise.f_IsSet())
 						Promise.f_SetException(DErrorInstance(_TimeoutError));
