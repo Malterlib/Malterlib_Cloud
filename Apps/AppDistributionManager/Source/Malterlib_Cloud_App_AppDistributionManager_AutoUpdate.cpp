@@ -130,7 +130,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				if (!Distribution.m_RunningDeploys(VersionID).f_WasCreated())
 					continue;
 
-				auto CleanupDeploy = g_OnScopeExitActor / [=]
+				auto CleanupDeploy = g_OnScopeExitActor / [=, this]
 					{
 						auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
 
@@ -142,7 +142,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						TCActorResultVector<void> Destroys;
 						for (auto &RunningDeploy : Distribution.m_RunningDeploys[VersionID])
 							RunningDeploy.f_Destroy() > Destroys.f_AddResult();
-						Destroys.f_GetResults() > [=](TCAsyncResult<TCVector<TCAsyncResult<void>>> &&)
+						Destroys.f_GetResults() > [=, this](TCAsyncResult<TCVector<TCAsyncResult<void>>> &&)
 							{
 								auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
 								if (!pDistribution)
@@ -172,7 +172,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 				mp_DistributeSequencer.f_RunSequenced
 					(
-						g_ActorFunctorWeak / [=](CActorSubscription &&_Subscription) -> TCFuture<TCSet<CStr>>
+						g_ActorFunctorWeak / [=, this](CActorSubscription &&_Subscription) -> TCFuture<TCSet<CStr>>
 						{
 							TCPromise<TCSet<CStr>> Promise;
 
@@ -181,7 +181,7 @@ namespace NMib::NCloud::NAppDistributionManager
 							if (mp_State.m_bStoppingApp)
 								return Promise <<= DMibErrorInstance("Stopping app");
 
-							auto CleanupDownload = g_OnScopeExitActor / [=]
+							auto CleanupDownload = g_OnScopeExitActor / [=, this]
 								{
 									if (!mp_FileActor)
 										return;
@@ -215,7 +215,7 @@ namespace NMib::NCloud::NAppDistributionManager
 							self(&CAppDistributionManagerActor::fp_DownloadApplication, VersionManagerApplicationName, VersionID, DownloadDirectory)
 								> Promise
 								% ("Failed to download '{}' ({}) version '{}'"_f << DistributionName << VersionManagerApplicationName << VersionID)
-								/ [=, Subscription = fg_Move(_Subscription)](CVersionInformation &&_VersionInformation) mutable
+								/ [=, this, Subscription = fg_Move(_Subscription)](CVersionInformation &&_VersionInformation) mutable
 								{
 									auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
 									if (!pDistribution)
@@ -316,7 +316,7 @@ namespace NMib::NCloud::NAppDistributionManager
 										;
 									}
 
-									DeploysResults.f_GetResults() > [=, Subscription = fg_Move(Subscription)](TCAsyncResult<TCMap<CStr, TCAsyncResult<void>>> &&_Results) mutable
+									DeploysResults.f_GetResults() > [=, this, Subscription = fg_Move(Subscription)](TCAsyncResult<TCMap<CStr, TCAsyncResult<void>>> &&_Results) mutable
 										{
 											auto pDistribution = mp_Distributions.f_FindEqual(DistributionName);
 											if (!pDistribution)
