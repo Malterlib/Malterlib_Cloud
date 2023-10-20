@@ -365,7 +365,7 @@ Property
 	MalterlibCloudVersionInfo_UpdateScriptEnvironment_ExpectedType: string
 
 	MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents function(string _EnvVar) {...: string} = {}
-	MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents =+ { `@(_EnvVar)`: Property.@(_EnvVar)->OverridingType("MalterlibCloudVersionInfo_UpdateScriptEnvironment_ExpectedType") }
+	MalterlibCloudVersionInfo_UpdateScriptEnvironment_Contents =+ { `@(_EnvVar)`: &Property.@(_EnvVar)->OverridingType(&MalterlibCloudVersionInfo_UpdateScriptEnvironment_ExpectedType) }
 }
 
 Property
