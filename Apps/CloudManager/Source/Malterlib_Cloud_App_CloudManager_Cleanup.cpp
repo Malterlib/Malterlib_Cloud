@@ -173,10 +173,10 @@ namespace NMib::NCloud::NCloudManager
 		if (State.mp_OriginalStats.m_UsedBytes < State.mp_TargetSize)
 		{
 			if (!bDoRetention)
-				co_return fg_Move(WriteTransaction);
+				co_return {.m_Transaction = fg_Move(WriteTransaction)};
 
 			if (State.mp_StartTime.f_IsValid() && State.mp_StartTime > OldestAllowedReading)
-				co_return fg_Move(WriteTransaction);
+				co_return {.m_Transaction = fg_Move(WriteTransaction)};
 		}
 
 		CClock RuntimeClock(true);
@@ -245,7 +245,7 @@ namespace NMib::NCloud::NCloudManager
 				// Avoid pathological performance case in database
 				++State.mp_nDatabaseYields;
 				fCheckStatsLog();
-				co_return {fg_Move(WriteTransaction), true};
+				co_return {.m_Transaction = fg_Move(WriteTransaction), .m_bMoreWork = true};
 			}
 
 			if (State.mp_CurrentStats.m_UsedBytes < State.mp_TargetSize)
@@ -271,7 +271,7 @@ namespace NMib::NCloud::NCloudManager
 					if (RuntimeClock.f_GetTime() > gc_MaxRunTime)
 					{
 						++State.mp_nDatabaseYields;
-						co_return {fg_Move(WriteTransaction), true};
+						co_return {.m_Transaction = fg_Move(WriteTransaction), .m_bMoreWork = true};
 					}
 				}
 			}
@@ -280,6 +280,6 @@ namespace NMib::NCloud::NCloudManager
 		if (State.mp_nReadingsDeletedSensor || State.mp_nReadingsDeletedLog)
 			State.f_Log(false);
 
-		co_return {fg_Move(WriteTransaction)};
+		co_return {.m_Transaction = fg_Move(WriteTransaction)};
 	}
 }

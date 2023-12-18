@@ -438,23 +438,26 @@ namespace NMib::NCloud::NCloudManager
 
 		Auditor.f_Info("App manager registered");
 
-		co_return TCDistributedActorInterfaceWithID<CAppManagerCloudManagerInterface>
-			(
-				pThis->mp_AppManagerCloudManagerInterface.m_Actor->f_ShareInterface<CAppManagerCloudManagerInterface>()
-				, g_ActorSubscription / [pThis, RegisterSequence, AppManagerID, DatabaseKey]() -> TCFuture<void>
-				{
-					CAppManagerState *pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
-					if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
-						co_return DMibErrorInstance("App Manager was removed before subscription finished");
+		co_return
+			{
+				.m_AppManagerCloudManagerInterface = TCDistributedActorInterfaceWithID<CAppManagerCloudManagerInterface>
+				(
+					pThis->mp_AppManagerCloudManagerInterface.m_Actor->f_ShareInterface<CAppManagerCloudManagerInterface>()
+					, g_ActorSubscription / [pThis, RegisterSequence, AppManagerID, DatabaseKey]() -> TCFuture<void>
+					{
+						CAppManagerState *pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+						if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
+							co_return DMibErrorInstance("App Manager was removed before subscription finished");
 
-					auto DestroyFuture = pAppManager->f_Destroy(*pThis);
-					pThis->mp_AppManagers.f_Remove(AppManagerID);
+						auto DestroyFuture = pAppManager->f_Destroy(*pThis);
+						pThis->mp_AppManagers.f_Remove(AppManagerID);
 
-					co_await fg_Move(DestroyFuture);
+						co_await fg_Move(DestroyFuture);
 
-					co_return {};
-				}
-			)
+						co_return {};
+					}
+				)
+			}
 		;
 	}
 
