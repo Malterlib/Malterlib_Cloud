@@ -7,6 +7,7 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
+#include <Mib/Concurrency/DistributedApp>
 
 #include "Malterlib_Cloud_KeyManager_Shared.h"
 
@@ -74,6 +75,12 @@ namespace NMib::NCloud
 	{
 		NConcurrency::TCActor<ICKeyManagerServerDatabase> m_DatabaseActor;
 		NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> m_TrustManager;
+		NFunction::TCFunctionMovable<NConcurrency::CDistributedAppAuditor (NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> m_fAuditorFactory
+			= [](NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category) -> NConcurrency::CDistributedAppAuditor
+			{
+				return {};
+			}
+		;
 	};
 
 	struct CKeyManagerServer : public NConcurrency::CActor

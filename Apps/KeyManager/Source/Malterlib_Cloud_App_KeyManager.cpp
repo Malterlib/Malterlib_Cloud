@@ -38,6 +38,7 @@ namespace NMib::NCloud::NKeyManager
 				{
 					.m_DatabaseActor = mp_DatabaseActor
 					, .m_TrustManager = mp_State.m_TrustManager
+					, .m_fAuditorFactory = mp_State.f_AuditorFactory()
 				}
 			)
 		;

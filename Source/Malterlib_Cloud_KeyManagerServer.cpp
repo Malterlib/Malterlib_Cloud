@@ -69,6 +69,8 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 
+		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(fg_GetCallingHostInfo(), "KeyManager");
+
 		co_await Internal.f_ReadDatabase();
 
 		DMibCheck(Internal.m_pDatabase);
@@ -86,14 +88,18 @@ namespace NMib::NCloud
 			NSys::fg_Security_GenerateHighEntropyData(Key.f_GetArray(), Key.f_GetLen());
 		}
 
+		mint nCreated = GeneratedKeys.f_GetLen();
+
 		Internal.m_pDatabase->m_AvailableKeys[_KeySize].f_InsertFirst(fg_Move(GeneratedKeys));
 
 		auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, *Internal.m_pDatabase).f_Wrap();
 		if (!WriteResult)
 		{
 			DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to write database: {}", WriteResult.f_GetExceptionStr());
-			co_return DMibErrorInstance("Failed to write database: {}"_f << WriteResult.f_GetExceptionStr());
+			co_return AppAuditor.f_Exception("Failed to write database: {}"_f << WriteResult.f_GetExceptionStr());
 		}
+
+		AppAuditor.f_Info("Pre-created {} keys of {} bytes"_f << nCreated << _KeySize);
 
 		co_return {};
 	}
@@ -101,6 +107,8 @@ namespace NMib::NCloud
 	NConcurrency::TCFuture<CSymmetricKey> CKeyManagerServer::CInternal::CKeyManagerImplementation::f_RequestKey(CStr const &_Identifier, uint32 _KeySize)
 	{
 		auto &Internal = *m_pThis->mp_pInternal;
+
+		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(fg_GetCallingHostInfo(), "KeyManager");
 
 		auto HostID = NConcurrency::CActorDistributionManager::fs_GetCallingHostInfo().f_GetRealHostID();
 
@@ -119,6 +127,7 @@ namespace NMib::NCloud
 			{
 				pKey->f_SetLen(_KeySize);
 				NSys::fg_Security_GenerateHighEntropyData(pKey->f_GetArray(), pKey->f_GetLen());
+				AppAuditor.f_Info("Created new key of {} bytes for ID '{}'"_f << _KeySize << _Identifier);
 			}
 			else
 			{
@@ -127,8 +136,10 @@ namespace NMib::NCloud
 				{
 					CStr Error = "Requested key size mismatch with pre-created key. Requested: {}, Pre-created: {}"_f << _KeySize << pKey->f_GetLen();
 					DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "{}", Error);
-					co_return DMibErrorInstance(Error);
+					co_return AppAuditor.f_Exception(Error);
 				}
+
+				AppAuditor.f_Info("Used pre-created key of {} bytes for ID '{}'"_f << _KeySize << _Identifier);
 
 				pAvailableKeys->f_Remove(pAvailableKeys->f_GetLen() - 1);
 				if (pAvailableKeys->f_IsEmpty())
@@ -141,7 +152,7 @@ namespace NMib::NCloud
 			if (!WriteResult)
 			{
 				DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to write database: {}", WriteResult.f_GetExceptionStr());
-				co_return DMibErrorInstance("Failed to write database: {}"_f <<WriteResult.f_GetExceptionStr());
+				co_return AppAuditor.f_Exception("Failed to write database: {}"_f <<WriteResult.f_GetExceptionStr());
 			}
 
 			co_return fg_Move(Key);
@@ -149,7 +160,9 @@ namespace NMib::NCloud
 		else
 		{
 			if (pKey->f_GetLen() != _KeySize)
-				co_return DMibErrorInstance("Saved key has different size {} from requested size {}"_f << pKey->f_GetLen() << _KeySize);
+				co_return AppAuditor.f_Exception("Saved key has different size {} from requested size {}"_f << pKey->f_GetLen() << _KeySize);
+
+			AppAuditor.f_Info("Returned key of {} bytes with ID '{}'"_f << _KeySize << _Identifier);
 
 			co_return *pKey;
 		}
