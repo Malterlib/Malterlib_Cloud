@@ -472,14 +472,14 @@ namespace NMib::NCloud::NCloudManager
 		auto Auditor = pThis->mp_AppState.f_Auditor({}, CallingHostInfo);
 		CStr AppManagerID = CallingHostInfo.f_GetRealHostID();
 
-		CAppManagerState *pAppMangaerState;
+		CAppManagerState *pAppManagerState;
 
 		auto OnResume = co_await fg_OnResume
 			(
 				[&]() -> CExceptionPointer
 				{
-					pAppMangaerState = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
-					if (!pAppMangaerState)
+					pAppManagerState = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
+					if (!pAppManagerState)
 						return DMibErrorInstance("App manager no longer registered");
 
 					return {};
@@ -489,8 +489,8 @@ namespace NMib::NCloud::NCloudManager
 
 		CAppManagerKey DatabaseKey{.m_HostID = AppManagerID};
 
-		pAppMangaerState->m_Data.m_LastSeen = CTime::fs_NowUTC();
-		pAppMangaerState->m_Data.m_PauseReportingFor = _SecondsToPause;
+		pAppManagerState->m_Data.m_LastSeen = CTime::fs_NowUTC();
+		pAppManagerState->m_Data.m_PauseReportingFor = _SecondsToPause;
 
 		TCMap<CStr, CDistributedAppSensorStoreLocal::CSeenHost> AppManagerSeenHosts;
 		{
@@ -516,7 +516,7 @@ namespace NMib::NCloud::NCloudManager
 			;
 		}
 
-		auto SaveAppManagerDataResult = co_await pThis->fp_SaveAppManagerData(DatabaseKey, pAppMangaerState->m_Data).f_Wrap();
+		auto SaveAppManagerDataResult = co_await pThis->fp_SaveAppManagerData(DatabaseKey, pAppManagerState->m_Data).f_Wrap();
 
 		if (!SaveAppManagerDataResult)
 			SaveAppManagerDataResult > fg_LogWarning("CloudManager", "Failed to store app manager data when pausing reporting");
