@@ -17,7 +17,6 @@ namespace NMib::NCloud
 	CKeyManagerServer::CInternal::CInternal(CKeyManagerServer *_pThis, CKeyManagerServerConfig &&_Config)
 		: m_pThis(_pThis)
 		, m_Config(fg_Move(_Config))
-		, m_pDatabase(nullptr)
 	{
 		
 	}
@@ -35,6 +34,8 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_DistributionManager = co_await Internal.m_Config.m_TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager);
+
+		co_await Internal.f_ReadDatabase();
 
 		co_await Internal.m_KeyManagerInstance.f_Publish<CKeyManager>(Internal.m_DistributionManager, this, CKeyManager::mc_pDefaultNamespace);
 

@@ -26,10 +26,7 @@ namespace NMib::NCloud
 		CKeyManagerServer *m_pThis;
 		CKeyManagerServerConfig m_Config;
 		NConcurrency::TCActor<NConcurrency::CActorDistributionManager> m_DistributionManager;
-		NStorage::TCUniquePointer<ICKeyManagerServerDatabase::CDatabase> m_pDatabase;
-		NContainer::TCVector<NConcurrency::TCPromise<void>> m_OnDatabaseReadyQueue;
+		ICKeyManagerServerDatabase::CDatabase m_Database;
 		NConcurrency::TCDistributedActorInstance<CKeyManagerImplementation> m_KeyManagerInstance;
-
-		bool m_bReadingDatabase = false;
 	};
 }

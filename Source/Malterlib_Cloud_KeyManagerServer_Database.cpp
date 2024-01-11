@@ -16,44 +16,17 @@ namespace NMib::NCloud
 
 	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::f_ReadDatabase()
 	{
-		if (m_pDatabase)
-			co_return {};
-
-		if (m_bReadingDatabase)
-		{
-			co_await m_OnDatabaseReadyQueue.f_Insert().f_Future();
-			co_return {};
-		}
-
-		m_bReadingDatabase = true;
-		auto Cleanup = g_OnScopeExit / [&]
-			{
-				m_bReadingDatabase = false;
-			}
-		;
-
 		auto Database = co_await m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Wrap();
 
 		if (!Database)
 		{
 			DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to read database: {}", Database.f_GetExceptionStr());
 
-			auto Exception = Database.f_GetException();
-			for (auto &Promise : m_OnDatabaseReadyQueue)
-				Promise.f_SetException(Exception);
-			
-			m_OnDatabaseReadyQueue.f_Clear();
-
-			co_return fg_Move(Exception);
+			co_return fg_Move(Database.f_GetException());
 		}
 
-		m_pDatabase = fg_Construct(fg_Move(*Database));
+		m_Database = fg_Move(*Database);
 
-		for (auto &Promise : m_OnDatabaseReadyQueue)
-			Promise.f_SetResult();
-
-		m_OnDatabaseReadyQueue.f_Clear();
-		
 		co_return {};
 	}
 
@@ -63,11 +36,7 @@ namespace NMib::NCloud
 
 		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(fg_GetCallingHostInfo(), "KeyManager");
 
-		co_await Internal.f_ReadDatabase();
-
-		DMibCheck(Internal.m_pDatabase);
-
-		auto const& CurrentKeys = Internal.m_pDatabase->m_AvailableKeys[_KeySize];
+		auto const& CurrentKeys = Internal.m_Database.m_AvailableKeys[_KeySize];
 		if (CurrentKeys.f_GetLen() >= _nKeys)
 			co_return {};
 
@@ -82,9 +51,9 @@ namespace NMib::NCloud
 
 		mint nCreated = GeneratedKeys.f_GetLen();
 
-		Internal.m_pDatabase->m_AvailableKeys[_KeySize].f_InsertFirst(fg_Move(GeneratedKeys));
+		Internal.m_Database.m_AvailableKeys[_KeySize].f_InsertFirst(fg_Move(GeneratedKeys));
 
-		auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, *Internal.m_pDatabase).f_Wrap();
+		auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Internal.m_Database).f_Wrap();
 		if (!WriteResult)
 		{
 			DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to write database: {}", WriteResult.f_GetExceptionStr());

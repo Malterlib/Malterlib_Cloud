@@ -22,17 +22,13 @@ namespace NMib::NCloud
 
 		auto HostID = NConcurrency::CActorDistributionManager::fs_GetCallingHostInfo().f_GetRealHostID();
 
-		co_await Internal.f_ReadDatabase();
-
-		DMibCheck(Internal.m_pDatabase);
-
-		auto &Client = Internal.m_pDatabase->m_Clients[HostID];
+		auto &Client = Internal.m_Database.m_Clients[HostID];
 		auto pKey = Client.m_Keys.f_FindEqual(_Identifier);
 		if (!pKey)
 		{
 			pKey = &Client.m_Keys[_Identifier];
 
-			auto pAvailableKeys = Internal.m_pDatabase->m_AvailableKeys.f_FindEqual(_KeySize);
+			auto pAvailableKeys = Internal.m_Database.m_AvailableKeys.f_FindEqual(_KeySize);
 			if (!pAvailableKeys)
 			{
 				pKey->f_SetLen(_KeySize);
@@ -53,12 +49,12 @@ namespace NMib::NCloud
 
 				pAvailableKeys->f_Remove(pAvailableKeys->f_GetLen() - 1);
 				if (pAvailableKeys->f_IsEmpty())
-					Internal.m_pDatabase->m_AvailableKeys.f_Remove(_KeySize);
+					Internal.m_Database.m_AvailableKeys.f_Remove(_KeySize);
 			}
 
 			auto Key = *pKey;
 
-			auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, *Internal.m_pDatabase).f_Wrap();
+			auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Internal.m_Database).f_Wrap();
 			if (!WriteResult)
 			{
 				DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to write database: {}", WriteResult.f_GetExceptionStr());
