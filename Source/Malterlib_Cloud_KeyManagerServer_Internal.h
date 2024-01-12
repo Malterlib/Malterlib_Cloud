@@ -10,33 +10,26 @@
 
 namespace NMib::NCloud
 {
-	class CKeyManagerInternalInterface : public NConcurrency::CActor
-	{
-		// Synchronize databases
-	};
-	
 	struct CKeyManagerServer::CInternal : public NConcurrency::CActorInternal
 	{
-		CInternal(CKeyManagerServer *_pThis, CKeyManagerServerConfig const &_Config);
+		struct CKeyManagerImplementation : public CKeyManager
+		{
+			NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize) override;
+
+			DMibDelegatedActorImplementation(CKeyManagerServer);
+		};
 		
-		void f_ReadDatabase(NFunction::TCFunction<void ()> &&_fOnReady, NFunction::TCFunction<void (NStr::CStr const&)> &&_fOnError);
-		NConcurrency::TCFuture<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
-		NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize);
+		CInternal(CKeyManagerServer *_pThis, CKeyManagerServerConfig &&_Config);
+
+		NConcurrency::TCFuture<void> f_ReadDatabase();
 		
 		CKeyManagerServer *m_pThis;
 		CKeyManagerServerConfig m_Config;
-		NConcurrency::TCDistributedActor<CKeyManager> m_KeyManagerActor;
-		NConcurrency::CDistributedActorPublication m_KeyManagerPublication;
+		NConcurrency::TCActor<NConcurrency::CActorDistributionManager> m_DistributionManager;
 		NStorage::TCUniquePointer<ICKeyManagerServerDatabase::CDatabase> m_pDatabase;
-		NContainer::TCLinkedList<NFunction::TCFunction<void ()>> m_OnDatabaseReadyQueue;
-		NContainer::TCLinkedList<NFunction::TCFunction<void (NStr::CStr const&)>> m_OnDatabaseErrorQueue;
-	};
-	
-	struct CKeyManager::CInternal : public NConcurrency::CActorInternal
-	{
-		CInternal(CKeyManager *_pThis, NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
-		
-		CKeyManager *m_pThis;
-		NConcurrency::TCWeakActor<CKeyManagerServer> m_ServerActor;
+		NContainer::TCVector<NConcurrency::TCPromise<void>> m_OnDatabaseReadyQueue;
+		NConcurrency::TCDistributedActorInstance<CKeyManagerImplementation> m_KeyManagerInstance;
+
+		bool m_bReadingDatabase = false;
 	};
 }

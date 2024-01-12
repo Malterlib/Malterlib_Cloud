@@ -25,7 +25,7 @@ namespace NMib::NCloud::NKeyManager
 		TCFuture<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
-		void fp_DatabaseDecrypted();
+		TCFuture<void> fp_DatabaseDecrypted();
 
 		TCActor<CKeyManagerServer> mp_ServerActor;
 		TCActor<CKeyManagerServerDatabase_EncryptedFile> mp_DatabaseActor;

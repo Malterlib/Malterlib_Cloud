@@ -101,8 +101,6 @@ namespace NMib::NCloud::NKeyManager
 							(
 								g_ActorFunctor / [this](NStr::CStrSecure &&_Password) -> TCFuture<void>
 								{
-									TCPromise<void> Promise;
-
 									CSecureByteVector Salt{(uint8 const *)"MiBKeyMa", 8};
 									TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
 										(
@@ -116,33 +114,20 @@ namespace NMib::NCloud::NKeyManager
 									CClock Clock;
 									Clock.f_Start();
 
-									DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_Initialize)
-										> [this, Promise, DatabaseActor, Clock](TCAsyncResult<void> &&_Result)
-										{
-											if (!_Result)
-											{
-												// Delay reply to be same response time every time
-												fg_Timeout(fg_Max(fp64(0.5) - Clock.f_GetTime(), fp64(0.01)))
-													> [Promise, Result = fg_Move(_Result)]
-													{
-														Promise.f_SetException
-															(
-																DMibErrorInstance(fg_Format("Failed to initialize database: {}", Result.f_GetExceptionStr()))
-															)
-														;
-													}
-												;
-												return;
-											}
-											mp_bDatabaseDecrypted = true;
-											mp_DatabaseActor = DatabaseActor;
+									auto Result = co_await DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_Initialize).f_Wrap();
 
-											fp_DatabaseDecrypted();
-											Promise.f_SetResult();
-										}
-									;
+									if (!Result)
+									{
+										// Delay reply to be same response time every time
+										co_await fg_Timeout(fg_Max(fp64(0.5) - Clock.f_GetTime(), fp64(0.01)));
+										co_return DMibErrorInstance("Failed to initialize database: {}"_f << Result.f_GetExceptionStr());
+									}
+									mp_bDatabaseDecrypted = true;
+									mp_DatabaseActor = fg_Move(DatabaseActor);
 
-									return Promise.f_MoveFuture();
+									co_await fp_DatabaseDecrypted();
+
+									co_return {};
 								}
 								, true
 								, "Already processing a password. Try again later."

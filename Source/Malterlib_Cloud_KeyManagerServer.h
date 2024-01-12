@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedActor>
+#include <Mib/Concurrency/DistributedActorTrustManager>
 
 #include "Malterlib_Cloud_KeyManager_Shared.h"
 
@@ -72,25 +73,21 @@ namespace NMib::NCloud
 	struct CKeyManagerServerConfig
 	{
 		NConcurrency::TCActor<ICKeyManagerServerDatabase> m_DatabaseActor;
-		NContainer::TCSet<NContainer::CByteVector> m_PublicKeysForAllKeyManagers;
+		NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> m_TrustManager;
 	};
 
-	class CKeyManagerServer : public NConcurrency::CActor
+	struct CKeyManagerServer : public NConcurrency::CActor
 	{
-		friend class CKeyManager;
-		
-	public:
-		CKeyManagerServer(CKeyManagerServerConfig const &_Config, NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager);
+		CKeyManagerServer(CKeyManagerServerConfig &&_Config);
 		~CKeyManagerServer();
 		
 		NConcurrency::TCFuture<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
-		
-	protected:
-		NConcurrency::TCFuture<CSymmetricKey> fp_RequestKey(NStr::CStr const &_HostID, NStr::CStr const &_Identifier, uint32 _KeySize);
+		NConcurrency::TCFuture<void> f_Init();
+
+	private:
 
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 		
-	private:
 		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};

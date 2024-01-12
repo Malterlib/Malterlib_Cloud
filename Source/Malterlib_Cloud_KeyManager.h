@@ -10,29 +10,27 @@
 
 namespace NMib::NCloud
 {
-	class CKeyManagerServer;
-	
-	class CKeyManager : public NConcurrency::CActor
+	enum : uint32
 	{
-		friend class CKeyManagerServer;
-		
-	public:
+		EKeyManagerProtocolVersion_Min = 0x101
+
+		, EKeyManagerProtocolVersion_Current = 0x101
+	};
+
+	struct CKeyManager : public NConcurrency::CActor
+	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/KeyManager";
 		
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x101
-			, EProtocolVersion_Current = 0x101
+			EProtocolVersion_Min = EKeyManagerProtocolVersion_Min
+			, EProtocolVersion_Current = EKeyManagerProtocolVersion_Current
 		};
-		
-		CKeyManager(NConcurrency::TCWeakActor<CKeyManagerServer> const &_ServerActor);
+
+		CKeyManager();
 		~CKeyManager();
 		
-		NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize);
-	private:
-		struct CInternal;
-		
-		NStorage::TCUniquePointer<CInternal> mp_pInternal;
+		virtual NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize) = 0;
 	};
 }
 

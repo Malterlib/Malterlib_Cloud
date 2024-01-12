@@ -29,12 +29,21 @@ namespace NMib::NCloud::NKeyManager
 		co_return {};
 	}
 
-	void CKeyManagerDaemonActor::fp_DatabaseDecrypted()
+	TCFuture<void> CKeyManagerDaemonActor::fp_DatabaseDecrypted()
 	{
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Password provided, starting up key manager");
-		CKeyManagerServerConfig Config;
-		Config.m_DatabaseActor = mp_DatabaseActor;
-		mp_ServerActor = fg_ConstructActor<CKeyManagerServer>(Config, mp_State.m_DistributionManager);
+		mp_ServerActor = fg_ConstructActor<CKeyManagerServer>
+			(
+				CKeyManagerServerConfig
+				{
+					.m_DatabaseActor = mp_DatabaseActor
+					, .m_TrustManager = mp_State.m_TrustManager
+				}
+			)
+		;
+		co_await mp_ServerActor(&CKeyManagerServer::f_Init);
+
+		co_return {};
 	}
 
 	TCFuture<void> CKeyManagerDaemonActor::fp_StopApp()
