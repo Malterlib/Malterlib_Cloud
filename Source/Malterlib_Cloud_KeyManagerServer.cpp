@@ -14,6 +14,11 @@ namespace NMib::NCloud
 	using namespace NConcurrency::NPrivate;
 	using namespace NStr;
 
+	NStr::CStr const &ICKeyManagerServerDatabase::CDatabase::CClientStore::f_GetID() const
+	{
+		return NContainer::TCMap<NStr::CStr, CClientStore>::fs_GetKey(*this);
+	}
+
 	CKeyManagerServer::CInternal::CInternal(CKeyManagerServer *_pThis, CKeyManagerServerConfig &&_Config)
 		: m_pThis(_pThis)
 		, m_Config(fg_Move(_Config))

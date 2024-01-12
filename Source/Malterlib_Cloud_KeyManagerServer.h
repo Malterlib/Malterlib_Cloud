@@ -25,30 +25,16 @@ namespace NMib::NCloud
 			
 			struct CClientStore
 			{
-				NStr::CStr const &f_GetID() const
-				{
-					return NContainer::TCMap<NStr::CStr, CClientStore>::fs_GetKey(*this);
-				}
-				
+				NStr::CStr const &f_GetID() const;
+
 				template <typename tf_CStream>
-				void f_Stream(tf_CStream &_Stream)
-				{
-					_Stream % m_Keys;
-				}
+				void f_Stream(tf_CStream &_Stream);
 
 				NContainer::TCMap<NStr::CStr, CSymmetricKey> m_Keys;
 			};
 			
 			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream)
-			{
- 				EVersion Version = EVersion::mc_Current;
-				_Stream % Version;
-				DMibBinaryStreamVersion(_Stream, Version);
-
-				_Stream % m_Clients;
-				_Stream % m_AvailableKeys;
-			}
+			void f_Stream(tf_CStream &_Stream);
 
 			NContainer::TCMap<NStr::CStr, CClientStore> m_Clients;
 			NContainer::TCMap<uint32, NContainer::TCVector<CSymmetricKey>> m_AvailableKeys;
@@ -91,3 +77,5 @@ namespace NMib::NCloud
 #ifndef DMibPNoShortCuts
 	using namespace NMib::NCloud;
 #endif
+
+#include "Malterlib_Cloud_KeyManagerServer.hpp"
