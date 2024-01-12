@@ -18,52 +18,40 @@ namespace NMib::NCloud
 	public:
 		struct CDatabase
 		{
-			enum
+			enum class EVersion : uint32
 			{
-				EVersion = 0x100
+				mc_Current = 0x100
 			};
 			
 			struct CClientStore
 			{
-				NContainer::TCMap<NStr::CStr, CSymmetricKey> m_Keys;
-				
 				NStr::CStr const &f_GetID() const
 				{
 					return NContainer::TCMap<NStr::CStr, CClientStore>::fs_GetKey(*this);
 				}
 				
 				template <typename tf_CStream>
-				void f_Feed(tf_CStream &_Stream) const
+				void f_Stream(tf_CStream &_Stream)
 				{
-					_Stream << m_Keys;
+					_Stream % m_Keys;
 				}
-					
-				template <typename tf_CStream>
-				void f_Consume(tf_CStream &_Stream)
-				{
-					_Stream >> m_Keys;
-				}
+
+				NContainer::TCMap<NStr::CStr, CSymmetricKey> m_Keys;
 			};
 			
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream)
+			{
+ 				EVersion Version = EVersion::mc_Current;
+				_Stream % Version;
+				DMibBinaryStreamVersion(_Stream, Version);
+
+				_Stream % m_Clients;
+				_Stream % m_AvailableKeys;
+			}
+
 			NContainer::TCMap<NStr::CStr, CClientStore> m_Clients;
 			NContainer::TCMap<uint32, NContainer::TCVector<CSymmetricKey>> m_AvailableKeys;
-			
-			template <typename tf_CStream>
-			void f_Feed(tf_CStream &_Stream) const
-			{
-				_Stream << uint32(EVersion);
-				_Stream << m_Clients;
-				_Stream << m_AvailableKeys;
-			}
-				
-			template <typename tf_CStream>
-			void f_Consume(tf_CStream &_Stream)
-			{
-				uint32 Version = 0;
-				_Stream >> Version;
-				_Stream >> m_Clients;
-				_Stream >> m_AvailableKeys;
-			}
 		};
 		
 		virtual NConcurrency::TCFuture<void> f_Initialize() = 0;
