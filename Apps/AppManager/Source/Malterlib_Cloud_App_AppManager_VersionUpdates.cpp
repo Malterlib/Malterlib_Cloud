@@ -181,6 +181,8 @@ namespace NMib::NCloud::NAppManager
 			, CStr const &_DestinationDir
 		)
 	{
+		using namespace NStr;
+
 		TCPromise<CVersionManager::CVersionInformation> Promise;
 		
 		auto &DownloadState = mp_Downloads.f_Insert();
@@ -199,14 +201,22 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		DownloadState.m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, 16*1024*1024, CFileTransferReceive::EReceiveFlag_DeleteExisting)
-			> Promise % "Failed to initialize file transfer context"
-			/ [_ApplicationName, _VersionID, _Manager, Promise, pDownloadState, pCleanup]
-			(CFileTransferContext &&_TransferContext)
+			> [_ApplicationName, _VersionID, _Manager, Promise, pDownloadState, pCleanup](TCAsyncResult<CFileTransferContext> &&_TransferContext)
 			{
+				if (!_TransferContext)
+				{
+					if (!Promise.f_IsSet())
+						Promise.f_SetException(DMibErrorInstance("Failed to initialize file transfer context: {}"_f << _TransferContext.f_GetExceptionStr()));
+
+					return;
+				}
+
+				auto &TransferContext = *_TransferContext;
+
 				CVersionManager::CStartDownloadVersion StartDownload;
 				StartDownload.m_Application = _ApplicationName;
 				StartDownload.m_VersionIDAndPlatform = _VersionID;
-				StartDownload.m_TransferContext = fg_Move(_TransferContext);
+				StartDownload.m_TransferContext = fg_Move(TransferContext);
 				if (_Manager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_RefactorToActorFunctorsUploadDownload)
 				{
 					StartDownload.m_Subscription = g_ActorSubscription / [Promise]()
@@ -219,13 +229,21 @@ namespace NMib::NCloud::NAppManager
 
 				_Manager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
 					.f_Timeout(60.0, "Timed out waiting for version manager to reply")
-					> Promise % "Failed to start download on remote server" / [Promise, pCleanup, pDownloadState]
-					(CVersionManager::CStartDownloadVersion::CResult &&_Result)
+					> [Promise, pCleanup, pDownloadState](TCAsyncResult<CVersionManager::CStartDownloadVersion::CResult> &&_Result)
 					{
-						pDownloadState->m_Subscription = fg_Move(_Result.m_Subscription);
+						if (!_Result)
+						{
+							if (!Promise.f_IsSet())
+								Promise.f_SetException(DMibErrorInstance("Failed to start download on remote server: {}"_f << _Result.f_GetExceptionStr()));
+
+							return;
+						}
+						auto &Result = *_Result;
+
+						pDownloadState->m_Subscription = fg_Move(Result.m_Subscription);
 
 						pDownloadState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResult)
-							> [Promise, pDownloadState, pCleanup, VersionInfo = fg_Move(_Result.m_VersionInfo)]
+							> [Promise, pDownloadState, pCleanup, VersionInfo = fg_Move(Result.m_VersionInfo)]
 							(TCAsyncResult<CFileTransferResult> &&_Results) mutable
 							{
 								pDownloadState->m_Subscription.f_Clear();
