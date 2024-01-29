@@ -5,21 +5,22 @@
 
 #if DMalterlibCloudCompatibilityTests
 
-#include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Process/ProcessLaunchActor>
-#include <Mib/Concurrency/DistributedAppInterfaceLaunch>
-#include <Mib/Concurrency/DistributedTrustTestHelpers>
-#include <Mib/Concurrency/ActorSubscription>
-#include <Mib/Concurrency/DistributedAppInterface>
-#include <Mib/Concurrency/DistributedActorTrustManagerProxy>
-#include <Mib/Concurrency/DistributedAppLaunchHelper>
-#include <Mib/Cloud/VersionManager>
+#include <Mib/Cloud/App/AppManager>
+#include <Mib/Cloud/App/VersionManager>
 #include <Mib/Cloud/AppManager>
+#include <Mib/Cloud/VersionManager>
+#include <Mib/Concurrency/ActorSequencerActor>
+#include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/ConcurrencyManager>
+#include <Mib/Concurrency/DistributedActorTrustManagerProxy>
+#include <Mib/Concurrency/DistributedAppInterface>
+#include <Mib/Concurrency/DistributedAppInterfaceLaunch>
+#include <Mib/Concurrency/DistributedAppLaunchHelper>
+#include <Mib/Concurrency/DistributedTrustTestHelpers>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Encoding/JSONShortcuts>
-#include <Mib/Cloud/App/VersionManager>
-#include <Mib/Cloud/App/AppManager>
 #include <Mib/Process/Platform>
+#include <Mib/Process/ProcessLaunchActor>
 #include <Mib/Security/UniqueUserGroup>
 
 #ifdef DPlatformFamily_Windows
@@ -27,21 +28,22 @@
 #endif
 
 using namespace NMib;
+using namespace NMib::NAtomic;
+using namespace NMib::NCloud;
 using namespace NMib::NConcurrency;
-using namespace NMib::NFile;
-using namespace NMib::NStr;
-using namespace NMib::NProcess;
 using namespace NMib::NContainer;
 using namespace NMib::NCryptography;
-using namespace NMib::NCloud;
-using namespace NMib::NStorage;
-using namespace NMib::NAtomic;
-using namespace NMib::NNetwork;
 using namespace NMib::NEncoding;
-using namespace NMib::NSecurity;
 using namespace NMib::NException;
+using namespace NMib::NFile;
 using namespace NMib::NFunction;
+using namespace NMib::NNetwork;
+using namespace NMib::NProcess;
+using namespace NMib::NSecurity;
+using namespace NMib::NStorage;
+using namespace NMib::NStr;
 using namespace NMib::NTest;
+using namespace NMib::NTime;
 
 #define DTestUpdateCompatibilityEnableOtherOutput 0
 
@@ -113,6 +115,166 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		CEJSONSorted m_PackageOptions;
 		TCSet<CStr> m_FeatureFlags;
+	};
+
+	struct CKeyManagerPasswordProvider : public CActor
+	{
+		CKeyManagerPasswordProvider(CStr const &_RootPath, CStr const &_Password)
+			: mp_RootPath(_RootPath)
+			, mp_Password(_Password)
+		{
+			self(&CKeyManagerPasswordProvider::fp_Startup) > fg_DiscardResult();
+		}
+
+		TCFuture<void> f_WaitForProvide()
+		{
+			return mp_WaitForProvide.f_Insert().f_Future();
+		}
+
+		TCFuture<void> f_ProvidePasswordIfNeeded()
+		{
+			auto LogPath = mp_RootPath / "Log/KeyManager.log";
+
+			if (!CFile::fs_FileExists(LogPath))
+				co_return {};
+
+			CStr Contents;
+			try
+			{
+				Contents = CFile::fs_ReadStringFromFile(LogPath, true);
+			}
+			catch (CExceptionFile const &)
+			{
+				co_return {};
+			}
+
+			auto Lines = Contents.f_Split("\n");
+			for (auto &Line : Lines)
+			{
+				if (Line.f_Find("Waiting for user to provide password") < 0)
+					continue;
+
+				CStr DateStr;
+				CStr TimeStr;
+				aint nParsed = 0;
+				(CStr::CParse("{} {} ") >> DateStr >> TimeStr).f_Parse(Line, nParsed);
+				if (nParsed != 2)
+					continue;
+
+				CStr DateTimeStr = "{} {}"_f << DateStr << TimeStr;
+				CTime Time;
+
+				if (!fg_ParseFullTimeStr(Time, DateTimeStr))
+					continue;
+
+				if (mp_LastLineTime.f_IsValid() && Time <= mp_LastLineTime)
+					continue;
+
+				mp_LastLineTime = Time;
+
+				auto Result = co_await fp_ProvidePassword().f_Wrap();
+
+				if (!Result)
+				{
+					for (auto &Promise : mp_WaitForProvide)
+						Promise.f_SetException(Result.f_GetException());
+					DMibConErrOut2("Error providing password: {}", Result.f_GetExceptionStr());
+				}
+				else
+				{
+					for (auto &Promise : mp_WaitForProvide)
+						Promise.f_SetResult();
+				}
+
+				mp_WaitForProvide.f_Clear();
+			}
+
+			co_return {};
+		}
+
+	private:
+
+		TCFuture<void> fp_ProvidePassword()
+		{
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(mp_RootPath / "KeyManager", {"--provide-password"}, mp_RootPath);
+
+			TCSharedPointer<CStr> pStdErr = fg_Construct();
+			TCSharedPointer<CStr> pStdOut = fg_Construct();
+			TCActor<CProcessLaunchActor> LaunchActor = fg_Construct();
+
+			co_await mp_Sequencer.f_Sequence();
+
+			SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pStdErr, pStdOut, this](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
+				{
+					auto fCheckOutput = [&](auto &_Output)
+						{
+							if (_Output.f_Find("Type password for key database: ") >= 0)
+							{
+								_Output.f_Clear();
+								LaunchActor(&CProcessLaunchActor::f_SendStdIn, mp_Password + "\n\n\n\n") > fg_DiscardResult();
+							}
+						}
+					;
+
+					if (_OutputType == EProcessLaunchOutputType_StdErr)
+					{
+						*pStdErr += _Output;
+						fCheckOutput(*pStdErr);
+					}
+					else
+					{
+						*pStdOut += _Output;
+						fCheckOutput(*pStdOut);
+					}
+				}
+			;
+			SimpleLaunch.m_bWholeLineOutput = false;
+
+			TCPromise<void> LaunchFinished;
+			SimpleLaunch.m_Params.m_fOnStateChange = [LaunchFinished](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+				{
+					if (_State.f_GetTypeID() == EProcessLaunchState_Exited)
+					{
+						if (_State.f_Get<EProcessLaunchState_Exited>() == 0)
+							LaunchFinished.f_SetResult();
+						else
+							LaunchFinished.f_SetException(DMibErrorInstance("Error exit: {}"_f << _State.f_Get<EProcessLaunchState_Exited>()));
+					}
+					else if (_State.f_GetTypeID() == EProcessLaunchState_LaunchFailed)
+						LaunchFinished.f_SetException(DMibErrorInstance(_State.f_Get<EProcessLaunchState_LaunchFailed>()));
+				}
+			;
+
+			auto LaunchSubscription = co_await LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, fg_ThisActor(this)).f_Timeout(g_Timeout, "Timed out");
+			co_await LaunchFinished.f_MoveFuture().f_Timeout(g_Timeout, "Timed out");
+
+			co_return {};
+		}
+
+		TCFuture<void> fp_Startup()
+		{
+			mp_TimerSubscription = co_await fg_RegisterTimer
+				(
+					1_seconds
+					, [=, this, LogPath = mp_RootPath / "Log/KeyManager.log"]() -> TCFuture<void>
+					{
+						co_await self(&CKeyManagerPasswordProvider::f_ProvidePasswordIfNeeded);
+
+						co_return {};
+					}
+				)
+			;
+
+			co_return {};
+		}
+
+		CTime mp_LastLineTime;
+		CStr mp_RootPath;
+		CStr mp_Password;
+		CActorSubscription mp_TimerSubscription;
+		CSequencer mp_Sequencer{"KeyManagerPasswordProvider"};
+
+		TCVector<TCPromise<void>> mp_WaitForProvide;
 	};
 
 	void fp_RunUpgradeTests(CStr const &_AppManagerPackage, CStr const &_VersionManagerPackage, CStr const &_KeyManagerPackage)
@@ -425,6 +587,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				, CStr const &_Executable
 				, CStr const &_User
 				, CStr const &_Tag
+				, bool _bDoEncryption
 			)
 			{
 				DMibTestPath("Install App Manually ({}, {})"_f << CFile::fs_GetFile(_AppManager.m_RootPath) << CFile::fs_GetFile(_Package));
@@ -453,6 +616,19 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				else
 					Params.f_Insert({"--auto-update", "--update-tags", "[\"{}\"]"_f << _Tag, "--update-branches", "[\"*\"]"});
 
+				if (_bDoEncryption && bCanDoEncryption && !AppManagerPackageOptions.f_HasFeatureFlag("NoEncryption"))
+				{
+					CStr EncryptionFile = _AppManager.m_RootPath / (CFile::fs_GetFile(_Package) + ".enc");
+
+					CFile File;
+					File.f_Open(EncryptionFile, EFileOpen_Write);
+					File.f_SetPosition(constant_uint64(4) * 1024 * 1024 * 1024 - 4096);
+					uint8 Buffer[4096] = {0};
+					File.f_Write(Buffer, 4096);
+
+					Params.f_Insert({"--encryption-storage", EncryptionFile});
+				}
+
 				{
 					DMibTestPath("Add");
 					CProcessLaunch::fs_LaunchTool(_AppManager.m_RootPath / "AppManager", Params, _AppManager.m_RootPath);
@@ -475,7 +651,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fGetAppInfo = [&](CAppManager const &_AppManager, CStr const &_Application)
 			{
-				NTime::CClock Clock{true};
+				CClock Clock{true};
 				CStr LastError;
 
 				while (Clock.f_GetTime() < g_Timeout)
@@ -498,64 +674,29 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		CStr KeyManagerHostID;
 		CStr KeyManagerExecutable = KeyManagerDir / "App/KeyManager/KeyManager";
 
+		TCActor<CKeyManagerPasswordProvider> KeyManagerPasswordProvideActor = fg_Construct(KeyManagerDir / "App/KeyManager", KeyManagerPassword);
+
+		auto fProvideKeyManagerPasswordIfNeeded = [&]
+			{
+				KeyManagerPasswordProvideActor(&CKeyManagerPasswordProvider::f_ProvidePasswordIfNeeded) > fg_DiscardResult();
+			}
+		;
+
 		auto fSetupKeyManager = [&](CAppManager const &_AppManager)
 			{
 				DMibTestPath("Setup KeyManager ({})"_f << CFile::fs_GetFile(_AppManager.m_RootPath));
 
-				fInstallAppManually(_AppManager, KeyManagerPackageOptions, _KeyManagerPackage, "KeyManager", "MalterlibCloudKeyManager", "TestTag");
+				auto PasswordProvidedFuture = KeyManagerPasswordProvideActor(&CKeyManagerPasswordProvider::f_WaitForProvide).f_Future();
+
+				fInstallAppManually(_AppManager, KeyManagerPackageOptions, _KeyManagerPackage, "KeyManager", "MalterlibCloudKeyManager", "TestTag", false);
 
 				DMibAssert(fGetAppInfo(_AppManager, "KeyManager").m_Status, ==, "Launched");
-
-				CProcessLaunchActor::CSimpleLaunch SimpleLaunch(KeyManagerExecutable, {"--provide-password"}, KeyManagerDir);
-
-				TCSharedPointer<CStr> pStdErr = fg_Construct();
-				TCSharedPointer<CStr> pStdOut = fg_Construct();
-				TCActor<CProcessLaunchActor> LaunchActor = fg_Construct();
-
-				SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pStdErr, pStdOut, KeyManagerPassword](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
-					{
-						if (_OutputType == EProcessLaunchOutputType_StdErr)
-						{
-							*pStdErr += _Output;
-							if (pStdErr->f_Find("Type password for key database: ") >= 0)
-							{
-								pStdErr->f_Clear();
-								LaunchActor(&CProcessLaunchActor::f_SendStdIn, KeyManagerPassword + "\n\n\n\n") > fg_DiscardResult();
-							}
-						}
-						else
-						{
-							*pStdOut += _Output;
-							if (pStdOut->f_Find("Type password for key database: ") >= 0)
-							{
-								pStdOut->f_Clear();
-								LaunchActor(&CProcessLaunchActor::f_SendStdIn, KeyManagerPassword + "\n\n\n\n") > fg_DiscardResult();
-							}
-						}
-					}
-				;
-				SimpleLaunch.m_bWholeLineOutput = false;
-
-				TCPromise<void> LaunchFinished;
-				SimpleLaunch.m_Params.m_fOnStateChange = [LaunchFinished](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
-					{
-						if (_State.f_GetTypeID() == EProcessLaunchState_Exited)
-						{
-							if (_State.f_Get<EProcessLaunchState_Exited>() == 0)
-								LaunchFinished.f_SetResult();
-							else
-								LaunchFinished.f_SetException(DMibErrorInstance("Error exit: {}"_f << _State.f_Get<EProcessLaunchState_Exited>()));
-						}
-						else if (_State.f_GetTypeID() == EProcessLaunchState_LaunchFailed)
-							LaunchFinished.f_SetException(DMibErrorInstance(_State.f_Get<EProcessLaunchState_LaunchFailed>()));
-					}
-				;
-
+				fProvideKeyManagerPasswordIfNeeded();
 				{
-					DMibTestPath("Launch Password Provide");
-					auto LaunchSubscription = LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, HelperActor).f_CallSync(pRunLoop, g_Timeout);
-					LaunchFinished.f_MoveFuture().f_CallSync(pRunLoop, g_Timeout);
+					DMibTestPath("Wait For Password Provide");
+					fg_Move(PasswordProvidedFuture).f_CallSync(pRunLoop, g_Timeout);
 				}
+
 				fAddListen(KeyManagerExecutable, true);
 
 				KeyManagerHostID = fGetHostID(KeyManagerExecutable);
@@ -606,7 +747,17 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibTestPath("Setup VersionManager ({})"_f << CFile::fs_GetFile(_AppManager.m_RootPath));
 
-				fInstallAppManually(_AppManager, VersionManagerPackageOptions, _VersionManagerPackage, "VersionManager", "MalterlibCloudVersionManager", "VersionManagerTestTag");
+				fInstallAppManually
+					(
+						_AppManager
+						, VersionManagerPackageOptions
+						, _VersionManagerPackage
+						, "VersionManager"
+						, "MalterlibCloudVersionManager"
+						, "VersionManagerTestTag"
+						, true
+					)
+				;
 
 				DMibAssert(fGetAppInfo(_AppManager, "VersionManager").m_Status, ==, "Launched");
 
@@ -671,7 +822,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibTestPath("Wait Version Available ({}, {})"_f << CFile::fs_GetFile(_AppManager.m_RootPath) << _Application);
 
-				NTime::CClock Timeout{true};
+				CClock Timeout{true};
 				while (_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetAvailableVersions)(_Application).f_CallSync(pRunLoop, g_Timeout).f_IsEmpty())
 				{
 					if (Timeout.f_GetTime() > g_Timeout)
@@ -785,7 +936,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibTestPath("Wait For App ({}, {})"_f << CFile::fs_GetFile(_AppManager.m_RootPath) << _Application);
 
-				NTime::CClock Timeout{true};
+				CClock Timeout{true};
 				CAppManagerInterface::CApplicationInfo AppInfo;
 				auto fVersionIsEqual = [&]
 					{
@@ -887,6 +1038,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		fSleepKeyManager();
 
 		fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"}, KeyManagerPackageOptions.f_HasFeatureFlag("InvalidPackageTime"));
+		fProvideKeyManagerPasswordIfNeeded();
 
 		fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 
@@ -898,6 +1050,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 		fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+		fProvideKeyManagerPasswordIfNeeded();
 		fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 
 		fAddAppManagerApp(AppManager_AppManager, "AppManager", "AppManager", "AppManagerTestTag");
@@ -909,6 +1062,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					DMibTestPath("UpdateApps 0");
 					KeyManagerPackageInfo = fUpdateApp("KeyManager", {"TestTag"});
 					fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"});
+					fProvideKeyManagerPasswordIfNeeded();
 				}
 
 				{
@@ -951,6 +1105,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					DMibTestPath("UpdateApps 7");
 					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+					fProvideKeyManagerPasswordIfNeeded();
 				}
 			}
 		;
@@ -998,6 +1153,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 					fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 					fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"});
+					fProvideKeyManagerPasswordIfNeeded();
 					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No executable"});
 
