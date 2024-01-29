@@ -53,9 +53,6 @@ namespace NMib::NCloud::NAppManager
 				co_return {};
 		}
 
-		if (mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
-			co_return DMibErrorInstance("No key managers are connected, so key cannot be generated");
-
 		CSymmetricKey Key;
 		if (_Operation == EEncryptOperation_Close)
 		{
@@ -64,6 +61,9 @@ namespace NMib::NCloud::NAppManager
 		}
 		else
 		{
+			if (mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
+				co_return DMibErrorInstance("No key managers are connected, so key cannot be generated");
+
 			auto &KeyManagerInfo = *mp_KeyManagerSubscription.m_Actors.f_FindAny();
 			static const mint c_KeyBits = 512;
 			Key = co_await KeyManagerInfo.m_Actor.f_CallActor(&CKeyManager::f_RequestKey)(pEncryptionApplication->m_Name, c_KeyBits / 8);
