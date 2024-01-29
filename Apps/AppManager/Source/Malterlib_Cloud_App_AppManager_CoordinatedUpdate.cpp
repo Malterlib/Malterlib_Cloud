@@ -503,6 +503,7 @@ namespace NMib::NCloud::NAppManager
 							(
 								fg_IsSameVersion(AppInfo.m_AppInfo.m_FailedVersionID, AppInfo.m_AppInfo.m_FailedVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
 								&& AppInfo.m_AppInfo.m_FailedVersionRetrySequence == _pState->m_VersionRetrySequence
+								&& !_pState->m_bBypassCoordination
 							)
 						{
 							bFailed = true;
@@ -531,6 +532,7 @@ namespace NMib::NCloud::NAppManager
 						(
 							fg_IsSameVersion(Application.m_LastFailedInstalledVersion, Application.m_LastFailedInstalledVersionTime, _pState->m_VersionID, _pState->m_VersionTime)
 							&& Application.m_LastFailedInstalledVersionRetrySequence == _pState->m_VersionRetrySequence
+							&& !_pState->m_bBypassCoordination
 						)
 					{
 						bFailed = true;
