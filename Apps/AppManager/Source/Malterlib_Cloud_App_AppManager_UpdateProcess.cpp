@@ -535,6 +535,8 @@ namespace NMib::NCloud::NAppManager
 
 			fp_SetAppLaunchStatus(State.m_pApplication, Message, Severity);
 
+			State.m_pApplication->m_bAutoStart = true;
+
 			co_return false;
 		}
 
