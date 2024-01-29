@@ -257,10 +257,26 @@ namespace NMib::NCloud
 			if (iConfigFile.f_Last())
 			{
 				CConfigFileKeyValue Value;
-				Value.m_Key = iConfigFile.f_Key<CConfigFileHistoryEntryKey>();
-				Value.m_Value = iConfigFile.f_Value<CConfigFileHistoryEntryValue>();
+				try
+				{
+					Value.m_Key = iConfigFile.f_Key<CConfigFileHistoryEntryKey>();
+					Value.m_Value = iConfigFile.f_Value<CConfigFileHistoryEntryValue>();
 
-				OldKeyValue = fg_Move(Value);
+					OldKeyValue = fg_Move(Value);
+				}
+				catch (CException const &_Exception)
+				{
+					DMibLogWithCategory
+						(
+							Malterlib/Cloud/HostMonitor
+							, Error
+							, "Failed to read old config value for file '{}' with value size {}: {}"
+							, _FileName
+							, iConfigFile.f_Value().m_Size
+							, _Exception
+						)
+					;
+				}
 			}
 		}
 
