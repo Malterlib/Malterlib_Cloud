@@ -48,6 +48,17 @@ namespace NMib::NCloud::NAppManager
 		return false;
 	}
 
+	bool CAppManagerActor::CApplication::f_EncryptionOpened() const
+	{
+		if (m_pParentApplication && !m_pParentApplication->f_EncryptionOpened())
+			return false;
+
+		if (m_Settings.m_EncryptionStorage.f_IsEmpty())
+			return true;
+
+		return m_bEncryptionOpened;
+	}
+
 	bool CAppManagerActor::CApplication::f_IsChildApp() const
 	{
 		return !m_Settings.m_ParentApplication.f_IsEmpty();

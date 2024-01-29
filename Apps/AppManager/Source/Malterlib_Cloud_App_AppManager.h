@@ -171,6 +171,7 @@ namespace NMib::NCloud::NAppManager
 			COnScopeExitShared f_SetInProgress();
 
 			bool f_NeedsEncryption() const;
+			bool f_EncryptionOpened() const;
 			bool f_IsChildApp() const;
 			bool f_IsInProgress() const;
 			bool f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity) const;

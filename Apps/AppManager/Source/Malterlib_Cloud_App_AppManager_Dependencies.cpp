@@ -51,7 +51,7 @@ namespace NMib::NCloud::NAppManager
 				return false;
 			}
 
-			if (f_NeedsEncryption() && !m_pParentApplication->m_bEncryptionOpened)
+			if (f_NeedsEncryption() && !f_EncryptionOpened())
 			{
 				o_State = "Parent application encryption not yet opened";
 				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
@@ -65,7 +65,7 @@ namespace NMib::NCloud::NAppManager
 				return false;
 			}
 		}
-		else if (f_NeedsEncryption())
+		else if (f_NeedsEncryption() && !f_EncryptionOpened())
 		{
 			if (m_pThis->mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
 			{
