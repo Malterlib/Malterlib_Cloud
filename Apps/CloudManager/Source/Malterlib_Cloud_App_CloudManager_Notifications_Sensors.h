@@ -13,10 +13,10 @@ namespace NMib::NCloud::NCloudManager
 
 		TCFuture<void> f_Init();
 		TCFuture<void> f_Destroy();
-		TCFuture<void> f_UpdatePeriodicSensorNotifications();
+		TCFuture<void> f_UpdatePeriodicSensorNotifications(bool _bForceAtOnce);
 
 	private:
-		void fp_SchedulePeriodicSensorNotificationsOutOfBand();
+		void fp_SchedulePeriodicSensorNotificationsOutOfBand(bool _bForceAtOnce);
 		TCFuture<void> fp_UpdateSensorFromReading(CDistributedAppSensorReporter::CSensorInfoKey _SensorKey, CTime _Now);
 
 		struct CSensorStatus
@@ -46,6 +46,7 @@ namespace NMib::NCloud::NCloudManager
 		TCSet<CDistributedAppSensorReporter::CSensorInfoKey> mp_RemovedSensors;
 
 		CSlackActor::CMessage mp_LastSentProblemMessage;
+		CNotifications::EType mp_ProblemNotificationFlags = CNotifications::EType_None;
 
 		fp64 mp_SensorAlertThreshold = 2.0 * 60.0;
 

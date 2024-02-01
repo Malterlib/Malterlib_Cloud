@@ -63,6 +63,9 @@ namespace NMib::NCloud::NCloudManager
 							SensorStatus.m_Info = fg_Move(Sensor);
 							SensorStatus.m_bInfoValid = true;
 							mp_RemovedSensors.f_Remove(SensorKey);
+
+							if (mp_bSubscribedToSensors)
+								fp_SchedulePeriodicSensorNotificationsOutOfBand(false);
 						}
 						break;
 					case CDistributedAppSensorReader::ESensorChange_Removed:
@@ -70,6 +73,9 @@ namespace NMib::NCloud::NCloudManager
 							auto &SensorKey = _Change.f_Get<CDistributedAppSensorReader::ESensorChange_Removed>();
 							mp_SensorStatuses.f_Remove(SensorKey);
 							mp_RemovedSensors[SensorKey];
+
+							if (mp_bSubscribedToSensors)
+								fp_SchedulePeriodicSensorNotificationsOutOfBand(false);
 						}
 						break;
 					}
@@ -100,7 +106,7 @@ namespace NMib::NCloud::NCloudManager
 			{
 				// Allow time for sensors to recorrect after startup before considering their status
 				mp_bSubscribedToSensors = true;
-				fp_SchedulePeriodicSensorNotificationsOutOfBand();
+				fp_SchedulePeriodicSensorNotificationsOutOfBand(false);
 			}
 		;
 
@@ -126,11 +132,18 @@ namespace NMib::NCloud::NCloudManager
 		return nullptr;
 	}
 
-	void CSensorNotifications::fp_SchedulePeriodicSensorNotificationsOutOfBand()
+	void CSensorNotifications::fp_SchedulePeriodicSensorNotificationsOutOfBand(bool _bForceAtOnce)
 	{
 		if (mp_bSensorsUpdating)
 		{
 			mp_bSensorsReschedule = true;
+			return;
+		}
+
+		if (_bForceAtOnce)
+		{
+			f_UpdatePeriodicSensorNotifications(true) > fg_LogError("CloudManager", "Error updating sensor notifications");
+
 			return;
 		}
 
@@ -141,7 +154,7 @@ namespace NMib::NCloud::NCloudManager
 		fg_Timeout(gc_MinProblemUpdateTime) > [this]()
 			{
 				mp_bOutOfBandSensorsUpdateScheduled = false;
-				f_UpdatePeriodicSensorNotifications() > fg_LogError("CloudManager", "Error updating sensor notifications");
+				f_UpdatePeriodicSensorNotifications(false) > fg_LogError("CloudManager", "Error updating sensor notifications");
 			}
 		;
 	}
@@ -177,31 +190,22 @@ namespace NMib::NCloud::NCloudManager
 		pSensorStatus->m_LastCombinedStatus = CombinedStatus;
 		pSensorStatus->m_bLastCombinedStatusValid = true;
 
-		bool bForceUpdate = false;
-
-		if (CombinedStatus > CDistributedAppSensorReporter::EStatusSeverity_Warning && !pSensorStatus->m_State.m_bInProblemState)
-		{
-			bForceUpdate = true;
-			// Signal problem state as fast as possible
-			pSensorStatus->m_State.m_bInProblemState = true;
-			pSensorStatus->m_State.m_TimeInProblemState = 0.0;
-			pSensorStatus->m_ProblemClock.f_Start();
-		}
+		bool bForceUpdate = CombinedStatus > CDistributedAppSensorReporter::EStatusSeverity_Warning && !pSensorStatus->m_State.m_bInProblemState;
 
 		if (!bLastCombinedStatusValid || CombinedStatus != LastCombinedStatus || bForceUpdate)
-			fp_SchedulePeriodicSensorNotificationsOutOfBand();
+			fp_SchedulePeriodicSensorNotificationsOutOfBand(bForceUpdate);
 
 		co_return {};
 	}
 
-	TCFuture<void> CSensorNotifications::f_UpdatePeriodicSensorNotifications()
+	TCFuture<void> CSensorNotifications::f_UpdatePeriodicSensorNotifications(bool _bForceAtOnce)
 	{
 		if (!mp_bSubscribedToSensors)
 			co_return {};
 
 		auto OnResume = co_await mp_This.f_CheckDestroyedOnResume();
 
-		if (mp_bSensorsUpdating)
+		if (mp_bSensorsUpdating && !_bForceAtOnce)
 		{
 			mp_bSensorsReschedule = true;
 			co_return {};
@@ -214,7 +218,7 @@ namespace NMib::NCloud::NCloudManager
 			{
 				mp_bSensorsUpdating = false;
 				if (fg_Exchange(mp_bSensorsReschedule, false))
-					fp_SchedulePeriodicSensorNotificationsOutOfBand();
+					fp_SchedulePeriodicSensorNotificationsOutOfBand(false);
 			}
 		;
 
@@ -248,8 +252,11 @@ namespace NMib::NCloud::NCloudManager
 
 				auto &SensorInfoKey = mp_SensorStatuses.fs_GetKey(Sensor);
 				auto &SensorInfo = Sensor.m_Info;
+
 				bool bRemoved = SensorInfo.m_bRemoved;
-				bool bPaused = SensorInfo.f_IsPaused(Now, {});
+				bool bSnoozed = SensorInfo.m_SnoozeUntil.f_IsValid() && Now <= SensorInfo.m_SnoozeUntil;
+				fp32 SecondsOfPauseRemaining;
+				bool bPaused = SensorInfo.f_IsPaused(Now, {}, &SecondsOfPauseRemaining);
 
 				if (!SensorInfoKey.m_HostID.f_IsEmpty())
 				{
@@ -263,9 +270,10 @@ namespace NMib::NCloud::NCloudManager
 						if (Value.m_bRemoved)
 							bRemoved = true;
 
-						bPaused = SensorInfo.f_IsPaused(Now, Value.m_LastSeen);
+						bPaused = SensorInfo.f_IsPaused(Now, Value.m_LastSeen, &SecondsOfPauseRemaining);
 					}
 				}
+				bool bPausedForever = bPaused && SecondsOfPauseRemaining == fp32::fs_Inf();
 
 				bool bIsTemporary = false;
 				bool bIsFixed = false;
@@ -273,19 +281,15 @@ namespace NMib::NCloud::NCloudManager
 				auto &Reading = Sensor.m_LastReading;
 				auto CombinedStatus = Reading.f_GetCombinedStatus(&SensorInfo, Now);
 
-				if (CombinedStatus < CDistributedAppSensorReporter::EStatusSeverity_Warning || bRemoved || bPaused)
+				if (CombinedStatus < CDistributedAppSensorReporter::EStatusSeverity_Warning || bRemoved || bPausedForever)
 				{
+					Sensor.m_State.m_bSentAlert = false;
+
 					if (Sensor.m_State.m_bInProblemState)
 					{
 						Sensor.m_State.m_bInProblemState = false;
-						if (Sensor.m_State.m_TimeInProblemState >= gc_ProblemTemporaryTime)
-							bIsFixed = true;
-						else
-							bIsTemporary = true;
 						Sensor.m_State.m_TimeInProblemState = Sensor.m_ProblemClock.f_GetTime();
 					}
-					else
-						continue;
 				}
 				else
 				{
@@ -294,28 +298,43 @@ namespace NMib::NCloud::NCloudManager
 						Sensor.m_State.m_bInProblemState = true;
 						Sensor.m_State.m_TimeInProblemState = 0.0;
 						Sensor.m_ProblemClock.f_Start();
+					}
+					else
+						Sensor.m_State.m_TimeInProblemState = Sensor.m_ProblemClock.f_GetTime();
+				}
+
+				if (!Sensor.m_State.m_bInProblemState || bPaused || bSnoozed)
+				{
+					if (Sensor.m_State.m_bInProblemStateForReporting)
+					{
+						Sensor.m_State.m_bInProblemStateForReporting = false;
+						if (Sensor.m_State.m_TimeInProblemState >= gc_ProblemTemporaryTime)
+							bIsFixed = true;
+						else
+							bIsTemporary = true;
+					}
+					else
+						continue;
+				}
+				else
+				{
+					Sensor.m_State.m_bInProblemStateForReporting = true;
+
+					if (Sensor.m_State.m_TimeInProblemState < gc_ProblemTemporaryTime)
+					{
 						bReSchedule = true;
 						continue;
 					}
-					else
-					{
-						Sensor.m_State.m_TimeInProblemState = Sensor.m_ProblemClock.f_GetTime();
-						if (Sensor.m_State.m_TimeInProblemState < gc_ProblemTemporaryTime)
-						{
-							bReSchedule = true;
-							continue;
-						}
 
-						if
-							(
-								CombinedStatus >= CDistributedAppSensorReporter::EStatusSeverity_Error
-								&& Sensor.m_State.m_TimeInProblemState > mp_SensorAlertThreshold
-								&& !Sensor.m_State.m_bSentAlert
-							)
-						{
-							Sensor.m_State.m_bSentAlert = true;
-							NotificationFlags |= CNotifications::EType_Alert;
-						}
+					if
+						(
+							CombinedStatus >= CDistributedAppSensorReporter::EStatusSeverity_Error
+							&& Sensor.m_State.m_TimeInProblemState > mp_SensorAlertThreshold
+							&& !Sensor.m_State.m_bSentAlert
+						)
+					{
+						Sensor.m_State.m_bSentAlert = true;
+						NotificationFlags |= CNotifications::EType_Alert;
 					}
 				}
 
@@ -343,7 +362,7 @@ namespace NMib::NCloud::NCloudManager
 				SlackAttachment.m_Text = "`{}`"_f << fEscape(SensorInfo.m_Name);
 				SlackAttachment.m_Footer = SensorInfo.m_HostName;
 
-				if (bRemoved || bPaused)
+				if (bRemoved || bPaused || bSnoozed)
 					;
 				else if (CombinedStatus >= CDistributedAppSensorReporter::EStatusSeverity_Error)
 					SlackAttachment.m_Color = CSlackActor::EPredefinedColor_Danger;
@@ -392,7 +411,7 @@ namespace NMib::NCloud::NCloudManager
 
 				auto fAddFields = [&](CSensorNotificationStateNotificationStatus &_Status, CSensorNotificationStateNotificationStatus &_LastStatus)
 					{
-						if (_Status.m_Severity >= CDistributedAppSensorReporter::EStatusSeverity_Warning && !bRemoved && !bPaused)
+						if (_Status.m_Severity >= CDistributedAppSensorReporter::EStatusSeverity_Warning && !bRemoved && !bPaused && !bSnoozed)
 							fAddField(_Status, false);
 						else if (_LastStatus.m_Severity >= CDistributedAppSensorReporter::EStatusSeverity_Warning)
 						{
@@ -403,6 +422,8 @@ namespace NMib::NCloud::NCloudManager
 
 							if (bRemoved)
 								FixType = "Sensor removed";
+							else if (bSnoozed)
+								FixType = "Sensor snoozed";
 							else if (bPaused)
 								FixType = "Sensor paused";
 							else
@@ -481,12 +502,13 @@ namespace NMib::NCloud::NCloudManager
 
 			CNotifications::fs_LimitMessage(Message, "sensors are in a problem state");
 
-			if (Message != mp_LastSentProblemMessage || NotificationFlags != CNotifications::EType_None)
+			if (Message != mp_LastSentProblemMessage || (mp_ProblemNotificationFlags | NotificationFlags) != mp_ProblemNotificationFlags)
 			{
+				mp_ProblemNotificationFlags |= NotificationFlags;
 				mp_LastSentProblemMessage = Message;
 				GlobalState.m_SensorProblemsSlackThread = co_await mp_This.mp_Notifications.f_PostSlackMessage
 					(
-						CNotifications::EType_Sensor | NotificationFlags
+						CNotifications::EType_Sensor | mp_ProblemNotificationFlags
 						, Message
 						, fg_Move(GlobalState.m_SensorProblemsSlackThread)
 					)
@@ -498,6 +520,9 @@ namespace NMib::NCloud::NCloudManager
 			CSlackActor::CMessage AllResolvedMessage;
 			AllResolvedMessage.m_Text = "*All sensor problems have now been resolved*";
 			AllResolvedMessage.m_bReplyBroadcast = true;
+
+			mp_LastSentProblemMessage.m_Attachments.f_Clear();
+			mp_ProblemNotificationFlags = CNotifications::EType_None;
 
 			co_await mp_This.mp_Notifications.f_PostSlackMessage
 				(
@@ -551,7 +576,7 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		if (bReSchedule)
-			fp_SchedulePeriodicSensorNotificationsOutOfBand();
+			fp_SchedulePeriodicSensorNotificationsOutOfBand(false);
 
 		co_return {};
 	}

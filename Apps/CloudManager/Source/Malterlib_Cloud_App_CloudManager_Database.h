@@ -176,6 +176,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		CSensorNotificationStateNotification m_LastNotification;
 		fp64 m_TimeInProblemState = 0.0;
 		bool m_bInProblemState = false;
+		bool m_bInProblemStateForReporting = false;
 		bool m_bSentAlert = false;
 	};
 

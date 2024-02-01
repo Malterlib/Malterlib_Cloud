@@ -215,4 +215,11 @@ namespace NMib::NCloud
 			}
 		}
 	}
+	
+	template <typename tf_CStream>
+	void CCloudManager::CSnoozeSensor::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Filter;
+		_Stream % m_SnoozeDuration;
+	}
 }

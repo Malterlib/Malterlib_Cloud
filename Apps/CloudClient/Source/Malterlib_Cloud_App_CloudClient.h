@@ -182,6 +182,7 @@ namespace NMib::NCloud::NCloudClient
 		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveAppManager(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveSensor(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveLog(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManager_SnoozeSensor(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 

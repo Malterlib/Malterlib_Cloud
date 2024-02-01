@@ -130,6 +130,7 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		Return["LastNotification"] = fg_ToJson(m_LastNotification);
 		Return["TimeInProblemState"] = fg_ToJson(m_TimeInProblemState);
 		Return["bInProblemState"] = fg_ToJson(m_bInProblemState);
+		Return["bInProblemStateForReporting"] = fg_ToJson(m_bInProblemStateForReporting);
 		Return["bSentAlert"] = fg_ToJson(m_bSentAlert);
 		return Return;
 	}

@@ -27,6 +27,7 @@ namespace NMib::NCloud::NCloudManager
 				, "CloudManager/RemoveAppManager"
 				, "CloudManager/RemoveSensor"
 				, "CloudManager/RemoveLog"
+				, "CloudManager/SnoozeSensor"
 				, "CloudManager/SetExpectedOsVersion"
 			}
 		;
@@ -703,6 +704,44 @@ namespace NMib::NCloud::NCloudManager
 		Auditor.f_Info("Remove Log");
 
 		co_return nRemoved;
+	}
+
+	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_SnoozeSensor(CSnoozeSensor &&_SnoozeSensor)
+	{
+		auto pThis = m_pThis;
+		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		NContainer::TCVector<NStr::CStr> Permissions = {"CloudManager/SnoozeSensor"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Snooze sensor", Permissions))
+			co_return Auditor.f_AccessDenied("(Snooze sensor)", Permissions);
+
+		CDistributedAppSensorReader::CGetSensorStatus GetSensorStatus;
+		auto &Filter = GetSensorStatus.m_Filters.f_Insert();
+		Filter.m_SensorFilter = fg_Move(_SnoozeSensor.m_Filter);
+		if (_SnoozeSensor.m_SnoozeDuration.f_IsValid())
+			Filter.m_Flags = CDistributedAppSensorReader_SensorReadingFilter::ESensorReadingsFlag_OnlyProblems;
+
+		auto SensorStatus = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_GetSensorStatus, fg_Move(GetSensorStatus));
+
+		TCSet<CDistributedAppSensorReporter::CSensorInfoKey> SensorsToSnooze;
+
+		for (auto iSensorStatus = co_await fg_Move(SensorStatus).f_GetIterator(); iSensorStatus; co_await ++iSensorStatus)
+		{
+			for (auto &SensorStatus : *iSensorStatus)
+				SensorsToSnooze[SensorStatus.m_SensorInfoKey];
+		}
+
+		auto nChanged = co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SnoozeSensors, fg_Move(SensorsToSnooze), _SnoozeSensor.m_SnoozeDuration);
+
+		if (_SnoozeSensor.m_SnoozeDuration.f_IsValid())
+			Auditor.f_Info("Snoozed {} sensors"_f << nChanged);
+		else
+			Auditor.f_Info("Un-snoozed {} sensors"_f << nChanged);
+
+		co_return nChanged;
 	}
 
 	TCFuture<TCActorSubscriptionWithID<>> CCloudManagerServer::CCloudManagerImplementation::f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions &&_Params)

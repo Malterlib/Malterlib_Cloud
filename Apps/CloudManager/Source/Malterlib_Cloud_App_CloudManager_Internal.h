@@ -43,6 +43,7 @@ namespace NMib::NCloud::NCloudManager
 			TCFuture<void> f_RemoveAppManager(CStr const &_AppManagerHostID) override;
 			TCFuture<uint32> f_RemoveSensor(CRemoveSensor &&_RemoveSensor) override;
 			TCFuture<uint32> f_RemoveLog(CRemoveLog &&_RemoveLog) override;
+			TCFuture<uint32> f_SnoozeSensor(CSnoozeSensor &&_SnoozeSensor) override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> f_GetSensorReporter() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> f_GetSensorReader() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> f_GetLogReporter() override;

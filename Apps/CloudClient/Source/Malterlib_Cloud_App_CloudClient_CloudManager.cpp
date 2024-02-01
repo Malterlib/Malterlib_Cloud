@@ -291,6 +291,66 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
+					"Names"_o= {"--cloud-manager-snooze-sensor"}
+					, "Description"_o= "Snooze sensor from reporting as problem in cloud manager."
+					, "Options"_o=
+					{
+						"SensorHostID?"_o=
+						{
+							"Names"_o= {"--sensor-host-id"}
+							, "Type"_o= ""
+							, "Description"_o= "The host ID of the sensor to snooze."
+						}
+						, "SensorApplication?"_o=
+						{
+							"Names"_o= {"--sensor-application"}
+							, "Type"_o= ""
+							, "Description"_o= "The application of the sensor to snooze. Supports wildcards."
+						}
+						, "SensorIdentifier?"_o=
+						{
+							"Names"_o= {"--sensor-identifier"}
+							, "Type"_o= ""
+							, "Description"_o= "The identifier of the sensor to snooze. Supports wildcards."
+						}
+						, "SensorIdentifierScope?"_o=
+						{
+							"Names"_o= {"--sensor-identifier-scope"}
+							, "Type"_o= ""
+							, "Description"_o= "The identifier scope of the sensor to snooze. Supports wildcards."
+						}
+						, "Force?"_o=
+						{
+							"Names"_o= {"--force"}
+							, "Default"_o= false
+							, "Description"_o= "Force snoozing of all sensors when no filtering options are specified."
+						}
+						, "Duration?"_o=
+						{
+							"Names"_o= {"--duration"}
+							, "Default"_o= 7.0
+							, "Description"_o= "Number of days to snooze sensor."
+						}
+						, "UnSnooze?"_o=
+						{
+							"Names"_o= {"--un-snooze", "-u"}
+							, "Default"_o= false
+							, "Description"_o= "Remove snoozing instead of adding it."
+						}
+						, QuietOption
+					}
+				}
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_SnoozeSensor, _Params, _pCommandLine);
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
+		
+		_Section.f_RegisterCommand
+			(
+				{
 					"Names"_o= {"--cloud-manager-expected-os-version-list"}
 					, "Description"_o= "List expected os version settings."
 					, "Options"_o=
@@ -1214,6 +1274,32 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
+	namespace
+	{
+		CExceptionPointer fg_ParseSensorFilter(auto &o_Filter, CEJSONSorted const &_Params, CStr const &_Action)
+		{
+			if (auto pValue = _Params.f_GetMember("SensorHostID"))
+				o_Filter.m_HostID = pValue->f_String();
+
+			if (auto pValue = _Params.f_GetMember("SensorApplication"))
+				o_Filter.m_Scope = CDistributedAppSensorReporter::CSensorScope_Application{.m_ApplicationName = pValue->f_String()};
+
+			if (auto pValue = _Params.f_GetMember("SensorIdentifier"))
+				o_Filter.m_Identifier = pValue->f_String();
+
+			if (auto pValue = _Params.f_GetMember("SensorIdentifierScope"))
+				o_Filter.m_IdentifierScope = pValue->f_String();
+
+			if (!o_Filter.m_HostID && !o_Filter.m_Scope && !o_Filter.m_Identifier && !o_Filter.m_IdentifierScope)
+			{
+				if (!_Params["Force"].f_Boolean())
+					return DMibErrorInstance("No filtering specified. To force {} of all sensors specify --force."_f << _Action).f_ExceptionPointer();
+			}
+
+			return nullptr;
+		}
+	}
+	
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
@@ -1223,23 +1309,8 @@ namespace NMib::NCloud::NCloudClient
 
 		CCloudManager::CRemoveSensor RemoveSensor;
 
-		if (auto pValue = _Params.f_GetMember("SensorHostID"))
-			RemoveSensor.m_Filter.m_HostID = pValue->f_String();
-
-		if (auto pValue = _Params.f_GetMember("SensorApplication"))
-			RemoveSensor.m_Filter.m_Scope = CDistributedAppSensorReporter::CSensorScope_Application{.m_ApplicationName = pValue->f_String()};
-
-		if (auto pValue = _Params.f_GetMember("SensorIdentifier"))
-			RemoveSensor.m_Filter.m_Identifier = pValue->f_String();
-
-		if (auto pValue = _Params.f_GetMember("SensorIdentifierScope"))
-			RemoveSensor.m_Filter.m_IdentifierScope = pValue->f_String();
-
-		if (!RemoveSensor.m_Filter.m_HostID && !RemoveSensor.m_Filter.m_Scope && !RemoveSensor.m_Filter.m_Identifier && !RemoveSensor.m_Filter.m_IdentifierScope)
-		{
-			if (!_Params["Force"].f_Boolean())
-				co_return DMibErrorInstance("No filtering specified. To force removal of all sensors specify --force.");
-		}
+		if (auto pException = fg_ParseSensorFilter(RemoveSensor.m_Filter, _Params, "removal"))
+			co_return fg_Move(pException);
 
 		TCActorResultVector<uint32> AppManagersResults;
 
@@ -1321,6 +1392,53 @@ namespace NMib::NCloud::NCloudClient
 				nRemoved += Removed;
 
 			*_pCommandLine %= "Removed {} logs\n"_f << nRemoved;
+		}
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_SnoozeSensor(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		CStr Host = _Params["Host"].f_String();
+		bool bQuiet = _Params["Quiet"].f_Boolean();
+		bool bUnSnooze = _Params["UnSnooze"].f_Boolean();
+
+		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
+
+		auto Duration = _Params["Duration"].f_Float();
+
+		if (Duration.f_IsInvalid() || Duration <= 0.0)
+			co_return DMibErrorInstance("Duration has to be a positive number of days.");
+
+		CCloudManager::CSnoozeSensor SnoozeSensor;
+		SnoozeSensor.m_SnoozeDuration = bUnSnooze ? CTimeSpan() : CTimeSpanConvert::fs_CreateSpanFromDays(Duration);
+
+		if (auto pException = fg_ParseSensorFilter(SnoozeSensor.m_Filter, _Params, "snoozing"))
+			co_return fg_Move(pException);
+
+		TCActorResultVector<uint32> AppManagersResults;
+
+		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
+		{
+			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
+				continue;
+
+			auto &CloudManager = TrustedCloudManager.m_Actor;
+			(CloudManager.f_CallActor(&CCloudManager::f_SnoozeSensor)(SnoozeSensor) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+		}
+
+		auto AllSnoozed = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+
+		if (!bQuiet)
+		{
+			uint32 nChanged = 0;
+			for (auto &Changed : AllSnoozed)
+				nChanged += Changed;
+
+			if (bUnSnooze)
+				*_pCommandLine %= "Un-snoozed {} sensors\n"_f << nChanged;
+			else
+				*_pCommandLine %= "Snoozed {} sensors\n"_f << nChanged;
 		}
 
 		co_return 0;

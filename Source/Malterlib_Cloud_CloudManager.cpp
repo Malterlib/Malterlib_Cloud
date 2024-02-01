@@ -16,6 +16,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CCloudManager::f_RemoveAppManager);
 		DMibPublishActorFunction(CCloudManager::f_RemoveSensor);
 		DMibPublishActorFunction(CCloudManager::f_RemoveLog);
+		DMibPublishActorFunction(CCloudManager::f_SnoozeSensor);
 		DMibPublishActorFunction(CCloudManager::f_GetSensorReporter);
 		DMibPublishActorFunction(CCloudManager::f_GetSensorReader);
 		DMibPublishActorFunction(CCloudManager::f_GetLogReporter);

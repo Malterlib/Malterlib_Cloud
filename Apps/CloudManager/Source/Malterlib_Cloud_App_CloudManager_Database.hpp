@@ -185,7 +185,12 @@ namespace NMib::NCloud::NCloudManagerDatabase
 
 		_Stream % m_LastNotification;
 		_Stream % m_TimeInProblemState;
-		_Stream % m_bInProblemState;
+		_Stream % m_bInProblemStateForReporting;
+		if (Version >= ECloudManagerProtocolVersion_DistinguishReportedAndActualProblemState)
+			_Stream % m_bInProblemState;
+		else if constexpr (tf_CStream::mc_bConsume)
+			m_bInProblemState = m_bInProblemStateForReporting;
+
 		_Stream % m_bSentAlert;
 	}
 

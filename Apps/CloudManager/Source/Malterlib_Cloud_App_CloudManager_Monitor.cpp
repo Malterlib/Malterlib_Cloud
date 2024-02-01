@@ -166,7 +166,7 @@ namespace NMib::NCloud::NCloudManager
 							self / [&]() -> TCFuture<void>
 							{
 								co_await self(&CCloudManagerServer::fp_UpdateAppManagerState);
-								auto UpdateResult = co_await mp_SensorNotifications.f_UpdatePeriodicSensorNotifications().f_Wrap();
+								auto UpdateResult = co_await mp_SensorNotifications.f_UpdatePeriodicSensorNotifications(false).f_Wrap();
 
 								if (!UpdateResult)
 									UpdateResult > fg_LogError("CloudManager", "Error updating sensor notifications");

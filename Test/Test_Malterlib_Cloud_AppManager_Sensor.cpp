@@ -98,6 +98,7 @@ public:
 						, "WarnValue"_= nullptr
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
+						, "SnoozeUntil"_= NTime::CTime()
 					}
 					,
 					{
@@ -145,6 +146,7 @@ public:
 						, "WarnValue"_= nullptr
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
+						, "SnoozeUntil"_= NTime::CTime()
 					}
 				}
 			;
@@ -166,6 +168,7 @@ public:
 								, "Value"_= fp64(i)
 								, "OutdatedStatus"_= "Ok"
 								, "OutdatedSeconds"_= fp64::fs_Inf()
+								, "SnoozeUntil"_= NTime::CTime()
 							}
 						}
 					)
@@ -194,6 +197,7 @@ public:
 								}
 								, "OutdatedStatus"_= "Ok"
 								, "OutdatedSeconds"_= fp64::fs_Inf()
+								, "SnoozeUntil"_= NTime::CTime()
 							}
 						}
 					)
@@ -213,6 +217,7 @@ public:
 						, "Value"_= fp64(4.0)
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= fp64::fs_Inf()
+						, "SnoozeUntil"_= NTime::CTime()
 					}
 					,
 					{
@@ -236,6 +241,7 @@ public:
 						}
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= fp64::fs_Inf()
+						, "SnoozeUntil"_= NTime::CTime()
 					},
 				}
 			;

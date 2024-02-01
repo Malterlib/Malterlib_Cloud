@@ -34,8 +34,9 @@ namespace NMib::NCloud
 		, ECloudManagerProtocolVersion_SupportDeferredUpdateNotification = 0x117
 		, ECloudManagerProtocolVersion_SupportFilterInRemoveSensorAndLog = 0x118
 		, ECloudManagerProtocolVersion_SupportAppManagerCloudManagerInterface = 0x119
+		, ECloudManagerProtocolVersion_DistinguishReportedAndActualProblemState = 0x120
 
-		, ECloudManagerProtocolVersion_Current = 0x119
+		, ECloudManagerProtocolVersion_Current = 0x120
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -215,6 +216,15 @@ namespace NMib::NCloud
 			NConcurrency::CDistributedAppSensorReader_SensorFilter m_Filter;
 		};
 
+		struct CSnoozeSensor
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NConcurrency::CDistributedAppSensorReader_SensorFilter m_Filter;
+			NTime::CTimeSpan m_SnoozeDuration;
+		};
+
 		struct CRemoveLog
 		{
 			template <typename tf_CStream>
@@ -235,6 +245,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<void> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) = 0;
 		virtual NConcurrency::TCFuture<uint32> f_RemoveSensor(CRemoveSensor &&_RemoveSensor) = 0;
 		virtual NConcurrency::TCFuture<uint32> f_RemoveLog(CRemoveLog &&_RemoveLog) = 0;
+		virtual NConcurrency::TCFuture<uint32> f_SnoozeSensor(CSnoozeSensor &&_SnoozeSensor) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReporter>> f_GetSensorReporter() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReader>> f_GetSensorReader() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReporter>> f_GetLogReporter() = 0;
