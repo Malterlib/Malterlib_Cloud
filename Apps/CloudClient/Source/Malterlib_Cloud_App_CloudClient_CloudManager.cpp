@@ -209,19 +209,19 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Names"_o= {"--sensor-application"}
 							, "Type"_o= ""
-							, "Description"_o= "The application of the sensor to remove"
+							, "Description"_o= "The application of the sensor to remove. Supports wildcards."
 						}
 						, "SensorIdentifier?"_o=
 						{
 							"Names"_o= {"--sensor-identifier"}
 							, "Type"_o= ""
-							, "Description"_o= "The identifier of the sensor to remove"
+							, "Description"_o= "The identifier of the sensor to remove. Supports wildcards."
 						}
 						, "SensorIdentifierScope?"_o=
 						{
 							"Names"_o= {"--sensor-identifier-scope"}
 							, "Type"_o= ""
-							, "Description"_o= "The identifier scope of the sensor to remove"
+							, "Description"_o= "The identifier scope of the sensor to remove. Supports wildcards."
 						}
 						, "Force?"_o=
 						{
@@ -257,19 +257,19 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Names"_o= {"--log-application"}
 							, "Type"_o= ""
-							, "Description"_o= "The application of the log to remove"
+							, "Description"_o= "The application of the log to remove. Supports wildcards."
 						}
 						, "LogIdentifier?"_o=
 						{
 							"Names"_o= {"--log-identifier"}
 							, "Type"_o= ""
-							, "Description"_o= "The identifier of the log to remove"
+							, "Description"_o= "The identifier of the log to remove. Supports wildcards."
 						}
 						, "LogIdentifierScope?"_o=
 						{
 							"Names"_o= {"--log-identifier-scope"}
 							, "Type"_o= ""
-							, "Description"_o= "The identifier scope of the log to remove"
+							, "Description"_o= "The identifier scope of the log to remove. Supports wildcards."
 						}
 						, "Force?"_o=
 						{
