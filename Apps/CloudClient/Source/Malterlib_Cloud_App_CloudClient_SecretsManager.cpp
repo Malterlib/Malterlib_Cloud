@@ -44,7 +44,7 @@ namespace NMib::NCloud::NCloudClient
 				, "Default"_o= _[_]
 				, "Type"_o= {""}
 				, "Description"_o= "Limit query to secrets having the specified tags.\n"
-				"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
+				"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)."
 			}
 		;
 		auto Expect = "Expect?"_o=
@@ -68,7 +68,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					"Type"_o= ""
 					, "Description"_o= "Specify secret ID.\n"
-					"The ID is specified as Folder/Name with folder and name adhering to RFC 1123 (hostname). Additionally for Folder / is allowed, and for Name # is allowed"
+					"The ID is specified as Folder/Name with folder and name adhering to RFC 1123 (hostname). Additionally for Folder / is allowed, and for Name # is allowed."
 				}
 			}
 		;
@@ -171,7 +171,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					"Names"_o= {"--secrets-manager-get-secret"}
 					, "Description"_o= "Get secret."
-					, "Output"_o= "The secret formatted acconding to --expect"
+					, "Output"_o= "The secret formatted acconding to --expect."
 					, "Options"_o=
 					{
 						SecretsManagerHost
@@ -208,10 +208,10 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_o= "Set the secret.\n"
 							"The secret can be a string secret or a binary secret.\n"
 							"Specify 'string' to be prompted for a string secret.\n"
-							"Specify 'binary' for a binary secret. When --binary-as-base64 is enabled (which it is by default) you will be prompted for a base64 encoded binary secret. "
+							"Specify 'binary' for a binary secret. When --binary-as-base64 is enabled (which it is by default) you will be prompted for a base64 encoded binary secret.\n"
 							"Specify 'string_map' to be prompted for a map of string secrets.\n"
 							"Specify 'binary_map' to be prompted for a map of binary secrets.\n"
-							"When --binary-as-base64 is disabled, the raw binary secret must be piped or redirected to stdin\n"
+							"When --binary-as-base64 is disabled, the raw binary secret must be piped or redirected to stdin.\n"
 							"To set a file secret use --secrets-manager-upload-file."
 						}
 						, "Username?"_o=
@@ -243,7 +243,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_o= {"--metadata"}
 							, "Type"_o= EJSONType_Object
 							, "Description"_o= "The metadata to set.\n"
-							"The metadata is specified as a JSON object '{\"Key\" : \"Value\" ...}'"
+							"The metadata is specified as a JSON object '{\"Key\" : \"Value\" ...}'."
 						}
 						, "Created?"_o=
 						{
@@ -262,7 +262,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_o= {"--tags"}
 							, "Type"_o= {""}
 							, "Description"_o= "The tags to set.\n"
-							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
+							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)."
 						}
 						, "SemanticID?"_o=
 						{
@@ -296,7 +296,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_o= _[_]
 							, "Type"_o= {""}
 							, "Description"_o= "Remove these tags.\n"
-							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
+							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)."
 						}
 						, "AddTags?"_o=
 						{
@@ -304,7 +304,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_o= _[_]
 							, "Type"_o= {""}
 							, "Description"_o= "Add these tags.\n"
-							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)"
+							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)."
 						}
 					}
 					, IDParameter

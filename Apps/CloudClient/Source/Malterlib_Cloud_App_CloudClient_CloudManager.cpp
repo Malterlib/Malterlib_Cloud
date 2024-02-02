@@ -34,28 +34,28 @@ namespace NMib::NCloud::NCloudClient
 			{
 				"Names"_o= {"--quiet", "-q"}
 				, "Default"_o= false
-				, "Description"_o= "Don't output information on std out, just return the status"
+				, "Description"_o= "Don't output information on std out, just return the status."
 			}
 		;
 		auto IncludeCloudManagerOption = "IncludeCloudManager?"_o=
 			{
 				"Names"_o= {"--include-cloud-manager", "-c"}
 				, "Default"_o= false
-				, "Description"_o= "Include the cloud manager column"
+				, "Description"_o= "Include the cloud manager column."
 			}
 		;
 		auto FilterStatusError = "FilterStatusError?"_o=
 			{
 				"Names"_o= {"--filter-status-error"}
 				, "Type"_o= true
-				, "Description"_o= "Include applications and app managers with error status"
+				, "Description"_o= "Include applications and app managers with error status."
 			}
 		;
 		auto FilterEnvironment = "FilterEnvironment?"_o=
 			{
 				"Names"_o= {"--filter-environment"}
 				, "Type"_o= ""
-				, "Description"_o= "Include applications and appmanagers with specified environment\n"
+				, "Description"_o= "Include applications and appmanagers with specified environment.\n"
 				"Wildcard search."
 			}
 		;
@@ -63,21 +63,21 @@ namespace NMib::NCloud::NCloudClient
 			{
 				"Names"_o= {"--filter-name"}
 				, "Type"_o= ""
-				, "Description"_o= "Include applications with specified application name"
+				, "Description"_o= "Include applications with specified application name."
 			}
 		;
 		auto FilterVersionManagerApp = "FilterVersionManagerApp?"_o=
 			{
 				"Names"_o= {"--filter-application"}
 				, "Type"_o= ""
-				, "Description"_o= "Include applications with specified version manager app name"
+				, "Description"_o= "Include applications with specified version manager app name."
 			}
 		;
 		auto FilterOutOfDateVersion = "FilterOutOfDateVersion?"_o=
 			{
 				"Names"_o= {"--filter-out-of-date"}
 				, "Type"_o= true
-				, "Description"_o= "Include applications with out of date versions"
+				, "Description"_o= "Include applications with out of date versions."
 			}
 		;
 
@@ -85,11 +85,11 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--cloud-manager-status"}
-					, "Description"_o= "List the overall status for resources controlled by the Cloud Manager"
+					, "Description"_o= "List the overall status for resources controlled by the Cloud Manager."
 					, "Status"_o=
 					{
-						"0"_o= "The status of all resources is OK"
-						, "1"_o= "One or more resources has an error status"
+						"0"_o= "The status of all resources is OK."
+						, "1"_o= "One or more resources has an error status."
 					}
 					, "Options"_o=
 					{
@@ -115,11 +115,11 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--cloud-manager-app-manager-status"}
-					, "Description"_o= "List the status for app managers controlled by the Cloud Manager"
+					, "Description"_o= "List the status for app managers controlled by the Cloud Manager."
 					, "Status"_o=
 					{
-						"0"_o= "The status of all app managers is OK"
-						, "1"_o= "One or more app managers has an error status"
+						"0"_o= "The status of all app managers is OK."
+						, "1"_o= "One or more app managers has an error status."
 					}
 					, "Options"_o=
 					{
@@ -142,11 +142,11 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--cloud-manager-application-status"}
-					, "Description"_o= "List the status for applications in app managers controlled by the Cloud Manager"
+					, "Description"_o= "List the status for applications in app managers controlled by the Cloud Manager."
 					, "Status"_o=
 					{
-						"0"_o= "The status of all applications is OK"
-						, "1"_o= "One or more applications has an error status"
+						"0"_o= "The status of all applications is OK."
+						, "1"_o= "One or more applications has an error status."
 					}
 					, "Options"_o=
 					{
@@ -171,13 +171,13 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--cloud-manager-remove-app-manager"}
-					, "Description"_o= "Remove app manager from cloud manager database"
+					, "Description"_o= "Remove app manager from cloud manager database."
 					, "Parameters"_o=
 					{
 						"AppManagerHostID"_o=
 						{
 							"Type"_o= ""
-							, "Description"_o= "The host ID of the app manager to remove"
+							, "Description"_o= "The host ID of the app manager to remove."
 						}
 					}
 					, "Options"_o=
@@ -196,14 +196,14 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--cloud-manager-remove-sensor"}
-					, "Description"_o= "Remove sensor from cloud manager"
+					, "Description"_o= "Remove sensor from cloud manager."
 					, "Options"_o=
 					{
 						"SensorHostID?"_o=
 						{
 							"Names"_o= {"--sensor-host-id"}
 							, "Type"_o= ""
-							, "Description"_o= "The host ID of the sensor to remove"
+							, "Description"_o= "The host ID of the sensor to remove."
 						}
 						, "SensorApplication?"_o=
 						{
@@ -227,7 +227,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Names"_o= {"--force"}
 							, "Default"_o= false
-							, "Description"_o= "Force removal of all sensors when no filtering options are specified"
+							, "Description"_o= "Force removal of all sensors when no filtering options are specified."
 						}
 						, QuietOption
 					}
@@ -244,14 +244,14 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--cloud-manager-remove-log"}
-					, "Description"_o= "Remove log from cloud manager"
+					, "Description"_o= "Remove log from cloud manager."
 					, "Options"_o=
 					{
 						"LogHostID?"_o=
 						{
 							"Names"_o= {"--log-host-id"}
 							, "Type"_o= ""
-							, "Description"_o= "The host ID of the log to remove"
+							, "Description"_o= "The host ID of the log to remove."
 						}
 						, "LogApplication?"_o=
 						{
@@ -275,7 +275,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Names"_o= {"--force"}
 							, "Default"_o= false
-							, "Description"_o= "Force removal of all logs when no filtering options are specified"
+							, "Description"_o= "Force removal of all logs when no filtering options are specified."
 						}
 						, QuietOption
 					}
@@ -292,7 +292,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--cloud-manager-expected-os-version-list"}
-					, "Description"_o= "List expected os version settings"
+					, "Description"_o= "List expected os version settings."
 					, "Options"_o=
 					{
 						QuietOption
@@ -311,7 +311,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--cloud-manager-expected-os-version-set"}
-					, "Description"_o= "List expected os version settings"
+					, "Description"_o= "List expected os version settings."
 					, "Options"_o=
 					{
 						"OsName"_o=

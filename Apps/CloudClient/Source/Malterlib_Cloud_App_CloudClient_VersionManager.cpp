@@ -219,7 +219,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--version-manager-change-tags"}
-					, "Description"_o= "Upload a version to remote version manager\n"
+					, "Description"_o= "Upload a version to remote version manager.\n"
 					, "Options"_o=
 					{
 						"VersionManagerHost?"_o=
@@ -280,7 +280,7 @@ namespace NMib::NCloud::NCloudClient
 			(
 				{
 					"Names"_o= {"--version-manager-download-version"}
-					, "Description"_o= "Download a version from remote version manager\n"
+					, "Description"_o= "Download a version from remote version manager.\n"
 					, "Options"_o=
 					{
 						"VersionManagerHost?"_o=

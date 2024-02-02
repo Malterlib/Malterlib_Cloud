@@ -54,7 +54,7 @@ namespace NMib::NCloud::NAppManager
 
 	void CAppManagerActor::fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine)
 	{
-		auto HostMonitor = o_CommandLine.f_AddSection("Host Monitor", "Commands to manage host monitor");
+		auto HostMonitor = o_CommandLine.f_AddSection("Host Monitor", "Commands to manage host monitor.");
 
 		HostMonitor.f_RegisterCommand
 			(

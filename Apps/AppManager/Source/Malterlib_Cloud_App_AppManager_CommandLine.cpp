@@ -71,7 +71,7 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		
-		auto ApplicationManagement = o_CommandLine.f_AddSection("Application Management", "Commands to manage AppManager applications");
+		auto ApplicationManagement = o_CommandLine.f_AddSection("Application Management", "Commands to manage AppManager applications.");
 
 		auto SettingsOption_Executable = "Executable?"_o=
 			{
@@ -896,7 +896,7 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
-		auto ExternalManagement = o_CommandLine.f_AddSection("External Dependencies", "Commands to manage external dependencies");
+		auto ExternalManagement = o_CommandLine.f_AddSection("External Dependencies", "Commands to manage external dependencies.");
 		ExternalManagement.f_RegisterCommand
 			(
 				{

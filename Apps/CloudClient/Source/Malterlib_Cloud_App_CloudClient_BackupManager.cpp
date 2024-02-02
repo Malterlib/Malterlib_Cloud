@@ -108,7 +108,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_o= {"--destination"}
 							, "Type"_o= ""
 							, "Description"_o= "The directory to download to.\n"
-							"By default this directory will be the 'name of the source'/'backup time'"
+							"By default this directory will be the 'name of the source'/'backup time'."
 						}
 						, "SetOwner?"_o=
 						{
