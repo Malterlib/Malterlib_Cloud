@@ -42,7 +42,7 @@ namespace NMib::NCloud
 
 		co_await Internal.f_ReadDatabase();
 
-		co_await Internal.m_KeyManagerInstance.f_Publish<CKeyManager>(Internal.m_DistributionManager, this, CKeyManager::mc_pDefaultNamespace);
+		co_await Internal.m_KeyManagerInstance.f_Publish<CKeyManager>(Internal.m_DistributionManager, this);
 
 		co_return {};
 	}

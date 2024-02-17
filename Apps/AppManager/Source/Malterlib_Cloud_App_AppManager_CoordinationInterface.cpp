@@ -73,6 +73,6 @@ namespace NMib::NCloud::NAppManager
 	
 	TCFuture<void> CAppManagerActor::fp_PublishCoordinationInterface()
 	{
-		return mp_AppManagerCoordinationInterface.f_Publish<CAppManagerCoordinationInterface>(mp_State.m_DistributionManager, this, CAppManagerCoordinationInterface::mc_pDefaultNamespace);
+		return mp_AppManagerCoordinationInterface.f_Publish<CAppManagerCoordinationInterface>(mp_State.m_DistributionManager, this);
 	}
 }

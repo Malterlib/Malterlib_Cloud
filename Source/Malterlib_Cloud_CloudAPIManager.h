@@ -20,6 +20,8 @@ namespace NMib::NCloud
 	
 	struct CCloudAPIManager : public NConcurrency::CActor
 	{
+		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/CloudAPIManager";
+		
 		using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
 		using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
 		

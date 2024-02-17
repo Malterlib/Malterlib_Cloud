@@ -9,7 +9,7 @@ namespace NMib::NCloud::NAppManager
 {
 	TCFuture<void> CAppManagerActor::fp_PublishAppManagerInterface()
 	{
-		return mp_AppManagerInterface.f_Publish<CAppManagerInterface>(mp_State.m_DistributionManager, this, CAppManagerInterface::mc_pDefaultNamespace);
+		return mp_AppManagerInterface.f_Publish<CAppManagerInterface>(mp_State.m_DistributionManager, this);
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_RegisterPermissions()

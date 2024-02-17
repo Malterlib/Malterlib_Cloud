@@ -14,7 +14,7 @@ namespace NMib::NCloud::NCloudAPIManager
 {
 	void CCloudAPIManagerDaemonActor::CServer::fp_Publish()
 	{
-		mp_ProtocolInterface.f_Publish<CCloudAPIManager>(mp_AppState.m_DistributionManager, this, "com.malterlib/Cloud/CloudAPIManager") > [](TCAsyncResult<void> &&_Result)
+		mp_ProtocolInterface.f_Publish<CCloudAPIManager>(mp_AppState.m_DistributionManager, this) > [](TCAsyncResult<void> &&_Result)
 			{
 				if (!_Result)
 					DMibLog(Error, "Failed to publish cloud api manager interface: {}", _Result.f_GetExceptionStr());
