@@ -20,24 +20,57 @@ namespace NMib::NCloud
 		{
 			enum class EVersion : uint32
 			{
-				mc_Current = 0x100
+				mc_ServerSyncSupport = 0x101
+
+				, mc_Current = 0x101
 			};
-			
-			struct CClientStore
+
+			struct CClientKey
 			{
+				auto operator <=> (CClientKey const &) const = default;
+
 				NStr::CStr const &f_GetID() const;
 
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
 
-				NContainer::TCMap<NStr::CStr, CSymmetricKey> m_Keys;
+				template <typename tf_CStr>
+				void f_Format(tf_CStr &o_Str) const
+				{
+					o_Str += typename tf_CStr::CFormat("Key: {}   Verified: {vs}") << m_Key << m_VerifiedOnServers;
+				}
+
+				CSymmetricKey m_Key;
+				NContainer::TCSet<NStr::CStr> m_VerifiedOnServers;
+			};
+
+			struct CClientStore
+			{
+				auto operator <=> (CClientStore const &) const = default;
+
+				NStr::CStr const &f_GetID() const;
+
+				template <typename tf_CStream>
+				void f_Stream(tf_CStream &_Stream);
+
+				template <typename tf_CStr>
+				void f_Format(tf_CStr &o_Str) const
+				{
+					o_Str += typename tf_CStr::CFormat("{}") << m_Keys;
+				}
+
+				NContainer::TCMap<NStr::CStr, CClientKey> m_Keys;
 			};
 			
+			auto operator <=> (CDatabase const &) const = default;
+
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
+			bool f_HasAvailableKey(CSymmetricKey _Key);
+
 			NContainer::TCMap<NStr::CStr, CClientStore> m_Clients;
-			NContainer::TCMap<uint32, NContainer::TCVector<CSymmetricKey>> m_AvailableKeys;
+			NContainer::TCMap<uint32, NContainer::TCSet<CSymmetricKey>> m_AvailableKeys;
 		};
 		
 		virtual NConcurrency::TCFuture<void> f_Initialize() = 0;
@@ -52,9 +85,10 @@ namespace NMib::NCloud
 		NFunction::TCFunctionMovable<NConcurrency::CDistributedAppAuditor (NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> m_fAuditorFactory
 			= [](NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category) -> NConcurrency::CDistributedAppAuditor
 			{
-				return {};
+				return NConcurrency::CDistributedAppAuditor({}, _CallingHostInfo, _Category);
 			}
 		;
+		uint32 m_CreateNewKeyMinServers = 1;
 	};
 
 	struct CKeyManagerServer : public NConcurrency::CActor
@@ -63,7 +97,7 @@ namespace NMib::NCloud
 		~CKeyManagerServer();
 		
 		NConcurrency::TCFuture<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
-		NConcurrency::TCFuture<void> f_Init();
+		NConcurrency::TCFuture<void> f_Init(fp32 _WaitForPublicationsTimeout);
 
 	private:
 

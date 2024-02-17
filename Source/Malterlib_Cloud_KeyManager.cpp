@@ -13,7 +13,19 @@ namespace NMib::NCloud
 	CKeyManager::CKeyManager()
 	{
 		DMibPublishActorFunction(CKeyManager::f_RequestKey);
+		DMibPublishActorFunction(CKeyManager::f_GetServerSyncInterface);
 	}
 	
 	CKeyManager::~CKeyManager() = default;
+
+	CKeyManagerServerSync::CKeyManagerServerSync()
+	{
+		DMibPublishActorFunction(CKeyManagerServerSync::f_ReadDatabase);
+		DMibPublishActorFunction(CKeyManagerServerSync::f_CreateNewKeys);
+		DMibPublishActorFunction(CKeyManagerServerSync::f_UseAvailableKey);
+		DMibPublishActorFunction(CKeyManagerServerSync::f_PreCreateKeys);
+		DMibPublishActorFunction(CKeyManagerServerSync::f_KeysVerifiedOnServers);
+	}
+	
+	CKeyManagerServerSync::~CKeyManagerServerSync() = default;
 }

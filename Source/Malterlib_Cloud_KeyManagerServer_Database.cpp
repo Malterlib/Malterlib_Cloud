@@ -36,29 +36,31 @@ namespace NMib::NCloud
 
 		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(fg_GetCallingHostInfo(), "KeyManager");
 
-		auto const& CurrentKeys = Internal.m_Database.m_AvailableKeys[_KeySize];
+		auto const &CurrentKeys = Internal.m_Database.m_AvailableKeys[_KeySize];
 		if (CurrentKeys.f_GetLen() >= _nKeys)
 			co_return {};
 
-		NContainer::TCVector<CSymmetricKey> GeneratedKeys;
-		GeneratedKeys.f_SetLen(_nKeys - CurrentKeys.f_GetLen());
+		NContainer::TCSet<CSymmetricKey> GeneratedKeys;
 
-		for (auto& Key : GeneratedKeys)
+		mint nKeysToAdd = _nKeys - CurrentKeys.f_GetLen();
+		for (mint i = 0; i < nKeysToAdd; ++i)
 		{
-			Key.f_SetLen(_KeySize);
-			NSys::fg_Security_GenerateHighEntropyData(Key.f_GetArray(), Key.f_GetLen());
+			CSymmetricKey ToAdd;
+			ToAdd.f_SetLen(_KeySize);
+			NSys::fg_Security_GenerateHighEntropyData(ToAdd.f_GetArray(), ToAdd.f_GetLen());
+
+			GeneratedKeys[ToAdd];
 		}
 
 		mint nCreated = GeneratedKeys.f_GetLen();
 
-		Internal.m_Database.m_AvailableKeys[_KeySize].f_InsertFirst(fg_Move(GeneratedKeys));
+		Internal.m_Database.m_AvailableKeys[_KeySize] += GeneratedKeys;
+
+		co_await Internal.f_ForwardPreCreateKeys(Internal.m_ThisHostID, GeneratedKeys);
 
 		auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Internal.m_Database).f_Wrap();
 		if (!WriteResult)
-		{
-			DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to write database: {}", WriteResult.f_GetExceptionStr());
-			co_return AppAuditor.f_Exception("Failed to write database: {}"_f << WriteResult.f_GetExceptionStr());
-		}
+			co_return AppAuditor.f_CriticalException({"Failed to write database", WriteResult.f_GetExceptionStr()});
 
 		AppAuditor.f_Info("Pre-created {} keys of {} bytes"_f << nCreated << _KeySize);
 

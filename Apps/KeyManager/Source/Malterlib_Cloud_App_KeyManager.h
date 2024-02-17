@@ -18,7 +18,7 @@ namespace NMib::NCloud::NKeyManager
 		~CKeyManagerDaemonActor();
 
 		TCFuture<uint32> f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 
 	private:
 		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;

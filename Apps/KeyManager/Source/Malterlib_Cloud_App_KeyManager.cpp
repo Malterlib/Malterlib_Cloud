@@ -42,7 +42,7 @@ namespace NMib::NCloud::NKeyManager
 				}
 			)
 		;
-		co_await mp_ServerActor(&CKeyManagerServer::f_Init);
+		co_await mp_ServerActor(&CKeyManagerServer::f_Init, 10.0);
 
 		co_return {};
 	}

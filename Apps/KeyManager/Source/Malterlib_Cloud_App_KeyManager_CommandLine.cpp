@@ -44,7 +44,7 @@ namespace NMib::NCloud::NKeyManager
 			(
 				{
 					"Names"_o= {"--precreate-keys"}
-					, "Description"_o= "Precreate keys of a certain size. Useful to allow backup of future keys not yet sent to a client."
+					, "Description"_o= "Pre-create keys of a certain size. Useful to allow backup of future keys not yet sent to a client."
 					, "Options"_o=
 					{
 						"KeySize?"_o=
@@ -56,20 +56,20 @@ namespace NMib::NCloud::NKeyManager
 						, "NumberOfKeys?"_o=
 						{
 							"Names"_o= {"--number-of-keys"}
-							, "Description"_o= "Precreate this number of keys."
+							, "Description"_o= "Pre-create this number of keys."
 							, "Default"_o= 128
 						}
 					}
 				}
 				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 				{
-					return g_Future <<= self(&CKeyManagerDaemonActor::f_PrecreateKeys, _Parameters["KeySize"].f_Integer(), _Parameters["NumberOfKeys"].f_Integer(), _pCommandLine);
+					return g_Future <<= self(&CKeyManagerDaemonActor::f_PreCreateKeys, _Parameters["KeySize"].f_Integer(), _Parameters["NumberOfKeys"].f_Integer(), _pCommandLine);
 				}
 			)
 		;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_PrecreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		if (!mp_ServerActor)
 			co_return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
