@@ -289,20 +289,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 #ifdef DPlatformFamily_Linux
 		bCanDoEncryption = true;
 #endif
-		TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
-		auto CleanupRunLoop = g_OnScopeExit / [&]
-			{
-				while (pRunLoop->m_RefCount.f_Get() > 0)
-					pRunLoop->f_WaitOnceTimeout(0.1);
-			}
-		;
-		TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
-		auto CleanupHelperActor = g_OnScopeExit / [&]
-			{
-				HelperActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
-			}
-		;
-		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
+		CActorRunLoopTestHelper RunLoopHelper;
 
 		auto FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
 		auto CleanupTestActor = g_OnScopeExit / [&]
@@ -1249,20 +1236,7 @@ public:
 							VersionInfo["Version"] = CStr::fs_ToStr(VersionID);
 							CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString(), false);
 
-							TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
-							auto CleanupRunLoop = g_OnScopeExit / [&]
-								{
-									while (pRunLoop->m_RefCount.f_Get() > 0)
-										pRunLoop->f_WaitOnceTimeout(0.1);
-								}
-							;
-							TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
-							auto CleanupHelperActor = g_OnScopeExit / [&]
-								{
-									HelperActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
-								}
-							;
-							CCurrentlyProcessingActorScope CurrentActor{HelperActor};
+							CActorRunLoopTestHelper RunLoopHelper;
 
 							CVersionManagerHelper VersionManagerHelper(BinaryDirectory);
 

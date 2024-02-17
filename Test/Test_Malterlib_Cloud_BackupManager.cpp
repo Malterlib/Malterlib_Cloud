@@ -306,7 +306,14 @@ public:
 						case CBackupManagerClient::ENotification_InitialFinished:
 							{
 								auto &Notfification = _Notification.f_Get<CBackupManagerClient::ENotification_InitialFinished>();
-								DMibCloudBackupManagerDebugOut("+++ InitialFinished {vs} {vs} {vs}\n", Notfification.m_AddedFiles, Notfification.m_RemovedFiles, Notfification.m_UpdatedFiles);
+								DMibCloudBackupManagerDebugOut
+									(
+										"+++ InitialFinished {vs} {vs} {vs}\n"
+										, Notfification.m_AddedFiles
+										, Notfification.m_RemovedFiles
+										, Notfification.m_UpdatedFiles
+									)
+								;
 							}
 							break;
 						case CBackupManagerClient::ENotification_None:
@@ -526,20 +533,7 @@ public:
 	{
 		return; // Buggy
 
-		TCSharedPointer<CDefaultRunLoop> pRunLoop = fg_Construct();
-		auto CleanupRunLoop = g_OnScopeExit / [&]
-			{
-				while (pRunLoop->m_RefCount.f_Get() > 0)
-					pRunLoop->f_WaitOnceTimeout(0.1);
-			}
-		;
-		TCActor<CDispatchingActor> HelperActor(fg_Construct(), pRunLoop->f_Dispatcher());
-		auto CleanupHelperActor = g_OnScopeExit / [&]
-			{
-				HelperActor->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
-			}
-		;
-		CCurrentlyProcessingActorScope CurrentActor{HelperActor};
+		CActorRunLoopTestHelper RunLoopHelper;
 
 		NContainer::TCMap<NStr::CStr, CPermissionRequirements> BackupManagerPermissionsForTest = {{"Backup/WriteSelf", {}}, {"Backup/ReadAll", {}}};
 
@@ -557,31 +551,31 @@ public:
 		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
 		auto CleanupTrustManager = g_OnScopeExit / [&]
 			{
-				TrustManager->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
+				TrustManager->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
 			}
 		;
 
-		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(pRunLoop, g_Timeout);
+		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 		CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
 
 		CDistributedActorTrustManager_Address ServerAddress;
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath(RootDirectory / "controller.sock");
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(pRunLoop, g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
 		Dependencies.m_TrustManager = TrustManager;
-		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(pRunLoop, g_Timeout);
+		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		NMib::NConcurrency::CDistributedActorSecurity Security;
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CBackupManager::mc_pDefaultNamespace);
-		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(pRunLoop, g_Timeout);
+		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestBackupManagerEnableLogging);
 		auto Cleanup = g_OnScopeExit / [&]
 			{
-				LaunchHelper->f_BlockDestroy(pRunLoop->f_ActorDestroyLoop());
+				LaunchHelper->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
 			}
 		;
 
@@ -635,7 +629,7 @@ public:
 						> BackupManagerLaunchesResults.f_AddResult()
 					;
 				}
-				for (auto &LaunchResult : BackupManagerLaunchesResults.f_GetResults().f_CallSync(pRunLoop, g_Timeout))
+				for (auto &LaunchResult : BackupManagerLaunchesResults.f_GetResults().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout))
 					BackupManagerLaunches.f_Insert(fg_Move(*LaunchResult));
 			}
 		;
@@ -674,7 +668,7 @@ public:
 					BackupManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(BackupManagerInfo.m_Address) > ListenResults.f_AddResult();
 					++iBackupManager;
 				}
-				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(pRunLoop, g_Timeout));
+				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout));
 			}
 		;
 		fSetupListen();
@@ -732,7 +726,7 @@ public:
 			}
 		}
 
-		SetupTrustResults.f_GetResults().f_CallSync(pRunLoop, g_Timeout);
+		SetupTrustResults.f_GetResults().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		{
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
@@ -746,7 +740,7 @@ public:
 
 			CFile::fs_CreateDirectory(TestBackupDirectory);
 
-			CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+			CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 			BackupHelper.f_CreateFile("File1", 1024);
 			BackupHelper.f_CreateFile("Dir1/File1", 1024);
@@ -784,7 +778,7 @@ public:
 			CStr ManifestPath = BackupDestination / "Manifest.bin";
 			{
 				DMibTestPath("General");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				{
 					BackupHelper.f_Start(TrustManager, Dependencies);
@@ -819,7 +813,7 @@ public:
 			}
 			{
 				DMibTestPath("Include wildcards");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^File1", {}}};
@@ -843,7 +837,7 @@ public:
 			}
 			{
 				DMibTestPath("Wildcard destinations");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards =
@@ -898,7 +892,7 @@ public:
 			}
 			{
 				DMibTestPath("Conflicting wildcard destinations");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards =
@@ -921,7 +915,7 @@ public:
 			}
 			{
 				DMibTestPath("Exclude wildcards");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_ExcludeWildcards = {"*File1"};
@@ -946,7 +940,7 @@ public:
 			}
 			{
 				DMibTestPath("Append RSync");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				DMibTestMark;
 				BackupHelper.f_Start(TrustManager, Dependencies);
@@ -985,7 +979,7 @@ public:
 			}
 			{
 				DMibTestPath("Append semantics");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_AddSyncFlagsWildcards["*/File2"] = EDirectoryManifestSyncFlag_Append;
@@ -1026,7 +1020,7 @@ public:
 			}
 			{
 				DMibTestPath("Remove wildcard flags");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_AddSyncFlagsWildcards["*"] = EDirectoryManifestSyncFlag_Append;
@@ -1067,7 +1061,7 @@ public:
 			}
 			{
 				DMibTestPath("Renames");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*", {}}};
@@ -1480,7 +1474,7 @@ public:
 			}
 			{
 				DMibTestPath("Delete all");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"^*", {}}};
@@ -1557,7 +1551,7 @@ public:
 			}
 			{
 				DMibTestPath("Adds");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"Dir1/^*", {}}};
@@ -1628,7 +1622,7 @@ public:
 			}
 			{
 				DMibTestPath("Dynamic manifest changes");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_IncludeWildcards = {{"Dir2/^*", {}}};
@@ -1647,9 +1641,9 @@ public:
 
 				NFile::CDirectoryManifestConfig ExtraManifestConfig;
 				ExtraManifestConfig.m_IncludeWildcards = {{"Dir1/^*", {}}};
-				BackupHelper.m_BackupInterface.f_CallActor(&CDistributedAppInterfaceBackup::f_AppendManifest)(ExtraManifestConfig).f_CallSync(pRunLoop, g_Timeout);
+				BackupHelper.m_BackupInterface.f_CallActor(&CDistributedAppInterfaceBackup::f_AppendManifest)(ExtraManifestConfig).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
-				BackupFinishedSubscription->f_Destroy().f_CallSync(pRunLoop, g_Timeout);
+				BackupFinishedSubscription->f_Destroy().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 				COtherNotifications AppendManifestNotifications;
 				DMibTestMark;
@@ -1681,9 +1675,9 @@ public:
 			}
 			{
 				DMibTestPath("Downloads");
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
-				auto BackupSources = BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)().f_CallSync(pRunLoop, g_Timeout);
+				auto BackupSources = BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 				DMibAssert(BackupSources.f_GetLen(), ==, 1);
 
@@ -1693,7 +1687,9 @@ public:
 				Receive.m_BasePath = TestDownloadDirectory;
 
 				CActorSubscription Subscription;
-				auto DownloadResult = fg_CallSafeDispatched(&fg_DownloadBackup, BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription)).f_CallSync(pRunLoop, g_Timeout);
+				auto DownloadResult = fg_CallSafeDispatched(&fg_DownloadBackup, BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription))
+					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+				;
 
 				DMibExpectTrue(BackupHelper.f_FileIsSame(TestDownloadDirectory, "Dir1/File1"));
 				DMibExpectTrue(BackupHelper.f_FileIsSame(TestDownloadDirectory, "Dir1/File2"));
@@ -1722,7 +1718,7 @@ public:
 
 				// Test that backup is eventually consistent
 
-				CBackupClientHelper BackupHelper{TestBackupDirectory, pRunLoop};
+				CBackupClientHelper BackupHelper{TestBackupDirectory, RunLoopHelper.m_pRunLoop};
 
 				auto &ManifestConfig = BackupHelper.m_BackupConfig.m_ManifestConfig;
 				ManifestConfig.m_AddSyncFlagsWildcards["Dir1/*"] = EDirectoryManifestSyncFlag_Append;
