@@ -565,7 +565,7 @@ namespace NMib::NCloud
 				if (State.m_Options & EOption_EnableOtherOutput)
 					ExtraParams.f_Insert("--log-launches-to-stderr");
 
-				ExtraParams.f_Insert("--auto-update-delay=1.0"); // Make auto update faster
+				ExtraParams.f_Insert("--auto-update-delay=0.001"); // Make auto update faster
 
 				if (State.m_Options & EOption_DisableDiskMonitoring)
 					ExtraParams.f_Insert("--host-monitor-interval=0.0");

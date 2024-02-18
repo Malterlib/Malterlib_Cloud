@@ -109,7 +109,7 @@ namespace NMib::NCloud::NAppManager
 					Version.f_SetApplication(&Application);
 				}
 
-				if (_NewVersions.m_bFullResend)
+				if (_NewVersions.m_bFullResend && mp_AutoUpdateDelay >= 0.01)
 					co_await fg_Timeout(mp_AutoUpdateDelay); // Wait for other managers to send their versions
 
 				fp_AutoUpdate_Update();

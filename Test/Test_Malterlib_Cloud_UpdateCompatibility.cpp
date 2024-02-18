@@ -459,7 +459,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					ExtraParams.f_Insert("--daemon-run-standalone");
 
 				if (!AppManagerPackageOptions.f_HasFeatureFlag("NoAutoUpdateDelay"))
-					ExtraParams.f_Insert("--auto-update-delay=1.0"); // Make auto update faster
+					ExtraParams.f_Insert("--auto-update-delay=0.001"); // Make auto update faster
 #if DTestUpdateCompatibilityEnableOtherOutput
 				ExtraParams.f_Insert("--log-launches-to-stderr");
 #endif

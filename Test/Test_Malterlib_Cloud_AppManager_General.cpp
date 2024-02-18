@@ -133,7 +133,7 @@ public:
 	{
 		DMibTestSuite("Upgrades") -> TCFuture<void>
 		{
-			CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_EnableVersionManager;
+			CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_EnableVersionManager | CAppManagerTestHelper::EOption_DisablePatchMonitoring;
 
 			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;

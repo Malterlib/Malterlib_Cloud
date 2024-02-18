@@ -16,7 +16,12 @@ public:
 	{
 		DMibTestSuite("General") -> TCFuture<void>
 		{
-			CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp | CAppManagerTestHelper::EOption_EnableVersionManager;
+			CAppManagerTestHelper::EOption Options 
+				= CAppManagerTestHelper::EOption_LaunchTestAppInApp
+				| CAppManagerTestHelper::EOption_EnableVersionManager
+				| CAppManagerTestHelper::EOption_DisablePatchMonitoring
+			;
+
 			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
@@ -362,7 +367,12 @@ public:
 			, TCFunction<void (CEJSONSorted const &_Entries)> _fCheckEntries, bool _bStopCloudManager
 		)
 	{
-		CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp | CAppManagerTestHelper::EOption_EnableVersionManager;
+		CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp
+			| CAppManagerTestHelper::EOption_EnableVersionManager 
+			| CAppManagerTestHelper::EOption_DisablePatchMonitoring
+			| CAppManagerTestHelper::EOption_DisableDiskMonitoring
+		;
+
 		if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 			Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
 
