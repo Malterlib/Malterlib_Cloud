@@ -65,6 +65,16 @@ namespace NMib::NCloud::NAppManager
 		LogInfo.m_HostName = CallingHostInfo.f_GetHostInfo().m_FriendlyName;
 		LogInfo.m_Scope = CDistributedAppLogReporter::CLogScope_Application{Application.m_Name};
 
+		for (auto &MetaData : pThis->mp_LogMetaData.f_Entries())
+		{
+			auto &Key = MetaData.f_Key();
+
+			if (LogInfo.m_MetaData.f_FindEqual(Key))
+				continue;
+
+			LogInfo.m_MetaData[Key] = MetaData.f_Value();
+		}
+
 		auto Reporter = co_await pThis->mp_LogStore(&CDistributedAppLogStoreLocal::f_OpenLogReporter, fg_TempCopy(LogInfo));
 
 		DMibLogWithCategory

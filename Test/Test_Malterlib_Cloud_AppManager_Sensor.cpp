@@ -99,6 +99,7 @@ public:
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
 						, "SnoozeUntil"_= NTime::CTime()
+						, "SensorMetaData"_= EJSONType_Object
 					}
 					,
 					{
@@ -147,6 +148,7 @@ public:
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
 						, "SnoozeUntil"_= NTime::CTime()
+						, "SensorMetaData"_= EJSONType_Object
 					}
 				}
 			;
@@ -169,6 +171,7 @@ public:
 								, "OutdatedStatus"_= "Ok"
 								, "OutdatedSeconds"_= fp64::fs_Inf()
 								, "SnoozeUntil"_= NTime::CTime()
+								, "SensorMetaData"_= EJSONType_Object
 							}
 						}
 					)
@@ -198,6 +201,7 @@ public:
 								, "OutdatedStatus"_= "Ok"
 								, "OutdatedSeconds"_= fp64::fs_Inf()
 								, "SnoozeUntil"_= NTime::CTime()
+								, "SensorMetaData"_= EJSONType_Object
 							}
 						}
 					)
@@ -218,6 +222,7 @@ public:
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= fp64::fs_Inf()
 						, "SnoozeUntil"_= NTime::CTime()
+						, "SensorMetaData"_= EJSONType_Object
 					}
 					,
 					{
@@ -242,6 +247,7 @@ public:
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= fp64::fs_Inf()
 						, "SnoozeUntil"_= NTime::CTime()
+						, "SensorMetaData"_= EJSONType_Object
 					},
 				}
 			;

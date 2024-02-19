@@ -47,6 +47,7 @@ namespace NMib::NCloud
 					SensorInfo.m_Identifier = "org.malterlib.diskspace.{}"_f << _Identifier;
 					SensorInfo.m_IdentifierScope = _Options.m_Path;
 					SensorInfo.m_Name = "{} ({})"_f << _Name << _Options.m_Path;
+					SensorInfo.m_MetaData = Internal.m_SensorMetaData;
 					if (Internal.m_Config.m_Interval != 0.0)
 						SensorInfo.m_ExpectedReportInterval = Internal.m_Config.m_Interval;
 

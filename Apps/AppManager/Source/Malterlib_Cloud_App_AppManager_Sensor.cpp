@@ -65,6 +65,16 @@ namespace NMib::NCloud::NAppManager
 		SensorInfo.m_HostName = CallingHostInfo.f_GetHostInfo().m_FriendlyName;
 		SensorInfo.m_Scope = CDistributedAppSensorReporter::CSensorScope_Application{Application.m_Name};
 
+		for (auto &MetaData : pThis->mp_SensorMetaData.f_Entries())
+		{
+			auto &Key = MetaData.f_Key();
+
+			if (SensorInfo.m_MetaData.f_FindEqual(Key))
+				continue;
+
+			SensorInfo.m_MetaData[Key] = MetaData.f_Value();
+		}
+
 		auto Reporter = co_await pThis->mp_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_TempCopy(SensorInfo));
 
 		DMibLogWithCategory

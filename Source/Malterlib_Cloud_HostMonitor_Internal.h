@@ -103,6 +103,8 @@ namespace NMib::NCloud
 				, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore
 				, TCActor<CDistributedAppLogStoreLocal> const &_LogStore
 				, TCActor<CDatabaseActor> const &_Database
+ 				, TCMap<CStr, CEJSONSorted> const &_SensorMetaData
+				, TCMap<CStr, CEJSONSorted> const &_LogMetaData
 			)
 		;
 
@@ -119,6 +121,8 @@ namespace NMib::NCloud
 		CSequencer m_UpdatePeriodicDiskSpaceSequencer{"HostMonitor UpdatePeriodicDiskSpaceSequencer"};
 		TCVector<TCPromise<void>> m_UpdatePeriodicWaitList;
 		CConfig m_Config;
+		TCMap<CStr, CEJSONSorted> m_SensorMetaData;
+		TCMap<CStr, CEJSONSorted> m_LogMetaData;
 		mint m_FileActorSequence = 0;
 
 		TCMap<CStr, CMonitoredConfig> m_MonitoredConfigs;
