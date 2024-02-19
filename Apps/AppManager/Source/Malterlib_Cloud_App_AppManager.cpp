@@ -434,6 +434,14 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
 	{
+		CStr Environment = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("Environment", "").f_String();
+
+		if (Environment)
+		{
+			mp_SensorMetaData["Environment"] = Environment;
+			mp_LogMetaData["Environment"] = Environment;
+		}
+
 		mp_bLogLaunchesToStdErr = _Params["LogLaunchesToStdErr"].f_Boolean();
 		if (auto pValue = _Params.f_GetMember("HostMonitorInterval"))
 			mp_HostMonitorInterval = pValue->f_Float();
