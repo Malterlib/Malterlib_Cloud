@@ -112,6 +112,8 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
 		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs);
 		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_GetAllVerifiedHosts();
+		NConcurrency::TCFuture<NContainer::TCVector<CKeyManagerKey>> f_GetKeys();
+		NConcurrency::TCFuture<void> f_CopyKey(CKeyManagerKeyID &&_FromKey, CKeyManagerKeyID &&_ToKey);
 
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy() override;

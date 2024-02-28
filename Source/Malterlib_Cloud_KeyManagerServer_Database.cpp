@@ -106,4 +106,52 @@ namespace NMib::NCloud
 
 		co_return fg_Move(Hosts);
 	}
+
+	auto CKeyManagerServer::f_GetKeys() -> NConcurrency::TCFuture<NContainer::TCVector<CKeyManagerKey>>
+	{
+		auto &Internal = *mp_pInternal;
+
+		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(fg_GetCallingHostInfo(), "KeyManager");
+
+		NContainer::TCVector<CKeyManagerKey> Keys;
+
+		for (auto &Client : Internal.m_Database.m_Clients)
+		{
+			for (auto &Key : Client.m_Keys)
+				Keys.f_Insert(fg_Construct(CKeyManagerKeyID{.m_HostID = Client.f_GetID(), .m_KeyID = Key.f_GetID()}, Key.m_VerifiedOnServers));
+		}
+
+		AppAuditor.f_Info("Returned all keys");
+
+		co_return fg_Move(Keys);
+	}
+
+	NConcurrency::TCFuture<void> CKeyManagerServer::f_CopyKey(CKeyManagerKeyID &&_FromKey, CKeyManagerKeyID &&_ToKey)
+	{
+		auto &Internal = *mp_pInternal;
+
+		auto *pSourceClient = Internal.m_Database.m_Clients.f_FindEqual(_FromKey.m_HostID);
+		if (!pSourceClient)
+			co_return DMibErrorInstance("The source host was not found");
+
+		auto *pSourceKey = pSourceClient->m_Keys.f_FindEqual(_FromKey.m_KeyID);
+		if (!pSourceKey)
+			co_return DMibErrorInstance("The source key was not found");
+
+		if (!CActorDistributionManager::fs_IsValidHostID(_ToKey.m_HostID))
+			co_return DMibErrorInstance("'{}' is not a valid host ID"_f << _ToKey.m_HostID);
+
+		NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, CSymmetricKey> KeysToCreate;
+		KeysToCreate[CKeyManagerServerSync::CHostKeyID{.m_HostID = _ToKey.m_HostID, .m_KeyID = _ToKey.m_KeyID}] = pSourceKey->m_Key;
+
+		co_await fg_CallSafe
+			(
+				Internal.m_KeyManagerServerSyncInstance.m_pActor
+				, &CInternal::CKeyManagerServerSyncImplementation::f_CreateNewKeys
+				, fg_Move(KeysToCreate)
+			)
+		;
+
+		co_return {};
+	}
 }

@@ -603,6 +603,7 @@ namespace NMib::NCloud
 		bool bDatabaseChanged = false;
 
 		NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, CSymmetricKey> ForwardCreateNewKeys;
+		NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> ForwardVerified;
 
 		for (auto &KeyEntry : _Keys.f_Entries())
 		{
@@ -622,6 +623,9 @@ namespace NMib::NCloud
 			{
 				bDatabaseChanged = true;
 				ForwardCreateNewKeys(KeyID, Key);
+				(*KeyMapping).m_VerifiedOnServers[Internal.m_ThisHostID];
+				ForwardVerified[KeyID][Internal.m_ThisHostID];
+
 				AppAuditor.f_Info
 					(
 						"Created new key for host '{}' with ID '{}'. Received via server sync"_f
@@ -657,7 +661,7 @@ namespace NMib::NCloud
 			}
 		}
 
-		auto ForwardVerified = co_await Internal.f_ForwardCreateNewKeys(CallingHostInfo.f_GetRealHostID(), ForwardCreateNewKeys);
+		ForwardVerified += co_await Internal.f_ForwardCreateNewKeys(CallingHostInfo.f_GetRealHostID(), ForwardCreateNewKeys);
 
 		if (!ForwardVerified.f_IsEmpty())
 			bDatabaseChanged = true;
