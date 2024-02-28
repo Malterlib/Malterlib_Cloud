@@ -27,6 +27,13 @@ namespace NMib::NCloud
 
 		m_Database = fg_Move(*Database);
 
+		// In case you copied the database from another server, or this is a database version upgrade we need to add this host.
+		for (auto &Client : m_Database.m_Clients)
+		{
+			for (auto &Key : Client.m_Keys)
+				Key.m_VerifiedOnServers[m_ThisHostID];
+		}
+
 		co_return {};
 	}
 
