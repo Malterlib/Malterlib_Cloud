@@ -94,6 +94,29 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
+	auto CKeyManagerServer::CInternal::f_ForwardRemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> _HostIDs, NContainer::TCSet<NStr::CStr> _CheckedServers)
+		-> NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>>
+	{
+		TCActorResultVector<NContainer::TCSet<NStr::CStr>> ReportResults;
+
+		for (auto &OtherKeyManager : m_OtherKeyManagers)
+		{
+			if (_CheckedServers.f_FindEqual(OtherKeyManager.m_ActorInfo.m_HostInfo.m_HostID))
+				continue;
+
+			OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_RemoveVerifiedHosts)(_HostIDs, _CheckedServers) > ReportResults.f_AddResult();
+		}
+
+		auto Results = co_await ReportResults.f_GetUnwrappedResults();
+
+		NContainer::TCSet<NStr::CStr> RemovedIDs;
+
+		for (auto &Result : Results)
+			RemovedIDs += Result;
+
+		co_return fg_Move(RemovedIDs);
+	}
+
 	NConcurrency::TCFuture<NStorage::TCOptional<NConcurrency::CActorSubscription>> CKeyManagerServer::CInternal::f_UseAvailableKey(CSymmetricKey _Key)
 	{
 		TCActorResultMap<CHostInfo, CKeyManagerServerSync::CUseAvailableKeyResult> Results;
@@ -482,6 +505,51 @@ namespace NMib::NCloud
 			co_return AppAuditor.f_CriticalException({"Failed to write database", WriteResult.f_GetExceptionStr()});
 
 		co_return {};
+	}
+
+	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_RemoveVerifiedHosts
+		(
+			NContainer::TCSet<NStr::CStr> &&_HostIDs
+			, NContainer::TCSet<NStr::CStr> &&_CheckedServers
+		)
+	{
+		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
+
+		auto &Internal = *m_pThis->mp_pInternal;
+
+		auto CallingHostInfo = fg_GetCallingHostInfo();
+		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(CallingHostInfo, "KeyManager");
+
+		if (_HostIDs.f_FindEqual(Internal.m_ThisHostID))
+			co_return AppAuditor.f_Exception("The host ID {} you are trying to remove is still running"_f << Internal.m_ThisHostID);
+
+		if (!_CheckedServers(Internal.m_ThisHostID).f_WasCreated())
+			co_return {};
+
+		auto RemovedHosts = co_await Internal.f_ForwardRemoveVerifiedHosts(_HostIDs, _CheckedServers);
+
+		for (auto &Client : Internal.m_Database.m_Clients)
+		{
+			for (auto &Key : Client.m_Keys)
+			{
+				for (auto &RemoveKey : _HostIDs)
+				{
+					if (Key.m_VerifiedOnServers.f_Remove(RemoveKey))
+						RemovedHosts[RemoveKey];
+				}
+			}
+		}
+
+		if (RemovedHosts.f_IsEmpty())
+			co_return {};
+
+		AppAuditor.f_Info("Removed {} verified host IDs"_f << RemovedHosts.f_GetLen());
+
+		auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Internal.m_Database).f_Wrap();
+		if (!WriteResult)
+			co_return AppAuditor.f_CriticalException({"Failed to write database", WriteResult.f_GetExceptionStr()});
+
+		co_return fg_Move(RemovedHosts);
 	}
 
 	auto CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_UseAvailableKey(CSymmetricKey &&_Key) -> NConcurrency::TCFuture<CUseAvailableKeyResult>

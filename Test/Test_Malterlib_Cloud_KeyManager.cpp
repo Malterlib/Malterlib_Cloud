@@ -324,6 +324,11 @@ public:
 		auto HostID1 = co_await Helper1TrustManager(&CDistributedActorTrustManager::f_GetHostID);
 		DMibExpect(HostID0, !=, HostID1);
 
+		auto ServerHostID0 = co_await ServerTrustManager0(&CDistributedActorTrustManager::f_GetHostID);
+		DMibTestMark;
+		auto ServerHostID1 = co_await ServerTrustManager1(&CDistributedActorTrustManager::f_GetHostID);
+		DMibExpect(ServerHostID0, !=, ServerHostID1);
+
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
 			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(g_Timeout, "Timeout");
 
@@ -427,6 +432,33 @@ public:
 
 		DMibExpect(fs_CountAvailableKeys(DatabaseAfter0.m_AvailableKeys), ==, ExpectedAvailableKeys);
 		DMibExpect(fs_CountAvailableKeys(DatabaseAfter1.m_AvailableKeys), ==, ExpectedAvailableKeys);
+
+		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_NoPermissions))
+			co_return {};
+
+		auto Result0 = co_await KeyManagerServer0(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID0}).f_Timeout(g_Timeout, "Timeout").f_Wrap();
+		DMibExpectException(Result0.f_Get(), DMibErrorInstance("The host ID {} you are trying to remove is still running"_f << ServerHostID0));
+
+		auto Result1 = co_await KeyManagerServer1(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID0}).f_Timeout(g_Timeout, "Timeout").f_Wrap();
+		DMibExpectException(Result1.f_Get(), DMibErrorInstance("The host ID {} you are trying to remove is still running"_f << ServerHostID0));
+
+		auto DatabaseAfterRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+		auto DatabaseAfterRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+
+		DMibExpect(DatabaseAfterRemove0.m_Clients[HostID0].m_Keys["TestKey0"].m_VerifiedOnServers, ==, (TCSet<CStr>{ServerHostID0, ServerHostID1}));
+
+		DMibExpect(DatabaseAfterRemove0.m_Clients, ==, DatabaseAfter0.m_Clients);
+		DMibExpect(DatabaseAfterRemove0.m_AvailableKeys, ==, DatabaseAfter0.m_AvailableKeys);
+		DMibExpect(DatabaseAfterRemove1.m_Clients, ==, DatabaseAfter0.m_Clients);
+		DMibExpect(DatabaseAfterRemove1.m_AvailableKeys, ==, DatabaseAfter0.m_AvailableKeys);
+
+		co_await fg_Move(KeyManagerServer1).f_Destroy();
+
+		co_await KeyManagerServer0(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID1}).f_Timeout(g_Timeout, "Timeout");
+
+		auto DatabaseAfterRemoveSuccess0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+
+		DMibExpect(DatabaseAfterRemoveSuccess0.m_Clients[HostID0].m_Keys["TestKey0"].m_VerifiedOnServers, ==, TCSet<CStr>{ServerHostID0});
 
 		co_return {};
 	}

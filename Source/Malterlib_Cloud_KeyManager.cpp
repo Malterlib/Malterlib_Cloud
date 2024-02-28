@@ -25,6 +25,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CKeyManagerServerSync::f_UseAvailableKey);
 		DMibPublishActorFunction(CKeyManagerServerSync::f_PreCreateKeys);
 		DMibPublishActorFunction(CKeyManagerServerSync::f_KeysVerifiedOnServers);
+		DMibPublishActorFunction(CKeyManagerServerSync::f_RemoveVerifiedHosts);
 	}
 	
 	CKeyManagerServerSync::~CKeyManagerServerSync() = default;

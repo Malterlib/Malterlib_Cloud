@@ -73,4 +73,37 @@ namespace NMib::NCloud
 
 		co_return {};
 	}
+
+	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs)
+	{
+		auto &Internal = *mp_pInternal;
+
+		co_return co_await fg_CallSafe
+			(
+				Internal.m_KeyManagerServerSyncInstance.m_pActor
+				, &CInternal::CKeyManagerServerSyncImplementation::f_RemoveVerifiedHosts
+				, _HostIDs
+				, NContainer::TCSet<NStr::CStr>{}
+			)
+		;
+	}
+
+	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::f_GetAllVerifiedHosts()
+	{
+		auto &Internal = *mp_pInternal;
+
+		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(fg_GetCallingHostInfo(), "KeyManager");
+
+		NContainer::TCSet<NStr::CStr> Hosts;
+
+		for (auto &Client : Internal.m_Database.m_Clients)
+		{
+			for (auto &Key : Client.m_Keys)
+				Hosts += Key.m_VerifiedOnServers;
+		}
+
+		AppAuditor.f_Info("Returned verified host IDs");
+
+		co_return fg_Move(Hosts);
+	}
 }

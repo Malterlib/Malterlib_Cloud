@@ -93,14 +93,27 @@ namespace NMib::NCloud
 
 	struct CKeyManagerServer : public NConcurrency::CActor
 	{
+		struct CKeyManagerKeyID
+		{
+			NStr::CStr m_HostID;
+			NStr::CStr m_KeyID;
+		};
+
+		struct CKeyManagerKey
+		{
+			CKeyManagerKeyID m_Key;
+			NContainer::TCSet<NStr::CStr> m_VerifiedOnServers;
+		};
+
 		CKeyManagerServer(CKeyManagerServerConfig &&_Config);
 		~CKeyManagerServer();
-		
-		NConcurrency::TCFuture<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
+
 		NConcurrency::TCFuture<void> f_Init(fp32 _WaitForPublicationsTimeout);
+		NConcurrency::TCFuture<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
+		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs);
+		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_GetAllVerifiedHosts();
 
 	private:
-
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 		
 		struct CInternal;

@@ -119,6 +119,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<void> f_CreateNewKeys(NContainer::TCMap<CHostKeyID, CSymmetricKey> &&_Keys) = 0;
 		virtual NConcurrency::TCFuture<CUseAvailableKeyResult> f_UseAvailableKey(CSymmetricKey &&_Key) = 0;
 		virtual NConcurrency::TCFuture<void> f_PreCreateKeys(NContainer::TCSet<CSymmetricKey> &&_Keys) = 0;
+		virtual NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs, NContainer::TCSet<NStr::CStr> &&_CheckedServers) = 0;
 		virtual NConcurrency::TCFuture<void> f_KeysVerifiedOnServers(NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> &&_KeysVerifiedOnServers) = 0;
 	};
 

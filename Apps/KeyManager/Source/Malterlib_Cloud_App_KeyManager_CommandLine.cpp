@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/CommandLine/TableRenderer>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Cloud/KeyManagerServer>
 #include <Mib/Cloud/KeyManagerDatabases/EncryptedFile>
@@ -67,6 +68,42 @@ namespace NMib::NCloud::NKeyManager
 				}
 			)
 		;
+		DefaultSection.f_RegisterCommand
+			(
+				{
+					"Names"_o= {"--verified-host-remove"}
+					, "Description"_o= "Remove hosts that should no longer be part of the server cluster."
+					, "Parameters"_o=
+					{
+						"HostIDs"_o=
+						{
+							"Type"_o= CEJSONOrdered({""})
+							, "Description"_o= "The host IDs that should be removed."
+						}
+					}
+				}
+				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CKeyManagerDaemonActor::f_RemoveVerifiedHosts, TCSet<CStr>::fs_FromContainer(_Parameters["HostIDs"].f_StringArray()), _pCommandLine);
+				}
+			)
+		;
+		DefaultSection.f_RegisterCommand
+			(
+				{
+					"Names"_o= {"--verified-host-list"}
+					, "Description"_o= "Display all verified hosts in database."
+					, "Options"_o=
+					{
+						CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CKeyManagerDaemonActor::f_ListVerifiedHosts, _Parameters, _pCommandLine);
+				}
+			)
+		;
 	}
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
@@ -80,6 +117,56 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
+	TCFuture<uint32> CKeyManagerDaemonActor::f_RemoveVerifiedHosts(NContainer::TCSet<CStr> &&_HostIDs, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		if (!mp_ServerActor)
+			co_return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
+
+		auto RemovedHostIDs = co_await mp_ServerActor(&CKeyManagerServer::f_RemoveVerifiedHosts, _HostIDs);
+
+		*_pCommandLine %= "Removed {} hosts: {vs}\n"_f  << RemovedHostIDs.f_GetLen() << RemovedHostIDs;
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ListVerifiedHosts(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		if (!mp_ServerActor)
+			co_return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
+
+		auto Hosts = co_await mp_ServerActor(&CKeyManagerServer::f_GetAllVerifiedHosts);
+
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+		CTableRenderHelper::CColumnHelper Columns(0);
+		Columns.f_AddHeading("Host ID", 0);
+		Columns.f_AddHeading("Notes", 0);
+
+		auto ThisHostID = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_GetHostID);
+
+		TCActorResultMap<CStr, CStr> FriendlyNamesResults;
+		for (auto &HostID : Hosts)
+			mp_State.m_TrustManager(&CDistributedActorTrustManager::f_GetHostFriendlyName, HostID) > FriendlyNamesResults.f_AddResult(HostID);
+
+		auto FriendlyNames = co_await FriendlyNamesResults.f_GetUnwrappedResults();
+
+		TableRenderer.f_AddHeadings(&Columns);
+
+		for (auto &HostID : Hosts)
+		{
+			CHostInfo HostInfo(HostID, FriendlyNames[HostID]);
+
+			CStr Notes;
+			if (HostID == ThisHostID)
+				Notes = "Host ID for this server";
+
+			TableRenderer.f_AddRow(HostInfo.f_GetDescColored(AnsiEncoding.f_Flags()), Notes);
+		}
+
+		TableRenderer.f_Output(_Parameters);
+
+		co_return 0;
+	}
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStdInReaderPromptParams PasswordPrompt;
