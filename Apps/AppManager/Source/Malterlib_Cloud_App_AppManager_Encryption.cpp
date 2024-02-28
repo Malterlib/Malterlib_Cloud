@@ -69,11 +69,25 @@ namespace NMib::NCloud::NAppManager
 			Key = co_await KeyManagerInfo.m_Actor.f_CallActor(&CKeyManager::f_RequestKey)(pEncryptionApplication->m_Name, c_KeyBits / 8);
 		}
 
+		CStr UniqueName = CHash_SHA256::fs_DigestFromData(mp_State.m_RootDirectory.f_GetStr(), mp_State.m_RootDirectory.f_GetLen()).f_GetString().f_Left(8);
+
+		CStr DeviceName;
+		if (mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("UniqueEncriptionDeviceName", true).f_Boolean())
+			DeviceName = "enc_{}_{}"_f << UniqueName << pEncryptionApplication->m_Name.f_LowerCase();
+		else
+			DeviceName = "enc_{}"_f << pEncryptionApplication->m_Name.f_LowerCase();
+
+		CStr ZPoolName;
+		if (mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("UniqueZPoolName", false).f_Boolean())
+			ZPoolName = "zpool_{}_{}"_f << UniqueName << pEncryptionApplication->m_Name.f_LowerCase();
+		else
+			ZPoolName = "zpool_{}"_f << pEncryptionApplication->m_Name.f_LowerCase();
+
 		TCMap<CStr, CStr> Environment;
 		Environment["MibCloudApp_EncryptionStorage"] = pEncryptionApplication->m_Settings.m_EncryptionStorage;
 		Environment["MibCloudApp_EncryptionFileSystem"] = pEncryptionApplication->m_Settings.m_EncryptionFileSystem;
-		Environment["MibCloudApp_DeviceName"] = "enc_" + pEncryptionApplication->m_Name.f_LowerCase();
-		Environment["MibCloudApp_ZPoolName"] = "zpool_" + pEncryptionApplication->m_Name.f_LowerCase();
+		Environment["MibCloudApp_DeviceName"] = DeviceName;
+		Environment["MibCloudApp_ZPoolName"] = ZPoolName;
 		Environment["MibCloudApp_MountPoint"] = pEncryptionApplication->f_GetDirectory();
 		if (_Operation == EEncryptOperation_Setup && _bForceOverwrite)
 			Environment["MibCloudApp_ForceOverwrite"] = "1";
