@@ -74,12 +74,18 @@ namespace NMib::NCloud
 		)
 	{
 		auto &State = *m_pState;
+
+		if (State.m_Options & EOption_EnableOtherOutput)
+			_Params.f_Insert("--log-to-stderr");
+
+		auto SimpleLaunch = CProcessLaunchActor::CSimpleLaunch(_Executable, _Params, _WorkingDir, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode);
+
+		if (State.m_Options & EOption_EnableOtherOutput)
+			SimpleLaunch.m_ToLog |= CProcessLaunchActor::ELogFlag_Error | CProcessLaunchActor::ELogFlag_StdErr;
+
 		co_return
 			(
-				co_await CProcessLaunchActor::fs_LaunchSimple
-				(
-					CProcessLaunchActor::CSimpleLaunch(_Executable, _Params, _WorkingDir, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode)
-				)
+				co_await CProcessLaunchActor::fs_LaunchSimple(fg_Move(SimpleLaunch))
 				.f_Timeout(State.m_Timeout, "Timed out waiting for tool launch: {} {vs}"_f << _Executable << _Params)
 			)
 			.f_GetStdOut()
