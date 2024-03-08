@@ -283,42 +283,54 @@ public:
 			{
 				DMibTestPath("Local Store");
 
-				auto fGenerateSensorReading = [&]()
+				auto fGenerateSensorReading = g_ActorFunctor / [&]() -> TCFuture<void>
 					{
-						CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--generate-sensor-readings", "--no-random-values", "5"}, TestAppDirectory);
-						CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--generate-sensor-readings", "--no-random-values", "--reading-type=Version", "5"}, TestAppDirectory);
+						co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--generate-sensor-readings", "--no-random-values", "5"}, TestAppDirectory);
+						co_await AppManagerTestHelper.f_LaunchTool
+							(
+								TestAppDirectory / "TestApp"
+								, {"--generate-sensor-readings", "--no-random-values", "--reading-type=Version", "5"}
+								, TestAppDirectory
+							)
+						;
+
+						co_return {};
 					}
 				;
 
-				fGenerateSensorReading();
+				co_await fGenerateSensorReading();
 
-				auto fReadSensors = [&]()
+				auto fReadSensors = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
-						return fg_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-list", "--json"}, TestAppDirectory));
+						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-list", "--json"}, TestAppDirectory));
 					}
 				;
 
-				auto fReadSensorReadings = [&]()
+				auto fReadSensorReadings = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
-						return fg_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--newest", "--json"}, TestAppDirectory));
+						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--newest", "--json"}, TestAppDirectory));
 					}
 				;
 
-				auto fReadSensorStatus = [&]()
+				auto fReadSensorStatus = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
-						return fg_FromString(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--no-only-problems", "--json"}, TestAppDirectory));
+						co_return fg_FromString
+							(
+								co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-status", "--no-only-problems", "--json"}, TestAppDirectory)
+							)
+						;
 					}
 				;
 
-				DMibExpect(fReadSensors(), ==, fSortSensors(ExpectedSensors));
-				DMibExpect(fMakeComparable(fReadSensorReadings()), ==, ExpectedSensorReadings);
-				DMibExpect(fMakeComparable(fReadSensorStatus()), ==, ExpectedSensorStatus);
+				DMibExpect(co_await fReadSensors(), ==, fSortSensors(ExpectedSensors));
+				DMibExpect(fMakeComparable(co_await fReadSensorReadings()), ==, ExpectedSensorReadings);
+				DMibExpect(fMakeComparable(co_await fReadSensorStatus()), ==, ExpectedSensorStatus);
 			}
 
 			auto fSetHostInfo =
 				[
 					&
-					, TestAppHostID = CStr(CProcessLaunch::fs_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory).f_Trim())
+					, TestAppHostID = CStr(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim()
 					, HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName())
 				]
 				(CEJSONSorted const &_JSON)
@@ -341,27 +353,31 @@ public:
 
 				CStr AppManagerPath = AppManagerInfo.m_RootDirectory / "AppManager";
 
-				auto fReadSensors = [&]()
+				auto fReadSensors = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
-						return fg_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-list", "--json"}, AppManagerInfo.m_RootDirectory));
+						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-list", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
-				auto fReadSensorReadings = [&]()
+				auto fReadSensorReadings = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
-						return fg_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory));
+						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
-				auto fReadSensorStatus = [&]()
+				auto fReadSensorStatus = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
-						return fg_FromString(CProcessLaunch::fs_LaunchTool(AppManagerPath, {"--sensor-status", "--no-only-problems", "--json"}, AppManagerInfo.m_RootDirectory));
+						co_return fg_FromString
+							(
+								co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-status", "--no-only-problems", "--json"}, AppManagerInfo.m_RootDirectory)
+							)
+						;
 					}
 				;
 
-				DMibExpect(fReadSensors(), ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
-				DMibExpect(fMakeComparable(fReadSensorReadings()), ==, fSetHostInfo(ExpectedSensorReadings));
-				DMibExpect(fSortSensors(fMakeComparable(fReadSensorStatus())), ==, fSortSensors(fSetHostInfo(ExpectedSensorStatus)));
+				DMibExpect(co_await fReadSensors(), ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
+				DMibExpect(fMakeComparable(co_await fReadSensorReadings()), ==, fSetHostInfo(ExpectedSensorReadings));
+				DMibExpect(fSortSensors(fMakeComparable(co_await fReadSensorStatus())), ==, fSortSensors(fSetHostInfo(ExpectedSensorStatus)));
 			}
 
 			{
@@ -370,35 +386,43 @@ public:
 				CStr CloudClientDirectory = AppManagerTestHelper.m_pState->m_RootDirectory / "MalterlibCloud";
 				CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
 
-				auto fReadSensors = [&]()
+				auto fReadSensors = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
-						return fg_FromString(CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-list", "--json"}, CloudClientDirectory));
+						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-list", "--json"}, CloudClientDirectory));
 					}
 				;
 
-				auto fReadSensorReadings = [&]()
+				auto fReadSensorReadings = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
-						return fg_FromString(CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-readings-list", "--newest", "--json"}, CloudClientDirectory));
+						co_return fg_FromString
+							(
+								co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-readings-list", "--newest", "--json"}, CloudClientDirectory)
+							)
+						;
 					}
 				;
 
-				auto fReadSensorStatus = [&]()
+				auto fReadSensorStatus = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
 					{
-						return fg_FromString(CProcessLaunch::fs_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-status", "--no-only-problems", "--json"}, CloudClientDirectory));
+						co_return fg_FromString
+							(
+								co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-status", "--no-only-problems", "--json"}, CloudClientDirectory)
+							)
+						;
 					}
 				;
 
-				DMibExpect(fReadSensors(), ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
+				DMibExpect(co_await fReadSensors(), ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
 				DMibExpect
 					(
-						fMakeComparable(fReadSensorReadings())
+						fMakeComparable(co_await fReadSensorReadings())
 						, ==
 						, fSetHostInfo(ExpectedSensorReadings)
 					)
 				;
 				DMibExpect
 					(
-						fSortSensors(fMakeComparable(fReadSensorStatus()))
+						fSortSensors(fMakeComparable(co_await fReadSensorStatus()))
 						, ==
 						, fSortSensors(fSetHostInfo(ExpectedSensorStatus))
 					)
