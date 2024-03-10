@@ -2026,7 +2026,7 @@ public:
 					// Wait for secrets manager to handle the upload request
 					fg_Move(UploadInitializedFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					// Wait a while so we reproduce the race condition with file existing during RSync
-					fg_Timeout(0.1).f_Dispatch().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fg_Timeout(fp64(0.001) + NMisc::fg_GetRandomFloat() * 0.1).f_Dispatch().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					fSetProperties(ID.m_Folder, ID.m_Name, CSecretsManager::CSecretProperties{}.f_SetSecret(fg_TempCopy(StringSecret)));
 					// Flush file ops before checking number of files in the secret directory
 
