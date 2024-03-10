@@ -27,8 +27,6 @@ using namespace NMib::NTest;
 
 static fp64 g_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0 * gc_TimeoutMultiplier;
 
-#define DTestNetworkTunnelEnableLogging 0
-
 struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 {
 	struct CTestNetworkTunnelServerApp : public CDistributedAppActor
@@ -130,23 +128,20 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 						, _Params["TunnelName"].f_String()
 						, g_ActorFunctor / [](CNetAddress const &_Address) -> TCFuture<void> // New connection
 						{
-							#if DTestNetworkTunnelEnableLogging
+							if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 								DMibConErrOut2("New connection: {}\n", _Address.f_GetString());
-							#endif
 							co_return {};
 						}
 						, g_ActorFunctor / [](CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void> // On Close
 						{
-							#if DTestNetworkTunnelEnableLogging
+							if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 								DMibConErrOut2("Connection from '{}' closed: {}\n", _Address.f_GetString(), _Message);
-							#endif
 							co_return {};
 						}
 						, g_ActorFunctor / [](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void> // On Error
 						{
-							#if DTestNetworkTunnelEnableLogging
+							if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 								DMibConErrOut2("Connection from '{}' error: {}\n", _Address.f_GetString(), _Error);
-							#endif
 							co_return {};
 						}
 						, _Params["ListenHost"].f_String()
@@ -188,9 +183,6 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 	{
 		DMibTestSuite("General")
 		{
-#if DTestNetworkTunnelEnableLogging
-			fg_GetSys()->f_AddStdErrLogger();
-#endif
 			CActorRunLoopTestHelper RunLoopHelper;
 			
 			CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/NetworkTunnelGeneral";
@@ -240,7 +232,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			Dependencies.m_TrustManager = TrustManager;
 			Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
-			TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestNetworkTunnelEnableLogging);
+			TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, !!(fg_TestReportFlags() & ETestReportFlag_EnableLogs));
 			auto Cleanup = g_OnScopeExit / [&]
 				{
 					LaunchHelper->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());

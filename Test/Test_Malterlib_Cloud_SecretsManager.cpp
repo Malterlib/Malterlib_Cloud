@@ -45,8 +45,6 @@ using namespace NMib::NStorage;
 using namespace NMib::NNetwork;
 using namespace NMib::NTest;
 
-#define DTestSecretsManagerEnableLogging 0
-
 static fp64 g_Timeout = 60.0 * gc_TimeoutMultiplier;
 
 namespace NMib::NFile
@@ -159,9 +157,6 @@ public:
 		;
 #endif
 
-#if DTestSecretsManagerEnableLogging
-		fg_GetSys()->f_AddStdErrLogger();
-#endif
 		CActorRunLoopTestHelper RunLoopHelper;
 
 		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
@@ -211,7 +206,7 @@ public:
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CSecretsManager::mc_pDefaultNamespace);
 		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
-		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestSecretsManagerEnableLogging);
+		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, !!(fg_TestReportFlags() & ETestReportFlag_EnableLogs));
 		auto Cleanup = g_OnScopeExit / [&]
 			{
 				LaunchHelper->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
@@ -306,9 +301,9 @@ public:
 			CProcessLaunchActor::CSimpleLaunch LaunchParams{KeyManagerDirectory + "/KeyManager", {"--provide-password"}};
 			LaunchParams.m_DestructFlags = EProcessLaunchCloseFlag_BlockOnExit;
 			LaunchParams.m_ToLog = CProcessLaunchActor::ELogFlag_All;
-#if DTestSecretsManagerEnableLogging
-			LaunchParams.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
-#endif
+			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+				LaunchParams.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
+
 			TCPromise<void> LaunchedPromise;
 			TCPromise<void> ExitedPromise;
 

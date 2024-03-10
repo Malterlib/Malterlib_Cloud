@@ -35,8 +35,6 @@ using namespace NMib::NTime;
 using namespace NMib::NNetwork;
 using namespace NMib::NTest;
 
-#define DTestBackupManagerEnableLogging 0
-
 static fp64 g_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0 * gc_TimeoutMultiplier;
 
 class CBackupManager_Tests : public NMib::NTest::CTest
@@ -572,7 +570,7 @@ public:
 		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CBackupManager::mc_pDefaultNamespace);
 		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
-		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestBackupManagerEnableLogging);
+		TCActor<CDistributedApp_LaunchHelper> LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, !!(fg_TestReportFlags() & ETestReportFlag_EnableLogs));
 		auto Cleanup = g_OnScopeExit / [&]
 			{
 				LaunchHelper->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
