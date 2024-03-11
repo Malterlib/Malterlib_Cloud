@@ -118,7 +118,7 @@ namespace NMib::NCloud
 		for (auto &Client : Internal.m_Database.m_Clients)
 		{
 			for (auto &Key : Client.m_Keys)
-				Keys.f_Insert(fg_Construct(CKeyManagerKeyID{.m_HostID = Client.f_GetID(), .m_KeyID = Key.f_GetID()}, Key.m_VerifiedOnServers));
+				Keys.f_Insert(CKeyManagerKey{.m_Key = CKeyManagerKeyID{.m_HostID = Client.f_GetID(), .m_KeyID = Key.f_GetID()}, .m_VerifiedOnServers = Key.m_VerifiedOnServers});
 		}
 
 		AppAuditor.f_Info("Returned all keys");
