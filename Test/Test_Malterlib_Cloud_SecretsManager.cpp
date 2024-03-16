@@ -2237,7 +2237,7 @@ public:
 					TCSharedPointer<TCAtomic<bool>> pDestroyFinished = fg_Construct(false);
 					TCSharedPointer<NThread::CEvent> pDestroyFinishedEvent = fg_Construct();
 					auto Subscription = fg_Move(SecretsManagerLaunches[0].m_Subscription);
-					Subscription->f_Destroy() > NConcurrency::NPrivate::fg_DirectResultActor() / [=](auto &&)
+					Subscription->f_Destroy() > NConcurrency::fg_DirectResultActor() / [=](auto &&)
 						{
 							pDestroyFinished->f_Exchange(true);
 							pDestroyFinishedEvent->f_SetSignaled();
