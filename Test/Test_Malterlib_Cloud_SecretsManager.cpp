@@ -165,7 +165,7 @@ public:
 
 		auto SecretsManagerPermissionsForTest = fg_CreateMap<CStr, CPermissionRequirements>("SecretsManager/CommandAll", "SecretsManager/*/*/*");
 
-		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);
+		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 10.0);
 
 		for (mint i = 0; i < 5; ++i)
 		{

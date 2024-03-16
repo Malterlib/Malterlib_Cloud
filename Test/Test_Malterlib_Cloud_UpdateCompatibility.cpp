@@ -349,7 +349,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fCleanup = [&]
 			{
-				CProcessLaunch::fs_KillProcessesInDirectory("AppManager", {}, RootDirectory, 1000.0);
+				CProcessLaunch::fs_KillProcessesInDirectory("AppManager", {}, RootDirectory, 10.0);
 				CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 0.5);
 
 				for (auto User : CreatedUsers)

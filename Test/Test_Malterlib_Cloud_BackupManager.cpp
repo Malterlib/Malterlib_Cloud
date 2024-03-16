@@ -538,7 +538,7 @@ public:
 		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
 		CStr RootDirectory = ProgramDirectory + "/BackupManagerTests";
 
-		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, g_Timeout);
+		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 10.0);
 
 		if (CFile::fs_FileExists(RootDirectory))
 			CFile::fs_DeleteDirectoryRecursive(RootDirectory);

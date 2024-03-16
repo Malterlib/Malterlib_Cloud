@@ -458,7 +458,7 @@ namespace NMib::NCloud
 		auto &State = *m_pState;
 
 		State.m_nAppManagers = _nAppManagers;
-		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, State.m_RootDirectory, State.m_Timeout);
+		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, State.m_RootDirectory, 10.0);
 
 		for (mint i = 0; i < 5; ++i)
 		{
