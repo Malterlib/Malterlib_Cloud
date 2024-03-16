@@ -411,7 +411,11 @@ namespace NMib::NCloud
 		;
 
 		while (!fApplicationsDone() && Clock.f_GetTime() < State.m_Timeout)
+		{
+			co_await fg_Timeout(0.005);
 			Applications = co_await State.m_CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)().f_Timeout(State.m_Timeout, "Timed out waiting for app manager enumeration 4");
+		}
+
 		DMibExpect(Applications.f_GetLen(), ==, State.m_nAppManagers);
 
 		for (auto &Application : Applications)

@@ -47,17 +47,27 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		struct CInitResult
+		{
+			CStr m_DatabaseUniqueKey;
+			uint64 m_LastUpdateSequence;
+		};
+
+		TCPromise<CInitResult> InitResult;
+
 		co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [pThis = this, InitResult](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
 
 					if (_bCompacting)
-						WriteTransaction = co_await fp_CleanupDatabase(fg_Move(WriteTransaction));
+						WriteTransaction = co_await pThis->fp_CleanupDatabase(fg_Move(WriteTransaction));
+
+					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 					auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
@@ -72,19 +82,29 @@ namespace NMib::NCloud::NAppManager
 
 					WriteCursor.f_Upsert(Key, Value);
 
-					mp_DatabaseUniqueKey = Value.m_UniqueKey;
-					mp_LastUpdateSequence = Value.m_LastUpdateSequenceAtCleanup;
+					CInitResult Result;
+
+					Result.m_DatabaseUniqueKey = Value.m_UniqueKey;
+					Result.m_LastUpdateSequence = Value.m_LastUpdateSequenceAtCleanup;
 
 					{
 						auto ReadCursor = WriteTransaction.m_Transaction.f_ReadCursor(CUpdateNotificationKey::mc_Prefix);
 						if (ReadCursor.f_Last())
-							mp_LastUpdateSequence = fg_Max(mp_LastUpdateSequence, ReadCursor.f_Key<CUpdateNotificationKey>().m_UniqueSequence);
+							Result.m_LastUpdateSequence = fg_Max(Result.m_LastUpdateSequence, ReadCursor.f_Key<CUpdateNotificationKey>().m_UniqueSequence);
 					}
+
+					if (!InitResult.f_IsSet())
+						InitResult.f_SetResult(fg_Move(Result));
 
 					co_return fg_Move(WriteTransaction);
 				}
 			)
 		;
+
+		auto Result = co_await InitResult.f_Future();
+
+		mp_DatabaseUniqueKey = Result.m_DatabaseUniqueKey;
+		mp_LastUpdateSequence = Result.m_LastUpdateSequence;
 
 		co_return {};
 	}

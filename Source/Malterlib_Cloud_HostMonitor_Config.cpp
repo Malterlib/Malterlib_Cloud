@@ -254,35 +254,44 @@ namespace NMib::NCloud
 
 		TCOptional<CConfigFileKeyValue> OldKeyValue;
 		{
-			auto CaptureScope = co_await (g_CaptureExceptions % "Error reading config file data when comparing changed config file");
-
 			auto ReadTransaction = co_await m_Database(&CDatabaseActor::f_OpenTransactionRead);
 
-			auto iConfigFile = ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix, _FileName);
-			if (iConfigFile.f_Last())
-			{
-				CConfigFileKeyValue Value;
-				try
-				{
-					Value.m_Key = iConfigFile.f_Key<CConfigFileHistoryEntryKey>();
-					Value.m_Value = iConfigFile.f_Value<CConfigFileHistoryEntryValue>();
+			OldKeyValue = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[_FileName](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						TCOptional<CConfigFileKeyValue> OldKeyValue;
+						auto iConfigFile = _ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix, _FileName);
+						if (iConfigFile.f_Last())
+						{
+							CConfigFileKeyValue Value;
+							try
+							{
+								Value.m_Key = iConfigFile.f_Key<CConfigFileHistoryEntryKey>();
+								Value.m_Value = iConfigFile.f_Value<CConfigFileHistoryEntryValue>();
 
-					OldKeyValue = fg_Move(Value);
-				}
-				catch (CException const &_Exception)
-				{
-					DMibLogWithCategory
-						(
-							Malterlib/Cloud/HostMonitor
-							, Error
-							, "Failed to read old config value for file '{}' with value size {}: {}"
-							, _FileName
-							, iConfigFile.f_Value().m_Size
-							, _Exception
-						)
-					;
-				}
-			}
+								OldKeyValue = fg_Move(Value);
+							}
+							catch (CException const &_Exception)
+							{
+								DMibLogWithCategory
+									(
+										Malterlib/Cloud/HostMonitor
+										, Error
+										, "Failed to read old config value for file '{}' with value size {}: {}"
+										, _FileName
+										, iConfigFile.f_Value().m_Size
+										, _Exception
+									)
+								;
+							}
+						}
+
+						return OldKeyValue;
+					}
+					, "Error reading config file data when comparing changed config file"
+				)
+			;
 		}
 
 		if (OldKeyValue)
@@ -306,6 +315,8 @@ namespace NMib::NCloud
 					// TODO: Handle _bCompacting
 
 					auto WriteTransaction = fg_Move(_Transaction);
+
+					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 					CConfigFileHistoryEntryKey Key{.m_VersionKey = {.m_FileName = _FileName}};
 
@@ -562,76 +573,94 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 
-		auto CaptureScope = co_await (g_CaptureExceptions % "Error reading from database");
-
 		auto ReadTransaction = co_await Internal.m_Database(&CDatabaseActor::f_OpenTransactionRead);
 
-		TCSet<CStr> ConfigFiles;
+		co_return co_await fg_Move(ReadTransaction).f_BlockingDispatch
+			(
+				[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+				{
+					TCSet<CStr> ConfigFiles;
 
-		CStr LastFile;
-		for (auto iConfigFile = ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix); iConfigFile; ++iConfigFile)
-		{
-			auto Key = iConfigFile.f_Key<CConfigFileHistoryEntryKey>();
+					CStr LastFile;
+					for (auto iConfigFile = _ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix); iConfigFile; ++iConfigFile)
+					{
+						auto Key = iConfigFile.f_Key<CConfigFileHistoryEntryKey>();
 
-			if (LastFile == Key.m_VersionKey.m_FileName)
-				continue;
-			LastFile = Key.m_VersionKey.m_FileName;
+						if (LastFile == Key.m_VersionKey.m_FileName)
+							continue;
+						LastFile = Key.m_VersionKey.m_FileName;
 
-			ConfigFiles[Key.m_VersionKey.m_FileName];
-		}
+						ConfigFiles[Key.m_VersionKey.m_FileName];
+					}
 
-		co_return fg_Move(ConfigFiles);
+					return ConfigFiles;
+				}
+				, "Error reading from database"
+			)
+		;
 	}
 
 	TCFuture<TCMap<CConfigFileVersionKey, CConfigFileProperties>> CHostMonitor::f_EnumConfigFileVersions(CStr &&_File)
 	{
 		auto &Internal = *mp_pInternal;
 
-		auto CaptureScope = co_await (g_CaptureExceptions % "Error reading from database");
-
 		auto ReadTransaction = co_await Internal.m_Database(&CDatabaseActor::f_OpenTransactionRead);
 
-		TCMap<CConfigFileVersionKey, CConfigFileProperties> ConfigFileVersions;
+		co_return co_await fg_Move(ReadTransaction).f_BlockingDispatch
+			(
+				[_File](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+				{
+					TCMap<CConfigFileVersionKey, CConfigFileProperties> ConfigFileVersions;
 
-		for (auto iConfigFile = ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix, _File); iConfigFile; ++iConfigFile)
-		{
-			auto Key = iConfigFile.f_Key<CConfigFileHistoryEntryKey>();
-			auto Value = iConfigFile.f_Value<CConfigFileHistoryEntryValue>();
+					for (auto iConfigFile = _ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix, _File); iConfigFile; ++iConfigFile)
+					{
+						auto Key = iConfigFile.f_Key<CConfigFileHistoryEntryKey>();
+						auto Value = iConfigFile.f_Value<CConfigFileHistoryEntryValue>();
 
-			ConfigFileVersions[fg_Move(Key.m_VersionKey)] = fg_Move(Value.m_Properties);
-		}
+						ConfigFileVersions[fg_Move(Key.m_VersionKey)] = fg_Move(Value.m_Properties);
+					}
 
-		co_return fg_Move(ConfigFileVersions);
+					return ConfigFileVersions;
+				}
+				, "Error reading from database"
+			)
+		;
 	}
 
 	TCFuture<CConfigFileContents> CHostMonitor::f_GetConfigFileContents(CConfigFileVersionKey &&_Key)
 	{
 		auto &Internal = *mp_pInternal;
 
-		auto CaptureScope = co_await (g_CaptureExceptions % "Error reading from database");
-
 		auto ReadTransaction = co_await Internal.m_Database(&CDatabaseActor::f_OpenTransactionRead);
 
-		CConfigFileHistoryEntryValue Value;
-		if (_Key.m_Sequence == TCLimitsInt<uint64>::mc_Max)
-		{
-			auto iConfigFile = ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix, _Key.m_FileName);
-			if (!iConfigFile.f_Last())
-				co_return DMibErrorInstance("File does not exist in database");
+		co_return co_await fg_Move(ReadTransaction).f_BlockingDispatch
+			(
+				[_Key = fg_Move(_Key)](CDatabaseActor::CTransactionRead &&_ReadTransaction) mutable -> TCFuture<CConfigFileContents>
+				{
+					CConfigFileHistoryEntryValue Value;
+					if (_Key.m_Sequence == TCLimitsInt<uint64>::mc_Max)
+					{
+						auto iConfigFile = _ReadTransaction.m_Transaction.f_ReadCursor(CConfigFileHistoryEntryKey::mc_Prefix, _Key.m_FileName);
+						if (!iConfigFile.f_Last())
+							co_return DMibErrorInstance("File does not exist in database");
 
-			Value = iConfigFile.f_Value<CConfigFileHistoryEntryValue>();
-		}
-		else
-		{
-			CConfigFileHistoryEntryKey Key = {.m_VersionKey = fg_Move(_Key)};
+						Value = iConfigFile.f_Value<CConfigFileHistoryEntryValue>();
+					}
+					else
+					{
+						CConfigFileHistoryEntryKey Key = {.m_VersionKey = fg_Move(_Key)};
 
-			if (!ReadTransaction.m_Transaction.f_Get(Key, Value))
-				co_return DMibErrorInstance("Version does not exist in database");
-		}
+						if (!_ReadTransaction.m_Transaction.f_Get(Key, Value))
+							co_return DMibErrorInstance("Version does not exist in database");
+					}
 
-		if (!Value.m_Properties.m_UniqueProperties.m_bExists)
-			co_return DMibErrorInstance("The config file does not exist");
+					if (!Value.m_Properties.m_UniqueProperties.m_bExists)
+						co_return DMibErrorInstance("The config file does not exist");
 
-		co_return fg_Move(Value.m_Contents);
+					co_return fg_Move(Value.m_Contents);
+				}
+				, "Error reading from database"
+			)
+		;
 	}
 }

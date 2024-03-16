@@ -93,22 +93,33 @@ namespace NMib::NCloud::NAppManager
 		auto SequenceSubscription = co_await pSubscription->m_Sequencer.f_Sequence();
 
 		{
-			auto CaptureScope = co_await (g_CaptureExceptions % "Error reading notification data from database");
 			auto ReadTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
 
-			auto iNotification = ReadTransaction.m_Transaction.f_ReadCursor(CUpdateNotificationKey::mc_Prefix);
-			iNotification.f_FindLowerBound(CUpdateNotificationKey::mc_Prefix, _LastSeenNotification);
+			auto NotificationsToSend = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[_LastSeenNotification](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						auto iNotification = _ReadTransaction.m_Transaction.f_ReadCursor(CUpdateNotificationKey::mc_Prefix);
+						iNotification.f_FindLowerBound(CUpdateNotificationKey::mc_Prefix, _LastSeenNotification);
 
-			for (; iNotification; ++iNotification)
-			{
-				auto Key = iNotification.f_Key<CUpdateNotificationKey>();
-				if (Key.m_UniqueSequence <= _LastSeenNotification)
-					continue;
+						TCVector<CAppManagerInterface::CUpdateNotification> Return;
+						for (; iNotification; ++iNotification)
+						{
+							auto Key = iNotification.f_Key<CUpdateNotificationKey>();
+							if (Key.m_UniqueSequence <= _LastSeenNotification)
+								continue;
 
-				auto Value = iNotification.f_Value<CUpdateNotificationValue>();
+							Return.f_Insert(fg_Move(iNotification.f_Value<CUpdateNotificationValue>().m_Notification));
+						}
 
-				co_await fp_SendUpdateNotification(_SubscriptionID, Value.m_Notification, false);
-			}
+						return Return;
+					}
+					, "Error reading notification data from database"
+				)
+			;
+
+			for (auto &Notification : NotificationsToSend)
+				co_await fp_SendUpdateNotification(_SubscriptionID, Notification, false);
 		}
 
 		co_return {};

@@ -148,138 +148,152 @@ namespace NMib::NCloud::NCloudManager
 
 	auto CCloudManagerServer::fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction, TCSharedPointer<CCleanupState> &&_pState) -> TCFuture<CCleanupDatabaseResult>
 	{
-		auto &State = *_pState;
-		State.f_Initialize(_WriteTransaction);
-
-		auto OnResume = co_await f_CheckDestroyedOnResume();
-
-		auto WriteTransaction = co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_PrepareForCleanup, fg_Move(_WriteTransaction));
-		WriteTransaction = co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_PrepareForCleanup, fg_Move(WriteTransaction));
-
-		CDistributedAppLogStoreLocal::CCleanupHelper LogHelper;
-		NTime::CTime NextLogTime;
-		bool bHasLog = LogHelper.f_Init(WriteTransaction, mc_DatabasePrefixLog, NextLogTime);
-
-		CDistributedAppSensorStoreLocal::CCleanupHelper SensorHelper;
-		NTime::CTime NextSensorTime;
-		bool bHasSensor = SensorHelper.f_Init(WriteTransaction, mc_DatabasePrefixSensor, NextSensorTime);
-
-		bool bDoRetention = mp_RetentionDays > 0;
-		NTime::CTime OldestAllowedReading = NTime::CTime::fs_NowUTC() - NTime::CTimeSpanConvert::fs_CreateDaySpan(mp_RetentionDays);
-
-		State.mp_StartTime = fg_Min(State.mp_StartTime, NextLogTime, NextSensorTime);
-		State.mp_EndTime = fg_Max(State.mp_EndTime, NextLogTime, NextSensorTime);
-
-		if (State.mp_OriginalStats.m_UsedBytes < State.mp_TargetSize)
-		{
-			if (!bDoRetention)
-				co_return {.m_Transaction = fg_Move(WriteTransaction)};
-
-			if (State.mp_StartTime.f_IsValid() && State.mp_StartTime > OldestAllowedReading)
-				co_return {.m_Transaction = fg_Move(WriteTransaction)};
-		}
-
-		CClock RuntimeClock(true);
-		CClock YieldClock(true);
-
-		if ((bHasLog && NextLogTime.f_IsValid()) || (bHasSensor && NextSensorTime.f_IsValid()))
-			State.f_LogStartup();
-
-		auto fCheckStatsLog = [&]()
-			{
-				fp64 StatsTime = State.mp_StatsClock.f_GetTime();
-				if (StatsTime > gc_LogStatsInterval)
+		co_return co_await
+			(
+				g_Dispatch(_WriteTransaction.f_Checkout())
+				/
+				[
+					AppLogStore = mp_AppLogStore
+					, AppSensorStore = mp_AppSensorStore
+					, pState = fg_Move(_pState)
+					, WriteTransaction = fg_Move(_WriteTransaction)
+					, RetentionDays = mp_RetentionDays
+				]
+				() mutable -> TCFuture<CCleanupDatabaseResult>
 				{
-					State.mp_StatsClock.f_AddOffset(fp64(gc_LogStatsInterval) * (StatsTime / gc_LogStatsInterval).f_Floor());
-					State.f_Log(true);
-				}
-			}
-		;
+					auto &State = *pState;
+					State.f_Initialize(WriteTransaction);
 
-		fCheckStatsLog();
+					WriteTransaction = co_await AppLogStore(&CDistributedAppLogStoreLocal::f_PrepareForCleanup, fg_Move(WriteTransaction));
+					WriteTransaction = co_await AppSensorStore(&CDistributedAppSensorStoreLocal::f_PrepareForCleanup, fg_Move(WriteTransaction));
 
-		while (bHasLog || bHasSensor)
-		{
-			bool bDoLog = false;
-			bool bDoSensor = false;
-			if (bHasLog && bHasSensor)
-			{
-				if (NextLogTime.f_IsValid() && NextSensorTime.f_IsValid())
-				{
-					if (NextLogTime < NextSensorTime)
-						bDoLog = true;
-					else
-						bDoSensor = true;
-				}
-				else if (NextLogTime.f_IsValid())
-					bDoLog = true;
-				else if (NextSensorTime.f_IsValid())
-					bDoSensor = true;
-			}
-			else if (bHasLog && NextLogTime.f_IsValid())
-				bDoLog = true;
-			else if (bHasSensor && NextSensorTime.f_IsValid())
-				bDoSensor = true;
-			else
-				bDoLog = true;
+					CDistributedAppLogStoreLocal::CCleanupHelper LogHelper;
+					NTime::CTime NextLogTime;
+					bool bHasLog = LogHelper.f_Init(WriteTransaction, mc_DatabasePrefixLog, NextLogTime);
 
-			if (bDoSensor)
-			{
-				bHasSensor = SensorHelper.f_DeleteOne(WriteTransaction, NextSensorTime);
-				State.mp_EndTime = NextSensorTime;
-				++State.mp_nReadingsDeletedSensor;
-			}
-			else if (bDoLog)
-			{
-				bHasLog = LogHelper.f_DeleteOne(WriteTransaction, NextLogTime);
-				State.mp_EndTime = NextLogTime;
-				++State.mp_nReadingsDeletedLog;
-			}
-			else
-				break;
+					CDistributedAppSensorStoreLocal::CCleanupHelper SensorHelper;
+					NTime::CTime NextSensorTime;
+					bool bHasSensor = SensorHelper.f_Init(WriteTransaction, mc_DatabasePrefixSensor, NextSensorTime);
 
-			State.mp_CurrentStats = WriteTransaction.m_Transaction.f_SizeStatistics();
+					bool bDoRetention = RetentionDays > 0;
+					NTime::CTime OldestAllowedReading = NTime::CTime::fs_NowUTC() - NTime::CTimeSpanConvert::fs_CreateDaySpan(RetentionDays);
 
-			if (!State.m_bForcedCompaction && State.mp_CurrentStats.m_UsedBytes < State.mp_MaxFreedLimit)
-			{
-				// Avoid pathological performance case in database
-				++State.mp_nDatabaseYields;
-				fCheckStatsLog();
-				co_return {.m_Transaction = fg_Move(WriteTransaction), .m_bMoreWork = true};
-			}
+					State.mp_StartTime = fg_Min(State.mp_StartTime, NextLogTime, NextSensorTime);
+					State.mp_EndTime = fg_Max(State.mp_EndTime, NextLogTime, NextSensorTime);
 
-			if (State.mp_CurrentStats.m_UsedBytes < State.mp_TargetSize)
-			{
-				if (!bDoRetention)
-					break;
-
-				if (State.mp_EndTime.f_IsValid() && State.mp_EndTime > OldestAllowedReading)
-					break;
-			}
-
-			fp64 YieldTime = YieldClock.f_GetTime();
-			if (YieldTime > gc_YieldInterval)
-			{
-				++State.mp_nYields;
-				YieldClock.f_AddOffset(fp64(gc_YieldInterval) * (YieldTime / gc_YieldInterval).f_Floor());
-				co_await g_Yield;
-
-				fCheckStatsLog();
-
-				if (!State.m_bForcedCompaction)
-				{
-					if (RuntimeClock.f_GetTime() > gc_MaxRunTime)
+					if (State.mp_OriginalStats.m_UsedBytes < State.mp_TargetSize)
 					{
-						++State.mp_nDatabaseYields;
-						co_return {.m_Transaction = fg_Move(WriteTransaction), .m_bMoreWork = true};
+						if (!bDoRetention)
+							co_return {.m_Transaction = fg_Move(WriteTransaction)};
+
+						if (State.mp_StartTime.f_IsValid() && State.mp_StartTime > OldestAllowedReading)
+							co_return {.m_Transaction = fg_Move(WriteTransaction)};
 					}
+
+					CClock RuntimeClock(true);
+					CClock YieldClock(true);
+
+					if ((bHasLog && NextLogTime.f_IsValid()) || (bHasSensor && NextSensorTime.f_IsValid()))
+						State.f_LogStartup();
+
+					auto fCheckStatsLog = [&]()
+						{
+							fp64 StatsTime = State.mp_StatsClock.f_GetTime();
+							if (StatsTime > gc_LogStatsInterval)
+							{
+								State.mp_StatsClock.f_AddOffset(fp64(gc_LogStatsInterval) * (StatsTime / gc_LogStatsInterval).f_Floor());
+								State.f_Log(true);
+							}
+						}
+					;
+
+					fCheckStatsLog();
+
+					while (bHasLog || bHasSensor)
+					{
+						bool bDoLog = false;
+						bool bDoSensor = false;
+						if (bHasLog && bHasSensor)
+						{
+							if (NextLogTime.f_IsValid() && NextSensorTime.f_IsValid())
+							{
+								if (NextLogTime < NextSensorTime)
+									bDoLog = true;
+								else
+									bDoSensor = true;
+							}
+							else if (NextLogTime.f_IsValid())
+								bDoLog = true;
+							else if (NextSensorTime.f_IsValid())
+								bDoSensor = true;
+						}
+						else if (bHasLog && NextLogTime.f_IsValid())
+							bDoLog = true;
+						else if (bHasSensor && NextSensorTime.f_IsValid())
+							bDoSensor = true;
+						else
+							bDoLog = true;
+
+						if (bDoSensor)
+						{
+							bHasSensor = SensorHelper.f_DeleteOne(WriteTransaction, NextSensorTime);
+							State.mp_EndTime = NextSensorTime;
+							++State.mp_nReadingsDeletedSensor;
+						}
+						else if (bDoLog)
+						{
+							bHasLog = LogHelper.f_DeleteOne(WriteTransaction, NextLogTime);
+							State.mp_EndTime = NextLogTime;
+							++State.mp_nReadingsDeletedLog;
+						}
+						else
+							break;
+
+						State.mp_CurrentStats = WriteTransaction.m_Transaction.f_SizeStatistics();
+
+						if (!State.m_bForcedCompaction && State.mp_CurrentStats.m_UsedBytes < State.mp_MaxFreedLimit)
+						{
+							// Avoid pathological performance case in database
+							++State.mp_nDatabaseYields;
+							fCheckStatsLog();
+							co_return {.m_Transaction = fg_Move(WriteTransaction), .m_bMoreWork = true};
+						}
+
+						if (State.mp_CurrentStats.m_UsedBytes < State.mp_TargetSize)
+						{
+							if (!bDoRetention)
+								break;
+
+							if (State.mp_EndTime.f_IsValid() && State.mp_EndTime > OldestAllowedReading)
+								break;
+						}
+
+						fp64 YieldTime = YieldClock.f_GetTime();
+						if (YieldTime > gc_YieldInterval)
+						{
+							++State.mp_nYields;
+							YieldClock.f_AddOffset(fp64(gc_YieldInterval) * (YieldTime / gc_YieldInterval).f_Floor());
+							co_await g_Yield;
+
+							fCheckStatsLog();
+
+							if (!State.m_bForcedCompaction)
+							{
+								if (RuntimeClock.f_GetTime() > gc_MaxRunTime)
+								{
+									++State.mp_nDatabaseYields;
+									co_return {.m_Transaction = fg_Move(WriteTransaction), .m_bMoreWork = true};
+								}
+							}
+						}
+					}
+
+					if (State.mp_nReadingsDeletedSensor || State.mp_nReadingsDeletedLog)
+						State.f_Log(false);
+
+					co_return {.m_Transaction = fg_Move(WriteTransaction)};
 				}
-			}
-		}
-
-		if (State.mp_nReadingsDeletedSensor || State.mp_nReadingsDeletedLog)
-			State.f_Log(false);
-
-		co_return {.m_Transaction = fg_Move(WriteTransaction)};
+			)
+		;
 	}
 }

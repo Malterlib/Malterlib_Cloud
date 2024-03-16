@@ -99,30 +99,36 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this, _AppManagerID, _RegisterSequence, _Remove, _Add]
+				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), pThis = this, _AppManagerID, _RegisterSequence, _Remove, _Add]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+						WriteTransaction = fg_Move((co_await ThisActor(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
+					NCloudManagerDatabase::CAppManagerValue AppManagerData;
 					{
-						auto pAppManager = mp_AppManagers.f_FindEqual(_AppManagerID);
+						auto pAppManager = pThis->mp_AppManagers.f_FindEqual(_AppManagerID);
 
 						if (!pAppManager || pAppManager->m_RegisterSequence != _RegisterSequence)
 							co_return CDatabaseActor::CTransactionWrite::fs_Empty();
-
-						auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
-						CAppManagerKey Key{.m_HostID = _AppManagerID};
 
 						pAppManager->m_Data.m_OtherErrors -= _Remove;
 						for (auto &Error : _Add)
 							pAppManager->m_Data.m_OtherErrors[_Add.fs_GetKey(Error)] = Error;
 
-						WriteCursor.f_Upsert(Key, pAppManager->m_Data);
+						AppManagerData = pAppManager->m_Data;
 					}
+
+					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
+
+					auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
+
+					CAppManagerKey Key{.m_HostID = _AppManagerID};
+					WriteCursor.f_Upsert(Key, AppManagerData);
+
 					co_return fg_Move(WriteTransaction);
 				}
 			)
@@ -154,7 +160,7 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this, Params = fg_Move(_Params), _AppManagerID, pHostChanges]
+				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), Params = fg_Move(_Params), _AppManagerID, pHostChanges]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
@@ -163,7 +169,9 @@ namespace NMib::NCloud::NCloudManager
 
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+						WriteTransaction = fg_Move((co_await ThisActor(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+
+					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 					if (Params.m_bInitial)
 					{
@@ -335,7 +343,16 @@ namespace NMib::NCloud::NCloudManager
 		else
 		{
 			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
-			ReadTransaction.m_Transaction.f_Get(DatabaseKey, Data); // If available use old data
+			Data = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[DatabaseKey](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						CAppManagerValue Data;
+						_ReadTransaction.m_Transaction.f_Get(DatabaseKey, Data); // If available use old data
+						return Data;
+					}
+				)
+			;
 		}
 
 		auto RegisterSequence = ++pThis->mp_AppManagerRegisterSequence;
@@ -494,16 +511,26 @@ namespace NMib::NCloud::NCloudManager
 
 		TCMap<CStr, CDistributedAppSensorStoreLocal::CSeenHost> AppManagerSeenHosts;
 		{
-			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read apps from database");
-
 			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
 
-			for (auto ApplicationCursor = ReadTransaction.m_Transaction.f_ReadCursor(CApplicationKey::mc_Prefix, AppManagerID); ApplicationCursor; ++ApplicationCursor)
-			{
-				auto Application = ApplicationCursor.f_Value<CApplicationValue>();
-				if (Application.m_ApplicationInfo.m_HostID)
-					AppManagerSeenHosts[Application.m_ApplicationInfo.m_HostID].m_PauseReportingFor = _SecondsToPause;
-			}
+			AppManagerSeenHosts = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[AppManagerID, _SecondsToPause](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						TCMap<CStr, CDistributedAppSensorStoreLocal::CSeenHost> AppManagerSeenHosts;
+
+						for (auto ApplicationCursor = _ReadTransaction.m_Transaction.f_ReadCursor(CApplicationKey::mc_Prefix, AppManagerID); ApplicationCursor; ++ApplicationCursor)
+						{
+							auto Application = ApplicationCursor.f_Value<CApplicationValue>();
+							if (Application.m_ApplicationInfo.m_HostID)
+								AppManagerSeenHosts[Application.m_ApplicationInfo.m_HostID].m_PauseReportingFor = _SecondsToPause;
+						}
+
+						return AppManagerSeenHosts;
+					}
+					, "Failed to read apps from database"
+				)
+			;
 		}
 
 		if (!AppManagerSeenHosts.f_IsEmpty())
@@ -538,29 +565,38 @@ namespace NMib::NCloud::NCloudManager
 		if (!co_await pThis->mp_Permissions.f_HasPermission("Enum app managers", Permissions))
 			co_return Auditor.f_AccessDenied("(Enum app managers)", Permissions);
 
-		TCMap<CStr, CAppManagerDynamicInfo> Return;
-
 		co_await (pThis->fp_UpdateAppManagerState() % Auditor);
 
+		TCMap<CStr, CAppManagerDynamicInfo> Return;
 		{
-			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read app managers from database");
-
 			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
 
-			for (auto AppManagers = ReadTransaction.m_Transaction.f_ReadCursor(CAppManagerKey::mc_Prefix); AppManagers; ++AppManagers)
-			{
-				auto Key = AppManagers.f_Key<CAppManagerKey>();
-				auto Value = AppManagers.f_Value<CAppManagerValue>();
+			Return = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						TCMap<CStr, CAppManagerDynamicInfo> Return;
 
-				auto &OutAppManager = Return[Key.m_HostID];
-				OutAppManager = Value.m_Info;
-				OutAppManager.m_LastSeen = Value.m_LastSeen;
-				OutAppManager.m_LastConnectionError = Value.m_LastConnectionError;
-				OutAppManager.m_LastConnectionErrorTime = Value.m_LastConnectionErrorTime;
-				OutAppManager.m_OtherErrors = Value.m_OtherErrors;
-				OutAppManager.m_bActive = Value.m_bActive;
-				OutAppManager.m_PauseReportingFor = Value.m_PauseReportingFor;
-			}
+						for (auto AppManagers = _ReadTransaction.m_Transaction.f_ReadCursor(CAppManagerKey::mc_Prefix); AppManagers; ++AppManagers)
+						{
+							auto Key = AppManagers.f_Key<CAppManagerKey>();
+							auto Value = AppManagers.f_Value<CAppManagerValue>();
+
+							auto &OutAppManager = Return[Key.m_HostID];
+							OutAppManager = Value.m_Info;
+							OutAppManager.m_LastSeen = Value.m_LastSeen;
+							OutAppManager.m_LastConnectionError = Value.m_LastConnectionError;
+							OutAppManager.m_LastConnectionErrorTime = Value.m_LastConnectionErrorTime;
+							OutAppManager.m_OtherErrors = Value.m_OtherErrors;
+							OutAppManager.m_bActive = Value.m_bActive;
+							OutAppManager.m_PauseReportingFor = Value.m_PauseReportingFor;
+						}
+
+						return Return;
+					}
+					, "Failed to read app managers from database"
+				)
+			;
 		}
 
 		Auditor.f_Info("Enum app managers");
@@ -581,26 +617,36 @@ namespace NMib::NCloud::NCloudManager
 			co_return Auditor.f_AccessDenied("(Enum applications)", Permissions);
 
 		TCMap<CApplicationKey, CApplicationInfo> Return;
-
 		{
-			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read applications from database");
-
 			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
 
-			for (auto Applications = ReadTransaction.m_Transaction.f_ReadCursor(NCloudManagerDatabase::CApplicationKey::mc_Prefix); Applications; ++Applications)
-			{
-				auto Key = Applications.f_Key<NCloudManagerDatabase::CApplicationKey>();
-				auto Value = Applications.f_Value<CApplicationValue>();
+			Return = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						TCMap<CApplicationKey, CApplicationInfo> Return;
 
-				CApplicationKey ApplicationKey{Key.m_AppManagerHostID, Key.m_Application};
+						for (auto Applications = _ReadTransaction.m_Transaction.f_ReadCursor(NCloudManagerDatabase::CApplicationKey::mc_Prefix); Applications; ++Applications)
+						{
+							auto Key = Applications.f_Key<NCloudManagerDatabase::CApplicationKey>();
+							auto Value = Applications.f_Value<CApplicationValue>();
 
-				auto &OutApplication = Return[ApplicationKey];
-				OutApplication.m_ApplicationInfo = Value.m_ApplicationInfo;
-			}
+							CApplicationKey ApplicationKey{Key.m_AppManagerHostID, Key.m_Application};
+
+							auto &OutApplication = Return[ApplicationKey];
+							OutApplication.m_ApplicationInfo = Value.m_ApplicationInfo;
+						}
+
+						return Return;
+					}
+					, "Failed to read applications from database"
+				)
+			;
 		}
 
+#if !DMibConfig_Tests_Enable // This is used for polling in tests, and we don't want extra log traffic
 		Auditor.f_Info("Enum applications");
-
+#endif
 		co_return fg_Move(Return);
 	}
 
@@ -777,17 +823,28 @@ namespace NMib::NCloud::NCloudManager
 
 		CCloudManager::CExpectedVersions InitialExpectedVersions;
 		{
-			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read expected OS versions from database" % Auditor);
-
 			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
 
-			for (auto Applications = ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix, _Params.m_OsName); Applications; ++Applications)
-			{
-				auto Key = Applications.f_Key<CExpectedOsVersionKey>();
-				auto Value = Applications.f_Value<CExpectedOsVersionValue>();
+			InitialExpectedVersions = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[OsName = _Params.m_OsName](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						CCloudManager::CExpectedVersions InitialExpectedVersions;
 
-				InitialExpectedVersions.m_Versions[fg_Move(Key.m_CurrentVersion)] = fg_Move(Value.m_ExpectedVersionRange);
-			}
+						for (auto Applications = _ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix, OsName); Applications; ++Applications)
+						{
+							auto Key = Applications.f_Key<CExpectedOsVersionKey>();
+							auto Value = Applications.f_Value<CExpectedOsVersionValue>();
+
+							InitialExpectedVersions.m_Versions[fg_Move(Key.m_CurrentVersion)] = fg_Move(Value.m_ExpectedVersionRange);
+						}
+
+						return InitialExpectedVersions;
+					}
+					, "Failed to read expected OS versions from database"
+					, Auditor
+				)
+			;
 		}
 
 		for (auto &Notification : pSubscription->m_QueuedNotifications)
@@ -815,19 +872,29 @@ namespace NMib::NCloud::NCloudManager
 			co_return Auditor.f_AccessDenied("(Enum expected os versions)", Permissions);
 
 		TCMap<CStr, CExpectedVersions> Return;
-
 		{
-			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read expected OS versions from database" % Auditor);
-
 			auto ReadTransaction = co_await (pThis->mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead) % Auditor);
 
-			for (auto Applications = ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix); Applications; ++Applications)
-			{
-				auto Key = Applications.f_Key<CExpectedOsVersionKey>();
-				auto Value = Applications.f_Value<CExpectedOsVersionValue>();
+			Return = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						TCMap<CStr, CExpectedVersions> Return;
 
-				Return[Key.m_OsName].m_Versions[Key.m_CurrentVersion] = fg_Move(Value.m_ExpectedVersionRange);
-			}
+						for (auto Applications = _ReadTransaction.m_Transaction.f_ReadCursor(CExpectedOsVersionKey::mc_Prefix); Applications; ++Applications)
+						{
+							auto Key = Applications.f_Key<CExpectedOsVersionKey>();
+							auto Value = Applications.f_Value<CExpectedOsVersionValue>();
+
+							Return[Key.m_OsName].m_Versions[Key.m_CurrentVersion] = fg_Move(Value.m_ExpectedVersionRange);
+						}
+
+						return Return;
+					}
+					, "Failed to read expected OS versions from database"
+					, Auditor
+				)
+			;
 		}
 
 		Auditor.f_Info("Enum expected OS versions");
@@ -854,14 +921,16 @@ namespace NMib::NCloud::NCloudManager
 				pThis->mp_DatabaseActor
 				(
 					&CDatabaseActor::f_WriteWithCompaction
-					, g_ActorFunctorWeak / [pThis, _OsName, _CurrentVersion, _ExpectedRange, ChangedPromise]
+					, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(pThis), _OsName, _CurrentVersion, _ExpectedRange, ChangedPromise]
 					(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 						auto WriteTransaction = fg_Move(_Transaction);
 						if (_bCompacting)
-							WriteTransaction = fg_Move((co_await pThis->self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+							WriteTransaction = fg_Move((co_await ThisActor(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+
+						co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 						CExpectedOsVersionKey Key{.m_OsName = _OsName, .m_CurrentVersion = _CurrentVersion};
 

@@ -36,8 +36,6 @@ namespace NMib::NCloud::NCloudManager
 			TCSet<CStr> ToClearAppManagers;
 
 			{
-				auto ReadTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
-
 				TCSet<CStr> SeenAppManagers;
 
 				for (auto &State : HostStates)
@@ -83,15 +81,27 @@ namespace NMib::NCloud::NCloudManager
 						ToUpdateAppManagers[AppManagerID];
 				}
 
-				for (auto AppManagers = ReadTransaction.m_Transaction.f_ReadCursor(CAppManagerKey::mc_Prefix); AppManagers; ++AppManagers)
-				{
-					auto Key = AppManagers.f_Key<CAppManagerKey>();
-					if (SeenAppManagers.f_Exists(Key.m_HostID))
-						continue;
-					auto Data = AppManagers.template f_Value<CAppManagerValue>();
-					if (Data.m_bActive)
-						ToClearAppManagers[Key.m_HostID];
-				}
+				auto ReadTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
+				ToClearAppManagers = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+					(
+						[SeenAppManagers = fg_Move(SeenAppManagers)](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+						{
+							TCSet<CStr> ToClearAppManagers;
+
+							for (auto AppManagers = _ReadTransaction.m_Transaction.f_ReadCursor(CAppManagerKey::mc_Prefix); AppManagers; ++AppManagers)
+							{
+								auto Key = AppManagers.f_Key<CAppManagerKey>();
+								if (SeenAppManagers.f_Exists(Key.m_HostID))
+									continue;
+								auto Data = AppManagers.template f_Value<CAppManagerValue>();
+								if (Data.m_bActive)
+									ToClearAppManagers[Key.m_HostID];
+							}
+
+							return ToClearAppManagers;
+						}
+					)
+				;
 			}
 
 			if (!ToUpdateAppManagers.f_IsEmpty() || !ToClearAppManagers.f_IsEmpty())
@@ -99,25 +109,32 @@ namespace NMib::NCloud::NCloudManager
 				auto Result = co_await mp_DatabaseActor
 					(
 						&CDatabaseActor::f_WriteWithCompaction
-						, g_ActorFunctorWeak / [this, ToUpdateAppManagers = fg_Move(ToUpdateAppManagers), ToClearAppManagers = fg_Move(ToClearAppManagers)]
+						, g_ActorFunctorWeak
+						/ [pThis = this, ThisActor = fg_ThisActor(this), ToUpdateAppManagers = fg_Move(ToUpdateAppManagers), ToClearAppManagers = fg_Move(ToClearAppManagers)]
 						(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 						{
 							co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 							auto WriteTransaction = fg_Move(_Transaction);
 							if (_bCompacting)
-								WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+								WriteTransaction = fg_Move((co_await ThisActor(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+
+							TCMap<NCloudManagerDatabase::CAppManagerKey, NCloudManagerDatabase::CAppManagerValue> AppManagerWrites;
+							for (auto &AppManager : pThis->mp_AppManagers)
+							{
+								if (!ToUpdateAppManagers.f_IsEmpty() && !ToUpdateAppManagers.f_Exists(AppManager.f_AppManagerID()))
+									continue;
+
+								AppManagerWrites[AppManager.f_DatabaseKey()] = AppManager.m_Data;
+							}
+
+							co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 							{
 								auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
-								for (auto &AppManager : mp_AppManagers)
-								{
-									if (!ToUpdateAppManagers.f_IsEmpty() && !ToUpdateAppManagers.f_Exists(AppManager.f_AppManagerID()))
-										continue;
-
-									Cursor.f_Upsert(AppManager.f_DatabaseKey(), AppManager.m_Data);
-								}
+								for (auto &AppManagerData : AppManagerWrites.f_Entries())
+									Cursor.f_Upsert(AppManagerData.f_Key(), AppManagerData.f_Value());
 
 								for (auto &ToClear : ToClearAppManagers)
 								{

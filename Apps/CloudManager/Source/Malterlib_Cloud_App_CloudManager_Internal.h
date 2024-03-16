@@ -196,7 +196,7 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_SetupSensorStore();
 		TCFuture<void> fp_SetupLogStore();
 		TCFuture<CCleanupDatabaseResult> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction, TCSharedPointer<CCleanupState> &&_pState);
-		TCFuture<CDatabaseActor::CTransactionWrite> fp_SaveGlobalState(CDatabaseActor::CTransactionWrite &&_Transaction);
+		TCFuture<CDatabaseActor::CTransactionWrite> fp_SaveGlobalState(CDatabaseActor::CTransactionWrite _Transaction);
 		TCFuture<void> fp_SaveGlobalStateWithoutTransaction();
 		TCFuture<void> fp_UpdateAppManagerState();
 		TCFuture<void> fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data);

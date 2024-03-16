@@ -27,24 +27,34 @@ namespace NMib::NCloud::NCloudManager
 
 		mp_SensorAlertThreshold = fg_Const(mp_This.mp_AppState.m_ConfigDatabase.m_Data).f_GetMemberValue("SensorAlertThreshold", mp_SensorAlertThreshold).f_Float();
 		{
-			auto CaptureScope = co_await (g_CaptureExceptions % "Error reading notification state from database");
-
 			auto ReadTransaction = co_await mp_This.mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
 
-			for (auto iState = ReadTransaction.m_Transaction.f_ReadCursor(NStr::CStr(), CSensorNotificationStateKey::mc_Prefix); iState; ++iState)
-			{
-				auto Key = iState.f_Key<CSensorNotificationStateKey>();
-				auto Value = iState.f_Value<CSensorNotificationStateValue>();
+			mp_SensorStatuses = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CSensorStatus> SensorStatuses;
 
-				auto &SensorStatus = mp_SensorStatuses[Key.f_SensorInfoKey()];
-				SensorStatus.m_State = fg_Move(Value);
+						for (auto iState = _ReadTransaction.m_Transaction.f_ReadCursor(NStr::CStr(), CSensorNotificationStateKey::mc_Prefix); iState; ++iState)
+						{
+							auto Key = iState.f_Key<CSensorNotificationStateKey>();
+							auto Value = iState.f_Value<CSensorNotificationStateValue>();
 
-				if (SensorStatus.m_State.m_bInProblemState)
-				{
-					SensorStatus.m_ProblemClock.f_Start();
-					SensorStatus.m_ProblemClock.f_AddOffset(-SensorStatus.m_State.m_TimeInProblemState); // Could be off by the time the CloudManager was down
-				}
-			}
+							auto &SensorStatus = SensorStatuses[Key.f_SensorInfoKey()];
+							SensorStatus.m_State = fg_Move(Value);
+
+							if (SensorStatus.m_State.m_bInProblemState)
+							{
+								SensorStatus.m_ProblemClock.f_Start();
+								SensorStatus.m_ProblemClock.f_AddOffset(-SensorStatus.m_State.m_TimeInProblemState); // Could be off by the time the CloudManager was down
+							}
+						}
+
+						return SensorStatuses;
+					}
+					, "Error reading notification state from database"
+				)
+			;
 		}
 
 		mp_SensorSubscription = co_await mp_This.mp_AppSensorStore
@@ -263,15 +273,38 @@ namespace NMib::NCloud::NCloudManager
 					if (!ReadTransaction)
 						ReadTransaction = co_await mp_This.mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
 
-					NSensorStoreLocalDatabase::CKnownHostKey Key{.m_DbPrefix = CCloudManagerServer::mc_DatabasePrefixSensor, .m_HostID = SensorInfoKey.m_HostID};
-					NSensorStoreLocalDatabase::CKnownHostValue Value;
-					if (ReadTransaction->m_Transaction.f_Get(Key, Value))
-					{
-						if (Value.m_bRemoved)
-							bRemoved = true;
+					auto [RemovedDatabase, PausedDatabase, ReadTransactionMove, SecondsOfPauseRemainingDatabase] = co_await fg_Move(*ReadTransaction).f_BlockingDispatch
+						(
+							[
+								SecondsOfPauseRemaining
+								, Key = NSensorStoreLocalDatabase::CKnownHostKey{.m_DbPrefix = CCloudManagerServer::mc_DatabasePrefixSensor, .m_HostID = SensorInfoKey.m_HostID}
+								, Now
+								, SensorInfo
+							]
+							(CDatabaseActor::CTransactionRead &&_ReadTransaction) mutable
+							{
+								TCOptional<bool> Paused;
+								TCOptional<bool> Removed;
 
-						bPaused = SensorInfo.f_IsPaused(Now, Value.m_LastSeen, &SecondsOfPauseRemaining);
-					}
+								NSensorStoreLocalDatabase::CKnownHostValue Value;
+								if (_ReadTransaction.m_Transaction.f_Get(Key, Value))
+								{
+									if (Value.m_bRemoved)
+										Removed = true;
+
+									Paused = SensorInfo.f_IsPaused(Now, Value.m_LastSeen, &SecondsOfPauseRemaining);
+								}
+
+								return fg_Tuple(Paused, Removed, fg_Move(_ReadTransaction), SecondsOfPauseRemaining);
+							}
+						)
+					;
+					ReadTransaction = fg_Move(ReadTransactionMove);
+					if (RemovedDatabase)
+						bRemoved = *RemovedDatabase;
+					if (PausedDatabase)
+						bPaused = *PausedDatabase;
+					SecondsOfPauseRemaining = SecondsOfPauseRemainingDatabase;
 				}
 				bool bPausedForever = bPaused && SecondsOfPauseRemaining == fp32::fs_Inf();
 
@@ -538,30 +571,35 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_This.mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this]
+				, g_ActorFunctorWeak / [CloudManagerServer = fg_ThisActor(&mp_This), pCloudManagerServer = &mp_This, pThis = this]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = fg_Move((co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+						WriteTransaction = fg_Move((co_await CloudManagerServer(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
-					WriteTransaction = co_await mp_This.fp_SaveGlobalState(fg_Move(WriteTransaction));
+					WriteTransaction = co_await pCloudManagerServer->fp_SaveGlobalState(fg_Move(WriteTransaction));
 
-					for (auto &RemovedSensorKey : mp_RemovedSensors)
+					TCSet<CSensorNotificationStateKey> RemovedSensors;
+					for (auto &RemovedSensorKey : pThis->mp_RemovedSensors)
+						RemovedSensors[fg_GetSensorDatabaseKey<CSensorNotificationStateKey>(RemovedSensorKey)];
+
+					TCMap<CSensorNotificationStateKey, NCloudManagerDatabase::CSensorNotificationStateValue> SensorsStatuses;
+					for (auto &SensorStatus : pThis->mp_SensorStatuses.f_Entries())
+						SensorsStatuses(fg_GetSensorDatabaseKey<CSensorNotificationStateKey>(SensorStatus.f_Key()), SensorStatus.f_Value().m_State);
+
+					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
+
+					for (auto &RemovedSensorKey : RemovedSensors)
 					{
-						auto DatabaseKey = fg_GetSensorDatabaseKey<CSensorNotificationStateKey>(RemovedSensorKey);
-
-						if (WriteTransaction.m_Transaction.f_Exists(DatabaseKey))
-							WriteTransaction.m_Transaction.f_Delete(DatabaseKey);
+						if (WriteTransaction.m_Transaction.f_Exists(RemovedSensorKey))
+							WriteTransaction.m_Transaction.f_Delete(RemovedSensorKey);
 					}
 
-					for (auto &SensorStatus : mp_SensorStatuses)
-					{
-						auto DatabaseKey = fg_GetSensorDatabaseKey<CSensorNotificationStateKey>(mp_SensorStatuses.fs_GetKey(SensorStatus));
-						WriteTransaction.m_Transaction.f_Upsert(DatabaseKey, SensorStatus.m_State);
-					}
+					for (auto &SensorStatus : SensorsStatuses.f_Entries())
+						WriteTransaction.m_Transaction.f_Upsert(SensorStatus.f_Key(), SensorStatus.f_Value());
 
 					co_return fg_Move(WriteTransaction);
 				}

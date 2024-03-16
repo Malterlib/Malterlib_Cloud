@@ -21,12 +21,13 @@ namespace NMib::NCloud::NAppManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [=, this, Notification = fg_Move(_Notification)]
+				, g_ActorFunctorWeak / [=, ThisActor = fg_ThisActor(this), Notification = fg_Move(_Notification), DatabaseActor = mp_DatabaseActor, DatabaseUniqueKey = mp_DatabaseUniqueKey]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
+					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 					auto SizeStats = WriteTransaction.m_Transaction.f_SizeStatistics();
 					smint BatchLimit = fg_Min(SizeStats.m_MapSize / (20 * 3), 4 * 1024 * 1024);
@@ -40,16 +41,17 @@ namespace NMib::NCloud::NAppManager
 						bool bFreeUpSpace = nBytesInserted >= nBytesLimit || _bCompacting;
 
 						if (bFreeUpSpace)
-							WriteTransaction = co_await fg_CallSafe(this, &CAppManagerActor::fp_CleanupDatabase, fg_Move(WriteTransaction));
+							WriteTransaction = co_await ThisActor(&CAppManagerActor::fp_CleanupDatabase, fg_Move(WriteTransaction));
 
 						if (nBytesInserted > BatchLimit || bFreeUpSpace)
 						{
 							if (_bCompacting)
-								co_await mp_DatabaseActor(&CDatabaseActor::f_Compact, fg_Move(WriteTransaction), 0);
+								co_await DatabaseActor(&CDatabaseActor::f_Compact, fg_Move(WriteTransaction), 0);
 							else
-								co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
+								co_await DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
 
-							WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
+							WriteTransaction = co_await DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
+							co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 							SizeStats = WriteTransaction.m_Transaction.f_SizeStatistics();
 							nBytesLimit = smint(SizeLimit) - smint(SizeStats.m_UsedBytes);
 						}
@@ -58,7 +60,7 @@ namespace NMib::NCloud::NAppManager
 						Key.m_UniqueSequence = UpdateSequence;
 
 						CUpdateNotificationValue Value;
-						Value.m_UniqueKey = mp_DatabaseUniqueKey;
+						Value.m_UniqueKey = DatabaseUniqueKey;
 						Value.m_Notification = Notification;
 
 						WriteTransaction.m_Transaction.f_Upsert(Key, Value);
@@ -86,15 +88,24 @@ namespace NMib::NCloud::NAppManager
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
 
 		{
-			auto CaptureScope = co_await (g_CaptureExceptions % "Error reading notification data from database");
-
 			auto ReadTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
 
-			for (auto iNotification = ReadTransaction.m_Transaction.f_ReadCursor(CUpdateNotificationKey::mc_Prefix); iNotification; ++iNotification)
-			{
-				auto Key = iNotification.f_Key<CUpdateNotificationKey>();
-				auto Value = iNotification.f_Value<CUpdateNotificationValue>();
+			auto Values = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						TCVector<TCTuple<CUpdateNotificationKey, CUpdateNotificationValue>> Return;
+						for (auto iNotification = _ReadTransaction.m_Transaction.f_ReadCursor(CUpdateNotificationKey::mc_Prefix); iNotification; ++iNotification)
+							Return.f_Insert(fg_Tuple(iNotification.f_Key<CUpdateNotificationKey>(), iNotification.f_Value<CUpdateNotificationValue>()));
 
+						return Return;
+					}
+					, "Error reading notification data from database"
+				)
+			;
+
+			for (auto &[Key, Value] : Values)
+			{
 				TableRenderer.f_AddRow
 					(
 						"{}"_f << Key.m_UniqueSequence
@@ -120,13 +131,16 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StoredUpdateNotificationClear(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CaptureScope = co_await (g_CaptureExceptions % "Error clearing notification data in database");
+		auto DatabaseActor = mp_DatabaseActor;
 
-		auto WriteTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
+		auto WriteTransaction = co_await DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
+
+		co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 		for (auto iNotification = WriteTransaction.m_Transaction.f_WriteCursor(CUpdateNotificationKey::mc_Prefix); iNotification;)
 			iNotification.f_Delete();
 
-		co_await mp_DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
+		co_await DatabaseActor(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(WriteTransaction));
 
 		co_return 0;
 	}

@@ -172,7 +172,7 @@ namespace NMib::NCloud::NCloudManager
 		SubscribeLogEntriesParams.m_fOnEntry = g_ActorFunctor / [this](CDistributedAppLogReader_LogKeyAndEntry &&_Entry) -> TCFuture<void>
 			{
 				CStr ThisHostID;
-				NLogStore::CFilterLogKeyContext FilterContext{.m_pTransaction = nullptr, .m_ThisHostID = ThisHostID, .m_Prefix = mp_This.mc_DatabasePrefixLog};
+				NLogStore::CFilterLogKeyContext FilterContext{.m_ThisHostID = ThisHostID, .m_Prefix = mp_This.mc_DatabasePrefixLog};
 
 				mp_LastSeenTimestamp = fg_Max(mp_LastSeenTimestamp, _Entry.m_Entry.m_Timestamp);
 
@@ -187,7 +187,9 @@ namespace NMib::NCloud::NCloudManager
 				for (auto &AlertConfig : mp_AlertConfigs)
 				{
 					auto *pLog = mp_LogStatuses.f_FindEqual(_Entry.m_LogInfoKey);
-					if (!NLogStore::fg_FilterLogKey(DatabaseLogKey, AlertConfig.m_Filter.m_LogFilter, FilterContext, pLog ? pLog->f_GetInfo() : nullptr))
+
+					// We don't need to send in known hosts here, because the log filters already have ELogFlag_IgnoreRemoved set.
+					if (!NLogStore::fg_FilterLogKey(DatabaseLogKey, AlertConfig.m_Filter.m_LogFilter, FilterContext, pLog ? pLog->f_GetInfo() : nullptr, nullptr))
 						continue;
 
 					if (!NLogStore::fg_FilterLogValue(_Entry.m_Entry.m_Data, AlertConfig.m_Filter.m_LogDataFilter))

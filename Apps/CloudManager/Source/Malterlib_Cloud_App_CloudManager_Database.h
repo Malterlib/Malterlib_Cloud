@@ -44,6 +44,8 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
 
+		auto operator <=> (CAppManagerKey const &_Right) const = default;
+
 		CEJSONSorted f_ToJson() const;
 
 		static CStr const mc_Prefix;
@@ -136,6 +138,8 @@ namespace NMib::NCloud::NCloudManagerDatabase
 		void f_FeedLexicographic(tf_CStream &_Stream) const;
 		template <typename tf_CStream>
 		void f_ConsumeLexicographic(tf_CStream &_Stream);
+
+		auto operator <=> (CSensorNotificationStateKey const &_Right) const = default;
 
 		CSensorKey f_SensorKey() const &;
 		CSensorKey f_SensorKey() &&;

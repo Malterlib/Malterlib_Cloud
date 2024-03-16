@@ -30,14 +30,16 @@ namespace NMib::NCloud::NCloudManager
 			auto WriteResult = co_await mp_This.mp_DatabaseActor
 				(
 					&CDatabaseActor::f_WriteWithCompaction
-					, g_ActorFunctorWeak / [this]
+					, g_ActorFunctorWeak / [CloudManagerServer = fg_ThisActor(&mp_This), pThis = this]
 					(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) mutable -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 						auto WriteTransaction = fg_Move(_Transaction);
 						if (_bCompacting)
-							WriteTransaction = fg_Move((co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+							WriteTransaction = fg_Move((co_await CloudManagerServer(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+
+						CDeferredUpdates DeferredUpdates;
 
 						bool bHaveDeferred = false;
 						for (auto iState = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationUpdateStateKey::mc_Prefix); iState;)
@@ -56,10 +58,10 @@ namespace NMib::NCloud::NCloudManager
 							}
 
 							bHaveDeferred = true;
-							auto Mapping = mp_DeferredUpdates.m_AppManagers[Key.m_AppManagerHostID].m_Updates(Value.m_LastUpdateID);
+							auto Mapping = DeferredUpdates.m_AppManagers[Key.m_AppManagerHostID].m_Updates(Value.m_LastUpdateID);
 							auto &Update = *Mapping;
 							if (Mapping.f_WasCreated())
-								mp_DeferredUpdates.m_OrderedUpdates.f_Insert(Update);
+								DeferredUpdates.m_OrderedUpdates.f_Insert(Update);
 
 							Update.m_AppManagerID = Key.m_AppManagerHostID;
 							Update.m_LastUpdateState = fg_Move(Value);
@@ -67,8 +69,12 @@ namespace NMib::NCloud::NCloudManager
 							++iState;
 						}
 
+						co_await fg_ContinueRunningOnActor(CloudManagerServer);
+
+						pThis->mp_DeferredUpdates = fg_Move(DeferredUpdates);
+
 						if (bHaveDeferred)
-							fp_ScheduleDeferredNotifications();
+							pThis->fp_ScheduleDeferredNotifications();
 
 						co_return fg_Move(WriteTransaction);
 					}
@@ -157,14 +163,33 @@ namespace NMib::NCloud::NCloudManager
 			auto WriteResult = co_await mp_This.mp_DatabaseActor
 				(
 					&CDatabaseActor::f_WriteWithCompaction
-					, g_ActorFunctorWeak / [this, Notification = _Notification, _AppManagerID, StateValuePromise = fg_Move(StateValuePromise)]
+					, g_ActorFunctorWeak
+					/
+					[
+						CloudManagerServer = fg_ThisActor(&mp_This)
+						, Notification = _Notification
+						, _AppManagerID
+						, StateValuePromise = fg_Move(StateValuePromise)
+						, pCloudManagerServer = &mp_This
+					]
 					(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 						auto WriteTransaction = fg_Move(_Transaction);
 						if (_bCompacting)
-							WriteTransaction = fg_Move((co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+							WriteTransaction = fg_Move((co_await CloudManagerServer(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+
+						TCOptional<TCTuple<CAppManagerKey, CAppManagerValue>> AppManagerWrite;
+						auto pAppManager = pCloudManagerServer->mp_AppManagers.f_FindEqual(_AppManagerID);
+
+						if (pAppManager)
+						{
+							pAppManager->m_Data.m_LastSeenUpdateNotificationSequence = Notification.m_UniqueSequence;
+							AppManagerWrite = fg_Tuple(CAppManagerKey{.m_HostID = _AppManagerID}, pAppManager->m_Data);
+						}
+
+						co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 						auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
@@ -195,14 +220,8 @@ namespace NMib::NCloud::NCloudManager
 
 						StateValuePromise.f_SetResult(Value);
 
-						auto pAppManager = mp_This.mp_AppManagers.f_FindEqual(_AppManagerID);
-
-						if (pAppManager)
-						{
-							pAppManager->m_Data.m_LastSeenUpdateNotificationSequence = Notification.m_UniqueSequence;
-							CAppManagerKey AppManagerKey{.m_HostID = _AppManagerID};
-							WriteCursor.f_Upsert(AppManagerKey, pAppManager->m_Data);
-						}
+						if (AppManagerWrite)
+							WriteCursor.f_Upsert(fg_Get<0>(*AppManagerWrite), fg_Get<1>(*AppManagerWrite));
 
 						co_return fg_Move(WriteTransaction);
 					}
@@ -387,14 +406,16 @@ namespace NMib::NCloud::NCloudManager
 			auto WriteResult = co_await mp_This.mp_DatabaseActor
 				(
 					&CDatabaseActor::f_WriteWithCompaction
-					, g_ActorFunctorWeak / [this, Notification, _AppManagerID, SlackTimestamps = fg_Move(SlackTimestamps)]
+					, g_ActorFunctorWeak / [CloudManagerServer = fg_ThisActor(&mp_This), Notification, _AppManagerID, SlackTimestamps = fg_Move(SlackTimestamps)]
 					(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) mutable -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 						auto WriteTransaction = fg_Move(_Transaction);
 						if (_bCompacting)
-							WriteTransaction = fg_Move((co_await mp_This.self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+							WriteTransaction = fg_Move((co_await CloudManagerServer(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+
+						co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 						auto WriteCursor = WriteTransaction.m_Transaction.f_WriteCursor();
 

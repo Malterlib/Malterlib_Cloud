@@ -18,16 +18,25 @@ namespace NMib::NCloud
 
 	TCFuture<void> CHostMonitor::CInternal::f_SetupDatabase()
 	{
-		{
-			auto Capture = co_await (g_CaptureExceptions % "Error reading patch database state");
-			auto ReadTransaction = co_await m_Database(&CDatabaseActor::f_OpenTransactionRead);
-			auto ReadCursor = ReadTransaction.m_Transaction.f_ReadCursor();
+		auto ReadTransaction = co_await m_Database(&CDatabaseActor::f_OpenTransactionRead);
 
-			CPatchStateKey Key;
+		m_PatchDatabaseState = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+			(
+				[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+				{
+					auto ReadCursor = _ReadTransaction.m_Transaction.f_ReadCursor();
 
-			if (ReadCursor.f_FindEqual(Key))
-				m_PatchDatabaseState = ReadCursor.f_Value<CPatchStateValue>();
-		}
+					CPatchStateKey Key;
+					CPatchStateValue PatchDatabaseState;
+
+					if (ReadCursor.f_FindEqual(Key))
+						PatchDatabaseState = ReadCursor.f_Value<CPatchStateValue>();
+
+					return PatchDatabaseState;
+				}
+				, "Error reading patch database state"
+			)
+		;
 
 		co_return {};
 	}

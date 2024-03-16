@@ -199,25 +199,41 @@ namespace NMib::NCloud::NCloudManager
 
 		{
 			auto ReadTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
-			auto ReadCursor = ReadTransaction.m_Transaction.f_ReadCursor();
 
-			CCloudManagerGlobalStateKey Key;
+			mp_GlobalState = co_await fg_Move(ReadTransaction).f_BlockingDispatch
+				(
+					[](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+					{
+						auto ReadCursor = _ReadTransaction.m_Transaction.f_ReadCursor();
 
-			if (ReadCursor.f_FindEqual(Key))
-				mp_GlobalState = ReadCursor.f_Value<CCloudManagerGlobalStateValue>();
+						CCloudManagerGlobalStateKey Key;
+
+						CCloudManagerGlobalStateValue GlobalState;
+
+						if (ReadCursor.f_FindEqual(Key))
+							GlobalState = ReadCursor.f_Value<CCloudManagerGlobalStateValue>();
+
+						return GlobalState;
+					}
+				)
+			;
 		}
 
 		co_return {};
 	}
 
-	TCFuture<CDatabaseActor::CTransactionWrite> CCloudManagerServer::fp_SaveGlobalState(CDatabaseActor::CTransactionWrite &&_Transaction)
+	TCFuture<CDatabaseActor::CTransactionWrite> CCloudManagerServer::fp_SaveGlobalState(CDatabaseActor::CTransactionWrite _Transaction)
 	{
 		co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 		auto WriteTransaction = fg_Move(_Transaction);
+		auto State = mp_GlobalState;
+
+		co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
+
 		auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
 
-		Cursor.f_Upsert(CCloudManagerGlobalStateKey(), mp_GlobalState);
+		Cursor.f_Upsert(CCloudManagerGlobalStateKey(), State);
 
 		co_return fg_Move(WriteTransaction);
 	}
@@ -273,13 +289,15 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this, Key = fg_Move(_Key), Data = fg_Move(_Data)]
+				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), Key = fg_Move(_Key), Data = fg_Move(_Data)]
 				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+						WriteTransaction = fg_Move((co_await ThisActor(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+
+					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 					{
 						auto Cursor = WriteTransaction.m_Transaction.f_WriteCursor();
@@ -311,13 +329,16 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this, _HostID, pRemovedHostIDs](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), _HostID, pRemovedHostIDs](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) 
+				-> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 				
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+						WriteTransaction = fg_Move((co_await ThisActor(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+
+					co_await fg_ContinueRunningOnActor(WriteTransaction.f_Checkout());
 
 					bool bFoundAppManager = false;
 					for (auto AppManagerCursor = WriteTransaction.m_Transaction.f_WriteCursor(CAppManagerKey::mc_Prefix, _HostID); AppManagerCursor;)
@@ -391,30 +412,40 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Prefix)
 	{
-		auto CaptureScope = co_await (g_CaptureExceptions % "Error dumping database");
+		struct CTableRendererState
+		{
+			TCOptional<CTableRenderHelper> m_Renderer;
+			CTableRenderHelper::CColumnHelper m_Columns{0};
+		};
 
-		auto TableRenderer = _pCommandLine->f_TableRenderer();
+		TCSharedPointer<CTableRendererState> pState = fg_Construct();
+		pState->m_Renderer = _pCommandLine->f_TableRenderer();
 
-		CTableRenderHelper::CColumnHelper Columns(0);
+		pState->m_Columns.f_AddHeading("Prefix", 0);
+		pState->m_Columns.f_AddHeading("Key", 0);
+		pState->m_Columns.f_AddHeading("Value", 0);
 
-		Columns.f_AddHeading("Prefix", 0);
-		Columns.f_AddHeading("Key", 0);
-		Columns.f_AddHeading("Value", 0);
-
-		TableRenderer.f_AddHeadings(&Columns);
+		pState->m_Renderer->f_AddHeadings(&pState->m_Columns);
 
 		auto ReadTransaction = co_await mp_DatabaseActor(&CDatabaseActor::f_OpenTransactionRead);
+		co_await fg_Move(ReadTransaction).f_BlockingDispatch
+			(
+				[pState, _Prefix](CDatabaseActor::CTransactionRead &&_ReadTransaction)
+				{
+					CTableDumper Dumper{.m_TableRenderer = *pState->m_Renderer, .m_ReadTransaction = _ReadTransaction.m_Transaction, .m_FilterPrefix = _Prefix};
 
-		CTableDumper Dumper{.m_TableRenderer = TableRenderer, .m_ReadTransaction = ReadTransaction.m_Transaction, .m_FilterPrefix = _Prefix};
+					Dumper.f_DumpTable<CCloudManagerGlobalStateKey, CCloudManagerGlobalStateValue>(CCloudManagerGlobalStateKey::mc_Prefix);
+					Dumper.f_DumpTable<CAppManagerKey, CAppManagerValue>(CAppManagerKey::mc_Prefix);
+					Dumper.f_DumpTable<CApplicationKey, CApplicationValue>(CApplicationKey::mc_Prefix);
+					Dumper.f_DumpTable<CApplicationUpdateStateKey, CApplicationUpdateStateValue>(CApplicationUpdateStateKey::mc_Prefix);
+					Dumper.f_DumpTable<CSensorNotificationStateKey, CSensorNotificationStateValue>(CStr(), CSensorNotificationStateKey::mc_Prefix);
+					Dumper.f_DumpTable<CExpectedOsVersionKey, CExpectedOsVersionValue>(CExpectedOsVersionKey::mc_Prefix);
+				}
+				, "Error dumping database"
+			)
+		;
 
-		Dumper.f_DumpTable<CCloudManagerGlobalStateKey, CCloudManagerGlobalStateValue>(CCloudManagerGlobalStateKey::mc_Prefix);
-		Dumper.f_DumpTable<CAppManagerKey, CAppManagerValue>(CAppManagerKey::mc_Prefix);
-		Dumper.f_DumpTable<CApplicationKey, CApplicationValue>(CApplicationKey::mc_Prefix);
-		Dumper.f_DumpTable<CApplicationUpdateStateKey, CApplicationUpdateStateValue>(CApplicationUpdateStateKey::mc_Prefix);
-		Dumper.f_DumpTable<CSensorNotificationStateKey, CSensorNotificationStateValue>(CStr(), CSensorNotificationStateKey::mc_Prefix);
-		Dumper.f_DumpTable<CExpectedOsVersionKey, CExpectedOsVersionValue>(CExpectedOsVersionKey::mc_Prefix);
-
-		TableRenderer.f_Output();
+		pState->m_Renderer->f_Output();
 
 		co_return {};
 	}
