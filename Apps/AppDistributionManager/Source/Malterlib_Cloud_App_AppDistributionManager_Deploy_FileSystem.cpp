@@ -151,10 +151,7 @@ namespace NMib::NCloud::NAppDistributionManager
 								OutputFileInfo["BlockMapSize"] = Size;
 							}
 
-							if (CFile::fs_FileExists(Destination))
-								CFile::fs_AtomicReplaceFile(File, Destination);
-							else
-								CFile::fs_RenameFile(File, Destination);
+							CFile::fs_AtomicReplaceFile(File, Destination);
 
 							if (Extension == "exe" || Extension == "dmg" || Extension == "AppImage")
 								DownloadFile = RelativeDestination;
@@ -176,10 +173,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						if (!CFile::fs_TryDuplicateFile(_DeployInfo.m_SourceFile, TempFile))
 							CFile::fs_CopyFile(_DeployInfo.m_SourceFile, TempFile);
 
-						if (CFile::fs_FileExists(DestinationFile))
-							CFile::fs_AtomicReplaceFile(TempFile, DestinationFile);
-						else
-							CFile::fs_RenameFile(TempFile, DestinationFile);
+						CFile::fs_AtomicReplaceFile(TempFile, DestinationFile);
 
 						DownloadFile = _DeployInfo.m_Renamed;
 					}
@@ -248,19 +242,13 @@ namespace NMib::NCloud::NAppDistributionManager
 
 						CFile::fs_WriteStringToFile(TempFile, Database.f_ToString(), false);
 
-						if (CFile::fs_FileExists(DatabaseFile))
-							CFile::fs_AtomicReplaceFile(TempFile, DatabaseFile);
-						else
-							CFile::fs_RenameFile(TempFile, DatabaseFile);
+						CFile::fs_AtomicReplaceFile(TempFile, DatabaseFile);
 
 						{
 							CStr LatestReleaseFile = DestinationDirectory / "Latest.json";
 							CFile::fs_WriteStringToFile(TempFile, LatestRelease.f_ToString(), false);
 
-							if (CFile::fs_FileExists(LatestReleaseFile))
-								CFile::fs_AtomicReplaceFile(TempFile, LatestReleaseFile);
-							else
-								CFile::fs_RenameFile(TempFile, LatestReleaseFile);
+							CFile::fs_AtomicReplaceFile(TempFile, LatestReleaseFile);
 						}
 					}
 
@@ -269,10 +257,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						CStr LatestHTMLRedirectFile = DestinationDirectory / "Latest.html";
 						CFile::fs_WriteStringToFile(TempFile, LatestHTMLRedirect, false);
 
-						if (CFile::fs_FileExists(LatestHTMLRedirectFile))
-							CFile::fs_AtomicReplaceFile(TempFile, LatestHTMLRedirectFile);
-						else
-							CFile::fs_RenameFile(TempFile, LatestHTMLRedirectFile);
+						CFile::fs_AtomicReplaceFile(TempFile, LatestHTMLRedirectFile);
 					}
 
 					if (_DeployInfo.m_bElectron)
@@ -323,10 +308,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 						CFile::fs_WriteStringToFile(TempFile, LatestContents, false);
 
-						if (CFile::fs_FileExists(LatestFileName))
-							CFile::fs_AtomicReplaceFile(TempFile, LatestFileName);
-						else
-							CFile::fs_RenameFile(TempFile, LatestFileName);
+						CFile::fs_AtomicReplaceFile(TempFile, LatestFileName);
 					}
 				}
 			)

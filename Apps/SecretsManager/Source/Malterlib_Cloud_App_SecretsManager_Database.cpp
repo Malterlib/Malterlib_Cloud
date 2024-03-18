@@ -158,10 +158,7 @@ namespace NMib::NCloud::NSecretsManager
 			EncryptedStream << _Database;
 		}
 
-		if (CFile::fs_FileExists(_Path))
-			CFile::fs_AtomicReplaceFile(_Path + ".tmp", _Path);
-		else
-			CFile::fs_RenameFile(_Path + ".tmp", _Path);
+		CFile::fs_AtomicReplaceFile(_Path + ".tmp", _Path);
 
 		auto NewSaltIV = _State.m_IVSalt;
 

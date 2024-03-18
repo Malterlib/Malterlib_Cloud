@@ -196,10 +196,7 @@ namespace NMib::NCloud::NBackupManager
 			Stream << mp_CurrentManifest;
 		}
 
-		if (CFile::fs_FileExists(ManifestFileName))
-			CFile::fs_AtomicReplaceFile(ManifestFileName + ".tmp", ManifestFileName);
-		else
-			CFile::fs_RenameFile(ManifestFileName + ".tmp", ManifestFileName);
+		CFile::fs_AtomicReplaceFile(ManifestFileName + ".tmp", ManifestFileName);
 	}
 
 	void CBackupSource::fp_CleanupOldBackups()
@@ -309,10 +306,7 @@ namespace NMib::NCloud::NBackupManager
 						{
 							try
 							{
-								if (CFile::fs_FileExists(FullDestinationPath))
-									CFile::fs_AtomicReplaceFile(FullSourcePath, FullDestinationPath);
-								else
-									CFile::fs_RenameFile(FullSourcePath, FullDestinationPath);
+								CFile::fs_AtomicReplaceFile(FullSourcePath, FullDestinationPath);
 								break;
 							}
 							catch (CExceptionFile const &)
@@ -581,14 +575,9 @@ namespace NMib::NCloud::NBackupManager
 							fp_CloseFiles(OriginalFile);
 							fp_CloseFiles(DestinationFile);
 
-							if (CFile::fs_FileExists(DestinationFile))
-								CFile::fs_AtomicReplaceFile(SourceFile, DestinationFile);
-							else
-							{
-								CFile::fs_CreateDirectory(CFile::fs_GetPath(DestinationFile));
-								CFile::fs_RenameFile(OriginalFile, DestinationFile);
-							}
-							CFile::fs_CreateDirectory(CFile::fs_GetPath(DestinationFile));
+							CFile::fs_CreateDirectoryForFile(DestinationFile);
+							CFile::fs_AtomicReplaceFile(SourceFile, DestinationFile);
+							
 							CheckDeleteDirectories[CFile::fs_GetPath(OriginalFile)];
 							DMibCloudBackupManagerDebugOut("*** Rename {} -> {}\n", SpecificChange.m_FromFileName, _File);
 						}

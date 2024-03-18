@@ -224,10 +224,7 @@ namespace NMib::NCloud::NBackupManager
 									if (CFile::fs_FileExists(AbsoluteFrom))
 									{
 										CFile::fs_CreateDirectory(CFile::fs_GetPath(AbsoluteTo));
-										if (CFile::fs_FileExists(AbsoluteTo))
-											CFile::fs_AtomicReplaceFile(AbsoluteFrom, AbsoluteTo);
-										else
-											CFile::fs_RenameFile(AbsoluteFrom, AbsoluteTo);
+										CFile::fs_AtomicReplaceFile(AbsoluteFrom, AbsoluteTo);
 									}
 								}
 								catch (CExceptionFile const &_Exception)

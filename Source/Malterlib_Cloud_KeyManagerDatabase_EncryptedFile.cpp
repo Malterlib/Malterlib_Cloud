@@ -133,10 +133,8 @@ namespace NMib::NCloud
 				OutFile.f_Open(_Path + ".tmp", NFile::EFileOpen_Write | NFile::EFileOpen_ShareAll, Attributes);
 				OutFile.f_Write(EncryptedDatabase.f_GetArray(), EncryptedDatabase.f_GetLen());
 			}
-			if (NFile::CFile::fs_FileExists(_Path))
-				NFile::CFile::fs_AtomicReplaceFile(_Path + ".tmp", _Path);
-			else
-				NFile::CFile::fs_RenameFile(_Path + ".tmp", _Path);
+
+			NFile::CFile::fs_AtomicReplaceFile(_Path + ".tmp", _Path);
 		}
 	};
 	
