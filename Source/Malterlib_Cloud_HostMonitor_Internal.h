@@ -113,7 +113,6 @@ namespace NMib::NCloud
 		TCActor<CDistributedAppSensorStoreLocal> m_SensorStore;
 		TCActor<CDistributedAppLogStoreLocal> m_LogStore;
 		TCActor<CDatabaseActor> m_Database;
-		TCActor<CSeparateThreadActor> m_FileActor;
 		CActorSubscription m_UpdateTimerSubscription;
 		TCMap<CStr, CMonitoredPath> m_MonitoredPaths;
 		TCMap<CStr, CAutomaticMount> m_AutomaticMounts;
@@ -123,7 +122,6 @@ namespace NMib::NCloud
 		CConfig m_Config;
 		TCMap<CStr, CEJSONSorted> m_SensorMetaData;
 		TCMap<CStr, CEJSONSorted> m_LogMetaData;
-		mint m_FileActorSequence = 0;
 
 		TCMap<CStr, CMonitoredConfig> m_MonitoredConfigs;
 		TCActor<CFileChangeNotificationActor> m_FileChangeNotificationsActor{fg_Construct()};

@@ -90,16 +90,18 @@ namespace NMib::NCloud
 			}
 			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy on on new backup subscription or destroy tracker");
 		}
-		co_await
-			(
-				g_Dispatch(Internal.m_FileActor) / [AppendStates = fg_Move(Internal.m_AppendStates)]() mutable
-				{
-					AppendStates.f_Clear();
-				}
-			)
-			.f_Wrap() > LogError.f_Warning("Failed to destroy file append states")
-		;
-		co_await Internal.m_FileActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor");
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [AppendStates = fg_Move(Internal.m_AppendStates)]() mutable
+					{
+						AppendStates.f_Clear();
+					}
+				)
+				.f_Wrap() > LogError.f_Warning("Failed to destroy file append states")
+			;
+		}
 		co_await Internal.m_BackupInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy backup interface");
 
 		co_return {};
@@ -113,7 +115,6 @@ namespace NMib::NCloud
 
 	void CBackupManagerClient::CInternal::f_Construct(TCActor<CActorDistributionManager> const &_DistributionManager)
 	{
-		m_FileActor = fg_Construct(fg_Construct(), "BackupManagerClient file actor");
 		m_FileChangeNotificationsActor = fg_Construct();
 		if (_DistributionManager)
 			m_BackupInterface.f_Construct(_DistributionManager, m_pThis);
@@ -144,7 +145,10 @@ namespace NMib::NCloud
 
 				m_bInitialSubscribeDone = true;
 
-				g_Dispatch(m_FileActor) / [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]()
+				auto BlockingActorCheckout = fg_BlockingActor();
+				auto BlockingActor = BlockingActorCheckout.f_Actor();
+
+				g_Dispatch(BlockingActor) / [Config = m_Config.m_ManifestConfig, pDestroyed = m_pDestroyed]()
 					-> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
 					{
 						TCMap<CStr, CFile::CFileChecksumState_SHA256> SourceAppendStates;
@@ -177,7 +181,8 @@ namespace NMib::NCloud
 
 						return {fg_Move(Manifest), fg_Move(FileIDs), fg_Move(AppendStates)};
 					}
-					> [this](TCAsyncResult<TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>> &&_Manifest)
+					> [this, BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
+					(TCAsyncResult<TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>> &&_Manifest)
 					{
 						if (m_pThis->f_IsDestroyed())
 							return;

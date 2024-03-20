@@ -38,9 +38,9 @@ public:
 			co_return {};
 		}
 
-		TCFuture<void> f_WriteDatabase(CDatabase const &_Database)
+		TCFuture<void> f_WriteDatabase(CDatabase &&_Database)
 		{
-			m_Database = _Database;
+			m_Database = fg_Move(_Database);
 			co_return {};
 		}
 
@@ -637,7 +637,7 @@ public:
 			if (CFile::fs_FileExists(DatabasePath))
 				CFile::fs_DeleteFile(DatabasePath);
 
-			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, NContainer::CSecureByteVector{});
+			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, Password, NContainer::CSecureByteVector{});
 			co_await DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
 			auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
 			DMibExpect(Database.m_Clients.f_GetLen(), ==, 0);
@@ -659,7 +659,7 @@ public:
 				DMibTestPath("ExistingKeys");
 
 				auto DatabaseActor2
-					= fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, Password, NContainer::CSecureByteVector{})
+					= fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, Password, NContainer::CSecureByteVector{})
 				;
 				co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
 				auto Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
@@ -694,9 +694,7 @@ public:
 
 				{
 					DMibTestPath("Check incorrect password is caught");
-					auto DatabaseActor3
-						= fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("EncryptedFileThread"), DatabasePath, "WrongPassword", NContainer::CSecureByteVector{})
-					;
+					auto DatabaseActor3 = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, "WrongPassword", NContainer::CSecureByteVector{});
 
 					DMibTest
 						(
@@ -728,7 +726,7 @@ public:
 			auto &ServerTrustManager = pTestState->m_ServerTrustManager;
 			auto &Helper0TrustManager = pTestState->m_Helper0TrustManager;
 
-			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(fg_Construct("PreCreateKeysThread"), DatabasePath, Password, NContainer::CSecureByteVector{});
+			auto DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, Password, NContainer::CSecureByteVector{});
 
 			co_await DatabaseActor(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
 

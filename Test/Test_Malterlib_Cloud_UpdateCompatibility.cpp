@@ -292,13 +292,6 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 #endif
 		CActorRunLoopTestHelper RunLoopHelper;
 
-		auto FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-		auto CleanupTestActor = g_OnScopeExit / [&]
-			{
-				FileActor->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
-			}
-		;
-
 		DMibExpectTrue(CFile::fs_FileExists(_AppManagerPackage));
 		DMibExpectTrue(CFile::fs_FileExists(_VersionManagerPackage));
 		DMibExpectTrue(CFile::fs_FileExists(_KeyManagerPackage));
@@ -437,9 +430,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibTestPath("Setup AppManager ({})"_f << CFile::fs_GetFile(_Directory));
 
+				auto BlockingActorCheckout = fg_BlockingActor();
+
 				TCActorResultVector<void> AppManagerLaunchesResults;
 				(
-					g_Dispatch(FileActor) / [=]
+					g_Dispatch(BlockingActorCheckout) / [=]
 					{
 						CFile::fs_CreateDirectory(_Directory);
 						CProcessLaunch::fs_LaunchTool(BinaryDirectory / "bin/bsdtar", {"--no-same-owner", "-xf", _AppManagerPackage}, _Directory);

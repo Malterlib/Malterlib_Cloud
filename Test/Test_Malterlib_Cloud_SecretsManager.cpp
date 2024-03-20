@@ -227,11 +227,12 @@ public:
 		mint nSecretsManagers = 1;
 		{
 			TCActorResultVector<void> SecretsManagerLaunchesResults;
-			TCVector<TCActor<CSeparateThreadActor>> FileActors;
 			for (mint i = 0; i < nSecretsManagers; ++i)
 			{
-				auto &FileActor = FileActors.f_Insert() = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-				g_Dispatch(FileActor) / [=]
+				auto BlockingActorCheckout = fg_BlockingActor();
+				auto BlockingActor = BlockingActorCheckout.f_Actor();
+
+				g_Dispatch(BlockingActor) / [=, BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
 					{
 						CStr SecretsManagerName = fg_Format("SecretsManager{sf0,sl2}", i);
 						CStr SecretsManagerDirectory = RootDirectory + "/" + SecretsManagerName;

@@ -44,7 +44,6 @@ namespace NMib::NCloud::NVersionManager
 				return TCMap<CStr, CVersionUpload>::fs_GetKey(*this);
 			}
 
-			TCActor<CSeparateThreadActor> m_UploadFileAccess;
 			TCActor<NCloud::CFileTransferReceive> m_FileTransferReceive;
 			CActorSubscription m_DownloadSubscription;
 
@@ -143,11 +142,9 @@ namespace NMib::NCloud::NVersionManager
 		TCFuture<CFilteredTagsResult> fp_FilterTags(CStr const &_HostID, TCSet<CStr> const &_TagsAdded, TCSet<CStr> const &_TagsRemoved);
 		void fp_NewTagsKnown(TCSet<CStr> const &_Tags);
 		void fp_NewVersion(CStr const &_ApplicationName, CVersion const &_Version);
-		TCFuture<CSizeInfo> fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo);
+		TCFuture<CSizeInfo> fp_SaveVersionInfo(CStr _VersionPath, CVersionManager::CVersionInformation _VersionInfo);
 		bool fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version);
 		CSubscription const *fp_GetSubscription(CStr const &_ApplicationName, CStr const &_SubscriptionID) const;
-
-		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
 
 		TCDistributedActorInstance<CVersionManagerImplementation> mp_ProtocolInterface;
 
@@ -159,8 +156,6 @@ namespace NMib::NCloud::NVersionManager
 
 		TCMap<CStr, CVersionDownload> mp_VersionDownloads;
 		TCMap<CStr, CVersionUpload> mp_VersionUploads;
-
-		TCActor<CSeparateThreadActor> mp_QueryFileActor;
 
 		TCMap<CStr, CApplication> mp_Applications;
 

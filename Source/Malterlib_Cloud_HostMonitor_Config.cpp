@@ -135,88 +135,92 @@ namespace NMib::NCloud
 
 		for (mint iRetry = 0; true; ++iRetry)
 		{
-			auto Result = co_await
-				(
-					g_Dispatch(m_FileActor) / [Type, _FileName]() -> TCFuture<CConfigFileHistoryEntryValue>
-					{
-						auto CaptureScope = g_CaptureExceptions.f_Specific<CExceptionFile>();
-
-						CConfigFileHistoryEntryValue Value;
-
-						auto &UniqueProperties = Value.m_Properties.m_UniqueProperties;
-
-						UniqueProperties.m_bExists = CFile::fs_FileExists(_FileName);
-
-						if (!UniqueProperties.m_bExists)
-							co_return {};
-
-						Value.m_Contents.m_Raw = CFile::fs_ReadFile(_FileName);
-						UniqueProperties.m_Size = CFile::fs_GetFileSize(_FileName);
-						UniqueProperties.m_Digest = CHash_SHA256::fs_DigestFromData(Value.m_Contents.m_Raw);
-						UniqueProperties.m_Attributes = CFile::fs_GetAttributesOnLink(_FileName);
-						UniqueProperties.m_Owner = CFile::fs_GetOwner(_FileName);
-						UniqueProperties.m_Group = CFile::fs_GetGroup(_FileName);
-
-						switch (Type)
+			TCAsyncResult<CConfigFileHistoryEntryValue> Result;
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+				Result = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [Type, _FileName]() -> TCFuture<CConfigFileHistoryEntryValue>
 						{
-						case CDistributedAppInterfaceServer::EMonitorConfigType_GeneralText:
+							auto CaptureScope = g_CaptureExceptions.f_Specific<CExceptionFile>();
+
+							CConfigFileHistoryEntryValue Value;
+
+							auto &UniqueProperties = Value.m_Properties.m_UniqueProperties;
+
+							UniqueProperties.m_bExists = CFile::fs_FileExists(_FileName);
+
+							if (!UniqueProperties.m_bExists)
+								co_return {};
+
+							Value.m_Contents.m_Raw = CFile::fs_ReadFile(_FileName);
+							UniqueProperties.m_Size = CFile::fs_GetFileSize(_FileName);
+							UniqueProperties.m_Digest = CHash_SHA256::fs_DigestFromData(Value.m_Contents.m_Raw);
+							UniqueProperties.m_Attributes = CFile::fs_GetAttributesOnLink(_FileName);
+							UniqueProperties.m_Owner = CFile::fs_GetOwner(_FileName);
+							UniqueProperties.m_Group = CFile::fs_GetGroup(_FileName);
+
+							switch (Type)
 							{
-								CConfigFileContents_GeneralText Contents;
-								Contents.m_Parsed = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
-
-								Value.m_Contents.m_Parsed = fg_Move(Contents);
-							}
-							break;
-						case CDistributedAppInterfaceServer::EMonitorConfigType_GeneralBinary:
-							{
-								CConfigFileContents_GeneralBinary Contents;
-
-								Value.m_Contents.m_Parsed = fg_Move(Contents);
-							}
-							break;
-						case CDistributedAppInterfaceServer::EMonitorConfigType_Registry:
-							{
-								CConfigFileContents_Registry Contents;
-
-								auto String = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
-								try
+							case CDistributedAppInterfaceServer::EMonitorConfigType_GeneralText:
 								{
-									CRegistryPreserveAllFull Registry;
-									Registry.f_ParseStr(String, _FileName);
-									Contents.m_Parsed = fg_Move(Registry);
-								}
-								catch (CException const &_Exception)
-								{
-									UniqueProperties.m_ParseError = _Exception.f_GetErrorStr();
-								}
+									CConfigFileContents_GeneralText Contents;
+									Contents.m_Parsed = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
 
-								Value.m_Contents.m_Parsed = fg_Move(Contents);
+									Value.m_Contents.m_Parsed = fg_Move(Contents);
+								}
+								break;
+							case CDistributedAppInterfaceServer::EMonitorConfigType_GeneralBinary:
+								{
+									CConfigFileContents_GeneralBinary Contents;
+
+									Value.m_Contents.m_Parsed = fg_Move(Contents);
+								}
+								break;
+							case CDistributedAppInterfaceServer::EMonitorConfigType_Registry:
+								{
+									CConfigFileContents_Registry Contents;
+
+									auto String = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
+									try
+									{
+										CRegistryPreserveAllFull Registry;
+										Registry.f_ParseStr(String, _FileName);
+										Contents.m_Parsed = fg_Move(Registry);
+									}
+									catch (CException const &_Exception)
+									{
+										UniqueProperties.m_ParseError = _Exception.f_GetErrorStr();
+									}
+
+									Value.m_Contents.m_Parsed = fg_Move(Contents);
+								}
+								break;
+							case CDistributedAppInterfaceServer::EMonitorConfigType_Json:
+								{
+									CConfigFileContents_Json Contents;
+
+									auto String = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
+									try
+									{
+										Contents.m_Parsed = CEJSONSorted::fs_FromString(String, _FileName, false, EJSONDialectFlag_AllowUndefined | EJSONDialectFlag_AllowInvalidFloat);
+									}
+									catch (CException const &_Exception)
+									{
+										UniqueProperties.m_ParseError = _Exception.f_GetErrorStr();
+									}
+
+									Value.m_Contents.m_Parsed = fg_Move(Contents);
+								}
+								break;
 							}
-							break;
-						case CDistributedAppInterfaceServer::EMonitorConfigType_Json:
-							{
-								CConfigFileContents_Json Contents;
 
-								auto String = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
-								try
-								{
-									Contents.m_Parsed = CEJSONSorted::fs_FromString(String, _FileName, false, EJSONDialectFlag_AllowUndefined | EJSONDialectFlag_AllowInvalidFloat);
-								}
-								catch (CException const &_Exception)
-								{
-									UniqueProperties.m_ParseError = _Exception.f_GetErrorStr();
-								}
-
-								Value.m_Contents.m_Parsed = fg_Move(Contents);
-							}
-							break;
+							co_return fg_Move(Value);
 						}
-
-						co_return fg_Move(Value);
-					}
-				)
-				.f_Wrap()
-			;
+					)
+					.f_Wrap()
+				;
+			}
 
 			if (Result)
 			{

@@ -153,7 +153,7 @@ namespace NMib::NCloud::NAppManager
 		State.m_SourcePath = DownloadDirectory;
 		State.m_AllowSourceExist[DownloadDirectoryRoot];
 
-		State.m_DownloadDirectoryCleanup = g_ActorSubscription(mp_FileActor) / [DownloadDirectoryRoot]
+		State.m_DownloadDirectoryCleanup = g_BlockingActorSubscription / [DownloadDirectoryRoot]
 			{
 				try
 				{
@@ -240,7 +240,7 @@ namespace NMib::NCloud::NAppManager
 		CStr BuggyTemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "{}";
 		CStr TemporaryDirectory = TemporaryDirectoryRoot / fg_RandomID();
 		State.m_TempraryPath = TemporaryDirectory;
-		State.m_TemporaryDirectoryCleanup = g_ActorSubscription(mp_FileActor) / [TemporaryDirectoryRoot]
+		State.m_TemporaryDirectoryCleanup = g_BlockingActorSubscription / [TemporaryDirectoryRoot]
 			{
 				try
 				{
@@ -255,9 +255,11 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
+		auto BlockingActorCheckout = fg_BlockingActor();
+
 		State.m_Files = co_await
 			(
-				g_Dispatch(mp_FileActor) /
+				g_Dispatch(BlockingActorCheckout) /
 				[
 					=
 					, Settings = State.m_pNewSettings ? *State.m_pNewSettings : State.m_pApplication->m_Settings
@@ -377,62 +379,66 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
-		co_await
-			(
-				g_Dispatch(mp_FileActor) /
-				[
-					=
-					, OutputDirectory = State.m_pApplication->f_GetDirectory()
-					, TemporaryDirectory = State.m_TempraryPath
-					, OldFiles = State.m_pApplication->m_Files
-					, Files = State.m_Files
-					, pApplication = State.m_pApplication
-					, pUniqueUserGroup = mp_pUniqueUserGroup
-					, fOnInfo = State.m_fOnInfo
-				]
-				{
-					// 3. Delete old files
-					for (auto &File : OldFiles)
-					{
-						CStr FullPath = fg_Format("{}/{}", OutputDirectory, File);
-						if (CFile::fs_FileExists(FullPath, EFileAttrib_Directory))
-						{
-							try
-							{
-								// Allow only empty directories to be deleted, ignore error on non-empty ones.
-								CFile::fs_DeleteDirectory(FullPath);
-							}
-							catch (CExceptionFile const &)
-							{
-							}
-						}
-						else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
-							CFile::fs_DeleteFile(FullPath);
-					}
-#ifdef DPlatformFamily_Windows
-					if (CSystem::ms_PlatformVersion <= 10'0'017763)
-						NSys::fg_Thread_Sleep(5.0); // Try to work around access denied below when file is renamed
-#endif
-					// 4. Move files from temporary directory to final destination
-					for (auto &File : Files)
-					{
-						CStr SourcePath = fg_Format("{}/{}", TemporaryDirectory, File);
-						CStr DestinationPath = fg_Format("{}/{}", OutputDirectory, File);
-						if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
-						{
-							CStr Directory = CFile::fs_GetPath(DestinationPath);
-							CFile::fs_CreateDirectory(Directory);
-							if (CFile::fs_FileExists(DestinationPath))
-								CFile::fs_AtomicReplaceFile(SourcePath, DestinationPath);
-							else
-								CFile::fs_RenameFile(SourcePath, DestinationPath);
-						}
-					}
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
 
-					fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Files, pUniqueUserGroup, fOnInfo);
-				}
-			)
-		;
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) /
+					[
+						=
+						, OutputDirectory = State.m_pApplication->f_GetDirectory()
+						, TemporaryDirectory = State.m_TempraryPath
+						, OldFiles = State.m_pApplication->m_Files
+						, Files = State.m_Files
+						, pApplication = State.m_pApplication
+						, pUniqueUserGroup = mp_pUniqueUserGroup
+						, fOnInfo = State.m_fOnInfo
+					]
+					{
+						// 3. Delete old files
+						for (auto &File : OldFiles)
+						{
+							CStr FullPath = fg_Format("{}/{}", OutputDirectory, File);
+							if (CFile::fs_FileExists(FullPath, EFileAttrib_Directory))
+							{
+								try
+								{
+									// Allow only empty directories to be deleted, ignore error on non-empty ones.
+									CFile::fs_DeleteDirectory(FullPath);
+								}
+								catch (CExceptionFile const &)
+								{
+								}
+							}
+							else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
+								CFile::fs_DeleteFile(FullPath);
+						}
+	#ifdef DPlatformFamily_Windows
+						if (CSystem::ms_PlatformVersion <= 10'0'017763)
+							NSys::fg_Thread_Sleep(5.0); // Try to work around access denied below when file is renamed
+	#endif
+						// 4. Move files from temporary directory to final destination
+						for (auto &File : Files)
+						{
+							CStr SourcePath = fg_Format("{}/{}", TemporaryDirectory, File);
+							CStr DestinationPath = fg_Format("{}/{}", OutputDirectory, File);
+							if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
+							{
+								CStr Directory = CFile::fs_GetPath(DestinationPath);
+								CFile::fs_CreateDirectory(Directory);
+								if (CFile::fs_FileExists(DestinationPath))
+									CFile::fs_AtomicReplaceFile(SourcePath, DestinationPath);
+								else
+									CFile::fs_RenameFile(SourcePath, DestinationPath);
+							}
+						}
+
+						fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Files, pUniqueUserGroup, fOnInfo);
+					}
+				)
+			;
+		}
 
 		if (State.m_TemporaryDirectoryCleanup)
 			co_await State.m_TemporaryDirectoryCleanup->f_Destroy();

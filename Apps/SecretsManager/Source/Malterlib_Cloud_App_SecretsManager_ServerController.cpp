@@ -83,7 +83,7 @@ namespace NMib::NCloud::NSecretsManager
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Keymanager available, reading database");
 
 		CStr DatabasePath = mp_AppState.m_RootDirectory + "/SecretsManagerDB.enc";
-		auto DatabaseActor = fg_ConstructActor<CSecretsManagerServerDatabase>(fg_Construct("SecretsManager Database"), DatabasePath, fg_Move(Key));
+		auto DatabaseActor = fg_ConstructActor<CSecretsManagerServerDatabase>(DatabasePath, fg_Move(Key));
 
 		mp_PendingDatabases[DatabaseActor];
 

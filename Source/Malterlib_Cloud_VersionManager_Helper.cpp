@@ -92,22 +92,13 @@ namespace NMib::NCloud
 
 	struct CVersionManagerHelperInternal
 	{
-		CVersionManagerHelperInternal(TCActor<CSeparateThreadActor> const &_FileActor, uint64 _QueueSize, fp64 _Timeout, CStr const &_RootDirectory)
-			: m_FileActor(_FileActor)
-			, m_QueueSize(_QueueSize)
+		CVersionManagerHelperInternal(uint64 _QueueSize, fp64 _Timeout, CStr const &_RootDirectory)
+			: m_QueueSize(_QueueSize)
 			, m_Timeout(_Timeout)
 			, m_RootDirectory(_RootDirectory)
 		{
 		}
 
-		TCActor<CSeparateThreadActor> f_GetFileActor()
-		{
-			if (!m_FileActor)
-				m_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File Actor (version manager helper)"));
-			return m_FileActor;
-		}
-
-		TCActor<CSeparateThreadActor> m_FileActor;
 		CStr m_RootDirectory;
 		TCMap<CStr, TCWeakPointer<CState>> m_States;
 		fp64 m_Timeout = 0.0;
@@ -117,11 +108,10 @@ namespace NMib::NCloud
 	CVersionManagerHelper::CVersionManagerHelper
 		(
 			CStr const &_RootDirectory
-			, TCActor<CSeparateThreadActor> const &_FileActor
 			, uint64 _QueueSize
 			, fp64 _Timeout
 		)
-		: mp_pInternal(fg_Construct(_FileActor, _QueueSize, _Timeout, _RootDirectory))
+		: mp_pInternal(fg_Construct(_QueueSize, _Timeout, _RootDirectory))
 	{
 	}
 
@@ -267,7 +257,6 @@ namespace NMib::NCloud
 				_DestinationDirectory
 				, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute | EFileAttrib_UnixAttributesValid
 				, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid
-				, Internal.f_GetFileActor()
 			)
 		;
 
@@ -319,12 +308,6 @@ namespace NMib::NCloud
 		;
 
 		return Promise.f_MoveFuture();
-	}
-
-	TCActor<CSeparateThreadActor> CVersionManagerHelper::f_GetFileActor() const
-	{
-		auto &Internal = *mp_pInternal;
-		return Internal.f_GetFileActor();
 	}
 
 	namespace
@@ -457,16 +440,12 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCFuture<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_CreatePackage
-		(
-			NStr::CStr const &_SourceDirectory
-			, NStr::CStr const &_DestinationFileName
-			, uint32 _CompressionLevel
-		) const
+	TCFuture<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_CreatePackage(NStr::CStr _SourceDirectory, NStr::CStr _DestinationFileName, uint32 _CompressionLevel) const
 	{
-		TCPromise<CPackageInfo> Promise;
+		co_await ECoroutineFlag_AllowReferences;
 
-		auto &Internal = *mp_pInternal;
+		auto pInternal = mp_pInternal;
+		auto &Internal = *pInternal;
 		TCSharedPointer<CProcessLaunchState, CSupportWeakTag> pState = fg_Construct();
 		pState->m_Launch = fg_ConstructActor<CProcessLaunchActor>();
 
@@ -519,11 +498,11 @@ namespace NMib::NCloud
 			}
 		;
 
-		pState->m_Launch(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))
-			+ fg_Dispatch
+		auto BlockingActorCheckout = fg_BlockingActor();
+		auto [LaunchResult, PackageInfo] = co_await
 			(
-				Internal.f_GetFileActor()
-				, [=]() -> CPackageInfo
+				pState->m_Launch(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))
+				+ g_Dispatch(BlockingActorCheckout) / [=]() -> CPackageInfo
 				{
 					auto Files = CFile::fs_FindFiles(_SourceDirectory + "/*VersionInfo.json", EFileAttrib_File, false);
 					if (Files.f_IsEmpty())
@@ -551,13 +530,8 @@ namespace NMib::NCloud
 					return PackageInfo;
 				}
 			)
-			> Promise
-			/ [pState, pStateCleanup, Promise](CProcessLaunchActor::CSimpleLaunchResult &&_LaunchResult, CPackageInfo &&_PackageInfo)
-			{
-				Promise.f_SetResult(fg_Move(_PackageInfo));
-			}
 		;
 
-		return Promise.f_MoveFuture();
+		co_return fg_Move(PackageInfo);
 	}
 }

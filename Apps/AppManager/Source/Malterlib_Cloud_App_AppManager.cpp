@@ -485,7 +485,6 @@ namespace NMib::NCloud::NAppManager
 
 		mp_AutoUpdateDelay = _Params["AutoUpdateDelay"].f_Float();
 
-		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App manager file operations"));
 		mp_KnownPlatforms[DMalterlibCloudPlatform];
 
 		auto InitResult = co_await fp_InitApp().f_Wrap();

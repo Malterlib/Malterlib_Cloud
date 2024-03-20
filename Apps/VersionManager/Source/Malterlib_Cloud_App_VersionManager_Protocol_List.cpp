@@ -45,7 +45,6 @@ namespace NMib::NCloud::NVersionManager
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		Auditor.f_Info("Listing applications");
 		
@@ -63,8 +62,6 @@ namespace NMib::NCloud::NVersionManager
 		auto pThis = m_pThis;
 		
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
-
-		auto QueryFileActor = pThis->fp_GetQueryFileActor();
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		

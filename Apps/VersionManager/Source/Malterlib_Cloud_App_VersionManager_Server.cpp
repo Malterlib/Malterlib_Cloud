@@ -71,14 +71,11 @@ namespace NMib::NCloud::NVersionManager
 
 	TCFuture<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_EnumApplications()
 	{
-		TCPromise<TCSet<CStr>> Promise;
+		auto BlockingActorCheckout = fg_BlockingActor();
 
-		auto QueryFileActor = fp_GetQueryFileActor();
-
-		fg_Dispatch
+		auto Result = co_await
 			(
-				QueryFileActor
-				, [RootDirectory = mp_AppState.m_RootDirectory]() -> TCSet<CStr>
+				g_Dispatch(BlockingActorCheckout) / [RootDirectory = mp_AppState.m_RootDirectory]() -> TCSet<CStr>
 				{
 					CStr FindPath = RootDirectory + "/Applications";
 					CFile::CFindFilesOptions FindOptions(FindPath + "/*", false);
@@ -94,12 +91,9 @@ namespace NMib::NCloud::NVersionManager
 					return Applications;
 				}
 			)
-			> Promise / [Promise](TCSet<CStr> &&_Result)
-			{
-				Promise.f_SetResult(fg_Move(_Result));
-			}
 		;
-		return Promise.f_MoveFuture();
+
+		co_return fg_Move(Result);
 	}
 
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_FindVersions()
@@ -107,12 +101,12 @@ namespace NMib::NCloud::NVersionManager
 		auto Applications = co_await self(&CVersionManagerDaemonActor::CServer::fp_EnumApplications);
 		for (auto &Application : Applications)
 			mp_Applications[Application];
-		auto QueryFileActor = fp_GetQueryFileActor();
+
+		auto BlockingActorCheckout = fg_BlockingActor();
 
 		auto Result = co_await
 			(
-				g_Dispatch(QueryFileActor) /
-				[Applications, RootDirectory = mp_AppState.m_RootDirectory]()
+				g_Dispatch(BlockingActorCheckout) / [Applications, RootDirectory = mp_AppState.m_RootDirectory]()
 				-> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>
 				{
 					CStr ApplicationDirectory = RootDirectory + "/Applications";
@@ -295,18 +289,6 @@ namespace NMib::NCloud::NVersionManager
 
 		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
 
-		if (mp_QueryFileActor)
-			co_await mp_QueryFileActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy query file actor");
-
 		co_return {};
-	}
-
-	TCActor<CSeparateThreadActor> const &CVersionManagerDaemonActor::CServer::fp_GetQueryFileActor()
-	{
-		if (mp_QueryFileActor)
-			return mp_QueryFileActor;
-
-		mp_QueryFileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Version manager query file actor"));
-		return mp_QueryFileActor;
 	}
 }

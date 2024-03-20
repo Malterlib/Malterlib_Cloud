@@ -66,8 +66,6 @@ namespace NMib::NCloud::NSecretsManager
 	class CSecretsManagerServerDatabase : public CActor
 	{
 	public:
-		using CActorHolder = NConcurrency::CSeparateThreadActorHolder;
-
 		CSecretsManagerServerDatabase(NStr::CStr const &_Path, NContainer::CSecureByteVector const &_Key);
 		~CSecretsManagerServerDatabase();
 		
@@ -76,16 +74,22 @@ namespace NMib::NCloud::NSecretsManager
 		NConcurrency::TCFuture<CSecretsDatabase> f_ReadDatabase();
 
 	private:
-		void fp_WriteDatabase(CSecretsDatabase const &_Database);
-		void fp_ReadDatabase(CSecretsDatabase *_pDatabase);
+		struct CEncryptionState
+		{
+			NContainer::CSecureByteVector const m_Key;
+			CSecretsDatabaseIV m_IVSalt;
+		};
+
+		static CSecretsDatabaseIV fsp_WriteDatabase(CSecretsDatabase const &_Database, CStr const &_Path, CEncryptionState const &_State);
+		static CSecretsDatabaseIV fsp_ReadDatabase(CSecretsDatabase *_pDatabase, CStr const &_Path, CEncryptionState const &_State);
 		TCFuture<void> fp_Destroy() override;
 		static NContainer::CSecureByteVector fsp_ComputeSalt(CSecretsDatabaseIV const &_Salt);
 
 		TCSharedPointer<CSecretsDatabase> mp_pPendingWrite;
 		TCVector<TCPromise<void>> mp_PendingWritePromises;
+		CEncryptionState mp_EncryptionState;
 		NStr::CStr mp_Path;
-		NContainer::CSecureByteVector const mp_Key;
-		CSecretsDatabaseIV mp_IVSalt;
+		CSequencer mp_Sequencer{"SecretsManagerDatabase"};
 	};
 }
 

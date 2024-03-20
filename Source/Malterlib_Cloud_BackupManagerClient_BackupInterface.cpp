@@ -78,9 +78,10 @@ namespace NMib::NCloud
 		if (!Result)
 			Internal.f_ReportBackupError("Failed to subscribe to file notifications when appending manifest: {}"_f << Result.f_GetExceptionStr(), false);
 
+		auto BlockingActorCheckout = fg_BlockingActor();
 		auto Manifest = co_await
 			(
-				g_Dispatch(Internal.m_FileActor) / [NewConfig = fg_Move(NewConfig), pDestroyed = Internal.m_pDestroyed]()
+				g_Dispatch(BlockingActorCheckout) / [NewConfig = fg_Move(NewConfig), pDestroyed = Internal.m_pDestroyed]()
 				-> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
 				{
 					TCMap<CStr, CFile::CFileChecksumState_SHA256> SourceAppendStates;
@@ -138,11 +139,11 @@ namespace NMib::NCloud
 			Internal.m_AppendStates[FileName] = fg_Move(pAppendState);
 		}
 
-		g_Dispatch(Internal.m_FileActor) / [AppendStates = fg_Move(AppendStates)]() mutable
+		g_Dispatch(BlockingActorCheckout) / [AppendStates = fg_Move(AppendStates)]() mutable
 			{
 				AppendStates.f_Clear();
 			}
-			> fg_DiscardResult()
+			> BlockingActorCheckout.f_MoveResultHandler(Internal.m_Config.m_LogCategory, "Error cleaning up append states");
 		;
 
 		for (auto &NewFile : NewManifest.m_Files)

@@ -62,46 +62,52 @@ namespace NMib::NCloud
 				ToRemovePaths[WatchedPath.f_GetPath()];
 		}
 		
-		CPendingInfo PendingInfo = co_await
-			(
-				g_Dispatch(m_FileActor) / [PendingPaths]
-				{
-					CPendingInfo PendingInfo;
+		CPendingInfo PendingInfo;
 
-					for (auto &Path : PendingPaths)
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			PendingInfo = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [PendingPaths]
 					{
-						if (CFile::fs_FileExists(Path, EFileAttrib_Directory))
-							continue;
+						CPendingInfo PendingInfo;
 
-						CStr MissingPath = CFile::fs_GetPath(Path);
-						while (!MissingPath.f_IsEmpty() && !CFile::fs_FileExists(MissingPath, EFileAttrib_Directory))
-							MissingPath = CFile::fs_GetPath(MissingPath);
-
-						if (!MissingPath.f_IsEmpty() && !PendingInfo.m_MissingPaths.f_FindEqual(MissingPath))
+						for (auto &Path : PendingPaths)
 						{
-							bool bFound = false;
-							for (auto &Path : PendingInfo.m_MissingPaths)
+							if (CFile::fs_FileExists(Path, EFileAttrib_Directory))
+								continue;
+
+							CStr MissingPath = CFile::fs_GetPath(Path);
+							while (!MissingPath.f_IsEmpty() && !CFile::fs_FileExists(MissingPath, EFileAttrib_Directory))
+								MissingPath = CFile::fs_GetPath(MissingPath);
+
+							if (!MissingPath.f_IsEmpty() && !PendingInfo.m_MissingPaths.f_FindEqual(MissingPath))
 							{
-								if (MissingPath.f_StartsWith(Path))
+								bool bFound = false;
+								for (auto &Path : PendingInfo.m_MissingPaths)
 								{
-									bFound = true;
-									break;
+									if (MissingPath.f_StartsWith(Path))
+									{
+										bFound = true;
+										break;
+									}
+									else if (Path.f_StartsWith(MissingPath))
+									{
+										PendingInfo.m_MissingPaths.f_Remove(Path);
+										break;
+									}
 								}
-								else if (Path.f_StartsWith(MissingPath))
-								{
-									PendingInfo.m_MissingPaths.f_Remove(Path);
-									break;
-								}
+								if (!bFound)
+									PendingInfo.m_MissingPaths[MissingPath];
 							}
-							if (!bFound)
-								PendingInfo.m_MissingPaths[MissingPath];
+							PendingInfo.m_PendingPaths[Path];
 						}
-						PendingInfo.m_PendingPaths[Path];
+						return PendingInfo;
 					}
-					return PendingInfo;
-				}
-			)
-		;
+				)
+			;
+		}
 
 		if (m_pThis->f_IsDestroyed())
 			co_return DMibErrorInstance("Destroyed");
@@ -257,7 +263,10 @@ namespace NMib::NCloud
 	void CBackupManagerClient::CInternal::f_NewPathWatched(CStr const &_Path)
 	{
 		DMibCloudBackupManagerDebugOut("New path watched: {}\n", _Path);
-		g_Dispatch(m_FileActor) / [_Path]
+		auto BlockingActorCheckout = fg_BlockingActor();
+		auto BlockingActor = BlockingActorCheckout.f_Actor();
+
+		g_Dispatch(BlockingActor) / [_Path]
 			{
 				TCVector<CFileChangeNotification::CNotification> Notifications;
 				for (auto &File : CFile::fs_FindFilesEx(_Path / "*", EFileAttrib_File | EFileAttrib_Directory, true, false))
@@ -269,7 +278,7 @@ namespace NMib::NCloud
 
 				return Notifications;
 			}
-			> [this, _Path](TCAsyncResult<TCVector<CFileChangeNotification::CNotification>> &&_Notifications)
+			> [this, _Path, BlockingActorCheckout = fg_Move(BlockingActorCheckout)](TCAsyncResult<TCVector<CFileChangeNotification::CNotification>> &&_Notifications)
 			{
 				if (!_Notifications)
 				{

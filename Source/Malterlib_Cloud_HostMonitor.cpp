@@ -54,7 +54,6 @@ namespace NMib::NCloud
 
 		auto &Internal = *mp_pInternal;
 
-		Internal.m_FileActor = fg_Construct(fg_Construct(), "Host monitor file actor {}"_f << Internal.m_FileActorSequence++);
 		Internal.m_Config = fg_Move(_Config);
 
 		co_await Internal.f_SetupDatabase();
@@ -160,9 +159,6 @@ namespace NMib::NCloud
 			fg_Move(Internal.m_OsPatchStatusReporter->m_fReportReadings).f_Destroy() > Destroys.f_AddResult();
 
 		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy host monitor");
-
-		if (Internal.m_FileActor)
-			co_await fg_Move(Internal.m_FileActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor");;
 
 		co_return {};
 	}

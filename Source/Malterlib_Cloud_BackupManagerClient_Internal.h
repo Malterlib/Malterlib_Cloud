@@ -147,7 +147,6 @@ namespace NMib::NCloud
 		CConfig m_Config;
 		TCActor<CDistributedActorTrustManager> m_TrustManager;
 
-		TCActor<CSeparateThreadActor> m_FileActor;
 		CDirectoryManifest m_Manifest; // Kept up to date
 		TCMap<CStr, CBackupManagerClient_ChecksumState> m_ChecksumState;
 		TCMap<CStr, CUniqueFileIdentifier> m_ManifestFileIDs;

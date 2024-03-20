@@ -13,7 +13,6 @@ namespace NMib::NCloud::NSecretsManager
 	CSecretsManagerDaemonActor::CServer::CServer(CDistributedAppState &_AppState, TCActor<CSecretsManagerServerDatabase> const &_DatabaseActor)
 		: mp_AppState(_AppState)
 		, mp_DatabaseActor(_DatabaseActor)
-		, mp_FileActor(fg_ConstructActor<CFileActor>(fg_Construct("SecretsManager FileActor")))
 		, mp_pCanDestroyFileActorTracker(fg_Construct())
 	{
 	}
@@ -58,7 +57,10 @@ namespace NMib::NCloud::NSecretsManager
 			co_return co_await (mp_DestroyWaitingForCanDestroy = TCPromise<CEJSONSorted>{})->f_Future();
 
 		if (_Command == "SyncFileOperations")
-			co_return co_await mp_FileActor(&CSecretsManagerDaemonActor::CServer::CFileActor::f_SyncFileOperations);
+		{
+			auto Subscription = co_await mp_FileSequencer.f_Sequence();
+			co_return {};
+		}
 
 		co_return DMibErrorInstance(fg_Format("Unhandled test command: {}", _Command));
 	}
@@ -184,11 +186,10 @@ namespace NMib::NCloud::NSecretsManager
 		if (mp_DatabaseActor)
 			co_await mp_DatabaseActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");
 
-		if (mp_FileActor)
-			co_await mp_FileActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor");
-
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroying protocol interface");
 		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
+
+		co_await fg_Move(mp_FileSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor");
 
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroy finished");
 		co_return {};
@@ -361,25 +362,28 @@ namespace NMib::NCloud::NSecretsManager
 		}
 	}
 
-	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_RemoveFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor)
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_RemoveFile(CStr _FileName, CDistributedAppAuditor _Auditor)
 	{
-		TCPromise<void> Promise;
+		auto pCanDestroyTracker = mp_pCanDestroyFileActorTracker;
 		CStr FileName{"{}/SecretsManagerFiles/{}"_f << mp_AppState.m_RootDirectory << _FileName};
-		mp_FileActor(&CFileActor::f_Delete, FileName) > [Promise, _Auditor, pCanDestroyTracker = mp_pCanDestroyFileActorTracker](TCAsyncResult<void> &&_Result) mutable
-			{
-				if (!_Result)
+		auto SequenceSubscription = co_await mp_FileSequencer.f_Sequence();
+
+		auto BlockingActorCheckout = fg_BlockingActor();
+
+		auto Result = co_await
+			(
+				g_Dispatch(BlockingActorCheckout) / [FileName]
 				{
-					Promise.f_SetException
-						(
-							_Auditor.f_Exception({"Internal error. Check SecretsManager.log for details.", fg_Format("File removal failed: {}", _Result.f_GetExceptionStr())})
-						)
-					;
+					if (CFile::fs_FileExists(FileName))
+						CFile::fs_DeleteFile(FileName);
 				}
-				else
-					Promise.f_SetResult();
-			}
+			).f_Wrap()
 		;
-		return Promise.f_MoveFuture();
+
+		if (!Result)
+			co_return _Auditor.f_Exception({"Internal error. Check SecretsManager.log for details.", fg_Format("File removal failed: {}", Result.f_GetExceptionStr())});
+
+		co_return {};
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_RemoveUnreferencedFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor)
@@ -432,6 +436,7 @@ namespace NMib::NCloud::NSecretsManager
 			DMibError("Empty file name");
 
 		++mp_ReservedFiles[_FileName].m_RefCount;
+
 		return NConcurrency::g_ActorSubscription / [this, _FileName]
 			{
 				if (auto *pReservedFile = mp_ReservedFiles.f_FindEqual(_FileName))
@@ -457,26 +462,12 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 
-	TCFuture<void> CSecretsManagerDaemonActor::CServer::CFileActor::f_Delete(NStr::CStr const &_File)
-	{
-		return TCFuture<void>::fs_RunProtected<CExceptionFile>() / [&]()
-			{
-				if (CFile::fs_FileExists(_File))
-					CFile::fs_DeleteFile(_File);
-			}
-		;
-	}
-
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServer::CFileActor::f_SyncFileOperations()
-	{
-		// This function is used for debugging concurrent operations.
-		co_return {};
-	}
-
 	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServer::f_SyncFileOperations()
 	{
-		co_return co_await mp_FileActor(&CFileActor::f_SyncFileOperations);
+		auto SequenceSubscription = co_await mp_FileSequencer.f_Sequence();
+
+		co_return {};
 	}
 #endif
 }

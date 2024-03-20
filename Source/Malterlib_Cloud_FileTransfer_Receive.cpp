@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/ActorSequencerActor>
 
 #include "Malterlib_Cloud_FileTransfer.h"
 #include "Malterlib_Cloud_FileTransfer_Internal.h"
@@ -19,22 +20,24 @@ namespace NMib::NCloud
 	{
 		struct CFileCache
 		{
-			TCActor<CActor> m_FileActor;
 			CStr m_FileName;
 			CFile m_File;
 			~CFileCache()
 			{
 				if (m_File.f_IsValid())
 				{
+					auto BlockingActorCheckout = fg_BlockingActor();
+					auto BlockingActor = BlockingActorCheckout.f_Actor();
+
 					fg_Dispatch
 						(
-							m_FileActor
-							, [File = fg_Move(m_File), FileActor = m_FileActor]() mutable
+							BlockingActor
+							, [File = fg_Move(m_File)]() mutable
 							{
 								File.f_Close();
 							}
 						)
-						> fg_DiscardResult()
+						> BlockingActorCheckout.f_MoveResultHandler("FileTransferReceive", "Error closing file")
 					;
 				}
 			}
@@ -43,6 +46,7 @@ namespace NMib::NCloud
 		CStr m_BasePath;
 		TCPromise<CFileTransferResult> m_DonePromise;
 		TCSharedPointer<CFileCache> m_pFileCache = fg_Construct();
+		CSequencer m_WriteSequencer{"File transfer receive"};
 		EFileAttrib m_AttributeMask = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute | EFileAttrib_UnixAttributesValid;
 		EFileAttrib m_AttributeAdd = EFileAttrib_None;
 		CStr m_RootDirectory;
@@ -52,17 +56,13 @@ namespace NMib::NCloud
 
 	CFileTransferReceive::~CFileTransferReceive() = default;
 	
-	CFileTransferReceive::CFileTransferReceive(NStr::CStr const &_BasePath, EFileAttrib _AttributeMask, NFile::EFileAttrib _AttributeAdd, TCActor<CActor> const &_FileActor)
+	CFileTransferReceive::CFileTransferReceive(NStr::CStr const &_BasePath, EFileAttrib _AttributeMask, NFile::EFileAttrib _AttributeAdd)
 		: mp_pInternal(fg_Construct()) 
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_AttributeMask = _AttributeMask;
 		Internal.m_AttributeAdd = _AttributeAdd;
 		Internal.m_BasePath = _BasePath;
-		auto &Cache = *Internal.m_pFileCache;
-		Cache.m_FileActor = _FileActor;
-		if (!Cache.m_FileActor)
-			Cache.m_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File transfer receive file access"));
 	}
 	
 	NConcurrency::TCFuture<CFileTransferContext> CFileTransferReceive::f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags)
@@ -73,65 +73,67 @@ namespace NMib::NCloud
 			co_return DMibErrorInstance("The file transfer context has already been gotten");
 		Internal.m_bCalled = true;
 		
-		auto &Cache = *Internal.m_pFileCache;
-		
-		CFileTransferContext::CInternal::CManifest Manifest = co_await
-			(
-				g_Dispatch(Cache.m_FileActor) / [RootDirectory = Internal.m_RootDirectory, _Flags]() -> CFileTransferContext::CInternal::CManifest
-				{
-					CFileTransferContext::CInternal::CManifest Manifest;
-
-					if (CFile::fs_FileExists(RootDirectory, EFileAttrib_File))
+		CFileTransferContext::CInternal::CManifest Manifest;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			Manifest = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [RootDirectory = Internal.m_RootDirectory, _Flags]() -> CFileTransferContext::CInternal::CManifest
 					{
+						CFileTransferContext::CInternal::CManifest Manifest;
+
+						if (CFile::fs_FileExists(RootDirectory, EFileAttrib_File))
+						{
+							if (_Flags & EReceiveFlag_DeleteExisting)
+							{
+								CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+								return Manifest;
+							}
+							DMibError("Destination already exists but is a file");
+						}
+
+						if (!CFile::fs_FileExists(RootDirectory, EFileAttrib_Directory))
+							return Manifest;
+
 						if (_Flags & EReceiveFlag_DeleteExisting)
 						{
-							CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+							try
+							{
+								CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+							}
+							catch (CExceptionFile const &)
+							{
+								if (!CFile::fs_FileExists(RootDirectory))
+									return Manifest;
+								throw;
+							}
+
 							return Manifest;
 						}
-						DMibError("Destination already exists but is a file");
-					}
 
-					if (!CFile::fs_FileExists(RootDirectory, EFileAttrib_Directory))
-						return Manifest;
+						if (_Flags & EReceiveFlag_FailOnExisting)
+							DMibError("Directory already exists");
 
-					if (_Flags & EReceiveFlag_DeleteExisting)
-					{
-						try
+						if (_Flags & EReceiveFlag_IgnoreExisting)
+							return Manifest;
+
 						{
-							CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+							CFile::CFindFilesOptions FindOptions(RootDirectory + "/*", true);
+							FindOptions.m_AttribMask = EFileAttrib_File;
+							auto FoundFiles = CFile::fs_FindFiles(FindOptions);
+							for (auto &File : FoundFiles)
+							{
+								CStr RelativePath = File.m_Path.f_Extract(RootDirectory.f_GetLen() + 1);
+								auto &OutFile = Manifest.m_Files[RelativePath];
+								OutFile.m_FileSize = CFile::fs_GetFileSize(File.m_Path);
+							}
 						}
-						catch (CExceptionFile const &)
-						{
-							if (!CFile::fs_FileExists(RootDirectory))
-								return Manifest;
-							throw;
-						}
-
 						return Manifest;
 					}
-
-					if (_Flags & EReceiveFlag_FailOnExisting)
-						DMibError("Directory already exists");
-
-					if (_Flags & EReceiveFlag_IgnoreExisting)
-						return Manifest;
-
-					{
-						CFile::CFindFilesOptions FindOptions(RootDirectory + "/*", true);
-						FindOptions.m_AttribMask = EFileAttrib_File;
-						auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-						for (auto &File : FoundFiles)
-						{
-							CStr RelativePath = File.m_Path.f_Extract(RootDirectory.f_GetLen() + 1);
-							auto &OutFile = Manifest.m_Files[RelativePath];
-							OutFile.m_FileSize = CFile::fs_GetFileSize(File.m_Path);
-						}
-					}
-					return Manifest;
-				}
-				% "Failed to generate current manifest"
-			)
-		;
+					% "Failed to generate current manifest"
+				)
+			;
+		}
 		CFileTransferContext StartDownloadResult;
 		CFileTransferContext::CInternal &StartDownload = *(StartDownloadResult.mp_pInternal);
 		StartDownload.m_Manifest = fg_Move(Manifest);
@@ -161,13 +163,12 @@ namespace NMib::NCloud
 		StartDownload.m_fSendPart = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CSendPart &&_Part) mutable
 			-> NConcurrency::TCFuture<CFileTransferContext::CInternal::CSendPart::CResult>
 			{
-				NConcurrency::TCPromise<CFileTransferContext::CInternal::CSendPart::CResult> Promise;
 				auto &Internal = *mp_pInternal;
-				auto &Cache = *Internal.m_pFileCache;
-				fg_Dispatch
+				auto SequenceSubscription = co_await Internal.m_WriteSequencer.f_Sequence();
+				auto BlockingActorCheckout = fg_BlockingActor();
+				auto Result = co_await
 					(
-						Cache.m_FileActor
-						,
+						g_Dispatch(BlockingActorCheckout) /
 						[
 							pCache = Internal.m_pFileCache
 							, RootDirectory = Internal.m_RootDirectory
@@ -219,9 +220,8 @@ namespace NMib::NCloud
 							return DownloadPart.f_GetResult();
 						}
 					)
-					> Promise
 				;
-				return Promise.f_MoveFuture();
+				co_return fg_Move(Result);
 			}
 		;
 

@@ -36,7 +36,8 @@ namespace NMib::NCloud
 		Return.m_Revision = Fix;
 
 #if defined(DPlatformFamily_Linux)
-		co_await fg_ContinueRunningOnActor(m_FileActor);
+		auto BlockingActorCheckout = fg_BlockingActor();
+		co_await fg_ContinueRunningOnActor(BlockingActorCheckout);
 
 		auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed to get OS name");
 
@@ -341,22 +342,26 @@ namespace NMib::NCloud
 			bool m_bRebootRequired = false;
 		};
 
-		auto FileProperties = co_await
-			(
-				g_Dispatch(m_FileActor) / [=]() -> TCFuture<CFileProperties>
-				{
-					auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed to read the patch status from file");
+		CFileProperties FileProperties;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			FileProperties = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [=]() -> TCFuture<CFileProperties>
+					{
+						auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed to read the patch status from file");
 
-					CStr RebootRequiredFile = "/var/run/reboot-required";
+						CStr RebootRequiredFile = "/var/run/reboot-required";
 
-					CFileProperties Return;
-					Return.m_bAptCheckExists = CFile::fs_FileExists(AptCheckExecutable);
-					Return.m_bRebootRequired = CFile::fs_FileExists(RebootRequiredFile) && !CFile::fs_ReadStringFromFile(RebootRequiredFile, true).f_Trim().f_IsEmpty();
+						CFileProperties Return;
+						Return.m_bAptCheckExists = CFile::fs_FileExists(AptCheckExecutable);
+						Return.m_bRebootRequired = CFile::fs_FileExists(RebootRequiredFile) && !CFile::fs_ReadStringFromFile(RebootRequiredFile, true).f_Trim().f_IsEmpty();
 
-					co_return fg_Move(Return);
-				}
-			)
-		;
+						co_return fg_Move(Return);
+					}
+				)
+			;
+		}
 
 		uint32 nSecurityPatches = 0;
 		uint32 nNormalPatches = 0;

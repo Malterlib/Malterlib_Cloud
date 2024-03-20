@@ -111,22 +111,10 @@ namespace NMib::NCloud::NBackupManager
 		for (auto &Download : mp_BackupDownloads)
 			Download.f_Destroy() > Destroys.f_AddResult();
 
-		if (mp_QueryFileActor)
-			mp_QueryFileActor.f_Destroy() > Destroys.f_AddResult();
-
 		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy backup manager server");;
 
 		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
 
 		co_return {};
-	}
-
-	TCActor<CSeparateThreadActor> const &CBackupManagerServer::fp_GetQueryFileActor()
-	{
-		if (mp_QueryFileActor)
-			return mp_QueryFileActor;
-
-		mp_QueryFileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Backup manager query file actor"));
-		return mp_QueryFileActor;
 	}
 }

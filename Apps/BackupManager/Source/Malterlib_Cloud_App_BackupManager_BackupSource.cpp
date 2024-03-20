@@ -9,9 +9,10 @@ namespace NMib::NCloud::NBackupManager
 {
 	TCFuture<TCVector<CStr>> CBackupManagerServer::fp_EnumBackupSourcesFromDisk()
 	{
+		auto BlockingActorCheckout = fg_BlockingActor();
 		co_return co_await
 			(
-				g_Dispatch(fp_GetQueryFileActor()) / [RootDirectory = mp_AppState.m_RootDirectory]
+				g_Dispatch(BlockingActorCheckout) / [RootDirectory = mp_AppState.m_RootDirectory]
 				{
 					CStr FindPath = RootDirectory + "/Backups";
 					CFile::CFindFilesOptions FindOptions(FindPath + "/*_*", false);

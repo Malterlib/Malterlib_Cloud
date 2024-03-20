@@ -586,11 +586,12 @@ public:
 		mint nBackupManagers = 1;
 		{
 			TCActorResultVector<void> BackupManagerLaunchesResults;
-			TCVector<TCActor<CSeparateThreadActor>> FileActors;
 			for (mint i = 0; i < nBackupManagers; ++i)
 			{
-				auto &FileActor = FileActors.f_Insert() = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-				g_Dispatch(FileActor) / [=]
+				auto BlockingActorCheckout = fg_BlockingActor();
+				auto BlockingActor = BlockingActorCheckout.f_Actor();
+
+				g_Dispatch(BlockingActor) / [=, BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
 					{
 						CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << i;
 						CStr BackupManagerDirectory = RootDirectory + "/" + BackupManagerName;

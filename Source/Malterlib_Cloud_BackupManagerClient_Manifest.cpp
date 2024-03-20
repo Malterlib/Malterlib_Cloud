@@ -24,9 +24,11 @@ namespace NMib::NCloud
 				pAppendState = *m_AppendStates(_FileName, fg_Construct());
 		}
 		
+		auto BlockingActorCheckout = fg_BlockingActor();
+
 		CUpdateManifestResult Result = co_await
 			(
-				g_Dispatch(m_FileActor) / [_FileName, _OriginalFileName, Config = m_Config, pAppendState, bDirty]() mutable -> CUpdateManifestResult
+				g_Dispatch(BlockingActorCheckout) / [_FileName, _OriginalFileName, Config = m_Config, pAppendState, bDirty]() mutable -> CUpdateManifestResult
 				{
 					auto AbsoluteFileName = CFile::fs_AppendPath(Config.m_ManifestConfig.m_Root, _OriginalFileName);
 

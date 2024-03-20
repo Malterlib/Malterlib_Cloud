@@ -110,8 +110,6 @@ namespace NMib::NCloud::NBackupManager
 			)
 		;
 
-		TCActor<CSeparateThreadActor> const &fp_GetQueryFileActor();
-
 		TCMap<CStr, TCActor<CBackupSource>> mp_BackupSources;
 		TCMap<CBackupKey, CBackupInstanceManager> mp_BackupInstances;
 		TCMap<CStr, CBackupDownload> mp_BackupDownloads;
@@ -121,7 +119,5 @@ namespace NMib::NCloud::NBackupManager
 		CStr mp_FriendlyName;
 
 		CTrustedPermissionSubscription mp_Permissions;
-
-		TCActor<CSeparateThreadActor> mp_QueryFileActor;
 	};
 }

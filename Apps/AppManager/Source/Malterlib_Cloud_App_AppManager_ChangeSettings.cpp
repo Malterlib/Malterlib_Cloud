@@ -83,9 +83,11 @@ namespace NMib::NCloud::NAppManager
 
 		fOnInfo("Upgrading from {nfh} to {nfh}"_f << _OldVersion << mc_CurrentAppMangerVersion);
 
+		auto BlockingActorCheckout = fg_BlockingActor();
+
 		co_await
 			(
-				g_Dispatch(mp_FileActor) / [=, Directory = _pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]() mutable
+				g_Dispatch(BlockingActorCheckout) / [=, Directory = _pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]() mutable
 				{
 					if (_OldVersion < 0x101)
 					{
@@ -296,28 +298,33 @@ namespace NMib::NCloud::NAppManager
 
 		_fOnInfo("Saving application state and update application files");
 
-		auto [Result, UpdateJSONResults] = co_await
-			(
-				(
-					g_Dispatch(mp_FileActor) / [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope, pUniqueUserGroup = mp_pUniqueUserGroup]()
-					{
-						fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
-						fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
-					}
-				)
-				+ fp_UpdateApplicationJSON(pApplication)
-			)
-			.f_Wrap()
-		;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
 
-		if (!Result && !UpdateJSONResults)
-			co_return Auditor.f_Exception("Failed to update application files and save application state: {} {}"_f << Result.f_GetExceptionStr() << UpdateJSONResults.f_GetExceptionStr());
-		else if (!Result)
-			co_return Auditor.f_Exception("Failed to update application files: {}"_f << Result.f_GetExceptionStr());
-		else if (!UpdateJSONResults)
-			co_return Auditor.f_Exception("Failed to save application state: {}"_f << UpdateJSONResults.f_GetExceptionStr());
-		else
-			_fOnInfo("Application state successfully stored, so any changes will persist");
+			auto [Result, UpdateJSONResults] = co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout)
+						/ [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope, pUniqueUserGroup = mp_pUniqueUserGroup]()
+						{
+							fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
+							fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
+						}
+					)
+					+ fp_UpdateApplicationJSON(pApplication)
+				)
+				.f_Wrap()
+			;
+
+			if (!Result && !UpdateJSONResults)
+				co_return Auditor.f_Exception("Failed to update application files and save application state: {} {}"_f << Result.f_GetExceptionStr() << UpdateJSONResults.f_GetExceptionStr());
+			else if (!Result)
+				co_return Auditor.f_Exception("Failed to update application files: {}"_f << Result.f_GetExceptionStr());
+			else if (!UpdateJSONResults)
+				co_return Auditor.f_Exception("Failed to save application state: {}"_f << UpdateJSONResults.f_GetExceptionStr());
+			else
+				_fOnInfo("Application state successfully stored, so any changes will persist");
+		}
 
 		if (pApplication->m_bDeleted)
 			co_return Auditor.f_Exception("Application has been deleted, aborting");

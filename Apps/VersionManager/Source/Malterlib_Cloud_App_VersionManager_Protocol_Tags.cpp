@@ -145,7 +145,7 @@ namespace NMib::NCloud::NVersionManager
 					++_Version.m_VersionInfo.m_RetrySequence;
 
 				pThis->fp_NewVersion(_Params.m_Application, _Version);
-				pThis->fp_SaveVersionInfo(pThis->fp_GetQueryFileActor(), VersionPath, _Version.m_VersionInfo) > VersionResults.f_AddResult();
+				pThis->fp_SaveVersionInfo(VersionPath, _Version.m_VersionInfo) > VersionResults.f_AddResult();
 			}
 		;
 

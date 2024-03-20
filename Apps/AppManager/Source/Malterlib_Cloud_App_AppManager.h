@@ -967,7 +967,6 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
-		TCActor<CSeparateThreadActor> mp_FileActor;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagerSubscription;
 		TCTrustedActorSubscription<CCloudManager> mp_CloudManagerSubscription;

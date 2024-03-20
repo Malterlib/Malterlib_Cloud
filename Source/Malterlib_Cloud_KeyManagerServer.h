@@ -74,7 +74,7 @@ namespace NMib::NCloud
 		};
 		
 		virtual NConcurrency::TCFuture<void> f_Initialize() = 0;
-		virtual NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase const &_Database) = 0;
+		virtual NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase &&_Database) = 0;
 		virtual NConcurrency::TCFuture<CDatabase> f_ReadDatabase() = 0;
 	};
 	

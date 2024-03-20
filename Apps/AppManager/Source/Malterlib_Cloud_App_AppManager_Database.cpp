@@ -20,7 +20,7 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_SetupDatabase()
 	{
-		mp_DatabaseActor = fg_Construct(fg_Construct(), "App manager database");
+		mp_DatabaseActor = fg_Construct();
 		auto MaxDatabaseSize = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("MaxDatabaseSize", gc_MaxDatabaseSize).f_Integer();
 		co_await
 			(

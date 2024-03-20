@@ -619,9 +619,10 @@ namespace NMib::NCloud::NCloudClient
 			CStr SettingsFile = SettingsFileOrSettings.f_Get<0>();
 			if (!SettingsFile.f_IsEmpty())
 			{
+				auto BlockingActorCheckout = fg_BlockingActor();
 				auto SettingsResult = co_await
 					(
-						g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [SettingsFile]
+						g_Dispatch(BlockingActorCheckout) / [SettingsFile]
 						{
 							return CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
 						}
@@ -701,9 +702,10 @@ namespace NMib::NCloud::NCloudClient
 
 		if (!Time.f_IsValid())
 		{
+			auto BlockingActorCheckout = fg_BlockingActor();
 			Time = co_await
 				(
-					g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [Source]() -> CTime
+					g_Dispatch(BlockingActorCheckout) / [Source]() -> CTime
 					{
 						if (!CFile::fs_FileExists(Source))
 							DMibError(fg_Format("Source specified does not exist: {}", Source));

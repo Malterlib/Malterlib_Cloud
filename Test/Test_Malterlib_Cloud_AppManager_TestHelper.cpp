@@ -542,11 +542,12 @@ namespace NMib::NCloud
 		// Copy AppManagers to their directories
 		{
 			TCActorResultVector<void> AppManagerLaunchesResults;
-			TCVector<TCActor<CSeparateThreadActor>> FileActors;
 			for (mint iAppManager = 0; iAppManager < _nAppManagers; ++iAppManager)
 			{
-				auto &FileActor = FileActors.f_Insert() = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("File actor"));
-				g_Dispatch(FileActor) / [=, RootDirectory = State.m_RootDirectory, ProgramDirectory = State.m_ProgramDirectory]
+				auto BlockingActorCheckout = fg_BlockingActor();
+				auto BlockingActor = BlockingActorCheckout.f_Actor();
+
+				g_Dispatch(BlockingActor) / [=, RootDirectory = State.m_RootDirectory, ProgramDirectory = State.m_ProgramDirectory, BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
 					{
 						CStr AppManagerDirectory = RootDirectory / ("AppManager{sf0,sl2}"_f << iAppManager);
 						CFile::fs_CreateDirectory(AppManagerDirectory);

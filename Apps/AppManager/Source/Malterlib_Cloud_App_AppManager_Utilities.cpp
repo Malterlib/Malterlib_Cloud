@@ -87,9 +87,12 @@ namespace NMib::NCloud::NAppManager
 		
 		CStr FileName = fg_Format("{}/TempScripts/Bash_{}.sh", mp_State.m_RootDirectory, CHash_MD5::fs_DigestFromData(_Script.f_GetStr(), _Script.f_GetLen()).f_GetString());
 	
+		auto BlockingActorCheckout = fg_BlockingActor();
+		auto BlockingActor = BlockingActorCheckout.f_Actor();
+
 		fg_Dispatch
 			(
-				mp_FileActor
+				BlockingActor
 				, [FileName, _Script]
 				{
 					if (!CFile::fs_FileExists(FileName))
@@ -107,7 +110,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 			> pState->m_Promise % fg_Format("[{}] Failed to save temporary script", _Description) 
-			/ [this, FileName, _Description, _Environment, _fOnStdOutput, pState, _WarningErrorStatus]
+			/ [this, FileName, _Description, _Environment, _fOnStdOutput, pState, _WarningErrorStatus, BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
 			{
 				auto fReportError = [pState, _Description](CStr const &_Error)
 					{

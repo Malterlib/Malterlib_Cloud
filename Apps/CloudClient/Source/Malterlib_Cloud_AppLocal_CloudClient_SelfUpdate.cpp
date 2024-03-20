@@ -112,9 +112,10 @@ namespace NMib::NCloud::NCloudClient
 		CStr DestinationDirectory = CFile::fs_GetProgramDirectory() + "/SelfUpdate";
 
 		auto TransferResult = co_await mp_VersionManagerHelper.f_Download(Version.m_Actor, "MalterlibCloud", VersionID, DestinationDirectory);
+		auto BlockingActorCheckout = fg_BlockingActor();
 		co_await
 			(
-				g_Dispatch(mp_VersionManagerHelper.f_GetFileActor()) / [DestinationDirectory]
+				g_Dispatch(BlockingActorCheckout) / [DestinationDirectory]
 				{
 					CStr StdOut;
 					CStr StdErr;

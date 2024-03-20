@@ -29,38 +29,42 @@ namespace NMib::NCloud::NVersionManager
 
 	static constexpr EFileAttrib gc_FilePermissions = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid;
 
-	auto CVersionManagerDaemonActor::CServer::fp_SaveVersionInfo(TCActor<> const &_FileActor, CStr const &_VersionPath, CVersionManager::CVersionInformation const &_VersionInfo) 
+	auto CVersionManagerDaemonActor::CServer::fp_SaveVersionInfo(CStr _VersionPath, CVersionManager::CVersionInformation _VersionInfo)
 		-> TCFuture<CSizeInfo>
 	{
-		TCPromise<CSizeInfo> Promise;
-		g_Dispatch(_FileActor) / [_VersionInfo, _VersionPath]() mutable -> CSizeInfo
-			{
-				CEJSONSorted VersionJSONInfo;
-				CStr VersionInfoPath = fg_Format("{}.json", _VersionPath);
+		auto BlockingActorCheckout = fg_BlockingActor();
 
-				VersionJSONInfo["Time"] = _VersionInfo.m_Time;
-				VersionJSONInfo["Configuration"] = _VersionInfo.m_Configuration;
-				if (_VersionInfo.m_ExtraInfo.f_IsObject())
-					VersionJSONInfo["ExtraInfo"] = _VersionInfo.m_ExtraInfo;
-				auto &TagsArray = VersionJSONInfo["Tags"].f_Array();
-				for (auto &Tag : _VersionInfo.m_Tags)
-					TagsArray.f_Insert(Tag);
-				VersionJSONInfo["RetrySequence"] = _VersionInfo.m_RetrySequence;
+		auto Result = co_await
+			(
+				g_Dispatch(BlockingActorCheckout) / [_VersionInfo, _VersionPath]() mutable -> CSizeInfo
+				{
+					CEJSONSorted VersionJSONInfo;
+					CStr VersionInfoPath = fg_Format("{}.json", _VersionPath);
 
-				CSizeInfo SizeInfo;
-				auto Files = CFile::fs_FindFiles(_VersionPath + "/*", EFileAttrib_File, true);
-				SizeInfo.m_nFiles = Files.f_GetLen();
-				for (auto &File : Files)
-					SizeInfo.m_nBytes += CFile::fs_GetFileSize(File);
+					VersionJSONInfo["Time"] = _VersionInfo.m_Time;
+					VersionJSONInfo["Configuration"] = _VersionInfo.m_Configuration;
+					if (_VersionInfo.m_ExtraInfo.f_IsObject())
+						VersionJSONInfo["ExtraInfo"] = _VersionInfo.m_ExtraInfo;
+					auto &TagsArray = VersionJSONInfo["Tags"].f_Array();
+					for (auto &Tag : _VersionInfo.m_Tags)
+						TagsArray.f_Insert(Tag);
+					VersionJSONInfo["RetrySequence"] = _VersionInfo.m_RetrySequence;
 
-				CFile::fs_CreateDirectory(CFile::fs_GetPath(VersionInfoPath));
-				CFile::fs_WriteStringToFile(VersionInfoPath, VersionJSONInfo.f_ToString(), false, gc_FilePermissions);
+					CSizeInfo SizeInfo;
+					auto Files = CFile::fs_FindFiles(_VersionPath + "/*", EFileAttrib_File, true);
+					SizeInfo.m_nFiles = Files.f_GetLen();
+					for (auto &File : Files)
+						SizeInfo.m_nBytes += CFile::fs_GetFileSize(File);
 
-				return SizeInfo;
-			}
-			> Promise
+					CFile::fs_CreateDirectory(CFile::fs_GetPath(VersionInfoPath));
+					CFile::fs_WriteStringToFile(VersionInfoPath, VersionJSONInfo.f_ToString(), false, gc_FilePermissions);
+
+					return SizeInfo;
+				}
+			)
 		;
-		return Promise.f_MoveFuture();
+
+		co_return fg_Move(Result);
 	}
 	
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_UploadVersion(CStartUploadVersion &&_Params) -> TCFuture<CStartUploadVersion::CResult>
@@ -152,8 +156,7 @@ namespace NMib::NCloud::NVersionManager
 		CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
 		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, pParams->m_Application, pParams->m_VersionIDAndPlatform.f_EncodeFileName());
 
-		pUpload->m_UploadFileAccess = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Upload version file access"));
-		pUpload->m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, gc_FilePermissions, gc_FilePermissions, pUpload->m_UploadFileAccess);
+		pUpload->m_FileTransferReceive = fg_ConstructActor<CFileTransferReceive>(VersionPath, gc_FilePermissions, gc_FilePermissions);
 
 		auto ReceiveFlags = CFileTransferReceive::EReceiveFlag_FailOnExisting;
 		if (pParams->m_Flags & CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite)
@@ -255,7 +258,6 @@ namespace NMib::NCloud::NVersionManager
 				if (pUpload->m_FileTransferReceive)
 					fg_Move(pUpload->m_FileTransferReceive).f_Destroy() > fg_DiscardResult();
 
-				auto FileAccess = fg_Move(pUpload->m_UploadFileAccess);
 				pThis->mp_VersionUploads.f_Remove(UploadID);
 
 				if (!_Result)
@@ -264,8 +266,8 @@ namespace NMib::NCloud::NVersionManager
 					return;
 				}
 
-				pThis->fp_SaveVersionInfo(FileAccess, VersionPath, VersionInfo)
-					> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor, pParams, pFinishedPromise, FileAccess](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
+				pThis->fp_SaveVersionInfo(VersionPath, VersionInfo)
+					> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor, pParams, pFinishedPromise](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
 					{
 						if (!_InfoWriteResult)
 						{

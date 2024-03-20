@@ -153,14 +153,19 @@ namespace NMib::NCloud
 	{
 		auto OnResume = co_await m_pThis->f_CheckDestroyedOnResume();
 
-		auto Mounts = co_await
-			(
-				g_Dispatch(m_FileActor) / []
-				{
-					return CFile::fs_GetMounts(EFileMountType_Block | EFileMountType_Local | EFileMountType_Remote);
-				}
-			)
-		;
+		TCVector<CStr> Mounts;
+
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			Mounts = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / []
+					{
+						return CFile::fs_GetMounts(EFileMountType_Block | EFileMountType_Local | EFileMountType_Remote);
+					}
+				)
+			;
+		}
 
 		auto MountsToDelete = m_AutomaticMounts.f_KeySet();
 		for (auto &Mount : Mounts)
@@ -216,44 +221,41 @@ namespace NMib::NCloud
 			uint64 m_TotalSpace = 0;
 		};
 
-		auto FreeDiskSpace = co_await
-			(
+		TCAsyncResult<TCMap<CStr, TCAsyncResult<CPathInfo>>> FreeDiskSpace;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			auto BlockingActor = BlockingActorCheckout.f_Actor();
+			FreeDiskSpace = co_await
 				(
-					g_Dispatch(m_FileActor) / [Paths = m_MonitoredPaths.f_KeySet()]() -> TCMap<CStr, TCAsyncResult<CPathInfo>>
-					{
-						TCMap<CStr, TCAsyncResult<CPathInfo>> Return;
-
-						for (auto &Path : Paths)
+					(
+						g_Dispatch(BlockingActor) / [Paths = m_MonitoredPaths.f_KeySet(), BlockingActorCheckout = fg_Move(BlockingActorCheckout)]() -> TCMap<CStr, TCAsyncResult<CPathInfo>>
 						{
-							try
-							{
-								uint64 FreeSpace = CFile::fs_GetFreeSpace(Path);
-								uint64 TotalSpace = CFile::fs_GetTotalSpace(Path);
+							TCMap<CStr, TCAsyncResult<CPathInfo>> Return;
 
-								Return[Path].f_SetResult(CPathInfo{FreeSpace, TotalSpace});
-							}
-							catch (CException const &)
+							for (auto &Path : Paths)
 							{
-								Return[Path].f_SetException(NException::fg_CurrentException());
+								try
+								{
+									uint64 FreeSpace = CFile::fs_GetFreeSpace(Path);
+									uint64 TotalSpace = CFile::fs_GetTotalSpace(Path);
+
+									Return[Path].f_SetResult(CPathInfo{FreeSpace, TotalSpace});
+								}
+								catch (CException const &)
+								{
+									Return[Path].f_SetException(NException::fg_CurrentException());
+								}
 							}
+
+							return Return;
 						}
-
-						return Return;
-					}
-				).f_Timeout(60.0, "Timed out getting disk space").f_Wrap()
-			)
-		;
+					).f_Timeout(60.0, "Timed out getting disk space").f_Wrap()
+				)
+			;
+		}
 
 		if (!FreeDiskSpace)
-		{
-			if (FreeDiskSpace.f_HasExceptionType<CExceptionAsyncTimeout>())
-			{
-				fg_Move(m_FileActor).f_Destroy() > fg_DiscardResult(); // Hope that the operation will finish eventually
-				m_FileActor = fg_Construct(fg_Construct(), "Host monitor file actor {}"_f << m_FileActorSequence++);
-			}
-
 			co_return FreeDiskSpace.f_GetException();
-		}
 
 		TCActorResultVector<void> ReportResults;
 

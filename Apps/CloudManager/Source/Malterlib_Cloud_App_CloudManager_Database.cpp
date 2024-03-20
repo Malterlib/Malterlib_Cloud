@@ -170,7 +170,7 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_SetupDatabase()
 	{
-		mp_DatabaseActor = fg_Construct(fg_Construct(), "Cloud manager database");
+		mp_DatabaseActor = fg_Construct();
 		auto MaxDatabaseSize = mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("MaxDatabaseSize", g_MaxDatabaseSize).f_Integer();
 		co_await
 			(

@@ -279,7 +279,6 @@ namespace NMib::NCloud
 		CVersionManagerHelper
 			(
 				NStr::CStr const &_RootDirectory
-				, NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> const &_FileActor = {}
 				, uint64 _QueueSize = 8*1024*1024
 				, fp64 _Timeout = 30.0
 			)
@@ -326,11 +325,9 @@ namespace NMib::NCloud
 			) const
 		;
 		
-		NConcurrency::TCFuture<CPackageInfo> f_CreatePackage(NStr::CStr const &_SourceDirectory, NStr::CStr const &_DestinationFileName, uint32 _CompressionLevel) const;
+		NConcurrency::TCFuture<CPackageInfo> f_CreatePackage(NStr::CStr _SourceDirectory, NStr::CStr _DestinationFileName, uint32 _CompressionLevel) const;
 		NConcurrency::TCFuture<CPackageInfo> f_GetPackageInfo(NStr::CStr const &_PackageFile) const;
 		NConcurrency::TCFuture<void> f_AbortAll() const;
-		
-		NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> f_GetFileActor() const;
 		
 	private:
 		NStorage::TCSharedPointer<CVersionManagerHelperInternal> mp_pInternal;

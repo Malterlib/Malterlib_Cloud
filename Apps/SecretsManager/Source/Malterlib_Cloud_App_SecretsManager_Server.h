@@ -73,17 +73,6 @@ namespace NMib::NCloud::NSecretsManager
 			TCFunctionMutable<void ()> m_fPendingDelete;
 		};
 
-		class CFileActor : public CActor
-		{
-		public:
-			using CActorHolder = CSeparateThreadActorHolder;
-
-			TCFuture<void> f_Delete(CStr const &_File);
-#if DMibConfig_Tests_Enable
-			TCFuture<CEJSONSorted> f_SyncFileOperations();
-#endif
-		};
-
 		struct CChangeSubscription
 		{
 			CStr const &f_GetSubscriptionID() const
@@ -148,7 +137,7 @@ namespace NMib::NCloud::NSecretsManager
 		;
 		void fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove,TCSet<CStrSecure> const &_TagsToAdd);
 		void fp_UpdateSemanticIDs(CStr const &_SemanticIDToRemove, CStr const &_SemanticIDToAdd);
-		TCFuture<void> fp_RemoveFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor);
+		TCFuture<void> fp_RemoveFile(CStr _FileName, CDistributedAppAuditor _Auditor);
 		CActorSubscription fp_ReserveFile(CStr const &_FileName);
 		TCFuture<void> fp_RemoveUnreferencedFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor);
 		TCFuture<void> fp_WriteDatabase();
@@ -168,7 +157,7 @@ namespace NMib::NCloud::NSecretsManager
 		CTrustedPermissionSubscription mp_Permissions;
 
 		TCActor<CSecretsManagerServerDatabase> mp_DatabaseActor;
-		TCActor<CFileActor> mp_FileActor;
+		CSequencer mp_FileSequencer{"SecretsManager"};
 		CSecretsDatabase mp_Database;
 		TCMap<CStr, uint32> mp_Tags;
 		TCMap<CStr, uint32> mp_SemanticIDs;

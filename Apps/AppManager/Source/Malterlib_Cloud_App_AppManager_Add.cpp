@@ -323,10 +323,11 @@ namespace NMib::NCloud::NAppManager
 		TCSharedPointer<CStr> pDeletePath = fg_Construct();
 		CStr SourcePath;
 
-		auto CleanupDownload = g_ActorSubscription(mp_FileActor) / [pDeletePath]
+		auto CleanupDownload = g_BlockingActorSubscription / [pDeletePath]
 			{
 				if (!*pDeletePath)
 					return;
+
 				try
 				{
 					if (CFile::fs_FileExists(*pDeletePath))
@@ -457,53 +458,58 @@ namespace NMib::NCloud::NAppManager
 			pApplication->m_Settings.m_RunAsUserPassword = fg_HighEntropyRandomID("23456789ABCDEFGHJKLMNPQRSTWXYZabcdefghijkmnopqrstuvwxyz&=*!@~^") + "2Dg&";
 #endif
 		_fOnInfo("Unpacking application");
-		auto Files = co_await
-			(
-				g_Dispatch(mp_FileActor) / [=, pUniqueUserGroup = mp_pUniqueUserGroup, RootDirectory = mp_State.m_RootDirectory]() mutable
-				{
-					auto &Settings = pApplication->m_Settings;
-					fsp_CreateApplicationUserGroup(Settings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
 
-					TCVector<CStr> Files;
-
-					if (!bNullApplication)
+		TCVector<CStr> Files;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			Files = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [=, pUniqueUserGroup = mp_pUniqueUserGroup, RootDirectory = mp_State.m_RootDirectory]() mutable
 					{
-						if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
+						auto &Settings = pApplication->m_Settings;
+						fsp_CreateApplicationUserGroup(Settings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
+
+						TCVector<CStr> Files;
+
+						if (!bNullApplication)
 						{
-							auto Files = CFile::fs_FindFiles(SourcePath + "/*");
-							if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar")))
-								SourcePath = Files[0];
+							if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
+							{
+								auto Files = CFile::fs_FindFiles(SourcePath + "/*");
+								if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar")))
+									SourcePath = Files[0];
+							}
+							TCSet<CStr> AllowExist;
+							AllowExist[Directory + "/lost+found"];
+							AllowExist[Directory + "/.home"];
+							AllowExist[Directory + "/.tmp"];
+							if (!pDeletePath->f_IsEmpty())
+								AllowExist[*pDeletePath];
+							CStr Output = fsp_UnpackApplication
+								(
+									RootDirectory
+									, SourcePath
+									, Directory
+									, pApplication->m_Name
+									, pApplication->m_Settings
+									, Files
+									, AllowExist
+									, _bForceInstall
+									, pUniqueUserGroup
+								)
+							;
+							if (!Output.f_IsEmpty())
+								_fOnInfo(Output.f_TrimRight());
 						}
-						TCSet<CStr> AllowExist;
-						AllowExist[Directory + "/lost+found"];
-						AllowExist[Directory + "/.home"];
-						AllowExist[Directory + "/.tmp"];
-						if (!pDeletePath->f_IsEmpty())
-							AllowExist[*pDeletePath];
-						CStr Output = fsp_UnpackApplication
-							(
-								RootDirectory
-								, SourcePath
-								, Directory
-								, pApplication->m_Name
-								, pApplication->m_Settings
-								, Files
-								, AllowExist
-								, _bForceInstall
-								, pUniqueUserGroup
-							)
-						;
-						if (!Output.f_IsEmpty())
-							_fOnInfo(Output.f_TrimRight());
+
+						fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
+
+						return Files;
 					}
-
-					fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
-
-					return Files;
-				}
-				% "Failed to unpack application" % Auditor
-			)
-		;
+					% "Failed to unpack application" % Auditor
+				)
+			;
+		}
 
 		if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))
 		{

@@ -45,7 +45,7 @@ namespace NMib::NCloud
 	struct CFileTransferSend : public NConcurrency::CActor
 	{
 		~CFileTransferSend();
-		CFileTransferSend(NStr::CStr const &_BasePath, NConcurrency::TCActor<CActor> const &_FileActor = {});
+		CFileTransferSend(NStr::CStr const &_BasePath);
 		
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SendFiles(CFileTransferContext &&_TransferContext);
 		NConcurrency::TCFuture<CFileTransferResult> f_GetResult();
@@ -63,7 +63,6 @@ namespace NMib::NCloud
 				NStr::CStr const &_BasePath
 				, NFile::EFileAttrib _AttributeMask = NFile::EFileAttrib_UserRead | NFile::EFileAttrib_UserWrite | NFile::EFileAttrib_UserExecute | NFile::EFileAttrib_UnixAttributesValid
 				, NFile::EFileAttrib _AttributeAdd = NFile::EFileAttrib_None
-				, NConcurrency::TCActor<CActor> const &_FileActor = {}
 			)
 		;
 		

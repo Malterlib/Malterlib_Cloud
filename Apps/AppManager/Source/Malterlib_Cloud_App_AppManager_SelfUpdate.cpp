@@ -22,9 +22,11 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
+		auto BlockingActorCheckout = fg_BlockingActor();
+
 		TCAsyncResult<bool> UpdateResult = co_await
 			(
-				g_Dispatch(mp_FileActor) / [SourceDir = _pApplication->f_GetDirectory()]() -> bool
+				g_Dispatch(BlockingActorCheckout) / [SourceDir = _pApplication->f_GetDirectory()]() -> bool
 				{
 					CStr ProgramDir = CFile::fs_GetProgramDirectory();
 					CStr ProgramPath = CFile::fs_GetProgramPath();
