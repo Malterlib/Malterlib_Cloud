@@ -51,6 +51,8 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<CFileTransferResult> f_GetResult();
 		
 	private:
+		NConcurrency::TCFuture<void> fp_Destroy();
+
 		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
@@ -78,6 +80,8 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<CFileTransferResult> f_GetResult(); 
 		
 	private:
+		NConcurrency::TCFuture<void> fp_Destroy() override;
+
 		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};

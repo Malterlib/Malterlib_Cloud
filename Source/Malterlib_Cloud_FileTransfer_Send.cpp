@@ -87,7 +87,17 @@ namespace NMib::NCloud
 		auto &Internal = *mp_pInternal;
 		Internal.m_pFileState->m_RootPath = _BasePath;
 	}
-	
+
+	TCFuture<void> CFileTransferSend::fp_Destroy()
+	{
+		auto &Internal = *mp_pInternal;
+
+		co_await fg_Move(Internal.m_ReadSequencer).f_Destroy().f_Wrap() > fg_LogError("FileTransferSend", "Failed to destroy sequencer");
+
+		co_return {};
+	}
+
+
 	void CFileTransferSend::CInternal::fp_ReportError(CStr const &_Error)
 	{
 		CFileTransferContext::CInternal::CStateChange StateChange{m_Version};

@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Concurrency/ActorSequencerActor>
+#include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/SymmetricCrypto>
 
 #include "Malterlib_Cloud_KeyManagerDatabase_EncryptedFile.h"
@@ -153,7 +154,16 @@ namespace NMib::NCloud
 	{
 		
 	}
-	
+
+	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::fp_Destroy()
+	{
+		auto &Internal = *mp_pInternal;
+
+		co_await fg_Move(Internal.m_Sequencer).f_Destroy().f_Wrap() > NConcurrency::fg_LogError("KeyManagerServerDatabase", "Failed to destroy sequencer");
+
+		co_return {};
+	}
+
 	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::f_Initialize()
 	{
 		return mp_pInternal->f_Initialize();

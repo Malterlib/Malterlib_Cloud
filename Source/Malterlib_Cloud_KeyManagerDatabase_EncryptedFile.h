@@ -21,6 +21,8 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<CDatabase> f_ReadDatabase() override;
 	
 	private:
+		NConcurrency::TCFuture<void> fp_Destroy() override;
+
 		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};

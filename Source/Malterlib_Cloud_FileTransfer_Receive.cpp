@@ -3,6 +3,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ActorSequencerActor>
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_FileTransfer.h"
 #include "Malterlib_Cloud_FileTransfer_Internal.h"
@@ -64,7 +65,16 @@ namespace NMib::NCloud
 		Internal.m_AttributeAdd = _AttributeAdd;
 		Internal.m_BasePath = _BasePath;
 	}
-	
+
+	TCFuture<void> CFileTransferReceive::fp_Destroy()
+	{
+		auto &Internal = *mp_pInternal;
+
+		co_await fg_Move(Internal.m_WriteSequencer).f_Destroy().f_Wrap() > fg_LogError("FileTransferReceive", "Failed to destroy sequencer");
+
+		co_return {};
+	}
+
 	NConcurrency::TCFuture<CFileTransferContext> CFileTransferReceive::f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags)
 	{
 		auto &Internal = *mp_pInternal;

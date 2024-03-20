@@ -94,7 +94,18 @@ namespace NMib::NCloud
 			{
 				auto &Internal = *mp_pInternal;
 
-				Internal.m_MonitoredConfigs.f_Remove(ConfigID);
+				auto *pConfig = Internal.m_MonitoredConfigs.f_FindEqual(ConfigID);
+				if (!pConfig)
+					co_return {};
+
+				TCActorResultVector<void> Results;
+
+				for (auto &File : pConfig->m_Files)
+					fg_Move(File.m_UpdateSequencer).f_Destroy() > Results.f_AddResult();
+
+				Internal.m_MonitoredConfigs.f_Remove(pConfig);
+
+				co_await Results.f_GetUnwrappedResults().f_Wrap() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy sequencers");
 
 				co_return {};
 			}

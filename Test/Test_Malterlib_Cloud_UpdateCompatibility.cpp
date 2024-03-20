@@ -18,6 +18,7 @@
 #include <Mib/Concurrency/DistributedAppLaunchHelper>
 #include <Mib/Concurrency/DistributedTrustTestHelpers>
 #include <Mib/Concurrency/DistributedActorTestHelpers>
+#include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Process/Platform>
@@ -194,6 +195,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		}
 
 	private:
+
+		TCFuture<void> fp_Destroy() override
+		{
+			co_await fg_Move(mp_Sequencer).f_Destroy().f_Wrap() > fg_LogError("Test", "Failed to destroy sequencer");;
+		}
 
 		TCFuture<void> fp_ProvidePassword()
 		{

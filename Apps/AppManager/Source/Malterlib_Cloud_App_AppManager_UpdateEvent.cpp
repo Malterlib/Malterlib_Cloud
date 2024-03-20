@@ -64,11 +64,14 @@ namespace NMib::NCloud::NAppManager
 					if (!pUpdateNotificationSubscriptions)
 						co_return {};
 
-					TCFuture<void> DestroyFuture = fg_Move(pUpdateNotificationSubscriptions->m_fOnUpdate).f_Destroy();
+					TCActorResultVector<void> Destroys;
+					fg_Move(pUpdateNotificationSubscriptions->m_fOnUpdate).f_Destroy() > Destroys.f_AddResult();
+					fg_Move(pUpdateNotificationSubscriptions->m_Sequencer).f_Destroy() > Destroys.f_AddResult();
 
 					pThis->mp_UpdateNotificationSubscriptions.f_Remove(SubscriptionID);
 
-					co_await fg_Move(DestroyFuture);
+					co_await Destroys.f_GetUnwrappedResults().f_Wrap() > fg_LogError("UpdateNotifications", "Failed to destroy subscription");
+
 					co_return {};
 				}
 			)

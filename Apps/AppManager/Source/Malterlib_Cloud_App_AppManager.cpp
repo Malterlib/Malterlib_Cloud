@@ -20,6 +20,15 @@ namespace NMib::NCloud::NAppManager
 			fg_Move(mp_InitialStartupResultFuture) > fg_DiscardResult();
 	}
 
+	TCFuture<void> CAppManagerActor::fp_Destroy()
+	{
+		co_await fg_Move(mp_ChangeNotificationsPermissionsChangedSequencer).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy sequencer");
+
+		co_await CDistributedAppActor::fp_Destroy();
+
+		co_return {};
+	}
+
 	void CAppManagerActor::fp_OnApplicationAdded(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		CRemoteApplicationKey RemoteKey{_pApplication->m_Settings};
@@ -574,6 +583,8 @@ namespace NMib::NCloud::NAppManager
 			{
 				if (Subscription.m_fOnUpdate)
 					fg_Move(Subscription.m_fOnUpdate).f_Destroy() > Destroys.f_AddResult();
+
+				fg_Move(Subscription.m_Sequencer).f_Destroy() > Destroys.f_AddResult();
 			}
 			mp_UpdateNotificationSubscriptions.f_Clear();
 

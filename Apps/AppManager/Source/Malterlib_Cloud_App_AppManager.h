@@ -668,6 +668,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
 		TCFuture<void> fp_StopApp() override;
+		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_PauseReporting();
 		TCFuture<void> fp_ReadState();
 		void fp_InitApplications();

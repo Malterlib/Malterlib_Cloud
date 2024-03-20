@@ -142,7 +142,21 @@ namespace NMib::NCloud
 		if (Internal.m_UpdateTimerSubscription)
 			co_await fg_Exchange(Internal.m_UpdateTimerSubscription, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update timer subscription");
 
-		co_await fg_Move(Internal.m_UpdatePeriodicSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update periodic sequencer");
+		{
+			TCActorResultVector<void> Results;
+			
+			for (auto &Config : Internal.m_MonitoredConfigs)
+			{
+				for (auto &File : Config.m_Files)
+					fg_Move(File.m_UpdateSequencer).f_Destroy() > Results.f_AddResult();
+			}
+
+			fg_Move(Internal.m_UpdatePeriodicSequencer).f_Destroy() > Results.f_AddResult();
+			fg_Move(Internal.m_UpdatePeriodicDiskSpaceSequencer).f_Destroy() > Results.f_AddResult();
+			fg_Move(Internal.m_UpdatePeriodicPatch).f_Destroy() > Results.f_AddResult();
+
+			co_await Results.f_GetUnwrappedResults().f_Wrap() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy sequencers");
+		}
 
 		TCActorResultVector<void> Destroys;
 

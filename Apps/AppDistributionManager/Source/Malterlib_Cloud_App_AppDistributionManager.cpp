@@ -116,6 +116,8 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		co_await CDistributedAppActor::fp_Destroy();
 
+		co_await fg_Move(mp_DistributeSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy sequencer");
+
 		co_return {};
 	}
 
