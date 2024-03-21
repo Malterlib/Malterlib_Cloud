@@ -95,6 +95,17 @@ namespace NMib::NCloud
 	TCFuture<void> CAppManagerTestHelper::f_Destroy()
 	{
 		auto &State = *m_pState;
+		TCActorResultVector<void> Destroys;
+		for (auto &Info : State.m_AppManagerInfos)
+		{
+			if (!Info.m_Launch)
+				continue;
+
+			Info.m_Launch->f_Destroy() > Destroys.f_AddResult();
+		}
+
+		[[maybe_unused]] auto Result = co_await Destroys.f_GetUnwrappedResults();
+
 		if (State.m_LaunchHelper)
 			co_await fg_Move(State.m_LaunchHelper).f_Destroy();
 
