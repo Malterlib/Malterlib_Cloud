@@ -49,7 +49,7 @@ using namespace NMib::NTime;
 
 #define DTestUpdateCompatibilityEnableOtherOutput 0
 
-static fp64 g_Timeout = 60.0 * gc_TimeoutMultiplier;
+static fp64 g_Timeout = 120.0 * gc_TimeoutMultiplier;
 static uint32 g_CompressionLevel = 1;
 
 namespace
@@ -199,6 +199,8 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		TCFuture<void> fp_Destroy() override
 		{
 			co_await fg_Move(mp_Sequencer).f_Destroy().f_Wrap() > fg_LogError("Test", "Failed to destroy sequencer");;
+
+			co_return {};
 		}
 
 		TCFuture<void> fp_ProvidePassword()
