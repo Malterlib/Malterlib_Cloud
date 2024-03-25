@@ -295,7 +295,7 @@ namespace NMib::NCloud::NCloudManager
 									Paused = SensorInfo.f_IsPaused(Now, Value.m_LastSeen, &SecondsOfPauseRemaining);
 								}
 
-								return fg_Tuple(Paused, Removed, fg_Move(_ReadTransaction), SecondsOfPauseRemaining);
+								return fg_Tuple(Removed, Paused, fg_Move(_ReadTransaction), SecondsOfPauseRemaining);
 							}
 						)
 					;
