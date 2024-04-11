@@ -961,6 +961,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationClear(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
+		static CStr fsp_LimitErrorLogSize(CStr const &_String, mint _ExtraSize);
+
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #else

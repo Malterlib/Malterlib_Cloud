@@ -84,6 +84,7 @@ namespace NMib::NCloud
 		TCFuture<void> f_StopCloudManager();
 		TCFuture<void> f_StartCloudManager();
 		TCFuture<void> f_Destroy();
+		CStr f_RootDirectory();
 
 		TCFuture<NStr::CStr> f_LaunchTool
 			(

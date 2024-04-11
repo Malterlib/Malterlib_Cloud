@@ -9,6 +9,10 @@
 
 static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 
+static ch8 const *g_pFailingPreUpdateScript =
+#	include "Test_Malterlib_Cloud_AppManager_General_FailingPreUpdate.sh"
+;
+
 class CAppManager_General_Tests : public NMib::NTest::CTest
 {
 public:
@@ -38,6 +42,7 @@ public:
 
 		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStage;
 		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStageCoordination;
+		TCVector<CStr> m_Errors;
 		TCAtomic<mint> m_nSuccess = 0;
 		TCAtomic<mint> m_nFinished = 0;
 
@@ -61,6 +66,7 @@ public:
 			m_LastInStage.f_Clear();
 			m_InStage.f_Clear();
 			m_MaxInStage.f_Clear();
+			m_Errors.f_Clear();
 			m_nMaxInProgress = 0;
 			m_nSuccess = 0;
 			m_nFinished = 0;
@@ -141,6 +147,8 @@ public:
 			CAppManagerTestHelper AppManagerTestHelper("AppManagerTests", Options, g_Timeout);
 			auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
 
+			auto RootDirectory = AppManagerTestHelper.f_RootDirectory();
+
 			auto &PackageInfo = AppManagerTestHelper.m_pState->m_PackageInfo;
 			auto &TestAppArchive = AppManagerTestHelper.m_pState->m_TestAppArchive;
 			auto &VersionManager = AppManagerTestHelper.m_pState->m_VersionManager;
@@ -217,6 +225,7 @@ public:
 					if (_Notification.m_Stage == CAppManagerInterface::EUpdateStage_Failed)
 					{
 						_State.m_InProgress.f_Remove(_ApplicationKey);
+						_State.m_Errors.f_Insert(_Notification.m_Message);
 						++_State.m_nFinished;
 					}
 					else if (!_Notification.m_bCoordinateWait && _Notification.m_Stage == CAppManagerInterface::EUpdateStage_Finished)
@@ -381,6 +390,23 @@ public:
 				}
 			;
 
+			auto fSetPreUpdateScriptApp0 = [&](CStr _AppName, CStr _Script) -> CUnsafeFuture
+				{
+					TCActorResultVector<void> AppCommandResults;
+					auto &AppManager = *AppManagers.f_FindSmallest();
+					{
+						CAppManagerInterface::CApplicationChangeSettings ChangeSettings;
+						CAppManagerInterface::CApplicationSettings Settings;
+						Settings.m_UpdateScriptPreUpdate = _Script;
+
+						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
+					}
+					co_await (co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for pre update script change") | g_Unwrap);
+
+					co_return {};
+				}
+			;
+
 			co_await AppManagerTestHelper.f_CheckCloudManager(1);
 
 			{
@@ -426,6 +452,33 @@ public:
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
+			}
+
+			{
+				DMibTestPath("Fail Update");
+				UpdateNotificationState.f_Clear();
+				DMibTestMark;
+				CStr ScriptPath = RootDirectory / "FailingPreUpdate.sh";
+				CFile::fs_WriteStringToFile(ScriptPath, g_pFailingPreUpdateScript, false);
+
+				co_await fSetPreUpdateScriptApp0("TestApp", ScriptPath);
+				DMibTestMark;
+				co_await fUpdateTestApp({"TestTag"});
+				DMibTestMark;
+				co_await fWaitForAllUpdated("TestApp");
+
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors.f_GetLen(), ==, 1);
+				if (UpdateNotificationState.m_Applications["TestApp"].m_Errors.f_GetLen())
+				{
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors[0].f_GetLen(), >=, 512 * 1024 - 548);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors[0].f_GetLen(), <=, 512 * 1024);
+				}
+
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers - 1);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
+
+				co_await fSetPreUpdateScriptApp0("TestApp", "");
 			}
 
 			if (!NMib::NTest::fg_GroupActive("Expensive"))

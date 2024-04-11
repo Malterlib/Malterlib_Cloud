@@ -134,7 +134,7 @@ namespace NMib::NCloud::NAppManager
 							auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
 							if (ExitStatus != 0)
 							{
-								auto ErrorOutput = pState->m_AllOutput.f_Trim();
+								auto ErrorOutput = fsp_LimitErrorLogSize(pState->m_AllOutput.f_Trim(), 128);
 								if (ErrorOutput.f_IsEmpty())
 									fReportError(fg_Format("Exit status: {}", ExitStatus));
 								else

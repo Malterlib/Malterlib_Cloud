@@ -66,6 +66,13 @@ namespace NMib::NCloud
 			m_TrustManager->f_BlockDestroy();
 	}
 
+	CStr CAppManagerTestHelper::f_RootDirectory()
+	{
+		auto &State = *m_pState;
+
+		return State.m_RootDirectory;
+	}
+
 	TCFuture<NStr::CStr> CAppManagerTestHelper::f_LaunchTool
 		(
 			NStr::CStr _Executable

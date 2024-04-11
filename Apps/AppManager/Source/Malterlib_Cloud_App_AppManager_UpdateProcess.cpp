@@ -51,7 +51,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				if (!_Result)
 				{
-					CStr Error = fg_Format("Pending self update failed: {}", _Result.f_GetExceptionStr());
+					CStr Error = fg_Format("Pending self update failed: {}", fsp_LimitErrorLogSize(_Result.f_GetExceptionStr(), 128));
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "{}", Error);
 					fp_OnUpdateEvent(pUpdateState, EUpdateStage::EUpdateStage_Failed, Error) > fg_DiscardResult();
 					return;

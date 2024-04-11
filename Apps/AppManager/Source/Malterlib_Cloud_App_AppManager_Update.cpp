@@ -295,7 +295,7 @@ namespace NMib::NCloud::NAppManager
 			co_return {};
 		}
 
-		CStr Error = Result.f_GetExceptionStr();
+		CStr Error = fsp_LimitErrorLogSize(Result.f_GetExceptionStr(), 0);
 
 		if (Error.f_Find("AppManager stopped") >= 0 && pState->m_pApplication->m_UpdateStage <= EUpdateStage::EUpdateStage_SyncStart)
 			co_return Auditor.f_Exception("Reschedule update after next restart");

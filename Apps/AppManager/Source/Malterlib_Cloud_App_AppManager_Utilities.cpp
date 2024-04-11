@@ -21,6 +21,30 @@ namespace NMib::NCloud::NAppManager
 		return DMibNewLine + Ret;
 	}
 
+	CStr CAppManagerActor::fsp_LimitErrorLogSize(CStr const &_String, mint _ExtraSize)
+	{
+		mint MaxSize = 512 * 1024 - _ExtraSize;
+
+		auto Lines = _String.f_SplitLine().f_Reverse();
+
+		TCVector<CStr> OutLines;
+		mint Size = 0;
+		for (auto &Line : Lines)
+		{
+			auto LineSize = Line.f_GetLen() + 1;
+			if (Size + LineSize > MaxSize)
+				break;
+
+			Size += LineSize;
+			OutLines.f_Insert(fg_Move(Line));
+		}
+
+		if (OutLines.f_IsEmpty() && !Lines.f_IsEmpty())
+			OutLines.f_Insert(Lines.f_GetFirst().f_Left(MaxSize));
+
+		return CStr::fs_Join(fg_Move(OutLines).f_Reverse(), "\n");
+	}
+
 	CStr CAppManagerActor::fsp_RunTool
 		(
 			CStr const &_Description
