@@ -609,7 +609,9 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
-		State.m_pInProgressScope.f_Clear();
+		if (State.m_InProgressScope)
+			co_await fg_Exchange(State.m_InProgressScope, nullptr)->f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Error waiting for in progress scope");
+
 		fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_Finished, {}) > fg_DiscardResult();
 
 		co_return {};

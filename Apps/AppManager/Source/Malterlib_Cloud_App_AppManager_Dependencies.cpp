@@ -153,7 +153,7 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		auto InProgressScope = Application.f_SetInProgress();
-		fp_LaunchApp(_pApplication, true) > [this, InProgressScope, _pApplication, pCleanupAutoLaunches](TCAsyncResult<CAppLaunchResult> &&_Result)
+		fp_LaunchApp(_pApplication, true) > [this, InProgressScope = fg_Move(InProgressScope), _pApplication, pCleanupAutoLaunches](TCAsyncResult<CAppLaunchResult> &&_Result)
 			{
 				if (_Result)
 					return;

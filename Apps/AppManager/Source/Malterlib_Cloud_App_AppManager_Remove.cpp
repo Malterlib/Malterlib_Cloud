@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppManager.h"
 
@@ -33,6 +34,7 @@ namespace NMib::NCloud::NAppManager
 			co_return Auditor.f_Exception("Operation already in progress for application");
 
 		auto InProgressScope = (*pApplication)->f_SetInProgress();
+		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		if (CStr Error = pThis->fp_GetApplicationStopErrors(co_await (*pApplication)->f_Stop(EStopFlag_CloseEncryption).f_Wrap(), _Name); !Error.f_IsEmpty())
 			Auditor.f_Warning(Error);
@@ -58,6 +60,7 @@ namespace NMib::NCloud::NAppManager
 
 		Auditor.f_Info(fg_Format("Removed application '{}'", _Name));
 
+		co_await fg_Move(DestroyInProgress);
 		co_await pThis->fp_SyncNotifications(_Name);
 
 		co_return {};

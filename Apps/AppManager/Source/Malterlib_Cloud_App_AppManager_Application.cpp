@@ -86,11 +86,11 @@ namespace NMib::NCloud::NAppManager
 		return false;
 	}
 
-	COnScopeExitShared CAppManagerActor::CApplication::f_SetInProgress()
+	CActorSubscription CAppManagerActor::CApplication::f_SetInProgress()
 	{
 		DRequire(!f_IsInProgress());
 		m_bOperationInProgress = true;
-		return g_OnScopeExitActor(fg_ThisActor(m_pThis)) / [pThis = m_pThis, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]
+		return g_ActorSubscription / [pThis = m_pThis, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]
 			{
 				DCheck(pApplication->m_bOperationInProgress);
 				pApplication->m_bOperationInProgress = false;

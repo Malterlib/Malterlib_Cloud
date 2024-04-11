@@ -168,7 +168,7 @@ namespace NMib::NCloud::NAppManager
 
 			CStr f_GetDirectory();
 
-			COnScopeExitShared f_SetInProgress();
+			CActorSubscription f_SetInProgress();
 
 			bool f_NeedsEncryption() const;
 			bool f_EncryptionOpened() const;
@@ -570,7 +570,7 @@ namespace NMib::NCloud::NAppManager
 			TCFunction <void ()> m_fUpdateVersionInfo;
 			CActorSubscription m_DownloadDirectoryCleanup;
 			CActorSubscription m_TemporaryDirectoryCleanup;
-			COnScopeExitShared m_pInProgressScope;
+			CActorSubscription m_InProgressScope;
 			COnScopeExitShared m_pCleanupStateMap;
 			CStr m_SourcePath;
 			CStr m_TempraryPath;

@@ -3,6 +3,8 @@
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
+#include <Mib/Concurrency/AsyncDestroy>
+
 namespace NMib::NCloud::NAppManager
 {
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_ChangeSettings
@@ -241,6 +243,7 @@ namespace NMib::NCloud::NAppManager
 			co_return Auditor.f_Exception("Operation already in progress for application");
 
 		auto InProgressScope = Application.f_SetInProgress();
+		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !_bForce)
 		{
@@ -305,7 +308,7 @@ namespace NMib::NCloud::NAppManager
 				(
 					(
 						g_Dispatch(BlockingActorCheckout)
-						/ [=, Directory = pApplication->f_GetDirectory(), InProgressScope = InProgressScope, pUniqueUserGroup = mp_pUniqueUserGroup]()
+						/ [=, Directory = pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]()
 						{
 							fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
 							fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
@@ -353,7 +356,8 @@ namespace NMib::NCloud::NAppManager
 
 		Auditor.f_Info("Updated application settings");
 
-		co_await fp_SyncNotifications(_Name);		
+		co_await fg_Move(DestroyInProgress);
+		co_await fp_SyncNotifications(_Name);
 
 		co_return {};
 	}

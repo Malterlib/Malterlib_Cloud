@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppManager.h"
 
@@ -270,7 +271,7 @@ namespace NMib::NCloud::NAppManager
 		pState->m_StartUpdateTime = NTime::CTime::fs_NowUTC();
 		if (!bDownloadVersion)
 			pState->m_SourcePath = _FromFileName;
-		pState->m_pInProgressScope = pApplication->f_SetInProgress();
+		pState->m_InProgressScope = pApplication->f_SetInProgress();
 
 		mp_RunningUpdates[pState];
 		pState->m_pCleanupStateMap = g_OnScopeExitActor / [this, pStateWeak = pState.f_Weak()]
@@ -298,55 +299,64 @@ namespace NMib::NCloud::NAppManager
 
 		if (Error.f_Find("AppManager stopped") >= 0 && pState->m_pApplication->m_UpdateStage <= EUpdateStage::EUpdateStage_SyncStart)
 			co_return Auditor.f_Exception("Reschedule update after next restart");
-		else
-			fp_OnUpdateEvent(pState, EUpdateStage::EUpdateStage_Failed, Error) > fg_DiscardResult();
 
-		self / [=, this, bUnencrypted = pState->m_bUnencrypted]() -> TCFuture<void>
-			{
-				if (!pApplication->m_bDeleted && bUnencrypted)
-				{
-					auto ScriptResult = co_await fp_RunUpdateScript
-						(
-							pApplication
-							, EUpdateScript_OnError
-							, Error
-							, VersionID
-							, pState->m_pVersionInfo.f_Get()
-							, pState->m_LastInstalledVersion
-							, pState->m_LastInstalledVersionInfo
-							, pClock->f_GetTime()
-						)
-						.f_Wrap()
-					;
-					if (!ScriptResult)
+		if (pState->m_InProgressScope)
+			co_await fg_Exchange(pState->m_InProgressScope, nullptr)->f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Error waiting for in progress scope");
+
+		auto [EventResult, ScriptResult] = co_await
+			(
+				(
+					fp_OnUpdateEvent(pState, EUpdateStage::EUpdateStage_Failed, Error)
+					+ self / [=, this, bUnencrypted = pState->m_bUnencrypted]() -> TCFuture<void>
 					{
-						DMibLogWithCategory
-							(
-								Malterlib/Cloud/AppManager
-								, Warning
-								, "Error script failed: {}"
-								, ScriptResult.f_GetExceptionStr()
-							)
-						;
-					}
-				}
-				else
-				{
-					DMibLogWithCategory
-						(
-							Malterlib/Cloud/AppManager
-							, Info
-							, "Skipped error script: bDeleted {}   bUnencrypted {}"
-							, pApplication->m_bDeleted
-							, bUnencrypted
-						)
-					;
-				}
+						if (!pApplication->m_bDeleted && bUnencrypted)
+						{
+							auto ScriptResult = co_await fp_RunUpdateScript
+								(
+									pApplication
+									, EUpdateScript_OnError
+									, Error
+									, VersionID
+									, pState->m_pVersionInfo.f_Get()
+									, pState->m_LastInstalledVersion
+									, pState->m_LastInstalledVersionInfo
+									, pClock->f_GetTime()
+								)
+								.f_Wrap()
+							;
+							if (!ScriptResult)
+							{
+								DMibLogWithCategory
+									(
+										Malterlib/Cloud/AppManager
+										, Warning
+										, "Error script failed: {}"
+										, ScriptResult.f_GetExceptionStr()
+									)
+								;
+							}
+						}
+						else
+						{
+							DMibLogWithCategory
+								(
+									Malterlib/Cloud/AppManager
+									, Info
+									, "Skipped error script: bDeleted {}   bUnencrypted {}"
+									, pApplication->m_bDeleted
+									, bUnencrypted
+								)
+							;
+						}
 
-				co_return {};
-			}
-			> fg_DiscardResult()
+						co_return {};
+					}
+				).f_Wrap()
+			)
 		;
+
+		fg_Move(EventResult) > fg_LogError("Malterlib/Cloud/AppManager", "Error sending failed event notification");
+		fg_Move(ScriptResult) > fg_LogError("Malterlib/Cloud/AppManager", "Error running error script");
 
 		co_return Auditor.f_Exception(Error);
 	}

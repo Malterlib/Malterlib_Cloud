@@ -4,6 +4,7 @@
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/AsyncDestroy>
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
@@ -527,6 +528,7 @@ namespace NMib::NCloud::NAppManager
 
 		fp_OnApplicationAdded(pApplication);
 		auto InProgressScope = pApplication->f_SetInProgress();
+		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		pApplication->m_LastInstalledVersionFinished = pApplication->m_LastInstalledVersion;
 		pApplication->m_LastInstalledVersionInfoFinished = pApplication->m_LastInstalledVersionInfo;
@@ -541,6 +543,7 @@ namespace NMib::NCloud::NAppManager
 		if (AppLaunchResult.m_StartupError)
 			_fOnInfo("Application startup failed: {}"_f << AppLaunchResult.m_StartupError);
 
+		co_await fg_Move(DestroyInProgress);
 		co_await fp_SyncNotifications(_Name);
 
 		co_return {};
