@@ -88,7 +88,7 @@ namespace NMib::NCloud
 		auto SimpleLaunch = CProcessLaunchActor::CSimpleLaunch(_Executable, _Params, _WorkingDir, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode);
 
 		if (State.m_Options & EOption_EnableOtherOutput)
-			SimpleLaunch.m_ToLog |= CProcessLaunchActor::ELogFlag_Error | CProcessLaunchActor::ELogFlag_StdErr;
+			SimpleLaunch.m_ToLog |= CProcessLaunchActor::ELogFlag_Error | CProcessLaunchActor::ELogFlag_StdErr | CProcessLaunchActor::ELogFlag_Info;
 
 		co_return
 			(
