@@ -74,6 +74,7 @@ namespace NMib::NCloud
 		};
 		
 		virtual NConcurrency::TCFuture<void> f_Initialize() = 0;
+		virtual NConcurrency::TCFuture<void> f_ChangePassword(NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt) = 0;
 		virtual NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase &&_Database) = 0;
 		virtual NConcurrency::TCFuture<CDatabase> f_ReadDatabase() = 0;
 	};
@@ -114,6 +115,7 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_GetAllVerifiedHosts();
 		NConcurrency::TCFuture<NContainer::TCVector<CKeyManagerKey>> f_GetKeys();
 		NConcurrency::TCFuture<void> f_CopyKey(CKeyManagerKeyID &&_FromKey, CKeyManagerKeyID &&_ToKey);
+		NConcurrency::TCFuture<void> f_ForceWriteDatabase();
 
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy() override;

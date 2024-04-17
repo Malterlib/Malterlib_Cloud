@@ -66,7 +66,24 @@ namespace NMib::NCloud
 				)
 			;
 		}
-		
+
+		NConcurrency::TCFuture<void> f_ChangePassword(NStr::CStrSecure _Password, NContainer::CSecureByteVector _Salt)
+		{
+			m_pAESContext = fg_Construct
+				(
+					NCryptography::CEncryptKeyIV::fs_GenerateKeyIV
+					(
+						_Password
+						, _Salt
+						, NCryptography::CKeyDerivationSettings_PKCS5_Deprecated{NCryptography::EDigestType_SHA256}
+						, NCryptography::ECryptoType_AES_256_CBC
+					)
+				)
+			;
+
+			co_return {};
+		}
+
 		NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase _Database)
 		{
 			auto SequenceSubscription = co_await m_Sequencer.f_Sequence();
@@ -168,7 +185,12 @@ namespace NMib::NCloud
 	{
 		return mp_pInternal->f_Initialize();
 	}
-		
+
+	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::f_ChangePassword(NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt)
+	{
+		return mp_pInternal->f_ChangePassword(_Password, _Salt);
+	}
+
 	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::f_WriteDatabase(CDatabase &&_Database)
 	{
 		return mp_pInternal->f_WriteDatabase(fg_Move(_Database));

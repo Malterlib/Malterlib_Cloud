@@ -38,6 +38,11 @@ public:
 			co_return {};
 		}
 
+		NConcurrency::TCFuture<void> f_ChangePassword(NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt)
+		{
+			co_return {};
+		}
+
 		TCFuture<void> f_WriteDatabase(CDatabase &&_Database)
 		{
 			m_Database = fg_Move(_Database);
@@ -658,9 +663,7 @@ public:
 			{
 				DMibTestPath("ExistingKeys");
 
-				auto DatabaseActor2
-					= fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, Password, NContainer::CSecureByteVector{})
-				;
+				auto DatabaseActor2 = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, Password, NContainer::CSecureByteVector{});
 				co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
 				auto Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
 
@@ -703,8 +706,47 @@ public:
 						)
 					;
 				}
-				co_return {};
 			}
+			{
+				DMibTestPath("ChangePassword");
+
+				CStrSecure NewPassword = "Password123";
+				co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ChangePassword, NewPassword, NContainer::CSecureByteVector{}).f_Timeout(g_Timeout, "Timeout");
+				co_await DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Database).f_Timeout(g_Timeout, "Timeout");
+
+				auto DatabaseActor2 = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>(DatabasePath, NewPassword, NContainer::CSecureByteVector{});
+				co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_Initialize).f_Timeout(g_Timeout, "Timeout");
+				auto Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+
+				auto fTestDatabase = [&]
+					{
+						DMibExpect(Database2.m_Clients[HostID0].m_Keys.f_GetLen(), ==, 2);
+						DMibExpect(Database2.m_Clients[HostID1].m_Keys.f_GetLen(), ==, 2);
+						DMibExpect(Database.m_Clients[HostID0].m_Keys["TestKey0"].m_Key, ==, Database2.m_Clients[HostID0].m_Keys["TestKey0"].m_Key);
+						DMibExpect(Database.m_Clients[HostID0].m_Keys["TestKey1"].m_Key, ==, Database2.m_Clients[HostID0].m_Keys["TestKey1"].m_Key);
+						DMibExpect(Database.m_Clients[HostID1].m_Keys["TestKey0"].m_Key, ==, Database2.m_Clients[HostID1].m_Keys["TestKey0"].m_Key);
+						DMibExpect(Database.m_Clients[HostID1].m_Keys["TestKey1"].m_Key, ==, Database2.m_Clients[HostID1].m_Keys["TestKey1"].m_Key);
+					}
+				;
+
+				{
+					DMibTestPath("Load without running");
+					fTestDatabase();
+				}
+
+				DMibTestMark;
+
+				co_await f_TestCloudKeyManager(DatabaseActor2, pTestState);
+
+				DMibTestMark;
+
+				{
+					DMibTestPath("After running");
+					Database2 = co_await DatabaseActor2(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+					fTestDatabase();
+				}
+			}
+			co_return {};
 		};
 		DMibTestSuite("PreCreateKeys") -> TCFuture<void>
 		{

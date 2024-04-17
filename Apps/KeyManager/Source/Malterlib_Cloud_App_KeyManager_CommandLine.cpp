@@ -44,6 +44,18 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
+					"Names"_o= {"--change-password"}
+					, "Description"_o= "Change the password that is used to unencrypt the key manager database."
+				}
+				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CKeyManagerDaemonActor::f_ChangePassword, _pCommandLine);
+				}
+			)
+		;
+		DefaultSection.f_RegisterCommand
+			(
+				{
 					"Names"_o= {"--precreate-keys"}
 					, "Description"_o= "Pre-create keys of a certain size. Useful to allow backup of future keys not yet sent to a client."
 					, "Options"_o=
@@ -282,6 +294,8 @@ namespace NMib::NCloud::NKeyManager
 		co_return {};
 	}
 
+	static constexpr ch8 const *gc_Salt = "MiBKeyMa";
+
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		CStdInReaderPromptParams PasswordPrompt;
@@ -303,7 +317,7 @@ namespace NMib::NCloud::NKeyManager
 							(
 								g_ActorFunctor / [this](NStr::CStrSecure &&_Password) -> TCFuture<void>
 								{
-									CSecureByteVector Salt{(uint8 const *)"MiBKeyMa", 8};
+									CSecureByteVector Salt{(uint8 const *)gc_Salt, 8};
 									TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
 										(
 											mp_State.m_RootDirectory + "/KeyDatabase.encrypted"
@@ -349,6 +363,81 @@ namespace NMib::NCloud::NKeyManager
 			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Error, "Provide password attempt failed: {}", Result.f_GetExceptionStr());
 			co_return Result.f_GetException();
 		}
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ChangePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		auto AppAuditor = this->f_Auditor();
+
+		CStrSecure OldPassword;
+		{
+			CStdInReaderPromptParams PasswordPrompt;
+			PasswordPrompt.m_bPassword = true;
+			PasswordPrompt.m_Prompt = "Type old password for key database: ";
+			OldPassword = co_await _pCommandLine->f_ReadPrompt(PasswordPrompt);
+		}
+
+		CStrSecure NewPassword;
+		{
+			CStdInReaderPromptParams PasswordPrompt;
+			PasswordPrompt.m_bPassword = true;
+			PasswordPrompt.m_Prompt = "Type new password for key database: ";
+			NewPassword = co_await _pCommandLine->f_ReadPrompt(PasswordPrompt);
+		}
+
+		auto Result = co_await
+			(
+				g_Dispatch / [this, NewPassword = fg_Move(NewPassword), OldPassword = fg_Move(OldPassword)]() mutable -> TCFuture<void>
+				{
+					if (!mp_bDatabaseDecrypted)
+						co_return DErrorInstance("A database has not yet been decrypted");
+
+					{
+						CSecureByteVector Salt{(uint8 const *)gc_Salt, 8};
+						TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
+							(
+								mp_State.m_RootDirectory + "/KeyDatabase.encrypted"
+								, OldPassword
+								, Salt
+							)
+						;
+
+						CClock Clock;
+						Clock.f_Start();
+
+						auto Result = co_await DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_Initialize).f_Wrap();
+
+						if (!Result)
+						{
+							// Delay reply to be same response time every time
+							co_await fg_Timeout(fg_Max(fp64(0.5) - Clock.f_GetTime(), fp64(0.01)));
+							co_return DMibErrorInstance("Failed to read database with old password: {}"_f << Result.f_GetExceptionStr());
+						}
+					}
+
+					CSecureByteVector Salt{(uint8 const *)gc_Salt, 8};
+					co_await mp_DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_ChangePassword, NewPassword, Salt);
+
+					if (!mp_ServerActor)
+						co_return DErrorInstance("Server actor does not exist");
+
+					co_await mp_ServerActor(&CKeyManagerServer::f_ForceWriteDatabase);
+
+					co_return {};
+				}
+			)
+			.f_Wrap()
+		;
+
+		if (!Result)
+		{
+			AppAuditor.f_Error("Change password attempt failed: {}"_f << Result.f_GetExceptionStr());
+			co_return Result.f_GetException();
+		}
+
+		AppAuditor.f_Audit(NLog::ESeverity_Critical, "Password for database was changed");
 
 		co_return 0;
 	}
