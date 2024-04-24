@@ -1,8 +1,6 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-Import "../../../../External/curl/Curl.MTarget"
-
 %Target "Lib_Malterlib_Cloud_CloudAPIManager"
 {
 	Property
@@ -27,7 +25,7 @@ Import "../../../../External/curl/Curl.MTarget"
 	{
 		Dependency.Indirect true
 	}
-	%Dependency "Lib_Curl"
+	%Dependency "Lib_CURL_libcurl_static"
 	{
 		!DocumentationEnabled true
 
