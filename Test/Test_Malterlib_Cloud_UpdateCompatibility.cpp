@@ -557,7 +557,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				AppManager.m_Address = fSetupAppManagerTrust(AppManager.m_LaunchInfo, _Directory);
 				{
 					DMibTestPath("Subscribe from host ({})"_f << _Name);
-					AppManager.m_AppManager = Subscriptions.f_SubscribeFromHost<CAppManagerInterface>(AppManager.m_LaunchInfo.m_HostID);
+					AppManager.m_AppManager = Subscriptions.f_SubscribeFromHost<CAppManagerInterface>(RunLoopHelper, AppManager.m_LaunchInfo.m_HostID);
 				}
 				AppManager.m_RootPath = _Directory;
 
@@ -790,7 +790,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				{
 					DMibTestPath("Subscribe");
-					VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
+					VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(RunLoopHelper, VersionManagerHostID);
 				}
 			}
 		;
@@ -999,13 +999,13 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		auto fResubscribeAppManager = [&](CAppManager &_AppManager)
 			{
 				DMibTestPath("Resubscribe AppManager ({})"_f << CFile::fs_GetFile(_AppManager.m_RootPath));
-				_AppManager.m_AppManager = Subscriptions.f_SubscribeFromHost<CAppManagerInterface>(_AppManager.m_LaunchInfo.m_HostID);
+				_AppManager.m_AppManager = Subscriptions.f_SubscribeFromHost<CAppManagerInterface>(RunLoopHelper, _AppManager.m_LaunchInfo.m_HostID);
 			}
 		;
 		auto fResubscribeVersionManager = [&]()
 			{
 				DMibTestPath("Resubscribe VersionManager");
-				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(VersionManagerHostID);
+				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(RunLoopHelper, VersionManagerHostID);
 			}
 		;
 

@@ -729,7 +729,7 @@ public:
 
 		{
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
-			auto BackupManagers = Subscriptions.f_SubscribeMultiple<CBackupManager>(nBackupManagers);
+			auto BackupManagers = Subscriptions.f_SubscribeMultiple<CBackupManager>(RunLoopHelper, nBackupManagers);
 			auto BackupManager = BackupManagers[0];
 
 			CStr TestBackupDirectory = RootDirectory + "/RecursiveBackupSource";

@@ -486,7 +486,7 @@ public:
 		{
 			DMibTestPath("General");
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
-			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(nSecretsManagers);
+			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(RunLoopHelper, nSecretsManagers);
 			auto SecretsManager = SecretsManagers[0];
 
 			{
@@ -1719,7 +1719,7 @@ public:
 			fLaunchSecretManagers();
 
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
-			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(nSecretsManagers);
+			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(RunLoopHelper, nSecretsManagers);
 			auto SecretsManager = SecretsManagers[0];
 
 			//
@@ -1759,7 +1759,7 @@ public:
 			DMibTestPath("Upload and Download");
 
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
-			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(nSecretsManagers);
+			auto SecretsManagers = Subscriptions.f_SubscribeMultiple<CSecretsManager>(RunLoopHelper, nSecretsManagers);
 			auto SecretsManager = SecretsManagers[0];
 			auto &SecretsManagerLaunchInfo = SecretsManagerLaunches[0];
 
