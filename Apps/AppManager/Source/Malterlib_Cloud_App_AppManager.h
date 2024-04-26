@@ -168,7 +168,7 @@ namespace NMib::NCloud::NAppManager
 
 			CStr f_GetDirectory();
 
-			CActorSubscription f_SetInProgress();
+			CActorSubscription f_SetInProgress(CStr const &_Description);
 
 			bool f_NeedsEncryption() const;
 			bool f_EncryptionOpened() const;
@@ -235,6 +235,8 @@ namespace NMib::NCloud::NAppManager
 			bool m_bJustUpdated = false;
 			bool m_bDistributedStartupFinished = false;
 			bool m_bPendingStop = false;
+
+			CStr m_OperationInProgressDescription;
 
 			TCVector<TCPromise<void>> m_OnRegisterDistributedApp;
 			TCVector<TCPromise<void>> m_OnStartedDistributedApp;

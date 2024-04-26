@@ -31,9 +31,9 @@ namespace NMib::NCloud::NAppManager
 			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 
 		if ((*pApplication)->f_IsInProgress())
-			co_return Auditor.f_Exception("Operation already in progress for application");
+			co_return Auditor.f_Exception("Operation already in progress for application: {}"_f << (*pApplication)->m_OperationInProgressDescription);
 
-		auto InProgressScope = (*pApplication)->f_SetInProgress();
+		auto InProgressScope = (*pApplication)->f_SetInProgress("Remove");
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		if (CStr Error = pThis->fp_GetApplicationStopErrors(co_await (*pApplication)->f_Stop(EStopFlag_CloseEncryption).f_Wrap(), _Name); !Error.f_IsEmpty())

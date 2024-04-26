@@ -240,9 +240,9 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		if (Application.f_IsInProgress())
-			co_return Auditor.f_Exception("Operation already in progress for application");
+			co_return Auditor.f_Exception("Operation already in progress for application: {}"_f << pApplication->m_OperationInProgressDescription);
 
-		auto InProgressScope = Application.f_SetInProgress();
+		auto InProgressScope = Application.f_SetInProgress("ChangeApplicationSettings");
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !_bForce)

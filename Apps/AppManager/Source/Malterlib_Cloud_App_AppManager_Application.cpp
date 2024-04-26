@@ -86,10 +86,11 @@ namespace NMib::NCloud::NAppManager
 		return false;
 	}
 
-	CActorSubscription CAppManagerActor::CApplication::f_SetInProgress()
+	CActorSubscription CAppManagerActor::CApplication::f_SetInProgress(CStr const &_Description)
 	{
 		DRequire(!f_IsInProgress());
 		m_bOperationInProgress = true;
+		m_OperationInProgressDescription = _Description;
 		return g_ActorSubscription / [pThis = m_pThis, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]
 			{
 				DCheck(pApplication->m_bOperationInProgress);

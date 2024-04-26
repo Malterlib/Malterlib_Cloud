@@ -153,7 +153,7 @@ namespace NMib::NCloud::NAppManager
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 
 		if (pApplication->f_IsInProgress())
-			co_return Auditor.f_Exception("Operation already in progress for application");
+			co_return Auditor.f_Exception("Operation already in progress for application: {}"_f << pApplication->m_OperationInProgressDescription);
 
 		bool bDownloadVersion = true;
 		bool bUpdateSettings = false;
@@ -271,7 +271,7 @@ namespace NMib::NCloud::NAppManager
 		pState->m_StartUpdateTime = NTime::CTime::fs_NowUTC();
 		if (!bDownloadVersion)
 			pState->m_SourcePath = _FromFileName;
-		pState->m_InProgressScope = pApplication->f_SetInProgress();
+		pState->m_InProgressScope = pApplication->f_SetInProgress("UpdateApplication {}"_f << VersionID);
 
 		mp_RunningUpdates[pState];
 		pState->m_pCleanupStateMap = g_OnScopeExitActor / [this, pStateWeak = pState.f_Weak()]
