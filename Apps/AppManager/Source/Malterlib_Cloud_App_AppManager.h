@@ -174,6 +174,9 @@ namespace NMib::NCloud::NAppManager
 			bool f_EncryptionOpened() const;
 			bool f_IsChildApp() const;
 			bool f_IsInProgress() const;
+			CStr f_InProgressDescription() const;
+			fp64 f_InProgressTime() const;
+			TCFuture<void> f_InProgressWait();
 			bool f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity) const;
 			bool f_IsLaunched() const;
 
@@ -237,6 +240,8 @@ namespace NMib::NCloud::NAppManager
 			bool m_bPendingStop = false;
 
 			CStr m_OperationInProgressDescription;
+			CClock m_OperationInProgressClock;
+			TCVector<TCPromise<void>> m_OnOperationInProgressFinished;
 
 			TCVector<TCPromise<void>> m_OnRegisterDistributedApp;
 			TCVector<TCPromise<void>> m_OnStartedDistributedApp;
@@ -572,8 +577,6 @@ namespace NMib::NCloud::NAppManager
 			TCFunction <void ()> m_fUpdateVersionInfo;
 			CActorSubscription m_DownloadDirectoryCleanup;
 			CActorSubscription m_TemporaryDirectoryCleanup;
-			CActorSubscription m_InProgressScope;
-			COnScopeExitShared m_pCleanupStateMap;
 			CStr m_SourcePath;
 			CStr m_TempraryPath;
 			TCSharedPointer<CApplicationSettings> m_pNewSettings;
@@ -675,6 +678,9 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_ReadState();
 		void fp_InitApplications();
 		void fp_OnApplicationAdded(TCSharedPointer<CApplication> const &_pApplication);
+
+		TCFuture<CActorSubscription> fp_SetInProgressWithWait(TCSharedPointer<CApplication> _pApplication, CStr _Description);
+		void fp_ReportInProgress(TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_ApplicationName);
 
 		TCFuture<CAppLaunchResult> fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);

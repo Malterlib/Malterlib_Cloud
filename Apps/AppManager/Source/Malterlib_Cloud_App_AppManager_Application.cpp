@@ -31,12 +31,19 @@ namespace NMib::NCloud::NAppManager
 	{
 		f_AbortPendingLaunches();
 		f_Clear();
+
 		m_bDeleted = true;
 		m_pParentApplication = nullptr;
 		m_ChildrenLink.f_Unlink();
 		for (auto &Child : m_Children)
 			Child.m_pParentApplication = nullptr;
 		m_Children.f_Clear();
+
+		{
+			auto OnOperationInProgressFinished = fg_Move(m_OnOperationInProgressFinished);
+			for (auto &OnFinished : OnOperationInProgressFinished)
+				OnFinished.f_SetResult();
+		}
 	}
 
 	bool CAppManagerActor::CApplication::f_NeedsEncryption() const
@@ -85,18 +92,118 @@ namespace NMib::NCloud::NAppManager
 
 		return false;
 	}
+	
+	TCFuture<void> CAppManagerActor::CApplication::f_InProgressWait()
+	{
+		if (m_bOperationInProgress)
+			return m_OnOperationInProgressFinished.f_Insert().f_Future();
+
+		if (m_pParentApplication && m_pParentApplication->m_bOperationInProgress)
+			return m_pParentApplication->m_OnOperationInProgressFinished.f_Insert().f_Future();
+
+		for (auto &Child : m_Children)
+		{
+			if (Child.m_bOperationInProgress)
+				return Child.m_OnOperationInProgressFinished.f_Insert().f_Future();
+		}
+
+		DNeverGetHere;
+
+		return {};
+	}
+
+	CStr CAppManagerActor::CApplication::f_InProgressDescription() const
+	{
+		if (m_bOperationInProgress)
+			return m_OperationInProgressDescription;
+
+		if (m_pParentApplication && m_pParentApplication->m_bOperationInProgress)
+			return m_pParentApplication->m_OperationInProgressDescription;
+
+		for (auto &Child : m_Children)
+		{
+			if (Child.m_bOperationInProgress)
+				return Child.m_OperationInProgressDescription;
+		}
+
+		DNeverGetHere;
+
+		return {};
+	}
+
+	fp64 CAppManagerActor::CApplication::f_InProgressTime() const
+	{
+		if (m_bOperationInProgress)
+			return m_OperationInProgressClock.f_GetTime();
+
+		if (m_pParentApplication && m_pParentApplication->m_bOperationInProgress)
+			return m_pParentApplication->m_OperationInProgressClock.f_GetTime();
+
+		for (auto &Child : m_Children)
+		{
+			if (Child.m_bOperationInProgress)
+				return Child.m_OperationInProgressClock.f_GetTime();
+		}
+
+		DNeverGetHere;
+
+		return {};
+	}
 
 	CActorSubscription CAppManagerActor::CApplication::f_SetInProgress(CStr const &_Description)
 	{
 		DRequire(!f_IsInProgress());
 		m_bOperationInProgress = true;
 		m_OperationInProgressDescription = _Description;
+		m_OperationInProgressClock.f_Start();
 		return g_ActorSubscription / [pThis = m_pThis, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]
 			{
 				DCheck(pApplication->m_bOperationInProgress);
 				pApplication->m_bOperationInProgress = false;
+				auto OnOperationInProgressFinished = fg_Move(pApplication->m_OnOperationInProgressFinished);
+				for (auto &OnFinished : OnOperationInProgressFinished)
+					OnFinished.f_SetResult();
+
 				pThis->fp_UpdateApplicationDependencies();
 			}
+		;
+	}
+
+	constexpr static double c_InProgressWaitTimeout = 120_seconds;
+
+	TCFuture<CActorSubscription> CAppManagerActor::fp_SetInProgressWithWait(TCSharedPointer<CApplication> _pApplication, CStr _Description)
+	{
+		if (_pApplication->f_IsInProgress())
+		{
+			CClock WaitTime{true};
+			fp64 TimeoutTime = c_InProgressWaitTimeout;
+			while (_pApplication->f_IsInProgress())
+			{
+				CStr ErrorMessage = "Timed out waiting for in progress application operation to finish: {}"_f << _pApplication->f_InProgressDescription();
+				auto Timeout = TimeoutTime - WaitTime.f_GetTime();
+				if (Timeout < 0.001)
+					co_return DMibErrorInstance(ErrorMessage);
+
+				co_await _pApplication->f_InProgressWait().f_Timeout(Timeout - WaitTime.f_GetTime(), ErrorMessage);
+
+				if (_pApplication->m_bDeleted)
+					co_return DMibErrorInstance("Application was deleted while waiting for in progress operation to finish");
+			}
+		}
+
+		co_return _pApplication->f_SetInProgress(_Description);
+	}
+
+	void CAppManagerActor::fp_ReportInProgress(TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_ApplicationName)
+	{
+		auto *pApplication = mp_Applications.f_FindEqual(_ApplicationName);
+		if (!pApplication || !(*pApplication)->f_IsInProgress())
+			return;
+
+		*_pCommandLine %= "Application has an operation '{}' that has been in progress for {}. Will wait for operation to finish for {} before timing out.\n"_f
+			<< (*pApplication)->f_InProgressDescription()
+			<< NTime::fg_SecondsDurationToHumanReadable((*pApplication)->f_InProgressTime())
+			<< NTime::fg_SecondsDurationToHumanReadable(c_InProgressWaitTimeout)
 		;
 	}
 

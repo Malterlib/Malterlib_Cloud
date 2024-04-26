@@ -526,9 +526,10 @@ namespace NMib::NCloud::NAppManager
 		mp_Applications[pApplication->m_Name] = pApplication;
 		pCleanup->f_Clear();
 
-		fp_OnApplicationAdded(pApplication);
 		auto InProgressScope = pApplication->f_SetInProgress("Add Application");
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
+
+		fp_OnApplicationAdded(pApplication);
 
 		pApplication->m_LastInstalledVersionFinished = pApplication->m_LastInstalledVersion;
 		pApplication->m_LastInstalledVersionInfoFinished = pApplication->m_LastInstalledVersionInfo;

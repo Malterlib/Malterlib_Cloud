@@ -1,10 +1,12 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include "Malterlib_Cloud_App_AppManager.h"
+
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
-#include "Malterlib_Cloud_App_AppManager.h"
+#include <Mib/Encoding/JSONShortcuts>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -152,9 +154,9 @@ namespace NMib::NCloud::NAppManager
 
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 
-		if (pApplication->f_IsInProgress())
-			co_return Auditor.f_Exception("Operation already in progress for application: {}"_f << pApplication->m_OperationInProgressDescription);
-
+		auto InProgressScope = co_await (fp_SetInProgressWithWait(pApplication, "UpdateApplication") % Auditor);
+		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
+		
 		bool bDownloadVersion = true;
 		bool bUpdateSettings = false;
 		bool bDryRun = false;
@@ -271,16 +273,19 @@ namespace NMib::NCloud::NAppManager
 		pState->m_StartUpdateTime = NTime::CTime::fs_NowUTC();
 		if (!bDownloadVersion)
 			pState->m_SourcePath = _FromFileName;
-		pState->m_InProgressScope = pApplication->f_SetInProgress("UpdateApplication {}"_f << VersionID);
 
 		mp_RunningUpdates[pState];
-		pState->m_pCleanupStateMap = g_OnScopeExitActor / [this, pStateWeak = pState.f_Weak()]
+
+		auto RunningUpdatesScope = g_ActorSubscription / [this, pStateWeak = pState.f_Weak()]() mutable -> TCFuture<void>
 			{
 				mp_RunningUpdates.f_Remove(pStateWeak);
 				if (mp_RunningUpdates.f_IsEmpty() && !mp_CancelRunningUpdatesOnStopAppManagerPromise.f_IsSet())
 					mp_CancelRunningUpdatesOnStopAppManagerPromise.f_SetResult();
+
+				co_return {};
 			}
 		;
+		auto DestroyRunningState = co_await fg_AsyncDestroy(fg_Move(RunningUpdatesScope));
 
 		pState->m_fOnInfo(fg_Format("Starting update with type '{}'", fsp_UpdateTypeToStr(pApplication->f_GetUpdateType(pState->m_bBypassCoordination))));
 
@@ -299,9 +304,6 @@ namespace NMib::NCloud::NAppManager
 
 		if (Error.f_Find("AppManager stopped") >= 0 && pState->m_pApplication->m_UpdateStage <= EUpdateStage::EUpdateStage_SyncStart)
 			co_return Auditor.f_Exception("Reschedule update after next restart");
-
-		if (pState->m_InProgressScope)
-			co_await fg_Exchange(pState->m_InProgressScope, nullptr)->f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Error waiting for in progress scope");
 
 		auto [EventResult, ScriptResult] = co_await
 			(

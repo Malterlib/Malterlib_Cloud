@@ -447,19 +447,31 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Stop, _Params["Name"].f_String());
+		CStr ApplicationName = _Params["Name"].f_String();
+		fp_ReportInProgress(_pCommandLine, ApplicationName);
+
+		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Stop, ApplicationName);
+
 		co_return 0;
 	}
 	
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Start, _Params["Name"].f_String());
+		CStr ApplicationName = _Params["Name"].f_String();
+		fp_ReportInProgress(_pCommandLine, ApplicationName);
+
+		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Start, ApplicationName);
+
 		co_return 0;
 	}
 	
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Restart, _Params["Name"].f_String());
+		CStr ApplicationName = _Params["Name"].f_String();
+		fp_ReportInProgress(_pCommandLine, ApplicationName);
+
+		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Restart, ApplicationName);
+
 		co_return 0;
 	}
 	
@@ -504,14 +516,11 @@ namespace NMib::NCloud::NAppManager
 
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 
-		if (pApplication->f_IsInProgress())
-			co_return Auditor.f_Exception("Operation already in progress for application: {}"_f << pApplication->m_OperationInProgressDescription);
+		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(pApplication, "Start") % Auditor);
+		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		if (!pApplication->m_ProcessLaunch.f_IsOfType<void>())
 			co_return Auditor.f_Exception("Application already started");
-
-		auto InProgressScope = pApplication->f_SetInProgress("Start");
-		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		co_await pThis->fp_ClearPreventLaunch(pApplication);
 
@@ -559,13 +568,11 @@ namespace NMib::NCloud::NAppManager
 
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 
-		if (pApplication->f_IsInProgress())
-			co_return Auditor.f_Exception("Operation already in progress for application: {}"_f << pApplication->m_OperationInProgressDescription);
+		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(pApplication, "Start") % Auditor);
+		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
+		
 		if (pApplication->m_bStopped)
 			co_return Auditor.f_Exception("Application already stopped");
-
-		auto InProgressScope = pApplication->f_SetInProgress("Stop");
-		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		TCAsyncResult<uint32> ExitStatus = co_await pApplication->f_Stop(EStopFlag_PreventLaunchUser).f_Wrap();
 
@@ -614,10 +621,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCSharedPointer<CApplication> pApplication = *pOldApplication;
 
-		if (pApplication->f_IsInProgress())
-			co_return Auditor.f_Exception("Operation already in progress for application: {}"_f << pApplication->m_OperationInProgressDescription);
-
-		auto InProgressScope = pApplication->f_SetInProgress("Restart");
+		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(pApplication, "Start") % Auditor);
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		TCAsyncResult<uint32> ExitStatus = co_await pApplication->f_Stop(EStopFlag_None).f_Wrap();

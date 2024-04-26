@@ -40,6 +40,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
+		fp_ReportInProgress(_pCommandLine, Name);
 
 		CApplicationSettings Settings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
@@ -239,12 +240,9 @@ namespace NMib::NCloud::NAppManager
 			co_return {};
 		}
 
-		if (Application.f_IsInProgress())
-			co_return Auditor.f_Exception("Operation already in progress for application: {}"_f << pApplication->m_OperationInProgressDescription);
-
-		auto InProgressScope = Application.f_SetInProgress("ChangeApplicationSettings");
+		auto InProgressScope = co_await (fp_SetInProgressWithWait(pApplication, "ChangeApplicationSettings") % Auditor);
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
-
+		
 		if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !_bForce)
 		{
 			Application.m_Settings = NewSettings;

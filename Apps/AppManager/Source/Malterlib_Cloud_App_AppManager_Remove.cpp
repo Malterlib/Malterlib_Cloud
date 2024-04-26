@@ -30,12 +30,9 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication)
 			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 
-		if ((*pApplication)->f_IsInProgress())
-			co_return Auditor.f_Exception("Operation already in progress for application: {}"_f << (*pApplication)->m_OperationInProgressDescription);
-
-		auto InProgressScope = (*pApplication)->f_SetInProgress("Remove");
+		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(*pApplication, "Remove") % Auditor);
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
-
+		
 		if (CStr Error = pThis->fp_GetApplicationStopErrors(co_await (*pApplication)->f_Stop(EStopFlag_CloseEncryption).f_Wrap(), _Name); !Error.f_IsEmpty())
 			Auditor.f_Warning(Error);
 
@@ -68,7 +65,11 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		CStr ApplicationName = _Params["Name"].f_String();
+		fp_ReportInProgress(_pCommandLine, ApplicationName);
+
 		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Remove, _Params["Name"].f_String());
+
 		co_return 0;
 	}
 }
