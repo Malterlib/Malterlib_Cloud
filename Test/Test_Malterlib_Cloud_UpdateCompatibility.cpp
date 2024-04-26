@@ -622,7 +622,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 					CFile File;
 					File.f_Open(EncryptionFile, EFileOpen_Write);
-					File.f_SetPosition(constant_uint64(4) * 1024 * 1024 * 1024 - 4096);
+					File.f_SetPosition(constant_uint64(2) * 1024 * 1024 * 1024 - 4096);
 					uint8 Buffer[4096] = {0};
 					File.f_Write(Buffer, 4096);
 
@@ -802,19 +802,45 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
+		TCMap<CStr, TCVector<CVersionManager::CVersionIDAndPlatform>> UploadedPackages;
+
 		auto fUploadPackage = [&](CStr const &_Package, TCSet<CStr> const &_Tags)
 			{
 				DMibLogWithCategory(Test, Info, "Upload Package ({}, {})", CFile::fs_GetFile(_Package), CFile::fs_GetFile(CFile::fs_GetPath(_Package)));
 
 				auto PackageInfo = VersionManagerHelper.f_GetPackageInfo(_Package).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+
 				PackageInfo.m_VersionInfo.m_Tags = _Tags;
 				CStr PackageName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(_Package));
 
+				UploadedPackages[PackageName].f_Insert(PackageInfo.m_VersionID);
 				{
 					DMibTestPath("Upload");
 					VersionManagerHelper.f_Upload(VersionManager, PackageName, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, _Package).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 				}
 				return PackageInfo;
+			}
+		;
+
+		auto fRemoveOldPackages = [&](CStr const &_Name)
+			{
+				auto *pPackage = UploadedPackages.f_FindEqual(_Name);
+				if (!pPackage)
+					DMibError("No such package: {}"_f << _Name);
+
+				auto &PackageVersions = *pPackage;
+				if (PackageVersions.f_GetLen() != 1)
+					DMibError("Incorrect package versions length: {}"_f << PackageVersions);
+
+				auto ToRemove = fg_Move(PackageVersions);
+
+				CStr ApplicationRoot = VersionManagerDir / "App/VersionManager/Applications" / _Name;
+
+				for (auto &Version : ToRemove)
+				{
+					CStr VersionFileName = "{}_{}.{}.{}"_f << Version.m_VersionID.m_Branch << Version.m_VersionID.m_Major << Version.m_VersionID.m_Minor << Version.m_VersionID.m_Revision;
+					CFile::fs_DeleteDirectoryRecursive(ApplicationRoot / VersionFileName);
+				}
 			}
 		;
 
@@ -1068,6 +1094,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		auto fUpdateApps = [&]()
 			{
 				DMibLogWithCategory(Test, Info, "UpdateApps");
+
+				fRemoveOldPackages("KeyManager");
+				fRemoveOldPackages("VersionManager");
+				fRemoveOldPackages("AppManager");
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 0");
 					KeyManagerPackageInfo = fUpdateApp("KeyManager", {"TestTag"});
@@ -1139,6 +1169,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		auto fUpdateAppsSimultaneous = [&](TCVector<TCFunction<void ()>> &&_DoTags)
 			{
 				DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous");
+
+				fRemoveOldPackages("KeyManager");
+				fRemoveOldPackages("VersionManager");
+				fRemoveOldPackages("AppManager");
 
 				{
 					DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous 0");
