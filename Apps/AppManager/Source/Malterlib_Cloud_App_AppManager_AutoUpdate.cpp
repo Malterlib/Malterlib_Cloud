@@ -216,7 +216,20 @@ namespace NMib::NCloud::NAppManager
 			return {};
 		}
 
-		DMibLogWithCategory(Malterlib/Cloud/AppManager, DebugVerbose1, "Found version: '{}'\n   {} - {}\n   {} - {}", _pApplication->m_Name, VersionID, o_VersionInfo.m_Time, CurrentVersionID, CurrentVersionInfo.m_Time);
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Debug
+				, "Found new version for '{}': \n"
+				"   New version    : {} - {}\n"
+				"   Current version: {} - {}"
+				, _pApplication->m_Name
+				, VersionID
+				, o_VersionInfo.m_Time
+				, CurrentVersionID
+				, CurrentVersionInfo.m_Time
+			)
+		;
 
 		return VersionID;
 	}

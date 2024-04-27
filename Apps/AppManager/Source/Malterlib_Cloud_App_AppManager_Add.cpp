@@ -347,7 +347,6 @@ namespace NMib::NCloud::NAppManager
 			if (_bSettingsFromVersionInfo && (_FromLocalFile.f_EndsWith(".tar.gz") || _FromLocalFile.f_EndsWith(".tar")))
 			{
 				auto &LaunchActor = mp_LaunchActors.f_Insert() = fg_Construct();
-
 				CProcessLaunchActor::CSimpleLaunch Launch
 					{
 						mp_State.m_RootDirectory / "bin/bsdtar"
@@ -362,7 +361,73 @@ namespace NMib::NCloud::NAppManager
 					}
 				;
 
-				auto LaunchResult = co_await LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch)).f_Wrap();
+				auto &LaunchListActor = mp_LaunchActors.f_Insert() = fg_Construct();
+				CProcessLaunchActor::CSimpleLaunch LaunchList
+					{
+						mp_State.m_RootDirectory / "bin/bsdtar"
+						,
+						{
+							"-tvvf"
+							, _FromLocalFile
+						}
+						, CFile::fs_GetPath(_FromLocalFile)
+						, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+					}
+				;
+
+				auto [LaunchResult, LaunchListResult] = co_await
+					(
+						LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))
+						+ LaunchListActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))
+					).f_Wrap()
+				;
+
+				if (!LaunchResult)
+					_fOnInfo("Failed to extract version info from package: {}"_f << LaunchResult.f_GetExceptionStr());
+
+				if (!LaunchListResult)
+					_fOnInfo("Failed to extract version time from package: {}"_f << LaunchListResult.f_GetExceptionStr());
+
+				auto fGetVersionTime = [&]() -> CTime
+					{
+						if (!LaunchListResult)
+							return {};
+
+						auto ListStr = (*LaunchListResult).f_GetStdOut();
+						CTime Newest;
+						for (auto &Line : ListStr.f_SplitLine<true>())
+						{
+							ch8 const *pParse = Line.f_GetStr();
+
+							auto fParseField = [&]() -> CStr
+								{
+									ch8 const *pStart = pParse;
+									fg_ParseNonWhiteSpaceAndSeparators(pParse, "");
+									CStr Field(pStart, pParse - pStart);
+									fg_ParseWhiteSpace(pParse);
+									return Field;
+								}
+							;
+
+							fParseField(); // Permissions
+							fParseField(); // ?
+							fParseField(); // User
+							fParseField(); // Group
+							fParseField(); // Size
+
+							CStr UnixSeconds = fParseField();
+							CStr NanoSeconds = fParseField();
+
+							auto FileTime = CTimeConvert::fs_FromUnixSeconds(UnixSeconds.f_ToInt(int64(0)));
+							FileTime.f_SetFraction(fp64(NanoSeconds.f_ToInt(int32(0))) / fp64(1'000'000'000.0));
+
+							if (!Newest.f_IsValid() || FileTime > Newest)
+								Newest = FileTime;
+						}
+
+						return CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
+					}
+				;
 
 				if (LaunchResult)
 				{
@@ -416,6 +481,7 @@ namespace NMib::NCloud::NAppManager
 						CVersionManager::CVersionInformation VersionInfo;
 						VersionInfo.m_Configuration = Configuration;
 						VersionInfo.m_ExtraInfo = ExtraInfo;
+						VersionInfo.m_Time = fGetVersionTime();
 
 						fApplyVersion(VersionID, VersionInfo);
 
@@ -426,8 +492,6 @@ namespace NMib::NCloud::NAppManager
 						_fOnInfo("Failed to parse version info from VersionInfo.json in package: {}"_f << _Exception);
 					}
 				}
-				else
-					_fOnInfo("Failed to extract version info from package: {}"_f << LaunchResult.f_GetExceptionStr());
 
 				SourcePath = _FromLocalFile;
 			}
