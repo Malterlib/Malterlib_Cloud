@@ -50,7 +50,7 @@ using namespace NMib::NTime;
 
 #define DTestUpdateCompatibilityEnableOtherOutput 0
 
-static fp64 g_Timeout = 120.0 * gc_TimeoutMultiplier;
+static fp64 g_Timeout = 2_minutes * gc_TimeoutMultiplier;
 static uint32 g_CompressionLevel = 1;
 
 namespace
@@ -122,6 +122,8 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 	struct CKeyManagerPasswordProvider : public CActor
 	{
+		using CActorHolder = CSeparateThreadActorHolder;
+
 		CKeyManagerPasswordProvider(CStr const &_RootPath, CStr const &_Password)
 			: mp_RootPath(_RootPath)
 			, mp_Password(_Password)
@@ -201,7 +203,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		TCFuture<void> fp_Destroy() override
 		{
-			co_await fg_Move(mp_Sequencer).f_Destroy().f_Wrap() > fg_LogError("Test", "Failed to destroy sequencer");;
+			co_await fg_Move(mp_Sequencer).f_Destroy().f_Wrap() > fg_LogError("Test", "Failed to destroy sequencer");
+
+			if (mp_TimerSubscription)
+				co_await fg_Exchange(mp_TimerSubscription, nullptr)->f_Destroy().f_Wrap() > fg_LogError("Test", "Failed to timer subscription");
 
 			co_return {};
 		}
@@ -267,7 +272,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		{
 			mp_TimerSubscription = co_await fg_RegisterTimer
 				(
-					1_seconds
+					50_ms
 					, [=, this, LogPath = mp_RootPath / "Log/KeyManager.log"]() -> TCFuture<void>
 					{
 						co_await self(&CKeyManagerPasswordProvider::f_ProvidePasswordIfNeeded);
@@ -437,22 +442,26 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
-		auto fSetupAppManager = [&](CStr const &_Directory)
+		auto fSetupAppManager = [&](CStr const &_Directory) -> TCFuture<void>
 			{
 				DMibLogWithCategory(Test, Info, "Setup AppManager ({})", CFile::fs_GetFile(_Directory));
 
+				co_await ECoroutineFlag_AllowReferences;
 
 				auto BlockingActorCheckout = fg_BlockingActor();
 
 				TCActorResultVector<void> AppManagerLaunchesResults;
-				(
-					g_Dispatch(BlockingActorCheckout) / [=]
-					{
-						CFile::fs_CreateDirectory(_Directory);
-						CProcessLaunch::fs_LaunchTool(BinaryDirectory / "bin/bsdtar", {"--no-same-owner", "-xf", _AppManagerPackage}, _Directory);
-					}
-				)
-				.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [=]
+						{
+							CFile::fs_CreateDirectory(_Directory);
+							CProcessLaunch::fs_LaunchTool(BinaryDirectory / "bin/bsdtar", {"--no-same-owner", "-xf", _AppManagerPackage}, _Directory);
+						}
+					)
+				;
+
+				co_return {};
 			}
 		;
 
@@ -674,7 +683,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		CStr KeyManagerHostID;
 		CStr KeyManagerExecutable = KeyManagerDir / "App/KeyManager/KeyManager";
 
-		TCActor<CKeyManagerPasswordProvider> KeyManagerPasswordProvideActor = fg_Construct(KeyManagerDir / "App/KeyManager", KeyManagerPassword);
+		TCActor<CKeyManagerPasswordProvider> KeyManagerPasswordProvideActor{fg_Construct(KeyManagerDir / "App/KeyManager", KeyManagerPassword), "Password provider"};
 
 		auto fProvideKeyManagerPasswordIfNeeded = [&]
 			{
@@ -804,21 +813,20 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		TCMap<CStr, TCVector<CVersionManager::CVersionIDAndPlatform>> UploadedPackages;
 
-		auto fUploadPackage = [&](CStr const &_Package, TCSet<CStr> const &_Tags)
+		auto fUploadPackage = [&](CStr _Package, TCSet<CStr> _Tags) -> TCFuture<CVersionManagerHelper::CPackageInfo>
 			{
 				DMibLogWithCategory(Test, Info, "Upload Package ({}, {})", CFile::fs_GetFile(_Package), CFile::fs_GetFile(CFile::fs_GetPath(_Package)));
 
-				auto PackageInfo = VersionManagerHelper.f_GetPackageInfo(_Package).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				co_await ECoroutineFlag_AllowReferences;
 
+				auto PackageInfo = co_await VersionManagerHelper.f_GetPackageInfo(_Package);
 				PackageInfo.m_VersionInfo.m_Tags = _Tags;
 				CStr PackageName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(_Package));
 
 				UploadedPackages[PackageName].f_Insert(PackageInfo.m_VersionID);
-				{
-					DMibTestPath("Upload");
-					VersionManagerHelper.f_Upload(VersionManager, PackageName, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, _Package).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-				}
-				return PackageInfo;
+				co_await VersionManagerHelper.f_Upload(VersionManager, PackageName, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, _Package);
+
+				co_return fg_Move(PackageInfo);
 			}
 		;
 
@@ -907,9 +915,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		TCMap<CStr, CVersionManagerHelper::CPackageInfo> AppPackageInfos;
 		TCSet<CStr> DoneInitPackageInfo;
 
-		auto fUpdateApp = [&](CStr const &_Name, TCSet<CStr> const &_Tags)
+		auto fUpdateApp = [&](CStr _Name, TCSet<CStr> _Tags) -> TCFuture<CVersionManagerHelper::CPackageInfo>
 			{
 				DMibLogWithCategory(Test, Info, "Update App ({})", _Name);
+
+				co_await ECoroutineFlag_AllowReferences;
 
 				CStr AppArchive = "{}/TestApps/Dynamic/{}/{}.tar"_f << ProgramDirectory << _UniqueName << _Name;
 				CStr SourceTempPath = "{}/TestApps/LatestSource/{}/{}"_f << ProgramDirectory << _UniqueName << _Name;
@@ -939,14 +949,15 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				CFile::fs_CreateDirectory(CFile::fs_GetPath(AppArchive));
 
-				auto PackageInfo = VersionManagerHelper.f_CreatePackage(SourceTempPath, AppArchive, g_CompressionLevel)
-					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
-				;
+				auto PackageInfo = co_await VersionManagerHelper.f_CreatePackage(SourceTempPath, AppArchive, g_CompressionLevel);
 
 				PackageInfo.m_VersionInfo.m_Tags = _Tags;
 				auto Flags = CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite;
-				VersionManagerHelper.f_Upload(VersionManager, _Name, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, AppArchive, Flags).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-				return PackageInfo;
+				co_await VersionManagerHelper.f_Upload(VersionManager, _Name, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, AppArchive, Flags);
+
+				UploadedPackages[_Name].f_Insert(PackageInfo.m_VersionID);
+
+				co_return fg_Move(PackageInfo);
 			}
 		;
 
@@ -1044,9 +1055,12 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		{
 			DMibLogWithCategory(Test, Info, "Setup Root App Managers");
-			fSetupAppManager(KeyManagerDir);
-			fSetupAppManager(VersionManagerDir);
-			fSetupAppManager(AppManagerDir);
+			auto KeyManagerFuture = fSetupAppManager(KeyManagerDir);
+			auto VersionManagerFuture = fSetupAppManager(VersionManagerDir);
+			auto AppManagerFuture = fSetupAppManager(AppManagerDir);
+			fg_Move(KeyManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fg_Move(VersionManagerFuture ).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 		}
 
 		auto AppManager_KeyManager = fInitAppManager("KeyManager", KeyManagerDir);
@@ -1062,13 +1076,32 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		fSetupAppManagerConnection(AppManager_VersionManager, VersionManagerExecutable, "com.malterlib/Cloud/VersionManager", {"Application/ReadAll"}, VersionManagerHostID);
 		fSetupAppManagerConnection(AppManager_AppManager, VersionManagerExecutable, "com.malterlib/Cloud/VersionManager", {"Application/ReadAll"}, VersionManagerHostID);
 
-		auto AppManagerPackageInfo = fUploadPackage(_AppManagerPackage, {"TestTag", "VersionManagerTestTag", "AppManagerTestTag"});
+		bool bUpdatesOnFirstUpload = AppManagerPackageOptions.f_HasFeatureFlag("UpdatesOnFirstUpload");
+
+		CVersionManagerHelper::CPackageInfo AppManagerPackageInfo;
+		CVersionManagerHelper::CPackageInfo KeyManagerPackageInfo;
+		CVersionManagerHelper::CPackageInfo VersionManagerPackageInfo;
+
+		auto AppManagerPackageInfoFuture = fUploadPackage(_AppManagerPackage, {"TestTag", "VersionManagerTestTag", "AppManagerTestTag"});
+		auto KeyManagerPackageInfoFuture = fUploadPackage(_KeyManagerPackage, {"TestTag"});
+		if (bUpdatesOnFirstUpload)
+		{
+			AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		}
+
+		auto VersionManagerPackageInfoFuture = fUploadPackage(_VersionManagerPackage, {"VersionManagerTestTag"});
+
+		if (!bUpdatesOnFirstUpload)
+		{
+			AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		}
+
+		VersionManagerPackageInfo = fg_Move(VersionManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+
 		AppPackageInfos["AppManager"] = AppManagerPackageInfo;
-
-		auto KeyManagerPackageInfo = fUploadPackage(_KeyManagerPackage, {"TestTag"});
 		AppPackageInfos["KeyManager"] = KeyManagerPackageInfo;
-
-		auto VersionManagerPackageInfo = fUploadPackage(_VersionManagerPackage, {"VersionManagerTestTag"});
 		AppPackageInfos["VersionManager"] = VersionManagerPackageInfo;
 
 		fSleepKeyManager();
@@ -1078,7 +1111,8 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 
-		fResubscribeVersionManager();
+		if (bUpdatesOnFirstUpload)
+			fResubscribeVersionManager();
 
 		fSetupAppManagerSelfUpdate(AppManager_KeyManager, "TestTag");
 		fSetupAppManagerSelfUpdate(AppManager_AppManager, "TestTag");
@@ -1099,15 +1133,25 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				fRemoveOldPackages("VersionManager");
 				fRemoveOldPackages("AppManager");
 				{
+					DMibLogWithCategory(Test, Info, "UpdateApps Update");
+					auto KeyManagerPackageInfoFuture = fUpdateApp("KeyManager", {});
+					auto VersionManagerPackageInfoFuture = fUpdateApp("VersionManager", {});
+					auto AppManagerPackageInfoFuture = fUpdateApp("AppManager", {});
+					AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					VersionManagerPackageInfo = fg_Move(VersionManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				}
+
+				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 0");
-					KeyManagerPackageInfo = fUpdateApp("KeyManager", {"TestTag"});
+					fTagApp("KeyManager", KeyManagerPackageInfo, {"TestTag"});
 					fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"});
 					fProvideKeyManagerPasswordIfNeeded();
 				}
 
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 1");
-					VersionManagerPackageInfo = fUpdateApp("VersionManager", {"VersionManagerTestTag"});
+					fTagApp("VersionManager", VersionManagerPackageInfo, {"VersionManagerTestTag"});
 					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 				}
 
@@ -1117,7 +1161,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				}
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 3");
-					AppManagerPackageInfo = fUpdateApp("AppManager", {"VersionManagerTestTag"});
+					fTagApp("AppManager", AppManagerPackageInfo, {"VersionManagerTestTag"});
 					fResubscribeAppManager(AppManager_VersionManager);
 				}
 				{
@@ -1176,9 +1220,12 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				{
 					DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous 0");
-					KeyManagerPackageInfo = fUpdateApp("KeyManager", {});
-					VersionManagerPackageInfo = fUpdateApp("VersionManager", {});
-					AppManagerPackageInfo = fUpdateApp("AppManager", {});
+					auto KeyManagerPackageInfoFuture = fUpdateApp("KeyManager", {});
+					auto VersionManagerPackageInfoFuture = fUpdateApp("VersionManager", {});
+					auto AppManagerPackageInfoFuture = fUpdateApp("AppManager", {});
+					AppManagerPackageInfo = fg_Move(AppManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					KeyManagerPackageInfo = fg_Move(KeyManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					VersionManagerPackageInfo = fg_Move(VersionManagerPackageInfoFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 				}
 
 				{
@@ -1254,22 +1301,24 @@ public:
 
 			auto fInit = [&](CStr &_AppManager, CStr &_VersionManager, CStr &_KeyManager, CStr const &_UniqueName)
 				{
-					auto fInitPackage = [&](CStr &_PackagePath)
+					auto fInitPackage = [&](CStr &o_PackagePath) -> TCFuture<void>
 						{
+							co_await ECoroutineFlag_AllowReferences;
+
 							CStr BasePath = "{}/TestApps/Latest/{}"_f << ProgramDirectory << _UniqueName;
 							CFile::fs_CreateDirectory(BasePath);
 
-							CStr AppName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(_PackagePath));
+							CStr AppName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(o_PackagePath));
 
 							CStr SourceTempPath = "{}/TestApps/LatestSource/{}/{}"_f << ProgramDirectory << _UniqueName << AppName;
 
 							CFile::fs_DiffCopyFileOrDirectory("{}/TestApps/{}"_f << ProgramDirectory << AppName, SourceTempPath, nullptr);
 
-							CStr Version = CFile::fs_GetFile(CFile::fs_GetPath(_PackagePath));
+							CStr Version = CFile::fs_GetFile(CFile::fs_GetPath(o_PackagePath));
 							if (Version != "Latest")
-								return;
+								co_return {};
 
-							_PackagePath = BasePath / _PackagePath.f_RemovePrefix("Latest/");
+							o_PackagePath = BasePath / o_PackagePath.f_RemovePrefix("Latest/");
 
 							CStr VersionInfoFile = "{}/{}VersionInfo.json"_f << SourceTempPath << AppName;
 							CEJSONSorted VersionInfo = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
@@ -1280,19 +1329,23 @@ public:
 							VersionInfo["Version"] = CStr::fs_ToStr(VersionID);
 							CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString(), false);
 
-							CActorRunLoopTestHelper RunLoopHelper;
-
 							CVersionManagerHelper VersionManagerHelper(BinaryDirectory);
 
-							VersionManagerHelper.f_CreatePackage(SourceTempPath, _PackagePath, g_CompressionLevel)
-								.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
-							;
+							co_await VersionManagerHelper.f_CreatePackage(SourceTempPath, o_PackagePath, g_CompressionLevel);
+
+							co_return {};
 						}
 					;
 
-					fInitPackage(_AppManager);
-					fInitPackage(_VersionManager);
-					fInitPackage(_KeyManager);
+					CActorRunLoopTestHelper RunLoopHelper;
+
+					auto AppManagerFuture = fInitPackage(_AppManager);
+					auto VersionManagerFuture = fInitPackage(_VersionManager);
+					auto KeyManagerFuture = fInitPackage(_KeyManager);
+
+					fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fg_Move(VersionManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					fg_Move(KeyManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 				}
 			;
 
