@@ -19,6 +19,7 @@
 #include <Mib/Concurrency/DistributedTrustTestHelpers>
 #include <Mib/Concurrency/DistributedActorTestHelpers>
 #include <Mib/Concurrency/LogError>
+#include <Mib/CommandLine/AnsiEncodingParse>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/Process/Platform>
@@ -156,10 +157,12 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				if (Line.f_Find("Waiting for user to provide password") < 0)
 					continue;
 
+				auto StrippedLine = NCommandLine::CAnsiEncodingParse::fs_StripEncoding(Line);
+
 				CStr DateStr;
 				CStr TimeStr;
 				aint nParsed = 0;
-				(CStr::CParse("{} {} ") >> DateStr >> TimeStr).f_Parse(Line, nParsed);
+				(CStr::CParse("{} {} ") >> DateStr >> TimeStr).f_Parse(StrippedLine, nParsed);
 				if (nParsed != 2)
 					continue;
 
