@@ -48,21 +48,23 @@ function WaitForPidToExit()
 	Log "AppManager exited"
 }
 
+eval "ExtraLaunchParamsArray=($ExtraLaunchParams)"
+
 if [[ "$2" == "DaemonStandalone" ]]; then
 	WaitForPidToExit $AppManagerPID
-	Log "Launching new standalone executable"
-	"$1" --daemon-run-standalone >> "$LogFile" 2>&1 &
+	Log "Launching new standalone executable:" "$1" --daemon-run-standalone "${ExtraLaunchParamsArray[@]}"
+	"$1" --daemon-run-standalone "${ExtraLaunchParamsArray[@]}" >> "$LogFile" 2>&1 &
 	NewProcessID=$!
 	disown
 elif [[ "$2" == "DaemonDebug" ]]; then
 	WaitForPidToExit $AppManagerPID
-	Log "Launching new daemon debug executable"
-	"$1" --daemon-run-debug >> "$LogFile" 2>&1 &
+	Log "Launching new daemon debug executable:" "$1" --daemon-run-debug "${ExtraLaunchParamsArray[@]}"
+	"$1" --daemon-run-debug "${ExtraLaunchParamsArray[@]}" >> "$LogFile" 2>&1 &
 	NewProcessID=$!
 	disown
 elif [[ "$2" == "Daemon" ]]; then
 	WaitForPidToExit $PPID
-	Log "Launching new daemon executable"
+	Log "Launching new daemon executable:" "$1" --daemon-restart
 	"$1" --daemon-restart >> "$LogFile" 2>&1
 	NewProcessID=$!
 else

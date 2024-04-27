@@ -26,7 +26,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCAsyncResult<bool> UpdateResult = co_await
 			(
-				g_Dispatch(BlockingActorCheckout) / [SourceDir = _pApplication->f_GetDirectory()]() -> bool
+				g_Dispatch(BlockingActorCheckout) / [SourceDir = _pApplication->f_GetDirectory(), AutoUpdateDelay = mp_AutoUpdateDelay]() -> bool
 				{
 					CStr ProgramDir = CFile::fs_GetProgramDirectory();
 					CStr ProgramPath = CFile::fs_GetProgramPath();
@@ -103,6 +103,14 @@ namespace NMib::NCloud::NAppManager
 						Type = "Daemon";
 					else
 						DError("Program not running as daemon or in daemon debug mode, so self update is not supported");
+
+					TCVector<CStr> ExtraLaunchParams;
+
+					if (AutoUpdateDelay != mc_DefaultAutoUpdateDelay && (bDaemonDebug || bDaemonStandalone))
+						ExtraLaunchParams.f_Insert("--auto-update-delay={}"_f << AutoUpdateDelay);
+
+					if (!ExtraLaunchParams.f_IsEmpty())
+						Params.m_Environment["ExtraLaunchParams"] = CProcessLaunchParams::fs_GetParamsBash(ExtraLaunchParams);
 
 					CStr StdOut;
 					CStr StdErr;

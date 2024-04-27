@@ -38,7 +38,11 @@ namespace NMib::NCloud::NAppManager
 					"AutoUpdateDelay?"_o=
 					{
 						"Names"_o= {"--auto-update-delay"}
-						,"Default"_o= 15.0
+						,"Default"_o= fg_GetSys()->f_GetEnvironmentVariable
+						(
+							"MalterlibAppManagerAutoUpdateDelay"
+							, CStr::fs_ToStr(fp64(mc_DefaultAutoUpdateDelay))
+						).f_ToFloat(fp64(mc_DefaultAutoUpdateDelay))
 						, "Description"_o= "Delay wait when receiving new versions to wait for other version managers to also send their versions."
 					}
 				}

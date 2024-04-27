@@ -467,7 +467,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 #if DTestUpdateCompatibilityEnableOtherOutput
 				ExtraParams.f_Insert("--log-launches-to-stderr");
 #endif
-				return LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, "AppManager_{}"_f << _Name, _Dir / "AppManager", fg_Move(ExtraParams))
+				CSystemEnvironment Environment;
+				Environment["MalterlibAppManagerAutoUpdateDelay"] = "0.001";
+
+				return LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, "AppManager_{}"_f << _Name, _Dir / "AppManager", fg_Move(ExtraParams), fg_Move(Environment))
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 			}

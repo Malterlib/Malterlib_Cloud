@@ -110,7 +110,10 @@ namespace NMib::NCloud::NAppManager
 				}
 
 				if (_NewVersions.m_bFullResend && mp_AutoUpdateDelay >= 0.01)
+				{
+					DMibLog(Debug, "Delaying after first version notification: {}", mp_AutoUpdateDelay);
 					co_await fg_Timeout(mp_AutoUpdateDelay); // Wait for other managers to send their versions
+				}
 
 				fp_AutoUpdate_Update();
 

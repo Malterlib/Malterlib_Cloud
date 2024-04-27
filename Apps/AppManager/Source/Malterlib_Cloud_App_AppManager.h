@@ -29,6 +29,8 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerActor();
 		~CAppManagerActor();
 
+		static constexpr double mc_DefaultAutoUpdateDelay = 15.0;
+
 	private:
 		using EUpdateStage = CAppManagerInterface::EUpdateStage;
 		struct CFirstApplicationUpdate;
@@ -989,7 +991,7 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bLogLaunchesToStdErr = false;
 		bool mp_bPendingSelfUpdateInProgress = false;
 
-		fp64 mp_AutoUpdateDelay = 15.0;
+		fp64 mp_AutoUpdateDelay = mc_DefaultAutoUpdateDelay;
 
 		TCActor<CDatabaseActor> mp_DatabaseActor;
 
