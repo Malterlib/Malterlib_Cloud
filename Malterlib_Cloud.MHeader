@@ -143,22 +143,11 @@ Property
 	MalterlibCloudCompatibilityTestsSupported: bool = false
 	MalterlibCloudCompatibilityTestsSupported true
 	{
-		&
+		|
 		{
 			MalterlibCloudCompatibilityTests true
-			|
-			{
-				&
-				{
-					Platform "Linux"
-					Architecture "x64"
-				}
-				&
-				{
-					PlatformFamily "macOS"
-					Architecture "x64"
-				}
-			}
+			PlatformFamily "Linux"
+			PlatformFamily "macOS"
 		}
 	}
 
@@ -503,7 +492,12 @@ Property
 	{
 		MalterlibPostCopySources =+ {Pattern: `@(TestBinariesRepoDir)/*`, Destination: "CloudTestBinaries", FindDirectory: true}
 		{
-			!!MalterlibCloudCompatibilityTestsSupported true
+			&
+			{
+				MalterlibCloudCompatibilityTestsSupported true
+				MalterlibCloudCompatibilityTests true
+				TestBinariesRepoDir->DirectoryExists() true
+			}
 		}
 	}
 }
