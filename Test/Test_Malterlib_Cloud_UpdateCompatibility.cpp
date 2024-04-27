@@ -439,7 +439,8 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fSetupAppManager = [&](CStr const &_Directory)
 			{
-				DMibTestPath("Setup AppManager ({})"_f << CFile::fs_GetFile(_Directory));
+				DMibLogWithCategory(Test, Info, "Setup AppManager ({})", CFile::fs_GetFile(_Directory));
+
 
 				auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -457,7 +458,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fLaunchAppManager = [&](CStr const &_Name, CStr const &_Dir) -> CDistributedApp_LaunchInfo
 			{
-				DMibTestPath("Launch AppManager ({})"_f << _Name);
+				DMibLogWithCategory(Test, Info, "Launch AppManager ({})", _Name);
 
 				TCVector<CStr> ExtraParams;
 				if (AppManagerPackageOptions.f_HasFeatureFlag("NoDaemonRunStandalone"))
@@ -489,7 +490,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fAddListen = [&](CStr const &_Application, bool _bOldFormat = false) -> CStr
 			{
-				DMibTestPath("Add Listen ({})"_f << CFile::fs_GetFile(_Application));
+				DMibLogWithCategory(Test, Info, "Add Listen ({})", CFile::fs_GetFile(_Application));
 
 				CStr AppDir = CFile::fs_GetPath(_Application);
 				CStr SocketFile = AppDir / "test.ls";
@@ -507,7 +508,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fGenerateTicket = [&](CStr const &_Application) -> CStr
 			{
-				DMibTestPath("Generate Ticket ({})"_f << CFile::fs_GetFile(_Application));
+				DMibLogWithCategory(Test, Info, "Generate Ticket ({})", CFile::fs_GetFile(_Application));
 
 				return CProcessLaunch::fs_LaunchTool(_Application, fg_CreateVector<CStr>("--trust-generate-ticket")).f_Trim();
 			}
@@ -515,7 +516,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fGetHostID = [&](CStr const &_Application) -> CStr
 			{
-				DMibTestPath("Get Host ID ({})"_f << CFile::fs_GetFile(_Application));
+				DMibLogWithCategory(Test, Info, "Get Host ID ({})", CFile::fs_GetFile(_Application));
 
 				return CProcessLaunch::fs_LaunchTool(_Application, fg_CreateVector<CStr>("--trust-host-id")).f_Trim();
 			}
@@ -523,7 +524,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fSetupAppManagerTrust = [&](CDistributedApp_LaunchInfo &_LaunchInfo, CStr const &_Directory) -> CDistributedActorTrustManager_Address
 			{
-				DMibTestPath("Setup AppManager Trust ({})"_f << CFile::fs_GetFile(_Directory));
+				DMibLogWithCategory(Test, Info, "Setup AppManager Trust ({})", CFile::fs_GetFile(_Directory));
 
 				CDistributedActorTrustManager_Address Address;
 				Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << _Directory);
@@ -557,12 +558,12 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fInitAppManager = [&](CStr const &_Name, CStr const &_Directory) -> CAppManager
 			{
-				DMibTestPath("Init AppManager ({})"_f << _Name);
+				DMibLogWithCategory(Test, Info, "Init AppManager ({})", _Name);
 
 				CAppManager AppManager = {fLaunchAppManager(_Name, _Directory)};
 				AppManager.m_Address = fSetupAppManagerTrust(AppManager.m_LaunchInfo, _Directory);
 				{
-					DMibTestPath("Subscribe from host ({})"_f << _Name);
+					DMibLogWithCategory(Test, Info, "Subscribe from host ({})", _Name);
 					AppManager.m_AppManager = Subscriptions.f_SubscribeFromHost<CAppManagerInterface>(RunLoopHelper, AppManager.m_LaunchInfo.m_HostID);
 				}
 				AppManager.m_RootPath = _Directory;
@@ -589,7 +590,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				, bool _bDoEncryption
 			)
 			{
-				DMibTestPath("Install App Manually ({}, {})"_f << CFile::fs_GetFile(_AppManager.m_RootPath) << CFile::fs_GetFile(_Package));
+				DMibLogWithCategory(Test, Info, "Install App Manually ({}, {})", CFile::fs_GetFile(_AppManager.m_RootPath), CFile::fs_GetFile(_Package));
 
 				CStr PackageName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(_Package));
 				TCVector<CStr> Params = {"--application-add", "--force-overwrite", "--from-file", _Package, "--name", PackageName};
@@ -629,11 +630,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				}
 
 				{
-					DMibTestPath("Add");
+					DMibLogWithCategory(Test, Info, "Add");
 					CProcessLaunch::fs_LaunchTool(_AppManager.m_RootPath / "AppManager", Params, _AppManager.m_RootPath);
 				}
 				{
-					DMibTestPath("Change Settings");
+					DMibLogWithCategory(Test, Info, "Change Settings");
 					CProcessLaunch::fs_LaunchTool
 						(
 							_AppManager.m_RootPath / "AppManager"
@@ -683,7 +684,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fSetupKeyManager = [&](CAppManager const &_AppManager)
 			{
-				DMibTestPath("Setup KeyManager ({})"_f << CFile::fs_GetFile(_AppManager.m_RootPath));
+				DMibLogWithCategory(Test, Info, "Setup KeyManager ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
 
 				auto PasswordProvidedFuture = KeyManagerPasswordProvideActor(&CKeyManagerPasswordProvider::f_WaitForProvide).f_Future();
 
@@ -692,7 +693,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				DMibAssert(fGetAppInfo(_AppManager, "KeyManager").m_Status, ==, "Launched");
 				fProvideKeyManagerPasswordIfNeeded();
 				{
-					DMibTestPath("Wait For Password Provide");
+					DMibLogWithCategory(Test, Info, "Wait For Password Provide");
 					fg_Move(PasswordProvidedFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 				}
 
@@ -706,11 +707,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fSetupAppManagerConnection = [&](CAppManager const &_AppManager, CStr const &_Executable, CStr const &_Namespace, TCVector<CStr> const &_Permissions, CStr const &_HostID)
 			{
-				DMibTestPath("Setup AppManager Connection ({})"_f << CFile::fs_GetFile(_AppManager.m_RootPath));
+				DMibLogWithCategory(Test, Info, "Setup AppManager Connection ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
 
 				for (auto &Permission : _Permissions)
 				{
-					DMibTestPath("Add permission '{}'"_f << Permission);
+					DMibLogWithCategory(Test, Info, "Add permission '{}'", Permission);
 					CProcessLaunch::fs_LaunchTool(_Executable, fg_CreateVector<CStr>("--trust-permission-add", "--host", _AppManager.m_LaunchInfo.m_HostID, Permission));
 				}
 
@@ -719,17 +720,17 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				Hosts.m_Namespace = _Namespace;
 
 				{
-					DMibTestPath("Allow Hosts");
+					DMibLogWithCategory(Test, Info, "Allow Hosts");
 					_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 						(fg_Move(Hosts)).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
 				}
 
 				{
-					DMibTestPath("Connect");
+					DMibLogWithCategory(Test, Info, "Connect");
 					auto Ticket = CDistributedActorTrustManagerInterface::CTrustTicket::fs_FromStringTicket(fGenerateTicket(_Executable));
 					{
-						DMibTestPath("Add Client Connection");
+						DMibLogWithCategory(Test, Info, "Add Client Connection");
 						_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
 							(Ticket, g_Timeout, -1).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 						;
@@ -744,7 +745,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fSetupVersionManager = [&](CAppManager const &_AppManager)
 			{
-				DMibTestPath("Setup VersionManager ({})"_f << CFile::fs_GetFile(_AppManager.m_RootPath));
+				DMibLogWithCategory(Test, Info, "Setup VersionManager ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
 
 				fInstallAppManually
 					(
@@ -765,7 +766,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				VersionManagerHostID = fGetHostID(VersionManagerExecutable);
 
 				{
-					DMibTestPath("Allow Hosts");
+					DMibLogWithCategory(Test, Info, "Allow Hosts");
 
 					TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 						(
@@ -781,21 +782,21 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				for (auto &Permission : Permissions)
 				{
-					DMibTestPath("Add permission '{}'"_f << Permission);
+					DMibLogWithCategory(Test, Info, "Add permission '{}'", Permission);
 					CProcessLaunch::fs_LaunchTool(VersionManagerExecutable, fg_CreateVector<CStr>("--trust-permission-add", "--host", TestHostID, Permission));
 				}
 
 				{
-					DMibTestPath("Connect");
+					DMibLogWithCategory(Test, Info, "Connect");
 					auto Ticket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(fGenerateTicket(VersionManagerExecutable));
 					{
-						DMibTestPath("Add Client Connection");
+						DMibLogWithCategory(Test, Info, "Add Client Connection");
 						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					}
 				}
 
 				{
-					DMibTestPath("Subscribe");
+					DMibLogWithCategory(Test, Info, "Subscribe");
 					VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(RunLoopHelper, VersionManagerHostID);
 				}
 			}
@@ -803,7 +804,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fUploadPackage = [&](CStr const &_Package, TCSet<CStr> const &_Tags)
 			{
-				DMibTestPath("Upload Package ({}, {})"_f << CFile::fs_GetFile(_Package) << CFile::fs_GetFile(CFile::fs_GetPath(_Package)));
+				DMibLogWithCategory(Test, Info, "Upload Package ({}, {})", CFile::fs_GetFile(_Package), CFile::fs_GetFile(CFile::fs_GetPath(_Package)));
 
 				auto PackageInfo = VersionManagerHelper.f_GetPackageInfo(_Package).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 				PackageInfo.m_VersionInfo.m_Tags = _Tags;
@@ -819,7 +820,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fWaitVersionsAvailable = [&](CAppManager const &_AppManager, CStr const &_Application)
 			{
-				DMibTestPath("Wait Version Available ({}, {})"_f << CFile::fs_GetFile(_AppManager.m_RootPath) << _Application);
+				DMibLogWithCategory(Test, Info, "Wait Version Available ({}, {})", CFile::fs_GetFile(_AppManager.m_RootPath), _Application);
 
 				CClock Timeout{true};
 				while (_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetAvailableVersions)(_Application).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout).f_IsEmpty())
@@ -833,7 +834,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fSetupAppManagerSelfUpdate = [&](CAppManager const &_AppManager, CStr const &_Tag)
 			{
-				DMibTestPath("Setup AppManager SelfUpdate ({})"_f << CFile::fs_GetFile(_AppManager.m_RootPath));
+				DMibLogWithCategory(Test, Info, "Setup AppManager SelfUpdate ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
 
 				fWaitVersionsAvailable(_AppManager, "AppManager");
 				CAppManagerInterface::CApplicationAdd Add;
@@ -846,7 +847,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				ApplicationSettings.m_ExecutableParameters = TCVector<CStr>{};
 
 				{
-					DMibTestPath("Add");
+					DMibLogWithCategory(Test, Info, "Add");
 					_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)("SelfUpdate", fg_Move(Add), fg_Move(ApplicationSettings))
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
@@ -856,7 +857,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fAddAppManagerApp = [&](CAppManager const &_AppManager, CStr const &_Application, CStr const &_Executable, CStr const &_Tag)
 			{
-				DMibTestPath("Add AppManager App ({})"_f << CFile::fs_GetFile(_AppManager.m_RootPath));
+				DMibLogWithCategory(Test, Info, "Add AppManager App ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
 
 				fWaitVersionsAvailable(_AppManager, "AppManager");
 				CAppManagerInterface::CApplicationAdd Add;
@@ -869,7 +870,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					ApplicationSettings.m_Executable = _Executable;
 
 				{
-					DMibTestPath("Add");
+					DMibLogWithCategory(Test, Info, "Add");
 					_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_Add)(_Application, fg_Move(Add), fg_Move(ApplicationSettings))
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
@@ -882,7 +883,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fUpdateApp = [&](CStr const &_Name, TCSet<CStr> const &_Tags)
 			{
-				DMibTestPath("Update App ({})"_f << _Name);
+				DMibLogWithCategory(Test, Info, "Update App ({})", _Name);
 
 				CStr AppArchive = "{}/TestApps/Dynamic/{}/{}.tar"_f << ProgramDirectory << _UniqueName << _Name;
 				CStr SourceTempPath = "{}/TestApps/LatestSource/{}/{}"_f << ProgramDirectory << _UniqueName << _Name;
@@ -925,7 +926,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fTagApp = [&](CStr const &_Name, CVersionManagerHelper::CPackageInfo const &_PackageInfo, TCSet<CStr> const &_Tags)
 			{
-				DMibTestPath("Tag App ({})"_f << _Name);
+				DMibLogWithCategory(Test, Info, "Tag App ({})", _Name);
 				CVersionManager::CChangeTags ChangeTags;
 				ChangeTags.m_AddTags = _Tags;
 				ChangeTags.m_Application = _Name;
@@ -943,7 +944,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				, bool _bCanHaveInvalidTime = false
 			)
 			{
-				DMibTestPath("Wait For App ({}, {})"_f << CFile::fs_GetFile(_AppManager.m_RootPath) << _Application);
+				DMibLogWithCategory(Test, Info, "Wait For App ({}, {})", CFile::fs_GetFile(_AppManager.m_RootPath), _Application);
 
 				CClock Timeout{true};
 				CAppManagerInterface::CApplicationInfo AppInfo;
@@ -1004,19 +1005,19 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fResubscribeAppManager = [&](CAppManager &_AppManager)
 			{
-				DMibTestPath("Resubscribe AppManager ({})"_f << CFile::fs_GetFile(_AppManager.m_RootPath));
+				DMibLogWithCategory(Test, Info, "Resubscribe AppManager ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
 				_AppManager.m_AppManager = Subscriptions.f_SubscribeFromHost<CAppManagerInterface>(RunLoopHelper, _AppManager.m_LaunchInfo.m_HostID);
 			}
 		;
 		auto fResubscribeVersionManager = [&]()
 			{
-				DMibTestPath("Resubscribe VersionManager");
+				DMibLogWithCategory(Test, Info, "Resubscribe VersionManager");
 				VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(RunLoopHelper, VersionManagerHostID);
 			}
 		;
 
 		{
-			DMibTestPath("Setup Root App Managers");
+			DMibLogWithCategory(Test, Info, "Setup Root App Managers");
 			fSetupAppManager(KeyManagerDir);
 			fSetupAppManager(VersionManagerDir);
 			fSetupAppManager(AppManagerDir);
@@ -1066,31 +1067,31 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fUpdateApps = [&]()
 			{
-				DMibTestPath("UpdateApps");
+				DMibLogWithCategory(Test, Info, "UpdateApps");
 				{
-					DMibTestPath("UpdateApps 0");
+					DMibLogWithCategory(Test, Info, "UpdateApps 0");
 					KeyManagerPackageInfo = fUpdateApp("KeyManager", {"TestTag"});
 					fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"});
 					fProvideKeyManagerPasswordIfNeeded();
 				}
 
 				{
-					DMibTestPath("UpdateApps 1");
+					DMibLogWithCategory(Test, Info, "UpdateApps 1");
 					VersionManagerPackageInfo = fUpdateApp("VersionManager", {"VersionManagerTestTag"});
 					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 				}
 
 				{
-					DMibTestPath("UpdateApps 2");
+					DMibLogWithCategory(Test, Info, "UpdateApps 2");
 					fResubscribeVersionManager();
 				}
 				{
-					DMibTestPath("UpdateApps 3");
+					DMibLogWithCategory(Test, Info, "UpdateApps 3");
 					AppManagerPackageInfo = fUpdateApp("AppManager", {"VersionManagerTestTag"});
 					fResubscribeAppManager(AppManager_VersionManager);
 				}
 				{
-					DMibTestPath("UpdateApps 4");
+					DMibLogWithCategory(Test, Info, "UpdateApps 4");
 					fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 					fResubscribeVersionManager();
@@ -1098,20 +1099,20 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				// Update app manager manager
 				{
-					DMibTestPath("UpdateApps 5");
+					DMibLogWithCategory(Test, Info, "UpdateApps 5");
 					fTagApp("AppManager", AppManagerPackageInfo, {"AppManagerTestTag"});
 					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No executable"});
 				}
 
 				// Update rest
 				{
-					DMibTestPath("UpdateApps 6");
+					DMibLogWithCategory(Test, Info, "UpdateApps 6");
 					fTagApp("AppManager", AppManagerPackageInfo, {"TestTag"});
 					fResubscribeAppManager(AppManager_AppManager);
 					fResubscribeAppManager(AppManager_KeyManager);
 				}
 				{
-					DMibTestPath("UpdateApps 7");
+					DMibLogWithCategory(Test, Info, "UpdateApps 7");
 					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 					fProvideKeyManagerPasswordIfNeeded();
@@ -1137,17 +1138,17 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fUpdateAppsSimultaneous = [&](TCVector<TCFunction<void ()>> &&_DoTags)
 			{
-				DMibTestPath("UpdateAppsSimultaneous");
+				DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous");
 
 				{
-					DMibTestPath("UpdateAppsSimultaneous 0");
+					DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous 0");
 					KeyManagerPackageInfo = fUpdateApp("KeyManager", {});
 					VersionManagerPackageInfo = fUpdateApp("VersionManager", {});
 					AppManagerPackageInfo = fUpdateApp("AppManager", {});
 				}
 
 				{
-					DMibTestPath("UpdateAppsSimultaneous 1");
+					DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous 1");
 					for (auto &fTag : _DoTags)
 						fTag();
 
@@ -1157,7 +1158,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				}
 
 				{
-					DMibTestPath("UpdateAppsSimultaneous 2");
+					DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous 2");
 					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
 					fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
@@ -1172,35 +1173,35 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		;
 
 		{
-			DMibTestPath("Upgrade");
+			DMibLogWithCategory(Test, Info, "Upgrade");
 			fUpdateApps();
 		}
 		{
-			DMibTestPath("UpgradeAgain");
+			DMibLogWithCategory(Test, Info, "UpgradeAgain");
 			fUpdateApps();
 		}
 		{
-			DMibTestPath("SimultaneousUpgrade1");
+			DMibLogWithCategory(Test, Info, "SimultaneousUpgrade1");
 			fUpdateAppsSimultaneous({fTagAllKeyManager, fTagAllVersionManager, fTagAllAppManager});
 		}
 		{
-			DMibTestPath("SimultaneousUpgrade2");
+			DMibLogWithCategory(Test, Info, "SimultaneousUpgrade2");
 			fUpdateAppsSimultaneous({fTagAllKeyManager, fTagAllAppManager, fTagAllVersionManager});
 		}
 		{
-			DMibTestPath("SimultaneousUpgrade3");
+			DMibLogWithCategory(Test, Info, "SimultaneousUpgrade3");
 			fUpdateAppsSimultaneous({fTagAllVersionManager, fTagAllKeyManager, fTagAllAppManager});
 		}
 		{
-			DMibTestPath("SimultaneousUpgrade4");
+			DMibLogWithCategory(Test, Info, "SimultaneousUpgrade4");
 			fUpdateAppsSimultaneous({fTagAllVersionManager, fTagAllAppManager, fTagAllKeyManager});
 		}
 		{
-			DMibTestPath("SimultaneousUpgrade5");
+			DMibLogWithCategory(Test, Info, "SimultaneousUpgrade5");
 			fUpdateAppsSimultaneous({fTagAllAppManager, fTagAllKeyManager, fTagAllVersionManager});
 		}
 		{
-			DMibTestPath("SimultaneousUpgrade6");
+			DMibLogWithCategory(Test, Info, "SimultaneousUpgrade6");
 			fUpdateAppsSimultaneous({fTagAllAppManager, fTagAllVersionManager, fTagAllKeyManager});
 		}
 	}
