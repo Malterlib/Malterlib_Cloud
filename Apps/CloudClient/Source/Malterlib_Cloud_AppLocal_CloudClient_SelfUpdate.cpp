@@ -132,6 +132,7 @@ namespace NMib::NCloud::NCloudClient
 							, fg_CreateVector<CStr>
 							(
 								"--no-same-owner"
+								, "--no-xattr"
 								, "-xf"
 								, PackageFile
 							)

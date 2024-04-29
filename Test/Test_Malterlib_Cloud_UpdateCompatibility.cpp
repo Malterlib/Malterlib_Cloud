@@ -456,7 +456,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 						g_Dispatch(BlockingActorCheckout) / [=]
 						{
 							CFile::fs_CreateDirectory(_Directory);
-							CProcessLaunch::fs_LaunchTool(BinaryDirectory / "bin/bsdtar", {"--no-same-owner", "-xf", _AppManagerPackage}, _Directory);
+							CProcessLaunch::fs_LaunchTool(BinaryDirectory / "bin/bsdtar", {"--no-same-owner", "--no-xattr", "-xf", _AppManagerPackage}, _Directory);
 						}
 					)
 				;

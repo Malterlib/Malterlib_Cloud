@@ -121,6 +121,7 @@ namespace NMib::NCloud::NAppManager
 					, fg_CreateVector<CStr>
 					(
 						"--no-same-owner"
+						, "--no-xattr"
 						, "-xf"
 						, _Source
 					)
