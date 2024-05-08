@@ -6,9 +6,11 @@
 
 namespace NMib::NCloud::NAppManager
 {
+#ifndef DPlatformFamily_Windows
 	static ch8 const *g_pLimitsSetupScript =
 #		include "Malterlib_Cloud_App_AppManager_Limits_Setup.sh"
 	;
+#endif
 
 	TCFuture<void> CAppManagerActor::fp_SetupLimits()
 	{

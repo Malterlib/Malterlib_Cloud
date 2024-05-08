@@ -81,7 +81,7 @@ namespace NMib::NCloud
 							{
 								if (pAppendState)
 									pAppendState->m_File.f_Close();
-								return {{}, {}, false};
+								return CUpdateManifestResult{.m_bExists = false};
 							}
 
 							CDirectoryManifestFile ManifestFile;
@@ -98,7 +98,7 @@ namespace NMib::NCloud
 
 							FileID = CFile::fs_GetUniqueIdentifierOnLink(AbsoluteFileName);
 
-							CUpdateManifestResult Result = {ManifestFile, {}, FileID, true};
+							CUpdateManifestResult Result = {.m_ManifestFile = ManifestFile, .m_FileID = FileID, .m_bExists = true};
 
 							if (pAppendState)
 							{
