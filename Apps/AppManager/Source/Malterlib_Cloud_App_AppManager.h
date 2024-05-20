@@ -733,6 +733,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_VersionManagerList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CloudManagerList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_NetworkTunnelSubscriptionList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		TCFuture<uint32> fp_CommandLine_RemoveKnownHost(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 

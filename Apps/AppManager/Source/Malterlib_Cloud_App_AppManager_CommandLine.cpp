@@ -978,6 +978,30 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		auto NetworkTunnelsManagement = o_CommandLine.f_AddSection("Network Tunnels", "Commands to network tunnels");
+		NetworkTunnelsManagement.f_RegisterCommand
+			(
+				{
+					"Names"_o= {"--network-tunnel-subscription-list"}
+					, "Description"_o= "List network tunnel subscriptions."
+					, "Options"_o=
+					{
+						"Verbose?"_o=
+						{
+							"Names"_o= {"--verbose", "-v"}
+							, "Default"_o= false
+							, "Description"_o= "Display more extensive information."
+						}
+						, CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_NetworkTunnelSubscriptionList, _Params, _pCommandLine);
+				}
+			)
+		;
+
 		fp_BuildCommandLine_HostMonitor(o_CommandLine);
 	}
 }

@@ -1,0 +1,71 @@
+%Target "Lib_Malterlib_Cloud_TunnelManager"
+{
+	Property
+	{
+		MalterlibConcurrency_DistributedActors true
+		MalterlibCloudTargetLibrary true
+	}
+	Target
+	{
+		Type "StaticLibrary"
+		BaseName "Malterlib_Cloud_TunnelManager"
+		Group "Apps"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_App_*"
+	}
+
+	%Dependency "Lib_Malterlib_Cloud"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib_Database"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib"
+	{
+		Dependency.Indirect true
+	}
+}
+
+%Target "Malterlib_Cloud_TunnelManager"
+{
+	Property
+	{
+		ProductName "Malterlib Tunnel Manager"
+		MalterlibTestApp true
+		MalterlibPostCopyProject MalterlibAppTestPostCopyProject
+		{
+			&
+			{
+				MalterlibPostCopyProject undefined
+				!MalterlibAppTestPostCopyProject undefined
+			}
+		}
+		MalterlibPostCopyProject "Malterlib_Cloud_TunnelManager"
+		{
+			!!MalterlibPostCopyProject undefined
+		}
+		MalterlibCloud_EnableVersionUpload true
+		MalterlibConcurrency_DistributedActors true
+		MalterlibTargetNameType "Normal"
+		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudTunnelManager"
+		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudTunnelManager"
+	}
+	Target
+	{
+		Type "ConsoleExecutable"
+		BaseFileName "TunnelManager"
+		DebuggerCommandArguments ["--daemon-run-debug"]
+		Group "Apps"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_AppLocal_*"
+	}
+	%Dependency "Lib_Malterlib_Cloud_TunnelManager"
+}
+
+Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_TunnelManager"
