@@ -5,6 +5,7 @@
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Network/AsyncSocket>
+#include <Mib/Cryptography/RandomID>
 
 #include "Malterlib_Cloud_NetworkTunnelsServer.h"
 
@@ -17,6 +18,7 @@ namespace NMib::NCloud
 	using namespace NStorage;
 	using namespace NEncoding;
 	using namespace NFunction;
+	using namespace NCryptography;
 
 	struct CNetworkTunnelsServer::CInternal : public CActorInternal
 	{
@@ -93,6 +95,39 @@ namespace NMib::NCloud
 				co_return ReturnTunnels;
 			}
 
+			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeTunnels(CSubscribeTunnels &&_Subscribe) override
+			{
+				auto &Internal = *m_pThis->mp_pInternal;
+
+				auto SubscriptionID = fg_RandomID(Internal.m_ChangeSubscriptions);
+
+				auto &Subscription = Internal.m_ChangeSubscriptions[SubscriptionID] = fg_Move(_Subscribe);
+
+				ICNetworkTunnels::CTunnelChange_Initial Change;
+				for (auto &Tunnel : Internal.m_NetworkTunnels)
+					Change.m_Tunnels[Internal.m_NetworkTunnels.fs_GetKey(Tunnel)].m_MetaData = Tunnel.m_MetaData;
+
+				co_await Subscription.m_fOnTunnelChange(fg_Move(Change));
+
+				co_return g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCFuture<void>
+					{
+						auto &Internal = *pThis->mp_pInternal;
+
+						auto pChangeSubscription = Internal.m_ChangeSubscriptions.f_FindEqual(SubscriptionID);
+
+						if (!pChangeSubscription)
+							co_return {};
+
+						auto fOnTunnelChange = fg_Move(pChangeSubscription->m_fOnTunnelChange);
+						Internal.m_ChangeSubscriptions.f_Remove(pChangeSubscription);
+
+						co_await fg_Move(fOnTunnelChange).f_Destroy();
+
+						co_return {};
+					}
+				;
+			}
+
 			TCFuture<FSendBytes> f_OpenConnection(CNetworkTunnelName const &_Name, FSendBytes &&_fOnReceive) override
 			{
 				auto &Internal = *m_pThis->mp_pInternal;
@@ -104,7 +139,7 @@ namespace NMib::NCloud
 				bool bHasPermisions = co_await (Internal.m_Permissions.f_HasPermission("Open connection", Permissions) % AppAuditor);
 
 				if (!bHasPermisions)
-					co_return AppAuditor.f_AccessDenied("(Download backup)", Permissions);
+					co_return AppAuditor.f_AccessDenied("(Open connection)", Permissions);
 
 				auto pTunnel = Internal.m_NetworkTunnels.f_FindEqual(_Name);
 				if (!pTunnel)
@@ -210,6 +245,7 @@ namespace NMib::NCloud
 		TCMap<CStr, CNetworkTunnel> m_NetworkTunnels;
 		TCActor<CAsyncSocketClientActor> m_SocketClient = fg_Construct();
 		TCMap<mint, CConnection> m_Connections;
+		TCMap<CStr, ICNetworkTunnels::CSubscribeTunnels> m_ChangeSubscriptions;
 
 		mint m_ConnectionID = 0;
 	};
@@ -267,6 +303,19 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
+	NConcurrency::TCFuture<void> CNetworkTunnelsServer::fp_SendChange(ICNetworkTunnels::CTunnelChange _Change)
+	{
+		auto &Internal = *mp_pInternal;
+
+		TCActorResultVector<void> SubscriptionResults;
+		for (auto &Subscription : Internal.m_ChangeSubscriptions)
+			Subscription.m_fOnTunnelChange(fg_TempCopy(_Change)) > SubscriptionResults.f_AddResult();
+
+		co_await SubscriptionResults.f_GetResults();
+
+		co_return {};
+	}
+
 	TCFuture<CActorSubscription> CNetworkTunnelsServer::f_PublishNetworkTunnel
 		(
 			ICNetworkTunnels::CNetworkTunnelName const &_Name
@@ -277,12 +326,23 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 
+		auto MetaData = _MetaData;
+
 		auto TunnelMap = Internal.m_NetworkTunnels(_Name, CInternal::CNetworkTunnel{_Host, _Port, fg_Move(_MetaData)});
 		if (!TunnelMap.f_WasCreated())
 			co_return DMibErrorInstance("A tunnel with the same name is already published");
 
 		auto Permissions = TCSet<CStr>{fg_Format("{}/Connect/{}", Internal.m_PermissionPrefix, _Name)};
 		co_await Internal.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
+
+		if (!Internal.m_ChangeSubscriptions.f_IsEmpty())
+		{
+			ICNetworkTunnels::CTunnelChange_Add Change;
+			Change.m_TunnelName = _Name;
+			Change.m_Tunnel.m_MetaData = fg_Move(MetaData);
+
+			co_await fp_SendChange(fg_Move(Change));
+		}
 
 		co_return
 			(
@@ -293,6 +353,15 @@ namespace NMib::NCloud
 						> fg_LogWarning("NetworkTunnelsServer", "Failed to desroy network tunnel publication");
 					;
 					Internal.m_NetworkTunnels.f_Remove(_Name);
+
+					if (!Internal.m_ChangeSubscriptions.f_IsEmpty())
+					{
+						ICNetworkTunnels::CTunnelChange_Remove Change;
+						Change.m_TunnelName = _Name;
+
+						co_await fp_SendChange(fg_Move(Change));
+					}
+
 					co_return {};
 				}
 			)

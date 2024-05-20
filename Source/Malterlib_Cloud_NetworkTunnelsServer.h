@@ -37,6 +37,7 @@ namespace NMib::NCloud
 
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy() override;
+		NConcurrency::TCFuture<void> fp_SendChange(ICNetworkTunnels::CTunnelChange _Change);
 
 		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
