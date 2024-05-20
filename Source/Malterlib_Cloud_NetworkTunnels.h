@@ -20,7 +20,10 @@ namespace NMib::NCloud
 		enum : uint32
 		{
 			EProtocolVersion_Min = 0x101
-			, EProtocolVersion_Current = 0x101
+
+			, EProtocolVersion_SupportSubscribeTunnels = 0x102
+
+			, EProtocolVersion_Current = 0x102
 		};
 
 		using CNetworkTunnelName = NStr::CStr;
@@ -33,10 +36,60 @@ namespace NMib::NCloud
 			NEncoding::CEJSONSorted m_MetaData;
 		};
 
+		enum ETunnelChange
+		{
+			ETunnelChange_Initial
+			, ETunnelChange_Add
+			, ETunnelChange_Remove
+		};
+
+		struct CTunnelChange_Initial
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel> m_Tunnels;
+		};
+
+		struct CTunnelChange_Add
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			CNetworkTunnelName m_TunnelName;
+			CNetworkTunnel m_Tunnel;
+		};
+
+		struct CTunnelChange_Remove
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			CNetworkTunnelName m_TunnelName;
+		};
+
+		using CTunnelChange = NStorage::TCStreamableVariant
+			<
+				ETunnelChange
+				, NStorage::TCMember<CTunnelChange_Initial, ETunnelChange_Initial>
+				, NStorage::TCMember<CTunnelChange_Add, ETunnelChange_Add>
+				, NStorage::TCMember<CTunnelChange_Remove, ETunnelChange_Remove>
+			>
+		;
+
+		struct CSubscribeTunnels
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CTunnelChange &&_TunnelChange)> m_fOnTunnelChange;
+		};
+
 		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSecureByteVector &&_Data)>;
 
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() = 0;
 		virtual NConcurrency::TCFuture<FSendBytes> f_OpenConnection(CNetworkTunnelName const &_Name, FSendBytes &&_fOnReceive) = 0;
+		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeTunnels(CSubscribeTunnels &&_Subscribe) = 0;
 	};
 }
 

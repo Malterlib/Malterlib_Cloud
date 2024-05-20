@@ -13,6 +13,7 @@ namespace NMib::NCloud
 	{
 		DMibPublishActorFunction(ICNetworkTunnels::f_EnumerateTunnels);
 		DMibPublishActorFunction(ICNetworkTunnels::f_OpenConnection);
+		DMibPublishActorFunction(ICNetworkTunnels::f_SubscribeTunnels);
 	}
 
 	ICNetworkTunnels::~ICNetworkTunnels() = default;
