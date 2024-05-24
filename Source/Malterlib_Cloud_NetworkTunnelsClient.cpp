@@ -307,7 +307,7 @@ namespace NMib::NCloud
 						, PeerAddress = _Connection.m_Info.m_PeerAddress
 						, AllowDestroy = g_AllowWrongThreadDestroy
 					]
-					(EAsyncSocketStatus _Reason, CStr const &_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
+					(EAsyncSocketStatus _Reason, CStr &&_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
 					{
 						auto &Internal = *mp_pInternal;
 
@@ -326,7 +326,7 @@ namespace NMib::NCloud
 				;
 
 				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
-					(TCSharedPointer<CSecureByteVector> const &_pMessage) -> TCFuture<void>
+					(TCSharedPointer<CSecureByteVector> &&_pMessage) -> TCFuture<void>
 					{
 						auto &Internal = *mp_pInternal;
 
@@ -334,7 +334,7 @@ namespace NMib::NCloud
 						if (!pConnection || !pConnection->m_fSendData)
 							co_return DMibErrorInstance("Socket no longer exists");
 
-						co_await pConnection->m_fSendData(*_pMessage);
+						co_await pConnection->m_fSendData(fg_Move(*_pMessage));
 						co_return {};
 					}
 				;

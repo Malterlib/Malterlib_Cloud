@@ -216,7 +216,7 @@ namespace NMib::NCloud
 
 				CAsyncSocketCallbacks SocketCallbacks;
 				SocketCallbacks.m_fOnClose = g_ActorFunctor / [fCleanupConnection, AllowDestroy = g_AllowWrongThreadDestroy]
-					(EAsyncSocketStatus _Reason, CStr const &_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
+					(EAsyncSocketStatus _Reason, CStr &&_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
 					{
 						co_await fCleanupConnection();
 						co_return {};
@@ -224,7 +224,7 @@ namespace NMib::NCloud
 				;
 
 				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
-					(TCSharedPointer<CSecureByteVector> const &_pMessage) -> TCFuture<void>
+					(TCSharedPointer<CSecureByteVector> &&_pMessage) -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
 
@@ -232,7 +232,7 @@ namespace NMib::NCloud
 						if (!pConnection)
 							co_return DMibErrorInstance("Socket no longer exists");
 
-						co_await pConnection->m_fSendData(*_pMessage);
+						co_await pConnection->m_fSendData(fg_Move(*_pMessage));
 						co_return {};
 					}
 				;
