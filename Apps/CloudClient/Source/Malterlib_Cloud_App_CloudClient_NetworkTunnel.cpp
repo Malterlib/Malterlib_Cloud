@@ -206,27 +206,32 @@ namespace NMib::NCloud::NCloudClient
 							, .m_TunnelName = TunnelName
 							, .m_fOnConnection = g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetAddress const &_Address) mutable -> TCFuture<void>
 							{
-								if (!bVerbose && !LoggedAddresses(_Address.f_GetString()).f_WasCreated())
+								if (!bVerbose && !LoggedAddresses(_Address.f_GetString(ENetAddressStringFlag_None)).f_WasCreated())
 									co_return {};
 
 								CStr ActionString;
 								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 								ActionString = "{}Connected{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
 
-								*_pCommandLine += "{} '{}': {}:{}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort();
+								*_pCommandLine += "{} '{}': {}\n"_f << ActionString << TunnelName << _Address.f_GetString(ENetAddressStringFlag_IncludePort);
 
 								co_return {};
 							}
 							, .m_fOnClose = g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetAddress const &_Address, NStr::CStr const &_Message) mutable -> TCFuture<void>
 							{
-								if (!bVerbose && !LoggedAddresses(_Address.f_GetString()).f_WasCreated())
+								if (!bVerbose && !LoggedAddresses(_Address.f_GetString(ENetAddressStringFlag_None)).f_WasCreated())
 									co_return {};
 
 								CStr ActionString;
 								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 								ActionString = "{}Closed   {}"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default();
 
-								*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Message;
+								*_pCommandLine += "{} '{}': {} {}\n"_f
+									<< ActionString
+									<< TunnelName
+									<< _Address.f_GetString(ENetAddressStringFlag_IncludePort)
+									<< _Message
+								;
 
 								co_return {};
 							}
@@ -236,7 +241,12 @@ namespace NMib::NCloud::NCloudClient
 								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 								ActionString = "{}Error    {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();
 
-								*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Error;
+								*_pCommandLine += "{} '{}': {} {}\n"_f 
+									<< ActionString
+									<< TunnelName
+									<< _Address.f_GetString(ENetAddressStringFlag_IncludePort)
+									<< _Error
+								;
 								co_return {};
 							}
 							, .m_ListenHost = ListenHost
@@ -256,7 +266,7 @@ namespace NMib::NCloud::NCloudClient
 		{
 			auto &TunnelKey = OpenedTunnels.fs_GetKey(Tunnel);
 
-			CStr HostString = Tunnel.m_ListenAddress.f_GetString(true);
+			CStr HostString = Tunnel.m_ListenAddress.f_GetString(ENetAddressStringFlag_IncludeType);
 
 			CStr TunnelURL = URLTemplates[TunnelKey];
 
