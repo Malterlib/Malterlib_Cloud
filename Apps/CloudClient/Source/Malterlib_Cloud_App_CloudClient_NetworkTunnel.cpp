@@ -200,44 +200,47 @@ namespace NMib::NCloud::NCloudClient
 				mp_TunnelsClient
 					(
 						&CNetworkTunnelsClient::f_OpenTunnel
-						, HostID
-						, TunnelName
-						, g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetAddress const &_Address) mutable -> TCFuture<void>
+						, CNetworkTunnelsClient::COpenTunnel
 						{
-							if (!bVerbose && !LoggedAddresses(_Address.f_GetString()).f_WasCreated())
+							.m_HostID = HostID
+							, .m_TunnelName = TunnelName
+							, .m_fOnConnection = g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetAddress const &_Address) mutable -> TCFuture<void>
+							{
+								if (!bVerbose && !LoggedAddresses(_Address.f_GetString()).f_WasCreated())
+									co_return {};
+
+								CStr ActionString;
+								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+								ActionString = "{}Connected{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
+
+								*_pCommandLine += "{} '{}': {}:{}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort();
+
 								co_return {};
+							}
+							, .m_fOnClose = g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetAddress const &_Address, NStr::CStr const &_Message) mutable -> TCFuture<void>
+							{
+								if (!bVerbose && !LoggedAddresses(_Address.f_GetString()).f_WasCreated())
+									co_return {};
 
-							CStr ActionString;
-							auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
-							ActionString = "{}Connected{}"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default();
+								CStr ActionString;
+								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+								ActionString = "{}Closed   {}"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default();
 
-							*_pCommandLine += "{} '{}': {}:{}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort();
+								*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Message;
 
-							co_return {};
-						}
-						, g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetAddress const &_Address, NStr::CStr const &_Message) mutable -> TCFuture<void>
-						{
-							if (!bVerbose && !LoggedAddresses(_Address.f_GetString()).f_WasCreated())
 								co_return {};
+							}
+							, .m_fOnError = g_ActorFunctor / [=](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void>
+							{
+								CStr ActionString;
+								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+								ActionString = "{}Error    {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();
 
-							CStr ActionString;
-							auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
-							ActionString = "{}Closed   {}"_f << AnsiEncoding.f_StatusWarning() << AnsiEncoding.f_Default();
-
-							*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Message;
-
-							co_return {};
+								*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Error;
+								co_return {};
+							}
+							, .m_ListenHost = ListenHost
 						}
-						, g_ActorFunctor / [=](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void>
-						{
-							CStr ActionString;
-							auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
-							ActionString = "{}Error    {}"_f << AnsiEncoding.f_StatusError() << AnsiEncoding.f_Default();
-
-							*_pCommandLine += "{} '{}': {}:{} {}\n"_f << ActionString << TunnelName << _Address.f_GetString() << _Address.f_GetPort() << _Error;
-							co_return {};
-						}
-						, ListenHost
 					)
 					> OpenedTunnelResults.f_AddResult(TunnelKey)
 				;

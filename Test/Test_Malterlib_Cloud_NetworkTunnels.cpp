@@ -124,27 +124,30 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				auto Tunnel = co_await m_TunnelClient
 					(
 						&CNetworkTunnelsClient::f_OpenTunnel
-						, _Params["HostID"].f_String()
-						, _Params["TunnelName"].f_String()
-						, g_ActorFunctor / [](CNetAddress const &_Address) -> TCFuture<void> // New connection
+						, CNetworkTunnelsClient::COpenTunnel
 						{
-							if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-								DMibConErrOut2("New connection: {}\n", _Address.f_GetString());
-							co_return {};
+							.m_HostID = _Params["HostID"].f_String()
+							, .m_TunnelName = _Params["TunnelName"].f_String()
+							, .m_fOnConnection = g_ActorFunctor / [](CNetAddress const &_Address) -> TCFuture<void> // New connection
+							{
+								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+									DMibConErrOut2("New connection: {}\n", _Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort));
+								co_return {};
+							}
+							, .m_fOnClose = g_ActorFunctor / [](CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void> // On Close
+							{
+								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+									DMibConErrOut2("Connection from '{}' closed: {}\n", _Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Message);
+								co_return {};
+							}
+							, .m_fOnError = g_ActorFunctor / [](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void> // On Error
+							{
+								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+									DMibConErrOut2("Connection from '{}' error: {}\n", _Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Error);
+								co_return {};
+							}
+							, .m_ListenHost = _Params["ListenHost"].f_String()
 						}
-						, g_ActorFunctor / [](CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void> // On Close
-						{
-							if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-								DMibConErrOut2("Connection from '{}' closed: {}\n", _Address.f_GetString(), _Message);
-							co_return {};
-						}
-						, g_ActorFunctor / [](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void> // On Error
-						{
-							if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-								DMibConErrOut2("Connection from '{}' error: {}\n", _Address.f_GetString(), _Error);
-							co_return {};
-						}
-						, _Params["ListenHost"].f_String()
 					)
 				;
 
@@ -316,15 +319,15 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 
-				TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-					(
-						fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID})
-					)
-					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
-				;
 				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 					(
 						fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll", {}}})
+					)
+					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+				;
+				TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
+					(
+						fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID})
 					)
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;

@@ -10,6 +10,29 @@ namespace NMib::NCloud
 	{
 		_Stream % m_MetaData;
 	}
+
+	template <typename tf_CStream>
+	void ICNetworkTunnels::CSubscribeTunnels::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % fg_Move(m_fOnTunnelChange);
+	}
+
+	template <typename tf_CStream>
+	void ICNetworkTunnels::CTunnelChange_Initial::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Tunnels;
+	}
+
+	template <typename tf_CStream>
+	void ICNetworkTunnels::CTunnelChange_Add::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_TunnelName;
+		_Stream % m_Tunnel;
+	}
+
+	template <typename tf_CStream>
+	void ICNetworkTunnels::CTunnelChange_Remove::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_TunnelName;
+	}
 }
-
-

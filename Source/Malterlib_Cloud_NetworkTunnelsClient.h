@@ -27,20 +27,22 @@ namespace NMib::NCloud
 			NNetwork::CNetAddress m_ListenAddress;
 		};
 
+		struct COpenTunnel
+		{
+			NStr::CStr m_HostID; // Leave empty to allow any host
+			ICNetworkTunnels::CNetworkTunnelName m_TunnelName;
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address)> m_fOnConnection;
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Message)> m_fOnClose;
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Error)> m_fOnError;
+			NStr::CStr m_ListenHost;
+			bool m_bWaitForTunnel = false;
+		};
+
 		NConcurrency::TCFuture<void> f_Start();
 
 		NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, NContainer::TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> f_EnumTunnels();
 
-		NConcurrency::TCFuture<CTunnel> f_OpenTunnel
-			(
-				NStr::CStr const &_HostID
-				, ICNetworkTunnels::CNetworkTunnelName const &_TunnelName
-				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address)> &&_fOnConnection
-				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Message)> &&_fOnClose
-				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Error)> &&_fOnError
-				, NStr::CStr const &_ListenHost
-			)
-		;
+		NConcurrency::TCFuture<CTunnel> f_OpenTunnel(COpenTunnel &&_OpenTunnel);
 
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy() override;

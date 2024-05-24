@@ -405,7 +405,7 @@ namespace NMib::NCloud
 			Change.m_TunnelName = _Name;
 			Change.m_Tunnel.m_MetaData = fg_Move(MetaData);
 
-			co_await Internal.f_SendChange(fg_Move(Change), _Name).f_Wrap() > fg_LogError("NetworkTunnelsServer", "Failed to send tunnels changes to subscribed");
+			co_await Internal.f_SendChange(fg_Move(Change), _Name).f_Wrap() > fg_LogError("NetworkTunnelsServer", "Failed to send tunnel changes to subscribers");
 		}
 
 		co_return
@@ -423,7 +423,7 @@ namespace NMib::NCloud
 						ICNetworkTunnels::CTunnelChange_Remove Change;
 						Change.m_TunnelName = _Name;
 
-						co_await Internal.f_SendChange(fg_Move(Change), _Name).f_Wrap() > fg_LogError("NetworkTunnelsServer", "Failed to send tunnels changes to subscribed");
+						co_await Internal.f_SendChange(fg_Move(Change), _Name).f_Wrap() > fg_LogError("NetworkTunnelsServer", "Failed to send tunnel changes to subscribers");
 					}
 
 					co_return {};

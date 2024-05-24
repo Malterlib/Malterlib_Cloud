@@ -106,7 +106,9 @@ namespace NMib::NCloud
 				co_return {};
 			}
 
+			DMibListLinkDS_Link(CTunnel, m_ByNameLink);
 			ICNetworkTunnels::CNetworkTunnelName m_TunnelName;
+			CStr m_HostID;
 			TCDistributedActor<ICNetworkTunnels> m_TunnelActor;
 			CActorSubscription m_ListenSubscription;
 			TCActorFunctor<TCFuture<void> (CNetAddress const &_Address)> m_fOnConnection;
@@ -114,15 +116,34 @@ namespace NMib::NCloud
 			TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Error)> m_fOnError;
 		};
 
+		struct CNetworkTunnelsState
+		{
+			CActorSubscription m_ChangesSubscription;
+			NContainer::TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel> m_Tunnels;
+		};
+
+		struct CByNameState
+		{
+			TCDistributedActor<ICNetworkTunnels> f_GetFirstAvailableTunnelActor(CStr const &_HostID);
+			bool f_CanBeRemoved() const;
+
+			DMibListLinkDS_List(CTunnel, m_ByNameLink) m_OpenedTunnels;
+			TCSet<TCWeakDistributedActor<ICNetworkTunnels>> m_AvailableOnNetworkTunnels;
+		};
+
 		TCFuture<void> f_Subscribe();
+
+		void f_RemoveTunnelByName(TCWeakDistributedActor<CActor> const &_Actor, CStr const &_Name);
 
 		CNetworkTunnelsClient *m_pThis;
 		TCActor<CActorDistributionManager> m_DistributionManager;
 		TCActor<CDistributedActorTrustManager> m_TrustManager;
 		TCTrustedActorSubscription<ICNetworkTunnels> m_NetworkTunnelSubscription;
+		TCMap<TCWeakDistributedActor<CActor>, CNetworkTunnelsState> m_NetworkTunnelsState;
 		TCActor<CAsyncSocketServerActor> m_SocketServer = fg_Construct();
 		TCMap<mint, CConnection> m_Connections;
 		TCMap<mint, TCSharedPointer<CTunnel>> m_Tunnels;
+		TCMap<CStr, CByNameState> m_ByNameStates;
 		TCActor<NNetwork::CResolveActor> m_AddressResolver;
 
 		mint m_ConnectionID = 0;
@@ -154,25 +175,40 @@ namespace NMib::NCloud
 
 		NConcurrency::CLogError LogError("NetworkTunnelsClient");
 
-		TCActorResultVector<void> Results;
-		for (auto &Connection : Internal.m_Connections)
 		{
-			if (Connection.m_Socket)
-				fg_Move(Connection.m_Socket).f_Destroy() > Results.f_AddResult();
-			fg_Move(Connection.m_fSendData).f_Destroy() > Results.f_AddResult();
+			TCActorResultVector<void> Results;
+			for (auto &Connection : Internal.m_Connections)
+			{
+				if (Connection.m_Socket)
+					fg_Move(Connection.m_Socket).f_Destroy() > Results.f_AddResult();
+				fg_Move(Connection.m_fSendData).f_Destroy() > Results.f_AddResult();
+			}
+			Internal.m_Connections.f_Clear();
+
+			for (auto &Tunnel : Internal.m_Tunnels)
+				Tunnel->f_Destroy() > Results.f_AddResult();
+			Internal.m_Tunnels.f_Clear();
+
+			if (Internal.m_AddressResolver)
+				fg_Move(Internal.m_AddressResolver).f_Destroy() > Results.f_AddResult();
+
+			co_await Results.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy tunnels client");
 		}
-		Internal.m_Connections.f_Clear();
-
-		for (auto &Tunnel : Internal.m_Tunnels)
-			Tunnel->f_Destroy() > Results.f_AddResult();
-		Internal.m_Tunnels.f_Clear();
-
-		if (Internal.m_AddressResolver)
-			fg_Move(Internal.m_AddressResolver).f_Destroy() > Results.f_AddResult();
-
-		co_await Results.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy tunnels client");
 
 		co_await Internal.m_NetworkTunnelSubscription.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy tunnels client subscription");
+
+		Internal.m_ByNameStates.f_Clear();
+
+		{
+			TCActorResultVector<void> Results;
+			for (auto &State : Internal.m_NetworkTunnelsState)
+			{
+				if (State.m_ChangesSubscription)
+					fg_Exchange(State.m_ChangesSubscription, nullptr)->f_Destroy() > Results.f_AddResult();
+			}
+
+			co_await Results.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy change subscriptions");
+		}
 
 		co_return {};
 	}
@@ -188,55 +224,117 @@ namespace NMib::NCloud
 		co_return co_await (co_await TunnelResults.f_GetResults() | g_Unwrap);
 	}
 
-	auto CNetworkTunnelsClient::f_OpenTunnel
-		(
-			CStr const &_HostID
-			, ICNetworkTunnels::CNetworkTunnelName const &_TunnelName
-			, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address)> &&_fOnConnection
-			, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Message)> &&_fOnClose
-			, TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Error)> &&_fOnError
-			, CStr const &_ListenHost
-		)
-		-> TCFuture<CTunnel>
+	TCDistributedActor<ICNetworkTunnels> CNetworkTunnelsClient::CInternal::CByNameState::f_GetFirstAvailableTunnelActor(CStr const &_HostID)
+	{
+		for (auto &NewTunnel : m_AvailableOnNetworkTunnels)
+		{
+			auto LockedActor = NewTunnel.f_Lock();
+			if (!LockedActor)
+				continue;
+
+			if (_HostID && LockedActor->f_GetHostInfo().m_RealHostID != _HostID)
+				continue;
+
+			return LockedActor;
+		}
+
+		return {};
+	}
+
+	bool CNetworkTunnelsClient::CInternal::CByNameState::f_CanBeRemoved() const
+	{
+		return m_AvailableOnNetworkTunnels.f_IsEmpty() && m_OpenedTunnels.f_IsEmpty();
+	}
+
+	auto CNetworkTunnelsClient::f_OpenTunnel(COpenTunnel &&_OpenTunnel) -> TCFuture<CTunnel>
 	{
 		auto &Internal = *mp_pInternal;
+
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
 
 		mint TunnelID = ++Internal.m_TunnelID;
 		TCSharedPointer<CInternal::CTunnel> pTunnel = fg_Construct();
 
 		Internal.m_Tunnels[TunnelID] = pTunnel;
-		auto CleanupTunnel = g_OnScopeExitActor / [this, TunnelID]
+		auto TunnelSubscription = g_ActorSubscription / [this, TunnelID]() -> TCFuture<void>
 			{
 				auto &Internal = *mp_pInternal;
 				auto pTunnel = Internal.m_Tunnels.f_FindEqual(TunnelID);
-				if (pTunnel)
+				if (!pTunnel)
+					co_return {};
+
+				auto &Tunnel = **pTunnel;
+
+				if (Tunnel.m_ByNameLink.f_IsInList())
 				{
-					(*pTunnel)->f_Destroy() > fg_LogError("Network tunnel client", "Failed to destroy tunnel");
-					Internal.m_Tunnels.f_Remove(TunnelID);
+					auto *pByNameState = Internal.m_ByNameStates.f_FindEqual(Tunnel.m_TunnelName);
+					if (pByNameState)
+					{
+						pByNameState->m_OpenedTunnels.f_Remove(&Tunnel);
+						if (pByNameState->f_CanBeRemoved())
+							Internal.m_ByNameStates.f_Remove(pByNameState);
+					}
 				}
+
+				TCFuture<void> DestroyFuture = Tunnel.f_Destroy();
+				Internal.m_Tunnels.f_Remove(TunnelID);
+				co_await fg_Move(DestroyFuture);
+
+				co_return {};
 			}
 		;
 
-		pTunnel->m_TunnelName = _TunnelName;
-		pTunnel->m_fOnConnection = fg_Move(_fOnConnection);
-		pTunnel->m_fOnClose = fg_Move(_fOnClose);
-		pTunnel->m_fOnError = fg_Move(_fOnError);
-
-		for (auto &Actor : Internal.m_NetworkTunnelSubscription.m_Actors)
-		{
-			if (Actor.m_TrustInfo.m_HostInfo.m_HostID == _HostID)
+		auto Cleanup = g_OnScopeExit / [&]
 			{
-				pTunnel->m_TunnelActor = Actor.m_Actor;
-				break;
+				fg_Exchange(TunnelSubscription, nullptr)->f_Destroy() > fg_LogError("Network tunnel client", "Failed to destroy tunnel");
+			}
+		;
+
+		pTunnel->m_TunnelName = _OpenTunnel.m_TunnelName;
+		pTunnel->m_HostID = _OpenTunnel.m_HostID;
+		pTunnel->m_fOnConnection = fg_Move(_OpenTunnel.m_fOnConnection);
+		pTunnel->m_fOnClose = fg_Move(_OpenTunnel.m_fOnClose);
+		pTunnel->m_fOnError = fg_Move(_OpenTunnel.m_fOnError);
+
+		auto &ByNameState = Internal.m_ByNameStates[_OpenTunnel.m_TunnelName];
+		ByNameState.m_OpenedTunnels.f_Insert(*pTunnel);
+
+		pTunnel->m_TunnelActor = ByNameState.f_GetFirstAvailableTunnelActor(_OpenTunnel.m_HostID);
+
+		if (!pTunnel->m_TunnelActor)
+		{
+			// This is for legacy tunnels that don't have support for subscribing to changes
+			for (auto &Actor : Internal.m_NetworkTunnelSubscription.m_Actors)
+			{
+				if (Actor.m_Actor->f_InterfaceVersion() >= ICNetworkTunnels::EProtocolVersion_SupportSubscribeTunnels)
+					continue;
+
+				if (!_OpenTunnel.m_HostID || Actor.m_TrustInfo.m_HostInfo.m_HostID == _OpenTunnel.m_HostID)
+				{
+					pTunnel->m_TunnelActor = Actor.m_Actor;
+					break;
+				}
 			}
 		}
-		if (!pTunnel->m_TunnelActor)
+
+		if (!_OpenTunnel.m_bWaitForTunnel && !pTunnel->m_TunnelActor)
 			co_return DMibErrorInstance("No tunnel subscription found for this host ID");
 
 		CAsyncSocketServerCallbacks Callbacks;
 
 		Callbacks.m_fNewConnection = g_ActorFunctor / [this, pTunnel, AllowDestroy = g_AllowWrongThreadDestroy](CAsyncSocketNewServerConnection &&_Connection) mutable -> TCFuture<void>
 			{
+				if (!pTunnel->m_TunnelActor)
+				{
+					CStr Error = "Tunnel is not available";
+
+					_Connection.f_Reject(Error);
+
+					co_await pTunnel->f_OnError(_Connection.m_Info.m_PeerAddress, Error);
+
+					co_return DMibErrorInstance(Error);
+				}
+
 				auto &Internal = *mp_pInternal;
 
 				mint ConnectionID = ++Internal.m_ConnectionID;
@@ -368,12 +466,12 @@ namespace NMib::NCloud
 
 		CNetAddressTCPv4 DefaultListenAddress(CNetAddressIPv4{127, 0, 0, 1}, 0);
 
-		if (_ListenHost)
+		if (_OpenTunnel.m_ListenHost)
 		{
 			if (!Internal.m_AddressResolver)
 				Internal.m_AddressResolver = NConcurrency::fg_ConstructActor<NNetwork::CResolveActor>();
 
-			ListenAddresses.f_Insert(co_await Internal.m_AddressResolver(&NNetwork::CResolveActor::f_Resolve, _ListenHost, NNetwork::ENetAddressType_TCPv4));
+			ListenAddresses.f_Insert(co_await Internal.m_AddressResolver(&NNetwork::CResolveActor::f_Resolve, _OpenTunnel.m_ListenHost, NNetwork::ENetAddressType_TCPv4));
 		}
 		else
 			ListenAddresses.f_Insert(DefaultListenAddress);
@@ -390,7 +488,7 @@ namespace NMib::NCloud
 
 		CNetAddress ReturnListenAddress;
 
-		if (_ListenHost)
+		if (_OpenTunnel.m_ListenHost)
 		{
 			ReturnListenAddress = ListenAddresses[0];
 			ReturnListenAddress.f_SetPort(ListenResults.m_ListenPorts[0]);
@@ -400,30 +498,154 @@ namespace NMib::NCloud
 
 		pTunnel->m_ListenSubscription = fg_Move(ListenResults.m_Subscription);
 
-		CleanupTunnel->f_Clear();
+		Cleanup.f_Clear();
+
 		co_return
 			{
-				g_ActorSubscription / [this, TunnelID]() -> TCFuture<void>
-				{
-					auto &Internal = *mp_pInternal;
-					auto pTunnel = Internal.m_Tunnels.f_FindEqual(TunnelID);
-					if (pTunnel)
-					{
-						TCFuture<void> DestroyFuture = (*pTunnel)->f_Destroy();
-						Internal.m_Tunnels.f_Remove(TunnelID);
-						co_await fg_Move(DestroyFuture);
-					}
-
-					co_return {};
-				}
+				fg_Move(TunnelSubscription)
 				, fg_Move(ReturnListenAddress)
 			}
 		;
 	}
 
+	void CNetworkTunnelsClient::CInternal::f_RemoveTunnelByName(TCWeakDistributedActor<CActor> const &_Actor, CStr const &_Name)
+	{
+		auto *pByNameState = m_ByNameStates.f_FindEqual(_Name);
+		if (!pByNameState)
+			return;
+
+		pByNameState->m_AvailableOnNetworkTunnels.f_Remove(_Actor);
+		for (auto &Tunnel : pByNameState->m_OpenedTunnels)
+		{
+			if (Tunnel.m_TunnelActor != _Actor)
+				continue;
+
+			Tunnel.m_TunnelActor = pByNameState->f_GetFirstAvailableTunnelActor(Tunnel.m_HostID);
+		}
+
+		if (pByNameState->f_CanBeRemoved())
+			m_ByNameStates.f_Remove(pByNameState);
+	}
+
 	TCFuture<void> CNetworkTunnelsClient::CInternal::f_Subscribe()
 	{
 		m_NetworkTunnelSubscription = co_await m_TrustManager->f_SubscribeTrustedActors<ICNetworkTunnels>();
+
+		co_await m_NetworkTunnelSubscription.f_OnActor
+			(
+				g_ActorFunctor / [this](TCDistributedActor<ICNetworkTunnels> const &_Tunnels, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				{
+					if (_Tunnels->f_InterfaceVersion() < ICNetworkTunnels::EProtocolVersion_SupportSubscribeTunnels)
+						co_return {};
+
+					ICNetworkTunnels::CSubscribeTunnels Subscribe;
+					Subscribe.m_fOnTunnelChange = g_ActorFunctor / [this, Actor = _Tunnels.f_Weak(), HostID = _ActorInfo.m_HostInfo.m_HostID]
+						(ICNetworkTunnels::CTunnelChange &&_TunnelChange) -> TCFuture<void>
+						{
+							auto LockedActor = Actor.f_Lock();
+							if (!LockedActor)
+								co_return {};
+
+							auto *pState = m_NetworkTunnelsState.f_FindEqual(Actor);
+							if (!pState)
+								co_return {};
+
+							auto fRemoveByName = [&](CStr const &_TunnelName)
+								{
+									f_RemoveTunnelByName(Actor, _TunnelName);
+								}
+							;
+
+							auto fAddByName = [&](CStr const &_TunnelName)
+								{
+									auto &ByNameState = m_ByNameStates[_TunnelName];
+
+									ByNameState.m_AvailableOnNetworkTunnels[Actor];
+
+									for (auto &Tunnel : ByNameState.m_OpenedTunnels)
+									{
+										if (Tunnel.m_HostID && HostID != Tunnel.m_HostID)
+											continue;
+
+										Tunnel.m_TunnelActor = LockedActor;
+									}
+								}
+							;
+
+							switch (_TunnelChange.f_GetTypeID())
+							{
+							case ICNetworkTunnels::ETunnelChange_Initial:
+								{
+									auto &Change = _TunnelChange.f_Get<ICNetworkTunnels::ETunnelChange_Initial>();
+
+									for (auto &Name : pState->m_Tunnels.f_Keys())
+									{
+										DMibLog(Info, "Initial remove: {}", Name);
+										fRemoveByName(Name);
+									}
+
+									pState->m_Tunnels = fg_Move(Change.m_Tunnels);
+
+									for (auto &Name : pState->m_Tunnels.f_Keys())
+									{
+										DMibLog(Info, "Initial add: {}", Name);
+										fAddByName(Name);
+									}
+								}
+								break;
+							case ICNetworkTunnels::ETunnelChange_Add:
+								{
+									auto &Change = _TunnelChange.f_Get<ICNetworkTunnels::ETunnelChange_Add>();
+
+									pState->m_Tunnels[Change.m_TunnelName] = fg_Move(Change.m_Tunnel);
+
+									DMibLog(Info, "Add: {}", Change.m_TunnelName);
+									fAddByName(Change.m_TunnelName);
+								}
+								break;
+							case ICNetworkTunnels::ETunnelChange_Remove:
+								{
+									auto &Change = _TunnelChange.f_Get<ICNetworkTunnels::ETunnelChange_Remove>();
+
+									fRemoveByName(Change.m_TunnelName);
+
+									DMibLog(Info, "Remove: {}", Change.m_TunnelName);
+									pState->m_Tunnels.f_Remove(Change.m_TunnelName);
+								}
+								break;
+							}
+
+							co_return {};
+						}
+					;
+
+					auto &State = m_NetworkTunnelsState[_Tunnels];
+					State.m_ChangesSubscription = co_await _Tunnels.f_CallActor(&ICNetworkTunnels::f_SubscribeTunnels)(fg_Move(Subscribe));
+
+					co_return {};
+				}
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_Actor, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				{
+					auto pState = m_NetworkTunnelsState.f_FindEqual(_Actor);
+					if (!pState)
+						co_return {};
+
+					auto ChangesSubscription = fg_Move(pState->m_ChangesSubscription);
+
+					for (auto &Name : pState->m_Tunnels.f_Keys())
+						f_RemoveTunnelByName(_Actor, Name);
+
+					m_NetworkTunnelsState.f_Remove(pState);
+
+					if (ChangesSubscription)
+						co_await fg_Move(ChangesSubscription)->f_Destroy();
+
+					co_return {};
+				}
+				, "NetworkTunnelsClient"
+				, "Failed to handle '{}' for network tunnel subscription"
+			)
+		;
 
 		co_return {};
 	}
