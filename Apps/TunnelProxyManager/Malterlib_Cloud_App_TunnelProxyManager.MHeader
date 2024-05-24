@@ -1,0 +1,71 @@
+// Copyright © 2024 Favro Holding AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+%Target "Lib_Malterlib_Cloud_TunnelProxyManager"
+{
+	Property
+	{
+	}
+	Target
+	{
+		Type "StaticLibrary"
+		BaseName "Malterlib_Cloud_TunnelProxyManager"
+		Group "Apps"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_App_*"
+	}
+
+	%Dependency "Lib_Malterlib_Cloud"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib_Database"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib"
+	{
+		Dependency.Indirect true
+	}
+}
+
+%Target "Malterlib_Cloud_TunnelProxyManager"
+{
+	Property
+	{
+		ProductName "Malterlib Cloud Manager"
+		MalterlibTestApp true
+		MalterlibPostCopyProject MalterlibAppTestPostCopyProject
+		{
+			&
+			{
+				MalterlibPostCopyProject undefined
+				!MalterlibAppTestPostCopyProject undefined
+			}
+		}
+		MalterlibPostCopyProject "Malterlib_Cloud_TunnelProxyManager"
+		{
+			!!MalterlibPostCopyProject undefined
+		}
+		MalterlibCloud_EnableVersionUpload true
+		MalterlibTargetNameType "Normal"
+		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudTunnelProxyManager"
+		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudTunnelProxyManager"
+	}
+	Target
+	{
+		Type "ConsoleExecutable"
+		BaseFileName "TunnelProxyManager"
+		DebuggerCommandArguments ["--daemon-run-debug"]
+		Group "Apps"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_AppLocal_*"
+	}
+	%Dependency "Lib_Malterlib_Cloud_TunnelProxyManager"
+}
+
+Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_TunnelProxyManager"
