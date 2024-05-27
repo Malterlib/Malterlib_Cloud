@@ -54,4 +54,12 @@
 	%Dependency "Lib_Malterlib_Cloud_KeyManager"
 }
 
-Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_KeyManager"
+Property
+{
+	Malterlib_App_Enable_KeyManager: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_KeyManager"
+	{
+		!!Malterlib_App_Enable_KeyManager true
+	}
+}

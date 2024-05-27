@@ -68,4 +68,12 @@
 	%Dependency "Lib_Malterlib_Cloud_TunnelProxyManager"
 }
 
-Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_TunnelProxyManager"
+Property
+{
+	Malterlib_App_Enable_TunnelProxyManager: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_TunnelProxyManager"
+	{
+		!!Malterlib_App_Enable_TunnelProxyManager true
+	}
+}

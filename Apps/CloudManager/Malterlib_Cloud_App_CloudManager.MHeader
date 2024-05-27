@@ -65,4 +65,12 @@
 	%Dependency "Lib_Malterlib_Cloud_CloudManager"
 }
 
-Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_CloudManager"
+Property
+{
+	Malterlib_App_Enable_CloudManager: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_CloudManager"
+	{
+		!!Malterlib_App_Enable_CloudManager true
+	}
+}

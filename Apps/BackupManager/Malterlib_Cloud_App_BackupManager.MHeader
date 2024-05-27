@@ -60,4 +60,12 @@
 	%Dependency "Lib_Malterlib_Cloud_BackupManager"
 }
 
-Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_BackupManager"
+Property
+{
+	Malterlib_App_Enable_BackupManager: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_BackupManager"
+	{
+		!!Malterlib_App_Enable_BackupManager true
+	}
+}

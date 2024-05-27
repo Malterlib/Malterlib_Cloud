@@ -56,4 +56,12 @@
 	%Dependency "Lib_Malterlib_Cloud_VersionManager"
 }
 
-Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_VersionManager"
+Property
+{
+	Malterlib_App_Enable_VersionManager: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_VersionManager"
+	{
+		!!Malterlib_App_Enable_VersionManager true
+	}
+}

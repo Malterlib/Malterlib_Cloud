@@ -55,4 +55,12 @@
 	%Dependency "Lib_Malterlib_Cloud_AppDistributionManager"
 }
 
-Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_AppDistributionManager"
+Property
+{
+	Malterlib_App_Enable_AppDistributionManager: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_AppDistributionManager"
+	{
+		!!Malterlib_App_Enable_AppDistributionManager true
+	}
+}

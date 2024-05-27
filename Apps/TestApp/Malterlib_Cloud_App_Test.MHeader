@@ -56,4 +56,12 @@
 	%Dependency "Lib_Malterlib_Cloud_Test"
 }
 
-Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_Test"
+Property
+{
+	Malterlib_App_Enable_Test: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_Test"
+	{
+		!!Malterlib_App_Enable_Test true
+	}
+}

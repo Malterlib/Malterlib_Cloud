@@ -67,4 +67,12 @@
 	%Dependency "Lib_Malterlib_Cloud_CloudAPIManager"
 }
 
-Property.Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_CloudAPIManager"
+Property
+{
+	Malterlib_App_Enable_CloudAPIManager: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_CloudAPIManager"
+	{
+		!!Malterlib_App_Enable_CloudAPIManager true
+	}
+}
