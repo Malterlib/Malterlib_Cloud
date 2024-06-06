@@ -156,8 +156,15 @@ Property
 		&
 		{
 			MalterlibCloudCompatibilityTests true
-			EnablePlatform_Linux true
-			EnableArchitecture_x64 true
+			|
+			{
+				MalterlibAllBinaryTestRepositories true
+				&
+				{
+					EnablePlatform_Linux true
+					EnableArchitecture_x64 true
+				}
+			}
 		}
 	}
 
@@ -166,8 +173,15 @@ Property
 		&
 		{
 			MalterlibCloudCompatibilityTests true
-			EnablePlatformFamily_macOS true
-			EnableArchitecture_x64 true
+			|
+			{
+				MalterlibAllBinaryTestRepositories true
+				&
+				{
+					EnablePlatformFamily_macOS true
+					EnableArchitecture_x64 true
+				}
+			}
 		}
 	}
 }
