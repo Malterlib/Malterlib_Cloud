@@ -327,12 +327,9 @@ public:
 				DMibExpect(fMakeComparable(co_await fReadSensorStatus()), ==, ExpectedSensorStatus);
 			}
 
-			auto fSetHostInfo =
-				[
-					&
-					, TestAppHostID = CStr(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim()
-					, HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName())
-				]
+			auto TestAppHostID = CStr(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim();
+			auto HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName());
+			auto fSetHostInfo = [&]
 				(CEJSONSorted const &_JSON)
 				{
 					CEJSONSorted Return = _JSON;
