@@ -22,8 +22,9 @@ namespace NMib::NCloud
 			EProtocolVersion_Min = 0x101
 
 			, EProtocolVersion_SupportSubscribeTunnels = 0x102
+			, EProtocolVersion_SupportConnectionID = 0x103
 
-			, EProtocolVersion_Current = 0x102
+			, EProtocolVersion_Current = 0x103
 		};
 
 		using CNetworkTunnelName = NStr::CStr;
@@ -87,8 +88,18 @@ namespace NMib::NCloud
 
 		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSecureByteVector &&_Data)>;
 
+		struct COpenConnection
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			CNetworkTunnelName m_Name;
+			FSendBytes m_fOnReceive;
+			NStr::CStr m_ConnectionID;
+		};
+
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() = 0;
-		virtual NConcurrency::TCFuture<FSendBytes> f_OpenConnection(CNetworkTunnelName const &_Name, FSendBytes &&_fOnReceive) = 0;
+		virtual NConcurrency::TCFuture<FSendBytes> f_OpenConnection(COpenConnection &&_OpenConnection) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeTunnels(CSubscribeTunnels &&_Subscribe) = 0;
 	};
 }

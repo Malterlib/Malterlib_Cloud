@@ -160,20 +160,20 @@ namespace NMib::NCloud
 				co_return fg_Move(SubscriptionHandle);
 			}
 
-			TCFuture<FSendBytes> f_OpenConnection(CNetworkTunnelName const &_Name, FSendBytes &&_fOnReceive) override
+			TCFuture<FSendBytes> f_OpenConnection(COpenConnection &&_OpenConnection) override
 			{
 				auto &Internal = *m_pThis->mp_pInternal;
 
 				auto AppAuditor = Internal.m_AuditorFactory(fg_GetCallingHostInfo(), {});
 
-				TCVector<CStr> Permissions = {"{}/ConnectAll"_f << Internal.m_PermissionPrefix, "{}/{}/Connect"_f << Internal.m_PermissionPrefix << _Name};
+				TCVector<CStr> Permissions = {"{}/ConnectAll"_f << Internal.m_PermissionPrefix, "{}/{}/Connect"_f << Internal.m_PermissionPrefix << _OpenConnection.m_Name};
 
 				bool bHasPermisions = co_await (Internal.m_Permissions.f_HasPermission("Open connection", Permissions) % AppAuditor);
 
 				if (!bHasPermisions)
 					co_return AppAuditor.f_AccessDenied("(Open connection)", Permissions);
 
-				auto pTunnel = Internal.m_NetworkTunnels.f_FindEqual(_Name);
+				auto pTunnel = Internal.m_NetworkTunnels.f_FindEqual(_OpenConnection.m_Name);
 				if (!pTunnel)
 					co_return DMibErrorInstance("No such network tunnel");
 
@@ -187,7 +187,8 @@ namespace NMib::NCloud
 
 				auto &Connection = Internal.m_Connections[ConnectionID];
 
-				auto fCleanupConnection = [pThis = m_pThis, ConnectionID]() -> TCFuture<void>
+				auto fCleanupConnection = [pThis = m_pThis, ConnectionID, RemoteConnectionID = _OpenConnection.m_ConnectionID, Name = _OpenConnection.m_Name, AppAuditor]
+					(CStr const &_Description) -> TCFuture<void>
 					{
 						co_await ECoroutineFlag_AllowReferences;
 
@@ -195,6 +196,8 @@ namespace NMib::NCloud
 						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
 						if (pConnection)
 						{
+							AppAuditor.f_Info("({} - {}) {{{}} Tunnel connection closed: {}"_f << RemoteConnectionID << ConnectionID << Name << _Description);
+
 							auto Connection = fg_Move(*pConnection);
 							Internal.m_Connections.f_Remove(pConnection);
 
@@ -208,17 +211,17 @@ namespace NMib::NCloud
 
 				auto Cleanup = g_OnScopeExitActor / [pThis = m_pThis, fCleanupConnection]() mutable
 					{
-						(pThis->self / fg_Move(fCleanupConnection)) > fg_LogWarning("NetworkTunnelsServer", "Failed to cleanup connection");
+						(pThis->self.f_Invoke(fg_Move(fCleanupConnection), "Cleanup")) > fg_LogWarning("NetworkTunnelsServer", "Failed to cleanup connection");
 					}
 				;
 
-				Connection.m_fSendData = fg_Move(_fOnReceive);
+				Connection.m_fSendData = fg_Move(_OpenConnection.m_fOnReceive);
 
 				CAsyncSocketCallbacks SocketCallbacks;
 				SocketCallbacks.m_fOnClose = g_ActorFunctor / [fCleanupConnection, AllowDestroy = g_AllowWrongThreadDestroy]
 					(EAsyncSocketStatus _Reason, CStr &&_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
 					{
-						co_await fCleanupConnection();
+						co_await fCleanupConnection(_Message);
 						co_return {};
 					}
 				;
@@ -241,15 +244,20 @@ namespace NMib::NCloud
 
 				Cleanup->f_Clear();
 
-				AppAuditor.f_Info("Opened tunnel connection: {}"_f << _Name);
+				AppAuditor.f_Info("({} - {}) {{{}} Tunnel connection opened"_f << _OpenConnection.m_ConnectionID << ConnectionID << _OpenConnection.m_Name);
 
 				co_return g_ActorFunctor
 					(
-						g_ActorSubscription / fCleanupConnection
+						g_ActorSubscription / [fCleanupConnection]() -> TCFuture<void>
+						{
+							co_await fCleanupConnection("Remote closed tunnel connection");
+							co_return {};
+						}
 					)
-					/ [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](CSecureByteVector &&_Data) -> TCFuture<void>
+					/ [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy, AppAuditor](CSecureByteVector &&_Data) -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
+
 						auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
 						if (!pConnection)
 							co_return DMibErrorInstance("Socket no longer exists");

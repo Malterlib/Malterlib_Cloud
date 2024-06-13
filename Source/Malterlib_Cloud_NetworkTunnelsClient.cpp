@@ -70,38 +70,38 @@ namespace NMib::NCloud
 				return Promise.f_MoveFuture();
 			}
 
-			TCFuture<void> f_OnConnection(CNetAddress const &_Address)
+			TCFuture<void> f_OnConnection(CCallbackInfo const &_CallbackInfo)
 			{
 				co_await ECoroutineFlag_AllowReferences;
 
 				if (!m_fOnConnection)
 					co_return {};
 
-				co_await m_fOnConnection(_Address).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on connection on tunnel");
+				co_await m_fOnConnection(_CallbackInfo).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on connection on tunnel");
 
 				co_return {};
 			}
 
-			TCFuture<void> f_OnClose(CNetAddress const &_Address, CStr const &_Message)
+			TCFuture<void> f_OnClose(CCallbackInfo const &_CallbackInfo, CStr const &_Message)
 			{
 				co_await ECoroutineFlag_AllowReferences;
 
 				if (!m_fOnClose)
 					co_return {};
 
-				co_await m_fOnClose(_Address, _Message).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on close on tunnel");
+				co_await m_fOnClose(_CallbackInfo, _Message).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on close on tunnel");
 
 				co_return {};
 			}
 
-			TCFuture<void> f_OnError(CNetAddress const &_Address, CStr const &_Error)
+			TCFuture<void> f_OnError(CCallbackInfo const &_CallbackInfo, CStr const &_Error)
 			{
 				co_await ECoroutineFlag_AllowReferences;
 
 				if (!m_fOnError)
 					co_return {};
 
-				co_await m_fOnError(_Address, _Error).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on error on tunnel");
+				co_await m_fOnError(_CallbackInfo, _Error).f_Wrap() > fg_LogError("Network tunnel client", "Failed to call on error on tunnel");
 
 				co_return {};
 			}
@@ -111,9 +111,9 @@ namespace NMib::NCloud
 			CStr m_HostID;
 			TCDistributedActor<ICNetworkTunnels> m_TunnelActor;
 			CActorSubscription m_ListenSubscription;
-			TCActorFunctor<TCFuture<void> (CNetAddress const &_Address)> m_fOnConnection;
-			TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Message)> m_fOnClose;
-			TCActorFunctor<TCFuture<void> (CNetAddress const &_Address, CStr const &_Error)> m_fOnError;
+			TCActorFunctor<TCFuture<void> (CCallbackInfo const &_CallbackInfo)> m_fOnConnection;
+			TCActorFunctor<TCFuture<void> (CCallbackInfo const &_CallbackInfo, CStr const &_Message)> m_fOnClose;
+			TCActorFunctor<TCFuture<void> (CCallbackInfo const &_CallbackInfo, CStr const &_Error)> m_fOnError;
 		};
 
 		struct CNetworkTunnelsState
@@ -324,20 +324,21 @@ namespace NMib::NCloud
 
 		Callbacks.m_fNewConnection = g_ActorFunctor / [this, pTunnel, AllowDestroy = g_AllowWrongThreadDestroy](CAsyncSocketNewServerConnection &&_Connection) mutable -> TCFuture<void>
 			{
+				auto &Internal = *mp_pInternal;
+				mint ConnectionID = ++Internal.m_ConnectionID;
+
+				CCallbackInfo CallbackInfo{.m_Address = _Connection.m_Info.m_PeerAddress, .m_ConnectionID = CStr::fs_ToStr(ConnectionID)};
+
 				if (!pTunnel->m_TunnelActor)
 				{
 					CStr Error = "Tunnel is not available";
 
 					_Connection.f_Reject(Error);
 
-					co_await pTunnel->f_OnError(_Connection.m_Info.m_PeerAddress, Error);
+					co_await pTunnel->f_OnError(CallbackInfo, Error);
 
 					co_return DMibErrorInstance(Error);
 				}
-
-				auto &Internal = *mp_pInternal;
-
-				mint ConnectionID = ++Internal.m_ConnectionID;
 
 				auto &Connection = Internal.m_Connections[ConnectionID];
 
@@ -353,35 +354,41 @@ namespace NMib::NCloud
 					}
 				;
 
+				CallbackInfo.m_RemoteHostID = pTunnel->m_TunnelActor->f_GetHostInfo().m_RealHostID;
+
 				auto OpenConnectionResult = co_await pTunnel->m_TunnelActor.f_CallActor(&ICNetworkTunnels::f_OpenConnection)
 					(
-						pTunnel->m_TunnelName
-						, g_ActorFunctor
-						(
-							g_ActorSubscription / [this, ConnectionID]() -> TCFuture<void>
+						ICNetworkTunnels::COpenConnection
+						{
+							.m_Name = pTunnel->m_TunnelName
+							, .m_fOnReceive = g_ActorFunctor
+							(
+								g_ActorSubscription / [this, ConnectionID]() -> TCFuture<void>
+								{
+									auto &Internal = *mp_pInternal;
+									auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
+									if (!pConnection)
+										co_return {};
+
+									auto DestroyFuture = pConnection->f_Destroy();
+									Internal.m_Connections.f_Remove(pConnection);
+									co_await fg_Move(DestroyFuture).f_Wrap() > fg_LogError("Network tunnel client", "Failed to destroy connection");
+
+									co_return {};
+								}
+							)
+							/ [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](CSecureByteVector &&_Data) -> TCFuture<void>
 							{
 								auto &Internal = *mp_pInternal;
+
 								auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
-								if (!pConnection)
-									co_return {};
+								if (!pConnection || !pConnection->m_Socket)
+									co_return DMibErrorInstance("Socket no longer exists");
 
-								auto DestroyFuture = pConnection->f_Destroy();
-								Internal.m_Connections.f_Remove(pConnection);
-								co_await fg_Move(DestroyFuture).f_Wrap() > fg_LogError("Network tunnel client", "Failed to destroy connection");
-
+								co_await pConnection->m_Socket(&CAsyncSocketActor::f_SendData, fg_Construct(fg_Move(_Data)), 0);
 								co_return {};
 							}
-						)
-						/ [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](CSecureByteVector &&_Data) -> TCFuture<void>
-						{
-							auto &Internal = *mp_pInternal;
-
-							auto *pConnection = Internal.m_Connections.f_FindEqual(ConnectionID);
-							if (!pConnection || !pConnection->m_Socket)
-								co_return DMibErrorInstance("Socket no longer exists");
-							
-							co_await pConnection->m_Socket(&CAsyncSocketActor::f_SendData, fg_Construct(fg_Move(_Data)), 0);
-							co_return {};
+							, .m_ConnectionID = CStr::fs_ToStr(ConnectionID)
 						}
 					)
 					.f_Wrap()
@@ -389,7 +396,7 @@ namespace NMib::NCloud
 
 				if (!OpenConnectionResult)
 				{
-					co_await pTunnel->f_OnError(_Connection.m_Info.m_PeerAddress, "Error opening connection: {}"_f << OpenConnectionResult.f_GetExceptionStr());
+					co_await pTunnel->f_OnError(CallbackInfo, "Error opening connection: {}"_f << OpenConnectionResult.f_GetExceptionStr());
 
 					co_return OpenConnectionResult.f_GetException();
 				}
@@ -402,7 +409,7 @@ namespace NMib::NCloud
 						this
 						, pTunnel
 						, ConnectionID
-						, PeerAddress = _Connection.m_Info.m_PeerAddress
+						, CallbackInfo
 						, AllowDestroy = g_AllowWrongThreadDestroy
 					]
 					(EAsyncSocketStatus _Reason, CStr &&_Message, EAsyncSocketCloseOrigin _Origin) -> TCFuture<void>
@@ -417,7 +424,7 @@ namespace NMib::NCloud
 							co_await fg_Move(DestroyFuture).f_Wrap() > fg_LogError("Network tunnel client", "Failed to destroy connection");
 						}
 
-						co_await pTunnel->f_OnClose(PeerAddress, _Message);
+						co_await pTunnel->f_OnClose(CallbackInfo, _Message);
 
 						co_return {};
 					}
@@ -440,7 +447,7 @@ namespace NMib::NCloud
 				auto SocketResult = co_await _Connection.f_Accept(fg_Move(SocketCallbacks)).f_Wrap();
 				if (!SocketResult)
 				{
-					co_await pTunnel->f_OnError(_Connection.m_Info.m_PeerAddress, "Error accepting connection"_f << SocketResult.f_GetExceptionStr());
+					co_await pTunnel->f_OnError(CallbackInfo, "Error accepting connection: {}"_f << SocketResult.f_GetExceptionStr());
 
 					co_return SocketResult.f_GetException();
 				}
@@ -448,7 +455,7 @@ namespace NMib::NCloud
 
 				Cleanup->f_Clear();
 
-				pTunnel->f_OnConnection(_Connection.m_Info.m_PeerAddress) > fg_LogError("Network tunnel client", "Failed to call on connection on tunnel");
+				pTunnel->f_OnConnection(CallbackInfo) > fg_LogError("Network tunnel client", "Failed to call on connection on tunnel");
 
 				co_return {};
 			}
@@ -456,7 +463,7 @@ namespace NMib::NCloud
 
 		Callbacks.m_fFailedConnection = g_ActorFunctor / [pTunnel, AllowDestroy = g_AllowWrongThreadDestroy](CAsyncSocketActor::CConnectionInfo &&_ConnectionInfo) mutable -> TCFuture<void>
 			{
-				co_await pTunnel->f_OnError(_ConnectionInfo.m_PeerAddress, "Connection failed: {}"_f << _ConnectionInfo.m_Error);
+				co_await pTunnel->f_OnError({.m_Address = _ConnectionInfo.m_PeerAddress}, "Connection failed: {}"_f << _ConnectionInfo.m_Error);
 
 				co_return {};
 			}
@@ -579,18 +586,12 @@ namespace NMib::NCloud
 									auto &Change = _TunnelChange.f_Get<ICNetworkTunnels::ETunnelChange_Initial>();
 
 									for (auto &Name : pState->m_Tunnels.f_Keys())
-									{
-										DMibLog(Info, "Initial remove: {}", Name);
 										fRemoveByName(Name);
-									}
 
 									pState->m_Tunnels = fg_Move(Change.m_Tunnels);
 
 									for (auto &Name : pState->m_Tunnels.f_Keys())
-									{
-										DMibLog(Info, "Initial add: {}", Name);
 										fAddByName(Name);
-									}
 								}
 								break;
 							case ICNetworkTunnels::ETunnelChange_Add:
@@ -599,7 +600,6 @@ namespace NMib::NCloud
 
 									pState->m_Tunnels[Change.m_TunnelName] = fg_Move(Change.m_Tunnel);
 
-									DMibLog(Info, "Add: {}", Change.m_TunnelName);
 									fAddByName(Change.m_TunnelName);
 								}
 								break;
@@ -609,7 +609,6 @@ namespace NMib::NCloud
 
 									fRemoveByName(Change.m_TunnelName);
 
-									DMibLog(Info, "Remove: {}", Change.m_TunnelName);
 									pState->m_Tunnels.f_Remove(Change.m_TunnelName);
 								}
 								break;

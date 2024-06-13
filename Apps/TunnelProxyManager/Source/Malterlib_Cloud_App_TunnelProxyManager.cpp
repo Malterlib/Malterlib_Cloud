@@ -55,22 +55,30 @@ namespace NMib::NCloud::NTunnelProxyManager
 				CNetworkTunnelsClient::COpenTunnel OpenTunnel
 					{
 						.m_TunnelName = SubscribeEntry.f_Name()
-						, .m_fOnConnection = g_ActorFunctor / [this](NMib::NNetwork::CNetAddress const &_Address) -> TCFuture<void>
+						, .m_fOnConnection = g_ActorFunctor / [this](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo) -> TCFuture<void>
 						{
 							auto Auditor = mp_State.f_Auditor();
-							Auditor.f_Info("New connection from address: {}"_f << _Address);
+							Auditor.f_Info("<{}> ({}) {} New connection"_f << _CallbackInfo.m_RemoteHostID << _CallbackInfo.m_ConnectionID << _CallbackInfo.m_Address);
 							co_return {};
 						}
-						, .m_fOnClose = g_ActorFunctor / [this](NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void>
+						, .m_fOnClose = g_ActorFunctor / [this](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, NStr::CStr const &_Message) -> TCFuture<void>
 						{
 							auto Auditor = mp_State.f_Auditor();
-							Auditor.f_Info("Connection from address '{}' closed: {}"_f << _Address << _Message);
+							Auditor.f_Info
+								(
+									"<{}> ({}) {} Connection closed: {}"_f
+									<< _CallbackInfo.m_RemoteHostID
+									<< _CallbackInfo.m_ConnectionID
+									<< _CallbackInfo.m_Address
+									<< _Message
+								)
+							;
 							co_return {};
 						}
-						, .m_fOnError = g_ActorFunctor / [this](NMib::NNetwork::CNetAddress const &_Address, NStr::CStr const &_Error) -> TCFuture<void>
+						, .m_fOnError = g_ActorFunctor / [this](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, NStr::CStr const &_Error) -> TCFuture<void>
 						{
 							auto Auditor = mp_State.f_Auditor();
-							Auditor.f_Error("Connection error from address '{}': {}"_f << _Address << _Error);
+							Auditor.f_Error("<{}> ({}) {} Connection error: {}"_f << _CallbackInfo.m_RemoteHostID << _CallbackInfo.m_ConnectionID << _CallbackInfo.m_Address << _Error);
 							co_return {};
 						}
 						, .m_ListenHost = SubscribeEntry.f_Value()["Listen"].f_String()

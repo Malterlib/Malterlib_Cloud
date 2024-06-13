@@ -128,22 +128,22 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 						{
 							.m_HostID = _Params["HostID"].f_String()
 							, .m_TunnelName = _Params["TunnelName"].f_String()
-							, .m_fOnConnection = g_ActorFunctor / [](CNetAddress const &_Address) -> TCFuture<void> // New connection
+							, .m_fOnConnection = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo) -> TCFuture<void> // New connection
 							{
 								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-									DMibConErrOut2("New connection: {}\n", _Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort));
+									DMibConErrOut2("New connection: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort));
 								co_return {};
 							}
-							, .m_fOnClose = g_ActorFunctor / [](CNetAddress const &_Address, NStr::CStr const &_Message) -> TCFuture<void> // On Close
+							, .m_fOnClose = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, NStr::CStr const &_Message) -> TCFuture<void> // On Close
 							{
 								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-									DMibConErrOut2("Connection from '{}' closed: {}\n", _Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Message);
+									DMibConErrOut2("Connection from '{}' closed: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Message);
 								co_return {};
 							}
-							, .m_fOnError = g_ActorFunctor / [](CNetAddress const &_Address, CStr const &_Error) -> TCFuture<void> // On Error
+							, .m_fOnError = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, CStr const &_Error) -> TCFuture<void> // On Error
 							{
 								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-									DMibConErrOut2("Connection from '{}' error: {}\n", _Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Error);
+									DMibConErrOut2("Connection from '{}' error: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Error);
 								co_return {};
 							}
 							, .m_ListenHost = _Params["ListenHost"].f_String()

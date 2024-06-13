@@ -35,4 +35,14 @@ namespace NMib::NCloud
 	{
 		_Stream % m_TunnelName;
 	}
+
+	template <typename tf_CStream>
+	void ICNetworkTunnels::COpenConnection::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Name;
+		_Stream % fg_Move(m_fOnReceive);
+		
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportConnectionID)
+			_Stream % m_ConnectionID;
+	}
 }
