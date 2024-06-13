@@ -164,6 +164,7 @@ namespace NMib::NCloud
 	TCFuture<void> CNetworkTunnelsClient::f_Start()
 	{
 		auto &Internal = *mp_pInternal;
+		co_await Internal.m_SocketServer(&CAsyncSocketServerActor::f_SetDefaultTimeout, 0.0);
 		co_await Internal.f_Subscribe();
 
 		co_return {};
