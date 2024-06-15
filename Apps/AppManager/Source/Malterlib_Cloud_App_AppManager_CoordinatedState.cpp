@@ -233,10 +233,79 @@ namespace NMib::NCloud::NAppManager
 		return m_RegisterInfo.m_UpdateType;
 	}
 
+	TCFuture<void> CAppManagerActor::fp_SetApplicationSensorStatus(TCSharedPointer<CApplication> _pApplication, CStr _LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity)
+	{
+		if (!mp_bEnableApplicationStatusSensors)
+			co_return {};
+
+		auto OnResume = co_await fg_OnResume
+			(
+				[_pApplication]() -> CExceptionPointer
+				{
+					if (_pApplication->m_bDeleted)
+						return DMibErrorInstance("Application was deleted");
+
+					return nullptr;
+				}
+			)
+		;
+
+		if (!_pApplication->m_StatusSensorReporter.m_fReportReadings)
+		{
+			auto SequenceSubscription = co_await _pApplication->m_StatusSensorReporterSequencer.f_Sequence();
+			if (!_pApplication->m_StatusSensorReporter.m_fReportReadings)
+			{
+				CDistributedAppSensorReporter::CSensorInfo SensorInfo;
+				SensorInfo.m_Identifier = "org.malterlib.appmanager.application.status";
+				SensorInfo.m_Name = "Application Status";
+				SensorInfo.m_IdentifierScope = _pApplication->m_Name;
+				SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Status;
+
+				_pApplication->m_StatusSensorReporter = co_await fp_OpenSensorReporter(fg_Move(SensorInfo));
+			}
+		}
+
+		if (!_pApplication->m_StatusSensorReporter.m_fReportReadings)
+			co_return {};
+
+		auto NewStatus = CDistributedAppSensorReporter::CStatus
+			{
+				.m_Severity = [_Severity]
+				{
+					switch (_Severity)
+					{
+					case CAppManagerInterface::EStatusSeverity_None: return CDistributedAppSensorReporter::EStatusSeverity_Ok;
+					case CAppManagerInterface::EStatusSeverity_Warning: return CDistributedAppSensorReporter::EStatusSeverity_Warning;
+					case CAppManagerInterface::EStatusSeverity_Error: return CDistributedAppSensorReporter::EStatusSeverity_Error;
+					}
+
+					return CDistributedAppSensorReporter::EStatusSeverity_Info;
+				}
+				()
+				, .m_Description = _LaunchStatus
+			}
+		;
+
+		if (_pApplication->m_LastReporterSensorStatus && NewStatus == *_pApplication->m_LastReporterSensorStatus)
+			co_return {};
+
+		_pApplication->m_LastReporterSensorStatus = NewStatus;
+
+		TCVector<CDistributedAppSensorReporter::CSensorReading> Readings;
+		Readings.f_Insert().m_Data = fg_Move(NewStatus);
+
+		co_await _pApplication->m_StatusSensorReporter.m_fReportReadings(fg_Move(Readings));
+
+		co_return {};
+	}
+
 	void CAppManagerActor::fp_SetAppLaunchStatus(TCSharedPointer<CApplication> const &_pApplication, CStr const &_LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity)
 	{
 		_pApplication->m_LaunchStatus = _LaunchStatus;
 		_pApplication->m_LaunchStatusSeverity = _Severity;
+
+		fp_SetApplicationSensorStatus(_pApplication, _LaunchStatus, _Severity) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to report application sensor status");
+
 		fp_SendAppChange_Status(*_pApplication);
 	}
 

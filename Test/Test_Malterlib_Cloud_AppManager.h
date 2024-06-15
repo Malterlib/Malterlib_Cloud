@@ -49,6 +49,7 @@ namespace NMib::NCloud
 			, EOption_LaunchTestAppInApp = DMibBit(2)
 			, EOption_DisablePatchMonitoring = DMibBit(3)
 			, EOption_DisableDiskMonitoring = DMibBit(3)
+			, EOption_DisableApplicationStatusSensors = DMibBit(4)
 		};
 
 		struct CAppManagerInfo

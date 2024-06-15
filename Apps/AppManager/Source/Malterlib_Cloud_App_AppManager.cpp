@@ -477,6 +477,8 @@ namespace NMib::NCloud::NAppManager
 		else
 			mp_HostMonitorPatchInterval = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("HostMonitorPatchInterval", mp_HostMonitorPatchInterval).f_Float();
 
+		mp_bEnableApplicationStatusSensors = _Params["EnableApplicationStatusSensors"].f_Boolean();
+
 		DMibFastCheck(!mp_HostMonitorPatchInterval.f_IsInvalid());
 		if (mp_HostMonitorPatchInterval != 0.0 && mp_HostMonitorPatchInterval < CHostMonitor::mc_MinimumHostMonitorPatchInterval)
 		{

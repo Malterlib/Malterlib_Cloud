@@ -32,6 +32,9 @@ namespace NMib::NCloud::NAppManager
 		f_AbortPendingLaunches();
 		f_Clear();
 
+		fg_Move(m_StatusSensorReporterSequencer).f_Destroy() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy application status reporter sequencer");
+		fg_Move(m_StatusSensorReporter.m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy application status reporter");
+
 		m_bDeleted = true;
 		m_pParentApplication = nullptr;
 		m_ChildrenLink.f_Unlink();

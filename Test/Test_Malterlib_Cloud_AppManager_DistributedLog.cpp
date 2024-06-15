@@ -373,6 +373,7 @@ public:
 			| CAppManagerTestHelper::EOption_EnableVersionManager 
 			| CAppManagerTestHelper::EOption_DisablePatchMonitoring
 			| CAppManagerTestHelper::EOption_DisableDiskMonitoring
+			| CAppManagerTestHelper::EOption_DisableApplicationStatusSensors
 		;
 
 		if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)

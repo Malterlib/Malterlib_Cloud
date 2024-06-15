@@ -602,6 +602,9 @@ namespace NMib::NCloud
 				if (State.m_Options & EOption_DisablePatchMonitoring)
 					ExtraParams.f_Insert("--host-monitor-patch-interval=0.0");
 
+				if (State.m_Options & EOption_DisableApplicationStatusSensors)
+					ExtraParams.f_Insert("--application-status-sensors=false");
+
 				State.m_LaunchHelper
 					(
 						&CDistributedApp_LaunchHelper::f_LaunchInProcess

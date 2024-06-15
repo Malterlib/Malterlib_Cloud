@@ -74,7 +74,20 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		
+
+		o_CommandLine.f_RegisterGlobalOptions
+			(
+				{
+					"EnableApplicationStatusSensors?"_o=
+					{
+						"Names"_o= {"--application-status-sensors"}
+						,"Default"_o= true
+						, "Description"_o= "Enable application status sensors."
+					}
+				}
+			)
+		;
+
 		auto ApplicationManagement = o_CommandLine.f_AddSection("Application Management", "Commands to manage AppManager applications.");
 
 		auto SettingsOption_Executable = "Executable?"_o=

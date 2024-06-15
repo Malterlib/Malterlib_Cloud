@@ -267,6 +267,9 @@ namespace NMib::NCloud::NAppManager
 
 			TCActor<CBackupManagerClient> m_BackupClient;
 			CActorSubscription m_DirectoryMonitorSubscription;
+			CDistributedAppSensorReporter::CSensorReporter m_StatusSensorReporter;
+			CSequencer m_StatusSensorReporterSequencer{"StatusSensorReporterSequencer"};
+			TCOptional<CDistributedAppSensorReporter::CStatus> m_LastReporterSensorStatus;
 		};
 
 		struct CBashScriptOutput
@@ -918,6 +921,7 @@ namespace NMib::NCloud::NAppManager
 		void fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted);
 		void fp_SetAppLaunchStatus(TCSharedPointer<CApplication> const &_pApplication, CStr const &_LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity);
 
+		TCFuture<void> fp_SetApplicationSensorStatus(TCSharedPointer<CApplication> _pApplication, CStr _LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		TCFuture<void> fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		TCFuture<void> fp_Coordination_WaitForAllToReachWantUpdateStage
@@ -990,6 +994,7 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bPendingAutoUpdate = false;
 		bool mp_bLogLaunchesToStdErr = false;
 		bool mp_bPendingSelfUpdateInProgress = false;
+		bool mp_bEnableApplicationStatusSensors = true;
 
 		fp64 mp_AutoUpdateDelay = mc_DefaultAutoUpdateDelay;
 
