@@ -3,6 +3,8 @@
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
+#include <Mib/Concurrency/LogError>
+
 namespace NMib::NCloud::NAppManager
 {
 	auto CAppManagerActor::CApplication::f_GetDependents() const -> TCVector<TCSharedPointer<CApplication>>
@@ -19,7 +21,7 @@ namespace NMib::NCloud::NAppManager
 		return Return;
 	}
 
-	bool CAppManagerActor::CApplication::f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity) const
+	bool CAppManagerActor::CApplication::f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity, bool &o_bNeedsEncryption) const
 	{
 		if (m_bPreventLaunch_User)
 		{
@@ -51,11 +53,15 @@ namespace NMib::NCloud::NAppManager
 				return false;
 			}
 
-			if (f_NeedsEncryption() && !f_EncryptionOpened())
+			if (f_NeedsEncryption())
 			{
-				o_State = "Parent application encryption not yet opened";
-				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
-				return false;
+				o_bNeedsEncryption = true;
+				if (!f_EncryptionOpened())
+				{
+					o_State = "Parent application encryption not yet opened";
+					o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
+					return false;
+				}
 			}
 
 			if (m_pParentApplication->m_LaunchStatusSeverity != CAppManagerInterface::EStatusSeverity_None)
@@ -65,9 +71,10 @@ namespace NMib::NCloud::NAppManager
 				return false;
 			}
 		}
-		else if (f_NeedsEncryption() && !f_EncryptionOpened())
+		else if (f_NeedsEncryption())
 		{
-			if (m_pThis->mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
+			o_bNeedsEncryption = true;
+			if (!f_EncryptionOpened() && m_pThis->mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
 			{
 				o_State = "Waiting for key manager to become available";
 				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
@@ -95,16 +102,18 @@ namespace NMib::NCloud::NAppManager
 		return true;
 	}
 
-	bool CAppManagerActor::fp_AutoStartApp(TCSharedPointer<CApplication> const &_pApplication)
+	bool CAppManagerActor::fp_AutoStartApp(TCSharedPointer<CApplication> const &_pApplication, bool &o_bNeedsEncryption)
 	{
 		auto &Application = *_pApplication;
+
+		CStr Status;
+		CAppManagerInterface::EStatusSeverity Severity;
+		bool bDependenciesSatisfied = Application.f_DependenciesSatisfied(Status, Severity, o_bNeedsEncryption);
 
 		if (Application.f_IsInProgress())
 			return false;
 
-		CStr Status;
-		CAppManagerInterface::EStatusSeverity Severity;
-		if (!Application.f_DependenciesSatisfied(Status, Severity))
+		if (!bDependenciesSatisfied)
 		{
 			if (!Application.f_IsLaunched() || Application.m_bStopped)
 			{
@@ -183,6 +192,7 @@ namespace NMib::NCloud::NAppManager
 	void CAppManagerActor::fp_UpdateApplicationDependencies()
 	{
 		bool bAllStarted = true;
+		bool bNeedEncryption = false;
 
 		for (auto &pApplication : mp_Applications)
 		{
@@ -190,9 +200,11 @@ namespace NMib::NCloud::NAppManager
 			if (Application.m_bStopped && !Application.m_bAutoStart)
 				continue;
 
-			if (!fp_AutoStartApp(pApplication))
+			if (!fp_AutoStartApp(pApplication, bNeedEncryption))
 				bAllStarted = false;
 		}
+
+		fp_UpdateEncryptionSensorStatus(bNeedEncryption) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to report encryption sensor status");
 
 		if (bAllStarted && mp_PendingAutoLaunches == 0)
 		{
@@ -202,5 +214,85 @@ namespace NMib::NCloud::NAppManager
 
 		if (mp_bPendingAutoUpdate)
 			fp_AutoUpdate_Update();
+	}
+
+	TCFuture<void> CAppManagerActor::fp_UpdateEncryptionSensorStatus(bool _bNeedEncryption)
+	{
+		if (!mp_bEnableEncryptionStatusSensors)
+			co_return {};
+
+		if (!_bNeedEncryption)
+		{
+			if (!!mp_EncryptionSensorReporter.m_fReportReadings)
+			{
+				auto SequenceSubscription = co_await mp_EncryptionSensorReporterSequencer.f_Sequence();
+				
+				if (!!mp_EncryptionSensorReporter.m_fReportReadings)
+				{
+					CDistributedAppSensorReporter::CStatus NewStatus
+						{
+							.m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Ok
+							, .m_Description = "Encryption not needed"
+						}
+					;
+					mp_LastEncryptionReporterSensorStatus = NewStatus;
+
+					TCVector<CDistributedAppSensorReporter::CSensorReading> Readings;
+					Readings.f_Insert().m_Data = fg_Move(NewStatus);
+
+					co_await mp_EncryptionSensorReporter.m_fReportReadings(fg_Move(Readings)).f_Wrap()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to clear encryption sensor status")
+					;
+
+					co_await fg_Move(mp_EncryptionSensorReporter.m_fReportReadings).f_Destroy();
+				}
+			}
+
+			co_return {};
+		}
+
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
+		if (!mp_EncryptionSensorReporter.m_fReportReadings)
+		{
+			auto SequenceSubscription = co_await mp_EncryptionSensorReporterSequencer.f_Sequence();
+			if (!mp_EncryptionSensorReporter.m_fReportReadings)
+			{
+				CDistributedAppSensorReporter::CSensorInfo SensorInfo;
+				SensorInfo.m_Identifier = "org.malterlib.appmanager.encryption.status";
+				SensorInfo.m_Name = "Encryption Status";
+				SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Status;
+
+				mp_EncryptionSensorReporter = co_await fp_OpenSensorReporter(fg_Move(SensorInfo));
+			}
+		}
+
+		if (!mp_EncryptionSensorReporter.m_fReportReadings)
+			co_return {};
+
+		CDistributedAppSensorReporter::CStatus NewStatus;
+
+		if (mp_KeyManagerSubscription.m_Actors.f_IsEmpty())
+		{
+			NewStatus.m_Description = "No key manager available";
+			NewStatus.m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Error;
+		}
+		else
+		{
+			NewStatus.m_Description = "Key manager is available";
+			NewStatus.m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Ok;
+		}
+
+		if (mp_LastEncryptionReporterSensorStatus && NewStatus == *mp_LastEncryptionReporterSensorStatus)
+			co_return {};
+
+		mp_LastEncryptionReporterSensorStatus = NewStatus;
+
+		TCVector<CDistributedAppSensorReporter::CSensorReading> Readings;
+		Readings.f_Insert().m_Data = fg_Move(NewStatus);
+
+		co_await mp_EncryptionSensorReporter.m_fReportReadings(fg_Move(Readings));
+
+		co_return {};
 	}
 }

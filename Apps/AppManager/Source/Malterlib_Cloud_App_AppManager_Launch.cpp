@@ -72,7 +72,8 @@ namespace NMib::NCloud::NAppManager
 
 		CStr Status;
 		CAppManagerInterface::EStatusSeverity Severity;
-		if (!_pApplication->f_DependenciesSatisfied(Status, Severity))
+		bool bNeedsEncryption = false;
+		if (!_pApplication->f_DependenciesSatisfied(Status, Severity, bNeedsEncryption))
 		{
 			fp_SetAppLaunchStatus(_pApplication, Status, Severity);
 			co_return DMibErrorInstance(fg_Format("Dependencies not satisfied: {}", Status));

@@ -179,7 +179,7 @@ namespace NMib::NCloud::NAppManager
 			CStr f_InProgressDescription() const;
 			fp64 f_InProgressTime() const;
 			TCFuture<void> f_InProgressWait();
-			bool f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity) const;
+			bool f_DependenciesSatisfied(CStr &o_State, CAppManagerInterface::EStatusSeverity &o_Severity, bool &o_bNeedsEncryption) const;
 			bool f_IsLaunched() const;
 
 			TCVector<TCSharedPointer<CApplication>> f_GetDependents() const;
@@ -822,7 +822,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite);
 
 		CStr fp_GetApplicationStopErrors(TCAsyncResult<uint32> const &_Result, CStr const &_Name);
-		TCFuture<void> fp_KeyManagerAvailable();
+		TCFuture<void> fp_KeyManagersUpdated();
 
 		TCFuture<void> fp_VersionManagerResubscribeAll();
 		TCFuture<void> fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState);
@@ -921,6 +921,7 @@ namespace NMib::NCloud::NAppManager
 		void fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted);
 		void fp_SetAppLaunchStatus(TCSharedPointer<CApplication> const &_pApplication, CStr const &_LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity);
 
+		TCFuture<void> fp_UpdateEncryptionSensorStatus(bool _bNeedEncryption);
 		TCFuture<void> fp_SetApplicationSensorStatus(TCSharedPointer<CApplication> _pApplication, CStr _LaunchStatus, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_Coordination_WaitForOurAppsTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
 		TCFuture<void> fp_Coordination_OneAtATime_WaitForOurTurnToUpdate(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState);
@@ -949,7 +950,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_SetupLimits();
 		void fp_UpdateLimits();
 
-		bool fp_AutoStartApp(TCSharedPointer<CApplication> const &_pApplication);
+		bool fp_AutoStartApp(TCSharedPointer<CApplication> const &_pApplication, bool &o_bNeedEncryption);
 		void fp_UpdateApplicationDependencies();
 
 		void fp_InitialStartupFailed(CExceptionPointer const &_pException);
@@ -995,6 +996,7 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bLogLaunchesToStdErr = false;
 		bool mp_bPendingSelfUpdateInProgress = false;
 		bool mp_bEnableApplicationStatusSensors = true;
+		bool mp_bEnableEncryptionStatusSensors = true;
 
 		fp64 mp_AutoUpdateDelay = mc_DefaultAutoUpdateDelay;
 
@@ -1055,6 +1057,10 @@ namespace NMib::NCloud::NAppManager
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
 		CActorSubscription mp_MainConfigFileMonitorSubscription;
 		CStr mp_OsName;
+
+		CDistributedAppSensorReporter::CSensorReporter mp_EncryptionSensorReporter;
+		CSequencer mp_EncryptionSensorReporterSequencer{"EncryptionSensorReporter"};
+		TCOptional<CDistributedAppSensorReporter::CStatus> mp_LastEncryptionReporterSensorStatus;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

@@ -529,7 +529,8 @@ namespace NMib::NCloud::NAppManager
 
 		State.m_pApplication->m_bPreventLaunch_DelayAfterFailure = false;
 
-		if (!State.m_pApplication->f_DependenciesSatisfied(Message, Severity))
+		bool bNeedsEncryption = false;
+		if (!State.m_pApplication->f_DependenciesSatisfied(Message, Severity, bNeedsEncryption))
 		{
 			if (State.m_VersionID.f_IsValid())
 				State.m_fOnInfo(fg_Format("Application was successfully updated to version {}. Launch skipped because of missing dependency: {}", State.m_VersionID, Message));

@@ -374,6 +374,7 @@ public:
 			| CAppManagerTestHelper::EOption_DisablePatchMonitoring
 			| CAppManagerTestHelper::EOption_DisableDiskMonitoring
 			| CAppManagerTestHelper::EOption_DisableApplicationStatusSensors
+			| CAppManagerTestHelper::EOption_DisableEncryptionStatusSensors
 		;
 
 		if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)

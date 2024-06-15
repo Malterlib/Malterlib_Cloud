@@ -340,7 +340,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<void> CAppManagerActor::fp_KeyManagerAvailable()
+	TCFuture<void> CAppManagerActor::fp_KeyManagersUpdated()
 	{
 		fp_UpdateApplicationDependencies();
 		co_return {};
@@ -393,10 +393,15 @@ namespace NMib::NCloud::NAppManager
 			(
 				g_ActorFunctor / [this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
 				{
-					co_await fp_KeyManagerAvailable();
+					co_await fp_KeyManagersUpdated();
 					co_return {};
 				}
-				, nullptr
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_KeyManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				{
+					co_await fp_KeyManagersUpdated();
+
+					co_return {};
+				}
 			)
 		;
 
@@ -478,6 +483,7 @@ namespace NMib::NCloud::NAppManager
 			mp_HostMonitorPatchInterval = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("HostMonitorPatchInterval", mp_HostMonitorPatchInterval).f_Float();
 
 		mp_bEnableApplicationStatusSensors = _Params["EnableApplicationStatusSensors"].f_Boolean();
+		mp_bEnableEncryptionStatusSensors = _Params["EnableEncryptionStatusSensors"].f_Boolean();
 
 		DMibFastCheck(!mp_HostMonitorPatchInterval.f_IsInvalid());
 		if (mp_HostMonitorPatchInterval != 0.0 && mp_HostMonitorPatchInterval < CHostMonitor::mc_MinimumHostMonitorPatchInterval)
@@ -641,6 +647,9 @@ namespace NMib::NCloud::NAppManager
 
 		if (mp_HostMonitor)
 			co_await fg_Move(mp_HostMonitor).f_Destroy();
+
+		co_await fg_Move(mp_EncryptionSensorReporterSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy encryption sensor reporter sequencer");
+		co_await fg_Move(mp_EncryptionSensorReporter.m_fReportReadings).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy encryption sensor reporter");
 
 		co_return {};
 	}

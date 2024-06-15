@@ -605,6 +605,9 @@ namespace NMib::NCloud
 				if (State.m_Options & EOption_DisableApplicationStatusSensors)
 					ExtraParams.f_Insert("--application-status-sensors=false");
 
+				if (State.m_Options & EOption_DisableEncryptionStatusSensors)
+					ExtraParams.f_Insert("--encryption-status-sensors=false");
+
 				State.m_LaunchHelper
 					(
 						&CDistributedApp_LaunchHelper::f_LaunchInProcess

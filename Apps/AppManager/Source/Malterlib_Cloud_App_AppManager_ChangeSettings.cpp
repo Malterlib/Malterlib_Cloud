@@ -334,7 +334,8 @@ namespace NMib::NCloud::NAppManager
 
 		CStr DependenciesMessage;
 		CAppManagerInterface::EStatusSeverity Severity;
-		if (!pApplication->f_DependenciesSatisfied(DependenciesMessage, Severity))
+		bool bNeedsEncryption = false;
+		if (!pApplication->f_DependenciesSatisfied(DependenciesMessage, Severity, bNeedsEncryption))
 		{
 			_fOnInfo(fg_Format("Application settings were successfully changed. Launch skipped because of missing dependencies: {}", DependenciesMessage));
 			Auditor.f_Info("Updated application settings");

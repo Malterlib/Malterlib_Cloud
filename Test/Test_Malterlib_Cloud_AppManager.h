@@ -50,6 +50,7 @@ namespace NMib::NCloud
 			, EOption_DisablePatchMonitoring = DMibBit(3)
 			, EOption_DisableDiskMonitoring = DMibBit(3)
 			, EOption_DisableApplicationStatusSensors = DMibBit(4)
+			, EOption_DisableEncryptionStatusSensors = DMibBit(5)
 		};
 
 		struct CAppManagerInfo
