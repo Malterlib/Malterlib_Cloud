@@ -86,7 +86,7 @@ namespace NMib::NCloud::NTest
 						SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Float;
 						SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_DiskSpaceDivisors();
 					}
-					auto SensorReporter = co_await self(&CTestAppActor::fp_OpenSensorReporter, fg_Move(SensorInfo));
+					auto SensorReporter = co_await fp_OpenSensorReporter(fg_Move(SensorInfo));
 
 					if (!SensorReporter.m_fReportReadings)
 						co_return DMibErrorInstance("Invalid sensor reporter returned");
@@ -155,7 +155,7 @@ namespace NMib::NCloud::NTest
 					SensorInfo.m_Name = "Test Sensor (status)";
 					SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Status;
 
-					auto SensorReporter = co_await self(&CTestAppActor::fp_OpenSensorReporter, fg_Move(SensorInfo));
+					auto SensorReporter = co_await fp_OpenSensorReporter(fg_Move(SensorInfo));
 
 					if (!SensorReporter.m_fReportReadings)
 						co_return DMibErrorInstance("Invalid sensor reporter returned");
