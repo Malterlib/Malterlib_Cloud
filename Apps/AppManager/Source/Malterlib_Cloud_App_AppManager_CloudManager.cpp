@@ -22,9 +22,16 @@ namespace NMib::NCloud::NAppManager
 		Info.m_Version = (*g_CloudVersion).m_Version;
 		Info.m_ProgramDirectory = mp_Settings.m_RootDirectory;
 
-		NMib::NProcess::CVersionInfo VersionInfo;
-		NProcess::NPlatform::fg_Process_GetVersionInfo(CFile::fs_GetProgramPath(), VersionInfo);
-		Info.m_VersionDate = VersionInfo.m_BuildTime;
+		try
+		{
+			NMib::NProcess::CVersionInfo VersionInfo;
+			NProcess::NPlatform::fg_Process_GetVersionInfo(CFile::fs_GetProgramPathForExecutabelContents(), VersionInfo);
+			Info.m_VersionDate = VersionInfo.m_BuildTime;
+		}
+		catch (NException::CException const &_Exception)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to get current executable version: {}", _Exception);
+		}
 
 		auto RegisterAppManagerResult = co_await _CloudManager.f_CallActor(&CCloudManager::f_RegisterAppManager)
 			(

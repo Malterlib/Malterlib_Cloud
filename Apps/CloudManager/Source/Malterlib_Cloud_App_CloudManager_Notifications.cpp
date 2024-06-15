@@ -145,9 +145,6 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CNotifications::fp_SendStartupMessage(CStr _Error)
 	{
-		NProcess::CVersionInfo VersionInfo;
-		NProcess::NPlatform::fg_Process_GetVersionInfo(CFile::fs_GetProgramPath(), VersionInfo);
-
 		CSlackActor::CMessage Message;
 
 		auto &SlackAttachment = Message.m_Attachments.f_Insert();
@@ -177,25 +174,50 @@ namespace NMib::NCloud::NCloudManager
 						, CFile::fs_GetProgramDirectory()
 						, true
 					}
-					,
-					{
-						"Version"
-						, "{}.{}.{}.{}"_f
-						<< VersionInfo.m_Major
-						<< VersionInfo.m_Minor
-						<< VersionInfo.m_Revision
-						<< VersionInfo.m_MinorRevision
-						, true
-					}
-					,
-					{
-						"Version Time"
-						, "{tc5}"_f << VersionInfo.m_BuildTime
-						, true
-					}
 				}
 			)
 		;
+
+		try
+		{
+			NProcess::CVersionInfo VersionInfo;
+			NProcess::NPlatform::fg_Process_GetVersionInfo(CFile::fs_GetProgramPathForExecutabelContents(), VersionInfo);
+			SlackAttachment.m_Fields.f_Insert
+				(
+					{
+						{
+							"Version"
+							, "{}.{}.{}.{}"_f
+							<< VersionInfo.m_Major
+							<< VersionInfo.m_Minor
+							<< VersionInfo.m_Revision
+							<< VersionInfo.m_MinorRevision
+							, true
+						}
+						,
+						{
+							"Version Time"
+							, "{tc5}"_f << VersionInfo.m_BuildTime
+							, true
+						}
+					}
+				)
+			;
+		}
+		catch (NException::CException const &_Exception)
+		{
+			SlackAttachment.m_Fields.f_Insert
+				(
+					{
+						{
+							"Error getting version"
+							, "{}"_f << _Exception
+							, false
+						}
+					}
+				)
+			;
+		}
 
 		co_await f_PostSlackMessage(EType_Startup, Message, fg_Default());
 		
