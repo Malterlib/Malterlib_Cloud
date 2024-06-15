@@ -358,12 +358,12 @@ namespace NMib::NCloud::NCloudManager
 						Attachment.m_bFieldsMarkdown = true;
 						Attachment.m_bTextMarkdown = true;
 
-						if (LogInfoKey.m_IdentifierScope)
-							Attachment.m_Text = "*{}* ({} {})"_f << fEscape(pLogInfo->m_Name) << LogInfoKey.m_Identifier << LogInfoKey.m_IdentifierScope;
-						else
-							Attachment.m_Text = "*{}* ({})"_f << fEscape(pLogInfo->m_Name) << LogInfoKey.m_Identifier;
+						Attachment.m_Text = "{}\n\n"_f << CNotifications::fs_ReformatHostForSlack(pLogInfo->m_HostName);
 
-						Attachment.m_Footer = pLogInfo->m_HostName;
+						if (LogInfoKey.m_IdentifierScope)
+							Attachment.m_Text += "*{}*\n• {}\n• {}"_f << fEscape(pLogInfo->m_Name) << fEscape(LogInfoKey.m_Identifier) << fEscape(LogInfoKey.m_IdentifierScope);
+						else
+							Attachment.m_Text += "*{}*\n• {}"_f << fEscape(pLogInfo->m_Name) << fEscape(LogInfoKey.m_Identifier);
 
 						return *pAttachment;
 					}
@@ -407,7 +407,22 @@ namespace NMib::NCloud::NCloudManager
 					if (MessageData.m_Flags & CDistributedAppLogReporter::ELogEntryFlag_Performance)
 						fg_AddStrSep(SeverityString, "_Performance_", " ");
 
-					fg_AddStrSep(SeverityString, CDistributedAppLogReporter::fs_LogSeverityToStr(MessageData.m_Severity), " ");
+					fg_AddStrSep
+						(
+							SeverityString
+							, [&]() -> CStr
+							{
+								CStr SeverityString = CDistributedAppLogReporter::fs_LogSeverityToStr(MessageData.m_Severity);
+
+								if (MessageData.m_Severity == CDistributedAppLogReporter::ELogSeverity_Critical)
+									return "_*{}*_"_f << SeverityString;
+
+								return SeverityString;
+							}
+							()
+							, " "
+						)
+					;
 
 					auto fAddInfoField = [&](CStr const &_Name, auto &&_Value, bool _bShort = true)
 						{

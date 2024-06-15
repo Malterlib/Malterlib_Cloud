@@ -235,4 +235,25 @@ namespace NMib::NCloud::NCloudManager
 			Attachment.m_Text = "Warning: {} other {}, but were cut off to limit size of this message"_f << (nAttachments - c_MaxAttachments) << _ErrorType;
 		}
 	}
+
+	CStr CNotifications::fs_ReformatHostForSlack(CStr const &_FriendlyName)
+	{
+		CStr UserName;
+		CStr HostName;
+		CStr Application;
+		aint nParsed;
+		(CStr::CParse("{}@{}/{}") >> UserName >> HostName >> Application).f_Parse(_FriendlyName, nParsed);
+
+		CStr Return;
+		if (nParsed == 3)
+		{
+			return "`{}` *{}* (_{}_)"_f
+				<< CSlackActor::CMessage::fs_EscapeString(HostName)
+				<< CSlackActor::CMessage::fs_EscapeString(Application)
+				<< CSlackActor::CMessage::fs_EscapeString(UserName)
+			;
+		}
+		else
+			return _FriendlyName;
+	}
 }

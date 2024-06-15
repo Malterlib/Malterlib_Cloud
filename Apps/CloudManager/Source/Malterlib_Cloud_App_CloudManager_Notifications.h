@@ -28,6 +28,7 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<TCMap<CStr, CStr>> f_PostSlackMessage(EType _TypeFlags, CSlackActor::CMessage _Message, TCMap<CStr, CStr> _Timestamps);
 
 		static void fs_LimitMessage(CSlackActor::CMessage &o_Message, CStr const &_ErrorType);
+		static CStr fs_ReformatHostForSlack(CStr const &_FriendlyName);
 
 	private:
 		struct CSlackNotificationChannel
