@@ -315,7 +315,11 @@ public:
 		DMibTestMark;
 
 		if (!fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
+		{
 			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(g_Timeout, "Timeout");
+		}
 
 		CSymmetricKey Key0 = co_await KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(g_Timeout, "Timeout");
 		DMibTestMark;
@@ -335,7 +339,11 @@ public:
 		DMibExpect(ServerHostID0, !=, ServerHostID1);
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
+		{
 			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(g_Timeout, "Timeout");
+		}
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_InitAfterCreate))
 			co_await KeyManagerServer1(&CKeyManagerServer::f_Init, g_Timeout / 2);
@@ -348,9 +356,9 @@ public:
 		else
 			DMibExpect(Database0.m_Clients, ==, Database1.m_Clients);
 
-		mint ExpectedAvailableKeys = 2;
+		mint ExpectedAvailableKeys = 8 + 2;
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
-			ExpectedAvailableKeys = 4;
+			ExpectedAvailableKeys = 8 + 4;
 
 		DMibExpect(fs_CountAvailableKeys(Database0.m_AvailableKeys), ==, ExpectedAvailableKeys);
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_NoPermissions))
@@ -369,7 +377,11 @@ public:
 		DMibTestMark;
 
 		if (!fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
+		{
 			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(g_Timeout, "Timeout");
+		}
 
 		CSymmetricKey SecondKey0 = co_await KeyManager1.f_CallActor(&CKeyManager::f_RequestKey)("TestKey0", 32).f_Timeout(g_Timeout, "Timeout");
 		DMibTestMark;
@@ -377,7 +389,11 @@ public:
 		DMibTestMark;
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
+		{
 			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 32, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 64, 4).f_Timeout(g_Timeout, "Timeout");
+			co_await KeyManagerServer1(&CKeyManagerServer::f_PreCreateKeys, 128, 4).f_Timeout(g_Timeout, "Timeout");
+		}
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_SimultaneousCreate))
 		{
@@ -457,6 +473,45 @@ public:
 		DMibExpect(DatabaseAfterRemove1.m_Clients, ==, DatabaseAfter0.m_Clients);
 		DMibExpect(DatabaseAfterRemove1.m_AvailableKeys, ==, DatabaseAfter0.m_AvailableKeys);
 
+		{
+			DMibTestPath("Remove one size");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, 64).f_Timeout(g_Timeout, "Timeout");
+
+			auto DatabaseAfterPreRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			auto DatabaseAfterPreRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+
+			ExpectedAvailableKeys -= 4;
+
+			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove0.m_AvailableKeys), ==, ExpectedAvailableKeys);
+			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove1.m_AvailableKeys), ==, ExpectedAvailableKeys);
+		}
+
+		{
+			DMibTestPath("Remove all");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(g_Timeout, "Timeout");
+
+			auto DatabaseAfterPreRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			auto DatabaseAfterPreRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+
+			ExpectedAvailableKeys = 0;
+
+			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove0.m_AvailableKeys), ==, ExpectedAvailableKeys);
+			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove1.m_AvailableKeys), ==, ExpectedAvailableKeys);
+		}
+		
+		{
+			DMibTestPath("Remove all empty");
+			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(g_Timeout, "Timeout");
+
+			auto DatabaseAfterPreRemove0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+			auto DatabaseAfterPreRemove1 = co_await DatabaseActor1(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+
+			ExpectedAvailableKeys = 0;
+
+			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove0.m_AvailableKeys), ==, ExpectedAvailableKeys);
+			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove1.m_AvailableKeys), ==, ExpectedAvailableKeys);
+		}
+		
 		co_await fg_Move(KeyManagerServer1).f_Destroy();
 
 		co_await KeyManagerServer0(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID1}).f_Timeout(g_Timeout, "Timeout");
@@ -464,7 +519,6 @@ public:
 		auto DatabaseAfterRemoveSuccess0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
 
 		DMibExpect(DatabaseAfterRemoveSuccess0.m_Clients[HostID0].m_Keys["TestKey0"].m_VerifiedOnServers, ==, TCSet<CStr>{ServerHostID0});
-
 		co_return {};
 	}
 
@@ -831,6 +885,22 @@ public:
 				DMibAssert(Database.m_AvailableKeys.f_GetLen(), ==, 1);
 				DMibAssert(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
 				DMibExpectTrue(Database.m_AvailableKeys[32u].f_FindEqual(AvailableKey));
+			}
+
+			co_await KeyManagerServer(&CKeyManagerServer::f_RemovePreCreatedKeys, 64).f_Timeout(g_Timeout, "Timeout");
+			{
+				DMibTestPath("After removing wrong size keys");
+				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				DMibAssert(Database.m_AvailableKeys.f_GetLen(), ==, 1);
+				DMibAssert(Database.m_AvailableKeys[32u].f_GetLen(), ==, 2);
+				DMibExpectTrue(Database.m_AvailableKeys[32u].f_FindEqual(AvailableKey));
+			}
+
+			co_await KeyManagerServer(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(g_Timeout, "Timeout");
+			{
+				DMibTestPath("After removing keys");
+				auto Database = co_await DatabaseActor(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
+				DMibAssert(Database.m_AvailableKeys.f_GetLen(), ==, 0);
 			}
 
 			co_return {};

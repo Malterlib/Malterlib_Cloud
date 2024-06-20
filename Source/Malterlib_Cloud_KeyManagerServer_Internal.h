@@ -28,6 +28,7 @@ namespace NMib::NCloud
 			NConcurrency::TCFuture<void> f_CreateNewKeys(NContainer::TCMap<CHostKeyID, CSymmetricKey> &&_Keys) override;
 			NConcurrency::TCFuture<CUseAvailableKeyResult> f_UseAvailableKey(CSymmetricKey &&_Key) override;
 			NConcurrency::TCFuture<void> f_PreCreateKeys(NContainer::TCSet<CSymmetricKey> &&_Keys) override;
+			NConcurrency::TCFuture<void> f_RemovePreCreatedKeys(NContainer::TCSet<CSymmetricKey> &&_Keys) override;
 			NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs, NContainer::TCSet<NStr::CStr> &&_CheckedServers) override;
 			NConcurrency::TCFuture<void> f_KeysVerifiedOnServers(NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> &&_KeysVerifiedOnServers) override;
 
@@ -50,6 +51,7 @@ namespace NMib::NCloud
 			-> NConcurrency::TCFuture<NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>>>
 		;
 		NConcurrency::TCFuture<void> f_ForwardPreCreateKeys(NStr::CStr _FromHostID, NContainer::TCSet<CSymmetricKey> _PreCreateKeys);
+		NConcurrency::TCFuture<void> f_ForwardRemovePreCreatedKeys(NStr::CStr _FromHostID, NContainer::TCSet<CSymmetricKey> _Keys);
 		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_ForwardRemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> _HostIDs, NContainer::TCSet<NStr::CStr> _CheckedServers);
 		NConcurrency::TCFuture<void> f_ForwardVerifiedHosts(NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> _KeysVerifiedOnServers);
 		NConcurrency::TCFuture<NStorage::TCOptional<NConcurrency::CActorSubscription>> f_UseAvailableKey(CSymmetricKey _Key);

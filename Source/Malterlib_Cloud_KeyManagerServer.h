@@ -111,9 +111,11 @@ namespace NMib::NCloud
 
 		NConcurrency::TCFuture<void> f_Init(fp32 _WaitForPublicationsTimeout);
 		NConcurrency::TCFuture<void> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys);
+		NConcurrency::TCFuture<uint32> f_RemovePreCreatedKeys(NStorage::TCOptional<uint32> _KeySize);
 		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs);
 		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_GetAllVerifiedHosts();
 		NConcurrency::TCFuture<NContainer::TCVector<CKeyManagerKey>> f_GetKeys();
+		NConcurrency::TCFuture<NContainer::TCMap<uint32, uint32>> f_GetPreCreatedKeysStats();
 		NConcurrency::TCFuture<void> f_CopyKey(CKeyManagerKeyID &&_FromKey, CKeyManagerKeyID &&_ToKey);
 		NConcurrency::TCFuture<void> f_ForceWriteDatabase();
 

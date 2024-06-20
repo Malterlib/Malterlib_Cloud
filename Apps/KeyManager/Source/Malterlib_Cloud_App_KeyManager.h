@@ -20,6 +20,8 @@ namespace NMib::NCloud::NKeyManager
 		TCFuture<uint32> f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> f_ChangePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> f_ListPreCreatedKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> f_RemovePreCreatedKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> f_RemoveVerifiedHosts(TCSet<CStr> &&_HostIDs, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> f_ListVerifiedHosts(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
 		TCFuture<uint32> f_ListKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);

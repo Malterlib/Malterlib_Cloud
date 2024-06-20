@@ -91,6 +91,45 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
+					"Names"_o= {"--precreated-keys-list"}
+					, "Description"_o= "List precreated keys."
+					, "Options"_o=
+					{
+						CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				{
+					return g_Future <<= self(&CKeyManagerDaemonActor::f_ListPreCreatedKeys, _Parameters, _pCommandLine);
+				}
+			)
+		;
+		DefaultSection.f_RegisterCommand
+			(
+				{
+					"Names"_o= {"--precreated-keys-remove"}
+					, "Description"_o= "Remove pre-created keys."
+					, "Options"_o=
+					{
+						"KeySize?"_o=
+						{
+							"Names"_o= {"--key-size"}
+							, "Description"_o= "The key size to remove. If not specified all key sizes will be removed."
+							, "Type"_o= 1
+						}
+					}
+				}
+				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					co_await self(&CKeyManagerDaemonActor::f_RemovePreCreatedKeys, _Parameters, _pCommandLine);
+
+					co_return 0;
+				}
+			)
+		;
+		DefaultSection.f_RegisterCommand
+			(
+				{
 					"Names"_o= {"--verified-host-remove"}
 					, "Description"_o= "Remove hosts that should no longer be part of the server cluster."
 					, "Parameters"_o=
@@ -188,7 +227,46 @@ namespace NMib::NCloud::NKeyManager
 
 		co_await mp_ServerActor(&CKeyManagerServer::f_PreCreateKeys, _KeySize, _nKeys);
 
-		*_pCommandLine += "The server now has at least {} ({} bit) keys{\n}"_f << _nKeys << _KeySize;
+		*_pCommandLine += "The server now has at least {} ({} bit) keys\n"_f << _nKeys << _KeySize;
+		co_return 0;
+	}
+
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ListPreCreatedKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		if (!mp_ServerActor)
+			co_return fg_NotDecryptedError();
+
+		auto KeyStats = co_await mp_ServerActor(&CKeyManagerServer::f_GetPreCreatedKeysStats);
+
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+
+		CTableRenderHelper::CColumnHelper Columns(0);
+		Columns.f_AddHeading("Key Size", 0);
+		Columns.f_AddHeading("Number of available keys", 0);
+		TableRenderer.f_AddHeadings(&Columns);
+
+		for (auto &KeyEntry : KeyStats.f_Entries())
+			TableRenderer.f_AddRow(KeyEntry.f_Key(), KeyEntry.f_Value());
+
+		TableRenderer.f_Output(_Parameters);
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CKeyManagerDaemonActor::f_RemovePreCreatedKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	{
+		if (!mp_ServerActor)
+			co_return fg_NotDecryptedError();
+
+		TCOptional<uint32> KeySize;
+
+		if (auto pValue = _Parameters.f_GetMember("KeySize"))
+			KeySize = pValue->f_Integer();
+
+		auto nRemoved = co_await mp_ServerActor(&CKeyManagerServer::f_RemovePreCreatedKeys, KeySize);
+
+		*_pCommandLine += "Removed {} pre-created keys\n"_f << nRemoved;
 		co_return 0;
 	}
 

@@ -51,6 +51,37 @@ namespace NMib::NCloud
 		co_return ForwardVerified;
 	}
 
+	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::f_ForwardRemovePreCreatedKeys(NStr::CStr _FromHostID, NContainer::TCSet<CSymmetricKey> _Keys)
+	{
+		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
+
+		for (auto &OtherKeyManager : m_OtherKeyManagers)
+		{
+			if (OtherKeyManager.m_ActorInfo.m_HostInfo.m_HostID == _FromHostID)
+				continue;
+
+			if (OtherKeyManager.m_ServerSync->f_InterfaceVersion() < EKeyManagerProtocolVersion_SupportRemovePreCreatedKeys)
+				continue;
+
+			auto Result = co_await OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_RemovePreCreatedKeys)(_Keys).f_Wrap();
+			if (!Result)
+			{
+				DMibLogWithCategory
+					(
+						Mib/Cloud/KeyManagerServer
+						, Error
+						, "Failed to remove pre-created keys in remote key manager '{}': {}"
+						, OtherKeyManager.m_ActorInfo.m_HostInfo
+						, Result.f_GetExceptionStr()
+					)
+				;
+				continue;
+			}
+		}
+
+		co_return {};
+	}
+
 	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::f_ForwardPreCreateKeys(NStr::CStr _FromHostID, NContainer::TCSet<CSymmetricKey> _PreCreateKeys)
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
@@ -499,6 +530,40 @@ namespace NMib::NCloud
 			co_return {};
 
 		co_await Internal.f_ForwardPreCreateKeys(CallingHostInfo.f_GetRealHostID(), ForwardPreCreateKeys);
+
+		auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Internal.m_Database).f_Wrap();
+		if (!WriteResult)
+			co_return AppAuditor.f_CriticalException({"Failed to write database", WriteResult.f_GetExceptionStr()});
+
+		co_return {};
+	}
+
+	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_RemovePreCreatedKeys(NContainer::TCSet<CSymmetricKey> &&_Keys)
+	{
+		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
+
+		auto &Internal = *m_pThis->mp_pInternal;
+
+		auto CallingHostInfo = fg_GetCallingHostInfo();
+		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(CallingHostInfo, "KeyManager");
+
+		NContainer::TCSet<CSymmetricKey> ForwardRemoveKeys;
+
+		for (auto &Key : _Keys)
+		{
+			mint KeySize = Key.f_GetLen();
+			auto *pKeys = Internal.m_Database.m_AvailableKeys.f_FindEqual(KeySize);
+			if (!pKeys)
+				continue;
+
+			if (pKeys->f_Remove(Key))
+				ForwardRemoveKeys[Key];
+		}
+
+		if (ForwardRemoveKeys.f_IsEmpty())
+			co_return {};
+
+		co_await Internal.f_ForwardRemovePreCreatedKeys(CallingHostInfo.f_GetRealHostID(), ForwardRemoveKeys);
 
 		auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Internal.m_Database).f_Wrap();
 		if (!WriteResult)

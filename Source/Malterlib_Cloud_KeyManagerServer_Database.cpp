@@ -74,6 +74,47 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
+	NConcurrency::TCFuture<uint32> CKeyManagerServer::f_RemovePreCreatedKeys(NStorage::TCOptional<uint32> _KeySize)
+	{
+		auto &Internal = *mp_pInternal;
+
+		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(fg_GetCallingHostInfo(), "KeyManager");
+
+		NContainer::TCSet<CSymmetricKey> RemovedKeys;
+		if (_KeySize)
+		{
+			auto pAvailableKeys = Internal.m_Database.m_AvailableKeys.f_FindEqual(*_KeySize);
+			if (pAvailableKeys)
+			{
+				RemovedKeys = fg_Move(*pAvailableKeys);
+
+				Internal.m_Database.m_AvailableKeys.f_Remove(pAvailableKeys);
+			}
+		}
+		else
+		{
+			for (auto &Keys : Internal.m_Database.m_AvailableKeys)
+				RemovedKeys += fg_Move(Keys);
+
+			Internal.m_Database.m_AvailableKeys.f_Clear();
+		}
+
+		if (RemovedKeys.f_IsEmpty())
+			co_return 0;
+
+		mint nRemoved = RemovedKeys.f_GetLen();
+
+		co_await Internal.f_ForwardRemovePreCreatedKeys(Internal.m_ThisHostID, fg_Move(RemovedKeys));
+
+		auto WriteResult = co_await Internal.m_Config.m_DatabaseActor(&ICKeyManagerServerDatabase::f_WriteDatabase, Internal.m_Database).f_Wrap();
+		if (!WriteResult)
+			co_return AppAuditor.f_CriticalException({"Failed to write database", WriteResult.f_GetExceptionStr()});
+
+		AppAuditor.f_Info("Removed {} pre-created keys"_f << nRemoved);
+
+		co_return nRemoved;
+	}
+
 	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs)
 	{
 		auto &Internal = *mp_pInternal;
@@ -124,6 +165,22 @@ namespace NMib::NCloud
 		AppAuditor.f_Info("Returned all keys");
 
 		co_return fg_Move(Keys);
+	}
+
+	NConcurrency::TCFuture<NContainer::TCMap<uint32, uint32>> CKeyManagerServer::f_GetPreCreatedKeysStats()
+	{
+		auto &Internal = *mp_pInternal;
+
+		auto AppAuditor = Internal.m_Config.m_fAuditorFactory(fg_GetCallingHostInfo(), "KeyManager");
+
+		NContainer::TCMap<uint32, uint32> KeyStats;
+
+		for (auto &KeyEntry : Internal.m_Database.m_AvailableKeys.f_Entries())
+			KeyStats[KeyEntry.f_Key()] = KeyEntry.f_Value().f_GetLen();
+
+		AppAuditor.f_Info("Returned statistics for pre-created keys");
+
+		co_return fg_Move(KeyStats);
 	}
 
 	NConcurrency::TCFuture<void> CKeyManagerServer::f_CopyKey(CKeyManagerKeyID &&_FromKey, CKeyManagerKeyID &&_ToKey)
