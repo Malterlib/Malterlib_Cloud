@@ -17,6 +17,14 @@
 
 namespace NMib::NCloud::NKeyManager
 {
+	namespace
+	{
+		CExceptionPointer fg_NotDecryptedError()
+		{
+			return DErrorInstance("The key database has not yet been decrypted. Use --provide-password to decrypt it.");
+		}
+	}
+
 	void CKeyManagerDaemonActor::fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine)
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
@@ -176,7 +184,7 @@ namespace NMib::NCloud::NKeyManager
 	TCFuture<uint32> CKeyManagerDaemonActor::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		if (!mp_ServerActor)
-			co_return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
+			co_return fg_NotDecryptedError();
 
 		co_await mp_ServerActor(&CKeyManagerServer::f_PreCreateKeys, _KeySize, _nKeys);
 
@@ -187,7 +195,7 @@ namespace NMib::NCloud::NKeyManager
 	TCFuture<uint32> CKeyManagerDaemonActor::f_RemoveVerifiedHosts(NContainer::TCSet<CStr> &&_HostIDs, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		if (!mp_ServerActor)
-			co_return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
+			co_return fg_NotDecryptedError();
 
 		auto RemovedHostIDs = co_await mp_ServerActor(&CKeyManagerServer::f_RemoveVerifiedHosts, _HostIDs);
 
@@ -199,7 +207,7 @@ namespace NMib::NCloud::NKeyManager
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ListVerifiedHosts(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		if (!mp_ServerActor)
-			co_return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
+			co_return fg_NotDecryptedError();
 
 		auto Hosts = co_await mp_ServerActor(&CKeyManagerServer::f_GetAllVerifiedHosts);
 
@@ -238,7 +246,7 @@ namespace NMib::NCloud::NKeyManager
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ListKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		if (!mp_ServerActor)
-			co_return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
+			co_return fg_NotDecryptedError();
 
 		auto Keys = co_await mp_ServerActor(&CKeyManagerServer::f_GetKeys);
 
@@ -284,7 +292,7 @@ namespace NMib::NCloud::NKeyManager
 	TCFuture<uint32> CKeyManagerDaemonActor::f_CopyKey(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
 	{
 		if (!mp_ServerActor)
-			co_return DErrorInstance("The key database has not yet been decrypted. Use --provide-key to decrypt it.");
+			co_return fg_NotDecryptedError();
 
 		CKeyManagerServer::CKeyManagerKeyID FromID{.m_HostID = _Parameters["FromHostID"].f_String(), .m_KeyID = _Parameters["FromKeyID"].f_String()};
 		CKeyManagerServer::CKeyManagerKeyID ToID{.m_HostID = _Parameters["ToHostID"].f_String(), .m_KeyID = _Parameters["ToKeyID"].f_String()};
