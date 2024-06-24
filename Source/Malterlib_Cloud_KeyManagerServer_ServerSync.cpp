@@ -17,6 +17,9 @@ namespace NMib::NCloud
 	auto CKeyManagerServer::CInternal::f_ForwardCreateNewKeys(CStr _FromHostID, NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, CSymmetricKey> _CreateNewKeys)
 		-> NConcurrency::TCFuture<NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>>>
 	{
+		if (_CreateNewKeys.f_IsEmpty())
+			co_return {};
+
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
 		NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> ForwardVerified;
@@ -53,6 +56,9 @@ namespace NMib::NCloud
 
 	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::f_ForwardRemovePreCreatedKeys(NStr::CStr _FromHostID, NContainer::TCSet<CSymmetricKey> _Keys)
 	{
+		if (_Keys.f_IsEmpty())
+			co_return {};
+
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
 		for (auto &OtherKeyManager : m_OtherKeyManagers)
@@ -84,6 +90,9 @@ namespace NMib::NCloud
 
 	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::f_ForwardPreCreateKeys(NStr::CStr _FromHostID, NContainer::TCSet<CSymmetricKey> _PreCreateKeys)
 	{
+		if (_PreCreateKeys.f_IsEmpty())
+			co_return {};
+
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
 		for (auto &OtherKeyManager : m_OtherKeyManagers)
@@ -115,6 +124,9 @@ namespace NMib::NCloud
 			NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> _KeysVerifiedOnServers
 		)
 	{
+		if (_KeysVerifiedOnServers.f_IsEmpty())
+			co_return {};
+
 		TCActorResultVector<void> ReportResults;
 
 		for (auto &OtherKeyManager : m_OtherKeyManagers)
@@ -128,6 +140,9 @@ namespace NMib::NCloud
 	auto CKeyManagerServer::CInternal::f_ForwardRemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> _HostIDs, NContainer::TCSet<NStr::CStr> _CheckedServers)
 		-> NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>>
 	{
+		if (_HostIDs.f_IsEmpty())
+			co_return {};
+		
 		TCActorResultVector<NContainer::TCSet<NStr::CStr>> ReportResults;
 
 		for (auto &OtherKeyManager : m_OtherKeyManagers)
