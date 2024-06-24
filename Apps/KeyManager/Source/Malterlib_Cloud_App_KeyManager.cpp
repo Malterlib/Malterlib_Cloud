@@ -32,6 +32,10 @@ namespace NMib::NCloud::NKeyManager
 	TCFuture<void> CKeyManagerDaemonActor::fp_DatabaseDecrypted()
 	{
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Password provided, starting up key manager");
+		
+		uint32 CreateNewKeyMinServers = fg_Clamp(mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("CreateNewKeyMinServers", 1).f_Integer(), int64(1), int64(100));
+		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Requiring a minimun of {} servers to create a new key", CreateNewKeyMinServers);
+
 		mp_ServerActor = fg_ConstructActor<CKeyManagerServer>
 			(
 				CKeyManagerServerConfig
@@ -39,6 +43,7 @@ namespace NMib::NCloud::NKeyManager
 					.m_DatabaseActor = mp_DatabaseActor
 					, .m_TrustManager = mp_State.m_TrustManager
 					, .m_fAuditorFactory = mp_State.f_AuditorFactory()
+					, .m_CreateNewKeyMinServers = CreateNewKeyMinServers
 				}
 			)
 		;
