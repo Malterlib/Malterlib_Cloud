@@ -392,7 +392,10 @@ namespace NMib::NCloud::NCloudManager
 				SlackAttachment.m_bFieldsMarkdown = true;
 				SlackAttachment.m_bTextMarkdown = true;
 
-				SlackAttachment.m_Text = "{}\n\n{}"_f << CNotifications::fs_ReformatHostForSlack(SensorInfo.m_HostName) << fEscape(SensorInfo.m_Name);
+				SlackAttachment.m_Text = "{}\n\n*{}*"_f << CNotifications::fs_ReformatHostForSlack(SensorInfo.m_HostName) << fEscape(SensorInfo.m_Name);
+
+				if (SensorInfo.m_IdentifierScope)
+					SlackAttachment.m_Text += "\n`{}`"_f << fEscape(SensorInfo.m_IdentifierScope);
 
 				if (bRemoved || bPaused || bSnoozed)
 					;
