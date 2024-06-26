@@ -456,7 +456,7 @@ namespace NMib::NCloud::NAppManager
 
 								CStr RelaunchInfo;
 								if (!_pApplication->m_bStopped)
-									RelaunchInfo = "Waiting to retry launching.";
+									RelaunchInfo = "Waiting to retry launching. ";
 
 								if (ExitStatus)
 								{
