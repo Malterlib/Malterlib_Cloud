@@ -270,12 +270,18 @@ namespace NMib::NCloud::NAppManager
 
 		auto NewStatus = CDistributedAppSensorReporter::CStatus
 			{
-				.m_Severity = [_Severity]
+				.m_Severity = [&]
 				{
 					switch (_Severity)
 					{
 					case CAppManagerInterface::EStatusSeverity_None: return CDistributedAppSensorReporter::EStatusSeverity_Ok;
-					case CAppManagerInterface::EStatusSeverity_Warning: return CDistributedAppSensorReporter::EStatusSeverity_Warning;
+					case CAppManagerInterface::EStatusSeverity_Warning: 
+						{
+							if (_pApplication->m_LastReporterSensorStatus)
+								return fg_Max(_pApplication->m_LastReporterSensorStatus->m_Severity, CDistributedAppSensorReporter::EStatusSeverity_Info);
+
+							return CDistributedAppSensorReporter::EStatusSeverity_Info;
+						}
 					case CAppManagerInterface::EStatusSeverity_Error: return CDistributedAppSensorReporter::EStatusSeverity_Error;
 					}
 
