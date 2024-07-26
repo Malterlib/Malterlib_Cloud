@@ -83,9 +83,11 @@ namespace NMib::NCloud::NBackupManager
 
 		auto CaptureScope = co_await g_CaptureExceptions.f_Specific<CExceptionFile>();
 
-		TCBinaryStreamFile<> Stream;
-		Stream.f_Open(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin"), EFileOpen_Read | EFileOpen_ShareAll);
-		Stream >> Internal.m_Manifest;
+		{
+			TCBinaryStreamFile<> Stream;
+			Stream.f_Open(CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin"), EFileOpen_Read | EFileOpen_ShareAll);
+			Internal.m_Manifest.f_Stream(fg_ConsumeStream(Stream), CDirectoryManifest::EManifestStreamVersion_Current);
+		}
 
 		TCSet<CStr> ManifestFiles;
 		for (auto &File : Internal.m_Manifest.m_Files)
@@ -128,7 +130,7 @@ namespace NMib::NCloud::NBackupManager
 								bDuplicatedFile = true;
 							else
 							{
-								if (CFile::fs_GetFileChecksum_SHA256(SourceFileName, &ChecksumState) == File.m_Digest)
+								if (File.m_Digest && CFile::fs_GetFileChecksum_SHA256(SourceFileName, &ChecksumState) == *File.m_Digest)
 								{
 									CFile OutFile;
 									OutFile.f_Open(FileName, EFileOpen_Write | EFileOpen_ShareAll, EFileAttrib_UserRead | EFileAttrib_UserWrite);
@@ -155,7 +157,7 @@ namespace NMib::NCloud::NBackupManager
 							if (File.m_Flags & EDirectoryManifestSyncFlag_Append)
 								Cleanup.f_Clear();
 
-							if (CFile::fs_GetFileChecksum_SHA256(FileName, &ChecksumState) == File.m_Digest)
+							if (File.m_Digest && CFile::fs_GetFileChecksum_SHA256(FileName, &ChecksumState) == *File.m_Digest)
 							{
 								Cleanup.f_Clear();
 								continue;
@@ -174,7 +176,7 @@ namespace NMib::NCloud::NBackupManager
 			}
 
 			auto Hash = CFile::fs_GetFileChecksum_SHA256(FileName);
-			if (Hash == File.m_Digest)
+			if (File.m_Digest && Hash == *File.m_Digest)
 				continue;
 
 			BackupResult.m_FilesNotUpToDate[File.f_GetFileName()] = Hash;

@@ -500,7 +500,7 @@ public:
 
 			TCBinaryStreamFile<> Stream;
 			Stream.f_Open(_Path, EFileOpen_Read | EFileOpen_ShareAll);
-			Stream >> Manifest;
+			Manifest.f_Stream(NStream::fg_ConsumeStream(Stream), CDirectoryManifest::EManifestStreamVersion_Current);
 
 			return Manifest;
 		}
@@ -1638,7 +1638,7 @@ public:
 				DMibExpect(FileFinished.m_TransferStats.m_OutgoingBytes, >, 1024);
 				DMibExpect(FileFinished.m_TransferStats.m_nSeconds, >, 0.0);
 
-				NFile::CDirectoryManifestConfig ExtraManifestConfig;
+				CDistributedAppInterfaceBackup::CManifestConfig ExtraManifestConfig;
 				ExtraManifestConfig.m_IncludeWildcards = {{"Dir1/^*", {}}};
 				BackupHelper.m_BackupInterface.f_CallActor(&CDistributedAppInterfaceBackup::f_AppendManifest)(ExtraManifestConfig).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 

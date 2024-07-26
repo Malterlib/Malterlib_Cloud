@@ -193,7 +193,7 @@ namespace NMib::NCloud::NBackupManager
 		{
 			TCBinaryStreamFile<> Stream;
 			Stream.f_Open(ManifestFileName + ".tmp", EFileOpen_Write | EFileOpen_ShareAll, EFileAttrib_UserRead | EFileAttrib_UserWrite);
-			Stream << mp_CurrentManifest;
+			mp_CurrentManifest.f_Stream(fg_FeedStream(Stream), CDirectoryManifest::EManifestStreamVersion_Current);
 		}
 
 		CFile::fs_AtomicReplaceFile(ManifestFileName + ".tmp", ManifestFileName);

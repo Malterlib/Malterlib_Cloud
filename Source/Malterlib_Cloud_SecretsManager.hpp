@@ -46,7 +46,10 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void CSecretsManager::CSecretFile::f_Stream(tf_CStream &_Stream)
 	{
-		uint32 Version = 0x102;
+		uint32 Version = NFile::CDirectoryManifest::EManifestStreamVersion_Min;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportOptionalDigest)
+			Version = NFile::CDirectoryManifest::EManifestStreamVersion_OptionalDigest;
+
 		DMibBinaryStreamVersion(_Stream, Version);
 		m_Manifest.f_Stream(_Stream, Version);
 	}

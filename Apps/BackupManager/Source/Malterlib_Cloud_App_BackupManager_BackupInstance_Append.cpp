@@ -40,7 +40,7 @@ namespace NMib::NCloud::NBackupManager
 						}
 					;
 
-					if (pManifestFile->m_Digest != Data.m_PreviousDigest)
+					if (pManifestFile->m_Digest && *pManifestFile->m_Digest != Data.m_PreviousDigest)
 					{
 						fDigestFailed();
 						return Promise.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("Previous digest does not match"));
@@ -73,7 +73,7 @@ namespace NMib::NCloud::NBackupManager
 									ToDigest -= ThisTime;
 								}
 
-								if (State.m_Hash.f_GetDigest() != ManifestFile.m_Digest)
+								if (ManifestFile.m_Digest && State.m_Hash.f_GetDigest() != *ManifestFile.m_Digest)
 								{
 									fDigestFailed();
 									DMibErrorInstanceBackupManagerHashMismatch("Manifest digest does not match digest on file");
@@ -94,7 +94,7 @@ namespace NMib::NCloud::NBackupManager
 
 							auto NewDigest = AppendState.m_Hash.f_GetDigest();
 
-							if (NewDigest != Data.m_ManifestFile.m_Digest)
+							if (Data.m_ManifestFile.m_Digest && NewDigest != *Data.m_ManifestFile.m_Digest)
 							{
 								AppendState.m_Hash = OldState;
 								fDigestFailed();

@@ -102,7 +102,7 @@ namespace NMib::NCloud
 
 		struct CDistributedAppInterfaceBackupImplementation : public CDistributedAppInterfaceBackup
 		{
-			TCFuture<void> f_AppendManifest(NFile::CDirectoryManifestConfig const &_Config) override;
+			TCFuture<void> f_AppendManifest(CManifestConfig const &_Config) override;
 			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeInitialFinished(TCActorFunctorWithID<TCFuture<void> ()> &&_fOnInitialFinished) override;
 			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeBackupStopped(TCActorFunctorWithID<TCFuture<void> ()> &&_fOnStopped) override;
 

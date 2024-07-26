@@ -35,8 +35,9 @@ namespace NMib::NCloud
 			, EProtocolVersion_SupportResultFlags = 0x106
 			, EProtocolVersion_SupportMapSecrets = 0x106
 			, EProtocolVersion_SupportExpectedMetadataAndModifiedTime = 0x106
+			, EProtocolVersion_SupportOptionalDigest = 0x107
 
-			, EProtocolVersion_Current = 0x106
+			, EProtocolVersion_Current = 0x107
 		};
 		
 		enum ESecretType : int32

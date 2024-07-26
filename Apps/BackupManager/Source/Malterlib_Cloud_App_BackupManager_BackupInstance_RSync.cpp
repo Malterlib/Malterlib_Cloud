@@ -57,7 +57,7 @@ namespace NMib::NCloud::NBackupManager
 			try
 			{
 				auto ActualDigest = CFile::fs_GetFileChecksum_SHA256(_Context.m_AbsoluteFileName);
-				if (_Context.m_ExpectedDigest != ActualDigest)
+				if (_Context.m_ExpectedDigest && *_Context.m_ExpectedDigest != ActualDigest)
 					_Context.m_bFailedHash = true;
 			}
 			catch (CException const &_Exception)
@@ -118,7 +118,7 @@ namespace NMib::NCloud::NBackupManager
 			, EDirectoryManifestSyncFlag _SyncFlags
 			, CStr *o_pRSyncID
 			, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
-			, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
+			, TCOptional<NCryptography::CHashDigest_SHA256> const &_ExpectedDigest
 			, uint32 _ProtocolVersion
 		)
 	{

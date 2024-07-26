@@ -18,7 +18,8 @@ namespace NMib::NCloud
 	{
 		EBackupManagerProtocolVersion_Min = 0x101
 		, EBackupManagerProtocolVersion_UseSHA256 = 0x106
-		, EBackupManagerProtocolVersion_Current = 0x106
+		, EBackupManagerProtocolVersion_OptionalDigest = 0x107
+		, EBackupManagerProtocolVersion_Current = 0x107
 	};
 
 	DMibImpErrorClassDefine(CExceptionBackupManagerHashMismatch, NException::CException);

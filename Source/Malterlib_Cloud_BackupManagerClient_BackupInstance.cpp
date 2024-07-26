@@ -198,7 +198,7 @@ namespace NMib::NCloud::NPrivate
 									Position += ThisTime;
 								}
 								RunningState.m_LimitedFile.f_SetPosition(0);
-								if (AppendState.m_DigestState.f_GetDigest() != RunningState.m_ManifestFile.m_Digest)
+								if (RunningState.m_ManifestFile.m_Digest && AppendState.m_DigestState.f_GetDigest() != *RunningState.m_ManifestFile.m_Digest)
 								{
 									DMibLog(Info, "Reschedule (Append mismatch): {}", FileName);
 									AppendState.m_bDirty = true;
@@ -323,7 +323,7 @@ namespace NMib::NCloud::NPrivate
 				return;
 			}
 
-			if (AppendState.m_DigestState.f_GetDigest() != RunningState.m_ManifestFile.m_Digest)
+			if (RunningState.m_ManifestFile.m_Digest && AppendState.m_DigestState.f_GetDigest() != *RunningState.m_ManifestFile.m_Digest)
 			{
 				auto *pPendingFile = mp_PendingFiles.f_FindEqual(RunningState.m_FileName);
 				if (pPendingFile)
@@ -616,14 +616,20 @@ namespace NMib::NCloud::NPrivate
 
 	TCFuture<void> CBackupManagerClient_Instance::fp_SyncManifest()
 	{
+		auto InterfaceVersion = mp_Backup->f_InterfaceVersion();
+		CDirectoryManifest::EManifestStreamVersion ManifestVersion = CDirectoryManifest::EManifestStreamVersion_Min;
+		if (InterfaceVersion >= EBackupManagerProtocolVersion_OptionalDigest)
+			ManifestVersion = CDirectoryManifest::EManifestStreamVersion_OptionalDigest;
+
 		TCSharedPointer<CManifestSyncState> pState = fg_Construct();
-		pState->m_ManifestStream << mp_Manifest;
+		mp_Manifest.f_Stream(fg_FeedStream(pState->m_ManifestStream), ManifestVersion);
 		pState->m_ManifestStream.f_SetPosition(0);
+
 		mp_pManifestSyncState = pState;
 		auto ManifestDigest = CHash_SHA256::fs_DigestFromData(pState->m_ManifestStream.f_GetVector());
 
 		ERSyncFlag RSyncFlags = ERSyncFlag_None;
-		if (mp_Backup->f_InterfaceVersion() >= EBackupManagerProtocolVersion_UseSHA256)
+		if (InterfaceVersion >= EBackupManagerProtocolVersion_UseSHA256)
 			RSyncFlags |= ERSyncFlag_UseSHA256;
 
 		{
@@ -936,7 +942,8 @@ namespace NMib::NCloud::NPrivate
 						if (ManifestChange.f_GetTypeID() == CBackupManagerBackup::EManifestChange_Rename)
 						{
 							auto &RenameChange = ManifestChange.f_Get<CBackupManagerBackup::EManifestChange_Rename>();
-							NewRenameDigest = RenameChange.m_ManifestFile.m_Digest;
+							if (RenameChange.m_ManifestFile.m_Digest)
+								NewRenameDigest = *RenameChange.m_ManifestFile.m_Digest;
 							RenameChange.m_ManifestFile.m_Digest = pManifestFile->m_Digest;
 						}
 					}
@@ -1043,7 +1050,7 @@ namespace NMib::NCloud::NPrivate
 											fp_FileFinished(Change.m_FromFileName);
 
 											CBackupManagerBackup::fs_ApplyManifestChange(mp_Manifest, _FileName, ManifestChange);
-											if (Change.m_ManifestFile.m_Digest == NewRenameDigest)
+											if (Change.m_ManifestFile.m_Digest && *Change.m_ManifestFile.m_Digest == NewRenameDigest)
 											{
 												DMibCloudBackupManagerDebugOut("Rename MATCH digest: {} -> {}\n", SourceFile, _FileName);
 												ChangePromise.f_SetResult();
@@ -1099,7 +1106,7 @@ namespace NMib::NCloud::NPrivate
 				(
 					!File.f_IsFile()
 					|| !(File.m_Flags & EDirectoryManifestSyncFlag_Append)
-					|| File.m_Digest == _ChecksumState.m_DigestState.f_GetDigest()
+					|| (File.m_Digest && *File.m_Digest == _ChecksumState.m_DigestState.f_GetDigest())
 				)
 			;
 		}

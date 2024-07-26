@@ -18,7 +18,11 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void CBackupManagerBackup::CManifestFile::f_Stream(tf_CStream &_Stream)
 	{
-		NFile::CDirectoryManifestFile::f_Stream(_Stream, 0x102);
+		NFile::CDirectoryManifest::EManifestStreamVersion ManifestVersion = NFile::CDirectoryManifest::EManifestStreamVersion_Min;
+		if (_Stream.f_GetVersion() >= EBackupManagerProtocolVersion_OptionalDigest)
+			ManifestVersion = NFile::CDirectoryManifest::EManifestStreamVersion_OptionalDigest;
+
+		NFile::CDirectoryManifestFile::f_Stream(_Stream, ManifestVersion);
 	}
 
 	inline NFile::CDirectoryManifestFile &CBackupManagerBackup::CManifestFile::f_ManifestFile()

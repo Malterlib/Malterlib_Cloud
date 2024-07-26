@@ -31,7 +31,7 @@ namespace NMib::NCloud
 			f_BackupInstance_ReportFinishedStarting(RunningInstance.m_Instance);
 	}
 
-	TCFuture<void> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_AppendManifest(CDirectoryManifestConfig const &_Config)
+	TCFuture<void> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_AppendManifest(CManifestConfig const &_Config)
 	{
 		if (!_Config.m_Root.f_IsEmpty())
 			co_return DMibErrorInstance("You cannot change manifest root when appending manifest");
