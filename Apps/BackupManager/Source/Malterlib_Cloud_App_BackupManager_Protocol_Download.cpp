@@ -15,12 +15,19 @@ namespace NMib::NCloud::NBackupManager
 	
 	TCFuture<void> CBackupManagerServer::CBackupDownload::f_Destroy()
 	{
+		co_await ECoroutineFlag_AllowReferences;
+
 		auto DirectorySend = fg_Move(m_DirectorySyncSend);
+		auto Subscription = fg_Move(m_Subscription);
 
 		CLogError LogError("Mib/Cloud/BackupManager");
 
-		if (m_Subscription)
-			co_await m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for backup download to destroy").f_Wrap() > LogError.f_Warning("Failed to destroy subscription");
+		if (Subscription)
+		{
+			co_await fg_Exchange(Subscription, nullptr)->f_Destroy().f_Timeout(10.0, "Timed out waiting for backup download to destroy").f_Wrap()
+				> LogError.f_Warning("Failed to destroy subscription")
+			;
+		}
 
 		if (DirectorySend)
 			co_await fg_Move(DirectorySend).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy directory sync send in destroy");
@@ -93,33 +100,41 @@ namespace NMib::NCloud::NBackupManager
 
 					auto Subscription = fg_Move(pDownload->m_Subscription);
 
-					auto GetResultFuture = g_Future <<= pDownload->m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult);
-					pThis->mp_BackupDownloads.f_Remove(DownloadID);
-
-					auto GetResultResult = co_await fg_Move(GetResultFuture).f_Wrap();
-					if (!GetResultResult)
-						Auditor.f_Error(fg_Format("'{}' Failed to get sync result for: {}", Desc, GetResultResult.f_GetExceptionStr()));
-					else
+					if (pDownload->m_DirectorySyncSend)
 					{
-						auto &Result = *GetResultResult;
+						auto GetResultFuture = g_Future <<= pDownload->m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult);
+						pThis->mp_BackupDownloads.f_Remove(DownloadID);
 
-						CStr StatsMessage;
-						uint64 nBytes = Result.m_Stats.m_IncomingBytes + Result.m_Stats.m_OutgoingBytes;
+						auto GetResultResult = co_await fg_Move(GetResultFuture).f_Wrap();
+						if (!GetResultResult)
+							Auditor.f_Error(fg_Format("'{}' Failed to get sync result for: {}", Desc, GetResultResult.f_GetExceptionStr()));
+						else
+						{
+							auto &Result = *GetResultResult;
 
-						StatsMessage = fg_Format
-							(
-								"{} files using {ns } bytes at {fe2} MB/s"
-								, Result.m_Stats.m_nSyncedFiles
-								, nBytes
-								, (fp64(nBytes) / Result.m_Stats.m_nSeconds) / 1'000'000.0
-							)
-						;
+							CStr StatsMessage;
+							uint64 nBytes = Result.m_Stats.m_IncomingBytes + Result.m_Stats.m_OutgoingBytes;
 
-						Auditor.f_Info(fg_Format("'{}' Backup download finished transferring: {}", Desc, StatsMessage));
+							StatsMessage = fg_Format
+								(
+									"{} files using {ns } bytes at {fe2} MB/s"
+									, Result.m_Stats.m_nSyncedFiles
+									, nBytes
+									, (fp64(nBytes) / Result.m_Stats.m_nSeconds) / 1'000'000.0
+								)
+							;
+
+							Auditor.f_Info(fg_Format("'{}' Backup download finished transferring: {}", Desc, StatsMessage));
+						}
 					}
+					else
+						pThis->mp_BackupDownloads.f_Remove(DownloadID);
 
-					co_await CheckedOutDirectory.m_Subscription->f_Destroy();
-					co_await Subscription->f_Destroy();
+					if (CheckedOutDirectory.m_Subscription)
+						co_await CheckedOutDirectory.m_Subscription->f_Destroy();
+
+					if (Subscription)
+						co_await Subscription->f_Destroy();
 
 					co_return {};
 				}
