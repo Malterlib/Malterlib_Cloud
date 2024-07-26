@@ -50,8 +50,18 @@ namespace NMib::NCloud::NBackupManager
 			CHash_SHA256 m_Hash;
 		};
 
-		CInternal(CStr const &_Name, CTime const &_StartTime, CStr const &_ID, CStr const &_RootDirectory, bool _bForceNew, TCActor<CBackupSource> const &_BackupSource)
-			: m_Name(_Name)
+		CInternal
+			(
+				CBackupInstance *_pThis
+				, CStr const &_Name
+				, CTime const &_StartTime
+				, CStr const &_ID
+				, CStr const &_RootDirectory
+				, bool _bForceNew
+				, TCActor<CBackupSource> const &_BackupSource
+			)
+			: m_pThis(_pThis)
+			, m_Name(_Name)
 			, m_StartTime(_StartTime)
 			, m_ID(_ID)
 			, m_RootDirectory(_RootDirectory)
@@ -102,6 +112,8 @@ namespace NMib::NCloud::NBackupManager
 		COnScopeExitShared f_FilePending(CStr const &_FileName);
 		void f_OnPendingQuiescence(TCFunctionMutable<void ()> &&_fOnQuiescence);
 		void fp_UpdatePendingQuiescence();
+
+		CBackupInstance *m_pThis = nullptr;
 
 		CStr m_Name;
 		CTime m_StartTime;

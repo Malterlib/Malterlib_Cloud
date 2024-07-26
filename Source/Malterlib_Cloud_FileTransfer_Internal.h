@@ -96,8 +96,8 @@ namespace NMib::NCloud
 		uint32 m_Version = EProtocolVersion_Current;
 		
 		CManifest m_Manifest;
-		uint64 m_QueueSize = 8*1024*1024;
-		NConcurrency::TCActor<> m_DispatchActor; 
+		uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
+		NConcurrency::TCActor<> m_DispatchActor;
 		NFunction::TCFunctionMovable<NConcurrency::TCFuture<CInternal::CSendPart::CResult> (CInternal::CSendPart &&_Part)> m_fSendPart;
 		NFunction::TCFunctionMovable<NConcurrency::TCFuture<CInternal::CStateChange::CResult> (CInternal::CStateChange &&_State)> m_fStateChange;
 	};

@@ -7,7 +7,7 @@
 namespace NMib::NCloud::NBackupManager
 {
 	CBackupInstance::CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID, CStr const &_RootDirectory, bool _bForceNew, TCActor<CBackupSource> const &_BackupSource)
-		: mp_pInternal(fg_Construct(_Name, _StartTime, _ID, _RootDirectory, _bForceNew, _BackupSource))
+		: mp_pInternal(fg_Construct(this, _Name, _StartTime, _ID, _RootDirectory, _bForceNew, _BackupSource))
 	{
 	}
 

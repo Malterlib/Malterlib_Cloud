@@ -33,7 +33,7 @@ namespace NMib::NCloud
 			NFile::CDirectoryManifestConfig m_ManifestConfig;										///< The config to generate the manifest
 			NTime::CTimeSpan m_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);	///< Interval for creating new full backup snapshots. Set to 0 to disable.
 			NStr::CStr m_LogCategory = "Backup";													///< The category to do logging under.
-			uint32 m_MaxSendQueue = 8*1024*1024;													///< The maximum number of bytes to queue on the network
+			uint32 m_MaxSendQueue = NFile::gc_IdealNetworkQueueSize;								///< The maximum number of bytes to queue on the network
 			fp32 m_ChangeAggregationTime = 1.0;														///< The number of seconds to aggregate changes over
 			bool m_bReportChangesInInitialFinished = false;											///< Include added/removed/updated files in InitialFinished notification
 		};

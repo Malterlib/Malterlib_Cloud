@@ -188,7 +188,7 @@ namespace NMib::NCloud::NCloudClient
 						, "TransferQueueSize?"_o=
 						{
 							"Names"_o= {"--queue-size"}
-							, "Default"_o= int64(8*1024*1024)
+							, "Default"_o= int64(NFile::gc_IdealNetworkQueueSize)
 							, "Description"_o= "The amount of data to keep in flight while uploading."
 						}
 						, "CurrentDirectory?"_o=
@@ -311,7 +311,7 @@ namespace NMib::NCloud::NCloudClient
 						, "TransferQueueSize?"_o=
 						{
 							"Names"_o= {"--queue-size"}
-							, "Default"_o= int64(8*1024*1024)
+							, "Default"_o= int64(NFile::gc_IdealNetworkQueueSize)
 							, "Description"_o= "The amount of data to keep in flight while downloading."
 						}
 					}

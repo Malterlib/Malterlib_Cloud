@@ -28,6 +28,8 @@ namespace NMib::NCloud::NBackupManager
 	private:
 		TCFuture<void> fp_Destroy() override;
 
+		constexpr static uint32 mc_QueueSize = NFile::gc_IdealNetworkQueueSize;
+
 		struct CInternal;
 		TCUniquePointer<CInternal> mp_pInternal;
 	};

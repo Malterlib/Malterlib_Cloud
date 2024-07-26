@@ -45,8 +45,8 @@ namespace NMib::NCloud
 	struct CFileTransferSend : public NConcurrency::CActor
 	{
 		~CFileTransferSend();
-		CFileTransferSend(NStr::CStr const &_BasePath);
-		
+		CFileTransferSend(NStr::CStr const &_BasePath, uint64 _MaxQueueSize = NFile::gc_IdealNetworkQueueSize);
+
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SendFiles(CFileTransferContext &&_TransferContext);
 		NConcurrency::TCFuture<CFileTransferResult> f_GetResult();
 		

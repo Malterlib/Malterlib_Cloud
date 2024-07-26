@@ -70,6 +70,7 @@ namespace NMib::NCloud
 		CFileTransferContext::CInternal m_Params;
 		CWorkQueue m_Queue;
 		uint64 m_OutstandingBytes = 0;
+		uint64 m_MaxQueueSize = 0;
 		TCSharedPointer<CFileState> m_pFileState = fg_Construct();
 		
 		NConcurrency::TCPromise<CFileTransferResult> m_Promise;
@@ -81,11 +82,12 @@ namespace NMib::NCloud
 
 	CFileTransferSend::~CFileTransferSend() = default;
 
-	CFileTransferSend::CFileTransferSend(NStr::CStr const &_BasePath)
+	CFileTransferSend::CFileTransferSend(NStr::CStr const &_BasePath, uint64 _MaxQueueSize)
 		: mp_pInternal(fg_Construct(this)) 
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_pFileState->m_RootPath = _BasePath;
+		Internal.m_MaxQueueSize = _MaxQueueSize;
 	}
 
 	TCFuture<void> CFileTransferSend::fp_Destroy()
@@ -151,9 +153,9 @@ namespace NMib::NCloud
 									Entry.m_Position = ExpectedSize;
 								else
 								{
-									// Re-upload last 128 KiB
-									if (pFile->m_FileSize > 128*1024)
-										Entry.m_Position = pFile->m_FileSize - 128*1024;
+									// Re-upload last 1024 KiB, aligned
+									if (pFile->m_FileSize > NFile::gc_IdealIoSize)
+										Entry.m_Position = fg_AlignDown(pFile->m_FileSize - NFile::gc_IdealIoSize, NFile::gc_IdealIoSize);
 									else
 										Entry.m_Position = 0;
 								}
@@ -222,7 +224,7 @@ namespace NMib::NCloud
 			CStr FileName = Entry.m_FileName;
 			CStr RelativeFileName = Entry.m_RelativeFileName;
 			uint64 Position = Entry.m_Position;
-			uint64 nBytes = fg_Min(Entry.m_Size - Entry.m_Position, 64u*1024u, CActorDistributionManager::mc_HalfMaxMessageSize);
+			uint64 nBytes = fg_Min(Entry.m_Size - Entry.m_Position, NFile::gc_IdealIoSize, CActorDistributionManager::mc_HalfMaxMessageSize);
 			Entry.m_Position += nBytes;
 			bool bFinished = Entry.f_IsFinished(); 
 			if (bFinished)
@@ -296,6 +298,9 @@ namespace NMib::NCloud
 		Internal.m_bCalled = true;
 
 		auto &Params = *_TransferContext.mp_pInternal;
+
+		if (Params.m_QueueSize > Internal.m_MaxQueueSize)
+			co_return DMibErrorInstance("Queue size larger than maximum allowed");
 
 		for (auto &FileInfo : Params.m_Manifest.m_Files)
 		{

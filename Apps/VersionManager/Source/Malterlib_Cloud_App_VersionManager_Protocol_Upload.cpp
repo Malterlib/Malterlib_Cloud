@@ -87,6 +87,9 @@ namespace NMib::NCloud::NVersionManager
 		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
 			co_return Auditor.f_Exception({"Invalid version platform format", "(start upload version)"});
 
+		if (_Params.m_QueueSize > mcp_MaxQueueSize)
+			co_return Auditor.f_Exception("Queue size larger than maximum allowed");
+
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["//Command//"] = {{"Application/WriteAll", fg_Format("Application/Write/{}", _Params.m_Application)}};

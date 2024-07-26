@@ -18,8 +18,23 @@ namespace NMib::NCloud::NBackupManager
 
 			try
 			{
-				if (_Context.m_pClient->f_ProcessPacket(_ServerPacket, ToSendToServer, bWantOneMoreProcess))
+				if
+					(
+						_Context.m_pClient->f_ProcessPacket
+						(
+							_ServerPacket
+							, ToSendToServer
+							, bWantOneMoreProcess
+							, [this]
+							{
+								if (m_pThis->f_IsDestroyed())
+									DMibError("Aborted");
+							}
+						)
+					)
+				{
 					bDone = true;
+				}
 			}
 			catch (CException const &_Exception)
 			{
@@ -233,14 +248,25 @@ namespace NMib::NCloud::NBackupManager
 					{
 						RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 						RSyncContext.m_TempFile.f_Open(_TempFileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
-						RSyncContext.m_pClient = fg_Construct(RSyncContext.m_File, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, &RSyncContext.m_TempFile, RSyncFlags);
+						RSyncContext.m_pClient = fg_Construct
+							(
+								RSyncContext.m_File
+								, RSyncContext.m_File
+								, 256
+								, 4 * 1024 * 1024
+								, 8 * 1024 * 1024
+								, mc_QueueSize
+								, &RSyncContext.m_TempFile
+								, RSyncFlags
+							)
+						;
 					}
 					else
 					{
 						bUseOld = true;
 						RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 						RSyncContext.m_SourceFile.f_Open(_OldFileName, EFileOpen_Read | EFileOpen_ShareAll);
-						RSyncContext.m_pClient = fg_Construct(RSyncContext.m_SourceFile, RSyncContext.m_File, 256, 4*1024*1024, 8*1024*1024, nullptr, RSyncFlags);
+						RSyncContext.m_pClient = fg_Construct(RSyncContext.m_SourceFile, RSyncContext.m_File, 256, 4 * 1024 * 1024, 8 * 1024 * 1024, mc_QueueSize, nullptr, RSyncFlags);
 					}
 
 					DMibLogWithCategory

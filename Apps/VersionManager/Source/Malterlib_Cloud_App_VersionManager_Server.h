@@ -146,6 +146,8 @@ namespace NMib::NCloud::NVersionManager
 		bool fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version);
 		CSubscription const *fp_GetSubscription(CStr const &_ApplicationName, CStr const &_SubscriptionID) const;
 
+		constexpr static uint32 mcp_MaxQueueSize = NFile::gc_IdealNetworkQueueSize;
+
 		TCDistributedActorInstance<CVersionManagerImplementation> mp_ProtocolInterface;
 
 		CDistributedAppState &mp_AppState;

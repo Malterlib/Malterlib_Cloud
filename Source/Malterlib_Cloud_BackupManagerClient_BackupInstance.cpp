@@ -127,7 +127,7 @@ namespace NMib::NCloud::NPrivate
 		{
 			RunningState.m_File.f_Open(FullPath, EFileOpen_Read | EFileOpen_ShareAll | EFileOpen_ShareBypass | EFileOpen_NoLocalCache);
 			RunningState.m_LimitedFile.f_Open(&RunningState.m_File, 0, _PendingFile.m_ManifestFile.m_Length);
-			RunningState.m_pRSyncServer = fg_Construct(RunningState.m_LimitedFile, 8*1024*1024, RSyncFlags);
+			RunningState.m_pRSyncServer = fg_Construct(RunningState.m_LimitedFile, 8 * 1024 * 1024, RSyncFlags);
 		}
 		catch (CExceptionFile const &_Exception)
 		{
@@ -224,7 +224,19 @@ namespace NMib::NCloud::NPrivate
 							NContainer::CSecureByteVector ToSendToClient;
 							auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName);
 
-							if (pRunningState->m_pRSyncServer->f_ProcessPacket(_Packet, ToSendToClient))
+							if
+								(
+									pRunningState->m_pRSyncServer->f_ProcessPacket
+									(
+										_Packet
+										, ToSendToClient
+										, [this]
+										{
+											if (f_IsDestroyed())
+												DMibError("Aborted");
+										}
+									)
+								)
 							{
 								if (pPendingFile)
 									pPendingFile->m_bFinished = true;
@@ -634,7 +646,7 @@ namespace NMib::NCloud::NPrivate
 
 		{
 			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to prepare manifest rsync");
-			pState->m_pRSyncServer = fg_Construct(pState->m_ManifestStream, 8*1024*1024, RSyncFlags);
+			pState->m_pRSyncServer = fg_Construct(pState->m_ManifestStream, 8 * 1024 * 1024, RSyncFlags);
 		}
 
 		TCPromise<void> Promise;
@@ -682,8 +694,22 @@ namespace NMib::NCloud::NPrivate
 							TCFuture<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
 							{
 								NContainer::CSecureByteVector ToSendToClient;
-								if (mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket(_Packet, ToSendToClient))
+								if
+									(
+										mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket
+										(
+											_Packet
+											, ToSendToClient
+											, [this]
+											{
+												if (f_IsDestroyed())
+													DMibError("Aborted");
+											}
+										)
+									)
+								{
 									mp_pManifestSyncState->m_bDone = true;
+								}
 
 								return ToSendToClient;
 							}

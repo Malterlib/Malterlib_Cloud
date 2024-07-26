@@ -164,7 +164,7 @@ namespace NMib::NCloud
 			NStr::CStr m_Application;
 			CVersionIDAndPlatform m_VersionIDAndPlatform;
 			CVersionInformation m_VersionInfo;
-			uint64 m_QueueSize = 8*1024*1024;
+			uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
 			EFlag m_Flags = EFlag_None;
 			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CStartUploadTransfer::CResult> (CStartUploadTransfer &&_Params)> m_fStartTransfer;
 		};
@@ -279,7 +279,7 @@ namespace NMib::NCloud
 		CVersionManagerHelper
 			(
 				NStr::CStr const &_RootDirectory
-				, uint64 _QueueSize = 8*1024*1024
+				, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize
 				, fp64 _Timeout = 30.0
 			)
 		;
