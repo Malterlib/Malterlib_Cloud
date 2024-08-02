@@ -61,16 +61,16 @@ namespace NMib::NCloud::NBackupManager
 								CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
 								State.m_File.f_Open(FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll | EFileOpen_NoLocalCache);
 
-								uint8 Buffer[32768];
+								CFileIoTempBuffer Buffer;
 
 								for (uint64 ToDigest = ManifestFile.m_Length; ToDigest; )
 								{
-									uint64 ThisTime = fg_Min(ToDigest, 32768);
+									auto BufferResult = Buffer.f_UseBuffer(ToDigest);
 
-									State.m_File.f_Read(Buffer, ThisTime);
-									State.m_Hash.f_AddData(Buffer, ThisTime);
+									State.m_File.f_Read(BufferResult.m_pBuffer, BufferResult.m_nBytes);
+									State.m_Hash.f_AddData(BufferResult.m_pBuffer, BufferResult.m_nBytes);
 
-									ToDigest -= ThisTime;
+									ToDigest -= BufferResult.m_nBytes;
 								}
 
 								if (ManifestFile.m_Digest && State.m_Hash.f_GetDigest() != *ManifestFile.m_Digest)

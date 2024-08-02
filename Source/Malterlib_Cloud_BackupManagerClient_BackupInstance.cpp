@@ -189,13 +189,15 @@ namespace NMib::NCloud::NPrivate
 								AppendState.m_Position = RunningState.m_ManifestFile.m_Length;
 								AppendState.m_DigestState.f_Reset();
 								RunningState.m_LimitedFile.f_SetPosition(0);
-								uint8 Buffer[16*1024];
+
+								CFileIoTempBuffer Buffer;
+
 								for (auto Position = 0; Position < AppendState.m_Position;)
 								{
-									mint ThisTime = fg_Min(AppendState.m_Position - Position, 16*1024);
-									RunningState.m_LimitedFile.f_ConsumeBytes(Buffer, ThisTime);
-									AppendState.m_DigestState.f_AddData(Buffer, ThisTime);
-									Position += ThisTime;
+									auto BufferResult = Buffer.f_UseBuffer(AppendState.m_Position - Position);
+									RunningState.m_LimitedFile.f_ConsumeBytes(BufferResult.m_pBuffer, BufferResult.m_nBytes);
+									AppendState.m_DigestState.f_AddData(BufferResult.m_pBuffer, BufferResult.m_nBytes);
+									Position += BufferResult.m_nBytes;
 								}
 								RunningState.m_LimitedFile.f_SetPosition(0);
 								if (RunningState.m_ManifestFile.m_Digest && AppendState.m_DigestState.f_GetDigest() != *RunningState.m_ManifestFile.m_Digest)

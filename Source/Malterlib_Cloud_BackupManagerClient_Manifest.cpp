@@ -50,13 +50,13 @@ namespace NMib::NCloud
 						{
 							AppendState.m_ManifestFile.m_Length = AppendState.m_File.f_GetLength();
 
-							uint8 Buffer[16384];
+							CFileIoTempBuffer Buffer;
 
 							while (AppendState.m_ChecksumState.m_Position < AppendState.m_ManifestFile.m_Length)
 							{
-								auto ThisTime = fg_Min(AppendState.m_ManifestFile.m_Length - AppendState.m_File.f_GetPosition(), 16384);
-								AppendState.m_File.f_Read(Buffer, ThisTime);
-								AppendState.m_ChecksumState.m_DigestState.f_AddData(Buffer, ThisTime);
+								auto BufferResult = Buffer.f_UseBuffer(AppendState.m_ManifestFile.m_Length - AppendState.m_File.f_GetPosition());
+								AppendState.m_File.f_Read(BufferResult.m_pBuffer, BufferResult.m_nBytes);
+								AppendState.m_ChecksumState.m_DigestState.f_AddData(BufferResult.m_pBuffer, BufferResult.m_nBytes);
 								AppendState.m_ChecksumState.m_Position = uint64(AppendState.m_File.f_GetPosition());
 							}
 
