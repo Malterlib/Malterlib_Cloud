@@ -650,7 +650,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Return);
 	}
 
-	TCFuture<void> CCloudManagerServer::CCloudManagerImplementation::f_RemoveAppManager(NStr::CStr const &_AppManagerHostID)
+	TCFuture<CCloudManager::CRemoveAppManagerReturn> CCloudManagerServer::CCloudManagerImplementation::f_RemoveAppManager(NStr::CStr const &_AppManagerHostID)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -683,11 +683,11 @@ namespace NMib::NCloud::NCloudManager
 				co_await Interface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app manager interface subscription");
 		}
 
-		co_await (pThis->self(&CCloudManagerServer::fp_RemoveAppManagerData, _AppManagerHostID) % Auditor);
+		auto Result = co_await (pThis->self(&CCloudManagerServer::fp_RemoveAppManagerData, _AppManagerHostID) % Auditor);
 
 		Auditor.f_Info("Remove App Manager");
 
-		co_return {};
+		co_return Result;
 	}
 
 	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveSensor(CRemoveSensor &&_RemoveSensor)

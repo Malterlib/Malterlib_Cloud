@@ -319,17 +319,16 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<void> CCloudManagerServer::fp_RemoveAppManagerData(CStr const &_HostID)
+	TCFuture<CCloudManager::CRemoveAppManagerReturn> CCloudManagerServer::fp_RemoveAppManagerData(CStr const &_HostID)
 	{
 		auto OnResume = co_await f_CheckDestroyedOnResume();
 
 		TCSharedPointer<TCSet<CStr>> pRemovedHostIDs = fg_Construct();
-		(*pRemovedHostIDs)[_HostID];
 
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), _HostID, pRemovedHostIDs](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) 
+				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), _HostID, pRemovedHostIDs](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting)
 				-> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
@@ -348,7 +347,9 @@ namespace NMib::NCloud::NCloudManager
 					}
 
 					if (!bFoundAppManager)
-						co_return DMibErrorInstance("App manager does not exist");
+						co_return CDatabaseActor::CTransactionWrite::fs_Empty();
+
+					(*pRemovedHostIDs)[_HostID];
 
 					for (auto ApplicationCursor = WriteTransaction.m_Transaction.f_WriteCursor(CApplicationKey::mc_Prefix, _HostID); ApplicationCursor;)
 					{
@@ -373,10 +374,18 @@ namespace NMib::NCloud::NCloudManager
 			co_return Result.f_GetException();
 		}
 
-		co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveHosts, *pRemovedHostIDs);
-		co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_RemoveHosts, *pRemovedHostIDs);
+		CCloudManager::CRemoveAppManagerReturn Statistics;
 
-		co_return {};
+		if (!pRemovedHostIDs->f_IsEmpty())
+		{
+			Statistics.m_nRemovedAppManagers = 1;
+			Statistics.m_nRemovedHostIDs += pRemovedHostIDs->f_GetLen();
+
+			co_await mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_RemoveHosts, *pRemovedHostIDs);
+			co_await mp_AppLogStore(&CDistributedAppLogStoreLocal::f_RemoveHosts, *pRemovedHostIDs);
+		}
+
+		co_return Statistics;
 	}
 
 	namespace

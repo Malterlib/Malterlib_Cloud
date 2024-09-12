@@ -1255,10 +1255,11 @@ namespace NMib::NCloud::NCloudClient
 	{
 		CStr Host = _Params["Host"].f_String();
 		CStr AppManagerHostID = _Params["AppManagerHostID"].f_String();
+		bool bQuiet = _Params["Quiet"].f_Boolean();
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
-		TCActorResultVector<void> AppManagersResults;
+		TCActorResultVector<CCloudManager::CRemoveAppManagerReturn> AppManagersResults;
 
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
@@ -1269,7 +1270,24 @@ namespace NMib::NCloud::NCloudClient
 			(CloudManager.f_CallActor(&CCloudManager::f_RemoveAppManager)(AppManagerHostID) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
 		}
 
-		co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+		auto RemoveStatistics = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+
+		if (!bQuiet)
+		{
+			CCloudManager::CRemoveAppManagerReturn AggregatedStatistics;
+
+			for (auto &Statistic : RemoveStatistics)
+			{
+				AggregatedStatistics.m_nRemovedAppManagers += Statistic.m_nRemovedAppManagers;
+				AggregatedStatistics.m_nRemovedHostIDs += Statistic.m_nRemovedHostIDs;
+			}
+
+			*_pCommandLine %= "Removed {} app managers\n"
+				"Removed {} host IDs\n"_f
+				<< AggregatedStatistics.m_nRemovedAppManagers
+				<< AggregatedStatistics.m_nRemovedHostIDs
+			;
+		}
 
 		co_return 0;
 	}

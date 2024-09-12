@@ -222,4 +222,14 @@ namespace NMib::NCloud
 		_Stream % m_Filter;
 		_Stream % m_SnoozeDuration;
 	}
+	
+	template <typename tf_CStream>
+	void CCloudManager::CRemoveAppManagerReturn::f_Stream(tf_CStream &_Stream)
+	{
+		if (_Stream.f_GetVersion() >= ECloudManagerProtocolVersion_StatisticsInAppManagerRemove)
+		{
+			_Stream % m_nRemovedAppManagers;
+			_Stream % m_nRemovedHostIDs;
+		}
+	}
 }

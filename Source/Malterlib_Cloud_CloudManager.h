@@ -35,8 +35,9 @@ namespace NMib::NCloud
 		, ECloudManagerProtocolVersion_SupportFilterInRemoveSensorAndLog = 0x118
 		, ECloudManagerProtocolVersion_SupportAppManagerCloudManagerInterface = 0x119
 		, ECloudManagerProtocolVersion_DistinguishReportedAndActualProblemState = 0x120
+		, ECloudManagerProtocolVersion_StatisticsInAppManagerRemove = 0x121
 
-		, ECloudManagerProtocolVersion_Current = 0x120
+		, ECloudManagerProtocolVersion_Current = 0x121
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
@@ -233,6 +234,15 @@ namespace NMib::NCloud
 			NConcurrency::CDistributedAppLogReader_LogFilter m_Filter;
 		};
 
+		struct CRemoveAppManagerReturn
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			uint32 m_nRemovedAppManagers = 0;
+			uint32 m_nRemovedHostIDs = 0;
+		};
+
 		virtual NConcurrency::TCFuture<CRegisterAppManagerResult> f_RegisterAppManager
 			(
 				NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
@@ -242,7 +252,7 @@ namespace NMib::NCloud
 		;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() = 0;
-		virtual NConcurrency::TCFuture<void> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) = 0;
+		virtual NConcurrency::TCFuture<CRemoveAppManagerReturn> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) = 0;
 		virtual NConcurrency::TCFuture<uint32> f_RemoveSensor(CRemoveSensor &&_RemoveSensor) = 0;
 		virtual NConcurrency::TCFuture<uint32> f_RemoveLog(CRemoveLog &&_RemoveLog) = 0;
 		virtual NConcurrency::TCFuture<uint32> f_SnoozeSensor(CSnoozeSensor &&_SnoozeSensor) = 0;
