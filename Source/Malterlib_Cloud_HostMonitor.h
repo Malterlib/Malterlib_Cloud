@@ -138,6 +138,7 @@ namespace NMib::NCloud
 			EInitFlag m_Flags = EInitFlag_None;
 			fp64 m_Interval = mc_DefaultHostMonitorInterval;
 			fp64 m_PatchInterval = mc_DefaultHostMonitorPatchInterval;
+			fp64 m_MemoryInterval = mc_DefaultHostMonitorMemoryInterval;
 
 			fp64 m_ReportErrorAfter_OsVersion = 7_days;
 
@@ -178,6 +179,8 @@ namespace NMib::NCloud
 
 		static constexpr pfp64 mc_MinimumHostMonitorPatchInterval = 5_minutes;
 		static constexpr pfp64 mc_DefaultHostMonitorPatchInterval = 12_hours;
+
+		static constexpr pfp64 mc_DefaultHostMonitorMemoryInterval = 15_minutes;
 
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy();

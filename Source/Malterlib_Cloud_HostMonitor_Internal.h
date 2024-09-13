@@ -3,11 +3,12 @@
 
 #pragma once
 
-#include <Mib/File/ChangeNotificationActor>
 #include <Mib/Database/DatabaseActor>
+#include <Mib/Cloud/CloudManager>
 #include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Concurrency/DistributedAppInterface>
-#include <Mib/Cloud/CloudManager>
+#include <Mib/File/ChangeNotificationActor>
+#include <Mib/Memory/Platform>
 
 namespace NMib::NCloud
 {
@@ -70,6 +71,12 @@ namespace NMib::NCloud
 			NHostMonitorDatabase::CConfigFileHistoryEntryValue m_Value;
 		};
 
+		struct CMemoryStatistic
+		{
+			NMemory::CSystemMemoryStatisticCharacteristics m_Characteristics;
+			TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_SensorReporter;
+		};
+
 		TCFuture<CDistributedAppSensorReporter::CVersion> f_GetOsNameAndVersion();
 
 		TCFuture<void> f_SetupDatabase();
@@ -81,6 +88,7 @@ namespace NMib::NCloud
 		TCFuture<bool> f_PeriodicUpdate_Patch_OsVersion();
 		TCFuture<bool> f_PeriodicUpdate_Patch_ExpectedOsVersion();
 		TCFuture<bool> f_PeriodicUpdate_Patch_PatchStatus();
+		TCFuture<void> f_PeriodicUpdate_Memory(bool _bCanSkip);
 
 		CExceptionPointer f_ConfigFile_CheckFilePrerequisites(CMonitoredConfigFile * &o_pConfigFile, CStr _ConfigID, CStr _FileName);
 
@@ -135,5 +143,9 @@ namespace NMib::NCloud
 		TCOptional<CClock> m_PatchClock;
 		CCloudManager::CExpectedVersions m_ExpectedOsVersions;
 		CDistributedAppSensorReporter::CVersion m_CurrentOsVersion;
+
+		CSequencer m_UpdatePeriodicMemory{"HostMonitor UpdatePeriodicMemory"};
+		TCOptional<CClock> m_MemoryClock;
+		TCMap<CStr, CMemoryStatistic> m_MemoryReporters;
 	};
 }

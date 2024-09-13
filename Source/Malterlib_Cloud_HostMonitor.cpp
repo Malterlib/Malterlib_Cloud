@@ -98,6 +98,7 @@ namespace NMib::NCloud
 			(
 				f_PeriodicUpdate_Diskspace(true)
 				+ f_PeriodicUpdate_Patch(true)
+				+ f_PeriodicUpdate_Memory(true)
 			)
 		;
 
@@ -171,6 +172,12 @@ namespace NMib::NCloud
 
 		if (Internal.m_OsPatchStatusReporter && Internal.m_OsPatchStatusReporter->m_fReportReadings)
 			fg_Move(Internal.m_OsPatchStatusReporter->m_fReportReadings).f_Destroy() > Destroys.f_AddResult();
+
+		for (auto &Reporter : Internal.m_MemoryReporters)
+		{
+			if (Reporter.m_SensorReporter && Reporter.m_SensorReporter->m_fReportReadings)
+				fg_Move(Reporter.m_SensorReporter->m_fReportReadings).f_Destroy() > Destroys.f_AddResult();
+		}
 
 		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy host monitor");
 
