@@ -84,7 +84,7 @@ namespace NMib::NCloud::NTest
 						SensorInfo.m_Identifier = "org.malterlib.testapp.test";
 						SensorInfo.m_Name = "Test Sensor";
 						SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Float;
-						SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_DiskSpaceDivisors();
+						SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_BytesDivisors();
 					}
 					auto SensorReporter = co_await fp_OpenSensorReporter(fg_Move(SensorInfo));
 

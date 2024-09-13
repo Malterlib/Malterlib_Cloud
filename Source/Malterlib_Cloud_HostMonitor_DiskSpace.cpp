@@ -56,7 +56,7 @@ namespace NMib::NCloud
 					case CInternal::ESensorType_Free:
 					case CInternal::ESensorType_Total:
 						SensorInfo.m_Type = CDistributedAppSensorReporter::ESensorDataType_Integer;
-						SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_DiskSpaceDivisors();
+						SensorInfo.m_UnitDivisors = CDistributedAppSensorReporter::fs_BytesDivisors();
 						break;
 					case CInternal::ESensorType_FreePercent:
 						SensorInfo.m_Type = CDistributedAppSensorReporter::ESensorDataType_Float;
