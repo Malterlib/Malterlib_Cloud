@@ -62,7 +62,7 @@ namespace NMib::NCloud::NAppManager
 		
 		if (auto *pValue = _Params.f_GetMember("Package"))
 		{
-			Package = _Params["Package"].f_String();
+			Package = pValue->f_String();
 			if (Package.f_IsEmpty())
 				co_return DMibErrorInstance("You have to specify a package");
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
