@@ -344,6 +344,71 @@ namespace NMib::NCloud::NAppManager
 
 		if (!_FromLocalFile.f_IsEmpty() || bNullApplication)
 		{
+			auto fApplyVersionInfo = [&](CStr const &_VersionInfoContents, CTime const &_VersionTime)
+				{
+					try
+					{
+						CEJSONSorted VersionInfoJSON = CEJSONSorted::fs_FromString(_VersionInfoContents);
+
+						CStr Application;
+						CStr Version;
+						CStr Configuration;
+						CStr Platform;
+						CEJSONSorted ExtraInfo;
+
+						auto fApplySettings = [&](CEJSONSorted const &_Settings)
+							{
+								if (auto *pValue = _Settings.f_GetMember("Application", EJSONType_String))
+									Application = pValue->f_String();
+								if (auto *pValue = _Settings.f_GetMember("Version", EJSONType_String))
+									Version = pValue->f_String();
+								if (auto *pValue = _Settings.f_GetMember("Configuration", EJSONType_String))
+									Configuration = pValue->f_String();
+								if (auto *pValue = _Settings.f_GetMember("Platform", EJSONType_String))
+									Platform = pValue->f_String();
+								if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJSONType_Object))
+									ExtraInfo = pValue->f_Object();
+							}
+						;
+
+						fApplySettings(VersionInfoJSON);
+
+						if (Application.f_IsEmpty())
+							DMibError("Application must be specified");
+						if (Version.f_IsEmpty())
+							DMibError("Version must be specified");
+
+						if (!CVersionManager::fs_IsValidApplicationName(Application))
+							DMibError("Application format is invalid");
+
+						CVersionManager::CVersionIDAndPlatform VersionID;
+						{
+							CStr Error;
+							if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
+								DMibError(fg_Format("Version identifier format is invalid: {}", Error));
+						}
+
+						if (!CVersionManager::fs_IsValidPlatform(Platform))
+							DMibError("Invalid version platform format");
+
+						VersionID.m_Platform = Platform;
+
+						CVersionManager::CVersionInformation VersionInfo;
+						VersionInfo.m_Configuration = Configuration;
+						VersionInfo.m_ExtraInfo = ExtraInfo;
+						VersionInfo.m_Time = _VersionTime;
+
+						fApplyVersion(VersionID, VersionInfo);
+
+						pApplication->m_Settings.m_VersionManagerApplication = Application;
+					}
+					catch (CException const &_Exception)
+					{
+						_fOnInfo("Failed to parse version info from VersionInfo.json in package: {}"_f << _Exception);
+					}
+				}
+			;
+
 			if (_bSettingsFromVersionInfo && (_FromLocalFile.f_EndsWith(".tar.gz") || _FromLocalFile.f_EndsWith(".tar")))
 			{
 				auto &LaunchActor = mp_LaunchActors.f_Insert() = fg_Construct();
@@ -430,73 +495,45 @@ namespace NMib::NCloud::NAppManager
 				;
 
 				if (LaunchResult)
-				{
-					try
-					{
-						CEJSONSorted VersionInfoJSON = CEJSONSorted::fs_FromString(LaunchResult->f_GetStdOut());
-
-						CStr Application;
-						CStr Version;
-						CStr Configuration;
-						CStr Platform;
-						CEJSONSorted ExtraInfo;
-
-						auto fApplySettings = [&](CEJSONSorted const &_Settings)
-							{
-								if (auto *pValue = _Settings.f_GetMember("Application", EJSONType_String))
-									Application = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Version", EJSONType_String))
-									Version = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Configuration", EJSONType_String))
-									Configuration = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Platform", EJSONType_String))
-									Platform = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJSONType_Object))
-									ExtraInfo = pValue->f_Object();
-							}
-						;
-
-						fApplySettings(VersionInfoJSON);
-
-						if (Application.f_IsEmpty())
-							DMibError("Application must be specified");
-						if (Version.f_IsEmpty())
-							DMibError("Version must be specified");
-
-						if (!CVersionManager::fs_IsValidApplicationName(Application))
-							DMibError("Application format is invalid");
-
-						CVersionManager::CVersionIDAndPlatform VersionID;
-						{
-							CStr Error;
-							if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
-								DMibError(fg_Format("Version identifier format is invalid: {}", Error));
-						}
-
-						if (!CVersionManager::fs_IsValidPlatform(Platform))
-							DMibError("Invalid version platform format");
-
-						VersionID.m_Platform = Platform;
-
-						CVersionManager::CVersionInformation VersionInfo;
-						VersionInfo.m_Configuration = Configuration;
-						VersionInfo.m_ExtraInfo = ExtraInfo;
-						VersionInfo.m_Time = fGetVersionTime();
-
-						fApplyVersion(VersionID, VersionInfo);
-
-						pApplication->m_Settings.m_VersionManagerApplication = Application;
-					}
-					catch (CException const &_Exception)
-					{
-						_fOnInfo("Failed to parse version info from VersionInfo.json in package: {}"_f << _Exception);
-					}
-				}
+					fApplyVersionInfo(LaunchResult->f_GetStdOut(), fGetVersionTime());
 
 				SourcePath = _FromLocalFile;
 			}
 			else
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+				auto [VersionInfoContents, VersionTime] = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [_FromLocalFile]
+						{
+							if (!CFile::fs_FileExists(_FromLocalFile, EFileAttrib_Directory))
+								return fg_Tuple(CStr{}, CTime{});
+
+							CStr VersionInfoFile;
+
+							if (CFile::fs_FileExists(_FromLocalFile / "VersionInfo.json", EFileAttrib_Directory))
+								VersionInfoFile = _FromLocalFile / "VersionInfo.json";
+							else
+							{
+								auto Files = CFile::fs_FindFiles(_FromLocalFile / "*VersionInfo.json");
+
+								if (Files.f_GetLen() != 1)
+									return fg_Tuple(CStr{}, CTime{});
+
+								VersionInfoFile = Files[0];
+							}
+
+							return fg_Tuple(CFile::fs_ReadStringFromFile(VersionInfoFile, true), CFile::fs_GetWriteTime(VersionInfoFile));
+						}
+						% "Failed to unpack application" % Auditor
+					)
+				;
+
+				if (!VersionInfoContents.f_IsEmpty())
+					fApplyVersionInfo(VersionInfoContents, VersionTime);
+
 				SourcePath = _FromLocalFile;
+			}
 		}
 		else
 		{
