@@ -2,6 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_HostMonitor.h"
@@ -53,6 +54,20 @@ namespace NMib::NCloud
 			co_return DMibErrorInstance("Patch interval cannot be lower than interval");
 
 		auto &Internal = *mp_pInternal;
+		if (Internal.m_bInitialized)
+			co_return DMibErrorInstance("Host monitor has already been initialized");
+
+		auto AsyncDestroy = co_await fg_AsyncDestroy
+			(
+				[&]() -> TCFuture<void>
+				{
+					auto Future = fp_Destroy();
+					co_await fg_Move(Future);
+
+					co_return {};
+				}
+			)
+		;
 
 		Internal.m_Config = fg_Move(_Config);
 
@@ -84,6 +99,10 @@ namespace NMib::NCloud
 
 		if (Internal.m_Config.m_PatchInterval != 0.0)
 			Internal.f_PeriodicUpdate_Patch(true) > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to run initial patch update");
+
+		Internal.m_bInitialized = true;
+
+		AsyncDestroy.f_Clear();
 
 		co_return fg_Move(Result);
 	}

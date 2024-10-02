@@ -156,5 +156,7 @@ namespace NMib::NCloud
 		CSequencer m_UpdatePeriodicMemory{"HostMonitor UpdatePeriodicMemory"};
 		TCOptional<CClock> m_MemoryClock;
 		TCMap<CStr, CMemoryStatistic> m_MemoryReporters;
+
+		bool m_bInitialized = false;
 	};
 }
