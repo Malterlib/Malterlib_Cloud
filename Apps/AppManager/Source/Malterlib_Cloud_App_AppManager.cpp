@@ -500,6 +500,25 @@ namespace NMib::NCloud::NAppManager
 			mp_HostMonitorPatchInterval = CHostMonitor::mc_MinimumHostMonitorPatchInterval;
 		}
 
+		if (auto pValue = _Params.f_GetMember("HostMonitorMemoryInterval"))
+			mp_HostMonitorMemoryInterval = pValue->f_Float();
+		else
+			mp_HostMonitorMemoryInterval = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("HostMonitorMemoryInterval", mp_HostMonitorMemoryInterval).f_Float();
+
+		if (mp_HostMonitorMemoryInterval != 0.0 && mp_HostMonitorMemoryInterval < CHostMonitor::mc_MinimumHostMonitorMemoryInterval)
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Warning
+					, "Limited HostMonitorMemoryInterval to {} seconds as this is the lowest supported"
+					, CHostMonitor::mc_MinimumHostMonitorMemoryInterval
+					, mp_HostMonitorMemoryInterval
+				)
+			;
+			mp_HostMonitorMemoryInterval = CHostMonitor::mc_MinimumHostMonitorMemoryInterval;
+		}
+		
 		mp_AutoUpdateDelay = _Params["AutoUpdateDelay"].f_Float();
 
 		mp_KnownPlatforms[DMalterlibCloudPlatform];

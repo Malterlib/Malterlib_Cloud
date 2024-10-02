@@ -180,6 +180,7 @@ namespace NMib::NCloud
 		static constexpr pfp64 mc_MinimumHostMonitorPatchInterval = 5_minutes;
 		static constexpr pfp64 mc_DefaultHostMonitorPatchInterval = 12_hours;
 
+		static constexpr pfp64 mc_MinimumHostMonitorMemoryInterval = 10_seconds;
 		static constexpr pfp64 mc_DefaultHostMonitorMemoryInterval = 15_minutes;
 
 	private:

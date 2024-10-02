@@ -78,6 +78,19 @@ namespace NMib::NCloud::NAppManager
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
+					"HostMonitorMemoryInterval?"_o=
+					{
+						"Names"_o= {"--host-monitor-memory-interval"}
+						,"Type"_o= 0.0
+						, "Description"_o= "Override host monitor memory interval."
+					}
+				}
+			)
+		;
+
+		o_CommandLine.f_RegisterGlobalOptions
+			(
+				{
 					"EnableApplicationStatusSensors?"_o=
 					{
 						"Names"_o= {"--application-status-sensors"}

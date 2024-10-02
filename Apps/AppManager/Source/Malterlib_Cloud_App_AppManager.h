@@ -1053,6 +1053,8 @@ namespace NMib::NCloud::NAppManager
 
 		fp64 mp_HostMonitorInterval = CHostMonitor::mc_DefaultHostMonitorInterval;
 		fp64 mp_HostMonitorPatchInterval = CHostMonitor::mc_DefaultHostMonitorPatchInterval;
+		fp64 mp_HostMonitorMemoryInterval = CHostMonitor::mc_DefaultHostMonitorMemoryInterval;
+
 		TCActor<CHostMonitor> mp_HostMonitor;
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
 		CActorSubscription mp_MainConfigFileMonitorSubscription;
