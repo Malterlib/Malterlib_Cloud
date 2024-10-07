@@ -98,6 +98,18 @@ namespace NMib::NCloud
 
 		auto PatchesNeeded = co_await f_Patch_PatchesNeeded();
 
+		if
+			(
+				(PatchesNeeded.m_nSecurityPatches && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_SecurityUpdates))
+				|| (PatchesNeeded.m_nNormalPatches && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_NormalUpdates))
+			)
+		{
+			co_await f_Patch_InstallPatches().f_Wrap() > LogError("Failed to install patches automatically (OS patch status)");
+
+			// Update patch state after install
+			PatchesNeeded = co_await f_Patch_PatchesNeeded();
+		}
+
 		bool bRebootRequired = co_await f_Patch_RebootNeeded();
 		bool bSecurityPatchesNeeded = PatchesNeeded.m_nSecurityPatches > 0;
 
@@ -191,6 +203,12 @@ namespace NMib::NCloud
 		co_await m_OsPatchStatusReporter->m_fReportReadings(TCVector<CDistributedAppSensorReporter::CSensorReading>{fg_Move(Reading)}).f_Wrap()
 			> LogError("Failed to report readings (OS patch status)")
 		;
+
+		if (bRebootRequired && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_AutomaticReboot))
+		{
+			if (m_Config.m_fOnRebootNeeded)
+				co_await m_Config.m_fOnRebootNeeded().f_Wrap() > LogError("Failed to initiate automatic reboot (OS patch status)");
+		}
 
 		co_return bUpdateDatabase;
 #endif

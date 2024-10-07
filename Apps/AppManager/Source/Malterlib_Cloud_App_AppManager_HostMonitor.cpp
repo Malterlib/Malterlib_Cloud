@@ -28,6 +28,21 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
+		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJSONType_Object))
+		{
+			if (pAutoUpdate->f_GetMemberValue("NormalUpdates", false).f_Boolean())
+				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_NormalUpdates;
+
+			if (pAutoUpdate->f_GetMemberValue("SecurityUpdates", false).f_Boolean())
+				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_SecurityUpdates;
+
+			if (pAutoUpdate->f_GetMemberValue("AutomaticReboot", false).f_Boolean())
+			{
+				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_AutomaticReboot;
+				Config.m_fOnRebootNeeded = fp_HostMonitorRebootNeededFunctor(*pAutoUpdate);
+			}
+		}
+
 		auto InitResult = co_await mp_HostMonitor(&CHostMonitor::f_Init, fg_Move(Config));
 		mp_OsName = InitResult.m_OsName;
 

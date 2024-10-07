@@ -98,6 +98,7 @@ namespace NMib::NCloud
 
 		TCFuture<bool> f_Patch_RebootNeeded();
 		TCFuture<CPatchesNeeded> f_Patch_PatchesNeeded();
+		TCFuture<void> f_Patch_InstallPatches();
 
 		CExceptionPointer f_ConfigFile_CheckFilePrerequisites(CMonitoredConfigFile * &o_pConfigFile, CStr _ConfigID, CStr _FileName);
 

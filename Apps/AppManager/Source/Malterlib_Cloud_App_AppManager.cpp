@@ -22,7 +22,12 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_Destroy()
 	{
-		co_await fg_Move(mp_ChangeNotificationsPermissionsChangedSequencer).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy sequencer");
+		CLogError LogError("Malterlib/Cloud/AppManager");
+
+		if (mp_RebootScheduleTimerSubscrption)
+			co_await fg_Exchange(mp_RebootScheduleTimerSubscrption, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy reboot timer subscription");
+
+		co_await fg_Move(mp_ChangeNotificationsPermissionsChangedSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy sequencer");
 
 		co_await CDistributedAppActor::fp_Destroy();
 
@@ -556,6 +561,9 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<void> CAppManagerActor::fp_StopApp()
 	{
 		CLogError LogError("Malterlib/Cloud/AppManager");
+
+		if (mp_RebootScheduleTimerSubscrption)
+			co_await fg_Exchange(mp_RebootScheduleTimerSubscrption, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy reboot timer subscription");
 
 		co_await fp_PauseReporting().f_Wrap() > LogError.f_Warning("Failed to pause reporting at shutdown");
 

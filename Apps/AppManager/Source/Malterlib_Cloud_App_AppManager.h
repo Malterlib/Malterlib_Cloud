@@ -675,6 +675,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_InitSensor();
 		TCFuture<void> fp_InitLog();
 		TCFuture<void> fp_InitHostMonitor();
+		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> fp_HostMonitorRebootNeededFunctor(NEncoding::CEJSONSorted const &_AutoUpdateConfig);
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
 		TCFuture<void> fp_StopApp() override;
@@ -723,6 +724,7 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		TCFuture<bool> fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication);
+		TCFuture<void> fp_Reboot();
 
 		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_AddApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -1063,6 +1065,10 @@ namespace NMib::NCloud::NAppManager
 		CDistributedAppSensorReporter::CSensorReporter mp_EncryptionSensorReporter;
 		CSequencer mp_EncryptionSensorReporterSequencer{"EncryptionSensorReporter"};
 		TCOptional<CDistributedAppSensorReporter::CStatus> mp_LastEncryptionReporterSensorStatus;
+
+		CActorSubscription mp_RebootScheduleTimerSubscrption;
+		bool mp_bRebooting = false;
+		bool mp_bRebootScheduled = false;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

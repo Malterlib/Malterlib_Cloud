@@ -121,6 +121,14 @@ namespace NMib::NCloud
 			, EInitFlag_MonitorAllMounts = DMibBit(0)
 		};
 
+		enum class EAutomaticUpdatesFlag : uint32
+		{
+			mc_None = 0
+			, mc_SecurityUpdates = DMibBit(0)
+			, mc_NormalUpdates = DMibBit(1)
+			, mc_AutomaticReboot = DMibBit(2)
+		};
+
 		struct CMonitorPathOptions
 		{
 			auto f_Tuple() const;
@@ -147,6 +155,9 @@ namespace NMib::NCloud
 
 			fp64 m_ReportWarningAfter_RebootRequired = 1_weeks;
 			fp64 m_ReportErrorAfter_RebootRequired = 2_weeks;
+
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> m_fOnRebootNeeded;
+			EAutomaticUpdatesFlag m_AutomaticUpdateFlags = EAutomaticUpdatesFlag::mc_None;
 		};
 
 		struct [[nodiscard]] CInitResult
@@ -189,6 +200,17 @@ namespace NMib::NCloud
 		struct CInternal;
 
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
+	};
+
+	struct CHostMonitorRebootSchedule
+	{
+		NStorage::TCOptional<uint8> m_Month;
+		NStorage::TCOptional<uint8> m_DayOfMonth;
+		NStorage::TCOptional<uint8> m_DayOfWeek;
+		NStorage::TCOptional<uint8> m_Hour;
+		NStorage::TCOptional<uint8> m_Minute;
+
+		NTime::CTime f_GetNextRebootTime(NTime::CTime const &_EarliestRebootTime, bool _bLocalTime = true) const;
 	};
 }
 
