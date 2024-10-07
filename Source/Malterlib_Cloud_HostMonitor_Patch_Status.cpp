@@ -4,12 +4,88 @@
 #include "Malterlib_Cloud_HostMonitor.h"
 #include "Malterlib_Cloud_HostMonitor_Internal.h"
 
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Process/ProcessLaunchActor>
 
 namespace NMib::NCloud
 {
 	using namespace NProcess;
+
+	TCFuture<bool> CHostMonitor::CInternal::f_Patch_RebootNeeded()
+	{
+#ifndef DPlatformFamily_Linux
+		co_return false;
+#else
+		auto BlockingActorCheckout = fg_BlockingActor();
+		co_return co_await
+			(
+				g_Dispatch(BlockingActorCheckout) / [=]() -> TCFuture<bool>
+				{
+					auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed to read the patch status from file");
+
+					CStr RebootRequiredFile = gc_Str<"/var/run/reboot-required">;
+
+					co_return CFile::fs_FileExists(RebootRequiredFile) && !CFile::fs_ReadStringFromFile(RebootRequiredFile, true).f_Trim().f_IsEmpty();
+				}
+			)
+		;
+#endif
+	}
+
+#ifdef DPlatformFamily_Linux
+	static constexpr CStr gc_AptCheckExecutable = gc_Str<"/usr/lib/update-notifier/apt-check">;
+#endif
+
+	auto CHostMonitor::CInternal::f_Patch_PatchesNeeded() -> TCFuture<CPatchesNeeded>
+	{
+#ifndef DPlatformFamily_Linux
+		co_return {};
+#else
+		bool bAptCheckExists = false;
+
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			bAptCheckExists = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / []() -> bool
+					{
+						return CFile::fs_FileExists(gc_AptCheckExecutable);
+					}
+				)
+			;
+		}
+
+		CPatchesNeeded PatchesNeeded;
+
+		if (bAptCheckExists)
+		{
+			TCActor<CProcessLaunchActor> LaunchActor(fg_Construct());
+			auto AutoDestroy = co_await fg_AsyncDestroy(LaunchActor);
+
+			CProcessLaunchActor::CSimpleLaunch Launch
+				{
+					gc_AptCheckExecutable
+					, {}
+					, CFile::fs_GetPath(gc_AptCheckExecutable)
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+				}
+			;
+
+			Launch.m_ToLog = CProcessLaunchActor::ELogFlag_Error;
+
+			auto PatchesNeededStrings = (co_await LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))).f_GetStdErr().f_Trim().f_Split<true>(";");
+
+			if (PatchesNeededStrings.f_GetLen() >= 1)
+				PatchesNeeded.m_nNormalPatches = PatchesNeededStrings[0].f_ToInt(uint32(0));
+
+			if (PatchesNeededStrings.f_GetLen() >= 2)
+				PatchesNeeded.m_nSecurityPatches = PatchesNeededStrings[1].f_ToInt(uint32(0));
+		}
+
+		co_return PatchesNeeded;
+#endif
+	}
 
 	TCFuture<bool> CHostMonitor::CInternal::f_PeriodicUpdate_Patch_PatchStatus()
 	{
@@ -20,73 +96,10 @@ namespace NMib::NCloud
 
 		CLogError LogError("Malterlib/Cloud/HostMonitor");
 
-		TCActor<CProcessLaunchActor> AptCheckLaunchActor;
+		auto PatchesNeeded = co_await f_Patch_PatchesNeeded();
 
-		auto Cleanup = g_OnScopeExit / [&]
-			{
-				if (AptCheckLaunchActor)
-					fg_Move(AptCheckLaunchActor).f_Destroy() > LogError("Failed to destroy process launch");
-			}
-		;
-
-		CStr AptCheckExecutable = "/usr/lib/update-notifier/apt-check";
-
-		struct CFileProperties
-		{
-			bool m_bAptCheckExists = false;
-			bool m_bRebootRequired = false;
-		};
-
-		CFileProperties FileProperties;
-		{
-			auto BlockingActorCheckout = fg_BlockingActor();
-			FileProperties = co_await
-				(
-					g_Dispatch(BlockingActorCheckout) / [=]() -> TCFuture<CFileProperties>
-					{
-						auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed to read the patch status from file");
-
-						CStr RebootRequiredFile = "/var/run/reboot-required";
-
-						CFileProperties Return;
-						Return.m_bAptCheckExists = CFile::fs_FileExists(AptCheckExecutable);
-						Return.m_bRebootRequired = CFile::fs_FileExists(RebootRequiredFile) && !CFile::fs_ReadStringFromFile(RebootRequiredFile, true).f_Trim().f_IsEmpty();
-
-						co_return fg_Move(Return);
-					}
-				)
-			;
-		}
-
-		uint32 nSecurityPatches = 0;
-		uint32 nNormalPatches = 0;
-
-		if (FileProperties.m_bAptCheckExists)
-		{
-			AptCheckLaunchActor = fg_Construct();
-
-			CProcessLaunchActor::CSimpleLaunch Launch
-				{
-					AptCheckExecutable
-					, {}
-					, CFile::fs_GetPath(AptCheckExecutable)
-					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
-				}
-			;
-
-			Launch.m_ToLog = CProcessLaunchActor::ELogFlag_Error;
-
-			auto PatchesNeeded = (co_await AptCheckLaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))).f_GetStdErr().f_Trim().f_Split<true>(";");
-
-			if (PatchesNeeded.f_GetLen() >= 1)
-				nNormalPatches = PatchesNeeded[0].f_ToInt(uint32(0));
-
-			if (PatchesNeeded.f_GetLen() >= 2)
-				nSecurityPatches = PatchesNeeded[1].f_ToInt(uint32(0));
-		}
-
-		bool bRebootRequired = FileProperties.m_bRebootRequired;
-		bool bSecurityPatchesNeeded = nSecurityPatches > 0;
+		bool bRebootRequired = co_await f_Patch_RebootNeeded();
+		bool bSecurityPatchesNeeded = PatchesNeeded.m_nSecurityPatches > 0;
 
 		if (!m_OsPatchStatusReporter)
 		{
@@ -163,11 +176,11 @@ namespace NMib::NCloud
 			)
 		;
 
-		if (nNormalPatches)
-			fg_AddStrSep(Status.m_Description, "{} normal patches available to be installed"_f << nNormalPatches, "\n");
+		if (PatchesNeeded.m_nNormalPatches)
+			fg_AddStrSep(Status.m_Description, "{} normal patches available to be installed"_f << PatchesNeeded.m_nNormalPatches, "\n");
 
-		if (nSecurityPatches)
-			fg_AddStrSep(Status.m_Description, "{} security patches available to be installed"_f << nSecurityPatches, "\n");
+		if (PatchesNeeded.m_nSecurityPatches)
+			fg_AddStrSep(Status.m_Description, "{} security patches available to be installed"_f << PatchesNeeded.m_nSecurityPatches, "\n");
 
 		if (Status.m_Description.f_IsEmpty())
 			Status.m_Description = "Patches up to date";

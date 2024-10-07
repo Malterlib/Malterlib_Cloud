@@ -77,6 +77,12 @@ namespace NMib::NCloud
 			TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_SensorReporter;
 		};
 
+		struct CPatchesNeeded
+		{
+			uint32 m_nSecurityPatches = 0;
+			uint32 m_nNormalPatches = 0;
+		};
+
 		TCFuture<CDistributedAppSensorReporter::CVersion> f_GetOsNameAndVersion();
 
 		TCFuture<void> f_SetupDatabase();
@@ -89,6 +95,9 @@ namespace NMib::NCloud
 		TCFuture<bool> f_PeriodicUpdate_Patch_ExpectedOsVersion();
 		TCFuture<bool> f_PeriodicUpdate_Patch_PatchStatus();
 		TCFuture<void> f_PeriodicUpdate_Memory(bool _bCanSkip);
+
+		TCFuture<bool> f_Patch_RebootNeeded();
+		TCFuture<CPatchesNeeded> f_Patch_PatchesNeeded();
 
 		CExceptionPointer f_ConfigFile_CheckFilePrerequisites(CMonitoredConfigFile * &o_pConfigFile, CStr _ConfigID, CStr _FileName);
 
