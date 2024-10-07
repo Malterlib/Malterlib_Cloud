@@ -18,21 +18,30 @@ trap ErrorReport ERR
 if [[ "$3" != "Recursive" ]]; then
 	Log "Launching recursive"
 	set -m
-	"${BASH_SOURCE[0]}" "$1" "$2" Recursive </dev/null &>/dev/null &
+	export ParentPID=$$
+	"${BASH_SOURCE[0]}" "$1" "$2" Recursive </dev/null >> "$LogFile" 2>&1 &
 	disown
 	exit 0
 fi
 
 Log "Launched recursive"
 
+if [ -f "/proc/self/cgroup" ] && [ -f "/sys/fs/cgroup/cgroup.procs" ]; then
+	# Break out of systemd cgroup so we are not killed when daemon stops
+	if cat /proc/self/cgroup | grep -q '/system\.slice/'; then
+		Log "Moving process to root CGroup: /sys/fs/cgroup/cgroup.procs"
+		echo $$ > "/sys/fs/cgroup/cgroup.procs"
+	fi
+fi
+
 SysName=$(uname -s)
 
 function WaitForPidToExit()
 {
-	Log "Waiting for AppManager to exit"
+	Log "Waiting for $1 to exit"
 
 	if [[ $SysName ==  Darwin* ]] ; then
-		if ! lsof -p $1 +r 1 2>&1 ; then
+		if ! lsof -p $1 +r 1 > /dev/null ; then
 			echo lsof exited with error
 		fi
 	elif [[ $SysName ==  Linux* ]] ; then
@@ -45,8 +54,10 @@ function WaitForPidToExit()
         done
 	fi
 
-	Log "AppManager exited"
+	Log "$1 exited"
 }
+
+WaitForPidToExit $ParentPID
 
 eval "ExtraLaunchParamsArray=($ExtraLaunchParams)"
 
@@ -63,12 +74,11 @@ elif [[ "$2" == "DaemonDebug" ]]; then
 	NewProcessID=$!
 	disown
 elif [[ "$2" == "Daemon" ]]; then
-	WaitForPidToExit $PPID
 	Log "Launching new daemon executable:" "$1" --daemon-restart
 	"$1" --daemon-restart >> "$LogFile" 2>&1
 	NewProcessID=$!
 else
-	Log "Unknow self update type: $2"
+	Log "Unknown self update type: $2"
 	exit 1
 fi
 
