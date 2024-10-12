@@ -185,7 +185,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				{
 					for (auto &Promise : mp_WaitForProvide)
 						Promise.f_SetException(Result.f_GetException());
-					DMibConErrOut2("Error providing password: {}", Result.f_GetExceptionStr());
+					DMibLogWithCategory(ProvidePassword, Warning, "Error providing password: {}", Result.f_GetExceptionStr());
 				}
 				else
 				{
@@ -214,6 +214,12 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		TCFuture<void> fp_ProvidePassword()
 		{
 			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(mp_RootPath / "KeyManager", {"--provide-password"}, mp_RootPath);
+
+			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+			{
+				SimpleLaunch.m_ToLog = CProcessLaunchActor::ELogFlag_Error | CProcessLaunchActor::ELogFlag_StdErr;
+				SimpleLaunch.m_LogName = "ProvidePassword";
+			}
 
 			TCSharedPointer<CStr> pStdErr = fg_Construct();
 			TCSharedPointer<CStr> pStdOut = fg_Construct();
