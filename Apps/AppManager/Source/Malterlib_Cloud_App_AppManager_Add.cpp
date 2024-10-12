@@ -29,10 +29,7 @@ namespace NMib::NCloud::NAppManager
 		ApplicationSettings.f_FromInterfaceSettings(_Settings, ChangedSettings);
 
 		if (!_Settings.m_ExecutableParameters)
-		{
 			ApplicationSettings.m_ExecutableParameters = {"--daemon-run-standalone"};
-			ChangedSettings |= EApplicationSetting_ExecutableParameters;
-		}
 
 		return Promise <<= m_pThis->self
 			(
@@ -303,6 +300,9 @@ namespace NMib::NCloud::NAppManager
 						DMibError(fg_Format("Failed to get settings from version info: {}", _Exception));
 					}
 					NewSettings.f_ApplySettings(NewChangedSettings, VersionInfoSettings);
+
+					// Reapply settings specified coming into this function
+					NewSettings.f_ApplySettings(_ChangedSettings, pApplication->m_Settings);
 
 					CStr Error;
 					if (!NewSettings.f_Validate(Error))
