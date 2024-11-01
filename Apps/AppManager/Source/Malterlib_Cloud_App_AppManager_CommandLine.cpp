@@ -1018,5 +1018,23 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		fp_BuildCommandLine_HostMonitor(o_CommandLine);
+
+		auto RebootManagement = o_CommandLine.f_AddSection("General", "General commands.");
+		RebootManagement.f_RegisterCommand
+			(
+				{
+					"Names"_o= {"--force-reboot"}
+					, "Description"_o= "Reboot computer at once."
+				}
+				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				{
+					co_await fp_Reboot();
+
+					*_pCommandLine %= "Reboot scheduled\n";
+
+					co_return 0;
+				}
+			)
+		;
 	}
 }
