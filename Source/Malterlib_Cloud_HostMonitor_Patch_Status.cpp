@@ -207,7 +207,7 @@ namespace NMib::NCloud
 		if (bRebootRequired && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_AutomaticReboot))
 		{
 			if (m_Config.m_fOnRebootNeeded)
-				co_await m_Config.m_fOnRebootNeeded().f_Wrap() > LogError("Failed to initiate automatic reboot (OS patch status)");
+				m_Config.m_fOnRebootNeeded() > LogError("Failed to initiate automatic reboot (OS patch status)");
 		}
 
 		co_return bUpdateDatabase;
