@@ -26,11 +26,17 @@ fi
 
 Log "Launched recursive"
 
-if [ -f "/proc/self/cgroup" ] && [ -f "/sys/fs/cgroup/cgroup.procs" ]; then
+# Support only cgroups V2 unified and Hybrid modes
+CGroupRoot="/sys/fs/cgroup/cgroup.procs"
+if ! [ -f "$CGroupRoot" ]; then
+	CGroupRoot="/sys/fs/cgroup/unified/cgroup.procs"
+fi 
+
+if [ -f "/proc/self/cgroup" ] && [ -f "$CGroupRoot" ]; then
 	# Break out of systemd cgroup so we are not killed when daemon stops
 	if cat /proc/self/cgroup | grep -q '/system\.slice/'; then
-		Log "Moving process to root CGroup: /sys/fs/cgroup/cgroup.procs"
-		echo $$ > "/sys/fs/cgroup/cgroup.procs"
+		Log "Moving process to root CGroup: $CGroupRoot"
+		echo $$ > "$CGroupRoot"
 	fi
 fi
 
