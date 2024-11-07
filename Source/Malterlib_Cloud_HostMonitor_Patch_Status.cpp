@@ -17,19 +17,61 @@ namespace NMib::NCloud
 #ifndef DPlatformFamily_Linux
 		co_return false;
 #else
+		constexpr static CStr c_NeedRestartExecutable = gc_Str<"/usr/sbin/needrestart">;
+
 		auto BlockingActorCheckout = fg_BlockingActor();
-		co_return co_await
+		auto [bHasCheckNeedRestart, bReebootRequired] = co_await
 			(
-				g_Dispatch(BlockingActorCheckout) / [=]() -> TCFuture<bool>
+				g_Dispatch(BlockingActorCheckout) / [=]() -> TCFuture<TCTuple<bool, bool>>
 				{
+
 					auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed to read the patch status from file");
 
-					CStr RebootRequiredFile = gc_Str<"/var/run/reboot-required">;
+					constexpr static CStr c_RebootRequiredFile = gc_Str<"/var/run/reboot-required">;
 
-					co_return CFile::fs_FileExists(RebootRequiredFile) && !CFile::fs_ReadStringFromFile(RebootRequiredFile, true).f_Trim().f_IsEmpty();
+					co_return
+						{
+							CFile::fs_FileExists(c_NeedRestartExecutable)
+							, CFile::fs_FileExists(c_RebootRequiredFile) && !CFile::fs_ReadStringFromFile(c_RebootRequiredFile, true).f_Trim().f_IsEmpty()
+						}
+					;
 				}
 			)
 		;
+
+		if (bHasCheckNeedRestart)
+		{
+			TCActor<CProcessLaunchActor> LaunchActor(fg_Construct());
+			auto AutoDestroy = co_await fg_AsyncDestroy(LaunchActor);
+
+			CProcessLaunchActor::CSimpleLaunch Launch
+				{
+					c_NeedRestartExecutable
+					, {"-p"}
+					, CFile::fs_GetPath(c_NeedRestartExecutable)
+					, CProcessLaunchActor::ESimpleLaunchFlag_None
+				}
+			;
+
+			Launch.m_ToLog = CProcessLaunchActor::ELogFlag_Error;
+
+			auto LaunchResult = co_await LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch));
+
+			auto Output = LaunchResult.f_GetStdOut();
+
+			if (LaunchResult.m_ExitCode == 0 && Output.f_StartsWith("OK "))
+				co_return bReebootRequired;
+			else if (LaunchResult.m_ExitCode == 1 && Output.f_StartsWith("WARN "))
+				co_return true; // Services etc needs restarting, just reboot instead
+			else if (LaunchResult.m_ExitCode == 2 && Output.f_StartsWith("CRIT "))
+				co_return true; // Kernel updates needs restart
+			else if (LaunchResult.m_ExitCode == 3 && Output.f_StartsWith("UNKN "))
+				DMibLogWithCategory(Malterlib/Cloud/HostMonitor, Warning, "needrestart couldn't determine if reboot is needed: {}", LaunchResult.f_GetCombinedOut());
+			else
+				DMibLogWithCategory(Malterlib/Cloud/HostMonitor, Warning, "needrestart check failed: {}", LaunchResult.f_GetCombinedOut());
+		}
+
+		co_return bReebootRequired;
 #endif
 	}
 
