@@ -53,7 +53,7 @@ namespace NMib::NCloud
 				}
 			;
 
-			Launch.m_ToLog = CProcessLaunchActor::ELogFlag_Error;
+			Launch.m_ToLog = CProcessLaunchActor::ELogFlag_None;
 
 			auto LaunchResult = co_await LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch));
 
