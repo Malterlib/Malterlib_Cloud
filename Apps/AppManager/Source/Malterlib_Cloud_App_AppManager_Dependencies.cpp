@@ -119,7 +119,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				// Don't recursively call update application dependencies
 				fp_SetAppLaunchStatus(_pApplication, Status, Severity);
-				return false;
+				return true;
 			}
 
 			if (Application.m_Settings.m_bStopOnDependencyFailure)
@@ -147,7 +147,7 @@ namespace NMib::NCloud::NAppManager
 					}
 				;
 			}
-			return false;
+			return true;
 		}
 
 		if (Application.f_IsLaunched())

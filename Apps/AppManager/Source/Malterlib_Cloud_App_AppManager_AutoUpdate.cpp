@@ -288,7 +288,7 @@ namespace NMib::NCloud::NAppManager
 
 			if (pApplication->f_IsInProgress())
 			{
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Debug, "In progress, reschedule '{}'", pApplication->m_Name);
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Debug, "In progress, reschedule '{}': {}", pApplication->m_Name, pApplication->f_InProgressDescription());
 				bReschedule = true;
 				continue;
 			}
