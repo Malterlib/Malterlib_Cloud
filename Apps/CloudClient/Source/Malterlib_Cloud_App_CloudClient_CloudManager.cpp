@@ -903,21 +903,21 @@ namespace NMib::NCloud::NCloudClient
 		CTime Now = CTime::fs_NowUTC();
 
 		TableRenderer.f_AddDescription("Applications");
-		TableRenderer.f_AddHeadings
-			(
-				"Environment"
-				, "App Manager"
-				, "Name"
-				, "Application"
-				, "ID"
-				, "Update [Tags]"
-				, "Version"
-				, "Failed Version"
-				, "Should Have Version"
-				, "Newer Version Available"
-				, "Status"
-			)
-		;
+		CTableRenderHelper::CColumnHelper Columns(0);
+
+		Columns.f_AddHeading("Environment", 0);
+		Columns.f_AddHeading("App Manager", 0);
+		Columns.f_AddHeading("Name", 0);
+		Columns.f_AddHeading("Application", 0);
+		Columns.f_AddHeading("ID", 0);
+		Columns.f_AddHeading("Update [Tags]", 0);
+		Columns.f_AddHeading("Version", 0);
+		Columns.f_AddHeading("Failed Version", 0);
+		Columns.f_AddHeading("Should Have Version", 0);
+		Columns.f_AddHeading("Newer Version Available", 0);
+		Columns.f_AddHeading("Status", 0);
+
+		TableRenderer.f_AddHeadings(&Columns);
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
 		TableRenderer.f_SetMaxColumnWidth(5, 50);
 
@@ -1166,11 +1166,11 @@ namespace NMib::NCloud::NCloudClient
 		if (CTableRenderHelper::fs_ParseOutputTypeOption(_Params) == CTableRenderHelper::EOutputType_HumanReadable)
 		{
 			if (!bHasNewestVersion)
-				TableRenderer.f_RemoveColumn(8);
+				Columns.f_SetVerbose("Newer Version Available");
 			if (!bHasWantVersion)
-				TableRenderer.f_RemoveColumn(7);
+				Columns.f_SetVerbose("Should Have Version");
 			if (!bHasFailedVersion)
-				TableRenderer.f_RemoveColumn(6);
+				Columns.f_SetVerbose("Failed Version");
 		}
 
 		if (!bQuiet)
