@@ -131,10 +131,10 @@ namespace NMib::NCloud::NAppManager
 				if (Result.m_bQuitManager)
 					fp_AppLaunchStateChanged(_pApplication, "Self update source - restarting self", CAppManagerInterface::EStatusSeverity_Warning);
 				else
-					fp_AppLaunchStateChanged(_pApplication, "Self update source - waiting for update", CAppManagerInterface::EStatusSeverity_None);
+					fp_AppLaunchStateChanged(_pApplication, "Ready", CAppManagerInterface::EStatusSeverity_None);
 			}
 			else
-				fp_AppLaunchStateChanged(_pApplication, "Self update source - waiting for update", CAppManagerInterface::EStatusSeverity_None);
+				fp_AppLaunchStateChanged(_pApplication, "Ready", CAppManagerInterface::EStatusSeverity_None);
 
 			_pApplication->m_bLaunched = true;
 
@@ -143,7 +143,7 @@ namespace NMib::NCloud::NAppManager
 
 		if (Application.m_Settings.m_Executable.f_IsEmpty())
 		{
-			fp_AppLaunchStateChanged(_pApplication, "No executable", CAppManagerInterface::EStatusSeverity_None);
+			fp_AppLaunchStateChanged(_pApplication, "No exe", CAppManagerInterface::EStatusSeverity_None);
 			_pApplication->m_bLaunched = true;
 			co_return CAppLaunchResult{};
 		}

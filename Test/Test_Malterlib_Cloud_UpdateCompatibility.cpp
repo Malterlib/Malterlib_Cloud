@@ -1124,10 +1124,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		fSetupAppManagerSelfUpdate(AppManager_AppManager, "TestTag");
 		fSetupAppManagerSelfUpdate(AppManager_VersionManager, "VersionManagerTestTag");
 
-		fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
-		fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+		fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Ready"});
+		fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Ready"});
 		fProvideKeyManagerPasswordIfNeeded();
-		fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+		fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Ready"});
 
 		fAddAppManagerApp(AppManager_AppManager, "AppManager", "AppManager", "AppManagerTestTag");
 
@@ -1172,7 +1172,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				}
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 4");
-					fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+					fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Ready"});
 					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 					fResubscribeVersionManager();
 				}
@@ -1181,7 +1181,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 5");
 					fTagApp("AppManager", AppManagerPackageInfo, {"AppManagerTestTag"});
-					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No executable"});
+					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No exe"});
 				}
 
 				// Update rest
@@ -1193,8 +1193,8 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				}
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 7");
-					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
-					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Ready"});
+					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Ready"});
 					fProvideKeyManagerPasswordIfNeeded();
 				}
 			}
@@ -1246,13 +1246,13 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				{
 					DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous 2");
-					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
-					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
-					fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Self update source - waiting for update"});
+					fWaitForAppVersion(AppManager_AppManager, "SelfUpdate", AppManagerPackageInfo, {"Ready"});
+					fWaitForAppVersion(AppManager_KeyManager, "SelfUpdate", AppManagerPackageInfo, {"Ready"});
+					fWaitForAppVersion(AppManager_VersionManager, "SelfUpdate", AppManagerPackageInfo, {"Ready"});
 					fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"});
 					fProvideKeyManagerPasswordIfNeeded();
 					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
-					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No executable"});
+					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No exe"});
 
 					fResubscribeVersionManager();
 				}
