@@ -199,6 +199,18 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto &Application = *pApplication;
 
+			if (Application.f_IsInProgress())
+			{
+				fg_AddStrSep
+					(
+						PreventRebootDescription
+						, "    Operation in progress ({}): {}"_f << Application.m_Name << Application.f_InProgressDescription()
+						, "\n"
+					)
+				;
+				bPreventReboot = true;
+			}
+
 			if (fg_IsSet(Application.m_PreventRebootSensorFlags, CDistributedAppSensorReporter::ESensorInfoFlag::mc_AllPreventRebootFlags))
 			{
 				fg_AddStrSep
