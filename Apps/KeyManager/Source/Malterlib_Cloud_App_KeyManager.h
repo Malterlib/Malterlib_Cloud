@@ -33,10 +33,12 @@ namespace NMib::NCloud::NKeyManager
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
 		TCFuture<void> fp_DatabaseDecrypted();
+		TCFuture<void> fp_SetPasswordStatus(CDistributedAppSensorReporter::CStatus _Status);
 
 		TCActor<CKeyManagerServer> mp_ServerActor;
 		TCActor<CKeyManagerServerDatabase_EncryptedFile> mp_DatabaseActor;
 		TCUniquePointer<TCActorCallOnce<void, NStr::CStrSecure &&>> mp_pProvidePasswordOnce;
+		TCOptional<CDistributedAppSensorReporter::CSensorReporter> mp_PasswordStatusReporter;
 		bool mp_bDatabaseDecrypted = false;
 	};
 }

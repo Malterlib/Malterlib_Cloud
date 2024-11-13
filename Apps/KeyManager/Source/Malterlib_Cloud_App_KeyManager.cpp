@@ -23,16 +23,44 @@ namespace NMib::NCloud::NKeyManager
 	{
 	}
 
+	TCFuture<void> CKeyManagerDaemonActor::fp_SetPasswordStatus(CDistributedAppSensorReporter::CStatus _Status)
+	{
+		if (!mp_PasswordStatusReporter)
+		{
+			CDistributedAppSensorReporter::CSensorInfo SensorInfo;
+			SensorInfo.m_Identifier = "org.malterlib.keymanager.password.status";
+			SensorInfo.m_Name = "Key Manager Password Status";
+			SensorInfo.m_Type = CDistributedAppSensorReporter::ESensorDataType_Status;
+			SensorInfo.m_MetaData = mp_SensorMetaData;
+
+			mp_PasswordStatusReporter = co_await fp_OpenSensorReporter(fg_Move(SensorInfo));
+		}
+
+		CDistributedAppSensorReporter::CSensorReading Reading;
+		Reading.m_Data = fg_Move(_Status);
+
+		co_await mp_PasswordStatusReporter->m_fReportReadings(TCVector<CDistributedAppSensorReporter::CSensorReading>{fg_Move(Reading)}).f_Wrap()
+			> fg_LogError("Mib/Cloud/KeyManager/Daemon", "Failed to report readings (Key Manager Password Status)")
+		;
+
+		co_return {};
+	}
+
 	TCFuture<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
 	{
-		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Critical, "Waiting for user to provide password");
+		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Warning, "Waiting for user to provide password");
+
+		co_await fp_SetPasswordStatus({.m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Error, .m_Description = "Waiting for user to provide password"});
+
 		co_return {};
 	}
 
 	TCFuture<void> CKeyManagerDaemonActor::fp_DatabaseDecrypted()
 	{
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Password provided, starting up key manager");
-		
+
+		co_await fp_SetPasswordStatus({.m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Ok, .m_Description = "Password provided"});
+
 		uint32 CreateNewKeyMinServers = fg_Clamp(mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("CreateNewKeyMinServers", 1).f_Integer(), int64(1), int64(100));
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Requiring a minimun of {} servers to create a new key", CreateNewKeyMinServers);
 
@@ -72,6 +100,9 @@ namespace NMib::NCloud::NKeyManager
 			co_await fg_Move(mp_DatabaseActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");
 			DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Key server database shut down");
 		}
+
+		if (mp_PasswordStatusReporter && mp_PasswordStatusReporter->m_fReportReadings)
+			co_await fg_Move(mp_PasswordStatusReporter->m_fReportReadings).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy password status reporter");
 
 		co_return {};
 	}
