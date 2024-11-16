@@ -23,7 +23,7 @@ namespace NMib::NCloud::NCloudClient
 	{
 	}
 
-	TCFuture<void> CCloudClientAppActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
+	TCFuture<void> CCloudClientAppActor::fp_StartApp(NEncoding::CEJSONSorted const _Params)
 	{
 		fp_ParseCommonOptions(_Params);
 
@@ -32,36 +32,33 @@ namespace NMib::NCloud::NCloudClient
 	
 	TCFuture<void> CCloudClientAppActor::fp_StopApp()
 	{	
-		TCActorResultVector<void> Destroys;
+		TCFutureVector<void> Destroys;
 
 		for (auto &StopPromise : mp_AppStopPromises)
 			StopPromise.f_SetResult();
 
 		if (mp_DownloadBackupSubscription)
-			mp_DownloadBackupSubscription->f_Destroy() > Destroys.f_AddResult();
+			mp_DownloadBackupSubscription->f_Destroy() > Destroys;
 
-		mp_BackupManagers.f_Destroy() > Destroys.f_AddResult();
+		mp_BackupManagers.f_Destroy() > Destroys;
 		
-		mp_VersionManagerHelper.f_AbortAll() > Destroys.f_AddResult();
-		mp_VersionManagers.f_Destroy() > Destroys.f_AddResult();
+		mp_VersionManagerHelper.f_AbortAll() > Destroys;
+		mp_VersionManagers.f_Destroy() > Destroys;
 
-		for (auto &Launch : mp_LaunchActors)
-			Launch.f_Destroy() > Destroys.f_AddResult();
-
-		mp_SecretsManagers.f_Destroy() > Destroys.f_AddResult();
+		mp_SecretsManagers.f_Destroy() > Destroys;
 		
 		if (mp_UploadSubscription)
-			mp_UploadSubscription->f_Destroy() > Destroys.f_AddResult();
+			mp_UploadSubscription->f_Destroy() > Destroys;
 
 		for (auto &Subscription : mp_TunnelSubscriptions)
-			Subscription->f_Destroy() > Destroys.f_AddResult();
+			Subscription->f_Destroy() > Destroys;
 
 		if (mp_TunnelsClient)
-			mp_TunnelsClient.f_Destroy() > Destroys.f_AddResult();
+			fg_Move(mp_TunnelsClient).f_Destroy() > Destroys;
 
-		mp_CloudManagers.f_Destroy() > Destroys.f_AddResult();
+		mp_CloudManagers.f_Destroy() > Destroys;
 
-		co_await Destroys.f_GetResults();
+		co_await fg_AllDoneWrapped(Destroys);
 
 		co_return {};
 	}

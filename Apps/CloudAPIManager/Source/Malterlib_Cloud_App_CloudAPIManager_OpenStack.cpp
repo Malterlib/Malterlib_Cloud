@@ -37,12 +37,10 @@ namespace NMib::NCloud::NCloudAPIManager
 				(
 					g_ActorFunctor / [this, KeystoneInfo = _CloudContext.m_KeystoneInfo, Name = _CloudContext.f_GetName()]() -> TCFuture<COpenStackServiceInfo>
 					{
-						TCPromise<COpenStackServiceInfo> Promise;
-
-						fg_Dispatch
+						auto ServiceInfo = co_await fg_Dispatch
 							(
 								fp_GetCURLQueryActor()
-								, [Promise, KeystoneInfo]() -> COpenStackServiceInfo
+								, [KeystoneInfo]() -> COpenStackServiceInfo
 								{
 									NException::CDisableExceptionTraceScope DisableTracing;
 									
@@ -127,32 +125,28 @@ namespace NMib::NCloud::NCloudAPIManager
 									return ServiceInfo;
 								}
 							)
-							> [this, Promise, Name](TCAsyncResult<COpenStackServiceInfo> && _ServiceInfo)
-							{
-								auto *pCloudContext = mp_CloudContexts.f_FindEqual(Name);
-								if (!_ServiceInfo)
-								{
-									if (pCloudContext)
-									{
-										pCloudContext->m_LastErrorClock.f_Start();
-										pCloudContext->m_bLastWasError = true;
-										DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to generate OpenStack service info: {}", _ServiceInfo.f_GetExceptionStr());
-									}
-									Promise.f_SetException(_ServiceInfo);
-									return;
-								}
-								else if (pCloudContext)
-								{
-									pCloudContext->m_bLastWasError = false;
-									pCloudContext->m_TokenExpiresAt = _ServiceInfo->m_TokenExpiresAt;
-									DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Info, "Generate OpenStack service info. Auth token expires at {}", pCloudContext->m_TokenExpiresAt);
-								}
-								
-								Promise.f_SetResult(fg_Move(*_ServiceInfo));
-							}
+							.f_Wrap()
 						;
 
-						return Promise.f_MoveFuture();
+						auto *pCloudContext = mp_CloudContexts.f_FindEqual(Name);
+						if (!ServiceInfo)
+						{
+							if (pCloudContext)
+							{
+								pCloudContext->m_LastErrorClock.f_Start();
+								pCloudContext->m_bLastWasError = true;
+								DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to generate OpenStack service info: {}", ServiceInfo.f_GetExceptionStr());
+							}
+							co_return ServiceInfo.f_GetException();
+						}
+						else if (pCloudContext)
+						{
+							pCloudContext->m_bLastWasError = false;
+							pCloudContext->m_TokenExpiresAt = ServiceInfo->m_TokenExpiresAt;
+							DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Info, "Generate OpenStack service info. Auth token expires at {}", pCloudContext->m_TokenExpiresAt);
+						}
+
+						co_return fg_Move(*ServiceInfo);
 					}
 					, true
 				)

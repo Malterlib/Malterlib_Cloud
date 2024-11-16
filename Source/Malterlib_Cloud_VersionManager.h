@@ -166,7 +166,7 @@ namespace NMib::NCloud
 			CVersionInformation m_VersionInfo;
 			uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
 			EFlag m_Flags = EFlag_None;
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CStartUploadTransfer::CResult> (CStartUploadTransfer &&_Params)> m_fStartTransfer;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CStartUploadTransfer::CResult> (CStartUploadTransfer _Params)> m_fStartTransfer;
 		};
 		
 		struct CStartDownloadVersion
@@ -230,7 +230,7 @@ namespace NMib::NCloud
 			NStr::CStr m_Application; /// Leave empty to subscribe to all applications
 			NContainer::TCSet<NStr::CStr> m_Platforms; /// Leave empty to subscribe to all platforms
 			NContainer::TCSet<NStr::CStr> m_Tags; /// Leave empty to subscribe to all tags
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CNewVersionNotifications::CResult> (CNewVersionNotifications &&_VersionInfo)> m_fOnNewVersions;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CNewVersionNotifications::CResult> (CNewVersionNotifications _VersionInfo)> m_fOnNewVersions;
 			uint32 m_nInitial = 10;
 		};
 
@@ -266,12 +266,12 @@ namespace NMib::NCloud
 		CVersionManager();
 		~CVersionManager();
 		
-		virtual NConcurrency::TCFuture<CListApplications::CResult> f_ListApplications(CListApplications &&_Params) = 0;
-		virtual NConcurrency::TCFuture<CListVersions::CResult> f_ListVersions(CListVersions &&_Params) = 0;
-		virtual NConcurrency::TCFuture<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion &&_Params) = 0;
-		virtual NConcurrency::TCFuture<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) = 0;
-		virtual NConcurrency::TCFuture<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) = 0;
-		virtual NConcurrency::TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) = 0;
+		virtual NConcurrency::TCFuture<CListApplications::CResult> f_ListApplications(CListApplications _Params) = 0;
+		virtual NConcurrency::TCFuture<CListVersions::CResult> f_ListVersions(CListVersions _Params) = 0;
+		virtual NConcurrency::TCFuture<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion _Params) = 0;
+		virtual NConcurrency::TCFuture<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion _Params) = 0;
+		virtual NConcurrency::TCFuture<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates _Params) = 0;
+		virtual NConcurrency::TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags _Params) = 0;
 	};
 	
 	struct CVersionManagerHelper
@@ -302,30 +302,30 @@ namespace NMib::NCloud
 			CVersionManager::CVersionInformation m_VersionInfo;
 		};
 		
-		NConcurrency::TCFuture<CUploadResult> f_Upload
+		NConcurrency::TCUnsafeFuture<CUploadResult> f_Upload
 			(
-				NConcurrency::TCDistributedActor<CVersionManager> const &_VersionManager
-				, NStr::CStr const &_Application
-				, CVersionManager::CVersionIDAndPlatform const &_VersionID
-				, CVersionManager::CVersionInformation const &_VersionInfo
-				, NStr::CStr const &_SourceTGZFile
+				NConcurrency::TCDistributedActor<CVersionManager> _VersionManager
+				, NStr::CStr _Application
+				, CVersionManager::CVersionIDAndPlatform _VersionID
+				, CVersionManager::CVersionInformation _VersionInfo
+				, NStr::CStr _SourceTGZFile
 				, CVersionManager::CStartUploadVersion::EFlag _Flags = CVersionManager::CStartUploadVersion::EFlag_None
 				, uint64 _QueueSize = 0
 			) const
 		;
 		
-		NConcurrency::TCFuture<CFileTransferResult> f_Download
+		NConcurrency::TCUnsafeFuture<CFileTransferResult> f_Download
 			(
-				NConcurrency::TCDistributedActor<CVersionManager> const &_VersionManager
-				, NStr::CStr const &_Application
-				, CVersionManager::CVersionIDAndPlatform const &_VersionID
-				, NStr::CStr const &_DestinationDirectory
+				NConcurrency::TCDistributedActor<CVersionManager> _VersionManager
+				, NStr::CStr _Application
+				, CVersionManager::CVersionIDAndPlatform _VersionID
+				, NStr::CStr _DestinationDirectory
 				, CFileTransferReceive::EReceiveFlag _ReceiveFlags = CFileTransferReceive::EReceiveFlag_IgnoreExisting
 				, uint64 _QueueSize = 0
 			) const
 		;
 		
-		NConcurrency::TCFuture<CPackageInfo> f_CreatePackage(NStr::CStr _SourceDirectory, NStr::CStr _DestinationFileName, uint32 _CompressionLevel) const;
+		NConcurrency::TCUnsafeFuture<CPackageInfo> f_CreatePackage(NStr::CStr _SourceDirectory, NStr::CStr _DestinationFileName, uint32 _CompressionLevel) const;
 		NConcurrency::TCFuture<CPackageInfo> f_GetPackageInfo(NStr::CStr const &_PackageFile) const;
 		NConcurrency::TCFuture<void> f_AbortAll() const;
 		

@@ -22,8 +22,6 @@ namespace NMib::NCloud
 			, NReference::TCReference<CActorSubscription> o_Subscription
 		)
 	{
-		co_await ECoroutineFlag_AllowReferences;
-
 		struct CState
 		{
 			TCActor<CDirectorySyncReceive> m_DownloadBackupReceive;

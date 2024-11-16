@@ -43,9 +43,9 @@ namespace NMib::NCloud::NKeyManager
 					"Names"_o= {"--provide-password"}
 					, "Description"_o= "Provide a password for the key database to be able to start the key manager."
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CKeyManagerDaemonActor::f_ProvidePassword, _pCommandLine);
+					return f_ProvidePassword(fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -55,9 +55,9 @@ namespace NMib::NCloud::NKeyManager
 					"Names"_o= {"--change-password"}
 					, "Description"_o= "Change the password that is used to unencrypt the key manager database."
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CKeyManagerDaemonActor::f_ChangePassword, _pCommandLine);
+					return f_ChangePassword(fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -82,9 +82,9 @@ namespace NMib::NCloud::NKeyManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CKeyManagerDaemonActor::f_PreCreateKeys, _Parameters["KeySize"].f_Integer(), _Parameters["NumberOfKeys"].f_Integer(), _pCommandLine);
+					return f_PreCreateKeys(_Parameters["KeySize"].f_Integer(), _Parameters["NumberOfKeys"].f_Integer(), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -98,9 +98,9 @@ namespace NMib::NCloud::NKeyManager
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CKeyManagerDaemonActor::f_ListPreCreatedKeys, _Parameters, _pCommandLine);
+					return f_ListPreCreatedKeys(fg_Move(_Parameters), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -119,9 +119,9 @@ namespace NMib::NCloud::NKeyManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
-					co_await self(&CKeyManagerDaemonActor::f_RemovePreCreatedKeys, _Parameters, _pCommandLine);
+					co_await f_RemovePreCreatedKeys(fg_Move(_Parameters), _pCommandLine);
 
 					co_return 0;
 				}
@@ -141,9 +141,9 @@ namespace NMib::NCloud::NKeyManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CKeyManagerDaemonActor::f_RemoveVerifiedHosts, TCSet<CStr>::fs_FromContainer(_Parameters["HostIDs"].f_StringArray()), _pCommandLine);
+					return f_RemoveVerifiedHosts(TCSet<CStr>::fs_FromContainer(_Parameters["HostIDs"].f_StringArray()), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -157,9 +157,9 @@ namespace NMib::NCloud::NKeyManager
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CKeyManagerDaemonActor::f_ListVerifiedHosts, _Parameters, _pCommandLine);
+					return f_ListVerifiedHosts(fg_Move(_Parameters), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -173,9 +173,9 @@ namespace NMib::NCloud::NKeyManager
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CKeyManagerDaemonActor::f_ListKeys, _Parameters, _pCommandLine);
+					return f_ListKeys(fg_Move(_Parameters), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -212,15 +212,15 @@ namespace NMib::NCloud::NKeyManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CKeyManagerDaemonActor::f_CopyKey, _Parameters, _pCommandLine);
+					return f_CopyKey(fg_Move(_Parameters), fg_Move(_pCommandLine));
 				}
 			)
 		;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
@@ -231,7 +231,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_ListPreCreatedKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ListPreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
@@ -254,7 +254,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_RemovePreCreatedKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_RemovePreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
@@ -270,7 +270,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_RemoveVerifiedHosts(NContainer::TCSet<CStr> &&_HostIDs, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_RemoveVerifiedHosts(NContainer::TCSet<CStr> _HostIDs, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
@@ -282,7 +282,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_ListVerifiedHosts(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ListVerifiedHosts(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
@@ -297,11 +297,11 @@ namespace NMib::NCloud::NKeyManager
 
 		auto ThisHostID = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_GetHostID);
 
-		TCActorResultMap<CStr, CStr> FriendlyNamesResults;
+		TCFutureMap<CStr, CStr> FriendlyNamesResults;
 		for (auto &HostID : Hosts)
-			mp_State.m_TrustManager(&CDistributedActorTrustManager::f_GetHostFriendlyName, HostID) > FriendlyNamesResults.f_AddResult(HostID);
+			mp_State.m_TrustManager(&CDistributedActorTrustManager::f_GetHostFriendlyName, HostID) > FriendlyNamesResults[HostID];
 
-		auto FriendlyNames = co_await FriendlyNamesResults.f_GetUnwrappedResults();
+		auto FriendlyNames = co_await fg_AllDone(FriendlyNamesResults);
 
 		TableRenderer.f_AddHeadings(&Columns);
 
@@ -321,7 +321,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_ListKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ListKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
@@ -342,11 +342,11 @@ namespace NMib::NCloud::NKeyManager
 		Columns.f_AddHeading("Key ID", 0);
 		Columns.f_AddHeading("Verified on servers", 0);
 
-		TCActorResultMap<CStr, CStr> FriendlyNamesResults;
+		TCFutureMap<CStr, CStr> FriendlyNamesResults;
 		for (auto &HostID : Hosts)
-			mp_State.m_TrustManager(&CDistributedActorTrustManager::f_GetHostFriendlyName, HostID) > FriendlyNamesResults.f_AddResult(HostID);
+			mp_State.m_TrustManager(&CDistributedActorTrustManager::f_GetHostFriendlyName, HostID) > FriendlyNamesResults[HostID];
 
-		auto FriendlyNames = co_await FriendlyNamesResults.f_GetUnwrappedResults();
+		auto FriendlyNames = co_await fg_AllDone(FriendlyNamesResults);
 
 		TableRenderer.f_AddHeadings(&Columns);
 
@@ -367,7 +367,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_CopyKey(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_CopyKey(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
@@ -382,7 +382,7 @@ namespace NMib::NCloud::NKeyManager
 
 	static constexpr ch8 const *gc_Salt = "MiBKeyMa";
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStdInReaderPromptParams PasswordPrompt;
 		PasswordPrompt.m_bPassword = true;
@@ -401,7 +401,7 @@ namespace NMib::NCloud::NKeyManager
 					{
 						mp_pProvidePasswordOnce = fg_Construct
 							(
-								g_ActorFunctor / [this](NStr::CStrSecure &&_Password) -> TCFuture<void>
+								g_ActorFunctor / [this](NStr::CStrSecure _Password) -> TCFuture<void>
 								{
 									CSecureByteVector Salt{(uint8 const *)gc_Salt, 8};
 									TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
@@ -453,7 +453,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_ChangePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ChangePassword(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto AppAuditor = this->f_Auditor();
 

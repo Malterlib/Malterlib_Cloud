@@ -19,7 +19,7 @@ namespace NMib::NCloud
 		return f_Tuple() == _Other.f_Tuple();
 	}
 
-	TCFuture<CActorSubscription> CHostMonitor::f_MonitorPath(CMonitorPathOptions const &_Options)
+	TCFuture<CActorSubscription> CHostMonitor::f_MonitorPath(CMonitorPathOptions _Options)
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -123,7 +123,7 @@ namespace NMib::NCloud
 			}
 		}
 
-		co_await fg_CallSafe(Internal, &CInternal::f_PeriodicUpdate_Diskspace, false);
+		co_await Internal.f_PeriodicUpdate_Diskspace(false);
 
 		co_return g_ActorSubscription / [this, Path = _Options.m_Path]() -> TCFuture<void>
 			{
@@ -157,14 +157,7 @@ namespace NMib::NCloud
 
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
-			Mounts = co_await
-				(
-					g_Dispatch(BlockingActorCheckout) / []
-					{
-						return CFile::fs_GetMounts(EFileMountType_Block | EFileMountType_Local | EFileMountType_Remote);
-					}
-				)
-			;
+			Mounts = co_await BlockingActorCheckout.f_Actor().f_Bind<CFile::fs_GetMounts>(EFileMountType_Block | EFileMountType_Local | EFileMountType_Remote);
 		}
 
 		auto MountsToDelete = m_AutomaticMounts.f_KeySet();
@@ -180,7 +173,7 @@ namespace NMib::NCloud
 
 			CMonitorPathOptions MonitorOptions;
 			MonitorOptions.m_Path = Mount;
-			AutomaticMount.m_MonitorPathSubscription = co_await m_pThis->self(&CHostMonitor::f_MonitorPath, MonitorOptions);
+			AutomaticMount.m_MonitorPathSubscription = co_await m_pThis->f_MonitorPath(MonitorOptions);
 		}
 
 		for (auto &MountToDelete : MountsToDelete)
@@ -210,7 +203,7 @@ namespace NMib::NCloud
 
 		if (m_Config.m_Flags & EInitFlag_MonitorAllMounts)
 		{
-			auto Result = co_await fg_CallSafe(*this, &CInternal::f_PeriodicUpdate_Diskspace_UpdateMounts).f_Wrap();
+			auto Result = co_await f_PeriodicUpdate_Diskspace_UpdateMounts().f_Wrap();
 			if (!Result)
 				DMibLogWithCategory(Malterlib/Cloud/HostMonitor, Error, "Failed update disk space monitoring for mounts: {}", Result.f_GetExceptionStr());
 		}
@@ -257,7 +250,7 @@ namespace NMib::NCloud
 		if (!FreeDiskSpace)
 			co_return FreeDiskSpace.f_GetException();
 
-		TCActorResultVector<void> ReportResults;
+		TCFutureVector<void> ReportResults;
 
 		for (auto &PathInfoResult : *FreeDiskSpace)
 		{
@@ -282,7 +275,7 @@ namespace NMib::NCloud
 
 				pMonitoredPath->m_FreeReporter->m_fReportReadings(TCVector<CDistributedAppSensorReporter::CSensorReading>{fg_Move(Reading)})
 					% ("Failed to report readings (free) for path '{}'"_f << Path)
-					> ReportResults.f_AddResult()
+					> ReportResults
 				;
 			}
 
@@ -293,7 +286,7 @@ namespace NMib::NCloud
 
 				pMonitoredPath->m_TotalReporter->m_fReportReadings(TCVector<CDistributedAppSensorReporter::CSensorReading>{fg_Move(Reading)})
 					% ("Failed to report readings (total) for path '{}'"_f << Path)
-					> ReportResults.f_AddResult()
+					> ReportResults
 				;
 			}
 
@@ -304,12 +297,12 @@ namespace NMib::NCloud
 
 				pMonitoredPath->m_FreePercentReporter->m_fReportReadings(TCVector<CDistributedAppSensorReporter::CSensorReading>{fg_Move(Reading)})
 					% ("Failed to report readings (free %) for path '{}'"_f << Path)
-					> ReportResults.f_AddResult()
+					> ReportResults
 				;
 			}
 		}
 
-		co_await (co_await ReportResults.f_GetResults() | g_Unwrap);
+		co_await fg_AllDone(ReportResults);
 
 		co_return {};
 	}

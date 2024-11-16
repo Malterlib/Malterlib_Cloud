@@ -57,12 +57,12 @@ namespace NMib::NCloud::NCloudManager
 				mp_SlackActor = fg_Construct(mp_CurlActor);
 		}
 
-		TCActorResultVector<void> InitResults;
-		mp_This.mp_UpdateNotifications.f_Init().f_Dispatch() % "Failed to init update notifications" > InitResults.f_AddResult();
-		mp_This.mp_SensorNotifications.f_Init().f_Dispatch() % "Failed to init sensor notifications" > InitResults.f_AddResult();
-		mp_This.mp_LogNotifications.f_Init().f_Dispatch() % "Failed to init log notifications" > InitResults.f_AddResult();
+		TCFutureVector<void> InitResults;
+		mp_This.mp_UpdateNotifications.f_Init() % "Failed to init update notifications" > InitResults;
+		mp_This.mp_SensorNotifications.f_Init() % "Failed to init sensor notifications" > InitResults;
+		mp_This.mp_LogNotifications.f_Init() % "Failed to init log notifications" > InitResults;
 
-		auto InitResult = co_await InitResults.f_GetUnwrappedResults().f_Wrap();
+		auto InitResult = co_await fg_AllDone(InitResults).f_Wrap();
 
 		CStr Error;
 		if (!InitResult)

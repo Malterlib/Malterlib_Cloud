@@ -221,7 +221,7 @@ public:
 				m_ChangeSubscription->f_Destroy().f_CallSync(m_pRunLoop, g_Timeout);
 
 			if (m_BackupClient)
-				m_BackupClient.f_Destroy().f_CallSync(m_pRunLoop, g_Timeout);
+				fg_Move(m_BackupClient).f_Destroy().f_CallSync(m_pRunLoop, g_Timeout);
 		}
 
 		template <CBackupManagerClient::ENotification tf_Notification>
@@ -241,9 +241,9 @@ public:
 					, _TrustManager
 					, g_ActorFunctor / [pManifestFinished, pBackupInterface, ReceivedManifestFinished]
 					(
-						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
-						, CActorSubscription &&_ManifestFinished
-						, CStr const &_BackupRoot
+						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
+						, CActorSubscription _ManifestFinished
+						, CStr _BackupRoot
 					) -> TCFuture<TCActorSubscriptionWithID<>>
 					{
 						*pManifestFinished = fg_Move(_ManifestFinished);
@@ -268,7 +268,7 @@ public:
 					| CBackupManagerClient::ENotification_Quiescent
 					| CBackupManagerClient::ENotification_Unquiescent
 					| CBackupManagerClient::ENotification_InitialFinished
-					, g_ActorFunctor / [pState = m_pState, ReceivedManifestFinished](NConcurrency::CHostInfo const &_RemoteHost, CBackupManagerClient::CNotification &&_Notification)
+					, g_ActorFunctor / [pState = m_pState, ReceivedManifestFinished](NConcurrency::CHostInfo _RemoteHost, CBackupManagerClient::CNotification _Notification)
 					-> NConcurrency::TCFuture<void>
 					{
 #ifdef DMibCloudBackupManagerDebug
@@ -585,7 +585,7 @@ public:
 		// Copy BackupManagers to their directories
 		mint nBackupManagers = 1;
 		{
-			TCActorResultVector<void> BackupManagerLaunchesResults;
+			TCFutureVector<void> BackupManagerLaunchesResults;
 			for (mint i = 0; i < nBackupManagers; ++i)
 			{
 				auto BlockingActorCheckout = fg_BlockingActor();
@@ -598,14 +598,14 @@ public:
 						CFile::fs_CreateDirectory(BackupManagerDirectory);
 						//CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/BackupManager", BackupManagerDirectory, nullptr);
 					}
-					> BackupManagerLaunchesResults.f_AddResult()
+					> BackupManagerLaunchesResults
 				;
 			}
-			fg_CombineResults(BackupManagerLaunchesResults.f_GetResults().f_CallSync());
+			fg_CombineResults(fg_AllDoneWrapped(BackupManagerLaunchesResults).f_CallSync());
 		}
 
 		// Launch BackupManagers
-		TCActorResultVector<CDistributedApp_LaunchInfo> BackupManagerLaunchesResults;
+		TCFutureVector<CDistributedApp_LaunchInfo> BackupManagerLaunchesResults;
 		TCVector<CDistributedApp_LaunchInfo> BackupManagerLaunches;
 
 		auto fLaunchSecretManagers = [&]
@@ -625,10 +625,10 @@ public:
 							, &fg_ConstructApp_BackupManager
 							, NContainer::TCVector<NStr::CStr>{}
 						)
-						> BackupManagerLaunchesResults.f_AddResult()
+						> BackupManagerLaunchesResults
 					;
 				}
-				for (auto &LaunchResult : BackupManagerLaunchesResults.f_GetResults().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout))
+				for (auto &LaunchResult : fg_AllDoneWrapped(BackupManagerLaunchesResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout))
 					BackupManagerLaunches.f_Insert(fg_Move(*LaunchResult));
 			}
 		;
@@ -653,7 +653,7 @@ public:
 			{
 				AllBackupManagerHosts.f_Clear();
 				AllBackupManagers.f_Clear();
-				TCActorResultVector<void> ListenResults;
+				TCFutureVector<void> ListenResults;
 				mint iBackupManager = 0;
 				for (auto &BackupManager : BackupManagerLaunches)
 				{
@@ -664,15 +664,15 @@ public:
 					auto &BackupManagerInfo = AllBackupManagers[BackupManager.m_HostID];
 					BackupManagerInfo.m_pTrustInterface = BackupManager.m_pTrustInterface;
 					BackupManagerInfo.m_Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/BackupManagerTest.sock"_f << BackupManagerDirectory);
-					BackupManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(BackupManagerInfo.m_Address) > ListenResults.f_AddResult();
+					BackupManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(BackupManagerInfo.m_Address) > ListenResults;
 					++iBackupManager;
 				}
-				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout));
+				fg_CombineResults(fg_AllDoneWrapped(ListenResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout));
 			}
 		;
 		fSetupListen();
 
-		TCActorResultVector<void> SetupTrustResults;
+		TCFutureVector<void> SetupTrustResults;
 
 		static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 		auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
@@ -695,11 +695,11 @@ public:
 					, fg_CreateSet<CStr>(BackupManagerHostID)
 					, c_WaitForSubscriptions
 				)
-				> SetupTrustResults.f_AddResult()
+				> SetupTrustResults
 			;
 
 			BackupManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)(fPermissions(TestHostID, BackupManagerPermissionsForTest))
-				> SetupTrustResults.f_AddResult()
+				> SetupTrustResults
 			;
 
 			for (auto &BackupManagerInner : AllBackupManagers)
@@ -721,11 +721,11 @@ public:
 						BackupManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 					}
 				;
-				Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
+				Promise.f_MoveFuture() > SetupTrustResults;
 			}
 		}
 
-		SetupTrustResults.f_GetResults().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		fg_AllDoneWrapped(SetupTrustResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		{
 			CTrustedSubscriptionTestHelper Subscriptions{TrustManager};
@@ -1686,7 +1686,7 @@ public:
 				Receive.m_BasePath = TestDownloadDirectory;
 
 				CActorSubscription Subscription;
-				auto DownloadResult = fg_CallSafeDispatched(&fg_DownloadBackup, BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription))
+				auto DownloadResult = fg_CurrentActor().f_Bind<fg_DownloadBackup>(BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription))
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 

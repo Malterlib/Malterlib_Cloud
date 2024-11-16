@@ -156,27 +156,27 @@ namespace NMib::NCloud
 		static bool fs_ManifestChangeValid(NStr::CStr const &_FileName, CManifestChange const &_Change, NStr::CStr &o_Error);
 		static bool fs_ManifestFileValid(NStr::CStr const &_FileName, NFile::CDirectoryManifestFile const &_File, NStr::CStr &o_Error);
 
-		using FRunRSyncProtocol = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<NContainer::CSecureByteVector> (NContainer::CSecureByteVector &&_Packet)>;
+		using FRunRSyncProtocol = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<NContainer::CSecureByteVector> (NContainer::CSecureByteVector _Packet)>;
 
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_StartManifestRSync
 			(
-				FRunRSyncProtocol &&_fRunProtocol
+				FRunRSyncProtocol _fRunProtocol
 				, uint64 _ManifestSize
-				, NCryptography::CHashDigest_SHA256 const &_ExpectedDigest
+				, NCryptography::CHashDigest_SHA256 _ExpectedDigest
 			) = 0
 		;
 		virtual NConcurrency::TCFuture<CStartBackupResult> f_StartBackup() = 0;
 
-		virtual NConcurrency::TCFuture<void> f_ManifestChange(NStr::CStr const &_FileName, CManifestChange const &_Change) = 0;
+		virtual NConcurrency::TCFuture<void> f_ManifestChange(NStr::CStr _FileName, CManifestChange _Change) = 0;
 
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_StartRSync
 			(
-				NStr::CStr const &_FileName
-				, CManifestFile const &_ManifestFile
-				, FRunRSyncProtocol &&_fRunProtocol
+				NStr::CStr _FileName
+				, CManifestFile _ManifestFile
+				, FRunRSyncProtocol _fRunProtocol
 			) = 0
 		;
-		virtual NConcurrency::TCFuture<void> f_AppendData(NStr::CStr const &_FileName, CAppendData &&_Data) = 0;
+		virtual NConcurrency::TCFuture<void> f_AppendData(NStr::CStr _FileName, CAppendData _Data) = 0;
 
 		virtual NConcurrency::TCFuture<CInitialBackupFinishedResult> f_InitialBackupFinished(EInitialBackupFinishedFlag _FinishedFlags) = 0;
 	};
@@ -345,20 +345,20 @@ namespace NMib::NCloud
 		// Deprecated - End
 		
 		// Deprecated - Start
-		virtual NConcurrency::TCFuture<CStartBackup::CResult> f_StartBackup(CStartBackup &&_Params);
-		virtual NConcurrency::TCFuture<CStopBackup::CResult> f_StopBackup(CStopBackup &&_Params);
-		virtual NConcurrency::TCFuture<CUploadData::CResult> f_UploadData(CUploadData &&_Params);
-		virtual NConcurrency::TCFuture<CStartDownloadBackup::CResult> f_StartDownloadBackup(CStartDownloadBackup &&_Params);
+		virtual NConcurrency::TCFuture<CStartBackup::CResult> f_StartBackup(CStartBackup _Params);
+		virtual NConcurrency::TCFuture<CStopBackup::CResult> f_StopBackup(CStopBackup _Params);
+		virtual NConcurrency::TCFuture<CUploadData::CResult> f_UploadData(CUploadData _Params);
+		virtual NConcurrency::TCFuture<CStartDownloadBackup::CResult> f_StartDownloadBackup(CStartDownloadBackup _Params);
 		// Deprecated - End
 
-		virtual auto f_InitBackup(CInitBackup &&_Params)
+		virtual auto f_InitBackup(CInitBackup _Params)
 			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CBackupManagerBackup>> = 0
 		;
 		
 		virtual NConcurrency::TCFuture<NContainer::TCVector<NStr::CStr>> f_ListBackupSources() = 0;
-		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CBackupInfo>> f_ListBackups(NStr::CStr const &_ForBackupSource) = 0;
+		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CBackupInfo>> f_ListBackups(NStr::CStr _ForBackupSource) = 0;
 		
-		virtual auto f_DownloadBackup(CDownloadBackup &&_DownloadBackup)
+		virtual auto f_DownloadBackup(CDownloadBackup _DownloadBackup)
 			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>>
 			= 0
 		;

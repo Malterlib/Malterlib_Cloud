@@ -20,9 +20,9 @@ namespace NMib::NCloud
 			<
 				TCFuture<TCActorSubscriptionWithID<>>
 				(
-					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
-					, CActorSubscription &&_ManifestFinished
-					, CStr const &_BackupRoot
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
+					, CActorSubscription _ManifestFinished
+					, CStr _BackupRoot
 				)
 			>
 			&&_fOnNewBackup
@@ -64,31 +64,34 @@ namespace NMib::NCloud
 
 		*Internal.m_pDestroyed = true;
 		{
-			TCActorResultVector<void> RunningInstancesDestroys;
+			TCFutureVector<void> RunningInstancesDestroys;
 			for (auto &BackupInstance : Internal.m_RunningBackupInstances)
-				BackupInstance.m_Instance.f_Destroy() > RunningInstancesDestroys.f_AddResult();
+			{
+				if (BackupInstance.m_Instance2)
+					fg_Move(BackupInstance.m_Instance2).f_Destroy() > RunningInstancesDestroys;
+			}
 
 			Internal.m_RunningBackupInstances.f_Clear();
 
-			co_await RunningInstancesDestroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy running backup instances");
+			co_await fg_AllDone(RunningInstancesDestroys).f_Wrap() > LogError.f_Warning("Failed to destroy running backup instances");
 		}
 		{
-			TCActorResultVector<void> StoppedNotifications;
+			TCFutureVector<void> StoppedNotifications;
 			for (auto &fOnStopped : Internal.m_OnBackupStoppedSubscriptions)
-				fOnStopped() > StoppedNotifications.f_AddResult();
+				fOnStopped() > StoppedNotifications;
 
-			co_await StoppedNotifications.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy on backup stopped subscriptions");
+			co_await fg_AllDone(StoppedNotifications).f_Wrap() > LogError.f_Warning("Failed to destroy on backup stopped subscriptions");
 		}
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 
-			fg_Move(Internal.m_fOnNewBackup).f_Destroy() > Destroys.f_AddResult();
+			fg_Move(Internal.m_fOnNewBackup).f_Destroy() > Destroys;
 
 			{
 				auto pTracker = fg_Move(Internal.m_pCanDestroyTracker);
-				pTracker->f_Future() > Destroys.f_AddResult();
+				pTracker->f_Future() > Destroys;
 			}
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy on on new backup subscription or destroy tracker");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy on on new backup subscription or destroy tracker");
 		}
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();

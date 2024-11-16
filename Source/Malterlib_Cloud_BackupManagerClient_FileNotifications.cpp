@@ -112,8 +112,8 @@ namespace NMib::NCloud
 		if (m_pThis->f_IsDestroyed())
 			co_return DMibErrorInstance("Destroyed");
 
-		TCActorResultMap<CStr, CActorSubscription> SubscribeResults;
-		TCActorResultMap<CStr, CActorSubscription> SubscribeResultsMissing;
+		TCFutureMap<CStr, CActorSubscription> SubscribeResults;
+		TCFutureMap<CStr, CActorSubscription> SubscribeResultsMissing;
 
 		for (auto &Path : PendingPaths)
 		{
@@ -135,7 +135,7 @@ namespace NMib::NCloud
 					&CFileChangeNotificationActor::f_RegisterForChanges
 					, Path
 					, Changes
-					, g_ActorFunctor / [this, Path](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCFuture<void>
+					, g_ActorFunctor / [this, Path](TCVector<CFileChangeNotification::CNotification> _Notifications) -> TCFuture<void>
 					{
 						for (auto Notification : _Notifications)
 						{
@@ -162,7 +162,7 @@ namespace NMib::NCloud
 					}
 					, m_pThis->mp_pInternal->f_CoalesceSettings()
 				)
-				> SubscribeResults.f_AddResult(Path)
+				> SubscribeResults[Path]
 			;
 		}
 
@@ -176,19 +176,19 @@ namespace NMib::NCloud
 					&CFileChangeNotificationActor::f_RegisterForChanges
 					, MissingPath
 					, EFileChange_FileName | EFileChange_DirectoryName
-					, g_ActorFunctor / [this](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCFuture<void>
+					, g_ActorFunctor / [this](TCVector<CFileChangeNotification::CNotification> _Notifications) -> TCFuture<void>
 					{
 						if (!m_bRerunRetrySubscribe)
 						{
 							m_bRerunRetrySubscribe = true;
-							f_RetrySubscribeChanges() > fg_DiscardResult();
+							f_RetrySubscribeChanges().f_DiscardResult();
 						}
 
 						co_return {};
 					}
 					, m_pThis->mp_pInternal->f_CoalesceSettings()
 				)
-				> SubscribeResultsMissing.f_AddResult(MissingPath)
+				> SubscribeResultsMissing[MissingPath]
 			;
 		}
 
@@ -203,7 +203,7 @@ namespace NMib::NCloud
 		for (auto &ToRemove : MissingPathsToRemove)
 			m_WatchedPathsMissing.f_Remove(ToRemove);
 
-		auto [Results, ResultsMissing] = co_await (SubscribeResults.f_GetResults() + SubscribeResultsMissing.f_GetResults());
+		auto [Results, ResultsMissing] = co_await (fg_AllDoneWrapped(SubscribeResults) + fg_AllDoneWrapped(SubscribeResultsMissing));
 
 		bool bChanged = false;
 		for (auto &Result : Results)
@@ -255,7 +255,7 @@ namespace NMib::NCloud
 		}
 
 		if (bChanged)
-			f_RetrySubscribeChanges() > fg_DiscardResult();
+			f_RetrySubscribeChanges().f_DiscardResult();
 
 		co_return {};
 	}
@@ -295,10 +295,8 @@ namespace NMib::NCloud
 
 	TCFuture<void> CBackupManagerClient::CInternal::f_SubscribeChanges()
 	{
-		TCPromise<void> Promise;
-
 		if (m_pThis->f_IsDestroyed())
-			return Promise <<= DMibErrorInstance("Destroyed");
+			co_return DMibErrorInstance("Destroyed");
 		
 		auto &ManifestConfig = m_Config.m_ManifestConfig;
 
@@ -406,7 +404,7 @@ namespace NMib::NCloud
 				WatchedPath.m_bPending = false;
 		}
 
-		return Promise <<= f_RetrySubscribeChanges();
+		co_return co_await f_RetrySubscribeChanges();
 	}
 	
 	bool CBackupManagerClient::CInternal::f_IsPathInManifest(CStr const &_Path, CStr &o_FileName)
@@ -485,7 +483,8 @@ namespace NMib::NCloud
 			if (RunningInstance.m_bSentActive)
 				continue;
 			RunningInstance.m_bSentActive = true;
-			RunningInstance.m_Instance(&NPrivate::CBackupManagerClient_Instance::f_MarkActive, true) > fg_DiscardResult();
+			if (RunningInstance.m_Instance2)
+				RunningInstance.m_Instance2(&NPrivate::CBackupManagerClient_Instance::f_MarkActive, true).f_DiscardResult();
 		}
 
 		++m_nActive;
@@ -499,7 +498,8 @@ namespace NMib::NCloud
 					if (!RunningInstance.m_bSentActive)
 						continue;
 					RunningInstance.m_bSentActive = false;
-					RunningInstance.m_Instance(&NPrivate::CBackupManagerClient_Instance::f_MarkActive, false) > fg_DiscardResult();
+					if (RunningInstance.m_Instance2)
+						RunningInstance.m_Instance2(&NPrivate::CBackupManagerClient_Instance::f_MarkActive, false).f_DiscardResult();
 				}
 			}
 		;
@@ -542,7 +542,7 @@ namespace NMib::NCloud
 			{
 				DMibCloudBackupManagerDebugOut("%%% RESUBSCRIBE {}\n", Notification.m_Path);
 				pWatchedDeleted->m_bPending = true;
-				f_RetrySubscribeChanges() > fg_DiscardResult();
+				f_RetrySubscribeChanges().f_DiscardResult();
 			}
 		}
 
@@ -581,8 +581,8 @@ namespace NMib::NCloud
 
 		auto pActive = f_MarkInstancesActive();
 
-		fg_CallSafe(this, &CInternal::f_UpdateManifest, RelativePath, OriginalPath, bDirtyHint)
-			+ fg_CallSafe(this, &CInternal::f_UpdateManifest, RelativePathFrom, OriginalPathFrom, bDirtyHint)
+		f_UpdateManifest(RelativePath, OriginalPath, bDirtyHint)
+			+ f_UpdateManifest(RelativePathFrom, OriginalPathFrom, bDirtyHint)
 			> [=, this](TCAsyncResult<CUpdateManifestResult> &&_Change, TCAsyncResult<CUpdateManifestResult> &&_ChangeFrom)
 			{
 				(void)pActive;
@@ -616,7 +616,10 @@ namespace NMib::NCloud
 						DMibCheck(CBackupManagerBackup::fs_ManifestChangeValid(_Path, _ManifestChange, ManifestError));
 #endif
 						for (auto &RunningInstance : m_RunningBackupInstances)
-							RunningInstance.m_Instance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty, _ChecksumState) > fg_DiscardResult();
+						{
+							if (RunningInstance.m_Instance2)
+								RunningInstance.m_Instance2(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty, _ChecksumState).f_DiscardResult();
+						}
 					}
 				;
 				

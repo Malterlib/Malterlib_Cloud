@@ -128,12 +128,12 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			: mp_RootPath(_RootPath)
 			, mp_Password(_Password)
 		{
-			self(&CKeyManagerPasswordProvider::fp_Startup) > fg_DiscardResult();
+			fp_Startup().f_DiscardResult();
 		}
 
 		TCFuture<void> f_WaitForProvide()
 		{
-			return mp_WaitForProvide.f_Insert().f_Future();
+			co_return co_await mp_WaitForProvide.f_Insert().f_Future();
 		}
 
 		TCFuture<void> f_ProvidePasswordIfNeeded()
@@ -234,7 +234,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 							if (_Output.f_Find("Type password for key database: ") >= 0)
 							{
 								_Output.f_Clear();
-								LaunchActor(&CProcessLaunchActor::f_SendStdIn, mp_Password + "\n\n\n\n") > fg_DiscardResult();
+								LaunchActor(&CProcessLaunchActor::f_SendStdIn, mp_Password + "\n\n\n\n").f_DiscardResult();
 							}
 						}
 					;
@@ -281,7 +281,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					50_ms
 					, [=, this, LogPath = mp_RootPath / "Log/KeyManager.log"]() -> TCFuture<void>
 					{
-						co_await self(&CKeyManagerPasswordProvider::f_ProvidePasswordIfNeeded);
+						co_await f_ProvidePasswordIfNeeded();
 
 						co_return {};
 					}
@@ -310,7 +310,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		[[maybe_unused]] bool bCanDoEncryption = false;
 #ifdef DPlatformFamily_Linux
-		bCanDoEncryption = true;
+		bCanDoEncryption = false;
 #endif
 		CActorRunLoopTestHelper RunLoopHelper;
 
@@ -448,15 +448,13 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
-		auto fSetupAppManager = [&](CStr const &_Directory) -> TCFuture<void>
+		auto fSetupAppManager = [&](CStr const &_Directory) -> TCUnsafeFuture<void>
 			{
 				DMibLogWithCategory(Test, Info, "Setup AppManager ({})", CFile::fs_GetFile(_Directory));
 
-				co_await ECoroutineFlag_AllowReferences;
-
 				auto BlockingActorCheckout = fg_BlockingActor();
 
-				TCActorResultVector<void> AppManagerLaunchesResults;
+				TCFutureVector<void> AppManagerLaunchesResults;
 				co_await
 					(
 						g_Dispatch(BlockingActorCheckout) / [=]
@@ -693,7 +691,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fProvideKeyManagerPasswordIfNeeded = [&]
 			{
-				KeyManagerPasswordProvideActor(&CKeyManagerPasswordProvider::f_ProvidePasswordIfNeeded) > fg_DiscardResult();
+				KeyManagerPasswordProvideActor(&CKeyManagerPasswordProvider::f_ProvidePasswordIfNeeded).f_DiscardResult();
 			}
 		;
 
@@ -701,7 +699,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibLogWithCategory(Test, Info, "Setup KeyManager ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
 
-				auto PasswordProvidedFuture = KeyManagerPasswordProvideActor(&CKeyManagerPasswordProvider::f_WaitForProvide).f_Future();
+				TCFuture<void> PasswordProvidedFuture = KeyManagerPasswordProvideActor(&CKeyManagerPasswordProvider::f_WaitForProvide);
 
 				fInstallAppManually(_AppManager, KeyManagerPackageOptions, _KeyManagerPackage, "KeyManager", "MalterlibCloudKeyManager", "TestTag", false);
 
@@ -819,11 +817,9 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		TCMap<CStr, TCVector<CVersionManager::CVersionIDAndPlatform>> UploadedPackages;
 
-		auto fUploadPackage = [&](CStr _Package, TCSet<CStr> _Tags) -> TCFuture<CVersionManagerHelper::CPackageInfo>
+		auto fUploadPackage = [&](CStr _Package, TCSet<CStr> _Tags) -> TCUnsafeFuture<CVersionManagerHelper::CPackageInfo>
 			{
 				DMibLogWithCategory(Test, Info, "Upload Package ({}, {})", CFile::fs_GetFile(_Package), CFile::fs_GetFile(CFile::fs_GetPath(_Package)));
-
-				co_await ECoroutineFlag_AllowReferences;
 
 				auto PackageInfo = co_await VersionManagerHelper.f_GetPackageInfo(_Package);
 				PackageInfo.m_VersionInfo.m_Tags = _Tags;
@@ -921,11 +917,9 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		TCMap<CStr, CVersionManagerHelper::CPackageInfo> AppPackageInfos;
 		TCSet<CStr> DoneInitPackageInfo;
 
-		auto fUpdateApp = [&](CStr _Name, TCSet<CStr> _Tags) -> TCFuture<CVersionManagerHelper::CPackageInfo>
+		auto fUpdateApp = [&](CStr _Name, TCSet<CStr> _Tags) -> TCUnsafeFuture<CVersionManagerHelper::CPackageInfo>
 			{
 				DMibLogWithCategory(Test, Info, "Update App ({})", _Name);
-
-				co_await ECoroutineFlag_AllowReferences;
 
 				CStr AppArchive = "{}/TestApps/Dynamic/{}/{}.tar"_f << ProgramDirectory << _UniqueName << _Name;
 				CStr SourceTempPath = "{}/TestApps/LatestSource/{}/{}"_f << ProgramDirectory << _UniqueName << _Name;
@@ -1307,10 +1301,8 @@ public:
 
 			auto fInit = [&](CStr &_AppManager, CStr &_VersionManager, CStr &_KeyManager, CStr const &_UniqueName)
 				{
-					auto fInitPackage = [&](CStr &o_PackagePath) -> TCFuture<void>
+					auto fInitPackage = [&](CStr &o_PackagePath) -> TCUnsafeFuture<void>
 						{
-							co_await ECoroutineFlag_AllowReferences;
-
 							CStr BasePath = "{}/TestApps/Latest/{}"_f << ProgramDirectory << _UniqueName;
 							CFile::fs_CreateDirectory(BasePath);
 

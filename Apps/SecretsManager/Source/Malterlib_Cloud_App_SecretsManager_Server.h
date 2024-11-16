@@ -23,24 +23,24 @@ namespace NMib::NCloud::NSecretsManager
 
 		struct CSecretsManagerImplementation : public CSecretsManager
 		{
-			TCFuture<TCSet<CSecretID>> f_EnumerateSecrets(CEnumerateSecrets const &_Options) override;
-			TCFuture<CSetSecretPropertiesResult> f_SetSecretProperties(CSecretID &&_ID, CSecretProperties &&_Secret) override;
-			TCFuture<CSecretProperties> f_GetSecretProperties(CSecretID &&_ID) override;
-			TCFuture<CSecret> f_GetSecret(CSecretID &&_ID) override;
-			TCFuture<CSecret> f_GetSecretBySemanticID(CGetSecretBySemanticID const &_Options) override;
-			TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> f_DownloadFile(CSecretID &&_ID, TCActorSubscriptionWithID<> &&_Subscription) override;
-			TCFuture<void> f_ModifyTags(CSecretID &&_ID, TCSet<CStrSecure> &&_TagsToRemove, TCSet<CStrSecure> &&_TagsToAdd) override;
-			TCFuture<void> f_SetMetadata(CSetMetadata &&_Metadata) override;
-			TCFuture<void> f_RemoveMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey) override;
-			TCFuture<void> f_RemoveSecret(CSecretID &&_ID) override;
+			TCFuture<TCSet<CSecretID>> f_EnumerateSecrets(CEnumerateSecrets _Options) override;
+			TCFuture<CSetSecretPropertiesResult> f_SetSecretProperties(CSecretID _ID, CSecretProperties _Secret) override;
+			TCFuture<CSecretProperties> f_GetSecretProperties(CSecretID _ID) override;
+			TCFuture<CSecret> f_GetSecret(CSecretID _ID) override;
+			TCFuture<CSecret> f_GetSecretBySemanticID(CGetSecretBySemanticID _Options) override;
+			TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> f_DownloadFile(CSecretID _ID, TCActorSubscriptionWithID<> _Subscription) override;
+			TCFuture<void> f_ModifyTags(CSecretID _ID, TCSet<CStrSecure> _TagsToRemove, TCSet<CStrSecure> _TagsToAdd) override;
+			TCFuture<void> f_SetMetadata(CSetMetadata _Metadata) override;
+			TCFuture<void> f_RemoveMetadata(CSecretID _ID, CStrSecure _MetadataKey) override;
+			TCFuture<void> f_RemoveSecret(CSecretID _ID) override;
 			TCFuture<TCActorFunctorWithID<TCFuture<void> ()>> f_UploadFile
 				(
-					CSecretID &&_ID
-					, CStrSecure const &_FileName
-					, TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Uploader
+					CSecretID _ID
+					, CStrSecure _FileName
+					, TCDistributedActorInterfaceWithID<CDirectorySyncClient> _Uploader
 				) override
 			;
-			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeToChanges(CSubscribeToChanges &&_Params) override;
+			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeToChanges(CSubscribeToChanges _Params) override;
 
 			DMibDelegatedActorImplementation(CServer);
 		};
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NSecretsManager
 		TCFuture<void> f_Init();
 
 #if DMibConfig_Tests_Enable
-		TCFuture<CEJSONSorted> f_Test_Command(CStr const &_Command, CEJSONSorted const &_Params);
+		TCFuture<CEJSONSorted> f_Test_Command(CStr _Command, CEJSONSorted const _Params);
 #endif
 		static bool fs_MatchSecret
 			(
@@ -139,14 +139,14 @@ namespace NMib::NCloud::NSecretsManager
 		void fp_UpdateSemanticIDs(CStr const &_SemanticIDToRemove, CStr const &_SemanticIDToAdd);
 		TCFuture<void> fp_RemoveFile(CStr _FileName, CDistributedAppAuditor _Auditor);
 		CActorSubscription fp_ReserveFile(CStr const &_FileName);
-		TCFuture<void> fp_RemoveUnreferencedFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor);
+		TCFuture<void> fp_RemoveUnreferencedFile(CStr _FileName, CDistributedAppAuditor _Auditor);
 		TCFuture<void> fp_WriteDatabase();
 
 #if DMibConfig_Tests_Enable
 		TCFuture<CEJSONSorted> f_SyncFileOperations();
 #endif
 
-		TCFuture<void> fp_SendSubscriptionInitial(CStr const &_SubscriptionID);
+		TCFuture<void> fp_SendSubscriptionInitial(CStr _SubscriptionID);
 		void fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity);
 		void fp_SecretUpdated(CSecretPropertiesInternal const &_SecretProperties, bool _bRemoved);
 		bool fp_SecretMatchesSubscription(CChangeSubscription const &_Subscription, CSecretPropertiesInternal const &_SecretProperties);

@@ -21,7 +21,7 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 	
-	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Update(NStr::CStr const &_Name, CApplicationUpdate const &_Update)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Update(NStr::CStr _Name, CApplicationUpdate _Update)
 	{
 		return m_pThis->fp_UpdateApplication
 			(
@@ -38,7 +38,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		for (auto &pUpdateWeak : mp_RunningUpdates)
 		{
@@ -52,7 +52,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		
@@ -365,10 +365,9 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_CancelAllApplicationUpdatesOnStopAppManager()
 	{
-		TCPromise<void> Promise;
 
 		if (mp_RunningUpdates.f_IsEmpty())
-			return Promise <<= g_Void;
+			co_return {};
 
 		bool bNeedCancel = false;
 		
@@ -382,13 +381,17 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
+		TCPromiseFuturePair<void> Promise;
 		if (bNeedCancel)
-			mp_CancelRunningUpdatesOnStopAppManagerPromise = Promise;
+			mp_CancelRunningUpdatesOnStopAppManagerPromise = fg_Move(Promise.m_Promise);
 		else
-			Promise.f_SetResult();
+		{
+			Promise.m_Promise.f_SetResult();
+			Promise.m_Promise.f_ClearResultSet();
+		}
 
 		fp_OnAppUpdateInfoChange();
 		
-		return Promise.f_MoveFuture();
+		co_return co_await fg_Move(Promise.m_Future);
 	}
 }

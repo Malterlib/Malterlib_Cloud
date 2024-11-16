@@ -64,8 +64,8 @@ namespace NMib::NCloud
 		};
 
 		CTransferStats m_TransferStats;
-		TCActorFunctorWeak<TCFuture<CFileTransferContext::CInternal::CSendPart::CResult> (CFileTransferContext::CInternal::CSendPart &&_Part)> m_fUploadCallback;
-		TCActorFunctorWeak<TCFuture<CFileTransferContext::CInternal::CStateChange::CResult> (CFileTransferContext::CInternal::CStateChange &&_State)> m_fStateCallback;
+		TCActorFunctorWeak<TCFuture<CFileTransferContext::CInternal::CSendPart::CResult> (CFileTransferContext::CInternal::CSendPart _Part)> m_fUploadCallback;
+		TCActorFunctorWeak<TCFuture<CFileTransferContext::CInternal::CStateChange::CResult> (CFileTransferContext::CInternal::CStateChange _State)> m_fStateCallback;
 		uint32 m_Version = 0;
 		CFileTransferContext::CInternal m_Params;
 		CWorkQueue m_Queue;
@@ -105,7 +105,7 @@ namespace NMib::NCloud
 		CFileTransferContext::CInternal::CStateChange StateChange{m_Version};
 		StateChange.m_State = CFileTransferContext::CInternal::EState_Error;
 		StateChange.m_Error = _Error;
-		m_fStateCallback(fg_Move(StateChange)) > fg_DiscardResult();
+		m_fStateCallback(fg_Move(StateChange)).f_DiscardResult();
 		if (!m_Promise.f_IsSet() && !m_bDelayedFinish)
 			m_Promise.f_SetException(DMibErrorInstance(_Error));
 	}
@@ -116,7 +116,7 @@ namespace NMib::NCloud
 		StateChange.m_State = CFileTransferContext::CInternal::EState_Finished;
 		StateChange.m_Finished.m_nBytes = m_TransferStats.m_nTransferredBytes;
 		StateChange.m_Finished.m_nSeconds = m_TransferStats.m_Clock.f_GetTime();
-		auto Future = m_fStateCallback(fg_TempCopy(StateChange)).f_Future();
+		auto Future = m_fStateCallback(fg_TempCopy(StateChange));
 		m_bDelayedFinish = true;
 		fg_Move(Future) > [this, Finished = StateChange.m_Finished](TCAsyncResult<CFileTransferContext::CInternal::CStateChange::CResult> &&_Result)
 			{
@@ -290,7 +290,7 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	NConcurrency::TCFuture<NConcurrency::CActorSubscription> CFileTransferSend::f_SendFiles(CFileTransferContext &&_TransferContext)
+	NConcurrency::TCFuture<NConcurrency::CActorSubscription> CFileTransferSend::f_SendFiles(CFileTransferContext _TransferContext)
 	{
 		auto &Internal = *mp_pInternal;
 		if (Internal.m_bCalled)
@@ -326,15 +326,15 @@ namespace NMib::NCloud
 			{
 				auto &Internal = *mp_pInternal;
 
-				TCActorResultVector<void> Destroys;
+				TCFutureVector<void> Destroys;
 
 				if (!Internal.m_Promise.f_IsSet() && !Internal.m_bDelayedFinish)
 					Internal.m_Promise.f_SetException(DMibErrorInstance("File transfer aborted"));
 
-				fg_Move(Internal.m_fUploadCallback).f_Destroy() > Destroys.f_AddResult();
-				fg_Move(Internal.m_fStateCallback).f_Destroy() > Destroys.f_AddResult();
+				fg_Move(Internal.m_fUploadCallback).f_Destroy() > Destroys;
+				fg_Move(Internal.m_fStateCallback).f_Destroy() > Destroys;
 
-				co_await Destroys.f_GetUnwrappedResults();
+				co_await fg_AllDone(Destroys);
 
 				co_return {};
 			}
@@ -343,14 +343,12 @@ namespace NMib::NCloud
 	
 	NConcurrency::TCFuture<CFileTransferResult> CFileTransferSend::f_GetResult()
 	{
-		NConcurrency::TCPromise<CFileTransferResult> Promise;
-
 		auto &Internal = *mp_pInternal;
 		if (Internal.m_bDoneCalled)
-			return Promise <<= DMibErrorInstance("The file result has already been gotten");
+			co_return DMibErrorInstance("The file result has already been gotten");
 
 		Internal.m_bDoneCalled = true;
 
-		return Promise <<= Internal.m_Promise.f_Future();
+		co_return co_await Internal.m_Promise.f_Future();
 	}
 }

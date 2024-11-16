@@ -13,9 +13,9 @@ namespace NMib::NCloud::NAppManager
 		co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [this](CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
-					co_return co_await self(&CAppManagerActor::fp_CleanupDatabase, fg_Move(_Transaction));
+					co_return co_await fp_CleanupDatabase(fg_Move(_Transaction));
 				}
 			)
 		;
@@ -50,7 +50,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<NDatabase::CDatabaseActor::CTransactionWrite> CAppManagerActor::fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction)
+	TCFuture<NDatabase::CDatabaseActor::CTransactionWrite> CAppManagerActor::fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite _WriteTransaction)
 	{
 		auto WriteTransaction = fg_Move(_WriteTransaction);
 

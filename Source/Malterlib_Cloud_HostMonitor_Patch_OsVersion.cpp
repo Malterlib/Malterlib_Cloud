@@ -8,7 +8,7 @@
 
 namespace NMib::NCloud
 {
-	TCFuture<void> CHostMonitor::f_SetExpectedOsVersions(CCloudManager::CExpectedVersions &&_ExpectedOsVersions)
+	TCFuture<void> CHostMonitor::f_SetExpectedOsVersions(CCloudManager::CExpectedVersions _ExpectedOsVersions)
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_ExpectedOsVersions = fg_Move(_ExpectedOsVersions);

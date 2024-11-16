@@ -13,7 +13,7 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_EnsureContainer(CEnsureContainer &&_Params) -> TCFuture<CEnsureContainer::CResult> 
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_EnsureContainer(CEnsureContainer _Params) -> TCFuture<CEnsureContainer::CResult> 
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->mp_AppState.f_Auditor();

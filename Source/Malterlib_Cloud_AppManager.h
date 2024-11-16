@@ -347,7 +347,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CUpdateNotification const &_Notification)> m_fOnNotification;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CUpdateNotification _Notification)> m_fOnNotification;
 			uint64 m_LastSeenUniqueSequence = TCLimitsInt<uint64>::mc_Max;
 			bool m_bWaitForNotification = true;
 		};
@@ -357,7 +357,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams &&_Params)> m_fOnNotification;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams _Params)> m_fOnNotification;
 			bool m_bWaitForNotification = true;
 		};
 
@@ -365,31 +365,31 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCFuture<CVersionsAvailableForUpdate> f_GetAvailableVersions
 			(
-				NStr::CStr const &_Application	/// Leave empty to list versions for all version manager applications know by the AppManager. By default app manager will only subscribe to 
-												/// applications with the same platform as it's running under and all platforms of any application it has installed.
+				NStr::CStr _Application	/// Leave empty to list versions for all version manager applications know by the AppManager. By default app manager will only subscribe to
+										/// applications with the same platform as it's running under and all platforms of any application it has installed.
 			) = 0
 		;
 		
-		virtual NConcurrency::TCFuture<void> f_Add(NStr::CStr const &_Name, CApplicationAdd const &_Add, CApplicationSettings const &_Settings) = 0;
-		virtual NConcurrency::TCFuture<void> f_Remove(NStr::CStr const &_Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_Add(NStr::CStr _Name, CApplicationAdd _Add, CApplicationSettings _Settings) = 0;
+		virtual NConcurrency::TCFuture<void> f_Remove(NStr::CStr _Name) = 0;
 
-		virtual NConcurrency::TCFuture<void> f_Update(NStr::CStr const &_Name, CApplicationUpdate const &_Update) = 0;
+		virtual NConcurrency::TCFuture<void> f_Update(NStr::CStr _Name, CApplicationUpdate _Update) = 0;
 		
-		virtual NConcurrency::TCFuture<void> f_Start(NStr::CStr const &_Name) = 0;
-		virtual NConcurrency::TCFuture<void> f_Stop(NStr::CStr const &_Name) = 0;
-		virtual NConcurrency::TCFuture<void> f_Restart(NStr::CStr const &_Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_Start(NStr::CStr _Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_Stop(NStr::CStr _Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_Restart(NStr::CStr _Name) = 0;
 
 		virtual NConcurrency::TCFuture<void> f_ChangeSettings
 			(
-				NStr::CStr const &_Name
-				, CApplicationChangeSettings const &_ChangeSettings
-				, CApplicationSettings const &_Settings
+				NStr::CStr _Name
+				, CApplicationChangeSettings _ChangeSettings
+				, CApplicationSettings _Settings
 			) = 0
 		;
 
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CApplicationInfo>> f_GetInstalled() = 0;
-		virtual auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications &&_Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
-		virtual auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications &&_Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
+		virtual auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
+		virtual auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
 	};
 }
 

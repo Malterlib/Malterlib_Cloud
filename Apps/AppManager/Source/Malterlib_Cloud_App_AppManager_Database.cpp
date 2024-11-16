@@ -53,12 +53,13 @@ namespace NMib::NCloud::NAppManager
 			uint64 m_LastUpdateSequence;
 		};
 
-		TCPromise<CInitResult> InitResult;
+		TCPromiseFuturePair<CInitResult> InitResult;
 
 		co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [pThis = this, InitResult](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [pThis = this, InitResult = fg_Move(InitResult.m_Promise)]
+				(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
@@ -101,7 +102,7 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
-		auto Result = co_await InitResult.f_Future();
+		auto Result = co_await fg_Move(InitResult.m_Future);
 
 		mp_DatabaseUniqueKey = Result.m_DatabaseUniqueKey;
 		mp_LastUpdateSequence = Result.m_LastUpdateSequence;

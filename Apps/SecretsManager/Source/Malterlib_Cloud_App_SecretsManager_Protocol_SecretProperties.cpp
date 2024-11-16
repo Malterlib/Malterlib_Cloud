@@ -126,7 +126,7 @@ namespace NMib::NCloud::NSecretsManager
 		;
 	}
 
-	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_EnumerateSecrets(CEnumerateSecrets const &_Options) -> TCFuture<TCSet<CSecretID>>
+	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_EnumerateSecrets(CEnumerateSecrets _Options) -> TCFuture<TCSet<CSecretID>>
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
@@ -175,7 +175,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return fg_Move(IDs);
 	}
 
-	TCFuture<CSecretsManager::CSecret> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecret(CSecretsManager::CSecretID &&_ID)
+	TCFuture<CSecretsManager::CSecret> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecret(CSecretsManager::CSecretID _ID)
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
@@ -231,7 +231,7 @@ namespace NMib::NCloud::NSecretsManager
 		;
 	}
 
-	TCFuture<CSecretsManager::CSecretProperties> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretProperties(CSecretsManager::CSecretID &&_ID)
+	TCFuture<CSecretsManager::CSecretProperties> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretProperties(CSecretsManager::CSecretID _ID)
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
@@ -274,7 +274,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return pSecretProperties->f_ToSecretProperties();
 	}
 
-	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretBySemanticID(CGetSecretBySemanticID const &_Options)
+	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretBySemanticID(CGetSecretBySemanticID _Options)
 		-> TCFuture<CSecretsManager::CSecret>
 	{
 		auto &This = *m_pThis;
@@ -340,7 +340,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return fg_Move(FoundSecret);
 	}
 	
-	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SetSecretProperties(CSecretsManager::CSecretID &&_ID, CSecretsManager::CSecretProperties &&_Secret)
+	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SetSecretProperties(CSecretsManager::CSecretID _ID, CSecretsManager::CSecretProperties _Secret)
 		-> TCFuture<CSetSecretPropertiesResult>
 	{
 		auto &This = *m_pThis;
@@ -535,9 +535,9 @@ namespace NMib::NCloud::NSecretsManager
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_ModifyTags
 		(
-			CSecretsManager::CSecretID &&_ID
-			, TCSet<CStrSecure> &&_TagsToRemove
-			, TCSet<CStrSecure> &&_TagsToAdd
+			CSecretsManager::CSecretID _ID
+			, TCSet<CStrSecure> _TagsToRemove
+			, TCSet<CStrSecure> _TagsToAdd
 		)
 	{
 		auto &This = *m_pThis;
@@ -612,7 +612,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 	
-	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SetMetadata(CSetMetadata &&_SetMetadata)
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SetMetadata(CSetMetadata _SetMetadata)
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
@@ -684,7 +684,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 	
-	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_RemoveMetadata(CSecretID &&_ID, CStrSecure const &_MetadataKey)
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_RemoveMetadata(CSecretID _ID, CStrSecure _MetadataKey)
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
@@ -728,7 +728,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 
-	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_RemoveSecret(CSecretID &&_ID)
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_RemoveSecret(CSecretID _ID)
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();

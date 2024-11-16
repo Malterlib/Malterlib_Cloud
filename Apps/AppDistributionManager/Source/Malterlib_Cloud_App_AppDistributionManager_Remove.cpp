@@ -7,7 +7,7 @@
 
 namespace NMib::NCloud::NAppDistributionManager
 {
-	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionRemove(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionRemove(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 

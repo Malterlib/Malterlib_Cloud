@@ -133,7 +133,7 @@ namespace NMib::NCloud::NAppManager
 		co_return fg_Move(OutputApplications);
 	}
 
-	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_GetAvailableVersions(CStr const &_Application) -> TCFuture<CVersionsAvailableForUpdate>
+	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_GetAvailableVersions(CStr _Application) -> TCFuture<CVersionsAvailableForUpdate>
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -185,7 +185,7 @@ namespace NMib::NCloud::NAppManager
 		co_return fg_Move(Versions);
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumApplications(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		bool bExtraVerbose = _Params["ExtraVerbose"].f_Boolean();
@@ -340,7 +340,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CAppManagerInterface::CVersionsAvailableForUpdate Results = co_await
@@ -398,7 +398,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_VersionManagerList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_VersionManagerList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
@@ -413,7 +413,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CloudManagerList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CloudManagerList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		auto AnsiEncoding= _pCommandLine->f_AnsiEncoding();

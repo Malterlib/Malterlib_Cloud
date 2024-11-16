@@ -63,7 +63,7 @@ namespace NMib::NCloud::NBackupManager
 			{
 				fp_Init();
 			}
-			> fg_DiscardResult()
+			> g_DiscardResult
 		;
 	}
 
@@ -135,7 +135,7 @@ namespace NMib::NCloud::NBackupManager
 		co_return mp_BackupInfo;
 	}
 
-	auto CBackupSource::f_CheckOutDirectory(CTime const &_Time) -> TCFuture<CCheckedOutDirectory>
+	auto CBackupSource::f_CheckOutDirectory(CTime _Time) -> TCFuture<CCheckedOutDirectory>
 	{
 		CStr CheckedOutID = fg_RandomID(mp_CheckedOutStates);
 
@@ -169,7 +169,7 @@ namespace NMib::NCloud::NBackupManager
 
 			CStr ManifestFileName = "{}/Manifest.bin"_f << mp_Directory;
 			if (!CFile::fs_FileExists(ManifestFileName))
-				DMibError("Initial manifest does not exist");
+				co_return DMibErrorInstance("Initial manifest does not exist");
 
 			CFile::fs_CreateHardLink(ManifestFileName, State.m_Directory / "Manifest.bin");
 
@@ -222,176 +222,174 @@ namespace NMib::NCloud::NBackupManager
 		}
 	}
 
-	auto CBackupSource::f_InitialCommit(CStr const &_BackupID, CStr const &_Directory, CDirectoryManifest &&_Manifest, CBackupManagerBackup::EInitialBackupFinishedFlag _FinishedFlags)
+	auto CBackupSource::f_InitialCommit(CStr _BackupID, CStr _Directory, CDirectoryManifest _Manifest, CBackupManagerBackup::EInitialBackupFinishedFlag _FinishedFlags)
 		-> TCFuture<CInitialCommitResult>
 	{
-		return TCFuture<CInitialCommitResult>::fs_RunProtected() / [&]() mutable
+		auto CaptureScope = co_await g_CaptureExceptions;
+
+		if (mp_Backups.f_FindEqual(_BackupID))
+			co_return DMibErrorInstance("Backup with this ID has already done initial commit");
+
+		CInitialCommitResult CommitResult;
+
+		CStr TempFileName = "{}/TempFile"_f << mp_Directory;
+
+		mp_CurrentBackupID = _BackupID;
+		mp_CurrentManifest = fg_Move(_Manifest);
+
+		CFile::fs_CreateDirectory(mp_Directory);
+
+		for (auto &Backup : mp_Backups)
+			Backup.m_AppendFiles.f_Clear();
+
+		CFile::CFindFilesOptions Options{mp_LatestDirectory + "/*", true};
+		Options.m_AttribMask = EFileAttrib_File | EFileAttrib_Directory | EFileAttrib_FindDirectoryLast;
+
+		TCSet<CStr> ExtraFiles;
+		TCSet<CStr> ExtraDirectories;
+		TCVector<CStr> OldDirectories;
+
+		for (auto &File : CFile::fs_FindFiles(Options))
+		{
+			auto RelativePath = CFile::fs_MakePathRelative(File.m_Path, mp_LatestDirectory);
+			if (File.m_Attribs & EFileAttrib_File)
+				ExtraFiles[RelativePath];
+			else
 			{
-				if (mp_Backups.f_FindEqual(_BackupID))
-					DMibError("Backup with this ID has already done initial commit");
+				ExtraDirectories[RelativePath];
+				OldDirectories.f_Insert(RelativePath);
+			}
+		}
 
-				CInitialCommitResult CommitResult;
+#ifdef DMibCloudBackupManagerDebug
+		TCSet<CStr> InitialFiles;
+#endif
 
-				CStr TempFileName = "{}/TempFile"_f << mp_Directory;
+		for (auto &File : mp_CurrentManifest.m_Files)
+		{
+			auto &FileName = mp_CurrentManifest.m_Files.fs_GetKey(File);
+			if (File.f_IsDirectory())
+			{
+				ExtraDirectories.f_Remove(FileName);
+				continue;
+			}
+			if (!File.f_IsFile())
+				continue;
 
-				mp_CurrentBackupID = _BackupID;
-				mp_CurrentManifest = fg_Move(_Manifest);
+#ifdef DMibCloudBackupManagerDebug
+			InitialFiles[FileName];
+#endif
+			ExtraFiles.f_Remove(FileName);
 
-				CFile::fs_CreateDirectory(mp_Directory);
+			CStr FullSourcePath = CFile::fs_AppendPath(_Directory, FileName);
+			CStr FullDestinationPath = CFile::fs_AppendPath(mp_LatestDirectory, FileName);
 
-				for (auto &Backup : mp_Backups)
-					Backup.m_AppendFiles.f_Clear();
+			CFile::fs_CreateDirectory(CFile::fs_GetPath(FullDestinationPath));
 
-				CFile::CFindFilesOptions Options{mp_LatestDirectory + "/*", true};
-				Options.m_AttribMask = EFileAttrib_File | EFileAttrib_Directory | EFileAttrib_FindDirectoryLast;
+			if (File.m_Flags & EDirectoryManifestSyncFlag_Append)
+			{
+				if (!CFile::fs_TryDuplicateFile(FullSourcePath, TempFileName))
+					CFile::fs_CopyFile(FullSourcePath, TempFileName);
+				FullSourcePath = TempFileName;
+			}
 
-				TCSet<CStr> ExtraFiles;
-				TCSet<CStr> ExtraDirectories;
-				TCVector<CStr> OldDirectories;
-
-				for (auto &File : CFile::fs_FindFiles(Options))
+			if (CFile::fs_FileExists(FullDestinationPath))
+			{
+				if (_FinishedFlags & CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges)
 				{
-					auto RelativePath = CFile::fs_MakePathRelative(File.m_Path, mp_LatestDirectory);
-					if (File.m_Attribs & EFileAttrib_File)
-						ExtraFiles[RelativePath];
-					else
-					{
-						ExtraDirectories[RelativePath];
-						OldDirectories.f_Insert(RelativePath);
-					}
+					if (CFile::fs_GetUniqueIdentifier(FullSourcePath) != CFile::fs_GetUniqueIdentifier(FullDestinationPath))
+						CommitResult.m_Result.m_UpdatedFiles.f_Insert(FileName);
 				}
-
-#ifdef DMibCloudBackupManagerDebug
-				TCSet<CStr> InitialFiles;
-#endif
-
-				for (auto &File : mp_CurrentManifest.m_Files)
-				{
-					auto &FileName = mp_CurrentManifest.m_Files.fs_GetKey(File);
-					if (File.f_IsDirectory())
-					{
-						ExtraDirectories.f_Remove(FileName);
-						continue;
-					}
-					if (!File.f_IsFile())
-						continue;
-
-#ifdef DMibCloudBackupManagerDebug
-					InitialFiles[FileName];
-#endif
-					ExtraFiles.f_Remove(FileName);
-
-					CStr FullSourcePath = CFile::fs_AppendPath(_Directory, FileName);
-					CStr FullDestinationPath = CFile::fs_AppendPath(mp_LatestDirectory, FileName);
-
-					CFile::fs_CreateDirectory(CFile::fs_GetPath(FullDestinationPath));
-
-					if (File.m_Flags & EDirectoryManifestSyncFlag_Append)
-					{
-						if (!CFile::fs_TryDuplicateFile(FullSourcePath, TempFileName))
-							CFile::fs_CopyFile(FullSourcePath, TempFileName);
-						FullSourcePath = TempFileName;
-					}
-
-					if (CFile::fs_FileExists(FullDestinationPath))
-					{
-						if (_FinishedFlags & CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges)
-						{
-							if (CFile::fs_GetUniqueIdentifier(FullSourcePath) != CFile::fs_GetUniqueIdentifier(FullDestinationPath))
-								CommitResult.m_Result.m_UpdatedFiles.f_Insert(FileName);
-						}
 
 #ifdef DPlatformFamily_Windows
-						for (mint i = 0; i < 200; ++i)
-						{
-							try
-							{
-								CFile::fs_AtomicReplaceFile(FullSourcePath, FullDestinationPath);
-								break;
-							}
-							catch (CExceptionFile const &)
-							{
-								try
-								{
-									if (CFile::fs_FileExists(FullDestinationPath))
-										CFile::fs_DeleteFile(FullDestinationPath);
-									CFile::fs_RenameFile(FullSourcePath, FullDestinationPath);
-									break;
-								}
-								catch (CExceptionFile const&)
-								{
-									if (i == 199)
-										throw;
-									NSys::fg_Thread_Sleep(0.01f);
-								}
-							}
-						}
-#else
+				for (mint i = 0; i < 200; ++i)
+				{
+					try
+					{
 						CFile::fs_AtomicReplaceFile(FullSourcePath, FullDestinationPath);
-#endif
+						break;
 					}
-					else
+					catch (CExceptionFile const &)
 					{
-						if (_FinishedFlags & CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges)
-							CommitResult.m_Result.m_AddedFiles.f_Insert(FileName);
-						CFile::fs_RenameFile(FullSourcePath, FullDestinationPath);
-					}
-				}
-
-				for (auto &FileName : ExtraFiles)
-				{
-					if (_FinishedFlags & CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges)
-						CommitResult.m_Result.m_RemovedFiles.f_Insert(FileName);
-					CFile::fs_DeleteFile(CFile::fs_AppendPath(mp_LatestDirectory, FileName));
-				}
-
-				for (auto &FileName : OldDirectories)
-				{
-					if (!ExtraDirectories.f_FindEqual(FileName))
-						continue;
-					CFile::fs_DeleteDirectory(CFile::fs_AppendPath(mp_LatestDirectory, FileName));
-				}
-
-				DMibCloudBackupManagerDebugOut("*** Initial {vs}\n", InitialFiles);
-
-				fp_SaveManifest();
-				mp_LatestBackupID = mp_CurrentBackupID;
-
-				auto &Backup = mp_Backups[_BackupID];
-				Backup.m_SourceDirectory = _Directory;
-
-				fp_CleanupOldBackups();
-
-				CommitResult.m_Subscription = g_ActorSubscription / [this, _BackupID]
-					{
-						if (!mp_LatestBackupID.f_IsEmpty() && _BackupID != mp_LatestBackupID)
+						try
 						{
-							try
-							{
-								CStr Directory = "{}/Sync_{}"_f << mp_Directory << _BackupID;
-								if (CFile::fs_FileExists(Directory))
-									CFile::fs_DeleteDirectoryRecursive(Directory);
-							}
-							catch (CException const &_Exception)
-							{
-								(void)_Exception;
-								DMibLogCategory(Mib/Cloud/BackupManager);
-								DMibLog(Error, "Failed to delete sync directory: {}", _Exception);
-							}
+							if (CFile::fs_FileExists(FullDestinationPath))
+								CFile::fs_DeleteFile(FullDestinationPath);
+							CFile::fs_RenameFile(FullSourcePath, FullDestinationPath);
+							break;
 						}
-
-						mp_Backups.f_Remove(_BackupID);
-						if (mp_CurrentBackupID == _BackupID)
-							mp_CurrentBackupID.f_Clear();
+						catch (CExceptionFile const&)
+						{
+							if (i == 199)
+								throw;
+							NSys::fg_Thread_Sleep(0.01f);
+						}
 					}
-				;
+				}
+#else
+				CFile::fs_AtomicReplaceFile(FullSourcePath, FullDestinationPath);
+#endif
+			}
+			else
+			{
+				if (_FinishedFlags & CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges)
+					CommitResult.m_Result.m_AddedFiles.f_Insert(FileName);
+				CFile::fs_RenameFile(FullSourcePath, FullDestinationPath);
+			}
+		}
 
-				return CommitResult;
+		for (auto &FileName : ExtraFiles)
+		{
+			if (_FinishedFlags & CBackupManagerBackup::EInitialBackupFinishedFlag_ReturnChanges)
+				CommitResult.m_Result.m_RemovedFiles.f_Insert(FileName);
+			CFile::fs_DeleteFile(CFile::fs_AppendPath(mp_LatestDirectory, FileName));
+		}
+
+		for (auto &FileName : OldDirectories)
+		{
+			if (!ExtraDirectories.f_FindEqual(FileName))
+				continue;
+			CFile::fs_DeleteDirectory(CFile::fs_AppendPath(mp_LatestDirectory, FileName));
+		}
+
+		DMibCloudBackupManagerDebugOut("*** Initial {vs}\n", InitialFiles);
+
+		fp_SaveManifest();
+		mp_LatestBackupID = mp_CurrentBackupID;
+
+		auto &Backup = mp_Backups[_BackupID];
+		Backup.m_SourceDirectory = _Directory;
+
+		fp_CleanupOldBackups();
+
+		CommitResult.m_Subscription = g_ActorSubscription / [this, _BackupID]
+			{
+				if (!mp_LatestBackupID.f_IsEmpty() && _BackupID != mp_LatestBackupID)
+				{
+					try
+					{
+						CStr Directory = "{}/Sync_{}"_f << mp_Directory << _BackupID;
+						if (CFile::fs_FileExists(Directory))
+							CFile::fs_DeleteDirectoryRecursive(Directory);
+					}
+					catch (CException const &_Exception)
+					{
+						(void)_Exception;
+						DMibLogCategory(Mib/Cloud/BackupManager);
+						DMibLog(Error, "Failed to delete sync directory: {}", _Exception);
+					}
+				}
+
+				mp_Backups.f_Remove(_BackupID);
+				if (mp_CurrentBackupID == _BackupID)
+					mp_CurrentBackupID.f_Clear();
 			}
 		;
+
+		co_return fg_Move(CommitResult);
 	}
 
-	TCFuture<void> CBackupSource::f_Commit(CStr const &_BackupID, CStr const &_File, CBackupManagerBackup::CManifestChange const &_ManifestChange)
+	TCFuture<void> CBackupSource::f_Commit(CStr _BackupID, CStr _File, CBackupManagerBackup::CManifestChange _ManifestChange)
 	{
 		CStr ManifestError;
 		if (!CBackupManagerBackup::fs_ManifestChangeValid(_File, _ManifestChange, ManifestError))
@@ -465,7 +463,7 @@ namespace NMib::NCloud::NBackupManager
 
 					auto pOriginalManifestFile = mp_CurrentManifest.m_Files.f_FindEqual(_File);
 					if (pOriginalManifestFile)
-						DMibError("Found unexpected original manifest file '{}' for add operation"_f << _File);
+						co_return DMibErrorInstance("Found unexpected original manifest file '{}' for add operation"_f << _File);
 
 					if (SpecificChange.m_ManifestFile.f_IsFile())
 					{
@@ -476,7 +474,7 @@ namespace NMib::NCloud::NBackupManager
 						if (CFile::fs_FileExists(DestinationFile, EFileAttrib_Directory))
 							CFile::fs_DeleteDirectoryRecursive(DestinationFile);
 						else if (CFile::fs_FileExists(DestinationFile))
-							DMibError("Destination file '{}' exists when it shouldn't for add operation"_f << DestinationFile);
+							co_return DMibErrorInstance("Destination file '{}' exists when it shouldn't for add operation"_f << DestinationFile);
 
 						CFile::fs_CreateDirectory(CFile::fs_GetPath(DestinationFile));
 						CFile::fs_RenameFile(SourceFile, DestinationFile);
@@ -493,7 +491,7 @@ namespace NMib::NCloud::NBackupManager
 
 					auto pOriginalManifestFile = mp_CurrentManifest.m_Files.f_FindEqual(_File);
 					if (!pOriginalManifestFile)
-						DMibError("Could not find original manifest file '{}' for change operation"_f << _File);
+						co_return DMibErrorInstance("Could not find original manifest file '{}' for change operation"_f << _File);
 
 					if (SpecificChange.m_ManifestFile.f_IsFile())
 					{
@@ -504,7 +502,8 @@ namespace NMib::NCloud::NBackupManager
 						if (pOriginalManifestFile->f_IsFile())
 						{
 							if (!CFile::fs_FileExists(DestinationFile))
-								DMibError("Destination file '{}' does not exist for change operation"_f << DestinationFile);
+								co_return DMibErrorInstance("Destination file '{}' does not exist for change operation"_f << DestinationFile);
+
 							CFile::fs_AtomicReplaceFile(SourceFile, DestinationFile);
 						}
 						else
@@ -512,7 +511,7 @@ namespace NMib::NCloud::NBackupManager
 							if (CFile::fs_FileExists(DestinationFile, EFileAttrib_Directory))
 								CFile::fs_DeleteDirectoryRecursive(DestinationFile);
 							else if (CFile::fs_FileExists(DestinationFile))
-								DMibError("Destination file '{}' exists when it shouldn't for change operation"_f << DestinationFile);
+								co_return DMibErrorInstance("Destination file '{}' exists when it shouldn't for change operation"_f << DestinationFile);
 
 							CFile::fs_CreateDirectory(CFile::fs_GetPath(DestinationFile));
 							CFile::fs_RenameFile(SourceFile, DestinationFile);
@@ -521,7 +520,7 @@ namespace NMib::NCloud::NBackupManager
 					else if (pOriginalManifestFile->f_IsFile())
 					{
 						if (!CFile::fs_FileExists(DestinationFile))
-							DMibError("Destination file '{}' does not exist for change operation"_f << DestinationFile);
+							co_return DMibErrorInstance("Destination file '{}' does not exist for change operation"_f << DestinationFile);
 
 						fp_CloseFiles(DestinationFile);
 
@@ -536,12 +535,12 @@ namespace NMib::NCloud::NBackupManager
 				{
 					auto pOriginalManifestFile = mp_CurrentManifest.m_Files.f_FindEqual(_File);
 					if (!pOriginalManifestFile)
-						DMibError("Could not find original manifest file '{}' for remove operation"_f << _File);
+						co_return DMibErrorInstance("Could not find original manifest file '{}' for remove operation"_f << _File);
 
 					if (pOriginalManifestFile->f_IsFile())
 					{
 						if (!CFile::fs_FileExists(DestinationFile))
-							DMibError("Source file '{}' does not exists for remove operation"_f << DestinationFile);
+							co_return DMibErrorInstance("Source file '{}' does not exists for remove operation"_f << DestinationFile);
 
 						DMibCloudBackupManagerDebugOut("*** Remove {}\n", _File);
 
@@ -563,21 +562,22 @@ namespace NMib::NCloud::NBackupManager
 
 					auto pOriginalManifestFile = mp_CurrentManifest.m_Files.f_FindEqual(SpecificChange.m_FromFileName);
 					if (!pOriginalManifestFile)
-						DMibError("Could not find original manifest file '{}' for rename operation"_f << SpecificChange.m_FromFileName);
+						co_return DMibErrorInstance("Could not find original manifest file '{}' for rename operation"_f << SpecificChange.m_FromFileName);
 
 					if (SpecificChange.m_ManifestFile.f_IsFile())
 					{
 						if (pOriginalManifestFile->f_IsFile())
 						{
 							if (!CFile::fs_FileExists(OriginalFile))
-								DMibError("Source file '{}' does not exist for rename operation"_f << OriginalFile);
+								co_return DMibErrorInstance("Source file '{}' does not exist for rename operation"_f << OriginalFile);
 
 							fp_CloseFiles(OriginalFile);
 							fp_CloseFiles(DestinationFile);
 
 							CFile::fs_CreateDirectoryForFile(DestinationFile);
 							CFile::fs_AtomicReplaceFile(SourceFile, DestinationFile);
-							
+							CFile::fs_DeleteFile(OriginalFile);
+
 							CheckDeleteDirectories[CFile::fs_GetPath(OriginalFile)];
 							DMibCloudBackupManagerDebugOut("*** Rename {} -> {}\n", SpecificChange.m_FromFileName, _File);
 						}
@@ -625,11 +625,11 @@ namespace NMib::NCloud::NBackupManager
 
 	TCFuture<void> CBackupSource::f_CommitAppend
 		(
-			CStr const &_BackupID
-			, CStr const &_File
+			CStr _BackupID
+			, CStr _File
 			, uint64 _Position
-			, CSecureByteVector &&_Data
-			, CBackupManagerBackup::CManifestChange &&_ManifestChange
+			, CSecureByteVector _Data
+			, CBackupManagerBackup::CManifestChange _ManifestChange
 		)
 	{
 		CStr ManifestError;
@@ -683,10 +683,10 @@ namespace NMib::NCloud::NBackupManager
 					auto &SpecificChange = _ManifestChange.f_Get<CBackupInstance::EManifestChange_Change>();
 
 					if (!SpecificChange.m_ManifestFile.f_IsFile())
-						DMibError("Manifest file '{}' is not a file in append operation"_f << _File);
+						co_return DMibErrorInstance("Manifest file '{}' is not a file in append operation"_f << _File);
 
 					if (!CFile::fs_FileExists(DestinationFile))
-						DMibError("Destination file '{}' does not exist for append operation"_f << DestinationFile);
+						co_return DMibErrorInstance("Destination file '{}' does not exist for append operation"_f << DestinationFile);
 
 					auto &File = Backup.m_AppendFiles[DestinationFile];
 
@@ -704,7 +704,7 @@ namespace NMib::NCloud::NBackupManager
 				}
 			default:
 				{
-					DMibError("Non change manifest in append operation");
+					co_return DMibErrorInstance("Non change manifest in append operation");
 					break;
 				}
 			}

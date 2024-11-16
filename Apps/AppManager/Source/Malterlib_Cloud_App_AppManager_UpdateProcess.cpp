@@ -53,12 +53,12 @@ namespace NMib::NCloud::NAppManager
 				{
 					CStr Error = fg_Format("Pending self update failed: {}", fsp_LimitErrorLogSize(_Result.f_GetExceptionStr(), 128));
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "{}", Error);
-					fp_OnUpdateEvent(pUpdateState, EUpdateStage::EUpdateStage_Failed, Error) > fg_DiscardResult();
+					fp_OnUpdateEvent(pUpdateState, EUpdateStage::EUpdateStage_Failed, Error).f_DiscardResult();
 					return;
 				}
 
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pending self update finished");
-				fp_OnUpdateEvent(pUpdateState, EUpdateStage::EUpdateStage_Finished, {}) > fg_DiscardResult();
+				fp_OnUpdateEvent(pUpdateState, EUpdateStage::EUpdateStage_Finished, {}).f_DiscardResult();
 			}
 		;
 	}
@@ -98,7 +98,7 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = _pState->f_CheckAbort())
 			co_return pException;
 
-		co_await (self(&CAppManagerActor::fp_ChangeEncryption, _pState->m_pApplication, EEncryptOperation_Open, false) % "Failed to open encryption");
+		co_await (fp_ChangeEncryption(_pState->m_pApplication, EEncryptOperation_Open, false) % "Failed to open encryption");
 
 		_pState->m_bUnencrypted = true;
 
@@ -169,7 +169,7 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		CVersionManager::CVersionInformation VersionInfo = co_await
-			self(&CAppManagerActor::fp_DownloadApplication, State.m_pApplication->m_Settings.m_VersionManagerApplication, State.m_VersionID, DownloadDirectory)
+			fp_DownloadApplication(State.m_pApplication->m_Settings.m_VersionManagerApplication, State.m_VersionID, DownloadDirectory)
 		;
 
 		auto &Application = *State.m_pApplication;

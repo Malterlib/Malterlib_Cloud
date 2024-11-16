@@ -115,7 +115,7 @@ namespace NMib::NCloud::NVersionManager
 	
 	void CVersionManagerDaemonActor::CServer::CSubscription::f_SendVersions(CVersionManager::CNewVersionNotifications const &_NewVersionNotifications) const
 	{
-		m_fOnNewVersions(_NewVersionNotifications) > fg_DiscardResult();
+		m_fOnNewVersions(_NewVersionNotifications).f_DiscardResult();
 	}
 
 	void CVersionManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity)
@@ -126,7 +126,7 @@ namespace NMib::NCloud::NVersionManager
 				{
 					if (Subscription.m_CallingHostInfo.f_GetRealHostID() != _Identity.f_GetHostID())
 						continue;
-					fp_SendSubscriptionInitial(_Application, Subscription) > fg_DiscardResult();
+					fp_SendSubscriptionInitial(_Application, &Subscription).f_DiscardResult();
 				}
 			}
 		;
@@ -135,98 +135,90 @@ namespace NMib::NCloud::NVersionManager
 			fSendForSubscriptions(Subscriptions, mp_VersionSubscriptions.fs_GetKey(Subscriptions));
 	}
 	
-	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr const &_ApplicationName, CSubscription const &_Subscription)
+	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr _ApplicationName, CSubscription const *_pSubscription)
 	{
-		TCPromise<void> Promise;
-		
-		auto fSendInitialForApplication = [&](CStr const &_Application) -> TCFuture<TCVector<CVersionManager::CNewVersionNotification>>
+		auto fSendInitialForApplication =
+			[this, CallingHostInfo = _pSubscription->m_CallingHostInfo, SubscriptionID = _pSubscription->f_GetSubscriptionID(), ApplicationName = _ApplicationName]
+			(CStr _Application) -> TCFuture<TCVector<CVersionManager::CNewVersionNotification>>
 			{
-				TCPromise<TCVector<CVersionManager::CNewVersionNotification>> Promise;
-				mp_Permissions.f_HasPermission
+				auto bHasPermissions = co_await mp_Permissions.f_HasPermission
 					(
 						"Receive VersionManager version update notification"
 						, {"Application/ReadAll", "Application/ListAll", fg_Format("Application/Read/{}", _Application)}
-						, _Subscription.m_CallingHostInfo
+						, CallingHostInfo
 					)
 					.f_Timeout(60.0, "Timed out checking permissions for sending version update subscription")
-					> Promise / [=, this, SubscriptionID = _Subscription.f_GetSubscriptionID()](bool _bHasPermission)
-					{
-						CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, SubscriptionID);
-
-						TCVector<CVersionManager::CNewVersionNotification> NewVersionNotifications;
-						if (pSubscription && _bHasPermission)
-						{
-							auto *pApplication = mp_Applications.f_FindEqual(_Application);
-							mint nToSend = pSubscription->m_nInitial;
-							mint nVersions = pApplication->m_VersionsByTime.f_GetLen();
-							(void)nVersions;
-							decltype(pApplication->m_VersionsByTime.f_GetIterator()) iVersion;
-							for (iVersion.f_StartBackward(pApplication->m_VersionsByTime); iVersion && nToSend; --iVersion)
-							{
-								auto &Version = *iVersion;
-								if (!fp_VersionMatchesSubscription(*pSubscription, Version))
-									continue;
-								auto &NewVersionNotification = NewVersionNotifications.f_Insert();
-								NewVersionNotification.m_Application = pApplication->f_GetName();
-								NewVersionNotification.m_VersionIDAndPlatform = Version.f_GetIdentifier();
-								NewVersionNotification.m_VersionInfo = Version.m_VersionInfo;
-								--nToSend;
-							}
-						}
-						Promise.f_SetResult(NewVersionNotifications);
-					}
 				;
-				return Promise.f_MoveFuture();
+
+				CSubscription const *pSubscription = fp_GetSubscription(ApplicationName, SubscriptionID);
+
+				TCVector<CVersionManager::CNewVersionNotification> NewVersionNotifications;
+				if (pSubscription && bHasPermissions)
+				{
+					auto *pApplication = mp_Applications.f_FindEqual(_Application);
+					mint nToSend = pSubscription->m_nInitial;
+					mint nVersions = pApplication->m_VersionsByTime.f_GetLen();
+					(void)nVersions;
+					decltype(pApplication->m_VersionsByTime.f_GetIterator()) iVersion;
+					for (iVersion.f_StartBackward(pApplication->m_VersionsByTime); iVersion && nToSend; --iVersion)
+					{
+						auto &Version = *iVersion;
+						if (!fp_VersionMatchesSubscription(*pSubscription, Version))
+							continue;
+						auto &NewVersionNotification = NewVersionNotifications.f_Insert();
+						NewVersionNotification.m_Application = pApplication->f_GetName();
+						NewVersionNotification.m_VersionIDAndPlatform = Version.f_GetIdentifier();
+						NewVersionNotification.m_VersionInfo = Version.m_VersionInfo;
+						--nToSend;
+					}
+				}
+
+				co_return fg_Move(NewVersionNotifications);
 			}
 		;
-		TCActorResultVector<TCVector<CVersionManager::CNewVersionNotification>> NewVersionNotificationResults;
+
+		TCFutureVector<TCVector<CVersionManager::CNewVersionNotification>> NewVersionNotificationResults;
 		if (_ApplicationName.f_IsEmpty())
 		{
 			for (auto &Application : mp_Applications)
-				fSendInitialForApplication(mp_Applications.fs_GetKey(Application)) > NewVersionNotificationResults.f_AddResult();
+				self.f_Invoke(fSendInitialForApplication, mp_Applications.fs_GetKey(Application)) > NewVersionNotificationResults;
 		}
 		else if (auto *pApplication = mp_Applications.f_FindEqual(_ApplicationName))
-			fSendInitialForApplication(mp_Applications.fs_GetKey(pApplication)) > NewVersionNotificationResults.f_AddResult();
-		
-		NewVersionNotificationResults.f_GetResults()
-			> Promise / [this, Promise, _ApplicationName, SubscriptionID = _Subscription.f_GetSubscriptionID()]
-			(TCVector<TCAsyncResult<TCVector<CVersionManager::CNewVersionNotification>>> &&_Results)
+			self.f_Invoke(fSendInitialForApplication, mp_Applications.fs_GetKey(pApplication)) > NewVersionNotificationResults;
+
+		auto Results = co_await fg_AllDoneWrapped(NewVersionNotificationResults);
+
+		CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, _pSubscription->f_GetSubscriptionID());
+
+		if (!pSubscription)
+			co_return {};
+
+		CVersionManager::CNewVersionNotifications NewVersionNotifications;
+		NewVersionNotifications.m_bFullResend = true;
+
+		CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo, {});
+
+		CStr Errors;
+
+		for (auto &Result : Results)
+		{
+			if (!Result)
 			{
-				CSubscription const *pSubscription = fp_GetSubscription(_ApplicationName, SubscriptionID);
-
-				if (!pSubscription)
-					return Promise.f_SetResult();
-
-				CVersionManager::CNewVersionNotifications NewVersionNotifications;
-				NewVersionNotifications.m_bFullResend = true;
-
-				CDistributedAppAuditor Auditor(mp_AppState.m_AppActor, pSubscription->m_CallingHostInfo, {});
-
-				CStr Errors;
-
-				for (auto &Result : _Results)
-				{
-					if (!Result)
-					{
-						Errors += "{}\n"_f << Result.f_GetExceptionStr();
-						continue;
-					}
-					NewVersionNotifications.m_NewVersions.f_InsertLast(*Result);
-				}
-
-				if (!Errors.f_IsEmpty())
-					Auditor.f_Error("Errors checking permissions for subscription:\n\n{}"_f << Errors);
-
-				pSubscription->f_SendVersions(NewVersionNotifications);
-
-				Promise.f_SetResult();
+				Errors += "{}\n"_f << Result.f_GetExceptionStr();
+				continue;
 			}
-		;
+			NewVersionNotifications.m_NewVersions.f_InsertLast(*Result);
+		}
 
-		return Promise.f_MoveFuture();
+		if (!Errors.f_IsEmpty())
+			Auditor.f_Error("Errors checking permissions for subscription:\n\n{}"_f << Errors);
+
+		pSubscription->f_SendVersions(NewVersionNotifications);
+
+		co_return {};
 	}
 	
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) -> TCFuture<CSubscribeToUpdates::CResult>
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_SubscribeToUpdates(CSubscribeToUpdates _Params) -> TCFuture<CSubscribeToUpdates::CResult>
 	{
 		auto pThis = m_pThis;
 		
@@ -278,7 +270,7 @@ namespace NMib::NCloud::NVersionManager
 			co_return fg_Move(Result);
 
 		auto ApplicationName = _Params.m_Application;
-		co_await pThis->fp_SendSubscriptionInitial(_Params.m_Application, Subscription);
+		co_await pThis->fp_SendSubscriptionInitial(_Params.m_Application, &Subscription);
 
 		{
 			CSubscription const *pSubscription = pThis->fp_GetSubscription(ApplicationName, SubscriptionID);

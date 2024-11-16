@@ -107,10 +107,10 @@ namespace NMib::NCloud
 		static bool fs_IsValidMethod(NStr::CStr const &_String);
 		static bool fs_IsValidObjectId(NStr::CStr const &_String);
 		
-		virtual NConcurrency::TCFuture<CGetSwiftBaseURL::CResult> f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params) = 0;
-		virtual NConcurrency::TCFuture<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer &&_Params) = 0;
-		virtual NConcurrency::TCFuture<CSignTempURL::CResult> f_SignTempURL(CSignTempURL &&_Params) = 0;
-		virtual NConcurrency::TCFuture<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) = 0;
+		virtual NConcurrency::TCFuture<CGetSwiftBaseURL::CResult> f_GetSwiftBaseURL(CGetSwiftBaseURL _Params) = 0;
+		virtual NConcurrency::TCFuture<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer _Params) = 0;
+		virtual NConcurrency::TCFuture<CSignTempURL::CResult> f_SignTempURL(CSignTempURL _Params) = 0;
+		virtual NConcurrency::TCFuture<CDeleteObject::CResult> f_DeleteObject(CDeleteObject _Params) = 0;
 	};
 }
 

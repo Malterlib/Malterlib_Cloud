@@ -186,12 +186,12 @@ namespace NMib::NCloud
 		return mp_pInternal->f_Initialize();
 	}
 
-	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::f_ChangePassword(NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt)
+	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::f_ChangePassword(NStr::CStrSecure _Password, NContainer::CSecureByteVector _Salt)
 	{
-		return mp_pInternal->f_ChangePassword(_Password, _Salt);
+		return mp_pInternal->f_ChangePassword(fg_Move(_Password), fg_Move(_Salt));
 	}
 
-	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::f_WriteDatabase(CDatabase &&_Database)
+	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::f_WriteDatabase(CDatabase _Database)
 	{
 		return mp_pInternal->f_WriteDatabase(fg_Move(_Database));
 	}

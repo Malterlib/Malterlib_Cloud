@@ -13,10 +13,8 @@ namespace NMib::NCloud::NBackupManager
 			fg_Move(m_DirectorySyncSend).f_Destroy() > fg_LogWarning("Mib/Cloud/SecretsManager", "Failed to destroy directory sync send in destructor");
 	}
 	
-	TCFuture<void> CBackupManagerServer::CBackupDownload::f_Destroy()
+	TCUnsafeFuture<void> CBackupManagerServer::CBackupDownload::f_Destroy()
 	{
-		co_await ECoroutineFlag_AllowReferences;
-
 		auto DirectorySend = fg_Move(m_DirectorySyncSend);
 		auto Subscription = fg_Move(m_Subscription);
 
@@ -39,7 +37,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 	}
 
-	auto CBackupManagerServer::CBackupManagerImplementation::f_DownloadBackup(CDownloadBackup &&_DownloadBackup)
+	auto CBackupManagerServer::CBackupManagerImplementation::f_DownloadBackup(CDownloadBackup _DownloadBackup)
 		-> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 	{
 		auto pThis = m_pThis;
@@ -102,7 +100,7 @@ namespace NMib::NCloud::NBackupManager
 
 					if (pDownload->m_DirectorySyncSend)
 					{
-						auto GetResultFuture = g_Future <<= pDownload->m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult);
+						TCFuture<CDirectorySyncSend::CSyncResult> GetResultFuture = pDownload->m_DirectorySyncSend(&CDirectorySyncSend::f_GetResult);
 						pThis->mp_BackupDownloads.f_Remove(DownloadID);
 
 						auto GetResultResult = co_await fg_Move(GetResultFuture).f_Wrap();

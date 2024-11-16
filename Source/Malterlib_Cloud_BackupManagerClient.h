@@ -169,9 +169,9 @@ namespace NMib::NCloud
 				<
 					NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 					(
-						NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppInterfaceBackup> &&_BackupInterface
-						, NConcurrency::CActorSubscription &&_ManifestFinished
-						, NStr::CStr const &_BackupRoot
+						NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppInterfaceBackup> _BackupInterface
+						, NConcurrency::CActorSubscription _ManifestFinished
+						, NStr::CStr _BackupRoot
 					)
 				>
 				&&_fOnNewBackup = {}
@@ -186,7 +186,7 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SubscribeNotifications /// \brief Subscribe to notification. \sa ENotification
 			(
 				ENotification _ToSubscribeTo	/// Specify the notifications to subscribe to 
-				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification)> &&_fOnNotification
+				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NConcurrency::CHostInfo _RemoteHost, CNotification _Notification)> _fOnNotification
 				/// The actor functor to receive notifications
 			)
 		;

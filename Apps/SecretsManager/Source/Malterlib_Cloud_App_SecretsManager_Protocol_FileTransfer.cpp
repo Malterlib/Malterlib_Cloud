@@ -29,16 +29,16 @@ namespace NMib::NCloud::NSecretsManager
 
 		CLogError LogError("Mib/Cloud/SecretsManager");
 
-		TCActorResultVector<void> Destroys;
+		TCFutureVector<void> Destroys;
 
 		auto DirectorySend = fg_Move(This.m_DirectorySyncSend);
 		if (This.m_Subscription)
-			This.m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > Destroys.f_AddResult();
+			This.m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > Destroys;
 
 		if (This.m_FileSubscription)
-			This.m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > Destroys.f_AddResult();
+			This.m_Subscription->f_Destroy().f_Timeout(10.0, "Timed out waiting for secret download to destroy") > Destroys;
 
-		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy download");
+		co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy download");
 
 		if (DirectorySend)
 			co_await fg_Move(DirectorySend).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy directory sync send in destroy");
@@ -52,7 +52,7 @@ namespace NMib::NCloud::NSecretsManager
 	CSecretsManagerDaemonActor::CServer::CUpload::~CUpload()
 	{
 		if (m_DirectorySyncReceive)
-			fg_Move(m_DirectorySyncReceive).f_Destroy() > fg_DiscardResult();
+			fg_Move(m_DirectorySyncReceive).f_Destroy().f_DiscardResult();
 	}
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CUpload::f_Destroy()
@@ -64,7 +64,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 
-	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_DownloadFile(CSecretID &&_ID, NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
+	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_DownloadFile(CSecretID _ID, NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 		-> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 	{
 		auto &This = *m_pThis;
@@ -219,9 +219,9 @@ namespace NMib::NCloud::NSecretsManager
 
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_UploadFile
 		(
-			CSecretID &&_ID
-			, NStr::CStrSecure const &_FileName
-			, TCDistributedActorInterfaceWithID<CDirectorySyncClient> &&_Uploader
+			CSecretID _ID
+			, NStr::CStrSecure _FileName
+			, TCDistributedActorInterfaceWithID<CDirectorySyncClient> _Uploader
 		 )
 		-> TCFuture<NConcurrency::TCActorFunctorWithID<TCFuture<void> ()>>
 	{
@@ -350,9 +350,10 @@ namespace NMib::NCloud::NSecretsManager
 		auto &Upload = This.mp_Uploads[NewFileName];
 		Upload.m_DirectorySyncReceive = fg_ConstructActor<NFile::CDirectorySyncReceive>(fg_Move(Config), fg_Move(_Uploader));
 
-		TCPromise<void> CheckResultPromise;
+		TCPromiseFuturePair<void> CheckResultPromise;
 
-		Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync) > [=, this, OldFileName = _FileName, SavedSecret = pSecretProperties->m_Secret]
+		Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync) >
+			[=, this, OldFileName = _FileName, SavedSecret = pSecretProperties->m_Secret, CheckResultPromise = fg_Move(CheckResultPromise.m_Promise)]
 			(TCAsyncResult<CDirectorySyncReceive::CSyncResult> &&_Result) mutable
 			{
 				auto &This = *m_pThis;
@@ -408,7 +409,7 @@ namespace NMib::NCloud::NSecretsManager
 					if (Result.m_Manifest.m_Files.f_GetLen() == 1)
 					{
 						*pNewFileClaimed = true;
-						This.fp_RemoveUnreferencedFile(pSecretProperties->m_RandomFileName, Auditor) > fg_DiscardResult();
+						This.fp_RemoveUnreferencedFile(pSecretProperties->m_RandomFileName, Auditor).f_DiscardResult();
 						auto ManifestFile = *Result.m_Manifest.m_Files.f_FindAny();
 						pSecretProperties->m_Secret = CSecretsManager::CSecret{CSecretsManager::CSecretFile{ManifestFile}};
 						pSecretProperties->m_Modified = CTime::fs_NowUTC();
@@ -477,9 +478,9 @@ namespace NMib::NCloud::NSecretsManager
 					This.mp_Uploads.f_Remove(NewFileName);
 				}
 			)
-			/ [CheckResultPromise = fg_Move(CheckResultPromise), AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
+			/ [CheckResultFuture = fg_Move(CheckResultPromise.m_Future), AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
 			{
-				co_return co_await CheckResultPromise.f_MoveFuture();
+				co_return co_await fg_Move(CheckResultFuture);
 			}
 		;
 	}

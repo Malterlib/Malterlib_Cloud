@@ -11,7 +11,7 @@ namespace NMib::NCloud::NSecretsManager
 {
 	NConcurrency::TCFuture<void> CSecretsManagerDaemonActor::CServer::CChangeSubscription::f_SendChanges(CSecretsManager::CSecretChanges &&_Changes) const
 	{
-		return m_SubscriptionParams.m_fOnChanges(fg_Move(_Changes)).f_Future();
+		return m_SubscriptionParams.m_fOnChanges(fg_Move(_Changes));
 	}
 
 	void CSecretsManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity)
@@ -22,7 +22,7 @@ namespace NMib::NCloud::NSecretsManager
 				{
 					if (Subscription.m_CallingHostInfo.f_GetRealHostID() != _Identity.f_GetHostID())
 						continue;
-					self(&CServer::fp_SendSubscriptionInitial, Subscription.f_GetSubscriptionID()) > fg_DiscardResult();
+					fp_SendSubscriptionInitial(Subscription.f_GetSubscriptionID()).f_DiscardResult();
 				}
 			}
 		;
@@ -43,7 +43,7 @@ namespace NMib::NCloud::NSecretsManager
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 		fsp_AddPermissionQueryIndexedByPermission("Read", _SecretProperties.m_SemanticID, _SecretProperties.m_Tags, Permissions);
 
-		auto fSendToSubscription = [this, Permissions, SecretID, SecretProperties, _bRemoved](CStr const &_SubscriptionID) -> TCFuture<void>
+		auto fSendToSubscription = [this, Permissions, SecretID, SecretProperties, _bRemoved](CStr _SubscriptionID) -> TCFuture<void>
 			{
 				CChangeSubscription const *pSubscription = nullptr;
 
@@ -88,7 +88,7 @@ namespace NMib::NCloud::NSecretsManager
 				else
 					Changes.m_Changed[SecretID] = SecretProperties;
 
-				pSubscription->m_SubscriptionParams.m_fOnChanges(fg_Move(Changes)) > fg_DiscardResult();
+				pSubscription->m_SubscriptionParams.m_fOnChanges(fg_Move(Changes)).f_DiscardResult();
 
 				co_return {};
 			}
@@ -99,14 +99,12 @@ namespace NMib::NCloud::NSecretsManager
 			if (!fp_SecretMatchesSubscription(Subscription, _SecretProperties))
 				continue;
 
-			self.f_Invoke(fSendToSubscription, Subscription.f_GetSubscriptionID()) > fg_DiscardResult();
+			self.f_Invoke(fSendToSubscription, Subscription.f_GetSubscriptionID()).f_DiscardResult();
 		}
 	}
 
-	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr const &_SubscriptionID)
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr _SubscriptionID)
 	{
-		TCPromise<void> Promise;
-
 		CChangeSubscription const *pSubscription = nullptr;
 
 		auto OnResume = co_await fg_OnResume
@@ -181,7 +179,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 
-	TCFuture<TCActorSubscriptionWithID<>> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SubscribeToChanges(CSubscribeToChanges &&_Params)
+	TCFuture<TCActorSubscriptionWithID<>> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SubscribeToChanges(CSubscribeToChanges _Params)
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
@@ -243,7 +241,7 @@ namespace NMib::NCloud::NSecretsManager
 			}
 		;
 
-		co_await (This.self(&CServer::fp_SendSubscriptionInitial, SubscriptionID) % "Error sending initial subsciption" % Auditor);
+		co_await (This.fp_SendSubscriptionInitial(SubscriptionID) % "Error sending initial subsciption" % Auditor);
 
 		Auditor.f_Info
 			(

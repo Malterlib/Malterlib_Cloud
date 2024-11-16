@@ -102,16 +102,16 @@ namespace NMib::NCloud::NBackupManager
 		auto CanDestroyFuture = mp_pCanDestroyTracker->f_Future();
 		mp_pCanDestroyTracker.f_Clear();
 
-		TCActorResultVector<void> Destroys;
-		fg_Move(CanDestroyFuture) > Destroys.f_AddResult();
+		TCFutureVector<void> Destroys;
+		fg_Move(CanDestroyFuture) > Destroys;
 
 		for (auto &BackupInstance : mp_BackupInstances)
-			self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupInstance.f_GetKey(), BackupInstance.m_OwningHost, true, "Backup Manager shutting down") > Destroys.f_AddResult();
+			fp_DestroyBackupInstance(BackupInstance.f_GetKey(), BackupInstance.m_OwningHost, true, "Backup Manager shutting down") > Destroys;
 
 		for (auto &Download : mp_BackupDownloads)
-			Download.f_Destroy() > Destroys.f_AddResult();
+			Download.f_Destroy() > Destroys;
 
-		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy backup manager server");;
+		co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy backup manager server");;
 
 		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
 

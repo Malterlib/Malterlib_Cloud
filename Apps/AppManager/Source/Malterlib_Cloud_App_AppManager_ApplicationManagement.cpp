@@ -187,13 +187,12 @@ namespace NMib::NCloud::NAppManager
 		return Return;
 	}
 
-	TCFuture<void> CAppManagerActor::fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplicationJSON(TCSharedPointer<CApplication> _pApplication)
 	{
-		TCPromise<void> Promise;
-
 		auto &Application = *_pApplication;
 		if (Application.m_bDeleted)
-			return Promise <<= DMibErrorInstance("Application has been deleted");
+			co_return DMibErrorInstance("Application has been deleted");
+
 		auto &Settings = Application.m_Settings;
 		
 		auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][Application.m_Name];
@@ -331,7 +330,7 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJSON["AppManagerVersion"] = Settings.m_AppManagerVersion;
 		ApplicationJSON["LaunchInProcess"] = Settings.m_bLaunchInProcess;
 
-		return Promise <<= mp_State.m_StateDatabase.f_Save();
+		co_return co_await mp_State.m_StateDatabase.f_Save();
 	}
 	
 	void CAppManagerActor::fsp_CreateApplicationUserGroup
@@ -446,7 +445,7 @@ namespace NMib::NCloud::NAppManager
 		CFile::fs_SetAttributes(_ApplicationDir, gc_RootAttributes);
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
 		fp_ReportInProgress(_pCommandLine, ApplicationName);
@@ -456,7 +455,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
 		fp_ReportInProgress(_pCommandLine, ApplicationName);
@@ -466,7 +465,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
 		fp_ReportInProgress(_pCommandLine, ApplicationName);
@@ -489,7 +488,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 	
-	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Start(NStr::CStr const &_Name)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Start(NStr::CStr _Name)
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -541,7 +540,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 	
-	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Stop(NStr::CStr const &_Name)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Stop(NStr::CStr _Name)
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -594,7 +593,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 	
-	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Restart(NStr::CStr const &_Name)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Restart(NStr::CStr _Name)
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();

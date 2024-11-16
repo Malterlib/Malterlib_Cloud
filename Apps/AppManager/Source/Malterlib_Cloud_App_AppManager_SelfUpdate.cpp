@@ -11,7 +11,7 @@ namespace NMib::NCloud::NAppManager
 #		include "Malterlib_Cloud_App_AppManager_SelfUpdate.sh"
 	;
 
-	TCFuture<bool> CAppManagerActor::fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication)
+	TCFuture<bool> CAppManagerActor::fp_SelfUpdate(TCSharedPointer<CApplication> _pApplication)
 	{
 		if (CFile::fs_GetProgramDirectory() != mp_State.m_RootDirectory)
 		{

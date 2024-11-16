@@ -26,7 +26,7 @@ namespace NMib::NCloud::NAppManager
 		fp_UpdateApplicationDependencies();
 	}
 
-	TCFuture<void> CAppManagerActor::fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite)
+	TCFuture<void> CAppManagerActor::fp_ChangeEncryption(TCSharedPointer<CApplication> _pApplication, EEncryptOperation _Operation, bool _bForceOverwrite)
 	{
 		auto pEncryptionApplication = _pApplication;
 		if (pEncryptionApplication->f_IsChildApp())
@@ -116,16 +116,15 @@ namespace NMib::NCloud::NAppManager
 
 		co_await
 			(
-				self
+				fp_RunBashScript
 				(
-					&CAppManagerActor::fp_RunBashScript
-					, pScript
+					pScript
 					, pDesc
 					, fg_Move(Environment)
 					, [Key](NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)
 					{
 						if (_Output == "PROVIDE KEY")
-							_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, Key) > fg_DiscardResult();
+							_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, Key).f_DiscardResult();
 					}
 					, TCLimitsInt<uint32>::mc_Max
 				)

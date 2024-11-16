@@ -40,7 +40,7 @@ namespace NMib::NCloud
 			co_await m_Database
 				(
 					&CDatabaseActor::f_WriteWithCompaction
-					, g_ActorFunctorWeak / [pThis = this](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+					, g_ActorFunctorWeak / [pThis = this](CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						auto CaptureScope = co_await (g_CaptureExceptions % "Error saving patch state to database");
 

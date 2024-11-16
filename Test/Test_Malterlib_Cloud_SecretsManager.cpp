@@ -226,7 +226,7 @@ public:
 		// Copy SecretsManagers to their directories
 		mint nSecretsManagers = 1;
 		{
-			TCActorResultVector<void> SecretsManagerLaunchesResults;
+			TCFutureVector<void> SecretsManagerLaunchesResults;
 			for (mint i = 0; i < nSecretsManagers; ++i)
 			{
 				auto BlockingActorCheckout = fg_BlockingActor();
@@ -239,14 +239,14 @@ public:
 						CFile::fs_CreateDirectory(SecretsManagerDirectory);
 						//CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/SecretsManager", SecretsManagerDirectory, nullptr);
 					}
-					> SecretsManagerLaunchesResults.f_AddResult()
+					> SecretsManagerLaunchesResults
 				;
 			}
-			fg_CombineResults(SecretsManagerLaunchesResults.f_GetResults().f_CallSync());
+			fg_CombineResults(fg_AllDoneWrapped(SecretsManagerLaunchesResults).f_CallSync());
 		}
 
 		// Launch SecretsManagers
-		TCActorResultVector<CDistributedApp_LaunchInfo> SecretsManagerLaunchesResults;
+		TCFutureVector<CDistributedApp_LaunchInfo> SecretsManagerLaunchesResults;
 		TCVector<CDistributedApp_LaunchInfo> SecretsManagerLaunches;
 
 		auto fLaunchSecretManagers = [&]
@@ -266,10 +266,10 @@ public:
 							, &fg_ConstructApp_SecretsManager
 							, NContainer::TCVector<NStr::CStr>{}
 						)
-						> SecretsManagerLaunchesResults.f_AddResult()
+						> SecretsManagerLaunchesResults
 					;
 				}
-				for (auto &LaunchResult : SecretsManagerLaunchesResults.f_GetResults().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout))
+				for (auto &LaunchResult : fg_AllDoneWrapped(SecretsManagerLaunchesResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout))
 					SecretsManagerLaunches.f_Insert(fg_Move(*LaunchResult));
 			}
 		;
@@ -341,7 +341,7 @@ public:
 			LaunchedPromise.f_MoveFuture().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 			KeyManagerCommandLine(&CProcessLaunchActor::f_SendStdIn, "Password\n").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 			ExitedPromise.f_MoveFuture().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-			KeyManagerCommandLine.f_Destroy().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fg_Move(KeyManagerCommandLine).f_Destroy().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 		}
 
 		// Setup trust for SecretsManagers
@@ -363,7 +363,7 @@ public:
 			{
 				AllSecretsManagerHosts.f_Clear();
 				AllSecretsManagers.f_Clear();
-				TCActorResultVector<void> ListenResults;
+				TCFutureVector<void> ListenResults;
 				mint iSecretsManager = 0;
 				for (auto &SecretsManager : SecretsManagerLaunches)
 				{
@@ -375,15 +375,15 @@ public:
 					SecretsManagerInfo.m_pTrustInterface = SecretsManager.m_pTrustInterface;
 
 					SecretsManagerInfo.m_Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/SecretsManagerTest.sock"_f << SecretsManagerDirectory);
-					SecretsManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(SecretsManagerInfo.m_Address) > ListenResults.f_AddResult();
+					SecretsManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(SecretsManagerInfo.m_Address) > ListenResults;
 					++iSecretsManager;
 				}
-				fg_CombineResults(ListenResults.f_GetResults().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout));
+				fg_CombineResults(fg_AllDoneWrapped(ListenResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout));
 			}
 		;
 		fSetupListen();
 
-		TCActorResultVector<void> SetupTrustResults;
+		TCFutureVector<void> SetupTrustResults;
 
 		static auto constexpr c_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 		auto fPermissionsAdd = [](auto &&_HostID, auto &&_Permissions)
@@ -414,14 +414,14 @@ public:
 				(
 					fNamespaceHosts("com.malterlib/Cloud/SecretsManagerCoordination", TrustSecretsManagers)
 				)
-				> SetupTrustResults.f_AddResult()
+				> SetupTrustResults
 			;
 #endif
 			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
 				(
 					fNamespaceHosts(CKeyManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(KeyManagerHostID))
 				)
-				> SetupTrustResults.f_AddResult()
+				> SetupTrustResults
 			;
 
 			TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
@@ -430,14 +430,14 @@ public:
 					, fg_CreateSet<CStr>(SecretsManagerHostID)
 					, c_WaitForSubscriptions
 				)
-				> SetupTrustResults.f_AddResult()
+				> SetupTrustResults
 			;
 
 			SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
 				(
 					fPermissionsAdd(TestHostID, SecretsManagerPermissionsForTest)
 				)
-				> SetupTrustResults.f_AddResult()
+				> SetupTrustResults
 			;
 
 			for (auto &SecretsManagerInner : AllSecretsManagers)
@@ -459,7 +459,7 @@ public:
 						SecretsManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 					}
 				;
-				Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
+				Promise.f_MoveFuture() > SetupTrustResults;
 
 			}
 
@@ -474,10 +474,10 @@ public:
 					SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
 				}
 			;
-			Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
+			Promise.f_MoveFuture() > SetupTrustResults;
 		}
 
-		SetupTrustResults.f_GetResults().f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		fg_AllDoneWrapped(SetupTrustResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		CSecretsManager::CSecret StringSecret{"Secret1"};
 		CSecretsManager::CSecret ByteVectorSecret{CSecureByteVector{(uint8 const *)"Secret2", 7}};
@@ -744,7 +744,7 @@ public:
 			{
 				pChangesState->f_Signal(false);
 				CSecretsManager::CSubscribeToChanges ChangesSubscription;
-				ChangesSubscription.m_fOnChanges = g_ActorFunctor / [pChangesState](CSecretsManager::CSecretChanges &&_Changes) -> TCFuture<void>
+				ChangesSubscription.m_fOnChanges = g_ActorFunctor / [pChangesState](CSecretsManager::CSecretChanges _Changes) -> TCFuture<void>
 					{
 						DMibLock(pChangesState->m_Lock);
 						if (pChangesState->m_Changes.f_IsEmpty())
@@ -1783,7 +1783,7 @@ public:
 			auto fSetPropertiesNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, CSecretsManager::CSecretProperties &&_Properties) 
 				-> TCFuture<CSecretsManager::CSetSecretPropertiesResult>
 				{
-					return g_Future <<= SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
+					return SecretsManager.f_CallActor(&CSecretsManager::f_SetSecretProperties)(CSecretsManager::CSecretID{_Folder, _Name}, fg_Move(_Properties));
 				}
 			;
 			auto fRemoveSecret = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)
@@ -1793,7 +1793,7 @@ public:
 			;
 			auto fRemoveSecretNoWait = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name)  -> TCFuture<void>
 				{
-					return g_Future <<= SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name});
+					return SecretsManager.f_CallActor(&CSecretsManager::f_RemoveSecret)(CSecretsManager::CSecretID{_Folder, _Name});
 				}
 			;
 			auto fWriteFile = [&](CStr _FileName, CStr _Content)
@@ -1854,10 +1854,9 @@ public:
 						}
 					;
 
-					fg_CallSafeDispatched
+					fg_CurrentActor().f_Bind<fg_UploadSecretFile>
 						(
-							&fg_UploadSecretFile
-							, SecretsManager
+							SecretsManager
 							, Dependencies.m_DistributionManager
 							, fg_TempCopy(_ID)
 							, fg_Move(Config)
@@ -1899,7 +1898,7 @@ public:
 						}
 					;
 
-					fg_CallSafeDispatched(&fg_DownloadSecretFile, SecretsManager, fg_Move(_ID), fg_Move(Config))
+					fg_CurrentActor().f_Bind<fg_DownloadSecretFile>(SecretsManager, fg_Move(_ID), fg_Move(Config))
 						> Promise % "Failed to transfer secret file" / [=](NFile::CDirectorySyncReceive::CSyncResult &&_Result)
 						{
 							Promise.f_SetResult(_Result.m_Stats.m_nSyncedFiles - 1); // Subtract one for the manifest file
@@ -1921,7 +1920,7 @@ public:
 
 			auto fSyncFileOperations = [&](CStr const &_Command, CEJSONSorted const _Params = "") -> TCFuture<CEJSONSorted>
 				{
-					return SecretsManagerLaunchInfo.f_Test_Command(_Command, _Params);
+					return SecretsManagerLaunchInfo.f_Test_Command(fg_TempCopy(_Command), fg_TempCopy(_Params));
 				}
 			;
 
@@ -2213,7 +2212,7 @@ public:
 					CActorSubscription UploadSubscription;
 					fUpload(ID, File2, RootDirectory, UploadSubscription).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					DMibTestPath("Keep secrets manager alive until last pending delete has completed");
-					fSyncFileOperations("DelayDelete") > fg_DiscardResult();
+					fSyncFileOperations("DelayDelete").f_DiscardResult();
 					auto UploadCompletedFuture = fSyncFileOperations("UploadCompleted", File3);
 					auto DownloadInitializedFuture = fSyncFileOperations("DownloadInitialized", ID.m_Name);
 					auto DestroyWaitingForCanDestroyFuture = fSyncFileOperations("DestroyWaitingForCanDestroy", ID.m_Name);
@@ -2238,12 +2237,16 @@ public:
 					TCSharedPointer<TCAtomic<bool>> pDestroyFinished = fg_Construct(false);
 					TCSharedPointer<NThread::CEvent> pDestroyFinishedEvent = fg_Construct();
 					auto Subscription = fg_Move(SecretsManagerLaunches[0].m_Subscription);
-					Subscription->f_Destroy() > NConcurrency::fg_DirectResultActor() / [=](auto &&)
-						{
-							pDestroyFinished->f_Exchange(true);
-							pDestroyFinishedEvent->f_SetSignaled();
-						}
+					Subscription->f_Destroy().f_OnResultSet
+						(
+							[=](auto &&)
+							{
+								pDestroyFinished->f_Exchange(true);
+								pDestroyFinishedEvent->f_SetSignaled();
+							}
+						)
 					;
+
 					fg_Move(DestroyWaitingForCanDestroyFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 					DMibExpectFalse(pDestroyFinished->f_Load());

@@ -67,7 +67,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					bool bIsVersion = _Params["ReadingType"].f_String() == "Version";
 					bool bRandomValues = _Params["RandomValues"].f_Boolean();
@@ -148,7 +148,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					CDistributedAppSensorReporter::CSensorInfo SensorInfo;
 					SensorInfo.m_Identifier = "org.malterlib.testapp.test.status";
@@ -203,7 +203,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					mint nEntries = _Params["NumEntries"].f_Integer();
 
@@ -213,7 +213,7 @@ namespace NMib::NCloud::NTest
 					LogInfo.m_IdentifierScope = "Test";
 					LogInfo.m_Name = "Malterlib Test";
 
-					auto LogReporter = co_await self(&CTestAppActor::fp_OpenLogReporter, LogInfo);
+					auto LogReporter = co_await fp_OpenLogReporter(LogInfo);
 
 					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
 
@@ -255,7 +255,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					mint nEntries = _Params["NumEntries"].f_Integer();
 					mint bError = _Params["Error"].f_Boolean();
@@ -280,7 +280,7 @@ namespace NMib::NCloud::NTest
 					"Names"_o= {"--get-log-report-depth"}
 					, "Description"_o= "Gets the depth of the log reporting chain."
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					CDistributedAppLogReporter::CLogInfo LogInfo;
 
@@ -288,7 +288,7 @@ namespace NMib::NCloud::NTest
 					LogInfo.m_IdentifierScope = "Test";
 					LogInfo.m_Name = "Malterlib Test";
 
-					auto LogReporter = co_await self(&CTestAppActor::fp_OpenLogReporter, LogInfo);
+					auto LogReporter = co_await fp_OpenLogReporter(LogInfo);
 
 					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
 
@@ -329,7 +329,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					mint nEntries = _Params["NumEntries"].f_Integer();
 					mint EntrySize = _Params["EntrySize"].f_Integer();
@@ -344,7 +344,7 @@ namespace NMib::NCloud::NTest
 					LogInfo.m_IdentifierScope = "Test";
 					LogInfo.m_Name = "Malterlib Test";
 
-					auto LogReporter = co_await self(&CTestAppActor::fp_OpenLogReporter, LogInfo);
+					auto LogReporter = co_await fp_OpenLogReporter(LogInfo);
 
 					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
 
@@ -395,7 +395,7 @@ namespace NMib::NCloud::NTest
 		}
 	}
 
-	TCFuture<void> CTestAppActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
+	TCFuture<void> CTestAppActor::fp_StartApp(NEncoding::CEJSONSorted const _Params)
 	{
 		co_return {};
 	}

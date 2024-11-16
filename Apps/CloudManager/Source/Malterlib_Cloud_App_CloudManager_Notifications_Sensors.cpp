@@ -61,7 +61,7 @@ namespace NMib::NCloud::NCloudManager
 			(
 				&CDistributedAppSensorStoreLocal::f_SubscribeSensors
 				, TCVector<CDistributedAppSensorReader_SensorFilter>()
-				, g_ActorFunctor / [this](CDistributedAppSensorReader::CSensorChange &&_Change) -> TCFuture<void>
+				, g_ActorFunctor / [this](CDistributedAppSensorReader::CSensorChange _Change) -> TCFuture<void>
 				{
 					switch (_Change.f_GetTypeID())
 					{
@@ -99,7 +99,7 @@ namespace NMib::NCloud::NCloudManager
 			(
 				&CDistributedAppSensorStoreLocal::f_SubscribeSensorStatus
 				, TCVector<CDistributedAppSensorReader_SensorStatusFilter>()
-				, g_ActorFunctor / [this](CDistributedAppSensorReader_SensorKeyAndReading &&_Reading) -> TCFuture<void>
+				, g_ActorFunctor / [this](CDistributedAppSensorReader_SensorKeyAndReading _Reading) -> TCFuture<void>
 				{
 					auto &SensorStatus = mp_SensorStatuses[_Reading.m_SensorInfoKey];
 
@@ -112,11 +112,13 @@ namespace NMib::NCloud::NCloudManager
 			)
 		;
 
-		fg_Timeout(2.0) > [this]
+		fg_Timeout(2.0) > [this]() -> TCFuture<void>
 			{
 				// Allow time for sensors to recorrect after startup before considering their status
 				mp_bSubscribedToSensors = true;
 				fp_SchedulePeriodicSensorNotificationsOutOfBand(false);
+
+				co_return {};
 			}
 		;
 
@@ -161,10 +163,12 @@ namespace NMib::NCloud::NCloudManager
 			return;
 
 		mp_bOutOfBandSensorsUpdateScheduled = true;
-		fg_Timeout(gc_MinProblemUpdateTime) > [this]()
+		fg_Timeout(gc_MinProblemUpdateTime) > [this]() -> TCFuture<void>
 			{
 				mp_bOutOfBandSensorsUpdateScheduled = false;
 				f_UpdatePeriodicSensorNotifications(false) > fg_LogError("CloudManager", "Error updating sensor notifications");
+
+				co_return {};
 			}
 		;
 	}
@@ -574,7 +578,7 @@ namespace NMib::NCloud::NCloudManager
 			(
 				&CDatabaseActor::f_WriteWithCompaction
 				, g_ActorFunctorWeak / [CloudManagerServer = fg_ThisActor(&mp_This), pCloudManagerServer = &mp_This, pThis = this]
-				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 

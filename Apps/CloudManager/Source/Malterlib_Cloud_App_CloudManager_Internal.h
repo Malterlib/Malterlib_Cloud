@@ -37,50 +37,50 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CCloudManagerImplementation : public CCloudManager
 		{
-			TCFuture<CRegisterAppManagerResult> f_RegisterAppManager(TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager, CAppManagerInfo &&_AppManagerInfo) override;
+			TCFuture<CRegisterAppManagerResult> f_RegisterAppManager(TCDistributedActorInterfaceWithID<CAppManagerInterface> _AppManager, CAppManagerInfo _AppManagerInfo) override;
 			TCFuture<TCMap<CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() override;
 			TCFuture<TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() override;
-			TCFuture<CRemoveAppManagerReturn> f_RemoveAppManager(CStr const &_AppManagerHostID) override;
-			TCFuture<uint32> f_RemoveSensor(CRemoveSensor &&_RemoveSensor) override;
-			TCFuture<uint32> f_RemoveLog(CRemoveLog &&_RemoveLog) override;
-			TCFuture<uint32> f_SnoozeSensor(CSnoozeSensor &&_SnoozeSensor) override;
+			TCFuture<CRemoveAppManagerReturn> f_RemoveAppManager(CStr _AppManagerHostID) override;
+			TCFuture<uint32> f_RemoveSensor(CRemoveSensor _RemoveSensor) override;
+			TCFuture<uint32> f_RemoveLog(CRemoveLog _RemoveLog) override;
+			TCFuture<uint32> f_SnoozeSensor(CSnoozeSensor _SnoozeSensor) override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> f_GetSensorReporter() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> f_GetSensorReader() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> f_GetLogReporter() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReader>> f_GetLogReader() override;
-			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions &&_Params) override;
+			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions _Params) override;
 	 		TCFuture<TCMap<CStr, CExpectedVersions>> f_EnumExpectedOsVersions() override;
-			TCFuture<void> f_SetExpectedOsVersions(CStr &&_OsName, CCurrentVersion &&_CurrentVersion, CExpectedVersionRange &&_ExpectedRange) override;
+			TCFuture<void> f_SetExpectedOsVersions(CStr _OsName, CCurrentVersion _CurrentVersion, CExpectedVersionRange _ExpectedRange) override;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
 
 		struct CDistributedAppSensorReporterImplementation : public CDistributedAppSensorReporter
 		{
-			TCFuture<CSensorReporter> f_OpenSensorReporter(CSensorInfo &&_SensorInfo) override;
+			TCFuture<CSensorReporter> f_OpenSensorReporter(CSensorInfo _SensorInfo) override;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
 
 		struct CDistributedAppSensorReaderImplementation : public CDistributedAppSensorReader
 		{
-			TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> f_GetSensors(CGetSensors &&_Params) override;
-			auto f_GetSensorReadings(CGetSensorReadings &&_Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override;
-			auto f_GetSensorStatus(CGetSensorStatus &&_Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override;
-			auto f_SubscribeSensors(TCVector<CDistributedAppSensorReader_SensorFilter> &&_Filters, TCActorFunctorWithID<TCFuture<void> (CSensorChange &&_Change)> &&_fOnChange)
+			TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> f_GetSensors(CGetSensors _Params) override;
+			auto f_GetSensorReadings(CGetSensorReadings _Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override;
+			auto f_GetSensorStatus(CGetSensorStatus _Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> override;
+			auto f_SubscribeSensors(TCVector<CDistributedAppSensorReader_SensorFilter> _Filters, TCActorFunctorWithID<TCFuture<void> (CSensorChange _Change)> _fOnChange)
 				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
 			auto f_SubscribeSensorReadings
 				(
-					TCVector<CDistributedAppSensorReader_SensorReadingSubscriptionFilter> &&_Filters
-					, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading &&_Reading)> &&_fOnReading
+					TCVector<CDistributedAppSensorReader_SensorReadingSubscriptionFilter> _Filters
+					, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading _Reading)> _fOnReading
 				)
 				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
 			auto f_SubscribeSensorStatus
 				(
-					TCVector<CDistributedAppSensorReader_SensorStatusFilter> &&_Filters
-					, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading &&_Reading)> &&_fOnReading
+					TCVector<CDistributedAppSensorReader_SensorStatusFilter> _Filters
+					, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading _Reading)> _fOnReading
 				)
 				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
@@ -90,19 +90,19 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CDistributedAppLogReporterImplementation : public CDistributedAppLogReporter
 		{
-			TCFuture<CLogReporter> f_OpenLogReporter(CLogInfo &&_LogInfo) override;
+			TCFuture<CLogReporter> f_OpenLogReporter(CLogInfo _LogInfo) override;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
 
 		struct CDistributedAppLogReaderImplementation : public CDistributedAppLogReader
 		{
-			TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>> f_GetLogs(CGetLogs &&_Params) override;
-			auto f_GetLogEntries(CGetLogEntries &&_Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> override;
-			auto f_SubscribeLogs(TCVector<CDistributedAppLogReader_LogFilter> &&_Filter, TCActorFunctorWithID<TCFuture<void> (CLogChange &&_Change)> &&_fOnChange)
+			TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>> f_GetLogs(CGetLogs _Params) override;
+			auto f_GetLogEntries(CGetLogEntries _Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> override;
+			auto f_SubscribeLogs(TCVector<CDistributedAppLogReader_LogFilter> _Filter, TCActorFunctorWithID<TCFuture<void> (CLogChange _Change)> _fOnChange)
 				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
-			auto f_SubscribeLogEntries(CSubscribeLogEntries &&_Params) -> TCFuture<TCActorSubscriptionWithID<>> override;
+			auto f_SubscribeLogEntries(CSubscribeLogEntries _Params) -> TCFuture<TCActorSubscriptionWithID<>> override;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
@@ -115,7 +115,7 @@ namespace NMib::NCloud::NCloudManager
 		};
 
 		TCFuture<void> f_Init();
-		TCFuture<void> f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Prefix);
+		TCFuture<void> f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> _pCommandLine, CStr _Prefix);
 
 	private:
 		struct CAppManagerState
@@ -123,7 +123,7 @@ namespace NMib::NCloud::NCloudManager
 			CStr const &f_AppManagerID() const;
 			NCloudManagerDatabase::CAppManagerKey f_DatabaseKey() const;
 
-			TCFuture<void> f_Destroy(CCloudManagerServer &_This);
+			TCUnsafeFuture<void> f_Destroy(CCloudManagerServer &_This);
 
 			TCDistributedActorInterfaceWithID<CAppManagerInterface> m_Interface;
 			NCloudManagerDatabase::CAppManagerValue m_Data;
@@ -146,7 +146,7 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CExpectedOsVersionSubscription
 		{
-			TCActorFunctorWithID<TCFuture<void> (CCloudManager::CExpectedVersions &&_Versions)> m_fVersionRangeChanged;
+			TCActorFunctorWithID<TCFuture<void> (CCloudManager::CExpectedVersions _Versions)> m_fVersionRangeChanged;
 			TCVector<CCloudManager::CExpectedVersions> m_QueuedNotifications;
 		};
 
@@ -195,15 +195,15 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_SetupCleanup();
 		TCFuture<void> fp_SetupSensorStore();
 		TCFuture<void> fp_SetupLogStore();
-		TCFuture<CCleanupDatabaseResult> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction, TCSharedPointer<CCleanupState> &&_pState);
+		TCFuture<CCleanupDatabaseResult> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite _WriteTransaction, TCSharedPointer<CCleanupState> _pState);
 		TCFuture<CDatabaseActor::CTransactionWrite> fp_SaveGlobalState(CDatabaseActor::CTransactionWrite _Transaction);
 		TCFuture<void> fp_SaveGlobalStateWithoutTransaction();
 		TCFuture<void> fp_UpdateAppManagerState();
 		TCFuture<void> fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data);
-		TCFuture<CCloudManager::CRemoveAppManagerReturn> fp_RemoveAppManagerData(CStr const &_HostID);
-		TCFuture<void> fp_ProcessApplicationChanges(CStr const &_AppManagerID, CAppManagerInterface::COnChangeNotificationParams &&_Params);
-		TCFuture<void> fp_ChangeOtherErrors(CStr const &_AppManagerID, mint _RegisterSequence, TCSet<CStr> const &_Remove, TCMap<CStr, CStr> const &_Add);
-		TCFuture<void> fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied);
+		TCFuture<CCloudManager::CRemoveAppManagerReturn> fp_RemoveAppManagerData(CStr _HostID);
+		TCFuture<void> fp_ProcessApplicationChanges(CStr _AppManagerID, CAppManagerInterface::COnChangeNotificationParams _Params);
+		TCFuture<void> fp_ChangeOtherErrors(CStr _AppManagerID, mint _RegisterSequence, TCSet<CStr> _Remove, TCMap<CStr, CStr> _Add);
+		TCFuture<void> fp_ReportFiltered(CStr _AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied);
 
 		static TCVector<CStr> fsp_SensorReadPermissions();
 		static TCVector<CStr> fsp_LogReadPermissions();

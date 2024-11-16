@@ -5,6 +5,7 @@
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Encoding/JSONShortcuts>
 #include <Mib/CommandLine/TableRenderer>
 
@@ -45,9 +46,9 @@ namespace NMib::NCloud::NCloudClient
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications, _Params, _pCommandLine);
+					return fp_CommandLine_VersionManager_ListApplications(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -79,9 +80,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions, _Params, _pCommandLine);
+					return fp_CommandLine_VersionManager_ListVersions(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -208,9 +209,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion, _Params, _pCommandLine);
+					return fp_CommandLine_VersionManager_UploadVersion(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -269,9 +270,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags, _Params, _pCommandLine);
+					return fp_CommandLine_VersionManager_ChangeTags(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -324,9 +325,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion, _Params, _pCommandLine);
+					return fp_CommandLine_VersionManager_DownloadVersion(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -355,14 +356,14 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 
-		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
+		co_await fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
-		TCActorResultMap<CHostInfo, CVersionManager::CListApplications::CResult> Applications;
+		TCFutureMap<CHostInfo, CVersionManager::CListApplications::CResult> Applications;
 
 		for (auto &TrustedActor : mp_VersionManagers.m_Actors)
 		{
@@ -371,7 +372,7 @@ namespace NMib::NCloud::NCloudClient
 			CVersionManager::CListApplications Command;
 			TrustedActor.m_Actor.f_CallActor(&CVersionManager::f_ListApplications)(fg_Move(Command))
 				.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
-				> Applications.f_AddResult(TrustedActor.m_TrustInfo.m_HostInfo)
+				> Applications[TrustedActor.m_TrustInfo.m_HostInfo]
 			;
 		}
 
@@ -379,7 +380,7 @@ namespace NMib::NCloud::NCloudClient
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("Host", "Application");
 
-		auto Results = co_await Applications.f_GetResults();
+		auto Results = co_await fg_AllDoneWrapped(Applications);
 		for (auto &Result : Results)
 		{
 			auto &HostInfo = Results.fs_GetKey(Result);
@@ -406,15 +407,15 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 
-		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
-		TCActorResultMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
+		co_await fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
+		TCFutureMap<CHostInfo, CVersionManager::CListVersions::CResult> Versions;
 
 		for (auto &TrustedVersionManager : mp_VersionManagers.m_Actors)
 		{
@@ -424,11 +425,11 @@ namespace NMib::NCloud::NCloudClient
 			Options.m_ForApplication = Application;
 			TrustedVersionManager.m_Actor.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(Options))
 				.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
-				> Versions.f_AddResult(TrustedVersionManager.m_TrustInfo.m_HostInfo)
+				> Versions[TrustedVersionManager.m_TrustInfo.m_HostInfo]
 			;
 		}
 
-		auto Results = co_await Versions.f_GetResults();
+		auto Results = co_await fg_AllDoneWrapped(Versions);
 
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
@@ -552,7 +553,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
 		if (Source.f_IsEmpty())
@@ -569,7 +570,8 @@ namespace NMib::NCloud::NCloudClient
 		{
 			// tar -xOf AppManager.tar.gz VersionInfo.json
 
-			auto &LaunchActor = mp_LaunchActors.f_Insert() = fg_Construct();
+			TCActor<CProcessLaunchActor> LaunchActor = fg_Construct();
+			auto DestroyLaunch = co_await fg_AsyncDestroy(LaunchActor);
 
 			CProcessLaunchActor::CSimpleLaunch Launch
 				{
@@ -727,7 +729,7 @@ namespace NMib::NCloud::NCloudClient
 			;
 		}
 
-		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
+		co_await fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
 		CStr Error;
 		auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
@@ -774,7 +776,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -806,7 +808,7 @@ namespace NMib::NCloud::NCloudClient
 
 		VersionID.m_Platform = Platform;
 
-		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
+		co_await fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
 		CStr Error;
 		auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
@@ -832,7 +834,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -883,7 +885,7 @@ namespace NMib::NCloud::NCloudClient
 		if (AddTags.f_IsEmpty() && RemoveTags.f_IsEmpty() && !bRetryUpgrade)
 			co_return DMibErrorInstance("No changes specified. Specify tags to add and remove with --add and --remove, or specify --retry-upgrade");
 
-		co_await self(&CCloudClientAppActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
+		co_await fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
 		CStr Error;
 		auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);

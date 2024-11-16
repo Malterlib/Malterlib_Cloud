@@ -32,9 +32,9 @@ namespace NMib::NCloud::NAppManager
 				, mp_State.m_TrustManager
 				, g_ActorFunctor / [_pApplication]
 				(
-					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
-					, NConcurrency::CActorSubscription &&_ManifestFinished
-					, NStr::CStr const &_BackupRoot
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
+					, NConcurrency::CActorSubscription _ManifestFinished
+					, NStr::CStr _BackupRoot
 				) -> TCFuture<TCActorSubscriptionWithID<>>
 				{
 					if (!_BackupInterface)

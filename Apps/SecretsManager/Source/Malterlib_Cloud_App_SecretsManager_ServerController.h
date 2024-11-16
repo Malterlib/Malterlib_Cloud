@@ -25,12 +25,12 @@ namespace NMib::NCloud::NSecretsManager
 		TCFuture<void> f_Init();
 
 #if DMibConfig_Tests_Enable
-		TCFuture<CEJSONSorted> f_Test_Command(CStr const &_Command, CEJSONSorted const &_Params);
+		TCFuture<CEJSONSorted> f_Test_Command(CStr _Command, CEJSONSorted const _Params);
 #endif
 
 	private:
 		TCFuture<void> fp_Destroy() override;
-		TCFuture<void> fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> const &_KeyManager);
+		TCFuture<void> fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> _KeyManager);
 		
 		TCActor<CSecretsManagerDaemonActor::CServer> mp_ServerActor;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;

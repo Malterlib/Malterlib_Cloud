@@ -22,17 +22,16 @@ namespace NMib::NCloud::NVersionManager
 				NewPermissions[fg_Format("Application/Tag/{}", Tag)];
 		}
 		if (!NewPermissions.f_IsEmpty())
-			mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, NewPermissions) > fg_DiscardResult();
+			mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, NewPermissions).f_DiscardResult();
 	}
 
 	TCFuture<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> CVersionManagerDaemonActor::CServer::fp_FilterTags
 		(
-			CStr const &_Description
-			, TCSet<CStr> const &_TagsAdded
-			, TCSet<CStr> const &_TagsRemoved
+			CStr _Description
+			, TCSet<CStr> _TagsAdded
+			, TCSet<CStr> _TagsRemoved
 		)
 	{
-		TCPromise<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> Promise;
 		TCMap<CStr, TCVector<CPermissionQuery>> Permissions;
 
 		Permissions["//TagAll//"] = {{"Application/TagAll"}};
@@ -52,41 +51,39 @@ namespace NMib::NCloud::NVersionManager
 				DeniedTags[Tag];
 		}
 
-		mp_Permissions.f_HasPermissions(_Description, Permissions) > Promise / [=](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
+		auto HasPermissions = co_await mp_Permissions.f_HasPermissions(_Description, Permissions);
+		CFilteredTagsResult Result;
+		Result.m_DeniedTags = DeniedTags;
+
+		if (HasPermissions["//TagAll//"])
+		{
+			Result.m_TagsAdded = _TagsAdded;
+			Result.m_TagsRemoved = _TagsRemoved;
+		}
+		else
+		{
+			for (auto &Tag : _TagsAdded)
 			{
-				CFilteredTagsResult Result;
-				Result.m_DeniedTags = DeniedTags;
-				if (_HasPermissions["//TagAll//"])
-				{
-					Result.m_TagsAdded = _TagsAdded;
-					Result.m_TagsRemoved = _TagsRemoved;
-				}
+				auto pHasPermission = HasPermissions.f_FindEqual(Tag);
+				if (pHasPermission && *pHasPermission)
+					Result.m_TagsAdded[Tag];
 				else
-				{
-					for (auto &Tag : _TagsAdded)
-					{
-						auto pHasPermission = _HasPermissions.f_FindEqual(Tag);
-						if (pHasPermission && *pHasPermission)
-							Result.m_TagsAdded[Tag];
-						else
-							Result.m_DeniedTags[Tag];
-					}
-					for (auto &Tag : _TagsRemoved)
-					{
-						auto pHasPermission = _HasPermissions.f_FindEqual(Tag);
-						if (pHasPermission && *pHasPermission)
-							Result.m_TagsRemoved[Tag];
-						else
-							Result.m_DeniedTags[Tag];
-					}
-				}
-				Promise.f_SetResult(Result);
+					Result.m_DeniedTags[Tag];
 			}
-		;
-		return Promise.f_MoveFuture();
+			for (auto &Tag : _TagsRemoved)
+			{
+				auto pHasPermission = HasPermissions.f_FindEqual(Tag);
+				if (pHasPermission && *pHasPermission)
+					Result.m_TagsRemoved[Tag];
+				else
+					Result.m_DeniedTags[Tag];
+			}
+		}
+
+		co_return fg_Move(Result);
 	}
 
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags &&_Params) -> TCFuture<CChangeTags::CResult>
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags _Params) -> TCFuture<CChangeTags::CResult>
 	{
 		auto pThis = m_pThis;
 		
@@ -105,7 +102,7 @@ namespace NMib::NCloud::NVersionManager
 
 		auto FilteredTags = co_await
 			(
-				fg_CallSafe(pThis, &CServer::fp_FilterTags, "Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags)
+				pThis->fp_FilterTags("Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags)
 				% "Access denied filtering tags by permission"
 				% Auditor
 			)
@@ -132,7 +129,7 @@ namespace NMib::NCloud::NVersionManager
 		if (!pApplication)
 			co_return Auditor.f_Exception(fg_Format("No such application: {}", _Params.m_Application));
 
-		TCActorResultVector<CSizeInfo> VersionResults;
+		TCFutureVector<CSizeInfo> VersionResults;
 
 		auto fTagVersion = [&](CVersion &_Version)
 			{
@@ -145,7 +142,7 @@ namespace NMib::NCloud::NVersionManager
 					++_Version.m_VersionInfo.m_RetrySequence;
 
 				pThis->fp_NewVersion(_Params.m_Application, _Version);
-				pThis->fp_SaveVersionInfo(VersionPath, _Version.m_VersionInfo) > VersionResults.f_AddResult();
+				pThis->fp_SaveVersionInfo(VersionPath, _Version.m_VersionInfo) > VersionResults;
 			}
 		;
 
@@ -171,7 +168,7 @@ namespace NMib::NCloud::NVersionManager
 			}
 		}
 
-		auto Results = co_await VersionResults.f_GetResults().f_Wrap();
+		auto Results = co_await fg_AllDoneWrapped(VersionResults).f_Wrap();
 		if (!Results)
 			co_return Auditor.f_Exception({"Failed to save version infos. See Version Manager log.", fg_Format("Error: {}", Results.f_GetExceptionStr())});
 

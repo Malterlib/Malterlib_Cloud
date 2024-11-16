@@ -66,7 +66,7 @@ namespace NMib::NCloud::NAppManager
 			void f_Replied()
 			{
 				m_bReplied = true;
-				fg_Move(m_LaunchActor).f_Destroy() > fg_DiscardResult();
+				fg_Move(m_LaunchActor).f_Destroy().f_DiscardResult();
 			}
 		};
 		TCSharedPointer<CState> pState = fg_Construct();

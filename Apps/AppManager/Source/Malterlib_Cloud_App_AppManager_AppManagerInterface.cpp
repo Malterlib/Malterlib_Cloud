@@ -14,8 +14,6 @@ namespace NMib::NCloud::NAppManager
 	
 	TCFuture<void> CAppManagerActor::fp_RegisterPermissions()
 	{
-		TCPromise<void> Promise;
-
 		TCSet<CStr> Permissions;
 		Permissions["AppManager/VersionAppAll"];
 		
@@ -40,23 +38,19 @@ namespace NMib::NCloud::NAppManager
 			Permissions[fg_Format("AppManager/App/{}", Application.m_Name)];
 		}
 
-		return Promise <<= mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
+		co_return co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
 	}
 	
-	TCFuture<void> CAppManagerActor::fp_RegisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication)
+	TCFuture<void> CAppManagerActor::fp_RegisterApplicationPermissions(TCSharedPointer<CApplication> _pApplication)
 	{
-		TCPromise<void> Promise;
-
 		auto Permissions = fg_CreateSet<CStr>(fg_Format("AppManager/App/{}", _pApplication->m_Name));
-		return Promise <<= mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
+		co_return co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
 	}
 	
-	TCFuture<void> CAppManagerActor::fp_UnregisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication)
+	TCFuture<void> CAppManagerActor::fp_UnregisterApplicationPermissions(TCSharedPointer<CApplication> _pApplication)
 	{
-		TCPromise<void> Promise;
-
 		auto Permissions = fg_CreateSet<CStr>(fg_Format("AppManager/App/{}", _pApplication->m_Name));
-		return Promise <<= mp_State.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions));
+		co_return co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions));
 	}
 	
 	TCFuture<void> CAppManagerActor::fp_SubscribePermissions()
@@ -87,7 +81,6 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_SetupAppManagerInterfacePermissions()
 	{
-		TCPromise<void> Promise;
 		NContainer::TCMap<NStr::CStr, CPermissionRequirements> CommandLinePermissions = {{"AppManager/VersionAppAll", {}}, {"AppManager/AppAll", {}}, {"AppManager/CommandAll", {}}};
 
 		co_await

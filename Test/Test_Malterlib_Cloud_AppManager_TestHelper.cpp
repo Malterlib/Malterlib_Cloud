@@ -102,16 +102,16 @@ namespace NMib::NCloud
 	TCFuture<void> CAppManagerTestHelper::f_Destroy()
 	{
 		auto &State = *m_pState;
-		TCActorResultVector<void> Destroys;
+		TCFutureVector<void> Destroys;
 		for (auto &Info : State.m_AppManagerInfos)
 		{
 			if (!Info.m_Launch)
 				continue;
 
-			Info.m_Launch->f_Destroy() > Destroys.f_AddResult();
+			Info.m_Launch->f_Destroy() > Destroys;
 		}
 
-		[[maybe_unused]] auto Result = co_await Destroys.f_GetUnwrappedResults();
+		[[maybe_unused]] auto Result = co_await fg_AllDone(Destroys);
 
 		if (State.m_LaunchHelper)
 			co_await fg_Move(State.m_LaunchHelper).f_Destroy();
@@ -124,7 +124,7 @@ namespace NMib::NCloud
 
 	TCFuture<void> CAppManagerTestHelper::f_SetupTrust()
 	{
-		TCActorResultVector<void> SetupTrustResults;
+		TCFutureVector<void> SetupTrustResults;
 
 		auto &State = *m_pState;
 
@@ -142,7 +142,7 @@ namespace NMib::NCloud
 					(
 						fs_NamespaceHosts("com.malterlib/Cloud/AppManagerCoordination", TrustAppManagers)
 					)
-					> SetupTrustResults.f_AddResult()
+					> SetupTrustResults
 				;
 			}
 
@@ -152,7 +152,7 @@ namespace NMib::NCloud
 					, TCSet<CStr>{AppManagerHostID}
 					, mc_WaitForSubscriptions
 				)
-				> SetupTrustResults.f_AddResult()
+				> SetupTrustResults
 			;
 
 			for (auto &AppManagerInner : State.m_AppManagerInfos)
@@ -175,7 +175,7 @@ namespace NMib::NCloud
 						AppManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, State.m_Timeout, -1) > Promise.f_ReceiveAny();
 					}
 				;
-				Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
+				Promise.f_MoveFuture() > SetupTrustResults;
 			}
 		}
 
@@ -221,7 +221,7 @@ namespace NMib::NCloud
 						;
 					}
 				;
-				Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
+				Promise.f_MoveFuture() > SetupTrustResults;
 			}
 
 			{
@@ -285,11 +285,11 @@ namespace NMib::NCloud
 						;
 					}
 				;
-				Promise.f_MoveFuture() > SetupTrustResults.f_AddResult();
+				Promise.f_MoveFuture() > SetupTrustResults;
 			}
 		}
 		DMibTestMark;
-		co_await (co_await SetupTrustResults.f_GetResults().f_Timeout(State.m_Timeout, "Timed out waiting for trust setup") | g_Unwrap);
+		co_await fg_AllDone(SetupTrustResults).f_Timeout(State.m_Timeout, "Timed out waiting for trust setup");
 
 		DMibTestMark;
 		for (NTime::CClock Timer(true); true; co_await fg_Timeout(1.0))
@@ -325,7 +325,7 @@ namespace NMib::NCloud
 	{
 		auto &State = *m_pState;
 
-		TCActorResultVector<void> AddAppResults;
+		TCFutureVector<void> AddAppResults;
 		for (auto &AppManager : State.m_AppManagerInfos)
 		{
 			if (State.m_Options & EOption_LaunchTestAppInApp)
@@ -351,7 +351,7 @@ namespace NMib::NCloud
 				Settings.m_bLaunchInProcess = (State.m_Options & EOption_LaunchTestAppInApp) != EOption_None;
 				Add.m_Version = State.m_PackageInfo.m_VersionID;
 
-				AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_Add)(_Name, Add, Settings) > AddAppResults.f_AddResult();
+				AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_Add)(_Name, Add, Settings) > AddAppResults;
 			}
 			else
 			{
@@ -379,11 +379,11 @@ namespace NMib::NCloud
 
 				TCPromise<void> LaunchPromise;
 				f_LaunchTool(AppManager.m_RootDirectory / "AppManager", Params, AppManager.m_RootDirectory) > LaunchPromise.f_ReceiveAny();
-				LaunchPromise.f_Future() > AddAppResults.f_AddResult();
+				LaunchPromise.f_Future() > AddAppResults;
 			}
 		}
 		DMibTestMark;
-		co_await (co_await AddAppResults.f_GetResults().f_Timeout(State.m_Timeout, "Timed out waiting for installing test apps") | g_Unwrap);
+		co_await fg_AllDone(AddAppResults).f_Timeout(State.m_Timeout, "Timed out waiting for installing test apps");
 
 		co_return {};
 	}
@@ -563,7 +563,7 @@ namespace NMib::NCloud
 		}
 		// Copy AppManagers to their directories
 		{
-			TCActorResultVector<void> AppManagerLaunchesResults;
+			TCFutureVector<void> AppManagerLaunchesResults;
 			for (mint iAppManager = 0; iAppManager < _nAppManagers; ++iAppManager)
 			{
 				auto BlockingActorCheckout = fg_BlockingActor();
@@ -575,15 +575,15 @@ namespace NMib::NCloud
 						CFile::fs_CreateDirectory(AppManagerDirectory);
 						CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory / "TestApps/AppManager", AppManagerDirectory, nullptr);
 					}
-					> AppManagerLaunchesResults.f_AddResult()
+					> AppManagerLaunchesResults
 				;
 			}
 			DMibTestMark;
-			co_await (co_await AppManagerLaunchesResults.f_GetResults() | g_Unwrap);
+			co_await fg_AllDone(AppManagerLaunchesResults);
 		}
 		{
 			// Launch AppManagers
-			TCActorResultMap<mint, CDistributedApp_LaunchInfo> AppManagerLaunchesResults;
+			TCFutureMap<mint, CDistributedApp_LaunchInfo> AppManagerLaunchesResults;
 
 			for (mint iAppManager = 0; iAppManager < _nAppManagers; ++iAppManager)
 			{
@@ -616,11 +616,11 @@ namespace NMib::NCloud
 						, &fg_ConstructApp_AppManager
 						, fg_Move(ExtraParams)
 					)
-					> AppManagerLaunchesResults.f_AddResult(iAppManager)
+					> AppManagerLaunchesResults[iAppManager]
 				;
 			}
 			DMibTestMark;
-			auto Results = co_await AppManagerLaunchesResults.f_GetResults().f_Timeout(State.m_Timeout, "Timed out waiting for app manager launches");
+			auto Results = co_await fg_AllDoneWrapped(AppManagerLaunchesResults).f_Timeout(State.m_Timeout, "Timed out waiting for app manager launches");
 			for (auto &LaunchResult : Results)
 			{
 				mint iAppManager = Results.fs_GetKey(LaunchResult);
@@ -793,12 +793,12 @@ namespace NMib::NCloud
 
 		// Setup trust for AppManagers
 		{
-			TCActorResultVector<void> ListenResults;
+			TCFutureVector<void> ListenResults;
 			for (auto &AppManager : State.m_AppManagerInfos)
-				AppManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(AppManager.m_Address) > ListenResults.f_AddResult();
+				AppManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(AppManager.m_Address) > ListenResults;
 
 			DMibTestMark;
-			co_await (co_await ListenResults.f_GetResults().f_Timeout(State.m_Timeout, "Timed out waiting for app managers add listen") | g_Unwrap);
+			co_await fg_AllDone(ListenResults).f_Timeout(State.m_Timeout, "Timed out waiting for app managers add listen");
 		}
 
 		DMibTestMark;

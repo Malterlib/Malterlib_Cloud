@@ -45,7 +45,7 @@ namespace NMib::NCloud::NCloudClient
 			, ECloudManagerStatusFlag_Applications = DBit(1)
 		};
 		
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		
@@ -56,19 +56,19 @@ namespace NMib::NCloud::NCloudClient
 		// Backup Manager
 		void fp_BackupManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_BackupManager_SubscribeToServers();
-		TCFuture<uint32> fp_CommandLine_BackupManager_ListBackupSources(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_BackupManager_ListBackups(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_BackupManager_DownloadBackup(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_BackupManager_ListBackupSources(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_BackupManager_ListBackups(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_BackupManager_DownloadBackup(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		// Version Manager
 		void fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_VersionManager_SubscribeToServers();
 		
-		TCFuture<uint32> fp_CommandLine_VersionManager_ListApplications(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_VersionManager_ListVersions(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_VersionManager_UploadVersion(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_VersionManager_DownloadVersion(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_VersionManager_ChangeTags(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VersionManager_ListApplications(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VersionManager_ListVersions(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VersionManager_UploadVersion(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VersionManager_DownloadVersion(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VersionManager_ChangeTags(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		// Secrets manager
 		void fp_SecretsManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
@@ -94,8 +94,8 @@ namespace NMib::NCloud::NCloudClient
 		template<typename tf_CType>
 		TCFuture<uint32> fp_CommandLine_SecretsManager_EnumerateImpl
 		(
-			CEJSONSorted const &_Params
-			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			CEJSONSorted const _Params
+			, TCSharedPointer<CCommandLineControl> _pCommandLine
 			, TCFunctionMovable
 			<
 				TCFuture<tf_CType>
@@ -106,7 +106,7 @@ namespace NMib::NCloud::NCloudClient
 					, TCSet<CStrSecure> const &_Tags
 				)
 			>
-			&&_fGetResult
+			_fGetResult
 			, TCFunctionMovable
 			<
 				NStr::CStr
@@ -117,15 +117,15 @@ namespace NMib::NCloud::NCloudClient
 					, TCOptional<CStrSecure> const &_MapKey
 					, bool _bBinaryAsBase64
 				)
-			> &&_fOnResult
+			> _fOnResult
 		);
 
 		template<typename tf_CType>
 		TCFuture<uint32> fp_CommandLine_SecretsManager_GetImpl
 			(
-				CEJSONSorted const &_Params
-				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-				, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> &&_fGetResult
+				CEJSONSorted const _Params
+				, TCSharedPointer<CCommandLineControl> _pCommandLine
+				, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> _fGetResult
 				, TCFunctionMovable
 				<
 					NStr::CStr
@@ -136,93 +136,91 @@ namespace NMib::NCloud::NCloudClient
 						, TCOptional<CStrSecure> const &_MapKey
 						, bool _bBinaryAsBase64
 					)
-				> &&_fOnResult
+				> _fOnResult
 			)
 		;
 
-		TCFuture<uint32> fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_SecretsManager_GetSecretBySemanticID(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_SecretsManager_GetProperties(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_SecretsManager_GetSecret(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_GetSecretBySemanticID(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_GetProperties(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_GetSecret(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_SecretsManager_SetProperties(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_SecretsManager_SetMetadata(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_SecretsManager_RemoveMetadata(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_SecretsManager_ChangeTags(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_SecretsManager_RemoveSecret(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_SecretsManager_Upload(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_SecretsManager_Download(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_SetProperties(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_SetMetadata(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_RemoveMetadata(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_ChangeTags(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_RemoveSecret(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_Upload(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_SecretsManager_Download(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		// Network tunnel
 		void fp_NetworkTunnel_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
-		TCFuture<uint32> fp_CommandLine_NetworkTunnel_EnumTunnels(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_NetworkTunnel_EnumTunnels(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<void> fp_NetworkTunnel_Init();
-		TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> fp_NetworkTunnel_Filter(CEJSONSorted const &_Params);
+		TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> fp_NetworkTunnel_Filter(CEJSONSorted const _Params);
 
 		// Cloud Manager
 		void fp_CloudManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_CloudManager_SubscribeToServers();
-		TCFuture<uint32> fp_CommandLine_CloudManager_Status(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine, ECloudManagerStatusFlag _Flags);
+		TCFuture<uint32> fp_CommandLine_CloudManager_Status(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine, ECloudManagerStatusFlag _Flags);
 		TCFuture<uint32> fp_CommandLine_CloudManager_Status_AppManagers
 			(
-				CEJSONSorted const &_Params
-				, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> const &_AppManagers
-				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+				CEJSONSorted const _Params
+				, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> _AppManagers
+				, TCSharedPointer<CCommandLineControl> _pCommandLine
 			)
 		;
 		TCFuture<uint32> fp_CommandLine_CloudManager_Status_Applications
 			(
-				CEJSONSorted const &_Params
-				, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> const &_Applications
-				, TCMap<CStr, CCloudManagerAppManagerInfo> const &_AppManagerInfos
-				, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+				CEJSONSorted const _Params
+				, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> _Applications
+				, TCMap<CStr, CCloudManagerAppManagerInfo> _AppManagerInfos
+				, TCSharedPointer<CCommandLineControl> _pCommandLine
 			)
 		;
-		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveAppManager(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveSensor(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveLog(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_CloudManager_SnoozeSensor(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveAppManager(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveSensor(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManager_RemoveLog(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManager_SnoozeSensor(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>>> fp_CommandLine_CloudManager_GetSensorReaders(CStr const &_Host);
+		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>>> fp_CommandLine_CloudManager_GetSensorReaders(CStr _Host);
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> fp_CommandLine_CloudManager_GetAggregatedSensors
 			(
-				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
-				, CDistributedAppSensorReader_SensorFilter const &_Filter
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
+				, CDistributedAppSensorReader_SensorFilter _Filter
 			)
 		;
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> fp_CommandLine_CloudManager_GetAggregatedSensorStatus
 			(
-				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
-				, CDistributedAppSensorReader_SensorStatusFilter const &_Filter
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
+				, CDistributedAppSensorReader_SensorStatusFilter _Filter
 			)
 		;
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> fp_CommandLine_CloudManager_GetAggregatedSensorReadings
 			(
-				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
-				, CDistributedAppSensorReader_SensorReadingFilter const &_Filter
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
+				, CDistributedAppSensorReader_SensorReadingFilter _Filter
 			)
 		;
 
-		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>>> fp_CommandLine_CloudManager_GetLogReaders(CStr const &_Host);
+		TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>>> fp_CommandLine_CloudManager_GetLogReaders(CStr _Host);
 		TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> fp_CommandLine_CloudManager_GetAggregatedLogs
 			(
-				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> const &_pLogReaders
-				, CDistributedAppLogReader_LogFilter const &_Filter
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> _pLogReaders
+				, CDistributedAppLogReader_LogFilter _Filter
 			)
 		;
 		TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>> fp_CommandLine_CloudManager_GetAggregatedLogEntries
 			(
-				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> const &_pLogReaders
-				, CDistributedAppLogReader_LogEntryFilter const &_Filter
+				TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> _pLogReaders
+				, CDistributedAppLogReader_LogEntryFilter _Filter
 			)
 		;
 
 		fp64 mp_Timeout = 0.0;
-
-		TCVector<TCActor<CProcessLaunchActor>> mp_LaunchActors;
 
 		TCVector<TCPromise<void>> mp_AppStopPromises;
 

@@ -15,9 +15,9 @@ namespace NMib::NCloud
 			<
 				TCFuture<TCActorSubscriptionWithID<>>
 				(
-					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
-					, CActorSubscription &&_ManifestFinished
-					, CStr const &_BackupRoot
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
+					, CActorSubscription _ManifestFinished
+					, CStr _BackupRoot
 				)
 			>
 			&&_fOnNewBackup

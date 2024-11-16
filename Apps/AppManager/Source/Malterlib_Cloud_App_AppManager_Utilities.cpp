@@ -23,7 +23,11 @@ namespace NMib::NCloud::NAppManager
 
 	CStr CAppManagerActor::fsp_LimitErrorLogSize(CStr const &_String, mint _ExtraSize)
 	{
+#if DMibPPtrBits < 64
+		mint MaxSize = 64 * 1024 - _ExtraSize;
+#else
 		mint MaxSize = 512 * 1024 - _ExtraSize;
+#endif
 
 		auto Lines = _String.f_SplitLine().f_Reverse();
 
@@ -102,7 +106,7 @@ namespace NMib::NCloud::NAppManager
 			void f_Replied()
 			{
 				m_bReplied = true;
-				fg_Move(m_LaunchActor).f_Destroy() > fg_DiscardResult();
+				fg_Move(m_LaunchActor).f_Destroy().f_DiscardResult();
 			}
 		};
 		

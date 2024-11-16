@@ -13,14 +13,16 @@ namespace NMib::NCloud::NAppDistributionManager
 {
 	CDeployDestination_FileSystem::CDeployDestination_FileSystem()
 	{
-		mp_FileActor = fg_Construct(fg_Construct(), "DeployDestination_FileSystem file actor");
 	}
 
 	TCFuture<void> CDeployDestination_FileSystem::fp_Destroy()
 	{
 		CLogError LogError("Mib/Cloud/AppDistributionManager");
 
-		co_await mp_FileActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor in file system");
+		auto CanDestroyFuture = mp_pCanDestroy->f_Future();
+		mp_pCanDestroy.f_Clear();
+
+		co_await fg_Move(CanDestroyFuture).f_Wrap() > LogError.f_Warning("Failed to destroy file actor in file system");
 
 		co_return {};
 	}
@@ -67,11 +69,12 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	}
 
-	TCFuture<void> CDeployDestination_FileSystem::f_Deploy(CDeployInfo const &_DeployInfo)
+	TCFuture<void> CDeployDestination_FileSystem::f_Deploy(CDeployInfo _DeployInfo)
 	{
+		auto BlockingActorCheckout = fg_BlockingActor();
 		co_await
 			(
-				g_Dispatch(mp_FileActor) / [=]() -> void
+				g_Dispatch(BlockingActorCheckout) / [=, pCanDestroy = mp_pCanDestroy]() -> void
 				{
 					CStr TempDirectory = CFile::fs_GetProgramDirectory() / "Temp" / fg_RandomID();
 					CStr TempFile = TempDirectory / "TempFile";

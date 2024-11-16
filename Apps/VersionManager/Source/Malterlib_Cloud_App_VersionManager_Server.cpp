@@ -46,8 +46,7 @@ namespace NMib::NCloud::NVersionManager
 					DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Failed to find versions, aborting startup: {}", _ResultVersions.f_GetExceptionStr());
 					return;
 				}
-				self(&CVersionManagerDaemonActor::CServer::fp_SetupPermissions)
-					> [this](TCAsyncResult<void> &&_ResultPermissions)
+				fp_SetupPermissions() > [this](TCAsyncResult<void> &&_ResultPermissions)
 					{
 						if (!_ResultPermissions)
 						{
@@ -98,7 +97,7 @@ namespace NMib::NCloud::NVersionManager
 
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_FindVersions()
 	{
-		auto Applications = co_await self(&CVersionManagerDaemonActor::CServer::fp_EnumApplications);
+		auto Applications = co_await fp_EnumApplications();
 		for (auto &Application : Applications)
 			mp_Applications[Application];
 
@@ -249,21 +248,21 @@ namespace NMib::NCloud::NVersionManager
 	{
 		CLogError LogError("Malterlib/Cloud/VersionManager");
 		{
-			TCActorResultVector<void> DestroyResults;
+			TCFutureVector<void> DestroyResults;
 
 			for (auto &VersionDownloads : mp_VersionDownloads)
 			{
 				if (VersionDownloads.m_FileTransferSend)
-					fg_Move(VersionDownloads.m_FileTransferSend).f_Destroy() > DestroyResults.f_AddResult();
+					fg_Move(VersionDownloads.m_FileTransferSend).f_Destroy() > DestroyResults;
 			}
 			mp_VersionDownloads.f_Clear();
 
 			for (auto &VersionUploads : mp_VersionUploads)
 			{
 				if (VersionUploads.m_FileTransferReceive)
-					fg_Move(VersionUploads.m_FileTransferReceive).f_Destroy() > DestroyResults.f_AddResult();
+					fg_Move(VersionUploads.m_FileTransferReceive).f_Destroy() > DestroyResults;
 				if (VersionUploads.m_DownloadSubscription)
-					fg_Exchange(VersionUploads.m_DownloadSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+					fg_Exchange(VersionUploads.m_DownloadSubscription, nullptr)->f_Destroy() > DestroyResults;
 			}
 			mp_VersionUploads.f_Clear();
 
@@ -272,7 +271,7 @@ namespace NMib::NCloud::NVersionManager
 					for (auto &Subscription : o_Subscriptions)
 					{
 						if (Subscription.m_fOnNewVersions)
-							fg_Move(Subscription.m_fOnNewVersions).f_Destroy() > DestroyResults.f_AddResult();
+							fg_Move(Subscription.m_fOnNewVersions).f_Destroy() > DestroyResults;
 					}
 					o_Subscriptions.f_Clear();
 				}
@@ -284,7 +283,7 @@ namespace NMib::NCloud::NVersionManager
 				fDestroySubscriptions(Subscriptions);
 			mp_VersionSubscriptions.f_Clear();
 
-			co_await DestroyResults.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy version manager");
+			co_await fg_AllDone(DestroyResults).f_Wrap() > LogError.f_Warning("Failed to destroy version manager");
 		}
 
 		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");

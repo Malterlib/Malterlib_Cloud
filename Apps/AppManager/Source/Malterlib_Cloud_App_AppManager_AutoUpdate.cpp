@@ -274,7 +274,7 @@ namespace NMib::NCloud::NAppManager
 			if (bVersionsChanged)
 			{
 				fp_SendAppChange_AddedOrChanged(*pApplication);
-				fp_UpdateApplicationJSON(pApplication) > fg_DiscardResult();
+				fp_UpdateApplicationJSON(pApplication).f_DiscardResult();
 			}
 
 			if (!pApplication->m_Settings.m_bAutoUpdate)

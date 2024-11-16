@@ -15,14 +15,14 @@ namespace NMib::NCloud::NVersionManager
 	CVersionManagerDaemonActor::CServer::CVersionDownload::~CVersionDownload()
 	{
 		if (m_FileTransferSend)
-			fg_Move(m_FileTransferSend).f_Destroy() > fg_DiscardResult();
+			fg_Move(m_FileTransferSend).f_Destroy().f_DiscardResult();
 	}
 
 	CVersionManagerDaemonActor::CServer::CVersionDownload::CVersionDownload()
 	{
 	}
 
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_DownloadVersion(CStartDownloadVersion &&_Params) -> TCFuture<CStartDownloadVersion::CResult>
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_DownloadVersion(CStartDownloadVersion _Params) -> TCFuture<CStartDownloadVersion::CResult>
 	{
 		auto pThis = m_pThis;
 		
@@ -130,7 +130,7 @@ namespace NMib::NCloud::NVersionManager
 				if (!pDownload)
 					return;
 				if (pDownload->m_FileTransferSend)
-					fg_Move(pDownload->m_FileTransferSend).f_Destroy() > fg_DiscardResult();
+					fg_Move(pDownload->m_FileTransferSend).f_Destroy().f_DiscardResult();
 				
 				pThis->mp_VersionDownloads.f_Remove(DownloadID);
 			}

@@ -67,7 +67,7 @@ namespace NMib::NCloud::NVersionManager
 		co_return fg_Move(Result);
 	}
 	
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_UploadVersion(CStartUploadVersion &&_Params) -> TCFuture<CStartUploadVersion::CResult>
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_UploadVersion(CStartUploadVersion _Params) -> TCFuture<CStartUploadVersion::CResult>
 	{
 		auto pThis = m_pThis;
 
@@ -204,18 +204,18 @@ namespace NMib::NCloud::NVersionManager
 						if (!pUpload)
 							co_return {};
 
-						TCActorResultVector<void> DestroyResults;
+						TCFutureVector<void> DestroyResults;
 
 						if (pUpload->m_FileTransferReceive)
-							fg_Move(pUpload->m_FileTransferReceive).f_Destroy() > DestroyResults.f_AddResult();
+							fg_Move(pUpload->m_FileTransferReceive).f_Destroy() > DestroyResults;
 
 						if (pUpload->m_DownloadSubscription)
-							fg_Exchange(pUpload->m_DownloadSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+							fg_Exchange(pUpload->m_DownloadSubscription, nullptr)->f_Destroy() > DestroyResults;
 
 						if (pThis->mp_VersionUploads.f_Remove(UploadID))
 							Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
 
-						co_await DestroyResults.f_GetUnwrappedResults().f_Wrap() > fg_LogWarning("VersionUpload", "Failed do destroy finish start upload subscription");
+						co_await fg_AllDone(DestroyResults).f_Wrap() > fg_LogWarning("VersionUpload", "Failed do destroy finish start upload subscription");
 
 						co_return {};
 					}
@@ -259,7 +259,7 @@ namespace NMib::NCloud::NVersionManager
 					return;
 				}
 				if (pUpload->m_FileTransferReceive)
-					fg_Move(pUpload->m_FileTransferReceive).f_Destroy() > fg_DiscardResult();
+					fg_Move(pUpload->m_FileTransferReceive).f_Destroy().f_DiscardResult();
 
 				pThis->mp_VersionUploads.f_Remove(UploadID);
 
@@ -293,7 +293,7 @@ namespace NMib::NCloud::NVersionManager
 								Permissions[fg_Format("Application/Read/{}", ApplicationName)];
 								Permissions[fg_Format("Application/Write/{}", ApplicationName)];
 							}
-							pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+							pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions).f_DiscardResult();
 						}
 
 						VersionInfo.m_nFiles  = _InfoWriteResult->m_nFiles;

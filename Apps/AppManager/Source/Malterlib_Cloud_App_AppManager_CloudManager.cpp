@@ -9,7 +9,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCFuture<void> CAppManagerActor::fp_CloudManagerAdded(TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_Info)
+	TCFuture<void> CAppManagerActor::fp_CloudManagerAdded(TCDistributedActor<CCloudManager> _CloudManager, CTrustedActorInfo _Info)
 	{
 		if (f_IsDestroyed() || mp_State.m_bStoppingApp)
 			co_return DMibErrorInstance("Shutting down");
@@ -40,7 +40,7 @@ namespace NMib::NCloud::NAppManager
 					mp_AppManagerInterface.m_Actor->f_ShareInterface<CAppManagerInterface>()
 					, g_ActorSubscription / [this, WeakCloudManager = _CloudManager.f_Weak()]() -> TCFuture<void>
 					{
-						co_await self(&CAppManagerActor::fp_CloudManagerRemoved, WeakCloudManager).f_Wrap()
+						co_await fp_CloudManagerRemoved(WeakCloudManager).f_Wrap()
 							> fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to destroy register subscription for cloud manager")
 						;
 
@@ -124,7 +124,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			CCloudManager::CSubscribeExpectedOsVersions SubscribeParams;
 			SubscribeParams.m_OsName = mp_OsName;
-			SubscribeParams.m_fVersionRangeChanged = g_ActorFunctor / [this, CloudManagerWeak = _CloudManager.f_Weak()](CCloudManager::CExpectedVersions &&_Versions) -> TCFuture<void>
+			SubscribeParams.m_fVersionRangeChanged = g_ActorFunctor / [this, CloudManagerWeak = _CloudManager.f_Weak()](CCloudManager::CExpectedVersions _Versions) -> TCFuture<void>
 				{
 					auto pCloudManagerState = mp_CloudManagers.f_FindEqual(CloudManagerWeak);
 					if (!pCloudManagerState)
@@ -185,29 +185,29 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<void> CAppManagerActor::fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> const &_CloudManager)
+	TCFuture<void> CAppManagerActor::fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> _CloudManager)
 	{
 		auto pCloudManagerState = mp_CloudManagers.f_FindEqual(_CloudManager);
 		if (!pCloudManagerState)
 			co_return {};
 
-		TCActorResultVector<void> DestroyResults;
+		TCFutureVector<void> DestroyResults;
 
 		if (pCloudManagerState->m_AppManagerCloudManagerInterface)
-			fg_Move(pCloudManagerState->m_AppManagerCloudManagerInterface).f_Destroy() > DestroyResults.f_AddResult();
+			fg_Move(pCloudManagerState->m_AppManagerCloudManagerInterface).f_Destroy() > DestroyResults;
 
 		if (pCloudManagerState->m_SensorReporterSubscription)
-			fg_Exchange(pCloudManagerState->m_SensorReporterSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+			fg_Exchange(pCloudManagerState->m_SensorReporterSubscription, nullptr)->f_Destroy() > DestroyResults;
 
 		if (pCloudManagerState->m_LogReporterSubscription)
-			fg_Exchange(pCloudManagerState->m_LogReporterSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+			fg_Exchange(pCloudManagerState->m_LogReporterSubscription, nullptr)->f_Destroy() > DestroyResults;
 
 		if (pCloudManagerState->m_ExpectedOsVersionSubscription)
-			fg_Exchange(pCloudManagerState->m_ExpectedOsVersionSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+			fg_Exchange(pCloudManagerState->m_ExpectedOsVersionSubscription, nullptr)->f_Destroy() > DestroyResults;
 
 		mp_CloudManagers.f_Remove(_CloudManager);
 
-		co_await DestroyResults.f_GetUnwrappedResults();
+		co_await fg_AllDone(DestroyResults);
 
 		co_return {};
 	}

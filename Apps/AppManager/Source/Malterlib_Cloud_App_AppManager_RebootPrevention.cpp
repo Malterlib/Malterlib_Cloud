@@ -35,7 +35,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<void> CAppManagerActor::fp_RebootPrevention_RemoveApplication(CStr _Application)
 	{
 		TCSet<CDistributedAppSensorReporter::CSensorInfoKey> ToRemove;
-		TCActorResultVector<void> RemoveResults;
+		TCFutureVector<void> RemoveResults;
 
 		for (auto &SensorWatchEntry : mp_SensorRebootPreventionWatch.f_Entries())
 		{
@@ -51,13 +51,13 @@ namespace NMib::NCloud::NAppManager
 			ToRemove[SensorWatchKey];
 
 			if (SensorWatch.m_SensorSubscription)
-				fg_Exchange(SensorWatch.m_SensorSubscription, nullptr)->f_Destroy() > RemoveResults.f_AddResult();
+				fg_Exchange(SensorWatch.m_SensorSubscription, nullptr)->f_Destroy() > RemoveResults;
 		}
 
 		for (auto &SensorWatchKey : ToRemove)
 			mp_SensorRebootPreventionWatch.f_Remove(SensorWatchKey);
 
-		co_await RemoveResults.f_GetUnwrappedResults().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to remove sensor subscription");
+		co_await fg_AllDone(RemoveResults).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to remove sensor subscription");
 
 		co_return {};
 	}
@@ -173,7 +173,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				&CDistributedAppSensorStoreLocal::f_SubscribeSensorStatus
 				, TCVector<CDistributedAppSensorReader_SensorStatusFilter>{fg_Move(Filter)}
-				, g_ActorFunctor / [this](CDistributedAppSensorReader_SensorKeyAndReading &&_Reading) -> TCFuture<void>
+				, g_ActorFunctor / [this](CDistributedAppSensorReader_SensorKeyAndReading _Reading) -> TCFuture<void>
 				{
 					auto *pWatch = mp_SensorRebootPreventionWatch.f_FindEqual(_Reading.m_SensorInfoKey);
 					if (!pWatch)

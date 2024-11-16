@@ -70,7 +70,7 @@ namespace NMib::NCloud::NSecretsManager
 		~CSecretsManagerServerDatabase();
 		
 		NConcurrency::TCFuture<void> f_Initialize();
-		NConcurrency::TCFuture<void> f_WriteDatabase(CSecretsDatabase &&_Database);
+		NConcurrency::TCFuture<void> f_WriteDatabase(CSecretsDatabase _Database);
 		NConcurrency::TCFuture<CSecretsDatabase> f_ReadDatabase();
 
 	private:

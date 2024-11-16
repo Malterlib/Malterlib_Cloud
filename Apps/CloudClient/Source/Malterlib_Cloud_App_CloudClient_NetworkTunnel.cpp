@@ -45,9 +45,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels, _Params, _pCommandLine);
+					return fp_CommandLine_NetworkTunnel_EnumTunnels(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -90,9 +90,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels, _Params, _pCommandLine);
+					return fp_CommandLine_NetworkTunnel_OpenTunnels(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -109,9 +109,11 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> CCloudClientAppActor::fp_NetworkTunnel_Filter(CEJSONSorted const &_Params)
+	TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> CCloudClientAppActor::fp_NetworkTunnel_Filter(CEJSONSorted const _Params)
 	{
-		co_await self(&CCloudClientAppActor::fp_NetworkTunnel_Init);
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
+		co_await fp_NetworkTunnel_Init();
 
 		TCSet<CStr> Wildcards;
 		for (auto &Wildcard : _Params["TunnelName"].f_Array())
@@ -140,9 +142,9 @@ namespace NMib::NCloud::NCloudClient
 		co_return fg_Move(Return);
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		auto TunnelsPerHost = co_await self(&CCloudClientAppActor::fp_NetworkTunnel_Filter, _Params);
+		auto TunnelsPerHost = co_await fp_NetworkTunnel_Filter(_Params);
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("HostID", "Tunnel Name", "Meta Data");
@@ -170,9 +172,11 @@ namespace NMib::NCloud::NCloudClient
 		auto operator <=> (CTunnelKey const &_Right) const = default;
 	};
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		auto TunnelsPerHost = co_await self(&CCloudClientAppActor::fp_NetworkTunnel_Filter, _Params);
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
+		auto TunnelsPerHost = co_await fp_NetworkTunnel_Filter(_Params);
 
 		if (TunnelsPerHost.f_IsEmpty())
 			co_return DMibErrorInstance("No matching tunnels found");
@@ -180,7 +184,7 @@ namespace NMib::NCloud::NCloudClient
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CStr ListenHost = _Params["ListenHost"].f_String();
 
-		TCActorResultMap<CTunnelKey, CNetworkTunnelsClient::CTunnel> OpenedTunnelResults;
+		TCFutureMap<CTunnelKey, CNetworkTunnelsClient::CTunnel> OpenedTunnelResults;
 		TCMap<CTunnelKey, CStr> URLTemplates;
 		for (auto &Tunnels : TunnelsPerHost)
 		{
@@ -204,7 +208,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							.m_HostID = HostID
 							, .m_TunnelName = TunnelName
-							, .m_fOnConnection = g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo) mutable -> TCFuture<void>
+							, .m_fOnConnection = g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo) mutable -> TCFuture<void>
 							{
 								if (!bVerbose && !LoggedAddresses(_CallbackInfo.m_Address.f_GetString(ENetAddressStringFlag_None)).f_WasCreated())
 									co_return {};
@@ -224,7 +228,7 @@ namespace NMib::NCloud::NCloudClient
 								co_return {};
 							}
 							, .m_fOnClose = g_ActorFunctor / [=, LoggedAddresses = TCSet<CStr>()]
-							(CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, NStr::CStr const &_Message) mutable -> TCFuture<void>
+							(CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, NStr::CStr _Message) mutable -> TCFuture<void>
 							{
 								if (!bVerbose && !LoggedAddresses(_CallbackInfo.m_Address.f_GetString(ENetAddressStringFlag_None)).f_WasCreated())
 									co_return {};
@@ -244,7 +248,7 @@ namespace NMib::NCloud::NCloudClient
 
 								co_return {};
 							}
-							, .m_fOnError = g_ActorFunctor / [=](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, CStr const &_Error) -> TCFuture<void>
+							, .m_fOnError = g_ActorFunctor / [=](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, CStr _Error) -> TCFuture<void>
 							{
 								CStr ActionString;
 								auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
@@ -263,12 +267,12 @@ namespace NMib::NCloud::NCloudClient
 							, .m_ListenHost = ListenHost
 						}
 					)
-					> OpenedTunnelResults.f_AddResult(TunnelKey)
+					> OpenedTunnelResults[TunnelKey]
 				;
 			}
 		}
 
-		auto OpenedTunnels = co_await (co_await OpenedTunnelResults.f_GetResults() | g_Unwrap);
+		auto OpenedTunnels = co_await fg_AllDone(OpenedTunnelResults);
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		TableRenderer.f_AddHeadings("HostID", "Tunnel Name", "URL");

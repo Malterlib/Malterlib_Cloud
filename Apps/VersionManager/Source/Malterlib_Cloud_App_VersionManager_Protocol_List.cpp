@@ -12,33 +12,29 @@
 
 namespace NMib::NCloud::NVersionManager
 {
-	TCFuture<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_FilterApplicationsByPermissions(CStr const &_Description, TCSet<CStr> const &_Applications)
+	TCFuture<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_FilterApplicationsByPermissions(CStr _Description, TCSet<CStr> _Applications)
 	{
-		TCPromise<TCSet<CStr>> Promise;
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
 		Permissions["//ALL//"] = {{"Application/ReadAll", "Application/ListAll"}};
 		for (auto &Application : _Applications)
 			Permissions[Application] = {CPermissionQuery{fg_Format("Application/Read/{}", Application)}.f_Description("Access application {} in VersionManager"_f << Application)};
 
-		mp_Permissions.f_HasPermissions(_Description, Permissions) > Promise / [Promise, _Applications](NContainer::TCMap<NStr::CStr, bool> const &_HasPermissions)
-			{
-				TCSet<CStr> Applications;
-				bool bListAllAccess = _HasPermissions["//ALL//"];
+		auto const HasPermissions = co_await mp_Permissions.f_HasPermissions(_Description, Permissions);
 
-				for (auto &Application : _Applications)
-				{
-					if (!bListAllAccess && !_HasPermissions[Application])
-						continue;
-					Applications[Application];
-				}
+		TCSet<CStr> Applications;
+		bool bListAllAccess = HasPermissions["//ALL//"];
 
-				Promise.f_SetResult(fg_Move(Applications));
-			}
-		;
-		return Promise.f_MoveFuture();
+		for (auto &Application : _Applications)
+		{
+			if (!bListAllAccess && !HasPermissions[Application])
+				continue;
+			Applications[Application];
+		}
+
+		co_return fg_Move(Applications);
 	}
 
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications &&_Params) -> TCFuture<CListApplications::CResult>
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications _Params) -> TCFuture<CListApplications::CResult>
 	{
 		auto pThis = m_pThis;
 		
@@ -57,7 +53,7 @@ namespace NMib::NCloud::NVersionManager
 		co_return fg_Move(Results);
 	}
 
-	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListVersions(CListVersions &&_Params) -> TCFuture<CListVersions::CResult>
+	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListVersions(CListVersions _Params) -> TCFuture<CListVersions::CResult>
 	{
 		auto pThis = m_pThis;
 		

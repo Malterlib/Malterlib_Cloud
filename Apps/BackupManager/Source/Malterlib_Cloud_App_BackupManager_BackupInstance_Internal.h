@@ -3,6 +3,7 @@
 
 #include <Mib/File/RSync>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/ActorSequencerActor>
 
 namespace NMib::NCloud::NBackupManager
 {
@@ -31,7 +32,7 @@ namespace NMib::NCloud::NBackupManager
 			
 			TCOptional<NCryptography::CHashDigest_SHA256> m_ExpectedDigest;
 
-			COnScopeExitShared m_SequenceSyncsCleanup;
+			CActorSubscription m_SequenceSyncsCleanup;
 			
 			uint64 m_BytesTransferredIn = 0;
 			uint64 m_BytesTransferredOut = 0;
@@ -41,7 +42,7 @@ namespace NMib::NCloud::NBackupManager
 
 		struct CSequencedSync
 		{
-			TCLinkedList<TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)>> m_Waiting;
+			CSequencer m_Sequencer{"Backup Instance Sync"};
 		};
 
 		struct CAppendFileState
@@ -87,27 +88,26 @@ namespace NMib::NCloud::NBackupManager
 		CStr f_GetLatestPath(CStr const &_Path);
 		TCFuture<TCActorSubscriptionWithID<>> f_StartRSyncShared
 			(
-				FRunRSyncProtocol &&_fRunProtocol
-				, CStr const &_FileName
-				, CStr const &_OldFileName
-				, CStr const &_TempFileName
-				, CStr const &_RelativeFileName
+				FRunRSyncProtocol _fRunProtocol
+				, CStr _FileName
+				, CStr _OldFileName
+				, CStr _TempFileName
+				, CStr _RelativeFileName
 				, uint64 _FileLength
 				, EDirectoryManifestSyncFlag _SyncFlags
 				, CStr *o_pRSyncID
-				, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
-				, TCOptional<NCryptography::CHashDigest_SHA256> const &_ExpectedDigest
+				, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> _fOnDone
+				, TCOptional<NCryptography::CHashDigest_SHA256> _ExpectedDigest
 				, uint32 _ProtocolVersion
 			)
 		;
-		TCFuture<void> f_CommitFile(CStr const &_File, CBackupManagerBackup::CManifestFile const &_ManifestFile);
-		TCFuture<void> f_CommitManifestChange(CStr const &_FileName, CManifestChange const &_Change, CStr const &_Description);
+		TCFuture<void> f_CommitFile(CStr _File, CBackupManagerBackup::CManifestFile _ManifestFile);
+		TCFuture<void> f_CommitManifestChange(CStr _FileName, CManifestChange _Change, CStr _Description);
 
 		void f_InitBackupDirectory();
 
-		void f_SequenceSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun);
-		void f_SequenceMultipleSyncs(TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun, TCVector<CStr> const &_Files);
-		void fp_RunSequencedSyncs(CStr const &_FileName);
+		TCFuture<CActorSubscription> f_SequenceSyncs(CStr _FileName);
+		TCFuture<CActorSubscription> f_SequenceMultipleSyncs(TCVector<CStr> _Files);
 
 		COnScopeExitShared f_FilePending(CStr const &_FileName);
 		void f_OnPendingQuiescence(TCFunctionMutable<void ()> &&_fOnQuiescence);

@@ -9,7 +9,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeChangeNotifications(CSubscribeChangeNotifications &&_Params)
+	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeChangeNotifications(CSubscribeChangeNotifications _Params)
 		-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 	{
 		auto pThis = m_pThis;
@@ -41,12 +41,12 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		co_await pThis->self(&CAppManagerActor::fp_ChangeNotifications_SendInitial, SubscriptionID);
+		co_await pThis->fp_ChangeNotifications_SendInitial(SubscriptionID);
 
 		co_return fg_Move(ReturnSubscription);
 	}
 
-	TCFuture<void> CAppManagerActor::fp_ChangeNotifications_SendInitial(CStr const &_SubscriptionID)
+	TCFuture<void> CAppManagerActor::fp_ChangeNotifications_SendInitial(CStr _SubscriptionID)
 	{
 		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> NamedPermissionsQueries;
 		auto pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(_SubscriptionID);
@@ -119,13 +119,13 @@ namespace NMib::NCloud::NAppManager
 	{
 		return mp_ChangeNotificationsPermissionsChangedSequencer.f_RunSequenced
 			(
-				g_ActorFunctorWeak / [this](CActorSubscription &&_Subscription) -> TCFuture<void>
+				g_ActorFunctorWeak / [this](CActorSubscription _Subscription) -> TCFuture<void>
 				{
-					TCActorResultVector<void> SendInitialResults;
+					TCFutureVector<void> SendInitialResults;
 					for (auto &Subscription : mp_ChangeNotificationSubscriptions)
-						self(&CAppManagerActor::fp_ChangeNotifications_SendInitial, mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription)) > SendInitialResults.f_AddResult();
+						fp_ChangeNotifications_SendInitial(mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription)) > SendInitialResults;
 
-					co_await (co_await SendInitialResults.f_GetResults() | g_Unwrap);
+					co_await fg_AllDone(SendInitialResults);
 
 					(void)_Subscription;
 
@@ -160,7 +160,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, _Application.m_Name
 			)
-			> fg_DiscardResult()
+			.f_DiscardResult()
 		;
 	}
 
@@ -177,7 +177,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, _Application.m_Name
 			)
-			> fg_DiscardResult()
+			.f_DiscardResult()
 		;
 	}
 
@@ -194,13 +194,13 @@ namespace NMib::NCloud::NAppManager
 				}
 				, _Application.m_Name
 			)
-			> fg_DiscardResult()
+			.f_DiscardResult()
 		;
 	}
 
 	TCFuture<void> CAppManagerActor::fp_ChangeNotifications_SendChanges(TCVector<CAppManagerInterface::CChangeNotification> _Notifications, CStr _Application)
 	{
-		TCActorResultVector<void> OnChangeResultsVector;
+		TCFutureVector<void> OnChangeResultsVector;
 
 		CAppManagerInterface::COnChangeNotificationParams NotificationParams;
 		NotificationParams.m_Changes = fg_Move(_Notifications);
@@ -212,17 +212,19 @@ namespace NMib::NCloud::NAppManager
 			auto &SubscriptionID = mp_ChangeNotificationSubscriptions.fs_GetKey(Subscription);
 			auto fSendNotification = [this, SubscriptionID, AppPermission, NotificationParams, _Application]() mutable -> TCFuture<void>
 				{
-					TCPromise<void> OnChangePromise;
-
 					auto *pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
 					if (!pSubscription || pSubscription->m_bAccessDenied)
-						return OnChangePromise <<= g_Void;
+						return g_Void;
 
 					auto &Subscription = *pSubscription;
 
+					TCPromiseFuturePair<void> OnChangePromisePair;
 					mp_Permissions.f_HasPermission("AppManager Change Event", {"AppManager/AppAll", AppPermission}, Subscription.m_CallingHostInfo)
 						.f_Timeout(60.0, "Timed out waiting for permission in OnChange callback to {}"_f << Subscription.m_CallingHostInfo.f_GetRealHostID())
-						> OnChangePromise / [=, this, NotificationParams = fg_Move(NotificationParams)](bool _bHasPermission) mutable
+						> fg_Move(OnChangePromisePair.m_Promise) / [=, OnChangePromise = OnChangePromisePair.m_Promise, this, NotificationParams = fg_Move(NotificationParams)]
+						(
+							bool _bHasPermission
+						) mutable
 						{
 							auto pSubscription = mp_ChangeNotificationSubscriptions.f_FindEqual(SubscriptionID);
 							if (!pSubscription)
@@ -258,17 +260,17 @@ namespace NMib::NCloud::NAppManager
 
 							pSubscription->m_fOnChange(fg_Move(NotificationParams))
 								.f_Timeout(60.0, "Timed out waiting for OnChange callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
-								> OnChangePromise
+								> fg_Move(OnChangePromise)
 							;
 						}
 					;
-					return OnChangePromise.f_MoveFuture();
+					return fg_Move(OnChangePromisePair.m_Future);
 				}
 			;
 			if (Subscription.m_bInitialFinished)
 			{
 				if (Subscription.m_bWaitForResult)
-					fSendNotification() > OnChangeResultsVector.f_AddResult();
+					fSendNotification() > OnChangeResultsVector;
 				else
 					fSendNotification() > fg_LogWarning("ChangeNotifications", "Send non-waiting change notification failed");
 			}
@@ -285,7 +287,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
-		auto Result = co_await OnChangeResultsVector.f_GetUnwrappedResults().f_Wrap();
+		auto Result = co_await fg_AllDone(OnChangeResultsVector).f_Wrap();
 
 		if (!Result)
 		{

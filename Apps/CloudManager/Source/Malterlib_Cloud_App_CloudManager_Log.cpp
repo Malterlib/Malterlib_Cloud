@@ -18,9 +18,9 @@ namespace NMib::NCloud::NCloudManager
 				&CDistributedAppLogStoreLocal::f_StartWithDatabase
 				, fg_TempCopy(mp_DatabaseActor)
 				, mc_DatabasePrefixLog
-				, g_ActorFunctor / [this](NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction) -> TCFuture<NDatabase::CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctor / [this](NDatabase::CDatabaseActor::CTransactionWrite _WriteTransaction) -> TCFuture<NDatabase::CDatabaseActor::CTransactionWrite>
 				{
-					co_return fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(_WriteTransaction), fg_Construct())).m_Transaction);
+					co_return fg_Move((co_await fp_CleanupDatabase(fg_Move(_WriteTransaction), fg_Construct())).m_Transaction);
 				}
 			)
 		;
@@ -28,7 +28,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	auto CCloudManagerServer::CDistributedAppLogReporterImplementation::f_OpenLogReporter(CLogInfo &&_LogInfo) -> TCFuture<CLogReporter>
+	auto CCloudManagerServer::CDistributedAppLogReporterImplementation::f_OpenLogReporter(CLogInfo _LogInfo) -> TCFuture<CLogReporter>
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -71,7 +71,7 @@ namespace NMib::NCloud::NCloudManager
 		return {"CloudManager/ReadLogs", "CloudManager/ReadAll"};
 	}
 
-	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogs(CGetLogs &&_Params)
+	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogs(CGetLogs _Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> Logs;
@@ -94,7 +94,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Logs);
 	}
 
-	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogEntries(CDistributedAppLogReader::CGetLogEntries &&_Params)
+	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogEntries(CDistributedAppLogReader::CGetLogEntries _Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>> LogEntriesGenerator;
@@ -119,8 +119,8 @@ namespace NMib::NCloud::NCloudManager
 
 	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_SubscribeLogs
 		(
-			NContainer::TCVector<CDistributedAppLogReader_LogFilter> &&_Filters
-			, TCActorFunctorWithID<TCFuture<void> (CLogChange &&_Change)> &&_fOnChange
+			NContainer::TCVector<CDistributedAppLogReader_LogFilter> _Filters
+			, TCActorFunctorWithID<TCFuture<void> (CLogChange _Change)> _fOnChange
 		)
 		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
@@ -144,7 +144,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Subscription);
 	}
 
-	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_SubscribeLogEntries(CSubscribeLogEntries &&_Params) -> TCFuture<TCActorSubscriptionWithID<>>
+	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_SubscribeLogEntries(CSubscribeLogEntries _Params) -> TCFuture<TCActorSubscriptionWithID<>>
 	{
 		TCActorSubscriptionWithID<> Subscription;
 		{

@@ -15,7 +15,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	auto CAppManagerActor::CDistributedAppLogReporterImplementation::f_OpenLogReporter(CLogInfo &&_LogInfo) -> TCFuture<CLogReporter>
+	auto CAppManagerActor::CDistributedAppLogReporterImplementation::f_OpenLogReporter(CLogInfo _LogInfo) -> TCFuture<CLogReporter>
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();

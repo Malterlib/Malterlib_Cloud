@@ -103,10 +103,10 @@ namespace NMib::NCloud::NCloudClient
 						, FilterOutOfDateVersion
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_Applications | ECloudManagerStatusFlag_AppManagers;
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
+					return fp_CommandLine_CloudManager_Status(fg_Move(_Params), fg_Move(_pCommandLine), ReportFor);
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -130,10 +130,10 @@ namespace NMib::NCloud::NCloudClient
 						, FilterEnvironment
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_AppManagers;
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
+					return fp_CommandLine_CloudManager_Status(fg_Move(_Params), fg_Move(_pCommandLine), ReportFor);
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -159,10 +159,10 @@ namespace NMib::NCloud::NCloudClient
 						, FilterOutOfDateVersion
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_Applications;
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status, _Params, _pCommandLine, ReportFor);
+					return fp_CommandLine_CloudManager_Status(fg_Move(_Params), fg_Move(_pCommandLine), ReportFor);
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -185,9 +185,9 @@ namespace NMib::NCloud::NCloudClient
 						QuietOption
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager, _Params, _pCommandLine);
+					return fp_CommandLine_CloudManager_RemoveAppManager(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -232,9 +232,9 @@ namespace NMib::NCloud::NCloudClient
 						, QuietOption
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor, _Params, _pCommandLine);
+					return fp_CommandLine_CloudManager_RemoveSensor(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -280,9 +280,9 @@ namespace NMib::NCloud::NCloudClient
 						, QuietOption
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog, _Params, _pCommandLine);
+					return fp_CommandLine_CloudManager_RemoveLog(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -340,9 +340,9 @@ namespace NMib::NCloud::NCloudClient
 						, QuietOption
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_SnoozeSensor, _Params, _pCommandLine);
+					return fp_CommandLine_CloudManager_SnoozeSensor(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -359,9 +359,9 @@ namespace NMib::NCloud::NCloudClient
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList, _Params, _pCommandLine);
+					return fp_CommandLine_CloudManager_ExpectedOsVersionList(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -412,9 +412,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet, _Params, _pCommandLine);
+					return fp_CommandLine_CloudManager_ExpectedOsVersionSet(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -427,20 +427,19 @@ namespace NMib::NCloud::NCloudClient
 				, "cloud-manager-"
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const &_Params
-					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-					, CDistributedAppSensorReader_SensorFilter const &_Filter
+					CEJSONSorted const _Params
+					, TCSharedPointer<CCommandLineControl> _pCommandLine
+					, CDistributedAppSensorReader_SensorFilter _Filter
 					, ESensorOutputFlag _Flags
-					, CStr const &_TableType
+					, CStr _TableType
 				)
 				-> TCFuture<uint32>
 				{
-					auto SensorReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders, _Params["Host"].f_String());
-					co_return co_await self
+					auto SensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
+					co_return co_await f_CommandLine_SensorListOutput
 						(
-							&CDistributedAppActor::f_CommandLine_SensorListOutput
-							, _pCommandLine
-							, co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors, SensorReaders, _Filter)
+							_pCommandLine
+							, fp_CommandLine_CloudManager_GetAggregatedSensors(SensorReaders, _Filter)
 							, _Flags
 							, _TableType
 						)
@@ -448,25 +447,24 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const &_Params
-					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-					, CDistributedAppSensorReader_SensorStatusFilter const &_Filter
+					CEJSONSorted const _Params
+					, TCSharedPointer<CCommandLineControl> _pCommandLine
+					, CDistributedAppSensorReader_SensorStatusFilter _Filter
 					, ESensorOutputFlag _Flags
-					, CStr const &_TableType
+					, CStr _TableType
 				)
 				-> TCFuture<uint32>
 				{
-					auto SensorReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders, _Params["Host"].f_String());
-					auto SensorsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors, SensorReaders, _Filter.m_SensorFilter);
-					auto ReadingsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorStatus, SensorReaders, _Filter);
+					auto SensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
+					auto SensorsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensors(SensorReaders, _Filter.m_SensorFilter);
+					auto ReadingsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensorStatus(SensorReaders, _Filter);
 
 					CDistributedAppSensorReader_SensorReadingFilter Filter;
 					Filter.m_Flags = CDistributedAppSensorReader_SensorReadingFilter::ESensorReadingsFlag_None;
 
-					co_return co_await self
+					co_return co_await f_CommandLine_SensorReadingsOutput
 						(
-							&CDistributedAppActor::f_CommandLine_SensorReadingsOutput
-							, _pCommandLine
+							_pCommandLine
 							, fg_Move(ReadingsGenerator)
 							, fg_Move(SensorsGenerator)
 							, 0
@@ -478,23 +476,22 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const &_Params
-					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-					, CDistributedAppSensorReader_SensorReadingFilter const &_Filter
+					CEJSONSorted const _Params
+					, TCSharedPointer<CCommandLineControl> _pCommandLine
+					, CDistributedAppSensorReader_SensorReadingFilter _Filter
 					, uint64 _MaxEntries
 					, ESensorOutputFlag _Flags
-					, CStr const &_TableType
+					, CStr _TableType
 				)
 				-> TCFuture<uint32>
 				{
-					auto SensorReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders, _Params["Host"].f_String());
-					auto SensorsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors, SensorReaders, _Filter.m_SensorFilter);
-					auto ReadingsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorReadings, SensorReaders, _Filter);
+					auto SensorReaders = co_await fp_CommandLine_CloudManager_GetSensorReaders(_Params["Host"].f_String());
+					auto SensorsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensors(SensorReaders, _Filter.m_SensorFilter);
+					auto ReadingsGenerator = fp_CommandLine_CloudManager_GetAggregatedSensorReadings(SensorReaders, _Filter);
 
-					co_return co_await self
+					co_return co_await f_CommandLine_SensorReadingsOutput
 						(
-							&CDistributedAppActor::f_CommandLine_SensorReadingsOutput
-							, _pCommandLine
+							_pCommandLine
 							, fg_Move(ReadingsGenerator)
 							, fg_Move(SensorsGenerator)
 							, _MaxEntries
@@ -514,21 +511,20 @@ namespace NMib::NCloud::NCloudClient
 				, "cloud-manager-"
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const &_Params
-					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-					, CDistributedAppLogReader_LogFilter const &_Filter
+					CEJSONSorted const _Params
+					, TCSharedPointer<CCommandLineControl> _pCommandLine
+					, CDistributedAppLogReader_LogFilter _Filter
 					, ELogOutputFlag _Flags
 					, uint32 _Verbosity
-					, CStr const &_TableType
+					, CStr _TableType
 				)
 				-> TCFuture<uint32>
 				{
-					auto LogReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetLogReaders, _Params["Host"].f_String());
-					co_return co_await self
+					auto LogReaders = co_await fp_CommandLine_CloudManager_GetLogReaders(_Params["Host"].f_String());
+					co_return co_await f_CommandLine_LogListOutput
 						(
-							&CDistributedAppActor::f_CommandLine_LogListOutput
-							, _pCommandLine
-							, co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogs, LogReaders, _Filter)
+							_pCommandLine
+							, fp_CommandLine_CloudManager_GetAggregatedLogs(LogReaders, _Filter)
 							, _Flags
 							, _Verbosity
 							, _TableType
@@ -537,24 +533,23 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const &_Params
-					, TCSharedPointer<CCommandLineControl> const &_pCommandLine
-					, CDistributedAppLogReader_LogEntryFilter const &_Filter
+					CEJSONSorted const _Params
+					, TCSharedPointer<CCommandLineControl> _pCommandLine
+					, CDistributedAppLogReader_LogEntryFilter _Filter
 					, uint64 _MaxEntries
 					, ELogOutputFlag _Flags
 					, uint32 _Verbosity
-					, CStr const &_TableType
+					, CStr _TableType
 				)
 				-> TCFuture<uint32>
 				{
-					auto LogReaders = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetLogReaders, _Params["Host"].f_String());
-					auto LogsGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogs, LogReaders, _Filter.m_LogFilter);
-					auto EntriesGenerator = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogEntries, LogReaders, _Filter);
+					auto LogReaders = co_await fp_CommandLine_CloudManager_GetLogReaders(_Params["Host"].f_String());
+					auto LogsGenerator = fp_CommandLine_CloudManager_GetAggregatedLogs(LogReaders, _Filter.m_LogFilter);
+					auto EntriesGenerator = fp_CommandLine_CloudManager_GetAggregatedLogEntries(LogReaders, _Filter);
 
-					co_return co_await self
+					co_return co_await f_CommandLine_LogEntriesOutput
 						(
-							&CDistributedAppActor::f_CommandLine_LogEntriesOutput
-							, _pCommandLine
+							_pCommandLine
 							, fg_Move(EntriesGenerator)
 							, fg_Move(LogsGenerator)
 							, _MaxEntries
@@ -712,9 +707,9 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers
 		(
-			CEJSONSorted const &_Params
-			, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> const &_AppManagers
-			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			CEJSONSorted const _Params
+			, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> _AppManagers
+			, TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
 	{
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -869,10 +864,10 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_Applications
 		(
-			CEJSONSorted const &_Params
-			, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> const &_Applications
-			, TCMap<CStr, CCloudManagerAppManagerInfo> const &_AppManagerInfos
-			, TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			CEJSONSorted const _Params
+			, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> _Applications
+			, TCMap<CStr, CCloudManagerAppManagerInfo> _AppManagerInfos
+			, TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
 	{
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1181,8 +1176,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status
 		(
-			CEJSONSorted const &_Params
-			, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			CEJSONSorted const _Params
+			, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine
 			, ECloudManagerStatusFlag _Flags
 		)
 	{
@@ -1190,8 +1185,8 @@ namespace NMib::NCloud::NCloudClient
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
-		TCActorResultMap<CHostInfo, TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>> AppManagersResults;
-		TCActorResultMap<CHostInfo, TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>> ApplicationsResults;
+		TCFutureMap<CHostInfo, TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>> AppManagersResults;
+		TCFutureMap<CHostInfo, TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>> ApplicationsResults;
 
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
@@ -1200,27 +1195,27 @@ namespace NMib::NCloud::NCloudClient
 			auto &CloudManager = TrustedCloudManager.m_Actor;
 			CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)()
 				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
-				> AppManagersResults.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+				> AppManagersResults[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 			;
 			if (_Flags & ECloudManagerStatusFlag_Applications)
 			{
 				CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)()
 					.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
-					> ApplicationsResults.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+					> ApplicationsResults[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 				;
 			}
 		}
 
-		auto AppManagers = co_await AppManagersResults.f_GetResults();
+		auto AppManagers = co_await fg_AllDoneWrapped(AppManagersResults);
 
 		uint32 ReturnAppManagers = 0;
 		if (_Flags & ECloudManagerStatusFlag_AppManagers)
-			ReturnAppManagers = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers, _Params, AppManagers, _pCommandLine);
+			ReturnAppManagers = co_await fp_CommandLine_CloudManager_Status_AppManagers(_Params, AppManagers, _pCommandLine);
 
 		uint32 ReturnApplications = 0;
 		if (_Flags & ECloudManagerStatusFlag_Applications)
 		{
-			auto Applications = co_await ApplicationsResults.f_GetResults();
+			auto Applications = co_await fg_AllDoneWrapped(ApplicationsResults);
 
 			TCMap<CStr, CCloudManagerAppManagerInfo> AppManagerInfos;
 
@@ -1245,13 +1240,13 @@ namespace NMib::NCloud::NCloudClient
 				}
 			}
 
-			ReturnApplications = co_await self(&CCloudClientAppActor::fp_CommandLine_CloudManager_Status_Applications, _Params, Applications, AppManagerInfos, _pCommandLine);
+			ReturnApplications = co_await fp_CommandLine_CloudManager_Status_Applications(_Params, Applications, AppManagerInfos, _pCommandLine);
 		}
 
 		co_return fg_Max(ReturnAppManagers, ReturnApplications);
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		CStr AppManagerHostID = _Params["AppManagerHostID"].f_String();
@@ -1259,7 +1254,7 @@ namespace NMib::NCloud::NCloudClient
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
-		TCActorResultVector<CCloudManager::CRemoveAppManagerReturn> AppManagersResults;
+		TCFutureVector<CCloudManager::CRemoveAppManagerReturn> AppManagersResults;
 
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
@@ -1267,10 +1262,10 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			(CloudManager.f_CallActor(&CCloudManager::f_RemoveAppManager)(AppManagerHostID) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+			(CloudManager.f_CallActor(&CCloudManager::f_RemoveAppManager)(AppManagerHostID) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults;
 		}
 
-		auto RemoveStatistics = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+		auto RemoveStatistics = co_await fg_AllDone(AppManagersResults);
 
 		if (!bQuiet)
 		{
@@ -1318,7 +1313,7 @@ namespace NMib::NCloud::NCloudClient
 		}
 	}
 	
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1330,7 +1325,7 @@ namespace NMib::NCloud::NCloudClient
 		if (auto pException = fg_ParseSensorFilter(RemoveSensor.m_Filter, _Params, "removal"))
 			co_return fg_Move(pException);
 
-		TCActorResultVector<uint32> AppManagersResults;
+		TCFutureVector<uint32> AppManagersResults;
 
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
@@ -1338,10 +1333,10 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			(CloudManager.f_CallActor(&CCloudManager::f_RemoveSensor)(RemoveSensor) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+			(CloudManager.f_CallActor(&CCloudManager::f_RemoveSensor)(RemoveSensor) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults;
 		}
 
-		auto AllRemoved = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+		auto AllRemoved = co_await fg_AllDone(AppManagersResults);
 
 		if (!bQuiet)
 		{
@@ -1355,7 +1350,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1390,7 +1385,7 @@ namespace NMib::NCloud::NCloudClient
 		LogInfoKey.m_Identifier = _Params["LogIdentifier"].f_String();
 		LogInfoKey.m_IdentifierScope = _Params["LogIdentifierScope"].f_String();
 
-		TCActorResultVector<uint32> AppManagersResults;
+		TCFutureVector<uint32> AppManagersResults;
 
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
@@ -1398,10 +1393,10 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			(CloudManager.f_CallActor(&CCloudManager::f_RemoveLog)(RemoveLog) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+			(CloudManager.f_CallActor(&CCloudManager::f_RemoveLog)(RemoveLog) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults;
 		}
 
-		auto AllRemoved = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+		auto AllRemoved = co_await fg_AllDone(AppManagersResults);
 
 		if (!bQuiet)
 		{
@@ -1415,7 +1410,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_SnoozeSensor(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_SnoozeSensor(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1434,7 +1429,7 @@ namespace NMib::NCloud::NCloudClient
 		if (auto pException = fg_ParseSensorFilter(SnoozeSensor.m_Filter, _Params, "snoozing"))
 			co_return fg_Move(pException);
 
-		TCActorResultVector<uint32> AppManagersResults;
+		TCFutureVector<uint32> AppManagersResults;
 
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
@@ -1442,10 +1437,10 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
-			(CloudManager.f_CallActor(&CCloudManager::f_SnoozeSensor)(SnoozeSensor) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults.f_AddResult();
+			(CloudManager.f_CallActor(&CCloudManager::f_SnoozeSensor)(SnoozeSensor) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo)) > AppManagersResults;
 		}
 
-		auto AllSnoozed = co_await (co_await AppManagersResults.f_GetResults() | g_Unwrap);
+		auto AllSnoozed = co_await fg_AllDone(AppManagersResults);
 
 		if (!bQuiet)
 		{
@@ -1462,16 +1457,16 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
-		TCActorResultVector<uint32> ListResults;
+		TCFutureVector<uint32> ListResults;
 
-		TCActorResultMap<CHostInfo, TCMap<CStr, CCloudManager::CExpectedVersions>> Results;
+		TCFutureMap<CHostInfo, TCMap<CStr, CCloudManager::CExpectedVersions>> Results;
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
 			if (!Host.f_IsEmpty() && TrustedCloudManager.m_TrustInfo.m_HostInfo.m_HostID != Host)
@@ -1480,11 +1475,11 @@ namespace NMib::NCloud::NCloudClient
 			auto &CloudManager = TrustedCloudManager.m_Actor;
 			CloudManager.f_CallActor(&CCloudManager::f_EnumExpectedOsVersions)()
 				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
-				> Results.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+				> Results[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 			;
 		}
 
-		auto AllResults = co_await Results.f_GetUnwrappedResults();
+		auto AllResults = co_await fg_AllDone(Results);
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		CAnsiEncoding AnsiEncoding = _pCommandLine->f_AnsiEncoding();
@@ -1540,7 +1535,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 
@@ -1579,7 +1574,7 @@ namespace NMib::NCloud::NCloudClient
 			ExpectedVersion.m_Max = co_await CCloudManager::CVersion::fs_ParseVersion(pValue->f_String());
 		}
 
-		TCActorResultVector<void> Results;
+		TCFutureVector<void> Results;
 
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
@@ -1588,21 +1583,21 @@ namespace NMib::NCloud::NCloudClient
 
 			auto &CloudManager = TrustedCloudManager.m_Actor;
 			(CloudManager.f_CallActor(&CCloudManager::f_SetExpectedOsVersions)(OsName, CurrentVersion, ExpectedVersion) % ("{}"_f << TrustedCloudManager.m_TrustInfo.m_HostInfo))
-				> Results.f_AddResult()
+				> Results
 			;
 		}
 
-		co_await Results.f_GetUnwrappedResults();
+		co_await fg_AllDone(Results);
 
 		co_return 0;
 	}
 
-	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders(CStr const &_Host)
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders(CStr _Host)
 		-> TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>>>
 	{
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
-		TCActorResultMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> SensorReaders;
+		TCFutureMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> SensorReaders;
 
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
@@ -1611,27 +1606,27 @@ namespace NMib::NCloud::NCloudClient
 			auto &CloudManager = TrustedCloudManager.m_Actor;
 			CloudManager.f_CallActor(&CCloudManager::f_GetSensorReader)()
 				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
-				> SensorReaders.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+				> SensorReaders[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 			;
 		}
 
-		co_return fg_Construct(co_await (co_await SensorReaders.f_GetResults() | g_Unwrap));
+		co_return fg_Construct(co_await fg_AllDone(SensorReaders));
 	}
 
 	TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensors
 		(
-			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
-			, CDistributedAppSensorReader_SensorFilter const &_Filter
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
+			, CDistributedAppSensorReader_SensorFilter _Filter
 		)
 	{
-		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> SensorsResults;
+		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>> SensorsResults;
 
 		for (auto &Reader : *_pSensorReaders)
-			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensors)(CDistributedAppSensorReader::CGetSensors{.m_Filters = {_Filter}}) > SensorsResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensors)(CDistributedAppSensorReader::CGetSensors{.m_Filters = {_Filter}}) > SensorsResults;
 
 		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CDistributedAppSensorReporter::CSensorInfo> SensorInfos;
 
-		auto SensorGenerators = co_await (co_await SensorsResults.f_GetResults() | g_Unwrap);
+		auto SensorGenerators = co_await fg_AllDone(SensorsResults);
 		{
 			for (auto &SensorGenerator : SensorGenerators)
 			{
@@ -1655,16 +1650,16 @@ namespace NMib::NCloud::NCloudClient
 
 	TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorStatus
 		(
-			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
-			, CDistributedAppSensorReader_SensorStatusFilter const &_Filter
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
+			, CDistributedAppSensorReader_SensorStatusFilter _Filter
 		)
 	{
-		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> StatusResults;
+		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> StatusResults;
 
 		for (auto &Reader : *_pSensorReaders)
-			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorStatus)(CDistributedAppSensorReader::CGetSensorStatus{.m_Filters = {_Filter}}) > StatusResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorStatus)(CDistributedAppSensorReader::CGetSensorStatus{.m_Filters = {_Filter}}) > StatusResults;
 
-		auto StatusGenerators = co_await (co_await StatusResults.f_GetResults() | g_Unwrap);
+		auto StatusGenerators = co_await fg_AllDone(StatusResults);
 
 		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CDistributedAppSensorReader_SensorKeyAndReading> SensorStatus;
 
@@ -1695,16 +1690,16 @@ namespace NMib::NCloud::NCloudClient
 
 	TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedSensorReadings
 		(
-			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> const &_pSensorReaders
-			, CDistributedAppSensorReader_SensorReadingFilter const &_Filter
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>> _pSensorReaders
+			, CDistributedAppSensorReader_SensorReadingFilter _Filter
 		)
 	{
-		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> ReadingsResults;
+		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>> ReadingsResults;
 
 		for (auto &Reader : *_pSensorReaders)
-			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorReadings)(CDistributedAppSensorReader::CGetSensorReadings{.m_Filters = {_Filter}}) > ReadingsResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppSensorReader::f_GetSensorReadings)(CDistributedAppSensorReader::CGetSensorReadings{.m_Filters = {_Filter}}) > ReadingsResults;
 
-		auto SensorGenerators = co_await (co_await ReadingsResults.f_GetResults() | g_Unwrap);
+		auto SensorGenerators = co_await fg_AllDone(ReadingsResults);
 		if (SensorGenerators.f_IsEmpty())
 			co_return {};
 		if (SensorGenerators.f_GetLen() == 1)
@@ -1714,14 +1709,14 @@ namespace NMib::NCloud::NCloudClient
 			co_return {};
 		}
 
-		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>::CIterator> IteratorResults;
+		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>::CIterator> IteratorResults;
 
 		for (auto &Generator : SensorGenerators)
-			fg_Move(Generator).f_GetIterator() > IteratorResults.f_AddResult();
+			fg_Move(Generator).f_GetIterator() > IteratorResults;
 
 		TCVector<TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>::CIterator> Iterators;
 
-		for (auto &iReadings : co_await (co_await IteratorResults.f_GetResults() | g_Unwrap))
+		for (auto &iReadings : co_await fg_AllDone(IteratorResults))
 		{
 			Iterators.f_Insert
 				(
@@ -1766,10 +1761,8 @@ namespace NMib::NCloud::NCloudClient
 		bool bAtEnd = false;
 		CDistributedAppSensorReader_SensorKeyAndReading LastReading;
 
-		auto fGetNextReading = [&]() -> TCFuture<CDistributedAppSensorReader_SensorKeyAndReading>
+		auto fGetNextReading = [&]() -> TCUnsafeFuture<CDistributedAppSensorReader_SensorKeyAndReading>
 			{
-				co_await ECoroutineFlag_AllowReferences;
-
 				TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>::CIterator *pBestReading = nullptr;
 
 				while (true)
@@ -1827,12 +1820,12 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetLogReaders(CStr const &_Host)
+	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetLogReaders(CStr _Host)
 		-> TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>>>
 	{
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
-		TCActorResultMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>> LogReaders;
+		TCFutureMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>> LogReaders;
 
 		for (auto &TrustedCloudManager : mp_CloudManagers.m_Actors)
 		{
@@ -1841,27 +1834,27 @@ namespace NMib::NCloud::NCloudClient
 			auto &CloudManager = TrustedCloudManager.m_Actor;
 			CloudManager.f_CallActor(&CCloudManager::f_GetLogReader)()
 				.f_Timeout(mp_Timeout, "Timed out waiting for cloud manager to reply")
-				> LogReaders.f_AddResult(TrustedCloudManager.m_TrustInfo.m_HostInfo)
+				> LogReaders[TrustedCloudManager.m_TrustInfo.m_HostInfo]
 			;
 		}
 
-		co_return fg_Construct(co_await (co_await LogReaders.f_GetResults() | g_Unwrap));
+		co_return fg_Construct(co_await fg_AllDone(LogReaders));
 	}
 
 	TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogs
 		(
-			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> const &_pLogReaders
-			, CDistributedAppLogReader_LogFilter const &_Filter
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> _pLogReaders
+			, CDistributedAppLogReader_LogFilter _Filter
 		)
 	{
-		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>> LogsResults;
+		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>> LogsResults;
 
 		for (auto &Reader : *_pLogReaders)
-			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogs)(CDistributedAppLogReader::CGetLogs{.m_Filters = {_Filter}}) > LogsResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogs)(CDistributedAppLogReader::CGetLogs{.m_Filters = {_Filter}}) > LogsResults;
 
 		TCMap<CDistributedAppLogReporter::CLogInfoKey, CDistributedAppLogReporter::CLogInfo> LogInfos;
 
-		auto LogGenerators = co_await (co_await LogsResults.f_GetResults() | g_Unwrap);
+		auto LogGenerators = co_await fg_AllDone(LogsResults);
 		{
 			for (auto &LogGenerator : LogGenerators)
 			{
@@ -1885,16 +1878,16 @@ namespace NMib::NCloud::NCloudClient
 
 	TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>> CCloudClientAppActor::fp_CommandLine_CloudManager_GetAggregatedLogEntries
 		(
-			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> const &_pLogReaders
-			, CDistributedAppLogReader_LogEntryFilter const &_Filter
+			TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>> _pLogReaders
+			, CDistributedAppLogReader_LogEntryFilter _Filter
 		)
 	{
-		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> EntriesResults;
+		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>> EntriesResults;
 
 		for (auto &Reader : *_pLogReaders)
-			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogEntries)(CDistributedAppLogReader::CGetLogEntries{.m_Filters = {_Filter}}) > EntriesResults.f_AddResult();
+			Reader.f_CallActor(&CDistributedAppLogReader::f_GetLogEntries)(CDistributedAppLogReader::CGetLogEntries{.m_Filters = {_Filter}}) > EntriesResults;
 
-		auto LogGenerators = co_await (co_await EntriesResults.f_GetResults() | g_Unwrap);
+		auto LogGenerators = co_await fg_AllDone(EntriesResults);
 		if (LogGenerators.f_IsEmpty())
 			co_return {};
 		if (LogGenerators.f_GetLen() == 1)
@@ -1904,14 +1897,14 @@ namespace NMib::NCloud::NCloudClient
 			co_return {};
 		}
 
-		TCActorResultVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>::CIterator> IteratorResults;
+		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>::CIterator> IteratorResults;
 
 		for (auto &Generator : LogGenerators)
-			fg_Move(Generator).f_GetIterator() > IteratorResults.f_AddResult();
+			fg_Move(Generator).f_GetIterator() > IteratorResults;
 
 		TCVector<TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>::CIterator> Iterators;
 
-		for (auto &iEntries : co_await (co_await IteratorResults.f_GetResults() | g_Unwrap))
+		for (auto &iEntries : co_await fg_AllDone(IteratorResults))
 		{
 			Iterators.f_Insert
 				(
@@ -1956,10 +1949,8 @@ namespace NMib::NCloud::NCloudClient
 		bool bAtEnd = false;
 		CDistributedAppLogReader_LogKeyAndEntry LastEntry;
 
-		auto fGetNextEntry = [&]() -> TCFuture<CDistributedAppLogReader_LogKeyAndEntry>
+		auto fGetNextEntry = [&]() -> TCUnsafeFuture<CDistributedAppLogReader_LogKeyAndEntry>
 			{
-				co_await ECoroutineFlag_AllowReferences;
-
 				TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>::CIterator *pBestEntry = nullptr;
 
 				while (true)

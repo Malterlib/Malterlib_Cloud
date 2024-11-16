@@ -123,37 +123,35 @@ namespace NMib::NCloud
 
 	TCFuture<void> CVersionManagerHelper::f_AbortAll() const
 	{
-		TCPromise<void> Promise;
-
 		auto &Internal = *mp_pInternal;
 
-		TCActorResultVector<void> Destroys;
+		TCFutureVector<void> Destroys;
 
 		for (auto &pState : Internal.m_States)
 		{
 			auto pLockedState = pState.f_Lock();
 			if (pLockedState)
-				pLockedState->f_Abort() > Destroys.f_AddResult();
+				pLockedState->f_Abort() > Destroys;
 		}
 
-		Destroys.f_GetResults() > Promise.f_ReceiveAny();
+		TCPromiseFuturePair<void> Promise;
 
-		return Promise.f_MoveFuture();
+		fg_AllDoneWrapped(Destroys) > fg_Move(Promise.m_Promise).f_ReceiveAny();
+
+		return fg_Move(Promise.m_Future);
 	}
 
-	TCFuture<CVersionManagerHelper::CUploadResult> CVersionManagerHelper::f_Upload
+	TCUnsafeFuture<CVersionManagerHelper::CUploadResult> CVersionManagerHelper::f_Upload
 		(
-			TCDistributedActor<CVersionManager> const &_VersionManager
-			, CStr const &_Application
-			, CVersionManager::CVersionIDAndPlatform const &_VersionID
-			, CVersionManager::CVersionInformation const &_VersionInfo
-			, NStr::CStr const &_SourceTGZFile
+			TCDistributedActor<CVersionManager> _VersionManager
+			, CStr _Application
+			, CVersionManager::CVersionIDAndPlatform _VersionID
+			, CVersionManager::CVersionInformation _VersionInfo
+			, NStr::CStr _SourceTGZFile
 			, CVersionManager::CStartUploadVersion::EFlag _Flags
 			, uint64 _QueueSize
 		) const
 	{
-		TCPromise<CUploadResult> Promise;
-
 		auto &Internal = *mp_pInternal;
 
 		TCSharedPointer<CUploadState, CSupportWeakTag> pState = fg_Construct();
@@ -167,19 +165,13 @@ namespace NMib::NCloud
 		StartUpload.m_QueueSize = _QueueSize ? _QueueSize : Internal.m_QueueSize;
 		StartUpload.m_Flags = _Flags;
 
-		StartUpload.m_fStartTransfer = g_ActorFunctor / [pState](CVersionManager::CStartUploadTransfer &&_Params)
-			-> TCFuture<CVersionManager::CStartUploadTransfer::CResult>
+		StartUpload.m_fStartTransfer = g_ActorFunctor / [pState](CVersionManager::CStartUploadTransfer _Params) -> TCFuture<CVersionManager::CStartUploadTransfer::CResult>
 			{
-				TCPromise<CVersionManager::CStartUploadTransfer::CResult> StartTransferPromise;
-				pState->m_UploadVersionSend(&CFileTransferSend::f_SendFiles, fg_Move(_Params.m_TransferContext))
-					> StartTransferPromise / [pState, StartTransferPromise](CActorSubscription &&_Subscription)
-					{
-						CVersionManager::CStartUploadTransfer::CResult Result;
-						Result.m_Subscription = fg_Move(_Subscription);
-						StartTransferPromise.f_SetResult(fg_Move(Result));
-					}
-				;
-				return StartTransferPromise.f_MoveFuture();
+				CVersionManager::CStartUploadTransfer::CResult Result;
+
+				Result.m_Subscription = co_await pState->m_UploadVersionSend.f_Bind<&CFileTransferSend::f_SendFiles>(fg_Move(_Params.m_TransferContext));
+
+				co_return fg_Move(Result);
 			}
 		;
 
@@ -199,56 +191,42 @@ namespace NMib::NCloud
 			}
 		;
 
-		_VersionManager.f_CallActor(&CVersionManager::f_UploadVersion)(fg_Move(StartUpload))
-			.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
-			> Promise % "Failed to start upload on remote server"
-			/ [pCleanupAfterTimeout, pState, Promise, pStateCleanup]
-			(CVersionManager::CStartUploadVersion::CResult &&_Result)
-			{
-				pCleanupAfterTimeout->f_Clear();
-
-				pState->m_fFinish = fg_Move(_Result.m_fFinish);
-				pState->m_UploadVersionSend(&CFileTransferSend::f_GetResult)
-					> Promise / [pState, Promise, DeniedTags = _Result.m_DeniedTags, pStateCleanup](CFileTransferResult &&_Result) mutable
-					{
-						CUploadResult Result;
-						Result.m_TransferResult = fg_Move(_Result);
-						Result.m_DeniedTags = fg_Move(DeniedTags);
-
-						if (pState->m_fFinish.f_GetFunctor())
-						{
-							pState->m_fFinish() > Promise / [pState, Promise, Result = fg_Move(Result)]() mutable
-								{
-									pState->m_fFinish.f_Clear();
-									Promise.f_SetResult(fg_Move(Result));
-								}
-							;
-						}
-						else
-						{
-							Promise.f_SetResult(fg_Move(Result));
-							pState->m_fFinish.f_Clear();
-						}
-					}
-				;
-			}
+		auto Result = co_await
+			(
+				_VersionManager.f_CallActor(&CVersionManager::f_UploadVersion)(fg_Move(StartUpload))
+				.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
+				%"Failed to start upload on remote server"
+			)
 		;
 
-		return Promise.f_MoveFuture();
+		pCleanupAfterTimeout->f_Clear();
+
+		pState->m_fFinish = fg_Move(Result.m_fFinish);
+
+		auto TransferResult = co_await pState->m_UploadVersionSend(&CFileTransferSend::f_GetResult);
+
+		CUploadResult ReturnResult;
+		ReturnResult.m_TransferResult = fg_Move(TransferResult);
+		ReturnResult.m_DeniedTags = fg_Move(Result.m_DeniedTags);
+
+		if (pState->m_fFinish.f_GetFunctor())
+			co_await pState->m_fFinish();
+
+		pState->m_fFinish.f_Clear();
+
+		co_return fg_Move(ReturnResult);
 	}
 
-	TCFuture<CFileTransferResult> CVersionManagerHelper::f_Download
+	TCUnsafeFuture<CFileTransferResult> CVersionManagerHelper::f_Download
 		(
-			TCDistributedActor<CVersionManager> const &_VersionManager
-			, CStr const &_Application
-			, CVersionManager::CVersionIDAndPlatform const &_VersionID
-			, CStr const &_DestinationDirectory
+			TCDistributedActor<CVersionManager> _VersionManager
+			, CStr _Application
+			, CVersionManager::CVersionIDAndPlatform _VersionID
+			, CStr _DestinationDirectory
 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 			, uint64 _QueueSize
 		) const
 	{
-		TCPromise<CFileTransferResult> Promise;
-
 		auto &Internal = *mp_pInternal;
 		TCSharedPointer<CDownloadState, CSupportWeakTag> pState = fg_Construct();
 
@@ -270,44 +248,42 @@ namespace NMib::NCloud
 			}
 		;
 
-		pState->m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, _QueueSize ? _QueueSize : Internal.m_QueueSize, _ReceiveFlags)
-			> Promise % "Failed to initialize file transfer context"
-			/ [_VersionManager, _Application, _VersionID, pInternal = mp_pInternal, Promise, pState, pStateCleanup]
-			(CFileTransferContext &&_TransferContext)
+		auto TransferContext = co_await
+			(
+				pState->m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, _QueueSize ? _QueueSize : Internal.m_QueueSize, _ReceiveFlags)
+				% "Failed to initialize file transfer context"
+			)
+		;
+
+		CVersionManager::CStartDownloadVersion StartDownload;
+		StartDownload.m_Application = _Application;
+		StartDownload.m_VersionIDAndPlatform = _VersionID;
+		StartDownload.m_TransferContext = fg_Move(TransferContext);
+
+		if (_VersionManager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_RefactorToActorFunctorsUploadDownload)
+			StartDownload.m_Subscription = co_await pState->m_DownloadVersionReceive.f_Bind<&CFileTransferReceive::f_GetAbortSubscription>();
+
+		auto pCleanupAfterTimeout = g_OnScopeExitActor / [pState]
 			{
-				auto &Internal = *pInternal;
-
-				CVersionManager::CStartDownloadVersion StartDownload;
-				StartDownload.m_Application = _Application;
-				StartDownload.m_VersionIDAndPlatform = _VersionID;
-				StartDownload.m_TransferContext = fg_Move(_TransferContext);
-
-				auto pCleanupAfterTimeout = g_OnScopeExitActor / [pState]
-					{
-						(void)pState->f_Abort();
-					}
-				;
-
-				_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
-					.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
-					> Promise % "Failed to start download on remote server"
-					/ [pState, pCleanupAfterTimeout, Promise, pStateCleanup](CVersionManager::CStartDownloadVersion::CResult &&_Result)
-					{
-						pCleanupAfterTimeout->f_Clear();
-						pState->m_DownloadVersionSubscription = fg_Move(_Result.m_Subscription);
-
-						pState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResult) > [pState, Promise](TCAsyncResult<CFileTransferResult> &&_Results)
-							{
-								pState->m_DownloadVersionSubscription.f_Clear();
-								Promise.f_SetResult(fg_Move(_Results));
-							}
-						;
-					}
-				;
+				(void)pState->f_Abort();
 			}
 		;
 
-		return Promise.f_MoveFuture();
+		auto Result = co_await
+			(
+				_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
+				.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
+				% "Failed to start download on remote server"
+			)
+		;
+
+		pCleanupAfterTimeout->f_Clear();
+		pState->m_DownloadVersionSubscription = fg_Move(Result.m_Subscription);
+
+		auto Results = co_await pState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResult);
+		pState->m_DownloadVersionSubscription.f_Clear();
+
+		co_return fg_Move(Results);
 	}
 
 	namespace
@@ -349,7 +325,7 @@ namespace NMib::NCloud
 
 	NConcurrency::TCFuture<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_GetPackageInfo(NStr::CStr const &_PackageFile) const
 	{
-		return g_Future <<= g_DirectDispatch / [pInternal = mp_pInternal, _PackageFile]() -> TCFuture<CVersionManagerHelper::CPackageInfo>
+		return g_DirectDispatch / [pInternal = mp_pInternal, _PackageFile]() -> TCFuture<CVersionManagerHelper::CPackageInfo>
 			{
 				auto &Internal = *pInternal;
 
@@ -440,10 +416,8 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCFuture<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_CreatePackage(NStr::CStr _SourceDirectory, NStr::CStr _DestinationFileName, uint32 _CompressionLevel) const
+	TCUnsafeFuture<CVersionManagerHelper::CPackageInfo> CVersionManagerHelper::f_CreatePackage(NStr::CStr _SourceDirectory, NStr::CStr _DestinationFileName, uint32 _CompressionLevel) const
 	{
-		co_await ECoroutineFlag_AllowReferences;
-
 		auto pInternal = mp_pInternal;
 		auto &Internal = *pInternal;
 		TCSharedPointer<CProcessLaunchState, CSupportWeakTag> pState = fg_Construct();

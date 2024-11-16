@@ -130,39 +130,38 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	TCFuture<void> CAppDistributionManagerActor::fp_ReadState()
 	{
-		return TCFuture<void>::fs_RunProtected() / [&]
+		auto CaptureScope = co_await g_CaptureExceptions;
+		auto pDistributions = mp_State.m_StateDatabase.m_Data.f_GetMember("Distributions");
+		if (!pDistributions)
+			co_return {};
+
+		for (auto &DistributionObject : pDistributions->f_Object())
+		{
+			auto &Name = DistributionObject.f_Name();
+			if (!fg_IsValidHostname(Name))
+				DMibError("'{}' is not a valid distribution name"_f << Name);
+
+			auto &DistributionJSON = DistributionObject.f_Value();
+
+			CDistributionSettings Settings;
+			fp_ParseSettings(DistributionJSON["Settings"], Settings);
+
+			TCMap<CVersionManager::CVersionIDAndPlatform, CDeployedVersionInfo> DeployedVersions;
+			if (auto *pDeployedVersions = DistributionJSON.f_GetMember("DeployedVersions"))
 			{
-				auto pDistributions = mp_State.m_StateDatabase.m_Data.f_GetMember("Distributions");
-				if (!pDistributions)
-					return;
-
-				for (auto &DistributionObject : pDistributions->f_Object())
+				for (auto &DistributedVersionJSON : pDeployedVersions->f_Array())
 				{
-					auto &Name = DistributionObject.f_Name();
-					if (!fg_IsValidHostname(Name))
-						DMibError("'{}' is not a valid distribution name"_f << Name);
-
-					auto &DistributionJSON = DistributionObject.f_Value();
-
-					CDistributionSettings Settings;
-					fp_ParseSettings(DistributionJSON["Settings"], Settings);
-
-					TCMap<CVersionManager::CVersionIDAndPlatform, CDeployedVersionInfo> DeployedVersions;
-					if (auto *pDeployedVersions = DistributionJSON.f_GetMember("DeployedVersions"))
-					{
-						for (auto &DistributedVersionJSON : pDeployedVersions->f_Array())
-						{
-							auto Version = CVersionManager::CVersionIDAndPlatform::fs_FromJson(DistributedVersionJSON["Version"]);
-							DeployedVersions[Version].m_Time = DistributedVersionJSON["Time"].f_Date();
-							DeployedVersions[Version].m_RetrySequence = DistributedVersionJSON["RetrySequence"].f_Integer();
-						}
-					}
-
-					auto &Distribution = mp_Distributions[Name];
-					Distribution.m_Settings = fg_Move(Settings);
-					Distribution.m_DeployedVersions = fg_Move(DeployedVersions);
+					auto Version = CVersionManager::CVersionIDAndPlatform::fs_FromJson(DistributedVersionJSON["Version"]);
+					DeployedVersions[Version].m_Time = DistributedVersionJSON["Time"].f_Date();
+					DeployedVersions[Version].m_RetrySequence = DistributedVersionJSON["RetrySequence"].f_Integer();
 				}
 			}
-		;
+
+			auto &Distribution = mp_Distributions[Name];
+			Distribution.m_Settings = fg_Move(Settings);
+			Distribution.m_DeployedVersions = fg_Move(DeployedVersions);
+		}
+
+		co_return {};
 	}
 }

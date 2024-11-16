@@ -25,25 +25,25 @@ namespace NMib::NCloud::NBackupManager
 		CBackupSource(CStr const &_Directory);
 		~CBackupSource();
 
-		TCFuture<CCheckedOutDirectory> f_CheckOutDirectory(CTime const &_Time);
+		TCFuture<CCheckedOutDirectory> f_CheckOutDirectory(CTime _Time);
 		TCFuture<CBackupManager::CBackupInfo> f_GetInfo();
 
 		TCFuture<CInitialCommitResult> f_InitialCommit
 			(
-				CStr const &_BackupID
-				, CStr const &_Directory
-				, CDirectoryManifest &&_Manifest
+				CStr _BackupID
+				, CStr _Directory
+				, CDirectoryManifest _Manifest
 				, CBackupManagerBackup::EInitialBackupFinishedFlag _FinishedFlags
 			)
 		;
-		TCFuture<void> f_Commit(CStr const &_BackupID, CStr const &_File, CBackupManagerBackup::CManifestChange const &_ManifestChange);
+		TCFuture<void> f_Commit(CStr _BackupID, CStr _File, CBackupManagerBackup::CManifestChange _ManifestChange);
 		TCFuture<void> f_CommitAppend
 			(
-				CStr const &_BackupID
-				, CStr const &_File
+				CStr _BackupID
+				, CStr _File
 				, uint64 _Position
-				, CSecureByteVector &&_Data
-				, CBackupManagerBackup::CManifestChange &&_ManifestChange
+				, CSecureByteVector _Data
+				, CBackupManagerBackup::CManifestChange _ManifestChange
 			)
 		;
 

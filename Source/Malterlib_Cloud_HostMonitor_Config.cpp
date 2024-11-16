@@ -27,7 +27,7 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	TCFuture<CActorSubscription> CHostMonitor::f_MonitorConfigs(CDistributedAppInterfaceServer::CConfigFiles &&_ConfigFiles)
+	TCFuture<CActorSubscription> CHostMonitor::f_MonitorConfigs(CDistributedAppInterfaceServer::CConfigFiles _ConfigFiles)
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -49,7 +49,7 @@ namespace NMib::NCloud
 					&CFileChangeNotificationActor::f_RegisterForChanges
 					, DirectoryPath
 					, EFileChange_All & ~EFileChange_Recursive
-					, g_ActorFunctor / [this, ConfigID, FileName, DirectoryPath](TCVector<CFileChangeNotification::CNotification> const &_Notifications) -> TCFuture<void>
+					, g_ActorFunctor / [this, ConfigID, FileName, DirectoryPath](TCVector<CFileChangeNotification::CNotification> _Notifications) -> TCFuture<void>
 					{
 						auto &Internal = *mp_pInternal;
 
@@ -80,14 +80,14 @@ namespace NMib::NCloud
 
 		auto &CreatedConfig = Internal.m_MonitoredConfigs[ConfigID] = fg_Move(MonitoredConfig);
 
-		TCActorResultVector<void> InitialCheckResults;
+		TCFutureVector<void> InitialCheckResults;
 		for (auto &ConfigFile : CreatedConfig.m_Files)
 		{
 			auto &FileName = CreatedConfig.m_Files.fs_GetKey(ConfigFile);
-			Internal.f_ConfigFile_Changed(ConfigID, FileName) > InitialCheckResults.f_AddResult();
+			Internal.f_ConfigFile_Changed(ConfigID, FileName) > InitialCheckResults;
 		}
 
-		if (auto Result = co_await InitialCheckResults.f_GetUnwrappedResults().f_Wrap(); !Result)
+		if (auto Result = co_await fg_AllDone(InitialCheckResults).f_Wrap(); !Result)
 			Result > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to check config file initially");
 
 		co_return g_ActorSubscription / [this, ConfigID]() -> TCFuture<void>
@@ -98,14 +98,14 @@ namespace NMib::NCloud
 				if (!pConfig)
 					co_return {};
 
-				TCActorResultVector<void> Results;
+				TCFutureVector<void> Results;
 
 				for (auto &File : pConfig->m_Files)
-					fg_Move(File.m_UpdateSequencer).f_Destroy() > Results.f_AddResult();
+					fg_Move(File.m_UpdateSequencer).f_Destroy() > Results;
 
 				Internal.m_MonitoredConfigs.f_Remove(pConfig);
 
-				co_await Results.f_GetUnwrappedResults().f_Wrap() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy sequencers");
+				co_await fg_AllDone(Results).f_Wrap() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to destroy sequencers");
 
 				co_return {};
 			}
@@ -319,7 +319,7 @@ namespace NMib::NCloud
 		co_await m_Database
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [OldKeyValue, _FileName, _Value](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [OldKeyValue, _FileName, _Value](CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					auto CaptureScope = co_await (g_CaptureExceptions % "Error saving config file data");
 
@@ -611,7 +611,7 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCFuture<TCMap<CConfigFileVersionKey, CConfigFileProperties>> CHostMonitor::f_EnumConfigFileVersions(CStr &&_File)
+	TCFuture<TCMap<CConfigFileVersionKey, CConfigFileProperties>> CHostMonitor::f_EnumConfigFileVersions(CStr _File)
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -638,7 +638,7 @@ namespace NMib::NCloud
 		;
 	}
 
-	TCFuture<CConfigFileContents> CHostMonitor::f_GetConfigFileContents(CConfigFileVersionKey &&_Key)
+	TCFuture<CConfigFileContents> CHostMonitor::f_GetConfigFileContents(CConfigFileVersionKey _Key)
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -646,7 +646,7 @@ namespace NMib::NCloud
 
 		co_return co_await fg_Move(ReadTransaction).f_BlockingDispatch
 			(
-				[_Key = fg_Move(_Key)](CDatabaseActor::CTransactionRead &&_ReadTransaction) mutable -> TCFuture<CConfigFileContents>
+				[_Key = fg_Move(_Key)](CDatabaseActor::CTransactionRead _ReadTransaction) mutable -> TCFuture<CConfigFileContents>
 				{
 					CConfigFileHistoryEntryValue Value;
 					if (_Key.m_Sequence == TCLimitsInt<uint64>::mc_Max)

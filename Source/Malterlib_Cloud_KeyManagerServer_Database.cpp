@@ -115,15 +115,11 @@ namespace NMib::NCloud
 		co_return nRemoved;
 	}
 
-	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs)
+	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> _HostIDs)
 	{
-		auto &Internal = *mp_pInternal;
-
-		co_return co_await fg_CallSafe
+		return mp_pInternal->m_KeyManagerServerSyncInstance.m_pActor->f_RemoveVerifiedHosts
 			(
-				Internal.m_KeyManagerServerSyncInstance.m_pActor
-				, &CInternal::CKeyManagerServerSyncImplementation::f_RemoveVerifiedHosts
-				, _HostIDs
+				_HostIDs
 				, NContainer::TCSet<NStr::CStr>{}
 			)
 		;
@@ -183,7 +179,7 @@ namespace NMib::NCloud
 		co_return fg_Move(KeyStats);
 	}
 
-	NConcurrency::TCFuture<void> CKeyManagerServer::f_CopyKey(CKeyManagerKeyID &&_FromKey, CKeyManagerKeyID &&_ToKey)
+	NConcurrency::TCFuture<void> CKeyManagerServer::f_CopyKey(CKeyManagerKeyID _FromKey, CKeyManagerKeyID _ToKey)
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -201,13 +197,7 @@ namespace NMib::NCloud
 		NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, CSymmetricKey> KeysToCreate;
 		KeysToCreate[CKeyManagerServerSync::CHostKeyID{.m_HostID = _ToKey.m_HostID, .m_KeyID = _ToKey.m_KeyID}] = pSourceKey->m_Key;
 
-		co_await fg_CallSafe
-			(
-				Internal.m_KeyManagerServerSyncInstance.m_pActor
-				, &CInternal::CKeyManagerServerSyncImplementation::f_CreateNewKeys
-				, fg_Move(KeysToCreate)
-			)
-		;
+		co_await Internal.m_KeyManagerServerSyncInstance.m_pActor->f_CreateNewKeys(fg_Move(KeysToCreate));
 
 		co_return {};
 	}

@@ -24,7 +24,6 @@ namespace NMib::NCloud
 			(
 				g_Dispatch(BlockingActorCheckout) / [=]() -> TCFuture<TCTuple<bool, bool>>
 				{
-
 					auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed to read the patch status from file");
 
 					constexpr static CStr c_RebootRequiredFile = gc_Str<"/var/run/reboot-required">;
@@ -90,7 +89,7 @@ namespace NMib::NCloud
 			auto BlockingActorCheckout = fg_BlockingActor();
 			bAptCheckExists = co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / []() -> bool
+					g_Dispatch(BlockingActorCheckout) / [] -> bool
 					{
 						return CFile::fs_FileExists(gc_AptCheckExecutable);
 					}

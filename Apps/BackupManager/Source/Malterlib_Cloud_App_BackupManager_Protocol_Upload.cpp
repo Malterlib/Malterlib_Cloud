@@ -41,7 +41,7 @@ namespace NMib::NCloud::NBackupManager
 		return nullptr;
 	}		
 	
-	TCFuture<void> CBackupManagerServer::fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason)
+	TCFuture<void> CBackupManagerServer::fp_DestroyBackupInstance(CBackupKey _Key, CDistributedAppAuditor _Auditor, bool _bError, CStr _Reason)
 	{
 		auto *pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
 		if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != _Auditor.f_HostInfo())
@@ -97,7 +97,7 @@ namespace NMib::NCloud::NBackupManager
 		co_return {};
 	}
 
-	auto CBackupManagerServer::CBackupManagerImplementation::f_InitBackup(CBackupManager::CInitBackup &&_Params)
+	auto CBackupManagerServer::CBackupManagerImplementation::f_InitBackup(CBackupManager::CInitBackup _Params)
 		-> NConcurrency::TCFuture<TCDistributedActorInterfaceWithID<CBackupManagerBackup>>
 	{
 		auto pThis = m_pThis;
@@ -118,7 +118,7 @@ namespace NMib::NCloud::NBackupManager
 			co_return Auditor.f_AccessDenied("(Start backup)", Permissions);
 
 		CStr BackupPermission = fg_Format("Backup/Read/{}", BackupKey.m_BackupName);
-		pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_CreateSet(BackupPermission)) > fg_DiscardResult();
+		pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_CreateSet(BackupPermission)).f_DiscardResult();
 
 		Auditor.f_Info(fg_Format("Starting backup '{}'", BackupKey.f_GetDesc()));
 
@@ -129,7 +129,7 @@ namespace NMib::NCloud::NBackupManager
 			(
 				g_ActorFunctorWeak(fg_ThisActor(pThis)) / [pThis, BackupKey, Auditor]() -> TCFuture<void>
 				{
-					co_await pThis->self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupKey, Auditor, true, "Actor host disconnected (restarted)");
+					co_await pThis->fp_DestroyBackupInstance(BackupKey, Auditor, true, "Actor host disconnected (restarted)");
 					co_return {};
 				}
 			)
@@ -150,7 +150,7 @@ namespace NMib::NCloud::NBackupManager
 		else
 		{
 			auto OnDestroyedFuture = Instance.m_OnDestroyed.f_Insert().f_Future();
-			pThis->self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupKey, Instance.m_OwningHost, false, "Old host removed") > fg_DiscardResult(); // Remove old Host
+			pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Old host removed").f_DiscardResult(); // Remove old Host
 			Instance.m_OwningHost = Auditor; // Take ownership
 
 			co_await fg_Move(OnDestroyedFuture);
@@ -186,7 +186,7 @@ namespace NMib::NCloud::NBackupManager
 
 					auto &Instance = *pBackupInstance;
 
-					co_return co_await pThis->self(&CBackupManagerServer::fp_DestroyBackupInstance, BackupKey, Instance.m_OwningHost, false, "Backup stopped remotely");
+					co_return co_await pThis->fp_DestroyBackupInstance(BackupKey, Instance.m_OwningHost, false, "Backup stopped remotely");
 				}
 			}
 		;

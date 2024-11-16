@@ -4,94 +4,41 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	void CBackupInstance::CInternal::fp_RunSequencedSyncs(CStr const &_FileName)
-	{
-		auto pSequencedSync = m_SequencedSyncs.f_FindEqual(_FileName);
-		if (!pSequencedSync)
-			return;
-
-		if (pSequencedSync->m_Waiting.f_IsEmpty())
-		{
-			m_SequencedSyncs.f_Remove(_FileName);
-			return;
-		}
-
-		pSequencedSync->m_Waiting.f_Pop()
-			(
-				g_OnScopeExitActor / [this, _FileName]
-				{
-					fp_RunSequencedSyncs(_FileName);
-				}
-			)
-		;
-	}
-
-	namespace
-	{
-		struct CMultipleSyncsState
-		{
-			mint m_nWaiting = 0;
-			TCVector<COnScopeExitShared> m_CleanupScopes;
-			TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> m_fToRun;
-		};
-	}
-
-	void CBackupInstance::CInternal::f_SequenceMultipleSyncs(TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun, TCVector<CStr> const &_Files)
+	TCFuture<CActorSubscription> CBackupInstance::CInternal::f_SequenceMultipleSyncs(TCVector<CStr> _Files)
 	{
 		if (_Files.f_IsEmpty())
 		{
-			_fToRun
-				(
-					g_OnScopeExitShared / []
-					{
-					}
-				)
+			co_return g_ActorSubscription / []
+				{
+				}
 			;
-			return;
 		}
 		else if (_Files.f_GetLen() == 1)
-			return f_SequenceSyncs(_Files[0], fg_Move(_fToRun));
+			co_return co_await f_SequenceSyncs(_Files[0]);
 
-		TCSharedPointer<CMultipleSyncsState> pState = fg_Construct();
-		pState->m_nWaiting = _Files.f_GetLen();
-		pState->m_fToRun = fg_Move(_fToRun);
-
+		TCFutureVector<CActorSubscription> PendingSubscriptions;
 		for (auto &File : _Files)
-		{
-			f_SequenceSyncs
-				(
-					File
-					, [pState](COnScopeExitShared &&_pCleanup)
-					{
-						pState->m_CleanupScopes.f_Insert(fg_Move(_pCleanup));
-						if (--pState->m_nWaiting == 0)
-						{
-							pState->m_fToRun
-								(
-									g_OnScopeExitShared / [CleanupScopes = fg_Move(pState->m_CleanupScopes)]
-									{
-									}
-								)
-							;
-							pState->m_fToRun.f_Clear();
-						}
-					}
-				)
-			;
-		}
+			f_SequenceSyncs(File) > PendingSubscriptions;
+
+		auto Subscriptions = co_await fg_AllDone(PendingSubscriptions);
+
+		co_return g_ActorSubscription / [Subscriptions = fg_Move(Subscriptions)]() -> TCFuture<void>
+			{
+				TCFutureVector<void> Destroys;
+
+				for (auto &Subscription : Subscriptions)
+					Subscription->f_Destroy() > Destroys;
+
+				co_await fg_AllDone(Destroys);
+
+				co_return {};
+			}
+		;
 	}
 
-	void CBackupInstance::CInternal::f_SequenceSyncs(CStr const &_FileName, TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> &&_fToRun)
+	TCFuture<CActorSubscription> CBackupInstance::CInternal::f_SequenceSyncs(CStr _FileName)
 	{
-		if (auto pSequencedSync = m_SequencedSyncs.f_FindEqual(_FileName))
-		{
-			pSequencedSync->m_Waiting.f_Insert(fg_Move(_fToRun));
-			return;
-		}
-
-		m_SequencedSyncs[_FileName].m_Waiting.f_Insert(fg_Move(_fToRun));
-
-		fp_RunSequencedSyncs(_FileName);
+		co_return co_await m_SequencedSyncs[_FileName].m_Sequencer.f_Sequence();
 	}
 
 	COnScopeExitShared CBackupInstance::CInternal::f_FilePending(CStr const &_FileName)

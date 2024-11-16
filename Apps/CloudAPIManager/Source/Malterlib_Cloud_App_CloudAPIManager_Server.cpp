@@ -30,7 +30,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		if (Path != OriginalPath)
 			fg_GetSys()->f_SetEnvironmentVariable("PATH", Path);
 #endif
-		self(&CServer::fp_Init) > fg_LogError("CloudAPIManager", "Failed to initialize server");
+		fp_Init() > fg_LogError("CloudAPIManager", "Failed to initialize server");
 	}
 
 	CCloudAPIManagerDaemonActor::CServer::~CServer()
@@ -39,9 +39,9 @@ namespace NMib::NCloud::NCloudAPIManager
 
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_Init()
 	{
-		co_await (self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs) % "Failed to find cloud contexts, aborting startup");
-		co_await (self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupPermissions) % "Failed to setup permissions, aborting startup");
-		co_await (self(&CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge) % "Failed to setup DDP bridge, aborting startup");
+		co_await (fp_SetupCloudContexs() % "Failed to find cloud contexts, aborting startup");
+		co_await (fp_SetupPermissions() % "Failed to setup permissions, aborting startup");
+		co_await (fp_SetupDDPBridge() % "Failed to setup DDP bridge, aborting startup");
 
 		fp_Publish();
 
@@ -110,14 +110,16 @@ namespace NMib::NCloud::NCloudAPIManager
 
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_Destroy()
 	{
-		TCPromise<void> Promise;
-
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
 		if (mp_CURLQueryActor)
-			mp_CURLQueryActor.f_Destroy() > pCanDestroy->f_Track();
+			fg_Move(mp_CURLQueryActor).f_Destroy() > pCanDestroy->f_Track();
 
-		return Promise <<= pCanDestroy->f_Future();
+		auto CanDestroyFuture = pCanDestroy->f_Future();
+		pCanDestroy.f_Clear();
+		co_await fg_Move(CanDestroyFuture);
+
+		co_return {};
 	}
 
 	TCActor<CSeparateThreadActor> const &CCloudAPIManagerDaemonActor::CServer::fp_GetCURLQueryActor()

@@ -66,55 +66,55 @@ namespace NMib::NCloud::NCloudManager
 		co_await mp_Notifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy notifications");;
 
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 
 			if (mp_MonitorTimerSubscription)
-				mp_MonitorTimerSubscription->f_Destroy() > Destroys.f_AddResult();
+				mp_MonitorTimerSubscription->f_Destroy() > Destroys;
 
 			if (mp_CleanupTimerSubscription)
-				mp_CleanupTimerSubscription->f_Destroy() > Destroys.f_AddResult();
+				mp_CleanupTimerSubscription->f_Destroy() > Destroys;
 
 			for (auto &Subscription : mp_ExpectedOsVersionSubscriptions)
-				fg_Move(Subscription.m_fVersionRangeChanged).f_Destroy() > Destroys.f_AddResult();
+				fg_Move(Subscription.m_fVersionRangeChanged).f_Destroy() > Destroys;
 
 			mp_ExpectedOsVersionSubscriptions.f_Clear();
 
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy remote subscriptions");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy remote subscriptions");
 		}
 
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 
 			for (auto &Subscription : mp_ExpectedOsVersionSubscriptions)
 			{
 				if (Subscription.m_fVersionRangeChanged)
-					fg_Move(Subscription.m_fVersionRangeChanged).f_Destroy() > Destroys.f_AddResult();
+					fg_Move(Subscription.m_fVersionRangeChanged).f_Destroy() > Destroys;
 			}
 			mp_ExpectedOsVersionSubscriptions.f_Clear();
 
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy expected OS version subscriptions");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy expected OS version subscriptions");
 		}
 
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 
 			for (auto &AppManager : mp_AppManagers)
-				AppManager.f_Destroy(*this) > Destroys.f_AddResult();
+				AppManager.f_Destroy(*this) > Destroys;
 
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy app manager subscriptions");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy app manager subscriptions");
 		}
 
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 
-			mp_ProtocolInterface.f_Destroy() > Destroys.f_AddResult();
-			mp_SensorReporterInterface.f_Destroy() > Destroys.f_AddResult();
-			mp_SensorReaderInterface.f_Destroy() > Destroys.f_AddResult();
-			mp_LogReporterInterface.f_Destroy() > Destroys.f_AddResult();
-			mp_LogReaderInterface.f_Destroy() > Destroys.f_AddResult();
-			mp_AppManagerCloudManagerInterface.f_Destroy() > Destroys.f_AddResult();
+			mp_ProtocolInterface.f_Destroy() > Destroys;
+			mp_SensorReporterInterface.f_Destroy() > Destroys;
+			mp_SensorReaderInterface.f_Destroy() > Destroys;
+			mp_LogReporterInterface.f_Destroy() > Destroys;
+			mp_LogReaderInterface.f_Destroy() > Destroys;
+			mp_AppManagerCloudManagerInterface.f_Destroy() > Destroys;
 
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy interfaces");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy interfaces");
 		}
 
 		if (mp_AppSensorStore)

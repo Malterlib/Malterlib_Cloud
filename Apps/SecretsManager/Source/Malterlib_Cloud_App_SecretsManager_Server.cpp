@@ -22,7 +22,7 @@ namespace NMib::NCloud::NSecretsManager
 	}
 	
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServer::f_Test_Command(CStr const &_Command, CEJSONSorted const &_Params)
+	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServer::f_Test_Command(CStr _Command, CEJSONSorted const _Params)
 	{
 		if (_Command == "UploadInitialized")
 			co_return co_await mp_UploadInitialized[_Params.f_String()].f_Future();
@@ -68,6 +68,8 @@ namespace NMib::NCloud::NSecretsManager
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::f_Init()
 	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+		
 		auto Database = co_await mp_DatabaseActor(&CSecretsManagerServerDatabase::f_ReadDatabase).f_Wrap();
 		if (!Database)
 		{
@@ -82,7 +84,7 @@ namespace NMib::NCloud::NSecretsManager
 			fp_UpdateSemanticIDs("", SecretProperties.m_SemanticID);
 		}
 				
-		auto ResultPermissions = co_await self(&CServer::fp_SetupPermissions).f_Wrap();
+		auto ResultPermissions = co_await fp_SetupPermissions().f_Wrap();
 
 		if (!ResultPermissions)
 		{
@@ -162,16 +164,16 @@ namespace NMib::NCloud::NSecretsManager
 
 		CLogError LogError("Mib/Cloud/SecretsManager");
 
-		TCActorResultVector<void> Results;
+		TCFutureVector<void> Results;
 
-		mp_ProtocolInterface.m_Publication.f_Destroy() > Results.f_AddResult();
+		mp_ProtocolInterface.m_Publication.f_Destroy() > Results;
 		
 		for (auto &Upload : mp_Uploads)
-			Upload.f_Destroy() > Results.f_AddResult();
+			Upload.f_Destroy() > Results;
 		for (auto &Download : mp_Downloads)
-			Download.f_Destroy() > Results.f_AddResult();
+			Download.f_Destroy() > Results;
 
-		co_await Results.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy uploads and downloads");
+		co_await fg_AllDone(Results).f_Wrap() > LogError.f_Warning("Failed to destroy uploads and downloads");
 
 #if DMibConfig_Tests_Enable
 		if (mp_DestroyWaitingForCanDestroy)
@@ -184,7 +186,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Can destroy file actor, waiting for file and database actor destroy");
 		if (mp_DatabaseActor)
-			co_await mp_DatabaseActor.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");
+			co_await fg_Move(mp_DatabaseActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");
 
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroying protocol interface");
 		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
@@ -313,8 +315,8 @@ namespace NMib::NCloud::NSecretsManager
 				if (--*pCount == 0)
 				{
 					mp_Tags.f_Remove(Tag);
-					mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, TCSet<CStr>{fg_Format("SecretsManager/Read/*/Tag/{}", Tag)}) > fg_DiscardResult();
-					mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, TCSet<CStr>{fg_Format("SecretsManager/Write/*/Tag/{}", Tag)}) > fg_DiscardResult();
+					mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, TCSet<CStr>{fg_Format("SecretsManager/Read/*/Tag/{}", Tag)}).f_DiscardResult();
+					mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, TCSet<CStr>{fg_Format("SecretsManager/Write/*/Tag/{}", Tag)}).f_DiscardResult();
 				}
 			}
 		}
@@ -326,8 +328,8 @@ namespace NMib::NCloud::NSecretsManager
 
 			if (++mp_Tags[Tag] == 1)
 			{
-				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, TCSet<CStr>{fg_Format("SecretsManager/Read/*/Tag/{}", Tag)}) > fg_DiscardResult();
-				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, TCSet<CStr>{fg_Format("SecretsManager/Write/*/Tag/{}", Tag)}) > fg_DiscardResult();
+				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, TCSet<CStr>{fg_Format("SecretsManager/Read/*/Tag/{}", Tag)}).f_DiscardResult();
+				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, TCSet<CStr>{fg_Format("SecretsManager/Write/*/Tag/{}", Tag)}).f_DiscardResult();
 			}
 		}
 	}
@@ -346,7 +348,7 @@ namespace NMib::NCloud::NSecretsManager
 				Permissions[fg_Format("SecretsManager/Write/SemanticID/{}/*", _SemanticIDToRemove)];
 				mp_SemanticIDs.f_Remove(_SemanticIDToRemove);
 
-				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, Permissions) > fg_DiscardResult();
+				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, Permissions).f_DiscardResult();
 			}
 		}
 
@@ -357,7 +359,7 @@ namespace NMib::NCloud::NSecretsManager
 				TCSet<CStr> Permissions;
 				Permissions[fg_Format("SecretsManager/Read/SemanticID/{}/*", _SemanticIDToAdd)];
 				Permissions[fg_Format("SecretsManager/Write/SemanticID/{}/*", _SemanticIDToAdd)];
-				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+				mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions).f_DiscardResult();
 			}
 		}
 	}
@@ -386,26 +388,25 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 
-	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_RemoveUnreferencedFile(CStr const &_FileName, CDistributedAppAuditor const &_Auditor)
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_RemoveUnreferencedFile(CStr _FileName, CDistributedAppAuditor _Auditor)
 	{
-		TCPromise<void> Promise;
 		if (!_FileName)
-			return Promise <<= g_Void;
+			co_return {};
 
 		if (auto *pReservedFile = mp_ReservedFiles.f_FindEqual(_FileName))
 		{
 			DCheck(!pReservedFile->m_fPendingDelete);
-			TCPromise<void> RemovePromise;
-			pReservedFile->m_fPendingDelete = [=, this, pCanDestroyTracker = mp_pCanDestroyFileActorTracker]()
+			TCPromiseFuturePair<void> RemovePromise;
+			pReservedFile->m_fPendingDelete = [=, this, pCanDestroyTracker = mp_pCanDestroyFileActorTracker, RemovePromise = fg_Move(RemovePromise.m_Promise)]() mutable
 				{
 #if DMibConfig_Tests_Enable
 					if (mp_bDelayDelete)
 					{
 						// This is used to test shutdown. We wait here while the test checks that the file has been deleted
 						// and that the future from the secrets manager destruction has not resloved set yet
-						mp_DelayDeletes.f_Insert().f_Future() > [=, this, pCanDestroyTracker = pCanDestroyTracker](auto &&)
+						mp_DelayDeletes.f_Insert().f_Future() > [=, this, pCanDestroyTracker = pCanDestroyTracker, RemovePromise = fg_Move(RemovePromise)](auto &&) mutable
 							{
-								fp_RemoveFile(_FileName, _Auditor) > RemovePromise / [pCanDestroyTracker, RemovePromise]()
+								fp_RemoveFile(_FileName, _Auditor) > fg_Move(RemovePromise) / [pCanDestroyTracker, RemovePromise]()
 									{
 										RemovePromise.f_SetResult();
 									}
@@ -416,7 +417,7 @@ namespace NMib::NCloud::NSecretsManager
 					else
 #endif
 					{
-						fp_RemoveFile(_FileName, _Auditor) > RemovePromise / [pCanDestroyTracker, RemovePromise]()
+						fp_RemoveFile(_FileName, _Auditor) > fg_Move(RemovePromise) / [pCanDestroyTracker, RemovePromise]()
 							{
 								RemovePromise.f_SetResult();
 							}
@@ -424,10 +425,10 @@ namespace NMib::NCloud::NSecretsManager
 					}
 				}
 			;
-			return Promise <<= RemovePromise.f_MoveFuture();
+			co_return co_await fg_Move(RemovePromise.m_Future);
 		}
 		else
-			return Promise <<= fp_RemoveFile(_FileName, _Auditor);
+			co_return co_await fp_RemoveFile(_FileName, _Auditor);
 	}
 
 	CActorSubscription CSecretsManagerDaemonActor::CServer::fp_ReserveFile(CStr const &_FileName)
@@ -455,6 +456,8 @@ namespace NMib::NCloud::NSecretsManager
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_WriteDatabase()
 	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
 		auto Result = co_await mp_DatabaseActor(&CSecretsManagerServerDatabase::f_WriteDatabase, fg_TempCopy(mp_Database)).f_Wrap();
 		if (!Result)
 			DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to write database: {}", Result.f_GetExceptionStr());

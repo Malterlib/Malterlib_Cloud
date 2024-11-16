@@ -15,7 +15,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	auto CAppManagerActor::CDistributedAppSensorReporterImplementation::f_OpenSensorReporter(CSensorInfo &&_SensorInfo) -> TCFuture<CSensorReporter>
+	auto CAppManagerActor::CDistributedAppSensorReporterImplementation::f_OpenSensorReporter(CSensorInfo _SensorInfo) -> TCFuture<CSensorReporter>
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();

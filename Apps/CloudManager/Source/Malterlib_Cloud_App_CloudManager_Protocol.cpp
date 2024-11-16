@@ -31,7 +31,7 @@ namespace NMib::NCloud::NCloudManager
 				, "CloudManager/SetExpectedOsVersion"
 			}
 		;
-		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions) > fg_DiscardResult();
+		mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions).f_DiscardResult();
 
 		TCVector<CStr> SubscribePermissions{"CloudManager/*"};
 		mp_Permissions = co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this));
@@ -41,29 +41,29 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<void> CCloudManagerServer::fp_Publish()
 	{
-		TCActorResultVector<void> PublishResults;
-		mp_ProtocolInterface.f_Publish<CCloudManager>(mp_AppState.m_DistributionManager, this) > PublishResults.f_AddResult();
+		TCFutureVector<void> PublishResults;
+		mp_ProtocolInterface.f_Publish<CCloudManager>(mp_AppState.m_DistributionManager, this) > PublishResults;
 
 		if (mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("PublishSensorReporter", false).f_Boolean())
-			mp_SensorReporterInterface.f_Publish<CDistributedAppSensorReporter>(mp_AppState.m_DistributionManager, this) > PublishResults.f_AddResult();
+			mp_SensorReporterInterface.f_Publish<CDistributedAppSensorReporter>(mp_AppState.m_DistributionManager, this) > PublishResults;
 		else
 			mp_SensorReporterInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 		mp_SensorReaderInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 
 		if (mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("PublishLogReporter", false).f_Boolean())
-			mp_LogReporterInterface.f_Publish<CDistributedAppLogReporter>(mp_AppState.m_DistributionManager, this) > PublishResults.f_AddResult();
+			mp_LogReporterInterface.f_Publish<CDistributedAppLogReporter>(mp_AppState.m_DistributionManager, this) > PublishResults;
 		else
 			mp_LogReporterInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 		mp_LogReaderInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 
 		mp_AppManagerCloudManagerInterface.f_Construct(mp_AppState.m_DistributionManager, this);
 
-		co_await (co_await PublishResults.f_GetResults() | g_Unwrap);
+		co_await fg_AllDone(PublishResults);
 
 		co_return {};
 	}
 
-	TCFuture<void> CCloudManagerServer::fp_ReportFiltered(CStr const &_AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied)
+	TCFuture<void> CCloudManagerServer::fp_ReportFiltered(CStr _AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied)
 	{
 		auto OnResume = co_await f_CheckDestroyedOnResume();
 
@@ -87,12 +87,12 @@ namespace NMib::NCloud::NCloudManager
 		else
 			RemoveErrors["Subscribed Notifications"];
 
-		co_await self(&CCloudManagerServer::fp_ChangeOtherErrors, _AppManagerID, _RegisterSequence, fg_Move(RemoveErrors), fg_Move(Errors));
+		co_await fp_ChangeOtherErrors(_AppManagerID, _RegisterSequence, fg_Move(RemoveErrors), fg_Move(Errors));
 
 		co_return {};
 	}
 
-	TCFuture<void> CCloudManagerServer::fp_ChangeOtherErrors(CStr const &_AppManagerID, mint _RegisterSequence, TCSet<CStr> const &_Remove, TCMap<CStr, CStr> const &_Add)
+	TCFuture<void> CCloudManagerServer::fp_ChangeOtherErrors(CStr _AppManagerID, mint _RegisterSequence, TCSet<CStr> _Remove, TCMap<CStr, CStr> _Add)
 	{
 		auto OnResume = co_await f_CheckDestroyedOnResume();
 
@@ -100,7 +100,7 @@ namespace NMib::NCloud::NCloudManager
 			(
 				&CDatabaseActor::f_WriteWithCompaction
 				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), pThis = this, _AppManagerID, _RegisterSequence, _Remove, _Add]
-				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
@@ -144,7 +144,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<void> CCloudManagerServer::fp_ProcessApplicationChanges(CStr const &_AppManagerID, CAppManagerInterface::COnChangeNotificationParams &&_Params)
+	TCFuture<void> CCloudManagerServer::fp_ProcessApplicationChanges(CStr _AppManagerID, CAppManagerInterface::COnChangeNotificationParams _Params)
 	{
 		auto OnResume = co_await f_CheckDestroyedOnResume();
 
@@ -161,7 +161,7 @@ namespace NMib::NCloud::NCloudManager
 			(
 				&CDatabaseActor::f_WriteWithCompaction
 				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), Params = fg_Move(_Params), _AppManagerID, pHostChanges]
-				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
@@ -262,21 +262,19 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<void> CCloudManagerServer::CAppManagerState::f_Destroy(CCloudManagerServer &_This)
+	TCUnsafeFuture<void> CCloudManagerServer::CAppManagerState::f_Destroy(CCloudManagerServer &_This)
 	{
-		co_await ECoroutineFlag_AllowReferences;
-
 		CAppManagerKey DatabaseKey{.m_HostID = f_AppManagerID()};
 
 		TCDistributedActorInterfaceWithID<CAppManagerInterface> Interface;
 		NCloudManagerDatabase::CAppManagerValue Data;
-		TCActorResultVector<void> DestroyResults;
+		TCFutureVector<void> DestroyResults;
 		{
 			if (m_ChangeNotificationsSubscription)
-				fg_Exchange(m_ChangeNotificationsSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+				fg_Exchange(m_ChangeNotificationsSubscription, nullptr)->f_Destroy() > DestroyResults;
 
 			if (m_UpdateNotificationsSubscription)
-				fg_Exchange(m_UpdateNotificationsSubscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+				fg_Exchange(m_UpdateNotificationsSubscription, nullptr)->f_Destroy() > DestroyResults;
 
 			Data = fg_Move(m_Data);
 			Data.m_LastSeen = CTime::fs_NowUTC();
@@ -286,7 +284,7 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		auto [InterfaceDestroyResult, SaveAppManagerDataDestroyResult, SubscriptionDestroyResult] = co_await
-			(Interface.f_Destroy() + _This.fp_SaveAppManagerData(DatabaseKey, fg_Move(Data)) + DestroyResults.f_GetUnwrappedResults()).f_Wrap()
+			(Interface.f_Destroy() + _This.fp_SaveAppManagerData(DatabaseKey, fg_Move(Data)) + fg_AllDone(DestroyResults)).f_Wrap()
 		;
 
 		if (!SubscriptionDestroyResult)
@@ -303,8 +301,8 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<CCloudManager::CRegisterAppManagerResult> CCloudManagerServer::CCloudManagerImplementation::f_RegisterAppManager
 		(
-			TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
-			, CAppManagerInfo &&_AppManagerInfo
+			TCDistributedActorInterfaceWithID<CAppManagerInterface> _AppManager
+			, CAppManagerInfo _AppManagerInfo
 		)
 	{
 		if (!_AppManager)
@@ -377,14 +375,14 @@ namespace NMib::NCloud::NCloudManager
 					CAppManagerInterface::CSubscribeChangeNotifications
 					{
 						.m_fOnNotification = g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
-						(CAppManagerInterface::COnChangeNotificationParams &&_Params) -> TCFuture<void>
+						(CAppManagerInterface::COnChangeNotificationParams _Params) -> TCFuture<void>
 						{
 							auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
 							if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
 								co_return {};
 
-							co_await pThis->self(&CCloudManagerServer::fp_ReportFiltered, AppManagerID, RegisterSequence, _Params.m_bFiltered, _Params.m_bAccessDenied);
-							co_await pThis->self(&CCloudManagerServer::fp_ProcessApplicationChanges, AppManagerID, fg_Move(_Params));
+							co_await pThis->fp_ReportFiltered(AppManagerID, RegisterSequence, _Params.m_bFiltered, _Params.m_bAccessDenied);
+							co_await pThis->fp_ProcessApplicationChanges(AppManagerID, fg_Move(_Params));
 
 							co_return {};
 						}
@@ -396,7 +394,7 @@ namespace NMib::NCloud::NCloudManager
 					CAppManagerInterface::CSubscribeUpdateNotifications
 					{
 						.m_fOnNotification = g_ActorFunctor / [pThis, RegisterSequence, AppManagerID, AllowDestroy = g_AllowWrongThreadDestroy]
-						(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
+						(CAppManagerInterface::CUpdateNotification _Notification) -> TCFuture<void>
 						{
 							auto pAppManager = pThis->mp_AppManagers.f_FindEqual(AppManagerID);
 							if (!pAppManager || pAppManager->m_RegisterSequence != RegisterSequence)
@@ -421,14 +419,13 @@ namespace NMib::NCloud::NCloudManager
 		if (ChangeNotificationsSubscription)
 		{
 			pAppManager->m_ChangeNotificationsSubscription = fg_Move(*ChangeNotificationsSubscription);
-			co_await pThis->self(&CCloudManagerServer::fp_ChangeOtherErrors, AppManagerID, RegisterSequence, TCSet<CStr>{"Subscribe Notifications"}, TCMap<CStr, CStr>{});
+			co_await pThis->fp_ChangeOtherErrors(AppManagerID, RegisterSequence, TCSet<CStr>{"Subscribe Notifications"}, TCMap<CStr, CStr>{});
 		}
 		else
 		{
-			co_await pThis->self
+			co_await pThis->fp_ChangeOtherErrors
 				(
-					&CCloudManagerServer::fp_ChangeOtherErrors
-					, AppManagerID
+					AppManagerID
 					, RegisterSequence
 					, TCSet<CStr>{}
 					, TCMap<CStr, CStr>{{"Subscribe Notifications", ChangeNotificationsSubscription.f_GetExceptionStr()}}
@@ -439,14 +436,13 @@ namespace NMib::NCloud::NCloudManager
 		if (UpdateNotificationsSubscription)
 		{
 			pAppManager->m_UpdateNotificationsSubscription = fg_Move(*UpdateNotificationsSubscription);
-			co_await pThis->self(&CCloudManagerServer::fp_ChangeOtherErrors, AppManagerID, RegisterSequence, TCSet<CStr>{"Subscribe Update Notifications"}, TCMap<CStr, CStr>{});
+			co_await pThis->fp_ChangeOtherErrors(AppManagerID, RegisterSequence, TCSet<CStr>{"Subscribe Update Notifications"}, TCMap<CStr, CStr>{});
 		}
 		else
 		{
-			co_await pThis->self
+			co_await pThis->fp_ChangeOtherErrors
 				(
-					&CCloudManagerServer::fp_ChangeOtherErrors
-					, AppManagerID
+					AppManagerID
 					, RegisterSequence
 					, TCSet<CStr>{}
 					, TCMap<CStr, CStr>{{"Subscribe Update Notifications", UpdateNotificationsSubscription.f_GetExceptionStr()}}
@@ -481,8 +477,6 @@ namespace NMib::NCloud::NCloudManager
 
 	NConcurrency::TCFuture<void> CCloudManagerServer::CAppManagerCloudManagerInterfaceImplementation::f_PauseReporting(fp32 _SecondsToPause)
 	{
-		co_await ECoroutineFlag_AllowReferences;
-
 		auto pThis = m_pThis;
 
 		auto CallingHostInfo = fg_GetCallingHostInfo();
@@ -650,7 +644,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Return);
 	}
 
-	TCFuture<CCloudManager::CRemoveAppManagerReturn> CCloudManagerServer::CCloudManagerImplementation::f_RemoveAppManager(NStr::CStr const &_AppManagerHostID)
+	TCFuture<CCloudManager::CRemoveAppManagerReturn> CCloudManagerServer::CCloudManagerImplementation::f_RemoveAppManager(NStr::CStr _AppManagerHostID)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -683,14 +677,14 @@ namespace NMib::NCloud::NCloudManager
 				co_await Interface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app manager interface subscription");
 		}
 
-		auto Result = co_await (pThis->self(&CCloudManagerServer::fp_RemoveAppManagerData, _AppManagerHostID) % Auditor);
+		auto Result = co_await (pThis->fp_RemoveAppManagerData(_AppManagerHostID) % Auditor);
 
 		Auditor.f_Info("Remove App Manager");
 
 		co_return Result;
 	}
 
-	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveSensor(CRemoveSensor &&_RemoveSensor)
+	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveSensor(CRemoveSensor _RemoveSensor)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -721,7 +715,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return nRemoved;
 	}
 
-	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveLog(CRemoveLog &&_RemoveLog)
+	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_RemoveLog(CRemoveLog _RemoveLog)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -752,7 +746,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return nRemoved;
 	}
 
-	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_SnoozeSensor(CSnoozeSensor &&_SnoozeSensor)
+	TCFuture<uint32> CCloudManagerServer::CCloudManagerImplementation::f_SnoozeSensor(CSnoozeSensor _SnoozeSensor)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -790,7 +784,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return nChanged;
 	}
 
-	TCFuture<TCActorSubscriptionWithID<>> CCloudManagerServer::CCloudManagerImplementation::f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions &&_Params)
+	TCFuture<TCActorSubscriptionWithID<>> CCloudManagerServer::CCloudManagerImplementation::f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions _Params)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -902,7 +896,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Return);
 	}
 
-	TCFuture<void> CCloudManagerServer::CCloudManagerImplementation::f_SetExpectedOsVersions(CStr &&_OsName, CCurrentVersion &&_CurrentVersion, CExpectedVersionRange &&_ExpectedRange)
+	TCFuture<void> CCloudManagerServer::CCloudManagerImplementation::f_SetExpectedOsVersions(CStr _OsName, CCurrentVersion _CurrentVersion, CExpectedVersionRange _ExpectedRange)
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -914,15 +908,15 @@ namespace NMib::NCloud::NCloudManager
 		if (!co_await pThis->mp_Permissions.f_HasPermission("Set expected OS version", Permissions))
 			co_return Auditor.f_AccessDenied("(Set expected OS version)", Permissions);
 
-		TCPromise<bool> ChangedPromise;
+		TCPromiseFuturePair<bool> ChangedPromise;
 
 		co_await
 			(
 				pThis->mp_DatabaseActor
 				(
 					&CDatabaseActor::f_WriteWithCompaction
-					, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(pThis), _OsName, _CurrentVersion, _ExpectedRange, ChangedPromise]
-					(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+					, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(pThis), _OsName, _CurrentVersion, _ExpectedRange, ChangedPromise = fg_Move(ChangedPromise.m_Promise)]
+					(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
@@ -969,14 +963,14 @@ namespace NMib::NCloud::NCloudManager
 
 		Auditor.f_Info("Set expected OS version");
 
-		auto bChanged = co_await ChangedPromise.f_MoveFuture();
+		auto bChanged = co_await fg_Move(ChangedPromise.m_Future);
 
 		if (bChanged)
 		{
 			CCloudManager::CExpectedVersions ChangeData;
 			ChangeData.m_Versions[_CurrentVersion] = _ExpectedRange;
 
-			TCActorResultVector<void> NotificationResults;
+			TCFutureVector<void> NotificationResults;
 			CExpectedOsVersionSubscriptionKey Key{.m_OsName = _OsName};
 			for
 				(
@@ -987,12 +981,12 @@ namespace NMib::NCloud::NCloudManager
 			{
 				auto &Subscription = *iSubscription;
 				if (Subscription.m_fVersionRangeChanged)
-					Subscription.m_fVersionRangeChanged(ChangeData) > NotificationResults.f_AddResult();
+					Subscription.m_fVersionRangeChanged(ChangeData) > NotificationResults;
 				else
 					Subscription.m_QueuedNotifications.f_Insert(ChangeData);
 			}
 
-			co_await NotificationResults.f_GetUnwrappedResults().f_Wrap() > fg_LogError("CloudManager", "Error sending expected OS version notifications");
+			co_await fg_AllDone(NotificationResults).f_Wrap() > fg_LogError("CloudManager", "Error sending expected OS version notifications");
 		}
 
 		co_return {};

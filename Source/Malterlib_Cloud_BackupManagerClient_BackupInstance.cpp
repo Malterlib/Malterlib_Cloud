@@ -67,18 +67,18 @@ namespace NMib::NCloud::NPrivate
 		mp_PendingFiles.f_Clear();
 		mp_SequencedSyncs.f_Clear();
 
-		TCActorResultVector<void> DestroyResults;
+		TCFutureVector<void> DestroyResults;
 		if (mp_pManifestSyncState && mp_pManifestSyncState->m_RSyncSubscription)
-			mp_pManifestSyncState->m_RSyncSubscription->f_Destroy() > DestroyResults.f_AddResult();
+			mp_pManifestSyncState->m_RSyncSubscription->f_Destroy() > DestroyResults;
 
-		co_await DestroyResults.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy can destroy backup manager client instance");
+		co_await fg_AllDone(DestroyResults).f_Wrap() > LogError.f_Warning("Failed to destroy can destroy backup manager client instance");
 
 		co_return {};
 	}
 
 	void CBackupManagerClient_Instance::fp_BackupNotification(CBackupManagerClient::CNotification &&_Notification)
 	{
-		mp_BackupManagerClient(&CBackupManagerClient::fp_OnNotification, mp_ActorInfo.m_HostInfo, fg_Move(_Notification)) > fg_DiscardResult();
+		mp_BackupManagerClient(&CBackupManagerClient::fp_OnNotification, mp_ActorInfo.m_HostInfo, fg_Move(_Notification)).f_DiscardResult();
 	}
 
 	void CBackupManagerClient_Instance::fp_ReportBackupError(CStr const &_Error, bool _bFatal)
@@ -100,7 +100,7 @@ namespace NMib::NCloud::NPrivate
 
 		_pRunningState->m_pOnScopeExit.f_Clear();
 
-		mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, _PendingFile.m_ManifestFile.m_OriginalPath) > fg_DiscardResult();
+		mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, _PendingFile.m_ManifestFile.m_OriginalPath).f_DiscardResult();
 	}
 
 	void CBackupManagerClient_Instance::fp_ReportRetry(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState)
@@ -111,7 +111,7 @@ namespace NMib::NCloud::NPrivate
 
 		_pRunningState->m_pOnScopeExit.f_Clear();
 
-		mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, _pRunningState->m_ManifestFile.m_OriginalPath) > fg_DiscardResult();
+		mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, _pRunningState->m_ManifestFile.m_OriginalPath).f_DiscardResult();
 	}
 
 	void CBackupManagerClient_Instance::fp_RSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, CPendingBackupFile &_PendingFile, mint _SyncSequence)
@@ -166,21 +166,24 @@ namespace NMib::NCloud::NPrivate
 
 						if (auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName))
 						{
-							bool bHandled = NException::fg_VisitException<CExceptionBackupManagerHashMismatch>
-								(
-									DestroyResult.f_GetException()
-									, [&](CExceptionBackupManagerHashMismatch const &_Exception)
-									{
-										(void)_Exception;
-										DMibLog(Info, "Reschedule: {}: {}", FileName, _Exception);
+							if (!DestroyResult)
+							{
+								bool bHandled = NException::fg_VisitException<CExceptionBackupManagerHashMismatch>
+									(
+										DestroyResult.f_GetException()
+										, [&](CExceptionBackupManagerHashMismatch const &_Exception)
+										{
+											(void)_Exception;
+											DMibLog(Info, "Reschedule: {}: {}", FileName, _Exception);
 
-										fp_ReportHashMismatch(pRunningState, *pPendingFile);
-									}
-								)
-							;
+											fp_ReportHashMismatch(pRunningState, *pPendingFile);
+										}
+									)
+								;
 
-							if (bHandled)
-								co_return {};
+								if (bHandled)
+									co_return {};
+							}
 
 							if (pPendingFile->m_bFinished && (SyncFlags & EDirectoryManifestSyncFlag_Append))
 							{
@@ -204,7 +207,7 @@ namespace NMib::NCloud::NPrivate
 								{
 									DMibLog(Info, "Reschedule (Append mismatch): {}", FileName);
 									AppendState.m_bDirty = true;
-									mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, pPendingFile->m_ManifestFile.m_OriginalPath) > fg_DiscardResult();
+									mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, pPendingFile->m_ManifestFile.m_OriginalPath).f_DiscardResult();
 								}
 								else
 									AppendState.m_bDirty = false;
@@ -219,40 +222,38 @@ namespace NMib::NCloud::NPrivate
 						co_return {};
 					}
 				)
-				/ [this, pRunningState, FileName](CSecureByteVector &&_Packet) mutable -> TCFuture<CSecureByteVector>
+				/ [this, pRunningState, FileName](CSecureByteVector _Packet) mutable -> TCFuture<CSecureByteVector>
 				{
-					return TCFuture<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
-						{
-							NContainer::CSecureByteVector ToSendToClient;
-							auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName);
+					auto CaptureScope = co_await g_CaptureExceptions;
 
-							if
-								(
-									pRunningState->m_pRSyncServer->f_ProcessPacket
-									(
-										_Packet
-										, ToSendToClient
-										, [this]
-										{
-											if (f_IsDestroyed())
-												DMibError("Aborted");
-										}
-									)
-								)
-							{
-								if (pPendingFile)
-									pPendingFile->m_bFinished = true;
-							}
+					NContainer::CSecureByteVector ToSendToClient;
+					auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName);
 
-							if (pPendingFile)
-							{
-								pPendingFile->m_TransferStats.m_IncomingBytes += _Packet.f_GetLen();
-								pPendingFile->m_TransferStats.m_OutgoingBytes += ToSendToClient.f_GetLen();
-							}
+					if
+						(
+							pRunningState->m_pRSyncServer->f_ProcessPacket
+							(
+								_Packet
+								, ToSendToClient
+								, [this]
+								{
+									if (f_IsDestroyed())
+										DMibError("Aborted");
+								}
+							)
+						)
+					{
+						if (pPendingFile)
+							pPendingFile->m_bFinished = true;
+					}
 
-							return ToSendToClient;
-						}
-					;
+					if (pPendingFile)
+					{
+						pPendingFile->m_TransferStats.m_IncomingBytes += _Packet.f_GetLen();
+						pPendingFile->m_TransferStats.m_OutgoingBytes += ToSendToClient.f_GetLen();
+					}
+
+					co_return fg_Move(ToSendToClient);
 				}
 			)
 			> [this, FileName, SyncSequence, pRunningState](TCAsyncResult<TCActorSubscriptionWithID<>> &&_Subscription)
@@ -412,19 +413,18 @@ namespace NMib::NCloud::NPrivate
 
 	void CBackupManagerClient_Instance::fp_AppendSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, mint _SyncSequence)
 	{
-		TCPromise<bool> Promise;
-
 		auto &RunningState = *_pRunningState;
 
 		auto FileName = RunningState.m_FileName;
 		auto SyncSequence = _SyncSequence;
 		auto pRunningState = _pRunningState;
 
+		TCPromiseFuturePair<bool> Promise;
 		try
 		{
 			auto pFileCache = fp_GetAppendFileCache(RunningState.m_ManifestFile.m_OriginalPath);
 
-			fp_SendAppendSyncFile(_pRunningState, Promise, _pRunningState->m_ManifestFile.m_Length, pFileCache, true);
+			fp_SendAppendSyncFile(_pRunningState, Promise.m_Promise, _pRunningState->m_ManifestFile.m_Length, pFileCache, true);
 		}
 		catch (NException::CException const &_Exception)
 		{
@@ -435,7 +435,7 @@ namespace NMib::NCloud::NPrivate
 			return;
 		}
 
-		Promise.f_MoveFuture() > [=, this](TCAsyncResult<bool> &&_Result)
+		fg_Move(Promise.m_Future) > [=, this](TCAsyncResult<bool> &&_Result)
 			{
 				if (!_Result)
 				{
@@ -651,12 +651,12 @@ namespace NMib::NCloud::NPrivate
 			pState->m_pRSyncServer = fg_Construct(pState->m_ManifestStream, 8 * 1024 * 1024, RSyncFlags);
 		}
 
-		TCPromise<void> Promise;
+		TCPromiseFuturePair<void> Promise;
 		auto Subscription = co_await mp_Backup.f_CallActor(&CBackupManagerBackup::f_StartManifestRSync)
 			(
 				g_ActorFunctor
 				(
-					g_ActorSubscription / [Promise, this]() -> TCFuture<void>
+					g_ActorSubscription / [Promise = fg_Move(Promise.m_Promise), this]() -> TCFuture<void>
 					{
 						if (!mp_pManifestSyncState)
 							co_return {};
@@ -686,37 +686,32 @@ namespace NMib::NCloud::NPrivate
 						co_return {};
 					}
 				)
-				/ [this](CSecureByteVector &&_Packet) mutable -> TCFuture<CSecureByteVector>
+				/ [this](CSecureByteVector _Packet) mutable -> TCFuture<CSecureByteVector>
 				{
 					if (!mp_pManifestSyncState)
 						co_return DMibErrorInstance("Aborted");
 
-					co_return co_await
-						(
-							TCFuture<CSecureByteVector>::fs_RunProtected() / [&]() -> CSecureByteVector
-							{
-								NContainer::CSecureByteVector ToSendToClient;
-								if
-									(
-										mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket
-										(
-											_Packet
-											, ToSendToClient
-											, [this]
-											{
-												if (f_IsDestroyed())
-													DMibError("Aborted");
-											}
-										)
-									)
-								{
-									mp_pManifestSyncState->m_bDone = true;
-								}
+					auto CaptureScope = co_await g_CaptureExceptions;
 
-								return ToSendToClient;
-							}
+					NContainer::CSecureByteVector ToSendToClient;
+					if
+						(
+							mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket
+							(
+								_Packet
+								, ToSendToClient
+								, [this]
+								{
+									if (f_IsDestroyed())
+										DMibError("Aborted");
+								}
+							)
 						)
-					;
+					{
+						mp_pManifestSyncState->m_bDone = true;
+					}
+
+					co_return fg_Move(ToSendToClient);
 				}
 				, pState->m_ManifestStream.f_GetLength()
 				, ManifestDigest
@@ -732,7 +727,7 @@ namespace NMib::NCloud::NPrivate
 
 		mp_pManifestSyncState->m_RSyncSubscription = fg_Move(*Subscription);
 
-		co_await Promise.f_MoveFuture();
+		co_await fg_Move(Promise.m_Future);
 
 		co_return {};
 	}
@@ -1116,14 +1111,12 @@ namespace NMib::NCloud::NPrivate
 
 	TCFuture<void> CBackupManagerClient_Instance::f_ManifestChanged
 		(
-			CStr const &_FileName
-			, CBackupManagerBackup::CManifestChange const &_ManifestChange
+			CStr _FileName
+			, CBackupManagerBackup::CManifestChange _ManifestChange
 			, bool _bDirty
-			, CBackupManagerClient_ChecksumState const &_ChecksumState
+			, CBackupManagerClient_ChecksumState _ChecksumState
 		)
 	{
-		TCPromise<void> Promise;
-
 #if defined DMibContractConfigure_CheckEnabled
 		CStr ManifestError;
 		DMibCheck(CBackupManagerBackup::fs_ManifestChangeValid(_FileName, _ManifestChange, ManifestError));
@@ -1139,22 +1132,24 @@ namespace NMib::NCloud::NPrivate
 			;
 		}
 #endif
+		TCPromiseFuturePair<void> Promise;
+
 		if (mp_Backup)
 		{
 			if (mp_bBackupStarted)
-				fp_ProcessManifestChange(_FileName, {_ManifestChange, Promise, _bDirty});
+				fp_ProcessManifestChange(_FileName, {_ManifestChange, Promise.m_Promise, _bDirty});
 			else if (!mp_bBackupStartFailed)
-				mp_PendingManifestChanges.f_Insert({_FileName, {_ManifestChange, Promise, _bDirty}});
+				mp_PendingManifestChanges.f_Insert({_FileName, {_ManifestChange, Promise.m_Promise, _bDirty}});
 			else
-				Promise.f_SetResult();
+				Promise.m_Promise.f_SetResult();
 		}
 		else
 		{
 			CBackupManagerBackup::fs_ApplyManifestChange(mp_Manifest, _FileName, _ManifestChange);
-			Promise.f_SetResult();
+			Promise.m_Promise.f_SetResult();
 		}
 
-		return Promise.f_MoveFuture();
+		co_return co_await fg_Move(Promise.m_Future);
 	}
 
 	void CBackupManagerClient_Instance::f_MarkActive(bool _bActive)

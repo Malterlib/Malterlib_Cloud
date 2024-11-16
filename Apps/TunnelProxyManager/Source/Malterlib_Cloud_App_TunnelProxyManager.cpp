@@ -21,16 +21,16 @@ namespace NMib::NCloud::NTunnelProxyManager
 	{
 	}
 
-	TCFuture<void> CTunnelProxyManagerApp::fp_ReloadConfig(TCActorFunctor<TCFuture<void> (CStr &&_Message)> _fLog)
+	TCFuture<void> CTunnelProxyManagerApp::fp_ReloadConfig(TCActorFunctor<TCFuture<void> (CStr _Message)> _fLog)
 	{
 		CLogError LogError("TunnelProxyManager");
 
-		TCActorResultVector<void> RemoveResults;
+		TCFutureVector<void> RemoveResults;
 
 		{
 			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read Publish config");
 
-			TCActorResultMap<CStr, CActorSubscription> PublishResults;
+			TCFutureMap<CStr, CActorSubscription> PublishResults;
 			TCMap<CStr, CStr> NewHosts;
 
 			if (auto const *pPublish = mp_State.m_ConfigDatabase.m_Data.f_GetMember("Publish"))
@@ -57,11 +57,11 @@ namespace NMib::NCloud::NTunnelProxyManager
 					else if (_fLog)
 						co_await _fLog("Publishing new tunnel '{}': {}"_f << TunnelName << Host);
 
-					mp_TunnelsServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, TunnelName, Host, 0, CEJSONSorted()) > PublishResults.f_AddResult(TunnelName);
+					mp_TunnelsServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, TunnelName, Host, 0, CEJSONSorted()) > PublishResults[TunnelName];
 				}
 			}
 
-			auto NewPublish = co_await PublishResults.f_GetUnwrappedResults();
+			auto NewPublish = co_await fg_AllDone(PublishResults);
 
 			for (auto &PublishEntry : NewPublish.f_Entries())
 			{
@@ -82,7 +82,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 					continue;
 
 				if (Publication.m_Subscription)
-					fg_Exchange(Publication.m_Subscription, nullptr)->f_Destroy() > RemoveResults.f_AddResult();
+					fg_Exchange(Publication.m_Subscription, nullptr)->f_Destroy() > RemoveResults;
 
 				if (_fLog)
 					co_await _fLog("Removing published tunnel '{}'"_f << TunnelName);
@@ -97,7 +97,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 		{
 			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to read Subscribe config");
 
-			TCActorResultMap<CStr, CNetworkTunnelsClient::CTunnel> OpenTunnelResults;
+			TCFutureMap<CStr, CNetworkTunnelsClient::CTunnel> OpenTunnelResults;
 
 			TCMap<CStr, CStr> NewListenHosts;
 
@@ -119,7 +119,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 							co_await _fLog("Changing tunnel subscription '{}' listen: {} -> {}"_f << TunnelName << pOldSubscription->m_ListenHost << ListenHost);
 
 						if (pOldSubscription->m_Tunnel.m_Subscription)
-							fg_Exchange(pOldSubscription->m_Tunnel.m_Subscription, nullptr)->f_Destroy() > RemoveResults.f_AddResult();						
+							fg_Exchange(pOldSubscription->m_Tunnel.m_Subscription, nullptr)->f_Destroy() > RemoveResults;
 					}
 					else if (_fLog)
 						co_await _fLog("Opening new tunnel subscription '{}': {}"_f << TunnelName << ListenHost);
@@ -127,7 +127,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 					CNetworkTunnelsClient::COpenTunnel OpenTunnel
 						{
 							.m_TunnelName = TunnelName
-							, .m_fOnConnection = g_ActorFunctor / [this, TunnelName](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo) -> TCFuture<void>
+							, .m_fOnConnection = g_ActorFunctor / [this, TunnelName](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo) -> TCFuture<void>
 							{
 								auto Auditor = mp_State.f_Auditor();
 								Auditor.f_Info
@@ -141,7 +141,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 								;
 								co_return {};
 							}
-							, .m_fOnClose = g_ActorFunctor / [this, TunnelName](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, NStr::CStr const &_Message) -> TCFuture<void>
+							, .m_fOnClose = g_ActorFunctor / [this, TunnelName](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, NStr::CStr _Message) -> TCFuture<void>
 							{
 								auto Auditor = mp_State.f_Auditor();
 								Auditor.f_Info
@@ -156,7 +156,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 								;
 								co_return {};
 							}
-							, .m_fOnError = g_ActorFunctor / [this, TunnelName](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, NStr::CStr const &_Error) -> TCFuture<void>
+							, .m_fOnError = g_ActorFunctor / [this, TunnelName](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, NStr::CStr _Error) -> TCFuture<void>
 							{
 								auto Auditor = mp_State.f_Auditor();
 								Auditor.f_Error
@@ -175,11 +175,11 @@ namespace NMib::NCloud::NTunnelProxyManager
 							, .m_bWaitForTunnel = true
 						}
 					;
-					mp_TunnelsClient(&CNetworkTunnelsClient::f_OpenTunnel, fg_Move(OpenTunnel)) > OpenTunnelResults.f_AddResult(TunnelName);
+					mp_TunnelsClient(&CNetworkTunnelsClient::f_OpenTunnel, fg_Move(OpenTunnel)) > OpenTunnelResults[TunnelName];
 				}
 			}
 
-			auto NewTunnels = co_await OpenTunnelResults.f_GetUnwrappedResults();
+			auto NewTunnels = co_await fg_AllDone(OpenTunnelResults);
 
 			for (auto &TunnelEntry : NewTunnels.f_Entries())
 			{
@@ -200,7 +200,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 					continue;
 
 				if (Subscription.m_Tunnel.m_Subscription)
-					fg_Exchange(Subscription.m_Tunnel.m_Subscription, nullptr)->f_Destroy() > RemoveResults.f_AddResult();
+					fg_Exchange(Subscription.m_Tunnel.m_Subscription, nullptr)->f_Destroy() > RemoveResults;
 
 				if (_fLog)
 					co_await _fLog("Removing tunnel subscription '{}'"_f << TunnelName);
@@ -212,12 +212,12 @@ namespace NMib::NCloud::NTunnelProxyManager
 				mp_Subscriptions.f_Remove(Remove);
 		}
 
-		co_await RemoveResults.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to remove old subscriptions");
+		co_await fg_AllDone(RemoveResults).f_Wrap() > LogError.f_Warning("Failed to remove old subscriptions");
 
 		co_return {};
 	}
 
-	TCFuture<void> CTunnelProxyManagerApp::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
+	TCFuture<void> CTunnelProxyManagerApp::fp_StartApp(NEncoding::CEJSONSorted const _Params)
 	{
 		mp_TunnelsServer = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager, mp_State.f_AuditorFactory(), "TunnelProxyManager", "TunnelProxyManager");
 		co_await mp_TunnelsServer(&CNetworkTunnelsServer::f_Start);
@@ -237,24 +237,24 @@ namespace NMib::NCloud::NTunnelProxyManager
 
 	TCFuture<void> CTunnelProxyManagerApp::fp_Destroy()
 	{
-		TCActorResultVector<void> Destroys;
+		TCFutureVector<void> Destroys;
 
 		CLogError LogError("TunnelProxyManager");
 
 		for (auto &Publication : mp_Publications)
-			fg_Exchange(Publication.m_Subscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
+			fg_Exchange(Publication.m_Subscription, nullptr)->f_Destroy() > Destroys;
 
 		mp_Publications.f_Clear();
 
 		for (auto &Subscription : mp_Subscriptions)
 		{
 			if (Subscription.m_Tunnel.m_Subscription)
-				fg_Exchange(Subscription.m_Tunnel.m_Subscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
+				fg_Exchange(Subscription.m_Tunnel.m_Subscription, nullptr)->f_Destroy() > Destroys;
 		}
 
 		mp_Subscriptions.f_Clear();
 
-		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy tunnel subscriptions");
+		co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy tunnel subscriptions");
 
 		if (mp_TunnelsClient)
 			co_await fg_Move(mp_TunnelsClient).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy tunnels client");

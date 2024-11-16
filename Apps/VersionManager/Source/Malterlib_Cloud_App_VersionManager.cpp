@@ -21,7 +21,7 @@ namespace NMib::NCloud::NVersionManager
 	{
 	}
 
-	TCFuture<void> CVersionManagerDaemonActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
+	TCFuture<void> CVersionManagerDaemonActor::fp_StartApp(NEncoding::CEJSONSorted const _Params)
 	{
 		mp_pServer = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);
 		

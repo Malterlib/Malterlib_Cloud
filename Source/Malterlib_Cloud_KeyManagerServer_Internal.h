@@ -14,8 +14,8 @@ namespace NMib::NCloud
 	{
 		struct CKeyManagerImplementation : public CKeyManager
 		{
-			NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize) override;
-			auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
+			NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr _Identifier, uint32 _KeySize) override;
+			auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 				-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>>
 			override;
 
@@ -25,12 +25,12 @@ namespace NMib::NCloud
 		struct CKeyManagerServerSyncImplementation : public CKeyManagerServerSync
 		{
 			NConcurrency::TCFuture<CReadDatabase> f_ReadDatabase() override;
-			NConcurrency::TCFuture<void> f_CreateNewKeys(NContainer::TCMap<CHostKeyID, CSymmetricKey> &&_Keys) override;
-			NConcurrency::TCFuture<CUseAvailableKeyResult> f_UseAvailableKey(CSymmetricKey &&_Key) override;
-			NConcurrency::TCFuture<void> f_PreCreateKeys(NContainer::TCSet<CSymmetricKey> &&_Keys) override;
-			NConcurrency::TCFuture<void> f_RemovePreCreatedKeys(NContainer::TCSet<CSymmetricKey> &&_Keys) override;
-			NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs, NContainer::TCSet<NStr::CStr> &&_CheckedServers) override;
-			NConcurrency::TCFuture<void> f_KeysVerifiedOnServers(NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> &&_KeysVerifiedOnServers) override;
+			NConcurrency::TCFuture<void> f_CreateNewKeys(NContainer::TCMap<CHostKeyID, CSymmetricKey> _Keys) override;
+			NConcurrency::TCFuture<CUseAvailableKeyResult> f_UseAvailableKey(CSymmetricKey _Key) override;
+			NConcurrency::TCFuture<void> f_PreCreateKeys(NContainer::TCSet<CSymmetricKey> _Keys) override;
+			NConcurrency::TCFuture<void> f_RemovePreCreatedKeys(NContainer::TCSet<CSymmetricKey> _Keys) override;
+			NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> _HostIDs, NContainer::TCSet<NStr::CStr> _CheckedServers) override;
+			NConcurrency::TCFuture<void> f_KeysVerifiedOnServers(NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> _KeysVerifiedOnServers) override;
 
 			DMibDelegatedActorImplementation(CKeyManagerServer);
 		};

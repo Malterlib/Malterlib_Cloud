@@ -95,7 +95,7 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	NConcurrency::TCFuture<CSymmetricKey> CKeyManagerServer::CInternal::CKeyManagerImplementation::f_RequestKey(CStr const &_Identifier, uint32 _KeySize)
+	NConcurrency::TCFuture<CSymmetricKey> CKeyManagerServer::CInternal::CKeyManagerImplementation::f_RequestKey(CStr _Identifier, uint32 _KeySize)
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
@@ -167,7 +167,7 @@ namespace NMib::NCloud
 		}
 	}
 
-	auto CKeyManagerServer::CInternal::CKeyManagerImplementation::f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
+	auto CKeyManagerServer::CInternal::CKeyManagerImplementation::f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 		-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>>
 	{
 		auto &Internal = *m_pThis->mp_pInternal;

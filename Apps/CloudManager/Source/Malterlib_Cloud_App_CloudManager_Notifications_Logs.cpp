@@ -140,7 +140,7 @@ namespace NMib::NCloud::NCloudManager
 			(
 				&CDistributedAppLogStoreLocal::f_SubscribeLogs
 				, TCVector<CDistributedAppLogReader_LogFilter>()
-				, g_ActorFunctor / [this](CDistributedAppLogReader::CLogChange &&_Change) -> TCFuture<void>
+				, g_ActorFunctor / [this](CDistributedAppLogReader::CLogChange _Change) -> TCFuture<void>
 				{
 					switch (_Change.f_GetTypeID())
 					{
@@ -169,7 +169,7 @@ namespace NMib::NCloud::NCloudManager
 		CDistributedAppLogReader::CSubscribeLogEntries SubscribeLogEntriesParams;
 		SubscribeLogEntriesParams.m_Flags = CDistributedAppLogReader::ELogEntriesFlag_IncludeLastSeenSentinel;
 		SubscribeLogEntriesParams.m_Filters = fg_Move(LogEntryFilters);
-		SubscribeLogEntriesParams.m_fOnEntry = g_ActorFunctor / [this](CDistributedAppLogReader_LogKeyAndEntry &&_Entry) -> TCFuture<void>
+		SubscribeLogEntriesParams.m_fOnEntry = g_ActorFunctor / [this](CDistributedAppLogReader_LogKeyAndEntry _Entry) -> TCFuture<void>
 			{
 				CStr ThisHostID;
 				NLogStore::CFilterLogKeyContext FilterContext{.m_ThisHostID = ThisHostID, .m_Prefix = mp_This.mc_DatabasePrefixLog};
@@ -244,10 +244,12 @@ namespace NMib::NCloud::NCloudManager
 			return;
 
 		mp_bSlackNotificationsScheduled = true;
-		fg_Timeout(gc_LogAggregationTime) > [this]()
+		fg_Timeout(gc_LogAggregationTime) > [this]() -> TCFuture<void>
 			{
 				mp_bSlackNotificationsScheduled = false;
 				fp_SendSlackNotifications() > fg_LogError("CloudManager", "Error sending log notifications");
+
+				co_return {};
 			}
 		;
 	}

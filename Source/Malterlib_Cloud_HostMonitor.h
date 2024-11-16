@@ -176,14 +176,14 @@ namespace NMib::NCloud
 		;
 		~CHostMonitor();
 
-		NConcurrency::TCFuture<CInitResult> f_Init(CConfig &&_Config);
-		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_MonitorPath(CMonitorPathOptions const &_Options);
-		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_MonitorConfigs(NConcurrency::CDistributedAppInterfaceServer::CConfigFiles &&_ConfigFiles);
-		NConcurrency::TCFuture<void> f_SetExpectedOsVersions(CCloudManager::CExpectedVersions &&_ExpectedOsVersions);
+		NConcurrency::TCFuture<CInitResult> f_Init(CConfig _Config);
+		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_MonitorPath(CMonitorPathOptions _Options);
+		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_MonitorConfigs(NConcurrency::CDistributedAppInterfaceServer::CConfigFiles _ConfigFiles);
+		NConcurrency::TCFuture<void> f_SetExpectedOsVersions(CCloudManager::CExpectedVersions _ExpectedOsVersions);
 
 		NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_EnumConfigFiles();
-		NConcurrency::TCFuture<NContainer::TCMap<NHostMonitor::CConfigFileVersionKey, NHostMonitor::CConfigFileProperties>> f_EnumConfigFileVersions(NStr::CStr &&_File);
-		NConcurrency::TCFuture<NHostMonitor::CConfigFileContents> f_GetConfigFileContents(NHostMonitor::CConfigFileVersionKey &&_Key);
+		NConcurrency::TCFuture<NContainer::TCMap<NHostMonitor::CConfigFileVersionKey, NHostMonitor::CConfigFileProperties>> f_EnumConfigFileVersions(NStr::CStr _File);
+		NConcurrency::TCFuture<NHostMonitor::CConfigFileContents> f_GetConfigFileContents(NHostMonitor::CConfigFileVersionKey _Key);
 
 		static constexpr pfp64 mc_MinimumHostMonitorInterval = 10_seconds;
 		static constexpr pfp64 mc_DefaultHostMonitorInterval = 60_seconds;

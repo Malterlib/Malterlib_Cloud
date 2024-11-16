@@ -85,9 +85,9 @@ namespace NMib::NCloud::NAppManager
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_HostMonitorConfigList, _Params, _pCommandLine);
+					return fp_CommandLine_HostMonitorConfigList(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -116,9 +116,9 @@ namespace NMib::NCloud::NAppManager
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList, _Params, _pCommandLine);
+					return fp_CommandLine_HostMonitorConfigVersionList(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -146,15 +146,15 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet, _Params, _pCommandLine);
+					return fp_CommandLine_HostMonitorConfigContentsGet(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_HostMonitor)
 			co_return DMibErrorInstance("Host monitor not yet initialized");
@@ -176,7 +176,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_HostMonitor)
 			co_return DMibErrorInstance("Host monitor not yet initialized");
@@ -251,7 +251,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		NHostMonitor::CConfigFileVersionKey Key;
 		Key.m_FileName = _Params["FileName"].f_String();

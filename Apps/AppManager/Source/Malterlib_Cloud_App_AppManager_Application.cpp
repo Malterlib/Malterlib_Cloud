@@ -226,12 +226,12 @@ namespace NMib::NCloud::NAppManager
 						if (_Flags & EStopFlag_PreventLaunchUpdate)
 							pApplication->m_bPreventLaunch_Update = true;
 
-						TCPromise<void> SaveStatePromise;
+						TCFuture<void> SaveStateFuture;
 
 						if (_Flags & (EStopFlag_PreventLaunchUser | EStopFlag_PreventLaunchUpdate))
-							m_pThis->fp_UpdateApplicationJSON(pApplication) > SaveStatePromise;
+							SaveStateFuture = m_pThis->fp_UpdateApplicationJSON(pApplication);
 						else
-							SaveStatePromise.f_SetResult();
+							SaveStateFuture = g_Void;
 
 						bool bWasStopped = pApplication->m_bStopped;
 						pApplication->m_bLaunched = false;
@@ -257,18 +257,18 @@ namespace NMib::NCloud::NAppManager
 							}
 						;
 
-						TCActorResultVector<uint32> ChildrenCloses;
+						TCFutureVector<uint32> ChildrenCloses;
 
 						// Stop all children and dependents first
 						for (auto &pDependent : f_GetDependents())
-							fg_CallSafe(*pDependent, &CApplication::f_Stop, EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
+							pDependent->f_Stop(EStopFlag_AutoStart) > ChildrenCloses;
 
 						for (auto &ChildApp : m_Children)
-							fg_CallSafe(ChildApp, &CApplication::f_Stop, EStopFlag_AutoStart) > ChildrenCloses.f_AddResult();
+							ChildApp.f_Stop(EStopFlag_AutoStart) > ChildrenCloses;
 
 						m_pThis->fp_AppLaunchStateChanged(pApplication, "Stopping", CAppManagerInterface::EStatusSeverity_Warning);
 
-						auto [ChildrenCloseResults, SaveStateResult] = co_await ((ChildrenCloses.f_GetResults() + SaveStatePromise.f_MoveFuture()) % "Failed to stop child application");
+						auto [ChildrenCloseResults, SaveStateResult] = co_await ((fg_AllDoneWrapped(ChildrenCloses) + fg_Move(SaveStateFuture)) % "Failed to stop child application");
 
 						CStr ChildCloseErrors;
 						for (auto &ChildCloseResult : ChildrenCloseResults)
@@ -319,7 +319,7 @@ namespace NMib::NCloud::NAppManager
 								StopResult = co_await pApplication->m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInterfaceLaunchActor>>()(&CProcessLaunchActor::f_StopProcess).f_Wrap();
 							else if (pApplication->m_ProcessLaunch.f_IsOfType<TCActor<CDistributedAppInProcessActor>>())
 							{
-								auto Result = co_await pApplication->m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInProcessActor>>().f_Destroy().f_Wrap();
+								auto Result = co_await fg_TempCopy(pApplication->m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInProcessActor>>()).f_Destroy().f_Wrap();
 								if (!Result)
 									StopResult.f_SetException(fg_Move(Result));
 								else
@@ -407,7 +407,7 @@ namespace NMib::NCloud::NAppManager
 						if (m_Settings.m_EncryptionStorage.f_IsEmpty() || !m_bEncryptionOpened)
 							co_return _Status;
 
-						co_await m_pThis->self(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Close, false);
+						co_await m_pThis->fp_ChangeEncryption(pApplication, EEncryptOperation_Close, false);
 
 						co_return _Status;
 					}

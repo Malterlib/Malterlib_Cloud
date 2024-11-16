@@ -194,7 +194,7 @@ namespace NMib::NCloud::NBackupManager
 		co_return fg_Move(BackupResult);
 	}
 
-	TCFuture<void> CBackupInstance::CInternal::f_CommitManifestChange(CStr const &_FileName, CManifestChange const &_Change, CStr const &_Description)
+	TCFuture<void> CBackupInstance::CInternal::f_CommitManifestChange(CStr _FileName, CManifestChange _Change, CStr _Description)
 	{
 #if defined DMibContractConfigure_CheckEnabled
 		CStr ManifestError;
@@ -215,7 +215,7 @@ namespace NMib::NCloud::NBackupManager
 		co_return {};
 	}
 
-	TCFuture<void> CBackupInstance::CInternal::f_CommitFile(CStr const &_File, CBackupManagerBackup::CManifestFile const &_ManifestFile)
+	TCFuture<void> CBackupInstance::CInternal::f_CommitFile(CStr _File, CBackupManagerBackup::CManifestFile _ManifestFile)
 	{
 #if defined DMibContractConfigure_CheckEnabled
 		CStr ManifestError;
@@ -244,13 +244,12 @@ namespace NMib::NCloud::NBackupManager
 
 	auto CBackupInstance::f_InitialBackupFinished(EInitialBackupFinishedFlag _FinishedFlags) -> TCFuture<CInitialBackupFinishedResult>
 	{
-		TCPromise<CInitialBackupFinishedResult> Promise;
-
 		auto &Internal = *mp_pInternal;
 
+		TCPromiseFuturePair<CInitialBackupFinishedResult> Promise;
 		Internal.f_OnPendingQuiescence
 			(
-				[Promise, this, _FinishedFlags]
+				[Promise = fg_Move(Promise.m_Promise), this, _FinishedFlags]() mutable
 				{
 					// When we get here no rsyncs should be running, only appends can be queued. Guard against this by sequencing against all files in manifest
 
@@ -259,34 +258,29 @@ namespace NMib::NCloud::NBackupManager
 					for (auto &File : Internal.m_Manifest.m_Files)
 						FilesToSynchronize.f_Insert(File.f_GetFileName());
 
-					Internal.f_SequenceMultipleSyncs
-						(
-							[Promise, this, _FinishedFlags](COnScopeExitShared &&_pCleanup)
-							{
-								auto &Internal = *mp_pInternal;
-								Internal.m_bInitialBackupFinished = true;
-								DMibLogWithCategory(Mib/Cloud/BackupManager, Info, "({} - {tc5}) Initial backup finished, committing to latest", Internal.m_Name, Internal.m_StartTime);
-								Internal.m_BackupSource(&CBackupSource::f_InitialCommit, Internal.m_ID, Internal.f_GetCurrentPath(""), fg_TempCopy(Internal.m_Manifest), _FinishedFlags)
-									> Promise / [=, this](CBackupSource::CInitialCommitResult &&_Result)
-									{
-										(void)_pCleanup;
-										auto &Internal = *mp_pInternal;
-										Internal.m_BackupSourceSubscription = fg_Move(_Result.m_Subscription);
+					Internal.f_SequenceMultipleSyncs(FilesToSynchronize) > fg_Move(Promise) / [Promise, this, _FinishedFlags](CActorSubscription &&_Subscription) mutable
+						{
+							auto &Internal = *mp_pInternal;
+							Internal.m_bInitialBackupFinished = true;
+							DMibLogWithCategory(Mib/Cloud/BackupManager, Info, "({} - {tc5}) Initial backup finished, committing to latest", Internal.m_Name, Internal.m_StartTime);
+							Internal.m_BackupSource(&CBackupSource::f_InitialCommit, Internal.m_ID, Internal.f_GetCurrentPath(""), fg_TempCopy(Internal.m_Manifest), _FinishedFlags)
+								> fg_Move(Promise) / [Subscription = fg_Move(_Subscription), Promise, this](CBackupSource::CInitialCommitResult &&_Result)
+								{
+									(void)Subscription;
+									auto &Internal = *mp_pInternal;
+									Internal.m_BackupSourceSubscription = fg_Move(_Result.m_Subscription);
 
-										DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "({} - {tc5}) Committed to latest, finishing", Internal.m_Name, Internal.m_StartTime);
+									DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "({} - {tc5}) Committed to latest, finishing", Internal.m_Name, Internal.m_StartTime);
 
-										Promise.f_SetResult(_Result.m_Result);
-									}
-								;
-							}
-							, FilesToSynchronize
-						)
+									Promise.f_SetResult(_Result.m_Result);
+								}
+							;
+						}
 					;
-
 				}
 			)
 		;
 
-		return Promise.f_MoveFuture();
+		co_return co_await fg_Move(Promise.m_Future);
 	}
 }

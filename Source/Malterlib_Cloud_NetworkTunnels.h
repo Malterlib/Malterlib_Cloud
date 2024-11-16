@@ -83,10 +83,10 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CTunnelChange &&_TunnelChange)> m_fOnTunnelChange;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CTunnelChange _TunnelChange)> m_fOnTunnelChange;
 		};
 
-		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSecureByteVector &&_Data)>;
+		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSecureByteVector _Data)>;
 
 		struct COpenConnection
 		{
@@ -99,8 +99,8 @@ namespace NMib::NCloud
 		};
 
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CNetworkTunnelName, CNetworkTunnel>> f_EnumerateTunnels() = 0;
-		virtual NConcurrency::TCFuture<FSendBytes> f_OpenConnection(COpenConnection &&_OpenConnection) = 0;
-		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeTunnels(CSubscribeTunnels &&_Subscribe) = 0;
+		virtual NConcurrency::TCFuture<FSendBytes> f_OpenConnection(COpenConnection _OpenConnection) = 0;
+		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeTunnels(CSubscribeTunnels _Subscribe) = 0;
 	};
 }
 

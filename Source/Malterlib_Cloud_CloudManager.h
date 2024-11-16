@@ -196,7 +196,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NStr::CStr m_OsName;
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CExpectedVersions &&_Versions)> m_fVersionRangeChanged;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CExpectedVersions _Versions)> m_fVersionRangeChanged;
 		};
 
 		static uint32 fs_ProtocolVersion_CloudManagerToAppManager(uint32 _CloudManagerVersion);
@@ -245,24 +245,24 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCFuture<CRegisterAppManagerResult> f_RegisterAppManager
 			(
-				NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> &&_AppManager
-				, CAppManagerInfo &&_AppManagerInfo
+				NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerInterface> _AppManager
+				, CAppManagerInfo _AppManagerInfo
 			)
 			= 0
 		;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CAppManagerDynamicInfo>> f_EnumAppManagers() = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<CApplicationKey, CApplicationInfo>> f_EnumApplications() = 0;
-		virtual NConcurrency::TCFuture<CRemoveAppManagerReturn> f_RemoveAppManager(NStr::CStr const &_AppManagerHostID) = 0;
-		virtual NConcurrency::TCFuture<uint32> f_RemoveSensor(CRemoveSensor &&_RemoveSensor) = 0;
-		virtual NConcurrency::TCFuture<uint32> f_RemoveLog(CRemoveLog &&_RemoveLog) = 0;
-		virtual NConcurrency::TCFuture<uint32> f_SnoozeSensor(CSnoozeSensor &&_SnoozeSensor) = 0;
+		virtual NConcurrency::TCFuture<CRemoveAppManagerReturn> f_RemoveAppManager(NStr::CStr _AppManagerHostID) = 0;
+		virtual NConcurrency::TCFuture<uint32> f_RemoveSensor(CRemoveSensor _RemoveSensor) = 0;
+		virtual NConcurrency::TCFuture<uint32> f_RemoveLog(CRemoveLog _RemoveLog) = 0;
+		virtual NConcurrency::TCFuture<uint32> f_SnoozeSensor(CSnoozeSensor _SnoozeSensor) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReporter>> f_GetSensorReporter() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppSensorReader>> f_GetSensorReader() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReporter>> f_GetLogReporter() = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NConcurrency::CDistributedAppLogReader>> f_GetLogReader() = 0;
-		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions &&_Params) = 0;
+		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions _Params) = 0;
  		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CExpectedVersions>> f_EnumExpectedOsVersions() = 0;
- 		virtual NConcurrency::TCFuture<void> f_SetExpectedOsVersions(NStr::CStr &&_OsName, CCurrentVersion &&_CurrentVersion, CExpectedVersionRange &&_ExpectedRange) = 0;
+ 		virtual NConcurrency::TCFuture<void> f_SetExpectedOsVersions(NStr::CStr _OsName, CCurrentVersion _CurrentVersion, CExpectedVersionRange _ExpectedRange) = 0;
 
 		CCloudManager();
 		~CCloudManager();

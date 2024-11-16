@@ -17,18 +17,18 @@ namespace NMib::NCloud::NCloudManager
 	{
 		auto OnResume = co_await f_CheckDestroyedOnResume();
 
-		TCActorResultMap<CStr, CActorDistributionManager::CHostState> HostStateResults;
+		TCFutureMap<CStr, CActorDistributionManager::CHostState> HostStateResults;
 		for (auto &AppManager : mp_AppManagers)
 		{
 			CStr const &AppManagerID = mp_AppManagers.fs_GetKey(AppManager);
 
-			mp_AppState.m_DistributionManager(&CActorDistributionManager::f_GetHostState, AppManagerID) > HostStateResults.f_AddResult(AppManagerID);
+			mp_AppState.m_DistributionManager(&CActorDistributionManager::f_GetHostState, AppManagerID) > HostStateResults[AppManagerID];
 		}
 
 		{
 			auto CaptureScope = co_await g_CaptureExceptions;
 
-			auto HostStates = co_await HostStateResults.f_GetResults();
+			auto HostStates = co_await fg_AllDoneWrapped(HostStateResults);
 
 			auto Now = CTime::fs_NowUTC();
 
@@ -111,7 +111,7 @@ namespace NMib::NCloud::NCloudManager
 						&CDatabaseActor::f_WriteWithCompaction
 						, g_ActorFunctorWeak
 						/ [pThis = this, ThisActor = fg_ThisActor(this), ToUpdateAppManagers = fg_Move(ToUpdateAppManagers), ToClearAppManagers = fg_Move(ToClearAppManagers)]
-						(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+						(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 						{
 							co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
@@ -182,7 +182,7 @@ namespace NMib::NCloud::NCloudManager
 						(
 							self / [&]() -> TCFuture<void>
 							{
-								co_await self(&CCloudManagerServer::fp_UpdateAppManagerState);
+								co_await fp_UpdateAppManagerState();
 								auto UpdateResult = co_await mp_SensorNotifications.f_UpdatePeriodicSensorNotifications(false).f_Wrap();
 
 								if (!UpdateResult)

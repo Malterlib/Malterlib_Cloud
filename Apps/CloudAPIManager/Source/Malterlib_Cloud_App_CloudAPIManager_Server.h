@@ -23,10 +23,10 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		struct CCloudAPIManagerImplementation : public CCloudAPIManager
 		{
-			TCFuture<CGetSwiftBaseURL::CResult> f_GetSwiftBaseURL(CGetSwiftBaseURL &&_Params) override;
-			TCFuture<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer &&_Params) override;
-			TCFuture<CSignTempURL::CResult> f_SignTempURL(CSignTempURL &&_Params) override;
-			TCFuture<CDeleteObject::CResult> f_DeleteObject(CDeleteObject &&_Params) override;
+			TCFuture<CGetSwiftBaseURL::CResult> f_GetSwiftBaseURL(CGetSwiftBaseURL _Params) override;
+			TCFuture<CEnsureContainer::CResult> f_EnsureContainer(CEnsureContainer _Params) override;
+			TCFuture<CSignTempURL::CResult> f_SignTempURL(CSignTempURL _Params) override;
+			TCFuture<CDeleteObject::CResult> f_DeleteObject(CDeleteObject _Params) override;
 
 			DMibDelegatedActorImplementation(CServer);
 		};

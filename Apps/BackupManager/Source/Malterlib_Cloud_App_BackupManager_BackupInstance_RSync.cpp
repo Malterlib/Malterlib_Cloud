@@ -124,16 +124,16 @@ namespace NMib::NCloud::NBackupManager
 
 	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::CInternal::f_StartRSyncShared
 		(
-			FRunRSyncProtocol &&_fRunProtocol
-			, CStr const &_FileName
-			, CStr const &_OldFileName
-			, CStr const &_TempFileName
-			, CStr const &_RelativeFileName
+			FRunRSyncProtocol _fRunProtocol
+			, CStr _FileName
+			, CStr _OldFileName
+			, CStr _TempFileName
+			, CStr _RelativeFileName
 			, uint64 _FileLength
 			, EDirectoryManifestSyncFlag _SyncFlags
 			, CStr *o_pRSyncID
-			, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> &&_fOnDone
-			, TCOptional<NCryptography::CHashDigest_SHA256> const &_ExpectedDigest
+			, TCFunctionMovable<TCFuture<void> (TCAsyncResult<void> const &_Result)> _fOnDone
+			, TCOptional<NCryptography::CHashDigest_SHA256> _ExpectedDigest
 			, uint32 _ProtocolVersion
 		)
 	{
@@ -152,19 +152,19 @@ namespace NMib::NCloud::NBackupManager
 
 				auto pRsyncContext = m_RSyncContexts.f_FindEqual(RSyncID);
 
-				TCPromise<void> DestroyPromise;
+				TCFuture<void> DestroyFuture;
 
 				if (pRsyncContext)
 				{
 					bFailedHash = pRsyncContext->m_bFailedHash;
 
 					TempFiles = fg_Move(pRsyncContext->m_TempFileNames);
-					fg_Move(pRsyncContext->m_fRunProtocol).f_Destroy() > DestroyPromise;
+					DestroyFuture = fg_Move(pRsyncContext->m_fRunProtocol).f_Destroy();
 				}
 				else
 				{
 					bGeneralFailure = true;
-					DestroyPromise.f_SetResult();
+					DestroyFuture = g_Void;
 				}
 
 				m_RSyncContexts.f_Remove(RSyncID);
@@ -183,25 +183,25 @@ namespace NMib::NCloud::NBackupManager
 					}
 				}
 
-				auto DestroyResult = co_await DestroyPromise.f_MoveFuture().f_Wrap();
+				auto DestroyResult = co_await fg_Move(DestroyFuture).f_Wrap();
 
 				if (bGeneralFailure)
 				{
 					TCAsyncResult<void> Result;
 					Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("General failure for RSync"));
-					fg_CallSafe(fg_Move(fOnDone), Result) > fg_DiscardResult();
+					fg_CallSafe(fg_Move(fOnDone), Result).f_DiscardResult();
 					co_return fg_Move(Result);
 				}
 				else if (bFailedHash)
 				{
 					TCAsyncResult<void> Result;
 					Result.f_SetException(DMibErrorInstanceBackupManagerHashMismatch("Digest does not match after RSync"));
-					fg_CallSafe(fg_Move(fOnDone), Result) > fg_DiscardResult();
+					fg_CallSafe(fg_Move(fOnDone), Result).f_DiscardResult();
 					co_return fg_Move(Result);
 				}
 				else if (!DestroyResult)
 				{
-					fg_CallSafe(fg_Move(fOnDone), DestroyResult) > fg_DiscardResult();
+					fg_CallSafe(fg_Move(fOnDone), DestroyResult).f_DiscardResult();
 					co_return fg_Move(DestroyResult);
 				}
 				else
@@ -211,98 +211,99 @@ namespace NMib::NCloud::NBackupManager
 			}
 		;
 
-		f_SequenceSyncs
-			(
-				_RelativeFileName
-				, [=, this, fRunProtocol = fg_Move(_fRunProtocol)](COnScopeExitShared &&_pCleanup) mutable
-				{
-					auto pRsyncContext = m_RSyncContexts.f_FindEqual(RSyncID);
-					if (!pRsyncContext)
-						return;
+		auto Subscription = co_await f_SequenceSyncs(_RelativeFileName);
 
-					auto &RSyncContext = *pRsyncContext;
+		do
+		{
+			auto CatpureScope = co_await g_CaptureExceptions;
 
-					RSyncContext.m_SequenceSyncsCleanup = fg_Move(_pCleanup);
+			auto pRsyncContext = m_RSyncContexts.f_FindEqual(RSyncID);
+			if (!pRsyncContext)
+				break;
 
-					if (CFile::fs_FileExists(_FileName, EFileAttrib_Directory))
-						CFile::fs_DeleteDirectoryRecursive(_FileName);
-					else if (CFile::fs_FileExists(_FileName, EFileAttrib_Link))
-						CFile::fs_DeleteFile(_FileName);
+			auto &RSyncContext = *pRsyncContext;
 
-					ERSyncFlag RSyncFlags = ERSyncFlag_ClientTruncateOutput;
+			RSyncContext.m_SequenceSyncsCleanup = fg_Move(Subscription);
 
-					if (_ProtocolVersion >= EBackupManagerProtocolVersion_UseSHA256)
-						RSyncFlags |= ERSyncFlag_UseSHA256;
+			if (CFile::fs_FileExists(_FileName, EFileAttrib_Directory))
+				CFile::fs_DeleteDirectoryRecursive(_FileName);
+			else if (CFile::fs_FileExists(_FileName, EFileAttrib_Link))
+				CFile::fs_DeleteFile(_FileName);
 
-					RSyncContext.m_TempFileNames.f_Insert(_TempFileName);
+			ERSyncFlag RSyncFlags = ERSyncFlag_ClientTruncateOutput;
 
-					CFile::fs_CreateDirectory(CFile::fs_GetPath(_FileName));
+			if (_ProtocolVersion >= EBackupManagerProtocolVersion_UseSHA256)
+				RSyncFlags |= ERSyncFlag_UseSHA256;
 
-					RSyncContext.m_RelativeFileName = _RelativeFileName;
-					RSyncContext.m_AbsoluteFileName = _FileName;
-					RSyncContext.m_FileLength = _FileLength;
-					[[maybe_unused]] bool bUseOld = false;
-					bool bNewExists = CFile::fs_FileExists(_FileName);
-					bool bOldExists = !_OldFileName.f_IsEmpty() && CFile::fs_FileExists(_OldFileName);
-					if (bNewExists || !bOldExists)
-					{
-						RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
-						RSyncContext.m_TempFile.f_Open(_TempFileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
-						RSyncContext.m_pClient = fg_Construct
-							(
-								RSyncContext.m_File
-								, RSyncContext.m_File
-								, 256
-								, 4 * 1024 * 1024
-								, 8 * 1024 * 1024
-								, mc_QueueSize
-								, &RSyncContext.m_TempFile
-								, RSyncFlags
-							)
-						;
-					}
-					else
-					{
-						bUseOld = true;
-						RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
-						RSyncContext.m_SourceFile.f_Open(_OldFileName, EFileOpen_Read | EFileOpen_ShareAll);
-						RSyncContext.m_pClient = fg_Construct(RSyncContext.m_SourceFile, RSyncContext.m_File, 256, 4 * 1024 * 1024, 8 * 1024 * 1024, mc_QueueSize, nullptr, RSyncFlags);
-					}
+			RSyncContext.m_TempFileNames.f_Insert(_TempFileName);
 
-					DMibLogWithCategory
-						(
-							Mib/Cloud/BackupManager
-							, Debug
-							, "Start RSync protocol for file '{}' {}"
-							"\n    FileName: {}"
-							"\n    OldFileName: {}"
-							"\n    Size: {}   UseOld: {}   bNewExists: {}   bOldExists: {}"
-							, _RelativeFileName
-							, (_SyncFlags & EDirectoryManifestSyncFlag_Append) != 0 ? "Append" : ""
-							, _FileName
-							, _OldFileName
-							, _FileLength
-							, bUseOld
-							, bNewExists
-							, bOldExists
-						)
-					;
+			CFile::fs_CreateDirectory(CFile::fs_GetPath(_FileName));
 
-					RSyncContext.m_fRunProtocol = fg_Move(fRunProtocol);
+			RSyncContext.m_RelativeFileName = _RelativeFileName;
+			RSyncContext.m_AbsoluteFileName = _FileName;
+			RSyncContext.m_FileLength = _FileLength;
+			[[maybe_unused]] bool bUseOld = false;
+			bool bNewExists = CFile::fs_FileExists(_FileName);
+			bool bOldExists = !_OldFileName.f_IsEmpty() && CFile::fs_FileExists(_OldFileName);
+			if (bNewExists || !bOldExists)
+			{
+				RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
+				RSyncContext.m_TempFile.f_Open(_TempFileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
+				RSyncContext.m_pClient = fg_Construct
+					(
+						RSyncContext.m_File
+						, RSyncContext.m_File
+						, 256
+						, 4 * 1024 * 1024
+						, 8 * 1024 * 1024
+						, mc_QueueSize
+						, &RSyncContext.m_TempFile
+						, RSyncFlags
+					)
+				;
+			}
+			else
+			{
+				bUseOld = true;
+				RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
+				RSyncContext.m_SourceFile.f_Open(_OldFileName, EFileOpen_Read | EFileOpen_ShareAll);
+				RSyncContext.m_pClient = fg_Construct(RSyncContext.m_SourceFile, RSyncContext.m_File, 256, 4 * 1024 * 1024, 8 * 1024 * 1024, mc_QueueSize, nullptr, RSyncFlags);
+			}
 
-					f_RunRSyncProtocol(RSyncContext, {});
-				}
-			)
-		;
+			DMibLogWithCategory
+				(
+					Mib/Cloud/BackupManager
+					, Debug
+					, "Start RSync protocol for file '{}' {}"
+					"\n    FileName: {}"
+					"\n    OldFileName: {}"
+					"\n    Size: {}   UseOld: {}   bNewExists: {}   bOldExists: {}"
+					, _RelativeFileName
+					, (_SyncFlags & EDirectoryManifestSyncFlag_Append) != 0 ? "Append" : ""
+					, _FileName
+					, _OldFileName
+					, _FileLength
+					, bUseOld
+					, bNewExists
+					, bOldExists
+				)
+			;
+
+			RSyncContext.m_fRunProtocol = fg_Move(_fRunProtocol);
+
+			f_RunRSyncProtocol(RSyncContext, {});
+		}
+		while (false)
+			;
 
 		co_return fg_Move(ActorSubscription);
 	}
 
 	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::f_StartRSync
 		(
-			CStr const &_FileName
-			, CManifestFile const &_ManifestFile
-			, FRunRSyncProtocol &&_fRunProtocol
+			CStr _FileName
+			, CManifestFile _ManifestFile
+			, FRunRSyncProtocol _fRunProtocol
 		)
 	{
 		auto ProtocolVersion = fg_GetCallingHostInfo().f_GetProtocolVersion();
@@ -321,11 +322,9 @@ namespace NMib::NCloud::NBackupManager
 		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_RandomID());
 		CStr RSyncID;
 
-		co_return co_await fg_CallSafe
+		co_return co_await Internal.f_StartRSyncShared
 			(
-				Internal
-				, &CInternal::f_StartRSyncShared
-				, fg_Move(_fRunProtocol)
+				fg_Move(_fRunProtocol)
 				, FileName
 				, OldFileName
 				, TempFileName
@@ -333,11 +332,11 @@ namespace NMib::NCloud::NBackupManager
 				, _ManifestFile.m_Length
 				, _ManifestFile.m_Flags
 				, &RSyncID
-				, [this, _FileName, _ManifestFile](TCAsyncResult<void> const &_Result) -> TCFuture<void>
+				, [this, _FileName, _ManifestFile](TCAsyncResult<void> _Result) -> TCFuture<void>
 				{
 					auto &Internal = *mp_pInternal;
 					if (_Result)
-						co_await fg_CallSafe(Internal, &CInternal::f_CommitFile, _FileName, _ManifestFile);
+						co_await Internal.f_CommitFile(_FileName, _ManifestFile);
 
 					co_return _Result;
 				}

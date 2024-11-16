@@ -117,12 +117,12 @@ namespace NMib::NCloud
 		~CKeyManagerServerSync();
 		
 		virtual NConcurrency::TCFuture<CReadDatabase> f_ReadDatabase() = 0;
-		virtual NConcurrency::TCFuture<void> f_CreateNewKeys(NContainer::TCMap<CHostKeyID, CSymmetricKey> &&_Keys) = 0;
-		virtual NConcurrency::TCFuture<CUseAvailableKeyResult> f_UseAvailableKey(CSymmetricKey &&_Key) = 0;
-		virtual NConcurrency::TCFuture<void> f_PreCreateKeys(NContainer::TCSet<CSymmetricKey> &&_Keys) = 0;
-		virtual NConcurrency::TCFuture<void> f_RemovePreCreatedKeys(NContainer::TCSet<CSymmetricKey> &&_Keys) = 0;
-		virtual NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> &&_HostIDs, NContainer::TCSet<NStr::CStr> &&_CheckedServers) = 0;
-		virtual NConcurrency::TCFuture<void> f_KeysVerifiedOnServers(NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> &&_KeysVerifiedOnServers) = 0;
+		virtual NConcurrency::TCFuture<void> f_CreateNewKeys(NContainer::TCMap<CHostKeyID, CSymmetricKey> _Keys) = 0;
+		virtual NConcurrency::TCFuture<CUseAvailableKeyResult> f_UseAvailableKey(CSymmetricKey _Key) = 0;
+		virtual NConcurrency::TCFuture<void> f_PreCreateKeys(NContainer::TCSet<CSymmetricKey> _Keys) = 0;
+		virtual NConcurrency::TCFuture<void> f_RemovePreCreatedKeys(NContainer::TCSet<CSymmetricKey> _Keys) = 0;
+		virtual NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> _HostIDs, NContainer::TCSet<NStr::CStr> _CheckedServers) = 0;
+		virtual NConcurrency::TCFuture<void> f_KeysVerifiedOnServers(NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> _KeysVerifiedOnServers) = 0;
 	};
 
 	struct CKeyManager : public NConcurrency::CActor
@@ -138,8 +138,8 @@ namespace NMib::NCloud
 		CKeyManager();
 		~CKeyManager();
 		
-		virtual NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr const &_Identifier, uint32 _KeySize) = 0;
-		virtual auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
+		virtual NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr _Identifier, uint32 _KeySize) = 0;
+		virtual auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>>
 		= 0;
 	};

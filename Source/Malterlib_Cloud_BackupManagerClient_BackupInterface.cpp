@@ -28,10 +28,13 @@ namespace NMib::NCloud
 	{
 		m_bBackupFinishedStarting = true;
 		for (auto &RunningInstance : m_RunningBackupInstances)
-			f_BackupInstance_ReportFinishedStarting(RunningInstance.m_Instance);
+		{
+			if (RunningInstance.m_Instance2)
+				f_BackupInstance_ReportFinishedStarting(RunningInstance.m_Instance2);
+		}
 	}
 
-	TCFuture<void> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_AppendManifest(CManifestConfig const &_Config)
+	TCFuture<void> CBackupManagerClient::CInternal::CDistributedAppInterfaceBackupImplementation::f_AppendManifest(CManifestConfig _Config)
 	{
 		if (!_Config.m_Root.f_IsEmpty())
 			co_return DMibErrorInstance("You cannot change manifest root when appending manifest");
@@ -139,12 +142,13 @@ namespace NMib::NCloud
 			Internal.m_AppendStates[FileName] = fg_Move(pAppendState);
 		}
 
-		g_Dispatch(BlockingActorCheckout) / [AppendStates = fg_Move(AppendStates)]() mutable
+		(
+			g_Dispatch(BlockingActorCheckout) / [AppendStates = fg_Move(AppendStates)]() mutable
 			{
 				AppendStates.f_Clear();
 			}
-			> BlockingActorCheckout.f_MoveResultHandler(Internal.m_Config.m_LogCategory, "Error cleaning up append states");
-		;
+		)
+		.f_OnResultSet(BlockingActorCheckout.f_MoveResultHandler(Internal.m_Config.m_LogCategory, "Error cleaning up append states"));
 
 		for (auto &NewFile : NewManifest.m_Files)
 		{
@@ -177,7 +181,7 @@ namespace NMib::NCloud
 			}
 		}
 
-		TCActorResultVector<void> ManifestChangedResults;
+		TCFutureVector<void> ManifestChangedResults;
 
 		auto fSendManifestChange = [&]
 			(
@@ -194,9 +198,10 @@ namespace NMib::NCloud
 
 				for (auto &RunningInstance : Internal.m_RunningBackupInstances)
 				{
-					RunningInstance.m_Instance(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty, _ChecksumState)
-						> ManifestChangedResults.f_AddResult()
-					;
+					if (!RunningInstance.m_Instance2)
+						continue;
+					
+					RunningInstance.m_Instance2(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty, _ChecksumState) > ManifestChangedResults;
 				}
 			}
 		;
@@ -222,7 +227,7 @@ namespace NMib::NCloud
 
 		Internal.m_ManifestFileIDs += NewManifestFileIDs;
 
-		co_await ManifestChangedResults.f_GetResults();
+		co_await fg_AllDoneWrapped(ManifestChangedResults);
 
 		co_return {};
 	}

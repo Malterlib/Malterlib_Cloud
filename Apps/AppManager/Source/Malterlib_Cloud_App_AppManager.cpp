@@ -17,7 +17,7 @@ namespace NMib::NCloud::NAppManager
 	CAppManagerActor::~CAppManagerActor()
 	{
 		if (mp_InitialStartupResultFuture.f_IsValid())
-			fg_Move(mp_InitialStartupResultFuture) > fg_DiscardResult();
+			fg_Move(mp_InitialStartupResultFuture).f_DiscardResult();
 	}
 
 	TCFuture<void> CAppManagerActor::fp_Destroy()
@@ -32,15 +32,15 @@ namespace NMib::NCloud::NAppManager
 		if (mp_SensorRebootPreventionTimerSubscription)
 			co_await fg_Exchange(mp_SensorRebootPreventionTimerSubscription, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy reboot prevention timer");
 
-		TCActorResultVector<void> SensorRebootPreventionDestroys;
+		TCFutureVector<void> SensorRebootPreventionDestroys;
 
 		for (auto &Watch : mp_SensorRebootPreventionWatch)
 		{
 			if (Watch.m_SensorSubscription)
-				fg_Exchange(Watch.m_SensorSubscription, nullptr)->f_Destroy() > SensorRebootPreventionDestroys.f_AddResult();
+				fg_Exchange(Watch.m_SensorSubscription, nullptr)->f_Destroy() > SensorRebootPreventionDestroys;
 		}
 
-		co_await SensorRebootPreventionDestroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy reboot prevention subscriptions");
+		co_await fg_AllDone(SensorRebootPreventionDestroys).f_Wrap() > LogError.f_Warning("Failed to destroy reboot prevention subscriptions");
 
 		co_await CDistributedAppActor::fp_Destroy();
 
@@ -411,12 +411,12 @@ namespace NMib::NCloud::NAppManager
 		mp_KeyManagerSubscription = fg_Move(KeySubscription);
 		co_await mp_KeyManagerSubscription.f_OnActor
 			(
-				g_ActorFunctor / [this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				g_ActorFunctor / [this](TCDistributedActor<CKeyManager> _KeyManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
 					co_await fp_KeyManagersUpdated();
 					co_return {};
 				}
-				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_KeyManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> _KeyManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
 					co_await fp_KeyManagersUpdated();
 
@@ -428,12 +428,12 @@ namespace NMib::NCloud::NAppManager
 		mp_VersionManagerSubscription = fg_Move(VersionSubscription);
 		co_await mp_VersionManagerSubscription.f_OnActor
 			(
-				g_ActorFunctor / [this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				g_ActorFunctor / [this](TCDistributedActor<CVersionManager> _VersionManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
-					co_await self(&CAppManagerActor::fp_VersionManagerAdded, _VersionManager, _ActorInfo);
+					co_await fp_VersionManagerAdded(_VersionManager, _ActorInfo);
 					co_return {};
 				}
-				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> _VersionManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
 					fp_VersionManagerRemoved(_VersionManager);
 
@@ -445,14 +445,14 @@ namespace NMib::NCloud::NAppManager
 		mp_CloudManagerSubscription = fg_Move(CloudSubscription);
 		co_await mp_CloudManagerSubscription.f_OnActor
 			(
-				g_ActorFunctor / [this](TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				g_ActorFunctor / [this](TCDistributedActor<CCloudManager> _CloudManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
-					co_await self(&CAppManagerActor::fp_CloudManagerAdded, _CloudManager, _ActorInfo);
+					co_await fp_CloudManagerAdded(_CloudManager, _ActorInfo);
 					co_return {};
 				}
-				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_CloudManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> _CloudManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
-					co_await self(&CAppManagerActor::fp_CloudManagerRemoved, _CloudManager).f_Wrap() > fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to remove cloud manager");
+					co_await fp_CloudManagerRemoved(_CloudManager).f_Wrap() > fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to remove cloud manager");
 
 					co_return {};
 				}
@@ -466,7 +466,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
+	TCFuture<void> CAppManagerActor::fp_StartApp(NEncoding::CEJSONSorted const _Params)
 	{
 		CStr Environment = mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("Environment", "").f_String();
 
@@ -556,7 +556,7 @@ namespace NMib::NCloud::NAppManager
 		if (mp_PauseReportingForSecondsAtShutdown.f_IsNan())
 			co_return {};
 
-		TCActorResultVector<void> Results;
+		TCFutureVector<void> Results;
 
 		for (auto &CloudManager : mp_CloudManagers)
 		{
@@ -564,11 +564,11 @@ namespace NMib::NCloud::NAppManager
 				continue;
 
 			CloudManager.m_AppManagerCloudManagerInterface.f_CallActor(&CAppManagerCloudManagerInterface::f_PauseReporting)(mp_PauseReportingForSecondsAtShutdown)
-				> Results.f_AddResult()
+				> Results
 			;
 		}
 
-		co_await Results.f_GetUnwrappedResults();
+		co_await fg_AllDone(Results);
 
 		co_return {};
 	}
@@ -589,11 +589,11 @@ namespace NMib::NCloud::NAppManager
 		co_await fp_CancelAllApplicationUpdatesOnStopAppManager();
 
 		{
-			TCActorResultVector<uint32> ApplicationStops;
+			TCFutureVector<uint32> ApplicationStops;
 			for (auto &pApplication : mp_Applications)
-				pApplication->f_Stop(EStopFlag_CloseEncryption) > ApplicationStops.f_AddResult();
+				pApplication->f_Stop(EStopFlag_CloseEncryption) > ApplicationStops;
 
-			co_await ApplicationStops.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to stop applications");
+			co_await fg_AllDone(ApplicationStops).f_Wrap() > LogError.f_Warning("Failed to stop applications");
 		}
 
 		for (auto &pApplication : mp_Applications)
@@ -603,65 +603,65 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 
 			for (auto &Launch : mp_LaunchActors)
-				fg_Move(Launch).f_Destroy() > Destroys.f_AddResult();
+				fg_Move(Launch).f_Destroy() > Destroys;
 			mp_LaunchActors.f_Clear();
 
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy app launchers");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy app launchers");
 		}
 
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 
 			for (auto &Subscription : mp_ChangeNotificationSubscriptions)
 			{
 				if (Subscription.m_fOnChange)
-					fg_Move(Subscription.m_fOnChange).f_Destroy() > Destroys.f_AddResult();
+					fg_Move(Subscription.m_fOnChange).f_Destroy() > Destroys;
 			}
 
 			mp_ChangeNotificationSubscriptions.f_Clear();
 
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy change notification subscriptions");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy change notification subscriptions");
 		}
 
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 
 			for (auto &Subscription : mp_UpdateNotificationSubscriptions)
 			{
 				if (Subscription.m_fOnUpdate)
-					fg_Move(Subscription.m_fOnUpdate).f_Destroy() > Destroys.f_AddResult();
+					fg_Move(Subscription.m_fOnUpdate).f_Destroy() > Destroys;
 
-				fg_Move(Subscription.m_Sequencer).f_Destroy() > Destroys.f_AddResult();
+				fg_Move(Subscription.m_Sequencer).f_Destroy() > Destroys;
 			}
 			mp_UpdateNotificationSubscriptions.f_Clear();
 
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy update notification subscriptions");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy update notification subscriptions");
 		}
 
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 
 			for (auto &CloudManager : mp_CloudManagers)
 			{
 				if (CloudManager.m_AppManagerCloudManagerInterface)
-					fg_Move(CloudManager.m_AppManagerCloudManagerInterface).f_Destroy() > Destroys.f_AddResult();
+					fg_Move(CloudManager.m_AppManagerCloudManagerInterface).f_Destroy() > Destroys;
 				if (CloudManager.m_SensorReporterSubscription)
-					fg_Exchange(CloudManager.m_SensorReporterSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
+					fg_Exchange(CloudManager.m_SensorReporterSubscription, nullptr)->f_Destroy() > Destroys;
 				if (CloudManager.m_LogReporterSubscription)
-					fg_Exchange(CloudManager.m_LogReporterSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
+					fg_Exchange(CloudManager.m_LogReporterSubscription, nullptr)->f_Destroy() > Destroys;
 				if (CloudManager.m_ExpectedOsVersionSubscription)
-					fg_Exchange(CloudManager.m_ExpectedOsVersionSubscription, nullptr)->f_Destroy() > Destroys.f_AddResult();
+					fg_Exchange(CloudManager.m_ExpectedOsVersionSubscription, nullptr)->f_Destroy() > Destroys;
 			}
 
 			mp_CloudManagers.f_Clear();
 
-			mp_SensorReporterInterface.f_Destroy() > Destroys.f_AddResult();
-			mp_LogReporterInterface.f_Destroy() > Destroys.f_AddResult();
+			mp_SensorReporterInterface.f_Destroy() > Destroys;
+			mp_LogReporterInterface.f_Destroy() > Destroys;
 
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy cloud managers or reporter interfaces");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy cloud managers or reporter interfaces");
 		}
 
 		{

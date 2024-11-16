@@ -65,7 +65,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 	
-	TCFuture<void> CSecretsManagerServerDatabase::f_WriteDatabase(CSecretsDatabase &&_Database)
+	TCFuture<void> CSecretsManagerServerDatabase::f_WriteDatabase(CSecretsDatabase _Database)
 	{
 		if (!mp_pPendingWrite)
 		{
@@ -110,7 +110,7 @@ namespace NMib::NCloud::NSecretsManager
 		else
 			*mp_pPendingWrite = fg_Move(_Database);
 
-		return mp_PendingWritePromises.f_Insert().f_Future();
+		co_return co_await mp_PendingWritePromises.f_Insert().f_Future();
 	}
 	
 	TCFuture<CSecretsDatabase> CSecretsManagerServerDatabase::f_ReadDatabase()

@@ -41,11 +41,11 @@ namespace NMib::NCloud::NCloudManager
 			co_await mp_DatabaseActor
 				(
 					&CDatabaseActor::f_WriteWithCompaction
-					, g_ActorFunctorWeak / [this, pMoreWorkNeeded, pState](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+					, g_ActorFunctorWeak / [this, pMoreWorkNeeded, pState](CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						pState->m_bForcedCompaction = _bCompacting;
 
-						auto Result = co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(_Transaction), pState);
+						auto Result = co_await fp_CleanupDatabase(fg_Move(_Transaction), pState);
 
 						*pMoreWorkNeeded = Result.m_bMoreWork;
 
@@ -146,7 +146,7 @@ namespace NMib::NCloud::NCloudManager
 		mp_MaxFreedLimit = mp_CurrentStats.m_UsedBytes - gc_FreedPagesLimit * mp_OriginalStats.m_PageSize;
 	}
 
-	auto CCloudManagerServer::fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction, TCSharedPointer<CCleanupState> &&_pState) -> TCFuture<CCleanupDatabaseResult>
+	auto CCloudManagerServer::fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite _WriteTransaction, TCSharedPointer<CCleanupState> _pState) -> TCFuture<CCleanupDatabaseResult>
 	{
 		co_return co_await
 			(

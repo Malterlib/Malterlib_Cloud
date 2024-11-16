@@ -39,7 +39,7 @@ namespace NMib::NCloud::NCloudManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					co_await mp_Server(&CCloudManagerServer::f_DumpDatabaseEntries, _pCommandLine, _Params["Prefix"].f_String());
 

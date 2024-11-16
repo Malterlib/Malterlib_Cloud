@@ -365,7 +365,7 @@ public:
 	TCFuture<void> fp_TestLimitsImpl
 		(
 			CStr _Name
-			, TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> _pGenerateEntries
+			, TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> _pGenerateEntries
 			, TCFunction<void (CEJSONSorted const &_Entries)> _fCheckEntries, bool _bStopCloudManager
 		)
 	{
@@ -485,11 +485,11 @@ public:
 	TCFuture<void> fp_TestLimitsImpl
 		(
 			CStr _Name
-			, TCActorFunctor<TCFuture<void> (CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper)> _fGenerateEntries
+			, TCActorFunctor<TCFuture<void> (CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper)> _fGenerateEntries
 			, TCFunction<void (CEJSONSorted const &_Entries)> _fCheckEntries
 		)
 	{
-		TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> pGenerateEntries = fg_Construct(fg_Move(_fGenerateEntries));
+		TCSharedPointer<TCActorFunctor<TCFuture<void> (CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper)>> pGenerateEntries = fg_Construct(fg_Move(_fGenerateEntries));
 		{
 			DMibTestPath("Started CloudManager");
 			co_await fp_TestLimitsImpl(_Name + "CMStarted", pGenerateEntries, _fCheckEntries, false);
@@ -532,7 +532,7 @@ public:
 			co_return co_await fp_TestLimitsImpl
 				(
 					"BigEntry"
-					, g_ActorFunctor / [&](CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
+					, g_ActorFunctor / [&](CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
 					{
 						co_await _pAppManagerTestHelper->f_LaunchTool
 							(
@@ -559,7 +559,7 @@ public:
 			co_return co_await fp_TestLimitsImpl
 				(
 					"BigLine"
-					, g_ActorFunctor / [&](CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
+					, g_ActorFunctor / [&](CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
 					{
 						co_await _pAppManagerTestHelper->f_LaunchTool
 							(
@@ -588,7 +588,7 @@ public:
 			co_return co_await fp_TestLimitsImpl
 				(
 					"ManyLines"
-					, g_ActorFunctor / [&](CStr const &_Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
+					, g_ActorFunctor / [&](CStr _Root, CAppManagerTestHelper *_pAppManagerTestHelper) -> TCFuture<void>
 					{
 						co_await _pAppManagerTestHelper->f_LaunchTool
 							(

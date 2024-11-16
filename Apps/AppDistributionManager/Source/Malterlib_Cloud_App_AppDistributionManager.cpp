@@ -15,10 +15,8 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	CAppDistributionManagerActor::~CAppDistributionManagerActor() = default;
 
-	TCFuture<void> CAppDistributionManagerActor::fp_StartApp(NEncoding::CEJSONSorted const &_Params)
+	TCFuture<void> CAppDistributionManagerActor::fp_StartApp(NEncoding::CEJSONSorted const _Params)
 	{
-		mp_FileActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("App distribution manager file operations"));
-		
 		co_await fp_ReadState();
 
 		auto OnResume = co_await fg_OnResume
@@ -36,17 +34,13 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		co_await mp_VersionManagerSubscription.f_OnActor
 			(
-				g_ActorFunctor / [this](TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				g_ActorFunctor / [this](TCDistributedActor<CVersionManager> &&_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
-					co_await self(&CAppDistributionManagerActor::fp_VersionManagerAdded, _VersionManager, _ActorInfo);
-
-					co_return {};
+					return fp_VersionManagerAdded(fg_Move(_VersionManager), fg_Move(_ActorInfo));
 				}
-				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> &&_VersionManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
 				{
-					co_await self(&CAppDistributionManagerActor::fp_VersionManagerRemoved, _VersionManager);
-
-					co_return {};
+					return fp_VersionManagerRemoved(fg_Move(_VersionManager));
 				}
 			)
 		;
@@ -58,21 +52,18 @@ namespace NMib::NCloud::NAppDistributionManager
 	{	
 		CLogError LogError("Mib/Cloud/AppDistributionManager");
 
-		TCActorResultVector<void> DistributionDestroys;
+		TCFutureVector<void> DistributionDestroys;
 
 		for (auto &Distribution : mp_Distributions)
 		{
 			for (auto &RunningDeploys : Distribution.m_RunningDeploys)
 			{
 				for (auto &RunningDeploy : RunningDeploys)
-					RunningDeploy.f_Destroy() > DistributionDestroys.f_AddResult();
+					fg_Move(RunningDeploy).f_Destroy() > DistributionDestroys;
 			}
 		}
 
-		co_await DistributionDestroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to stop distribution deploys");
-
-		if (mp_FileActor)
-			co_await fg_Move(mp_FileActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to stop file actor");
+		co_await fg_AllDone(DistributionDestroys).f_Wrap() > LogError.f_Warning("Failed to stop distribution deploys");
 
 		co_return {};
 	}
@@ -87,32 +78,29 @@ namespace NMib::NCloud::NAppDistributionManager
 		}
 
 		{
-			TCActorResultVector<void> DestroyResults;
+			TCFutureVector<void> DestroyResults;
 
 			for (auto &VersionManager : mp_VersionManagers)
 			{
 				if (VersionManager.m_Subscription)
-					fg_Exchange(VersionManager.m_Subscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+					fg_Exchange(VersionManager.m_Subscription, nullptr)->f_Destroy() > DestroyResults;
 			}
 			mp_VersionManagers.f_Clear();
 
 			for (auto &Download : mp_Downloads)
 			{
 				if (Download.m_DownloadVersionReceive)
-					fg_Move(Download.m_DownloadVersionReceive).f_Destroy() > DestroyResults.f_AddResult();
+					fg_Move(Download.m_DownloadVersionReceive).f_Destroy() > DestroyResults;
 
 				if (Download.m_Subscription)
-					fg_Exchange(Download.m_Subscription, nullptr)->f_Destroy() > DestroyResults.f_AddResult();
+					fg_Exchange(Download.m_Subscription, nullptr)->f_Destroy() > DestroyResults;
 			}
 			mp_Downloads.f_Clear();
 
-			co_await DestroyResults.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy app distribution manager");
+			co_await fg_AllDone(DestroyResults).f_Wrap() > LogError.f_Warning("Failed to destroy app distribution manager");
 		}
 
 		co_await mp_VersionManagerSubscription.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy vesion manager subscription");
-
-		if (mp_FileActor)
-			co_await fg_Move(mp_FileActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy file actor");
 
 		co_await CDistributedAppActor::fp_Destroy();
 

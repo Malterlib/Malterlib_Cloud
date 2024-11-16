@@ -45,10 +45,10 @@ namespace NMib::NCloud::NPrivate
 		void f_MarkActive(bool _bActive);
 		TCFuture<void> f_ManifestChanged
 			(
-				CStr const &_FileName
-				, CBackupManagerBackup::CManifestChange const &_ManifestChange
+				CStr _FileName
+				, CBackupManagerBackup::CManifestChange _ManifestChange
 				, bool _bDirty
-				, CBackupManagerClient_ChecksumState const &_ChecksumState
+				, CBackupManagerClient_ChecksumState _ChecksumState
 			)
 		;
 

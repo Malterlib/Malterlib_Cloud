@@ -8,7 +8,7 @@
 
 namespace NMib::NCloud
 {
-	auto CBackupManagerClient::CInternal::f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName, bool _bDirtyHint) -> TCFuture<CUpdateManifestResult>
+	auto CBackupManagerClient::CInternal::f_UpdateManifest(CStr _FileName, CStr _OriginalFileName, bool _bDirtyHint) -> TCFuture<CUpdateManifestResult>
 	{
 		if (_FileName.f_IsEmpty())
 			co_return CUpdateManifestResult{};
@@ -23,7 +23,9 @@ namespace NMib::NCloud
 			else if (!pFile && (CDirectoryManifest::fs_GetSyncFlags(m_Config.m_ManifestConfig, _FileName) & EDirectoryManifestSyncFlag_Append))
 				pAppendState = *m_AppendStates(_FileName, fg_Construct());
 		}
-		
+
+		auto SequenceSubscription = co_await m_ManifestSequencer.f_Sequence();
+
 		auto BlockingActorCheckout = fg_BlockingActor();
 
 		CUpdateManifestResult Result = co_await

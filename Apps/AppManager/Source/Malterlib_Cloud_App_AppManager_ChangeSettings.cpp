@@ -9,21 +9,19 @@ namespace NMib::NCloud::NAppManager
 {
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_ChangeSettings
 		(
-			NStr::CStr const &_Name
-			, CApplicationChangeSettings const &_ChangeSettings
-			, CApplicationSettings const &_Settings
+			NStr::CStr _Name
+			, CApplicationChangeSettings _ChangeSettings
+			, CApplicationSettings _Settings
 		)
 	{
-		NConcurrency::TCPromise<void> Promise;
 
 		CAppManagerActor::CApplicationSettings ApplicationSettings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		ApplicationSettings.f_FromInterfaceSettings(_Settings, ChangedSettings);
 
-		return Promise <<= m_pThis->self
+		co_return co_await m_pThis->fp_ChangeApplicationSettings
 			(
-				&CAppManagerActor::fp_ChangeApplicationSettings
-				, _Name
+				_Name
 				, ApplicationSettings
 				, ChangedSettings
 				, _ChangeSettings.m_bUpdateFromVersionInfo
@@ -37,7 +35,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		fp_ReportInProgress(_pCommandLine, Name);
@@ -54,10 +52,9 @@ namespace NMib::NCloud::NAppManager
 				co_return DMibErrorInstance(Error);
 		}
 
-		auto Result = co_await self
+		auto Result = co_await fp_ChangeApplicationSettings
 			(
-				&CAppManagerActor::fp_ChangeApplicationSettings
-				, Name
+				Name
 				, Settings
 				, ChangedSettings
 				, bUpdateFromVersionInfo
@@ -75,7 +72,7 @@ namespace NMib::NCloud::NAppManager
 		co_return _pCommandLine->f_AddAsyncResult(Result);
 	}
 
-	TCFuture<void> CAppManagerActor::fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> const &_pApplication, uint32 _OldVersion)
+	TCFuture<void> CAppManagerActor::fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> _pApplication, uint32 _OldVersion)
 	{
 		auto fOnInfo = [Name = _pApplication->m_Name](CStr const &_Info)
 			{
@@ -146,13 +143,13 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_ChangeApplicationSettings
 		(
-			NStr::CStr const &_Name
-			, CApplicationSettings const &_Settings
+			NStr::CStr _Name
+			, CApplicationSettings _Settings
 			, EApplicationSetting _ChangedSettings
 			, bool _bUpdateFromVersionInfo
 			, bool _bForce
-			, TCFunction<void (CStr const &_Info)> &&_fOnInfo
-			, CCallingHostInfo const &_CallingHostInfo
+			, TCFunction<void (CStr const &_Info)> _fOnInfo
+			, CCallingHostInfo _CallingHostInfo
 		)
 	{
 		auto Auditor = f_Auditor({}, _CallingHostInfo);
@@ -268,7 +265,7 @@ namespace NMib::NCloud::NAppManager
 			co_return {};
 		}
 
-		co_await (self(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Open, false) % "Failed to open encryption" % Auditor);
+		co_await (fp_ChangeEncryption(pApplication, EEncryptOperation_Open, false) % "Failed to open encryption" % Auditor);
 
 		if (pApplication->m_bDeleted)
 			co_return Auditor.f_Exception("Application has been deleted, aborting");

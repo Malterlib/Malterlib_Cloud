@@ -29,9 +29,8 @@ namespace NMib::NCloud::NCloudAPIManager
 				CDistributedTrustDDPBridge::CMethod
 				{
 					"getSwiftBaseURL"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> const &_Params) -> TCFuture<NEncoding::CEJSONSorted>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> _Params) -> TCFuture<NEncoding::CEJSONSorted>
 					{
-						TCPromise<NEncoding::CEJSONSorted> Promise;
 						CCloudAPIManager::CGetSwiftBaseURL Params;
 						{
 							auto CaptureScope = co_await g_CaptureExceptions;
@@ -41,17 +40,16 @@ namespace NMib::NCloud::NCloudAPIManager
 							Params.m_CloudContext = InputParams["cloudContext"].f_String();
 						}
 
-						co_return (co_await fg_CallSafe(mp_ProtocolInterface.m_pActor, &CCloudAPIManagerImplementation::f_GetSwiftBaseURL, fg_Move(Params))).m_BaseURL;
+						co_return (co_await mp_ProtocolInterface.m_pActor->f_GetSwiftBaseURL(fg_Move(Params))).m_BaseURL;
 					}
 				}
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIEnsureContainer"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> const &_Params) -> TCFuture<NEncoding::CEJSONSorted>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> _Params) -> TCFuture<NEncoding::CEJSONSorted>
 					{
 						if (_Params.f_GetLen() != 1)
 							co_return "Method takes 1 parameter";
-						TCPromise<NEncoding::CEJSONSorted> Promise;
 						CCloudAPIManager::CEnsureContainer Params;
 						{
 							auto CaptureScope = co_await g_CaptureExceptions;
@@ -63,7 +61,7 @@ namespace NMib::NCloud::NCloudAPIManager
 							Params.m_TempURLKey = InputParams["tempURLKey"].f_String();
 						}
 
-						co_await fg_CallSafe(mp_ProtocolInterface.m_pActor, &CCloudAPIManagerImplementation::f_EnsureContainer, fg_Move(Params));
+						co_await mp_ProtocolInterface.m_pActor->f_EnsureContainer(fg_Move(Params));
 
 						co_return {};
 					}
@@ -71,11 +69,10 @@ namespace NMib::NCloud::NCloudAPIManager
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPISignTempURL"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> const &_Params) -> TCFuture<NEncoding::CEJSONSorted>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> _Params) -> TCFuture<NEncoding::CEJSONSorted>
 					{
 						if (_Params.f_GetLen() != 1)
 							co_return "Method takes 1 parameter";
-						TCPromise<NEncoding::CEJSONSorted> Promise;
 						CCloudAPIManager::CSignTempURL Params;
 						{
 							auto CaptureScope = co_await g_CaptureExceptions;
@@ -89,17 +86,16 @@ namespace NMib::NCloud::NCloudAPIManager
 							Params.m_TempURLKey = InputParams["tempURLKey"].f_String();
 						}
 
-						co_return (co_await fg_CallSafe(mp_ProtocolInterface.m_pActor, &CCloudAPIManagerImplementation::f_SignTempURL, fg_Move(Params))).m_SignedURL;
+						co_return (co_await mp_ProtocolInterface.m_pActor->f_SignTempURL(fg_Move(Params))).m_SignedURL;
 					}
 				}
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIDeleteObject"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> const &_Params) -> TCFuture<NEncoding::CEJSONSorted>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> _Params) -> TCFuture<NEncoding::CEJSONSorted>
 					{
 						if (_Params.f_GetLen() != 1)
 							co_return "Method takes 1 parameter";
-						TCPromise<NEncoding::CEJSONSorted> Promise;
 						CCloudAPIManager::CDeleteObject Params;
 						{
 							auto CaptureScope = co_await g_CaptureExceptions;
@@ -111,7 +107,7 @@ namespace NMib::NCloud::NCloudAPIManager
 							Params.m_ObjectId = InputParams["objectId"].f_String();
 						}
 						
-						co_await fg_CallSafe(mp_ProtocolInterface.m_pActor, &CCloudAPIManagerImplementation::f_DeleteObject, fg_Move(Params));
+						co_await mp_ProtocolInterface.m_pActor->f_DeleteObject(fg_Move(Params));
 
 						co_return {};
 					}

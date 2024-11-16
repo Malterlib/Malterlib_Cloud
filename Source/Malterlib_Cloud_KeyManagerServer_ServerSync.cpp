@@ -127,12 +127,12 @@ namespace NMib::NCloud
 		if (_KeysVerifiedOnServers.f_IsEmpty())
 			co_return {};
 
-		TCActorResultVector<void> ReportResults;
+		TCFutureVector<void> ReportResults;
 
 		for (auto &OtherKeyManager : m_OtherKeyManagers)
-			OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_KeysVerifiedOnServers)(_KeysVerifiedOnServers) > ReportResults.f_AddResult();
+			OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_KeysVerifiedOnServers)(_KeysVerifiedOnServers) > ReportResults;
 
-		co_await (ReportResults.f_GetUnwrappedResults() % "Failed to report keys verified on remote key managers");
+		co_await (fg_AllDone(ReportResults) % "Failed to report keys verified on remote key managers");
 
 		co_return {};
 	}
@@ -143,17 +143,17 @@ namespace NMib::NCloud
 		if (_HostIDs.f_IsEmpty())
 			co_return {};
 		
-		TCActorResultVector<NContainer::TCSet<NStr::CStr>> ReportResults;
+		TCFutureVector<NContainer::TCSet<NStr::CStr>> ReportResults;
 
 		for (auto &OtherKeyManager : m_OtherKeyManagers)
 		{
 			if (_CheckedServers.f_FindEqual(OtherKeyManager.m_ActorInfo.m_HostInfo.m_HostID))
 				continue;
 
-			OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_RemoveVerifiedHosts)(_HostIDs, _CheckedServers) > ReportResults.f_AddResult();
+			OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_RemoveVerifiedHosts)(_HostIDs, _CheckedServers) > ReportResults;
 		}
 
-		auto Results = co_await ReportResults.f_GetUnwrappedResults();
+		auto Results = co_await fg_AllDone(ReportResults);
 
 		NContainer::TCSet<NStr::CStr> RemovedIDs;
 
@@ -165,16 +165,16 @@ namespace NMib::NCloud
 
 	NConcurrency::TCFuture<NStorage::TCOptional<NConcurrency::CActorSubscription>> CKeyManagerServer::CInternal::f_UseAvailableKey(CSymmetricKey _Key)
 	{
-		TCActorResultMap<CHostInfo, CKeyManagerServerSync::CUseAvailableKeyResult> Results;
+		TCFutureMap<CHostInfo, CKeyManagerServerSync::CUseAvailableKeyResult> Results;
 
 		mint nTotalKeyManagers = m_OtherKeyManagers.f_GetLen() + 1;
 		if (nTotalKeyManagers < m_Config.m_CreateNewKeyMinServers)
 			co_return DMibErrorInstance("Only {} of {} key managers available to verify available key use"_f << nTotalKeyManagers << m_Config.m_CreateNewKeyMinServers);
 
 		for (auto &OtherKeyManager : m_OtherKeyManagers)
-			OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_UseAvailableKey)(_Key) > Results.f_AddResult(OtherKeyManager.m_ActorInfo.m_HostInfo);
+			OtherKeyManager.m_ServerSync.f_CallActor(&CKeyManagerServerSync::f_UseAvailableKey)(_Key) > Results[OtherKeyManager.m_ActorInfo.m_HostInfo];
 
-		auto UnwrappedResults = co_await (Results.f_GetResults() % "Failed to use available key on remote key managers");
+		auto UnwrappedResults = co_await (fg_AllDoneWrapped(Results) % "Failed to use available key on remote key managers");
 
 		mint nVerified = 1;
 		for (auto &Result : UnwrappedResults.f_Entries())
@@ -405,7 +405,7 @@ namespace NMib::NCloud
 
 		co_await m_OtherKeyManagersSubscription.f_OnActor
 			(
-				g_ActorFunctor / [this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				g_ActorFunctor / [this](TCDistributedActor<CKeyManager> _KeyManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
 					if (_KeyManager->f_InterfaceVersion() < EKeyManagerProtocolVersion_SupportServerSync)
 						co_return {};
@@ -423,7 +423,7 @@ namespace NMib::NCloud
 
 					co_return {};
 				}
-				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_KeyManager, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> _KeyManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
 					if (auto pManager = m_OtherKeyManagers.f_FindEqual(_KeyManager))
 					{
@@ -522,7 +522,7 @@ namespace NMib::NCloud
 		;
 	}
 
-	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_PreCreateKeys(NContainer::TCSet<CSymmetricKey> &&_Keys)
+	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_PreCreateKeys(NContainer::TCSet<CSymmetricKey> _Keys)
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
@@ -553,7 +553,7 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_RemovePreCreatedKeys(NContainer::TCSet<CSymmetricKey> &&_Keys)
+	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_RemovePreCreatedKeys(NContainer::TCSet<CSymmetricKey> _Keys)
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
@@ -589,8 +589,8 @@ namespace NMib::NCloud
 
 	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_RemoveVerifiedHosts
 		(
-			NContainer::TCSet<NStr::CStr> &&_HostIDs
-			, NContainer::TCSet<NStr::CStr> &&_CheckedServers
+			NContainer::TCSet<NStr::CStr> _HostIDs
+			, NContainer::TCSet<NStr::CStr> _CheckedServers
 		)
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
@@ -632,7 +632,7 @@ namespace NMib::NCloud
 		co_return fg_Move(RemovedHosts);
 	}
 
-	auto CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_UseAvailableKey(CSymmetricKey &&_Key) -> NConcurrency::TCFuture<CUseAvailableKeyResult>
+	auto CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_UseAvailableKey(CSymmetricKey _Key) -> NConcurrency::TCFuture<CUseAvailableKeyResult>
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
@@ -671,7 +671,7 @@ namespace NMib::NCloud
 		;
 	}
 
-	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_CreateNewKeys(NContainer::TCMap<CHostKeyID, CSymmetricKey> &&_Keys)
+	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_CreateNewKeys(NContainer::TCMap<CHostKeyID, CSymmetricKey> _Keys)
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
@@ -761,7 +761,7 @@ namespace NMib::NCloud
 
 	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_KeysVerifiedOnServers
 		(
-			NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> &&_KeysVerifiedOnServers
+			NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> _KeysVerifiedOnServers
 		)
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();

@@ -24,7 +24,7 @@ namespace NMib::NCloud::NTest
 			)
 			override
 		;
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
 	};
 }

@@ -12,7 +12,7 @@ namespace NMib::NCloud::NAppManager
 {
 	using namespace NAppManagerDatabase;
 
-	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications &&_Params)
+	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications _Params)
 		-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>>
 	{
 		auto pThis = m_pThis;
@@ -64,13 +64,13 @@ namespace NMib::NCloud::NAppManager
 					if (!pUpdateNotificationSubscriptions)
 						co_return {};
 
-					TCActorResultVector<void> Destroys;
-					fg_Move(pUpdateNotificationSubscriptions->m_fOnUpdate).f_Destroy() > Destroys.f_AddResult();
-					fg_Move(pUpdateNotificationSubscriptions->m_Sequencer).f_Destroy() > Destroys.f_AddResult();
+					TCFutureVector<void> Destroys;
+					fg_Move(pUpdateNotificationSubscriptions->m_fOnUpdate).f_Destroy() > Destroys;
+					fg_Move(pUpdateNotificationSubscriptions->m_Sequencer).f_Destroy() > Destroys;
 
 					pThis->mp_UpdateNotificationSubscriptions.f_Remove(SubscriptionID);
 
-					co_await Destroys.f_GetUnwrappedResults().f_Wrap() > fg_LogError("UpdateNotifications", "Failed to destroy subscription");
+					co_await fg_AllDone(Destroys).f_Wrap() > fg_LogError("UpdateNotifications", "Failed to destroy subscription");
 
 					co_return {};
 				}
@@ -171,9 +171,9 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_SendUpdateNotifications(CAppManagerInterface::CUpdateNotification _Notification)
 	{
-		_Notification.m_UniqueSequence = co_await self(&CAppManagerActor::fp_StoreUpdateNotification, _Notification);
+		_Notification.m_UniqueSequence = co_await fp_StoreUpdateNotification(_Notification);
 
-		TCActorResultVector<void> OnUpdateResultsVector;
+		TCFutureVector<void> OnUpdateResultsVector;
 
 		CStr AppPermission = fg_Format("AppManager/App/{}", _Notification.m_Application);
 
@@ -181,12 +181,12 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto Future = fp_SendUpdateNotification(mp_UpdateNotificationSubscriptions.fs_GetKey(Subscription), _Notification, true);
 			if (Subscription.m_bWaitForResult)
-				fg_Move(Future) > OnUpdateResultsVector.f_AddResult();
+				fg_Move(Future) > OnUpdateResultsVector;
 			else
 				fg_Move(Future) > fg_LogWarning("UpdateNotifications", "Send non-waiting update notification failed");
 		}
 
-		auto Result = co_await OnUpdateResultsVector.f_GetUnwrappedResults().f_Wrap();
+		auto Result = co_await fg_AllDone(OnUpdateResultsVector).f_Wrap();
 
 		if (!Result)
 		{

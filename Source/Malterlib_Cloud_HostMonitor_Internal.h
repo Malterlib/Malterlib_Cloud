@@ -39,7 +39,7 @@ namespace NMib::NCloud
 
 		struct CMonitoredPath
 		{
-			TCFuture<void> f_Destroy();
+			TCUnsafeFuture<void> f_Destroy();
 
 			CMonitorPathOptions m_Options;
 			mint m_RefCount = 0;

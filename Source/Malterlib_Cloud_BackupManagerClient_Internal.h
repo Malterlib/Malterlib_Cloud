@@ -10,6 +10,7 @@
 #include <Mib/Cloud/BackupManager>
 #include <Mib/File/ChangeNotificationActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
+#include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Cryptography/Hashes/SHA>
 
 using namespace NMib;
@@ -41,9 +42,9 @@ namespace NMib::NCloud
 				<
 					TCFuture<TCActorSubscriptionWithID<>>
 					(
-						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
-						, CActorSubscription &&_ManifestFinished
-						, CStr const &_BackupRoot
+						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
+						, CActorSubscription _ManifestFinished
+						, CStr _BackupRoot
 					)
 				>
 				&&_fOnNewBackup
@@ -97,14 +98,14 @@ namespace NMib::NCloud
 		struct CNotifacitonSubscription
 		{
 			CBackupManagerClient::ENotification m_Notifications;
-			TCActorFunctor<TCFuture<void> (CHostInfo const &_RemoteHost, CBackupManagerClient::CNotification &&_Notification)> m_fOnNotification;
+			TCActorFunctor<TCFuture<void> (CHostInfo _RemoteHost, CBackupManagerClient::CNotification _Notification)> m_fOnNotification;
 		};
 
 		struct CDistributedAppInterfaceBackupImplementation : public CDistributedAppInterfaceBackup
 		{
-			TCFuture<void> f_AppendManifest(CManifestConfig const &_Config) override;
-			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeInitialFinished(TCActorFunctorWithID<TCFuture<void> ()> &&_fOnInitialFinished) override;
-			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeBackupStopped(TCActorFunctorWithID<TCFuture<void> ()> &&_fOnStopped) override;
+			TCFuture<void> f_AppendManifest(CManifestConfig _Config) override;
+			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeInitialFinished(TCActorFunctorWithID<TCFuture<void> ()> _fOnInitialFinished) override;
+			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeBackupStopped(TCActorFunctorWithID<TCFuture<void> ()> _fOnStopped) override;
 
 			DMibDelegatedActorImplementation(CBackupManagerClient);
 		};
@@ -117,7 +118,7 @@ namespace NMib::NCloud
 
 		struct CRunningInstance
 		{
-			TCActor<NPrivate::CBackupManagerClient_Instance> m_Instance;
+			TCActor<NPrivate::CBackupManagerClient_Instance> m_Instance2;
 			bool m_bSentActive = false;
 		};
 
@@ -138,7 +139,7 @@ namespace NMib::NCloud
 
 		CFileChangeNotificationActor::CCoalesceSettings f_CoalesceSettings();
 
-		TCFuture<CUpdateManifestResult> f_UpdateManifest(CStr const &_FileName, CStr const &_OriginalFileName, bool _bDirtyHint);
+		TCFuture<CUpdateManifestResult> f_UpdateManifest(CStr _FileName, CStr _OriginalFileName, bool _bDirtyHint);
 
 		COnScopeExitShared f_MarkInstancesActive();
 
@@ -172,6 +173,8 @@ namespace NMib::NCloud
 		mint m_FileNotificationSequence = 1;
 		mint m_LastSeenNotificationSequence = 0;
 
+		CSequencer m_ManifestSequencer{"Manifest"};
+
 		TCMap<CStr, CNotifacitonSubscription> m_NotificationSubscriptions;
 		TCMap<CStr, TCActorFunctorWithID<TCFuture<void> ()>> m_OnInitialFinishedSubscriptions;
 		TCMap<CStr, TCActorFunctorWithID<TCFuture<void> ()>> m_OnBackupStoppedSubscriptions;
@@ -180,9 +183,9 @@ namespace NMib::NCloud
 			<
 				TCFuture<TCActorSubscriptionWithID<>>
 				(
-					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> &&_BackupInterface
-					, CActorSubscription &&_ManifestFinished
-					, CStr const &_BackupRoot
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
+					, CActorSubscription _ManifestFinished
+					, CStr _BackupRoot
 				)
 			>
 			m_fOnNewBackup

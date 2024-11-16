@@ -87,12 +87,12 @@ namespace NMib::NCloud::NVersionManager
 
 		struct CVersionManagerImplementation : public CVersionManager
 		{
-			TCFuture<CListApplications::CResult> f_ListApplications(CListApplications &&_Params) override;
-			TCFuture<CListVersions::CResult> f_ListVersions(CListVersions &&_Params) override;
-			TCFuture<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion &&_Params) override;
-			TCFuture<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion &&_Params) override;
-			TCFuture<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates &&_Params) override;
-			TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags &&_Params) override;
+			TCFuture<CListApplications::CResult> f_ListApplications(CListApplications _Params) override;
+			TCFuture<CListVersions::CResult> f_ListVersions(CListVersions _Params) override;
+			TCFuture<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion _Params) override;
+			TCFuture<CStartDownloadVersion::CResult> f_DownloadVersion(CStartDownloadVersion _Params) override;
+			TCFuture<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates _Params) override;
+			TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags _Params) override;
 
 			DMibDelegatedActorImplementation(CServer);
 		};
@@ -107,7 +107,7 @@ namespace NMib::NCloud::NVersionManager
 			CCallingHostInfo m_CallingHostInfo;
 			TCSet<CStr> m_Platforms;
 			TCSet<CStr> m_Tags;
-			TCActorFunctor<NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult> (CVersionManager::CNewVersionNotifications &&_VersionInfo)> m_fOnNewVersions;
+			TCActorFunctor<NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult> (CVersionManager::CNewVersionNotifications _VersionInfo)> m_fOnNewVersions;
 
 			void f_SendVersions(CVersionManager::CNewVersionNotifications const &_NewVersionNotification) const;
 		};
@@ -133,13 +133,13 @@ namespace NMib::NCloud::NVersionManager
 		TCFuture<void> fp_SetupPermissions();
 		TCFuture<void> fp_FindVersions();
 
-		TCFuture<void> fp_SendSubscriptionInitial(CStr const &_Application, CSubscription const &_Subscription);
+		TCFuture<void> fp_SendSubscriptionInitial(CStr _Application, CSubscription const *_pSubscription);
 		void fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity);
 
-		TCFuture<TCSet<CStr>> fp_FilterApplicationsByPermissions(CStr const &_Description, TCSet<CStr> const &_Applications);
+		TCFuture<TCSet<CStr>> fp_FilterApplicationsByPermissions(CStr _Description, TCSet<CStr> _Applications);
 		TCFuture<TCSet<CStr>> fp_EnumApplications();
 		TCSet<CStr> fp_ApplicationSet();
-		TCFuture<CFilteredTagsResult> fp_FilterTags(CStr const &_HostID, TCSet<CStr> const &_TagsAdded, TCSet<CStr> const &_TagsRemoved);
+		TCFuture<CFilteredTagsResult> fp_FilterTags(CStr _HostID, TCSet<CStr> _TagsAdded, TCSet<CStr> _TagsRemoved);
 		void fp_NewTagsKnown(TCSet<CStr> const &_Tags);
 		void fp_NewVersion(CStr const &_ApplicationName, CVersion const &_Version);
 		TCFuture<CSizeInfo> fp_SaveVersionInfo(CStr _VersionPath, CVersionManager::CVersionInformation _VersionInfo);

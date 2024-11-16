@@ -42,9 +42,9 @@ namespace NMib::NCloud::NCloudClient
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources, _Params, _pCommandLine);
+					return fp_CommandLine_BackupManager_ListBackupSources(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -70,9 +70,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups, _Params, _pCommandLine);
+					return fp_CommandLine_BackupManager_ListBackups(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -140,9 +140,9 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup, _Params, _pCommandLine);
+					return fp_CommandLine_BackupManager_DownloadBackup(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
@@ -171,14 +171,14 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 
-		co_await self(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers");
+		co_await fp_BackupManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers");
 
-		TCActorResultMap<CHostInfo, TCVector<CStr>> BackupSources;
+		TCFutureMap<CHostInfo, TCVector<CStr>> BackupSources;
 
 		for (auto &TrustedBackupManager : mp_BackupManagers.m_Actors)
 		{
@@ -188,11 +188,11 @@ namespace NMib::NCloud::NCloudClient
 			auto &BackupManager = TrustedBackupManager.m_Actor;
 			BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)()
 				.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
-				> BackupSources.f_AddResult(TrustedBackupManager.m_TrustInfo.m_HostInfo)
+				> BackupSources[TrustedBackupManager.m_TrustInfo.m_HostInfo]
 			;
 		}
 
-		TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> Results = co_await BackupSources.f_GetResults();
+		TCMap<CHostInfo, TCAsyncResult<TCVector<CStr>>> Results = co_await fg_AllDoneWrapped(BackupSources);
 
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
@@ -223,14 +223,14 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 
-		co_await self(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers");
-		TCActorResultMap<CHostInfo, TCMap<CStr, CBackupManager::CBackupInfo>> Backups;
+		co_await fp_BackupManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers");
+		TCFutureMap<CHostInfo, TCMap<CStr, CBackupManager::CBackupInfo>> Backups;
 
 		for (auto &TrustedBackupManager : mp_BackupManagers.m_Actors)
 		{
@@ -239,11 +239,11 @@ namespace NMib::NCloud::NCloudClient
 			auto &BackupManager = TrustedBackupManager.m_Actor;
 			BackupManager.f_CallActor(&CBackupManager::f_ListBackups)(BackupSource)
 				.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
-				> Backups.f_AddResult(TrustedBackupManager.m_TrustInfo.m_HostInfo)
+				> Backups[TrustedBackupManager.m_TrustInfo.m_HostInfo]
 			;
 		}
 
-		TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CBackupManager::CBackupInfo>>> Results = co_await Backups.f_GetResults();
+		TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CBackupManager::CBackupInfo>>> Results = co_await fg_AllDoneWrapped(Backups);
 
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
@@ -289,7 +289,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
@@ -310,7 +310,7 @@ namespace NMib::NCloud::NCloudClient
 		if (!CBackupManager::fs_IsValidBackupSource(BackupSource, nullptr, nullptr))
 			co_return DMibErrorInstance("Backup source name format is invalid");
 
-		co_await self(&CCloudClientAppActor::fp_BackupManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers");
+		co_await fp_BackupManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for backup servers");
 
 		CStr Error;
 		auto *pBackupManager = mp_BackupManagers.f_GetOneActor(BackupHost, Error);

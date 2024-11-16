@@ -14,7 +14,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_await mp_RemoteAppManagers.f_OnActor
 			(
-				g_ActorFunctor / [this](TCDistributedActor<CAppManagerCoordinationInterface> const &_NewActor, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				g_ActorFunctor / [this](TCDistributedActor<CAppManagerCoordinationInterface> _NewActor, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
 					auto &RemoteActor = mp_RemoteAppManagerState[_ActorInfo.m_HostInfo.m_HostID];
 					if (RemoteActor.m_ByActorLink.f_IsInTree())
@@ -24,11 +24,11 @@ namespace NMib::NCloud::NAppManager
 					mp_RemoteAppManagerStateByActor.f_Insert(RemoteActor);
 					RemoteActor.m_bInitialStateReceived = false;
 
-					co_await fp_NewRemoteAppManager(RemoteActor);
+					co_await fp_NewRemoteAppManager(&RemoteActor);
 
 					co_return {};
 				}
-				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> const &_RemovedActor, CTrustedActorInfo &&_ActorInfo) -> TCFuture<void>
+				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> _RemovedActor, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
 					auto pActor = mp_RemoteAppManagerStateByActor.f_FindEqual(_RemovedActor);
 					if (!pActor)
@@ -56,17 +56,15 @@ namespace NMib::NCloud::NAppManager
 			pOnChange->m_fOnChanged();
 	}
 	
-	TCFuture<void> CAppManagerActor::fp_NewRemoteAppManager(CRemoteAppManager &_AppManager)
+	TCFuture<void> CAppManagerActor::fp_NewRemoteAppManager(CRemoteAppManager *_pAppManager)
 	{
-		co_await NConcurrency::ECoroutineFlag_AllowReferences;
-
-		CStr HostID = _AppManager.f_GetHostID();
-		auto Actor = _AppManager.m_Actor;
+		CStr HostID = _pAppManager->f_GetHostID();
+		auto Actor = _pAppManager->m_Actor;
 		
 		auto Subscription = co_await Actor.f_CallActor(&CAppManagerCoordinationInterface::f_SubscribeToAppChanges)
 			(
 				g_ActorFunctor / [this, HostID, AllowDestroy = g_AllowWrongThreadDestroy]
-				(TCVector<CAppManagerCoordinationInterface::CAppChange> const &_Changes, bool _bInitial) -> TCFuture<void>
+				(TCVector<CAppManagerCoordinationInterface::CAppChange> _Changes, bool _bInitial) -> TCFuture<void>
 				{
 					auto &RemoteAppManager = mp_RemoteAppManagerState[HostID];
 					
@@ -125,7 +123,7 @@ namespace NMib::NCloud::NAppManager
 	
 	auto CAppManagerActor::CAppManagerCoordinationInterfaceImplementation::f_SubscribeToAppChanges
 		(
-			TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> const &_Changes, bool _bInitial)> &&_fOnChange
+			TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> _Changes, bool _bInitial)> _fOnChange
 		)
 		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
@@ -151,7 +149,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<void> CAppManagerActor::CAppManagerCoordinationInterfaceImplementation::f_RemoveKnownHost(CStr const &_Group, CStr const &_Application, CStr const &_HostID)
+	TCFuture<void> CAppManagerActor::CAppManagerCoordinationInterfaceImplementation::f_RemoveKnownHost(CStr _Group, CStr _Application, CStr _HostID)
 	{
 		auto pThis = m_pThis;
 
@@ -347,11 +345,11 @@ namespace NMib::NCloud::NAppManager
 		{
 			if (!RemoteAppManager.m_fOnChange)
 				continue;
-			RemoteAppManager.m_fOnChange(Changes, false) > fg_DiscardResult();
+			RemoteAppManager.m_fOnChange(Changes, false).f_DiscardResult();
 		}
 		
 		mp_State.m_StateDatabase.m_Data["KnownRemoteApplications"][_RemoteKey.m_Group][_RemoteKey.m_VersionManagerApplication][_HostID] = true;
-		fp_SaveStateDatabase() > fg_DiscardResult();
+		fp_SaveStateDatabase().f_DiscardResult();
 	}
 	
 	void CAppManagerActor::fp_BroadcastRemoteAppChange(CAppManagerCoordinationInterface::CAppChange &&_Change)
@@ -363,7 +361,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			if (!RemoteAppManager.m_fOnChange)
 				continue;
-			RemoteAppManager.m_fOnChange(Changes, false) > fg_DiscardResult();
+			RemoteAppManager.m_fOnChange(Changes, false).f_DiscardResult();
 		}
 	}
 	
@@ -423,6 +421,6 @@ namespace NMib::NCloud::NAppManager
 			Change.m_KnownHosts = KnownHosts;
 		}
 		
-		_AppManager.m_fOnChange(fg_Move(Changes), true) > fg_DiscardResult();
+		_AppManager.m_fOnChange(fg_Move(Changes), true).f_DiscardResult();
 	}
 }

@@ -38,7 +38,7 @@ namespace NMib::NCloud
 								File.f_Close();
 							}
 						)
-						> BlockingActorCheckout.f_MoveResultHandler("FileTransferReceive", "Error closing file")
+						.f_OnResultSet(BlockingActorCheckout.f_MoveResultHandler("FileTransferReceive", "Error closing file"))
 					;
 				}
 			}
@@ -150,27 +150,25 @@ namespace NMib::NCloud
 		StartDownload.m_QueueSize = _QueueSize;
 		StartDownload.m_DispatchActor = fg_ThisActor(this);
 
-		StartDownload.m_fStateChange = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CStateChange &&_StateChange) mutable
+		StartDownload.m_fStateChange = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CStateChange _StateChange) mutable
 			-> NConcurrency::TCFuture<CFileTransferContext::CInternal::CStateChange::CResult>
 			{
-				TCPromise<CFileTransferContext::CInternal::CStateChange::CResult> Promise;
-
 				CFileTransferContext::CInternal::CStateChange::CResult Result = _StateChange.f_GetResult();
 				auto &Internal = *mp_pInternal;
 
 				if (Internal.m_DonePromise.f_IsSet())
-					return Promise <<= fg_Move(Result);
+					co_return fg_Move(Result);
 
 				if (_StateChange.m_State == CFileTransferContext::CInternal::EState_Error)
 					Internal.m_DonePromise.f_SetException(DMibErrorInstance(_StateChange.m_Error));
 				else if (_StateChange.m_State == CFileTransferContext::CInternal::EState_Finished)
 					Internal.m_DonePromise.f_SetResult(_StateChange.m_Finished);
 
-				return Promise <<= fg_Move(Result);
+				co_return fg_Move(Result);
 			}
 		;
 
-		StartDownload.m_fSendPart = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CSendPart &&_Part) mutable
+		StartDownload.m_fSendPart = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContext::CInternal::CSendPart _Part) mutable
 			-> NConcurrency::TCFuture<CFileTransferContext::CInternal::CSendPart::CResult>
 			{
 				auto &Internal = *mp_pInternal;
@@ -240,15 +238,26 @@ namespace NMib::NCloud
 	
 	NConcurrency::TCFuture<CFileTransferResult> CFileTransferReceive::f_GetResult()
 	{
-		NConcurrency::TCPromise<CFileTransferResult> Promise;
-
 		auto &Internal = *mp_pInternal;
 
 		if (Internal.m_bDoneCalled)
-			return Promise <<= DMibErrorInstance("The file result has already been gotten");
+			co_return DMibErrorInstance("The file result has already been gotten");
 
 		Internal.m_bDoneCalled = true;
 
-		return Promise <<= Internal.m_DonePromise.f_Future();
+		co_return co_await Internal.m_DonePromise.f_Future();
+	}
+
+	NConcurrency::TCFuture<NConcurrency::CActorSubscription> CFileTransferReceive::f_GetAbortSubscription()
+	{
+		co_return g_ActorSubscription / [this]
+			{
+				auto &Internal = *mp_pInternal;
+				if (Internal.m_DonePromise.f_IsSet())
+					return;
+
+				Internal.m_DonePromise.f_SetException(DMibErrorInstance("Remote disconnected or aborted"));
+			}
+		;
 	}
 }

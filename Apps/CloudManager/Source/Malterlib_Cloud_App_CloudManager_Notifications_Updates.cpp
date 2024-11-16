@@ -31,7 +31,7 @@ namespace NMib::NCloud::NCloudManager
 				(
 					&CDatabaseActor::f_WriteWithCompaction
 					, g_ActorFunctorWeak / [CloudManagerServer = fg_ThisActor(&mp_This), pThis = this]
-					(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) mutable -> TCFuture<CDatabaseActor::CTransactionWrite>
+					(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) mutable -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
@@ -106,10 +106,12 @@ namespace NMib::NCloud::NCloudManager
 
 		mp_bScheduledDeferredNotifications = true;
 
-		fg_Timeout(1.0) > [this]
+		fg_Timeout(1.0) > [this]() -> TCFuture<void>
 			{
 				mp_bScheduledDeferredNotifications = false;
 				fp_SendDeferredNotifications() > fg_LogError("CloudManager", "Error sending deferred sensor notifications");
+
+				co_return {};
 			}
 		;
 	}
@@ -121,7 +123,7 @@ namespace NMib::NCloud::NCloudManager
 		auto DeferredUpdates = fg_Move(mp_DeferredUpdates);
 
 		for (auto &Update : DeferredUpdates.m_OrderedUpdates)
-			co_await fg_CallSafe(*this, &CUpdateNotifications::fp_ReportApplicationUpdateToSlack, Update.m_AppManagerID, Update.m_LastUpdateState);
+			co_await fp_ReportApplicationUpdateToSlack(Update.m_AppManagerID, Update.m_LastUpdateState);
 
 		co_return {};
 	}
@@ -147,7 +149,7 @@ namespace NMib::NCloud::NCloudManager
 				// Flush any old updates out
 				for (auto &Update : AppManager.m_Updates)
 				{
-					co_await fg_CallSafe(*this, &CUpdateNotifications::fp_ReportApplicationUpdateToSlack, _AppManagerID, Update.m_LastUpdateState).f_Wrap()
+					co_await fp_ReportApplicationUpdateToSlack(_AppManagerID, Update.m_LastUpdateState).f_Wrap()
 						> fg_LogError("CloudManager", "Error sending deferred sensor notification")
 					;
 				}
@@ -156,9 +158,7 @@ namespace NMib::NCloud::NCloudManager
 			}
 		}
 
-		TCPromise<CApplicationUpdateStateValue> StateValuePromise;
-		auto StateValueFuture = StateValuePromise.f_Future();
-
+		TCPromiseFuturePair<CApplicationUpdateStateValue> StateValuePromise;
 		{
 			auto WriteResult = co_await mp_This.mp_DatabaseActor
 				(
@@ -169,10 +169,10 @@ namespace NMib::NCloud::NCloudManager
 						CloudManagerServer = fg_ThisActor(&mp_This)
 						, Notification = _Notification
 						, _AppManagerID
-						, StateValuePromise = fg_Move(StateValuePromise)
+						, StateValuePromise = fg_Move(StateValuePromise.m_Promise)
 						, pCloudManagerServer = &mp_This
 					]
-					(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+					(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
@@ -236,11 +236,11 @@ namespace NMib::NCloud::NCloudManager
 			}
 		}
 
-		auto UpdateState = co_await fg_Move(StateValueFuture);
+		auto UpdateState = co_await fg_Move(StateValuePromise.m_Future);
 
 		if (!_Notification.m_UpdateID)
 		{
-			co_await fg_CallSafe(*this, &CUpdateNotifications::fp_ReportApplicationUpdateToSlack, _AppManagerID, UpdateState).f_Wrap()
+			co_await fp_ReportApplicationUpdateToSlack(_AppManagerID, UpdateState).f_Wrap()
 				> fg_LogError("CloudManager", "Error sending immediate sensor notification")
 			;
 		}
@@ -261,8 +261,8 @@ namespace NMib::NCloud::NCloudManager
 
 	TCFuture<TCMap<CStr, CStr>> CUpdateNotifications::fp_ReportApplicationUpdateToSlack
 		(
-			CStr const &_AppManagerID
-			, CApplicationUpdateStateValue const &_UpdateState
+			CStr _AppManagerID
+			, CApplicationUpdateStateValue _UpdateState
 		)
 	{
 		auto pAppManager = mp_This.mp_AppManagers.f_FindEqual(_AppManagerID);
@@ -407,7 +407,7 @@ namespace NMib::NCloud::NCloudManager
 				(
 					&CDatabaseActor::f_WriteWithCompaction
 					, g_ActorFunctorWeak / [CloudManagerServer = fg_ThisActor(&mp_This), Notification, _AppManagerID, SlackTimestamps = fg_Move(SlackTimestamps)]
-					(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) mutable -> TCFuture<CDatabaseActor::CTransactionWrite>
+					(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) mutable -> TCFuture<CDatabaseActor::CTransactionWrite>
 					{
 						co_await ECoroutineFlag_CaptureMalterlibExceptions;
 

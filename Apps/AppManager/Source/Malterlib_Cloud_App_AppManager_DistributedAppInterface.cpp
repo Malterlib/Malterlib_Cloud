@@ -35,9 +35,9 @@ namespace NMib::NCloud::NAppManager
 
 	NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterDistributedApp
 		(
-			NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
-			, NConcurrency::TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> &&_TrustInterface
-			, CRegisterInfo const &_RegisterInfo
+			NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> _ClientInterface
+			, NConcurrency::TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> _TrustInterface
+			, CRegisterInfo _RegisterInfo
 		)
 	{
 		if (!_ClientInterface)
@@ -126,7 +126,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterConfigFiles(CConfigFiles &&_ConfigFiles)
+	TCFuture<TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterConfigFiles(CConfigFiles _ConfigFiles)
 	{
 		auto pThis = m_pThis;
 

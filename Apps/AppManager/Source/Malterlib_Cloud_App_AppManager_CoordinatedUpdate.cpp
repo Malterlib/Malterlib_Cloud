@@ -8,25 +8,25 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveKnownHost(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 		CStr Group = _Params["Group"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		CStr HostID = _Params["HostID"].f_String();
 
-		TCActorResultVector<void> ResultsVector;
+		TCFutureVector<void> ResultsVector;
 
 		for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 		{
 			 if (!RemoteAppManager.m_Actor)
 				 continue;
-			RemoteAppManager.m_Actor.f_CallActor(&CAppManagerCoordinationInterface::f_RemoveKnownHost)(Group, Application, HostID) > ResultsVector.f_AddResult();
+			RemoteAppManager.m_Actor.f_CallActor(&CAppManagerCoordinationInterface::f_RemoveKnownHost)(Group, Application, HostID) > ResultsVector;
 		}
 
-		mp_AppManagerCoordinationInterface.m_pActor->f_RemoveKnownHost(Group, Application, HostID) > ResultsVector.f_AddResult();
+		mp_AppManagerCoordinationInterface.m_pActor->f_RemoveKnownHost(Group, Application, HostID) > ResultsVector;
 
-		co_await (co_await (ResultsVector.f_GetResults() % Auditor) | (g_Unwrap % Auditor));
+		co_await (co_await (fg_AllDoneWrapped(ResultsVector) % Auditor) | (g_Unwrap % Auditor));
 
 		co_return 0;
 	}
@@ -604,11 +604,13 @@ namespace NMib::NCloud::NAppManager
 		fg_OneshotTimerAbortable
 			(
 				_Timeout
-				, [=, this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]
+				, [=, this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() -> TCFuture<void>
 				{
 					if (!Promise.f_IsSet())
 						Promise.f_SetException(DErrorInstance(_TimeoutError));
 					mp_OnAppUpdateInfoChange.f_Remove(pOnAppUpdateInfoChangeWeak);
+
+					co_return {};
 				}
 			)
 			> [pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()](TCAsyncResult<CActorSubscription> &&_Subscription)
@@ -622,6 +624,6 @@ namespace NMib::NCloud::NAppManager
 
 		pOnAppUpdateInfoChange->m_fOnChanged();
 
-		return Promise.f_MoveFuture();
+		co_return co_await Promise.f_MoveFuture();
 	}
 }

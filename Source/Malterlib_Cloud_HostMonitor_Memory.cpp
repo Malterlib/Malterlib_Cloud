@@ -55,7 +55,7 @@ namespace NMib::NCloud
 
 		auto MemoryStats = NMemory::NPlatform::fg_Memory_GetStatistics(EMemoryStatisticsDetailLevel::mc_Basic);
 
-		TCActorResultVector<void> ReportResults;
+		TCFutureVector<void> ReportResults;
 
 		for (auto &StatisticEntry : MemoryStats.m_Statistics.f_Entries())
 		{
@@ -93,11 +93,11 @@ namespace NMib::NCloud
 
 			Reporter.m_SensorReporter->m_fReportReadings(TCVector<CDistributedAppSensorReporter::CSensorReading>{fg_Move(Reading)})
 				% ("Failed to report memory readings for '{}'"_f << StatisticName)
-				> ReportResults.f_AddResult()
+				> ReportResults
 			;
 		}
 
-		co_await ReportResults.f_GetUnwrappedResults();
+		co_await fg_AllDone(ReportResults);
 
 		co_return {};
 	}

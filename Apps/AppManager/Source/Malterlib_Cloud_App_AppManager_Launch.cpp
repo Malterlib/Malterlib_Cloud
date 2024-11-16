@@ -54,16 +54,18 @@ namespace NMib::NCloud::NAppManager
 		fg_OneshotTimer
 			(
 				10.0
-				, [this, _pApplication]
+				, [this, _pApplication]() -> TCFuture<void>
 				{
 					_pApplication->m_bPreventLaunch_DelayAfterFailure = false;
 					fp_UpdateApplicationDependencies();
+
+					co_return {};
 				}
 			)
 		;
 	}
 
-	auto CAppManagerActor::fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption) -> TCFuture<CAppLaunchResult>
+	auto CAppManagerActor::fp_LaunchAppInternal(TCSharedPointer<CApplication> _pApplication, bool _bOpenEncryption) -> TCFuture<CAppLaunchResult>
 	{
 		DCheck(!_pApplication->m_bLaunching);
 
@@ -106,7 +108,7 @@ namespace NMib::NCloud::NAppManager
 
 		if (_bOpenEncryption)
 		{
-			auto Result = co_await (self(&CAppManagerActor::fp_ChangeEncryption, _pApplication, EEncryptOperation_Open, false) % "Failed to open encryption").f_Wrap();
+			auto Result = co_await (fp_ChangeEncryption(_pApplication, EEncryptOperation_Open, false) % "Failed to open encryption").f_Wrap();
 			if (!Result)
 			{
 				fp_AppLaunchStateChanged(_pApplication, Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
@@ -127,7 +129,7 @@ namespace NMib::NCloud::NAppManager
 				_pApplication->m_bJustUpdated = false;
 
 				fp_AppLaunchStateChanged(_pApplication, "Self update source - running self update", CAppManagerInterface::EStatusSeverity_Warning);
-				Result.m_bQuitManager = co_await self(&CAppManagerActor::fp_SelfUpdate, _pApplication);
+				Result.m_bQuitManager = co_await fp_SelfUpdate(_pApplication);
 				if (Result.m_bQuitManager)
 					fp_AppLaunchStateChanged(_pApplication, "Self update source - restarting self", CAppManagerInterface::EStatusSeverity_Warning);
 				else
@@ -152,7 +154,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			fp_AppLaunchStateChanged(_pApplication, "Upgrading app manager version", CAppManagerInterface::EStatusSeverity_Warning);
 
-			co_await self(&CAppManagerActor::fp_UpdateAppManagerApplicationVersion, _pApplication, Application.m_Settings.m_AppManagerVersion);
+			co_await fp_UpdateAppManagerApplicationVersion(_pApplication, Application.m_Settings.m_AppManagerVersion);
 
 			Application.m_Settings.m_AppManagerVersion = mc_CurrentAppMangerVersion;
 			co_await fp_UpdateApplicationJSON(_pApplication);
@@ -183,8 +185,7 @@ namespace NMib::NCloud::NAppManager
 				(
 					mp_State.m_LocalAddress
 					, mp_State.m_TrustManager
-					, g_ActorFunctor / [_pApplication, this]
-					(CStr const &_HostID, CCallingHostInfo const &_HostInfo, CByteVector const &_Certificate) -> TCFuture<void>
+					, g_ActorFunctor / [_pApplication, this](CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _Certificate) -> TCFuture<void>
 					{
 						if (_pApplication->m_bDeleted)
 							co_return DMibErrorInstance("Application deleted");
@@ -324,14 +325,13 @@ namespace NMib::NCloud::NAppManager
 		}
 		else
 		{
-
-			TCPromise<CAppLaunchResult> LaunchPromise;
+			TCPromiseFuturePair<CAppLaunchResult> LaunchPromise;
 			CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
 				(
 					ApplicationDirectory / Application.m_Settings.m_Executable
 					, Application.m_Settings.m_ExecutableParameters
 					, ApplicationDirectory
-					, [this, _pApplication, pState, LaunchPromise, ApplicationDirectory](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+					, [this, _pApplication, pState, LaunchPromise = LaunchPromise.m_Promise, ApplicationDirectory](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 					{
 						if (_pApplication->m_bDeleted)
 							return;
@@ -344,18 +344,18 @@ namespace NMib::NCloud::NAppManager
 								{
 									fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)", CAppManagerInterface::EStatusSeverity_Warning);
 
-									TCPromise<void> RegisterPromise;
+									TCPromiseFuturePair<void> RegisterPromise;
 
 									if (_pApplication->m_AppInterface)
-										RegisterPromise.f_SetResult();
+										RegisterPromise.m_Promise.f_SetResult();
 									else
 									{
 										_pApplication->m_OnRegisterDistributedApp.f_Insert().f_Future().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)")
-											> RegisterPromise
+											> fg_Move(RegisterPromise.m_Promise)
 										;
 									}
 
-									RegisterPromise.f_MoveFuture() > [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
+									fg_Move(RegisterPromise.m_Future) > [this, pState, LaunchPromise, _pApplication](TCAsyncResult<void> &&_Result)
 										{
 											if (_pApplication->m_bDeleted)
 												return;
@@ -566,7 +566,7 @@ namespace NMib::NCloud::NAppManager
 					mp_State.m_LocalAddress
 					, mp_State.m_TrustManager
 					, g_ActorFunctor / [_pApplication, this]
-					(CStr const &_HostID, CCallingHostInfo const &_HostInfo, CByteVector const &_Certificate) -> TCFuture<void>
+					(CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _Certificate) -> TCFuture<void>
 					{
 						if (_pApplication->m_bDeleted)
 							co_return DMibErrorInstance("Application deleted");
@@ -597,7 +597,7 @@ namespace NMib::NCloud::NAppManager
 
 						co_return {};
 					}
-					, g_ActorFunctor / [this, _pApplication, pState, LaunchPromise](NStr::CStr const &_Error) -> TCFuture<void>
+					, g_ActorFunctor / [this, _pApplication, pState, LaunchPromise = LaunchPromise.m_Promise](NStr::CStr _Error) -> TCFuture<void>
 					{
 						if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
 							co_return {};
@@ -649,20 +649,19 @@ namespace NMib::NCloud::NAppManager
 
 			_pApplication->m_ProcessLaunchSubscription = fg_Move(*LaunchSubscription);
 
-			co_return co_await LaunchPromise.f_MoveFuture();
+			co_return co_await fg_Move(LaunchPromise.m_Future);
 		}
 	}
 
-	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption)
+	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> _pApplication, bool _bOpenEncryption)
 		-> TCFuture<CAppLaunchResult>
 	{
-		TCPromise<CAppLaunchResult> Promise;
-
 		if (_pApplication->m_bLaunching)
 		{
+			TCPromiseFuturePair<CAppLaunchResult> Promise;
 			_pApplication->m_OnLaunchFinished.f_Insert
 				(
-					[this, Promise, _pApplication, _bOpenEncryption](bool _bAborted)
+					[this, Promise = fg_Move(Promise.m_Promise), _pApplication, _bOpenEncryption](bool _bAborted) mutable
 					{
 						if (_bAborted)
 						{
@@ -671,13 +670,13 @@ namespace NMib::NCloud::NAppManager
 						}
 
 						DCheck(!_pApplication->m_bLaunching);
-						self(&CAppManagerActor::fp_LaunchAppInternal, _pApplication, _bOpenEncryption) > Promise;
+						fp_LaunchAppInternal(_pApplication, _bOpenEncryption) > fg_Move(Promise);
 					}
 				)
 			;
-			return Promise.f_MoveFuture();
+			co_return co_await fg_Move(Promise.m_Future);
 		}
 
-		return Promise <<= self(&CAppManagerActor::fp_LaunchAppInternal, _pApplication, _bOpenEncryption);
+		co_return co_await fp_LaunchAppInternal(_pApplication, _bOpenEncryption);
 	}
 }

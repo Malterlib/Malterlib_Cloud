@@ -243,13 +243,13 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [this](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [this](CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
-						WriteTransaction = fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
+						WriteTransaction = fg_Move((co_await fp_CleanupDatabase(fg_Move(WriteTransaction), fg_Construct())).m_Transaction);
 
 					WriteTransaction = co_await fp_SaveGlobalState(fg_Move(WriteTransaction));
 
@@ -290,7 +290,7 @@ namespace NMib::NCloud::NCloudManager
 			(
 				&CDatabaseActor::f_WriteWithCompaction
 				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), Key = fg_Move(_Key), Data = fg_Move(_Data)]
-				(CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
+				(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 					auto WriteTransaction = fg_Move(_Transaction);
@@ -319,7 +319,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<CCloudManager::CRemoveAppManagerReturn> CCloudManagerServer::fp_RemoveAppManagerData(CStr const &_HostID)
+	TCFuture<CCloudManager::CRemoveAppManagerReturn> CCloudManagerServer::fp_RemoveAppManagerData(CStr _HostID)
 	{
 		auto OnResume = co_await f_CheckDestroyedOnResume();
 
@@ -328,7 +328,7 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), _HostID, pRemovedHostIDs](CDatabaseActor::CTransactionWrite &&_Transaction, bool _bCompacting)
+				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), _HostID, pRemovedHostIDs](CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting)
 				-> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
@@ -419,7 +419,7 @@ namespace NMib::NCloud::NCloudManager
 		};
 	}
 
-	TCFuture<void> CCloudManagerServer::f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_Prefix)
+	TCFuture<void> CCloudManagerServer::f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> _pCommandLine, CStr _Prefix)
 	{
 		struct CTableRendererState
 		{

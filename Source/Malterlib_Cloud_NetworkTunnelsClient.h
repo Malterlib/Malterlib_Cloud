@@ -38,9 +38,9 @@ namespace NMib::NCloud
 		{
 			NStr::CStr m_HostID; // Leave empty to allow any host
 			ICNetworkTunnels::CNetworkTunnelName m_TunnelName;
-			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (CCallbackInfo const &_CallbackInfo)> m_fOnConnection;
-			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (CCallbackInfo const &_CallbackInfo, NStr::CStr const &_Message)> m_fOnClose;
-			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (CCallbackInfo const &_CallbackInfo, NStr::CStr const &_Error)> m_fOnError;
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (CCallbackInfo _CallbackInfo)> m_fOnConnection;
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (CCallbackInfo _CallbackInfo, NStr::CStr _Message)> m_fOnClose;
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (CCallbackInfo _CallbackInfo, NStr::CStr _Error)> m_fOnError;
 			NStr::CStr m_ListenHost;
 			bool m_bWaitForTunnel = false;
 		};
@@ -49,7 +49,7 @@ namespace NMib::NCloud
 
 		NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, NContainer::TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> f_EnumTunnels();
 
-		NConcurrency::TCFuture<CTunnel> f_OpenTunnel(COpenTunnel &&_OpenTunnel);
+		NConcurrency::TCFuture<CTunnel> f_OpenTunnel(COpenTunnel _OpenTunnel);
 
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy() override;

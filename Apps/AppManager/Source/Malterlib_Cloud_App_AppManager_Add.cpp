@@ -16,13 +16,11 @@ namespace NMib::NCloud::NAppManager
 {
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Add
 		(
-			NStr::CStr const &_Name
-			, CApplicationAdd const &_Add
-			, CApplicationSettings const &_Settings
+			NStr::CStr _Name
+			, CApplicationAdd _Add
+			, CApplicationSettings _Settings
 		)
 	{
-		NConcurrency::TCPromise<void> Promise;
-
 		CAppManagerActor::CApplicationSettings ApplicationSettings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		ApplicationSettings.f_FromInterfaceAdd(_Add, ChangedSettings);
@@ -31,10 +29,9 @@ namespace NMib::NCloud::NAppManager
 		if (!_Settings.m_ExecutableParameters)
 			ApplicationSettings.m_ExecutableParameters = {"--daemon-run-standalone"};
 
-		return Promise <<= m_pThis->self
+		co_return co_await m_pThis->fp_AddApplication
 			(
-				&CAppManagerActor::fp_AddApplication
-				, _Name
+				_Name
 				, ApplicationSettings
 				, ChangedSettings
 				, _Add.m_bForceOverwriteEncryption
@@ -51,7 +48,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 		CStr Name = _Params["Name"].f_String();
@@ -117,10 +114,9 @@ namespace NMib::NCloud::NAppManager
 		else if (!bNullPackage)
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
 		
-		auto Result = co_await self
+		auto Result = co_await fp_AddApplication
 			(
-				&CAppManagerActor::fp_AddApplication
-				, Name
+				Name
 				, Settings
 				, ChangedSettings
 				, bForceOverwrite
@@ -143,16 +139,16 @@ namespace NMib::NCloud::NAppManager
 	
 	TCFuture<void> CAppManagerActor::fp_AddApplication
 		(
-			NStr::CStr const &_Name
-			, CApplicationSettings const &_Settings
+			NStr::CStr _Name
+			, CApplicationSettings _Settings
 			, EApplicationSetting _ChangedSettings
 			, bool _bForceOverwrite
 			, bool _bForceInstall
 			, bool _bSettingsFromVersionInfo
-			, TCFunction<void (CStr const &_Info)> &&_fOnInfo
-			, CStr const &_FromLocalFile
-			, TCOptional<CVersionManager::CVersionIDAndPlatform> const &_Version
-			, CCallingHostInfo const &_CallingHostInfo
+			, TCFunction<void (CStr const &_Info)> _fOnInfo
+			, CStr _FromLocalFile
+			, TCOptional<CVersionManager::CVersionIDAndPlatform> _Version
+			, CCallingHostInfo _CallingHostInfo
 		)
 	{
 		auto Auditor = f_Auditor({}, _CallingHostInfo);
@@ -282,7 +278,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto Directory = pApplication->f_GetDirectory();
 
-		co_await (self(&CAppManagerActor::fp_ChangeEncryption, pApplication, EEncryptOperation_Setup, _bForceOverwrite) % Auditor);
+		co_await (fp_ChangeEncryption(pApplication, EEncryptOperation_Setup, _bForceOverwrite) % Auditor);
 
 		auto fApplyVersion = [&](CVersionManager::CVersionIDAndPlatform const &_VersionID, CVersionManager::CVersionInformation const &_VersionInfo)
 			{
@@ -317,7 +313,7 @@ namespace NMib::NCloud::NAppManager
 				pApplication->m_LastTriedInstalledVersionInfo = _VersionInfo;
 
 				if (mp_KnownPlatforms(_VersionID.m_Platform).f_WasCreated())
-					fp_VersionManagerResubscribeAll() > fg_DiscardResult();
+					fp_VersionManagerResubscribeAll().f_DiscardResult();
 			}
 		;
 
@@ -542,7 +538,7 @@ namespace NMib::NCloud::NAppManager
 			_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
 			auto VersionInfo = co_await
 				(
-					self(&CAppManagerActor::fp_DownloadApplication, VersionManagerApplication, VersionID, DownloadDirectory)
+					fp_DownloadApplication(VersionManagerApplication, VersionID, DownloadDirectory)
 					% "Failed to download application from version manager" % Auditor
 				)
 			;

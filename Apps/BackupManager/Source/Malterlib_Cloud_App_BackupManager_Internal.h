@@ -65,7 +65,7 @@ namespace NMib::NCloud::NBackupManager
 				return TCMap<CStr, CBackupDownload>::fs_GetKey(*this);
 			}
 
-			TCFuture<void> f_Destroy();
+			TCUnsafeFuture<void> f_Destroy();
 
 			TCDistributedActor<CDirectorySyncSend> m_DirectorySyncSend;
 			CActorSubscription m_Subscription;
@@ -73,13 +73,13 @@ namespace NMib::NCloud::NBackupManager
 
 		struct CBackupManagerImplementation : public CBackupManager
 		{
-			auto f_InitBackup(CBackupManager::CInitBackup &&_Params)
+			auto f_InitBackup(CBackupManager::CInitBackup _Params)
 				-> TCFuture<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> override
 			;
 
 			TCFuture<TCVector<CStr>> f_ListBackupSources() override;
-			TCFuture<TCMap<CStr, CBackupInfo>> f_ListBackups(CStr const &_ForBackupSource) override;
-			auto f_DownloadBackup(CDownloadBackup &&_DownloadBackup)
+			TCFuture<TCMap<CStr, CBackupInfo>> f_ListBackups(CStr _ForBackupSource) override;
+			auto f_DownloadBackup(CDownloadBackup _DownloadBackup)
 				-> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 				override
 			;
@@ -98,9 +98,9 @@ namespace NMib::NCloud::NBackupManager
 
 		TCFuture<TCVector<CStr>> fp_EnumBackupSourcesFromDisk();
 		TCVector<CStr> fp_EnumBackupSources();
-		TCFuture<TCVector<CStr>> fp_FilterBackupSourcesByPermissions(TCVector<CStr> const &_Sources);
+		TCFuture<TCVector<CStr>> fp_FilterBackupSourcesByPermissions(TCVector<CStr> _Sources);
 
-		TCFuture<void> fp_DestroyBackupInstance(CBackupKey const &_Key, CDistributedAppAuditor const &_Auditor, bool _bError, CStr const &_Reason);
+		TCFuture<void> fp_DestroyBackupInstance(CBackupKey _Key, CDistributedAppAuditor _Auditor, bool _bError, CStr _Reason);
 
 		CExceptionPointer fp_CheckBackupKey
 			(

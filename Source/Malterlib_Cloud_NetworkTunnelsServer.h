@@ -26,10 +26,10 @@ namespace NMib::NCloud
 
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_PublishNetworkTunnel
 			(
-				ICNetworkTunnels::CNetworkTunnelName const &_Name
-				, NStr::CStr const &_Host
+				ICNetworkTunnels::CNetworkTunnelName _Name
+				, NStr::CStr _Host
 				, uint16 _Port
-				, NEncoding::CEJSONSorted &&_MetaData
+				, NEncoding::CEJSONSorted _MetaData
 			)
 		;
 

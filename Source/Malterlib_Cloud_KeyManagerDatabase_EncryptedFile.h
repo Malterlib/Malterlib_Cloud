@@ -17,8 +17,8 @@ namespace NMib::NCloud
 		~CKeyManagerServerDatabase_EncryptedFile();
 		
 		NConcurrency::TCFuture<void> f_Initialize() override;
-		NConcurrency::TCFuture<void> f_ChangePassword(NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt) override;
-		NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase &&_Database) override;
+		NConcurrency::TCFuture<void> f_ChangePassword(NStr::CStrSecure _Password, NContainer::CSecureByteVector _Salt) override;
+		NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase _Database) override;
 		NConcurrency::TCFuture<CDatabase> f_ReadDatabase() override;
 	
 	private:

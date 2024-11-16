@@ -43,7 +43,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		{
 		}
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override
 		{
 			m_TunnelServer = fg_Construct
 				(
@@ -64,14 +64,14 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 
 		TCFuture<void> fp_StopApp() override
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 			for (auto &Tunnel : m_PublishedTunnels)
-				Tunnel->f_Destroy() > Destroys.f_AddResult();
+				Tunnel->f_Destroy() > Destroys;
 
-			co_await Destroys.f_GetResults();
+			co_await fg_AllDoneWrapped(Destroys);
 
 			if (m_TunnelServer)
-				co_await m_TunnelServer.f_Destroy();
+				co_await fg_Move(m_TunnelServer).f_Destroy();
 
 			co_return {};
 		}
@@ -94,7 +94,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		{
 		}
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override
 		{
 			m_TunnelClient = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager);
 
@@ -105,19 +105,19 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 
 		TCFuture<void> fp_StopApp() override
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 			for (auto &Subscription : m_TunnelSubscriptions)
-				Subscription->f_Destroy() > Destroys.f_AddResult();
+				Subscription->f_Destroy() > Destroys;
 
-			co_await Destroys.f_GetResults();
+			co_await fg_AllDoneWrapped(Destroys);
 
 			if (m_TunnelClient)
-				co_await m_TunnelClient.f_Destroy();
+				co_await fg_Move(m_TunnelClient).f_Destroy();
 
 			co_return {};
 		}
 
-		TCFuture<CEJSONSorted> fp_Test_Command(NStr::CStr const &_Command, NEncoding::CEJSONSorted const &_Params) override
+		TCFuture<CEJSONSorted> fp_Test_Command(NStr::CStr _Command, NEncoding::CEJSONSorted const _Params) override
 		{
 			if (_Command == "OpenTunnel")
 			{
@@ -128,19 +128,19 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 						{
 							.m_HostID = _Params["HostID"].f_String()
 							, .m_TunnelName = _Params["TunnelName"].f_String()
-							, .m_fOnConnection = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo) -> TCFuture<void> // New connection
+							, .m_fOnConnection = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo) -> TCFuture<void> // New connection
 							{
 								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 									DMibConErrOut2("New connection: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort));
 								co_return {};
 							}
-							, .m_fOnClose = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, NStr::CStr const &_Message) -> TCFuture<void> // On Close
+							, .m_fOnClose = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, NStr::CStr _Message) -> TCFuture<void> // On Close
 							{
 								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 									DMibConErrOut2("Connection from '{}' closed: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Message);
 								co_return {};
 							}
-							, .m_fOnError = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo const &_CallbackInfo, CStr const &_Error) -> TCFuture<void> // On Error
+							, .m_fOnError = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, CStr _Error) -> TCFuture<void> // On Error
 							{
 								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 									DMibConErrOut2("Connection from '{}' error: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Error);

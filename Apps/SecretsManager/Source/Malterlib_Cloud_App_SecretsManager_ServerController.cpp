@@ -20,12 +20,12 @@ namespace NMib::NCloud::NSecretsManager
 	}
 
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServerController::f_Test_Command(CStr const &_Command, CEJSONSorted const &_Params)
+	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServerController::f_Test_Command(CStr _Command, CEJSONSorted const _Params)
 	{
 		if (!mp_ServerActor)
 			co_return DMibErrorInstance("No server");
 
-		co_return co_await mp_ServerActor.f_CallActor(&CSecretsManagerDaemonActor::CServer::f_Test_Command)(_Command, _Params);
+		co_return co_await mp_ServerActor.f_CallActor(&CSecretsManagerDaemonActor::CServer::f_Test_Command)(fg_Move(_Command), fg_Move(fg_RemoveQualifiers(_Params)));
 	}
 #endif
 
@@ -57,9 +57,9 @@ namespace NMib::NCloud::NSecretsManager
 		mp_KeyManagerSubscription = fg_Move(*KeyManagerSubscription);
 		co_await mp_KeyManagerSubscription.f_OnActor
 			(
-				g_ActorFunctor / [this](TCDistributedActor<CKeyManager> const &_KeyManager, CTrustedActorInfo const &_ActorInfo) -> TCFuture<void>
+				g_ActorFunctor / [this](TCDistributedActor<CKeyManager> _KeyManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
-					co_await self(&CServerController::fp_KeyManagerAvailable, _KeyManager);
+					co_await fp_KeyManagerAvailable(_KeyManager);
 					co_return {};
 				}
 				, nullptr
@@ -69,8 +69,10 @@ namespace NMib::NCloud::NSecretsManager
 		co_return {};
 	}
 
-	TCFuture<void> CSecretsManagerDaemonActor::CServerController::fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> const &_KeyManager)
+	TCFuture<void> CSecretsManagerDaemonActor::CServerController::fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> _KeyManager)
 	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+		
 		if (mp_ServerActor || mp_AppState.m_bStoppingApp)
 			co_return {};
 
@@ -133,18 +135,18 @@ namespace NMib::NCloud::NSecretsManager
 
 	TCFuture<void> CSecretsManagerDaemonActor::CServerController::fp_Destroy()
 	{
-		TCActorResultVector<void> Destroys;
+		TCFutureVector<void> Destroys;
 
 		CLogError LogError("Mib/Cloud/SecretsManager");
 
 		if (mp_ServerActor)
-			mp_ServerActor.f_Destroy() > Destroys.f_AddResult();
+			fg_TempCopy(mp_ServerActor).f_Destroy() > Destroys;
 
 		for (auto Database : mp_PendingDatabases)
-			fg_Move(Database).f_Destroy() > Destroys.f_AddResult();
+			fg_Move(Database).f_Destroy() > Destroys;
 		mp_PendingDatabases.f_Clear();
 
-		co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy server actor or databases");
+		co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy server actor or databases");
 
 		co_await mp_KeyManagerSubscription.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy key manager subscription");
 

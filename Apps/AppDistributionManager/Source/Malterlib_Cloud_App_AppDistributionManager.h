@@ -46,19 +46,19 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	struct CDeployDestination : public CActor
 	{
-		virtual TCFuture<void> f_Deploy(CDeployInfo const &_DeployInfo) = 0;
+		virtual TCFuture<void> f_Deploy(CDeployInfo _DeployInfo) = 0;
 	};
 
 	struct CDeployDestination_FileSystem : public CDeployDestination
 	{
 		CDeployDestination_FileSystem();
 
-		TCFuture<void> f_Deploy(CDeployInfo const &_DeployInfo) override;
+		TCFuture<void> f_Deploy(CDeployInfo _DeployInfo) override;
 
 	private:
 		TCFuture<void> fp_Destroy() override;
 
-		TCActor<CSeparateThreadActor> mp_FileActor;
+		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroy = fg_Construct();
 	};
 
 	struct CAppDistributionManagerActor : public CDistributedAppActor
@@ -171,15 +171,15 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
 		TCFuture<void> fp_ReadState();
 
-		TCFuture<uint32> fp_CommandLine_DistributionEnum(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_DistributionAdd(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_DistributionChangeSettings(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_DistributionRemove(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> fp_CommandLine_ApplicationListAvailableVersions(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionEnum(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionAdd(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionChangeSettings(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionRemove(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ApplicationListAvailableVersions(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		static CStr fsp_DeployDestinationToString(EDeployDestination _Type);
 		static EDeployDestination fsp_DeployDestinationFromString(CStr const &_Type);
@@ -188,37 +188,43 @@ namespace NMib::NCloud::NAppDistributionManager
 		CEJSONSorted fp_SaveSettings(CDistributionSettings const &_Settings);
 		void fp_SaveState(CDistribution const &_Distribution);
 
-		TCFuture<void> fp_VersionManagerSubscribe(TCWeakDistributedActor<CVersionManager> const &_VersionManager);
-		TCFuture<void> fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info);
-		TCFuture<void> fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
-		TCFuture<CVersionsAvailableForUpdate> fp_GetAvailableVersions(CStr const &_Application);
+		TCFuture<void> fp_VersionManagerSubscribe(TCWeakDistributedActor<CVersionManager> _VersionManager);
+		TCFuture<void> fp_VersionManagerAdded(TCDistributedActor<CVersionManager> _VersionManager, CTrustedActorInfo _Info);
+		TCFuture<void> fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> _VersionManager);
+		TCFuture<CVersionsAvailableForUpdate> fp_GetAvailableVersions(CStr _Application);
 
 		TCFuture<CVersionInformation> fp_DownloadApplicationFromManager
 			(
-				TCDistributedActor<CVersionManager> const &_Manager
-				, CStr const &_ApplicationName
-				, CVersionManager::CVersionIDAndPlatform const &_VersionID
-				, CStr const &_DestinationDir
+				TCDistributedActor<CVersionManager> _Manager
+				, CStr _ApplicationName
+				, CVersionManager::CVersionIDAndPlatform _VersionID
+				, CStr _DestinationDir
 			)
 		;
 		
 		TCFuture<CVersionInformation> fp_DownloadApplication
 			(
-				CStr const &_ApplicationName
-				, CVersionManager::CVersionIDAndPlatform const &_VersionID
-				, CStr const &_DestinationDir
+				CStr _ApplicationName
+				, CVersionManager::CVersionIDAndPlatform _VersionID
+				, CStr _DestinationDir
 			)
 		;
 		
 		void fp_AutoUpdate_Update();
+		TCFuture<TCSet<CStr>> fp_AutoUpdate_DeployDistribution
+			(
+				CStr _DistributionName
+				, CVersionManager::CVersionIDAndPlatform _VersionID
+				, CVersionManager::CVersionInformation _VersionInfo
+				, TCSet<EDeployDestination> _DeployDestinations
+			)
+		;
 
 		TCActor<CDeployDestination> fp_CreateDeploy(EDeployDestination _Type);
 
 		bool fsp_VersionMatchesSettings(CVersionManagerVersion const &_Version, CDistributionSettings const &_Settings);
 
-		TCActor<CSeparateThreadActor> mp_FileActor;
-
-		TCSequencer<TCSet<CStr>> mp_DistributeSequencer{"AppDistributionManagerActor DistributeSequencer", 8}; // Max 8 distributions at the same time
+		TCSequencer<void> mp_DistributeSequencer{"AppDistributionManagerActor DistributeSequencer", 8}; // Max 8 distributions at the same time
 
 		TCMap<CStr, CDistribution> mp_Distributions;
 

@@ -76,8 +76,6 @@ namespace NMib::NCloud
 			, NReference::TCReference<CActorSubscription> o_Subscription
 		)
 	{
-		co_await ECoroutineFlag_AllowReferences;
-
 		NStorage::TCSharedPointer<CState> pState = fg_Construct();
 
 		if (!_Config.m_Manifest.f_IsOfType<CDirectoryManifestConfig>() || _Config.m_Manifest.f_Get<1>().m_IncludeWildcards.f_GetLen() != 1)
@@ -88,7 +86,7 @@ namespace NMib::NCloud
 				pState->m_bAborted = true;
 
 				if (pState->m_DirectorySyncSend)
-					co_await pState->m_DirectorySyncSend.f_Destroy();
+					co_await fg_Move(pState->m_DirectorySyncSend).f_Destroy();
 
 				co_return {};
 			}
@@ -102,7 +100,7 @@ namespace NMib::NCloud
 				pState->m_DirectorySyncSend->f_ShareInterface<CDirectorySyncClient>()
 				, g_ActorSubscription / [pState]() mutable -> TCFuture<void>
 				{
-					if (pState->m_bAborted)
+					if (pState->m_bAborted || !pState->m_DirectorySyncSend)
 						co_return DMibErrorInstance("Aborted");
 
 					TCAsyncResult<CDirectorySyncSend::CSyncResult> Result = co_await pState->m_DirectorySyncSend.f_CallActor(&CDirectorySyncSend::f_GetResult)().f_Wrap();
@@ -115,7 +113,7 @@ namespace NMib::NCloud
 					if (pState->m_DirectorySyncSend && !pState->m_bAborted)
 					{
 						pState->m_bAborted = true;
-						co_await pState->m_DirectorySyncSend.f_Destroy();
+						co_await fg_Move(pState->m_DirectorySyncSend).f_Destroy();
 					}
 
 					co_return {};

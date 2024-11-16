@@ -118,9 +118,9 @@ namespace NMib::NCloud::NAppDistributionManager
 						, AddOption_DeployDestinations
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionAdd, _Params, _pCommandLine);
+					return fp_CommandLine_DistributionAdd(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -145,9 +145,9 @@ namespace NMib::NCloud::NAppDistributionManager
 						, AddOption_DeployDestinations
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionChangeSettings, _Params, _pCommandLine);
+					return fp_CommandLine_DistributionChangeSettings(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -174,9 +174,9 @@ namespace NMib::NCloud::NAppDistributionManager
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionEnum, _Params, _pCommandLine);
+					return fp_CommandLine_DistributionEnum(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -194,9 +194,9 @@ namespace NMib::NCloud::NAppDistributionManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_DistributionRemove, _Params, _pCommandLine);
+					return fp_CommandLine_DistributionRemove(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -223,9 +223,9 @@ namespace NMib::NCloud::NAppDistributionManager
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return g_Future <<= self(&CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions, _Params, _pCommandLine);
+					return fp_CommandLine_ApplicationListAvailableVersions(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;

@@ -18,9 +18,9 @@ namespace NMib::NCloud::NCloudManager
 				&CDistributedAppSensorStoreLocal::f_StartWithDatabase
 				, fg_TempCopy(mp_DatabaseActor)
 				, mc_DatabasePrefixSensor
-				, g_ActorFunctor / [this](NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction) -> TCFuture<NDatabase::CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctor / [this](NDatabase::CDatabaseActor::CTransactionWrite _WriteTransaction) -> TCFuture<NDatabase::CDatabaseActor::CTransactionWrite>
 				{
-					co_return fg_Move((co_await self(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(_WriteTransaction), fg_Construct())).m_Transaction);
+					co_return fg_Move((co_await fp_CleanupDatabase(fg_Move(_WriteTransaction), fg_Construct())).m_Transaction);
 				}
 			)
 		;
@@ -28,7 +28,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	auto CCloudManagerServer::CDistributedAppSensorReporterImplementation::f_OpenSensorReporter(CSensorInfo &&_SensorInfo) -> TCFuture<CSensorReporter>
+	auto CCloudManagerServer::CDistributedAppSensorReporterImplementation::f_OpenSensorReporter(CSensorInfo _SensorInfo) -> TCFuture<CSensorReporter>
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
@@ -71,7 +71,7 @@ namespace NMib::NCloud::NCloudManager
 		return {"CloudManager/ReadSensors", "CloudManager/ReadAll"};
 	}
 
-	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensors(CGetSensors &&_Params)
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensors(CGetSensors _Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> Sensors;
@@ -94,7 +94,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(Sensors);
 	}
 
-	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorReadings(CGetSensorReadings &&_Params)
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorReadings(CGetSensorReadings _Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> SensorReadings;
@@ -117,7 +117,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return fg_Move(SensorReadings);
 	}
 
-	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorStatus(CGetSensorStatus &&_Params)
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensorStatus(CGetSensorStatus _Params)
 		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>> SensorReadings;
@@ -142,8 +142,8 @@ namespace NMib::NCloud::NCloudManager
 
 	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_SubscribeSensors
 		(
-			TCVector<CDistributedAppSensorReader_SensorFilter> &&_Filters
-			, TCActorFunctorWithID<TCFuture<void> (CSensorChange &&_Change)> &&_fOnChange
+			TCVector<CDistributedAppSensorReader_SensorFilter> _Filters
+			, TCActorFunctorWithID<TCFuture<void> (CSensorChange _Change)> _fOnChange
 		)
 		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
@@ -169,8 +169,8 @@ namespace NMib::NCloud::NCloudManager
 
 	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_SubscribeSensorReadings
 		(
-			TCVector<CDistributedAppSensorReader_SensorReadingSubscriptionFilter> &&_Filters
-			, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading &&_Reading)> &&_fOnReading
+			TCVector<CDistributedAppSensorReader_SensorReadingSubscriptionFilter> _Filters
+			, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading _Reading)> _fOnReading
 		)
 		-> TCFuture<TCActorSubscriptionWithID<>>
 	{
@@ -202,8 +202,8 @@ namespace NMib::NCloud::NCloudManager
 
 	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_SubscribeSensorStatus
 		(
-			TCVector<CDistributedAppSensorReader_SensorStatusFilter> &&_Filters
-			, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading &&_Reading)> &&_fOnReading
+			TCVector<CDistributedAppSensorReader_SensorStatusFilter> _Filters
+			, TCActorFunctorWithID<TCFuture<void> (CDistributedAppSensorReader_SensorKeyAndReading _Reading)> _fOnReading
 		)
 		-> TCFuture<TCActorSubscriptionWithID<>>
 	{

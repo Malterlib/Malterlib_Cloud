@@ -47,7 +47,7 @@ namespace NMib::NCloud
 		~CFileTransferSend();
 		CFileTransferSend(NStr::CStr const &_BasePath, uint64 _MaxQueueSize = NFile::gc_IdealNetworkQueueSize);
 
-		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SendFiles(CFileTransferContext &&_TransferContext);
+		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SendFiles(CFileTransferContext _TransferContext);
 		NConcurrency::TCFuture<CFileTransferResult> f_GetResult();
 		
 	private:
@@ -77,8 +77,9 @@ namespace NMib::NCloud
 		};
 
 		NConcurrency::TCFuture<CFileTransferContext> f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags);
-		NConcurrency::TCFuture<CFileTransferResult> f_GetResult(); 
-		
+		NConcurrency::TCFuture<CFileTransferResult> f_GetResult();
+		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_GetAbortSubscription();
+
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 

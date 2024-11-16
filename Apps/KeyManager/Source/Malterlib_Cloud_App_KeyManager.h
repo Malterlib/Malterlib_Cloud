@@ -17,18 +17,18 @@ namespace NMib::NCloud::NKeyManager
 		CKeyManagerDaemonActor();
 		~CKeyManagerDaemonActor();
 
-		TCFuture<uint32> f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> f_ChangePassword(NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> f_ListPreCreatedKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> f_RemovePreCreatedKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> f_RemoveVerifiedHosts(TCSet<CStr> &&_HostIDs, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> f_ListVerifiedHosts(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> f_ListKeys(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
-		TCFuture<uint32> f_CopyKey(CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine);
+		TCFuture<uint32> f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_ChangePassword(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_ListPreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_RemovePreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_RemoveVerifiedHosts(TCSet<CStr> _HostIDs, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_ListVerifiedHosts(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_ListKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_CopyKey(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 	private:
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
@@ -37,7 +37,7 @@ namespace NMib::NCloud::NKeyManager
 
 		TCActor<CKeyManagerServer> mp_ServerActor;
 		TCActor<CKeyManagerServerDatabase_EncryptedFile> mp_DatabaseActor;
-		TCUniquePointer<TCActorCallOnce<void, NStr::CStrSecure &&>> mp_pProvidePasswordOnce;
+		TCUniquePointer<TCActorCallOnce<void, NStr::CStrSecure>> mp_pProvidePasswordOnce;
 		TCOptional<CDistributedAppSensorReporter::CSensorReporter> mp_PasswordStatusReporter;
 		bool mp_bDatabaseDecrypted = false;
 	};

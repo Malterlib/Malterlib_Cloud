@@ -16,7 +16,7 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> f_ProcessApplicationUpdateNotification(CStr _AppManagerID, CAppManagerInterface::CUpdateNotification _Notification);
 
 	private:
-		TCFuture<TCMap<CStr, CStr>> fp_ReportApplicationUpdateToSlack(CStr const &_AppManagerID, NCloudManagerDatabase::CApplicationUpdateStateValue const &_UpdateState);
+		TCFuture<TCMap<CStr, CStr>> fp_ReportApplicationUpdateToSlack(CStr _AppManagerID, NCloudManagerDatabase::CApplicationUpdateStateValue _UpdateState);
 
 		void fp_ScheduleDeferredNotifications();
 		TCFuture<void> fp_SendDeferredNotifications();

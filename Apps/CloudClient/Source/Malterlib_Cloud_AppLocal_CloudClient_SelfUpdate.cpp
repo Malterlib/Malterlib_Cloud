@@ -18,10 +18,10 @@ namespace NMib::NCloud::NCloudClient
 {
 	auto CCloudClientAppLocalActor::fp_GetSelfUpdateVersion() -> TCFuture<CSelfUpdateVersion>
 	{
-		co_await self(&CCloudClientAppLocalActor::fp_VersionManager_SubscribeToServers).f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
+		co_await fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
 		TCSharedPointer<NContainer::TCMap<TCDistributedActor<CVersionManager>, TCVector<CVersionManager::CNewVersionNotification>>> pVersions = fg_Construct();
-		TCActorResultVector<CVersionManager::CSubscribeToUpdates::CResult> SubscribeResults;
+		TCFutureVector<CVersionManager::CSubscribeToUpdates::CResult> SubscribeResults;
 
 		for (auto &Actor : mp_VersionManagers.m_Actors)
 		{
@@ -31,18 +31,16 @@ namespace NMib::NCloud::NCloudClient
 			SubscriptionParams.m_Platforms[DMalterlibCloudPlatform];
 			SubscriptionParams.m_Tags["ClientSelfUpdate"];
 			SubscriptionParams.m_fOnNewVersions = g_ActorFunctor / [pVersions, Actor = Actor.m_Actor, AllowDestroy = g_AllowWrongThreadDestroy]
-				(CVersionManager::CNewVersionNotifications &&_NewVersions)
-				-> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
+				(CVersionManager::CNewVersionNotifications _NewVersions) -> NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 				{
-					TCPromise<CVersionManager::CNewVersionNotifications::CResult> Promise;
 					(*pVersions)[Actor].f_Insert(fg_Move(_NewVersions.m_NewVersions));
-					return Promise <<= CVersionManager::CNewVersionNotifications::CResult();
+					co_return CVersionManager::CNewVersionNotifications::CResult();
 				}
 			;
-			Actor.m_Actor.f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams)) > SubscribeResults.f_AddResult();
+			Actor.m_Actor.f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams)) > SubscribeResults;
 		}
 
-		auto Results = co_await SubscribeResults.f_GetResults();
+		auto Results = co_await fg_AllDoneWrapped(SubscribeResults);
 
 		NTime::CTime BestVersionTime;
 		CVersionManager::CNewVersionNotification BestVersion;
@@ -83,9 +81,9 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<void> CCloudClientAppLocalActor::fp_PreRunCommandLine
 		(
-			 CStr const &_Command
-			 , NEncoding::CEJSONSorted const &_Params
-			 , NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine
+			 CStr _Command
+			 , NEncoding::CEJSONSorted const _Params
+			 , NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
 	{
 		if (!_Params["SelfUpdateCheck"].f_Boolean() || _Command == "--self-update")
@@ -100,7 +98,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine)
+	TCFuture<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		DMibCheck(mp_State.m_RootDirectory == CFile::fs_GetProgramDirectory());
 

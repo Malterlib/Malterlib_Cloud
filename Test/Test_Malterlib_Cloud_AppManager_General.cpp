@@ -81,10 +81,10 @@ public:
 
 		void f_Destroy()
 		{
-			TCActorResultVector<void> Destroys;
+			TCFutureVector<void> Destroys;
 			for (auto &Subscription : m_Subscriptions)
-				Subscription->f_Destroy() > Destroys.f_AddResult();;
-			Destroys.f_GetResults() > fg_DiscardResult();
+				Subscription->f_Destroy() > Destroys;;
+			fg_AllDoneWrapped(Destroys).f_DiscardResult();
 			f_Clear();
 		}
 
@@ -259,17 +259,17 @@ public:
 
 			// Subscribe for notifications
 			{
-				TCActorResultVector<void> AppCommandResults;
+				TCFutureVector<void> AppCommandResults;
 				mint iAppManager = 0;
 				for (auto &AppManager : AppManagers)
 				{
-					TCPromise<void> Promise;
+					TCPromiseFuturePair<void> Promise;
 					AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_SubscribeUpdateNotifications)
 						(
 							CAppManagerInterface::CSubscribeUpdateNotifications
 							{
 								.m_fOnNotification = g_ActorFunctor / [pUpdateNotificationsState, iAppManager, fProcessApplicationState]
-								(CAppManagerInterface::CUpdateNotification const &_Notification) -> TCFuture<void>
+								(CAppManagerInterface::CUpdateNotification _Notification) -> TCFuture<void>
 								{
 									CApplicationKey ApplicationKey{_Notification.m_Application, iAppManager};
 
@@ -321,18 +321,18 @@ public:
 								}
 							}
 						)
-						> Promise / [pUpdateNotificationsState, Promise](NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
+						> fg_Move(Promise.m_Promise) / [pUpdateNotificationsState, Promise = fg_Move(Promise.m_Promise)](NConcurrency::TCActorSubscriptionWithID<> &&_Subscription)
 						{
 							pUpdateNotificationsState->m_Subscriptions.f_Insert(fg_Move(_Subscription));
 							Promise.f_SetResult();
 						}
 					;
 
-					Promise.f_MoveFuture() > AppCommandResults.f_AddResult();
+					fg_Move(Promise.m_Future) > AppCommandResults;
 					++iAppManager;
 				}
 				DMibTestMark;
-				co_await (co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting update notification subscriptions") | g_Unwrap);
+				co_await fg_AllDone(AppCommandResults).f_Timeout(g_Timeout, "Timed out waiting update notification subscriptions");
 			}
 
 			auto fWaitForAllUpdated = [&](CStr _Application) -> CUnsafeFuture
@@ -357,16 +357,16 @@ public:
 			auto fSetUpdateType = [&](CStr _AppName, CStr _UpdateType) -> CUnsafeFuture
 				{
 					PackageInfo.m_VersionInfo.m_ExtraInfo["ExecutableParameters"] = {"--update-type", _UpdateType, "--daemon-run-standalone"};
-					TCActorResultVector<void> AppCommandResults;
+					TCFutureVector<void> AppCommandResults;
 					for (auto &AppManager : AppManagers)
 					{
 						CAppManagerInterface::CApplicationChangeSettings ChangeSettings;
 						CAppManagerInterface::CApplicationSettings Settings;
 						Settings.m_ExecutableParameters = {"--update-type", _UpdateType, "--daemon-run-standalone"};
 
-						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
+						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults;
 					}
-					co_await (co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for update type change") | g_Unwrap);
+					co_await fg_AllDone(AppCommandResults).f_Timeout(g_Timeout, "Timed out waiting for update type change");
 					*pUpdateType = _UpdateType;
 
 					co_return {};
@@ -375,16 +375,16 @@ public:
 
 			auto fSetUpdateGroup = [&](CStr _AppName, CStr _Group) -> CUnsafeFuture
 				{
-					TCActorResultVector<void> AppCommandResults;
+					TCFutureVector<void> AppCommandResults;
 					for (auto &AppManager : AppManagers)
 					{
 						CAppManagerInterface::CApplicationChangeSettings ChangeSettings;
 						CAppManagerInterface::CApplicationSettings Settings;
 						Settings.m_UpdateGroup = _Group;
 
-						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
+						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults;
 					}
-					co_await (co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for update group change") | g_Unwrap);
+					co_await fg_AllDone(AppCommandResults).f_Timeout(g_Timeout, "Timed out waiting for update group change");
 
 					co_return {};
 				}
@@ -392,16 +392,16 @@ public:
 
 			auto fSetPreUpdateScriptApp0 = [&](CStr _AppName, CStr _Script) -> CUnsafeFuture
 				{
-					TCActorResultVector<void> AppCommandResults;
+					TCFutureVector<void> AppCommandResults;
 					auto &AppManager = *AppManagers.f_FindSmallest();
 					{
 						CAppManagerInterface::CApplicationChangeSettings ChangeSettings;
 						CAppManagerInterface::CApplicationSettings Settings;
 						Settings.m_UpdateScriptPreUpdate = _Script;
 
-						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults.f_AddResult();
+						AppManager.m_Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)(_AppName, ChangeSettings, Settings) > AppCommandResults;
 					}
-					co_await (co_await AppCommandResults.f_GetResults().f_Timeout(g_Timeout, "Timed out waiting for pre update script change") | g_Unwrap);
+					co_await fg_AllDone(AppCommandResults).f_Timeout(g_Timeout, "Timed out waiting for pre update script change");
 
 					co_return {};
 				}
@@ -470,8 +470,13 @@ public:
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors.f_GetLen(), ==, 1);
 				if (UpdateNotificationState.m_Applications["TestApp"].m_Errors.f_GetLen())
 				{
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors[0].f_GetLen(), >=, 512 * 1024 - 548);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors[0].f_GetLen(), <=, 512 * 1024);
+#if DMibPPtrBits < 64
+					constexpr static smint c_MaxSize = 64 * 1024;
+#else
+					constexpr static smint c_MaxSize = 512 * 1024;
+#endif
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors[0].f_GetLen(), >=, c_MaxSize - 548);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors[0].f_GetLen(), <=, c_MaxSize);
 				}
 
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers - 1);

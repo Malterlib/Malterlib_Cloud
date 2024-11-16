@@ -29,12 +29,12 @@ namespace NMib::NCloud::NTunnelProxyManager
 					"Names"_o= {"--reload-config"}
 					, "Description"_o= "Reload config."
 				}
-				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					co_await mp_State.m_ConfigDatabase.f_Load();
 					co_await fp_ReloadConfig
 						(
-							g_ActorFunctor / [pCommandLine = _pCommandLine](CStr &&_Message) -> TCFuture<void>
+							g_ActorFunctor / [pCommandLine = fg_Move(_pCommandLine)](CStr _Message) -> TCFuture<void>
 							{
 								*pCommandLine %= "{}\n"_f << _Message;
 								co_return {};

@@ -33,23 +33,23 @@ public:
 
 		CDatabase m_Database;
 
-		TCFuture<void> f_Initialize()
+		TCFuture<void> f_Initialize() override
 		{
 			co_return {};
 		}
 
-		NConcurrency::TCFuture<void> f_ChangePassword(NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt)
+		NConcurrency::TCFuture<void> f_ChangePassword(NStr::CStrSecure _Password, NContainer::CSecureByteVector _Salt) override
 		{
 			co_return {};
 		}
 
-		TCFuture<void> f_WriteDatabase(CDatabase &&_Database)
+		TCFuture<void> f_WriteDatabase(CDatabase _Database) override
 		{
 			m_Database = fg_Move(_Database);
 			co_return {};
 		}
 
-		TCFuture<CDatabase> f_ReadDatabase()
+		TCFuture<CDatabase> f_ReadDatabase() override
 		{
 			co_return m_Database;
 		}
@@ -397,8 +397,8 @@ public:
 
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_SimultaneousCreate))
 		{
-			auto Key0Future = KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 32).f_Timeout(g_Timeout, "Timeout");
-			auto Key1Future = KeyManager1.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 32).f_Timeout(g_Timeout, "Timeout");
+			TCFuture<CSymmetricKey> Key0Future = KeyManager0.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 32).f_Timeout(g_Timeout, "Timeout");
+			TCFuture<CSymmetricKey> Key1Future = KeyManager1.f_CallActor(&CKeyManager::f_RequestKey)("TestKey2", 32).f_Timeout(g_Timeout, "Timeout");
 			CSymmetricKey ThirdKey0 = co_await fg_Move(Key0Future);
 			DMibTestMark;
 			CSymmetricKey ThirdKey1 = co_await fg_Move(Key1Future);
@@ -674,7 +674,6 @@ public:
 			TCSharedPointer<CTestState> pTestState = fg_Construct(RootDirectory);
 			auto AsyncDestroy0 = co_await fg_AsyncDestroy(pTestState);
 			co_await pTestState->f_Init();
-
 			co_await f_TestCloudKeyManager(fg_ConstructActor<CKeyManagerServerDatabaseImpl>(), pTestState);
 
 			co_return {};

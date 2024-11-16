@@ -250,7 +250,7 @@ namespace NMib::NCloud::NAppManager
 			TCVector<TCPromise<void>> m_OnRegisterDistributedApp;
 			TCVector<TCPromise<void>> m_OnStartedDistributedApp;
 
-			TCLinkedList<TCFunction <void (bool _bAborted)>> m_OnLaunchFinished;
+			TCLinkedList<TCFunctionMutable<void (bool _bAborted)>> m_OnLaunchFinished;
 
 			CStr m_LaunchStatus = "Not yet launched";
 			CAppManagerInterface::EStatusSeverity m_LaunchStatusSeverity = CAppManagerInterface::EStatusSeverity_Warning;
@@ -363,12 +363,12 @@ namespace NMib::NCloud::NAppManager
 		{
 			TCFuture<TCActorSubscriptionWithID<>> f_RegisterDistributedApp
 				(
-					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> &&_ClientInterface
-					, TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> &&_TrustInterface
-					, CRegisterInfo const &_RegisterInfo
+					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> _ClientInterface
+					, TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface> _TrustInterface
+					, CRegisterInfo _RegisterInfo
 				) override
 			;
-			TCFuture<TCActorSubscriptionWithID<>> f_RegisterConfigFiles(CConfigFiles &&_ConfigFiles) override;
+			TCFuture<TCActorSubscriptionWithID<>> f_RegisterConfigFiles(CConfigFiles _ConfigFiles) override;
 
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> f_GetSensorReporter() override;
 			TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> f_GetLogReporter() override;
@@ -378,36 +378,36 @@ namespace NMib::NCloud::NAppManager
 
 		struct CAppManagerInterfaceImplementation : public CAppManagerInterface
 		{
-			TCFuture<CVersionsAvailableForUpdate> f_GetAvailableVersions(CStr const &_Application) override;
+			TCFuture<CVersionsAvailableForUpdate> f_GetAvailableVersions(CStr _Application) override;
 
-			TCFuture<void> f_Add(CStr const &_Name, CApplicationAdd const &_Add, CApplicationSettings const &_Settings) override;
-			TCFuture<void> f_Remove(CStr const &_Name) override;
+			TCFuture<void> f_Add(CStr _Name, CApplicationAdd _Add, CApplicationSettings _Settings) override;
+			TCFuture<void> f_Remove(CStr _Name) override;
 
-			TCFuture<void> f_Update(CStr const &_Name, CApplicationUpdate const &_Update) override;
+			TCFuture<void> f_Update(CStr _Name, CApplicationUpdate _Update) override;
 
-			TCFuture<void> f_Start(CStr const &_Name) override;
-			TCFuture<void> f_Stop(CStr const &_Name) override;
-			TCFuture<void> f_Restart(CStr const &_Name) override;
+			TCFuture<void> f_Start(CStr _Name) override;
+			TCFuture<void> f_Stop(CStr _Name) override;
+			TCFuture<void> f_Restart(CStr _Name) override;
 
 			TCFuture<void> f_ChangeSettings
 				(
-					CStr const &_Name
-					, CApplicationChangeSettings const &_ChangeSettings
-					, CApplicationSettings const &_Settings
+					CStr _Name
+					, CApplicationChangeSettings _ChangeSettings
+					, CApplicationSettings _Settings
 				) override
 			;
 
 			TCFuture<TCMap<CStr, CApplicationInfo>> f_GetInstalled() override;
 
-			auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications &&_Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
-			auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications &&_Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
+			auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
+			auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
 
 		struct CUpdateNotificationSubscription
 		{
-			TCActorFunctor<NConcurrency::TCFuture<void> (CAppManagerInterface::CUpdateNotification const &_Notification)> m_fOnUpdate;
+			TCActorFunctor<NConcurrency::TCFuture<void> (CAppManagerInterface::CUpdateNotification _Notification)> m_fOnUpdate;
 			CCallingHostInfo m_CallingHostInfo;
 			CSequencer m_Sequencer{"AppManagerActor UpdateNotificationSubscription {}"_f << TCMap<CStr, CUpdateNotificationSubscription>::fs_GetKey(*this)};
 			bool m_bInitialFinished = false;
@@ -416,7 +416,7 @@ namespace NMib::NCloud::NAppManager
 
 		struct CChangeNotificationSubscription
 		{
-			TCActorFunctor<NConcurrency::TCFuture<void> (CAppManagerInterface::COnChangeNotificationParams &&_Params)> m_fOnChange;
+			TCActorFunctor<NConcurrency::TCFuture<void> (CAppManagerInterface::COnChangeNotificationParams _Params)> m_fOnChange;
 			CCallingHostInfo m_CallingHostInfo;
 			TCSet<CStr> m_Filtered;
 			TCVector<TCFunctionMovable<void ()>> m_OnInitialFinished;
@@ -441,8 +441,8 @@ namespace NMib::NCloud::NAppManager
 
 		struct CAppManagerCoordinationInterfaceImplementation : public CAppManagerCoordinationInterface
 		{
-			TCFuture<void> f_RemoveKnownHost(CStr const &_Group, CStr const &_Application, CStr const &_HostID) override;
-			auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> const &_Changes, bool _bInitial)> &&_fOnChange)
+			TCFuture<void> f_RemoveKnownHost(CStr _Group, CStr _Application, CStr _HostID) override;
+			auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> _Changes, bool _bInitial)> _fOnChange)
 				-> TCFuture<TCActorSubscriptionWithID<>> override
 			;
 
@@ -535,7 +535,7 @@ namespace NMib::NCloud::NAppManager
 
 			TCDistributedActor<CAppManagerCoordinationInterface> m_Actor;
 			CTrustedActorInfo m_HostInfo;
-			TCActorFunctor<TCFuture<void> (TCVector<CAppManagerCoordinationInterface::CAppChange> const &_Changes, bool _bInitial)> m_fOnChange;
+			TCActorFunctor<TCFuture<void> (TCVector<CAppManagerCoordinationInterface::CAppChange> _Changes, bool _bInitial)> m_fOnChange;
 			CActorSubscription m_OnChangeSubscription;
 			mint m_iOnChangeSubscriptionSequence = 0;
 			bool m_bInitialStateReceived = false;
@@ -629,14 +629,14 @@ namespace NMib::NCloud::NAppManager
 
 		struct CDistributedAppSensorReporterImplementation : public CDistributedAppSensorReporter
 		{
-			TCFuture<CSensorReporter> f_OpenSensorReporter(CSensorInfo &&_SensorInfo) override;
+			TCFuture<CSensorReporter> f_OpenSensorReporter(CSensorInfo _SensorInfo) override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
 
 		struct CDistributedAppLogReporterImplementation : public CDistributedAppLogReporter
 		{
-			TCFuture<CLogReporter> f_OpenLogReporter(CLogInfo &&_LogInfo) override;
+			TCFuture<CLogReporter> f_OpenLogReporter(CLogInfo _LogInfo) override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -687,7 +687,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_InitHostMonitor();
 		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> fp_HostMonitorRebootNeededFunctor(NEncoding::CEJSONSorted const &_AutoUpdateConfig);
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const &_Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
 		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_PauseReporting();
@@ -698,8 +698,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<CActorSubscription> fp_SetInProgressWithWait(TCSharedPointer<CApplication> _pApplication, CStr _Description);
 		void fp_ReportInProgress(TCSharedPointer<CCommandLineControl> const &_pCommandLine, CStr const &_ApplicationName);
 
-		TCFuture<CAppLaunchResult> fp_LaunchApp(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
-		TCFuture<CAppLaunchResult> fp_LaunchAppInternal(TCSharedPointer<CApplication> const &_pApplication, bool _bOpenEncryption);
+		TCFuture<CAppLaunchResult> fp_LaunchApp(TCSharedPointer<CApplication> _pApplication, bool _bOpenEncryption);
+		TCFuture<CAppLaunchResult> fp_LaunchAppInternal(TCSharedPointer<CApplication> _pApplication, bool _bOpenEncryption);
 		void fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication);
 		static void fsp_CreateApplicationUserGroup
 			(
@@ -718,9 +718,9 @@ namespace NMib::NCloud::NAppManager
 				, TCFunction<void (CStr const &_Info)> const &_fLogInfo
 			)
 		;
-		TCFuture<void> fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> const &_pApplication, uint32 _OldVersion);
+		TCFuture<void> fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> _pApplication, uint32 _OldVersion);
 
-		TCFuture<void> fp_UpdateApplicationJSON(TCSharedPointer<CApplication> const &_pApplication);
+		TCFuture<void> fp_UpdateApplicationJSON(TCSharedPointer<CApplication> _pApplication);
 		TCFuture<void> fp_RunUpdateScript
 			(
 				TCSharedPointer<CApplication> const &_pApplication
@@ -733,55 +733,55 @@ namespace NMib::NCloud::NAppManager
 				, fp64 _TimeSinceUpdateStart
 			)
 		;
-		TCFuture<bool> fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication);
+		TCFuture<bool> fp_SelfUpdate(TCSharedPointer<CApplication> _pApplication);
 		TCFuture<void> fp_Reboot(bool _bErrorOnPreventReboot);
 		TCFuture<bool> fp_CheckAndLogPreventedReboot(bool _bErrorOnPreventReboot);
 
-		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_AddApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_ChangeApplicationSettings(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_RemoveApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_UpdateApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_StartApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_StopApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_RestartApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_AddApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ChangeApplicationSettings(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RemoveApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_UpdateApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StartApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StopApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RestartApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_VersionManagerList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_CloudManagerList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VersionManagerList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManagerList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_RemoveKnownHost(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RemoveKnownHost(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_CancelAllUpdates(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CancelAllUpdates(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_HostMonitorConfigList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_HostMonitorConfigVersionList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_HostMonitorConfigContentsGet(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_HostMonitorConfigList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_HostMonitorConfigVersionList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_HostMonitorConfigContentsGet(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		TCFuture<void> fp_AddApplication
 			(
-				CStr const &_Name
-				, CApplicationSettings const &_Settings
+				CStr _Name
+				, CApplicationSettings _Settings
 				, EApplicationSetting _ChangedSettings
 				, bool _bForceOverwrite
 				, bool _bForceInstall
 				, bool _bSettingsFromVersionInfo
-				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
-				, CStr const &_FromLocalFile
-				, TCOptional<CVersionManager::CVersionIDAndPlatform> const &_Version
-				, CCallingHostInfo const &_CallingHostInfo
+				, TCFunction<void (CStr const &_Info)> _fOnInfo
+				, CStr _FromLocalFile
+				, TCOptional<CVersionManager::CVersionIDAndPlatform> _Version
+				, CCallingHostInfo _CallingHostInfo
 			)
 		;
 
 		TCFuture<void> fp_ChangeApplicationSettings
 			(
-				CStr const &_Name
-				, CApplicationSettings const &_Settings
+				CStr _Name
+				, CApplicationSettings _Settings
 				, EApplicationSetting _ChangedSettings
 				, bool _bUpdateFromVersionInfo
 				, bool _bForce
-				, TCFunction<void (CStr const &_Info)> &&_fOnInfo
-				, CCallingHostInfo const &_CallingHostInfo
+				, TCFunction<void (CStr const &_Info)> _fOnInfo
+				, CCallingHostInfo _CallingHostInfo
 			)
 		;
 
@@ -832,30 +832,30 @@ namespace NMib::NCloud::NAppManager
 				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			)
 		;
-		TCFuture<void> fp_ChangeEncryption(TCSharedPointer<CApplication> const &_pApplication, EEncryptOperation _Operation, bool _bForceOverwrite);
+		TCFuture<void> fp_ChangeEncryption(TCSharedPointer<CApplication> _pApplication, EEncryptOperation _Operation, bool _bForceOverwrite);
 
 		CStr fp_GetApplicationStopErrors(TCAsyncResult<uint32> const &_Result, CStr const &_Name);
 		TCFuture<void> fp_KeyManagersUpdated();
 
 		TCFuture<void> fp_VersionManagerResubscribeAll();
-		TCFuture<void> fp_VersionManagerSubscribe(CVersionManagerState &_VersionManagerState);
-		TCFuture<void> fp_VersionManagerAdded(TCDistributedActor<CVersionManager> const &_VersionManager, CTrustedActorInfo const &_Info);
+		TCFuture<void> fp_VersionManagerSubscribe(CVersionManagerState *_pVersionManagerState);
+		TCFuture<void> fp_VersionManagerAdded(TCDistributedActor<CVersionManager> _VersionManager, CTrustedActorInfo _Info);
 		void fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> const &_VersionManager);
 
 		TCFuture<CVersionManager::CVersionInformation> fp_DownloadApplicationFromManager
 			(
-				TCDistributedActor<CVersionManager> const &_Manager
-				, CStr const &_ApplicationName
-				, CVersionManager::CVersionIDAndPlatform const &_VersionID
-				, CStr const &_DestinationDir
+				TCDistributedActor<CVersionManager> _Manager
+				, CStr _ApplicationName
+				, CVersionManager::CVersionIDAndPlatform _VersionID
+				, CStr _DestinationDir
 			)
 		;
 
 		TCFuture<CVersionManager::CVersionInformation> fp_DownloadApplication
 			(
-				CStr const &_ApplicationName
-				, CVersionManager::CVersionIDAndPlatform const &_VersionID
-				, CStr const &_DestinationDir
+				CStr _ApplicationName
+				, CVersionManager::CVersionIDAndPlatform _VersionID
+				, CStr _DestinationDir
 			)
 		;
 
@@ -890,8 +890,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_SetupAppManagerInterfacePermissions();
 		TCFuture<void> fp_SubscribePermissions();
 		TCFuture<void> fp_RegisterPermissions();
-		TCFuture<void> fp_RegisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication);
-		TCFuture<void> fp_UnregisterApplicationPermissions(TCSharedPointer<CApplication> const &_pApplication);
+		TCFuture<void> fp_RegisterApplicationPermissions(TCSharedPointer<CApplication> _pApplication);
+		TCFuture<void> fp_UnregisterApplicationPermissions(TCSharedPointer<CApplication> _pApplication);
 
 		TCFuture<void> fp_PublishAppInterface();
 		TCFuture<void> fp_PublishAppManagerInterface();
@@ -911,7 +911,7 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerInterface::CApplicationInfo fp_GetApplicationInfo(CApplication const &_Application);
 		TCFuture<void> fp_ChangeNotifications_SendChanges(TCVector<CAppManagerInterface::CChangeNotification> _Notifications, CStr _Application);
 		TCFuture<void> fp_ChangeNotifications_PermissionsChanged();
-		TCFuture<void> fp_ChangeNotifications_SendInitial(CStr const &_SubscriptionID);
+		TCFuture<void> fp_ChangeNotifications_SendInitial(CStr _SubscriptionID);
 		void fp_SendAppChange_AddedOrChanged(CApplication const &_Application);
 		void fp_SendAppChange_Removed(CApplication const &_Application);
 		void fp_SendAppChange_Status(CApplication const &_Application);
@@ -921,7 +921,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<void> fp_PublishCoordinationInterface();
 		TCFuture<void> fp_SubscribeCoordinationInterface();
-		TCFuture<void> fp_NewRemoteAppManager(CRemoteAppManager &_AppManager);
+		TCFuture<void> fp_NewRemoteAppManager(CRemoteAppManager *_pAppManager);
 		void fp_NewRemoteKnownApplication(CRemoteApplicationKey const &_RemoteKey, CStr const &_HostID);
 		void fp_SendInitialInfoToRemoteAppManager(CRemoteAppManager &_AppManager);
 		void fp_OnAppUpdateInfoChange(TCSharedPointer<CApplication> const &_pApplication);
@@ -975,8 +975,8 @@ namespace NMib::NCloud::NAppManager
 		CStr fp_GetRunAsGroup(CApplicationSettings const &_Settings) const;
 		CStr fp_TransformUserGroup(CStr const &_UserName) const;
 
-		TCFuture<void> fp_CloudManagerAdded(TCDistributedActor<CCloudManager> const &_CloudManager, CTrustedActorInfo const &_Info);
-		TCFuture<void> fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> const &_CloudManager);
+		TCFuture<void> fp_CloudManagerAdded(TCDistributedActor<CCloudManager> _CloudManager, CTrustedActorInfo _Info);
+		TCFuture<void> fp_CloudManagerRemoved(TCWeakDistributedActor<CActor> _CloudManager);
 
 		TCSharedPointer<CApplication> fp_ApplicationFromHostID(CStr const &_HostID);
 		TCSharedPointer<CApplication> fp_ApplicationFromLaunchID(CStr const &_LaunchID);
@@ -984,10 +984,10 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_PerformDatabaseCleanup();
 		TCFuture<void> fp_SetupDatabaseCleanup();
 		TCFuture<void> fp_SetupDatabase();
-		TCFuture<NDatabase::CDatabaseActor::CTransactionWrite> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite &&_WriteTransaction);
+		TCFuture<NDatabase::CDatabaseActor::CTransactionWrite> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite _WriteTransaction);
 		TCFuture<uint64> fp_StoreUpdateNotification(CAppManagerInterface::CUpdateNotification _Notification);
-		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationList(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationClear(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationClear(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		static CStr fsp_LimitErrorLogSize(CStr const &_String, mint _ExtraSize);
 
