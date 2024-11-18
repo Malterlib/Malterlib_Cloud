@@ -29,6 +29,19 @@ namespace NMib::NCloud::NAppManager
 
 		co_await fg_Move(mp_ChangeNotificationsPermissionsChangedSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy sequencer");
 
+		if (mp_SensorRebootPreventionTimerSubscription)
+			co_await fg_Exchange(mp_SensorRebootPreventionTimerSubscription, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy reboot prevention timer");
+
+		TCActorResultVector<void> SensorRebootPreventionDestroys;
+
+		for (auto &Watch : mp_SensorRebootPreventionWatch)
+		{
+			if (Watch.m_SensorSubscription)
+				fg_Exchange(Watch.m_SensorSubscription, nullptr)->f_Destroy() > SensorRebootPreventionDestroys.f_AddResult();
+		}
+
+		co_await SensorRebootPreventionDestroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy reboot prevention subscriptions");
+
 		co_await CDistributedAppActor::fp_Destroy();
 
 		co_return {};
@@ -371,6 +384,8 @@ namespace NMib::NCloud::NAppManager
 		co_await fp_InitHostMonitor();
 
 		co_await fp_ReadState();
+
+		co_await fp_RebootPrevention_WatchInitialSensors();
 
 		co_await (fp_PublishAppInterface() + fp_SetupLimits());
 

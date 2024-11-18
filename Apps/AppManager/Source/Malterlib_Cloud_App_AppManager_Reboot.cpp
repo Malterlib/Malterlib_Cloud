@@ -11,12 +11,15 @@ namespace NMib::NCloud::NAppManager
 #		include "Malterlib_Cloud_App_AppManager_Reboot.sh"
 	;
 
-	TCFuture<void> CAppManagerActor::fp_Reboot()
+	TCFuture<void> CAppManagerActor::fp_Reboot(bool _bErrorOnPreventReboot)
 	{
 #ifndef DPlatformFamily_Linux
 		co_return {};
 #else
 		if (mp_bRebooting)
+			co_return {};
+
+		if (co_await fp_CheckAndLogPreventedReboot(_bErrorOnPreventReboot))
 			co_return {};
 
 		mp_bRebooting = true;

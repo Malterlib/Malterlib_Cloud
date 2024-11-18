@@ -53,6 +53,7 @@ namespace NMib::NCloud::NAppManager
 				pApplicationsState->f_RemoveMember(_Name);
 		}
 
+		co_await pThis->fp_RebootPrevention_RemoveApplication(_Name);
 		co_await (pThis->mp_State.m_StateDatabase.f_Save() % "Failed to save state" % Auditor);
 
 		Auditor.f_Info(fg_Format("Removed application '{}'", _Name));

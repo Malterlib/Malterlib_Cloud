@@ -77,6 +77,8 @@ namespace NMib::NCloud::NAppManager
 
 		auto Reporter = co_await pThis->mp_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_TempCopy(SensorInfo));
 
+		co_await pThis->fp_RebootPrevention_WatchSensor(pApplication->m_Name, SensorInfo);
+
 		DMibLogWithCategory
 			(
 				Malterlib/Cloud/AppManager

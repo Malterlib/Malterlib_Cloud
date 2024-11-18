@@ -57,6 +57,9 @@ namespace NMib::NCloud::NAppManager
 				if (mp_bRebootScheduled)
 					co_return {};
 
+				if (co_await fp_CheckAndLogPreventedReboot(false))
+					co_return {};
+				
 				mp_bRebootScheduled = true;
 
 				auto EarliestRebootTime = CTime::fs_NowUTC();
@@ -88,7 +91,7 @@ namespace NMib::NCloud::NAppManager
 				mp_State.m_StateDatabase.m_Data["LastHostMonitorReboot"] = CTime::fs_NowUTC();
 				co_await (mp_State.m_StateDatabase.f_Save() % "Failed to save state database");
 
-				co_await fp_Reboot();
+				co_await fp_Reboot(false);
 
 				co_return {};
 			}

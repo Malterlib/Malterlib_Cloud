@@ -95,6 +95,7 @@ public:
 						, "Name"_= "Test Sensor (version)"
 						, "Type"_= 5
 						, "ExpectedReportInterval"_= fp64::fs_Inf()
+						, "Flags"_= _[_]
 						, "PauseReportingFor"_= fp64::fs_QNan()
 						, "UnitDivisors"_= _[_]
 						, "WarnValue"_= nullptr
@@ -113,6 +114,7 @@ public:
 						, "Name"_= "Test Sensor"
 						, "Type"_= 2
 						, "ExpectedReportInterval"_= fp64::fs_Inf()
+						, "Flags"_= _[_]
 						, "PauseReportingFor"_= fp64::fs_QNan()
 						, "UnitDivisors"_= CEJSONSorted
 						{

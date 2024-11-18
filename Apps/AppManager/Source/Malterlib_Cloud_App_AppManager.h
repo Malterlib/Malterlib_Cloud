@@ -241,6 +241,8 @@ namespace NMib::NCloud::NAppManager
 			bool m_bDistributedStartupFinished = false;
 			bool m_bPendingStop = false;
 
+			CDistributedAppSensorReporter::ESensorInfoFlag m_PreventRebootSensorFlags = CDistributedAppSensorReporter::ESensorInfoFlag::mc_None;
+
 			CStr m_OperationInProgressDescription;
 			CClock m_OperationInProgressClock;
 			TCVector<TCPromise<void>> m_OnOperationInProgressFinished;
@@ -649,6 +651,14 @@ namespace NMib::NCloud::NAppManager
 			uint32 m_VersionRetrySequence = 0;
 		};
 
+		struct CSensorRebootWatch
+		{
+			CStr m_Application;
+			CDistributedAppSensorReporter::CSensorInfo m_SensorInfo;
+			CActorSubscription m_SensorSubscription;
+			TCOptional<CDistributedAppSensorReader_SensorKeyAndReading> m_LastReading;
+		};
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		void fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine);
 
@@ -724,7 +734,8 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		TCFuture<bool> fp_SelfUpdate(TCSharedPointer<CApplication> const &_pApplication);
-		TCFuture<void> fp_Reboot();
+		TCFuture<void> fp_Reboot(bool _bErrorOnPreventReboot);
+		TCFuture<bool> fp_CheckAndLogPreventedReboot(bool _bErrorOnPreventReboot);
 
 		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_AddApplication(CEJSONSorted _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -980,6 +991,12 @@ namespace NMib::NCloud::NAppManager
 
 		static CStr fsp_LimitErrorLogSize(CStr const &_String, mint _ExtraSize);
 
+		TCFuture<void> fp_RebootPrevention_WatchSensor(CStr _Application, CDistributedAppSensorReporter::CSensorInfo _SensorInfo);
+		TCFuture<void> fp_RebootPrevention_RemoveApplication(CStr _Application);
+		TCFuture<void> fp_RebootPrevention_WatchInitialSensors();
+		TCFuture<void> fp_RebootPrevention_UpdateApplications();
+		void fp_RebootPrevention_UpdateApplicationFlags(CSensorRebootWatch const &_Watch, NTime::CTime const &_Now);
+
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #else
@@ -1069,6 +1086,10 @@ namespace NMib::NCloud::NAppManager
 		CActorSubscription mp_RebootScheduleTimerSubscrption;
 		bool mp_bRebooting = false;
 		bool mp_bRebootScheduled = false;
+
+		CStr mp_LastPreventRebootDescription;
+		TCMap<CDistributedAppSensorReporter::CSensorInfoKey, CSensorRebootWatch> mp_SensorRebootPreventionWatch;
+		CActorSubscription mp_SensorRebootPreventionTimerSubscription;
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);

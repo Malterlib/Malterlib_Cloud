@@ -1028,7 +1028,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSONSorted const &_Params, NStorage::TCSharedPointer<CCommandLineControl> const &_pCommandLine) -> TCFuture<uint32>
 				{
-					co_await fp_Reboot();
+					co_await fp_Reboot(true);
 
 					*_pCommandLine %= "Reboot scheduled\n";
 
