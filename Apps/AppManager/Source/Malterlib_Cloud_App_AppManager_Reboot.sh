@@ -26,17 +26,19 @@ fi
 
 Log "Launched recursive"
 
-# Support only cgroups V2 unified and Hybrid modes
-CGroupRoot="/sys/fs/cgroup/cgroup.procs"
-if ! [ -f "$CGroupRoot" ]; then
-	CGroupRoot="/sys/fs/cgroup/unified/cgroup.procs"
-fi 
-
-if [ -f "/proc/self/cgroup" ] && [ -f "$CGroupRoot" ]; then
+if [ -f "/proc/self/cgroup" ]; then
 	# Break out of systemd cgroup so we are not killed when daemon stops
 	if cat /proc/self/cgroup | grep -q '/system\.slice/'; then
-		Log "Moving process to root CGroup: $CGroupRoot"
-		echo $$ > "$CGroupRoot"
+		# Support only cgroups V2 unified and Hybrid modes
+		CGroupRoot="/sys/fs/cgroup"
+		if ! [ -f "$CGroupRoot/cgroup.procs" ]; then
+			CGroupRoot="/sys/fs/cgroup/unified"
+		fi
+
+		ScriptCGroup="$CGroupRoot/org.malterlib.appmanager.script"
+		mkdir -p "$ScriptCGroup"
+		Log "Moving process to script CGroup: $ScriptCGroup"
+		echo $$ > "$ScriptCGroup/cgroup.procs"
 	fi
 fi
 
