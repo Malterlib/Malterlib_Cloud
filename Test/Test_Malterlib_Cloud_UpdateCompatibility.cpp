@@ -379,27 +379,39 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				for (auto User : CreatedUsers)
 				{
 					CStr UID;
-					if (NSys::fg_UserManagement_UserExists(User, UID))
+					try
 					{
-						NSys::fg_UserManagement_DeleteUser(User);
+						if (NSys::fg_UserManagement_UserExists(User, UID))
+						{
+							CProcessLaunch::fs_KillProcesses
+								(
+									[&](CProcessInfo const &_ProcessInfo)
+									{
+										return _ProcessInfo.m_RealUID == UID;
+									}
+									, EProcessInfoFlag_User
+									, 0.5
+								)
+							;
 
-						CProcessLaunch::fs_KillProcesses
-							(
-								[&](CProcessInfo const &_ProcessInfo)
-								{
-									return _ProcessInfo.m_RealUID == UID;
-								}
-								, EProcessInfoFlag_User
-								, 0.5
-							)
-						;
+							NSys::fg_UserManagement_DeleteUser(User);
+						}
+					}
+					catch (...)
+					{
 					}
 				}
 				for (auto Group : CreatedGroups)
 				{
-					CStr GID;
-					if (NSys::fg_UserManagement_GroupExists(Group, GID))
-						NSys::fg_UserManagement_DeleteGroup(Group);
+					try
+					{
+						CStr GID;
+						if (NSys::fg_UserManagement_GroupExists(Group, GID))
+							NSys::fg_UserManagement_DeleteGroup(Group);
+					}
+					catch (...)
+					{
+					}
 				}
 			}
 		;
