@@ -224,10 +224,11 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			TCSharedPointer<CStr> pStdErr = fg_Construct();
 			TCSharedPointer<CStr> pStdOut = fg_Construct();
 			TCActor<CProcessLaunchActor> LaunchActor = fg_Construct();
+			TCSharedPointer<CProcessLaunchActor::CSimpleLaunchResult> pLaunchResult = fg_Construct();
 
 			co_await mp_Sequencer.f_Sequence();
 
-			SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pStdErr, pStdOut, this](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
+			SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pStdErr, pStdOut, pLaunchResult, this](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
 				{
 					auto fCheckOutput = [&](auto &_Output)
 						{
@@ -239,12 +240,14 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 						}
 					;
 
+					pLaunchResult->m_Output.f_Insert(CProcessLaunchActor::COutput{.m_Type = _OutputType, .m_Output = _Output});
+
 					if (_OutputType == EProcessLaunchOutputType_StdErr)
 					{
 						*pStdErr += _Output;
 						fCheckOutput(*pStdErr);
 					}
-					else
+					else if (_OutputType == EProcessLaunchOutputType_StdOut)
 					{
 						*pStdOut += _Output;
 						fCheckOutput(*pStdOut);
@@ -254,14 +257,20 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			SimpleLaunch.m_bWholeLineOutput = false;
 
 			TCPromise<void> LaunchFinished;
-			SimpleLaunch.m_Params.m_fOnStateChange = [LaunchFinished](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+			SimpleLaunch.m_Params.m_fOnStateChange = [LaunchFinished, pLaunchResult](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 				{
 					if (_State.f_GetTypeID() == EProcessLaunchState_Exited)
 					{
 						if (_State.f_Get<EProcessLaunchState_Exited>() == 0)
 							LaunchFinished.f_SetResult();
 						else
-							LaunchFinished.f_SetException(DMibErrorInstance("Error exit: {}"_f << _State.f_Get<EProcessLaunchState_Exited>()));
+						{
+							LaunchFinished.f_SetException
+								(
+									DMibErrorInstance("Error exit: {}\n{}"_f << _State.f_Get<EProcessLaunchState_Exited>() << pLaunchResult->f_GetCombinedOut().f_Trim())
+								)
+							;
+						}
 					}
 					else if (_State.f_GetTypeID() == EProcessLaunchState_LaunchFailed)
 						LaunchFinished.f_SetException(DMibErrorInstance(_State.f_Get<EProcessLaunchState_LaunchFailed>()));
