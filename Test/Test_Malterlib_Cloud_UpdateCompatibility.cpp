@@ -18,6 +18,7 @@
 #include <Mib/Concurrency/DistributedAppLaunchHelper>
 #include <Mib/Concurrency/DistributedTrustTestHelpers>
 #include <Mib/Concurrency/DistributedActorTestHelpers>
+#include <Mib/Concurrency/DistributedAppTestHelpers>
 #include <Mib/Concurrency/LogError>
 #include <Mib/CommandLine/AnsiEncodingParse>
 #include <Mib/Cryptography/RandomID>
@@ -340,6 +341,9 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				if (CFile::fs_FileExists(RootDirectory))
 					CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+
+				CFile::fs_CreateDirectory(RootDirectory);
+
 				break;
 			}
 			catch (NFile::CExceptionFile const &)
@@ -347,6 +351,16 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		}
 
+		TCActor<CDistributedAppLogForwarder> LogForwarder{fg_Construct(RootDirectory), "Log Forwarder Actor"};
+
+		auto CleanupLogForwarder = g_OnScopeExit / [&]
+			{
+				LogForwarder->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
+			}
+		;
+
+		LogForwarder(&CDistributedAppLogForwarder::f_StartMonitoring).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		
 		CStr KeyManagerDir = RootDirectory / "KeyManager";
 		CStr VersionManagerDir = RootDirectory / "VersionManager";
 		CStr AppManagerDir = RootDirectory / "AppManager";

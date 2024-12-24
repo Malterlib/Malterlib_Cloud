@@ -13,6 +13,7 @@
 #include <Mib/Concurrency/DistributedAppInterface>
 #include <Mib/Concurrency/DistributedActorTrustManagerProxy>
 #include <Mib/Concurrency/DistributedAppLaunchHelper>
+#include <Mib/Concurrency/DistributedAppTestHelpers>
 #include <Mib/Cloud/AppManager>
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Cloud/VersionManager>
@@ -142,6 +143,8 @@ namespace NMib::NCloud
 			TCMap<CStr, CAppManagerInfo> m_AppManagerInfos;
 			TCSet<CStr> m_AppManagerHosts;
 			TCVector<COnScopeExitShared> m_InProcessLaunchScopes;
+
+			TCActor<CDistributedAppLogForwarder> m_LogForwarder;
 
 			mint m_nAppManagers = 0;
 			fp64 m_Timeout = 60.0;

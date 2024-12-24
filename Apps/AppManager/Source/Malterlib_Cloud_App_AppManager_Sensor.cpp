@@ -83,7 +83,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				Malterlib/Cloud/AppManager
 				, Info
-				, "[{}] Application '{}' opened sensor reporter: {}"
+				, "[{}] Application '{}' opened sensor reporter:\n{}"
 				, CallingHostInfo.f_GetHostInfo().f_GetDesc()
 				, Application.m_Name
 				, SensorInfo

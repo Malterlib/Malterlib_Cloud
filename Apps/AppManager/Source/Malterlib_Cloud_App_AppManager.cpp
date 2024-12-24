@@ -430,11 +430,16 @@ namespace NMib::NCloud::NAppManager
 			(
 				g_ActorFunctor / [this](TCDistributedActor<CVersionManager> _VersionManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Debug, "Version manager added {}", _ActorInfo.m_HostInfo);
+
 					co_await fp_VersionManagerAdded(_VersionManager, _ActorInfo);
+
 					co_return {};
 				}
 				, g_ActorFunctor / [this](TCWeakDistributedActor<CActor> _VersionManager, CTrustedActorInfo _ActorInfo) -> TCFuture<void>
 				{
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Debug, "Version manager removed {}", _ActorInfo.m_HostInfo);
+
 					fp_VersionManagerRemoved(_VersionManager);
 
 					co_return {};

@@ -81,7 +81,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				Malterlib/Cloud/AppManager
 				, Info
-				, "[{}] Application '{}' opened log reporter: {}"
+				, "[{}] Application '{}' opened log reporter:\n{}"
 				, CallingHostInfo.f_GetHostInfo().f_GetDesc()
 				, Application.m_Name
 				, LogInfo
