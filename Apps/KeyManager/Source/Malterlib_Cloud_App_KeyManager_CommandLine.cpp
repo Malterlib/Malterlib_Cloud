@@ -222,6 +222,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
 
@@ -233,6 +235,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ListPreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
 
@@ -256,6 +260,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_RemovePreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
 
@@ -272,6 +278,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_RemoveVerifiedHosts(NContainer::TCSet<CStr> _HostIDs, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
 
@@ -284,6 +292,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ListVerifiedHosts(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
 
@@ -323,6 +333,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ListKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
 
@@ -369,6 +381,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_CopyKey(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_ServerActor)
 			co_return fg_NotDecryptedError();
 
@@ -384,6 +398,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStdInReaderPromptParams PasswordPrompt;
 		PasswordPrompt.m_bPassword = true;
 		PasswordPrompt.m_Prompt = "Type password for key database: ";
@@ -394,6 +410,8 @@ namespace NMib::NCloud::NKeyManager
 			(
 				g_Dispatch / [this, Password = fg_Move(Password)]() mutable -> TCFuture<void>
 				{
+					auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+					
 					if (mp_bDatabaseDecrypted)
 						co_return DErrorInstance("A correct password has already been provided");
 
@@ -403,6 +421,8 @@ namespace NMib::NCloud::NKeyManager
 							(
 								g_ActorFunctor / [this](NStr::CStrSecure _Password) -> TCFuture<void>
 								{
+									auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+									
 									CSecureByteVector Salt{(uint8 const *)gc_Salt, 8};
 									TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
 										(
@@ -455,6 +475,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<uint32> CKeyManagerDaemonActor::f_ChangePassword(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		auto AppAuditor = this->f_Auditor();
 
 		CStrSecure OldPassword;
@@ -477,6 +499,8 @@ namespace NMib::NCloud::NKeyManager
 			(
 				g_Dispatch / [this, NewPassword = fg_Move(NewPassword), OldPassword = fg_Move(OldPassword)]() mutable -> TCFuture<void>
 				{
+					auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 					if (!mp_bDatabaseDecrypted)
 						co_return DErrorInstance("A database has not yet been decrypted");
 

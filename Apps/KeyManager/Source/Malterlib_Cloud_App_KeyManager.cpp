@@ -25,6 +25,8 @@ namespace NMib::NCloud::NKeyManager
 
 	TCFuture<void> CKeyManagerDaemonActor::fp_SetPasswordStatus(CDistributedAppSensorReporter::CStatus _Status)
 	{
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_PasswordStatusReporter)
 		{
 			CDistributedAppSensorReporter::CSensorInfo SensorInfo;
@@ -49,6 +51,7 @@ namespace NMib::NCloud::NKeyManager
 	TCFuture<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSONSorted const _Params)
 	{
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Warning, "Waiting for user to provide password");
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
 
 		co_await fp_SetPasswordStatus({.m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Error, .m_Description = "Waiting for user to provide password"});
 
@@ -58,6 +61,7 @@ namespace NMib::NCloud::NKeyManager
 	TCFuture<void> CKeyManagerDaemonActor::fp_DatabaseDecrypted()
 	{
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Info, "Password provided, starting up key manager");
+		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
 
 		co_await fp_SetPasswordStatus({.m_Severity = CDistributedAppSensorReporter::EStatusSeverity_Ok, .m_Description = "Password provided"});
 
