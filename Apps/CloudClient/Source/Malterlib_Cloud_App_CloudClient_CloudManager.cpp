@@ -1630,7 +1630,7 @@ namespace NMib::NCloud::NCloudClient
 		{
 			for (auto &SensorGenerator : SensorGenerators)
 			{
-				for (auto iSensors = co_await fg_Move(SensorGenerator).f_GetIterator(); iSensors; co_await ++iSensors)
+				for (auto iSensors = co_await fg_Move(SensorGenerator).f_GetPipelinedIterator(); iSensors; co_await ++iSensors)
 				{
 					for (auto &SensorInfo : *iSensors)
 						SensorInfos[SensorInfo.f_Key()] = SensorInfo;
@@ -1665,7 +1665,7 @@ namespace NMib::NCloud::NCloudClient
 
 		for (auto &Generator : StatusGenerators)
 		{
-			for (auto iStatuses = co_await fg_Move(Generator).f_GetIterator(); iStatuses; co_await ++iStatuses)
+			for (auto iStatuses = co_await fg_Move(Generator).f_GetPipelinedIterator(); iStatuses; co_await ++iStatuses)
 			{
 				for (auto &Status : *iStatuses)
 				{
@@ -1704,17 +1704,17 @@ namespace NMib::NCloud::NCloudClient
 			co_return {};
 		if (SensorGenerators.f_GetLen() == 1)
 		{
-			for (auto iReadings = co_await fg_Move(SensorGenerators.f_GetFirst()).f_GetIterator(); iReadings; co_await ++iReadings)
+			for (auto iReadings = co_await fg_Move(SensorGenerators.f_GetFirst()).f_GetPipelinedIterator(); iReadings; co_await ++iReadings)
 				co_yield fg_Move(*iReadings);
 			co_return {};
 		}
 
-		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>::CIterator> IteratorResults;
+		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppSensorReader_SensorKeyAndReading>>::CPipelinedIterator> IteratorResults;
 
 		for (auto &Generator : SensorGenerators)
-			fg_Move(Generator).f_GetIterator() > IteratorResults;
+			fg_Move(Generator).f_GetPipelinedIterator() > IteratorResults;
 
-		TCVector<TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>::CIterator> Iterators;
+		TCVector<TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>::CPipelinedIterator> Iterators;
 
 		for (auto &iReadings : co_await fg_AllDone(IteratorResults))
 		{
@@ -1735,7 +1735,7 @@ namespace NMib::NCloud::NCloudClient
 								co_return {};
 							}
 						)
-					).f_GetIterator()
+					).f_GetPipelinedIterator()
 				)
 			;
 		}
@@ -1763,7 +1763,7 @@ namespace NMib::NCloud::NCloudClient
 
 		auto fGetNextReading = [&]() -> TCUnsafeFuture<CDistributedAppSensorReader_SensorKeyAndReading>
 			{
-				TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>::CIterator *pBestReading = nullptr;
+				TCAsyncGenerator<CDistributedAppSensorReader_SensorKeyAndReading>::CPipelinedIterator *pBestReading = nullptr;
 
 				while (true)
 				{
@@ -1858,7 +1858,7 @@ namespace NMib::NCloud::NCloudClient
 		{
 			for (auto &LogGenerator : LogGenerators)
 			{
-				for (auto iLogs = co_await fg_Move(LogGenerator).f_GetIterator(); iLogs; co_await ++iLogs)
+				for (auto iLogs = co_await fg_Move(LogGenerator).f_GetPipelinedIterator(); iLogs; co_await ++iLogs)
 				{
 					for (auto &LogInfo : *iLogs)
 						LogInfos[LogInfo.f_Key()] = LogInfo;
@@ -1892,17 +1892,17 @@ namespace NMib::NCloud::NCloudClient
 			co_return {};
 		if (LogGenerators.f_GetLen() == 1)
 		{
-			for (auto iEntries = co_await fg_Move(LogGenerators.f_GetFirst()).f_GetIterator(); iEntries; co_await ++iEntries)
+			for (auto iEntries = co_await fg_Move(LogGenerators.f_GetFirst()).f_GetPipelinedIterator(); iEntries; co_await ++iEntries)
 				co_yield fg_Move(*iEntries);
 			co_return {};
 		}
 
-		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>::CIterator> IteratorResults;
+		TCFutureVector<TCAsyncGenerator<TCVector<CDistributedAppLogReader_LogKeyAndEntry>>::CPipelinedIterator> IteratorResults;
 
 		for (auto &Generator : LogGenerators)
-			fg_Move(Generator).f_GetIterator() > IteratorResults;
+			fg_Move(Generator).f_GetPipelinedIterator() > IteratorResults;
 
-		TCVector<TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>::CIterator> Iterators;
+		TCVector<TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>::CPipelinedIterator> Iterators;
 
 		for (auto &iEntries : co_await fg_AllDone(IteratorResults))
 		{
@@ -1923,7 +1923,7 @@ namespace NMib::NCloud::NCloudClient
 								co_return {};
 							}
 						)
-					).f_GetIterator()
+					).f_GetPipelinedIterator()
 				)
 			;
 		}
@@ -1951,7 +1951,7 @@ namespace NMib::NCloud::NCloudClient
 
 		auto fGetNextEntry = [&]() -> TCUnsafeFuture<CDistributedAppLogReader_LogKeyAndEntry>
 			{
-				TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>::CIterator *pBestEntry = nullptr;
+				TCAsyncGenerator<CDistributedAppLogReader_LogKeyAndEntry>::CPipelinedIterator *pBestEntry = nullptr;
 
 				while (true)
 				{

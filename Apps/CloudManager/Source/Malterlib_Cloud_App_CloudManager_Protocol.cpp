@@ -702,7 +702,7 @@ namespace NMib::NCloud::NCloudManager
 
 		TCSet<CDistributedAppSensorReporter::CSensorInfoKey> SensorsToRemove;
 
-		for (auto iSensor = co_await fg_Move(Sensors).f_GetIterator(); iSensor; co_await ++iSensor)
+		for (auto iSensor = co_await fg_Move(Sensors).f_GetPipelinedIterator(); iSensor; co_await ++iSensor)
 		{
 			for (auto &Sensor : *iSensor)
 				SensorsToRemove[Sensor.f_Key()];
@@ -733,7 +733,7 @@ namespace NMib::NCloud::NCloudManager
 
 		TCSet<CDistributedAppLogReporter::CLogInfoKey> LogsToRemove;
 
-		for (auto iLog = co_await fg_Move(Logs).f_GetIterator(); iLog; co_await ++iLog)
+		for (auto iLog = co_await fg_Move(Logs).f_GetPipelinedIterator(); iLog; co_await ++iLog)
 		{
 			for (auto &Log : *iLog)
 				LogsToRemove[Log.f_Key()];
@@ -768,7 +768,7 @@ namespace NMib::NCloud::NCloudManager
 
 		TCSet<CDistributedAppSensorReporter::CSensorInfoKey> SensorsToSnooze;
 
-		for (auto iSensorStatus = co_await fg_Move(SensorStatus).f_GetIterator(); iSensorStatus; co_await ++iSensorStatus)
+		for (auto iSensorStatus = co_await fg_Move(SensorStatus).f_GetPipelinedIterator(); iSensorStatus; co_await ++iSensorStatus)
 		{
 			for (auto &SensorStatus : *iSensorStatus)
 				SensorsToSnooze[SensorStatus.m_SensorInfoKey];

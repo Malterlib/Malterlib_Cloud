@@ -233,7 +233,7 @@ namespace NMib::NCloud
 		NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> ReportVerified;
 		NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, CSymmetricKey> CreateNewKeys;
 
-		for (auto iClient = co_await fg_Move(ReadDatabase.m_Clients).f_GetIterator(); iClient; co_await ++iClient)
+		for (auto iClient = co_await fg_Move(ReadDatabase.m_Clients).f_GetPipelinedIterator(); iClient; co_await ++iClient)
 		{
 			auto &&Client = *iClient;
 
@@ -242,7 +242,7 @@ namespace NMib::NCloud
 				bDatabaseChanged = true;
 			auto &LocalClient = *MappedClient;
 
-			for (auto iKey = co_await fg_Move(Client.m_Keys).f_GetIterator(); iKey; co_await ++iKey)
+			for (auto iKey = co_await fg_Move(Client.m_Keys).f_GetPipelinedIterator(); iKey; co_await ++iKey)
 			{
 				auto &&Key = *iKey;
 				auto MappedKey = LocalClient.m_Keys(Key.m_KeyID);
@@ -305,12 +305,12 @@ namespace NMib::NCloud
 		{
 			NContainer::TCSet<uint32> Sizes;
 			NContainer::TCMap<uint32, NContainer::TCSet<CSymmetricKey>> PotentiallyAvailableKeys;
-			for (auto iAvailableKeys = co_await fg_Move(ReadDatabase.m_AvailableKeys).f_GetIterator(); iAvailableKeys; co_await ++iAvailableKeys)
+			for (auto iAvailableKeys = co_await fg_Move(ReadDatabase.m_AvailableKeys).f_GetPipelinedIterator(); iAvailableKeys; co_await ++iAvailableKeys)
 			{
 				auto &&AvailableKey = *iAvailableKeys;
 				auto KeySize = AvailableKey.m_KeySize;
 				Sizes[KeySize];
-				for (auto iKey = co_await fg_Move(AvailableKey.m_Keys).f_GetIterator(); iKey; co_await ++iKey)
+				for (auto iKey = co_await fg_Move(AvailableKey.m_Keys).f_GetPipelinedIterator(); iKey; co_await ++iKey)
 					PotentiallyAvailableKeys[KeySize][*iKey];
 			}
 

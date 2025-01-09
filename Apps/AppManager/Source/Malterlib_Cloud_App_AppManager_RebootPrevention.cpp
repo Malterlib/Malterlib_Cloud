@@ -14,7 +14,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto SensorsGenerator = co_await mp_SensorStore(&CDistributedAppSensorStoreLocal::f_GetSensors, CDistributedAppSensorReader::CGetSensors{.m_Filters = {Filter}});
 
-		for (auto iSensors = co_await fg_Move(SensorsGenerator).f_GetIterator(); iSensors; co_await ++iSensors)
+		for (auto iSensors = co_await fg_Move(SensorsGenerator).f_GetPipelinedIterator(); iSensors; co_await ++iSensors)
 		{
 			for (auto &SensorInfo : *iSensors)
 			{
