@@ -11,16 +11,32 @@ namespace NMib::NCloud::NAppManager
 #		include "Malterlib_Cloud_App_AppManager_Reboot.sh"
 	;
 
-	TCFuture<void> CAppManagerActor::fp_Reboot(bool _bErrorOnPreventReboot)
+	auto CAppManagerActor::fp_Reboot(bool _bErrorOnPreventReboot) -> TCFuture<ERebootResult>
 	{
 #ifndef DPlatformFamily_Linux
-		co_return {};
+		co_return ERebootResult::mc_NotSupported;
 #else
-		if (mp_bRebooting)
-			co_return {};
+		CClock Clock{true};
 
-		if (co_await fp_CheckAndLogPreventedReboot(_bErrorOnPreventReboot))
-			co_return {};
+		while (true)
+		{
+			if (mp_bRebooting)
+				co_return ERebootResult::mc_AlreadyScheduled;
+
+			if (Clock.f_GetTime() > 10_minutes)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Critical, "Aborted reboot due to timeout. Reboot has to be scheduled manually.");
+				co_return ERebootResult::mc_AlreadyScheduled;
+			}
+
+			if (!co_await fp_CheckAndLogPreventedReboot({.m_bErrorOnPreventReboot = _bErrorOnPreventReboot, .m_bCriticalLog = Clock.f_GetTime() > 5_minutes}))
+				break;
+
+			co_await fg_Timeout(10.0);
+		}
+
+		if (mp_bRebooting)
+			co_return ERebootResult::mc_AlreadyScheduled;
 
 		mp_bRebooting = true;
 
@@ -114,7 +130,7 @@ namespace NMib::NCloud::NAppManager
 			co_return Result.f_GetException();
 		}
 
-		co_return {};
+		co_return ERebootResult::mc_Scheduled;
 #endif
 	}
 }

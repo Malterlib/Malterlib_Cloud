@@ -190,7 +190,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<bool> CAppManagerActor::fp_CheckAndLogPreventedReboot(bool _bErrorOnPreventReboot)
+	TCFuture<bool> CAppManagerActor::fp_CheckAndLogPreventedReboot(CCheckAndLogPreventedRebootParams _Params)
 	{
 		CStr PreventRebootDescription;
 		bool bPreventReboot = false;
@@ -227,11 +227,16 @@ namespace NMib::NCloud::NAppManager
 		if (PreventRebootDescription != mp_LastPreventRebootDescription)
 		{
 			if (bPreventReboot)
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Critical, "Prevented reboot:\n{}", PreventRebootDescription);
+			{
+				if (_Params.m_bCriticalLog)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Critical, "Prevented reboot:\n{}", PreventRebootDescription);
+				else
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Prevented reboot:\n{}", PreventRebootDescription);
+			}
 			mp_LastPreventRebootDescription = PreventRebootDescription;
 		}
 
-		if (bPreventReboot && _bErrorOnPreventReboot)
+		if (bPreventReboot && _Params.m_bErrorOnPreventReboot)
 			co_return DMibErrorInstance("Prevented reboot:\n{}"_f << PreventRebootDescription);
 
 		co_return bPreventReboot;

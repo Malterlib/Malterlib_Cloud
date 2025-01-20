@@ -1028,9 +1028,12 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
-					co_await fp_Reboot(true);
-
-					*_pCommandLine %= "Reboot scheduled\n";
+					switch (co_await fp_Reboot(true))
+					{
+					case ERebootResult::mc_NotSupported: *_pCommandLine %= "Reboot not supported\n"; break;
+					case ERebootResult::mc_Scheduled: *_pCommandLine %= "Reboot scheduled\n"; break;
+					case ERebootResult::mc_AlreadyScheduled: *_pCommandLine %= "Reboot already scheduled\n"; break;
+					}
 
 					co_return 0;
 				}

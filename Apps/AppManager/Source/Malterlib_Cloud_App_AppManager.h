@@ -659,6 +659,19 @@ namespace NMib::NCloud::NAppManager
 			TCOptional<CDistributedAppSensorReader_SensorKeyAndReading> m_LastReading;
 		};
 
+		struct CCheckAndLogPreventedRebootParams
+		{
+			bool m_bErrorOnPreventReboot = false;
+			bool m_bCriticalLog = false;
+		};
+
+		enum class ERebootResult : uint32
+		{
+			mc_NotSupported
+			, mc_Scheduled
+			, mc_AlreadyScheduled
+		};
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		void fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine);
 
@@ -734,8 +747,8 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		TCFuture<bool> fp_SelfUpdate(TCSharedPointer<CApplication> _pApplication);
-		TCFuture<void> fp_Reboot(bool _bErrorOnPreventReboot);
-		TCFuture<bool> fp_CheckAndLogPreventedReboot(bool _bErrorOnPreventReboot);
+		TCFuture<ERebootResult> fp_Reboot(bool _bErrorOnPreventReboot);
+		TCFuture<bool> fp_CheckAndLogPreventedReboot(CCheckAndLogPreventedRebootParams _Params);
 
 		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_AddApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);

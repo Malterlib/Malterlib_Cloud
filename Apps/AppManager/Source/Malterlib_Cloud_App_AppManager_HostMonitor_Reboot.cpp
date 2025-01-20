@@ -57,9 +57,6 @@ namespace NMib::NCloud::NAppManager
 				if (mp_bRebootScheduled)
 					co_return {};
 
-				if (co_await fp_CheckAndLogPreventedReboot(false))
-					co_return {};
-				
 				mp_bRebootScheduled = true;
 
 				auto EarliestRebootTime = CTime::fs_NowUTC();
