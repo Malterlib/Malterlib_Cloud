@@ -9,7 +9,7 @@
 
 namespace NMib::NCloud
 {
-	struct CFileTransferContext::CInternal
+	struct CFileTransferContextDeprecated::CInternal
 	{
 		enum : uint32
 		{

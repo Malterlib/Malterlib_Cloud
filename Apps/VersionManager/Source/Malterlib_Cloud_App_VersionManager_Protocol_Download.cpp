@@ -25,11 +25,14 @@ namespace NMib::NCloud::NVersionManager
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_DownloadVersion(CStartDownloadVersion _Params) -> TCFuture<CStartDownloadVersion::CResult>
 	{
 		auto pThis = m_pThis;
+
+		auto CallingHostInfo = fg_GetCallingHostInfo();
+		uint32 ProtocolVersion = CallingHostInfo.f_GetProtocolVersion();
 		
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
-		auto Auditor = pThis->mp_AppState.f_Auditor(); 
-		
+		auto Auditor = pThis->mp_AppState.f_Auditor({}, CallingHostInfo);
+
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
 			co_return Auditor.f_Exception({"Invalid application format", "(start download version)"});
 
@@ -84,59 +87,122 @@ namespace NMib::NCloud::NVersionManager
 
 		auto VersionInfo = pVersion->m_VersionInfo;
 
-		auto Subscription = co_await Download.m_FileTransferSend(&CFileTransferSend::f_SendFiles, fg_Move(pParams->m_TransferContext)).f_Wrap();
-		if (!Subscription)
+		if (ProtocolVersion >= CVersionManager::EProtocolVersion_AsyncGeneratorFileTransfer)
 		{
-			co_return Auditor.f_Exception
-				(
-					{
-						fg_Format("'{}' Failed to send files. Check Version Manager log for more info.", Download.m_Desc)
-						, fg_Format("Error: {}", Subscription.f_GetExceptionStr())
-					}
-				)
-			;
-		}
-
-		CVersionManager::CStartDownloadVersion::CResult Result;
-		Result.m_Subscription = fg_Move(*Subscription);
-		Result.m_VersionInfo = fg_Move(VersionInfo);
-		auto *pDownload = pThis->mp_VersionDownloads.f_FindEqual(DownloadID);
-		if (!pDownload)
-			co_return DMibErrorInstance("Download aborted");
-
-		pDownload->m_FileTransferSend(&CFileTransferSend::f_GetResult) > [pThis, DownloadID, Desc = Download.m_Desc, Auditor, pParams](TCAsyncResult<CFileTransferResult> &&_Result)
+			auto SendResult = co_await Download.m_FileTransferSend(&CFileTransferSend::f_SendFiles).f_Wrap();
+			if (!SendResult)
 			{
-				if (!_Result)
-					Auditor.f_Error(fg_Format("'{}' Failed to transfer version (download): {}", Desc, _Result.f_GetExceptionStr()));
-				else
-				{
-					auto &Result = *_Result;
-					CStr Message;
-					Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
-
-					Auditor.f_Info
-						(
-							fg_Format
-							(
-								"'{}' Version download finished transferring: {}"
-								, Desc
-								, Message
-							)
-						)
-					;
-				}
-
-				auto *pDownload = pThis->mp_VersionDownloads.f_FindEqual(DownloadID);
-				if (!pDownload)
-					return;
-				if (pDownload->m_FileTransferSend)
-					fg_Move(pDownload->m_FileTransferSend).f_Destroy().f_DiscardResult();
-				
-				pThis->mp_VersionDownloads.f_Remove(DownloadID);
+				co_return Auditor.f_Exception
+					(
+						{
+							fg_Format("'{}' Failed to send files. Check Version Manager log for more info.", Download.m_Desc)
+							, fg_Format("Error: {}", SendResult.f_GetExceptionStr())
+						}
+					)
+				;
 			}
-		;
 
-		co_return fg_Move(Result);
+			CVersionManager::CStartDownloadVersion::CResult Result;
+			Result.m_Subscription = fg_Move(SendResult->m_Subscription);
+			Result.m_VersionInfo = fg_Move(VersionInfo);
+			Result.m_FilesGenerator = CFileTransferSendDownloadFile::fs_TranslateGenerator<CVersionManager::CDownloadFile>(fg_Move(SendResult->m_FilesGenerator));
+			auto *pDownload = pThis->mp_VersionDownloads.f_FindEqual(DownloadID);
+			if (!pDownload)
+				co_return DMibErrorInstance("Download aborted");
+
+			fg_Move(SendResult->m_Result) > [pThis, DownloadID, Desc = Download.m_Desc, Auditor, pParams](TCAsyncResult<CFileTransferResult> &&_Result)
+				{
+					if (!_Result)
+						Auditor.f_Error(fg_Format("'{}' Failed to transfer version (download): {}", Desc, _Result.f_GetExceptionStr()));
+					else
+					{
+						auto &Result = *_Result;
+						CStr Message;
+						Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
+
+						Auditor.f_Info
+							(
+								fg_Format
+								(
+									"'{}' Version download finished transferring: {}"
+									, Desc
+									, Message
+								)
+							)
+						;
+					}
+
+					auto *pDownload = pThis->mp_VersionDownloads.f_FindEqual(DownloadID);
+					if (!pDownload)
+						return;
+					if (pDownload->m_FileTransferSend)
+						fg_Move(pDownload->m_FileTransferSend).f_Destroy().f_DiscardResult();
+
+					pThis->mp_VersionDownloads.f_Remove(DownloadID);
+				}
+			;
+
+			co_return fg_Move(Result);
+		}
+		else
+		{
+			if (!pParams->m_TransferContextDeprecated)
+				co_return Auditor.f_Exception({"Internal error: Invalid transfer context", "(start download version)"});
+
+			auto SendResult = co_await Download.m_FileTransferSend(&CFileTransferSend::f_SendFilesDeprecated, fg_Move(*(pParams->m_TransferContextDeprecated))).f_Wrap();
+			if (!SendResult)
+			{
+				co_return Auditor.f_Exception
+					(
+						{
+							fg_Format("'{}' Failed to send files. Check Version Manager log for more info.", Download.m_Desc)
+							, fg_Format("Error: {}", SendResult.f_GetExceptionStr())
+						}
+					)
+				;
+			}
+
+			CVersionManager::CStartDownloadVersion::CResult Result;
+			Result.m_Subscription = fg_Move(SendResult->m_Subscription);
+			Result.m_VersionInfo = fg_Move(VersionInfo);
+			auto *pDownload = pThis->mp_VersionDownloads.f_FindEqual(DownloadID);
+			if (!pDownload)
+				co_return DMibErrorInstance("Download aborted");
+
+			fg_Move(SendResult->m_Result) > [pThis, DownloadID, Desc = Download.m_Desc, Auditor, pParams](TCAsyncResult<CFileTransferResult> &&_Result)
+				{
+					if (!_Result)
+						Auditor.f_Error(fg_Format("'{}' Failed to transfer version (download): {}", Desc, _Result.f_GetExceptionStr()));
+					else
+					{
+						auto &Result = *_Result;
+						CStr Message;
+						Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
+
+						Auditor.f_Info
+							(
+								fg_Format
+								(
+									"'{}' Version download finished transferring: {}"
+									, Desc
+									, Message
+								)
+							)
+						;
+					}
+
+					auto *pDownload = pThis->mp_VersionDownloads.f_FindEqual(DownloadID);
+					if (!pDownload)
+						return;
+					if (pDownload->m_FileTransferSend)
+						fg_Move(pDownload->m_FileTransferSend).f_Destroy().f_DiscardResult();
+
+					pThis->mp_VersionDownloads.f_Remove(DownloadID);
+				}
+			;
+
+			co_return fg_Move(Result);
+		}
 	}
 }
 

@@ -10,33 +10,28 @@ namespace NMib::NCloud
 {
 	using namespace NConcurrency;
 	
-	bool CFileTransferContext::fs_IsSafeRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error)
-	{
-		return NFile::CFile::fs_IsSafeRelativePath(_String, o_Error);
-	}
-	
-	// CFileTransferContext
-	CFileTransferContext::CFileTransferContext()
+	// CFileTransferContextDeprecated
+	CFileTransferContextDeprecated::CFileTransferContextDeprecated()
 		: mp_pInternal(fg_Construct())
 	{
 	}
 	
-	CFileTransferContext::~CFileTransferContext() = default;
-	CFileTransferContext::CFileTransferContext(CFileTransferContext &&_Other) = default;
-	CFileTransferContext &CFileTransferContext::operator =(CFileTransferContext &&_Other) = default;
+	CFileTransferContextDeprecated::~CFileTransferContextDeprecated() = default;
+	CFileTransferContextDeprecated::CFileTransferContextDeprecated(CFileTransferContextDeprecated &&_Other) = default;
+	CFileTransferContextDeprecated &CFileTransferContextDeprecated::operator =(CFileTransferContextDeprecated &&_Other) = default;
 
 
-	void CFileTransferContext::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CFileTransferContextDeprecated::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		mp_pInternal->f_Feed(_Stream);
 	}
 	
-	void CFileTransferContext::f_Consume(CDistributedActorReadStream &_Stream)
+	void CFileTransferContextDeprecated::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		mp_pInternal->f_Consume(_Stream);
 	}
 	
-	void CFileTransferContext::CInternal::f_Feed(CDistributedActorWriteStream &_Stream)
+	void CFileTransferContextDeprecated::CInternal::f_Feed(CDistributedActorWriteStream &_Stream)
 	{
 		DMibRequire(m_Version != 0);
 		_Stream << m_Version;
@@ -48,7 +43,7 @@ namespace NMib::NCloud
 		// Any version management needs to be additions past this point
 	}
 	
-	void CFileTransferContext::CInternal::f_Consume(CDistributedActorReadStream &_Stream)
+	void CFileTransferContextDeprecated::CInternal::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
 		m_Version = fg_Min(m_Version, EProtocolVersion_Current);
@@ -63,27 +58,27 @@ namespace NMib::NCloud
 	}
 	
 	
-	void CFileTransferContext::CInternal::CFileInfo::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CFileTransferContextDeprecated::CInternal::CFileInfo::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		_Stream << m_FileSize;
 	}
 	
-	void CFileTransferContext::CInternal::CFileInfo::f_Consume(CDistributedActorReadStream &_Stream)
+	void CFileTransferContextDeprecated::CInternal::CFileInfo::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_FileSize;
 	}
 
-	NStr::CStr const &CFileTransferContext::CInternal::CFileInfo::f_GetPath() const
+	NStr::CStr const &CFileTransferContextDeprecated::CInternal::CFileInfo::f_GetPath() const
 	{
 		return NContainer::TCMap<NStr::CStr, CFileInfo>::fs_GetKey(this);
 	}
 	
-	void CFileTransferContext::CInternal::CManifest::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CFileTransferContextDeprecated::CInternal::CManifest::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		_Stream << m_Files;
 	}
 	
-	void CFileTransferContext::CInternal::CManifest::f_Consume(CDistributedActorReadStream &_Stream)
+	void CFileTransferContextDeprecated::CInternal::CManifest::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Files;
 	}
@@ -91,18 +86,18 @@ namespace NMib::NCloud
 
 	// CSendPart
 	
-	CFileTransferContext::CInternal::CSendPart::CSendPart(uint32 _Version)
+	CFileTransferContextDeprecated::CInternal::CSendPart::CSendPart(uint32 _Version)
 		: m_Version(_Version)
 	{
 	}
 				
-	void CFileTransferContext::CInternal::CSendPart::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CFileTransferContextDeprecated::CInternal::CSendPart::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{	
 		DMibRequire(m_Version != 0);
 		_Stream << m_Version;
 	}
 	
-	void CFileTransferContext::CInternal::CSendPart::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	void CFileTransferContextDeprecated::CInternal::CSendPart::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
 		if (m_Version < 0x101 || m_Version > EProtocolVersion_Current)
@@ -110,14 +105,14 @@ namespace NMib::NCloud
 		DMibBinaryStreamVersion(_Stream, m_Version);
 	}
 					
-	auto CFileTransferContext::CInternal::CSendPart::f_GetResult() const -> CResult 
+	auto CFileTransferContextDeprecated::CInternal::CSendPart::f_GetResult() const -> CResult 
 	{
 		CResult Result;
 		Result.m_Version = m_Version;
 		return Result;
 	}
 	
-	void CFileTransferContext::CInternal::CSendPart::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CFileTransferContextDeprecated::CInternal::CSendPart::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		DMibRequire(m_Version != 0);
 		_Stream << m_Version;
@@ -132,7 +127,7 @@ namespace NMib::NCloud
 		}
 	}
 	
-	void CFileTransferContext::CInternal::CSendPart::f_Consume(CDistributedActorReadStream &_Stream)
+	void CFileTransferContextDeprecated::CInternal::CSendPart::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
 		if (m_Version < 0x101 || m_Version > EProtocolVersion_Current)
@@ -170,18 +165,18 @@ namespace NMib::NCloud
 	
 	// CStateChange
 	
-	CFileTransferContext::CInternal::CStateChange::CStateChange(uint32 _Version)
+	CFileTransferContextDeprecated::CInternal::CStateChange::CStateChange(uint32 _Version)
 		: m_Version(_Version)
 	{
 	}
 				
-	void CFileTransferContext::CInternal::CStateChange::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CFileTransferContextDeprecated::CInternal::CStateChange::CResult::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{	
 		DMibRequire(m_Version != 0);
 		_Stream << m_Version;
 	}
 	
-	void CFileTransferContext::CInternal::CStateChange::CResult::f_Consume(CDistributedActorReadStream &_Stream)
+	void CFileTransferContextDeprecated::CInternal::CStateChange::CResult::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
 		if (m_Version < 0x101 || m_Version > EProtocolVersion_Current)
@@ -189,14 +184,14 @@ namespace NMib::NCloud
 		DMibBinaryStreamVersion(_Stream, m_Version);
 	}
 					
-	auto CFileTransferContext::CInternal::CStateChange::f_GetResult() const -> CResult 
+	auto CFileTransferContextDeprecated::CInternal::CStateChange::f_GetResult() const -> CResult 
 	{
 		CResult Result;
 		Result.m_Version = m_Version;
 		return Result;
 	}
 	
-	void CFileTransferContext::CInternal::CStateChange::f_Feed(CDistributedActorWriteStream &_Stream) const
+	void CFileTransferContextDeprecated::CInternal::CStateChange::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		DMibRequire(m_Version != 0);
 		_Stream << m_Version;
@@ -207,7 +202,7 @@ namespace NMib::NCloud
 			_Stream << m_Finished;
 	}
 	
-	void CFileTransferContext::CInternal::CStateChange::f_Consume(CDistributedActorReadStream &_Stream)
+	void CFileTransferContextDeprecated::CInternal::CStateChange::f_Consume(CDistributedActorReadStream &_Stream)
 	{
 		_Stream >> m_Version;
 		if (m_Version < 0x101 || m_Version > EProtocolVersion_Current)

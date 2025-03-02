@@ -7,6 +7,8 @@
 
 namespace NMib::NCloud::NAppManager
 {
+	using namespace NMib::NStr;
+
 	CAppManagerActor::CVersionManagerVersion::CVersionManagerVersion(CVersionManagerState *_pVersionManager)
 		: m_pVersionManager(_pVersionManager)
 	{
@@ -199,44 +201,91 @@ namespace NMib::NCloud::NAppManager
 				, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid
 			)
 		;
-		auto TransferContext = co_await
-			(
-				DownloadState.m_DownloadVersionReceive
-				(
-					&CFileTransferReceive::f_ReceiveFiles
-					, 16*1024*1024
-					, CFileTransferReceive::EReceiveFlag_DeleteExisting
-				)
-				% "Failed to initialize file transfer context"
-			)
-		;
 
-		CVersionManager::CStartDownloadVersion StartDownload;
-		StartDownload.m_Application = _ApplicationName;
-		StartDownload.m_VersionIDAndPlatform = _VersionID;
-		StartDownload.m_TransferContext = fg_Move(TransferContext);
-
-		if (_Manager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_RefactorToActorFunctorsUploadDownload)
+		if (_Manager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_AsyncGeneratorFileTransfer)
+		{
+			CVersionManager::CStartDownloadVersion StartDownload;
+			StartDownload.m_Application = _ApplicationName;
+			StartDownload.m_VersionIDAndPlatform = _VersionID;
 			StartDownload.m_Subscription = co_await DownloadState.m_DownloadVersionReceive.f_Bind<&CFileTransferReceive::f_GetAbortSubscription>();
 
-		auto Result = co_await
-			(
-				_Manager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
-				.f_Timeout(60.0, "Timed out waiting for version manager to reply")
-				% "Failed to start download on remote server"
-			)
-		;
+			auto Result = co_await
+				(
+					_Manager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
+					.f_Timeout(60.0, "Timed out waiting for version manager to reply")
+					% "Failed to start download on remote server"
+				)
+			;
 
-		pDownloadState->m_Subscription = fg_Move(Result.m_Subscription);
+			if (!Result.m_FilesGenerator)
+				co_return DMibErrorInstance("Internal error: invalid files generator");
 
-		auto ReceiveResult = co_await pDownloadState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResult).f_Wrap();
+			pDownloadState->m_Subscription = fg_Move(Result.m_Subscription);
 
-		pDownloadState->m_Subscription.f_Clear();
+			auto ReceiveResult = co_await
+				(
+					DownloadState.m_DownloadVersionReceive
+					(
+						&CFileTransferReceive::f_ReceiveFiles
+						, CFileTransferSendDownloadFile::fs_TranslateGenerator<CFileTransferSendDownloadFile>(fg_Move(*Result.m_FilesGenerator))
+						, NFile::gc_IdealNetworkQueueSize
+						, CFileTransferReceive::EReceiveFlag_DeleteExisting
+					)
+					% "Failed to receive files"
+				)
+				.f_Wrap()
+			;
 
-		if (!ReceiveResult)
-			co_return ReceiveResult.f_GetException();
+			if (pDownloadState->m_Subscription)
+				(void)co_await fg_Exchange(pDownloadState->m_Subscription, nullptr)->f_Destroy().f_Wrap();
 
-		co_return fg_Move(Result.m_VersionInfo);
+			if (!ReceiveResult)
+				co_return ReceiveResult.f_GetException();
+
+			co_return fg_Move(Result.m_VersionInfo);
+		}
+		else
+		{
+			auto TransferContext = co_await
+				(
+					DownloadState.m_DownloadVersionReceive
+					(
+						&CFileTransferReceive::f_ReceiveFilesDeprecated
+						, NFile::gc_IdealNetworkQueueSize
+						, CFileTransferReceive::EReceiveFlag_DeleteExisting
+					)
+					% "Failed to initialize file transfer context"
+				)
+			;
+
+			CVersionManager::CStartDownloadVersion StartDownload;
+			StartDownload.m_Application = _ApplicationName;
+			StartDownload.m_VersionIDAndPlatform = _VersionID;
+			StartDownload.m_TransferContextDeprecated = fg_Move(TransferContext);
+
+			if (_Manager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_RefactorToActorFunctorsUploadDownload)
+				StartDownload.m_Subscription = co_await DownloadState.m_DownloadVersionReceive.f_Bind<&CFileTransferReceive::f_GetAbortSubscription>();
+
+			auto Result = co_await
+				(
+					_Manager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
+					.f_Timeout(60.0, "Timed out waiting for version manager to reply")
+					% "Failed to start download on remote server"
+				)
+			;
+
+			pDownloadState->m_Subscription = fg_Move(Result.m_Subscription);
+
+			auto ReceiveResult = co_await pDownloadState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResultDeprecated).f_Wrap();
+
+			if (pDownloadState->m_Subscription)
+				(void)co_await fg_Exchange(pDownloadState->m_Subscription, nullptr)->f_Destroy().f_Wrap();
+
+			if (!ReceiveResult)
+				co_return ReceiveResult.f_GetException();
+
+			co_return fg_Move(Result.m_VersionInfo);
+		}
 	}
 
 	TCFuture<CVersionManager::CVersionInformation> CAppManagerActor::fp_DownloadApplication

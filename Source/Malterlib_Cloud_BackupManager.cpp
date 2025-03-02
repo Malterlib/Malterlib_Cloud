@@ -557,7 +557,7 @@ namespace NMib::NCloud
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % m_BackupSource;
 		_Stream % m_BackupID;
-		_Stream % m_TransferContext;
+		_Stream % *m_TransferContextDeprecated;
 	}
 	DMibDistributedStreamImplement(CBackupManager::CStartDownloadBackup);
 	

@@ -14,23 +14,23 @@ namespace NMib::NCloud
 	
 	struct CFileTransferResult
 	{
-		uint64 m_nBytes;
-		fp64 m_nSeconds;
-		
+		uint64 m_nBytes = 0;
+		fp64 m_nSeconds = 0.0;
+
 		fp64 f_BytesPerSecond() const;
 
 		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
 	};
 	
-	struct CFileTransferContext
+	struct CFileTransferContextDeprecated
 	{
-		CFileTransferContext();
-		~CFileTransferContext();
-		CFileTransferContext(CFileTransferContext const &_Other) = delete;
-		CFileTransferContext &operator =(CFileTransferContext const &_Other) = delete;
-		CFileTransferContext(CFileTransferContext &&_Other);
-		CFileTransferContext &operator =(CFileTransferContext &&_Other);
+		CFileTransferContextDeprecated();
+		~CFileTransferContextDeprecated();
+		CFileTransferContextDeprecated(CFileTransferContextDeprecated const &_Other) = delete;
+		CFileTransferContextDeprecated &operator =(CFileTransferContextDeprecated const &_Other) = delete;
+		CFileTransferContextDeprecated(CFileTransferContextDeprecated &&_Other);
+		CFileTransferContextDeprecated &operator =(CFileTransferContextDeprecated &&_Other);
 		static bool fs_IsSafeRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error);
 		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
@@ -41,15 +41,50 @@ namespace NMib::NCloud
 		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
+
+	struct CFileTransferSendDownloadFileContents
+	{
+		NConcurrency::TCAsyncGenerator<NContainer::CSecureByteVector> m_DataGenerator;
+		NConcurrency::CActorSubscription m_Subscription;
+		uint64 m_StartPosition;
+	};
 	
+	struct CFileTransferSendDownloadFile
+	{
+		using CDownloadFileContents = CFileTransferSendDownloadFileContents;
+
+		NStr::CStr m_FilePath;
+		NFile::EFileAttrib m_FileAttributes = NFile::EFileAttrib_None;
+		NTime::CTime m_WriteTime;
+		uint64 m_FileSize = 0;
+		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<CDownloadFileContents> (uint64 _StartPosition, NCryptography::CHashDigest_SHA256 _StartDigest)> m_fGetDataGenerator;
+
+		template <typename tf_CTypeTo, typename tf_CTypeFrom>
+		static NConcurrency::TCAsyncGenerator<tf_CTypeTo> fs_TranslateGenerator(NConcurrency::TCAsyncGenerator<tf_CTypeFrom> _FilesGenerator);
+	};
+
 	struct CFileTransferSend : public NConcurrency::CActor
 	{
+		struct CSendFilesResult
+		{
+			NConcurrency::TCAsyncGenerator<CFileTransferSendDownloadFile> m_FilesGenerator;
+			NConcurrency::CActorSubscription m_Subscription;
+			NConcurrency::TCFuture<CFileTransferResult> m_Result;
+		};
+
+		struct CSendFilesResultDeprecated
+		{
+			NConcurrency::CActorSubscription m_Subscription;
+			NConcurrency::TCFuture<CFileTransferResult> m_Result;
+		};
+
 		~CFileTransferSend();
 		CFileTransferSend(NStr::CStr const &_BasePath, uint64 _MaxQueueSize = NFile::gc_IdealNetworkQueueSize);
 
-		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SendFiles(CFileTransferContext _TransferContext);
-		NConcurrency::TCFuture<CFileTransferResult> f_GetResult();
-		
+		NConcurrency::TCFuture<CSendFilesResultDeprecated> f_SendFilesDeprecated(CFileTransferContextDeprecated _TransferContext);
+
+		NConcurrency::TCFuture<CSendFilesResult> f_SendFiles();
+
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy();
 
@@ -76,8 +111,11 @@ namespace NMib::NCloud
 			, EReceiveFlag_DeleteExisting = DMibBit(2)
 		};
 
-		NConcurrency::TCFuture<CFileTransferContext> f_ReceiveFiles(uint64 _QueueSize, EReceiveFlag _Flags);
-		NConcurrency::TCFuture<CFileTransferResult> f_GetResult();
+		NConcurrency::TCFuture<CFileTransferContextDeprecated> f_ReceiveFilesDeprecated(uint64 _QueueSize, EReceiveFlag _Flags);
+		NConcurrency::TCFuture<CFileTransferResult> f_GetResultDeprecated();
+
+		NConcurrency::TCFuture<CFileTransferResult> f_ReceiveFiles(NConcurrency::TCAsyncGenerator<CFileTransferSendDownloadFile> _FilesGenerator, uint64 _QueueSize, EReceiveFlag _Flags);
+
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_GetAbortSubscription();
 
 	private:
@@ -91,3 +129,5 @@ namespace NMib::NCloud
 #ifndef DMibPNoShortCuts
 	using namespace NMib::NCloud;
 #endif
+
+#include "Malterlib_Cloud_FileTransfer.hpp"

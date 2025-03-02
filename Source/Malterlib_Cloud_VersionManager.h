@@ -31,7 +31,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_RefactorToActorFunctorsUploadDownload = 0x106
 			, EProtocolVersion_RefactorToActorFunctorsSubscribeChanges = 0x107
 			, EProtocolVersion_RenamePlatforms = 0x108
-			, EProtocolVersion_Current = 0x108
+			, EProtocolVersion_AsyncGeneratorFileTransfer = 0x109
+			, EProtocolVersion_Current = 0x109
 		};
 
 		struct CVersionID : public CCloudVersion
@@ -125,7 +126,31 @@ namespace NMib::NCloud
 			NStr::CStr m_ForApplication;
 		};
 
-		struct CStartUploadTransfer
+		struct CDownloadFileContents
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NConcurrency::TCAsyncGenerator<NContainer::CSecureByteVector> m_DataGenerator;
+			NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
+			uint64 m_StartPosition;
+		};
+
+		struct CDownloadFile
+		{
+			using CDownloadFileContents = CDownloadFileContents;
+
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStr m_FilePath;
+			NFile::EFileAttrib m_FileAttributes = NFile::EFileAttrib_None;
+			NTime::CTime m_WriteTime;
+			uint64 m_FileSize = 0;
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CDownloadFileContents> (uint64 _StartPosition, NCryptography::CHashDigest_SHA256 _StartDigest)> m_fGetDataGenerator;
+		};
+
+		struct CStartUploadTransferDeprecated
 		{
 			struct CResult
 			{
@@ -138,7 +163,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			CFileTransferContext m_TransferContext;
+			CFileTransferContextDeprecated m_TransferContextDeprecated;
 		};
 		
 		struct CStartUploadVersion
@@ -147,7 +172,7 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()> m_fFinish;
 				NContainer::TCSet<NStr::CStr> m_DeniedTags;
 			};
@@ -166,9 +191,16 @@ namespace NMib::NCloud
 			CVersionInformation m_VersionInfo;
 			uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
 			EFlag m_Flags = EFlag_None;
-			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CStartUploadTransfer::CResult> (CStartUploadTransfer _Params)> m_fStartTransfer;
+			NStorage::TCOptional
+				<
+					NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CStartUploadTransferDeprecated::CResult> (CStartUploadTransferDeprecated _Params)>
+				>
+				m_fStartTransferDeprecated
+			;
+
+			NStorage::TCOptional<NConcurrency::TCAsyncGeneratorWithID<CDownloadFile>> m_FilesGenerator;
 		};
-		
+
 		struct CStartDownloadVersion
 		{
 			struct CResult
@@ -178,6 +210,7 @@ namespace NMib::NCloud
 				
 				NConcurrency::CActorSubscription m_Subscription;
 				CVersionInformation m_VersionInfo;
+				NStorage::TCOptional<NConcurrency::TCAsyncGenerator<CDownloadFile>> m_FilesGenerator;
 			};
 
 			template <typename tf_CStream>
@@ -185,7 +218,7 @@ namespace NMib::NCloud
 			
 			NStr::CStr m_Application;
 			CVersionIDAndPlatform m_VersionIDAndPlatform;
-			CFileTransferContext m_TransferContext;
+			NStorage::TCOptional<CFileTransferContextDeprecated> m_TransferContextDeprecated;
 			NConcurrency::CActorSubscription m_Subscription;
 		};
 		

@@ -36,7 +36,6 @@ namespace NMib::NCloud
 
 		struct CDownloadState : public CState
 		{
-
 			TCActor<CFileTransferReceive> m_DownloadVersionReceive;
 			CActorSubscription m_DownloadVersionSubscription;
 
@@ -165,15 +164,34 @@ namespace NMib::NCloud
 		StartUpload.m_QueueSize = _QueueSize ? _QueueSize : Internal.m_QueueSize;
 		StartUpload.m_Flags = _Flags;
 
-		StartUpload.m_fStartTransfer = g_ActorFunctor / [pState](CVersionManager::CStartUploadTransfer _Params) -> TCFuture<CVersionManager::CStartUploadTransfer::CResult>
-			{
-				CVersionManager::CStartUploadTransfer::CResult Result;
+		NConcurrency::TCFuture<CFileTransferResult> TransferResultFuture;
+		if (_VersionManager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_AsyncGeneratorFileTransfer)
+		{
+			auto SendFilesResult = co_await pState->m_UploadVersionSend.f_Bind<&CFileTransferSend::f_SendFiles>();
+			StartUpload.m_FilesGenerator = CFileTransferSendDownloadFile::fs_TranslateGenerator<CVersionManager::CDownloadFile>(fg_Move(SendFilesResult.m_FilesGenerator));
+			StartUpload.m_FilesGenerator->f_SetSubscription(fg_Move(SendFilesResult.m_Subscription));
+			TransferResultFuture = fg_Move(SendFilesResult.m_Result);
+		}
+		else
+		{
+			NConcurrency::TCPromiseFuturePair<CFileTransferResult> Promise;
+			TransferResultFuture = fg_Move(Promise.m_Future);
 
-				Result.m_Subscription = co_await pState->m_UploadVersionSend.f_Bind<&CFileTransferSend::f_SendFiles>(fg_Move(_Params.m_TransferContext));
+			StartUpload.m_fStartTransferDeprecated = g_ActorFunctor / [pState, Promise = fg_Move(Promise.m_Promise)](CVersionManager::CStartUploadTransferDeprecated _Params) mutable
+				-> TCFuture<CVersionManager::CStartUploadTransferDeprecated::CResult>
+				{
+					CVersionManager::CStartUploadTransferDeprecated::CResult Result;
 
-				co_return fg_Move(Result);
-			}
-		;
+					auto SendResult = co_await pState->m_UploadVersionSend.f_Bind<&CFileTransferSend::f_SendFilesDeprecated>(fg_Move(_Params.m_TransferContextDeprecated));
+
+					Result.m_Subscription = fg_Move(SendResult.m_Subscription);
+
+					fg_Move(SendResult.m_Result) > fg_Move(Promise);
+
+					co_return fg_Move(Result);
+				}
+			;
+		}
 
 		auto pCleanupAfterTimeout = g_OnScopeExitActor / [pState]
 			{
@@ -203,16 +221,24 @@ namespace NMib::NCloud
 
 		pState->m_fFinish = fg_Move(Result.m_fFinish);
 
-		auto TransferResult = co_await pState->m_UploadVersionSend(&CFileTransferSend::f_GetResult);
+		auto TransferResult = co_await fg_Move(TransferResultFuture).f_Wrap();
 
-		CUploadResult ReturnResult;
-		ReturnResult.m_TransferResult = fg_Move(TransferResult);
-		ReturnResult.m_DeniedTags = fg_Move(Result.m_DeniedTags);
+		if (!TransferResult)
+		{
+			if (TransferResult.f_GetExceptionStr() == "File transfer aborted" && !pState->m_fFinish.f_IsEmpty() && pState->m_fFinish.f_GetFunctor())
+				co_await pState->m_fFinish();
 
-		if (pState->m_fFinish.f_GetFunctor())
+			co_return TransferResult.f_GetException();
+		}
+
+		if (!pState->m_fFinish.f_IsEmpty() && pState->m_fFinish.f_GetFunctor())
 			co_await pState->m_fFinish();
 
 		pState->m_fFinish.f_Clear();
+
+		CUploadResult ReturnResult;
+		ReturnResult.m_TransferResult = fg_Move(*TransferResult);
+		ReturnResult.m_DeniedTags = fg_Move(Result.m_DeniedTags);
 
 		co_return fg_Move(ReturnResult);
 	}
@@ -248,42 +274,81 @@ namespace NMib::NCloud
 			}
 		;
 
-		auto TransferContext = co_await
-			(
-				pState->m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFiles, _QueueSize ? _QueueSize : Internal.m_QueueSize, _ReceiveFlags)
-				% "Failed to initialize file transfer context"
-			)
-		;
-
 		CVersionManager::CStartDownloadVersion StartDownload;
 		StartDownload.m_Application = _Application;
 		StartDownload.m_VersionIDAndPlatform = _VersionID;
-		StartDownload.m_TransferContext = fg_Move(TransferContext);
-
 		if (_VersionManager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_RefactorToActorFunctorsUploadDownload)
 			StartDownload.m_Subscription = co_await pState->m_DownloadVersionReceive.f_Bind<&CFileTransferReceive::f_GetAbortSubscription>();
 
-		auto pCleanupAfterTimeout = g_OnScopeExitActor / [pState]
+		auto AbortSubscription = g_ActorSubscription / [pState]() -> TCFuture<void>
 			{
-				(void)pState->f_Abort();
+				co_await pState->f_Abort();
+
+				co_return {};
 			}
 		;
 
-		auto Result = co_await
-			(
-				_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
-				.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
-				% "Failed to start download on remote server"
-			)
-		;
+		if (_VersionManager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_AsyncGeneratorFileTransfer)
+		{
+			auto Result = co_await
+				(
+					_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
+					.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
+					% "Failed to start download on remote server"
+				)
+			;
 
-		pCleanupAfterTimeout->f_Clear();
-		pState->m_DownloadVersionSubscription = fg_Move(Result.m_Subscription);
+			if (!Result.m_FilesGenerator)
+				co_return DMibErrorInstance("Download missing files generator");
 
-		auto Results = co_await pState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResult);
-		pState->m_DownloadVersionSubscription.f_Clear();
+			pState->m_DownloadVersionSubscription = fg_Move(Result.m_Subscription);
 
-		co_return fg_Move(Results);
+			auto ReceiveResult = co_await
+				(
+					pState->m_DownloadVersionReceive
+					(
+						&CFileTransferReceive::f_ReceiveFiles
+						, CFileTransferSendDownloadFile::fs_TranslateGenerator<CFileTransferSendDownloadFile>(fg_Move(*Result.m_FilesGenerator))
+						, _QueueSize ? _QueueSize : Internal.m_QueueSize
+						, _ReceiveFlags
+					)
+					% "Failed to receive files"
+				)
+				.f_Wrap()
+			;
+
+			if (pState->m_DownloadVersionSubscription)
+				(void)co_await fg_Exchange(pState->m_DownloadVersionSubscription, nullptr)->f_Destroy().f_Wrap();
+
+			co_return fg_Move(ReceiveResult);
+		}
+		else
+		{
+			auto TransferContext = co_await
+				(
+					pState->m_DownloadVersionReceive(&CFileTransferReceive::f_ReceiveFilesDeprecated, _QueueSize ? _QueueSize : Internal.m_QueueSize, _ReceiveFlags)
+					% "Failed to initialize file transfer context"
+				)
+			;
+
+			StartDownload.m_TransferContextDeprecated = fg_Move(TransferContext);
+
+			auto Result = co_await
+				(
+					_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
+					.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
+					% "Failed to start download on remote server"
+				)
+			;
+
+			pState->m_DownloadVersionSubscription = fg_Move(Result.m_Subscription);
+			auto Results = co_await pState->m_DownloadVersionReceive(&CFileTransferReceive::f_GetResultDeprecated);
+
+			if (pState->m_DownloadVersionSubscription)
+				(void)co_await fg_Exchange(pState->m_DownloadVersionSubscription, nullptr)->f_Destroy().f_Wrap();
+
+			co_return fg_Move(Results);
+		}
 	}
 
 	namespace

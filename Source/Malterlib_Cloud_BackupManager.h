@@ -340,7 +340,7 @@ namespace NMib::NCloud
 			
 			NStr::CStr m_BackupSource;
 			CBackupID m_BackupID;
-			CFileTransferContext m_TransferContext;
+			NStorage::TCOptional<CFileTransferContextDeprecated> m_TransferContextDeprecated;
 		};
 		// Deprecated - End
 		

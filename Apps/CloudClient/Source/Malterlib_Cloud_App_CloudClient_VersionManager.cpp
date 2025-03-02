@@ -821,7 +821,7 @@ namespace NMib::NCloud::NCloudClient
 				, Application
 				, VersionID
 				, DestinationDirectory
-				, CFileTransferReceive::EReceiveFlag_IgnoreExisting
+				, CFileTransferReceive::EReceiveFlag_None
 				, QueueSize
 			)
 		;

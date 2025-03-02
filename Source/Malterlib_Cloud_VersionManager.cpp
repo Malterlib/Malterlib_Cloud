@@ -19,6 +19,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CVersionManager::f_ChangeTags);
 	}
 
+	DMibDistributedStreamImplement(CVersionManager::CDownloadFile);
 	DMibDistributedStreamImplement(CVersionManager::CVersionID);
 	DMibDistributedStreamImplement(CVersionManager::CVersionIDAndPlatform);
 	DMibDistributedStreamImplement(CVersionManager::CVersionInformation);
@@ -26,8 +27,8 @@ namespace NMib::NCloud
 	DMibDistributedStreamImplement(CVersionManager::CListApplications::CResult);
 	DMibDistributedStreamImplement(CVersionManager::CListVersions);
 	DMibDistributedStreamImplement(CVersionManager::CListVersions::CResult);
-	DMibDistributedStreamImplement(CVersionManager::CStartUploadTransfer);
-	DMibDistributedStreamImplement(CVersionManager::CStartUploadTransfer::CResult);
+	DMibDistributedStreamImplement(CVersionManager::CStartUploadTransferDeprecated);
+	DMibDistributedStreamImplement(CVersionManager::CStartUploadTransferDeprecated::CResult);
 	DMibDistributedStreamImplement(CVersionManager::CStartUploadVersion);
 	DMibDistributedStreamImplement(CVersionManager::CStartUploadVersion::CResult);
 	DMibDistributedStreamImplement(CVersionManager::CStartDownloadVersion);
@@ -279,19 +280,43 @@ namespace NMib::NCloud
 	// CStartUploadTransfer
 	
 	template <typename tf_CStream>
-	void CVersionManager::CStartUploadTransfer::CResult::f_Stream(tf_CStream &_Stream)
+	void CVersionManager::CStartUploadTransferDeprecated::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % fg_Move(m_Subscription);
 	}
 	
 	template <typename tf_CStream>
-	void CVersionManager::CStartUploadTransfer::f_Stream(tf_CStream &_Stream)
+	void CVersionManager::CStartUploadTransferDeprecated::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream % m_TransferContext;
+		_Stream % m_TransferContextDeprecated;
 	}
-	
+
+	// CDownloadFileContents
+	template <typename tf_CStream>
+	void CVersionManager::CDownloadFileContents::f_Stream(tf_CStream &_Stream)
+	{
+		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
+
+		_Stream % fg_Move(m_DataGenerator);
+		_Stream % fg_Move(m_Subscription);
+		_Stream % m_StartPosition;
+	}
+
+	// CDownloadFile
+
+	template <typename tf_CStream>
+	void CVersionManager::CDownloadFile::f_Stream(tf_CStream &_Stream)
+	{
+		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
+		_Stream % m_FilePath;
+		_Stream % m_FileAttributes;
+		_Stream % m_WriteTime;
+		_Stream % m_FileSize;
+		_Stream % fg_Move(m_fGetDataGenerator);
+	}
+
 	// CStartUploadVersion
 	
 	template <typename tf_CStream>
@@ -314,25 +339,38 @@ namespace NMib::NCloud
 		_Stream % m_VersionInfo;
 		_Stream % m_QueueSize;
 		_Stream % m_Flags;
-		if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsUploadDownload)
-			_Stream % fg_Move(m_fStartTransfer);
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AsyncGeneratorFileTransfer)
+		{
+			if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
+				m_FilesGenerator = fg_Construct();
+
+			_Stream % fg_Move(*m_FilesGenerator);
+		}
 		else
 		{
 			if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
-			{
-				NConcurrency::TCActor<> DispatchActor;
-				NFunction::TCFunctionMutable<NConcurrency::TCFuture<CStartUploadTransfer::CResult> (CStartUploadTransfer &&_Params)> fStartTransfer;
-				_Stream.f_GetStream() >> DispatchActor;
-				_Stream.f_GetStream() >> fStartTransfer;
+				m_fStartTransferDeprecated = fg_Construct();
 
-				m_fStartTransfer = {fg_Move(DispatchActor), fg_Move(fStartTransfer)};
-			}
+			if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsUploadDownload)
+				_Stream % fg_Move(*m_fStartTransferDeprecated);
 			else
 			{
-				_Stream.f_GetStream() << fg_Move(m_fStartTransfer.f_GetActor());
-				_Stream.f_GetStream() << fg_Move(m_fStartTransfer.f_GetFunctor());
+				if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
+				{
+					NConcurrency::TCActor<> DispatchActor;
+					NFunction::TCFunctionMutable<NConcurrency::TCFuture<CStartUploadTransferDeprecated::CResult> (CStartUploadTransferDeprecated &&_Params)> fStartTransfer;
+					_Stream.f_GetStream() >> DispatchActor;
+					_Stream.f_GetStream() >> fStartTransfer;
 
-				m_fStartTransfer.f_Clear();
+					m_fStartTransferDeprecated = {fg_Move(DispatchActor), fg_Move(fStartTransfer)};
+				}
+				else
+				{
+					_Stream.f_GetStream() << fg_Move(m_fStartTransferDeprecated->f_GetActor());
+					_Stream.f_GetStream() << fg_Move(m_fStartTransferDeprecated->f_GetFunctor());
+
+					m_fStartTransferDeprecated->f_Clear();
+				}
 			}
 		}
 	}
@@ -343,6 +381,13 @@ namespace NMib::NCloud
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % fg_Move(m_Subscription);
 		_Stream % m_VersionInfo;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AsyncGeneratorFileTransfer)
+		{
+			if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
+				m_FilesGenerator = fg_Construct();
+
+			_Stream % fg_Move(*m_FilesGenerator);
+		}
 	}
 	
 	template <typename tf_CStream>
@@ -351,7 +396,13 @@ namespace NMib::NCloud
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % m_Application;
 		_Stream % m_VersionIDAndPlatform;
-		_Stream % m_TransferContext;
+		if (_Stream.f_GetVersion() < EProtocolVersion_AsyncGeneratorFileTransfer)
+		{
+			if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
+				m_TransferContextDeprecated = fg_Construct();
+
+			_Stream % fg_Move(*m_TransferContextDeprecated);
+		}
 		if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsUploadDownload)
 			_Stream % fg_Move(m_Subscription);
 	}
