@@ -42,6 +42,7 @@ namespace NMib::NCloud::NCloudClient
 		fp_VersionManager_RegisterCommands(o_CommandLine.f_AddSection("Version Manager", "Commands to control version managers."));
 		fp_SecretsManager_RegisterCommands(o_CommandLine.f_AddSection("Secrets Manager", "Commands to control secrets managers."));
 		fp_NetworkTunnel_RegisterCommands(o_CommandLine.f_AddSection("Network Tunnel", "Commands to use network tunnels."));
+		fp_CodeSigningManager_RegisterCommands(o_CommandLine.f_AddSection("Code Signing Manager", "Commands to sign executables using the code signing manager."));
 		fp_DebugManager_RegisterCommands(o_CommandLine.f_AddSection("Debug Manager", "Commands to control debug managers."));
 		fp_CloudManager_RegisterCommands(o_CommandLine.f_AddSection("Cloud Manager", "Commands to control cloud managers."));
 	}

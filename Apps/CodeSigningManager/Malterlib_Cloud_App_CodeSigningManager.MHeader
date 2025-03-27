@@ -1,0 +1,73 @@
+// Copyright © Unbroken AB
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+%Target "Lib_Malterlib_Cloud_CodeSigningManager"
+{
+	Property
+	{
+	}
+	Target
+	{
+		Type "StaticLibrary"
+		BaseName "Malterlib_Cloud_CodeSigningManager"
+		Group "Apps"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_App_*"
+	}
+
+	%Dependency "Lib_Malterlib_Cloud"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib_Web"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib_XML"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib"
+	{
+		Dependency.Indirect true
+	}
+}
+
+%Target "Malterlib_Cloud_CodeSigningManager"
+{
+	Property
+	{
+		ProductName "Malterlib Code Signing Manager"
+		MalterlibTestApp true
+		MalterlibPostCopyProject "Malterlib_Cloud_CodeSigningManager"
+		{
+			!!MalterlibPostCopyProject undefined
+		}
+		MalterlibTargetNameType "Normal"
+		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudCodeSigningManager"
+		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudCodeSigningManager"
+	}
+	Target
+	{
+		DebuggerCommandArguments ["--daemon-run-debug"]
+		BaseFileName "CodeSigningManager"
+		Group "Apps"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_AppLocal_*"
+	}
+	%Dependency "Lib_Malterlib_Cloud_CodeSigningManager"
+}
+
+Property
+{
+	Malterlib_App_Enable_CodeSigningManager: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_CodeSigningManager"
+	{
+		!!Malterlib_App_Enable_CodeSigningManager true
+	}
+}
