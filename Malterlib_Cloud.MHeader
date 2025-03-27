@@ -604,6 +604,15 @@ Property
 			}
 		}
 		, {
+			Name: "Com_Malterlib_Cloud_CodeSigningManager"
+			, Properties: {
+				Dependency.Target: "Malterlib_Cloud_CodeSigningManager"
+				, Dependency.TargetProperties: {
+					MalterlibGenerateScheme: false
+				}
+			}
+		}
+		, {
 			Name: "Com_Malterlib_Cloud_CloudManager"
 			, Properties: {
 				Dependency.Target: "Malterlib_Cloud_CloudManager"
@@ -653,6 +662,7 @@ Property
 		, "Lib_Malterlib_Cloud_KeyManager"
 		, "Lib_Malterlib_Cloud_SecretsManager"
 		, "Lib_Malterlib_Cloud_VersionManager"
+		, "Lib_Malterlib_Cloud_CodeSigningManager"
 		, "Lib_Malterlib_Cloud_Test"
 	]
 	MalterlibTestExtraGroups_Malterlib_Cloud: [string] = ["{Test}/{Malterlib_Cloud}"]

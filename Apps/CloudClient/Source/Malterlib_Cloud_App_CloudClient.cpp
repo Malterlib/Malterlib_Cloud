@@ -75,6 +75,7 @@ namespace NMib::NCloud::NCloudClient
 			fg_Move(mp_TunnelsClient).f_Destroy() > Destroys;
 
 		mp_CloudManagers.f_Destroy() > Destroys;
+		mp_CodeSigningManagers.f_Destroy() > Destroys;
 
 		mp_DebugManagerHelper.f_AbortAll() > Destroys;
 		mp_DebugManagers.f_Destroy() > Destroys;

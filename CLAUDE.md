@@ -106,6 +106,14 @@ if (!Result)
 	DConErrOut("Failed: {}\n", Result.f_GetExceptionStr());
 ```
 
+### Code Signing Manager Highlights
+
+- Use `CCodeSigningManager::CSignFiles` for streaming uploads; it now relies on `NCryptography::fg_SignFiles` (file-path based) for asynchronous digest/signature generation.
+- Upload the executable via `TCAsyncGeneratorWithID<CCodeSigningManager::CDownloadFile>` and surface the generated metadata through the returned `m_fGetSignature` functor.
+- Emit structured results (`CEJsonSorted`) instead of staging files; the helper returns JSON with path, message length, digest hex/base64, and signature base64/length for direct serialization.
+- Wrap long-running work in `fg_CallSafe` so auditor context is preserved for any thrown exception.
+- Revalidate session pointers with `fg_OnResume`; other actor calls can mutate shared maps while the coroutine is suspended.
+
 ## Testing
 
 ```bash

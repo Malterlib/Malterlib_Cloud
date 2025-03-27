@@ -7,6 +7,7 @@
 
 #include <Mib/Cloud/BackupManager>
 #include <Mib/Cloud/CloudManager>
+#include <Mib/Cloud/CodeSigningManager>
 #include <Mib/Cloud/DebugManager>
 #include <Mib/Cloud/DebugManagerHelper>
 #include <Mib/Cloud/NetworkTunnels>
@@ -226,6 +227,12 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 
+		// Code Signing Manager
+		void fp_CodeSigningManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
+		TCFuture<void> fp_CodeSigningManager_SubscribeToServers();
+		TCFuture<TCVector<TCTrustedActor<CCodeSigningManager>>> fp_CodeSigningManager_GetManagers(CStr _Host);
+		TCFuture<uint32> fp_CommandLine_CodeSigningManager_SignFiles(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+
 		// Debug Manager
 		void fp_DebugManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_DebugManager_SubscribeToServers();
@@ -263,6 +270,9 @@ namespace NMib::NCloud::NCloudClient
 
 		// Cloud Manager
 		TCTrustedActorSubscription<CCloudManager> mp_CloudManagers;
+
+		// Code Signing Manager
+		TCTrustedActorSubscription<CCodeSigningManager> mp_CodeSigningManagers;
 
 		// Debug Manager
 		TCTrustedActorSubscription<CDebugManager> mp_DebugManagers;
