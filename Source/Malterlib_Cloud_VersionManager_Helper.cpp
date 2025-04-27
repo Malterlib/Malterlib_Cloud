@@ -199,6 +199,12 @@ namespace NMib::NCloud
 			}
 		;
 
+		auto CleanupResult = g_OnScopeExit / [&TransferResultFuture]
+			{
+				fg_Move(TransferResultFuture).f_DiscardResult();
+			}
+		;
+
 		CStr StateID = fg_RandomID(Internal.m_States);
 		Internal.m_States[StateID] = pState;
 
@@ -220,6 +226,8 @@ namespace NMib::NCloud
 		pCleanupAfterTimeout->f_Clear();
 
 		pState->m_fFinish = fg_Move(Result.m_fFinish);
+
+		CleanupResult.f_Clear();
 
 		auto TransferResult = co_await fg_Move(TransferResultFuture).f_Wrap();
 
