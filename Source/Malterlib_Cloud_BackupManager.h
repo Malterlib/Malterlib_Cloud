@@ -143,7 +143,7 @@ namespace NMib::NCloud
 
 			NStr::CStr m_FileName;
 			uint64 m_Position;
-			NContainer::CSecureByteVector m_Data;
+			NContainer::CIOByteVector m_Data;
 			NCryptography::CHashDigest_SHA256 m_PreviousDigest;
 			CManifestFile m_ManifestFile;
 		};
@@ -156,7 +156,7 @@ namespace NMib::NCloud
 		static bool fs_ManifestChangeValid(NStr::CStr const &_FileName, CManifestChange const &_Change, NStr::CStr &o_Error);
 		static bool fs_ManifestFileValid(NStr::CStr const &_FileName, NFile::CDirectoryManifestFile const &_File, NStr::CStr &o_Error);
 
-		using FRunRSyncProtocol = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<NContainer::CSecureByteVector> (NContainer::CSecureByteVector _Packet)>;
+		using FRunRSyncProtocol = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<NContainer::CIOByteVector> (NContainer::CIOByteVector _Packet)>;
 
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_StartManifestRSync
 			(
@@ -306,7 +306,7 @@ namespace NMib::NCloud
 			uint64 m_Position;
 			uint64 m_Size;
 			EFlag m_Flags = EFlag_None;
-			NContainer::CSecureByteVector m_Data;
+			NContainer::CIOByteVector m_Data;
 		};
 		
 		struct CStopBackup

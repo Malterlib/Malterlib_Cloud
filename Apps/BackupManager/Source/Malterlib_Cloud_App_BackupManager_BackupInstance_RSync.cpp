@@ -6,7 +6,7 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	void CBackupInstance::CInternal::f_RunRSyncProtocol(CRSyncContext &_Context, CSecureByteVector &&_ServerPacket)
+	void CBackupInstance::CInternal::f_RunRSyncProtocol(CRSyncContext &_Context, CIOByteVector &&_ServerPacket)
 	{
 		_Context.m_BytesTransferredIn += _ServerPacket.f_GetLen();
 
@@ -14,7 +14,7 @@ namespace NMib::NCloud::NBackupManager
 		bool bDone = false;
 		while (bWantOneMoreProcess)
 		{
-			CSecureByteVector ToSendToServer;
+			CIOByteVector ToSendToServer;
 
 			try
 			{
@@ -48,7 +48,7 @@ namespace NMib::NCloud::NBackupManager
 			{
 				_Context.m_BytesTransferredOut += ToSendToServer.f_GetLen();
 
-				_Context.m_fRunProtocol(fg_Move(ToSendToServer)) > [this, SyncID = _Context.f_GetSyncID()](TCAsyncResult<CSecureByteVector> &&_ServerPacket)
+				_Context.m_fRunProtocol(fg_Move(ToSendToServer)) > [this, SyncID = _Context.f_GetSyncID()](TCAsyncResult<CIOByteVector> &&_ServerPacket)
 					{
 						auto pContext = m_RSyncContexts.f_FindEqual(SyncID);
 						if (!pContext)

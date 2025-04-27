@@ -262,7 +262,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto Contents = co_await mp_HostMonitor(&CHostMonitor::f_GetConfigFileContents, Key);
 
-		co_await _pCommandLine->f_StdOutBinary(Contents.m_Raw.f_ToSecure());
+		co_await _pCommandLine->f_StdOutBinary(Contents.m_Raw);
 
 		co_return 0;
 	}

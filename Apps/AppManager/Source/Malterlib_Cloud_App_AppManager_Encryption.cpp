@@ -124,7 +124,7 @@ namespace NMib::NCloud::NAppManager
 					, [Key](NMib::NStr::CStr const &_Output, TCActor<CProcessLaunchActor> const &_LaunchActor)
 					{
 						if (_Output == "PROVIDE KEY")
-							_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, Key).f_DiscardResult();
+							_LaunchActor(&CProcessLaunchActor::f_SendStdInBinary, CIOByteVector::fs_AllowInsecureConversion(Key)).f_DiscardResult();
 					}
 					, TCLimitsInt<uint32>::mc_Max
 				)

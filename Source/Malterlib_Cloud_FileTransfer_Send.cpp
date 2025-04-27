@@ -487,7 +487,7 @@ namespace NMib::NCloud
 			{
 				.m_DataGenerator = fg_CallSafe
 				(
-					[this, FileName = _FileName, Position = _StartPosition, FileSize = _FileSize]() mutable -> TCAsyncGenerator<NContainer::CSecureByteVector>
+					[this, FileName = _FileName, Position = _StartPosition, FileSize = _FileSize]() mutable -> TCAsyncGenerator<NContainer::CIOByteVector>
 					{
 						auto CaptureScope = co_await g_CaptureExceptions;
 
@@ -536,7 +536,7 @@ namespace NMib::NCloud
 						;
 
 						mint ReadAhead = 16;
-						TCLinkedList<TCFuture<NContainer::CSecureByteVector>> ReadAheadFutures;
+						TCLinkedList<TCFuture<NContainer::CIOByteVector>> ReadAheadFutures;
 
 						CRoundRobinBlockingActors BlockingActors(4);
 
@@ -548,7 +548,7 @@ namespace NMib::NCloud
 								(
 									g_Dispatch(*BlockingActors) / [pFile, ThisTime, Position]() mutable
 									{
-										NContainer::CSecureByteVector Buffer;
+										NContainer::CIOByteVector Buffer;
 										Buffer.f_SetLen(ThisTime);
 
 										pFile->f_ReadNoLocalCache(Position, Buffer.f_GetArray(), ThisTime);

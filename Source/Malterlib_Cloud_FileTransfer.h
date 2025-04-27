@@ -44,7 +44,7 @@ namespace NMib::NCloud
 
 	struct CFileTransferSendDownloadFileContents
 	{
-		NConcurrency::TCAsyncGenerator<NContainer::CSecureByteVector> m_DataGenerator;
+		NConcurrency::TCAsyncGenerator<NContainer::CIOByteVector> m_DataGenerator;
 		NConcurrency::CActorSubscription m_Subscription;
 		uint64 m_StartPosition;
 	};

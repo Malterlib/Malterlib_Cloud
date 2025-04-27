@@ -1124,7 +1124,7 @@ namespace NMib::NCloud::NCloudClient
 					Secret = CSecretsManager::CSecret{fg_Move(Decoded)};
 				}
 				else
-					Secret = CSecretsManager::CSecret{co_await _pCommandLine->f_ReadBinary()};
+					Secret = CSecretsManager::CSecret{(co_await _pCommandLine->f_ReadBinary()).f_ToSecure()};
 			}
 			else
 				DNeverGetHere;

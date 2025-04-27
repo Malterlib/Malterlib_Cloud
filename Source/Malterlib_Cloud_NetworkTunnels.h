@@ -86,7 +86,7 @@ namespace NMib::NCloud
 			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CTunnelChange _TunnelChange)> m_fOnTunnelChange;
 		};
 
-		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSecureByteVector _Data)>;
+		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CIOByteVector _Data)>;
 
 		struct COpenConnection
 		{

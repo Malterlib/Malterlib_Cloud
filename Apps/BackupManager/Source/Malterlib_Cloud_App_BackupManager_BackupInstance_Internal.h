@@ -81,7 +81,7 @@ namespace NMib::NCloud::NBackupManager
 			;
 		}
 
-		void f_RunRSyncProtocol(CRSyncContext &_Context, CSecureByteVector &&_ServerPacket);
+		void f_RunRSyncProtocol(CRSyncContext &_Context, CIOByteVector &&_ServerPacket);
 		CExceptionPointer f_CheckFileName(CStr const &_FileName, CDirectoryManifestFile **o_pManifestFile);
 		CStr f_GetTempPath(CStr const &_Path);
 		CStr f_GetCurrentPath(CStr const &_Path);

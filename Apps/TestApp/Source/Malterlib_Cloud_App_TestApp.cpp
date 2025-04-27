@@ -296,7 +296,7 @@ namespace NMib::NCloud::NTest
 
 					co_await fg_Move(LogReporter.m_fReportEntries).f_Destroy();
 
-					co_await _pCommandLine->f_StdOut(CStrSecure::CFormat("{}\n") << ReportResult.m_ReportDepth);
+					co_await _pCommandLine->f_StdOut(CStrIO::CFormat("{}\n") << ReportResult.m_ReportDepth);
 
 					co_return 0;
 				}

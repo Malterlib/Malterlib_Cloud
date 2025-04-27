@@ -37,7 +37,7 @@ namespace NMib::NCloud
 			
 			NStr::CStr m_FilePath;
 			uint64 m_FilePosition;
-			NContainer::CSecureByteVector m_Data;
+			NContainer::CIOByteVector m_Data;
 			uint8 m_bFinished = false;
 			NFile::EFileAttrib m_FileAttributes = NFile::EFileAttrib_None;
 			NTime::CTime m_WriteTime;

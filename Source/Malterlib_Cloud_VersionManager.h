@@ -131,7 +131,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NConcurrency::TCAsyncGenerator<NContainer::CSecureByteVector> m_DataGenerator;
+			NConcurrency::TCAsyncGenerator<NContainer::CIOByteVector> m_DataGenerator;
 			NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
 			uint64 m_StartPosition;
 		};

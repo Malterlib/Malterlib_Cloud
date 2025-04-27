@@ -222,11 +222,11 @@ namespace NMib::NCloud::NPrivate
 						co_return {};
 					}
 				)
-				/ [this, pRunningState, FileName](CSecureByteVector _Packet) mutable -> TCFuture<CSecureByteVector>
+				/ [this, pRunningState, FileName](CIOByteVector _Packet) mutable -> TCFuture<CIOByteVector>
 				{
 					auto CaptureScope = co_await g_CaptureExceptions;
 
-					NContainer::CSecureByteVector ToSendToClient;
+					NContainer::CIOByteVector ToSendToClient;
 					auto *pPendingFile = mp_PendingFiles.f_FindEqual(FileName);
 
 					if
@@ -319,7 +319,7 @@ namespace NMib::NCloud::NPrivate
 			bForceSync = false;
 			mint ThisTime = fg_Min(_Length - Position, mp_Config.m_MaxSendQueue - RunningState.m_PendingQueue);
 
-			CSecureByteVector Data;
+			CIOByteVector Data;
 			Data.f_SetLen(ThisTime);
 
 			CBackupManagerBackup::CAppendData AppendData;
@@ -686,14 +686,14 @@ namespace NMib::NCloud::NPrivate
 						co_return {};
 					}
 				)
-				/ [this](CSecureByteVector _Packet) mutable -> TCFuture<CSecureByteVector>
+				/ [this](CIOByteVector _Packet) mutable -> TCFuture<CIOByteVector>
 				{
 					if (!mp_pManifestSyncState)
 						co_return DMibErrorInstance("Aborted");
 
 					auto CaptureScope = co_await g_CaptureExceptions;
 
-					NContainer::CSecureByteVector ToSendToClient;
+					NContainer::CIOByteVector ToSendToClient;
 					if
 						(
 							mp_pManifestSyncState->m_pRSyncServer->f_ProcessPacket

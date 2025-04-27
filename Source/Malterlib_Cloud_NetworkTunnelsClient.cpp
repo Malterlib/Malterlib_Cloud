@@ -376,7 +376,7 @@ namespace NMib::NCloud
 									co_return {};
 								}
 							)
-							/ [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](CSecureByteVector _Data) -> TCFuture<void>
+							/ [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](CIOByteVector _Data) -> TCFuture<void>
 							{
 								auto &Internal = *mp_pInternal;
 
@@ -430,7 +430,7 @@ namespace NMib::NCloud
 				;
 
 				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [this, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
-					(TCSharedPointer<CSecureByteVector> _pMessage) -> TCFuture<void>
+					(TCSharedPointer<CIOByteVector> _pMessage) -> TCFuture<void>
 					{
 						auto &Internal = *mp_pInternal;
 

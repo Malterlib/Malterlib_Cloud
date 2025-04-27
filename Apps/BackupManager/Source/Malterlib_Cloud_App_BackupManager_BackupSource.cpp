@@ -628,7 +628,7 @@ namespace NMib::NCloud::NBackupManager
 			CStr _BackupID
 			, CStr _File
 			, uint64 _Position
-			, CSecureByteVector _Data
+			, CIOByteVector _Data
 			, CBackupManagerBackup::CManifestChange _ManifestChange
 		)
 	{
