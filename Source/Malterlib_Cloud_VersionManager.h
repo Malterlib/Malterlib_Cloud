@@ -32,7 +32,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_RefactorToActorFunctorsSubscribeChanges = 0x107
 			, EProtocolVersion_RenamePlatforms = 0x108
 			, EProtocolVersion_AsyncGeneratorFileTransfer = 0x109
-			, EProtocolVersion_Current = 0x109
+			, EProtocolVersion_SupportSymlinks = 0x110
+			, EProtocolVersion_Current = 0x110
 		};
 
 		struct CVersionID : public CCloudVersion
@@ -147,6 +148,7 @@ namespace NMib::NCloud
 			NFile::EFileAttrib m_FileAttributes = NFile::EFileAttrib_None;
 			NTime::CTime m_WriteTime;
 			uint64 m_FileSize = 0;
+			NStr::CStr m_SymlinkContents;
 			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CDownloadFileContents> (uint64 _StartPosition, NCryptography::CHashDigest_SHA256 _StartDigest)> m_fGetDataGenerator;
 		};
 

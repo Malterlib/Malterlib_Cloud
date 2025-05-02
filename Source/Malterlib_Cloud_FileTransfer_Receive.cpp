@@ -381,13 +381,65 @@ namespace NMib::NCloud
 				auto BlockingActorCheckout = fg_BlockingActor();
 				*pResumeFileInfo = co_await
 					(
-						g_Dispatch(BlockingActorCheckout) / [FilePath, _Flags, ExpectedLen = RemoteFile.m_FileSize, Attributes]() -> TCFuture<CResumeFileInfo>
+						g_Dispatch(BlockingActorCheckout)
+						/
+						[
+							FilePath
+							, _Flags
+							, ExpectedLen = RemoteFile.m_FileSize
+							, Attributes
+							, SymlinkContents = RemoteFile.m_SymlinkContents
+							, WriteTime = RemoteFile.m_WriteTime
+							, FileAttributes = RemoteFile.m_FileAttributes
+						]
+						() -> TCFuture<CResumeFileInfo>
 						{
 							auto CaptureScope = co_await g_CaptureExceptions;
 
 							CFile::fs_CreateDirectory(CFile::fs_GetPath(FilePath));
 
-							auto FileAttributes = Attributes | EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+							if (FileAttributes & EFileAttrib_Link)
+							{
+								if (CFile::fs_FileExists(FilePath, EFileAttrib_Link))
+								{
+									auto CurrentContents = CFile::fs_ResolveSymbolicLink(FilePath);
+									if (CurrentContents == SymlinkContents)
+									{
+										CFile::fs_SetAttributesOnLink(FilePath, Attributes);
+										CFile::fs_SetWriteTimeOnLink(FilePath, WriteTime);
+
+										co_return {};
+									}
+
+									CFile::fs_DeleteFile(FilePath);
+								}
+								else if (CFile::fs_FileExists(FilePath, EFileAttrib_File))
+									CFile::fs_DeleteFile(FilePath);
+
+								CFile::fs_CreateDirectory(CFile::fs_GetPath(FilePath));
+								CFile::fs_CreateSymbolicLink(SymlinkContents, FilePath, FileAttributes, ESymbolicLinkFlag_Relative);
+								CFile::fs_SetAttributesOnLink(FilePath, Attributes);
+								CFile::fs_SetWriteTimeOnLink(FilePath, WriteTime);
+
+								co_return {};
+							}
+							else if (FileAttributes & EFileAttrib_Directory)
+							{
+								CFile::fs_CreateDirectory(FilePath);
+								CFile::fs_SetAttributes(FilePath, Attributes | EFileAttrib_UserExecute | EFileAttrib_UnixAttributesValid);
+								CFile::fs_SetWriteTime(FilePath, WriteTime);
+
+								co_return {};
+							}
+							else if (FileAttributes & EFileAttrib_File)
+							{
+								if (CFile::fs_FileExists(FilePath, EFileAttrib_Link))
+									CFile::fs_DeleteFile(FilePath);
+								else if (CFile::fs_FileExists(FilePath, EFileAttrib_Directory))
+									CFile::fs_DeleteDirectoryRecursive(FilePath);
+							}
+
+							auto OpenAttributes = Attributes | EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
 
 							if ((_Flags & EReceiveFlag_IgnoreExisting) || ExpectedLen == TCLimitsInt<uint64>::mc_Max)
 							{
@@ -396,7 +448,7 @@ namespace NMib::NCloud
 									(
 										FilePath
 										, EFileOpen_Write | EFileOpen_ShareAll | EFileOpen_NoLocalCache
-										, FileAttributes
+										, OpenAttributes
 									)
 								;
 								co_return CResumeFileInfoParams{.m_File = fg_Move(File)};
@@ -407,7 +459,7 @@ namespace NMib::NCloud
 								(
 									FilePath
 									, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll | EFileOpen_NoLocalCache
-									, FileAttributes
+									, OpenAttributes
 								)
 							;
 
@@ -432,6 +484,9 @@ namespace NMib::NCloud
 					)
 				;
 			}
+
+			if ((RemoteFile.m_FileAttributes & EFileAttrib_Link) || !(RemoteFile.m_FileAttributes & EFileAttrib_File))
+				continue;
 
 			auto DownloadContents = co_await (RemoteFile.m_fGetDataGenerator(pResumeFileInfo->m_StartPosition, pResumeFileInfo->m_StartDigest) % "Get Data Generator");
 
@@ -470,7 +525,7 @@ namespace NMib::NCloud
 
 			co_await (fg_AllDone(Writes) % "Writing output data failed");
 
-			if (RemoteFile.m_FileSize != TCLimitsInt<uint64>::mc_Max && FilePosition != RemoteFile.m_FileSize)
+			if (RemoteFile.m_FileSize != TCLimitsInt<uint64>::mc_Max && !(_Flags & EReceiveFlag_DecompressZstandard) && FilePosition != RemoteFile.m_FileSize)
 				co_return DMibErrorInstance("Number of transferred bytes does not match expected file size");
 
 			{

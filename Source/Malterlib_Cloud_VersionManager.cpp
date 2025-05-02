@@ -314,6 +314,8 @@ namespace NMib::NCloud
 		_Stream % m_FileAttributes;
 		_Stream % m_WriteTime;
 		_Stream % m_FileSize;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportSymlinks)
+			_Stream % m_SymlinkContents;
 		_Stream % fg_Move(m_fGetDataGenerator);
 	}
 

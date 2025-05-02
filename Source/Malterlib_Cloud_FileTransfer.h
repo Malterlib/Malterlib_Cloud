@@ -57,6 +57,7 @@ namespace NMib::NCloud
 		NFile::EFileAttrib m_FileAttributes = NFile::EFileAttrib_None;
 		NTime::CTime m_WriteTime;
 		uint64 m_FileSize = 0;
+		NStr::CStr m_SymlinkContents;
 		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<CDownloadFileContents> (uint64 _StartPosition, NCryptography::CHashDigest_SHA256 _StartDigest)> m_fGetDataGenerator;
 
 		template <typename tf_CTypeTo, typename tf_CTypeFrom>
@@ -80,12 +81,20 @@ namespace NMib::NCloud
 
 		struct CSendFilesOptions
 		{
-			bool m_bCompressZstandard = false;
-			int m_ZstandardLevel = 3;
+			int32 m_ZstandardLevel = 3;
+			bool m_bIncludeRootDirectoryName:1 = false;
+			bool m_bCompressZstandard:1 = false;
+		};
+
+		struct CBasePath
+		{
+			NStr::CStr m_Path;
+			NStr::CStr m_Name;
 		};
 
 		~CFileTransferSend();
 		CFileTransferSend(NStr::CStr const &_BasePath, uint64 _MaxQueueSize = NFile::gc_IdealNetworkQueueSize);
+		CFileTransferSend(NContainer::TCVector<CBasePath> &&_BasePaths, uint64 _MaxQueueSize = NFile::gc_IdealNetworkQueueSize);
 
 		NConcurrency::TCFuture<CSendFilesResultDeprecated> f_SendFilesDeprecated(CFileTransferContextDeprecated _TransferContext);
 

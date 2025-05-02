@@ -22,6 +22,7 @@ namespace NMib::NCloud
 					, .m_FileAttributes = fg_Move((*iGenerator).m_FileAttributes)
 					, .m_WriteTime = fg_Move((*iGenerator).m_WriteTime)
 					, .m_FileSize = (*iGenerator).m_FileSize
+					, .m_SymlinkContents = fg_Move((*iGenerator).m_SymlinkContents)
 					, .m_fGetDataGenerator = NConcurrency::g_ActorFunctor(fg_Move(Subscription)) /
 					[
 						fGetDataGenerator = fg_Move((*iGenerator).m_fGetDataGenerator)

@@ -51,6 +51,7 @@ namespace NMib::NCloud
 		{
 			CStr m_FileName;
 			CStr m_RelativeFileName;
+			EFileAttrib m_FileAttributes = EFileAttrib_None;
 		};
 	}
 	using namespace NPrivate;
@@ -103,7 +104,7 @@ namespace NMib::NCloud
 
 		TCOptional<CDeprecated> m_Deprecated;
 
-		CStr m_RootPath;
+		NContainer::TCVector<CBasePath> m_BasePaths;
 		uint64 m_MaxQueueSize = 0;
 		NConcurrency::TCPromise<CFileTransferResult> m_Promise;
 		CTransferStats m_TransferStats;
@@ -114,12 +115,17 @@ namespace NMib::NCloud
 
 	CFileTransferSend::~CFileTransferSend() = default;
 
-	CFileTransferSend::CFileTransferSend(NStr::CStr const &_BasePath, uint64 _MaxQueueSize)
+	CFileTransferSend::CFileTransferSend(NContainer::TCVector<CBasePath> &&_BasePaths, uint64 _MaxQueueSize)
 		: mp_pInternal(fg_Construct(this)) 
 	{
 		auto &Internal = *mp_pInternal;
-		Internal.m_RootPath = _BasePath;
+		Internal.m_BasePaths = fg_Move(_BasePaths);
 		Internal.m_MaxQueueSize = _MaxQueueSize;
+	}
+
+	CFileTransferSend::CFileTransferSend(NStr::CStr const &_BasePath, uint64 _MaxQueueSize)
+		: CFileTransferSend({CBasePath{.m_Path = _BasePath}}, _MaxQueueSize)
+	{
 	}
 
 	TCFuture<void> CFileTransferSend::fp_Destroy()
@@ -356,7 +362,13 @@ namespace NMib::NCloud
 		auto &Deprecated = *Internal.m_Deprecated;
 		Deprecated.m_pInternal = &Internal;
 
-		Deprecated.m_pFileState->m_RootPath = Internal.m_RootPath;
+		if (Internal.m_BasePaths.f_GetLen() != 1)
+			co_return DMibErrorInstance("Deprecated files send only supports one base path");
+
+		if (Internal.m_BasePaths[0].m_Name)
+			co_return DMibErrorInstance("Deprecated files cannot override send file name");
+
+		Deprecated.m_pFileState->m_RootPath = Internal.m_BasePaths[0].m_Path;
 
 		auto &Params = *_TransferContext.mp_pInternal;
 
@@ -412,39 +424,56 @@ namespace NMib::NCloud
 		auto BlockingActorCheckout = fg_BlockingActor();
 		co_return co_await
 			(
-				g_Dispatch(BlockingActorCheckout) / [RootPath = m_RootPath]() mutable -> TCVector<CUploadQueueEntry>
+				g_Dispatch(BlockingActorCheckout) / [BasePaths = m_BasePaths, bIncludeRootDirectoryName = m_Options.m_bIncludeRootDirectoryName]() mutable
+				-> TCFuture<TCVector<CUploadQueueEntry>>
 				{
+					auto CaptureExceptinos = co_await (g_CaptureExceptions % "Failed to determine what to send");
+
 					TCVector<NPrivate::CUploadQueueEntry> FilesToSend;
 
-					auto fAddEntry = [&](CStr const &_RelativePath, CStr const &_Path)
+					auto fAddEntry = [&](CStr const &_RelativePath, CStr const &_Path, EFileAttrib _Attributes)
 						{
 							auto &Entry = FilesToSend.f_Insert();
 							Entry.m_FileName = _Path;
 							Entry.m_RelativeFileName = _RelativePath;
+							Entry.m_FileAttributes = _Attributes;
 						}
 					;
 
-					if (CFile::fs_FileExists(RootPath, EFileAttrib_File))
+					for (auto &BasePath : BasePaths)
 					{
-						CStr RelativePath = CFile::fs_GetFile(RootPath);
-						fAddEntry(RelativePath, RootPath);
-						return FilesToSend;
+						if (CFile::fs_FileExists(BasePath.m_Path, EFileAttrib_File))
+						{
+							CStr RelativePath = BasePath.m_Name;
+							if (RelativePath.f_IsEmpty())
+								RelativePath = CFile::fs_GetFile(BasePath.m_Path);
+
+							fAddEntry(RelativePath, BasePath.m_Path, CFile::fs_GetAttributes(BasePath.m_Path));
+
+							continue;
+						}
+
+						if (!CFile::fs_FileExists(BasePath.m_Path, EFileAttrib_Directory))
+							co_return DMibErrorInstance("Send path does not exist");
+
+						CFile::CFindFilesOptions FindOptions(BasePath.m_Path + "/*", true);
+						FindOptions.m_AttribMask = EFileAttrib_File | EFileAttrib_Link | EFileAttrib_Directory | EFileAttrib_FindDirectoryLast;
+
+						CStr RelativeRoot = BasePath.m_Name;
+						if (bIncludeRootDirectoryName && RelativeRoot.f_IsEmpty())
+							RelativeRoot = CFile::fs_GetFile(BasePath.m_Path);
+
+						auto FoundFiles = CFile::fs_FindFiles(FindOptions);
+						for (auto &File : FoundFiles)
+						{
+							CStr RelativePath  = RelativeRoot / File.m_Path.f_Extract(BasePath.m_Path.f_GetLen() + 1);
+							fAddEntry(RelativePath, File.m_Path, File.m_Attribs);
+						}
+
+						fAddEntry(RelativeRoot, BasePath.m_Path, CFile::fs_GetAttributes(BasePath.m_Path));
 					}
 
-					if (!CFile::fs_FileExists(RootPath, EFileAttrib_Directory))
-						DMibError("Send path does not exist");
-
-					CFile::CFindFilesOptions FindOptions(RootPath + "/*", true);
-					FindOptions.m_AttribMask = EFileAttrib_File;
-
-					auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-					for (auto &File : FoundFiles)
-					{
-						CStr RelativePath = File.m_Path.f_Extract(RootPath.f_GetLen() + 1);
-						fAddEntry(RelativePath, File.m_Path);
-					}
-
-					return FilesToSend;
+					co_return fg_Move(FilesToSend);
 				}
 			)
 		;
@@ -532,24 +561,54 @@ namespace NMib::NCloud
 
 	TCFuture<CFileTransferSendDownloadFile> CFileTransferSend::CInternal::f_SendFile(CUploadQueueEntry _UploadEntry)
 	{
-		auto BlockingActorCheckout = fg_BlockingActor();
-		auto FileSize = co_await
-			(
-				g_Dispatch(BlockingActorCheckout) / [FileName = _UploadEntry.m_FileName]() mutable -> uint64
-				{
-					return (uint64)CFile::fs_GetFileSize(FileName);
-				}
-			)
-		;
+		uint64 FileSize = TCLimitsInt<uint64>::mc_Max;
+		NTime::CTime WriteTime;
+		if (_UploadEntry.m_FileAttributes & EFileAttrib_Link)
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			WriteTime = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [FileName = _UploadEntry.m_FileName]() mutable
+					{
+						return CFile::fs_GetWriteTimeOnLink(FileName);
+					}
+				)
+			;
+		}
+		else
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			auto [FileSizeResult, WriteTimeResult] = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [FileName = _UploadEntry.m_FileName]() mutable
+					{
+						return fg_Tuple
+							(
+								(uint64)CFile::fs_GetFileSize(FileName)
+								, CFile::fs_GetWriteTime(FileName)
+							)
+						;
+					}
+				)
+			;
+			FileSize = FileSizeResult;
+			WriteTime = WriteTimeResult;
+		}
 
 		++m_nTransfers;
+
+		CStr SymlinkContents;
+
+		if (_UploadEntry.m_FileAttributes & EFileAttrib_Link)
+			SymlinkContents = CFile::fs_ResolveSymbolicLink(_UploadEntry.m_FileName);
 
 		co_return CFileTransferSendDownloadFile
 			{
 				.m_FilePath = _UploadEntry.m_RelativeFileName
-				, .m_FileAttributes = CFile::fs_GetAttributes(_UploadEntry.m_FileName)
-				, .m_WriteTime = CFile::fs_GetWriteTime(_UploadEntry.m_FileName)
+				, .m_FileAttributes = _UploadEntry.m_FileAttributes
+				, .m_WriteTime = WriteTime
 				, .m_FileSize = m_Options.m_bCompressZstandard ? TCLimitsInt<uint64>::mc_Max : FileSize
+				, .m_SymlinkContents = fg_Move(SymlinkContents)
 				, .m_fGetDataGenerator = g_ActorFunctor
 				(
 					g_ActorSubscription / [this]
@@ -558,10 +617,13 @@ namespace NMib::NCloud
 						f_CheckTransferDone();
 					}
 				)
-				/ [this, FileName = _UploadEntry.m_FileName, FileSize, AllowDestroy = NConcurrency::g_AllowWrongThreadDestroy]
+				/ [this, FileName = _UploadEntry.m_FileName, FileSize, AllowDestroy = NConcurrency::g_AllowWrongThreadDestroy, FileAttributes = _UploadEntry.m_FileAttributes]
 				(uint64 _StartPosition, NCryptography::CHashDigest_SHA256 _StartDigest) mutable
 				-> NConcurrency::TCFuture<CFileTransferSendDownloadFileContents>
 				{
+					if ((FileAttributes & EFileAttrib_Link) || !(FileAttributes & EFileAttrib_File))
+						co_return DMibErrorInstance("File has no contents");
+
 					auto SendContentsResult = co_await f_SendFileContents(FileName, _StartPosition, _StartDigest, FileSize).f_Wrap();
 
 					if (!SendContentsResult)
