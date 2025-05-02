@@ -167,7 +167,7 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<CFileTransferResult> TransferResultFuture;
 		if (_VersionManager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_AsyncGeneratorFileTransfer)
 		{
-			auto SendFilesResult = co_await pState->m_UploadVersionSend.f_Bind<&CFileTransferSend::f_SendFiles>();
+			auto SendFilesResult = co_await pState->m_UploadVersionSend.f_Bind<&CFileTransferSend::f_SendFiles>(fg_Default());
 			StartUpload.m_FilesGenerator = CFileTransferSendDownloadFile::fs_TranslateGenerator<CVersionManager::CDownloadFile>(fg_Move(SendFilesResult.m_FilesGenerator));
 			StartUpload.m_FilesGenerator->f_SetSubscription(fg_Move(SendFilesResult.m_Subscription));
 			TransferResultFuture = fg_Move(SendFilesResult.m_Result);

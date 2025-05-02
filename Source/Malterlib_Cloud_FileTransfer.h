@@ -78,12 +78,18 @@ namespace NMib::NCloud
 			NConcurrency::TCFuture<CFileTransferResult> m_Result;
 		};
 
+		struct CSendFilesOptions
+		{
+			bool m_bCompressZstandard = false;
+			int m_ZstandardLevel = 3;
+		};
+
 		~CFileTransferSend();
 		CFileTransferSend(NStr::CStr const &_BasePath, uint64 _MaxQueueSize = NFile::gc_IdealNetworkQueueSize);
 
 		NConcurrency::TCFuture<CSendFilesResultDeprecated> f_SendFilesDeprecated(CFileTransferContextDeprecated _TransferContext);
 
-		NConcurrency::TCFuture<CSendFilesResult> f_SendFiles();
+		NConcurrency::TCFuture<CSendFilesResult> f_SendFiles(CSendFilesOptions _Options);
 
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy();
@@ -109,6 +115,7 @@ namespace NMib::NCloud
 			, EReceiveFlag_IgnoreExisting = DMibBit(0)
 			, EReceiveFlag_FailOnExisting = DMibBit(1)
 			, EReceiveFlag_DeleteExisting = DMibBit(2)
+			, EReceiveFlag_DecompressZstandard = DMibBit(3)
 		};
 
 		NConcurrency::TCFuture<CFileTransferContextDeprecated> f_ReceiveFilesDeprecated(uint64 _QueueSize, EReceiveFlag _Flags);

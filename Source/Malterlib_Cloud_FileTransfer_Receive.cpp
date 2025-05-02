@@ -2,8 +2,10 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
-#include <Mib/Concurrency/AsyncDestroy>
+
+#include <Mib/Compression/ZstandardAsync>
 #include <Mib/Concurrency/ActorSequencerActor>
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_FileTransfer.h"
@@ -11,12 +13,13 @@
 
 namespace NMib::NCloud
 {
+	using namespace NCompression;
 	using namespace NConcurrency;
-	using namespace NStr;
 	using namespace NContainer;
-	using namespace NTime;
 	using namespace NFile;
 	using namespace NStorage;
+	using namespace NStr;
+	using namespace NTime;
 
 	struct CFileTransferReceive::CInternal : public CActorInternal
 	{
@@ -386,7 +389,7 @@ namespace NMib::NCloud
 
 							auto FileAttributes = Attributes | EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
 
-							if (_Flags & EReceiveFlag_IgnoreExisting)
+							if ((_Flags & EReceiveFlag_IgnoreExisting) || ExpectedLen == TCLimitsInt<uint64>::mc_Max)
 							{
 								CFile File;
 								File.f_Open
@@ -438,7 +441,11 @@ namespace NMib::NCloud
 
 			CRoundRobinBlockingActors BlockingActors(4);
 
-			for (auto iData = co_await (fg_Move(DownloadContents.m_DataGenerator).f_GetPipelinedIterator(DownloadPipelineLength) % "GetPipelined Data"); iData; co_await (++iData % "Next Data"))
+			auto DataGenerator = fg_Move(DownloadContents.m_DataGenerator);
+			if (_Flags & EReceiveFlag_DecompressZstandard)
+				DataGenerator = fg_DecompressZstandardAsync(fg_Move(DataGenerator));
+
+			for (auto iData = co_await (fg_Move(DataGenerator).f_GetPipelinedIterator(DownloadPipelineLength) % "GetPipelined Data"); iData; co_await (++iData % "Next Data"))
 			{
 				auto &&Data = *iData;
 				auto DataLen = Data.f_GetLen();
@@ -461,9 +468,9 @@ namespace NMib::NCloud
 				Result.m_nBytes += DataLen;
 			}
 
-			co_await (fg_AllDone(Writes) % "Writes");
+			co_await (fg_AllDone(Writes) % "Writing output data failed");
 
-			if (FilePosition != RemoteFile.m_FileSize)
+			if (RemoteFile.m_FileSize != TCLimitsInt<uint64>::mc_Max && FilePosition != RemoteFile.m_FileSize)
 				co_return DMibErrorInstance("Number of transferred bytes does not match expected file size");
 
 			{
@@ -475,12 +482,12 @@ namespace NMib::NCloud
 							pResumeFileInfo
 							, Attributes
 							, WriteTime = RemoteFile.m_WriteTime
-							, FileSize = RemoteFile.m_FileSize
+							, FilePosition
 						]
 						() mutable
 						{
 							auto &File = pResumeFileInfo->m_File;
-							File.f_SetLength(FileSize);
+							File.f_SetLength(FilePosition);
 							File.f_SetAttributes(Attributes);
 							File.f_SetWriteTime(WriteTime);
 							File.f_Close();

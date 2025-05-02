@@ -2,21 +2,25 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
-#include <Mib/Concurrency/LogError>
+
+#include <Mib/Compression/ZstandardAsync>
 #include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Concurrency/AsyncDestroy>
+#include <Mib/Concurrency/LogError>
+#include <Mib/File/Generators>
 
 #include "Malterlib_Cloud_FileTransfer.h"
 #include "Malterlib_Cloud_FileTransfer_Internal.h"
 
 namespace NMib::NCloud
 {
+	using namespace NCompression;
 	using namespace NConcurrency;
-	using namespace NStr;
-	using namespace NFile;
-	using namespace NTime;
 	using namespace NContainer;
+	using namespace NFile;
 	using namespace NStorage;
+	using namespace NStr;
+	using namespace NTime;
 
 	namespace NPrivate
 	{
@@ -94,6 +98,8 @@ namespace NMib::NCloud
 		void f_ReportError(CStr const &_Error);
 
 		CFileTransferSend *m_pThis;
+
+		CSendFilesOptions m_Options;
 
 		TCOptional<CDeprecated> m_Deprecated;
 
@@ -454,7 +460,7 @@ namespace NMib::NCloud
 	{
 		if (_StartPosition != 0)
 		{
-			if (_FileSize < _StartPosition)
+			if (_FileSize < _StartPosition || m_Options.m_bCompressZstandard)
 				_StartPosition = 0;
 			else
 			{
@@ -483,118 +489,35 @@ namespace NMib::NCloud
 
 		++m_nTransfers;
 
-		co_return CFileTransferSendDownloadFileContents
-			{
-				.m_DataGenerator = fg_CallSafe
-				(
-					[this, FileName = _FileName, Position = _StartPosition, FileSize = _FileSize]() mutable -> TCAsyncGenerator<NContainer::CIOByteVector>
+		auto ReadFileGenerator = NFile::fg_ReadFileGenerator
+			(
+				CReadFileGeneratorParams
+				{
+					.m_Path = _FileName
+					, .m_fOnError = g_ActorFunctorWeak / [this](NException::CExceptionPointer _pError) -> TCFuture<void>
 					{
-						auto CaptureScope = co_await g_CaptureExceptions;
-
-						auto BlockingActorCheckout = fg_BlockingActor();
-						auto FileResult = co_await
-							(
-								g_Dispatch(BlockingActorCheckout) / [FileName]() mutable
-								{
-									TCSharedPointer<CFile> pFile = fg_Construct();
-									pFile->f_Open(FileName, EFileOpen_Read | EFileOpen_ShareAll | EFileOpen_NoLocalCache);
-									return pFile;
-								}
-							)
-							.f_Wrap()
-						;
-
-						if (!FileResult)
-						{
-							if (!m_Promise.f_IsSet())
-								m_Promise.f_SetException(FileResult.f_GetException());
-
-							co_return FileResult.f_GetException();
-						}
-
-						auto pFile = fg_Move(*FileResult);
-
-						auto DestoryFile = co_await fg_AsyncDestroyGeneric
-							(
-								[&]() -> TCFuture<void>
-								{
-									auto pLocalFile = fg_Move(pFile);
-
-									auto BlockingActorCheckout = fg_BlockingActor();
-									co_await
-										(
-											g_Dispatch(BlockingActorCheckout) / [pLocalFile = fg_Move(pLocalFile)]() mutable
-											{
-												pLocalFile->f_Close();
-											}
-										)
-									;
-
-									co_return {};
-								}
-							)
-						;
-
-						mint ReadAhead = 16;
-						TCLinkedList<TCFuture<NContainer::CIOByteVector>> ReadAheadFutures;
-
-						CRoundRobinBlockingActors BlockingActors(4);
-
-						while (Position < FileSize)
-						{
-							mint ThisTime = fg_Min(FileSize - Position, gc_IdealIoSize);
-
-							ReadAheadFutures.f_Insert
-								(
-									g_Dispatch(*BlockingActors) / [pFile, ThisTime, Position]() mutable
-									{
-										NContainer::CIOByteVector Buffer;
-										Buffer.f_SetLen(ThisTime);
-
-										pFile->f_ReadNoLocalCache(Position, Buffer.f_GetArray(), ThisTime);
-
-										return Buffer;
-									}
-								)
-							;
-
-							if (ReadAhead == 0)
-							{
-								auto Buffer = co_await ReadAheadFutures.f_PopFirst().f_Wrap();
-								if (!Buffer)
-								{
-									if (!m_Promise.f_IsSet())
-										m_Promise.f_SetException(Buffer.f_GetException());
-
-									co_return Buffer.f_GetException();
-								}
-
-								co_yield fg_Move(*Buffer);
-							}
-							else
-								--ReadAhead;
-
-							Position += ThisTime;
-							m_TransferStats.m_nTransferredBytes += ThisTime;
-						}
-
-						while (!ReadAheadFutures.f_IsEmpty())
-						{
-							auto Buffer = co_await ReadAheadFutures.f_PopFirst().f_Wrap();
-							if (!Buffer)
-							{
-								if (!m_Promise.f_IsSet())
-									m_Promise.f_SetException(Buffer.f_GetException());
-
-								co_return Buffer.f_GetException();
-							}
-
-							co_yield fg_Move(*Buffer);
-						}
+						if (!m_Promise.f_IsSet())
+							m_Promise.f_SetException(fg_Move(_pError));
 
 						co_return {};
 					}
-				)
+					, .m_fOnProgress = g_ActorFunctorWeak / [this](uint64 _nBytesProgress, uint64 _nTransferredBytes, uint64 _nTotalBytes) -> TCFuture<void>
+					{
+						m_TransferStats.m_nTransferredBytes += _nBytesProgress;
+
+						co_return {};
+					}
+					, .m_StartPosition = _StartPosition
+					, .m_FileSize = _FileSize
+				}
+			)
+		;
+
+		co_return CFileTransferSendDownloadFileContents
+			{
+				.m_DataGenerator = m_Options.m_bCompressZstandard
+				? fg_CompressZstandardAsync(fg_Move(ReadFileGenerator), CZStandardCompressionOptions{.m_KnownSize = _FileSize, .m_CompressionLevel = m_Options.m_ZstandardLevel})
+				: fg_Move(ReadFileGenerator)
 				, .m_Subscription = g_ActorSubscription / [this]
 				{
 					--m_nTransfers;
@@ -626,7 +549,7 @@ namespace NMib::NCloud
 				.m_FilePath = _UploadEntry.m_RelativeFileName
 				, .m_FileAttributes = CFile::fs_GetAttributes(_UploadEntry.m_FileName)
 				, .m_WriteTime = CFile::fs_GetWriteTime(_UploadEntry.m_FileName)
-				, .m_FileSize = FileSize
+				, .m_FileSize = m_Options.m_bCompressZstandard ? TCLimitsInt<uint64>::mc_Max : FileSize
 				, .m_fGetDataGenerator = g_ActorFunctor
 				(
 					g_ActorSubscription / [this]
@@ -655,12 +578,15 @@ namespace NMib::NCloud
 		;
 	}
 
-	auto CFileTransferSend::f_SendFiles() -> NConcurrency::TCFuture<CSendFilesResult>
+	auto CFileTransferSend::f_SendFiles(CSendFilesOptions _Options) -> NConcurrency::TCFuture<CSendFilesResult>
 	{
 		auto &Internal = *mp_pInternal;
+
 		if (Internal.m_bCalled)
 			co_return DMibErrorInstance("Send files has already been called");
 		Internal.m_bCalled = true;
+
+		Internal.m_Options = fg_Move(_Options);
 
 		co_return CSendFilesResult
 			{
