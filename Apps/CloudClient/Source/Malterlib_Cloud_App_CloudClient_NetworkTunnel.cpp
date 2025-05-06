@@ -22,16 +22,16 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--network-tunnel-enum"}
+					"Names"_o= _o["--network-tunnel-enum"]
 					, "Description"_o= "List network tunnels available on remotes."
 					, "Options"_o=
 					{
 						"Hosts?"_o=
 						{
-							"Names"_o= {"--hosts"}
-							, "Default"_o= _[_]
+							"Names"_o= _o["--hosts"]
+							, "Default"_o= _o[]
 							, "Description"_o= "The hosts to list tunnels for. If empty all hosts are included.\n"
-							, "Type"_o= {""}
+							, "Type"_o= _o[""]
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
@@ -39,8 +39,8 @@ namespace NMib::NCloud::NCloudClient
 					{
 						"TunnelName...?"_o=
 						{
-							"Default"_o= _[_]
-							, "Type"_o= {""}
+							"Default"_o= _o[]
+							, "Type"_o= _o[""]
 							, "Description"_o= "A list of wildcards for tunnel names to open tunnels to.\n"
 						}
 					}
@@ -55,26 +55,26 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--network-tunnel-open"}
+					"Names"_o= _o["--network-tunnel-open"]
 					, "Description"_o= "Open network tunnels."
 					, "Options"_o=
 					{
 						"Hosts?"_o=
 						{
-							"Names"_o= {"--hosts"}
-							, "Default"_o= _[_]
+							"Names"_o= _o["--hosts"]
+							, "Default"_o= _o[]
 							, "Description"_o= "The hosts to open tunnels for. If empty all hosts are included.\n"
-							, "Type"_o= {""}
+							, "Type"_o= _o[""]
 						}
 						, "ListenHost?"_o=
 						{
-							"Names"_o= {"--listen-host", "-l"}
+							"Names"_o= _o["--listen-host", "-l"]
 							, "Default"_o= ""
 							, "Description"_o= "The hostname to listen on. For unix sockets prefix path with UNIX:\n"
 						}
 						, "Verbose?"_o=
 						{
-							"Names"_o= {"--verbose", "-v"}
+							"Names"_o= _o["--verbose", "-v"]
 							, "Default"_o= false
 							, "Description"_o= "Log every connection.\n"
 						}
@@ -84,8 +84,8 @@ namespace NMib::NCloud::NCloudClient
 					{
 						"TunnelName...?"_o=
 						{
-							"Default"_o= _[_]
-							, "Type"_o= {""}
+							"Default"_o= _o[]
+							, "Type"_o= _o[""]
 							, "Description"_o= "A list of wildcards for tunnel names to open tunnels to.\n"
 						}
 					}

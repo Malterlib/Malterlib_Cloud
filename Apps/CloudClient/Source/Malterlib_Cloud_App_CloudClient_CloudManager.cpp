@@ -22,7 +22,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					"Host?"_o=
 					{
-						"Names"_o= {"--host"}
+						"Names"_o= _o["--host"]
 						, "Default"_o= ""
 						, "Description"_o= "Limit cloud managers to only specified host ID."
 					}
@@ -32,28 +32,28 @@ namespace NMib::NCloud::NCloudClient
 
 		auto QuietOption = "Quiet?"_o=
 			{
-				"Names"_o= {"--quiet", "-q"}
+				"Names"_o= _o["--quiet", "-q"]
 				, "Default"_o= false
 				, "Description"_o= "Don't output information on std out, just return the status."
 			}
 		;
 		auto IncludeCloudManagerOption = "IncludeCloudManager?"_o=
 			{
-				"Names"_o= {"--include-cloud-manager", "-c"}
+				"Names"_o= _o["--include-cloud-manager", "-c"]
 				, "Default"_o= false
 				, "Description"_o= "Include the cloud manager column."
 			}
 		;
 		auto FilterStatusError = "FilterStatusError?"_o=
 			{
-				"Names"_o= {"--filter-status-error"}
+				"Names"_o= _o["--filter-status-error"]
 				, "Type"_o= true
 				, "Description"_o= "Include applications and app managers with error status."
 			}
 		;
 		auto FilterEnvironment = "FilterEnvironment?"_o=
 			{
-				"Names"_o= {"--filter-environment"}
+				"Names"_o= _o["--filter-environment"]
 				, "Type"_o= ""
 				, "Description"_o= "Include applications and appmanagers with specified environment.\n"
 				"Wildcard search."
@@ -61,21 +61,21 @@ namespace NMib::NCloud::NCloudClient
 		;
 		auto FilterName = "FilterName?"_o=
 			{
-				"Names"_o= {"--filter-name"}
+				"Names"_o= _o["--filter-name"]
 				, "Type"_o= ""
 				, "Description"_o= "Include applications with specified application name."
 			}
 		;
 		auto FilterVersionManagerApp = "FilterVersionManagerApp?"_o=
 			{
-				"Names"_o= {"--filter-application"}
+				"Names"_o= _o["--filter-application"]
 				, "Type"_o= ""
 				, "Description"_o= "Include applications with specified version manager app name."
 			}
 		;
 		auto FilterOutOfDateVersion = "FilterOutOfDateVersion?"_o=
 			{
-				"Names"_o= {"--filter-out-of-date"}
+				"Names"_o= _o["--filter-out-of-date"]
 				, "Type"_o= true
 				, "Description"_o= "Include applications with out of date versions."
 			}
@@ -84,7 +84,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--cloud-manager-status"}
+					"Names"_o= _o["--cloud-manager-status"]
 					, "Description"_o= "List the overall status for resources controlled by the Cloud Manager."
 					, "Status"_o=
 					{
@@ -114,7 +114,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--cloud-manager-app-manager-status"}
+					"Names"_o= _o["--cloud-manager-app-manager-status"]
 					, "Description"_o= "List the status for app managers controlled by the Cloud Manager."
 					, "Status"_o=
 					{
@@ -141,7 +141,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--cloud-manager-application-status"}
+					"Names"_o= _o["--cloud-manager-application-status"]
 					, "Description"_o= "List the status for applications in app managers controlled by the Cloud Manager."
 					, "Status"_o=
 					{
@@ -170,7 +170,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--cloud-manager-remove-app-manager"}
+					"Names"_o= _o["--cloud-manager-remove-app-manager"]
 					, "Description"_o= "Remove app manager from cloud manager database."
 					, "Parameters"_o=
 					{
@@ -195,37 +195,37 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--cloud-manager-remove-sensor"}
+					"Names"_o= _o["--cloud-manager-remove-sensor"]
 					, "Description"_o= "Remove sensor from cloud manager."
 					, "Options"_o=
 					{
 						"SensorHostID?"_o=
 						{
-							"Names"_o= {"--sensor-host-id"}
+							"Names"_o= _o["--sensor-host-id"]
 							, "Type"_o= ""
 							, "Description"_o= "The host ID of the sensor to remove."
 						}
 						, "SensorApplication?"_o=
 						{
-							"Names"_o= {"--sensor-application"}
+							"Names"_o= _o["--sensor-application"]
 							, "Type"_o= ""
 							, "Description"_o= "The application of the sensor to remove. Supports wildcards."
 						}
 						, "SensorIdentifier?"_o=
 						{
-							"Names"_o= {"--sensor-identifier"}
+							"Names"_o= _o["--sensor-identifier"]
 							, "Type"_o= ""
 							, "Description"_o= "The identifier of the sensor to remove. Supports wildcards."
 						}
 						, "SensorIdentifierScope?"_o=
 						{
-							"Names"_o= {"--sensor-identifier-scope"}
+							"Names"_o= _o["--sensor-identifier-scope"]
 							, "Type"_o= ""
 							, "Description"_o= "The identifier scope of the sensor to remove. Supports wildcards."
 						}
 						, "Force?"_o=
 						{
-							"Names"_o= {"--force"}
+							"Names"_o= _o["--force"]
 							, "Default"_o= false
 							, "Description"_o= "Force removal of all sensors when no filtering options are specified."
 						}
@@ -243,37 +243,37 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--cloud-manager-remove-log"}
+					"Names"_o= _o["--cloud-manager-remove-log"]
 					, "Description"_o= "Remove log from cloud manager."
 					, "Options"_o=
 					{
 						"LogHostID?"_o=
 						{
-							"Names"_o= {"--log-host-id"}
+							"Names"_o= _o["--log-host-id"]
 							, "Type"_o= ""
 							, "Description"_o= "The host ID of the log to remove."
 						}
 						, "LogApplication?"_o=
 						{
-							"Names"_o= {"--log-application"}
+							"Names"_o= _o["--log-application"]
 							, "Type"_o= ""
 							, "Description"_o= "The application of the log to remove. Supports wildcards."
 						}
 						, "LogIdentifier?"_o=
 						{
-							"Names"_o= {"--log-identifier"}
+							"Names"_o= _o["--log-identifier"]
 							, "Type"_o= ""
 							, "Description"_o= "The identifier of the log to remove. Supports wildcards."
 						}
 						, "LogIdentifierScope?"_o=
 						{
-							"Names"_o= {"--log-identifier-scope"}
+							"Names"_o= _o["--log-identifier-scope"]
 							, "Type"_o= ""
 							, "Description"_o= "The identifier scope of the log to remove. Supports wildcards."
 						}
 						, "Force?"_o=
 						{
-							"Names"_o= {"--force"}
+							"Names"_o= _o["--force"]
 							, "Default"_o= false
 							, "Description"_o= "Force removal of all logs when no filtering options are specified."
 						}
@@ -291,49 +291,49 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--cloud-manager-snooze-sensor"}
+					"Names"_o= _o["--cloud-manager-snooze-sensor"]
 					, "Description"_o= "Snooze sensor from reporting as problem in cloud manager."
 					, "Options"_o=
 					{
 						"SensorHostID?"_o=
 						{
-							"Names"_o= {"--sensor-host-id"}
+							"Names"_o= _o["--sensor-host-id"]
 							, "Type"_o= ""
 							, "Description"_o= "The host ID of the sensor to snooze."
 						}
 						, "SensorApplication?"_o=
 						{
-							"Names"_o= {"--sensor-application"}
+							"Names"_o= _o["--sensor-application"]
 							, "Type"_o= ""
 							, "Description"_o= "The application of the sensor to snooze. Supports wildcards."
 						}
 						, "SensorIdentifier?"_o=
 						{
-							"Names"_o= {"--sensor-identifier"}
+							"Names"_o= _o["--sensor-identifier"]
 							, "Type"_o= ""
 							, "Description"_o= "The identifier of the sensor to snooze. Supports wildcards."
 						}
 						, "SensorIdentifierScope?"_o=
 						{
-							"Names"_o= {"--sensor-identifier-scope"}
+							"Names"_o= _o["--sensor-identifier-scope"]
 							, "Type"_o= ""
 							, "Description"_o= "The identifier scope of the sensor to snooze. Supports wildcards."
 						}
 						, "Force?"_o=
 						{
-							"Names"_o= {"--force"}
+							"Names"_o= _o["--force"]
 							, "Default"_o= false
 							, "Description"_o= "Force snoozing of all sensors when no filtering options are specified."
 						}
 						, "Duration?"_o=
 						{
-							"Names"_o= {"--duration"}
+							"Names"_o= _o["--duration"]
 							, "Default"_o= 7.0
 							, "Description"_o= "Number of days to snooze sensor."
 						}
 						, "UnSnooze?"_o=
 						{
-							"Names"_o= {"--un-snooze", "-u"}
+							"Names"_o= _o["--un-snooze", "-u"]
 							, "Default"_o= false
 							, "Description"_o= "Remove snoozing instead of adding it."
 						}
@@ -351,7 +351,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--cloud-manager-expected-os-version-list"}
+					"Names"_o= _o["--cloud-manager-expected-os-version-list"]
 					, "Description"_o= "List expected os version settings."
 					, "Options"_o=
 					{
@@ -370,43 +370,43 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--cloud-manager-expected-os-version-set"}
+					"Names"_o= _o["--cloud-manager-expected-os-version-set"]
 					, "Description"_o= "List expected os version settings."
 					, "Options"_o=
 					{
 						"OsName"_o=
 						{
-							"Names"_o= {"--os-name"}
+							"Names"_o= _o["--os-name"]
 							, "Type"_o= ""
 							, "Description"_o= "The name of the OS to set for."
 						}
 						, "CurrentVersionMajor?"_o=
 						{
-							"Names"_o= {"--apply-to-version-major"}
+							"Names"_o= _o["--apply-to-version-major"]
 							, "Type"_o= 0
 							, "Description"_o= "The major version of the OS that this should apply for."
 						}
 						, "CurrentVersionMinor?"_o=
 						{
-							"Names"_o= {"--apply-to-version-minor"}
+							"Names"_o= _o["--apply-to-version-minor"]
 							, "Type"_o= 0
 							, "Description"_o= "The minor version of the OS that this should apply for."
 						}
 						, "MinVersion?"_o=
 						{
-							"Names"_o= {"--min-version"}
+							"Names"_o= _o["--min-version"]
 							, "Type"_o= ""
 							, "Description"_o= "The minimum version required."
 						}
 						, "MaxVersion?"_o=
 						{
-							"Names"_o= {"--max-version"}
+							"Names"_o= _o["--max-version"]
 							, "Type"_o= ""
 							, "Description"_o= "The maximum version required."
 						}
 						, "Deprecated?"_o=
 						{
-							"Names"_o= {"--deprecated"}
+							"Names"_o= _o["--deprecated"]
 							, "Default"_o= false
 							, "Description"_o= "Deprecated the OS version, or whole OS."
 						}

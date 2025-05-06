@@ -84,8 +84,9 @@ public:
 
 			auto TestAppDirectory = AppManagerInfo.m_RootDirectory / "App/TestApp";
 
-			CEJSONSorted ExpectedSensors = CEJSONSorted
-				{
+			CEJSONSorted ExpectedSensors = _
+				[
+					_=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -95,16 +96,16 @@ public:
 						, "Name"_= "Test Sensor (version)"
 						, "Type"_= 5
 						, "ExpectedReportInterval"_= fp64::fs_Inf()
-						, "Flags"_= _[_]
+						, "Flags"_= _[]
 						, "PauseReportingFor"_= fp64::fs_QNan()
-						, "UnitDivisors"_= _[_]
+						, "UnitDivisors"_= _[]
 						, "WarnValue"_= nullptr
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
 						, "SnoozeUntil"_= NTime::CTime()
 						, "SensorMetaData"_= EJSONType_Object
 					}
-					,
+					, _=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -114,47 +115,52 @@ public:
 						, "Name"_= "Test Sensor"
 						, "Type"_= 2
 						, "ExpectedReportInterval"_= fp64::fs_Inf()
-						, "Flags"_= _[_]
+						, "Flags"_= _[]
 						, "PauseReportingFor"_= fp64::fs_QNan()
-						, "UnitDivisors"_= CEJSONSorted
-						{
+						, "UnitDivisors"_= _
+						[
+							_=
 							{
 								"Divisor"_= 0.0
 								, "nDecimals"_= 1
 								, "UnitFormatter"_= "{fn0} B"
 							}
 							,
+							_=
 							{
 								"Divisor"_= 1024.0
 								, "nDecimals"_= 1
 								, "UnitFormatter"_= "{fn1} KiB"
 							}
 							,
+							_=
 							{
 								"Divisor"_= 1048576.0
 								, "nDecimals"_= 1
 								, "UnitFormatter"_= "{fn1} MiB"
 							}
 							,
+							_=
 							{
 								"Divisor"_= 1073741824.0
 								, "nDecimals"_= 1
 								, "UnitFormatter"_= "{fn1} GiB"
 							}
 							,
+							_=
 							{
 								"Divisor"_= 1099511627776.0
 								, "nDecimals"_= 1
 								, "UnitFormatter"_= "{fn1} TiB"
 							}
-						}
+						]
 						, "WarnValue"_= nullptr
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
 						, "SnoozeUntil"_= NTime::CTime()
 						, "SensorMetaData"_= EJSONType_Object
 					}
-				}
+				]
 			;
 
 			CEJSONSorted ExpectedSensorReadings;
@@ -162,58 +168,57 @@ public:
 			{
 				ExpectedSensorReadings.f_Array().f_Insert
 					(
+						_=
 						{
-							{
-								"HostID"_= ""
-								, "HostName"_= ""
-								, "Application"_= ""
-								, "Identifier"_= "org.malterlib.testapp.test"
-								, "IdentifierScope"_= ""
-								, "Name"_= "Test Sensor"
-								, "UniqueSequence"_= i + 1
-								, "Value"_= fp64(i)
-								, "OutdatedStatus"_= "Ok"
-								, "OutdatedSeconds"_= fp64::fs_Inf()
-								, "SnoozeUntil"_= NTime::CTime()
-								, "SensorMetaData"_= EJSONType_Object
-							}
+							"HostID"_= ""
+							, "HostName"_= ""
+							, "Application"_= ""
+							, "Identifier"_= "org.malterlib.testapp.test"
+							, "IdentifierScope"_= ""
+							, "Name"_= "Test Sensor"
+							, "UniqueSequence"_= i + 1
+							, "Value"_= fp64(i)
+							, "OutdatedStatus"_= "Ok"
+							, "OutdatedSeconds"_= fp64::fs_Inf()
+							, "SnoozeUntil"_= NTime::CTime()
+							, "SensorMetaData"_= EJSONType_Object
 						}
 					)
 				;
 				ExpectedSensorReadings.f_Array().f_Insert
 					(
+						_=
 						{
+							"HostID"_= ""
+							, "HostName"_= ""
+							, "Application"_= ""
+							, "Identifier"_= "org.malterlib.testapp.test.version"
+							, "IdentifierScope"_= ""
+							, "Name"_= "Test Sensor (version)"
+							, "UniqueSequence"_= i + 1
+							, "Value"_= CEJSONUserTypeSorted
 							{
-								"HostID"_= ""
-								, "HostName"_= ""
-								, "Application"_= ""
-								, "Identifier"_= "org.malterlib.testapp.test.version"
-								, "IdentifierScope"_= ""
-								, "Name"_= "Test Sensor (version)"
-								, "UniqueSequence"_= i + 1
-								, "Value"_= CEJSONUserTypeSorted
+								"Version"
+								,
 								{
-									"Version"
-									,
-									{
-										"Identifier"_j= "Ident",
-										"Major"_j= 13,
-										"Minor"_j= 3,
-										"Revision"_j= i
-									}
+									"Identifier"_j= "Ident",
+									"Major"_j= 13,
+									"Minor"_j= 3,
+									"Revision"_j= i
 								}
-								, "OutdatedStatus"_= "Ok"
-								, "OutdatedSeconds"_= fp64::fs_Inf()
-								, "SnoozeUntil"_= NTime::CTime()
-								, "SensorMetaData"_= EJSONType_Object
 							}
+							, "OutdatedStatus"_= "Ok"
+							, "OutdatedSeconds"_= fp64::fs_Inf()
+							, "SnoozeUntil"_= NTime::CTime()
+							, "SensorMetaData"_= EJSONType_Object
 						}
 					)
 				;
 			}
 
-			CEJSONSorted ExpectedSensorStatus = CEJSONSorted
-				{
+			CEJSONSorted ExpectedSensorStatus = _
+				[
+					_=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -229,6 +234,7 @@ public:
 						, "SensorMetaData"_= EJSONType_Object
 					}
 					,
+					_=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -252,8 +258,8 @@ public:
 						, "OutdatedSeconds"_= fp64::fs_Inf()
 						, "SnoozeUntil"_= NTime::CTime()
 						, "SensorMetaData"_= EJSONType_Object
-					},
-				}
+					}
+				]
 			;
 
 			auto fSortSensors = [&](CEJSONSorted const &_Sensors)

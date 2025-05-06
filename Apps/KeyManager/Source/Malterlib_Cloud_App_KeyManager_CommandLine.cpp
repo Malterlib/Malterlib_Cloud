@@ -40,7 +40,7 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--provide-password"}
+					"Names"_o= _o["--provide-password"]
 					, "Description"_o= "Provide a password for the key database to be able to start the key manager."
 				}
 				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
@@ -52,7 +52,7 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--change-password"}
+					"Names"_o= _o["--change-password"]
 					, "Description"_o= "Change the password that is used to unencrypt the key manager database."
 				}
 				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
@@ -64,19 +64,19 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--precreate-keys"}
+					"Names"_o= _o["--precreate-keys"]
 					, "Description"_o= "Pre-create keys of a certain size. Useful to allow backup of future keys not yet sent to a client."
 					, "Options"_o=
 					{
 						"KeySize?"_o=
 						{
-							"Names"_o= {"--key-size"}
+							"Names"_o= _o["--key-size"]
 							, "Description"_o= "Set size in number of bits for the created keys."
 							, "Default"_o= 512
 						}
 						, "NumberOfKeys?"_o=
 						{
-							"Names"_o= {"--number-of-keys"}
+							"Names"_o= _o["--number-of-keys"]
 							, "Description"_o= "Pre-create this number of keys."
 							, "Default"_o= 128
 						}
@@ -91,7 +91,7 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--precreated-keys-list"}
+					"Names"_o= _o["--precreated-keys-list"]
 					, "Description"_o= "List precreated keys."
 					, "Options"_o=
 					{
@@ -107,13 +107,13 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--precreated-keys-remove"}
+					"Names"_o= _o["--precreated-keys-remove"]
 					, "Description"_o= "Remove pre-created keys."
 					, "Options"_o=
 					{
 						"KeySize?"_o=
 						{
-							"Names"_o= {"--key-size"}
+							"Names"_o= _o["--key-size"]
 							, "Description"_o= "The key size to remove. If not specified all key sizes will be removed."
 							, "Type"_o= 1
 						}
@@ -130,13 +130,13 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--verified-host-remove"}
+					"Names"_o= _o["--verified-host-remove"]
 					, "Description"_o= "Remove hosts that should no longer be part of the server cluster."
 					, "Parameters"_o=
 					{
 						"HostIDs"_o=
 						{
-							"Type"_o= CEJSONOrdered({""})
+							"Type"_o= _o[""]
 							, "Description"_o= "The host IDs that should be removed."
 						}
 					}
@@ -150,7 +150,7 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--verified-host-list"}
+					"Names"_o= _o["--verified-host-list"]
 					, "Description"_o= "Display all verified hosts in database."
 					, "Options"_o=
 					{
@@ -166,7 +166,7 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--key-list"}
+					"Names"_o= _o["--key-list"]
 					, "Description"_o= "List all keys."
 					, "Options"_o=
 					{
@@ -182,31 +182,31 @@ namespace NMib::NCloud::NKeyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--key-copy"}
+					"Names"_o= _o["--key-copy"]
 					, "Description"_o= "Copy key from one ID to another ID."
 					, "Options"_o=
 					{
 						"FromHostID"_o=
 						{
-							"Names"_o= {"--from-host-id"}
+							"Names"_o= _o["--from-host-id"]
 							, "Type"_o= ""
 							, "Description"_o= "The host ID to copy from."
 						}
 						, "FromKeyID"_o=
 						{
-							"Names"_o= {"--from-key-id"}
+							"Names"_o= _o["--from-key-id"]
 							, "Type"_o= ""
 							, "Description"_o= "The key ID to copy from."
 						}
 						, "ToHostID"_o=
 						{
-							"Names"_o= {"--to-host-id"}
+							"Names"_o= _o["--to-host-id"]
 							, "Type"_o= ""
 							, "Description"_o= "The host ID to copy to."
 						}
 						, "ToKeyID"_o=
 						{
-							"Names"_o= {"--to-key-id"}
+							"Names"_o= _o["--to-key-id"]
 							, "Type"_o= ""
 							, "Description"_o= "The key ID to copy to."
 						}

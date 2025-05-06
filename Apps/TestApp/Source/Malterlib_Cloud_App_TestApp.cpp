@@ -29,7 +29,7 @@ namespace NMib::NCloud::NTest
 				{
 					"UpdateType?"_o=
 					{
-						"Names"_o= {"--update-type"}
+						"Names"_o= _o["--update-type"]
 						,"Type"_o= COneOf{"Independent", "OneAtATime", "AllAtOnce"}
 						, "Description"_o= "Override the update type for the application."
 					}
@@ -40,20 +40,20 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--generate-sensor-readings"}
+					"Names"_o= _o["--generate-sensor-readings"]
 					, "Description"_o= "Generates a sensor reading."
 					, "Options"_o=
 					{
 						"ReadingType?"_o=
 						{
-							"Names"_o= {"--reading-type"}
+							"Names"_o= _o["--reading-type"]
 							, "Type"_o= COneOf{"Float", "Version"}
 							, "Default"_o= "Float"
 							, "Description"_o= "Do error audit logs."
 						}
 						, "RandomValues?"_o=
 						{
-							"Names"_o= {"--random-values"}
+							"Names"_o= _o["--random-values"]
 							, "Default"_o= true
 							, "Description"_o= "Do error audit logs."
 						}
@@ -136,7 +136,7 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--set-sensor-status"}
+					"Names"_o= _o["--set-sensor-status"]
 					, "Description"_o= "Set sensor status."
 					, "Parameters"_o=
 					{
@@ -192,7 +192,7 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--generate-log-entries"}
+					"Names"_o= _o["--generate-log-entries"]
 					, "Description"_o= "Generates log entries."
 					, "Parameters"_o=
 					{
@@ -235,7 +235,7 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--generate-audit-log-entries"}
+					"Names"_o= _o["--generate-audit-log-entries"]
 					, "Description"_o= "Generates audit log entries."
 					, "Parameters"_o=
 					{
@@ -249,7 +249,7 @@ namespace NMib::NCloud::NTest
 					{
 						"Error?"_o=
 						{
-							"Names"_o= {"--error"}
+							"Names"_o= _o["--error"]
 							, "Default"_o= false
 							, "Description"_o= "Do error audit logs."
 						}
@@ -277,7 +277,7 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--get-log-report-depth"}
+					"Names"_o= _o["--get-log-report-depth"]
 					, "Description"_o= "Gets the depth of the log reporting chain."
 				}
 				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
@@ -305,25 +305,25 @@ namespace NMib::NCloud::NTest
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--generate-huge-log-entries"}
+					"Names"_o= _o["--generate-huge-log-entries"]
 					, "Description"_o= "Generates a log entries."
 					, "Options"_o=
 					{
 						"NumEntries?"_o=
 						{
-							"Names"_o= {"--num-entries"}
+							"Names"_o= _o["--num-entries"]
 							, "Default"_o= 1
 							, "Description"_o= "The number of entries to report."
 						}
 						, "EntrySize?"_o=
 						{
-							"Names"_o= {"--entry-size"}
+							"Names"_o= _o["--entry-size"]
 							, "Default"_o= 1024
 							, "Description"_o= "The size of the entry in bytes."
 						}
 						, "LineSize?"_o=
 						{
-							"Names"_o= {"--line-size"}
+							"Names"_o= _o["--line-size"]
 							, "Default"_o= 128
 							, "Description"_o= "The size of the lines in bytes."
 						}

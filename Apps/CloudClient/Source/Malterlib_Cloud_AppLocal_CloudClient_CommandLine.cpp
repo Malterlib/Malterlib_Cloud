@@ -19,7 +19,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					"SelfUpdateCheck?"_o=
 					{
-						"Names"_o= {"--self-update-check"}
+						"Names"_o= _o["--self-update-check"]
 						, "Default"_o= true
 						, "ValidForDirectCommand"_o= false
 						, "Description"_o= "Check if a new version of the cloud client is available when running other commands."
@@ -34,13 +34,13 @@ namespace NMib::NCloud::NCloudClient
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--self-update"}
+					"Names"_o= _o["--self-update"]
 					, "Description"_o= "Update cloud client from from connected version managers."
 					, "Options"_o=
 					{
 						"VersionManagerHost?"_o=
 						{
-							"Names"_o= {"--host"}
+							"Names"_o= _o["--host"]
 							, "Default"_o= ""
 							, "Description"_o= "Only look for a new version on this version manager."
 						}

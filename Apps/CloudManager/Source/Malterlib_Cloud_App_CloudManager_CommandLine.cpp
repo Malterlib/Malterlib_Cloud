@@ -27,13 +27,13 @@ namespace NMib::NCloud::NCloudManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--dump-database"}
+					"Names"_o= _o["--dump-database"]
 					, "Description"_o= "Dump Cloud Manager specific database entries."
 					, "Options"_o=
 					{
 						"Prefix?"_o=
 						{
-							"Names"_o= {"--prefix", "-p"}
+							"Names"_o= _o["--prefix", "-p"]
 							, "Default"_o= ""
 							, "Description"_o= "Limit output to tabels with prefix."
 						}

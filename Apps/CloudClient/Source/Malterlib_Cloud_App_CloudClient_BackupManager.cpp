@@ -18,14 +18,14 @@ namespace NMib::NCloud::NCloudClient
 	{
 		auto OptionalBackupHost = "BackupHost?"_o=
 			{
-				"Names"_o= {"--host"}
+				"Names"_o= _o["--host"]
 				, "Default"_o= ""
 				, "Description"_o= "Limit backup query to only specified host ID."
 			}
 		;
 		auto IncludeHost = "IncludeHost?"_o=
 			{
-				"Names"_o= {"--include-host"}
+				"Names"_o= _o["--include-host"]
 				, "Default"_o= false
 				, "Description"_o= "Include version manager host in output.\n"
 			}
@@ -33,7 +33,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--backup-manager-list-sources"}
+					"Names"_o= _o["--backup-manager-list-sources"]
 					, "Description"_o= "List backup sources available on remote backup managers."
 					, "Options"_o=
 					{
@@ -52,7 +52,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--backup-manager-list-backups"}
+					"Names"_o= _o["--backup-manager-list-backups"]
 					, "Description"_o= "List backups available on remote backup managers."
 					, "Options"_o=
 					{
@@ -80,51 +80,51 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--backup-manager-download-backup"}
+					"Names"_o= _o["--backup-manager-download-backup"]
 					, "Description"_o= "Download a backup from remote backup manager.\n"
 						"If a backup already exists the download will be resumed or ammended with the latest changes. Only appended files such as oplogs are supported.\n"
 					, "Options"_o=
 					{
 						"BackupHost?"_o=
 						{
-							"Names"_o= {"--host"}
+							"Names"_o= _o["--host"]
 							, "Default"_o= ""
 							, "Description"_o= "The host ID of the host to download the backup from."
 						}
 						, "BackupSource"_o=
 						{
-							"Names"_o= {"--source"}
+							"Names"_o= _o["--source"]
 							, "Type"_o= ""
 							, "Description"_o= "The backup source to download from."
 						}
 						, "BackupQueueSize?"_o=
 						{
-							"Names"_o= {"--queue-size"}
+							"Names"_o= _o["--queue-size"]
 							, "Default"_o= int64(NFile::gc_IdealNetworkQueueSize)
 							, "Description"_o= "The amount of data to keep in flight while downloading."
 						}
 						, "Destination?"_o=
 						{
-							"Names"_o= {"--destination"}
+							"Names"_o= _o["--destination"]
 							, "Type"_o= ""
 							, "Description"_o= "The directory to download to.\n"
 							"By default this directory will be the 'name of the source'/'backup time'."
 						}
 						, "SetOwner?"_o=
 						{
-							"Names"_o= {"--set-owner"}
+							"Names"_o= _o["--set-owner"]
 							, "Default"_o= false
 							, "Description"_o= "Set owner and group on the files downloaded.\n"
 						}
 						, "FindClosestSnapshot?"_o=
 						{
-							"Names"_o= {"--find-closest-snapshot"}
+							"Names"_o= _o["--find-closest-snapshot"]
 							, "Default"_o= false
 							, "Description"_o= "Find the closest snapshot before the specified backup time.\n"
 						}
 						, "CurrentDirectory?"_o=
 						{
-							"Names"_o= _[_]
+							"Names"_o= _o[]
 							, "Default"_o= CFile::fs_GetCurrentDirectory()
 							, "Hidden"_o= true
 							, "Description"_o= "Internal hidden option to forward current directory."

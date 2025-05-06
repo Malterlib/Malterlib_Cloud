@@ -26,7 +26,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 		DefaultSection.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--reload-config"}
+					"Names"_o= _o["--reload-config"]
 					, "Description"_o= "Reload config."
 				}
 				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>

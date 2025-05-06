@@ -19,37 +19,37 @@ namespace NMib::NCloud::NCloudClient
 	{
 		auto SecretsManagerHost = "SecretsManagerHost?"_o=
 			{
-				"Names"_o= {"--host"}
+				"Names"_o= _o["--host"]
 				, "Default"_o= ""
 				, "Description"_o= "Limit query to only specified host ID."
 			}
 		;
 		auto BinaryAsBase64 = "BinaryAsBase64"_o=
 			{
-				"Names"_o= {"--binary-as-base64"}
+				"Names"_o= _o["--binary-as-base64"]
 				, "Default"_o= true
 				, "Description"_o= "Binary secrets will be read and written as base64 encoded strings."
 			}
 		;
 		auto Name = "Name?"_o=
 			{
-				"Names"_o= {"--name"}
+				"Names"_o= _o["--name"]
 				, "Type"_o= ""
 				, "Description"_o= "Limit query to secrets having the specified name. Wildcard search.\n"
 			}
 		;
 		auto Tags = "Tags?"_o=
 			{
-				"Names"_o= {"--tags"}
-				, "Default"_o= _[_]
-				, "Type"_o= {""}
+				"Names"_o= _o["--tags"]
+				, "Default"_o= _o[]
+				, "Type"_o= _o[""]
 				, "Description"_o= "Limit query to secrets having the specified tags.\n"
 				"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)."
 			}
 		;
 		auto Expect = "Expect?"_o=
 			{
-				"Names"_o= {"--expect"}
+				"Names"_o= _o["--expect"]
 				, "Type"_o= COneOf{"string", "binary", "file", "string_map"}
 				, "Default"_o= "string"
 				, "Description"_o= "Unless the secret is of the expected variant report an error.\n"
@@ -57,7 +57,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 		auto MapKey = "MapKey?"_o=
 			{
-				"Names"_o= {"--map-key"}
+				"Names"_o= _o["--map-key"]
 				, "Type"_o= ""
 				, "Description"_o= "For map secrets, index with specified key and return the value for this key."
 			}
@@ -74,7 +74,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 		auto CurrentDirectory = "CurrentDirectory?"_o=
 			{
-				"Names"_o= _[_]
+				"Names"_o= _o[]
 				, "Default"_o= CFile::fs_GetCurrentDirectory()
 				, "Hidden"_o= true
 				, "Description"_o= "Internal hidden option to forward current directory."
@@ -82,7 +82,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 		auto Quiet = "Quiet?"_o=
 			{
-				"Names"_o= {"--quiet"}
+				"Names"_o= _o["--quiet"]
 				, "Default"_o= false
 				, "Description"_o= "Suppress non-error output."
 			}
@@ -91,14 +91,14 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-enumerate-secrets"}
+					"Names"_o= _o["--secrets-manager-enumerate-secrets"]
 					, "Description"_o= "List the IDs of all secrets in the database."
 					, "Options"_o=
 					{
 						SecretsManagerHost
 						, "SemanticID?"_o=
 						{
-							"Names"_o= {"--semantic-id"}
+							"Names"_o= _o["--semantic-id"]
 							, "Default"_o= ""
 							, "Description"_o= "Limit query to secrets having the specified semantic ID wildcard.\n"
 							"The semantic ID must adhere to RFC 1123 (hostname) and additionally # is allowed as well as * and ? for wildcard."
@@ -118,7 +118,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-get-secret-by-semantic-id"}
+					"Names"_o= _o["--secrets-manager-get-secret-by-semantic-id"]
 					, "Description"_o= "Get secret matching the semantic id and tags."
 					, "Options"_o=
 					{
@@ -149,7 +149,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-get-secret-properties"}
+					"Names"_o= _o["--secrets-manager-get-secret-properties"]
 					, "Description"_o= "List all properties for the secret."
 					, "Options"_o=
 					{
@@ -169,7 +169,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-get-secret"}
+					"Names"_o= _o["--secrets-manager-get-secret"]
 					, "Description"_o= "Get secret."
 					, "Output"_o= "The secret formatted acconding to --expect."
 					, "Options"_o=
@@ -192,7 +192,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-set-secret-properties"}
+					"Names"_o= _o["--secrets-manager-set-secret-properties"]
 					, "Description"_o= "Set properties for a secret.\n"
 					"Add a new secret or change the properties of an existing secret.\n"
 					"When creating a new secret, properties that are not set on the command line will be assigned default values. "
@@ -203,7 +203,7 @@ namespace NMib::NCloud::NCloudClient
 						SecretsManagerHost
 						, "Secret?"_o=
 						{
-							"Names"_o= {"--secret"}
+							"Names"_o= _o["--secret"]
 							, "Type"_o= COneOf{"string", "binary", "string_map", "binary_map"}
 							, "Description"_o= "Set the secret.\n"
 							"The secret can be a string secret or a binary secret.\n"
@@ -216,57 +216,57 @@ namespace NMib::NCloud::NCloudClient
 						}
 						, "Username?"_o=
 						{
-							"Names"_o= {"--username"}
+							"Names"_o= _o["--username"]
 							, "Type"_o= ""
 							, "Description"_o= "The username to set.\n"
 						}
 						, "URL?"_o=
 						{
-							"Names"_o= {"--URL"}
+							"Names"_o= _o["--URL"]
 							, "Type"_o= ""
 							, "Description"_o= "The URL to set.\n"
 						}
 						, "Expires?"_o=
 						{
-							"Names"_o= {"--expires"}
+							"Names"_o= _o["--expires"]
 							, "Type"_o= CTime()
 							, "Description"_o= "The time when the secret expires.\n"
 						}
 						, "Notes?"_o=
 						{
-							"Names"_o= {"--notes"}
+							"Names"_o= _o["--notes"]
 							, "Type"_o= ""
 							, "Description"_o= "The notes to set.\n"
 						}
 						, "Metadata?"_o=
 						{
-							"Names"_o= {"--metadata"}
+							"Names"_o= _o["--metadata"]
 							, "Type"_o= EJSONType_Object
 							, "Description"_o= "The metadata to set.\n"
 							"The metadata is specified as a JSON object '{\"Key\" : \"Value\" ...}'."
 						}
 						, "Created?"_o=
 						{
-							"Names"_o= {"--created"}
+							"Names"_o= _o["--created"]
 							, "Type"_o= CTime()
 							, "Description"_o= "The time when the secret was created. Set automatically if not specified.\n"
 						}
 						, "Modified?"_o=
 						{
-							"Names"_o= {"--modified"}
+							"Names"_o= _o["--modified"]
 							, "Type"_o= CTime()
 							, "Description"_o= "The time when the secret was modified. Set automatically if not specified.\n"
 						}
 						, "Tags?"_o=
 						{
-							"Names"_o= {"--tags"}
-							, "Type"_o= {""}
+							"Names"_o= _o["--tags"]
+							, "Type"_o= _o[""]
 							, "Description"_o= "The tags to set.\n"
 							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)."
 						}
 						, "SemanticID?"_o=
 						{
-							"Names"_o= {"--semantic-id"}
+							"Names"_o= _o["--semantic-id"]
 							, "Type"_o= ""
 							, "Description"_o= "The semantic ID to set.\n"
 							"The semantic ID must adhere to RFC 1123 (hostname) and additionally # is allowed."
@@ -285,24 +285,24 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-change-tags"}
+					"Names"_o= _o["--secrets-manager-change-tags"]
 					, "Description"_o= "Remove or add tags from/to a secret."
 					, "Options"_o=
 					{
 						SecretsManagerHost
 						, "RemoveTags?"_o=
 						{
-							"Names"_o= {"--remove"}
-							, "Default"_o= _[_]
-							, "Type"_o= {""}
+							"Names"_o= _o["--remove"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
 							, "Description"_o= "Remove these tags.\n"
 							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)."
 						}
 						, "AddTags?"_o=
 						{
-							"Names"_o= {"--add"}
-							, "Default"_o= _[_]
-							, "Type"_o= {""}
+							"Names"_o= _o["--add"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
 							, "Description"_o= "Add these tags.\n"
 							"The tags are specified in a JSON array '[\"Tag1\", \"Tag2\" ...]' and the tags must adhere to RFC 1123 (hostname)."
 						}
@@ -319,7 +319,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-set-metadata"}
+					"Names"_o= _o["--secrets-manager-set-metadata"]
 					, "Description"_o= "Set or add metadata to a secret.\n"
 					"Add a new key, value pair to the secrets metadata or replace the value if the key already exists."
 					, "Options"_o=
@@ -327,19 +327,19 @@ namespace NMib::NCloud::NCloudClient
 						SecretsManagerHost
 						, "Key"_o=
 						{
-							"Names"_o= {"--key"}
+							"Names"_o= _o["--key"]
 							, "Type"_o= ""
 							, "Description"_o= "The key to set metadata for.\n"
 						}
 						, "Value"_o=
 						{
-							"Names"_o= {"--value"}
+							"Names"_o= _o["--value"]
 							, "Type"_o= fg_AnyType()
 							, "Description"_o= "The value to for the metadata.\n"
 						}
 						, "ExpectedValue?"_o=
 						{
-							"Names"_o= {"--expected-value"}
+							"Names"_o= _o["--expected-value"]
 							, "Type"_o= fg_AnyType()
 							, "Description"_o= "The expected value to replace.\nIf the value is different the operation will fail.\n"
 						}
@@ -356,14 +356,14 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-remove-metadata"}
+					"Names"_o= _o["--secrets-manager-remove-metadata"]
 					, "Description"_o= "Remove the metadata matching key from the secret."
 					, "Options"_o=
 					{
 						SecretsManagerHost
 						, "Key"_o=
 						{
-							"Names"_o= {"--key"}
+							"Names"_o= _o["--key"]
 							, "Type"_o= ""
 							, "Description"_o= "Key of the metadata to remove.\n"
 						}
@@ -380,7 +380,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-remove-secret"}
+					"Names"_o= _o["--secrets-manager-remove-secret"]
 					, "Description"_o= "Remove the secret."
 					, "Options"_o=
 					{
@@ -398,14 +398,14 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-upload-file"}
+					"Names"_o= _o["--secrets-manager-upload-file"]
 					, "Description"_o= "Upload a file."
 					, "Options"_o=
 					{
 						SecretsManagerHost
 						, "SecretFile"_o=
 						{
-							"Names"_o= {"--secret-file"}
+							"Names"_o= _o["--secret-file"]
 							, "Type"_o= ""
 							, "Description"_o= "The secret file to set.\n"
 						}
@@ -424,20 +424,20 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--secrets-manager-download-file"}
+					"Names"_o= _o["--secrets-manager-download-file"]
 					, "Description"_o= "Download a file."
 					, "Options"_o=
 					{
 						SecretsManagerHost
 						, "OutputFile?"_o=
 						{
-							"Names"_o= {"--output-file"}
+							"Names"_o= _o["--output-file"]
 							, "Type"_o= ""
 							, "Description"_o= "Filename for the downloaded file.\n"
 						}
 						, "AllowOverwrite?"_o=
 						{
-							"Names"_o= {"--allow-overwrite"}
+							"Names"_o= _o["--allow-overwrite"]
 							, "Default"_o= false
 							, "Description"_o= "Allow overwirte of destination file.\n"
 							"Only valid when output file is specified, otherwise file overwrite is never allowed.\n"

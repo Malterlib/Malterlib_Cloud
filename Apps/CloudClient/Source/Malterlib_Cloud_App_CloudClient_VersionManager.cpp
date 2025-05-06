@@ -21,14 +21,14 @@ namespace NMib::NCloud::NCloudClient
 	{
 		auto VersionManagerHost = "VersionManagerHost?"_o=
 			{
-				"Names"_o= {"--host"}
+				"Names"_o= _o["--host"]
 				, "Default"_o= ""
 				, "Description"_o= "Limit query to only specified host ID."
 			}
 		;
 		auto IncludeHost = "IncludeHost?"_o=
 			{
-				"Names"_o= {"--include-host"}
+				"Names"_o= _o["--include-host"]
 				, "Default"_o= false
 				, "Description"_o= "Include version manager host in output.\n"
 			}
@@ -37,7 +37,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--version-manager-list-applications"}
+					"Names"_o= _o["--version-manager-list-applications"]
 					, "Description"_o= "List applications available on remote version managers."
 					, "Options"_o=
 					{
@@ -56,7 +56,7 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--version-manager-list-versions"}
+					"Names"_o= _o["--version-manager-list-versions"]
 					, "Description"_o= "List application versions available on remote version managers."
 					, "Options"_o=
 					{
@@ -64,7 +64,7 @@ namespace NMib::NCloud::NCloudClient
 						, IncludeHost
 						, "Verbose?"_o=
 						{
-							"Names"_o= {"--verbose", "-v"}
+							"Names"_o= _o["--verbose", "-v"]
 							, "Default"_o= false
 							, "Description"_o= "Verbose output. Include custom JSON information.\n"
 						}
@@ -90,19 +90,19 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--version-manager-upload-version"}
+					"Names"_o= _o["--version-manager-upload-version"]
 					, "Description"_o= "Upload a version to remote version manager.\n"
 					, "Options"_o=
 					{
 						"VersionManagerHost?"_o=
 						{
-							"Names"_o= {"--host"}
+							"Names"_o= _o["--host"]
 							, "Default"_o= ""
 							, "Description"_o= "The host ID of the host to upload the version to."
 						}
 						, "SettingsFileFromPackage?"_o=
 						{
-							"Names"_o= {"--settings-file-from-package"}
+							"Names"_o= _o["--settings-file-from-package"]
 							, "Default"_o= true
 							, "Description"_o= "If the uploaded file is a tar.gz file, look inside it for VersionInfo.json and use as settings file.\n"
 							"If --settings-file is specified that will override the settings file inside the uploaded package.\n"
@@ -110,91 +110,89 @@ namespace NMib::NCloud::NCloudClient
 						}
 						, "SettingsFile?"_o=
 						{
-							"Names"_o= {"--settings-file"}
+							"Names"_o= _o["--settings-file"]
 							, "Default"_o= ""
 							, "Description"_o= "The JSON file to read settings from.\n"
 							"Settings in the settings file is overridden by settings specified on the command line.\n"
 							"The format template for the settings file is:\n" +
 							CEJSONOrdered
-							(
+							{
+								"Application"_o= "AppName"
+								, "Version"_o= "Branch/1.0.1"
+								, "Platform"_o= DMalterlibCloudPlatform
+								, "Configuration"_o= DMibStringize(DConfig)
+								, "ExtraInfo"_o=
 								{
-									"Application"_o= "AppName"
-									, "Version"_o= "Branch/1.0.1"
-									, "Platform"_o= DMalterlibCloudPlatform
-									, "Configuration"_o= DMibStringize(DConfig)
-									, "ExtraInfo"_o=
-									{
-										"Executable"_o= "ExecutableName"
-										, "ExecutableParams"_o= {"--daemon-run-standalone", "--debug"}
-										, "RunAsUser"_o= "ApplicationSpecificUser"
-										, "RunAsGroup"_o= "ApplicationSpecificGroup"
-										, "RunAsUserHasShell"_o= false
-										, "DistributedApp"_o= true
-									}
+									"Executable"_o= "ExecutableName"
+									, "ExecutableParams"_o= _o["--daemon-run-standalone", "--debug"]
+									, "RunAsUser"_o= "ApplicationSpecificUser"
+									, "RunAsGroup"_o= "ApplicationSpecificGroup"
+									, "RunAsUserHasShell"_o= false
+									, "DistributedApp"_o= true
 								}
-							)
+							}
 							.f_ToStringColored(CCommandLineDefaults::fs_ColorAnsiFlagsDefault(), "    ").f_Replace("\r\n", "\r").f_Replace("\n", "\r")
 						}
 						, "Application?"_o=
 						{
-							"Names"_o= {"--application"}
+							"Names"_o= _o["--application"]
 							, "Type"_o= ""
 							, "Description"_o= "The application to upload a version to."
 						}
 						, "Version?"_o=
 						{
-							"Names"_o= {"--version"}
+							"Names"_o= _o["--version"]
 							, "Type"_o= ""
 							, "Description"_o= "The version to upload.\n"
 								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
 						}
 						, "Platform?"_o=
 						{
-							"Names"_o= {"--platform"}
+							"Names"_o= _o["--platform"]
 							, "Type"_o= ""
 							, "Description"_o= "The platform of the version to upload.\n"
 						}
 						, "Configuration?"_o=
 						{
-							"Names"_o= {"--configuration"}
+							"Names"_o= _o["--configuration"]
 							, "Type"_o= ""
 							, "Description"_o= "The configuration for this build. Could be for example Debug or Release.\n"
 						}
 						, "ExtraInfo?"_o=
 						{
-							"Names"_o= {"--info"}
+							"Names"_o= _o["--info"]
 							, "Type"_o= EJSONType_Object
 							, "Description"_o= "EJSON formatted extra information.\n"
 						}
 						, "Tags?"_o=
 						{
-							"Names"_o= {"--tags"}
-							, "Default"_o= _[_]
-							, "Type"_o= {""}
+							"Names"_o= _o["--tags"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
 							, "Description"_o= "The tags to apply to the version.\n"
 						}
 						, "Time?"_o=
 						{
-							"Names"_o= {"--time"}
+							"Names"_o= _o["--time"]
 							, "Default"_o= CTime()
 							, "Description"_o= "The time for this version.\n"
 								"By default the time will be deduced from the modification time of the directory or file uploaded.\n"
 						}
 						, "Force?"_o=
 						{
-							"Names"_o= {"--force"}
+							"Names"_o= _o["--force"]
 							, "Default"_o= false
 							, "Description"_o= "Force upload even if version already exists.\n"
 						}
 						, "TransferQueueSize?"_o=
 						{
-							"Names"_o= {"--queue-size"}
+							"Names"_o= _o["--queue-size"]
 							, "Default"_o= int64(NFile::gc_IdealNetworkQueueSize)
 							, "Description"_o= "The amount of data to keep in flight while uploading."
 						}
 						, "CurrentDirectory?"_o=
 						{
-							"Names"_o= _[_]
+							"Names"_o= _o[]
 							, "Default"_o= CFile::fs_GetCurrentDirectory()
 							, "Hidden"_o= true
 							, "Description"_o= "Internal hidden option to forward current directory."
@@ -219,52 +217,52 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--version-manager-change-tags"}
+					"Names"_o= _o["--version-manager-change-tags"]
 					, "Description"_o= "Upload a version to remote version manager.\n"
 					, "Options"_o=
 					{
 						"VersionManagerHost?"_o=
 						{
-							"Names"_o= {"--host"}
+							"Names"_o= _o["--host"]
 							, "Default"_o= ""
 							, "Description"_o= "The host ID of the host to change tags for."
 						}
 						, "Application"_o=
 						{
-							"Names"_o= {"--application"}
+							"Names"_o= _o["--application"]
 							, "Type"_o= ""
 							, "Description"_o= "Change tags for this application."
 						}
 						, "Version"_o=
 						{
-							"Names"_o= {"--version"}
+							"Names"_o= _o["--version"]
 							, "Type"_o= ""
 							, "Description"_o= "Change tags for this version.\n"
 								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
 						}
 						, "Platform?"_o=
 						{
-							"Names"_o= {"--platform"}
+							"Names"_o= _o["--platform"]
 							, "Default"_o= ""
 							, "Description"_o= "The platform to change tags for. Leave empty to change all platforms.\n"
 						}
 						, "AddTags?"_o=
 						{
-							"Names"_o= {"--add"}
-							, "Default"_o= _[_]
-							, "Type"_o= {""}
+							"Names"_o= _o["--add"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
 							, "Description"_o= "Add these tags.\n"
 						}
 						, "RemoveTags?"_o=
 						{
-							"Names"_o= {"--remove"}
-							, "Default"_o= _[_]
-							, "Type"_o= {""}
+							"Names"_o= _o["--remove"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
 							, "Description"_o= "Remove these tags.\n"
 						}
 						, "RetryUpgrade?"_o=
 						{
-							"Names"_o= {"--retry-upgrade"}
+							"Names"_o= _o["--retry-upgrade"]
 							, "Default"_o= false
 							, "Description"_o= "Increase the retry sequence for this version. AppManagers will retry upgrade if it previously failed.\n"
 						}
@@ -280,38 +278,38 @@ namespace NMib::NCloud::NCloudClient
 		_Section.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--version-manager-download-version"}
+					"Names"_o= _o["--version-manager-download-version"]
 					, "Description"_o= "Download a version from remote version manager.\n"
 					, "Options"_o=
 					{
 						"VersionManagerHost?"_o=
 						{
-							"Names"_o= {"--host"}
+							"Names"_o= _o["--host"]
 							, "Default"_o= ""
 							, "Description"_o= "The host ID of the host to download the version from."
 						}
 						, "Application"_o=
 						{
-							"Names"_o= {"--application"}
+							"Names"_o= _o["--application"]
 							, "Type"_o= ""
 							, "Description"_o= "The application to download a version from."
 						}
 						, "Version"_o=
 						{
-							"Names"_o= {"--version"}
+							"Names"_o= _o["--version"]
 							, "Type"_o= ""
 							, "Description"_o= "The version to download.\n"
 								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
 						}
 						, "Platform?"_o=
 						{
-							"Names"_o= {"--platform"}
+							"Names"_o= _o["--platform"]
 							, "Default"_o= DMalterlibCloudPlatform
 							, "Description"_o= "The platform of the version to download.\n"
 						}
 						, "TransferQueueSize?"_o=
 						{
-							"Names"_o= {"--queue-size"}
+							"Names"_o= _o["--queue-size"]
 							, "Default"_o= int64(NFile::gc_IdealNetworkQueueSize)
 							, "Description"_o= "The amount of data to keep in flight while downloading."
 						}

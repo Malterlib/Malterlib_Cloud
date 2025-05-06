@@ -343,10 +343,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 					{
 						"Tunnels"_=
 						{
-							_(TunnelServerHostID) =
-							{
-								"TestTunnel"
-							}
+							_(TunnelServerHostID) = _["TestTunnel"]
 						}
 					}
 				)

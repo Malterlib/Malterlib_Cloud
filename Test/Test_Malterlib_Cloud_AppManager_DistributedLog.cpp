@@ -59,8 +59,9 @@ public:
 
 			auto TestAppDirectory = AppManagerInfo.m_RootDirectory / "App/TestApp";
 
-			CEJSONSorted ExpectedLogs = CEJSONSorted
-				{
+			CEJSONSorted ExpectedLogs = _
+				[
+					_=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -71,11 +72,12 @@ public:
 						, "Removed"_= false
 						, "LogMetaData"_= EJSONType_Object
 					}
-				}
+				]
 			;
 
-			CEJSONSorted ExpectedLogEntries = CEJSONSorted
-				{
+			CEJSONSorted ExpectedLogEntries = _
+				[
+					_=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -87,14 +89,14 @@ public:
 						, "Data"_=
 						{
 							"Message"_= "Test Log 0"
-							, "Categories"_= _[_]
-							, "Operations"_= _[_]
+							, "Categories"_= _[]
+							, "Operations"_= _[]
 							, "Severity"_= "Info"
-							, "Flags"_= _[_]
+							, "Flags"_= _[]
 						}
 						, "LogMetaData"_= EJSONType_Object
 					}
-					,
+					, _=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -106,14 +108,14 @@ public:
 						, "Data"_=
 						{
 							"Message"_= "Test Log 1"
-							, "Categories"_= _[_]
-							, "Operations"_= _[_]
+							, "Categories"_= _[]
+							, "Operations"_= _[]
 							, "Severity"_= "Info"
-							, "Flags"_= _[_]
+							, "Flags"_= _[]
 						}
 						, "LogMetaData"_= EJSONType_Object
 					}
-					,
+					, _=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -125,14 +127,14 @@ public:
 						, "Data"_=
 						{
 							"Message"_= "Test Log 2"
-							, "Categories"_= _[_]
-							, "Operations"_= _[_]
+							, "Categories"_= _[]
+							, "Operations"_= _[]
 							, "Severity"_= "Info"
-							, "Flags"_= _[_]
+							, "Flags"_= _[]
 						}
 						, "LogMetaData"_= EJSONType_Object
 					}
-					,
+					, _=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -144,14 +146,14 @@ public:
 						, "Data"_=
 						{
 							"Message"_= "Test Log 3"
-							, "Categories"_= _[_]
-							, "Operations"_= _[_]
+							, "Categories"_= _[]
+							, "Operations"_= _[]
 							, "Severity"_= "Info"
-							, "Flags"_= _[_]
+							, "Flags"_= _[]
 						}
 						, "LogMetaData"_= EJSONType_Object
 					}
-					,
+					, _=
 					{
 						"HostID"_= ""
 						, "HostName"_= ""
@@ -163,14 +165,14 @@ public:
 						, "Data"_=
 						{
 							"Message"_= "Test Log 4"
-							, "Categories"_= _[_]
-							, "Operations"_= _[_]
+							, "Categories"_= _[]
+							, "Operations"_= _[]
 							, "Severity"_= "Info"
-							, "Flags"_= _[_]
+							, "Flags"_= _[]
 						}
 						, "LogMetaData"_= EJSONType_Object
 					}
-				}
+				]
 			;
 
 			auto fSortLogs = [&](CEJSONSorted const &_Logs)

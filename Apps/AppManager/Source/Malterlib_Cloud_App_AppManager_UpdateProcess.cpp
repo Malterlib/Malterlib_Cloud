@@ -71,7 +71,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto &Application = *_pState->m_pApplication;
 
-		mp_State.m_StateDatabase.m_Data["PendingSelfUpdateProcess"] =
+		mp_State.m_StateDatabase.m_Data["PendingSelfUpdateProcess"] = _=
 			{
 				"Name"_= Application.m_Name
 				, "VersionID"_= _pState->m_VersionID.f_ToJson()

@@ -52,7 +52,7 @@ namespace NMib::NCloud::NCloudAPIManager
 											{
 												"identity"_=
 												{
-													"methods"_= {"password"},
+													"methods"_= _["password"],
 													"password"_=
 													{
 														"user"_=

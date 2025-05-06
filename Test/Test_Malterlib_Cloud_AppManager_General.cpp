@@ -356,7 +356,7 @@ public:
 
 			auto fSetUpdateType = [&](CStr _AppName, CStr _UpdateType) -> CUnsafeFuture
 				{
-					PackageInfo.m_VersionInfo.m_ExtraInfo["ExecutableParameters"] = {"--update-type", _UpdateType, "--daemon-run-standalone"};
+					PackageInfo.m_VersionInfo.m_ExtraInfo["ExecutableParameters"] = _["--update-type", _UpdateType, "--daemon-run-standalone"];
 					TCFutureVector<void> AppCommandResults;
 					for (auto &AppManager : AppManagers)
 					{

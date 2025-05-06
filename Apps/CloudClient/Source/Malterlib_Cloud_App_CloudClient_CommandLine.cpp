@@ -26,7 +26,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					"Timeout?"_o=
 					{
-						"Names"_o= {"--timeout"}
+						"Names"_o= _o["--timeout"]
 						, "Default"_o= 120.0
 						, "ValidForDirectCommand"_o= false
 						, "Description"_o= "The number of seconds to wait for remote servers to reply to commands."

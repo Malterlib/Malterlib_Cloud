@@ -24,24 +24,24 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		auto AddOption_Tags = "Tags?"_o=
 			{
-				"Names"_o= {"--tags"}
-				, "Type"_o= COneOfType{CEJSONOrdered{""}, COneOf{false}}
+				"Names"_o= _o["--tags"]
+				, "Type"_o= _o[""]
 				, "Description"_o= "Distribute versions have all these these tags only.\n"
 				"If you leave tags empty no versions will be distributed.\n"
 			}
 		;
 		auto AddOption_Platforms = "Platforms?"_o=
 			{
-				"Names"_o= {"--platforms"}
-				, "Type"_o= COneOfType{CEJSONOrdered{""}, COneOf{false}}
+				"Names"_o= _o["--platforms"]
+				, "Type"_o= _o[""]
 				, "Description"_o= "Distribute versions from these platforms.\n"
 				"Leave empty to distribute all platforms.\n"
 			}
 		;
 		auto AddOption_Branches = "BranchWildcards?"_o=
 			{
-				"Names"_o= {"--branches"}
-				, "Type"_o= {""}
+				"Names"_o= _o["--branches"]
+				, "Type"_o= _o[""]
 				, "Description"_o= "Distribute versions from these branches.\n"
 				"Leave empty to allow any branch.\n"
 				"Branches can be matched with wildcards.\n"
@@ -49,7 +49,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		;
 		auto AddOption_RenameTemplate = "RenameTemplate?"_o=
 			{
-				"Names"_o= {"--rename-template"}
+				"Names"_o= _o["--rename-template"]
 				, "Type"_o= ""
 				, "Default"_o= "{Name}/{PlatformFamily}/{Name}-{Version}.{FileExtension}"
 				, "Description"_o= "Template to use when renaming the package for distribution.\n"
@@ -78,8 +78,8 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		auto AddOption_DeployDestinations = "DeployDestinations?"_o=
 			{
-				"Names"_o= {"--deploy-destinations"}
-				, "Type"_o= {COneOf{"FileSystem"}}
+				"Names"_o= _o["--deploy-destinations"]
+				, "Type"_o= _o[COneOf{"FileSystem"}]
 				, "Description"_o= "The deploy destinations to deploy to.\n"
 				"Leave empty to determine deploy types from version meta data\n"
 				"Supported types:\n"
@@ -88,9 +88,9 @@ namespace NMib::NCloud::NAppDistributionManager
 				"\r"
 			}
 		;
-		auto AddOption_VersionManagerApplication =
+		CEJSONOrdered AddOption_VersionManagerApplication
 			{
-				"Names"_o= {"--application"}
+				"Names"_o= _o["--application"]
 				, "Type"_o= ""
 				, "Description"_o= "The version manager application to distribute.\n"
 			}
@@ -99,14 +99,14 @@ namespace NMib::NCloud::NAppDistributionManager
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--distribution-add"}
+					"Names"_o= _o["--distribution-add"]
 					, "Description"_o= "Adds an application distribution.\n"
 					, "Options"_o=
 					{
 						"VersionManagerApplication"_o= AddOption_VersionManagerApplication
 						, "Distribution?"_o=
 						{
-							"Names"_o= {"--distribution"}
+							"Names"_o= _o["--distribution"]
 							, "Type"_o= ""
 							, "Description"_o= "The unique name you give the distribution.\n"
 							"Defaults to the name of the version manager application."
@@ -127,13 +127,13 @@ namespace NMib::NCloud::NAppDistributionManager
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--distribution-change-settings"}
+					"Names"_o= _o["--distribution-change-settings"]
 					, "Description"_o= "Change settings for distribution.\n"
 					, "Options"_o=
 					{
 						"Distribution"_o=
 						{
-							"Names"_o= {"--distribution"}
+							"Names"_o= _o["--distribution"]
 							, "Type"_o= ""
 							, "Description"_o= "Unique name of the distribution to change settings for."
 						}
@@ -155,19 +155,19 @@ namespace NMib::NCloud::NAppDistributionManager
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--distribution-list"}
+					"Names"_o= _o["--distribution-list"]
 					, "Description"_o= "List distributions."
 					, "Options"_o=
 					{
 						"Verbose?"_o=
 						{
-							"Names"_o= {"--verbose", "-v"}
+							"Names"_o= _o["--verbose", "-v"]
 							, "Default"_o= false
 							, "Description"_o= "Display more extensive information about the distribution."
 						}
 						, "Distribution?"_o=
 						{
-							"Names"_o= {"--distribution"}
+							"Names"_o= _o["--distribution"]
 							, "Default"_o= ""
 							, "Description"_o= "Unique name of the distribution to list. Leave empty to list all distributions."
 						}
@@ -183,7 +183,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--distribution-remove"}
+					"Names"_o= _o["--distribution-remove"]
 					, "Description"_o= "Remove the distribution."
 					, "Parameters"_o=
 					{
@@ -203,19 +203,19 @@ namespace NMib::NCloud::NAppDistributionManager
 		DistributionManagement.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--application-list-versions"}
+					"Names"_o= _o["--application-list-versions"]
 					, "Description"_o= "List versions available to distribute from."
 					, "Options"_o=
 					{
 						"Verbose?"_o=
 						{
-							"Names"_o= {"--verbose", "-v"}
+							"Names"_o= _o["--verbose", "-v"]
 							, "Default"_o= false
 							, "Description"_o= "Display more extensive information about the versions."
 						}
 						, "Application?"_o=
 						{
-							"Names"_o= {"--application"}
+							"Names"_o= _o["--application"]
 							, "Default"_o= ""
 							, "Description"_o= "The application to list versions for.\n"
 							"Leave empty to list all applications.\n"

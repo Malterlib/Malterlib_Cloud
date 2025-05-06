@@ -78,7 +78,7 @@ namespace NMib::NCloud::NAppManager
 		HostMonitor.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--host-monitor-config-list"}
+					"Names"_o= _o["--host-monitor-config-list"]
 					, "Description"_o= "List monitored config files."
 					, "Options"_o=
 					{
@@ -95,7 +95,7 @@ namespace NMib::NCloud::NAppManager
 		HostMonitor.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--host-monitor-config-version-list"}
+					"Names"_o= _o["--host-monitor-config-version-list"]
 					, "Description"_o= "List monitored config files."
 					, "Parameters"_o=
 					{
@@ -109,7 +109,7 @@ namespace NMib::NCloud::NAppManager
 					{
 						"Verbose?"_o=
 						{
-							"Names"_o= {"--verbose", "-v"}
+							"Names"_o= _o["--verbose", "-v"]
 							, "Default"_o= false
 							, "Description"_o= "Display more extensive information about the config file versions."
 						}
@@ -126,7 +126,7 @@ namespace NMib::NCloud::NAppManager
 		HostMonitor.f_RegisterCommand
 			(
 				{
-					"Names"_o= {"--host-monitor-config-contents-get"}
+					"Names"_o= _o["--host-monitor-config-contents-get"]
 					, "Description"_o= "List monitored config files."
 					, "Parameters"_o=
 					{
@@ -140,7 +140,7 @@ namespace NMib::NCloud::NAppManager
 					{
 						"Sequence?"_o=
 						{
-							"Names"_o= {"--sequence", "-s"}
+							"Names"_o= _o["--sequence", "-s"]
 							, "Type"_o= 0
 							, "Description"_o= "The sequence of the config file to get contents for. If not specified latest version is retrieved."
 						}

@@ -136,7 +136,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 							auto &OutputFileInfo = Files[RelativeDestination];
 
-							OutputFileInfo =
+							OutputFileInfo = _=
 								{
 									"Digest"_= fg_GetDigest(File)
 									, "Size"_= CFile::fs_GetFileSize(File)
@@ -166,7 +166,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						DestinationDirectory = CFile::fs_GetPath(DestinationFile);
 						CFile::fs_CreateDirectory(DestinationDirectory);
 
-						Files[_DeployInfo.m_Renamed] =
+						Files[_DeployInfo.m_Renamed] = _=
 							{
 								"Digest"_= fg_GetDigest(_DeployInfo.m_SourceFile)
 								, "Size"_= CFile::fs_GetFileSize(_DeployInfo.m_SourceFile)

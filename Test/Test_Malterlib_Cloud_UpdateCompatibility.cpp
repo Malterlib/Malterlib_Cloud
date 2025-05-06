@@ -107,7 +107,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			if (CFile::fs_FileExists(_Package + ".json"))
 				m_PackageOptions = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(_Package + ".json"));
 
-			auto FeatureFlags = m_PackageOptions.f_GetMemberValue("FeatureFlags", _[_]);
+			auto FeatureFlags = m_PackageOptions.f_GetMemberValue("FeatureFlags", _[]);
 			for (auto &Flag : FeatureFlags.f_Array())
 				m_FeatureFlags[Flag.f_String()];
 		}
