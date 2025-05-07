@@ -136,7 +136,8 @@ namespace NMib::NCloud::NAppManager
 		{
 			CHostMonitor::CMonitorPathOptions PathOptions;
 			PathOptions.m_Path = pEncryptionApplication->f_GetDirectory();
-			pEncryptionApplication->m_DirectoryMonitorSubscription = co_await mp_HostMonitor(&CHostMonitor::f_MonitorPath, PathOptions);
+			if (mp_HostMonitor)
+				pEncryptionApplication->m_DirectoryMonitorSubscription = co_await mp_HostMonitor(&CHostMonitor::f_MonitorPath, PathOptions);
 
 			fp_AppEncryptionStateChanged(pEncryptionApplication, true);
 		}

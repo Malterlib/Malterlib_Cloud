@@ -161,9 +161,12 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 
-					co_await mp_HostMonitor(&CHostMonitor::f_SetExpectedOsVersions, fg_Move(AllExpectedVersions)).f_Wrap()
-						> fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to update expected OS versions in host monitor")
-					;
+					if (mp_HostMonitor)
+					{
+						co_await mp_HostMonitor(&CHostMonitor::f_SetExpectedOsVersions, fg_Move(AllExpectedVersions)).f_Wrap()
+							> fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to update expected OS versions in host monitor")
+						;
+					}
 
 					co_return {};
 				}

@@ -14,6 +14,17 @@ namespace NMib::NCloud::NAppManager
 	{
 		mp_HostMonitor = fg_Construct(mp_SensorStore, mp_LogStore, mp_DatabaseActor, mp_LogMetaData, mp_SensorMetaData);
 
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (mp_State.m_bStoppingApp || f_IsDestroyed())
+						return DMibErrorInstance("Startup aborted");
+					return {};
+				}
+			)
+		;
+
 		CHostMonitor::EInitFlag Flags = CHostMonitor::EInitFlag_None;
 
 		if (mp_State.m_ConfigDatabase.m_Data.f_GetMemberValue("MonitorAllMounts", false).f_Boolean())
@@ -159,6 +170,17 @@ namespace NMib::NCloud::NAppManager
 		if (!mp_HostMonitor)
 			co_return DMibErrorInstance("Host monitor not yet initialized");
 
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (!mp_HostMonitor)
+						return DMibErrorInstance("Host monitor destroyed");
+					return {};
+				}
+			)
+		;
+
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
 		CTableRenderHelper::CColumnHelper Columns(0);
@@ -180,6 +202,17 @@ namespace NMib::NCloud::NAppManager
 	{
 		if (!mp_HostMonitor)
 			co_return DMibErrorInstance("Host monitor not yet initialized");
+
+		auto OnResume = co_await fg_OnResume
+			(
+				[&]() -> CExceptionPointer
+				{
+					if (!mp_HostMonitor)
+						return DMibErrorInstance("Host monitor destroyed");
+					return {};
+				}
+			)
+		;
 
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
