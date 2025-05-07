@@ -20,15 +20,15 @@ namespace NMib::NCloud::NKeyManager
 		TCFuture<uint32> f_ProvidePassword(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> f_ChangePassword(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> f_PreCreateKeys(uint32 _KeySize, uint32 _nKeys, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> f_ListPreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> f_RemovePreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_ListPreCreatedKeys(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_RemovePreCreatedKeys(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> f_RemoveVerifiedHosts(TCSet<CStr> _HostIDs, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> f_ListVerifiedHosts(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> f_ListKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> f_CopyKey(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_ListVerifiedHosts(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_ListKeys(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> f_CopyKey(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 	private:
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 

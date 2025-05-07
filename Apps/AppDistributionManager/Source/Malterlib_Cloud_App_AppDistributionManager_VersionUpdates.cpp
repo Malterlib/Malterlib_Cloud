@@ -1,7 +1,7 @@
 // Copyright © 2018 Nonna Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include "Malterlib_Cloud_App_AppDistributionManager.h"
 
 namespace NMib::NCloud::NAppDistributionManager

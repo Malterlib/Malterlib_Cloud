@@ -21,7 +21,7 @@
 #include <Mib/Cloud/SecretsManagerDownload>
 #include <Mib/Cloud/App/SecretsManager>
 #include <Mib/Cryptography/RandomID>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Test/Exception>
 #include <Mib/File/DirectorySync>
 #include <Mib/File/DirectoryManifest>
@@ -500,7 +500,7 @@ public:
 				DMibExpect(Properties.f_GetURL(), ==, NStr::CStrSecure{});
 				DMibExpect(Properties.f_GetExpires(), ==, NTime::CTime{});
 				DMibExpect(Properties.f_GetNotes(), ==, NStr::CStrSecure{});
-				DMibExpect(Properties.f_GetMetadata(), ==, (TCMap<NStr::CStrSecure, CEJSONSorted>{}));
+				DMibExpect(Properties.f_GetMetadata(), ==, (TCMap<NStr::CStrSecure, CEJsonSorted>{}));
 				DMibExpect(Properties.f_GetCreated(), ==, NTime::CTime{});
 				DMibExpect(Properties.f_GetModified(), ==, NTime::CTime{});
 				DMibExpect(Properties.f_GetSemanticID(), ==, NStr::CStrSecure{});
@@ -526,7 +526,7 @@ public:
 				DMibExpect(Properties2.f_GetURL(), ==, "URL");
 				DMibExpect(Properties2.f_GetExpires(), ==, NTime::CTimeConvert::fs_CreateTime(1974, 4, 4));
 				DMibExpect(Properties2.f_GetNotes(), ==, "Note");
-				DMibExpect(Properties2.f_GetMetadata(), ==, (TCMap<NStr::CStrSecure, CEJSONSorted>{{"a", "b"}}));
+				DMibExpect(Properties2.f_GetMetadata(), ==, (TCMap<NStr::CStrSecure, CEJsonSorted>{{"a", "b"}}));
 				DMibExpect(Properties2.f_GetCreated(), ==, NTime::CTimeConvert::fs_CreateTime(1975, 5, 5));
 				DMibExpect(Properties2.f_GetModified(), ==, NTime::CTimeConvert::fs_CreateTime(1976, 6, 6));
 				DMibExpect(Properties2.f_GetSemanticID(), ==, "SemanticID");
@@ -621,7 +621,7 @@ public:
 					return fGetProperties(_Folder, _Name);
 				}
 			;
-			auto fSetKeyValue = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key, CEJSONSorted const &_Value)
+			auto fSetKeyValue = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key, CEJsonSorted const &_Value)
 				{
 					CSecretsManager::CSetMetadata SetMetadata;
 					SetMetadata.m_ID = CSecretsManager::CSecretID{_Folder, _Name};
@@ -776,7 +776,7 @@ public:
 				DMibExpect(*Properties.m_URL, ==, "http://URL/");
 				DMibExpect(*Properties.m_Expires, ==, NTime::CTimeConvert::fs_CreateTime(1971, 1, 1));
 				DMibExpect(*Properties.m_Notes, ==, "Testing11");
-				DMibExpect(*Properties.m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSONSorted>{{"Key", "Value"}}));
+				DMibExpect(*Properties.m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJsonSorted>{{"Key", "Value"}}));
 				DMibExpect(*Properties.m_Created, ==, NTime::CTimeConvert::fs_CreateTime(1972, 2, 2));
 				DMibExpect(*Properties.m_Modified, ==, NTime::CTimeConvert::fs_CreateTime(1973, 3, 3));
 				DMibExpect(*Properties.m_SemanticID, ==, "Semantic1");
@@ -913,7 +913,7 @@ public:
 				DMibTestPath("Test metadata");
 
 
-				auto fSetKeyValueAndGet = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key, CEJSONSorted const &_Value) -> CSecretsManager::CSecretProperties
+				auto fSetKeyValueAndGet = [&](NStr::CStr const &_Folder, NStr::CStr const &_Name, NStr::CStr const &_Key, CEJsonSorted const &_Value) -> CSecretsManager::CSecretProperties
 					{
 						fSetKeyValue(_Folder, _Name, _Key, _Value);
 						return fGetProperties(_Folder, _Name);
@@ -928,21 +928,21 @@ public:
 				;
 
 				// Verify original value
-				DMibExpect(*fGetProperties("Folder2", "Name2").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSONSorted>{{"Key1", "Value1"}}));
+				DMibExpect(*fGetProperties("Folder2", "Name2").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJsonSorted>{{"Key1", "Value1"}}));
 
-				DMibExpect(*fSetKeyValueAndGet("Folder2", "Name2", "Key2", "Value2").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSONSorted>{{"Key1", "Value1"}, {"Key2", "Value2"}}));
+				DMibExpect(*fSetKeyValueAndGet("Folder2", "Name2", "Key2", "Value2").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJsonSorted>{{"Key1", "Value1"}, {"Key2", "Value2"}}));
 				{
 					DMibTestPath("Changes 8");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name2"));
 				}
-				DMibExpect(*fSetKeyValueAndGet("Folder2", "Name1", "Key3", "Value3").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSONSorted>{{"Key3", "Value3"}}));
+				DMibExpect(*fSetKeyValueAndGet("Folder2", "Name1", "Key3", "Value3").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJsonSorted>{{"Key3", "Value3"}}));
 				{
 					DMibTestPath("Changes 9");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name1"));
 				}
 				DMibExpectException(fSetKeyValue("Folder1", "NoMatch", "Key3", "Value3"), DMibErrorInstance("No secret matching ID: 'Folder1/NoMatch'"));
 
-				DMibExpect(*fRemoveKeyAndGet("Folder2", "Name2", "Key1").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSONSorted>{{"Key2", "Value2"}}));
+				DMibExpect(*fRemoveKeyAndGet("Folder2", "Name2", "Key1").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJsonSorted>{{"Key2", "Value2"}}));
 				{
 					DMibTestPath("Changes 10");
 					DMibExpect(pChangesState->f_PopChangesAssertOne().m_Changed.f_KeySet(), ==, fSecretIDSet("Folder2/Name2"));
@@ -1703,7 +1703,7 @@ public:
 
 			// Reset permissions
 			fAddPermissions(SecretsManagerPermissionsForTest);
-			DMibExpect(*fGetProperties("Folder1", "Name1").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSONSorted>{}));
+			DMibExpect(*fGetProperties("Folder1", "Name1").m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJsonSorted>{}));
 
 			DMibExpect(pChangesState->f_GetNonFullResendNumChanges(), ==, 0);
 		};
@@ -1744,7 +1744,7 @@ public:
 				DMibExpect(*Properties.m_URL, ==, "http://URL/");
 				DMibExpect(*Properties.m_Expires, ==, NTime::CTimeConvert::fs_CreateTime(1971, 1, 1));
 				DMibExpect(*Properties.m_Notes, ==, "Note");
-				DMibExpect(*Properties.m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJSONSorted>{}));
+				DMibExpect(*Properties.m_Metadata, ==, (TCMap<NStr::CStrSecure, CEJsonSorted>{}));
 				DMibExpect(*Properties.m_Created, ==, NTime::CTimeConvert::fs_CreateTime(1972, 2, 2));
 				DMibExpect(*Properties.m_SemanticID, ==, "Semantic1");
 				DMibExpect(*Properties.m_Tags, ==, (TCSet<NStr::CStrSecure>{{"Shared1", "Unique1"}}));
@@ -1918,7 +1918,7 @@ public:
 				}
 			;
 
-			auto fSyncFileOperations = [&](CStr const &_Command, CEJSONSorted const _Params = "") -> TCFuture<CEJSONSorted>
+			auto fSyncFileOperations = [&](CStr const &_Command, CEJsonSorted const _Params = "") -> TCFuture<CEJsonSorted>
 				{
 					return SecretsManagerLaunchInfo.f_Test_Command(fg_TempCopy(_Command), fg_TempCopy(_Params));
 				}

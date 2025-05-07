@@ -13,27 +13,27 @@ namespace NMib::NCloud
 
 	CCloudVersionInfo fg_ParseVersionInfo(NStr::CStr const &_String)
 	{
-		auto const JSON = NEncoding::CEJSONSorted::fs_FromString(_String);
+		auto const Json = NEncoding::CEJsonSorted::fs_FromString(_String);
 		CCloudVersionInfo VersionInfo;
 		
 		NStr::CStr Error;
 		CVersionManager::CVersionID VersionID;
-		CVersionManager::fs_IsValidVersionIdentifier(JSON["Version"].f_String(), Error, &VersionID);
+		CVersionManager::fs_IsValidVersionIdentifier(Json["Version"].f_String(), Error, &VersionID);
 
 		VersionInfo.m_Version = VersionID;
-		VersionInfo.m_Platform = JSON["Platform"].f_String();
-		VersionInfo.m_Configuration = JSON["Configuration"].f_String();
-		VersionInfo.m_Application = JSON["Application"].f_String();
-		VersionInfo.m_ExtraInfo = JSON["ExtraInfo"];
+		VersionInfo.m_Platform = Json["Platform"].f_String();
+		VersionInfo.m_Configuration = Json["Configuration"].f_String();
+		VersionInfo.m_Application = Json["Application"].f_String();
+		VersionInfo.m_ExtraInfo = Json["ExtraInfo"];
 		
 		return VersionInfo;
 	}
 
-	NEncoding::CEJSONSorted CCloudVersion::f_ToJson() const
+	NEncoding::CEJsonSorted CCloudVersion::f_ToJson() const
 	{
 		using namespace NEncoding;
 		
-		CEJSONSorted Return;
+		CEJsonSorted Return;
 		Return["Branch"] = fg_ToJson(m_Branch);
 		Return["Major"] = fg_ToJson(m_Major);
 		Return["Minor"] = fg_ToJson(m_Minor);

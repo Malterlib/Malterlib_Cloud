@@ -4,7 +4,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 #include "Malterlib_Cloud_App_CloudClient.h"
 

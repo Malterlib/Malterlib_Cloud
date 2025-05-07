@@ -5,7 +5,7 @@
 
 #include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Process/ProcessLaunch>
 #include <Mib/File/File>
 
@@ -96,7 +96,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 					CStr DownloadFile;
 
-					CEJSONSorted Files = EJSONType_Object;
+					CEJsonSorted Files = EJsonType_Object;
 
 					CStr DestinationDirectory;
 
@@ -181,20 +181,20 @@ namespace NMib::NCloud::NAppDistributionManager
 						DownloadFile = _DeployInfo.m_Renamed;
 					}
 
-					CEJSONSorted LatestRelease;
+					CEJsonSorted LatestRelease;
 					{
 						CStr DatabaseFile = DestinationDirectory / "Releases.json";
-						CEJSONSorted Database;
+						CEJsonSorted Database;
 						if (CFile::fs_FileExists(DatabaseFile))
-							Database = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(DatabaseFile, true), DatabaseFile);
+							Database = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(DatabaseFile, true), DatabaseFile);
 
 						auto &Releases = Database["Releases"];
 
 						CStr ReleaseNotes;
 
-						if (auto pAppDistribution = _DeployInfo.m_Version.m_VersionInfo.m_ExtraInfo.f_GetMember("AppDistribution", EJSONType_Object))
+						if (auto pAppDistribution = _DeployInfo.m_Version.m_VersionInfo.m_ExtraInfo.f_GetMember("AppDistribution", EJsonType_Object))
 						{
-							if (auto pReleaseNotes = pAppDistribution->f_GetMember("ReleaseNotes", EJSONType_String))
+							if (auto pReleaseNotes = pAppDistribution->f_GetMember("ReleaseNotes", EJsonType_String))
 								ReleaseNotes = pReleaseNotes->f_String();
 						}
 
@@ -204,7 +204,7 @@ namespace NMib::NCloud::NAppDistributionManager
 							<< _DeployInfo.m_Version.m_VersionID.m_VersionID.m_Revision
 						;
 
-						CEJSONSorted NewRelease =
+						CEJsonSorted NewRelease =
 							{
 								"Path"_= DownloadFile
 								, "Version"_= _DeployInfo.m_Version.m_VersionID.f_ToJson()
@@ -233,7 +233,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 						Releases.f_Array().f_Sort
 							(
-								[](CEJSONSorted const &_Left, CEJSONSorted const &_Right)
+								[](CEJsonSorted const &_Left, CEJsonSorted const &_Right)
 								{
 									return CParsedVersion::fs_Parse(_Right["VersionString"].f_String()) <=> CParsedVersion::fs_Parse(_Left["VersionString"].f_String());
 								}

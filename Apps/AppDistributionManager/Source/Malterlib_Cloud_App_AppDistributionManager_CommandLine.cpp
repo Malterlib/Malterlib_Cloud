@@ -1,7 +1,7 @@
 // Copyright © 2018 Nonna Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/CommandLine/TableRenderer>
 
@@ -88,7 +88,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				"\r"
 			}
 		;
-		CEJSONOrdered AddOption_VersionManagerApplication
+		CEJsonOrdered AddOption_VersionManagerApplication
 			{
 				"Names"_o= _o["--application"]
 				, "Type"_o= ""
@@ -118,7 +118,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						, AddOption_DeployDestinations
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_DistributionAdd(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -145,7 +145,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						, AddOption_DeployDestinations
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_DistributionChangeSettings(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -174,7 +174,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_DistributionEnum(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -194,7 +194,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_DistributionRemove(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -223,7 +223,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_ApplicationListAvailableVersions(fg_Move(_Params), fg_Move(_pCommandLine));
 				}

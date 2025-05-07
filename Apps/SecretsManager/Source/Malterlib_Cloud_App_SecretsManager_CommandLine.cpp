@@ -2,7 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 #include "Malterlib_Cloud_App_SecretsManager.h"
 #include "Malterlib_Cloud_App_SecretsManager_Server.h"

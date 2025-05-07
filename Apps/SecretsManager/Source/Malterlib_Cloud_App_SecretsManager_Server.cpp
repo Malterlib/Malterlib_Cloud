@@ -22,7 +22,7 @@ namespace NMib::NCloud::NSecretsManager
 	}
 	
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServer::f_Test_Command(CStr _Command, CEJSONSorted const _Params)
+	TCFuture<CEJsonSorted> CSecretsManagerDaemonActor::CServer::f_Test_Command(CStr _Command, CEJsonSorted const _Params)
 	{
 		if (_Command == "UploadInitialized")
 			co_return co_await mp_UploadInitialized[_Params.f_String()].f_Future();
@@ -54,7 +54,7 @@ namespace NMib::NCloud::NSecretsManager
 		}
 
 		if (_Command == "DestroyWaitingForCanDestroy")
-			co_return co_await (mp_DestroyWaitingForCanDestroy = TCPromise<CEJSONSorted>{})->f_Future();
+			co_return co_await (mp_DestroyWaitingForCanDestroy = TCPromise<CEJsonSorted>{})->f_Future();
 
 		if (_Command == "SyncFileOperations")
 		{
@@ -466,7 +466,7 @@ namespace NMib::NCloud::NSecretsManager
 	}
 
 #if DMibConfig_Tests_Enable
-	TCFuture<CEJSONSorted> CSecretsManagerDaemonActor::CServer::f_SyncFileOperations()
+	TCFuture<CEJsonSorted> CSecretsManagerDaemonActor::CServer::f_SyncFileOperations()
 	{
 		auto SequenceSubscription = co_await mp_FileSequencer.f_Sequence();
 

@@ -32,7 +32,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 			CStr m_ListenHost;
 		};
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
 		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_ReloadConfig(TCActorFunctor<TCFuture<void> (CStr _Message)> _fLog);

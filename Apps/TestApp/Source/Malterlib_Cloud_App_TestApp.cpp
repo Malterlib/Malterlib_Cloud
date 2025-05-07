@@ -2,7 +2,7 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Concurrency/DistributedDaemon>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 #include "Malterlib_Cloud_App_TestApp.h"
 
@@ -67,7 +67,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					bool bIsVersion = _Params["ReadingType"].f_String() == "Version";
 					bool bRandomValues = _Params["RandomValues"].f_Boolean();
@@ -148,7 +148,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					CDistributedAppSensorReporter::CSensorInfo SensorInfo;
 					SensorInfo.m_Identifier = "org.malterlib.testapp.test.status";
@@ -203,7 +203,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					mint nEntries = _Params["NumEntries"].f_Integer();
 
@@ -255,7 +255,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					mint nEntries = _Params["NumEntries"].f_Integer();
 					mint bError = _Params["Error"].f_Boolean();
@@ -280,7 +280,7 @@ namespace NMib::NCloud::NTest
 					"Names"_o= _o["--get-log-report-depth"]
 					, "Description"_o= "Gets the depth of the log reporting chain."
 				}
-				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					CDistributedAppLogReporter::CLogInfo LogInfo;
 
@@ -329,7 +329,7 @@ namespace NMib::NCloud::NTest
 						}
 					}
 				}
-				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					mint nEntries = _Params["NumEntries"].f_Integer();
 					mint EntrySize = _Params["EntrySize"].f_Integer();
@@ -378,12 +378,12 @@ namespace NMib::NCloud::NTest
 		(
 			CDistributedAppInterfaceServer::CRegisterInfo &o_RegisterInfo
 			, CDistributedAppInterfaceServer::CConfigFiles &o_ConfigFiles
-			, NEncoding::CEJSONSorted const &_Params
+			, NEncoding::CEJsonSorted const &_Params
 		)
 	{
 		CDistributedAppActor::fp_PopulateAppInterfaceInfo(o_RegisterInfo, o_ConfigFiles, _Params);
 
-		if (auto pValue = _Params.f_GetMember("UpdateType", EJSONType_String))
+		if (auto pValue = _Params.f_GetMember("UpdateType", EJsonType_String))
 		{
 			CStr UpdateType = pValue->f_String();
 			if (UpdateType == "Independent")
@@ -395,7 +395,7 @@ namespace NMib::NCloud::NTest
 		}
 	}
 
-	TCFuture<void> CTestAppActor::fp_StartApp(NEncoding::CEJSONSorted const _Params)
+	TCFuture<void> CTestAppActor::fp_StartApp(NEncoding::CEJsonSorted const _Params)
 	{
 		co_return {};
 	}

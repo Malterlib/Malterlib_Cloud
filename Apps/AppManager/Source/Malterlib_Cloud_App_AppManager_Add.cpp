@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/AsyncDestroy>
@@ -48,7 +48,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 		CStr Name = _Params["Name"].f_String();
@@ -67,7 +67,7 @@ namespace NMib::NCloud::NAppManager
 		if (auto *pValue = _Params.f_GetMember("Version"))
 			Version = pValue->f_String();
 
-		bool bNullPackage = _Params["Package"].f_Type() == EJSONType_Null;
+		bool bNullPackage = _Params["Package"].f_Type() == EJsonType_Null;
 		
 		CStr Package;
 		if (!bNullPackage)
@@ -344,30 +344,30 @@ namespace NMib::NCloud::NAppManager
 				{
 					try
 					{
-						CEJSONSorted VersionInfoJSON = CEJSONSorted::fs_FromString(_VersionInfoContents);
+						CEJsonSorted VersionInfoJson = CEJsonSorted::fs_FromString(_VersionInfoContents);
 
 						CStr Application;
 						CStr Version;
 						CStr Configuration;
 						CStr Platform;
-						CEJSONSorted ExtraInfo;
+						CEJsonSorted ExtraInfo;
 
-						auto fApplySettings = [&](CEJSONSorted const &_Settings)
+						auto fApplySettings = [&](CEJsonSorted const &_Settings)
 							{
-								if (auto *pValue = _Settings.f_GetMember("Application", EJSONType_String))
+								if (auto *pValue = _Settings.f_GetMember("Application", EJsonType_String))
 									Application = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Version", EJSONType_String))
+								if (auto *pValue = _Settings.f_GetMember("Version", EJsonType_String))
 									Version = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Configuration", EJSONType_String))
+								if (auto *pValue = _Settings.f_GetMember("Configuration", EJsonType_String))
 									Configuration = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Platform", EJSONType_String))
+								if (auto *pValue = _Settings.f_GetMember("Platform", EJsonType_String))
 									Platform = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJSONType_Object))
+								if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJsonType_Object))
 									ExtraInfo = pValue->f_Object();
 							}
 						;
 
-						fApplySettings(VersionInfoJSON);
+						fApplySettings(VersionInfoJson);
 
 						if (Application.f_IsEmpty())
 							DMibError("Application must be specified");
@@ -631,7 +631,7 @@ namespace NMib::NCloud::NAppManager
 		pApplication->m_LastInstalledVersionFinished = pApplication->m_LastInstalledVersion;
 		pApplication->m_LastInstalledVersionInfoFinished = pApplication->m_LastInstalledVersionInfo;
 
-		co_await (fp_UpdateApplicationJSON(pApplication) % "Failed to save state" % Auditor);
+		co_await (fp_UpdateApplicationJson(pApplication) % "Failed to save state" % Auditor);
 
 		pApplication->m_bJustUpdated = true;
 		CAppLaunchResult AppLaunchResult = co_await (fp_LaunchApp(pApplication, false) % "Failed to launch app. Will retry periodically" % Auditor);

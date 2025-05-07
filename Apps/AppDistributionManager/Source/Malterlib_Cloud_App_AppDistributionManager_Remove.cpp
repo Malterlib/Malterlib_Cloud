@@ -1,13 +1,13 @@
 // Copyright © 2018 Nonna Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppDistributionManager.h"
 
 namespace NMib::NCloud::NAppDistributionManager
 {
-	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionRemove(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionRemove(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto Auditor = f_Auditor();
 

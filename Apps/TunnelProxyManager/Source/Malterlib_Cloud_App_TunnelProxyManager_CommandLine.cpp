@@ -6,7 +6,7 @@
 #include <Mib/Web/WebSocket>
 #include <Mib/Network/SSL>
 #include <Mib/Network/Sockets/SSL>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 namespace NMib::NCloud::NTunnelProxyManager
 {
@@ -29,7 +29,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 					"Names"_o= _o["--reload-config"]
 					, "Description"_o= "Reload config."
 				}
-				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					co_await mp_State.m_ConfigDatabase.f_Load();
 					co_await fp_ReloadConfig

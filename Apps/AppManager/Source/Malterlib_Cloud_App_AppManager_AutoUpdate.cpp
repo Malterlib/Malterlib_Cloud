@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -274,7 +274,7 @@ namespace NMib::NCloud::NAppManager
 			if (bVersionsChanged)
 			{
 				fp_SendAppChange_AddedOrChanged(*pApplication);
-				fp_UpdateApplicationJSON(pApplication).f_DiscardResult();
+				fp_UpdateApplicationJson(pApplication).f_DiscardResult();
 			}
 
 			if (!pApplication->m_Settings.m_bAutoUpdate)

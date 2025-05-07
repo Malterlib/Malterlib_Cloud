@@ -88,10 +88,10 @@ namespace NMib::NCloud
 		return fg_Move(*this);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSONSorted &&_MetadataValue) && -> CSecretProperties &&
+	auto CSecretsManager::CSecretProperties::f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJsonSorted &&_MetadataValue) && -> CSecretProperties &&
 	{
 		if (!m_Metadata)
-			m_Metadata = NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSONSorted>{};
+			m_Metadata = NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJsonSorted>{};
 		(*m_Metadata)[_MetadataKey] = _MetadataValue;
 		return fg_Move(*this);
 	}
@@ -164,10 +164,10 @@ namespace NMib::NCloud
 		return *this;
 	}
 
-	auto CSecretsManager::CSecretProperties::f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJSONSorted &&_MetadataValue) & -> CSecretProperties &
+	auto CSecretsManager::CSecretProperties::f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJsonSorted &&_MetadataValue) & -> CSecretProperties &
 	{
 		if (!m_Metadata)
-			m_Metadata = NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSONSorted>{};
+			m_Metadata = NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJsonSorted>{};
 		(*m_Metadata)[_MetadataKey] = _MetadataValue;
 		return *this;
 	}
@@ -240,9 +240,9 @@ namespace NMib::NCloud
 		return m_Notes.f_Get(s_Notes);
 	}
 	
-	auto CSecretsManager::CSecretProperties::f_GetMetadata() const -> NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSONSorted> const &
+	auto CSecretsManager::CSecretProperties::f_GetMetadata() const -> NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJsonSorted> const &
 	{
-		static NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJSONSorted> s_Metadata;
+		static NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJsonSorted> s_Metadata;
 		return m_Metadata.f_Get(s_Metadata);
 	}
 	

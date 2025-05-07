@@ -10,11 +10,11 @@
 namespace
 {
 	fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
-	constexpr EJSONDialectFlag gc_JsonFlags = EJSONDialectFlag_AllowUndefined | EJSONDialectFlag_AllowInvalidFloat;
+	constexpr EJsonDialectFlag gc_JsonFlags = EJsonDialectFlag_AllowUndefined | EJsonDialectFlag_AllowInvalidFloat;
 
-	CEJSONSorted fg_FromString(CStr &&_String)
+	CEJsonSorted fg_FromString(CStr &&_String)
 	{
-		return CEJSONSorted::fs_FromString
+		return CEJsonSorted::fs_FromString
 			(
 				fg_Move(_String)
 				, CStr()
@@ -50,13 +50,13 @@ public:
 
 			co_await AppManagerTestHelper.f_Setup(1);
 			auto &AppManagerInfo = *AppManagerTestHelper.m_pState->m_AppManagerInfos.f_FindAny();
-			auto fShouldKeepValue = [](CEJSONSorted const &_Reading)
+			auto fShouldKeepValue = [](CEJsonSorted const &_Reading)
 				{
 					return _Reading["Identifier"].f_String().f_StartsWith("org.malterlib.testapp.test");
 				}
 			;
 
-			auto fMakeComparable = [&](CEJSONSorted &&_Readings)
+			auto fMakeComparable = [&](CEJsonSorted &&_Readings)
 				{
 					for (auto &Reading : _Readings.f_Array())
 					{
@@ -68,7 +68,7 @@ public:
 					// We need to sort by sequence because the system clock might change
 					_Readings.f_Array().f_Sort
 						(
-							[](CEJSONSorted const &_Left, CEJSONSorted const &_Right)
+							[](CEJsonSorted const &_Left, CEJsonSorted const &_Right)
 							{
 								auto Left = _Left.f_GetMemberValue("UniqueSequence", 0);
 								auto Right = _Right.f_GetMemberValue("UniqueSequence", 0);
@@ -84,7 +84,7 @@ public:
 
 			auto TestAppDirectory = AppManagerInfo.m_RootDirectory / "App/TestApp";
 
-			CEJSONSorted ExpectedSensors = _
+			CEJsonSorted ExpectedSensors = _
 				[
 					_=
 					{
@@ -103,7 +103,7 @@ public:
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
 						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetaData"_= EJSONType_Object
+						, "SensorMetaData"_= EJsonType_Object
 					}
 					, _=
 					{
@@ -158,12 +158,12 @@ public:
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
 						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetaData"_= EJSONType_Object
+						, "SensorMetaData"_= EJsonType_Object
 					}
 				]
 			;
 
-			CEJSONSorted ExpectedSensorReadings;
+			CEJsonSorted ExpectedSensorReadings;
 			for (mint i = 0; i < 5; ++i)
 			{
 				ExpectedSensorReadings.f_Array().f_Insert
@@ -181,7 +181,7 @@ public:
 							, "OutdatedStatus"_= "Ok"
 							, "OutdatedSeconds"_= fp64::fs_Inf()
 							, "SnoozeUntil"_= NTime::CTime()
-							, "SensorMetaData"_= EJSONType_Object
+							, "SensorMetaData"_= EJsonType_Object
 						}
 					)
 				;
@@ -196,7 +196,7 @@ public:
 							, "IdentifierScope"_= ""
 							, "Name"_= "Test Sensor (version)"
 							, "UniqueSequence"_= i + 1
-							, "Value"_= CEJSONUserTypeSorted
+							, "Value"_= CEJsonUserTypeSorted
 							{
 								"Version"
 								,
@@ -210,13 +210,13 @@ public:
 							, "OutdatedStatus"_= "Ok"
 							, "OutdatedSeconds"_= fp64::fs_Inf()
 							, "SnoozeUntil"_= NTime::CTime()
-							, "SensorMetaData"_= EJSONType_Object
+							, "SensorMetaData"_= EJsonType_Object
 						}
 					)
 				;
 			}
 
-			CEJSONSorted ExpectedSensorStatus = _
+			CEJsonSorted ExpectedSensorStatus = _
 				[
 					_=
 					{
@@ -231,7 +231,7 @@ public:
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= fp64::fs_Inf()
 						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetaData"_= EJSONType_Object
+						, "SensorMetaData"_= EJsonType_Object
 					}
 					,
 					_=
@@ -243,7 +243,7 @@ public:
 						, "IdentifierScope"_= ""
 						, "Name"_= "Test Sensor (version)"
 						, "UniqueSequence"_= 5
-						, "Value"_= CEJSONUserTypeSorted
+						, "Value"_= CEJsonUserTypeSorted
 						{
 							"Version"
 							,
@@ -257,19 +257,19 @@ public:
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= fp64::fs_Inf()
 						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetaData"_= EJSONType_Object
+						, "SensorMetaData"_= EJsonType_Object
 					}
 				]
 			;
 
-			auto fSortSensors = [&](CEJSONSorted const &_Sensors)
+			auto fSortSensors = [&](CEJsonSorted const &_Sensors)
 				{
-					CEJSONSorted Return = _Sensors;
+					CEJsonSorted Return = _Sensors;
 					Return.f_Array().f_Sort
 						(
-							[](CEJSONSorted const &_Left, CEJSONSorted const &_Right)
+							[](CEJsonSorted const &_Left, CEJsonSorted const &_Right)
 							{
-								auto fTuple = [](CEJSONSorted const &_Value)
+								auto fTuple = [](CEJsonSorted const &_Value)
 									{
 										return fg_TupleReferences
 											(
@@ -310,19 +310,19 @@ public:
 
 				co_await fGenerateSensorReading();
 
-				auto fReadSensors = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
+				auto fReadSensors = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
 					{
 						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-list", "--json"}, TestAppDirectory));
 					}
 				;
 
-				auto fReadSensorReadings = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
+				auto fReadSensorReadings = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
 					{
 						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--sensor-readings-list", "--newest", "--json"}, TestAppDirectory));
 					}
 				;
 
-				auto fReadSensorStatus = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
+				auto fReadSensorStatus = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
 					{
 						co_return fg_FromString
 							(
@@ -340,9 +340,9 @@ public:
 			auto TestAppHostID = CStr(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim();
 			auto HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName());
 			auto fSetHostInfo = [&]
-				(CEJSONSorted const &_JSON)
+				(CEJsonSorted const &_Json)
 				{
-					CEJSONSorted Return = _JSON;
+					CEJsonSorted Return = _Json;
 
 					for (auto &Entry : Return.f_Array())
 					{
@@ -360,19 +360,19 @@ public:
 
 				CStr AppManagerPath = AppManagerInfo.m_RootDirectory / "AppManager";
 
-				auto fReadSensors = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
+				auto fReadSensors = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
 					{
 						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-list", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
-				auto fReadSensorReadings = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
+				auto fReadSensorReadings = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
 					{
 						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(AppManagerPath, {"--sensor-readings-list", "--newest", "--json"}, AppManagerInfo.m_RootDirectory));
 					}
 				;
 
-				auto fReadSensorStatus = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
+				auto fReadSensorStatus = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
 					{
 						co_return fg_FromString
 							(
@@ -393,13 +393,13 @@ public:
 				CStr CloudClientDirectory = AppManagerTestHelper.m_pState->m_RootDirectory / "MalterlibCloud";
 				CStr CloudClientPath = CloudClientDirectory / "MalterlibCloud";
 
-				auto fReadSensors = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
+				auto fReadSensors = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
 					{
 						co_return fg_FromString(co_await AppManagerTestHelper.f_LaunchTool(CloudClientPath, {"--cloud-manager-sensor-list", "--json"}, CloudClientDirectory));
 					}
 				;
 
-				auto fReadSensorReadings = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
+				auto fReadSensorReadings = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
 					{
 						co_return fg_FromString
 							(
@@ -409,7 +409,7 @@ public:
 					}
 				;
 
-				auto fReadSensorStatus = g_ActorFunctor / [&]() -> TCFuture<CEJSONSorted>
+				auto fReadSensorStatus = g_ActorFunctor / [&]() -> TCFuture<CEJsonSorted>
 					{
 						co_return fg_FromString
 							(

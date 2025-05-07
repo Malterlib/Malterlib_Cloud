@@ -5,9 +5,9 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 #include <Mib/Process/StdIn>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 #include "Malterlib_Cloud_App_CloudAPIManager.h"
 #include "Malterlib_Cloud_App_CloudAPIManager_Server.h"

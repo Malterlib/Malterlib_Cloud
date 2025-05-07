@@ -8,7 +8,7 @@
 #include <Mib/Concurrency/DistributedActorTestHelpers>
 #include <Mib/Concurrency/DistributedTrustTestHelpers>
 #include <Mib/Concurrency/DistributedAppLaunchHelper>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 using namespace NMib;
 using namespace NMib::NConcurrency;
@@ -43,7 +43,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		{
 		}
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override
+		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override
 		{
 			m_TunnelServer = fg_Construct
 				(
@@ -55,7 +55,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				)
 			;
 
-			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", m_ListenPath, 0, CEJSONSorted{}));
+			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", m_ListenPath, 0, CEJsonSorted{}));
 
 			co_await m_TunnelServer(&CNetworkTunnelsServer::f_Start);
 
@@ -94,7 +94,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		{
 		}
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override
+		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override
 		{
 			m_TunnelClient = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager);
 
@@ -117,7 +117,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			co_return {};
 		}
 
-		TCFuture<CEJSONSorted> fp_Test_Command(NStr::CStr _Command, NEncoding::CEJSONSorted const _Params) override
+		TCFuture<CEJsonSorted> fp_Test_Command(NStr::CStr _Command, NEncoding::CEJsonSorted const _Params) override
 		{
 			if (_Command == "OpenTunnel")
 			{
@@ -159,9 +159,9 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			{
 				auto Tunnels = co_await m_TunnelClient(&CNetworkTunnelsClient::f_EnumTunnels);
 
-				CEJSONSorted Return;
+				CEJsonSorted Return;
 
-				auto &OutTunnels = Return["Tunnels"] = EJSONType_Object;
+				auto &OutTunnels = Return["Tunnels"] = EJsonType_Object;
 
 				for (auto &TunnelsForHost : Tunnels)
 				{
@@ -339,7 +339,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				(
 					Tunnels
 					, ==
-					, CEJSONSorted
+					, CEJsonSorted
 					{
 						"Tunnels"_=
 						{

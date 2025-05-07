@@ -35,7 +35,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ChangeApplicationSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		fp_ReportInProgress(_pCommandLine, Name);
@@ -249,7 +249,7 @@ namespace NMib::NCloud::NAppManager
 			fp_SendAppChange_AddedOrChanged(Application);
 
 			_fOnInfo("Saving application state");
-			co_await (fp_UpdateApplicationJSON(pApplication) % "Failed to save application state" % Auditor);
+			co_await (fp_UpdateApplicationJson(pApplication) % "Failed to save application state" % Auditor);
 
 			if (ChangedSettings & EApplicationSetting_BackupEnabled)
 			{
@@ -299,7 +299,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
-			auto [Result, UpdateJSONResults] = co_await
+			auto [Result, UpdateJsonResults] = co_await
 				(
 					(
 						g_Dispatch(BlockingActorCheckout)
@@ -309,17 +309,17 @@ namespace NMib::NCloud::NAppManager
 							fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 						}
 					)
-					+ fp_UpdateApplicationJSON(pApplication)
+					+ fp_UpdateApplicationJson(pApplication)
 				)
 				.f_Wrap()
 			;
 
-			if (!Result && !UpdateJSONResults)
-				co_return Auditor.f_Exception("Failed to update application files and save application state: {} {}"_f << Result.f_GetExceptionStr() << UpdateJSONResults.f_GetExceptionStr());
+			if (!Result && !UpdateJsonResults)
+				co_return Auditor.f_Exception("Failed to update application files and save application state: {} {}"_f << Result.f_GetExceptionStr() << UpdateJsonResults.f_GetExceptionStr());
 			else if (!Result)
 				co_return Auditor.f_Exception("Failed to update application files: {}"_f << Result.f_GetExceptionStr());
-			else if (!UpdateJSONResults)
-				co_return Auditor.f_Exception("Failed to save application state: {}"_f << UpdateJSONResults.f_GetExceptionStr());
+			else if (!UpdateJsonResults)
+				co_return Auditor.f_Exception("Failed to save application state: {}"_f << UpdateJsonResults.f_GetExceptionStr());
 			else
 				_fOnInfo("Application state successfully stored, so any changes will persist");
 		}

@@ -6,7 +6,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/ActorSubscription>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Cloud/BackupManagerDownload>
 #include <Mib/CommandLine/TableRenderer>
 
@@ -42,7 +42,7 @@ namespace NMib::NCloud::NCloudClient
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_BackupManager_ListBackupSources(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -70,7 +70,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_BackupManager_ListBackups(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -140,7 +140,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_BackupManager_DownloadBackup(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -171,7 +171,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
@@ -223,7 +223,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
@@ -289,7 +289,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();

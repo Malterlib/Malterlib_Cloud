@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Concurrency/ActorSubscription>
@@ -218,7 +218,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		co_await fp_UpdateApplicationJSON(State.m_pApplication);
+		co_await fp_UpdateApplicationJson(State.m_pApplication);
 		co_return {};
 	}
 
@@ -479,7 +479,7 @@ namespace NMib::NCloud::NAppManager
 
 		State.m_pApplication->m_bPreventLaunch_Update = false;
 
-		co_await fp_UpdateApplicationJSON(State.m_pApplication);
+		co_await fp_UpdateApplicationJson(State.m_pApplication);
 		co_return {};
 	}
 

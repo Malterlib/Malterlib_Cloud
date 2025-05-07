@@ -6,7 +6,7 @@
 #include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -38,7 +38,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		for (auto &pUpdateWeak : mp_RunningUpdates)
 		{
@@ -52,7 +52,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
 		
@@ -79,8 +79,8 @@ namespace NMib::NCloud::NAppManager
 			if (auto *pValue = _Params.f_GetMember("RequiredTags"))
 			{
 				TCSet<CStr> RequiredTags;
-				for (auto &TagJSON : pValue->f_Array())
-					RequiredTags[TagJSON.f_String()];
+				for (auto &TagJson : pValue->f_Array())
+					RequiredTags[TagJson.f_String()];
 				Update.m_RequireTags = fg_Move(RequiredTags);
 			}
 			
@@ -242,7 +242,7 @@ namespace NMib::NCloud::NAppManager
 
 					fp_SendAppChange_AddedOrChanged(*pApplication);
 
-					co_await fp_UpdateApplicationJSON(pApplication);
+					co_await fp_UpdateApplicationJson(pApplication);
 				}
 			}
 		}

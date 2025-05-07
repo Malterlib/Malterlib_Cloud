@@ -7,7 +7,7 @@
 #include <Mib/Cloud/KeyManagerDatabases/EncryptedFile>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 #include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_KeyManager.h"
@@ -48,7 +48,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return {};
 	}
 
-	TCFuture<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJSONSorted const _Params)
+	TCFuture<void> CKeyManagerDaemonActor::fp_StartApp(NEncoding::CEJsonSorted const _Params)
 	{
 		DMibLogWithCategory(Mib/Cloud/KeyManager/Daemon, Warning, "Waiting for user to provide password");
 		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();

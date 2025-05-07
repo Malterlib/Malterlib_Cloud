@@ -8,9 +8,9 @@
 #include <Mib/Cloud/KeyManagerDatabases/EncryptedFile>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 #include <Mib/Process/StdIn>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Concurrency/ActorFunctor>
 
 #include "Malterlib_Cloud_App_KeyManager.h"
@@ -43,7 +43,7 @@ namespace NMib::NCloud::NKeyManager
 					"Names"_o= _o["--provide-password"]
 					, "Description"_o= "Provide a password for the key database to be able to start the key manager."
 				}
-				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return f_ProvidePassword(fg_Move(_pCommandLine));
 				}
@@ -55,7 +55,7 @@ namespace NMib::NCloud::NKeyManager
 					"Names"_o= _o["--change-password"]
 					, "Description"_o= "Change the password that is used to unencrypt the key manager database."
 				}
-				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return f_ChangePassword(fg_Move(_pCommandLine));
 				}
@@ -82,7 +82,7 @@ namespace NMib::NCloud::NKeyManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return f_PreCreateKeys(_Parameters["KeySize"].f_Integer(), _Parameters["NumberOfKeys"].f_Integer(), fg_Move(_pCommandLine));
 				}
@@ -98,7 +98,7 @@ namespace NMib::NCloud::NKeyManager
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return f_ListPreCreatedKeys(fg_Move(_Parameters), fg_Move(_pCommandLine));
 				}
@@ -119,7 +119,7 @@ namespace NMib::NCloud::NKeyManager
 						}
 					}
 				}
-				, [this](CEJSONSorted _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					co_await f_RemovePreCreatedKeys(fg_Move(_Parameters), _pCommandLine);
 
@@ -141,7 +141,7 @@ namespace NMib::NCloud::NKeyManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted const &_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return f_RemoveVerifiedHosts(TCSet<CStr>::fs_FromContainer(_Parameters["HostIDs"].f_StringArray()), fg_Move(_pCommandLine));
 				}
@@ -157,7 +157,7 @@ namespace NMib::NCloud::NKeyManager
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return f_ListVerifiedHosts(fg_Move(_Parameters), fg_Move(_pCommandLine));
 				}
@@ -173,7 +173,7 @@ namespace NMib::NCloud::NKeyManager
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return f_ListKeys(fg_Move(_Parameters), fg_Move(_pCommandLine));
 				}
@@ -212,7 +212,7 @@ namespace NMib::NCloud::NKeyManager
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Parameters, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return f_CopyKey(fg_Move(_Parameters), fg_Move(_pCommandLine));
 				}
@@ -233,7 +233,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_ListPreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ListPreCreatedKeys(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
 
@@ -258,7 +258,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_RemovePreCreatedKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_RemovePreCreatedKeys(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
 
@@ -290,7 +290,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_ListVerifiedHosts(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ListVerifiedHosts(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
 
@@ -331,7 +331,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_ListKeys(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_ListKeys(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
 
@@ -379,7 +379,7 @@ namespace NMib::NCloud::NKeyManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CKeyManagerDaemonActor::f_CopyKey(CEJSONSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CKeyManagerDaemonActor::f_CopyKey(CEJsonSorted const _Parameters, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
 

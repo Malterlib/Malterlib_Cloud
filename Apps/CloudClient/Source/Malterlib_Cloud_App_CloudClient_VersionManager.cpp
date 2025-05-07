@@ -6,7 +6,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/AsyncDestroy>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/CommandLine/TableRenderer>
 
 #include "Malterlib_Cloud_App_CloudClient.h"
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NCloudClient
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_ListApplications(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -80,7 +80,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_ListVersions(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -115,7 +115,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Description"_o= "The JSON file to read settings from.\n"
 							"Settings in the settings file is overridden by settings specified on the command line.\n"
 							"The format template for the settings file is:\n" +
-							CEJSONOrdered
+							CEJsonOrdered
 							{
 								"Application"_o= "AppName"
 								, "Version"_o= "Branch/1.0.1"
@@ -161,7 +161,7 @@ namespace NMib::NCloud::NCloudClient
 						, "ExtraInfo?"_o=
 						{
 							"Names"_o= _o["--info"]
-							, "Type"_o= EJSONType_Object
+							, "Type"_o= EJsonType_Object
 							, "Description"_o= "EJSON formatted extra information.\n"
 						}
 						, "Tags?"_o=
@@ -207,7 +207,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_UploadVersion(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -268,7 +268,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_ChangeTags(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -323,7 +323,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_VersionManager_DownloadVersion(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -354,7 +354,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
@@ -405,7 +405,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -519,7 +519,7 @@ namespace NMib::NCloud::NCloudClient
 
 				CStr ExtraInfo;
 				if (bVerbose && Version.m_ExtraInfo.f_IsValid())
-					ExtraInfo = Version.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", EJSONDialectFlag_AllowUndefined);
+					ExtraInfo = Version.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", EJsonDialectFlag_AllowUndefined);
 
 				TableRenderer.f_AddRow
 					(
@@ -551,7 +551,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
 		if (Source.f_IsEmpty())
@@ -561,7 +561,7 @@ namespace NMib::NCloud::NCloudClient
 		if (!SettingsFile.f_IsEmpty())
 			SettingsFile = CFile::fs_GetFullPath(SettingsFile, _Params["CurrentDirectory"].f_String());
 
-		TCVariant<CStr, CEJSONSorted> SettingsFileOrSettings;
+		TCVariant<CStr, CEJsonSorted> SettingsFileOrSettings;
 		if (!SettingsFile.f_IsEmpty())
 			SettingsFileOrSettings = SettingsFile;
 		else if (_Params["SettingsFileFromPackage"].f_Boolean() && (Source.f_EndsWith(".tar.gz") || Source.f_EndsWith(".tar")))
@@ -587,12 +587,12 @@ namespace NMib::NCloud::NCloudClient
 
 			auto LaunchResult = co_await LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch)).f_Wrap();
 
-			CEJSONSorted VersionInfo = EJSONType_Object;
+			CEJsonSorted VersionInfo = EJsonType_Object;
 			if (LaunchResult)
 			{
 				try
 				{
-					VersionInfo = CEJSONSorted::fs_FromString(LaunchResult->f_GetStdOut());
+					VersionInfo = CEJsonSorted::fs_FromString(LaunchResult->f_GetStdOut());
 				}
 				catch (CException const &_Exception)
 				{
@@ -611,8 +611,8 @@ namespace NMib::NCloud::NCloudClient
 		else
 			SettingsFileOrSettings = CStr{};
 
-		CEJSONSorted Settings;
-		if (SettingsFileOrSettings.f_IsOfType<CEJSONSorted>())
+		CEJsonSorted Settings;
+		if (SettingsFileOrSettings.f_IsOfType<CEJsonSorted>())
 			Settings = SettingsFileOrSettings.f_Get<1>();
 		else
 		{
@@ -624,7 +624,7 @@ namespace NMib::NCloud::NCloudClient
 					(
 						g_Dispatch(BlockingActorCheckout) / [SettingsFile]
 						{
-							return CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
+							return CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
 						}
 					)
 					.f_Wrap();
@@ -637,26 +637,26 @@ namespace NMib::NCloud::NCloudClient
 				Settings = fg_Move(*SettingsResult);
 			}
 			else
-				Settings = EJSONType_Object;
+				Settings = EJsonType_Object;
 		}
 
 		CStr Application;
 		CStr Version;
 		CStr Configuration;
 		CStr Platform;
-		CEJSONSorted ExtraInfo;
+		CEJsonSorted ExtraInfo;
 
-		auto fApplySettings = [&](CEJSONSorted const &_Settings)
+		auto fApplySettings = [&](CEJsonSorted const &_Settings)
 			{
-				if (auto *pValue = _Settings.f_GetMember("Application", EJSONType_String))
+				if (auto *pValue = _Settings.f_GetMember("Application", EJsonType_String))
 					Application = pValue->f_String();
-				if (auto *pValue = _Settings.f_GetMember("Version", EJSONType_String))
+				if (auto *pValue = _Settings.f_GetMember("Version", EJsonType_String))
 					Version = pValue->f_String();
-				if (auto *pValue = _Settings.f_GetMember("Configuration", EJSONType_String))
+				if (auto *pValue = _Settings.f_GetMember("Configuration", EJsonType_String))
 					Configuration = pValue->f_String();
-				if (auto *pValue = _Settings.f_GetMember("Platform", EJSONType_String))
+				if (auto *pValue = _Settings.f_GetMember("Platform", EJsonType_String))
 					Platform = pValue->f_String();
-				if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJSONType_Object))
+				if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJsonType_Object))
 					ExtraInfo = pValue->f_Object();
 			}
 		;
@@ -672,9 +672,9 @@ namespace NMib::NCloud::NCloudClient
 			QueueSize = 128*1024;
 
 		TCSet<CStr> Tags;
-		for (auto &TagJSON : _Params["Tags"].f_Array())
+		for (auto &TagJson : _Params["Tags"].f_Array())
 		{
-			CStr const &Tag = TagJSON.f_String();
+			CStr const &Tag = TagJson.f_String();
 			if (!CVersionManager::fs_IsValidTag(Tag))
 				co_return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
 			Tags[Tag];
@@ -774,7 +774,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -832,7 +832,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
@@ -857,12 +857,12 @@ namespace NMib::NCloud::NCloudClient
 		if (!Platform.f_IsEmpty() && !CVersionManager::fs_IsValidPlatform(Platform))
 			co_return DMibErrorInstance("Version platform format is invalid");
 
-		auto fParseTags = [](CEJSONSorted const &_Tags)
+		auto fParseTags = [](CEJsonSorted const &_Tags)
 			{
 				TCSet<CStr> OutTags;
-				for (auto &TagJSON : _Tags.f_Array())
+				for (auto &TagJson : _Tags.f_Array())
 				{
-					CStr const &Tag = TagJSON.f_String();
+					CStr const &Tag = TagJson.f_String();
 					if (!CVersionManager::fs_IsValidTag(Tag))
 						DMibError(fg_Format("'{}' is not a valid tag", Tag));
 					OutTags[Tag];

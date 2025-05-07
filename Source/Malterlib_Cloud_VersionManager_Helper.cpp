@@ -361,13 +361,13 @@ namespace NMib::NCloud
 
 	namespace
 	{
-		CVersionManagerHelper::CPackageInfo fg_ExtractPackageInfo(CEJSONSorted const &_VersionInfoJSON)
+		CVersionManagerHelper::CPackageInfo fg_ExtractPackageInfo(CEJsonSorted const &_VersionInfoJson)
 		{
 			CVersionManagerHelper::CPackageInfo PackageInfo;
 
 			{
 				CStr Version;
-				if (auto *pValue = _VersionInfoJSON.f_GetMember("Version", EJSONType_String))
+				if (auto *pValue = _VersionInfoJson.f_GetMember("Version", EJsonType_String))
 					Version = pValue->f_String();
 
 				CStr Error;
@@ -377,7 +377,7 @@ namespace NMib::NCloud
 
 			{
 				CStr Platform;
-				if (auto *pValue = _VersionInfoJSON.f_GetMember("Platform", EJSONType_String))
+				if (auto *pValue = _VersionInfoJson.f_GetMember("Platform", EJsonType_String))
 					Platform = pValue->f_String();
 
 				if (!CVersionManager::fs_IsValidPlatform(Platform))
@@ -386,10 +386,10 @@ namespace NMib::NCloud
 				PackageInfo.m_VersionID.m_Platform = Platform;
 			}
 
-			if (auto *pValue = _VersionInfoJSON.f_GetMember("Configuration", EJSONType_String))
+			if (auto *pValue = _VersionInfoJson.f_GetMember("Configuration", EJsonType_String))
 				PackageInfo.m_VersionInfo.m_Configuration = pValue->f_String();
 
-			if (auto *pValue = _VersionInfoJSON.f_GetMember("ExtraInfo", EJSONType_Object))
+			if (auto *pValue = _VersionInfoJson.f_GetMember("ExtraInfo", EJsonType_Object))
 				PackageInfo.m_VersionInfo.m_ExtraInfo = pValue->f_Object();
 
 			return PackageInfo;
@@ -432,7 +432,7 @@ namespace NMib::NCloud
 
 				auto VersionInfoStr = (co_await pState->m_Launch(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))).f_GetStdOut();
 
-				CEJSONSorted VersionInfo = CEJSONSorted::fs_FromString(VersionInfoStr);
+				CEJsonSorted VersionInfo = CEJsonSorted::fs_FromString(VersionInfoStr);
 
 				CVersionManagerHelper::CPackageInfo PackageInfo = fg_ExtractPackageInfo(VersionInfo);
 
@@ -558,9 +558,9 @@ namespace NMib::NCloud
 						DMibError("Several VersionInfo.json file found in package source directory");
 
 					CStr VersionInfoFile = Files[0];
-					CEJSONSorted VersionInfoJSON = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile, true), VersionInfoFile);
+					CEJsonSorted VersionInfoJson = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile, true), VersionInfoFile);
 
-					CPackageInfo PackageInfo = fg_ExtractPackageInfo(VersionInfoJSON);
+					CPackageInfo PackageInfo = fg_ExtractPackageInfo(VersionInfoJson);
 
 					{
 						CFile::CFindFilesOptions FindOptions{_SourceDirectory + "/*", true};

@@ -5,7 +5,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/LogError>
 
@@ -38,17 +38,17 @@ namespace NMib::NCloud::NVersionManager
 			(
 				g_Dispatch(BlockingActorCheckout) / [_VersionInfo, _VersionPath]() mutable -> CSizeInfo
 				{
-					CEJSONSorted VersionJSONInfo;
+					CEJsonSorted VersionJsonInfo;
 					CStr VersionInfoPath = fg_Format("{}.json", _VersionPath);
 
-					VersionJSONInfo["Time"] = _VersionInfo.m_Time;
-					VersionJSONInfo["Configuration"] = _VersionInfo.m_Configuration;
+					VersionJsonInfo["Time"] = _VersionInfo.m_Time;
+					VersionJsonInfo["Configuration"] = _VersionInfo.m_Configuration;
 					if (_VersionInfo.m_ExtraInfo.f_IsObject())
-						VersionJSONInfo["ExtraInfo"] = _VersionInfo.m_ExtraInfo;
-					auto &TagsArray = VersionJSONInfo["Tags"].f_Array();
+						VersionJsonInfo["ExtraInfo"] = _VersionInfo.m_ExtraInfo;
+					auto &TagsArray = VersionJsonInfo["Tags"].f_Array();
 					for (auto &Tag : _VersionInfo.m_Tags)
 						TagsArray.f_Insert(Tag);
-					VersionJSONInfo["RetrySequence"] = _VersionInfo.m_RetrySequence;
+					VersionJsonInfo["RetrySequence"] = _VersionInfo.m_RetrySequence;
 
 					CSizeInfo SizeInfo;
 					auto Files = CFile::fs_FindFiles(_VersionPath + "/*", EFileAttrib_File, true);
@@ -57,7 +57,7 @@ namespace NMib::NCloud::NVersionManager
 						SizeInfo.m_nBytes += CFile::fs_GetFileSize(File);
 
 					CFile::fs_CreateDirectory(CFile::fs_GetPath(VersionInfoPath));
-					CFile::fs_WriteStringToFile(VersionInfoPath, VersionJSONInfo.f_ToString(), false, gc_FilePermissions);
+					CFile::fs_WriteStringToFile(VersionInfoPath, VersionJsonInfo.f_ToString(), false, gc_FilePermissions);
 
 					return SizeInfo;
 				}
@@ -145,7 +145,7 @@ namespace NMib::NCloud::NVersionManager
 				VersionInfo.m_Tags.f_Remove(Tag);
 		}
 
-		// Force time to same as when saving in JSON file
+		// Force time to same as when saving in Json file
 		VersionInfo.m_Time = CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(VersionInfo.m_Time).f_UnixMilliseconds());
 
 		CStr UploadID = fg_RandomID(pThis->mp_VersionUploads);

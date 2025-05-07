@@ -1,7 +1,7 @@
 // Copyright © 2018 Nonna Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/CommandLine/TableRenderer>
 
@@ -35,7 +35,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		co_return fg_Move(Versions);
 	}
 
-	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionEnum(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_DistributionEnum(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CStr DistributionName = _Params["Distribution"].f_String();
@@ -85,7 +85,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	TCFuture<uint32> CAppDistributionManagerActor::fp_CommandLine_ApplicationListAvailableVersions
 		(
-			CEJSONSorted const _Params
+			CEJsonSorted const _Params
 			, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
 	{
@@ -116,7 +116,7 @@ namespace NMib::NCloud::NAppDistributionManager
 						, "{vs,vb}"_f << Version.m_VersionInfo.m_Tags
 						, Version.m_VersionInfo.m_RetrySequence
 						, Version.m_VersionInfo.m_ExtraInfo.f_IsValid() 
-						? Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", EJSONDialectFlag_AllowUndefined) 
+						? Version.m_VersionInfo.m_ExtraInfo.f_ToStringColored(_pCommandLine->m_AnsiFlags, "  ", EJsonDialectFlag_AllowUndefined)
 						: CStr()
 					)
 				;

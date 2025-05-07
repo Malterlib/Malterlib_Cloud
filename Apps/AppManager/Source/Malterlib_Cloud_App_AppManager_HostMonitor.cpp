@@ -1,7 +1,7 @@
 // Copyright © 2020 Favro Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/LogError>
 #include <Mib/CommandLine/TableRenderer>
@@ -28,7 +28,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJSONType_Object))
+		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
 		{
 			if (pAutoUpdate->f_GetMemberValue("NormalUpdates", false).f_Boolean())
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_NormalUpdates;
@@ -85,7 +85,7 @@ namespace NMib::NCloud::NAppManager
 						CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_HostMonitorConfigList(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -116,7 +116,7 @@ namespace NMib::NCloud::NAppManager
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_HostMonitorConfigVersionList(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -146,7 +146,7 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_HostMonitorConfigContentsGet(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -154,7 +154,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_HostMonitor)
 			co_return DMibErrorInstance("Host monitor not yet initialized");
@@ -176,7 +176,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigVersionList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		if (!mp_HostMonitor)
 			co_return DMibErrorInstance("Host monitor not yet initialized");
@@ -251,7 +251,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_HostMonitorConfigContentsGet(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		NHostMonitor::CConfigFileVersionKey Key;
 		Key.m_FileName = _Params["FileName"].f_String();

@@ -214,7 +214,7 @@ namespace NMib::NCloud
 									auto String = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
 									try
 									{
-										Contents.m_Parsed = CEJSONSorted::fs_FromString(String, _FileName, false, EJSONDialectFlag_AllowUndefined | EJSONDialectFlag_AllowInvalidFloat);
+										Contents.m_Parsed = CEJsonSorted::fs_FromString(String, _FileName, false, EJsonDialectFlag_AllowUndefined | EJsonDialectFlag_AllowInvalidFloat);
 									}
 									catch (CException const &_Exception)
 									{
@@ -346,7 +346,7 @@ namespace NMib::NCloud
 
 	namespace
 	{
-		void fg_FindJsonDiffsRecursive(CEJSONSorted const &_Old, CEJSONSorted const &_New, TCVector<CStr> &o_Changed, TCVector<CStr> &o_Added, TCVector<CStr> &o_Deleted, CStr const &_Context)
+		void fg_FindJsonDiffsRecursive(CEJsonSorted const &_Old, CEJsonSorted const &_New, TCVector<CStr> &o_Changed, TCVector<CStr> &o_Added, TCVector<CStr> &o_Deleted, CStr const &_Context)
 		{
 			if (_Old == _New)
 				return;
@@ -358,19 +358,19 @@ namespace NMib::NCloud
 			}
 			switch (_New.f_EType())
 			{
-			case EEJSONType_Invalid:
-			case EEJSONType_Null:
+			case EEJsonType_Invalid:
+			case EEJsonType_Null:
 				break;
-			case EEJSONType_String:
-			case EEJSONType_Integer:
-			case EEJSONType_Float:
-			case EEJSONType_Boolean:
-			case EEJSONType_Date:
-			case EEJSONType_UserType:
-			case EEJSONType_Binary:
+			case EEJsonType_String:
+			case EEJsonType_Integer:
+			case EEJsonType_Float:
+			case EEJsonType_Boolean:
+			case EEJsonType_Date:
+			case EEJsonType_UserType:
+			case EEJsonType_Binary:
 				o_Changed.f_Insert(_Context);
 				break;
-			case EEJSONType_Object:
+			case EEJsonType_Object:
 				{
 					auto iOld = _Old.f_Object().f_OrderedIterator();
 					auto iNew = _New.f_Object().f_OrderedIterator();
@@ -397,7 +397,7 @@ namespace NMib::NCloud
 					}
 				}
 				break;
-			case EEJSONType_Array:
+			case EEJsonType_Array:
 				{
 					auto iOld = _Old.f_Array().f_GetIterator();
 					auto iNew = _New.f_Array().f_GetIterator();
@@ -414,7 +414,7 @@ namespace NMib::NCloud
 			}
 		}
 
-		void fg_FindJsonDiffs(CEJSONSorted const &_Old, CEJSONSorted const &_New, TCVector<CStr> &o_Changed, TCVector<CStr> &o_Added, TCVector<CStr> &o_Deleted)
+		void fg_FindJsonDiffs(CEJsonSorted const &_Old, CEJsonSorted const &_New, TCVector<CStr> &o_Changed, TCVector<CStr> &o_Added, TCVector<CStr> &o_Deleted)
 		{
 			fg_FindJsonDiffsRecursive(_Old, _New, o_Changed, o_Added, o_Deleted, "<Root>");
 		}

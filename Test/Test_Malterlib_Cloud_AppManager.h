@@ -18,7 +18,7 @@
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Cryptography/RandomID>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Cloud/App/AppManager>
 #include <Mib/Cloud/App/CloudManager>
 #include <Mib/Cloud/App/VersionManager>

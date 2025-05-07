@@ -335,7 +335,7 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		if (bUpdatedAppInfo)
-			co_await fp_UpdateApplicationJSON(_pState->m_pApplication);
+			co_await fp_UpdateApplicationJson(_pState->m_pApplication);
 
 		co_return {};
 	}

@@ -5,7 +5,7 @@
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/CommandLine/TableRenderer>
 #include <Mib/CommandLine/AnsiEncoding>
 
@@ -45,7 +45,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_NetworkTunnel_EnumTunnels(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -90,7 +90,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_NetworkTunnel_OpenTunnels(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -109,7 +109,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> CCloudClientAppActor::fp_NetworkTunnel_Filter(CEJSONSorted const _Params)
+	TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> CCloudClientAppActor::fp_NetworkTunnel_Filter(CEJsonSorted const _Params)
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
 
@@ -142,7 +142,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return fg_Move(Return);
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto TunnelsPerHost = co_await fp_NetworkTunnel_Filter(_Params);
 
@@ -155,7 +155,7 @@ namespace NMib::NCloud::NCloudClient
 			for (auto &Tunnel : Tunnels)
 			{
 				auto &TunnelName = Tunnels.fs_GetKey(Tunnel);
-				TableRenderer.f_AddRow(HostID, TunnelName, Tunnel.m_MetaData.f_ToStringColored(_pCommandLine->m_AnsiFlags, "\t", EJSONDialectFlag_AllowUndefined));
+				TableRenderer.f_AddRow(HostID, TunnelName, Tunnel.m_MetaData.f_ToStringColored(_pCommandLine->m_AnsiFlags, "\t", EJsonDialectFlag_AllowUndefined));
 			}
 		}
 
@@ -172,7 +172,7 @@ namespace NMib::NCloud::NCloudClient
 		auto operator <=> (CTunnelKey const &_Right) const = default;
 	};
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
 
@@ -196,7 +196,7 @@ namespace NMib::NCloud::NCloudClient
 				CTunnelKey TunnelKey{HostID, TunnelName};
 
 				auto &URLTemplate = URLTemplates[TunnelKey];
-				if (auto *pValue = Tunnel.m_MetaData.f_GetMember("URLTemplate", EJSONType_String))
+				if (auto *pValue = Tunnel.m_MetaData.f_GetMember("URLTemplate", EJsonType_String))
 					URLTemplate = pValue->f_String();
 				else
 					URLTemplate = "{Host}:{Port}";

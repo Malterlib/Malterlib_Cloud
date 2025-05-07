@@ -7,7 +7,7 @@
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/DistributedAppSensorReader>
 #include <Mib/Concurrency/DistributedAppLogReader>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/CommandLine/TableRenderer>
 #include <Mib/CommandLine/AnsiEncoding>
 
@@ -103,7 +103,7 @@ namespace NMib::NCloud::NCloudClient
 						, FilterOutOfDateVersion
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_Applications | ECloudManagerStatusFlag_AppManagers;
 					return fp_CommandLine_CloudManager_Status(fg_Move(_Params), fg_Move(_pCommandLine), ReportFor);
@@ -130,7 +130,7 @@ namespace NMib::NCloud::NCloudClient
 						, FilterEnvironment
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_AppManagers;
 					return fp_CommandLine_CloudManager_Status(fg_Move(_Params), fg_Move(_pCommandLine), ReportFor);
@@ -159,7 +159,7 @@ namespace NMib::NCloud::NCloudClient
 						, FilterOutOfDateVersion
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					auto ReportFor = ECloudManagerStatusFlag_Applications;
 					return fp_CommandLine_CloudManager_Status(fg_Move(_Params), fg_Move(_pCommandLine), ReportFor);
@@ -185,7 +185,7 @@ namespace NMib::NCloud::NCloudClient
 						QuietOption
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					return fp_CommandLine_CloudManager_RemoveAppManager(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -232,7 +232,7 @@ namespace NMib::NCloud::NCloudClient
 						, QuietOption
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					return fp_CommandLine_CloudManager_RemoveSensor(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -280,7 +280,7 @@ namespace NMib::NCloud::NCloudClient
 						, QuietOption
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					return fp_CommandLine_CloudManager_RemoveLog(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -340,7 +340,7 @@ namespace NMib::NCloud::NCloudClient
 						, QuietOption
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					return fp_CommandLine_CloudManager_SnoozeSensor(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -359,7 +359,7 @@ namespace NMib::NCloud::NCloudClient
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					return fp_CommandLine_CloudManager_ExpectedOsVersionList(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -412,7 +412,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine) -> TCFuture<uint32>
 				{
 					return fp_CommandLine_CloudManager_ExpectedOsVersionSet(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -427,7 +427,7 @@ namespace NMib::NCloud::NCloudClient
 				, "cloud-manager-"
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const _Params
+					CEJsonSorted const _Params
 					, TCSharedPointer<CCommandLineControl> _pCommandLine
 					, CDistributedAppSensorReader_SensorFilter _Filter
 					, ESensorOutputFlag _Flags
@@ -447,7 +447,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const _Params
+					CEJsonSorted const _Params
 					, TCSharedPointer<CCommandLineControl> _pCommandLine
 					, CDistributedAppSensorReader_SensorStatusFilter _Filter
 					, ESensorOutputFlag _Flags
@@ -476,7 +476,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const _Params
+					CEJsonSorted const _Params
 					, TCSharedPointer<CCommandLineControl> _pCommandLine
 					, CDistributedAppSensorReader_SensorReadingFilter _Filter
 					, uint64 _MaxEntries
@@ -511,7 +511,7 @@ namespace NMib::NCloud::NCloudClient
 				, "cloud-manager-"
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const _Params
+					CEJsonSorted const _Params
 					, TCSharedPointer<CCommandLineControl> _pCommandLine
 					, CDistributedAppLogReader_LogFilter _Filter
 					, ELogOutputFlag _Flags
@@ -533,7 +533,7 @@ namespace NMib::NCloud::NCloudClient
 				}
 				, g_ActorFunctor / [this]
 				(
-					CEJSONSorted const _Params
+					CEJsonSorted const _Params
 					, TCSharedPointer<CCommandLineControl> _pCommandLine
 					, CDistributedAppLogReader_LogEntryFilter _Filter
 					, uint64 _MaxEntries
@@ -707,7 +707,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_AppManagers
 		(
-			CEJSONSorted const _Params
+			CEJsonSorted const _Params
 			, TCMap<CHostInfo, TCAsyncResult<TCMap<CStr, CCloudManager::CAppManagerDynamicInfo>>> _AppManagers
 			, TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
@@ -864,7 +864,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status_Applications
 		(
-			CEJSONSorted const _Params
+			CEJsonSorted const _Params
 			, TCMap<CHostInfo, TCAsyncResult<TCMap<CCloudManager::CApplicationKey, CCloudManager::CApplicationInfo>>> _Applications
 			, TCMap<CStr, CCloudManagerAppManagerInfo> _AppManagerInfos
 			, TCSharedPointer<CCommandLineControl> _pCommandLine
@@ -1176,7 +1176,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_Status
 		(
-			CEJSONSorted const _Params
+			CEJsonSorted const _Params
 			, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine
 			, ECloudManagerStatusFlag _Flags
 		)
@@ -1246,7 +1246,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return fg_Max(ReturnAppManagers, ReturnApplications);
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		CStr AppManagerHostID = _Params["AppManagerHostID"].f_String();
@@ -1289,7 +1289,7 @@ namespace NMib::NCloud::NCloudClient
 
 	namespace
 	{
-		CExceptionPointer fg_ParseSensorFilter(auto &o_Filter, CEJSONSorted const &_Params, CStr const &_Action)
+		CExceptionPointer fg_ParseSensorFilter(auto &o_Filter, CEJsonSorted const &_Params, CStr const &_Action)
 		{
 			if (auto pValue = _Params.f_GetMember("SensorHostID"))
 				o_Filter.m_HostID = pValue->f_String();
@@ -1313,7 +1313,7 @@ namespace NMib::NCloud::NCloudClient
 		}
 	}
 	
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1350,7 +1350,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1410,7 +1410,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_SnoozeSensor(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_SnoozeSensor(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1457,7 +1457,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1535,7 +1535,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["Host"].f_String();
 

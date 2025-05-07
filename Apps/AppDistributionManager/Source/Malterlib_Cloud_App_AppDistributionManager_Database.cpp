@@ -1,7 +1,7 @@
 // Copyright © 2018 Nonna Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include "Malterlib_Cloud_App_AppDistributionManager.h"
 
 namespace NMib::NCloud::NAppDistributionManager
@@ -24,7 +24,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			DMibError("Invalid deploy destination: {}"_f << _Type);
 	}
 
-	void CAppDistributionManagerActor::fp_ParseSettings(CEJSONSorted const &_Params, CDistributionSettings &o_Settings)
+	void CAppDistributionManagerActor::fp_ParseSettings(CEJsonSorted const &_Params, CDistributionSettings &o_Settings)
 	{
 		if (auto pValue = _Params.f_GetMember("VersionManagerApplication"))
 		{
@@ -73,9 +73,9 @@ namespace NMib::NCloud::NAppDistributionManager
 		}
 	}
 
-	CEJSONSorted CAppDistributionManagerActor::fp_SaveSettings(CDistributionSettings const &_Settings)
+	CEJsonSorted CAppDistributionManagerActor::fp_SaveSettings(CDistributionSettings const &_Settings)
 	{
-		CEJSONSorted Distribution;
+		CEJsonSorted Distribution;
 
 		Distribution["VersionManagerApplication"] = _Settings.m_VersionManagerApplication;
 		Distribution["RenameTemplate"] = _Settings.m_RenameTemplate;
@@ -115,15 +115,15 @@ namespace NMib::NCloud::NAppDistributionManager
 		auto &Distribution = Distributions[_Distribution.f_GetName()];
 		Distribution["Settings"] = fp_SaveSettings(_Distribution.m_Settings);
 		{
-			auto &DeployedVersionsJSON = Distribution["DeployedVersions"];
-			DeployedVersionsJSON.f_Array();
+			auto &DeployedVersionsJson = Distribution["DeployedVersions"];
+			DeployedVersionsJson.f_Array();
 			for (auto &VersionInfo : _Distribution.m_DeployedVersions)
 			{
 				auto &VersionID = _Distribution.m_DeployedVersions.fs_GetKey(VersionInfo);
-				auto &DistributedVersionJSON = DeployedVersionsJSON.f_Insert();
-				DistributedVersionJSON["Version"] = VersionID.f_ToJson();
-				DistributedVersionJSON["Time"] = VersionInfo.m_Time;
-				DistributedVersionJSON["RetrySequence"] = VersionInfo.m_RetrySequence;
+				auto &DistributedVersionJson = DeployedVersionsJson.f_Insert();
+				DistributedVersionJson["Version"] = VersionID.f_ToJson();
+				DistributedVersionJson["Time"] = VersionInfo.m_Time;
+				DistributedVersionJson["RetrySequence"] = VersionInfo.m_RetrySequence;
 			}
 		}
 	}
@@ -141,19 +141,19 @@ namespace NMib::NCloud::NAppDistributionManager
 			if (!fg_IsValidHostname(Name))
 				DMibError("'{}' is not a valid distribution name"_f << Name);
 
-			auto &DistributionJSON = DistributionObject.f_Value();
+			auto &DistributionJson = DistributionObject.f_Value();
 
 			CDistributionSettings Settings;
-			fp_ParseSettings(DistributionJSON["Settings"], Settings);
+			fp_ParseSettings(DistributionJson["Settings"], Settings);
 
 			TCMap<CVersionManager::CVersionIDAndPlatform, CDeployedVersionInfo> DeployedVersions;
-			if (auto *pDeployedVersions = DistributionJSON.f_GetMember("DeployedVersions"))
+			if (auto *pDeployedVersions = DistributionJson.f_GetMember("DeployedVersions"))
 			{
-				for (auto &DistributedVersionJSON : pDeployedVersions->f_Array())
+				for (auto &DistributedVersionJson : pDeployedVersions->f_Array())
 				{
-					auto Version = CVersionManager::CVersionIDAndPlatform::fs_FromJson(DistributedVersionJSON["Version"]);
-					DeployedVersions[Version].m_Time = DistributedVersionJSON["Time"].f_Date();
-					DeployedVersions[Version].m_RetrySequence = DistributedVersionJSON["RetrySequence"].f_Integer();
+					auto Version = CVersionManager::CVersionIDAndPlatform::fs_FromJson(DistributedVersionJson["Version"]);
+					DeployedVersions[Version].m_Time = DistributedVersionJson["Time"].f_Date();
+					DeployedVersions[Version].m_RetrySequence = DistributedVersionJson["RetrySequence"].f_Integer();
 				}
 			}
 

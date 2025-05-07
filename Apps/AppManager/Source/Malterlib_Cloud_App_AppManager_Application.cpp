@@ -229,7 +229,7 @@ namespace NMib::NCloud::NAppManager
 						TCFuture<void> SaveStateFuture;
 
 						if (_Flags & (EStopFlag_PreventLaunchUser | EStopFlag_PreventLaunchUpdate))
-							SaveStateFuture = m_pThis->fp_UpdateApplicationJSON(pApplication);
+							SaveStateFuture = m_pThis->fp_UpdateApplicationJson(pApplication);
 						else
 							SaveStateFuture = g_Void;
 

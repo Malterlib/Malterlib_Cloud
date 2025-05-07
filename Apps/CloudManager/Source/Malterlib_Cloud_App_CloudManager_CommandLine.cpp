@@ -7,7 +7,7 @@
 #include <Mib/Web/WebSocket>
 #include <Mib/Network/SSL>
 #include <Mib/Network/Sockets/SSL>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 namespace NMib::NCloud::NCloudManager
 {
@@ -39,7 +39,7 @@ namespace NMib::NCloud::NCloudManager
 						}
 					}
 				}
-				, [this](CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
 					co_await mp_Server(&CCloudManagerServer::f_DumpDatabaseEntries, _pCommandLine, _Params["Prefix"].f_String());
 

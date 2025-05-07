@@ -5,7 +5,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 
 #include "Malterlib_Cloud_App_CloudManager.h"
 #include "Malterlib_Cloud_App_CloudManager_Internal.h"
@@ -21,7 +21,7 @@ namespace NMib::NCloud::NCloudManager
 	{
 	}
 
-	TCFuture<void> CCloudManagerApp::fp_StartApp(NEncoding::CEJSONSorted const _Params)
+	TCFuture<void> CCloudManagerApp::fp_StartApp(NEncoding::CEJsonSorted const _Params)
 	{
 		mp_Server = fg_ConstructActor<CCloudManagerServer>(fg_Construct(self), mp_State);
 		co_await mp_Server(&CCloudManagerServer::f_Init);

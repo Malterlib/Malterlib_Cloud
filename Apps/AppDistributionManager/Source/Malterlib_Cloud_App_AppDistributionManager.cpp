@@ -14,7 +14,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	CAppDistributionManagerActor::~CAppDistributionManagerActor() = default;
 
-	TCFuture<void> CAppDistributionManagerActor::fp_StartApp(NEncoding::CEJSONSorted const _Params)
+	TCFuture<void> CAppDistributionManagerActor::fp_StartApp(NEncoding::CEJsonSorted const _Params)
 	{
 		co_await fp_ReadState();
 

@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace
@@ -157,7 +157,7 @@ namespace NMib::NCloud::NAppManager
 			co_await fp_UpdateAppManagerApplicationVersion(_pApplication, Application.m_Settings.m_AppManagerVersion);
 
 			Application.m_Settings.m_AppManagerVersion = mc_CurrentAppMangerVersion;
-			co_await fp_UpdateApplicationJSON(_pApplication);
+			co_await fp_UpdateApplicationJson(_pApplication);
 		}
 
 		fp_AppLaunchStateChanged(_pApplication, "Launching", CAppManagerInterface::EStatusSeverity_Warning);
@@ -196,7 +196,7 @@ namespace NMib::NCloud::NAppManager
 							fp_SendAppChange_AddedOrChanged(*_pApplication);
 						}
 
-						auto Result = co_await fp_UpdateApplicationJSON(_pApplication).f_Wrap();
+						auto Result = co_await fp_UpdateApplicationJson(_pApplication).f_Wrap();
 
 						if (!Result)
 						{
@@ -579,7 +579,7 @@ namespace NMib::NCloud::NAppManager
 							fp_SendAppChange_AddedOrChanged(*_pApplication);
 						}
 
-						auto Result = co_await fp_UpdateApplicationJSON(_pApplication).f_Wrap();
+						auto Result = co_await fp_UpdateApplicationJson(_pApplication).f_Wrap();
 
 						if (!Result)
 						{

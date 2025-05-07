@@ -44,7 +44,7 @@ namespace NMib::NCloud
 		{
 			CStr m_Host;
 			uint16 m_Port = 0;
-			CEJSONSorted m_MetaData;
+			CEJsonSorted m_MetaData;
 		};
 
 		struct CConnection
@@ -395,7 +395,7 @@ namespace NMib::NCloud
 			ICNetworkTunnels::CNetworkTunnelName _Name
 			, CStr _Host
 			, uint16 _Port
-			, CEJSONSorted _MetaData
+			, CEJsonSorted _MetaData
 		)
 	{
 		auto &Internal = *mp_pInternal;

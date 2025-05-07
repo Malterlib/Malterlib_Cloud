@@ -5,7 +5,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Encoding/EJSON>
+#include <Mib/Encoding/EJson>
 
 #include "Malterlib_Cloud_FileTransfer.h"
 #include "Malterlib_Cloud_VersionInfo.h"
@@ -50,8 +50,8 @@ namespace NMib::NCloud
 			
 			auto operator <=> (CVersionID const &_Right) const = default;
 			
-			NEncoding::CEJSONSorted f_ToJson() const;
-			static CVersionID fs_FromJson(NEncoding::CEJSONSorted const &_JSON);
+			NEncoding::CEJsonSorted f_ToJson() const;
+			static CVersionID fs_FromJson(NEncoding::CEJsonSorted const &_Json);
 		};
 
 		struct CVersionIDAndPlatform
@@ -70,8 +70,8 @@ namespace NMib::NCloud
 
 			auto operator <=> (CVersionIDAndPlatform const &_Right) const = default;
 			
-			NEncoding::CEJSONSorted f_ToJson() const;
-			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJSONSorted const &_JSON);
+			NEncoding::CEJsonSorted f_ToJson() const;
+			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJsonSorted const &_Json);
 			
 			CVersionID m_VersionID;
 			NStr::CStr m_Platform;
@@ -82,15 +82,15 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJSONSorted f_ToJson() const;
-			static CVersionInformation fs_FromJson(NEncoding::CEJSONSorted const &_JSON);
+			NEncoding::CEJsonSorted f_ToJson() const;
+			static CVersionInformation fs_FromJson(NEncoding::CEJsonSorted const &_Json);
 
 			auto operator <=> (CVersionInformation const &_Right) const = default;
 
 			NTime::CTime m_Time;
 			NStr::CStr m_Configuration;
 			NContainer::TCSet<NStr::CStr> m_Tags;
-			NEncoding::CEJSONSorted m_ExtraInfo;
+			NEncoding::CEJsonSorted m_ExtraInfo;
 			uint32 m_RetrySequence = 0;
 			uint32 m_nFiles = 0; /// The version manager set this value. Ignored when uploading
 			uint64 m_nBytes = 0; /// The version manager set this value. Ignored when uploading

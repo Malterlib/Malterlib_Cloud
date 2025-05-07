@@ -5,8 +5,8 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
+#include <Mib/Encoding/JsonShortcuts>
 
 
 #include "Malterlib_Cloud_App_CloudAPIManager.h"
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NCloudAPIManager
 									
 									CStr URL(KeystoneInfo.m_IdentityURL + "auth/tokens");
 									
-									CEJSONSorted AuthRequest =
+									CEJsonSorted AuthRequest =
 										{
 											"auth"_=
 											{
@@ -90,8 +90,8 @@ namespace NMib::NCloud::NCloudAPIManager
 									
 									ServiceInfo.m_Token = Result.m_Headers["x-subject-token"];
 									
-									auto const JSON = CJSONSorted::fs_FromString(Result.m_Body);
-									auto Token = JSON["token"];
+									auto const Json = CJsonSorted::fs_FromString(Result.m_Body);
+									auto Token = Json["token"];
 									
 									CStr ExpiresAt = Token["expires_at"].f_String();	// Example: "2016-09-30T08:36:31.932109Z"
 									int64 Year;

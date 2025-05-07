@@ -6,7 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Cryptography/Hashes/SHA>
-#include <Mib/Encoding/EJSON>
+#include <Mib/Encoding/EJson>
 #include <Mib/File/DirectoryManifest>
 #include <Mib/File/DirectorySync>
 

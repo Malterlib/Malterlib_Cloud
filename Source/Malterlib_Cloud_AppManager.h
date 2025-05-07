@@ -5,7 +5,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Encoding/EJSON>
+#include <Mib/Encoding/EJson>
 #include <Mib/Storage/Optional>
 #include <Mib/Storage/Variant>
 #include <Mib/Cloud/BackupManager>
@@ -156,7 +156,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJSONSorted f_ToJson() const;
+			NEncoding::CEJsonSorted f_ToJson() const;
 
 			NStr::CStr const &f_GetName()
 			{
@@ -233,7 +233,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJSONSorted f_ToJson() const;
+			NEncoding::CEJsonSorted f_ToJson() const;
 
 			bool f_IsDone() const;
 

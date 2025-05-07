@@ -21,7 +21,7 @@ namespace NMib::NCloud::NAppManager
 		return mp_pUniqueUserGroup->f_GetGroup(_Settings.m_RunAsGroup);
 	}
 
-	bool CAppManagerActor::CApplicationSettings::f_ParseSettings(CEJSONSorted const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed)
+	bool CAppManagerActor::CApplicationSettings::f_ParseSettings(CEJsonSorted const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed)
 	{
 		if (auto *pValue = _Params.f_GetMember("SelfUpdateSource"))
 		{
@@ -197,9 +197,9 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateTags;
 			m_UpdateTags.f_Clear();
-			for (auto &TagJSON : pValue->f_Array())
+			for (auto &TagJson : pValue->f_Array())
 			{
-				auto &Tag = TagJSON.f_String();
+				auto &Tag = TagJson.f_String();
 				if (!CVersionManager::fs_IsValidTag(Tag))
 				{
 					o_Error = fg_Format("'{}' is not a valid tag", Tag);
@@ -213,9 +213,9 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateBranches;
 			m_UpdateBranches.f_Clear();
-			for (auto &BranchJSON : pValue->f_Array())
+			for (auto &BranchJson : pValue->f_Array())
 			{
-				auto &Branch = BranchJSON.f_String();
+				auto &Branch = BranchJson.f_String();
 				if (!CVersionManager::fs_IsValidBranch(Branch, true))
 				{
 					o_Error = fg_Format("'{}' is not a valid branch or wildcard", Branch);
@@ -590,35 +590,35 @@ namespace NMib::NCloud::NAppManager
 	void CAppManagerActor::CApplicationSettings::f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings)
 	{
 		auto &ExtraInfo = _Info.m_ExtraInfo;
-		if (auto *pValue = ExtraInfo.f_GetMember("Executable", EJSONType_String))
+		if (auto *pValue = ExtraInfo.f_GetMember("Executable", EJsonType_String))
 		{
 			o_ChangedSettings |= EApplicationSetting_Executable;
 			m_Executable = pValue->f_String();
 		}
 
-		if (auto *pValue = ExtraInfo.f_GetMember("RunAsUser", EJSONType_String))
+		if (auto *pValue = ExtraInfo.f_GetMember("RunAsUser", EJsonType_String))
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsUser;
 			m_RunAsUser = pValue->f_String();
 		}
 
-		if (auto *pValue = ExtraInfo.f_GetMember("RunAsGroup", EJSONType_String))
+		if (auto *pValue = ExtraInfo.f_GetMember("RunAsGroup", EJsonType_String))
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
 			m_RunAsGroup = pValue->f_String();
 		}
 
-		if (auto *pValue = ExtraInfo.f_GetMember("RunAsUserHasShell", EJSONType_Boolean))
+		if (auto *pValue = ExtraInfo.f_GetMember("RunAsUserHasShell", EJsonType_Boolean))
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsUserHasShell;
 			m_bRunAsUserHasShell = pValue->f_Boolean();
 		}
 
-		if (auto *pValue = ExtraInfo.f_GetMember("Backup", EJSONType_Object))
+		if (auto *pValue = ExtraInfo.f_GetMember("Backup", EJsonType_Object))
 		{
-			auto &BackupJSON = *pValue;
+			auto &BackupJson = *pValue;
 			
-			if (auto pValue = BackupJSON.f_GetMember("IncludeWildcards", EJSONType_Array))
+			if (auto pValue = BackupJson.f_GetMember("IncludeWildcards", EJsonType_Array))
 			{
 				o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
 				m_Backup_IncludeWildcards.f_Clear();
@@ -631,21 +631,21 @@ namespace NMib::NCloud::NAppManager
 						Destination = Wildcard.f_Value().f_String();
 				}
 			}
-			if (auto pValue = BackupJSON.f_GetMember("ExcludeWildcards", EJSONType_Array))
+			if (auto pValue = BackupJson.f_GetMember("ExcludeWildcards", EJsonType_Array))
 			{
 				o_ChangedSettings |= EApplicationSetting_BackupExcludeWildcards;
 				m_Backup_ExcludeWildcards.f_Clear();
 				for (auto &Wildcard : pValue->f_Array())
 					m_Backup_ExcludeWildcards[Wildcard.f_String()];
 			}
-			if (auto pValue = BackupJSON.f_GetMember("AddSyncFlagsWildcards", EJSONType_Object))
+			if (auto pValue = BackupJson.f_GetMember("AddSyncFlagsWildcards", EJsonType_Object))
 			{
 				o_ChangedSettings |= EApplicationSetting_BackupAddSyncFlagsWildcards;
 				m_Backup_AddSyncFlagsWildcards.f_Clear();
 				for (auto &Wildcard : pValue->f_Object())
 					m_Backup_AddSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 			}
-			if (auto pValue = BackupJSON.f_GetMember("RemoveSyncFlagsWildcards", EJSONType_Object))
+			if (auto pValue = BackupJson.f_GetMember("RemoveSyncFlagsWildcards", EJsonType_Object))
 			{
 				o_ChangedSettings |= EApplicationSetting_BackupRemoveSyncFlagsWildcards;
 				m_Backup_RemoveSyncFlagsWildcards.f_Clear();
@@ -653,9 +653,9 @@ namespace NMib::NCloud::NAppManager
 					m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 			}
 			{
-				auto pValue = BackupJSON.f_GetMember("NewBackupInterval", EJSONType_Float);
+				auto pValue = BackupJson.f_GetMember("NewBackupInterval", EJsonType_Float);
 				if (!pValue)
-					pValue = BackupJSON.f_GetMember("NewBackupInterval", EJSONType_Integer);
+					pValue = BackupJson.f_GetMember("NewBackupInterval", EJsonType_Integer);
 				if (pValue)
 				{
 					o_ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
@@ -664,7 +664,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
-		if (auto *pValue = ExtraInfo.f_GetMember("ExecutableParams", EJSONType_Array))
+		if (auto *pValue = ExtraInfo.f_GetMember("ExecutableParams", EJsonType_Array))
 		{
 			o_ChangedSettings |= EApplicationSetting_ExecutableParameters;
 			m_ExecutableParameters.f_Clear();
@@ -676,7 +676,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 		
-		if (auto *pValue = ExtraInfo.f_GetMember("DistributedApp", EJSONType_Boolean))
+		if (auto *pValue = ExtraInfo.f_GetMember("DistributedApp", EJsonType_Boolean))
 		{
 			o_ChangedSettings |= EApplicationSetting_DistributedApp;
 			m_bDistributedApp = pValue->f_Boolean();

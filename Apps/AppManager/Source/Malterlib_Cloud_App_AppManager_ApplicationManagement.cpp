@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppManager.h"
@@ -187,7 +187,7 @@ namespace NMib::NCloud::NAppManager
 		return Return;
 	}
 
-	TCFuture<void> CAppManagerActor::fp_UpdateApplicationJSON(TCSharedPointer<CApplication> _pApplication)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplicationJson(TCSharedPointer<CApplication> _pApplication)
 	{
 		auto &Application = *_pApplication;
 		if (Application.m_bDeleted)
@@ -195,54 +195,54 @@ namespace NMib::NCloud::NAppManager
 
 		auto &Settings = Application.m_Settings;
 		
-		auto &ApplicationJSON = mp_State.m_StateDatabase.m_Data["Applications"][Application.m_Name];
-		ApplicationJSON["Executable"] = Settings.m_Executable; 
-		ApplicationJSON["RunAsUser"] = Settings.m_RunAsUser; 
-		ApplicationJSON["RunAsGroup"] = Settings.m_RunAsGroup;
-		ApplicationJSON["RunAsUserHasShell"] = Settings.m_bRunAsUserHasShell;
-		ApplicationJSON["DistributedApp"] = Settings.m_bDistributedApp;
+		auto &ApplicationJson = mp_State.m_StateDatabase.m_Data["Applications"][Application.m_Name];
+		ApplicationJson["Executable"] = Settings.m_Executable;
+		ApplicationJson["RunAsUser"] = Settings.m_RunAsUser;
+		ApplicationJson["RunAsGroup"] = Settings.m_RunAsGroup;
+		ApplicationJson["RunAsUserHasShell"] = Settings.m_bRunAsUserHasShell;
+		ApplicationJson["DistributedApp"] = Settings.m_bDistributedApp;
 		{
-			auto &Parameters = ApplicationJSON["Parameters"].f_Array();
+			auto &Parameters = ApplicationJson["Parameters"].f_Array();
 			Parameters.f_Clear();
 			for (auto &Parameter : Settings.m_ExecutableParameters)
 				Parameters.f_Insert(Parameter);
 		}
-		ApplicationJSON["EncryptionStorage"] = Settings.m_EncryptionStorage;
-		ApplicationJSON["EncryptionFileSystem"] = Settings.m_EncryptionFileSystem;
-		ApplicationJSON["ParentApplication"] = Settings.m_ParentApplication;
-		ApplicationJSON["VersionManagerApplication"] = Settings.m_VersionManagerApplication;
-		ApplicationJSON["LastInstalledVersion"] = Application.m_LastInstalledVersion.f_ToJson();
-		ApplicationJSON["LastInstalledVersionInfo"] = Application.m_LastInstalledVersionInfo.f_ToJson();
-		ApplicationJSON["LastInstalledVersionFinished"] = Application.m_LastInstalledVersionFinished.f_ToJson();
-		ApplicationJSON["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJson();
-		ApplicationJSON["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJson();
-		ApplicationJSON["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJson();
-		ApplicationJSON["LastTriedInstalledVersionError"] = Application.m_LastTriedInstalledVersionError;
+		ApplicationJson["EncryptionStorage"] = Settings.m_EncryptionStorage;
+		ApplicationJson["EncryptionFileSystem"] = Settings.m_EncryptionFileSystem;
+		ApplicationJson["ParentApplication"] = Settings.m_ParentApplication;
+		ApplicationJson["VersionManagerApplication"] = Settings.m_VersionManagerApplication;
+		ApplicationJson["LastInstalledVersion"] = Application.m_LastInstalledVersion.f_ToJson();
+		ApplicationJson["LastInstalledVersionInfo"] = Application.m_LastInstalledVersionInfo.f_ToJson();
+		ApplicationJson["LastInstalledVersionFinished"] = Application.m_LastInstalledVersionFinished.f_ToJson();
+		ApplicationJson["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJson();
+		ApplicationJson["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJson();
+		ApplicationJson["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJson();
+		ApplicationJson["LastTriedInstalledVersionError"] = Application.m_LastTriedInstalledVersionError;
 
-		ApplicationJSON["WantVersion"] = Application.m_WantVersion.f_ToJson();
-		ApplicationJSON["WantVersionInfo"] = Application.m_WantVersionInfo.f_ToJson();
-		ApplicationJSON["NewestUnconditionalVersion"] = Application.m_NewestUnconditionalVersion.f_ToJson();
-		ApplicationJSON["NewestUnconditionalVersionInfo"] = Application.m_NewestUnconditionalVersionInfo.f_ToJson();
+		ApplicationJson["WantVersion"] = Application.m_WantVersion.f_ToJson();
+		ApplicationJson["WantVersionInfo"] = Application.m_WantVersionInfo.f_ToJson();
+		ApplicationJson["NewestUnconditionalVersion"] = Application.m_NewestUnconditionalVersion.f_ToJson();
+		ApplicationJson["NewestUnconditionalVersionInfo"] = Application.m_NewestUnconditionalVersionInfo.f_ToJson();
 
-		ApplicationJSON["LastFailedInstalledVersionFailureStage"] = (uint32)Application.m_LastFailedInstalledVersionFailureStage;
-		ApplicationJSON["AutoUpdate"] = Settings.m_bAutoUpdate;
+		ApplicationJson["LastFailedInstalledVersionFailureStage"] = (uint32)Application.m_LastFailedInstalledVersionFailureStage;
+		ApplicationJson["AutoUpdate"] = Settings.m_bAutoUpdate;
 
 		{
-			ApplicationJSON.f_RemoveMember("AutoUpdateTags");
-			auto &Array = ApplicationJSON["UpdateTags"].f_Array();
+			ApplicationJson.f_RemoveMember("AutoUpdateTags");
+			auto &Array = ApplicationJson["UpdateTags"].f_Array();
 			Array.f_Clear();
 			for (auto &Tag : Settings.m_UpdateTags)
 				Array.f_Insert(Tag);
 		}
 		{
-			ApplicationJSON.f_RemoveMember("AutoUpdateBranches");
-			auto &Array = ApplicationJSON["UpdateBranches"].f_Array();
+			ApplicationJson.f_RemoveMember("AutoUpdateBranches");
+			auto &Array = ApplicationJson["UpdateBranches"].f_Array();
 			Array.f_Clear();
 			for (auto &Branch : Settings.m_UpdateBranches)
 				Array.f_Insert(Branch);
 		}
 		{
-			auto &UpdateScripts = ApplicationJSON["UpdateScripts"] = CEJSONSorted();
+			auto &UpdateScripts = ApplicationJson["UpdateScripts"] = CEJsonSorted();
 			UpdateScripts.f_Object();
 			UpdateScripts["PreUpdate"] = Settings.m_UpdateScripts.m_PreUpdate; 
 			UpdateScripts["PostUpdate"] = Settings.m_UpdateScripts.m_PostUpdate; 
@@ -250,55 +250,55 @@ namespace NMib::NCloud::NAppManager
 			UpdateScripts["OnError"] = Settings.m_UpdateScripts.m_OnError;
 		}
 		
-		ApplicationJSON["SelfUpdateSource"] = Settings.m_bSelfUpdateSource;
-		ApplicationJSON["Files"] = Application.m_Files;
+		ApplicationJson["SelfUpdateSource"] = Settings.m_bSelfUpdateSource;
+		ApplicationJson["Files"] = Application.m_Files;
 
-		ApplicationJSON["AssociatedHostID"] = Application.m_AssociatedHostID;
-		ApplicationJSON["UpdateGroup"] = Settings.m_UpdateGroup;
+		ApplicationJson["AssociatedHostID"] = Application.m_AssociatedHostID;
+		ApplicationJson["UpdateGroup"] = Settings.m_UpdateGroup;
 #ifdef DPlatformFamily_Windows
-		ApplicationJSON["RunAsUserPassword"] = Settings.m_RunAsUserPassword;
+		ApplicationJson["RunAsUserPassword"] = Settings.m_RunAsUserPassword;
 #endif
 
 		{
-			auto &BackupJSON = ApplicationJSON["Backup"] = CEJSONSorted();
-			BackupJSON.f_Object();
+			auto &BackupJson = ApplicationJson["Backup"] = CEJsonSorted();
+			BackupJson.f_Object();
 			{
-				auto &JSON = BackupJSON["IncludeWildcards"] = CEJSONSorted();
-				JSON.f_Object();
+				auto &Json = BackupJson["IncludeWildcards"] = CEJsonSorted();
+				Json.f_Object();
 				for (auto &Destination : Settings.m_Backup_IncludeWildcards)
 				{
-					auto &DestinationJSON = JSON[Settings.m_Backup_IncludeWildcards.fs_GetKey(Destination)];
+					auto &DestinationJson = Json[Settings.m_Backup_IncludeWildcards.fs_GetKey(Destination)];
 					
 					if (Destination)
-						DestinationJSON = *Destination;
+						DestinationJson = *Destination;
 					else
-						DestinationJSON = nullptr;
+						DestinationJson = nullptr;
 				}
 			}
 			{
-				auto &JSON = BackupJSON["ExcludeWildcards"];
-				JSON.f_Array().f_Clear();
+				auto &Json = BackupJson["ExcludeWildcards"];
+				Json.f_Array().f_Clear();
 				for (auto &Wildcard : Settings.m_Backup_ExcludeWildcards)
-					JSON.f_Insert(Wildcard);
+					Json.f_Insert(Wildcard);
 			}
 			{
-				auto &JSON = BackupJSON["AddSyncFlagsWildcards"] = CEJSONSorted();
-				JSON.f_Object();
+				auto &Json = BackupJson["AddSyncFlagsWildcards"] = CEJsonSorted();
+				Json.f_Object();
 				for (auto &Flags : Settings.m_Backup_AddSyncFlagsWildcards)
-					JSON[Settings.m_Backup_AddSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
+					Json[Settings.m_Backup_AddSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
 			}
 			{
-				auto &JSON = BackupJSON["RemoveSyncFlagsWildcards"] = CEJSONSorted();
-				JSON.f_Object();
+				auto &Json = BackupJson["RemoveSyncFlagsWildcards"] = CEJsonSorted();
+				Json.f_Object();
 				for (auto &Flags : Settings.m_Backup_RemoveSyncFlagsWildcards)
-					JSON[Settings.m_Backup_RemoveSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
+					Json[Settings.m_Backup_RemoveSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
 			}
-			BackupJSON["NewBackupIntervalHours"] = CTimeSpanConvert(Settings.m_Backup_NewBackupInterval).f_GetHoursFloat();
-			BackupJSON["Enabled"] = Settings.m_bBackupEnabled;
+			BackupJson["NewBackupIntervalHours"] = CTimeSpanConvert(Settings.m_Backup_NewBackupInterval).f_GetHoursFloat();
+			BackupJson["Enabled"] = Settings.m_bBackupEnabled;
 		}
 
 		{
-			auto &RegisterInfo = ApplicationJSON["RegisterInfo"] = CEJSONSorted();
+			auto &RegisterInfo = ApplicationJson["RegisterInfo"] = CEJsonSorted();
 			RegisterInfo.f_Object();
 			RegisterInfo["UpdateType"] = Application.m_RegisterInfo.m_UpdateType;
 			
@@ -318,17 +318,17 @@ namespace NMib::NCloud::NAppManager
 				RegisterInfo["ResourcesMaxMapCount"] = *Application.m_RegisterInfo.m_Resources_MaxMapCount;
 		}
 		{
-			auto &Array = ApplicationJSON["Dependencies"].f_Array();
+			auto &Array = ApplicationJson["Dependencies"].f_Array();
 			Array.f_Clear();
 			for (auto &Dependency : Settings.m_Dependencies)
 				Array.f_Insert(Dependency);
 		}
-		ApplicationJSON["StopOnDependencyFailure"] = Settings.m_bStopOnDependencyFailure;
+		ApplicationJson["StopOnDependencyFailure"] = Settings.m_bStopOnDependencyFailure;
 		
-		ApplicationJSON["PreventLaunchUser"] = Application.m_bPreventLaunch_User; 
-		ApplicationJSON["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update;
-		ApplicationJSON["AppManagerVersion"] = Settings.m_AppManagerVersion;
-		ApplicationJSON["LaunchInProcess"] = Settings.m_bLaunchInProcess;
+		ApplicationJson["PreventLaunchUser"] = Application.m_bPreventLaunch_User;
+		ApplicationJson["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update;
+		ApplicationJson["AppManagerVersion"] = Settings.m_AppManagerVersion;
+		ApplicationJson["LaunchInProcess"] = Settings.m_bLaunchInProcess;
 
 		co_return co_await mp_State.m_StateDatabase.f_Save();
 	}
@@ -415,7 +415,7 @@ namespace NMib::NCloud::NAppManager
 		}
 
 #ifdef DPlatformFamily_Linux
-		if (auto pLowPortExetutables = _pApplication->m_LastTriedInstalledVersionInfo.m_ExtraInfo.f_GetMember("LowPortExecutables", EJSONType_Array))
+		if (auto pLowPortExetutables = _pApplication->m_LastTriedInstalledVersionInfo.m_ExtraInfo.f_GetMember("LowPortExecutables", EJsonType_Array))
 		{
 			for (auto &Executable : pLowPortExetutables->f_Array())
 			{
@@ -445,7 +445,7 @@ namespace NMib::NCloud::NAppManager
 		CFile::fs_SetAttributes(_ApplicationDir, gc_RootAttributes);
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
 		fp_ReportInProgress(_pCommandLine, ApplicationName);
@@ -455,7 +455,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
 		fp_ReportInProgress(_pCommandLine, ApplicationName);
@@ -465,7 +465,7 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 	
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
 		fp_ReportInProgress(_pCommandLine, ApplicationName);
@@ -484,7 +484,7 @@ namespace NMib::NCloud::NAppManager
 		_pApplication->m_bPreventLaunch_Update = false;
 		_pApplication->m_bPreventLaunch_DelayAfterFailure = false;
 	
-		co_await (fp_UpdateApplicationJSON(_pApplication) % "Failed to save application state");
+		co_await (fp_UpdateApplicationJson(_pApplication) % "Failed to save application state");
 		co_return {};
 	}
 	

@@ -144,7 +144,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bBackupEnabled = false;
 			bool m_bLaunchInProcess = false;
 
-			bool f_ParseSettings(CEJSONSorted const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
+			bool f_ParseSettings(CEJsonSorted const &_Params, EApplicationSetting &o_ChangedSettings, CStr &o_Error, bool _bRelaxed);
 			void f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source);
 			void f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings);
 			void f_FromInterfaceSettings(CAppManagerInterface::CApplicationSettings const &_Settings, EApplicationSetting &o_ChangedSettings);
@@ -698,9 +698,9 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_InitSensor();
 		TCFuture<void> fp_InitLog();
 		TCFuture<void> fp_InitHostMonitor();
-		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> fp_HostMonitorRebootNeededFunctor(NEncoding::CEJSONSorted const &_AutoUpdateConfig);
+		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> fp_HostMonitorRebootNeededFunctor(NEncoding::CEJsonSorted const &_AutoUpdateConfig);
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
 		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_PauseReporting();
@@ -733,7 +733,7 @@ namespace NMib::NCloud::NAppManager
 		;
 		TCFuture<void> fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> _pApplication, uint32 _OldVersion);
 
-		TCFuture<void> fp_UpdateApplicationJSON(TCSharedPointer<CApplication> _pApplication);
+		TCFuture<void> fp_UpdateApplicationJson(TCSharedPointer<CApplication> _pApplication);
 		TCFuture<void> fp_RunUpdateScript
 			(
 				TCSharedPointer<CApplication> const &_pApplication
@@ -750,26 +750,26 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<ERebootResult> fp_Reboot(bool _bErrorOnPreventReboot);
 		TCFuture<bool> fp_CheckAndLogPreventedReboot(CCheckAndLogPreventedRebootParams _Params);
 
-		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_AddApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_ChangeApplicationSettings(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_RemoveApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_UpdateApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_StartApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_StopApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_RestartApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_AddApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ChangeApplicationSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RemoveApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_UpdateApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StartApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StopApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RestartApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_VersionManagerList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_CloudManagerList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VersionManagerList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CloudManagerList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_RemoveKnownHost(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RemoveKnownHost(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_CancelAllUpdates(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CancelAllUpdates(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		TCFuture<uint32> fp_CommandLine_HostMonitorConfigList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_HostMonitorConfigVersionList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_HostMonitorConfigContentsGet(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_HostMonitorConfigList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_HostMonitorConfigVersionList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_HostMonitorConfigContentsGet(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		TCFuture<void> fp_AddApplication
 			(
@@ -999,8 +999,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_SetupDatabase();
 		TCFuture<NDatabase::CDatabaseActor::CTransactionWrite> fp_CleanupDatabase(NDatabase::CDatabaseActor::CTransactionWrite _WriteTransaction);
 		TCFuture<uint64> fp_StoreUpdateNotification(CAppManagerInterface::CUpdateNotification _Notification);
-		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationList(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationClear(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationClear(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		static CStr fsp_LimitErrorLogSize(CStr const &_String, mint _ExtraSize);
 

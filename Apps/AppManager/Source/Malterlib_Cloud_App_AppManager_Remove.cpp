@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppManager.h"
@@ -64,7 +64,7 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
-	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
 		fp_ReportInProgress(_pCommandLine, ApplicationName);

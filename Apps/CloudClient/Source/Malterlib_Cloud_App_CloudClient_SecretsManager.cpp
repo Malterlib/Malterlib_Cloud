@@ -8,7 +8,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/ActorSubscription>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/CommandLine/TableRenderer>
 
 #include "Malterlib_Cloud_App_CloudClient.h"
@@ -108,7 +108,7 @@ namespace NMib::NCloud::NCloudClient
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_EnumerateSecrets(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -139,7 +139,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_GetSecretBySemanticID(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -159,7 +159,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_GetProperties(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -181,7 +181,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_GetSecret(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -241,7 +241,7 @@ namespace NMib::NCloud::NCloudClient
 						, "Metadata?"_o=
 						{
 							"Names"_o= _o["--metadata"]
-							, "Type"_o= EJSONType_Object
+							, "Type"_o= EJsonType_Object
 							, "Description"_o= "The metadata to set.\n"
 							"The metadata is specified as a JSON object '{\"Key\" : \"Value\" ...}'."
 						}
@@ -275,7 +275,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_SetProperties(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -309,7 +309,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_ChangeTags(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -346,7 +346,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_SetMetadata(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -370,7 +370,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_RemoveMetadata(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -388,7 +388,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_RemoveSecret(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -414,7 +414,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_Upload(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -447,7 +447,7 @@ namespace NMib::NCloud::NCloudClient
 					}
 					, IDParameter
 				}
-				, [this](CEJSONSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SecretsManager_Download(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
@@ -456,7 +456,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 
-	bool CCloudClientAppActor::fsp_SecretsManager_GetID(CEJSONSorted const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error)
+	bool CCloudClientAppActor::fsp_SecretsManager_GetID(CEJsonSorted const &_Params, CSecretsManager::CSecretID &o_ID, CStr &o_Error)
 	{
 		if (auto const &ID = _Params["ID"].f_String())
 		{
@@ -570,7 +570,7 @@ namespace NMib::NCloud::NCloudClient
 	template <typename tf_CType>
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateImpl
 		(
-			CEJSONSorted const _Params
+			CEJsonSorted const _Params
 			, TCSharedPointer<CCommandLineControl> _pCommandLine
 			, TCFunctionMovable
 			<
@@ -629,9 +629,9 @@ namespace NMib::NCloud::NCloudClient
 		}
 
 		TCSet<CStrSecure> Tags;
-		for (auto &TagJSON : _Params["Tags"].f_Array())
+		for (auto &TagJson : _Params["Tags"].f_Array())
 		{
-			CStr const &Tag = TagJSON.f_String();
+			CStr const &Tag = TagJson.f_String();
 			if (!CSecretsManager::fs_IsValidTag(Tag))
 				co_return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
 
@@ -698,7 +698,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_EnumerateSecrets(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		return fp_CommandLine_SecretsManager_EnumerateImpl<TCSet<CSecretsManager::CSecretID>>
 			(
@@ -786,7 +786,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID
 		(
-			CEJSONSorted const _Params
+			CEJsonSorted const _Params
 			, TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
 	{
@@ -829,7 +829,7 @@ namespace NMib::NCloud::NCloudClient
 	template<typename tf_CType>
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl
 		(
-			CEJSONSorted const _Params
+			CEJsonSorted const _Params
 			, TCSharedPointer<CCommandLineControl> _pCommandLine
 			, TCFunctionMovable<TCFuture<tf_CType> (TCDistributedActor<CSecretsManager> const &_Actor, CSecretsManager::CSecretID const &_ID)> _fGetResult
 			, TCFunctionMovable
@@ -915,7 +915,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecret(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		return fp_CommandLine_SecretsManager_GetImpl<CSecretsManager::CSecret>
 			(
@@ -946,7 +946,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetProperties(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		return fp_CommandLine_SecretsManager_GetImpl<CSecretsManager::CSecretProperties>
 			(
@@ -1008,7 +1008,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		bool bBinaryAsBase64 = _Params["BinaryAsBase64"].f_Boolean();
@@ -1079,9 +1079,9 @@ namespace NMib::NCloud::NCloudClient
 		if (auto pValue = _Params.f_GetMember("Tags"))
 		{
 			TCSet<CStrSecure> Tags;
-			for (auto &TagJSON : pValue->f_Array())
+			for (auto &TagJson : pValue->f_Array())
 			{
-				CStr const &Tag = TagJSON.f_String();
+				CStr const &Tag = TagJson.f_String();
 
 				if (!CSecretsManager::fs_IsValidTag(Tag))
 					co_return DMibErrorInstance(fg_Format("'{}' is not a valid tag", Tag));
@@ -1152,7 +1152,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1161,12 +1161,12 @@ namespace NMib::NCloud::NCloudClient
 		if (fsp_SecretsManager_GetID(_Params, ID, Error))
 			co_return DMibErrorInstance(Error);
 
-		auto fParseTags = [](CEJSONSorted const &_Tags)
+		auto fParseTags = [](CEJsonSorted const &_Tags)
 			{
 				TCSet<CStrSecure> OutTags;
-				for (auto &TagJSON : _Tags.f_Array())
+				for (auto &TagJson : _Tags.f_Array())
 				{
-					CStr const &Tag = TagJSON.f_String();
+					CStr const &Tag = TagJson.f_String();
 					if (!CVersionManager::fs_IsValidTag(Tag))
 						DMibError(fg_Format("'{}' is not a valid tag", Tag));
 					OutTags[Tag];
@@ -1201,7 +1201,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1228,7 +1228,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1254,7 +1254,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1276,7 +1276,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
@@ -1344,7 +1344,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return 0;
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJSONSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;

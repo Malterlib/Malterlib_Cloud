@@ -49,7 +49,7 @@ namespace NMib::NCloud::NHostMonitor
 
 		auto operator <=> (CConfigFileContents_Json const &_Right) const = default;
 
-		NEncoding::CEJSONSorted m_Parsed;
+		NEncoding::CEJsonSorted m_Parsed;
 	};
 
 	using CConfigFileContentsParsed = NStorage::TCStreamableVariant
@@ -170,8 +170,8 @@ namespace NMib::NCloud
 				NConcurrency::TCActor<NConcurrency::CDistributedAppSensorStoreLocal> const &_SensorStore
 				, NConcurrency::TCActor<NConcurrency::CDistributedAppLogStoreLocal> const &_LogStore
 				, NConcurrency::TCActor<NDatabase::CDatabaseActor> const &_Database
-				, NContainer::TCMap<NStr::CStr, NEncoding::CEJSONSorted> const &_SensorMetaData
-				, NContainer::TCMap<NStr::CStr, NEncoding::CEJSONSorted> const &_LogMetaData
+				, NContainer::TCMap<NStr::CStr, NEncoding::CEJsonSorted> const &_SensorMetaData
+				, NContainer::TCMap<NStr::CStr, NEncoding::CEJsonSorted> const &_LogMetaData
 			)
 		;
 		~CHostMonitor();

@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include "Malterlib_Cloud_App_AppManager.h"
 
@@ -246,7 +246,7 @@ namespace NMib::NCloud::NAppManager
 
 		if (_pVersionInformation)
 		{
-			if (auto pUpdateScriptEnv = _pVersionInformation->m_ExtraInfo.f_GetMember("UpdateScriptEnvironment", EJSONType_Object))
+			if (auto pUpdateScriptEnv = _pVersionInformation->m_ExtraInfo.f_GetMember("UpdateScriptEnvironment", EJsonType_Object))
 			{
 				for (auto &Member : pUpdateScriptEnv->f_Object())
 				{

@@ -5,7 +5,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Encoding/EJSON>
+#include <Mib/Encoding/EJson>
 #include <Mib/Concurrency/DistributedActor>
 
 namespace NMib::NCloud

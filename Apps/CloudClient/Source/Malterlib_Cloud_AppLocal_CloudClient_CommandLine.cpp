@@ -4,7 +4,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 #include "Malterlib_Cloud_AppLocal_CloudClient.h"
 
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NCloudClient
 						}
 					}
 				}
-				, [this](CEJSONSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_SelfUpdate(fg_Move(_Params), fg_Move(_pCommandLine));
 				}

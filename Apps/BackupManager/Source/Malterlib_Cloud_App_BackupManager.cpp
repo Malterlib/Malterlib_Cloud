@@ -3,7 +3,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 
 #include "Malterlib_Cloud_App_BackupManager.h"
 #include "Malterlib_Cloud_App_BackupManager_Internal.h"
@@ -19,7 +19,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 	}
 
-	TCFuture<void> CBackupManagerApp::fp_StartApp(NEncoding::CEJSONSorted const _Params)
+	TCFuture<void> CBackupManagerApp::fp_StartApp(NEncoding::CEJsonSorted const _Params)
 	{
 		mp_Server = fg_ConstructActor<CBackupManagerServer>(fg_Construct(self), mp_State);
 

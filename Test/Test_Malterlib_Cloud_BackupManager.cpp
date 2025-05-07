@@ -16,7 +16,7 @@
 #include <Mib/Cloud/BackupManagerDownload>
 #include <Mib/Cloud/App/BackupManager>
 #include <Mib/Cryptography/RandomID>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Test/Exception>
 
 using namespace NMib;

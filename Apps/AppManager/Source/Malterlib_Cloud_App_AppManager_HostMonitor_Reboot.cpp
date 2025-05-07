@@ -3,15 +3,15 @@
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 namespace NMib::NCloud::NAppManager
 {
 	namespace
 	{
-		CHostMonitorRebootSchedule fg_ParseRebootSchedule(NEncoding::CEJSONSorted const &_AutoUpdateConfig)
+		CHostMonitorRebootSchedule fg_ParseRebootSchedule(NEncoding::CEJsonSorted const &_AutoUpdateConfig)
 		{
-			CEJSONSorted DefaultSchedule =
+			CEJsonSorted DefaultSchedule =
 				{
 					"Hour"_= 0
 					, "Minute"_= 0
@@ -21,10 +21,10 @@ namespace NMib::NCloud::NAppManager
 
 			CHostMonitorRebootSchedule RebootSchedule;
 
-			if (auto *pValue = RebootScheduleJson.f_GetMember("Month", EJSONType_Integer))
+			if (auto *pValue = RebootScheduleJson.f_GetMember("Month", EJsonType_Integer))
 				RebootSchedule.m_Month = fg_Clamp(pValue->f_Integer(), 1, 12);
 
-			if (auto *pValue = RebootScheduleJson.f_GetMember("DayOfMonth", EJSONType_Integer))
+			if (auto *pValue = RebootScheduleJson.f_GetMember("DayOfMonth", EJsonType_Integer))
 			{
 				if (RebootSchedule.m_Month)
 				{
@@ -37,20 +37,20 @@ namespace NMib::NCloud::NAppManager
 				else
 					RebootSchedule.m_DayOfMonth = fg_Clamp(pValue->f_Integer(), 1, 31);
 			}
-			else if (auto *pValue = RebootScheduleJson.f_GetMember("DayOfWeek", EJSONType_Integer))
+			else if (auto *pValue = RebootScheduleJson.f_GetMember("DayOfWeek", EJsonType_Integer))
 				RebootSchedule.m_DayOfWeek = fg_Clamp(pValue->f_Integer(), 0, 6);
 
-			if (auto *pValue = RebootScheduleJson.f_GetMember("Hour", EJSONType_Integer))
+			if (auto *pValue = RebootScheduleJson.f_GetMember("Hour", EJsonType_Integer))
 				RebootSchedule.m_Hour = fg_Clamp(pValue->f_Integer(), 0, 23);
 
-			if (auto *pValue = RebootScheduleJson.f_GetMember("Minute", EJSONType_Integer))
+			if (auto *pValue = RebootScheduleJson.f_GetMember("Minute", EJsonType_Integer))
 				RebootSchedule.m_Minute = fg_Clamp(pValue->f_Integer(), 0, 59);
 
 			return RebootSchedule;
 		}
 	}
 
-	NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> CAppManagerActor::fp_HostMonitorRebootNeededFunctor(NEncoding::CEJSONSorted const &_AutoUpdateConfig)
+	NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> CAppManagerActor::fp_HostMonitorRebootNeededFunctor(NEncoding::CEJsonSorted const &_AutoUpdateConfig)
 	{
 		return g_ActorFunctor / [this, RebootSchedule = fg_ParseRebootSchedule(_AutoUpdateConfig)]() -> TCFuture<void>
 			{
@@ -61,7 +61,7 @@ namespace NMib::NCloud::NAppManager
 
 				auto EarliestRebootTime = CTime::fs_NowUTC();
 
-				if (auto *pValue = mp_State.m_StateDatabase.m_Data.f_GetMember("LastHostMonitorReboot", EEJSONType_Date))
+				if (auto *pValue = mp_State.m_StateDatabase.m_Data.f_GetMember("LastHostMonitorReboot", EEJsonType_Date))
 				{
 					// Make sure we don't go into a reboot loop
 					if ((EarliestRebootTime - pValue->f_Date()).f_GetSecondsFraction() < 24_hours)

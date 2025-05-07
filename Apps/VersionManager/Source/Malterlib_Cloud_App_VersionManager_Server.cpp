@@ -5,7 +5,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 #include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_VersionManager.h"
@@ -141,14 +141,14 @@ namespace NMib::NCloud::NVersionManager
 									CVersionManager::CVersionInformation OutVersion;
 									if (CFile::fs_FileExists(VersionInfoPath))
 									{
-										CEJSONSorted ApplicationInfo = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoPath), VersionInfoPath);
-										if (auto pValue = ApplicationInfo.f_GetMember("Time", EEJSONType_Date))
+										CEJsonSorted ApplicationInfo = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoPath), VersionInfoPath);
+										if (auto pValue = ApplicationInfo.f_GetMember("Time", EEJsonType_Date))
 											OutVersion.m_Time = pValue->f_Date();
-										if (auto pValue = ApplicationInfo.f_GetMember("Configuration", EJSONType_String))
+										if (auto pValue = ApplicationInfo.f_GetMember("Configuration", EJsonType_String))
 											OutVersion.m_Configuration = pValue->f_String();
-										if (auto pValue = ApplicationInfo.f_GetMember("ExtraInfo", EJSONType_Object))
+										if (auto pValue = ApplicationInfo.f_GetMember("ExtraInfo", EJsonType_Object))
 											OutVersion.m_ExtraInfo = *pValue;
-										if (auto pValue = ApplicationInfo.f_GetMember("Tags", EJSONType_Array))
+										if (auto pValue = ApplicationInfo.f_GetMember("Tags", EJsonType_Array))
 										{
 											for (auto &Value : pValue->f_Array())
 											{
@@ -156,7 +156,7 @@ namespace NMib::NCloud::NVersionManager
 													OutVersion.m_Tags[Value.f_String()];
 											}
 										}
-										if (auto pValue = ApplicationInfo.f_GetMember("RetrySequence", EJSONType_Integer))
+										if (auto pValue = ApplicationInfo.f_GetMember("RetrySequence", EJsonType_Integer))
 											OutVersion.m_RetrySequence = pValue->f_Integer();
 									}
 									{

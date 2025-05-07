@@ -22,7 +22,7 @@
 #include <Mib/Concurrency/LogError>
 #include <Mib/CommandLine/AnsiEncodingParse>
 #include <Mib/Cryptography/RandomID>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Process/Platform>
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/Security/UniqueUserGroup>
@@ -103,9 +103,9 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 	{
 		CPackageOptions(CStr const &_Package)
 		{
-			m_PackageOptions = EJSONType_Object;
+			m_PackageOptions = EJsonType_Object;
 			if (CFile::fs_FileExists(_Package + ".json"))
-				m_PackageOptions = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(_Package + ".json"));
+				m_PackageOptions = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(_Package + ".json"));
 
 			auto FeatureFlags = m_PackageOptions.f_GetMemberValue("FeatureFlags", _[]);
 			for (auto &Flag : FeatureFlags.f_Array())
@@ -117,7 +117,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			return m_FeatureFlags.f_Exists(_Flag);
 		}
 
-		CEJSONSorted m_PackageOptions;
+		CEJsonSorted m_PackageOptions;
 		TCSet<CStr> m_FeatureFlags;
 	};
 
@@ -962,7 +962,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				{
 
 					CStr VersionInfoFile = "{}/{}VersionInfo.json"_f << SourceTempPath << _Name;
-					CEJSONSorted VersionInfo = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
+					CEJsonSorted VersionInfo = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
 					CVersionManager::CVersionID VersionID;
 					CStr Platform;
 					if (DoneInitPackageInfo(_Name).f_WasCreated())
@@ -1354,7 +1354,7 @@ public:
 							o_PackagePath = BasePath / o_PackagePath.f_RemovePrefix("Latest/");
 
 							CStr VersionInfoFile = "{}/{}VersionInfo.json"_f << SourceTempPath << AppName;
-							CEJSONSorted VersionInfo = CEJSONSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
+							CEJsonSorted VersionInfo = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
 							CVersionManager::CVersionID VersionID;
 							CStr Error;
 							CVersionManager::fs_IsValidVersionIdentifier(VersionInfo.f_GetMemberValue("Version", "").f_String(), Error, &VersionID);

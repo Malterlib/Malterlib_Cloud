@@ -1,7 +1,7 @@
 // Copyright © 2018 Nonna Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
@@ -332,15 +332,15 @@ namespace NMib::NCloud::NAppDistributionManager
 
 				if (DeployDestinations.f_IsEmpty())
 				{
-					if (auto pAppDistribution = VersionInfo.m_ExtraInfo.f_GetMember("AppDistribution", EJSONType_Object))
+					if (auto pAppDistribution = VersionInfo.m_ExtraInfo.f_GetMember("AppDistribution", EJsonType_Object))
 					{
-						if (auto pValue = pAppDistribution->f_GetMember("DeployDestinations", EJSONType_Array))
+						if (auto pValue = pAppDistribution->f_GetMember("DeployDestinations", EJsonType_Array))
 						{
-							for (auto &TypeJSON : pValue->f_Array())
+							for (auto &TypeJson : pValue->f_Array())
 							{
 								try
 								{
-									DeployDestinations[fsp_DeployDestinationFromString(TypeJSON.f_String())];
+									DeployDestinations[fsp_DeployDestinationFromString(TypeJson.f_String())];
 								}
 								catch (CException const &_Exception)
 								{

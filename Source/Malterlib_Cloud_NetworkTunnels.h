@@ -6,7 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedActor>
-#include <Mib/Encoding/EJSON>
+#include <Mib/Encoding/EJson>
 
 namespace NMib::NCloud
 {
@@ -34,7 +34,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJSONSorted m_MetaData;
+			NEncoding::CEJsonSorted m_MetaData;
 		};
 
 		enum ETunnelChange

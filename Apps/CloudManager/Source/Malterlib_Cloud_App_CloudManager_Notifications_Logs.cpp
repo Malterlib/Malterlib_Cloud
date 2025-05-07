@@ -93,9 +93,9 @@ namespace NMib::NCloud::NCloudManager
 						else if (ConfigValue.f_Name() == "Severities")
 						{
 							NContainer::TCSet<CDistributedAppLogReporter::ELogSeverity> Severities;
-							for (auto &SeverityJSON : ConfigValue.f_Value().f_Array())
+							for (auto &SeverityJson : ConfigValue.f_Value().f_Array())
 							{
-								auto SeverityString = SeverityJSON.f_String();
+								auto SeverityString = SeverityJson.f_String();
 
 								CDistributedAppLogReporter::ELogSeverity Severity = CDistributedAppLogReporter::fs_LogSeverityFromStr(SeverityString);
 								if (Severity == CDistributedAppLogReporter::ELogSeverity_Unsupported)

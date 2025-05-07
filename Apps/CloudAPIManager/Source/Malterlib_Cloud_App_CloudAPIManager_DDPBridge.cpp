@@ -4,7 +4,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 
 #include "Malterlib_Cloud_App_CloudAPIManager.h"
 #include "Malterlib_Cloud_App_CloudAPIManager_Server.h"
@@ -29,7 +29,7 @@ namespace NMib::NCloud::NCloudAPIManager
 				CDistributedTrustDDPBridge::CMethod
 				{
 					"getSwiftBaseURL"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> _Params) -> TCFuture<NEncoding::CEJSONSorted>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJsonSorted> _Params) -> TCFuture<NEncoding::CEJsonSorted>
 					{
 						CCloudAPIManager::CGetSwiftBaseURL Params;
 						{
@@ -46,7 +46,7 @@ namespace NMib::NCloud::NCloudAPIManager
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIEnsureContainer"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> _Params) -> TCFuture<NEncoding::CEJSONSorted>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJsonSorted> _Params) -> TCFuture<NEncoding::CEJsonSorted>
 					{
 						if (_Params.f_GetLen() != 1)
 							co_return "Method takes 1 parameter";
@@ -69,7 +69,7 @@ namespace NMib::NCloud::NCloudAPIManager
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPISignTempURL"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> _Params) -> TCFuture<NEncoding::CEJSONSorted>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJsonSorted> _Params) -> TCFuture<NEncoding::CEJsonSorted>
 					{
 						if (_Params.f_GetLen() != 1)
 							co_return "Method takes 1 parameter";
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NCloudAPIManager
 				, CDistributedTrustDDPBridge::CMethod
 				{
 					"cloudAPIDeleteObject"
-					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJSONSorted> _Params) -> TCFuture<NEncoding::CEJSONSorted>
+					, g_ActorFunctor / [this](NContainer::TCVector<NEncoding::CEJsonSorted> _Params) -> TCFuture<NEncoding::CEJsonSorted>
 					{
 						if (_Params.f_GetLen() != 1)
 							co_return "Method takes 1 parameter";

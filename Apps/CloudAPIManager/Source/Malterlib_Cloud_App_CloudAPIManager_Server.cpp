@@ -5,7 +5,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 #include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_CloudAPIManager.h"
@@ -77,12 +77,12 @@ namespace NMib::NCloud::NCloudAPIManager
 
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupCloudContexs()
 	{
-		if (auto const *pCloudContexts = mp_AppState.m_ConfigDatabase.m_Data.f_GetMember("CloudContexts", EJSONType_Object))
+		if (auto const *pCloudContexts = mp_AppState.m_ConfigDatabase.m_Data.f_GetMember("CloudContexts", EJsonType_Object))
 		{
-			for (auto &CloudContextJSON : pCloudContexts->f_Object())
+			for (auto &CloudContextJson : pCloudContexts->f_Object())
 			{
-				auto &Values = CloudContextJSON.f_Value();
-				auto &CloudContext = mp_CloudContexts[CloudContextJSON.f_Name()];
+				auto &Values = CloudContextJson.f_Value();
+				auto &CloudContext = mp_CloudContexts[CloudContextJson.f_Name()];
 				CStr Type = Values["Type"].f_String();
 				if (Type == "OpenStack")
 				{

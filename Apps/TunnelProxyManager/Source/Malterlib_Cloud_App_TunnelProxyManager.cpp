@@ -5,7 +5,7 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
 #include <Mib/Concurrency/DistributedActorTrustManager>
-#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JSONDirectory>
+#include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 #include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_TunnelProxyManager.h"
@@ -57,7 +57,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 					else if (_fLog)
 						co_await _fLog("Publishing new tunnel '{}': {}"_f << TunnelName << Host);
 
-					mp_TunnelsServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, TunnelName, Host, 0, CEJSONSorted()) > PublishResults[TunnelName];
+					mp_TunnelsServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, TunnelName, Host, 0, CEJsonSorted()) > PublishResults[TunnelName];
 				}
 			}
 
@@ -217,7 +217,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 		co_return {};
 	}
 
-	TCFuture<void> CTunnelProxyManagerApp::fp_StartApp(NEncoding::CEJSONSorted const _Params)
+	TCFuture<void> CTunnelProxyManagerApp::fp_StartApp(NEncoding::CEJsonSorted const _Params)
 	{
 		mp_TunnelsServer = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager, mp_State.f_AuditorFactory(), "TunnelProxyManager", "TunnelProxyManager");
 		co_await mp_TunnelsServer(&CNetworkTunnelsServer::f_Start);

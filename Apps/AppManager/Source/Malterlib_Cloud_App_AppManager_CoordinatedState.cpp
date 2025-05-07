@@ -184,10 +184,10 @@ namespace NMib::NCloud::NAppManager
 				pThis->mp_KnownRemoteApplications
 				, [&](CRemoteApplicationKey const &_RemoteKey)
 				{
-					CEJSONSorted *pDBGroup = KnowApplicationsState.f_GetMember(_RemoteKey.m_Group, EJSONType_Object);
-					CEJSONSorted *pDBApplication = nullptr;
+					CEJsonSorted *pDBGroup = KnowApplicationsState.f_GetMember(_RemoteKey.m_Group, EJsonType_Object);
+					CEJsonSorted *pDBApplication = nullptr;
 					if (pDBGroup)
-						pDBApplication = pDBGroup->f_GetMember(_RemoteKey.m_VersionManagerApplication, EJSONType_Object);
+						pDBApplication = pDBGroup->f_GetMember(_RemoteKey.m_VersionManagerApplication, EJsonType_Object);
 					if (pDBApplication && pDBApplication->f_RemoveMember(_HostID))
 					{
 						bChanged = true;

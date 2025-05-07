@@ -171,21 +171,21 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 
-		TCFuture<void> fp_StartApp(NEncoding::CEJSONSorted const _Params) override;
+		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
 		TCFuture<void> fp_ReadState();
 
-		TCFuture<uint32> fp_CommandLine_DistributionEnum(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_DistributionAdd(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_DistributionChangeSettings(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_DistributionRemove(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
-		TCFuture<uint32> fp_CommandLine_ApplicationListAvailableVersions(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionEnum(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionAdd(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionChangeSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DistributionRemove(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ApplicationListAvailableVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		static CStr fsp_DeployDestinationToString(EDeployDestination _Type);
 		static EDeployDestination fsp_DeployDestinationFromString(CStr const &_Type);
 
-		void fp_ParseSettings(CEJSONSorted const &_Params, CDistributionSettings &o_Settings);
-		CEJSONSorted fp_SaveSettings(CDistributionSettings const &_Settings);
+		void fp_ParseSettings(CEJsonSorted const &_Params, CDistributionSettings &o_Settings);
+		CEJsonSorted fp_SaveSettings(CDistributionSettings const &_Settings);
 		void fp_SaveState(CDistribution const &_Distribution);
 
 		TCFuture<void> fp_VersionManagerSubscribe(TCWeakDistributedActor<CVersionManager> _VersionManager);

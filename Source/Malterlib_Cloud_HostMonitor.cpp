@@ -15,8 +15,8 @@ namespace NMib::NCloud
 			TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore
 			, TCActor<CDistributedAppLogStoreLocal> const &_LogStore
 			, TCActor<NDatabase::CDatabaseActor> const &_Database
-			, TCMap<CStr, CEJSONSorted> const &_SensorMetaData
-			, TCMap<CStr, CEJSONSorted> const &_LogMetaData
+			, TCMap<CStr, CEJsonSorted> const &_SensorMetaData
+			, TCMap<CStr, CEJsonSorted> const &_LogMetaData
 		)
 		: mp_pInternal(fg_Construct(this, _SensorStore, _LogStore, _Database, _SensorMetaData, _LogMetaData))
 	{
@@ -30,8 +30,8 @@ namespace NMib::NCloud
 			, TCActor<CDistributedAppSensorStoreLocal> const &_SensorStore
 			, TCActor<CDistributedAppLogStoreLocal> const &_LogStore
 			, TCActor<CDatabaseActor> const &_Database
-			, TCMap<CStr, CEJSONSorted> const &_SensorMetaData
-			, TCMap<CStr, CEJSONSorted> const &_LogMetaData
+			, TCMap<CStr, CEJsonSorted> const &_SensorMetaData
+			, TCMap<CStr, CEJsonSorted> const &_LogMetaData
 		)
 		: m_SensorStore(_SensorStore)
 		, m_LogStore(_LogStore)

@@ -1,7 +1,7 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/LogError>
@@ -67,13 +67,13 @@ namespace NMib::NCloud::NAppManager
 
 		Application.m_AppInterface = fg_Move(_ClientInterface);
 
-		bool bApplicationJSONChanged = false;
+		bool bApplicationJsonChanged = false;
 		bool bHostIDChanged = false;
 
 		if (Application.m_AssociatedHostID != HostID)
 		{
 			Application.m_AssociatedHostID = HostID;
-			bApplicationJSONChanged = true;
+			bApplicationJsonChanged = true;
 			bHostIDChanged = true;
 		}
 
@@ -83,15 +83,15 @@ namespace NMib::NCloud::NAppManager
 			Application.m_RegisterInfo = _RegisterInfo;
 			if (bUpdateTypeChanged)
 				pThis->fp_OnAppUpdateInfoChange(pApplication);
-			bApplicationJSONChanged = true;
+			bApplicationJsonChanged = true;
 			pThis->fp_UpdateLimits();
 		}
 
 		if (bHostIDChanged)
 			pThis->fp_SendAppChange_AddedOrChanged(*pApplication);
 
-		if (bApplicationJSONChanged)
-			pThis->fp_UpdateApplicationJSON(pApplication) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to update application JSON");
+		if (bApplicationJsonChanged)
+			pThis->fp_UpdateApplicationJson(pApplication) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to update application JSON");
 
 		DMibLogWithCategory
 			(

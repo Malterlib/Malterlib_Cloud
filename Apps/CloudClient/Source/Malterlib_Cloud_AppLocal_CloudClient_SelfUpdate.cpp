@@ -5,7 +5,7 @@
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Daemon/Daemon>
 #include <Mib/Concurrency/DistributedActor>
-#include <Mib/Encoding/JSONShortcuts>
+#include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Process/ProcessLaunch>
 
 #ifdef DPlatformFamily_Windows
@@ -82,7 +82,7 @@ namespace NMib::NCloud::NCloudClient
 	TCFuture<void> CCloudClientAppLocalActor::fp_PreRunCommandLine
 		(
 			 CStr _Command
-			 , NEncoding::CEJSONSorted const _Params
+			 , NEncoding::CEJsonSorted const _Params
 			 , NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
 	{
@@ -98,7 +98,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJSONSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	TCFuture<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		DMibCheck(mp_State.m_RootDirectory == CFile::fs_GetProgramDirectory());
 
