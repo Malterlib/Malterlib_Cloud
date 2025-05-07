@@ -70,7 +70,7 @@ public:
 						, "IdentifierScope"_= "Test"
 						, "Name"_= "Malterlib Test"
 						, "Removed"_= false
-						, "LogMetaData"_= EJsonType_Object
+						, "LogMetaData"_= _={}
 					}
 				]
 			;
@@ -94,7 +94,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= EJsonType_Object
+						, "LogMetaData"_= _={}
 					}
 					, _=
 					{
@@ -113,7 +113,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= EJsonType_Object
+						, "LogMetaData"_= _={}
 					}
 					, _=
 					{
@@ -132,7 +132,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= EJsonType_Object
+						, "LogMetaData"_= _={}
 					}
 					, _=
 					{
@@ -151,7 +151,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= EJsonType_Object
+						, "LogMetaData"_= _={}
 					}
 					, _=
 					{
@@ -170,7 +170,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= EJsonType_Object
+						, "LogMetaData"_= _={}
 					}
 				]
 			;

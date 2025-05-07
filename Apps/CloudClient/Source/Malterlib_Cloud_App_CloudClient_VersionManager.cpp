@@ -161,7 +161,7 @@ namespace NMib::NCloud::NCloudClient
 						, "ExtraInfo?"_o=
 						{
 							"Names"_o= _o["--info"]
-							, "Type"_o= EJsonType_Object
+							, "Type"_o= _o={}
 							, "Description"_o= "EJSON formatted extra information.\n"
 						}
 						, "Tags?"_o=
