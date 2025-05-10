@@ -240,6 +240,8 @@ Property
 
 	MalterlibCloudVersionInfo_PackageSuffix: string = ""
 
+	MalterlibCloudVersionInfo_Tags: [string] = []
+	MalterlibCloudVersionInfo_Product: string = Workspace:Workspace.Name
 	MalterlibCloudVersionInfo_Application: string = Target.FileName
 	MalterlibCloudVersionInfo_Configuration: string = FullConfiguration
 	MalterlibCloudVersionInfo_DistributedApp: bool = true
