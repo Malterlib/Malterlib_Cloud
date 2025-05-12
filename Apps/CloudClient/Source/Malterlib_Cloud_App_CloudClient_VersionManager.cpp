@@ -33,7 +33,15 @@ namespace NMib::NCloud::NCloudClient
 				, "Description"_o= "Include version manager host in output.\n"
 			}
 		;
-
+		auto HiddenCurrentDirectoryOption = "CurrentDirectory?"_o=
+			{
+				"Names"_o= _o[]
+				, "Default"_o= CFile::fs_GetCurrentDirectory()
+				, "Hidden"_o= true
+				, "Description"_o= "Internal hidden option to forward current directory."
+			}
+		;
+		
 		_Section.f_RegisterCommand
 			(
 				{
@@ -190,13 +198,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_o= int64(NFile::gc_IdealNetworkQueueSize)
 							, "Description"_o= "The amount of data to keep in flight while uploading."
 						}
-						, "CurrentDirectory?"_o=
-						{
-							"Names"_o= _o[]
-							, "Default"_o= CFile::fs_GetCurrentDirectory()
-							, "Hidden"_o= true
-							, "Description"_o= "Internal hidden option to forward current directory."
-						}
+						, HiddenCurrentDirectoryOption
 					}
 					, "Parameters"_o=
 					{
@@ -313,6 +315,7 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_o= int64(NFile::gc_IdealNetworkQueueSize)
 							, "Description"_o= "The amount of data to keep in flight while downloading."
 						}
+						, HiddenCurrentDirectoryOption
 					}
 					, "Parameters"_o=
 					{
@@ -779,7 +782,6 @@ namespace NMib::NCloud::NCloudClient
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		CStr Version = _Params["Version"].f_String();
-		CStr DestinationDirectory = _Params["DestinationDirectory"].f_String();
 		CStr Platform = _Params["Platform"].f_String();
 		uint64 QueueSize = _Params["TransferQueueSize"].f_Integer();
 		if (QueueSize < 128*1024)
@@ -789,6 +791,8 @@ namespace NMib::NCloud::NCloudClient
 			co_return DMibErrorInstance("Application must be specified");
 		if (Version.f_IsEmpty())
 			co_return DMibErrorInstance("Version must be specified");
+
+		CStr DestinationDirectory = CFile::fs_GetExpandedPath(_Params["DestinationDirectory"].f_String(), _Params["CurrentDirectory"].f_String());
 		if (DestinationDirectory.f_IsEmpty())
 			co_return DMibErrorInstance("Destination directory must be specified");
 
