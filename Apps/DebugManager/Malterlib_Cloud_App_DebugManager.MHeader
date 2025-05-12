@@ -1,0 +1,79 @@
+// Copyright © 2025 Unbroken AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+%Target "Lib_Malterlib_Cloud_DebugManager"
+{
+	Property
+	{
+	}
+	Target
+	{
+		Type "StaticLibrary"
+		BaseName "Malterlib_Cloud_DebugManager"
+		Group "Apps"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_App_*"
+	}
+
+	%Dependency "Lib_Malterlib_Cloud"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib_Database"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib"
+	{
+		Dependency.Indirect true
+	}
+}
+
+%Target "Malterlib_Cloud_DebugManager"
+{
+	Property
+	{
+		ProductName "Malterlib Debug Manager"
+		MalterlibTestApp true
+		MalterlibPostCopyProject MalterlibAppTestPostCopyProject
+		{
+			&
+			{
+				MalterlibPostCopyProject undefined
+				!MalterlibAppTestPostCopyProject undefined
+			}
+		}
+		MalterlibPostCopyProject "Malterlib_Cloud_DebugManager"
+		{
+			!!MalterlibPostCopyProject undefined
+		}
+		MalterlibCloud_EnableVersionUpload true
+		MalterlibTargetNameType "Normal"
+		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudDebugManager"
+		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudDebugManager"
+	}
+	Target
+	{
+		Type "ConsoleExecutable"
+		BaseFileName "DebugManager"
+		DebuggerCommandArguments ["--daemon-run-debug"]
+		Group "Apps"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_AppLocal_*"
+	}
+	%Dependency "Lib_Malterlib_Cloud_DebugManager"
+}
+
+Property
+{
+	Malterlib_App_Enable_DebugManager: bool = true
+
+	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_DebugManager"
+	{
+		!!Malterlib_App_Enable_DebugManager true
+	}
+}

@@ -4,16 +4,19 @@
 #pragma once
 
 #include <Mib/Core/Core>
-#include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Concurrency/DistributedApp>
-#include <Mib/Process/ProcessLaunchActor>
-#include <Mib/Daemon/Daemon>
+
 #include <Mib/Cloud/BackupManager>
 #include <Mib/Cloud/CloudManager>
+#include <Mib/Cloud/DebugManager>
+#include <Mib/Cloud/DebugManagerHelper>
 #include <Mib/Cloud/NetworkTunnels>
 #include <Mib/Cloud/NetworkTunnelsClient>
 #include <Mib/Cloud/SecretsManager>
 #include <Mib/Cloud/VersionManager>
+#include <Mib/Concurrency/ConcurrencyManager>
+#include <Mib/Concurrency/DistributedApp>
+#include <Mib/Daemon/Daemon>
+#include <Mib/Process/ProcessLaunchActor>
 
 namespace NMib::NCloud::NCloudClient
 {
@@ -220,6 +223,21 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 
+		// Debug Manager
+		void fp_DebugManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
+		TCFuture<void> fp_DebugManager_SubscribeToServers();
+		TCFuture<TCVector<TCTrustedActor<CDebugManager>>> fp_DebugManager_GetDebugManagers(CStr _Host);
+
+		TCFuture<uint32> fp_CommandLine_DebugManager_DebugAssetList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DebugManager_DebugAssetUpload(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DebugManager_DebugAssetDownload(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DebugManager_DebugAssetDelete(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+
+		TCFuture<uint32> fp_CommandLine_DebugManager_CrashDumpList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DebugManager_CrashDumpUpload(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DebugManager_CrashDumpDownload(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_DebugManager_CrashDumpDelete(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+
 		fp64 mp_Timeout = 0.0;
 
 		TCVector<TCPromise<void>> mp_AppStopPromises;
@@ -242,5 +260,9 @@ namespace NMib::NCloud::NCloudClient
 
 		// Cloud Manager
 		TCTrustedActorSubscription<CCloudManager> mp_CloudManagers;
+
+		// Debug Manager
+		TCTrustedActorSubscription<CDebugManager> mp_DebugManagers;
+		CDebugManagerHelper mp_DebugManagerHelper;
 	};
 }

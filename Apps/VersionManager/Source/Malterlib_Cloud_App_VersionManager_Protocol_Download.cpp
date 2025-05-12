@@ -89,7 +89,7 @@ namespace NMib::NCloud::NVersionManager
 
 		if (ProtocolVersion >= CVersionManager::EProtocolVersion_AsyncGeneratorFileTransfer)
 		{
-			auto SendResult = co_await Download.m_FileTransferSend(&CFileTransferSend::f_SendFiles).f_Wrap();
+			auto SendResult = co_await Download.m_FileTransferSend(&CFileTransferSend::f_SendFiles, fg_Default()).f_Wrap();
 			if (!SendResult)
 			{
 				co_return Auditor.f_Exception

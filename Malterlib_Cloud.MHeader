@@ -521,7 +521,9 @@ Property
 Property
 {
 	Malterlib_Cloud_App_Targets: [type(CEntity)] = []
+	Malterlib_Cloud_App_ExtraGroups: [string] = []
 	Malterlib_All_App_Targets =+ Malterlib_Cloud_App_Targets
+	Malterlib_All_App_ExtraGroups =+ Malterlib_Cloud_App_ExtraGroups
 }
 
 Property
@@ -626,6 +628,8 @@ Property
 	{
 		%Target Malterlib_Cloud_App_Targets
 	}
+
+	Workspace.ExtraGroups =+ Malterlib_Cloud_App_ExtraGroups
 }
 
 Property

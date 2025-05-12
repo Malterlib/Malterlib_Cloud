@@ -16,6 +16,7 @@ namespace NMib::NCloud::NCloudClient
 			.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_All & ~EDefaultCommandLineFunctionality_Sensor)
 		}
 		, mp_VersionManagerHelper(mp_State.m_RootDirectory)
+		, mp_DebugManagerHelper(mp_State.m_RootDirectory)
 	{
 	}
 	
@@ -57,6 +58,9 @@ namespace NMib::NCloud::NCloudClient
 			fg_Move(mp_TunnelsClient).f_Destroy() > Destroys;
 
 		mp_CloudManagers.f_Destroy() > Destroys;
+
+		mp_DebugManagerHelper.f_AbortAll() > Destroys;
+		mp_DebugManagers.f_Destroy() > Destroys;
 
 		co_await fg_AllDoneWrapped(Destroys);
 

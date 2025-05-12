@@ -1,0 +1,4 @@
+// Copyright © 2025 Favro Holdinga AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+#include "../../../Source/Malterlib_Cloud_DebugManager.h"
