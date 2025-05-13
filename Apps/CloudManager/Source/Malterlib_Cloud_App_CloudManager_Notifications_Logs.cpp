@@ -440,8 +440,8 @@ namespace NMib::NCloud::NCloudManager
 						fAddInfoField("Categories", fEscape(CStr::fs_Join(MessageData.m_Categories, ", ")));
 					if (!MessageData.m_Operations.f_IsEmpty())
 						fAddInfoField("Operations", fEscape(CStr::fs_Join(MessageData.m_Operations, ", ")));
-					if (MessageData.m_MetaData.f_IsValid())
-						fAddInfoField("MetaData", "```{}```"_f << fEscape(CStr::fs_ToStr(MessageData.m_MetaData)), false);
+					if (MessageData.m_Metadata.f_IsValid())
+						fAddInfoField("Metadata", "```{}```"_f << fEscape(CStr::fs_ToStr(MessageData.m_Metadata)), false);
 				}
 			}
 

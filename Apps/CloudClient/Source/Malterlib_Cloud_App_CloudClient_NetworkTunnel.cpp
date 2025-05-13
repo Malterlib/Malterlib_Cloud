@@ -147,7 +147,7 @@ namespace NMib::NCloud::NCloudClient
 		auto TunnelsPerHost = co_await fp_NetworkTunnel_Filter(_Params);
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
-		TableRenderer.f_AddHeadings("HostID", "Tunnel Name", "Meta Data");
+		TableRenderer.f_AddHeadings("HostID", "Tunnel Name", "Metadata");
 
 		for (auto &Tunnels : TunnelsPerHost)
 		{
@@ -155,7 +155,7 @@ namespace NMib::NCloud::NCloudClient
 			for (auto &Tunnel : Tunnels)
 			{
 				auto &TunnelName = Tunnels.fs_GetKey(Tunnel);
-				TableRenderer.f_AddRow(HostID, TunnelName, Tunnel.m_MetaData.f_ToStringColored(_pCommandLine->m_AnsiFlags, "\t", EJsonDialectFlag_AllowUndefined));
+				TableRenderer.f_AddRow(HostID, TunnelName, Tunnel.m_Metadata.f_ToStringColored(_pCommandLine->m_AnsiFlags, "\t", EJsonDialectFlag_AllowUndefined));
 			}
 		}
 
@@ -196,7 +196,7 @@ namespace NMib::NCloud::NCloudClient
 				CTunnelKey TunnelKey{HostID, TunnelName};
 
 				auto &URLTemplate = URLTemplates[TunnelKey];
-				if (auto *pValue = Tunnel.m_MetaData.f_GetMember("URLTemplate", EJsonType_String))
+				if (auto *pValue = Tunnel.m_Metadata.f_GetMember("URLTemplate", EJsonType_String))
 					URLTemplate = pValue->f_String();
 				else
 					URLTemplate = "{Host}:{Port}";

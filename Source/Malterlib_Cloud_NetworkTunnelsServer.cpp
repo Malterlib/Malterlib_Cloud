@@ -44,7 +44,7 @@ namespace NMib::NCloud
 		{
 			CStr m_Host;
 			uint16 m_Port = 0;
-			CEJsonSorted m_MetaData;
+			CEJsonSorted m_Metadata;
 		};
 
 		struct CConnection
@@ -86,7 +86,7 @@ namespace NMib::NCloud
 					auto &TunnelName = Internal.m_NetworkTunnels.fs_GetKey(Tunnel);
 					if (!bAccessAll && !HasPermissions[TunnelName])
 						continue;
-					ReturnTunnels[TunnelName].m_MetaData = Tunnel.m_MetaData;
+					ReturnTunnels[TunnelName].m_Metadata = Tunnel.m_Metadata;
 					TunnelNames[TunnelName];
 				}
 
@@ -150,7 +150,7 @@ namespace NMib::NCloud
 					if (!bAccessAll && !HasPermissions[TunnelName])
 						continue;
 					
-					Change.m_Tunnels[TunnelName].m_MetaData = Tunnel.m_MetaData;
+					Change.m_Tunnels[TunnelName].m_Metadata = Tunnel.m_Metadata;
 				}
 
 				co_await (Subscription.m_Subscription.m_fOnTunnelChange(fg_Move(Change)) % AppAuditor);
@@ -395,14 +395,14 @@ namespace NMib::NCloud
 			ICNetworkTunnels::CNetworkTunnelName _Name
 			, CStr _Host
 			, uint16 _Port
-			, CEJsonSorted _MetaData
+			, CEJsonSorted _Metadata
 		)
 	{
 		auto &Internal = *mp_pInternal;
 
-		auto MetaData = _MetaData;
+		auto Metadata = _Metadata;
 
-		auto TunnelMap = Internal.m_NetworkTunnels(_Name, CInternal::CNetworkTunnel{_Host, _Port, fg_Move(_MetaData)});
+		auto TunnelMap = Internal.m_NetworkTunnels(_Name, CInternal::CNetworkTunnel{_Host, _Port, fg_Move(_Metadata)});
 		if (!TunnelMap.f_WasCreated())
 			co_return DMibErrorInstance("A tunnel with the same name is already published");
 
@@ -413,7 +413,7 @@ namespace NMib::NCloud
 		{
 			ICNetworkTunnels::CTunnelChange_Add Change;
 			Change.m_TunnelName = _Name;
-			Change.m_Tunnel.m_MetaData = fg_Move(MetaData);
+			Change.m_Tunnel.m_Metadata = fg_Move(Metadata);
 
 			co_await Internal.f_SendChange(fg_Move(Change), _Name).f_Wrap() > fg_LogError("NetworkTunnelsServer", "Failed to send tunnel changes to subscribers");
 		}

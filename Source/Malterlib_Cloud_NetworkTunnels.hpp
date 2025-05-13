@@ -8,7 +8,7 @@ namespace NMib::NCloud
 	template <typename tf_CStream>
 	void ICNetworkTunnels::CNetworkTunnel::f_Stream(tf_CStream &_Stream)
 	{
-		_Stream % m_MetaData;
+		_Stream % m_Metadata;
 	}
 
 	template <typename tf_CStream>

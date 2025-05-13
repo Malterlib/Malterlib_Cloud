@@ -1048,8 +1048,8 @@ namespace NMib::NCloud::NCloudClient
 		if (auto pValue = _Params.f_GetMember("Metadata"))
 		{
 			auto Object = pValue->f_Object();
-			for (auto iMetaData = Object.f_OrderedIterator(); iMetaData; ++iMetaData)
-				Properties.f_SetMetadata(iMetaData->f_Name(), fg_TempCopy(iMetaData->f_Value()));
+			for (auto iMetadata = Object.f_OrderedIterator(); iMetadata; ++iMetadata)
+				Properties.f_SetMetadata(iMetadata->f_Name(), fg_TempCopy(iMetadata->f_Value()));
 			++nSetProperties;
 		}
 

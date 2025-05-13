@@ -4,7 +4,7 @@
 #include "Test_Malterlib_Cloud_AppManager.h"
 
 #ifdef DPlatformFamily_Windows
-#include <Windows.h>
+#	include <Windows.h>
 #endif
 
 namespace
@@ -103,7 +103,7 @@ public:
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
 						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetaData"_= _={}
+						, "SensorMetadata"_= _={}
 					}
 					, _=
 					{
@@ -158,7 +158,7 @@ public:
 						, "CriticalValue"_= nullptr
 						, "Removed"_= false
 						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetaData"_= _={}
+						, "SensorMetadata"_= _={}
 					}
 				]
 			;
@@ -181,7 +181,7 @@ public:
 							, "OutdatedStatus"_= "Ok"
 							, "OutdatedSeconds"_= fp64::fs_Inf()
 							, "SnoozeUntil"_= NTime::CTime()
-							, "SensorMetaData"_= _={}
+							, "SensorMetadata"_= _={}
 						}
 					)
 				;
@@ -210,7 +210,7 @@ public:
 							, "OutdatedStatus"_= "Ok"
 							, "OutdatedSeconds"_= fp64::fs_Inf()
 							, "SnoozeUntil"_= NTime::CTime()
-							, "SensorMetaData"_= _={}
+							, "SensorMetadata"_= _={}
 						}
 					)
 				;
@@ -231,7 +231,7 @@ public:
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= fp64::fs_Inf()
 						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetaData"_= _={}
+						, "SensorMetadata"_= _={}
 					}
 					,
 					_=
@@ -257,7 +257,7 @@ public:
 						, "OutdatedStatus"_= "Ok"
 						, "OutdatedSeconds"_= fp64::fs_Inf()
 						, "SnoozeUntil"_= NTime::CTime()
-						, "SensorMetaData"_= _={}
+						, "SensorMetadata"_= _={}
 					}
 				]
 			;

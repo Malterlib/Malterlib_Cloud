@@ -20,7 +20,7 @@ namespace NMib::NCloud
 		CDistributedAppLogReporter::CLogInfo LogInfo;
 		LogInfo.m_Identifier = "org.malterlib.log.configmonitor";
 		LogInfo.m_Name = "Malterlib Configuration Montior";
-		LogInfo.m_MetaData = m_LogMetaData;
+		LogInfo.m_Metadata = m_LogMetadata;
 
 		m_ConfigLogReporter = co_await m_LogStore(&CDistributedAppLogStoreLocal::f_OpenLogReporter, fg_Move(LogInfo));
 

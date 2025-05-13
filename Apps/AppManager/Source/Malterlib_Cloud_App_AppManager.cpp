@@ -477,8 +477,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (Environment)
 		{
-			mp_SensorMetaData["Environment"] = Environment;
-			mp_LogMetaData["Environment"] = Environment;
+			mp_SensorMetadata["Environment"] = Environment;
+			mp_LogMetadata["Environment"] = Environment;
 		}
 
 		mp_bLogLaunchesToStdErr = _Params["LogLaunchesToStdErr"].f_Boolean();

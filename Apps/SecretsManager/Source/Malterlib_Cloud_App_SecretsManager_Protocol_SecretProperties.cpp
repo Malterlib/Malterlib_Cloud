@@ -639,7 +639,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperties)
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
 
-		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Set metadata in SecretsManager", Permissions) % "Permission denied setting meta data" % Auditor);
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Set metadata in SecretsManager", Permissions) % "Permission denied setting metadata" % Auditor);
 
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(SetMetadata, command)", Permissions["Command"]);
@@ -699,7 +699,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (pSecretProperties)
 			fsp_AddPermissionQueryIndexedByPermission("Write", pSecretProperties->m_SemanticID, pSecretProperties->m_Tags, Permissions);
 
-		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove metadata in SecretsManager", Permissions) % "Permission denied removing meta data" % Auditor);
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Remove metadata in SecretsManager", Permissions) % "Permission denied removing metadata" % Auditor);
 
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(RemoveMetadata, command)", Permissions["Command"]);

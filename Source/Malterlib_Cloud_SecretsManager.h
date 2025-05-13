@@ -278,7 +278,7 @@ namespace NMib::NCloud
 				, NContainer::TCSet<NStr::CStrSecure> _TagsToAdd
 			) = 0
 		;
-		virtual NConcurrency::TCFuture<void> f_SetMetadata(CSetMetadata _SetMetaData) = 0;
+		virtual NConcurrency::TCFuture<void> f_SetMetadata(CSetMetadata _SetMetadata) = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveMetadata(CSecretID _ID, NStr::CStrSecure _MetadataKey) = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveSecret(CSecretID _ID) = 0;
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()>> f_UploadFile

@@ -4,7 +4,7 @@
 #include "Test_Malterlib_Cloud_AppManager.h"
 
 #ifdef DPlatformFamily_Windows
-#include <Windows.h>
+#	include <Windows.h>
 #endif
 
 static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
@@ -70,7 +70,7 @@ public:
 						, "IdentifierScope"_= "Test"
 						, "Name"_= "Malterlib Test"
 						, "Removed"_= false
-						, "LogMetaData"_= _={}
+						, "LogMetadata"_= _={}
 					}
 				]
 			;
@@ -94,7 +94,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= _={}
+						, "LogMetadata"_= _={}
 					}
 					, _=
 					{
@@ -113,7 +113,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= _={}
+						, "LogMetadata"_= _={}
 					}
 					, _=
 					{
@@ -132,7 +132,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= _={}
+						, "LogMetadata"_= _={}
 					}
 					, _=
 					{
@@ -151,7 +151,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= _={}
+						, "LogMetadata"_= _={}
 					}
 					, _=
 					{
@@ -170,7 +170,7 @@ public:
 							, "Severity"_= "Info"
 							, "Flags"_= _[]
 						}
-						, "LogMetaData"_= _={}
+						, "LogMetadata"_= _={}
 					}
 				]
 			;

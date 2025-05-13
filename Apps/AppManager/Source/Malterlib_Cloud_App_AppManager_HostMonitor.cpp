@@ -12,7 +12,7 @@ namespace NMib::NCloud::NAppManager
 {
 	TCFuture<void> CAppManagerActor::fp_InitHostMonitor()
 	{
-		mp_HostMonitor = fg_Construct(mp_SensorStore, mp_LogStore, mp_DatabaseActor, mp_LogMetaData, mp_SensorMetaData);
+		mp_HostMonitor = fg_Construct(mp_SensorStore, mp_LogStore, mp_DatabaseActor, mp_LogMetadata, mp_SensorMetadata);
 
 		auto OnResume = co_await fg_OnResume
 			(

@@ -170,8 +170,8 @@ namespace NMib::NCloud
 				NConcurrency::TCActor<NConcurrency::CDistributedAppSensorStoreLocal> const &_SensorStore
 				, NConcurrency::TCActor<NConcurrency::CDistributedAppLogStoreLocal> const &_LogStore
 				, NConcurrency::TCActor<NDatabase::CDatabaseActor> const &_Database
-				, NContainer::TCMap<NStr::CStr, NEncoding::CEJsonSorted> const &_SensorMetaData
-				, NContainer::TCMap<NStr::CStr, NEncoding::CEJsonSorted> const &_LogMetaData
+				, NContainer::TCMap<NStr::CStr, NEncoding::CEJsonSorted> const &_SensorMetadata
+				, NContainer::TCMap<NStr::CStr, NEncoding::CEJsonSorted> const &_LogMetadata
 			)
 		;
 		~CHostMonitor();

@@ -33,7 +33,7 @@ namespace NMib::NCloud::NKeyManager
 			SensorInfo.m_Identifier = "org.malterlib.keymanager.password.status";
 			SensorInfo.m_Name = "Key Manager Password Status";
 			SensorInfo.m_Type = CDistributedAppSensorReporter::ESensorDataType_Status;
-			SensorInfo.m_MetaData = mp_SensorMetaData;
+			SensorInfo.m_Metadata = mp_SensorMetadata;
 
 			mp_PasswordStatusReporter = co_await fp_OpenSensorReporter(fg_Move(SensorInfo));
 		}

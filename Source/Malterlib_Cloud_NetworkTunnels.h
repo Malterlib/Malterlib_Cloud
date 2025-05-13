@@ -34,7 +34,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJsonSorted m_MetaData;
+			NEncoding::CEJsonSorted m_Metadata;
 		};
 
 		enum ETunnelChange

@@ -81,7 +81,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				"Names"_o= _o["--deploy-destinations"]
 				, "Type"_o= _o[COneOf{"FileSystem"}]
 				, "Description"_o= "The deploy destinations to deploy to.\n"
-				"Leave empty to determine deploy types from version meta data\n"
+				"Leave empty to determine deploy types from version metadata\n"
 				"Supported types:\n"
 				"@Indent=27\r"
 				"   FileSystem              Deploy to the local file system. Useful for example for web distribution.\r"

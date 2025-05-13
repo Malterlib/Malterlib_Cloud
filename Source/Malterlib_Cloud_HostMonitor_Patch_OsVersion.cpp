@@ -135,7 +135,7 @@ namespace NMib::NCloud
 			SensorInfo.m_Identifier = "org.malterlib.os.version";
 			SensorInfo.m_Name = "OS Version";
 			SensorInfo.m_Type = CDistributedAppSensorReporter::ESensorDataType_Version;
-			SensorInfo.m_MetaData = m_SensorMetaData;
+			SensorInfo.m_Metadata = m_SensorMetadata;
 			if (m_Config.m_PatchInterval != 0.0)
 				SensorInfo.m_ExpectedReportInterval = m_Config.m_PatchInterval;
 
@@ -186,7 +186,7 @@ namespace NMib::NCloud
 			SensorInfo.m_Identifier = "org.malterlib.os.version.status";
 			SensorInfo.m_Name = "OS Version Status";
 			SensorInfo.m_Type = CDistributedAppSensorReporter::ESensorDataType_Status;
-			SensorInfo.m_MetaData = m_SensorMetaData;
+			SensorInfo.m_Metadata = m_SensorMetadata;
 			if (m_Config.m_PatchInterval != 0.0)
 				SensorInfo.m_ExpectedReportInterval = m_Config.m_PatchInterval;
 

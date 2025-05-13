@@ -70,7 +70,7 @@ namespace NMib::NCloud
 				SensorInfo.m_Identifier = "org.malterlib.os.memory.{}"_f << StatisticName;
 				SensorInfo.m_Name = "Memory ({})"_f << StatisticName;
 				SensorInfo.m_Type = CDistributedAppSensorReporter::ESensorDataType_Integer;
-				SensorInfo.m_MetaData = m_SensorMetaData;
+				SensorInfo.m_Metadata = m_SensorMetadata;
 				if (m_Config.m_MemoryInterval != 0.0)
 					SensorInfo.m_ExpectedReportInterval = m_Config.m_MemoryInterval;
 
