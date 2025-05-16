@@ -110,6 +110,7 @@ namespace NMib::NCloud
 				NStr::CStr m_BuildID;
 				CFileInfo m_FileInfo;
 				CMetadata m_Metadata;
+				NStr::CStr m_MainAssetFile;
 			};
 
 			struct CResult

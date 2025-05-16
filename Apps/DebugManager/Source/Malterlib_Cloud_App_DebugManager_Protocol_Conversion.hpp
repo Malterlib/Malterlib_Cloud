@@ -84,6 +84,7 @@ namespace NMib::NCloud::NDebugManager
 					, .m_BuildID = fg_Move(_Value.m_BuildID)
 					, .m_FileInfo = fg_ConvertToDebugDatabase<CDebugManager::CFileInfo>(fg_Move(_Value.m_FileInfo))
 					, .m_Metadata = fg_ConvertToDebugDatabase<CDebugManager::CMetadata>(fg_Move(_Value.m_Metadata))
+					, .m_MainAssetFile = fg_Move(_Value.m_MainAssetFile)
 				}
 			;
 		}

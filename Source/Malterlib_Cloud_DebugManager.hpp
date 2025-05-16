@@ -53,6 +53,7 @@ namespace NMib::NCloud
 		_Stream % m_BuildID;
 		_Stream % m_FileInfo;
 		_Stream % m_Metadata;
+		_Stream % m_MainAssetFile;
 	}
 
 	template <typename tf_CStream>

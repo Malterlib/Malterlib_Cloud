@@ -1,0 +1,115 @@
+// Copyright © 2025 Unbroken AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
+
+%Target "Lib_Malterlib_Cloud_DebugManagerClientServe"
+{
+	Property
+	{
+	}
+	Target
+	{
+		Type "StaticLibrary"
+		BaseName "Malterlib_Cloud_DebugManagerClientServe"
+		Group "WebApp/DebugManagerClient"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_App_*"
+	}
+
+	%Dependency "Lib_Malterlib_Cloud"
+	{
+		Dependency.Indirect true
+	}
+	%Dependency "Lib_Malterlib"
+	{
+		Dependency.Indirect true
+	}
+}
+
+%Target "Malterlib_Cloud_DebugManagerClientServe"
+{
+	Property
+	{
+		ProductName "Malterlib Cloud Manager"
+		MalterlibTestApp true
+		MalterlibPostCopyProject undefined
+		MalterlibTargetNameType "Normal"
+		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudDebugManagerClient"
+		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudDebugManagerClient"
+	}
+	Target
+	{
+		Type "ConsoleExecutable"
+		BaseFileName "DebugManagerClientServe"
+		DebuggerCommandArguments ["--daemon-run-debug"]
+		Group "WebApp/DebugManagerClient"
+	}
+	%Group "Source"
+	{
+		%File "Source/Malterlib_Cloud_AppLocal_*"
+	}
+	%Dependency "Lib_Malterlib_Cloud_DebugManagerClientServe"
+}
+
+%Group "{Malterlib_Cloud}/WebApp/DebugManagerClient"
+{
+	Property
+	{
+		MalterlibWebAppManagerName "DebugManagerClient"
+		MalterlibWebAppManagerPrefix "Empty"
+		WebAppManagerCustomizationFile "WebAppManager/Malterlib_Cloud_App_DebugManagerClient_BuildServerCustomization.cpp"->MakeAbsolute()
+
+		MalterlibWebAppSourceRoot "DistributionFiles"->MakeAbsolute()
+
+		WebAppManagerServeAllSubdomains true
+		WebAppManagerAllowUnelevated true
+
+		WebAppManagerLoopbackPrefix 28
+
+		WebAppManagerDefaultDomain "debugmanagerclient.malterlib.org"
+		WebAppManagerDefaultWebPort 17000
+		WebAppManagerDefaultWebSSLPort 17443
+
+		WebAppManagerUniqueNginxPath "DebugManagerClientNginx"
+
+		FastCGIBuilds [
+			{
+				Name: "DebugManagerClientServe"
+				, BuildDir: "DebugManagerClientServe"
+			}
+		]
+
+		Dependencies_DebugManagerClientServe: [type(CEntity)] = [
+			{
+				Name: "Com_Malterlib_Cloud_DebugManagerClientServe"
+				, Properties: {
+					Dependency.Target: "Malterlib_Cloud_DebugManagerClientServe"
+				}
+			}
+		]
+
+		Params_DebugManagerClientServe: [string] = ["--daemon-run-standalone", "--log-to-stderr"]
+		Concurrency_DebugManagerClientServe: int = 1
+		PortConcurrency_DebugManagerClientServe: int = 16
+		OwnPackageDirectory_DebugManagerClientServe: bool = true
+		MalterlibDistributedApp_DebugManagerClientServe: bool = true
+		UnixSocket_DebugManagerClientServe: bool = true
+
+		AllowRobots_DebugManagerClientServe: bool = false
+	}
+
+	Group.HideTargets true
+
+	%Target "Malterlib_WebApp_WebAppManager"
+}
+
+Property
+{
+	Malterlib_App_Enable_DebugManagerClient: bool = true
+
+	Malterlib_Cloud_App_ExtraGroups =+ ["{Malterlib_Cloud}/WebApp/DebugManagerClient", "{Malterlib}/{WebApp}/{WebAppManagerVariables}"]
+	{
+		!!Malterlib_App_Enable_DebugManagerClient true
+	}
+}

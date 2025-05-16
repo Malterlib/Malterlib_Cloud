@@ -710,6 +710,7 @@ namespace NMib::NCloud::NCloudClient
 		Columns.f_AddHeading("Asset Type", 2);
 		Columns.f_AddHeading("Build ID", 0);
 		Columns.f_AddHeading("File Name", 1);
+		Columns.f_AddHeading("Main Asset", 4);
 		Columns.f_AddHeading("Timestamp", 3);
 		Columns.f_AddHeading("Digest", 3);
 		Columns.f_AddHeading("Size", 3);
@@ -755,6 +756,7 @@ namespace NMib::NCloud::NCloudClient
 							, CDebugManager::fs_AssetTypeToStr(Asset.m_AssetType)
 							, Asset.m_BuildID
 							, Asset.m_FileInfo.m_FileName
+							, Asset.m_MainAssetFile
 							, Asset.m_FileInfo.m_Timestamp
 							, Asset.m_FileInfo.m_Digest.f_GetString()
 							, fg_FormatBytes(Asset.m_FileInfo.m_Size)
