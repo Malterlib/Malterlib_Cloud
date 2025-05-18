@@ -678,9 +678,9 @@ namespace NMib::NCloud::NCloudClient
 			}
 			else if (ResultToReturn != *Result)
 			{
-				if constexpr (TCIsSame<tf_CType, TCSet<CSecretsManager::CSecretID>>::mc_Value)
+				if constexpr (cIsSame<tf_CType, TCSet<CSecretsManager::CSecretID>>)
 					ResultToReturn += *Result;
-				else if constexpr (TCIsSame<tf_CType, CSecretsManager::CSecret>::mc_Value)
+				else if constexpr (cIsSame<tf_CType, CSecretsManager::CSecret>)
 					co_return DMibErrorInstance("Data inconsistency between secrets managers for '{}'. Please try again later.\n{}\n!=\n{}\n"_f << ResultToReturn << *Result);
 				else
 					static_assert(gc_MakeValueDependent<false, tf_CType>, "Missing support");
