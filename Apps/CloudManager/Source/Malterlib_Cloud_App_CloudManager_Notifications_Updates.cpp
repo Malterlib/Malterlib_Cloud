@@ -276,8 +276,6 @@ namespace NMib::NCloud::NCloudManager
 
 		auto &SlackAttachment = Message.m_Attachments.f_Insert();
 
-		fp64 StageDuration = fp64::fs_Inf();
-
 		bool bFinished = false;
 
 		CNotifications::EType SlackFlags = CNotifications::EType_None;
