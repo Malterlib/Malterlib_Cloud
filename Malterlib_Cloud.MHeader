@@ -22,6 +22,7 @@ Import "Apps/*/*.MHeader"
 			{
 				!MalterlibCloudVersionInfoFileName undefined
 				MalterlibCloud_EnableVersionUpload true
+				MalterlibCloud_VersionUploadGlobalEnable true
 				|
 				{
 					!MalterlibCloud_CloudClientExecutable undefined
@@ -635,6 +636,10 @@ Property
 Property
 {
 	MalterlibCloud_CloudClientExecutable: string? // User(Cloud Debug)="/opt/Deploy/Malterlib_Cloud/MalterlibCloud": Configure client executable to test local deploy to version manager
+
+	MalterlibCloud_DebugManagerGlobalEnable: bool = true // User(Cloud Debug)=false: Global enable for deploying to debug manager
+	MalterlibCloud_VersionUploadGlobalEnable: bool = true // User(Cloud Debug)=false: Global enable for version uploads
+
 	MalterlibCloud_VersionUploadVersion: string? // User(Cloud Debug): Allows you to override the version uploaded to version manager for debug purposes
 	MalterlibCloud_VersionUploadForce: bool = false // User(Cloud Debug)=true: Force uploads to version manager even if version already exists
 	MalterlibCloud_VersionUploadTags: [string] = [] // User(Cloud Debug)=["Debug"]: Set the tags to use when uploading to version managers
@@ -679,6 +684,21 @@ Property
 
 	MalterlibCloud_VersionUploadCopyTempContents: string
 	MalterlibCloud_VersionUploadCopyTempContents =+ fg_ExpandCopyOptions(MalterlibCloud_VersionUploadSources)->ForEach(&MalterlibCloud_VersionUploadCopyTempTemplate)
+}
+
+// Debug manager
+Property
+{
+	MalterlibCloud_DebugManagerAssetUploadCommand: string = ""
+	MalterlibCloud_DebugManagerAssetUploadCommand	`@(MalterlibCloud_CloudClientCommand) --debug-manager-asset-upload --no-self-update-check`\
+													` --metadata-product @(MalterlibCloudVersionInfo_Product->EscapeHost())`\
+													` --metadata-application @(MalterlibCloudVersionInfo_Application->EscapeHost())`\
+													` --metadata-configuration @(MalterlibCloudVersionInfo_Configuration->EscapeHost())`\
+													` --metadata-git-branch @((MalterlibGitBranch || "")->EscapeHost())`\
+													` --metadata-git-commit @(MalterlibGitCommit->EscapeHost())`\
+													` --metadata-platform @(MalterlibCloudPlatform->EscapeHost())`\
+													` --metadata-version @(MalterlibCloudVersionInfo_Version->EscapeHost())`\
+													` --metadata-tags @(MalterlibCloudVersionInfo_Tags->EJsonToString()->EscapeHost())`
 }
 
 // Upload
