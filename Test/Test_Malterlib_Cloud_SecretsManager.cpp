@@ -58,7 +58,7 @@ namespace
 	template <typename t_CStreamType = NStream::CBinaryStreamDefault>
 	class TCBinaryStreamFileDelayed : public TCBinaryStreamFile<t_CStreamType>
 	{
-		typedef TCBinaryStreamFile<t_CStreamType> CParent;
+		using CParent = TCBinaryStreamFile<t_CStreamType>;
 
 	protected:
 		DMibStreamImplementProtected(TCBinaryStreamFileDelayed);
