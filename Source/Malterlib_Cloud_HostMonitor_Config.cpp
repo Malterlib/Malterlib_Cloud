@@ -283,7 +283,7 @@ namespace NMib::NCloud
 
 								OldKeyValue = fg_Move(Value);
 							}
-							catch (CException const &_Exception)
+							catch ([[maybe_unused]] CException const &_Exception)
 							{
 								DMibLogWithCategory
 									(

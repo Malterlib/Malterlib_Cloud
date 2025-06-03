@@ -15,6 +15,8 @@ namespace NMib::NCloud
 	{
 		_BackupInstance(&NPrivate::CBackupManagerClient_Instance::f_BackupFinishedStarting) > [this](TCAsyncResult<void> &&_Result)
 			{
+				(void)this;
+				
 				if (!_Result)
 				{
 					DMibLogCategoryStr(m_Config.m_LogCategory);
