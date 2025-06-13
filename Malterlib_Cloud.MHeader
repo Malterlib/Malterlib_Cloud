@@ -696,17 +696,17 @@ Property
 		!!MalterlibCloud_VersionUploadForce true
 	}
 
-	MalterlibCloud_VersionUploadCloudClientHostSpecified function(string _Host) string = ""
-	MalterlibCloud_VersionUploadCloudClientHostSpecified ` --host @(_Host->EscapeHost())`
+	MalterlibCloud_VersionUploadCloudClientHostSpecified function([string] _Hosts) string = ""
+	MalterlibCloud_VersionUploadCloudClientHostSpecified ` --hosts "@(_Hosts->Join(","))"`
 	{
-		!_Host ""
+		!_Hosts []
 	}
 
 	MalterlibCloud_VersionUploadToBuildServerPath: string?
 	MalterlibCloud_VersionUploadToBuildServerPathFull: string? = `@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)`
 
-	MalterlibCloud_VersionUploadCloudClientCommand	function(string _Host) string
-	MalterlibCloud_VersionUploadCloudClientCommand	`@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --settings-file @(MalterlibCloudVersionInfoFileName->EscapeHost()) --tags @(MalterlibCloud_VersionUploadTags->EJSONToString("")->EscapeHost())@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified(_Host)) @(MalterlibCloud_VersionUploadTarArchivePath->EscapeHost())\r\n`
+	MalterlibCloud_VersionUploadCloudClientCommand	function([string] _Hosts) string
+	MalterlibCloud_VersionUploadCloudClientCommand	`@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --settings-file @(MalterlibCloudVersionInfoFileName->EscapeHost()) --tags @(MalterlibCloud_VersionUploadTags->EJSONToString("")->EscapeHost())@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified(_Hosts)) @(MalterlibCloud_VersionUploadTarArchivePath->EscapeHost())\r\n`
 	{
 		!!MalterlibCloud_VersionUploadToBuildServerPath undefined
 	}
@@ -732,17 +732,14 @@ Property
 		}
 	}
 
-	MalterlibCloud_VersionUploadCloudClientTemplate function(string _Host) string = ""
-	MalterlibCloud_VersionUploadCloudClientTemplate	=+ MalterlibCloud_VersionUploadCloudClientCommand(_Host)
-
 	MalterlibCloud_VersionUploadCloudClientContents: string = ""
 
-	MalterlibCloud_VersionUploadCloudClientContents MalterlibCloud_VersionUploadCloudClientCommand("")
+	MalterlibCloud_VersionUploadCloudClientContents MalterlibCloud_VersionUploadCloudClientCommand([])
 	{
 		!!MalterlibCloud_VersionUploadHosts []
 	}
 
-	MalterlibCloud_VersionUploadCloudClientContents MalterlibCloud_VersionUploadHosts->ForEach(&MalterlibCloud_VersionUploadCloudClientTemplate)
+	MalterlibCloud_VersionUploadCloudClientContents MalterlibCloud_VersionUploadCloudClientCommand(MalterlibCloud_VersionUploadHosts)
 	{
 		!MalterlibCloud_VersionUploadHosts []
 	}
