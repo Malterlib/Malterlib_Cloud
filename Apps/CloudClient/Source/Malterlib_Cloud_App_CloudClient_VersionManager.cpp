@@ -105,8 +105,14 @@ namespace NMib::NCloud::NCloudClient
 						"VersionManagerHost?"_o=
 						{
 							"Names"_o= _o["--host"]
-							, "Default"_o= ""
+							, "Type"_o= ""
 							, "Description"_o= "The host ID of the host to upload the version to."
+						}
+						, "VersionManagerHosts?"_o=
+						{
+							"Names"_o= _o["--hosts"]
+							, "Type"_o= _o[""]
+							, "Description"_o= "The host IDs of the hosts to upload the version to."
 						}
 						, "SettingsFileFromPackage?"_o=
 						{
@@ -556,6 +562,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto AnsiFlags = _pCommandLine->m_AnsiFlags;
+
 		CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
 		if (Source.f_IsEmpty())
 			co_return DMibErrorInstance("Source must be specified");
@@ -667,7 +675,18 @@ namespace NMib::NCloud::NCloudClient
 		fApplySettings(Settings);
 		fApplySettings(_Params);
 
-		CStr Host = _Params["VersionManagerHost"].f_String();
+		TCVector<CStr> UploadHosts;
+
+		if (auto *pValue = _Params.f_GetMember("VersionManagerHosts"))
+		{
+			if (_Params.f_GetMember("VersionManagerHost"))
+				co_return DMibErrorInstance("You cannot specify both --host and --hosts at the same time");
+
+			UploadHosts = pValue->f_StringArray();
+		}
+		else if (auto *pValue = _Params.f_GetMember("VersionManagerHost"))
+			UploadHosts.f_Insert(pValue->f_String());
+
 		CTime Time = _Params["Time"].f_Date();
 		uint64 QueueSize = _Params["TransferQueueSize"].f_Integer();
 		bool bForce = _Params["Force"].f_Boolean();
@@ -732,21 +751,7 @@ namespace NMib::NCloud::NCloudClient
 
 		co_await fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
-		CStr Error;
-		auto *pVersionManager = mp_VersionManagers.f_GetOneActor(Host, Error);
-		if (!pVersionManager)
-		{
-			co_return DMibErrorInstance
-				(
-					fg_Format
-					(
-						"Error selecting version manager for host '{}': {}. Connection might have failed. Use --log-to-stderr to see more info."
-						, Host
-						, Error
-					)
-				)
-			;
-		}
+		auto HostsToFind = TCSet<CStr>::fs_FromContainer(UploadHosts);
 
 		CVersionManager::CVersionInformation VersionInfo;
 		VersionInfo.m_Time = Time;
@@ -754,25 +759,63 @@ namespace NMib::NCloud::NCloudClient
 		VersionInfo.m_ExtraInfo = ExtraInfo;
 		VersionInfo.m_Tags = Tags;
 
-		CVersionManagerHelper::CUploadResult UploadResult = co_await mp_VersionManagerHelper.f_Upload
-			(
-				pVersionManager->m_Actor
-				, Application
-				, VersionID
-				, VersionInfo
-				, Source
-				, bForce ? CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite : CVersionManager::CStartUploadVersion::EFlag_None
-				, QueueSize
-			)
-		;
+		TCFutureVector<void> Results;
 
-		if (!UploadResult.m_DeniedTags.f_IsEmpty())
-			*_pCommandLine %= "The following tags were denied: {vs,vb}\n"_f << UploadResult.m_DeniedTags;
+		for (auto &VersionManager : mp_VersionManagers.m_Actors)
+		{
+			if (!UploadHosts.f_IsEmpty() && !HostsToFind.f_Remove(VersionManager.m_TrustInfo.m_HostInfo.m_HostID))
+				continue;
 
-		*_pCommandLine += "Upload finished transferring: {ns } bytes at {fe2} MB/s\n"_f
-			<< UploadResult.m_TransferResult.m_nBytes
-			<< UploadResult.m_TransferResult.f_BytesPerSecond()/1'000'000.0
-		;
+			fg_CallSafe
+				(
+					[=, this, Actor = VersionManager.m_Actor, HostInfo = VersionManager.m_TrustInfo.m_HostInfo] -> TCUnsafeFuture<void>
+					{
+						CVersionManagerHelper::CUploadResult UploadResult = co_await mp_VersionManagerHelper.f_Upload
+							(
+								Actor
+								, Application
+								, VersionID
+								, VersionInfo
+								, Source
+								, bForce ? CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite : CVersionManager::CStartUploadVersion::EFlag_None
+								, QueueSize
+							)
+						;
+
+						if (!UploadResult.m_DeniedTags.f_IsEmpty())
+							*_pCommandLine %= "{}: The following tags were denied: {vs,vb}\n"_f << HostInfo.f_GetDescColored(AnsiFlags) << UploadResult.m_DeniedTags;
+
+						*_pCommandLine += "{}: Upload finished transferring in {}: {ns } bytes at {fe2} MB/s\n"_f
+							<< HostInfo.f_GetDescColored(AnsiFlags)
+							<< fg_SecondsDurationToHumanReadable(UploadResult.m_TransferResult.m_nSeconds)
+							<< UploadResult.m_TransferResult.m_nBytes
+							<< UploadResult.m_TransferResult.f_BytesPerSecond() / 1'000'000.0
+						;
+
+						co_return {};
+					}
+				)
+				> Results
+			;
+		}
+
+		if (Results.f_IsEmpty())
+			co_return DMibErrorInstance("Did not find any host to upload to. Connection might have failed. Use --log-to-stderr to see more info.");
+
+		co_await fg_AllDone(fg_Move(Results));
+
+		if (!HostsToFind.f_IsEmpty())
+		{
+			co_return DMibErrorInstance
+				(
+					fg_Format
+					(
+						"Did not find these hosts: {vs}. Connection might have failed. Use --log-to-stderr to see more info."
+						, HostsToFind
+					)
+				)
+			;
+		}
 
 		co_return 0;
 	}
