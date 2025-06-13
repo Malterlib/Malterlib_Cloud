@@ -55,6 +55,8 @@ namespace NMib::NCloud::NDebugManager
 			case CDebugManager::EAssetType::mc_Executable: return CDebugDatabase::EAssetType::mc_Executable;
 			case CDebugManager::EAssetType::mc_DebugInfo: return CDebugDatabase::EAssetType::mc_DebugInfo;
 			}
+
+			return CDebugDatabase::EAssetType::mc_Executable;
 		}
 		else if constexpr (NTraits::cIsSame<tf_CTo, CDebugManager::EAssetType>)
 		{
@@ -63,6 +65,8 @@ namespace NMib::NCloud::NDebugManager
 			case CDebugDatabase::EAssetType::mc_Executable: return CDebugManager::EAssetType::mc_Executable;
 			case CDebugDatabase::EAssetType::mc_DebugInfo: return CDebugManager::EAssetType::mc_DebugInfo;
 			}
+
+			return CDebugManager::EAssetType::mc_Executable;
 		}
 		else if constexpr (NTraits::cIsSame<tf_CTo, CDebugManager::CFileInfo>)
 		{
