@@ -1,8 +1,10 @@
 // Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
+#include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Concurrency/DistributedDaemon>
 #include <Mib/Encoding/JsonShortcuts>
+#include <Mib/Process/ProcessLaunchActor>
 
 #include "Malterlib_Cloud_App_TestApp.h"
 
@@ -367,6 +369,76 @@ namespace NMib::NCloud::NTest
 					co_await LogReporter.m_fReportEntries(fg_Move(LogEntries));
 
 					co_await fg_Move(LogReporter.m_fReportEntries).f_Destroy();
+
+					co_return 0;
+				}
+			)
+		;
+		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
+			(
+				{
+					"Names"_o= _o["--test-launch"]
+					, "Description"_o= "Launch application from context of TestApp."
+					, "Options"_o=
+					{
+						"LaunchUser?"_o=
+						{
+							"Names"_o= _o["--user"]
+							, "Default"_o= ""
+							, "Description"_o= "The user to launch as."
+						}
+						, "LaunchGroup?"_o=
+						{
+							"Names"_o= _o["--group"]
+							, "Default"_o= ""
+							, "Description"_o= "The group to launch as."
+						}
+						, "LaunchInUserSession?"_o=
+						{
+							"Names"_o= _o["--launch-in-user-session"]
+							, "Default"_o= false
+							, "Description"_o= "Launch the application in user session."
+						}
+					}
+					, "Parameters"_o=
+					{
+						"Executable"_o=
+						{
+							"Type"_o= ""
+							, "Description"_o= "The executable to launch."
+						}
+						, "CommandLineParams...?"_o=
+						{
+							"Type"_o= _o[""]
+							, "Default"_o= _o[]
+							, "Description"_o= "Parameters to send to launch."
+						}
+					}
+				}
+				, [](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				{
+					TCActor<CProcessLaunchActor> LaunchActor = fg_Construct();
+					auto AsyncDestroy = co_await fg_AsyncDestroy(LaunchActor);
+
+					auto Excutable = _Params["Executable"].f_String();
+
+					CProcessLaunchActor::CSimpleLaunch SimpleLaunch(Excutable);
+					SimpleLaunch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+					SimpleLaunch.m_SimpleFlags = CProcessLaunchActor::ESimpleLaunchFlag::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode;
+					SimpleLaunch.m_Params.m_Parameters = CProcessLaunchParams::fs_GetParams(_Params["CommandLineParams"].f_StringArray());
+					SimpleLaunch.m_Params.m_bAllowExecutableLocate = true;
+					SimpleLaunch.m_Params.m_bLaunchInUserSession = _Params["LaunchInUserSession"].f_Boolean();
+					SimpleLaunch.m_Params.m_RunAsUser = _Params["LaunchUser"].f_String();
+					SimpleLaunch.m_Params.m_RunAsGroup = _Params["LaunchGroup"].f_String();
+
+					auto Results = co_await LaunchActor.f_Bind<&CProcessLaunchActor::f_LaunchSimple>(fg_Move(SimpleLaunch));
+					for (auto &Output : Results.m_Output)
+					{
+						if (Output.m_Type == EProcessLaunchOutputType_StdOut)
+							co_await _pCommandLine->f_StdOut(Output.m_Output);
+						else
+							co_await _pCommandLine->f_StdErr(Output.m_Output);
+					}
 
 					co_return 0;
 				}
