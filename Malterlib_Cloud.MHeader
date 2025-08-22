@@ -794,9 +794,6 @@ Property
 		BsdTarGenerateScheme =+ {
 			"Target.GenerateScheme": false
 		}
-		{
-			!!GeneratorFamily "Xcode"
-		}
 
 		BsdTarUniqueName: string = `@(MalterlibPostCopyProject)_@(MalterlibPostCopyDestination)@(MalterlibCloudTarBinDirectory)`->Replace("/", "_")
 	}
