@@ -11,6 +11,7 @@
 #include <Mib/Concurrency/DistributedAppLogReporter>
 #include <Mib/Concurrency/DistributedAppLogReader>
 #include <Mib/Cloud/AppManager>
+#include <Mib/Cloud/DebugManager>
 #include <Mib/Cloud/VersionInfo>
 
 namespace NMib::NCloud
@@ -263,6 +264,12 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions _Params) = 0;
  		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CExpectedVersions>> f_EnumExpectedOsVersions() = 0;
  		virtual NConcurrency::TCFuture<void> f_SetExpectedOsVersions(NStr::CStr _OsName, CCurrentVersion _CurrentVersion, CExpectedVersionRange _ExpectedRange) = 0;
+		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeDebugManagers
+			(
+				NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NConcurrency::TCDistributedActorInterfaceWithID<CDebugManager> _DebugManager, NStr::CStr _ActorID)> _fOnAdd
+				, NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NStr::CStr _ActorID)> _fOnRemove
+			) = 0
+		;
 
 		CCloudManager();
 		~CCloudManager();

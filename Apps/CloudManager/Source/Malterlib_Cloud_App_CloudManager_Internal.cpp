@@ -50,6 +50,8 @@ namespace NMib::NCloud::NCloudManager
 		co_await (fp_SetupCleanup() % "Failed to setup cleanup");
 		co_await (mp_Notifications.f_Init() % "Failed to setup notifications");
 
+		co_await (fp_InitDebugMananger() % "Failed to setup debug manager");
+
 		// Publish last so notifications are not missed
 		co_await (fp_Publish() % "Failed to publish");
 
@@ -64,6 +66,7 @@ namespace NMib::NCloud::NCloudManager
 		co_await mp_SensorNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy sensor notifications");;
 		co_await mp_UpdateNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update notifications");;
 		co_await mp_Notifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy notifications");;
+		co_await mp_DebugManagers.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy notifications");
 
 		{
 			TCFutureVector<void> Destroys;

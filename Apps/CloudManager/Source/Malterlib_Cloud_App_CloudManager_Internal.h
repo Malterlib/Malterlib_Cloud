@@ -51,6 +51,12 @@ namespace NMib::NCloud::NCloudManager
 			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeExpectedOsVersions(CSubscribeExpectedOsVersions _Params) override;
 	 		TCFuture<TCMap<CStr, CExpectedVersions>> f_EnumExpectedOsVersions() override;
 			TCFuture<void> f_SetExpectedOsVersions(CStr _OsName, CCurrentVersion _CurrentVersion, CExpectedVersionRange _ExpectedRange) override;
+			TCFuture<TCActorSubscriptionWithID<>> f_SubscribeDebugManagers
+				(
+					TCActorFunctorWithID<TCFuture<void> (TCDistributedActorInterfaceWithID<CDebugManager> _DebugManager, CStr _ActorID)> _fOnAdd
+					, TCActorFunctorWithID<TCFuture<void> (CStr _ActorID)> _fOnRemove
+				) override
+			;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
@@ -110,6 +116,23 @@ namespace NMib::NCloud::NCloudManager
 		struct CAppManagerCloudManagerInterfaceImplementation : public CAppManagerCloudManagerInterface
 		{
 			NConcurrency::TCFuture<void> f_PauseReporting(fp32 _SecondsToPauseFor) override;
+
+			DMibDelegatedActorImplementation(CCloudManagerServer);
+		};
+
+		struct CDebugManagerImplementation : public CDebugManager
+		{
+			TCFuture<CAssetList::CResult> f_Asset_List(CAssetList _Params) override;
+			TCFuture<CAssetUpload::CResult> f_Asset_Upload(CAssetUpload _Params) override;
+			TCFuture<CAssetDownload::CResult> f_Asset_Download(CAssetDownload _Params) override;
+			TCFuture<CAssetDelete::CResult> f_Asset_Delete(CAssetDelete _Params) override;
+
+			TCFuture<CCrashDumpList::CResult> f_CrashDump_List(CCrashDumpList _Params) override;
+			TCFuture<CCrashDumpUpload::CResult> f_CrashDump_Upload(CCrashDumpUpload _Params) override;
+			TCFuture<CCrashDumpDownload::CResult> f_CrashDump_Download(CCrashDumpDownload _Params) override;
+			TCFuture<CCrashDumpDelete::CResult> f_CrashDump_Delete(CCrashDumpDelete _Params) override;
+
+			TCWeakDistributedActor<CDebugManager> m_UpstreamActor;
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
@@ -186,6 +209,18 @@ namespace NMib::NCloud::NCloudManager
 			bool mp_bInitialized = false;
 		};
 
+		struct CDebugManagerSubscription
+		{
+			TCActorFunctorWithID<TCFuture<void> (TCDistributedActorInterfaceWithID<CDebugManager> _DebugManager, CStr _ActorID)> m_fOnAdd;
+			TCActorFunctorWithID<TCFuture<void> (CStr _ActorID)> m_fOnRemove;
+		};
+
+		struct CLocalDebugManager
+		{
+			TCDistributedActorInstance<CDebugManagerImplementation> m_DebugManagerInterface;
+			CStr m_ID;
+		};
+
 		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_Publish();
 		TCFuture<void> fp_SetupDatabase();
@@ -204,6 +239,8 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_ProcessApplicationChanges(CStr _AppManagerID, CAppManagerInterface::COnChangeNotificationParams _Params);
 		TCFuture<void> fp_ChangeOtherErrors(CStr _AppManagerID, mint _RegisterSequence, TCSet<CStr> _Remove, TCMap<CStr, CStr> _Add);
 		TCFuture<void> fp_ReportFiltered(CStr _AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied);
+
+		TCFuture<void> fp_InitDebugMananger();
 
 		static TCVector<CStr> fsp_SensorReadPermissions();
 		static TCVector<CStr> fsp_LogReadPermissions();
@@ -245,5 +282,9 @@ namespace NMib::NCloud::NCloudManager
 		mint mp_ExpectedOsVersionSubscriptionNextID = 0;
 
 		bool mp_bDoingCleanup = false;
+
+		TCMap<CStr, CDebugManagerSubscription> mp_DebugManagerSubscriptions;
+		TCTrustedActorSubscription<CDebugManager> mp_DebugManagers;
+		TCMap<TCWeakDistributedActor<CActor>, CLocalDebugManager> mp_LocalDebugManagers;
 	};
 }

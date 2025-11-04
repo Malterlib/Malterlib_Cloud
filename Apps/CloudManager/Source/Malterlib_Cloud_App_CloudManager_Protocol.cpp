@@ -1087,4 +1087,47 @@ namespace NMib::NCloud::NCloudManager
 			)
 		;
 	}
+
+	TCFuture<TCActorSubscriptionWithID<>> CCloudManagerServer::CCloudManagerImplementation::f_SubscribeDebugManagers
+		(
+			TCActorFunctorWithID<TCFuture<void> (TCDistributedActorInterfaceWithID<CDebugManager> _DebugManager, CStr _ActorID)> _fOnAdd
+			, TCActorFunctorWithID<TCFuture<void> (CStr _ActorID)> _fOnRemove
+		)
+	{
+		auto pThis = m_pThis;
+		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
+
+		auto Auditor = pThis->mp_AppState.f_Auditor();
+
+		TCVector<CStr> Permissions{"CloudManager/UploadCrashDumps"};
+
+		if (!co_await pThis->mp_Permissions.f_HasPermission("Register for debug managers", Permissions))
+			co_return Auditor.f_AccessDenied("(Register for debug managers)", Permissions);
+
+		Auditor.f_Info("Register for debug managers");
+
+		auto SubscriptionID = fg_RandomID(pThis->mp_DebugManagerSubscriptions);
+
+		auto &Subscription = pThis->mp_DebugManagerSubscriptions[SubscriptionID];
+		Subscription.m_fOnAdd = fg_Move(_fOnAdd);
+		Subscription.m_fOnRemove = fg_Move(_fOnRemove);
+
+		co_return g_ActorSubscription / [pThis, SubscriptionID]() -> TCFuture<void>
+			{
+				auto *pSubscription = pThis->mp_DebugManagerSubscriptions.f_FindEqual(SubscriptionID);
+				TCFutureVector<void> Destroys;
+				if (pSubscription)
+				{
+					fg_Move(pSubscription->m_fOnAdd).f_Destroy() > Destroys;
+					fg_Move(pSubscription->m_fOnRemove).f_Destroy() > Destroys;
+				}
+
+				pThis->mp_DebugManagerSubscriptions.f_Remove(pSubscription);
+
+				co_await fg_AllDone(Destroys);
+
+				co_return {};
+			}
+		;
+	}
 }

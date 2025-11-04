@@ -444,6 +444,20 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
+			(
+				{
+					"Names"_o= _o["--crash"]
+					, "Description"_o= "Crash.\n"
+				}
+				, [](CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				{
+					*((int volatile *)nullptr) = 0;
+
+					co_return 0;
+				}
+			)
+		;
 	}
 
 	void CTestAppActor::fp_PopulateAppInterfaceInfo

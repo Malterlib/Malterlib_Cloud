@@ -24,6 +24,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CCloudManager::f_SubscribeExpectedOsVersions);
 		DMibPublishActorFunction(CCloudManager::f_EnumExpectedOsVersions);
 		DMibPublishActorFunction(CCloudManager::f_SetExpectedOsVersions);
+		DMibPublishActorFunction(CCloudManager::f_SubscribeDebugManagers);
 	}
 
 	CCloudManager::~CCloudManager() = default;
