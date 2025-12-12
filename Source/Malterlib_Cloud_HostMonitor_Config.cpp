@@ -31,7 +31,7 @@ namespace NMib::NCloud
 	{
 		auto &Internal = *mp_pInternal;
 
-		CStr ConfigID = NCryptography::fg_RandomID(Internal.m_MonitoredConfigs);
+		CStr ConfigID = NCryptography::fg_FastRandomID(Internal.m_MonitoredConfigs);
 		CInternal::CMonitoredConfig MonitoredConfig;
 
 		for (auto &ConfigFile : _ConfigFiles.m_Files)

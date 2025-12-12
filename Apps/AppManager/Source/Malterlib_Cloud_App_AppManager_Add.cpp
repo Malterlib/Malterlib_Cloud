@@ -534,7 +534,7 @@ namespace NMib::NCloud::NAppManager
 		else
 		{
 			CStr DownloadDirectoryRoot = Directory / "TempVersionDownload";
-			CStr DownloadDirectory = DownloadDirectoryRoot / fg_RandomID();
+			CStr DownloadDirectory = DownloadDirectoryRoot / fg_FastRandomID();
 			_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
 			auto VersionInfo = co_await
 				(

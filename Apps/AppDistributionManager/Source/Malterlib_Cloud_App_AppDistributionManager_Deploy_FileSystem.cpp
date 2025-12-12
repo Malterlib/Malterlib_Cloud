@@ -76,7 +76,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			(
 				g_Dispatch(BlockingActorCheckout) / [=, pCanDestroy = mp_pCanDestroy]() -> void
 				{
-					CStr TempDirectory = CFile::fs_GetProgramDirectory() / "Temp" / fg_RandomID();
+					CStr TempDirectory = CFile::fs_GetProgramDirectory() / "Temp" / fg_FastRandomID();
 					CStr TempFile = TempDirectory / "TempFile";
 
 					CFile::fs_CreateDirectory(TempDirectory);

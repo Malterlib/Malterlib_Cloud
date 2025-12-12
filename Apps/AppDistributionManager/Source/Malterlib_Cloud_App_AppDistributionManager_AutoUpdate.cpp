@@ -75,7 +75,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			)
 		;
 
-		CStr DownloadDirectory = CFile::fs_GetProgramDirectory() / "Temp" / fg_RandomID();
+		CStr DownloadDirectory = CFile::fs_GetProgramDirectory() / "Temp" / fg_FastRandomID();
 		CApplicationVersion ApplicationVersion = {_VersionID, _VersionInfo};
 
 		auto &Distribution = *pDistribution;

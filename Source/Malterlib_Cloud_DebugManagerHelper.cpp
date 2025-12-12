@@ -172,7 +172,7 @@ namespace NMib::NCloud
 			}
 		;
 
-		CStr StateID = fg_RandomID(m_States);
+		CStr StateID = fg_FastRandomID(m_States);
 		m_States[StateID] = pState;
 
 		auto StateCleanup = g_ActorSubscription / [pInternal = TCSharedPointer<CDebugManagerHelperInternal>(fg_Explicit(this)), StateID]
@@ -230,7 +230,7 @@ namespace NMib::NCloud
 			)
 		;
 
-		CStr StateID = fg_RandomID(m_States);
+		CStr StateID = fg_FastRandomID(m_States);
 		m_States[StateID] = pState;
 
 		auto StateCleanup = g_ActorSubscription / [StateID, pInternal = TCSharedPointer<CDebugManagerHelperInternal>(fg_Explicit(this))]

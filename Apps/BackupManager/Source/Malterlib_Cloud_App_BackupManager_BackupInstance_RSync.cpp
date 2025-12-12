@@ -319,7 +319,7 @@ namespace NMib::NCloud::NBackupManager
 
 		CStr FileName = Internal.f_GetCurrentPath(_FileName);
 		CStr OldFileName = Internal.f_GetLatestPath(_FileName);
-		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_RandomID());
+		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_FastRandomID());
 		CStr RSyncID;
 
 		co_return co_await Internal.f_StartRSyncShared

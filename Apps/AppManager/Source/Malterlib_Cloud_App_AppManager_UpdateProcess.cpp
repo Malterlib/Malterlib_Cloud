@@ -149,7 +149,7 @@ namespace NMib::NCloud::NAppManager
 			co_return pException;
 
 		CStr DownloadDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersionDownload";
-		CStr DownloadDirectory = DownloadDirectoryRoot / fg_RandomID();
+		CStr DownloadDirectory = DownloadDirectoryRoot / fg_FastRandomID();
 		State.m_SourcePath = DownloadDirectory;
 		State.m_AllowSourceExist[DownloadDirectoryRoot];
 
@@ -238,7 +238,7 @@ namespace NMib::NCloud::NAppManager
 
 		CStr TemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersion";
 		CStr BuggyTemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "{}";
-		CStr TemporaryDirectory = TemporaryDirectoryRoot / fg_RandomID();
+		CStr TemporaryDirectory = TemporaryDirectoryRoot / fg_FastRandomID();
 		State.m_TempraryPath = TemporaryDirectory;
 		State.m_TemporaryDirectoryCleanup = g_BlockingActorSubscription / [TemporaryDirectoryRoot]
 			{

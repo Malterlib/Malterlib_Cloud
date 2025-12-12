@@ -23,7 +23,7 @@ namespace NMib::NCloud::NBackupManager
 
 		CStr FileName = CFile::fs_AppendPath(Internal.m_BackupDirectory, "Manifest.bin");
 		CStr OldFileName = CFile::fs_AppendPath(Internal.m_RootBackupDirectory, "Manifest.bin");
-		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_RandomID());
+		CStr TempFileName = fg_Format("{}.{}.tmp", FileName, fg_FastRandomID());
 
 		co_return co_await Internal.f_StartRSyncShared
 			(
