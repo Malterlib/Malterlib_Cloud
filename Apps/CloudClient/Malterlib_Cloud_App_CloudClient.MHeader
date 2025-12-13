@@ -15,6 +15,10 @@
 	%Group "Source"
 	{
 		%File "Source/Malterlib_Cloud_App_*"
+		%Group "Bootstrap"
+		{
+			%File "Source/Bootstrap/^*"
+		}
 	}
 
 	%Dependency "Lib_Malterlib_Cloud"

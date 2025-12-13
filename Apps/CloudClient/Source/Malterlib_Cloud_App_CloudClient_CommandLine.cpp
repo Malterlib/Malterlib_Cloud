@@ -44,5 +44,6 @@ namespace NMib::NCloud::NCloudClient
 		fp_NetworkTunnel_RegisterCommands(o_CommandLine.f_AddSection("Network Tunnel", "Commands to use network tunnels."));
 		fp_DebugManager_RegisterCommands(o_CommandLine.f_AddSection("Debug Manager", "Commands to control debug managers."));
 		fp_CloudManager_RegisterCommands(o_CommandLine.f_AddSection("Cloud Manager", "Commands to control cloud managers."));
+		fp_Bootstrap_RegisterCommands(o_CommandLine.f_AddSection("Bootstrap", "Commands to setup a new cloud environment."));
 	}
 }

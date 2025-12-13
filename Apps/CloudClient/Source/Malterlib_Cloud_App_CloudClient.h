@@ -241,6 +241,9 @@ namespace NMib::NCloud::NCloudClient
 		TCFuture<uint32> fp_CommandLine_DebugManager_CrashDumpDownload(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_DebugManager_CrashDumpDelete(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
+		// Bootstrap (Cloud Environment Setup)
+		void fp_Bootstrap_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
+
 		fp64 mp_Timeout = 0.0;
 
 		TCVector<TCPromise<void>> mp_AppStopPromises;
