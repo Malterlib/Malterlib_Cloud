@@ -21,6 +21,10 @@
 	{
 		Dependency.Indirect true
 	}
+	%Dependency "Lib_Malterlib_Database"
+	{
+		Dependency.Indirect true
+	}
 	%Dependency "Lib_Malterlib"
 	{
 		Dependency.Indirect true

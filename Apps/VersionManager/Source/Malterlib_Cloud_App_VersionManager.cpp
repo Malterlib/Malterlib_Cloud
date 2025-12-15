@@ -16,7 +16,7 @@ namespace NMib::NCloud::NVersionManager
 		: CDistributedAppActor(CDistributedAppActor_Settings{"VersionManager"}.f_AuditCategory("Malterlib/Cloud/VersionManager"))
 	{
 	}
-	
+
 	CVersionManagerDaemonActor::~CVersionManagerDaemonActor()
 	{
 	}
@@ -24,21 +24,23 @@ namespace NMib::NCloud::NVersionManager
 	TCFuture<void> CVersionManagerDaemonActor::fp_StartApp(NEncoding::CEJsonSorted const _Params)
 	{
 		mp_pServer = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);
-		
+
+		co_await mp_pServer(&CServer::f_Init);
+
 		co_return {};
 	}
-	
+
 	TCFuture<void> CVersionManagerDaemonActor::fp_StopApp()
-	{	
+	{
 		if (mp_pServer)
 		{
 			DMibLogWithCategory(Mib/Cloud/VersionManager/Daemon, Info, "Shutting down");
-			
+
 			auto Result = co_await fg_Move(mp_pServer).f_Destroy().f_Wrap();
 			if (!Result)
 				DMibLogWithCategory(Mib/Cloud/VersionManager/Daemon, Error, "Failed to shut down server: {}", Result.f_GetExceptionStr());
 		}
-		
+
 		co_return {};
 	}
 }

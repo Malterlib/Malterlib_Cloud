@@ -94,6 +94,8 @@ namespace NMib::NCloud::NVersionManager
 
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
+		auto UploadSequenceSubscription = co_await pThis->mp_UploadSequencer.f_Sequence();
+
 		auto Auditor = pThis->mp_AppState.f_Auditor({}, CallingHostInfo);
 
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
@@ -104,7 +106,7 @@ namespace NMib::NCloud::NVersionManager
 			if (!CVersionManager::fs_IsValidVersionIdentifier(_Params.m_VersionIDAndPlatform.m_VersionID, ErrorStr))
 				co_return Auditor.f_Exception({fg_Format("Invalid version ID format: {}", ErrorStr), "(start upload version)"});
 		}
-		
+
 		if (!CVersionManager::fs_IsValidPlatform(_Params.m_VersionIDAndPlatform.m_Platform))
 			co_return Auditor.f_Exception({"Invalid version platform format", "(start upload version)"});
 
@@ -147,6 +149,22 @@ namespace NMib::NCloud::NVersionManager
 
 		// Force time to same as when saving in Json file
 		VersionInfo.m_Time = CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(VersionInfo.m_Time).f_UnixMilliseconds());
+
+		// If refresh is in progress, wait for it to complete before proceeding
+		CActorSubscription RefreshSubscription;
+		if (pThis->mp_bRefreshInProgress)
+			RefreshSubscription = co_await pThis->mp_RefreshSequencer.f_Sequence();
+
+		++pThis->mp_nInProgressUploads;
+		auto InProgressSubscription = g_ActorSubscription / [pThis]() -> TCFuture<void>
+			{
+				--pThis->mp_nInProgressUploads;
+				pThis->fp_NotifyUploadsEmpty();
+
+				co_return {};
+			}
+		;
+		RefreshSubscription.f_Clear();
 
 		CStr UploadID = fg_RandomID(pThis->mp_VersionUploads);
 
@@ -243,7 +261,22 @@ namespace NMib::NCloud::NVersionManager
 
 			pCleanup->f_Clear();
 
-			fg_Move(ReceiveFilesFuture) > [pThis, UploadID, ApplicationName, VersionID, VersionInfo, VersionPath, Desc, Auditor, pParams, pFinishedPromise]
+			fg_Move(ReceiveFilesFuture)
+				>
+				[
+					pThis
+					, UploadID
+					, ApplicationName
+					, VersionID
+					, VersionInfo
+					, VersionPath
+					, Desc
+					, Auditor
+					, pParams
+					, pFinishedPromise
+					, InProgressSubscription = fg_Move(InProgressSubscription)
+					, UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)
+				]
 				(TCAsyncResult<CFileTransferResult> &&_Result) mutable
 				{
 					if (!_Result)
@@ -290,7 +323,21 @@ namespace NMib::NCloud::NVersionManager
 					}
 
 					pThis->fp_SaveVersionInfo(VersionPath, VersionInfo)
-						> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor, pParams, pFinishedPromise](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
+						>
+						[
+							pThis
+							, UploadID
+							, VersionID
+							, VersionInfo
+							, Desc
+							, ApplicationName
+							, Auditor
+							, pParams
+							, pFinishedPromise
+							, InProgressSubscription = fg_Move(InProgressSubscription)
+							, UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)
+						]
+						(TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
 						{
 							if (!_InfoWriteResult)
 							{
@@ -325,8 +372,19 @@ namespace NMib::NCloud::NVersionManager
 							Version.m_VersionInfo = VersionInfo;
 							Application.m_VersionsByTime.f_Insert(Version);
 
+							// Save to database for fast startup next time
+							pThis->fp_SaveVersionToDatabase(ApplicationName, VersionID, VersionInfo)
+								> [pFinishedPromise, InProgressSubscription = fg_Move(InProgressSubscription), UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)]
+								(TCAsyncResult<void> &&_SaveResult) mutable
+								{
+									if (!_SaveResult)
+										_SaveResult > fg_LogWarning("VersionManager", "Failed to save version to database");
+									pFinishedPromise->f_SetResult();
+									InProgressSubscription.f_Clear();
+								}
+							;
+
 							pThis->fp_NewVersion(ApplicationName, Version);
-							pFinishedPromise->f_SetResult();
 						}
 					;
 				}
@@ -399,7 +457,21 @@ namespace NMib::NCloud::NVersionManager
 			}
 
 			pUpload->m_FileTransferReceive(&CFileTransferReceive::f_GetResultDeprecated)
-				> [pThis, UploadID, ApplicationName, VersionID, VersionInfo, VersionPath, Desc, Auditor, pParams, pFinishedPromise]
+				>
+				[
+					pThis
+					, UploadID
+					, ApplicationName
+					, VersionID
+					, VersionInfo
+					, VersionPath
+					, Desc
+					, Auditor
+					, pParams
+					, pFinishedPromise
+					, InProgressSubscription = fg_Move(InProgressSubscription)
+					, UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)
+				]
 				(TCAsyncResult<CFileTransferResult> &&_Result) mutable
 				{
 					if (!_Result)
@@ -441,7 +513,21 @@ namespace NMib::NCloud::NVersionManager
 					}
 
 					pThis->fp_SaveVersionInfo(VersionPath, VersionInfo)
-						> [pThis, VersionID, VersionInfo, Desc, ApplicationName, Auditor, pParams, pFinishedPromise](TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
+						>
+						[
+							pThis
+							, UploadID
+							, VersionID
+							, VersionInfo
+							, Desc
+							, ApplicationName
+							, Auditor
+							, pParams
+							, pFinishedPromise
+							, InProgressSubscription = fg_Move(InProgressSubscription)
+							, UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)
+						]
+						(TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
 						{
 							if (!_InfoWriteResult)
 							{
@@ -476,8 +562,19 @@ namespace NMib::NCloud::NVersionManager
 							Version.m_VersionInfo = VersionInfo;
 							Application.m_VersionsByTime.f_Insert(Version);
 
+							// Save to database for fast startup next time
+							pThis->fp_SaveVersionToDatabase(ApplicationName, VersionID, VersionInfo)
+								> [pFinishedPromise, InProgressSubscription = fg_Move(InProgressSubscription), UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)]
+								(TCAsyncResult<void> &&_SaveResult) mutable
+								{
+									if (!_SaveResult)
+										_SaveResult > fg_LogWarning("VersionManager", "Failed to save version to database");
+									pFinishedPromise->f_SetResult();
+									InProgressSubscription.f_Clear();
+								}
+							;
+
 							pThis->fp_NewVersion(ApplicationName, Version);
-							pFinishedPromise->f_SetResult();
 						}
 					;
 				}

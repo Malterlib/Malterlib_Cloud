@@ -29,35 +29,20 @@ namespace NMib::NCloud::NVersionManager
 		if (Path != OriginalPath)
 			fg_GetSys()->f_SetEnvironmentVariable("PATH", Path);
 #endif
-		fp_Init();
 	}
 
 	CVersionManagerDaemonActor::CServer::~CServer()
 	{
 	}
 
-	void CVersionManagerDaemonActor::CServer::fp_Init()
+	TCFuture<void> CVersionManagerDaemonActor::CServer::f_Init()
 	{
-		fg_ThisActor(this)(&CVersionManagerDaemonActor::CServer::fp_FindVersions)
-			> [this](TCAsyncResult<void> &&_ResultVersions)
-			{
-				if (!_ResultVersions)
-				{
-					DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Failed to find versions, aborting startup: {}", _ResultVersions.f_GetExceptionStr());
-					return;
-				}
-				fp_SetupPermissions() > [this](TCAsyncResult<void> &&_ResultPermissions)
-					{
-						if (!_ResultPermissions)
-						{
-							DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Failed to setup permissions, aborting startup: {}", _ResultPermissions.f_GetExceptionStr());
-							return;
-						}
-						fp_Publish();
-					}
-				;
-			}
-		;
+		co_await fp_SetupDatabase();
+		co_await fp_FindVersions();
+		co_await fp_SetupPermissions();
+		co_await fp_Publish();
+
+		co_return {};
 	}
 
 	TCSet<CStr> CVersionManagerDaemonActor::CServer::fp_ApplicationSet()
@@ -68,131 +53,14 @@ namespace NMib::NCloud::NVersionManager
 		return Return;
 	}
 
-	TCFuture<TCSet<CStr>> CVersionManagerDaemonActor::CServer::fp_EnumApplications()
-	{
-		auto BlockingActorCheckout = fg_BlockingActor();
-
-		auto Result = co_await
-			(
-				g_Dispatch(BlockingActorCheckout) / [RootDirectory = mp_AppState.m_RootDirectory]() -> TCSet<CStr>
-				{
-					CStr FindPath = RootDirectory + "/Applications";
-					CFile::CFindFilesOptions FindOptions(FindPath + "/*", false);
-					FindOptions.m_AttribMask = EFileAttrib_Directory;
-					auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-					TCSet<CStr> Applications;
-					for (auto &File : FoundFiles)
-					{
-						CStr Application = File.m_Path.f_Extract(FindPath.f_GetLen() + 1);
-						if (CVersionManager::fs_IsValidApplicationName(Application))
-							Applications[Application];
-					}
-					return Applications;
-				}
-			)
-		;
-
-		co_return fg_Move(Result);
-	}
-
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_FindVersions()
 	{
-		auto Applications = co_await fp_EnumApplications();
-		for (auto &Application : Applications)
-			mp_Applications[Application];
+		bool bLoaded = co_await fp_LoadVersionsFromDatabase();
+		if (bLoaded && mp_Applications.f_GetLen() > 0)
+			co_return {};
 
-		auto BlockingActorCheckout = fg_BlockingActor();
-
-		auto Result = co_await
-			(
-				g_Dispatch(BlockingActorCheckout) / [Applications, RootDirectory = mp_AppState.m_RootDirectory]()
-				-> NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>>
-				{
-					CStr ApplicationDirectory = RootDirectory + "/Applications";
-					NContainer::TCMap<NStr::CStr, NContainer::TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>> VersionsPerApplication;
-					for (auto &Application : Applications)
-					{
-						auto &Versions = VersionsPerApplication[Application];
-						CStr ApplicationPath = fg_Format("{}/{}", ApplicationDirectory, Application);
-						CFile::CFindFilesOptions FindOptions(ApplicationPath + "/*", false);
-						FindOptions.m_AttribMask = EFileAttrib_Directory;
-						auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-						for (auto &File : FoundFiles)
-						{
-							CStr Version = CVersionManager::CVersionID::fs_DecodeFileName(File.m_Path.f_Extract(ApplicationPath.f_GetLen() + 1));
-							CVersionManager::CVersionIDAndPlatform VersionID;
-							CStr Error;
-							if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
-								continue;
-							CStr VersionIDPath = fg_Format("{}/{}", ApplicationPath, VersionID.m_VersionID.f_EncodeFileName());
-							CFile::CFindFilesOptions FindOptions(VersionIDPath + "/*", false);
-							FindOptions.m_AttribMask = EFileAttrib_Directory;
-							auto FoundFiles = CFile::fs_FindFiles(FindOptions);
-							for (auto &File : FoundFiles)
-							{
-								CStr Platform = File.m_Path.f_Extract(VersionIDPath.f_GetLen() + 1);
-								if (!CVersionManager::fs_IsValidPlatform(Platform))
-									continue;
-								VersionID.m_Platform = Platform;
-								try
-								{
-									CStr VersionPath = fg_Format("{}/{}", ApplicationPath, VersionID.f_EncodeFileName());
-									CStr VersionInfoPath = fg_Format("{}.json", VersionPath);
-									CVersionManager::CVersionInformation OutVersion;
-									if (CFile::fs_FileExists(VersionInfoPath))
-									{
-										CEJsonSorted ApplicationInfo = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoPath), VersionInfoPath);
-										if (auto pValue = ApplicationInfo.f_GetMember("Time", EEJsonType_Date))
-											OutVersion.m_Time = pValue->f_Date();
-										if (auto pValue = ApplicationInfo.f_GetMember("Configuration", EJsonType_String))
-											OutVersion.m_Configuration = pValue->f_String();
-										if (auto pValue = ApplicationInfo.f_GetMember("ExtraInfo", EJsonType_Object))
-											OutVersion.m_ExtraInfo = *pValue;
-										if (auto pValue = ApplicationInfo.f_GetMember("Tags", EJsonType_Array))
-										{
-											for (auto &Value : pValue->f_Array())
-											{
-												if (Value.f_IsString())
-													OutVersion.m_Tags[Value.f_String()];
-											}
-										}
-										if (auto pValue = ApplicationInfo.f_GetMember("RetrySequence", EJsonType_Integer))
-											OutVersion.m_RetrySequence = pValue->f_Integer();
-									}
-									{
-										auto Files = CFile::fs_FindFiles(VersionPath + "/*", EFileAttrib_File, true);
-										OutVersion.m_nFiles = Files.f_GetLen();
-										for (auto &File : Files)
-											OutVersion.m_nBytes += CFile::fs_GetFileSize(File);
-									}
-
-									// Only use versions that has the .json file
-									Versions[VersionID] = fg_Move(OutVersion);
-								}
-								catch (NException::CException const &_Exception)
-								{
-									[[maybe_unused]] auto &Exception = _Exception;
-									DLogWithCategory(Malterlib/Cloud/VersionManager, Error, "Internal error reading version info: {}", Exception.f_GetErrorStr());
-								}
-							}
-						}
-					}
-					return VersionsPerApplication;
-				}
-			)
-		;
-
-		for (auto &ApplicationVersions : Result)
-		{
-			auto &Application = mp_Applications[Result.fs_GetKey(ApplicationVersions)];
-			for (auto &Version : ApplicationVersions)
-			{
-				auto &OutVersion = Application.m_Versions[ApplicationVersions.fs_GetKey(Version)];
-				OutVersion.m_VersionInfo = Version;
-				Application.m_VersionsByTime.f_Insert(OutVersion);
-				mp_KnownTags += Version.m_Tags;
-			}
-		}
+		// Fallback: scan disk and populate database
+		co_await f_RefreshDatabaseFromDisk();
 
 		co_return {};
 	}
@@ -250,6 +118,9 @@ namespace NMib::NCloud::NVersionManager
 		{
 			TCFutureVector<void> DestroyResults;
 
+			fg_Move(mp_UploadSequencer).f_Destroy() > DestroyResults;
+			fg_Move(mp_RefreshSequencer).f_Destroy() > DestroyResults;
+
 			for (auto &VersionDownloads : mp_VersionDownloads)
 			{
 				if (VersionDownloads.m_FileTransferSend)
@@ -287,6 +158,16 @@ namespace NMib::NCloud::NVersionManager
 		}
 
 		co_await mp_ProtocolInterface.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy protocol interface");
+
+		{
+			auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
+			auto CanDestroyFuture = pCanDestroy->f_Future();
+			pCanDestroy.f_Clear();
+			co_await fg_Move(CanDestroyFuture);
+		}
+
+		if (mp_DatabaseActor)
+			co_await fg_Move(mp_DatabaseActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");
 
 		co_return {};
 	}

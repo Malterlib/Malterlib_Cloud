@@ -12,13 +12,10 @@
 
 namespace NMib::NCloud::NVersionManager
 {
-	void CVersionManagerDaemonActor::CServer::fp_Publish()
+	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_Publish()
 	{
-		mp_ProtocolInterface.f_Publish<CVersionManager>(mp_AppState.m_DistributionManager, this) > [](TCAsyncResult<void> &&_Result)
-			{
-				if (!_Result)
-					DMibLog(Error, "Failed to publish version manager {}", _Result.f_GetExceptionStr());
-			}
-		;
+		co_await mp_ProtocolInterface.f_Publish<CVersionManager>(mp_AppState.m_DistributionManager, this);
+
+		co_return {};
 	}
 }

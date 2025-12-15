@@ -38,6 +38,7 @@ namespace NMib::NCloud
 		: m_RootDirectory(m_ProgramDirectory / _RootDirectory)
 		, m_Options(_Options)
 		, m_Timeout(_Timeout)
+		, m_VersionManagerHelper(m_ProgramDirectory / "TestApps/VersionManager", NFile::gc_IdealNetworkQueueSize, _Timeout)
 	{
 		fg_TestAddCleanupPath(m_RootDirectory);
 
@@ -419,7 +420,7 @@ namespace NMib::NCloud
 
 		auto fApplicationsDone = [&]()
 			{
-				if (Applications.f_GetLen() < State.m_nAppManagers) 
+				if (Applications.f_GetLen() < State.m_nAppManagers)
 					return false;
 
 				for (auto &Application : Applications)
@@ -780,7 +781,7 @@ namespace NMib::NCloud
 				co_await
 					(
 						g_Dispatch
-						/ 
+						/
 						[
 							VersionManagerHelper = State.m_VersionManagerHelper
 							, VersionManager = State.m_VersionManager

@@ -10,6 +10,7 @@
 #include <Mib/Encoding/JsonShortcuts>
 
 #include "Malterlib_Cloud_App_VersionManager.h"
+#include "Malterlib_Cloud_App_VersionManager_Server.h"
 
 namespace NMib::NCloud::NVersionManager
 {
@@ -20,11 +21,27 @@ namespace NMib::NCloud::NVersionManager
 		o_CommandLine.f_SetProgramDescription
 			(
 				"Malterlib Cloud Version Manager"
-				, "Manages updates for Malterlib cloud apps." 
+				, "Manages updates for Malterlib cloud apps."
 			)
 		;
-		
+
 		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
-		(void)DefaultSection;
+
+		DefaultSection.f_RegisterCommand
+			(
+				{
+					"Names"_o= _o["--refresh-versions"]
+					, "Description"_o= "Rescan disk and refresh version database. Removes entries for versions no longer on disk, adds new versions, and updates changed metadata."
+				}
+				, [this](CEJsonSorted const, TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
+				{
+					using namespace NStr;
+					auto Result = co_await mp_pServer(&CServer::f_RefreshDatabaseFromDisk);
+					co_await _pCommandLine->f_StdOut("Refreshed versions: {} added, {} updated, {} removed\n"_f << Result.m_nAdded << Result.m_nUpdated << Result.m_nRemoved);
+					co_return 0;
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
 	}
 }

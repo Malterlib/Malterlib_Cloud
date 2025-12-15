@@ -7,8 +7,10 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedApp>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Cloud/VersionManager>
 #include <Mib/Daemon/Daemon>
+#include <Mib/Database/DatabaseActor>
 
 namespace NMib::NCloud::NVersionManager
 {
@@ -118,6 +120,16 @@ namespace NMib::NCloud::NVersionManager
 			uint64 m_nBytes = 0;
 		};
 
+		struct CRefreshResult
+		{
+			mint m_nAdded = 0;
+			mint m_nUpdated = 0;
+			mint m_nRemoved = 0;
+		};
+
+		TCFuture<CRefreshResult> f_RefreshDatabaseFromDisk();
+		TCFuture<void> f_Init();
+
 	private:
 		struct CFilteredTagsResult
 		{
@@ -128,16 +140,21 @@ namespace NMib::NCloud::NVersionManager
 
 		TCFuture<void> fp_Destroy() override;
 
-		void fp_Init();
-		void fp_Publish();
+		TCFuture<void> fp_Publish();
 		TCFuture<void> fp_SetupPermissions();
 		TCFuture<void> fp_FindVersions();
+
+		// Database operations
+		TCFuture<void> fp_SetupDatabase();
+		TCFuture<bool> fp_LoadVersionsFromDatabase();
+		TCFuture<void> fp_SaveVersionToDatabase(CStr _Application, CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _VersionInfo);
+		TCFuture<void> fp_RemoveVersionFromDatabase(CStr _Application, CVersionManager::CVersionIDAndPlatform _VersionID);
+		void fp_NotifyUploadsEmpty();
 
 		TCFuture<void> fp_SendSubscriptionInitial(CStr _Application, CSubscription const *_pSubscription);
 		void fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity);
 
 		TCFuture<TCSet<CStr>> fp_FilterApplicationsByPermissions(CStr _Description, TCSet<CStr> _Applications);
-		TCFuture<TCSet<CStr>> fp_EnumApplications();
 		TCSet<CStr> fp_ApplicationSet();
 		TCFuture<CFilteredTagsResult> fp_FilterTags(CStr _HostID, TCSet<CStr> _TagsAdded, TCSet<CStr> _TagsRemoved);
 		void fp_NewTagsKnown(TCSet<CStr> const &_Tags);
@@ -163,5 +180,16 @@ namespace NMib::NCloud::NVersionManager
 
 		TCMap<CStr, CSubscription> mp_GlobalVersionSubscriptions;
 		TCMap<CStr, TCMap<CStr, CSubscription>> mp_VersionSubscriptions;
+
+		TCActor<NDatabase::CDatabaseActor> mp_DatabaseActor;
+		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
+
+		CSequencer mp_UploadSequencer{"VersionManagerUpload", 8};
+
+		// Synchronization for refresh/upload mutual exclusion
+		CSequencer mp_RefreshSequencer{"VersionManagerRefreshSequencer"};
+		TCVector<TCPromise<void>> mp_UploadsEmptyWaiters;
+		mint mp_nInProgressUploads = 0;
+		bool mp_bRefreshInProgress = false;
 	};
 }

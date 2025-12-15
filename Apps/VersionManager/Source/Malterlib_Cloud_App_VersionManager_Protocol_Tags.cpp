@@ -130,6 +130,7 @@ namespace NMib::NCloud::NVersionManager
 			co_return Auditor.f_Exception(fg_Format("No such application: {}", _Params.m_Application));
 
 		TCFutureVector<CSizeInfo> VersionResults;
+		TCFutureVector<void> DatabaseResults;
 
 		auto fTagVersion = [&](CVersion &_Version)
 			{
@@ -143,6 +144,7 @@ namespace NMib::NCloud::NVersionManager
 
 				pThis->fp_NewVersion(_Params.m_Application, _Version);
 				pThis->fp_SaveVersionInfo(VersionPath, _Version.m_VersionInfo) > VersionResults;
+				pThis->fp_SaveVersionToDatabase(_Params.m_Application, _Version.f_GetIdentifier(), _Version.m_VersionInfo) > DatabaseResults;
 			}
 		;
 
@@ -172,6 +174,10 @@ namespace NMib::NCloud::NVersionManager
 		if (!Results)
 			co_return Auditor.f_Exception({"Failed to save version infos. See Version Manager log.", fg_Format("Error: {}", Results.f_GetExceptionStr())});
 
+		auto DbResults = co_await fg_AllDoneWrapped(DatabaseResults).f_Wrap();
+		if (!DbResults)
+			Auditor.f_Warning(fg_Format("Failed to save version infos to database: {}", DbResults.f_GetExceptionStr()));
+
 		bool bFailed = false;
 		mint nVersions = 0;
 		for (auto &Version : *Results)
@@ -183,6 +189,15 @@ namespace NMib::NCloud::NVersionManager
 			}
 			else
 				++nVersions;
+		}
+
+		if (DbResults)
+		{
+			for (auto &DbResult : *DbResults)
+			{
+				if (!DbResult)
+					Auditor.f_Warning(fg_Format("Failed to save version to database: {}", DbResult.f_GetExceptionStr()));
+			}
 		}
 
 		Auditor.f_Info
