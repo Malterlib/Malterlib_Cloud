@@ -54,6 +54,10 @@ using namespace NMib::NTime;
 static fp64 g_Timeout = 2_minutes * gc_TimeoutMultiplier;
 static uint32 g_CompressionLevel = 1;
 
+static constexpr ch8 const *gc_AccessDeniedErrorMessage =
+	"Failed to download application from version manager: Failed to download the application from any manager: Failed to start download on remote server: Access denied"
+;
+
 namespace
 {
 	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
@@ -97,7 +101,7 @@ namespace
 
 class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 {
-	static auto constexpr mc_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
+	static auto constexpr mcp_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 
 	struct CPackageOptions
 	{
@@ -314,7 +318,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 	{
 		auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
 			{
-				return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, mc_WaitForSubscriptions};
+				return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, mcp_WaitForSubscriptions};
 			}
 		;
 
@@ -360,7 +364,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		;
 
 		LogForwarder(&CDistributedAppLogForwarder::f_StartMonitoring).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
-		
+
 		CStr KeyManagerDir = RootDirectory / "KeyManager";
 		CStr VersionManagerDir = RootDirectory / "VersionManager";
 		CStr AppManagerDir = RootDirectory / "AppManager";
@@ -581,7 +585,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					(
 						CAppManagerInterface::mc_pDefaultNamespace
 						, fg_CreateSet<CStr>(_LaunchInfo.m_HostID)
-						, mc_WaitForSubscriptions
+						, mcp_WaitForSubscriptions
 					).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 				try
@@ -820,7 +824,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 						(
 							CVersionManager::mc_pDefaultNamespace
 							, fg_CreateSet<CStr>(VersionManagerHostID)
-							, mc_WaitForSubscriptions
+							, mcp_WaitForSubscriptions
 						)
 						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 					;
@@ -1322,6 +1326,884 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		}
 	}
 
+	struct CAuthPasswordProvider : public CActor
+	{
+		using CActorHolder = CSeparateThreadActorHolder;
+
+		CAuthPasswordProvider(CStr const &_Password)
+			: mp_Password(_Password)
+		{
+		}
+
+		void f_SetLaunchActor(TCActor<CProcessLaunchActor> _LaunchActor)
+		{
+			mp_LaunchActor = fg_Move(_LaunchActor);
+		}
+
+		void f_OnOutput(EProcessLaunchOutputType _OutputType, CStr const &_Output)
+		{
+			if (_OutputType == EProcessLaunchOutputType_StdOut || _OutputType == EProcessLaunchOutputType_StdErr)
+			{
+				mp_Buffer += _Output;
+
+				// Check for password prompts
+				if (mp_Buffer.f_Find("password:") >= 0 || mp_Buffer.f_Find("Password:") >= 0)
+				{
+					mp_Buffer.f_Clear();
+					if (mp_LaunchActor)
+						mp_LaunchActor(&CProcessLaunchActor::f_SendStdIn, mp_Password + "\n").f_DiscardResult();
+				}
+			}
+		}
+
+	private:
+		CStr mp_Password;
+		CStr mp_Buffer;
+		TCActor<CProcessLaunchActor> mp_LaunchActor;
+	};
+
+	void fp_RunMultiAuthCompatibilityTests(CStr const &_AppManagerPackage, CStr const &_VersionManagerPackage, CStr const &_UniqueName)
+	{
+		auto fPermissions = [](auto &&_HostID, auto &&_Permissions)
+			{
+				return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, mcp_WaitForSubscriptions};
+			}
+		;
+
+		CActorRunLoopTestHelper RunLoopHelper;
+
+		DMibExpectTrue(CFile::fs_FileExists(_AppManagerPackage));
+		DMibExpectTrue(CFile::fs_FileExists(_VersionManagerPackage));
+		// Note: KeyManager is not used in multi-auth tests
+
+		CStr ProgramDirectory = CFile::fs_GetProgramDirectory();
+
+		CStr RootDirectory = ProgramDirectory / "CU-MA" / _UniqueName;
+
+		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 0.5);
+
+		for (mint i = 0; i < 5; ++i)
+		{
+			try
+			{
+				if (CFile::fs_FileExists(RootDirectory))
+					CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+
+				CFile::fs_CreateDirectory(RootDirectory);
+
+				break;
+			}
+			catch (NFile::CExceptionFile const &)
+			{
+			}
+		}
+
+		TCActor<CDistributedAppLogForwarder> LogForwarder{fg_Construct(RootDirectory), "Log Forwarder Actor"};
+
+		auto CleanupLogForwarder = g_OnScopeExit / [&]
+			{
+				LogForwarder->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
+			}
+		;
+
+		LogForwarder(&CDistributedAppLogForwarder::f_StartMonitoring).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+
+		CStr VersionManagerDir = RootDirectory / "VersionManager";
+		CStr AppManagerDir = RootDirectory / "AppManager";
+
+		TCVector<CStr> CreatedUsers;
+		TCVector<CStr> CreatedGroups;
+
+		auto fAddUserGroup = [&](CStr const &_Directory, CStr const &_User)
+			{
+#ifdef DPlatformFamily_Windows
+				CUniqueUserGroup UserGroup("C:/M", _Directory);
+#else
+				CUniqueUserGroup UserGroup("/M", _Directory);
+#endif
+				CreatedUsers.f_Insert(UserGroup.f_GetUser(_User));
+				CreatedGroups.f_Insert(UserGroup.f_GetGroup(_User));
+				CreatedUsers.f_Insert(_User);
+				CreatedGroups.f_Insert(_User);
+			}
+		;
+
+		fAddUserGroup(VersionManagerDir, "MalterlibCloudVersionManager");
+
+		auto fCleanup = [&]
+			{
+				CProcessLaunch::fs_KillProcessesInDirectory("AppManager", {}, RootDirectory, 10.0);
+				CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 0.5);
+
+				for (auto User : CreatedUsers)
+				{
+					CStr UID;
+					try
+					{
+						if (NSys::fg_UserManagement_UserExists(User, UID))
+						{
+							CProcessLaunch::fs_KillProcesses
+								(
+									[&](CProcessInfo const &_ProcessInfo)
+									{
+										return _ProcessInfo.m_RealUID == UID;
+									}
+									, EProcessInfoFlag_User
+									, 0.5
+								)
+							;
+
+							NSys::fg_UserManagement_DeleteUser(User);
+						}
+					}
+					catch (...)
+					{
+					}
+				}
+				for (auto Group : CreatedGroups)
+				{
+					try
+					{
+						CStr GID;
+						if (NSys::fg_UserManagement_GroupExists(Group, GID))
+							NSys::fg_UserManagement_DeleteGroup(Group);
+					}
+					catch (...)
+					{
+					}
+				}
+			}
+		;
+
+		fCleanup();
+
+		auto Cleanup = g_OnScopeExit / [&]
+			{
+				fCleanup();
+			}
+		;
+
+		CPackageOptions AppManagerPackageOptions(_AppManagerPackage);
+		CPackageOptions VersionManagerPackageOptions(_VersionManagerPackage);
+
+		// Helper to detect multi-auth support
+		auto fSupportsMultiAuth = [](CPackageOptions const &_Options)
+			{
+				return !_Options.f_HasFeatureFlag("NoMultipleAuthenticationHandlers");
+			}
+		;
+
+		bool bAppManagerSupportsMultiAuth = fSupportsMultiAuth(AppManagerPackageOptions);
+		bool bVersionManagerSupportsMultiAuth = fSupportsMultiAuth(VersionManagerPackageOptions);
+
+		CStr BinaryDirectory = ProgramDirectory / "TestApps/VersionManager";
+		CVersionManagerHelper VersionManagerHelper(BinaryDirectory);
+
+		CFile::fs_CreateDirectory(RootDirectory);
+
+		CTrustManagerTestHelper TrustManagerState;
+		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+		auto CleanupTrustManager = g_OnScopeExit / [&]
+			{
+				TrustManager->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
+			}
+		;
+
+		CStr TestHostID = TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		CTrustedSubscriptionTestHelper Subscriptions{TrustManager, g_Timeout};
+
+		CDistributedActorTrustManager_Address ServerAddress;
+
+		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+
+		CDistributedApp_LaunchHelperDependencies Dependencies;
+		Dependencies.m_Address = ServerAddress.m_URL;
+		Dependencies.m_TrustManager = TrustManager;
+		Dependencies.m_DistributionManager = TrustManager(&CDistributedActorTrustManager::f_GetDistributionManager).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+
+		NMib::NConcurrency::CDistributedActorSecurity Security;
+		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CVersionManager::mc_pDefaultNamespace);
+		Security.m_AllowedIncomingConnectionNamespaces.f_Insert(CAppManagerInterface::mc_pDefaultNamespace);
+		Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+
+		TCActor<CDistributedApp_LaunchHelper> LaunchHelper
+			= fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, DTestUpdateCompatibilityEnableOtherOutput)
+		;
+
+		auto CleanupLaunchHelper = g_OnScopeExit / [&]
+			{
+				LaunchHelper->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
+			}
+		;
+
+		auto fSetupAppManager = [&](CStr const &_Directory) -> TCUnsafeFuture<void>
+			{
+				DMibLogWithCategory(Test, Info, "Setup AppManager ({})", CFile::fs_GetFile(_Directory));
+
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [=]
+						{
+							CFile::fs_CreateDirectory(_Directory);
+							CProcessLaunch::fs_LaunchTool(BinaryDirectory / "bin/bsdtar", {"--no-same-owner", "--no-xattr", "-xf", _AppManagerPackage}, _Directory);
+						}
+					)
+				;
+
+				co_return {};
+			}
+		;
+
+		DMibTestMark;
+
+		auto fLaunchAppManager = [&](CStr const &_Name, CStr const &_Dir) -> CDistributedApp_LaunchInfo
+			{
+				DMibLogWithCategory(Test, Info, "Launch AppManager ({})", _Name);
+
+				TCVector<CStr> ExtraParams;
+				if (AppManagerPackageOptions.f_HasFeatureFlag("NoDaemonRunStandalone"))
+					ExtraParams.f_Insert("--daemon-run-debug");
+				else
+					ExtraParams.f_Insert("--daemon-run-standalone");
+
+				if (!AppManagerPackageOptions.f_HasFeatureFlag("NoAutoUpdateDelay"))
+					ExtraParams.f_Insert("--auto-update-delay=0.001");
+#if DTestUpdateCompatibilityEnableOtherOutput
+				ExtraParams.f_Insert("--log-launches-to-stderr");
+#endif
+				CSystemEnvironment Environment;
+				Environment["MalterlibAppManagerAutoUpdateDelay"] = "0.001";
+
+				return LaunchHelper(&CDistributedApp_LaunchHelper::f_LaunchWithParams, "AppManager_{}"_f << _Name, _Dir / "AppManager", fg_Move(ExtraParams), fg_Move(Environment))
+					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+				;
+			}
+		;
+
+		struct CAppManager
+		{
+			CDistributedApp_LaunchInfo m_LaunchInfo;
+			CDistributedActorTrustManager_Address m_Address;
+			TCDistributedActor<CAppManagerInterface> m_AppManager;
+			CStr m_RootPath;
+		};
+
+		auto fAddListen = [&](CStr const &_Application, bool _bOldFormat = false) -> CStr
+			{
+				DMibLogWithCategory(Test, Info, "Add Listen ({})", CFile::fs_GetFile(_Application));
+
+				CStr AppDir = CFile::fs_GetPath(_Application);
+				CStr SocketFile = AppDir / "test.ls";
+				CStr URL;
+
+				if (_bOldFormat)
+					URL = "wss://[UNIX:{}]/"_f << SocketFile;
+				else
+					URL = "wss://[UNIX(666):{}]/"_f << SocketFile;
+
+				CProcessLaunch::fs_LaunchTool(_Application, fg_CreateVector<CStr>("--trust-listen-add", URL));
+				return URL;
+			}
+		;
+
+		auto fGenerateTicket = [&](CStr const &_Application) -> CStr
+			{
+				DMibLogWithCategory(Test, Info, "Generate Ticket ({})", CFile::fs_GetFile(_Application));
+
+				return CProcessLaunch::fs_LaunchTool(_Application, fg_CreateVector<CStr>("--trust-generate-ticket")).f_Trim();
+			}
+		;
+
+		auto fGetHostID = [&](CStr const &_Application) -> CStr
+			{
+				DMibLogWithCategory(Test, Info, "Get Host ID ({})", CFile::fs_GetFile(_Application));
+
+				return CProcessLaunch::fs_LaunchTool(_Application, fg_CreateVector<CStr>("--trust-host-id")).f_Trim();
+			}
+		;
+
+		auto fSetupAppManagerTrust = [&](CDistributedApp_LaunchInfo &_LaunchInfo, CStr const &_Directory) -> CDistributedActorTrustManager_Address
+			{
+				DMibLogWithCategory(Test, Info, "Setup AppManager Trust ({})", CFile::fs_GetFile(_Directory));
+
+				CDistributedActorTrustManager_Address Address;
+				Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << _Directory);
+				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(Address).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
+					(
+						CAppManagerInterface::mc_pDefaultNamespace
+						, fg_CreateSet<CStr>(_LaunchInfo.m_HostID)
+						, mcp_WaitForSubscriptions
+					).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+				;
+				try
+				{
+					_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+						(
+							fPermissions(TestHostID, fg_CreateMap<CStr, CPermissionRequirements>("AppManager/VersionAppAll", "AppManager/CommandAll", "AppManager/AppAll"))
+						)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					;
+				}
+				catch (CException const &_Exception)
+				{
+					if (_Exception.f_GetErrorStr() != "Function does not exist on remote actor")
+						throw;
+				}
+
+				return Address;
+			}
+		;
+
+		auto fInitAppManager = [&](CStr const &_Name, CStr const &_Directory) -> CAppManager
+			{
+				DMibLogWithCategory(Test, Info, "Init AppManager ({})", _Name);
+
+				CAppManager AppManager = {fLaunchAppManager(_Name, _Directory)};
+				AppManager.m_Address = fSetupAppManagerTrust(AppManager.m_LaunchInfo, _Directory);
+				{
+					DMibLogWithCategory(Test, Info, "Subscribe from host ({})", _Name);
+					AppManager.m_AppManager = Subscriptions.f_SubscribeFromHost<CAppManagerInterface>(RunLoopHelper, AppManager.m_LaunchInfo.m_HostID);
+				}
+				AppManager.m_RootPath = _Directory;
+
+				return AppManager;
+			}
+		;
+
+		// Helper struct for process results with stdin support
+		struct CProcessWithStdinResult
+		{
+			CStr m_StdOut;
+			CStr m_StdErr;
+			uint32 m_ExitCode = 0;
+			bool m_bSuccess = false;
+		};
+
+		// Launch a process and provide stdin input (typically for password prompts)
+		auto fLaunchWithStdIn = [](CActorRunLoopTestHelper &_RunLoopHelper, CStr _Executable, TCVector<CStr> _Params, CStr _WorkingDir, TCVector<CStr> _StdInLines) -> CProcessWithStdinResult
+			{
+				using namespace NMib::NStr;
+
+				TCSharedPointer<CProcessWithStdinResult> pResult = fg_Construct();
+
+				TCActor<CProcessLaunchActor> LaunchActor = fg_Construct();
+				TCPromise<void> LaunchFinished;
+
+				CProcessLaunchActor::CSimpleLaunch SimpleLaunch(_Executable, _Params, _WorkingDir);
+				SimpleLaunch.m_SimpleFlags = CProcessLaunchActor::ESimpleLaunchFlag_None;
+
+				if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+				{
+					SimpleLaunch.m_ToLog = CProcessLaunchActor::ELogFlag_Error | CProcessLaunchActor::ELogFlag_StdErr | CProcessLaunchActor::ELogFlag_StdOut;
+					SimpleLaunch.m_LogName = CFile::fs_GetFile(_Executable);
+				}
+
+				SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pResult, StdInBuffer = CStr(), nStdInIndex = mint(0), _StdInLines](EProcessLaunchOutputType _OutputType, CStr const &_Output) mutable
+					{
+						if (_OutputType == EProcessLaunchOutputType_StdErr)
+							pResult->m_StdErr += _Output;
+						else if (_OutputType == EProcessLaunchOutputType_StdOut)
+							pResult->m_StdOut += _Output;
+
+						// Check for password prompts
+						StdInBuffer += _Output;
+
+						if
+						(
+							(StdInBuffer.f_Find("Password        :") >= 0 || StdInBuffer.f_Find("Password (again):") >= 0 || StdInBuffer.f_Find("Password:") >= 0)
+							&& nStdInIndex < _StdInLines.f_GetLen()
+						)
+						{
+							StdInBuffer.f_Clear();
+							LaunchActor(&CProcessLaunchActor::f_SendStdIn, _StdInLines[nStdInIndex] + "\n").f_DiscardResult();
+							++nStdInIndex;
+						}
+					}
+				;
+				SimpleLaunch.m_bWholeLineOutput = false;
+
+				SimpleLaunch.m_Params.m_fOnStateChange = [LaunchFinished, pResult](CProcessLaunchStateChangeVariant const &_State, fp64)
+					{
+						if (_State.f_GetTypeID() == EProcessLaunchState_Exited)
+						{
+							pResult->m_ExitCode = _State.f_Get<EProcessLaunchState_Exited>();
+							pResult->m_bSuccess = (pResult->m_ExitCode == 0);
+							LaunchFinished.f_SetResult();
+						}
+						else if (_State.f_GetTypeID() == EProcessLaunchState_LaunchFailed)
+						{
+							pResult->m_StdErr += _State.f_Get<EProcessLaunchState_LaunchFailed>();
+							LaunchFinished.f_SetResult();
+						}
+					}
+				;
+
+				try
+				{
+					auto LaunchSubscription = LaunchActor(&CProcessLaunchActor::f_Launch, SimpleLaunch, _RunLoopHelper.m_HelperActor)
+						.f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
+					LaunchFinished.f_MoveFuture().f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
+					fg_Move(LaunchActor).f_Destroy().f_CallSync(_RunLoopHelper.m_pRunLoop, g_Timeout);
+				}
+				catch (CException const &_Exception)
+				{
+					pResult->m_StdErr += _Exception.f_GetErrorStr();
+					pResult->m_ExitCode = 1;
+					pResult->m_bSuccess = false;
+				}
+
+				return fg_Move(*pResult);
+			}
+		;
+
+		// Register a password authentication factor for a user
+		auto fRegisterUserPassword = [&](CStr _Executable, CStr _UserID, CStr _Password) -> CStr
+			{
+				DMibLogWithCategory(Test, Info, "Registering password factor for user {}", _UserID);
+
+				// Password registration prompts for password twice (for confirmation)
+				auto Result = fLaunchWithStdIn
+					(
+						RunLoopHelper
+						, _Executable
+						, {"--trust-user-add-authentication-factor", "--authentication-factor", "Password", _UserID}
+						, CFile::fs_GetPath(_Executable)
+						, {_Password, _Password}  // Enter password twice for confirmation
+					)
+				;
+
+				if (!Result.m_bSuccess)
+				{
+					DMibLogWithCategory(Test, Error, "Failed to register password: {}", Result.m_StdErr.f_Trim());
+					return {};
+				}
+
+				CStr FactorID = Result.m_StdOut.f_Trim();
+				DMibLogWithCategory(Test, Info, "Registered password factor: {}", FactorID);
+				return FactorID;
+			}
+		;
+
+		auto fSetupAppManagerConnection = [&](CAppManager const &_AppManager, CStr const &_Executable, CStr const &_Namespace, TCVector<CStr> const &_Permissions, CStr const &_HostID)
+			{
+				DMibLogWithCategory(Test, Info, "Setup AppManager Connection ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
+
+				for (auto &Permission : _Permissions)
+				{
+					DMibLogWithCategory(Test, Info, "Add permission '{}'", Permission);
+					CProcessLaunch::fs_LaunchTool(_Executable, fg_CreateVector<CStr>("--trust-permission-add", "--host", _AppManager.m_LaunchInfo.m_HostID, Permission));
+				}
+
+				{
+					CDistributedActorTrustManagerInterface::CChangeNamespaceHosts Hosts;
+					Hosts.m_Hosts[_HostID];
+					Hosts.m_Namespace = _Namespace;
+
+					DMibLogWithCategory(Test, Info, "Allow Hosts for namespace '{}'", _Namespace);
+					_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
+						(fg_Move(Hosts)).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					;
+				}
+
+				{
+					// Also allow the authentication namespace for password authentication
+					CDistributedActorTrustManagerInterface::CChangeNamespaceHosts AuthHosts;
+					AuthHosts.m_Hosts[_HostID];
+					AuthHosts.m_Namespace = "com.malterlib/Concurrency/DistributedActorAuthentication";
+
+					DMibLogWithCategory(Test, Info, "Allow Hosts for authentication namespace");
+					_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
+						(fg_Move(AuthHosts)).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					;
+				}
+
+				{
+					DMibLogWithCategory(Test, Info, "Connect");
+					auto Ticket = CDistributedActorTrustManagerInterface::CTrustTicket::fs_FromStringTicket(fGenerateTicket(_Executable));
+					{
+						DMibLogWithCategory(Test, Info, "Add Client Connection");
+						_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
+							(Ticket, g_Timeout, -1).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+						;
+					}
+				}
+			}
+		;
+
+		CStr VersionManagerExecutable = VersionManagerDir / "App/VersionManager/VersionManager";
+		CStr VersionManagerHostID;
+		TCDistributedActor<CVersionManager> VersionManager;
+
+		auto fSetupVersionManager = [&](CAppManager const &_AppManager)
+			{
+				DMibLogWithCategory(Test, Info, "Setup VersionManager ({})", CFile::fs_GetFile(_AppManager.m_RootPath));
+
+				// Install VersionManager manually
+				CStr PackageName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(_VersionManagerPackage));
+				TCVector<CStr> Params = {"--application-add", "--force-overwrite", "--from-file", _VersionManagerPackage, "--name", PackageName};
+				Params.f_Insert({"--executable", "VersionManager"});
+
+				if (VersionManagerPackageOptions.f_HasFeatureFlag("NoDaemonRunStandalone"))
+					Params.f_Insert({"--executable-parameters", "[\"--daemon-run-debug\"]"});
+				else
+					Params.f_Insert({"--executable-parameters", "[\"--daemon-run-standalone\"]"});
+
+				Params.f_Insert({"--run-as-user", "MalterlibCloudVersionManager"});
+				Params.f_Insert({"--run-as-group", "MalterlibCloudVersionManager"});
+
+				if (AppManagerPackageOptions.f_HasFeatureFlag("OldAutoUpdate"))
+					Params.f_Insert({"--auto-update-tags", "[\"VersionManagerTestTag\"]", "--auto-update-branches", "[\"*\"]"});
+				else
+					Params.f_Insert({"--auto-update", "--update-tags", "[\"VersionManagerTestTag\"]", "--update-branches", "[\"*\"]"});
+
+				CProcessLaunch::fs_LaunchTool(_AppManager.m_RootPath / "AppManager", Params, _AppManager.m_RootPath);
+
+				// Wait for launch
+				CClock Timeout{true};
+				while (Timeout.f_GetTime() < g_Timeout)
+				{
+					try
+					{
+						auto AppInfo = _AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_CallSync(RunLoopHelper.m_pRunLoop, 2.0)["VersionManager"];
+						if (AppInfo.m_Status == "Launched")
+							break;
+					}
+					catch (CException const &)
+					{
+					}
+					RunLoopHelper.m_pRunLoop->f_Sleep(0.01f);
+				}
+
+				fAddListen(VersionManagerExecutable);
+
+				VersionManagerHostID = fGetHostID(VersionManagerExecutable);
+
+				{
+					DMibLogWithCategory(Test, Info, "Allow Hosts");
+
+					TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
+						(
+							CVersionManager::mc_pDefaultNamespace
+							, fg_CreateSet<CStr>(VersionManagerHostID)
+							, mcp_WaitForSubscriptions
+						)
+						.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+					;
+				}
+
+				// Grant non-Read permissions to host (no auth required)
+				// NOTE: Application/ReadAll will be added per-user with auth factors in test scenarios
+				TCVector<CStr> Permissions = {"Application/ListAll", "Application/TagAll", "Application/WriteAll"};
+
+				for (auto &Permission : Permissions)
+				{
+					DMibLogWithCategory(Test, Info, "Add permission '{}'", Permission);
+					CProcessLaunch::fs_LaunchTool(VersionManagerExecutable, fg_CreateVector<CStr>("--trust-permission-add", "--host", TestHostID, Permission));
+				}
+
+				{
+					DMibLogWithCategory(Test, Info, "Connect");
+					auto Ticket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(fGenerateTicket(VersionManagerExecutable));
+					{
+						DMibLogWithCategory(Test, Info, "Add Client Connection");
+						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					}
+				}
+
+				{
+					DMibLogWithCategory(Test, Info, "Subscribe");
+					VersionManager = Subscriptions.f_SubscribeFromHost<CVersionManager>(RunLoopHelper, VersionManagerHostID);
+				}
+			}
+		;
+
+		// Helper to add user-based permission with Password authentication factor
+		auto fAddUserPermissionWithAuth = [&](CStr const &_HostID, CStr const &_UserID, CStr const &_Permission)
+			{
+				DMibLogWithCategory(Test, Info, "Add permission '{}' to user '{}' on host '{}' with Password auth", _Permission, _UserID, _HostID);
+
+				CProcessLaunch::fs_LaunchTool
+					(
+						VersionManagerExecutable
+						, fg_CreateVector<CStr>
+							(
+								"--trust-permission-add"
+								, "--host", _HostID
+								, "--user", _UserID
+								, _Permission
+								, "--authentication-factors", "[\"Password\"]"
+								, "--max-lifetime", "0"  // No caching - always prompt for password
+							)
+					)
+				;
+			}
+		;
+
+		// Helper to add an application with password authentication
+		// Returns empty string on success, error message on failure
+		auto fApplicationAddWithAuth = [&](CAppManager const &_AppManager, CStr const &_AppName, CStr const &_UserID, CStr const &_Password) -> CStr
+			{
+				DMibLogWithCategory(Test, Info, "Adding app '{}' as user '{}' (requires auth)", _AppName, _UserID);
+
+				auto Result = fLaunchWithStdIn
+					(
+						RunLoopHelper
+						, _AppManager.m_RootPath / "AppManager"
+						, fg_CreateVector<CStr>
+							(
+								"--application-add"
+								, "--name", _AppName
+								, "--update-tags", "[\"TestTag\"]"
+								, "--auto-update"
+								, "--authentication-user", _UserID
+								, "AppManager"
+							)
+						, _AppManager.m_RootPath
+						, {_Password}  // Provide password when prompted
+					)
+				;
+
+				if (Result.m_bSuccess)
+				{
+					DMibLogWithCategory(Test, Info, "App '{}' added successfully", _AppName);
+					return "";
+				}
+				else
+				{
+					DMibLogWithCategory(Test, Info, "App '{}' failed: {}", _AppName, Result.m_StdErr.f_Trim());
+					return Result.m_StdErr.f_Trim();
+				}
+			}
+		;
+
+		// Result struct for fCreateAndExportUser
+		struct CUserInfo
+		{
+			CStr m_UserID;
+			CStr m_ExportedUser;
+			CStr m_Password;
+		};
+
+		// Helper to create and export a user from AppManager with password authentication
+		auto fCreateAndExportUser = [&](CAppManager const &_AppManager, CStr const &_UserName, CStr const &_Password) -> CUserInfo
+			{
+				DMibLogWithCategory(Test, Info, "Create and export user '{}' from {}", _UserName, CFile::fs_GetFile(_AppManager.m_RootPath));
+
+				CStr AppManagerExe = _AppManager.m_RootPath / "AppManager";
+
+				// Add user
+				CStr UserID = CProcessLaunch::fs_LaunchTool(AppManagerExe, {"--trust-user-add", _UserName}).f_Trim();
+				DMibLogWithCategory(Test, Info, "Created user '{}' with ID: {}", _UserName, UserID);
+
+				// Register password authentication factor
+				CStr FactorID = fRegisterUserPassword(AppManagerExe, UserID, _Password);
+				DMibLogWithCategory(Test, Info, "Registered password factor: {}", FactorID);
+
+				// Set as default user
+				CProcessLaunch::fs_LaunchTool(AppManagerExe, {"--trust-user-set-default-user", UserID});
+
+				// Export user with private data for import into other services
+				CStr ExportedUser = CProcessLaunch::fs_LaunchTool(AppManagerExe, {"--trust-user-export", UserID, "--include-private-data"}).f_Trim();
+
+				return {UserID, ExportedUser, _Password};
+			}
+		;
+
+		// Helper to import user into VersionManager
+		auto fImportUser = [&](CStr const &_ExportedUser)
+			{
+				DMibLogWithCategory(Test, Info, "Import user to VersionManager");
+				CProcessLaunch::fs_LaunchTool(VersionManagerExecutable, {"--trust-user-import", _ExportedUser});
+			}
+		;
+
+		// Setup infrastructure
+		{
+			DMibLogWithCategory(Test, Info, "Setup App Managers");
+			auto VersionManagerFuture = fSetupAppManager(VersionManagerDir);
+			auto AppManagerFuture = fSetupAppManager(AppManagerDir);
+			fg_Move(VersionManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			fg_Move(AppManagerFuture).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		}
+
+		auto AppManager_VersionManager = fInitAppManager("VersionManager", VersionManagerDir);
+		auto AppManager_AppManager = fInitAppManager("AppManager", AppManagerDir);
+
+		DMibTestMark;
+
+		fSetupVersionManager(AppManager_VersionManager);
+
+		DMibTestMark;
+
+		fSetupAppManagerConnection(AppManager_VersionManager, VersionManagerExecutable, "com.malterlib/Cloud/VersionManager", {"Application/ReadAll"}, VersionManagerHostID);
+		// Note: For AppManager_AppManager, we don't grant Application/ReadAll here
+		// Each test scenario will add the appropriate permissions (host-based for old clients, user-based for new)
+		DMibTestMark;
+
+		fSetupAppManagerConnection(AppManager_AppManager, VersionManagerExecutable, "com.malterlib/Cloud/VersionManager", {"Application/ListAll"}, VersionManagerHostID);
+
+		// Upload test packages to VersionManager
+		auto fUploadPackage = [&](CStr _Package, TCSet<CStr> _Tags) -> TCUnsafeFuture<CVersionManagerHelper::CPackageInfo>
+			{
+				DMibLogWithCategory(Test, Info, "Upload Package ({}, {})", CFile::fs_GetFile(_Package), CFile::fs_GetFile(CFile::fs_GetPath(_Package)));
+
+				auto PackageInfo = co_await VersionManagerHelper.f_GetPackageInfo(_Package);
+				PackageInfo.m_VersionInfo.m_Tags = _Tags;
+				CStr PackageName = CFile::fs_GetFileNoExt(CFile::fs_GetFileNoExt(_Package));
+
+				co_await VersionManagerHelper.f_Upload(VersionManager, PackageName, PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, _Package);
+
+				co_return fg_Move(PackageInfo);
+			}
+		;
+
+		// Upload packages for testing
+		DMibTestMark;
+
+		auto AppManagerPackageInfo = fg_Move(fUploadPackage(_AppManagerPackage, {"TestTag", "VersionManagerTestTag", "AppManagerTestTag"})).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		DMibTestMark;
+
+		auto VersionManagerPackageInfo = fg_Move(fUploadPackage(_VersionManagerPackage, {"VersionManagerTestTag"})).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+
+		// Log version compatibility info
+		DMibLogWithCategory(Test, Info, "Multi-Auth Compatibility Test:");
+		DMibLogWithCategory(Test, Info, "  AppManager supports multi-auth: {}", bAppManagerSupportsMultiAuth);
+		DMibLogWithCategory(Test, Info, "  VersionManager supports multi-auth: {}", bVersionManagerSupportsMultiAuth);
+
+		DMibTestMark;
+
+		// Scenarios A, B, D: At least one version doesn't support multi-auth
+		// All use single sequential authentication
+		DMibLogWithCategory(Test, Info, "=== Single Auth Test (at least one old version) ===");
+
+		// Create and share user trust with password
+		auto UserInfo = fCreateAndExportUser(AppManager_AppManager, "TestUser_SingleAuth", "PasswordSingle123");
+		fImportUser(UserInfo.m_ExportedUser);
+
+		// Add user-based permission with Password authentication
+		fAddUserPermissionWithAuth(AppManager_AppManager.m_LaunchInfo.m_HostID, UserInfo.m_UserID, "Application/ReadAll");
+
+		// Create user without permission for failure testing
+		auto UserInfoNoPerms = fCreateAndExportUser(AppManager_AppManager, "TestUser_SingleAuth_NoPerms", "PasswordNoPerms123");
+		fImportUser(UserInfoNoPerms.m_ExportedUser);
+		// Note: Intentionally NOT calling fAddUserPermissionWithAuth
+
+		DMibLogWithCategory(Test, Info, "Testing download with user authentication...");
+
+		// Test that download works with password authentication
+		CStr Error = fApplicationAddWithAuth(AppManager_AppManager, "TestApp_SingleAuth", UserInfo.m_UserID, UserInfo.m_Password);
+		DMibExpect(Error, ==, "")("Download with authentication should succeed");
+		DMibLogWithCategory(Test, Info, "Single auth test succeeded");
+
+		// Test that download fails without permission
+		DMibLogWithCategory(Test, Info, "Testing download without permission (should fail)...");
+		CStr ErrorNoPerms = fApplicationAddWithAuth(AppManager_AppManager, "TestApp_SingleAuth_NoPerms", UserInfoNoPerms.m_UserID, UserInfoNoPerms.m_Password);
+		DMibExpect(ErrorNoPerms, ==, gc_AccessDeniedErrorMessage)("User without permission should be denied even with correct password");
+		DMibLogWithCategory(Test, Info, "Single auth failure test succeeded");
+
+		// Test Scenario C: New -> New with parallel downloads (both support multi-auth)
+		if (bVersionManagerSupportsMultiAuth)
+		{
+			// Test 2-4: Run parallel downloads in different permission modes
+			enum class EParallelTestMode { ESucceed, EFail, EMixed };
+
+			auto fParallelDownloadTest = [&](EParallelTestMode _Mode, CStr _TestName) -> TCUnsafeFuture<void>
+				{
+					DMibTestPath(_TestName);
+					DMibLogWithCategory(Test, Info, "Testing parallel downloads ({})...", _TestName);
+
+					TCVector<TCFuture<CStr>> Results;
+					TCVector<CBlockingActorCheckout> Checkouts;
+					TCVector<TCVector<CStr>> ExpectedErrors;
+
+					for (mint i = 0; i < 5; ++i)
+					{
+						bool bShouldSucceed;
+						switch (_Mode)
+						{
+							case EParallelTestMode::ESucceed: bShouldSucceed = true; break;
+							case EParallelTestMode::EFail: bShouldSucceed = false; break;
+							case EParallelTestMode::EMixed: bShouldSucceed = (i % 2 == 0); break; // alternating
+						}
+
+						auto const &User = bShouldSucceed ? UserInfo : UserInfoNoPerms;
+						CStr AppName = "ParallelTestApp{}_{}"_f << _TestName << i;
+
+						auto &Checkout = Checkouts.f_Insert(fg_BlockingActor());
+
+						Results.f_Insert() =
+							(
+								g_Dispatch(Checkout) / [&, AppName = fg_Move(AppName), UserID = User.m_UserID, Password = User.m_Password]() mutable -> CStr
+								{
+									// Need our own run loop since we're on a different thread
+									CActorRunLoopTestHelper LocalRunLoopHelper;
+									auto Result = fLaunchWithStdIn
+										(
+											LocalRunLoopHelper
+											, AppManager_AppManager.m_RootPath / "AppManager"
+											, fg_CreateVector<CStr>
+											(
+												"--application-add"
+												, "--name", AppName
+												, "--update-tags", "[\"TestTag\"]"
+												, "--auto-update"
+												, "--authentication-user", UserID
+												, "AppManager"
+											)
+											, AppManager_AppManager.m_RootPath
+											, {Password}
+										)
+									;
+									return Result.m_bSuccess ? "" : Result.m_StdErr.f_Trim();
+								}
+							).f_Call()
+						;
+
+						if (bAppManagerSupportsMultiAuth)
+						{
+							if (bShouldSucceed)
+								ExpectedErrors.f_Insert({""});
+							else
+								ExpectedErrors.f_Insert({gc_AccessDeniedErrorMessage});
+						}
+						else
+						{
+							if (bShouldSucceed)
+								ExpectedErrors.f_Insert({"Authentication already enabled", ""});
+							else
+								ExpectedErrors.f_Insert({"Authentication already enabled", gc_AccessDeniedErrorMessage});
+						}
+					}
+
+					// Wait for all downloads and verify expected results
+					for (mint i = 0; i < 5; ++i)
+					{
+						CStr AppName = "ParallelTestApp{}_{}"_f << _TestName << i;
+						DMibTestPath(AppName);
+						CStr Error = co_await fg_Move(Results[i]).f_Timeout(g_Timeout, "Parallel download timed out");
+						DMibExpect(ExpectedErrors[i].f_Contains(Error), >=, 0)(Error);
+					}
+
+					DMibLogWithCategory(Test, Info, "Parallel downloads ({}) completed with expected results", _TestName);
+					co_return {};
+				}
+			;
+
+			DMibTestMark;
+			fParallelDownloadTest(EParallelTestMode::ESucceed, "AllSucceed").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			DMibTestMark;
+			fParallelDownloadTest(EParallelTestMode::EFail, "AllFail").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			DMibTestMark;
+			fParallelDownloadTest(EParallelTestMode::EMixed, "Mixed").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		}
+
+		DMibLogWithCategory(Test, Info, "Multi-Auth Compatibility Tests Complete");
+	}
+
 public:
 
 	void f_DoTests()
@@ -1338,6 +2220,9 @@ public:
 				{
 					auto fInitPackage = [&](CStr &o_PackagePath) -> TCUnsafeFuture<void>
 						{
+							if (!o_PackagePath)
+								co_return {};
+
 							CStr BasePath = "{}/TestApps/Latest/{}"_f << ProgramDirectory << _UniqueName;
 							CFile::fs_CreateDirectory(BasePath);
 
@@ -1429,7 +2314,30 @@ public:
 							fInit(AppManagerPath, VersionManagerPath, KeyManagerPath, UniqueName);
 							fp_RunUpgradeTests(AppManagerPath, VersionManagerPath, KeyManagerPath, UniqueName);
 						};
+
 					}
+
+					CStr TestPath = "AppManager {}-VersionManager {}"_f
+						<< CFile::fs_GetFile(CFile::fs_GetPath(AppManager))
+						<< CFile::fs_GetFile(CFile::fs_GetPath(VersionManager))
+					;
+					DMibTestSuite("MultiAuth-" + TestPath)
+					{
+						if (NProcess::NPlatform::fg_Process_GetElevation() == EProcessElevation_IsNotElevated)
+							DMibError("You need to be elevated to run these tests (sudo)");
+
+						CStr UniqueName = "MA-{}-{}"_f
+							<< CFile::fs_GetFile(CFile::fs_GetPath(AppManager))
+							<< CFile::fs_GetFile(CFile::fs_GetPath(VersionManager))
+						;
+
+						CStr AppManagerPath = AppManager;
+						CStr VersionManagerPath = VersionManager;
+						CStr KeyManager;
+
+						fInit(AppManagerPath, VersionManagerPath, KeyManager, UniqueName);
+						fp_RunMultiAuthCompatibilityTests(AppManagerPath, VersionManagerPath, UniqueName);
+					};
 				}
 			}
 		};
