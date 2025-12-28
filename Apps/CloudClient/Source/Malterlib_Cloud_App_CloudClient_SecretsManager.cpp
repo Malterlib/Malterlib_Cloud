@@ -547,6 +547,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<void> CCloudClientAppActor::fp_SecretsManager_SubscribeToServers()
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_SecretsManagers.f_IsEmpty())
 			co_return {};
 
@@ -595,6 +597,8 @@ namespace NMib::NCloud::NCloudClient
 			> _fOnResult
 		)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 
 		bool bBinaryAsBase64 = true;
@@ -845,6 +849,8 @@ namespace NMib::NCloud::NCloudClient
 			> _fOnResult
 		)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 
 		CStr Host = _Params["SecretsManagerHost"].f_String();
@@ -1010,6 +1016,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetProperties(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		bool bBinaryAsBase64 = _Params["BinaryAsBase64"].f_Boolean();
 		CSecretsManager::CSecretID ID;
@@ -1154,6 +1162,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_ChangeTags(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
 		CStr Error;
@@ -1203,6 +1213,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_SetMetadata(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
 		CStr Error;
@@ -1230,6 +1242,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveMetadata(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
 		CStr Error;
@@ -1256,6 +1270,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_RemoveSecret(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
 		CStr Error;
@@ -1278,6 +1294,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Upload(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
 		CStr Error;
@@ -1346,6 +1364,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_Download(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["SecretsManagerHost"].f_String();
 		CSecretsManager::CSecretID ID;
 		CStr Error;

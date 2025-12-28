@@ -18,6 +18,8 @@ namespace NMib::NCloud::NCloudClient
 {
 	auto CCloudClientAppLocalActor::fp_GetSelfUpdateVersion() -> TCFuture<CSelfUpdateVersion>
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		co_await fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
 
 		TCSharedPointer<NContainer::TCMap<TCDistributedActor<CVersionManager>, TCVector<CVersionManager::CNewVersionNotification>>> pVersions = fg_Construct();
@@ -86,6 +88,8 @@ namespace NMib::NCloud::NCloudClient
 			 , NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!_Params["SelfUpdateCheck"].f_Boolean() || _Command == "--self-update")
 			co_return {};
 
@@ -100,6 +104,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppLocalActor::fp_CommandLine_SelfUpdate(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		DMibCheck(mp_State.m_RootDirectory == CFile::fs_GetProgramDirectory());
 
 		auto Version = co_await fp_GetSelfUpdateVersion();

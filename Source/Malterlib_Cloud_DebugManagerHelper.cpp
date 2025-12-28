@@ -2,6 +2,8 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
+#include <Mib/Concurrency/AsyncDestroy>
+#include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
 #include <Mib/File/File>
 
@@ -38,9 +40,10 @@ namespace NMib::NCloud
 				auto This = co_await fg_MoveThis(*this);
 
 				if (This.m_DownloadSubscription)
-					co_await fg_DestroySubscription(This.m_DownloadSubscription);
+					co_await fg_DestroySubscription(This.m_DownloadSubscription).f_Wrap() > fg_LogError("DebugManagerHelper", "Failed to abort download subscription");
+
 				if (This.m_DownloadReceive)
-					co_await fg_Move(This.m_DownloadReceive).f_Destroy();
+					co_await fg_Move(This.m_DownloadReceive).f_Destroy().f_Wrap() > fg_LogError("DebugManagerHelper", "Failed to abort download receive");
 
 				co_return {};
 			}
@@ -57,7 +60,7 @@ namespace NMib::NCloud
 
 				co_await fg_Move(This.m_fFinish).f_Destroy();
 				if (This.m_UploadSend)
-					co_await fg_Move(This.m_UploadSend).f_Destroy();
+					co_await fg_Move(This.m_UploadSend).f_Destroy().f_Wrap() > fg_LogError("DebugManagerHelper", "Failed to abort upload send");
 
 				co_return {};
 			}
@@ -144,6 +147,8 @@ namespace NMib::NCloud
 			, int32 _CompressionLevel
 		)
 	{
+		auto CheckDestroy = co_await fg_CurrentActorCheckDestroyedOnResume();
+
 		TCSharedPointer<CUploadState, CSupportWeakTag> pState = fg_Construct();
 
 		pState->m_UploadSend = fg_ConstructActor<CFileTransferSend>(_Source);
@@ -160,10 +165,15 @@ namespace NMib::NCloud
 		FilesGenerator.f_SetSubscription(fg_Move(SendFilesResult.m_Subscription));
 		auto TransferResultFuture = fg_Move(SendFilesResult.m_Result);
 
-		auto pCleanupAfterTimeout = g_OnScopeExitActor / [pState]
-			{
-				(void)pState->f_Abort();
-			}
+		auto AbortDestroyOnTimeout = co_await fg_AsyncDestroy
+			(
+				[pState] -> TCFuture<void>
+				{
+					auto pLocalState = pState;
+					co_await pLocalState->f_Abort();
+					co_return {};
+				}
+			)
 		;
 
 		auto CleanupResult = g_OnScopeExit / [&TransferResultFuture]
@@ -184,7 +194,7 @@ namespace NMib::NCloud
 
 		auto Result = co_await (_fDoUpload(fg_Move(FilesGenerator)).f_Timeout(m_Timeout, "Timed out waiting for debug manager to reply") % "Failed to start upload on remote server");
 
-		pCleanupAfterTimeout->f_Clear();
+		AbortDestroyOnTimeout.f_Clear();
 
 		pState->m_fFinish = fg_Move(Result.m_fFinish);
 
@@ -220,6 +230,8 @@ namespace NMib::NCloud
 			, uint64 _QueueSize
 		)
 	{
+		auto CheckDestroy = co_await fg_CurrentActorCheckDestroyedOnResume();
+
 		TCSharedPointer<CDownloadState, CSupportWeakTag> pState = fg_Construct();
 
 		pState->m_DownloadReceive = fg_ConstructActor<CFileTransferReceive>
@@ -242,12 +254,15 @@ namespace NMib::NCloud
 
 		auto Subscription = co_await pState->m_DownloadReceive.f_Bind<&CFileTransferReceive::f_GetAbortSubscription>();
 
-		auto AbortSubscription = g_ActorSubscription / [pState]() -> TCFuture<void>
-			{
-				co_await pState->f_Abort();
-
-				co_return {};
-			}
+		auto DestroyAbort = co_await fg_AsyncDestroy
+			(
+				[pState]() -> TCFuture<void>
+				{
+					auto pLocalState = pState;
+					co_await pLocalState->f_Abort();
+					co_return {};
+				}
+			)
 		;
 
 		auto Result = co_await
@@ -360,7 +375,7 @@ namespace NMib::NCloud
 
 		co_return co_await Internal.f_Upload<CDebugManager::CCrashDumpUpload::CResult>
 			(
-				g_ActorFunctor 
+				g_ActorFunctor
 				/ [_DebugManager, _ID, QueueSize = _QueueSize ? _QueueSize : Internal.m_QueueSize, _Flags, Metadata = fg_Move(_Metadata), ExceptionInfo = fg_Move(_ExceptionInfo)]
 				(NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> _FilesGenerator) mutable -> TCFuture<CDebugManager::CCrashDumpUpload::CResult>
 				{

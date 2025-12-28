@@ -24,7 +24,7 @@ namespace NMib::NCloud::NCloudClient
 	{
 		CCloudClientAppActor();
 		~CCloudClientAppActor();
-		
+
 	protected:
 		struct CCloudManagerAppManagerInfo
 		{
@@ -47,11 +47,13 @@ namespace NMib::NCloud::NCloudClient
 			ECloudManagerStatusFlag_AppManagers = DBit(0)
 			, ECloudManagerStatusFlag_Applications = DBit(1)
 		};
-		
+
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;
+		TCFuture<void> fp_Destroy() override;
+		TCFuture<void> fp_DestroyAll();
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
-		
+
 		TCFuture<void> fp_Initialize();
 
 		void fp_ParseCommonOptions(NEncoding::CEJsonSorted const &_Params);

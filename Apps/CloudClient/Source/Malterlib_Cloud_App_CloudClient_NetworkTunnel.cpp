@@ -101,6 +101,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<void> CCloudClientAppActor::fp_NetworkTunnel_Init()
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_TunnelsClient)
 		{
 			mp_TunnelsClient = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager);
@@ -111,7 +113,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<TCMap<CStr, TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> CCloudClientAppActor::fp_NetworkTunnel_Filter(CEJsonSorted const _Params)
 	{
-		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
 
 		co_await fp_NetworkTunnel_Init();
 
@@ -144,6 +146,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_EnumTunnels(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		auto TunnelsPerHost = co_await fp_NetworkTunnel_Filter(_Params);
 
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
@@ -174,7 +178,7 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
 
 		auto TunnelsPerHost = co_await fp_NetworkTunnel_Filter(_Params);
 

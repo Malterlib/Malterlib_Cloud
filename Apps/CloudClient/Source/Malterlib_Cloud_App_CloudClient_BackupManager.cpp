@@ -151,6 +151,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<void> CCloudClientAppActor::fp_BackupManager_SubscribeToServers()
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_BackupManagers.f_IsEmpty())
 			co_return {};
 
@@ -173,6 +175,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackupSources(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 
@@ -225,6 +229,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_ListBackups(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
@@ -291,6 +297,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_BackupManager_DownloadBackup(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr BackupHost = _Params["BackupHost"].f_String();
 		CStr BackupSource = _Params["BackupSource"].f_String();
 		CTime BackupTime = _Params["BackupTime"].f_Date();

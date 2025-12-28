@@ -41,7 +41,7 @@ namespace NMib::NCloud::NCloudClient
 				, "Description"_o= "Internal hidden option to forward current directory."
 			}
 		;
-		
+
 		_Section.f_RegisterCommand
 			(
 				{
@@ -343,10 +343,12 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<void> CCloudClientAppActor::fp_VersionManager_SubscribeToServers()
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_VersionManagers.f_IsEmpty())
 			co_return {};
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to version managers");
-		
+
 		auto Subscription = co_await mp_State.m_TrustManager->f_SubscribeTrustedActors<NCloud::CVersionManager>().f_Wrap();
 
 		if (!Subscription)
@@ -365,6 +367,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListApplications(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 
@@ -416,6 +420,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ListVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		bool bVerbose = _Params["Verbose"].f_Boolean();
@@ -562,6 +568,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_UploadVersion(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		auto AnsiFlags = _pCommandLine->m_AnsiFlags;
 
 		CStr Source = CFile::fs_GetFullPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
@@ -822,6 +830,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_DownloadVersion(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		CStr Version = _Params["Version"].f_String();
@@ -881,6 +891,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_ChangeTags(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["VersionManagerHost"].f_String();
 		CStr Application = _Params["Application"].f_String();
 		CStr Version = _Params["Version"].f_String();

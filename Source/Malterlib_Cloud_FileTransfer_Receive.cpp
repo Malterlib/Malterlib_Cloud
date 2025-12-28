@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -62,9 +62,9 @@ namespace NMib::NCloud
 	};
 
 	CFileTransferReceive::~CFileTransferReceive() = default;
-	
+
 	CFileTransferReceive::CFileTransferReceive(NStr::CStr const &_BasePath, EFileAttrib _AttributeMask, NFile::EFileAttrib _AttributeAdd)
-		: mp_pInternal(fg_Construct()) 
+		: mp_pInternal(fg_Construct())
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_AttributeMask = _AttributeMask;
@@ -83,6 +83,8 @@ namespace NMib::NCloud
 
 	NConcurrency::TCFuture<CFileTransferContextDeprecated> CFileTransferReceive::f_ReceiveFilesDeprecated(uint64 _QueueSize, EReceiveFlag _Flags)
 	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
 		auto &Internal = *mp_pInternal;
 		Internal.m_RootDirectory = Internal.m_BasePath;
 		if (Internal.m_bCalled)
@@ -292,6 +294,8 @@ namespace NMib::NCloud
 			, EReceiveFlag _Flags
 		)
 	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
 		auto &Internal = *mp_pInternal;
 		Internal.m_RootDirectory = Internal.m_BasePath;
 
@@ -563,7 +567,7 @@ namespace NMib::NCloud
 
 		co_return Result;
 	}
-	
+
 	NConcurrency::TCFuture<CFileTransferResult> CFileTransferReceive::f_GetResultDeprecated()
 	{
 		auto &Internal = *mp_pInternal;
@@ -584,7 +588,11 @@ namespace NMib::NCloud
 				if (Internal.m_bAbortByDestroy)
 				{
 					if (!Internal.m_bTransferDone)
-						co_await fg_ThisActor(this).f_Destroy().f_Wrap() > fg_LogError("FileTransferReceive", "Failed to destroy file transfer when aborting");
+					{
+						auto Error = co_await fg_ThisActor(this).f_Destroy().f_Wrap();
+						if (!Error.f_HasExceptionType<CExceptionActorAlreadyDestroyed>())
+							Error > fg_LogError("FileTransferReceive", "Failed to destroy file transfer when aborting");
+					}
 
 					co_return {};
 				}

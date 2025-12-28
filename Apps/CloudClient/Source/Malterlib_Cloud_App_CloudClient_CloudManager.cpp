@@ -347,7 +347,7 @@ namespace NMib::NCloud::NCloudClient
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
-		
+
 		_Section.f_RegisterCommand
 			(
 				{
@@ -712,6 +712,8 @@ namespace NMib::NCloud::NCloudClient
 			, TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		bool bQuiet = _Params["Quiet"].f_Boolean();
 		bool bIncludeCloudManager = _Params["IncludeCloudManager"].f_Boolean();
 
@@ -870,6 +872,8 @@ namespace NMib::NCloud::NCloudClient
 			, TCSharedPointer<CCommandLineControl> _pCommandLine
 		)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		bool bQuiet = _Params["Quiet"].f_Boolean();
 		TCOptional<bool> FilterStatusError;
 		TCOptional<CStr> FilterEnvironment;
@@ -1181,6 +1185,8 @@ namespace NMib::NCloud::NCloudClient
 			, ECloudManagerStatusFlag _Flags
 		)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["Host"].f_String();
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
@@ -1248,6 +1254,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveAppManager(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["Host"].f_String();
 		CStr AppManagerHostID = _Params["AppManagerHostID"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
@@ -1312,9 +1320,11 @@ namespace NMib::NCloud::NCloudClient
 			return nullptr;
 		}
 	}
-	
+
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveSensor(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
 
@@ -1352,6 +1362,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_RemoveLog(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
 
@@ -1376,7 +1388,7 @@ namespace NMib::NCloud::NCloudClient
 			if (!_Params["Force"].f_Boolean())
 				co_return DMibErrorInstance("No filtering specified. To force removal of all logs specify --force.");
 		}
-		
+
 		NConcurrency::CDistributedAppLogReporter::CLogInfoKey LogInfoKey;
 
 		LogInfoKey.m_HostID = _Params["LogHostID"].f_String();
@@ -1412,6 +1424,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_SnoozeSensor(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
 		bool bUnSnooze = _Params["UnSnooze"].f_Boolean();
@@ -1459,6 +1473,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["Host"].f_String();
 		bool bQuiet = _Params["Quiet"].f_Boolean();
 
@@ -1537,6 +1553,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_CloudManager_ExpectedOsVersionSet(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["Host"].f_String();
 
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
@@ -1566,7 +1584,7 @@ namespace NMib::NCloud::NCloudClient
 				co_return DMibErrorInstance("--min-version cannoct be specified when deprecated is set");
 			ExpectedVersion.m_Min = co_await CCloudManager::CVersion::fs_ParseVersion(pValue->f_String());
 		}
-		
+
 		if (auto *pValue =_Params.f_GetMember("MaxVersion"))
 		{
 			if (bDeprecated)
@@ -1595,6 +1613,8 @@ namespace NMib::NCloud::NCloudClient
 	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetSensorReaders(CStr _Host)
 		-> TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>>>>
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
 		TCFutureMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppSensorReader>> SensorReaders;
@@ -1823,6 +1843,8 @@ namespace NMib::NCloud::NCloudClient
 	auto CCloudClientAppActor::fp_CommandLine_CloudManager_GetLogReaders(CStr _Host)
 		-> TCFuture<TCSharedPointer<TCMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>>>>
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		co_await fp_CloudManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for cloud managers");
 
 		TCFutureMap<CHostInfo, TCDistributedActorInterfaceWithID<CDistributedAppLogReader>> LogReaders;

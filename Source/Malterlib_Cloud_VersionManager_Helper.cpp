@@ -3,6 +3,8 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Cryptography/RandomID>
+#include <Mib/Concurrency/AsyncDestroy>
+#include <Mib/Concurrency/LogError>
 #include <Mib/Process/ProcessLaunchActor>
 #include <Mib/File/File>
 
@@ -44,9 +46,10 @@ namespace NMib::NCloud
 				auto This = co_await fg_MoveThis(*this);
 
 				if (This.m_DownloadVersionSubscription)
-					co_await fg_DestroySubscription(This.m_DownloadVersionSubscription);
+					co_await fg_DestroySubscription(This.m_DownloadVersionSubscription).f_Wrap() > fg_LogError("VersionManagerHelper", "Failed to abort download subscription");
+
 				if (This.m_DownloadVersionReceive)
-					co_await fg_Move(This.m_DownloadVersionReceive).f_Destroy();
+					co_await fg_Move(This.m_DownloadVersionReceive).f_Destroy().f_Wrap() > fg_LogError("VersionManagerHelper", "Failed to abort download receive");
 
 				co_return {};
 			}
@@ -63,7 +66,7 @@ namespace NMib::NCloud
 
 				co_await fg_Move(This.m_fFinish).f_Destroy();
 				if (This.m_UploadVersionSend)
-					co_await fg_Move(This.m_UploadVersionSend).f_Destroy();
+					co_await fg_Move(This.m_UploadVersionSend).f_Destroy().f_Wrap() > fg_LogError("VersionManagerHelper", "Failed to abort upload send");
 
 				co_return {};
 			}
@@ -151,6 +154,8 @@ namespace NMib::NCloud
 			, uint64 _QueueSize
 		) const
 	{
+		auto CheckDestroy = co_await fg_CurrentActorCheckDestroyedOnResume();
+
 		auto &Internal = *mp_pInternal;
 
 		TCSharedPointer<CUploadState, CSupportWeakTag> pState = fg_Construct();
@@ -193,10 +198,15 @@ namespace NMib::NCloud
 			;
 		}
 
-		auto pCleanupAfterTimeout = g_OnScopeExitActor / [pState]
-			{
-				(void)pState->f_Abort();
-			}
+		auto AbortDestroyOnTimeout = co_await fg_AsyncDestroy
+			(
+				[pState] -> TCFuture<void>
+				{
+					auto pLocalState = pState;
+					co_await pLocalState->f_Abort();
+					co_return {};
+				}
+			)
 		;
 
 		auto CleanupResult = g_OnScopeExit / [&TransferResultFuture]
@@ -223,7 +233,7 @@ namespace NMib::NCloud
 			)
 		;
 
-		pCleanupAfterTimeout->f_Clear();
+		AbortDestroyOnTimeout.f_Clear();
 
 		pState->m_fFinish = fg_Move(Result.m_fFinish);
 
@@ -261,6 +271,8 @@ namespace NMib::NCloud
 			, uint64 _QueueSize
 		) const
 	{
+		auto CheckDestroy = co_await fg_CurrentActorCheckDestroyedOnResume();
+
 		auto &Internal = *mp_pInternal;
 		TCSharedPointer<CDownloadState, CSupportWeakTag> pState = fg_Construct();
 
@@ -288,12 +300,15 @@ namespace NMib::NCloud
 		if (_VersionManager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_RefactorToActorFunctorsUploadDownload)
 			StartDownload.m_Subscription = co_await pState->m_DownloadVersionReceive.f_Bind<&CFileTransferReceive::f_GetAbortSubscription>();
 
-		auto AbortSubscription = g_ActorSubscription / [pState]() -> TCFuture<void>
-			{
-				co_await pState->f_Abort();
-
-				co_return {};
-			}
+		auto DestroyAbort = co_await fg_AsyncDestroy
+			(
+				[pState]() -> TCFuture<void>
+				{
+					auto pLocalState = pState;
+					co_await pLocalState->f_Abort();
+					co_return {};
+				}
+			)
 		;
 
 		if (_VersionManager->f_InterfaceVersion() >= CVersionManager::EProtocolVersion_AsyncGeneratorFileTransfer)

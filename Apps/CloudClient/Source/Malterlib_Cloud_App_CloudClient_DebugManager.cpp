@@ -92,7 +92,7 @@ namespace NMib::NCloud::NCloudClient
 				Filter.m_TimestampEnd = pValue->f_Date();
 
 			if (auto pValue = _Params.f_GetMember("ExceptionInfo"))
-				Filter.m_ExceptionInfo = pValue->f_String();			
+				Filter.m_ExceptionInfo = pValue->f_String();
 
 			Filter.m_Metadata = fg_ParseMetadataOptions(_Params);
 
@@ -623,10 +623,12 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<void> CCloudClientAppActor::fp_DebugManager_SubscribeToServers()
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!mp_DebugManagers.f_IsEmpty())
 			co_return {};
 		DMibLogWithCategory(Malterlib/Cloud/CloudClient, Info, "Subscribing to debug managers");
-		
+
 		auto Subscription = co_await mp_State.m_TrustManager->f_SubscribeTrustedActors<NCloud::CDebugManager>().f_Wrap();
 
 		if (!Subscription)
@@ -645,6 +647,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<TCVector<TCTrustedActor<CDebugManager>>> CCloudClientAppActor::fp_DebugManager_GetDebugManagers(CStr _Host)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		if (!_Host.f_IsEmpty())
 		{
 			CStr Error;
@@ -683,6 +687,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_DebugManager_DebugAssetList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["DebugManagerHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 
@@ -783,6 +789,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_DebugManager_DebugAssetUpload(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Source = CFile::fs_GetExpandedPath(_Params["Source"].f_String(), _Params["CurrentDirectory"].f_String());
 		if (Source.f_IsEmpty())
 			co_return DMibErrorInstance("Source must be specified");
@@ -843,6 +851,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_DebugManager_DebugAssetDownload(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["DebugManagerHost"].f_String();
 		CStr DestinationDirectory = CFile::fs_GetExpandedPath(_Params["DestinationDirectory"].f_String(), _Params["CurrentDirectory"].f_String());
 		if (DestinationDirectory.f_IsEmpty())
@@ -914,6 +924,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_DebugManager_DebugAssetDelete(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["DebugManagerHost"].f_String();
 		uint64 nMaxToDelete = _Params["MaxDeletes"].f_Integer();
 		bool bAllowMultiDelete = _Params["AllowMultiDelete"].f_Boolean();
@@ -954,6 +966,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_DebugManager_CrashDumpList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["DebugManagerHost"].f_String();
 		bool bIncludeHost = _Params["IncludeHost"].f_Boolean();
 		bool bIncludeExceptionInfo = _Params["IncludeExceptionInfo"].f_Boolean();
@@ -1053,6 +1067,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_DebugManager_CrashDumpUpload(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		auto &CurrentDirectory = _Params["CurrentDirectory"].f_String();
 
 		auto RelativeSources = _Params["Sources"].f_StringArray();
@@ -1163,6 +1179,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_DebugManager_CrashDumpDownload(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["DebugManagerHost"].f_String();
 		CStr DestinationDirectory = CFile::fs_GetExpandedPath(_Params["DestinationDirectory"].f_String(), _Params["CurrentDirectory"].f_String());
 		if (DestinationDirectory.f_IsEmpty())
@@ -1234,6 +1252,8 @@ namespace NMib::NCloud::NCloudClient
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_DebugManager_CrashDumpDelete(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
 		CStr Host = _Params["DebugManagerHost"].f_String();
 		uint64 nMaxToDelete = _Params["MaxDeletes"].f_Integer();
 		bool bAllowMultiDelete = _Params["AllowMultiDelete"].f_Boolean();
