@@ -504,27 +504,30 @@ namespace NMib::NCloud
 			if (_Flags & EReceiveFlag_DecompressZstandard)
 				DataGenerator = fg_DecompressZstandardAsync(fg_Move(DataGenerator));
 
-			for (auto iData = co_await (fg_Move(DataGenerator).f_GetPipelinedIterator(DownloadPipelineLength) % "GetPipelined Data"); iData; co_await (++iData % "Next Data"))
 			{
-				auto &&Data = *iData;
-				auto DataLen = Data.f_GetLen();
-				(
-					g_Dispatch(*BlockingActors) /
-					[
-						pResumeFileInfo
-						, FilePosition
-						, Data = fg_Move(Data)
-					]
-					() mutable
-					{
-						auto &File = pResumeFileInfo->m_File;
-						File.f_WriteNoLocalCache(FilePosition, Data.f_GetArray(), Data.f_GetLen());
-					}
-				)
-				> Writes;
+				CPriorityScope LowPriority(CPriorityScope::mc_PriorityLow);
+				for (auto iData = co_await (fg_Move(DataGenerator).f_GetPipelinedIterator(DownloadPipelineLength) % "GetPipelined Data"); iData; co_await (++iData % "Next Data"))
+				{
+					auto &&Data = *iData;
+					auto DataLen = Data.f_GetLen();
+					(
+						g_Dispatch(*BlockingActors) /
+						[
+							pResumeFileInfo
+							, FilePosition
+							, Data = fg_Move(Data)
+						]
+						() mutable
+						{
+							auto &File = pResumeFileInfo->m_File;
+							File.f_WriteNoLocalCache(FilePosition, Data.f_GetArray(), Data.f_GetLen());
+						}
+					)
+					> Writes;
 
-				FilePosition += DataLen;
-				Result.m_nBytes += DataLen;
+					FilePosition += DataLen;
+					Result.m_nBytes += DataLen;
+				}
 			}
 
 			co_await (fg_AllDone(Writes) % "Writing output data failed");
