@@ -68,12 +68,13 @@ namespace NMib::NCloud::NCloudClient
 		// Version Manager
 		void fp_VersionManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);
 		TCFuture<void> fp_VersionManager_SubscribeToServers();
-		
+
 		TCFuture<uint32> fp_CommandLine_VersionManager_ListApplications(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_VersionManager_ListVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_VersionManager_UploadVersion(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_VersionManager_DownloadVersion(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_VersionManager_ChangeTags(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VersionManager_CopyVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		// Secrets manager
 		void fp_SecretsManager_RegisterCommands(CDistributedAppCommandLineSpecification::CSection _Section);

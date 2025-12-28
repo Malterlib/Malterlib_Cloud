@@ -339,6 +339,94 @@ namespace NMib::NCloud::NCloudClient
 				, EDistributedAppCommandFlag_WaitForRemotes
 			)
 		;
+		_Section.f_RegisterCommand
+			(
+				{
+					"Names"_o= _o["--version-manager-copy-versions"]
+					, "Description"_o= "Copy versions between version managers."
+					, "Options"_o=
+					{
+						"SourceHost"_o=
+						{
+							"Names"_o= _o["--source-host"]
+							, "Type"_o= ""
+							, "Description"_o= "Host ID of source version manager."
+						}
+						, "DestHost"_o=
+						{
+							"Names"_o= _o["--dest-host"]
+							, "Type"_o= ""
+							, "Description"_o= "Host ID of destination version manager."
+						}
+						, "LatestOnly?"_o=
+						{
+							"Names"_o= _o["--latest-only"]
+							, "Default"_o= false
+							, "Description"_o= "Only copy the latest version of each application (all platforms at that version)."
+						}
+						, "Platforms?"_o=
+						{
+							"Names"_o= _o["--platforms"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
+							, "Description"_o= "Filter to specific platforms (supports wildcards)."
+						}
+						, "Applications?"_o=
+						{
+							"Names"_o= _o["--applications"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
+							, "Description"_o= "Filter to specific applications (supports wildcards)."
+						}
+						, "Versions?"_o=
+						{
+							"Names"_o= _o["--versions"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
+							, "Description"_o= "Filter to specific versions (supports wildcards, format: 'Branch/Major.Minor.Patch')."
+						}
+						, "Tags?"_o=
+						{
+							"Names"_o= _o["--tags"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
+							, "Description"_o= "Filter to versions that have specific tags (supports wildcards)."
+						}
+						, "CopyTags?"_o=
+						{
+							"Names"_o= _o["--copy-tags"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
+							, "Description"_o= "Tags to copy to destination. Format: 'Tag' or 'SourceTag=DestTag' for renaming."
+						}
+						, "Pretend?"_o=
+						{
+							"Names"_o= _o["--pretend"]
+							, "Default"_o= true
+							, "Description"_o= "Preview what would be copied without transferring."
+						}
+						, "Force?"_o=
+						{
+							"Names"_o= _o["--force"]
+							, "Default"_o= false
+							, "Description"_o= "Overwrite versions that already exist on destination."
+						}
+						, "TransferQueueSize?"_o=
+						{
+							"Names"_o= _o["--queue-size"]
+							, "Default"_o= int64(NFile::gc_IdealNetworkQueueSize)
+							, "Description"_o= "Amount of data to keep in flight while transferring."
+						}
+						, CTableRenderHelper::fs_OutputTypeOption()
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_VersionManager_CopyVersions(fg_Move(_Params), fg_Move(_pCommandLine));
+				}
+				, EDistributedAppCommandFlag_WaitForRemotes
+			)
+		;
 	}
 
 	TCFuture<void> CCloudClientAppActor::fp_VersionManager_SubscribeToServers()
@@ -967,6 +1055,493 @@ namespace NMib::NCloud::NCloudClient
 
 		if (!Result.m_DeniedTags.f_IsEmpty())
 			*_pCommandLine %= "The following tags were denied: {vs,vb}\n"_f << Result.m_DeniedTags;
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_VersionManager_CopyVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		using namespace NStr;
+
+		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
+
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
+
+		CStr SourceHost = _Params["SourceHost"].f_String();
+		CStr DestHost = _Params["DestHost"].f_String();
+		bool bLatestOnly = _Params["LatestOnly"].f_Boolean();
+		bool bPretend = _Params["Pretend"].f_Boolean();
+		bool bForce = _Params["Force"].f_Boolean();
+		uint64 QueueSize = _Params["TransferQueueSize"].f_Integer();
+
+		if (QueueSize < 128 * 1024)
+			QueueSize = 128 * 1024;
+
+		if (SourceHost.f_IsEmpty())
+			co_return DMibErrorInstance("Source host must be specified with --source-host");
+		if (DestHost.f_IsEmpty())
+			co_return DMibErrorInstance("Destination host must be specified with --dest-host");
+		if (SourceHost == DestHost)
+			co_return DMibErrorInstance("Source and destination hosts cannot be the same");
+
+		auto ApplicationFilters = _Params["Applications"].f_StringArray();
+		auto VersionFilters = _Params["Versions"].f_StringArray();
+		auto PlatformFilters = _Params["Platforms"].f_StringArray();
+		auto TagFilters = _Params["Tags"].f_StringArray();
+
+		TCMap<CStr, CStr> CopyTagMappings;
+		for (auto &CopyTag : _Params["CopyTags"].f_StringArray())
+		{
+			CStr SourceTag, DestTag;
+			aint nVarsParsed = 0;
+			aint nCharsParsed = (CStr::CParse("{}={}") >> SourceTag >> DestTag).f_Parse(CopyTag, nVarsParsed);
+			if (nVarsParsed == 2 && nCharsParsed == CopyTag.f_GetLen())
+				CopyTagMappings[SourceTag] = DestTag;
+			else
+				CopyTagMappings[CopyTag] = CopyTag;
+		}
+
+		auto fContainsWildcard = [](CStr const &_Pattern) -> bool
+			{
+				return _Pattern.f_FindChars("*?") >= 0;
+			}
+		;
+
+		auto fMatchesFilter = [](CStr const &_Value, TCVector<CStr> const &_Filters) -> bool
+			{
+				if (_Filters.f_IsEmpty())
+					return true;
+				for (auto &Filter : _Filters)
+				{
+					if (fg_StrMatchWildcard(_Value.f_GetStr(), Filter.f_GetStr()) == EMatchWildcardResult_WholeStringMatchedAndPatternExhausted)
+						return true;
+				}
+				return false;
+			}
+		;
+
+		auto fMatchesTagFilter = [](TCSet<CStr> const &_Tags, TCVector<CStr> const &_Filters) -> bool
+			{
+				if (_Filters.f_IsEmpty())
+					return true;
+				for (auto &Tag : _Tags)
+				{
+					for (auto &Filter : _Filters)
+					{
+						if (fg_StrMatchWildcard(Tag.f_GetStr(), Filter.f_GetStr()) == EMatchWildcardResult_WholeStringMatchedAndPatternExhausted)
+							return true;
+					}
+				}
+				return false;
+			}
+		;
+
+		// Only explicitly specified tags are copied, others are dropped
+		auto fTransformTags = [&CopyTagMappings](TCSet<CStr> const &_SourceTags) -> TCSet<CStr>
+			{
+				TCSet<CStr> DestTags;
+				for (auto &Tag : _SourceTags)
+				{
+					if (auto *pMapping = CopyTagMappings.f_FindEqual(Tag))
+						DestTags[*pMapping];
+				}
+				return DestTags;
+			}
+		;
+
+		bool bApplicationFiltersHaveWildcards = false;
+		for (auto &Filter : ApplicationFilters)
+		{
+			if (fContainsWildcard(Filter))
+			{
+				bApplicationFiltersHaveWildcards = true;
+				break;
+			}
+		}
+
+		co_await fp_VersionManager_SubscribeToServers().f_Timeout(mp_Timeout, "Timed out waiting for subscriptions for version managers");
+
+		CStr Error;
+		auto *pSourceVersionManager = mp_VersionManagers.f_GetOneActor(SourceHost, Error);
+		if (!pSourceVersionManager)
+			co_return DMibErrorInstance("Error finding source version manager '{}': {}. Connection might have failed. Use --log-to-stderr to see more info."_f << SourceHost << Error);
+
+		auto *pDestVersionManager = mp_VersionManagers.f_GetOneActor(DestHost, Error);
+		if (!pDestVersionManager)
+			co_return DMibErrorInstance("Error finding destination version manager '{}': {}. Connection might have failed. Use --log-to-stderr to see more info."_f << DestHost << Error);
+
+		CVersionManager::CListVersions SourceQuery;
+		CVersionManager::CListVersions DestQuery;
+		if (ApplicationFilters.f_GetLen() == 1 && !bApplicationFiltersHaveWildcards)
+		{
+			SourceQuery.m_ForApplication = ApplicationFilters[0];
+			DestQuery.m_ForApplication = ApplicationFilters[0];
+		}
+
+		auto SourceVersionsFuture = pSourceVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(SourceQuery))
+			.f_Timeout(mp_Timeout, "Timed out waiting for source version manager to reply")
+		;
+		auto DestVersionsFuture = pDestVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(DestQuery))
+			.f_Timeout(mp_Timeout, "Timed out waiting for destination version manager to reply")
+		;
+
+		auto SourceVersionsResult = co_await fg_Move(SourceVersionsFuture).f_Wrap();
+		if (!SourceVersionsResult)
+			co_return DMibErrorInstance("Failed to list versions from source: {}"_f << SourceVersionsResult.f_GetExceptionStr());
+
+		auto DestVersionsResult = co_await fg_Move(DestVersionsFuture).f_Wrap();
+		if (!DestVersionsResult)
+			co_return DMibErrorInstance("Failed to list versions from destination: {}"_f << DestVersionsResult.f_GetExceptionStr());
+
+		auto &SourceVersions = SourceVersionsResult->m_Versions;
+		auto &DestVersions = DestVersionsResult->m_Versions;
+
+		struct CVersionToCopy
+		{
+			CStr m_Application;
+			CVersionManager::CVersionIDAndPlatform m_VersionIDAndPlatform;
+			CVersionManager::CVersionInformation m_VersionInfo;
+		};
+		TCVector<CVersionToCopy> VersionsToCopy;
+
+		auto fFormatVersionID = [](CVersionManager::CVersionID const &_VersionID) -> CStr
+			{
+				return CStr::fs_ToStr(_VersionID);
+			}
+		;
+
+		for (auto &AppVersions : SourceVersions)
+		{
+			CStr const &Application = SourceVersions.fs_GetKey(AppVersions);
+
+			if (!fMatchesFilter(Application, ApplicationFilters))
+				continue;
+
+			if (bLatestOnly)
+			{
+				CVersionManager::CVersionID LatestVersion;
+				bool bFirst = true;
+				for (auto &VersionEntry : AppVersions)
+				{
+					auto const &VersionIDAndPlatform = AppVersions.fs_GetKey(VersionEntry);
+
+					if (!fMatchesFilter(fFormatVersionID(VersionIDAndPlatform.m_VersionID), VersionFilters))
+						continue;
+
+					if (!fMatchesTagFilter(VersionEntry.m_Tags, TagFilters))
+						continue;
+
+					if (bFirst || VersionIDAndPlatform.m_VersionID > LatestVersion)
+					{
+						LatestVersion = VersionIDAndPlatform.m_VersionID;
+						bFirst = false;
+					}
+				}
+
+				if (bFirst)
+					continue;
+
+				for (auto &VersionEntry : AppVersions)
+				{
+					auto const &VersionIDAndPlatform = AppVersions.fs_GetKey(VersionEntry);
+					if (VersionIDAndPlatform.m_VersionID != LatestVersion)
+						continue;
+
+					if (!fMatchesFilter(VersionIDAndPlatform.m_Platform, PlatformFilters))
+						continue;
+
+					if (!fMatchesTagFilter(VersionEntry.m_Tags, TagFilters))
+						continue;
+
+					if (!bForce)
+					{
+						auto *pDestApp = DestVersions.f_FindEqual(Application);
+						if (pDestApp && pDestApp->f_FindEqual(VersionIDAndPlatform))
+							continue;
+					}
+
+					VersionsToCopy.f_Insert(CVersionToCopy{Application, VersionIDAndPlatform, VersionEntry});
+				}
+			}
+			else
+			{
+				for (auto &VersionEntry : AppVersions)
+				{
+					auto const &VersionIDAndPlatform = AppVersions.fs_GetKey(VersionEntry);
+
+					if (!fMatchesFilter(fFormatVersionID(VersionIDAndPlatform.m_VersionID), VersionFilters))
+						continue;
+
+					if (!fMatchesFilter(VersionIDAndPlatform.m_Platform, PlatformFilters))
+						continue;
+
+					if (!fMatchesTagFilter(VersionEntry.m_Tags, TagFilters))
+						continue;
+
+					if (!bForce)
+					{
+						auto *pDestApp = DestVersions.f_FindEqual(Application);
+						if (pDestApp && pDestApp->f_FindEqual(VersionIDAndPlatform))
+							continue;
+					}
+
+					VersionsToCopy.f_Insert(CVersionToCopy{Application, VersionIDAndPlatform, VersionEntry});
+				}
+			}
+		}
+
+		// Sort versions in descending order (newest first) so that when tags are applied,
+		// AppManager upgrades to the newest version directly
+		VersionsToCopy.f_Sort([](CVersionToCopy const &_Left, CVersionToCopy const &_Right)
+			{
+				if (auto Result = _Left.m_Application <=> _Right.m_Application; Result != 0)
+					return Result;
+
+				return _Right.m_VersionIDAndPlatform <=> _Left.m_VersionIDAndPlatform;
+			}
+		);
+
+		if (VersionsToCopy.f_IsEmpty())
+		{
+			*_pCommandLine += "No versions to copy. All matching versions already exist on destination or no matching versions found on source.\n";
+			co_return 0;
+		}
+
+		uint64 nTotalBytes = 0;
+		for (auto &Version : VersionsToCopy)
+			nTotalBytes += Version.m_VersionInfo.m_nBytes;
+
+		if (bPretend)
+		{
+			CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
+			TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
+			TableRenderer.f_AddHeadings("Application", "Version", "Platform", "Config", "Tags", "Size", "Files");
+
+			for (auto &Version : VersionsToCopy)
+			{
+				TableRenderer.f_AddRow
+					(
+						Version.m_Application
+						, Version.m_VersionIDAndPlatform.m_VersionID
+						, Version.m_VersionIDAndPlatform.m_Platform
+						, Version.m_VersionInfo.m_Configuration
+						, "{vs,vb,a-}"_f << fTransformTags(Version.m_VersionInfo.m_Tags)
+						, "{ns }"_f << Version.m_VersionInfo.m_nBytes
+						, Version.m_VersionInfo.m_nFiles
+					)
+				;
+			}
+
+			TableRenderer.f_Output(_Params);
+
+			*_pCommandLine += "{}Dry run:{} Would copy {} version(s), total size: {ns }\n\n"_f
+				<< AnsiEncoding.f_StatusNormal()
+				<< AnsiEncoding.f_Default()
+				<< VersionsToCopy.f_GetLen()
+				<< nTotalBytes
+			;
+
+			co_return 0;
+		}
+
+		*_pCommandLine += "Copying {} version(s), total size: {ns }\n"_f << VersionsToCopy.f_GetLen() << nTotalBytes;
+
+		uint32 nSuccessful = 0;
+		uint32 nFailed = 0;
+		uint64 nBytesDownloaded = 0;
+		uint64 nBytesUploaded = 0;
+
+		for (auto &Version : VersionsToCopy)
+		{
+			co_await g_AsyncDestroy;
+
+			*_pCommandLine += "Copying {} {} ({})...\n"_f
+				<< Version.m_Application
+				<< Version.m_VersionIDAndPlatform.m_VersionID
+				<< Version.m_VersionIDAndPlatform.m_Platform
+			;
+
+			CStr TempDir = CFile::fs_GetTemporaryDirectory() / ("CloudClient_CopyVersion_{}"_f << fg_RandomID());
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+				co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [TempDir]
+						{
+							CFile::fs_CreateDirectory(TempDir);
+						}
+					)
+				;
+			}
+
+			auto Cleanup = co_await fg_AsyncDestroy
+				(
+					[TempDir]() mutable -> TCUnsafeFuture<void>
+					{
+						auto LocalTempDir = TempDir;
+						auto BlockingActorCheckout = fg_BlockingActor();
+						co_await
+							(
+								g_Dispatch(BlockingActorCheckout) / [LocalTempDir]
+								{
+									try
+									{
+										CFile::fs_DeleteDirectoryRecursive(LocalTempDir);
+									}
+									catch (...)
+									{
+										// Ignore cleanup errors
+									}
+								}
+							)
+						;
+						co_return {};
+					}
+				)
+			;
+
+			auto DownloadResult = co_await mp_VersionManagerHelper.f_Download
+				(
+					pSourceVersionManager->m_Actor
+					, Version.m_Application
+					, Version.m_VersionIDAndPlatform
+					, TempDir
+					, CFileTransferReceive::EReceiveFlag_None
+					, QueueSize
+				)
+				.f_Wrap()
+			;
+
+			if (!DownloadResult)
+			{
+				*_pCommandLine %= "{}Failed{} to download {} {} ({}): {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< Version.m_Application
+					<< Version.m_VersionIDAndPlatform.m_VersionID
+					<< Version.m_VersionIDAndPlatform.m_Platform
+					<< DownloadResult.f_GetExceptionStr()
+				;
+				++nFailed;
+				continue;
+			}
+			nBytesDownloaded += DownloadResult->m_nBytes;
+
+			*_pCommandLine += "Downloaded {} {} ({}): {ns } bytes in {} at {fe2} MB/s\n"_f
+				<< Version.m_Application
+				<< Version.m_VersionIDAndPlatform.m_VersionID
+				<< Version.m_VersionIDAndPlatform.m_Platform
+				<< DownloadResult->m_nBytes
+				<< fg_SecondsDurationToHumanReadable(DownloadResult->m_nSeconds)
+				<< DownloadResult->f_BytesPerSecond() / 1'000'000.0
+			;
+
+			TCVector<CStr> PackageFiles;
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+				PackageFiles = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [TempDir]
+						{
+							return CFile::fs_FindFiles(TempDir / "*", EFileAttrib_File, false);
+						}
+					)
+				;
+			}
+
+			if (PackageFiles.f_IsEmpty())
+			{
+				*_pCommandLine %= "{}Failed{} to find package file for {} {} ({}): No package file found in download\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< Version.m_Application
+					<< Version.m_VersionIDAndPlatform.m_VersionID
+					<< Version.m_VersionIDAndPlatform.m_Platform
+				;
+				++nFailed;
+				continue;
+			}
+
+			if (PackageFiles.f_GetLen() > 1)
+			{
+				*_pCommandLine %= "{}Failed{} to find package file for {} {} ({}): Multiple package files found in download: {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< Version.m_Application
+					<< Version.m_VersionIDAndPlatform.m_VersionID
+					<< Version.m_VersionIDAndPlatform.m_Platform
+					<< PackageFiles
+				;
+				++nFailed;
+				continue;
+			}
+
+			CStr PackageFile = PackageFiles[0];
+
+			auto DestVersionInfo = Version.m_VersionInfo;
+			DestVersionInfo.m_Tags = fTransformTags(Version.m_VersionInfo.m_Tags);
+
+			auto UploadResult = co_await mp_VersionManagerHelper.f_Upload
+				(
+					pDestVersionManager->m_Actor
+					, Version.m_Application
+					, Version.m_VersionIDAndPlatform
+					, DestVersionInfo
+					, PackageFile
+					, bForce ? CVersionManager::CStartUploadVersion::EFlag_ForceOverwrite : CVersionManager::CStartUploadVersion::EFlag_None
+					, QueueSize
+				)
+				.f_Wrap()
+			;
+
+			if (!UploadResult)
+			{
+				*_pCommandLine %= "{}Failed{} to upload {} {} ({}): {}\n"_f
+					<< AnsiEncoding.f_StatusError()
+					<< AnsiEncoding.f_Default()
+					<< Version.m_Application
+					<< Version.m_VersionIDAndPlatform.m_VersionID
+					<< Version.m_VersionIDAndPlatform.m_Platform
+					<< UploadResult.f_GetExceptionStr()
+				;
+				++nFailed;
+				continue;
+			}
+
+			if (!UploadResult->m_DeniedTags.f_IsEmpty())
+			{
+				*_pCommandLine %= "Tags denied for {} {} ({}): {vs,vb}\n"_f
+					<< Version.m_Application
+					<< Version.m_VersionIDAndPlatform.m_VersionID
+					<< Version.m_VersionIDAndPlatform.m_Platform
+					<< UploadResult->m_DeniedTags
+				;
+			}
+
+			*_pCommandLine += "{}Uploaded{} {} {} ({}): {ns } bytes in {} at {fe2} MB/s\n"_f
+				<< AnsiEncoding.f_StatusNormal()
+				<< AnsiEncoding.f_Default()
+				<< Version.m_Application
+				<< Version.m_VersionIDAndPlatform.m_VersionID
+				<< Version.m_VersionIDAndPlatform.m_Platform
+				<< UploadResult->m_TransferResult.m_nBytes
+				<< fg_SecondsDurationToHumanReadable(UploadResult->m_TransferResult.m_nSeconds)
+				<< UploadResult->m_TransferResult.f_BytesPerSecond() / 1'000'000.0
+			;
+
+			nBytesUploaded += UploadResult->m_TransferResult.m_nBytes;
+			++nSuccessful;
+		}
+
+		*_pCommandLine += "\nCopy complete: {} succeeded, {} failed, {ns } bytes downloaded, {ns } bytes uploaded\n"_f
+			<< nSuccessful
+			<< nFailed
+			<< nBytesDownloaded
+			<< nBytesUploaded
+		;
+
+		if (nFailed > 0)
+			co_return 1;
 
 		co_return 0;
 	}
