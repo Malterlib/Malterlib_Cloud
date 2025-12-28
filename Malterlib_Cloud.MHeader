@@ -184,6 +184,23 @@ Property
 			}
 		}
 	}
+
+	MalterlibBinaryTestRepositories =+ "Cloud_macOS_arm64"
+	{
+		&
+		{
+			MalterlibCloudCompatibilityTests true
+			|
+			{
+				MalterlibAllBinaryTestRepositories true
+				&
+				{
+					EnablePlatformFamily_macOS true
+					EnableArchitecture_arm64 true
+				}
+			}
+		}
+	}
 }
 
 Type
