@@ -14,20 +14,26 @@ namespace NMib::NCloud::NSecretsManager
 		return m_SubscriptionParams.m_fOnChanges(fg_Move(_Changes));
 	}
 
-	void CSecretsManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity)
+	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers _Identity)
 	{
+		TCFutureVector<void> Results;
 		auto fSendForSubscriptions = [&](TCMap<CStr, CChangeSubscription> const &_Subscriptions)
 			{
 				for (auto &Subscription : _Subscriptions)
 				{
 					if (Subscription.m_CallingHostInfo.f_GetRealHostID() != _Identity.f_GetHostID())
 						continue;
-					fp_SendSubscriptionInitial(Subscription.f_GetSubscriptionID()).f_DiscardResult();
+
+					fp_SendSubscriptionInitial(Subscription.f_GetSubscriptionID()) > Results;
 				}
 			}
 		;
 
 		fSendForSubscriptions(mp_ChangeSubscriptions);
+
+		co_await fg_AllDone(Results).f_Wrap() > fg_LogError("SecretsManager/Subscriptions", "Falied to send initial subscription when changing permissions");
+
+		co_return {};
 	}
 
 	bool CSecretsManagerDaemonActor::CServer::fp_SecretMatchesSubscription(CChangeSubscription const &_Subscription, CSecretPropertiesInternal const &_SecretProperties)

@@ -118,23 +118,29 @@ namespace NMib::NCloud::NVersionManager
 		m_fOnNewVersions(_NewVersionNotifications).f_DiscardResult();
 	}
 
-	void CVersionManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity)
+	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers _Identity)
 	{
+		TCFutureVector<void> Results;
+
 		auto fSendForSubscriptions = [&](TCMap<CStr, CSubscription> const &_Subscriptions, CStr const &_Application)
 			{
 				for (auto &Subscription : _Subscriptions)
 				{
 					if (Subscription.m_CallingHostInfo.f_GetRealHostID() != _Identity.f_GetHostID())
 						continue;
-					fp_SendSubscriptionInitial(_Application, &Subscription).f_DiscardResult();
+					fp_SendSubscriptionInitial(_Application, &Subscription) > Results;
 				}
 			}
 		;
 		fSendForSubscriptions(mp_GlobalVersionSubscriptions, CStr());
 		for (auto &Subscriptions : mp_VersionSubscriptions)
 			fSendForSubscriptions(Subscriptions, mp_VersionSubscriptions.fs_GetKey(Subscriptions));
+
+		co_await fg_AllDone(Results).f_Wrap() > fg_LogError("VersionManager/Subscriptions", "Falied to send initial subscription when changing permissions");
+
+		co_return {};
 	}
-	
+
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr _ApplicationName, CSubscription const *_pSubscription)
 	{
 		auto fSendInitialForApplication =

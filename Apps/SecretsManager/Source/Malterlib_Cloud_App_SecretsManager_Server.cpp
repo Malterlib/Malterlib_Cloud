@@ -16,11 +16,11 @@ namespace NMib::NCloud::NSecretsManager
 		, mp_pCanDestroyFileActorTracker(fg_Construct())
 	{
 	}
-	
+
 	CSecretsManagerDaemonActor::CServer::~CServer()
 	{
 	}
-	
+
 #if DMibConfig_Tests_Enable
 	TCFuture<CEJsonSorted> CSecretsManagerDaemonActor::CServer::f_Test_Command(CStr _Command, CEJsonSorted const _Params)
 	{
@@ -69,21 +69,21 @@ namespace NMib::NCloud::NSecretsManager
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::f_Init()
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
-		
+
 		auto Database = co_await mp_DatabaseActor(&CSecretsManagerServerDatabase::f_ReadDatabase).f_Wrap();
 		if (!Database)
 		{
 			DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to read database: {}", Database.f_GetExceptionStr());
 			co_return {};
 		}
-				
+
 		mp_Database = fg_Move(*Database);
 		for (auto const &SecretProperties : mp_Database.m_Secrets)
 		{
 			fp_UpdateTags({}, SecretProperties.m_Tags);
 			fp_UpdateSemanticIDs("", SecretProperties.m_SemanticID);
 		}
-				
+
 		auto ResultPermissions = co_await fp_SetupPermissions().f_Wrap();
 
 		if (!ResultPermissions)
@@ -96,11 +96,11 @@ namespace NMib::NCloud::NSecretsManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_SetupPermissions()
 	{
 		TCSet<CStr> Permissions;
-		
+
 		Permissions["SecretsManager/CommandAll"];
 
 		Permissions["SecretsManager/Command/EnumerateSecrets"];
@@ -129,9 +129,9 @@ namespace NMib::NCloud::NSecretsManager
 			Permissions[fg_Format("SecretsManager/Read/SemanticID/{}/*", mp_SemanticIDs.fs_GetKey(pSemanticID))];
 			Permissions[fg_Format("SecretsManager/Write/SemanticID/{}/*", mp_SemanticIDs.fs_GetKey(pSemanticID))];
 		}
-		
+
 		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);
-		
+
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("SecretsManager/*");
 
@@ -139,25 +139,29 @@ namespace NMib::NCloud::NSecretsManager
 
 		mp_Permissions.f_OnPermissionsAdded
 			(
-				[this](CPermissionIdentifiers const &_Identity, TCMap<CStr, CPermissionRequirements> const &_AddedPermissions)
+				g_ActorFunctorWeak / [this](CPermissionIdentifiers _Identity, TCMap<CStr, CPermissionRequirements> _AddedPermissions) -> TCFuture<void>
 				{
-					fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+					co_await fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+
+					co_return {};
 				}
 			)
 		;
 
 		mp_Permissions.f_OnPermissionsRemoved
 			(
-				[this](CPermissionIdentifiers const &_Identity, TCSet<CStr> const &_RemovedPermissions)
+				g_ActorFunctorWeak / [this](CPermissionIdentifiers _Identity, TCSet<CStr> _RemovedPermissions) -> TCFuture<void>
 				{
-					fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+					co_await fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+
+					co_return {};
 				}
 			)
 		;
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::fp_Destroy()
 	{
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Debug, "Destroying protocol, uploads and downloads");
@@ -167,7 +171,7 @@ namespace NMib::NCloud::NSecretsManager
 		TCFutureVector<void> Results;
 
 		mp_ProtocolInterface.m_Publication.f_Destroy() > Results;
-		
+
 		for (auto &Upload : mp_Uploads)
 			Upload.f_Destroy() > Results;
 		for (auto &Download : mp_Downloads)
@@ -296,13 +300,13 @@ namespace NMib::NCloud::NSecretsManager
 			}
 		}
 	}
-	
+
 	void CSecretsManagerDaemonActor::CServer::fp_UpdateTags(TCSet<CStrSecure> const &_TagsToRemove,TCSet<CStrSecure> const &_TagsToAdd)
 	{
 		// Filter out tags in both sets to avoid unnecessary permission registrations
 		TCSet<CStr> InBoth;
 		fg_SetIntersection(_TagsToRemove.f_GetIterator(), _TagsToAdd.f_GetIterator(), InBoth);
-		
+
 		for (auto const &Tag : _TagsToRemove)
 		{
 			if (InBoth.f_FindEqual(Tag))

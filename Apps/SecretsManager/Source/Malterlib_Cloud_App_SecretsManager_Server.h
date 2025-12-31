@@ -147,7 +147,7 @@ namespace NMib::NCloud::NSecretsManager
 #endif
 
 		TCFuture<void> fp_SendSubscriptionInitial(CStr _SubscriptionID);
-		void fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity);
+		TCFuture<void> fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers _Identity);
 		void fp_SecretUpdated(CSecretPropertiesInternal const &_SecretProperties, bool _bRemoved);
 		bool fp_SecretMatchesSubscription(CChangeSubscription const &_Subscription, CSecretPropertiesInternal const &_SecretProperties);
 

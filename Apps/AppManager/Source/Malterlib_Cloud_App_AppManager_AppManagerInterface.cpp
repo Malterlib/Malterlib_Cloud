@@ -11,12 +11,12 @@ namespace NMib::NCloud::NAppManager
 	{
 		return mp_AppManagerInterface.f_Publish<CAppManagerInterface>(mp_State.m_DistributionManager, this);
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_RegisterPermissions()
 	{
 		TCSet<CStr> Permissions;
 		Permissions["AppManager/VersionAppAll"];
-		
+
 		Permissions["AppManager/CommandAll"];
 		Permissions["AppManager/Command/VersionEnum"];
 		Permissions["AppManager/Command/ApplicationEnum"];
@@ -31,7 +31,7 @@ namespace NMib::NCloud::NAppManager
 		Permissions["AppManager/Command/ApplicationSubscribeChanges"];
 
 		Permissions["AppManager/AppAll"];
-		
+
 		for (auto &pApplication : mp_Applications)
 		{
 			auto &Application = *pApplication;
@@ -40,41 +40,59 @@ namespace NMib::NCloud::NAppManager
 
 		co_return co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_RegisterApplicationPermissions(TCSharedPointer<CApplication> _pApplication)
 	{
 		auto Permissions = fg_CreateSet<CStr>(fg_Format("AppManager/App/{}", _pApplication->m_Name));
 		co_return co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UnregisterApplicationPermissions(TCSharedPointer<CApplication> _pApplication)
 	{
 		auto Permissions = fg_CreateSet<CStr>(fg_Format("AppManager/App/{}", _pApplication->m_Name));
 		co_return co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions));
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_SubscribePermissions()
 	{
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("AppManager/*");
 
 		mp_Permissions = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_SubscribeToPermissions, SubscribePermissions, fg_ThisActor(this));
-		auto fPermisionChanged = [=, this](CPermissionIdentifiers const &_Identifiers, auto const &_Permissions)
-			{
-				for (auto &PermissionRequirements : _Permissions)
+		mp_Permissions.f_OnPermissionsAdded
+			(
+				g_ActorFunctorWeak / [=, this](CPermissionIdentifiers _Identifiers, NContainer::TCMap<NStr::CStr, CPermissionRequirements> _Permissions) -> TCFuture<void>
 				{
-					auto &Permission = _Permissions.fs_GetKey(PermissionRequirements);
-
-					if (Permission == "AppManager/Command/ApplicationSubscribeChanges" || Permission == "AppManager/CommandAll" || Permission.f_StartsWith("AppManager/App"))
+					for (auto &Permission : _Permissions.f_Keys())
 					{
-						fp_ChangeNotifications_PermissionsChanged() > fg_LogError("CloudManager", "Failed to update change notification due to permission change");
-						break;
+						if (Permission == "AppManager/Command/ApplicationSubscribeChanges" || Permission == "AppManager/CommandAll" || Permission.f_StartsWith("AppManager/App"))
+						{
+							co_await fp_ChangeNotifications_PermissionsChanged().f_Wrap() > fg_LogError("CloudManager", "Failed to update change notification due to permission change");
+							break;
+						}
 					}
+
+					co_return {};
 				}
-			}
+			)
 		;
-		mp_Permissions.f_OnPermissionsAdded(fPermisionChanged);
-		mp_Permissions.f_OnPermissionsRemoved(fPermisionChanged);
+		mp_Permissions.f_OnPermissionsRemoved
+			(
+				g_ActorFunctorWeak / [=, this](CPermissionIdentifiers _Identifiers, NContainer::TCSet<NStr::CStr> _Permissions) -> TCFuture<void>
+				{
+					for (auto &Permission : _Permissions)
+					{
+						if (Permission == "AppManager/Command/ApplicationSubscribeChanges" || Permission == "AppManager/CommandAll" || Permission.f_StartsWith("AppManager/App"))
+						{
+							co_await fp_ChangeNotifications_PermissionsChanged().f_Wrap() > fg_LogError("CloudManager", "Failed to update change notification due to permission change");
+							break;
+						}
+					}
+
+					co_return {};
+				}
+			)
+		;
 
 		co_return {};
 	}

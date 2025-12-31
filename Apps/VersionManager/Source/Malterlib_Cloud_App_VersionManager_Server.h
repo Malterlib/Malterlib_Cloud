@@ -152,7 +152,7 @@ namespace NMib::NCloud::NVersionManager
 		void fp_NotifyUploadsEmpty();
 
 		TCFuture<void> fp_SendSubscriptionInitial(CStr _Application, CSubscription const *_pSubscription);
-		void fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers const &_Identity);
+		TCFuture<void> fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers _Identity);
 
 		TCFuture<TCSet<CStr>> fp_FilterApplicationsByPermissions(CStr _Description, TCSet<CStr> _Applications);
 		TCSet<CStr> fp_ApplicationSet();

@@ -93,18 +93,22 @@ namespace NMib::NCloud::NVersionManager
 
 		mp_Permissions.f_OnPermissionsAdded
 			(
-				[this](CPermissionIdentifiers const &_Identity, TCMap<CStr, CPermissionRequirements> const &_AddedPermissions)
+				g_ActorFunctorWeak / [this](CPermissionIdentifiers _Identity, TCMap<CStr, CPermissionRequirements> _AddedPermissions) -> TCFuture<void>
 				{
-					fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+					co_await fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+
+					co_return {};
 				}
 			)
 		;
 
 		mp_Permissions.f_OnPermissionsRemoved
 			(
-				[this](CPermissionIdentifiers const &_Identity, TCSet<CStr> const &_RemovedPermissions)
+				g_ActorFunctorWeak / [this](CPermissionIdentifiers _Identity, TCSet<CStr> _RemovedPermissions) -> TCFuture<void>
 				{
-					fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+					co_await fp_UpdateSubscriptionsForChangedPermissions(_Identity);
+
+					co_return {};
 				}
 			)
 		;
