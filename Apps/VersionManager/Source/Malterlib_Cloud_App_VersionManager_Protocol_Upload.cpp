@@ -209,6 +209,109 @@ namespace NMib::NCloud::NVersionManager
 
 		auto Desc = pUpload->m_Desc;
 
+		auto fFinishUpload =
+			[
+				pThis
+				, UploadID
+				, ApplicationName
+				, VersionID
+				, VersionInfo
+				, VersionPath
+				, Desc
+				, Auditor
+				, pParams
+				, InProgressSubscription = fg_Move(InProgressSubscription)
+				, UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)
+			]
+			(TCFuture<CFileTransferResult> _ReceiveFilesFuture) mutable -> TCFuture<void>
+			{
+				auto ReceiveResult = co_await fg_Move(_ReceiveFilesFuture).f_Wrap();
+
+				if (!ReceiveResult)
+					Auditor.f_Error(fg_Format("'{}' Failed to transfer version (upload): {}", Desc, ReceiveResult.f_GetExceptionStr()));
+				else
+				{
+					auto &Result = *ReceiveResult;
+					CStr Message;
+					Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
+
+					Auditor.f_Info
+						(
+							fg_Format
+							(
+								"'{}' Version upload finished transferring: {}"
+								, Desc
+								, Message
+							)
+						)
+					;
+				}
+
+				auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
+				if (!pUpload)
+					co_return DMibErrorInstance("Upload aborted");
+
+				auto FileTransferReceive = fg_Move(pUpload->m_FileTransferReceive);
+
+				pThis->mp_VersionUploads.f_Remove(UploadID);
+
+				if (FileTransferReceive)
+					co_await fg_Move(FileTransferReceive).f_Destroy().f_Wrap() > fg_LogError("VersionManager/Upload", "Failed to destroy file transfer receive");
+
+				if (!ReceiveResult)
+				{
+					CStr Error = ReceiveResult.f_GetExceptionStr();
+					if (Error == "Failed to generate current manifest: Directory already exists")
+						co_return Auditor.f_Exception("Version already exists");
+					else
+						co_return Auditor.f_Exception("Failed to receive files. See Version Manager log.");
+				}
+
+				auto InfoWriteResult = co_await pThis->fp_SaveVersionInfo(VersionPath, VersionInfo).f_Wrap();
+				if (!InfoWriteResult)
+				{
+					Auditor.f_Error(fg_Format("'{}' Failed to write version info file: {}", Desc, InfoWriteResult.f_GetExceptionStr()));
+#if DMibConfig_Tests_Enable
+					co_return DMibErrorInstance("Failed to save version info: {}"_f << InfoWriteResult.f_GetExceptionStr());
+#else
+					co_return DMibErrorInstance("Failed to save version info");
+#endif
+				}
+
+				auto ApplicationMapped = pThis->mp_Applications(ApplicationName);
+				auto &Application = *ApplicationMapped;
+
+				if (ApplicationMapped.f_WasCreated())
+				{
+					TCSet<CStr> Permissions;
+					{
+						Permissions[fg_Format("Application/Read/{}", ApplicationName)];
+						Permissions[fg_Format("Application/Write/{}", ApplicationName)];
+					}
+					pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions)
+						> fg_LogError("VersionManager/Upload", "Falied to register permissions")
+					;
+				}
+
+				VersionInfo.m_nFiles  = InfoWriteResult->m_nFiles;
+				VersionInfo.m_nBytes = InfoWriteResult->m_nBytes;
+
+				auto &Version = Application.m_Versions[VersionID];
+				if (Version.m_TimeLink.f_IsInTree())
+					Application.m_VersionsByTime.f_Remove(Version);
+				Version.m_VersionInfo = VersionInfo;
+				Application.m_VersionsByTime.f_Insert(Version);
+
+				// Save to database for fast startup next time
+				co_await pThis->fp_SaveVersionToDatabase(ApplicationName, VersionID, VersionInfo).f_Wrap() > fg_LogWarning("VersionManager", "Failed to save version to database");
+				co_await pThis->fp_NewVersion(ApplicationName, Version.f_GetIdentifier(), Version.m_VersionInfo, fg_RandomID());
+
+				co_return {};
+			}
+		;
+
+		TCFuture<void> FinishedFuture;
+
 		if (ProtocolVersion >= CVersionManager::EProtocolVersion_AsyncGeneratorFileTransfer)
 		{
 			if (!pParams->m_FilesGenerator || !pParams->m_FilesGenerator->f_IsValid())
@@ -224,174 +327,9 @@ namespace NMib::NCloud::NVersionManager
 				.f_Call()
 			;
 
-			TCSharedPointer<TCPromise<void>> pFinishedPromise = fg_Construct();
-
-			CVersionManager::CStartUploadVersion::CResult StartUploadResult;
-
-			StartUploadResult.m_DeniedTags = DeniedTags;
-			StartUploadResult.m_fFinish = g_ActorFunctor
-				(
-					g_ActorSubscription / [pThis, UploadID, Desc, Auditor]() -> TCFuture<void>
-					{
-						auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
-						if (!pUpload)
-							co_return {};
-
-						TCFutureVector<void> DestroyResults;
-
-						if (pUpload->m_FileTransferReceive)
-							fg_Move(pUpload->m_FileTransferReceive).f_Destroy() > DestroyResults;
-
-						if (pUpload->m_DownloadSubscription)
-							fg_Exchange(pUpload->m_DownloadSubscription, nullptr)->f_Destroy() > DestroyResults;
-
-						if (pThis->mp_VersionUploads.f_Remove(UploadID))
-							Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
-
-						co_await fg_AllDone(DestroyResults).f_Wrap() > fg_LogWarning("VersionUpload", "Failed to destroy finish start upload subscription");
-
-						co_return {};
-					}
-				)
-				/ [Future = COptionalFuture{pFinishedPromise->f_Future()}, AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
-				{
-					return fg_Move(Future.m_Future);
-				}
-			;
+			FinishedFuture = pThis->self.f_Invoke(fg_Move(fFinishUpload), fg_Move(ReceiveFilesFuture));
 
 			pCleanup->f_Clear();
-
-			fg_Move(ReceiveFilesFuture)
-				>
-				[
-					pThis
-					, UploadID
-					, ApplicationName
-					, VersionID
-					, VersionInfo
-					, VersionPath
-					, Desc
-					, Auditor
-					, pParams
-					, pFinishedPromise
-					, InProgressSubscription = fg_Move(InProgressSubscription)
-					, UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)
-				]
-				(TCAsyncResult<CFileTransferResult> &&_Result) mutable
-				{
-					if (!_Result)
-						Auditor.f_Error(fg_Format("'{}' Failed to transfer version (upload): {}", Desc, _Result.f_GetExceptionStr()));
-					else
-					{
-						auto &Result = *_Result;
-						CStr Message;
-						Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
-
-						Auditor.f_Info
-							(
-								fg_Format
-								(
-									"'{}' Version upload finished transferring: {}"
-									, Desc
-									, Message
-								)
-							)
-						;
-					}
-
-					auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
-					if (!pUpload)
-					{
-						pFinishedPromise->f_SetException(DMibErrorInstance("Upload aborted"));
-						return;
-					}
-
-					if (pUpload->m_FileTransferReceive)
-						fg_Move(pUpload->m_FileTransferReceive).f_Destroy().f_DiscardResult();
-
-					pThis->mp_VersionUploads.f_Remove(UploadID);
-
-					if (!_Result)
-					{
-						CStr Error = _Result.f_GetExceptionStr();
-						if (Error == "Failed to generate current manifest: Directory already exists")
-							pFinishedPromise->f_SetException(Auditor.f_Exception("Version already exists"));
-						else
-							pFinishedPromise->f_SetException(Auditor.f_Exception("Failed to receive files. See Version Manager log."));
-
-						return;
-					}
-
-					pThis->fp_SaveVersionInfo(VersionPath, VersionInfo)
-						>
-						[
-							pThis
-							, UploadID
-							, VersionID
-							, VersionInfo
-							, Desc
-							, ApplicationName
-							, Auditor
-							, pParams
-							, pFinishedPromise
-							, InProgressSubscription = fg_Move(InProgressSubscription)
-							, UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)
-						]
-						(TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
-						{
-							if (!_InfoWriteResult)
-							{
-	#if DMibConfig_Tests_Enable
-								pFinishedPromise->f_SetException(DMibErrorInstance("Failed to save version info: {}"_f << _InfoWriteResult.f_GetExceptionStr()));
-	#else
-								pFinishedPromise->f_SetException(DMibErrorInstance("Failed to save version info"));
-	#endif
-								Auditor.f_Error(fg_Format("'{}' Failed to write version info file: {}", Desc, _InfoWriteResult.f_GetExceptionStr()));
-								return;
-							}
-
-							auto ApplicationMapped = pThis->mp_Applications(ApplicationName);
-							auto &Application = *ApplicationMapped;
-
-							if (ApplicationMapped.f_WasCreated())
-							{
-								TCSet<CStr> Permissions;
-								{
-									Permissions[fg_Format("Application/Read/{}", ApplicationName)];
-									Permissions[fg_Format("Application/Write/{}", ApplicationName)];
-								}
-								pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions).f_DiscardResult();
-							}
-
-							VersionInfo.m_nFiles  = _InfoWriteResult->m_nFiles;
-							VersionInfo.m_nBytes = _InfoWriteResult->m_nBytes;
-
-							auto &Version = Application.m_Versions[VersionID];
-							if (Version.m_TimeLink.f_IsInTree())
-								Application.m_VersionsByTime.f_Remove(Version);
-							Version.m_VersionInfo = VersionInfo;
-							Application.m_VersionsByTime.f_Insert(Version);
-
-							// Save to database for fast startup next time
-							pThis->fp_SaveVersionToDatabase(ApplicationName, VersionID, VersionInfo)
-								> [pFinishedPromise, InProgressSubscription = fg_Move(InProgressSubscription), UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)]
-								(TCAsyncResult<void> &&_SaveResult) mutable
-								{
-									if (!_SaveResult)
-										_SaveResult > fg_LogWarning("VersionManager", "Failed to save version to database");
-									pFinishedPromise->f_SetResult();
-									InProgressSubscription.f_Clear();
-								}
-							;
-
-							pThis->fp_NewVersion(ApplicationName, Version);
-						}
-					;
-				}
-			;
-
-			Auditor.f_Info(fg_Format("'{}' Starting upload of version", Desc));
-			co_return fg_Move(StartUploadResult);
 		}
 		else
 		{
@@ -409,179 +347,57 @@ namespace NMib::NCloud::NVersionManager
 					co_return Auditor.f_Exception("Failed to receive files. See Version Manager log.");
 			}
 
-			TCSharedPointer<TCPromise<void>> pFinishedPromise = fg_Construct();
-
 			CVersionManager::CStartUploadTransferDeprecated StartTransfer;
 			StartTransfer.m_TransferContextDeprecated = fg_Move(*FileTransferContext);
-			CVersionManager::CStartUploadVersion::CResult StartUploadResult;
+
+			auto Result = co_await (*pParams->m_fStartTransferDeprecated)(fg_Move(StartTransfer)).f_Wrap();
+			if (!Result)
 			{
-				auto Result = co_await (*pParams->m_fStartTransferDeprecated)(fg_Move(StartTransfer)).f_Wrap();
-				if (!Result)
-				{
-					CStr Error = Auditor.f_Error({"Failed to start transfer. See Version Manager log.", fg_Format("'{}': {}", Desc, Result.f_GetExceptionStr())});
-					co_return DMibErrorInstance(Error);
-				}
-
-				pUpload->m_DownloadSubscription = fg_Move(Result->m_Subscription);
-				StartUploadResult.m_DeniedTags = DeniedTags;
-				StartUploadResult.m_fFinish = g_ActorFunctor
-					(
-						g_ActorSubscription / [pThis, UploadID, Desc, Auditor]() -> TCFuture<void>
-						{
-							auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
-							if (!pUpload)
-								co_return {};
-
-							TCFutureVector<void> DestroyResults;
-
-							if (pUpload->m_FileTransferReceive)
-								fg_Move(pUpload->m_FileTransferReceive).f_Destroy() > DestroyResults;
-
-							if (pUpload->m_DownloadSubscription)
-								fg_Exchange(pUpload->m_DownloadSubscription, nullptr)->f_Destroy() > DestroyResults;
-
-							if (pThis->mp_VersionUploads.f_Remove(UploadID))
-								Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
-
-							co_await fg_AllDone(DestroyResults).f_Wrap() > fg_LogWarning("VersionUpload", "Failed to destroy finish start upload subscription");
-
-							co_return {};
-						}
-					)
-					/ [Future = COptionalFuture{pFinishedPromise->f_Future()}, AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
-					{
-						return fg_Move(Future.m_Future);
-					}
-				;
-				pCleanup->f_Clear();
+				CStr Error = Auditor.f_Error({"Failed to start transfer. See Version Manager log.", fg_Format("'{}': {}", Desc, Result.f_GetExceptionStr())});
+				co_return DMibErrorInstance(Error);
 			}
 
-			pUpload->m_FileTransferReceive(&CFileTransferReceive::f_GetResultDeprecated)
-				>
-				[
-					pThis
-					, UploadID
-					, ApplicationName
-					, VersionID
-					, VersionInfo
-					, VersionPath
-					, Desc
-					, Auditor
-					, pParams
-					, pFinishedPromise
-					, InProgressSubscription = fg_Move(InProgressSubscription)
-					, UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)
-				]
-				(TCAsyncResult<CFileTransferResult> &&_Result) mutable
+			pUpload->m_DownloadSubscription = fg_Move(Result->m_Subscription);
+
+			FinishedFuture = pThis->self.f_Invoke(fg_Move(fFinishUpload), pUpload->m_FileTransferReceive(&CFileTransferReceive::f_GetResultDeprecated).f_Call());
+
+			pCleanup->f_Clear();
+		}
+
+		CVersionManager::CStartUploadVersion::CResult StartUploadResult;
+
+		StartUploadResult.m_DeniedTags = DeniedTags;
+		StartUploadResult.m_fFinish = g_ActorFunctor
+			(
+				g_ActorSubscription / [pThis, UploadID, Desc, Auditor]() -> TCFuture<void>
 				{
-					if (!_Result)
-						Auditor.f_Error(fg_Format("'{}' Failed to transfer version (upload): {}", Desc, _Result.f_GetExceptionStr()));
-					else
-					{
-						auto &Result = *_Result;
-						CStr Message;
-						Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
-
-						Auditor.f_Info
-							(
-								fg_Format
-								(
-									"'{}' Version upload finished transferring: {}"
-									, Desc
-									, Message
-								)
-							)
-						;
-					}
-
 					auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
 					if (!pUpload)
-					{
-						pFinishedPromise->f_SetException(DMibErrorInstance("Upload aborted"));
-						return;
-					}
+						co_return {};
+
+					TCFutureVector<void> DestroyResults;
 
 					if (pUpload->m_FileTransferReceive)
-						fg_Move(pUpload->m_FileTransferReceive).f_Destroy().f_DiscardResult();
+						fg_Move(pUpload->m_FileTransferReceive).f_Destroy() > DestroyResults;
 
-					pThis->mp_VersionUploads.f_Remove(UploadID);
+					if (pUpload->m_DownloadSubscription)
+						fg_Exchange(pUpload->m_DownloadSubscription, nullptr)->f_Destroy() > DestroyResults;
 
-					if (!_Result)
-					{
-						pFinishedPromise->f_SetException(DMibErrorInstance("Upload file transfer failed"));
-						return;
-					}
+					if (pThis->mp_VersionUploads.f_Remove(UploadID))
+						Auditor.f_Error(fg_Format("'{}' Aborted upload of version", Desc));
 
-					pThis->fp_SaveVersionInfo(VersionPath, VersionInfo)
-						>
-						[
-							pThis
-							, UploadID
-							, VersionID
-							, VersionInfo
-							, Desc
-							, ApplicationName
-							, Auditor
-							, pParams
-							, pFinishedPromise
-							, InProgressSubscription = fg_Move(InProgressSubscription)
-							, UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)
-						]
-						(TCAsyncResult<CSizeInfo> &&_InfoWriteResult) mutable
-						{
-							if (!_InfoWriteResult)
-							{
-	#if DMibConfig_Tests_Enable
-								pFinishedPromise->f_SetException(DMibErrorInstance("Failed to save version info: {}"_f << _InfoWriteResult.f_GetExceptionStr()));
-	#else
-								pFinishedPromise->f_SetException(DMibErrorInstance("Failed to save version info"));
-	#endif
-								Auditor.f_Error(fg_Format("'{}' Failed to write version info file: {}", Desc, _InfoWriteResult.f_GetExceptionStr()));
-								return;
-							}
+					co_await fg_AllDone(DestroyResults).f_Wrap() > fg_LogWarning("VersionUpload", "Failed to destroy finish start upload subscription");
 
-							auto ApplicationMapped = pThis->mp_Applications(ApplicationName);
-							auto &Application = *ApplicationMapped;
-
-							if (ApplicationMapped.f_WasCreated())
-							{
-								TCSet<CStr> Permissions;
-								{
-									Permissions[fg_Format("Application/Read/{}", ApplicationName)];
-									Permissions[fg_Format("Application/Write/{}", ApplicationName)];
-								}
-								pThis->mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions).f_DiscardResult();
-							}
-
-							VersionInfo.m_nFiles  = _InfoWriteResult->m_nFiles;
-							VersionInfo.m_nBytes = _InfoWriteResult->m_nBytes;
-
-							auto &Version = Application.m_Versions[VersionID];
-							if (Version.m_TimeLink.f_IsInTree())
-								Application.m_VersionsByTime.f_Remove(Version);
-							Version.m_VersionInfo = VersionInfo;
-							Application.m_VersionsByTime.f_Insert(Version);
-
-							// Save to database for fast startup next time
-							pThis->fp_SaveVersionToDatabase(ApplicationName, VersionID, VersionInfo)
-								> [pFinishedPromise, InProgressSubscription = fg_Move(InProgressSubscription), UploadSequenceSubscription = fg_Move(UploadSequenceSubscription)]
-								(TCAsyncResult<void> &&_SaveResult) mutable
-								{
-									if (!_SaveResult)
-										_SaveResult > fg_LogWarning("VersionManager", "Failed to save version to database");
-									pFinishedPromise->f_SetResult();
-									InProgressSubscription.f_Clear();
-								}
-							;
-
-							pThis->fp_NewVersion(ApplicationName, Version);
-						}
-					;
+					co_return {};
 				}
-			;
+			)
+			/ [Future = COptionalFuture{fg_Move(FinishedFuture)}, AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
+			{
+				return fg_Move(Future.m_Future);
+			}
+		;
 
-			Auditor.f_Info(fg_Format("'{}' Starting upload of version", Desc));
-			co_return fg_Move(StartUploadResult);
-		}
+		Auditor.f_Info(fg_Format("'{}' Starting upload of version", Desc));
+		co_return fg_Move(StartUploadResult);
 	}
 }

@@ -100,6 +100,31 @@ namespace NMib::NCloud
 		;
 	}
 
+	TCFuture<CProcessLaunchActor::CSimpleLaunchResult> CAppManagerTestHelper::f_LaunchSimple
+		(
+			NStr::CStr _Executable
+			, NContainer::TCVector<NStr::CStr> _Params
+			, NStr::CStr _WorkingDir
+		)
+	{
+		auto &State = *m_pState;
+
+		if (State.m_Options & EOption_EnableOtherOutput)
+			_Params.f_Insert("--log-to-stderr");
+
+		auto SimpleLaunch = CProcessLaunchActor::CSimpleLaunch(_Executable, _Params, _WorkingDir, CProcessLaunchActor::ESimpleLaunchFlag_None);
+
+		if (State.m_Options & EOption_EnableOtherOutput)
+			SimpleLaunch.m_ToLog |= CProcessLaunchActor::ELogFlag_OtherError | CProcessLaunchActor::ELogFlag_StdErr | CProcessLaunchActor::ELogFlag_Info;
+
+		co_return
+			(
+				co_await CProcessLaunchActor::fs_LaunchSimple(fg_Move(SimpleLaunch))
+				.f_Timeout(State.m_Timeout, "Timed out waiting for tool launch: {} {vs}"_f << _Executable << _Params)
+			)
+		;
+	}
+
 	TCFuture<void> CAppManagerTestHelper::f_Destroy()
 	{
 		auto &State = *m_pState;
@@ -812,10 +837,13 @@ namespace NMib::NCloud
 		DMibTestMark;
 		co_await f_SetupTrust().f_Timeout(State.m_Timeout, "Timed out waiting for setup trust");
 		DMibTestMark;
-		for (auto &AppManager : co_await State.m_Subscriptions->f_SubscribeMultipleAsync<CAppManagerInterface>(_nAppManagers))
+		if (_nAppManagers)
 		{
-			auto HostID = AppManager->f_GetHostInfo().m_RealHostID;
-			State.m_AppManagerInfos[HostID].m_Interface = fg_Move(AppManager);
+			for (auto &AppManager : co_await State.m_Subscriptions->f_SubscribeMultipleAsync<CAppManagerInterface>(_nAppManagers))
+			{
+				auto HostID = AppManager->f_GetHostInfo().m_RealHostID;
+				State.m_AppManagerInfos[HostID].m_Interface = fg_Move(AppManager);
+			}
 		}
 
 		DMibTestMark;

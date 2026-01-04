@@ -68,7 +68,7 @@ namespace NMib::NCloud::NSecretsManager
 						}
 					)
 				;
-				
+
 				auto HasPermissions = co_await mp_Permissions.f_HasPermissions("Send updated secrets in SecretsManager", Permissions, pSubscription->m_CallingHostInfo)
 					.f_Timeout(60.0, "Timed out checking permissions for sending secret changes").f_Wrap()
 				;

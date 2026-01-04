@@ -12,6 +12,8 @@
 #include <Mib/Daemon/Daemon>
 #include <Mib/Database/DatabaseActor>
 
+#include "Malterlib_Cloud_App_VersionManager_Sync.h"
+
 namespace NMib::NCloud::NVersionManager
 {
 	struct CVersionManagerDaemonActor::CServer : public CActor
@@ -110,8 +112,6 @@ namespace NMib::NCloud::NVersionManager
 			TCSet<CStr> m_Platforms;
 			TCSet<CStr> m_Tags;
 			TCActorFunctor<NConcurrency::TCFuture<CVersionManager::CNewVersionNotifications::CResult> (CVersionManager::CNewVersionNotifications _VersionInfo)> m_fOnNewVersions;
-
-			void f_SendVersions(CVersionManager::CNewVersionNotifications const &_NewVersionNotification) const;
 		};
 
 		struct CSizeInfo
@@ -158,10 +158,80 @@ namespace NMib::NCloud::NVersionManager
 		TCSet<CStr> fp_ApplicationSet();
 		TCFuture<CFilteredTagsResult> fp_FilterTags(CStr _HostID, TCSet<CStr> _TagsAdded, TCSet<CStr> _TagsRemoved);
 		void fp_NewTagsKnown(TCSet<CStr> const &_Tags);
-		void fp_NewVersion(CStr const &_ApplicationName, CVersion const &_Version);
+		TCFuture<void> fp_NewVersion(CStr _ApplicationName, CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _VersionInfo, CStr _OriginID);
 		TCFuture<CSizeInfo> fp_SaveVersionInfo(CStr _VersionPath, CVersionManager::CVersionInformation _VersionInfo);
 		bool fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version);
 		CSubscription const *fp_GetSubscription(CStr const &_ApplicationName, CStr const &_SubscriptionID) const;
+
+		// Sync types
+		struct CMatchingConfig
+		{
+			CStr m_Name;
+			CSyncSourceConfig const *m_pConfig;
+		};
+
+		// Sync lifecycle
+		TCFuture<void> fp_SyncInit();
+		TCFuture<void> fp_SyncDestroy();
+
+		// Sync sensor functions
+		TCFuture<void> fp_SyncRegisterSensors();
+		TCFuture<void> fp_SyncUpdateSensorStatus(CStr _ConfigName);
+		TCFuture<void> fp_SyncSetHostError(CStr _ConfigName, CStr _HostID, CStr _ErrorMessage);
+		TCFuture<void> fp_SyncClearHostError(CStr _ConfigName, CStr _HostID);
+
+		// Sync callbacks
+		TCFuture<void> fp_SyncOnVersionManagerAdded(TCDistributedActor<CVersionManager> _Manager, CTrustedActorInfo _Info);
+		TCFuture<void> fp_SyncOnVersionManagerRemoved(TCWeakDistributedActor<CActor> _Manager, CTrustedActorInfo _Info);
+		TCFuture<void> fp_SyncOnNewVersions(CStr _HostID, TCWeakDistributedActor<CVersionManager> _Manager, CVersionManager::CNewVersionNotifications _Notifications);
+
+		// Sync operations
+		TCVector<CMatchingConfig> fp_SyncGetMatchingConfigs
+			(
+				CStr const &_HostID
+				, CVersionManager::CNewVersionNotification const &_Notification
+				, TCMap<CStr, TCSet<CSyncVersionKey>> const &_DateBypassByConfig
+			)
+		;
+		TCFuture<void> fp_SyncProcessVersion
+			(
+				CStr _HostID
+				, TCDistributedActor<CVersionManager> _SourceManager
+				, CVersionManager::CNewVersionNotification _Notification
+				, TCVector<CMatchingConfig> _MatchingConfigs
+				, CStr _OriginID
+			)
+		;
+		TCFuture<void> fp_SyncDownloadAndStoreVersion
+			(
+				CStr _SyncSourceName
+				, CSyncSourceConfig _Config
+				, TCDistributedActor<CVersionManager> _SourceManager
+				, CStr _Application
+				, CVersionManager::CVersionIDAndPlatform _VersionID
+				, CVersionManager::CVersionInformation _VersionInfo
+				, TCSet<CStr> _CombinedTags
+				, bool _bSyncRetrySequence
+				, CStr _OriginID
+			)
+		;
+		TCFuture<void> fp_SyncUpdateLocalTags
+			(
+				CStr _Application
+				, CVersionManager::CVersionIDAndPlatform _VersionID
+				, TCSet<CStr> _TransformedTags
+				, bool _bSyncRetrySequence
+				, uint32 _RemoteRetrySequence
+				, CStr _OriginID
+			)
+		;
+
+		// Sync helpers
+		static bool fs_SyncMatchesFilter(CStr const &_Value, TCVector<CStr> const &_Filters);
+		static bool fs_SyncMatchesTagFilter(TCSet<CStr> const &_Tags, TCVector<CStr> const &_Filters);
+		static bool fs_SyncNotificationMatchesConfigFilters(CVersionManager::CNewVersionNotification const &_Notification, CSyncSourceConfig const &_Config);
+		static TCSet<CStr> fs_SyncGetConfigOwnedTags(TCMap<CStr, CStr> const &_CopyTagMappings);
+		static TCSet<CStr> fs_SyncGetPresentTags(TCSet<CStr> const &_SourceTags, TCMap<CStr, CStr> const &_CopyTagMappings);
 
 		constexpr static uint32 mcp_MaxQueueSize = NFile::gc_IdealNetworkQueueSize;
 
@@ -191,5 +261,11 @@ namespace NMib::NCloud::NVersionManager
 		TCVector<TCPromise<void>> mp_UploadsEmptyWaiters;
 		mint mp_nInProgressUploads = 0;
 		bool mp_bRefreshInProgress = false;
+
+		// Sync configuration and state
+		TCMap<CStr, CSyncSourceState> mp_SyncSources;
+		TCMap<CStr, CSyncHostSubscription> mp_SyncHostSubscriptions; // Keyed by host ID
+		TCMap<CSyncVersionKey, CSyncVersionState> mp_SyncVersionStates;
+		TCTrustedActorSubscription<CVersionManager> mp_SyncVersionManagerSubscription;
 	};
 }

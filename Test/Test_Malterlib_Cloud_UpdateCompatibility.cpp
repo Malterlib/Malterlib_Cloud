@@ -1000,14 +1000,31 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		;
 
-		auto fTagApp = [&](CStr const &_Name, CVersionManagerHelper::CPackageInfo const &_PackageInfo, TCSet<CStr> const &_Tags)
+		auto fTagApp = [&](CStr _Name, CVersionManagerHelper::CPackageInfo _PackageInfo, TCSet<CStr> _Tags) -> TCUnsafeFuture<void>
 			{
-				DMibLogWithCategory(Test, Info, "Tag App ({})", _Name);
-				CVersionManager::CChangeTags ChangeTags;
-				ChangeTags.m_AddTags = _Tags;
-				ChangeTags.m_Application = _Name;
-				ChangeTags.m_VersionID = _PackageInfo.m_VersionID.m_VersionID;
-				VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				for (mint i = 0; i < 3; ++i)
+				{
+					DMibLogWithCategory(Test, Info, "Tag App ({})", _Name);
+					CVersionManager::CChangeTags ChangeTags;
+					ChangeTags.m_AddTags = _Tags;
+					ChangeTags.m_Application = _Name;
+					ChangeTags.m_VersionID = _PackageInfo.m_VersionID.m_VersionID;
+
+					auto Result = co_await VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags))
+						.f_Timeout(g_Timeout, "Timed out tagging app")
+						.f_Wrap()
+					;
+
+					if (Result)
+						co_return {};
+
+					if (i == 2)
+						co_return Result.f_GetException(); // Throw the last exception
+
+					DMibLogWithCategory(Test, Info, "Tag App ({}) failed, resubscribing...", _Name);
+					VersionManager = co_await Subscriptions.f_SubscribeFromHostAsync<CVersionManager>(VersionManagerHostID);
+				}
+				co_return {};
 			}
 		;
 
@@ -1183,14 +1200,14 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 0");
-					fTagApp("KeyManager", KeyManagerPackageInfo, {"TestTag"});
+					fTagApp("KeyManager", KeyManagerPackageInfo, {"TestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					fWaitForAppVersion(AppManager_KeyManager, "KeyManager", KeyManagerPackageInfo, {"Launched"});
 					fProvideKeyManagerPasswordIfNeeded();
 				}
 
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 1");
-					fTagApp("VersionManager", VersionManagerPackageInfo, {"VersionManagerTestTag"});
+					fTagApp("VersionManager", VersionManagerPackageInfo, {"VersionManagerTestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					fWaitForAppVersion(AppManager_VersionManager, "VersionManager", VersionManagerPackageInfo, {"Launched"});
 				}
 
@@ -1200,7 +1217,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				}
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 3");
-					fTagApp("AppManager", AppManagerPackageInfo, {"VersionManagerTestTag"});
+					fTagApp("AppManager", AppManagerPackageInfo, {"VersionManagerTestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					fResubscribeAppManager(AppManager_VersionManager);
 				}
 				{
@@ -1213,14 +1230,14 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				// Update app manager manager
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 5");
-					fTagApp("AppManager", AppManagerPackageInfo, {"AppManagerTestTag"});
+					fTagApp("AppManager", AppManagerPackageInfo, {"AppManagerTestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					fWaitForAppVersion(AppManager_AppManager, "AppManager", AppManagerPackageInfo, {"Launched", "No exe", "No executable"});
 				}
 
 				// Update rest
 				{
 					DMibLogWithCategory(Test, Info, "UpdateApps 6");
-					fTagApp("AppManager", AppManagerPackageInfo, {"TestTag"});
+					fTagApp("AppManager", AppManagerPackageInfo, {"TestTag"}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					fResubscribeAppManager(AppManager_AppManager);
 					fResubscribeAppManager(AppManager_KeyManager);
 				}
@@ -1235,21 +1252,21 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fTagAllAppManager = [&]
 			{
-				fTagApp("AppManager", AppManagerPackageInfo, {"VersionManagerTestTag", "AppManagerTestTag", "TestTag"});
+				return fTagApp("AppManager", AppManagerPackageInfo, {"VersionManagerTestTag", "AppManagerTestTag", "TestTag"});
 			}
 		;
 		auto fTagAllVersionManager = [&]
 			{
-				fTagApp("VersionManager", VersionManagerPackageInfo, {"VersionManagerTestTag", "TestTag"});
+				return fTagApp("VersionManager", VersionManagerPackageInfo, {"VersionManagerTestTag", "TestTag"});
 			}
 		;
 		auto fTagAllKeyManager = [&]
 			{
-				fTagApp("KeyManager", KeyManagerPackageInfo, {"TestTag"});
+				return fTagApp("KeyManager", KeyManagerPackageInfo, {"TestTag"});
 			}
 		;
 
-		auto fUpdateAppsSimultaneous = [&](TCVector<TCFunction<void ()>> &&_DoTags)
+		auto fUpdateAppsSimultaneous = [&](TCVector<TCFunction<TCUnsafeFuture<void> ()>> &&_DoTags)
 			{
 				DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous");
 
@@ -1269,8 +1286,10 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				{
 					DMibLogWithCategory(Test, Info, "UpdateAppsSimultaneous 1");
+					TCFutureVector<void> TagFutures;
 					for (auto &fTag : _DoTags)
-						fTag();
+						fTag() > TagFutures;
+					fg_AllDone(TagFutures).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 					fResubscribeAppManager(AppManager_AppManager);
 					fResubscribeAppManager(AppManager_KeyManager);

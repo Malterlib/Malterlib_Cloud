@@ -861,4 +861,4 @@ public:
 	}
 };
 
-DMibTestRegister(CVersionManager_Refresh_Tests, Malterlib::Cloud::VersionManager);
+DMibTestRegister(CVersionManager_Refresh_Tests, Malterlib::Cloud);

@@ -437,7 +437,9 @@ namespace NMib::NCloud::NVersionManager
 
 		mp_KnownTags = fg_Move(WorkResult.m_KnownTags);
 
+		TCFutureVector<void> NotificationResults;
 		// Step 7: Send notifications for added/updated versions
+		CStr OriginID = fg_RandomID();
 		for (auto &[AppName, VersionID] : WorkResult.m_AddedOrUpdated)
 		{
 			auto *pApplication = mp_Applications.f_FindEqual(AppName);
@@ -446,8 +448,10 @@ namespace NMib::NCloud::NVersionManager
 			auto *pVersion = pApplication->m_Versions.f_FindEqual(VersionID);
 			if (!pVersion)
 				continue;
-			fp_NewVersion(AppName, *pVersion);
+			fp_NewVersion(AppName, pVersion->f_GetIdentifier(), pVersion->m_VersionInfo, OriginID) > NotificationResults;
 		}
+
+		co_await fg_AllDone(NotificationResults);
 
 		RefreshResult.m_nAdded = WorkResult.m_nAdded;
 		RefreshResult.m_nUpdated = WorkResult.m_nUpdated;

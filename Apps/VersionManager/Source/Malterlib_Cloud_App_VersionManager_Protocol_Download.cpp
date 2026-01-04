@@ -28,7 +28,7 @@ namespace NMib::NCloud::NVersionManager
 
 		auto CallingHostInfo = fg_GetCallingHostInfo();
 		uint32 ProtocolVersion = CallingHostInfo.f_GetProtocolVersion();
-		
+
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		auto Auditor = pThis->mp_AppState.f_Auditor({}, CallingHostInfo);
@@ -47,7 +47,7 @@ namespace NMib::NCloud::NVersionManager
 
 		TCSharedPointer<CStartDownloadVersion> pParams = fg_Construct(fg_Move(_Params));
 
-		NContainer::TCVector<NStr::CStr> Permissions = {"Application/ReadAll", "Application/Read/{}"_f << _Params.m_Application};
+		NContainer::TCVector<NStr::CStr> Permissions = {"Application/ReadAll", "Application/Read/{}"_f << pParams->m_Application};
 
 		bool bHasPermission = co_await
 			(

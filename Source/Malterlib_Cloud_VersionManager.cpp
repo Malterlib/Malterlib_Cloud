@@ -429,6 +429,8 @@ namespace NMib::NCloud
 	{
 		_Stream % m_bFullResend;
 		_Stream % m_NewVersions;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportOriginID)
+			_Stream % m_OriginID;
 	}
 	
 	// CSubscribeToUpdates

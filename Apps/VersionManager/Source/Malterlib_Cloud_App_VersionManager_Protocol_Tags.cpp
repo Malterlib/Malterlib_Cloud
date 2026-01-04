@@ -86,11 +86,11 @@ namespace NMib::NCloud::NVersionManager
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ChangeTags(CChangeTags _Params) -> TCFuture<CChangeTags::CResult>
 	{
 		auto pThis = m_pThis;
-		
+
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		
+
 		if (!CVersionManager::fs_IsValidApplicationName(_Params.m_Application))
 			co_return Auditor.f_Exception({"Invalid application format", "(change tags)"});
 
@@ -129,24 +129,34 @@ namespace NMib::NCloud::NVersionManager
 		if (!pApplication)
 			co_return Auditor.f_Exception(fg_Format("No such application: {}", _Params.m_Application));
 
-		TCFutureVector<CSizeInfo> VersionResults;
 		TCFutureVector<void> DatabaseResults;
 
-		auto fTagVersion = [&](CVersion &_Version)
+		CStr OriginID = fg_RandomID();
+		auto fTagVersion = [&](CVersion &_Version) -> TCUnsafeFuture<CSizeInfo>
 			{
-				CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
-				CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, _Params.m_Application, _Version.f_GetIdentifier().f_EncodeFileName());
-
 				_Version.m_VersionInfo.m_Tags -= RemoveTags;
 				_Version.m_VersionInfo.m_Tags += AddTags;
 				if (_Params.m_bIncreaseRetrySequence)
 					++_Version.m_VersionInfo.m_RetrySequence;
 
-				pThis->fp_NewVersion(_Params.m_Application, _Version);
-				pThis->fp_SaveVersionInfo(VersionPath, _Version.m_VersionInfo) > VersionResults;
-				pThis->fp_SaveVersionToDatabase(_Params.m_Application, _Version.f_GetIdentifier(), _Version.m_VersionInfo) > DatabaseResults;
+				// Store variables in co-routine frame, lambda capture goes out of scope
+				CStr ApplicationDirectory = "{}/Applications"_f << pThis->mp_AppState.m_RootDirectory;
+				CStr VersionPath = "{}/{}/{}"_f << ApplicationDirectory << _Params.m_Application << _Version.f_GetIdentifier().f_EncodeFileName();
+				auto OriginIDCopy = OriginID;
+				auto Application = _Params.m_Application;
+				auto VersionInfo = _Version.m_VersionInfo;
+				auto VersionID = _Version.f_GetIdentifier();
+				auto pLocalThis = pThis;
+
+				auto SizeInfo = co_await pLocalThis->fp_SaveVersionInfo(VersionPath, VersionInfo);
+				co_await pLocalThis->fp_SaveVersionToDatabase(Application, VersionID, VersionInfo);
+				co_await pLocalThis->fp_NewVersion(Application, VersionID, VersionInfo, OriginIDCopy);
+
+				co_return SizeInfo;
 			}
 		;
+
+		TCFutureVector<CSizeInfo> VersionResults;
 
 		if (!_Params.m_Platform.f_IsEmpty())
 		{
@@ -156,7 +166,7 @@ namespace NMib::NCloud::NVersionManager
 			auto *pVersion = pApplication->m_Versions.f_FindEqual(VersionIDAndPlatform);
 			if (!pVersion)
 				co_return Auditor.f_Exception(fg_Format("No such version: {}", VersionIDAndPlatform));
-			fTagVersion(*pVersion);
+			fTagVersion(*pVersion) > VersionResults;
 		}
 		else
 		{
@@ -166,17 +176,13 @@ namespace NMib::NCloud::NVersionManager
 			{
 				if (iVersion.f_GetKey().m_VersionID != _Params.m_VersionID)
 					break;
-				fTagVersion(*iVersion);
+				fTagVersion(*iVersion) > VersionResults;
 			}
 		}
 
 		auto Results = co_await fg_AllDoneWrapped(VersionResults).f_Wrap();
 		if (!Results)
 			co_return Auditor.f_Exception({"Failed to save version infos. See Version Manager log.", fg_Format("Error: {}", Results.f_GetExceptionStr())});
-
-		auto DbResults = co_await fg_AllDoneWrapped(DatabaseResults).f_Wrap();
-		if (!DbResults)
-			Auditor.f_Warning(fg_Format("Failed to save version infos to database: {}", DbResults.f_GetExceptionStr()));
 
 		bool bFailed = false;
 		mint nVersions = 0;
@@ -189,15 +195,6 @@ namespace NMib::NCloud::NVersionManager
 			}
 			else
 				++nVersions;
-		}
-
-		if (DbResults)
-		{
-			for (auto &DbResult : *DbResults)
-			{
-				if (!DbResult)
-					Auditor.f_Warning(fg_Format("Failed to save version to database: {}", DbResult.f_GetExceptionStr()));
-			}
 		}
 
 		Auditor.f_Info

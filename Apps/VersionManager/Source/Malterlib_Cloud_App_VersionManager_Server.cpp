@@ -41,6 +41,7 @@ namespace NMib::NCloud::NVersionManager
 		co_await fp_FindVersions();
 		co_await fp_SetupPermissions();
 		co_await fp_Publish();
+		co_await fp_SyncInit();
 
 		co_return {};
 	}
@@ -119,6 +120,9 @@ namespace NMib::NCloud::NVersionManager
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_Destroy()
 	{
 		CLogError LogError("Malterlib/Cloud/VersionManager");
+
+		co_await fp_SyncDestroy().f_Wrap() > LogError.f_Warning("Failed to destroy sync");
+
 		{
 			TCFutureVector<void> DestroyResults;
 

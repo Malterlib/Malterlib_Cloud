@@ -97,6 +97,14 @@ namespace NMib::NCloud
 			)
 		;
 
+		TCFuture<CProcessLaunchActor::CSimpleLaunchResult> f_LaunchSimple
+			(
+				NStr::CStr _Executable
+				, NContainer::TCVector<NStr::CStr> _Params
+				, NStr::CStr _WorkingDir = {}
+			)
+		;
+
 		static auto constexpr mc_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 
 		struct CState

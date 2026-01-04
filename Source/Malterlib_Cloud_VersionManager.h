@@ -33,7 +33,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_RenamePlatforms = 0x108
 			, EProtocolVersion_AsyncGeneratorFileTransfer = 0x109
 			, EProtocolVersion_SupportSymlinks = 0x110
-			, EProtocolVersion_Current = 0x110
+			, EProtocolVersion_SupportOriginID = 0x111
+			, EProtocolVersion_Current = 0x111
 		};
 
 		struct CVersionID : public CCloudVersion
@@ -244,9 +245,13 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			bool m_bFullResend = false;
 			NContainer::TCVector<CNewVersionNotification> m_NewVersions;
+			// Origin ID tracks the source of a notification chain to detect sync loops.
+			// When a manager receives a notification with an origin ID it has already
+			// processed for this version, it indicates a loop in the sync configuration.
+			NStr::CStr m_OriginID;
 		};
 		
 		struct CSubscribeToUpdates
