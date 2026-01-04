@@ -49,7 +49,7 @@ namespace NMib::NCloud
 		};
 
 		CStr m_BasePath;
-		TCPromise<CFileTransferResult> m_DonePromise;
+		TCOptional<TCPromise<CFileTransferResult>> m_DonePromise;
 		TCSharedPointer<CFileCache> m_pFileCache = fg_Construct();
 		CSequencer m_WriteSequencer{"File transfer receive"};
 		EFileAttrib m_AttributeMask = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute | EFileAttrib_UnixAttributesValid;
@@ -90,6 +90,7 @@ namespace NMib::NCloud
 		if (Internal.m_bCalled)
 			co_return DMibErrorInstance("The file transfer context has already been gotten");
 		Internal.m_bCalled = true;
+		Internal.m_DonePromise = TCPromise<CFileTransferResult>();
 
 		CFileTransferContextDeprecated::CInternal::CManifest Manifest;
 		{
@@ -164,13 +165,13 @@ namespace NMib::NCloud
 				CFileTransferContextDeprecated::CInternal::CStateChange::CResult Result = _StateChange.f_GetResult();
 				auto &Internal = *mp_pInternal;
 
-				if (Internal.m_DonePromise.f_IsSet())
+				if (Internal.m_DonePromise->f_IsSet())
 					co_return fg_Move(Result);
 
 				if (_StateChange.m_State == CFileTransferContextDeprecated::CInternal::EState_Error)
-					Internal.m_DonePromise.f_SetException(DMibErrorInstance(_StateChange.m_Error));
+					Internal.m_DonePromise->f_SetException(DMibErrorInstance(_StateChange.m_Error));
 				else if (_StateChange.m_State == CFileTransferContextDeprecated::CInternal::EState_Finished)
-					Internal.m_DonePromise.f_SetResult(_StateChange.m_Finished);
+					Internal.m_DonePromise->f_SetResult(_StateChange.m_Finished);
 
 				co_return fg_Move(Result);
 			}
@@ -580,7 +581,7 @@ namespace NMib::NCloud
 
 		Internal.m_bDoneCalled = true;
 
-		co_return co_await Internal.m_DonePromise.f_Future();
+		co_return co_await Internal.m_DonePromise->f_Future();
 	}
 
 	NConcurrency::TCFuture<NConcurrency::CActorSubscription> CFileTransferReceive::f_GetAbortSubscription()
@@ -600,10 +601,13 @@ namespace NMib::NCloud
 					co_return {};
 				}
 
-				if (Internal.m_DonePromise.f_IsSet())
-					co_return {};
+				if (Internal.m_DonePromise)
+				{
+					if (Internal.m_DonePromise->f_IsSet())
+						co_return {};
 
-				Internal.m_DonePromise.f_SetException(DMibErrorInstance("Remote disconnected or aborted"));
+					Internal.m_DonePromise->f_SetException(DMibErrorInstance("Remote disconnected or aborted"));
+				}
 
 				co_return {};
 			}
