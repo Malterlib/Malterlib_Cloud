@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -37,14 +37,14 @@ namespace NMib::NCloud
 		: m_pThis(_pThis)
 		, m_Config(fg_Move(_Config))
 	{
-		
+
 	}
-		
+
 	CKeyManagerServer::CKeyManagerServer(CKeyManagerServerConfig &&_Config)
 		: mp_pInternal(fg_Construct(this, fg_Move(_Config)))
 	{
 	}
-	
+
 	CKeyManagerServer::~CKeyManagerServer()
 	{
 	}

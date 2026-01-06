@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Concurrency/ActorSequencerActor>
@@ -27,14 +27,14 @@ namespace NMib::NCloud
 			)
 			, m_Path(_Path)
 		{
-			
+
 		}
-		
+
 		~CInternal()
 		{
-			
+
 		}
-		
+
 		NConcurrency::TCFuture<void> f_Initialize()
 		{
 			auto SequenceSubscription = co_await m_Sequencer.f_Sequence();
@@ -97,7 +97,7 @@ namespace NMib::NCloud
 				)
 			;
 		}
-		
+
 		NConcurrency::TCFuture<CDatabase> f_ReadDatabase()
 		{
 			auto SequenceSubscription = co_await m_Sequencer.f_Sequence();
@@ -125,7 +125,7 @@ namespace NMib::NCloud
 				)
 			;
 		}
-		
+
 		NStorage::TCSharedPointer<NCryptography::CEncryptAES> m_pAESContext;
 		NStr::CStr const m_Path;
 		static constexpr ch8 const *mc_pPlainTextCheck = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEF";
@@ -138,7 +138,7 @@ namespace NMib::NCloud
 			Stream.f_FeedBytes(mc_pPlainTextCheck, 32);
 			Stream << _Database;
 			NStream::fg_PadAlignStream(Stream, 32);
-			
+
 			NContainer::CSecureByteVector RawDatabase = Stream.f_MoveVector();
 			NContainer::CByteVector EncryptedDatabase;
 			_pAESContext->f_Encrypt(RawDatabase.f_GetArray(), RawDatabase.f_GetLen(), EncryptedDatabase.f_GetArray(RawDatabase.f_GetLen()));
@@ -155,7 +155,7 @@ namespace NMib::NCloud
 			NFile::CFile::fs_AtomicReplaceFile(_Path + ".tmp", _Path);
 		}
 	};
-	
+
 	CKeyManagerServerDatabase_EncryptedFile::CKeyManagerServerDatabase_EncryptedFile
 		(
 			NStr::CStr const &_Path
@@ -164,12 +164,12 @@ namespace NMib::NCloud
 		)
 		: mp_pInternal(fg_Construct(_Path, _Password, _Salt))
 	{
-		
+
 	}
-	
+
 	CKeyManagerServerDatabase_EncryptedFile::~CKeyManagerServerDatabase_EncryptedFile()
 	{
-		
+
 	}
 
 	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::fp_Destroy()
@@ -195,7 +195,7 @@ namespace NMib::NCloud
 	{
 		return mp_pInternal->f_WriteDatabase(fg_Move(_Database));
 	}
-	
+
 	NConcurrency::TCFuture<ICKeyManagerServerDatabase::CDatabase> CKeyManagerServerDatabase_EncryptedFile::f_ReadDatabase()
 	{
 		return mp_pInternal->f_ReadDatabase();

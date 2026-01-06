@@ -498,7 +498,7 @@ public:
 			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove0.m_AvailableKeys), ==, ExpectedAvailableKeys);
 			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove1.m_AvailableKeys), ==, ExpectedAvailableKeys);
 		}
-		
+
 		{
 			DMibTestPath("Remove all empty");
 			co_await KeyManagerServer0(&CKeyManagerServer::f_RemovePreCreatedKeys, fg_Default()).f_Timeout(g_Timeout, "Timeout");
@@ -511,7 +511,7 @@ public:
 			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove0.m_AvailableKeys), ==, ExpectedAvailableKeys);
 			DMibExpect(fs_CountAvailableKeys(DatabaseAfterPreRemove1.m_AvailableKeys), ==, ExpectedAvailableKeys);
 		}
-		
+
 		co_await fg_Move(KeyManagerServer1).f_Destroy();
 
 		co_await KeyManagerServer0(&CKeyManagerServer::f_RemoveVerifiedHosts, TCSet<CStr>{ServerHostID1}).f_Timeout(g_Timeout, "Timeout");
@@ -612,7 +612,7 @@ public:
 			;
 
 			auto Database0 = co_await DatabaseActor0(&ICKeyManagerServerDatabase::f_ReadDatabase).f_Timeout(g_Timeout, "Timeout");
-			
+
 			DMibExpect(fs_CountAvailableKeys(Database0.m_AvailableKeys), ==, 2);
 			DMibAssert(Database0.m_Clients.f_GetLen(), ==, 1);
 			DMibAssert(Database0.m_Clients.f_FindAny()->m_Keys.f_GetLen(), ==, 1);
@@ -689,7 +689,7 @@ public:
 			TCSharedPointer<CTestState> pTestState = fg_Construct(RootDirectory);
 			auto AsyncDestroy0 = co_await fg_AsyncDestroy(pTestState);
 			co_await pTestState->f_Init();
-			
+
 			CStrSecure Password = "Password";
 
 			if (CFile::fs_FileExists(DatabasePath))

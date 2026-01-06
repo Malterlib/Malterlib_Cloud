@@ -142,7 +142,7 @@ namespace NMib::NCloud
 	{
 		if (_HostIDs.f_IsEmpty())
 			co_return {};
-		
+
 		TCFutureVector<NContainer::TCSet<NStr::CStr>> ReportResults;
 
 		for (auto &OtherKeyManager : m_OtherKeyManagers)
@@ -801,7 +801,7 @@ namespace NMib::NCloud
 
 		if (!ForwardVerified.f_IsEmpty())
 			co_await Internal.f_ForwardVerifiedHosts(ForwardVerified);
-		
+
 		co_return {};
 	}
 

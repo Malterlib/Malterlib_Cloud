@@ -15,7 +15,7 @@ namespace NMib::NCloud::NDebugManagerClient
 
 		CStr BindIP = fg_GetSys()->f_GetEnvironmentVariable("BIND_IP_MALTERLIB", fg_GetSys()->f_GetEnvironmentVariable("BIND_IP", "127.0.0.1"));
 		DMibLog(Info, "BindIP: {}", BindIP);
-		
+
 		uint16 Port = fg_GetSys()->f_GetEnvironmentVariable("PORT", "8080").f_ToInt(uint16(8080));
 		uint32 PortConcurrency = fg_GetSys()->f_GetEnvironmentVariable("PORT_CONCURRENCY", "1").f_ToInt(uint32(1));
 

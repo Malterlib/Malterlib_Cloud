@@ -19,7 +19,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				, "Manages distribution of malterlib cloud applications to third party app stores and directory structures."
 			)
 		;
-		
+
 		auto DistributionManagement = o_CommandLine.f_AddSection("Distribution Management", "Commands to manage AppDistributionManager distributions");
 
 		auto AddOption_Tags = "Tags?"_o=
@@ -151,7 +151,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				}
 			)
 		;
-		
+
 		DistributionManagement.f_RegisterCommand
 			(
 				{

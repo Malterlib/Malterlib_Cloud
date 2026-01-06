@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -261,32 +261,32 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CBackupManager::f_StartDownloadBackup);
 		DMibPublishActorFunction(CBackupManager::f_DownloadBackup);
 	}
-	
+
 	auto CBackupManager::f_StartBackup(CStartBackup _Params) -> NConcurrency::TCFuture<CStartBackup::CResult>
 	{
 		co_return DMibErrorInstance("Deprecated");
 	}
-	
+
 	auto CBackupManager::f_StopBackup(CStopBackup _Params) -> NConcurrency::TCFuture<CStopBackup::CResult>
 	{
 		co_return DMibErrorInstance("Deprecated");
 	}
-	
+
 	auto CBackupManager::f_UploadData(CUploadData _Params) -> NConcurrency::TCFuture<CUploadData::CResult>
 	{
 		co_return DMibErrorInstance("Deprecated");
 	}
-	
+
 	auto CBackupManager::f_StartDownloadBackup(CStartDownloadBackup _Params) -> NConcurrency::TCFuture<CStartDownloadBackup::CResult>
 	{
 		co_return DMibErrorInstance("Deprecated");
 	}
-	
+
 	bool CBackupManager::fs_IsValidHostname(NStr::CStr const &_String)
 	{
 		return NNetwork::fg_IsValidHostname(_String);
 	}
-	
+
 	bool CBackupManager::fs_IsValidBackupSource(NStr::CStr const &_String, NStr::CStr *o_pFriendlyName, NStr::CStr *o_pHostID)
 	{
 		NStr::CStr FriendlyName;
@@ -304,9 +304,9 @@ namespace NMib::NCloud
 		if (!fs_IsValidHostname(HostID))
 			return false;
 		if (o_pFriendlyName)
-			*o_pFriendlyName = FriendlyName; 
+			*o_pFriendlyName = FriendlyName;
 		if (o_pHostID)
-			*o_pHostID = HostID; 
+			*o_pHostID = HostID;
 		return true;
 	}
 
@@ -380,9 +380,9 @@ namespace NMib::NCloud
 			if (nCharsParsed != _String.f_GetLen() || nParsed != 8)
 				return false;
 		}
-		if 
+		if
 			(
-				!Year.f_IsNumeric() 
+				!Year.f_IsNumeric()
 				|| !Month.f_IsNumeric()
 				|| !Day.f_IsNumeric()
 				|| !Hour.f_IsNumeric()
@@ -395,7 +395,7 @@ namespace NMib::NCloud
 		}
 		if (!fs_IsValidHostname(BackupID))
 			return false;
-		
+
 		if (o_pBackupID)
 			*o_pBackupID = BackupID;
 		if (o_pTime)
@@ -413,7 +413,7 @@ namespace NMib::NCloud
 			;
 		}
 		return true;
-	}	
+	}
 
 	bool CBackupManager::fs_IsValidProtocolVersion(uint32 _Version)
 	{
@@ -423,7 +423,7 @@ namespace NMib::NCloud
 	void CBackupManager::CBackupInfo::f_Format(NStr::CStrAggregate &o_Str) const
 	{
 		using namespace NStr;
-		
+
 		o_Str += "{tc5} -> {tc5}"_f << m_Earliest << m_Latest;
 	}
 
@@ -442,9 +442,9 @@ namespace NMib::NCloud
 		_Stream % m_ID;
 	}
 	DMibDistributedStreamImplement(CBackupManager::CBackupID);
-	
+
 	// CStartBackup
-	
+
 	template <typename tf_CStream>
 	void CBackupManager::CStartBackup::CResult::f_Stream(tf_CStream &_Stream)
 	{
@@ -460,14 +460,14 @@ namespace NMib::NCloud
 	{
 		DMibRequire(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % m_BackupKey;
-		
+
 		if (_Stream.f_GetVersion() >= 0x105)
 			_Stream % m_Version;
 	}
 	DMibDistributedStreamImplement(CBackupManager::CStartBackup);
 
 	// CStopBackup
-	
+
 	template <typename tf_CStream>
 	void CBackupManager::CStopBackup::CResult::f_Stream(tf_CStream &_Stream)
 	{
@@ -484,7 +484,7 @@ namespace NMib::NCloud
 	DMibDistributedStreamImplement(CBackupManager::CStopBackup);
 
 	// CUploadData
-	
+
 	template <typename tf_CStream>
 	void CBackupManager::CUploadData::CResult::f_Stream(tf_CStream &_Stream)
 	{
@@ -504,7 +504,7 @@ namespace NMib::NCloud
 		_Stream % m_Data;
 	}
 	DMibDistributedStreamImplement(CBackupManager::CUploadData);
-	
+
 	// CInitBackup
 
 	template <typename tf_CStream>
@@ -560,7 +560,7 @@ namespace NMib::NCloud
 		_Stream % *m_TransferContextDeprecated;
 	}
 	DMibDistributedStreamImplement(CBackupManager::CStartDownloadBackup);
-	
+
 	NStr::CStr CBackupManager::CStartDownloadBackup::f_GetDesc() const
 	{
 		return fg_Format
@@ -571,7 +571,7 @@ namespace NMib::NCloud
 			)
 		;
 	}
-	
+
 	template <typename tf_CStream>
 	void CBackupManager::CStartDownloadBackup::CResult::f_Stream(tf_CStream &_Stream)
 	{

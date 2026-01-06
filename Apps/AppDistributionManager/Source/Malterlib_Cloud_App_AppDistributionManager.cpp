@@ -46,9 +46,9 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CAppDistributionManagerActor::fp_StopApp()
-	{	
+	{
 		CLogError LogError("Mib/Cloud/AppDistributionManager");
 
 		TCFutureVector<void> DistributionDestroys;

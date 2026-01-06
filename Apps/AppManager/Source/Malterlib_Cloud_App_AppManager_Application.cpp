@@ -95,7 +95,7 @@ namespace NMib::NCloud::NAppManager
 
 		return false;
 	}
-	
+
 	TCFuture<void> CAppManagerActor::CApplication::f_InProgressWait()
 	{
 		if (m_bOperationInProgress)
@@ -327,7 +327,7 @@ namespace NMib::NCloud::NAppManager
 							}
 							else
 								StopResult.f_SetException(DMibErrorInstance("Application no longer running, cannot stop"));
-								
+
 							if (!StopResult)
 								DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application: {}", StopResult.f_GetExceptionStr());
 							else

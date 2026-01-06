@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -23,7 +23,7 @@ namespace NMib::NCloud
 	struct CSecretsManager : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/SecretsManager";
-		
+
 		CSecretsManager();
 
 		enum : uint32
@@ -39,7 +39,7 @@ namespace NMib::NCloud
 
 			, EProtocolVersion_Current = 0x107
 		};
-		
+
 		enum ESecretType : int32
 		{
 			ESecretType_NotSet
@@ -49,16 +49,16 @@ namespace NMib::NCloud
 			, ESecretType_StringMap
 			, ESecretType_BinaryMap
 		};
-		
+
 		struct CSecretID
 		{
 			auto operator <=> (CSecretID const &_Right) const = default;
 
 			operator NStr::CStr() const;
-			
+
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
 
@@ -67,7 +67,7 @@ namespace NMib::NCloud
 			NStr::CStr m_Folder;
 			NStr::CStr m_Name;
 		};
-		
+
 		struct CSecretFile
 		{
 			bool operator == (CSecretFile const &_Right) const;
@@ -77,7 +77,7 @@ namespace NMib::NCloud
 
 			NFile::CDirectoryManifestFile m_Manifest;
 		};
-		
+
 		struct CSecret : public NStorage::TCStreamableVariant
 			<
 				ESecretType
@@ -112,7 +112,7 @@ namespace NMib::NCloud
 				: CSuper(fg_Forward<tfp_CParam>(p_Params)...)
 			{
 			}
-			
+
 			CSuper &operator *();
 			CSuper const &operator *() const;
 			bool operator == (CSecret const &_Right) const;

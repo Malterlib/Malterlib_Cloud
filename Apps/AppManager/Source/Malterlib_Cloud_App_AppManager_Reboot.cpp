@@ -48,7 +48,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					CStr ProgramDir = CFile::fs_GetProgramDirectory();
 					CStr ProgramPath = CFile::fs_GetProgramPath();
-					
+
 					CProcessLaunchParams Params;
 					Params.m_bAllowExecutableLocate = true;
 					Params.m_WorkingDirectory = ProgramDir;

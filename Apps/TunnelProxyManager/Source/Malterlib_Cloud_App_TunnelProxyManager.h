@@ -13,12 +13,12 @@
 namespace NMib::NCloud::NTunnelProxyManager
 {
 	struct CTunnelProxyManagerServer;
-	
+
 	struct CTunnelProxyManagerApp : public CDistributedAppActor
 	{
 		CTunnelProxyManagerApp();
 		~CTunnelProxyManagerApp();
-		
+
 	private:
 		struct CPublication
 		{

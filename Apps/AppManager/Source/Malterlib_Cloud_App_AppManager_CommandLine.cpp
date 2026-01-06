@@ -15,7 +15,7 @@ namespace NMib::NCloud::NAppManager
 		o_CommandLine.f_SetProgramDescription
 			(
 				"Malterlib Cloud App Manager"
-				, "Manages malterlib cloud applications by providing services such as encryption at rest and automatic updates." 
+				, "Manages malterlib cloud applications by providing services such as encryption at rest and automatic updates."
 			)
 		;
 
@@ -250,7 +250,7 @@ namespace NMib::NCloud::NAppManager
 				"Example: '{\"Logs/*.tmp\": [\"Append\"]}'\n"
 			}
 		;
-		
+
 		auto SettingsOption_BackupNewBackupIntervalHours = "BackupNewBackupIntervalHours?"_o=
 			{
 				"Names"_o= _o["--backup-new-backup-interval"]
@@ -400,7 +400,7 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_o= true
 							, "Description"_o= "Get settings from version info of the downloaded application."
 						}
-						, SettingsOption_Dependencies 
+						, SettingsOption_Dependencies
 						, SettingsOption_StopOnDependencyFailure
 						, SettingsOption_Executable
 						, "ExecutableParameters?"_o=
@@ -418,11 +418,11 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_RunAsUserHasShell
 						, SettingsOption_LaunchInProcess
 						, SettingsOption_DistributedApp
-						, SettingsOption_BackupEnabled 
-						, SettingsOption_BackupIncludeWildcards 
-						, SettingsOption_BackupExcludeWildcards 
-						, SettingsOption_BackupAddSyncFlagsWildcards 
-						, SettingsOption_BackupRemoveSyncFlagsWildcards 
+						, SettingsOption_BackupEnabled
+						, SettingsOption_BackupIncludeWildcards
+						, SettingsOption_BackupExcludeWildcards
+						, SettingsOption_BackupAddSyncFlagsWildcards
+						, SettingsOption_BackupRemoveSyncFlagsWildcards
 						, SettingsOption_BackupNewBackupIntervalHours
 						, AddOption_AutoUpdate
 						, AddOption_UpdateTags
@@ -566,7 +566,7 @@ namespace NMib::NCloud::NAppManager
 							,"Type"_o= ""
 							, "Description"_o= "Unique name of the application to change settings for."
 						}
-						, SettingsOption_Dependencies 
+						, SettingsOption_Dependencies
 						, SettingsOption_StopOnDependencyFailure
 						, SettingsOption_Executable
 						, "ExecutableParameters?"_o=
@@ -574,7 +574,7 @@ namespace NMib::NCloud::NAppManager
 							"Names"_o= _o["--executable-parameters"]
 							, "Type"_o= _o[""]
 							, "Description"_o= "Run the application with these executable parameters."
-						}				
+						}
 						, SettingsOption_RunAsUser
 #ifdef DPlatformFamily_Windows
 						, SettingsOption_RunAsUserPassword
@@ -583,11 +583,11 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_RunAsUserHasShell
 						, SettingsOption_LaunchInProcess
 						, SettingsOption_DistributedApp
-						, SettingsOption_BackupEnabled 
-						, SettingsOption_BackupIncludeWildcards 
-						, SettingsOption_BackupExcludeWildcards 
-						, SettingsOption_BackupAddSyncFlagsWildcards 
-						, SettingsOption_BackupRemoveSyncFlagsWildcards 
+						, SettingsOption_BackupEnabled
+						, SettingsOption_BackupIncludeWildcards
+						, SettingsOption_BackupExcludeWildcards
+						, SettingsOption_BackupAddSyncFlagsWildcards
+						, SettingsOption_BackupRemoveSyncFlagsWildcards
 						, SettingsOption_BackupNewBackupIntervalHours
 						, "AutoUpdate?"_o=
 						{
@@ -613,19 +613,19 @@ namespace NMib::NCloud::NAppManager
 							"Names"_o= _o["--version-manager-application"]
 							, "Type"_o= ""
 							, "Description"_o= "Get updates from the version manager application with this name."
-						}				
+						}
 						, "UpdateFromVersionInfo?"_o=
 						{
 							"Names"_o= _o["--update-from-version-info"]
 							, "Default"_o= false
 							, "Description"_o= "Update settings from the last installed version manager application info."
-						}				
+						}
 						, "Force?"_o=
 						{
 							"Names"_o= _o["--force"]
 							, "Default"_o= false
 							, "Description"_o= "Force running the update process even if no settings are changed."
-						}				
+						}
 						, "UpdateScript_PreUpdate?"_o=
 						{
 							"Names"_o= _o["--update-script-pre-update"]
@@ -665,7 +665,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		
+
 		ApplicationManagement.f_RegisterCommand
 			(
 				{

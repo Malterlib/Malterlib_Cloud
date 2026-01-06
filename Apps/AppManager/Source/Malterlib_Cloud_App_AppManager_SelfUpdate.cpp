@@ -30,7 +30,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					CStr ProgramDir = CFile::fs_GetProgramDirectory();
 					CStr ProgramPath = CFile::fs_GetProgramPath();
-					
+
 					CFile::CFindFilesOptions FindFilesOptions(SourceDir / "*", true);
 					FindFilesOptions.m_AttribMask = EFileAttrib_File;
 					FindFilesOptions.m_ExcludePatterns = {SourceDir / "TempVersion", SourceDir / "TempVersionDownload", SourceDir / ".tmp", SourceDir / ".home"};

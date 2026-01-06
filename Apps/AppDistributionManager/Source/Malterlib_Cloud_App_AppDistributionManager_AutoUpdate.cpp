@@ -286,7 +286,7 @@ namespace NMib::NCloud::NAppDistributionManager
 	{
 		if (mp_State.m_bStoppingApp)
 			return;
-			
+
 		for (auto &Distribution : mp_Distributions)
 		{
 			CStr const &DistributionName = Distribution.f_GetName();

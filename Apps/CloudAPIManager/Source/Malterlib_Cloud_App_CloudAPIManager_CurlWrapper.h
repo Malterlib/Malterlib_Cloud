@@ -17,22 +17,22 @@ namespace NMib::NCloud::NCloudAPIManager
 		, ECurlMethod_PUT
 		, ECurlMethod_DELETE
 	};
-	
+
 	struct CState
 	{
 		CByteVector m_Headers;
 		CByteVector m_Body;
 	};
-	
+
 	struct CCurlResult
 	{
 		CCurlResult(CState const &_State);
-		
+
 		uint32 m_StatusCode;
 		CStr m_StatusMessage;
 		TCMap<CStr, CStr> m_Headers;
 		CStr m_Body;
 	};
-	
+
 	CCurlResult fg_Curl(ECurlMethod _Method, CStr const &_URL, TCMap<CStr, CStr> const &_Headers, CStr const &_Data);
 }

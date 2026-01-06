@@ -13,7 +13,7 @@ namespace NMib::NCloud::NSecretsManager
 		: CDistributedAppActor(CDistributedAppActor_Settings{"SecretsManager"})
 	{
 	}
-	
+
 	CSecretsManagerDaemonActor::~CSecretsManagerDaemonActor()
 	{
 	}
@@ -24,18 +24,18 @@ namespace NMib::NCloud::NSecretsManager
 		co_await mp_pServerController(&CServerController::f_Init);
 		co_return {};
 	}
-	
+
 	TCFuture<void> CSecretsManagerDaemonActor::fp_StopApp()
-	{	
+	{
 		if (mp_pServerController)
 		{
 			DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Shutting down server");
-			
+
 			auto Result = co_await fg_TempCopy(mp_pServerController).f_Destroy().f_Wrap();
 			if (!Result)
 				DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to shut down server: {}", Result.f_GetExceptionStr());
 		}
-		
+
 		co_return {};
 	}
 

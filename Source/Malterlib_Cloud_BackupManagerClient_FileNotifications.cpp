@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -14,7 +14,7 @@ namespace NMib::NCloud
 	{
 		return CFileChangeNotificationActor::CCoalesceSettings{5, m_Config.m_ChangeAggregationTime};
 	}
-	
+
 	TCFuture<void> CBackupManagerClient::CInternal::f_RetrySubscribeChanges()
 	{
 		if (m_pThis->f_IsDestroyed())
@@ -29,28 +29,28 @@ namespace NMib::NCloud
 			co_await m_SubscribeChangesPromises.f_Insert().f_Future();
 			co_return co_await f_RetrySubscribeChanges();
 		}
-		
+
 		DMibCheck(!m_bRunningRetrySubscribe);
 		m_bRunningRetrySubscribe = true;
 		m_bRerunRetrySubscribe = false;
-		
+
 		auto Cleanup = g_OnScopeExitActor / [this]
 			{
 				m_bRunningRetrySubscribe = false;
-				
+
 				auto SubscribeChangesPromises = fg_Move(m_SubscribeChangesPromises);
-				
+
 				for (auto &Promise : SubscribeChangesPromises)
 					Promise.f_SetResult();
 			}
 		;
-		
+
 		struct CPendingInfo
 		{
 			TCSet<CStr> m_PendingPaths;
 			TCSet<CStr> m_MissingPaths;
 		};
-		
+
 		TCSet<CStr> PendingPaths;
 		TCSet<CStr> ToRemovePaths;
 
@@ -61,7 +61,7 @@ namespace NMib::NCloud
 			else if (WatchedPath.m_bToBeRemoved)
 				ToRemovePaths[WatchedPath.f_GetPath()];
 		}
-		
+
 		CPendingInfo PendingInfo;
 
 		{
@@ -297,7 +297,7 @@ namespace NMib::NCloud
 	{
 		if (m_pThis->f_IsDestroyed())
 			co_return DMibErrorInstance("Destroyed");
-		
+
 		auto &ManifestConfig = m_Config.m_ManifestConfig;
 
 		struct CWatchedPathSettings
@@ -309,7 +309,7 @@ namespace NMib::NCloud
 
 			bool m_bRecursive = false;
 		};
-		
+
 		TCMap<CStr, CWatchedPathSettings> Paths;
 
 		auto fRemoveChildren = [&](CStr const &_Path)
@@ -331,7 +331,7 @@ namespace NMib::NCloud
 		for (auto &Destination : ManifestConfig.m_IncludeWildcards)
 		{
 			auto &Wildcard = ManifestConfig.m_IncludeWildcards.fs_GetKey(Destination);
-			
+
 			bool bRecursive = false;
 			auto WildcardParsed = CDirectoryManifestConfig::fs_ParseWildcard(Wildcard, bRecursive);
 
@@ -406,26 +406,26 @@ namespace NMib::NCloud
 
 		co_return co_await f_RetrySubscribeChanges();
 	}
-	
+
 	bool CBackupManagerClient::CInternal::f_IsPathInManifest(CStr const &_Path, CStr &o_FileName)
 	{
 		bool bIsIncluded = false;
-		
+
 		CStr NotificationPath = CFile::fs_GetPath(_Path);
 		CStr NotificationFile = CFile::fs_GetFile(_Path);
-		
+
 		auto &ManifestConfig = m_Config.m_ManifestConfig;
-		
+
 		for (auto &Destination : ManifestConfig.m_IncludeWildcards)
 		{
 			auto &Wildcard = ManifestConfig.m_IncludeWildcards.fs_GetKey(Destination);
-			
+
 			bool bRecursive = false;
 			auto WildcardParsed = CDirectoryManifestConfig::fs_ParseWildcard(Wildcard, bRecursive);
-			
+
 			CStr WildcardPath = CFile::fs_GetPath(WildcardParsed);
 			CStr WildcardFileName = CFile::fs_GetFile(WildcardParsed);
-			
+
 			if (!bRecursive)
 			{
 				if (NotificationPath != WildcardPath)
@@ -439,27 +439,27 @@ namespace NMib::NCloud
 
 			if (fg_StrMatchWildcard(NotificationFile.f_GetStr(), WildcardFileName.f_GetStr()) != EMatchWildcardResult_WholeStringMatchedAndPatternExhausted)
 				continue;
-			
+
 			CStr DestinationFileName;
 			if (Destination)
 				DestinationFileName = CFile::fs_AppendPath(*Destination, _Path.f_Extract(WildcardPath.f_GetLen() + 1));
 			else
 				DestinationFileName = _Path;
-			
+
 			if (!bIsIncluded)
 				o_FileName = DestinationFileName;
 			else if (o_FileName != DestinationFileName)
 				DMibError("Matched file to two different destinations in manifest");
-			
+
 			bIsIncluded = true;
 		}
-		
+
 		if (!bIsIncluded)
 			return false;
-		
+
 		if (fg_StrMatchesAnyWildcardInMap(_Path, ManifestConfig.m_ExcludeWildcards))
 			return false;
-		
+
 		return true;
 	}
 
@@ -520,15 +520,15 @@ namespace NMib::NCloud
 		case EFileChangeNotification_Renamed: DMibCloudBackupManagerDebugOut("%%% Renamed {} -> {} {}\n", Notification.m_PathFrom, Notification.m_Path, _bDirty); break;
 		}
 #endif
-		
+
 		auto &ManifestConfig = m_Config.m_ManifestConfig;
-		
+
 		CStr RelativePath;
 		CStr RelativePathFrom;
-		
+
 		CStr OriginalPath = CFile::fs_MakePathRelative(Notification.m_Path, ManifestConfig.m_Root);
 		CStr OriginalPathFrom;
-		
+
 		bool bDirtyHint = _bDirty;
 
 		if (Notification.m_Notification == EFileChangeNotification_Removed)
@@ -549,12 +549,12 @@ namespace NMib::NCloud
 		if (Notification.m_Notification == EFileChangeNotification_Renamed)
 		{
 			OriginalPathFrom = CFile::fs_MakePathRelative(Notification.m_PathFrom, ManifestConfig.m_Root);
-			
+
 			bool bFromValid = f_IsPathInManifest(OriginalPathFrom, RelativePathFrom);
 			bool bToValid = f_IsPathInManifest(OriginalPath, RelativePath);
 			if (!bFromValid && !bToValid)
 				return;
-			
+
 			if (bFromValid && !bToValid)
 			{
 				Notification.m_Notification = EFileChangeNotification_Removed;
@@ -595,14 +595,14 @@ namespace NMib::NCloud
 					DMibLog(Error, "Failed to update manifest ({}): {}", RelativePath, _Change.f_GetExceptionStr());
 					return;
 				}
-				
+
 				if (!_ChangeFrom)
 				{
 					DMibLogCategoryStr(m_Config.m_LogCategory);
 					DMibLog(Error, "Failed to update manifest ({}): {}", RelativePath, _ChangeFrom.f_GetExceptionStr());
 					return;
 				}
-				
+
 				auto fSendManifestChange = [&]
 					(
 						CStr const &_Path
@@ -622,17 +622,17 @@ namespace NMib::NCloud
 						}
 					}
 				;
-				
+
 				auto &Change = *_Change;
 				auto &ChangeFrom = *_ChangeFrom;
-				
+
 				TCMap<CStr, CUpdatedDirectory> UpdatedDirectories = Change.m_UpdatedDirectories;
 				for (auto &UpdatedDirectory : ChangeFrom.m_UpdatedDirectories)
 				{
 					CStr const &Path = ChangeFrom.m_UpdatedDirectories.fs_GetKey(UpdatedDirectory);
-					
+
 					auto Mapped = UpdatedDirectories(Path);
-					
+
 					if (Mapped.f_WasCreated())
 						*Mapped = UpdatedDirectory;
 					else
@@ -641,7 +641,7 @@ namespace NMib::NCloud
 							(*Mapped).m_bAdded = true;
 					}
 				}
-				
+
 				for (auto &UpdatedDirectory : UpdatedDirectories)
 				{
 					auto &Path = UpdatedDirectories.fs_GetKey(UpdatedDirectory);
@@ -708,7 +708,7 @@ namespace NMib::NCloud
 					else
 						DMibCloudBackupManagerDebugOut("### {},{} NOCHANGE {}\n", Sequence, NotificationStr, RelativePath);
 				}
-				
+
 				if (Change.m_bAdded)
 				{
 					DMibCloudBackupManagerDebugOut("##> {},{} {}.m_bAdded\n", Sequence, NotificationStr, RelativePath);

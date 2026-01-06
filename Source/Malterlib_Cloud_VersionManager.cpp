@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -40,7 +40,7 @@ namespace NMib::NCloud
 	DMibDistributedStreamImplement(CVersionManager::CSubscribeToUpdates::CResult);
 	DMibDistributedStreamImplement(CVersionManager::CChangeTags);
 	DMibDistributedStreamImplement(CVersionManager::CChangeTags::CResult);
-	
+
 	CVersionManager::~CVersionManager() = default;
 
 	NStr::CStr CVersionManager::CVersionIDAndPlatform::fs_ConvertFromOldPlatform(NStr::CStr const &_Platform)
@@ -52,7 +52,7 @@ namespace NMib::NCloud
 	{
 		return NNetwork::fg_IsValidHostname(_String);
 	}
-	
+
 	bool CVersionManager::fs_IsValidBranch(NStr::CStr const &_String, bool _bAllowWildCards)
 	{
 		if (_String.f_IsEmpty())
@@ -88,12 +88,12 @@ namespace NMib::NCloud
 	{
 		return NNetwork::fg_IsValidHostname(_String);
 	}
-	
+
 	bool CVersionManager::fs_IsValidProtocolVersion(uint32 _Version)
 	{
 		return _Version >= EProtocolVersion_Min && _Version <= EProtocolVersion_Current;
 	}
-	
+
 	bool CVersionManager::fs_IsValidVersionIdentifier(CVersionID const &_VersionID, CStr &o_Error)
 	{
 		if (!fs_IsValidBranch(_VersionID.m_Branch))
@@ -103,7 +103,7 @@ namespace NMib::NCloud
 		}
 		return true;
 	}
-	
+
 	bool CVersionManager::fs_IsValidVersionIdentifier(CStr const &_String, CStr &o_Error, CVersionID *o_pVersionID)
 	{
 		CVersionID VersionID;
@@ -143,19 +143,19 @@ namespace NMib::NCloud
 	{
 		return NNetwork::fg_IsValidHostname(_String);
 	}
-	
+
 	// CVersionID
-	
+
 	CStr CVersionManager::CVersionID::f_EncodeFileName() const
 	{
 		return fg_Format("{}_{}.{}.{}", m_Branch.f_ReplaceChar('/', '_'), m_Major, m_Minor, m_Revision);
 	}
-	
-	CStr CVersionManager::CVersionID::fs_DecodeFileName(CStr const &_FileName)  
+
+	CStr CVersionManager::CVersionID::fs_DecodeFileName(CStr const &_FileName)
 	{
 		return _FileName.f_ReplaceChar('_', '/');
 	}
-	
+
 	NEncoding::CEJsonSorted CVersionManager::CVersionID::f_ToJson() const
 	{
 		NEncoding::CEJsonSorted Ret;
@@ -165,7 +165,7 @@ namespace NMib::NCloud
 		Ret["Revision"] = m_Revision;
 		return Ret;
 	}
-	
+
 	bool CVersionManager::CVersionID::f_IsValid() const
 	{
 		return !m_Branch.f_IsEmpty();
@@ -187,7 +187,7 @@ namespace NMib::NCloud
 	{
 		return fg_Format("{}/{}", m_VersionID.f_EncodeFileName(), m_Platform);
 	}
-	
+
 	NEncoding::CEJsonSorted CVersionManager::CVersionIDAndPlatform::f_ToJson() const
 	{
 		NEncoding::CEJsonSorted Ret;
@@ -195,7 +195,7 @@ namespace NMib::NCloud
 		Ret["Platform"] = m_Platform;
 		return Ret;
 	}
-	
+
 	bool CVersionManager::CVersionIDAndPlatform::f_IsValid() const
 	{
 		return m_VersionID.f_IsValid() && !m_Platform.f_IsEmpty();
@@ -208,7 +208,7 @@ namespace NMib::NCloud
 		Ret.m_Platform = _Json["Platform"].f_String();
 		return Ret;
 	}
-	
+
 	// CVersionInformation
 
 	NEncoding::CEJsonSorted CVersionManager::CVersionInformation::f_ToJson() const
@@ -226,7 +226,7 @@ namespace NMib::NCloud
 		Ret["RetrySequence"] = m_RetrySequence;
 		return Ret;
 	}
-	
+
 	auto CVersionManager::CVersionInformation::fs_FromJson(NEncoding::CEJsonSorted const &_Json) -> CVersionInformation
 	{
 		CVersionInformation Ret;
@@ -245,47 +245,47 @@ namespace NMib::NCloud
 			Ret.m_RetrySequence = pValue->f_Integer();
 		return Ret;
 	}
-	
+
 	// CListApplications
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CListApplications::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % m_Applications;
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CListApplications::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 	}
-	
+
 	// CListVersions
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CListVersions::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % m_Versions;
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CListVersions::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % m_ForApplication;
 	}
-	
+
 	// CStartUploadTransfer
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CStartUploadTransferDeprecated::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
 		_Stream % fg_Move(m_Subscription);
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CStartUploadTransferDeprecated::f_Stream(tf_CStream &_Stream)
 	{
@@ -320,7 +320,7 @@ namespace NMib::NCloud
 	}
 
 	// CStartUploadVersion
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CStartUploadVersion::CResult::f_Stream(tf_CStream &_Stream)
 	{
@@ -331,13 +331,13 @@ namespace NMib::NCloud
 			_Stream % fg_Move(m_fFinish.f_GetSubscription());
 		_Stream % m_DeniedTags;
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CStartUploadVersion::f_Stream(tf_CStream &_Stream)
 	{
 		DMibFastCheck(fs_IsValidProtocolVersion(_Stream.f_GetVersion()));
-		_Stream % m_Application; 
-		_Stream % m_VersionIDAndPlatform; 
+		_Stream % m_Application;
+		_Stream % m_VersionIDAndPlatform;
 		_Stream % m_VersionInfo;
 		_Stream % m_QueueSize;
 		_Stream % m_Flags;
@@ -376,7 +376,7 @@ namespace NMib::NCloud
 			}
 		}
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CStartDownloadVersion::CResult::f_Stream(tf_CStream &_Stream)
 	{
@@ -391,7 +391,7 @@ namespace NMib::NCloud
 			_Stream % fg_Move(*m_FilesGenerator);
 		}
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CStartDownloadVersion::f_Stream(tf_CStream &_Stream)
 	{
@@ -408,14 +408,14 @@ namespace NMib::NCloud
 		if (_Stream.f_GetVersion() >= EProtocolVersion_RefactorToActorFunctorsUploadDownload)
 			_Stream % fg_Move(m_Subscription);
 	}
-	
+
 	// CNewVersionNotification
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CNewVersionNotifications::CResult::f_Stream(tf_CStream &_Stream)
 	{
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CNewVersionNotification::f_Stream(tf_CStream &_Stream)
 	{
@@ -423,7 +423,7 @@ namespace NMib::NCloud
 		_Stream % m_VersionIDAndPlatform;
 		_Stream % m_VersionInfo;
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CNewVersionNotifications::f_Stream(tf_CStream &_Stream)
 	{
@@ -432,9 +432,9 @@ namespace NMib::NCloud
 		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportOriginID)
 			_Stream % m_OriginID;
 	}
-	
+
 	// CSubscribeToUpdates
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CSubscribeToUpdates::CResult::f_Stream(tf_CStream &_Stream)
 	{
@@ -452,7 +452,7 @@ namespace NMib::NCloud
 				_Stream % fg_Move(m_Subscription).f_GetSubscription();
 		}
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CSubscribeToUpdates::f_Stream(tf_CStream &_Stream)
 	{
@@ -501,15 +501,15 @@ namespace NMib::NCloud
 		if (_Stream.f_GetVersion() >= EProtocolVersion_SupportSubscribeToTags)
 			_Stream % m_Tags;
 	}
-	
+
 	// CChangeTags
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CChangeTags::CResult::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_DeniedTags;
 	}
-	
+
 	template <typename tf_CStream>
 	void CVersionManager::CChangeTags::f_Stream(tf_CStream &_Stream)
 	{

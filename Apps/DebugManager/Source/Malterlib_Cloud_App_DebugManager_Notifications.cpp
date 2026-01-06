@@ -24,7 +24,7 @@ namespace NMib::NCloud::NDebugManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CDebugManagerApp::fp_Notify_ScheduleProcess()
 	{
 		if (!mp_PendingNotificationsTimeout)

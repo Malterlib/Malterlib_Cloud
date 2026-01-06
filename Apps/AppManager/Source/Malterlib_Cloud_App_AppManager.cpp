@@ -543,7 +543,7 @@ namespace NMib::NCloud::NAppManager
 			;
 			mp_HostMonitorMemoryInterval = CHostMonitor::mc_MinimumHostMonitorMemoryInterval;
 		}
-		
+
 		mp_AutoUpdateDelay = _Params["AutoUpdateDelay"].f_Float();
 
 		mp_KnownPlatforms[DMalterlibCloudPlatform];

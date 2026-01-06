@@ -16,7 +16,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		: CDistributedAppActor(CDistributedAppActor_Settings{"CloudAPIManager"})
 	{
 	}
-	
+
 	CCloudAPIManagerDaemonActor::~CCloudAPIManagerDaemonActor()
 	{
 	}
@@ -26,9 +26,9 @@ namespace NMib::NCloud::NCloudAPIManager
 		mp_pServer = fg_ConstructActor<CServer>(fg_Construct(self), mp_State);
 		co_return {};
 	}
-	
+
 	TCFuture<void> CCloudAPIManagerDaemonActor::fp_StopApp()
-	{	
+	{
 		if (mp_pServer)
 		{
 			DMibLogWithCategory(Mib/Cloud/CloudAPIManager/Daemon, Info, "Shutting down");

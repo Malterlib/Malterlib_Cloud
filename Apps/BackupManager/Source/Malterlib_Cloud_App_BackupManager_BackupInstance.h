@@ -13,10 +13,10 @@ namespace NMib::NCloud::NBackupManager
 	{
 	public:
 		using CActorHolder = CSeparateThreadActorHolder;
-		
+
 		CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID, CStr const &_RootDirectory, bool _bForceNew, TCActor<CBackupSource> const &_BackupSource);
 		~CBackupInstance();
-		
+
 		TCFuture<TCActorSubscriptionWithID<>> f_StartManifestRSync(FRunRSyncProtocol _fRunProtocol, uint64 _ManifestSize, CHashDigest_SHA256 _ExpectedDigest) override;
 		TCFuture<CStartBackupResult> f_StartBackup() override;
 		TCFuture<TCActorSubscriptionWithID<>> f_StartRSync(CStr _FileName, CManifestFile _ManifestFile, FRunRSyncProtocol _fRunProtocol) override;

@@ -13,7 +13,7 @@ namespace NMib::NCloud
 		if (_Stream.f_SupportsVersion(EVersion::mc_ServerSyncSupport))
 			_Stream % m_VerifiedOnServers;
 	}
-	
+
 	template <typename tf_CStream>
 	void ICKeyManagerServerDatabase::CDatabase::CClientStore::f_Stream(tf_CStream &_Stream)
 	{

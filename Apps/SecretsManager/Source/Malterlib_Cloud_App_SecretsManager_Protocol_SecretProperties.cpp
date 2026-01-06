@@ -339,7 +339,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		co_return fg_Move(FoundSecret);
 	}
-	
+
 	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SetSecretProperties(CSecretsManager::CSecretID _ID, CSecretsManager::CSecretProperties _Secret)
 		-> TCFuture<CSetSecretPropertiesResult>
 	{
@@ -611,7 +611,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_SetMetadata(CSetMetadata _SetMetadata)
 	{
 		auto &This = *m_pThis;
@@ -683,7 +683,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_RemoveMetadata(CSecretID _ID, CStrSecure _MetadataKey)
 	{
 		auto &This = *m_pThis;

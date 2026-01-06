@@ -407,7 +407,7 @@ public:
 		void f_RenameFile(CStr const &_FromName, CStr const &_ToName)
 		{
 			DMibCloudBackupManagerDebugOut("Rename file      {} -> {}\n", _FromName, _ToName);
-		
+
 #ifdef DPlatformFamily_Windows
 			for (mint i = 0; i < 200; ++i)
 			{

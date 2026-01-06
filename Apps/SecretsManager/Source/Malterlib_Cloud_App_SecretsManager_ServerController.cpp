@@ -45,7 +45,7 @@ namespace NMib::NCloud::NSecretsManager
 		;
 
 		auto KeyManagerSubscription = co_await mp_AppState.m_TrustManager->f_SubscribeTrustedActors<CKeyManager>().f_Wrap();
-		
+
 		if (!KeyManagerSubscription)
 		{
 			DMibLogWithCategory(Mib/Cloud/SecretsManager, Error, "Failed to subscribe to KeyManagers, aborting startup: {}", KeyManagerSubscription.f_GetExceptionStr());
@@ -72,7 +72,7 @@ namespace NMib::NCloud::NSecretsManager
 	TCFuture<void> CSecretsManagerDaemonActor::CServerController::fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> _KeyManager)
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
-		
+
 		if (mp_ServerActor || mp_AppState.m_bStoppingApp)
 			co_return {};
 

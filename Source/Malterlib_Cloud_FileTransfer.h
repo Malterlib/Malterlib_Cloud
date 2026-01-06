@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -11,7 +11,7 @@ namespace NMib::NCloud
 {
 	struct CFileTransferSend;
 	struct CFileTransferReceive;
-	
+
 	struct CFileTransferResult
 	{
 		uint64 m_nBytes = 0;
@@ -22,7 +22,7 @@ namespace NMib::NCloud
 		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
 	};
-	
+
 	struct CFileTransferContextDeprecated
 	{
 		CFileTransferContextDeprecated();
@@ -34,7 +34,7 @@ namespace NMib::NCloud
 		static bool fs_IsSafeRelativePath(NStr::CStr const &_String, NStr::CStr &o_Error);
 		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
-		
+
 	private:
 		friend struct CFileTransferSend;
 		friend struct CFileTransferReceive;
@@ -48,7 +48,7 @@ namespace NMib::NCloud
 		NConcurrency::CActorSubscription m_Subscription;
 		uint64 m_StartPosition;
 	};
-	
+
 	struct CFileTransferSendDownloadFile
 	{
 		using CDownloadFileContents = CFileTransferSendDownloadFileContents;
@@ -106,7 +106,7 @@ namespace NMib::NCloud
 		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
-	
+
 	struct CFileTransferReceive : public NConcurrency::CActor
 	{
 		~CFileTransferReceive();
@@ -117,7 +117,7 @@ namespace NMib::NCloud
 				, NFile::EFileAttrib _AttributeAdd = NFile::EFileAttrib_None
 			)
 		;
-		
+
 		enum EReceiveFlag
 		{
 			EReceiveFlag_None = 0

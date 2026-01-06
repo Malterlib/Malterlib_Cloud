@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -43,7 +43,7 @@ namespace NMib::NCloud
 					return m_Position == m_Size;
 				}
 			};
-			
+
 			TCLinkedList<CEntry> m_Queue;
 		};
 
@@ -55,7 +55,7 @@ namespace NMib::NCloud
 		};
 	}
 	using namespace NPrivate;
-	
+
 	struct CFileTransferSend::CInternal : public CActorInternal
 	{
 		struct CDeprecated
@@ -116,7 +116,7 @@ namespace NMib::NCloud
 	CFileTransferSend::~CFileTransferSend() = default;
 
 	CFileTransferSend::CFileTransferSend(NContainer::TCVector<CBasePath> &&_BasePaths, uint64 _MaxQueueSize)
-		: mp_pInternal(fg_Construct(this)) 
+		: mp_pInternal(fg_Construct(this))
 	{
 		auto &Internal = *mp_pInternal;
 		Internal.m_BasePaths = fg_Move(_BasePaths);
@@ -148,7 +148,7 @@ namespace NMib::NCloud
 		if (!m_pInternal->m_Promise.f_IsSet() && !m_bDelayedFinish)
 			m_pInternal->m_Promise.f_SetException(DMibErrorInstance(_Error));
 	}
-	
+
 	void CFileTransferSend::CInternal::CDeprecated::f_ReportFinished()
 	{
 		CFileTransferContextDeprecated::CInternal::CStateChange StateChange{m_Version};
@@ -164,7 +164,7 @@ namespace NMib::NCloud
 			}
 		;
 	}
-	
+
 	void CFileTransferSend::CInternal::f_ReportError(CStr const &_Error)
 	{
 		if (!m_Promise.f_IsSet())
@@ -259,7 +259,7 @@ namespace NMib::NCloud
 
 		co_return {};
 	}
-	
+
 	TCUnsafeFuture<void> CFileTransferSend::CInternal::CDeprecated::f_PerformFileSend()
 	{
 		if (m_Queue.m_Queue.f_IsEmpty())
@@ -271,7 +271,7 @@ namespace NMib::NCloud
 			co_return {};
 		}
 		auto &Params = m_Params;
-		
+
 		if (m_OutstandingBytes >= Params.m_QueueSize)
 			co_return {};
 
@@ -287,12 +287,12 @@ namespace NMib::NCloud
 			uint64 Position = Entry.m_Position;
 			uint64 nBytes = fg_Min(Entry.m_Size - Entry.m_Position, NFile::gc_IdealIoSize, CActorDistributionManager::mc_HalfMaxMessageSize);
 			Entry.m_Position += nBytes;
-			bool bFinished = Entry.f_IsFinished(); 
+			bool bFinished = Entry.f_IsFinished();
 			if (bFinished)
 				m_Queue.m_Queue.f_Remove(Entry);
-			
+
 			m_OutstandingBytes += nBytes;
-			
+
 			auto Result = co_await
 				(
 					g_Dispatch(BlockingActorCheckout) / [FileName, RelativeFileName, Position, nBytes, pFileState = m_pFileState, bFinished]()

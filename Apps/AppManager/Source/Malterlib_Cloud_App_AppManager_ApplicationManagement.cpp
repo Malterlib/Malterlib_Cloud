@@ -20,28 +20,28 @@ namespace NMib::NCloud::NAppManager
 			return fg_Format("Application '{}' exited with non 0 status: {}{\n}", _Name, *_Result);
 		return {};
 	}
-	
-	constexpr static EFileAttrib gc_RootAttributes = 
-		EFileAttrib_UnixAttributesValid  
-		| EFileAttrib_UserRead 
+
+	constexpr static EFileAttrib gc_RootAttributes =
+		EFileAttrib_UnixAttributesValid
+		| EFileAttrib_UserRead
 		| EFileAttrib_UserWrite
-		| EFileAttrib_UserExecute 
+		| EFileAttrib_UserExecute
 		| EFileAttrib_GroupRead
 		| EFileAttrib_GroupExecute
-		| EFileAttrib_EveryoneRead 
+		| EFileAttrib_EveryoneRead
 		| EFileAttrib_EveryoneExecute
 	;
-	
+
 	void CAppManagerActor::fsp_UpdateAttributes(CStr const &_File)
 	{
 		auto CurrentAttributes = CFile::fs_GetAttributes(_File);
 		CFile::fs_SetAttributes
 			(
 				_File
-				, EFileAttrib_UnixAttributesValid 
-				| (CurrentAttributes & EFileAttrib_UserRead) 
+				, EFileAttrib_UnixAttributesValid
+				| (CurrentAttributes & EFileAttrib_UserRead)
 				| (CurrentAttributes & EFileAttrib_UserWrite)
-				| (CurrentAttributes & EFileAttrib_UserExecute) 
+				| (CurrentAttributes & EFileAttrib_UserExecute)
 				| (CurrentAttributes & EFileAttrib_GroupRead)
 				| (CurrentAttributes & EFileAttrib_GroupExecute)
 				| (CurrentAttributes & EFileAttrib_EveryoneRead)
@@ -56,7 +56,7 @@ namespace NMib::NCloud::NAppManager
 			, CStr const &_Source
 			, CStr const &_Destination
 			, CStr const &_ApplicationName
-			, CApplicationSettings const &_Settings 
+			, CApplicationSettings const &_Settings
 			, TCVector<CStr> &o_Files
 			, TCSet<CStr> const &_AllowExist
 			, bool _bForceInstall
@@ -72,7 +72,7 @@ namespace NMib::NCloud::NAppManager
 				if (!_AllowExist.f_FindEqual(File))
 					DMibError(fg_Format("Application already exists at: '{}'. You have to manually delete it to resue the name", _Destination));
 			}
-		
+
 		}
 		if (CFile::fs_FileExists(_Source, EFileAttrib_Directory))
 		{
@@ -82,20 +82,20 @@ namespace NMib::NCloud::NAppManager
 					, _Destination
 					, [&](CFile::EDiffCopyChange _Change, NStr::CStr const &_Source, NStr::CStr const &_Destination, NStr::CStr const &_Link) -> CFile::EDiffCopyChangeAction
 					{
-						if 
+						if
 							(
-								_bForceInstall 
+								_bForceInstall
 								&&
 								(
-									_Change == CFile::EDiffCopyChange_DirectoryDeleted 
-									|| _Change == CFile::EDiffCopyChange_FileDeleted 
+									_Change == CFile::EDiffCopyChange_DirectoryDeleted
+									|| _Change == CFile::EDiffCopyChange_FileDeleted
 									|| _Change == CFile::EDiffCopyChange_LinkDeleted
 								)
 							)
 						{
 							return CFile::EDiffCopyChangeAction_Skip;
 						}
-						
+
 						for (auto &Allow : _AllowExist)
 						{
 							if (_Destination.f_StartsWith(Allow))
@@ -129,13 +129,13 @@ namespace NMib::NCloud::NAppManager
 			;
 			Return = Output;
 		}
-		
+
 		auto &Settings = _Settings;
 
 		if (!Settings.m_Executable.f_IsEmpty())
 		{
-			CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable); 
-			if 
+			CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable);
+			if
 				(
 					!CFile::fs_FileExists
 					(
@@ -151,14 +151,14 @@ namespace NMib::NCloud::NAppManager
 				DMibError(fg_Format("Executable file '{}' does not exist or does not have the executable flag set", ExcutableFile));
 			}
 		}
-		
+
 		CFile::CFindFilesOptions FindOptions(_Destination + "/*", true);
 		FindOptions.m_AttribMask = EFileAttrib_Directory | EFileAttrib_File | EFileAttrib_Link | EFileAttrib_FindDirectoryLast;
-		
+
 		auto Files = CFile::fs_FindFiles(FindOptions);
-		
+
 		CFile::fs_SetAttributes(_Destination, gc_RootAttributes);
-		
+
 		mint PrefixLen = _Destination.f_GetLen() + 1;
 		for (auto &File : Files)
 		{
@@ -173,17 +173,17 @@ namespace NMib::NCloud::NAppManager
 			}
 			if (bFound)
 				continue;
-			
+
 			if (!Settings.m_RunAsUser.f_IsEmpty())
 				CFile::fs_SetOwner(File.m_Path, _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser));
 			if (!Settings.m_RunAsGroup.f_IsEmpty())
 				CFile::fs_SetGroup(File.m_Path, _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup));
-			
+
 			fsp_UpdateAttributes(File.m_Path);
-			
+
 			o_Files.f_Insert(File.m_Path.f_Extract(PrefixLen));
 		}
-		
+
 		return Return;
 	}
 
@@ -194,7 +194,7 @@ namespace NMib::NCloud::NAppManager
 			co_return DMibErrorInstance("Application has been deleted");
 
 		auto &Settings = Application.m_Settings;
-		
+
 		auto &ApplicationJson = mp_State.m_StateDatabase.m_Data["Applications"][Application.m_Name];
 		ApplicationJson["Executable"] = Settings.m_Executable;
 		ApplicationJson["RunAsUser"] = Settings.m_RunAsUser;
@@ -244,12 +244,12 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto &UpdateScripts = ApplicationJson["UpdateScripts"] = CEJsonSorted();
 			UpdateScripts.f_Object();
-			UpdateScripts["PreUpdate"] = Settings.m_UpdateScripts.m_PreUpdate; 
-			UpdateScripts["PostUpdate"] = Settings.m_UpdateScripts.m_PostUpdate; 
-			UpdateScripts["PostLaunch"] = Settings.m_UpdateScripts.m_PostLaunch; 
+			UpdateScripts["PreUpdate"] = Settings.m_UpdateScripts.m_PreUpdate;
+			UpdateScripts["PostUpdate"] = Settings.m_UpdateScripts.m_PostUpdate;
+			UpdateScripts["PostLaunch"] = Settings.m_UpdateScripts.m_PostLaunch;
 			UpdateScripts["OnError"] = Settings.m_UpdateScripts.m_OnError;
 		}
-		
+
 		ApplicationJson["SelfUpdateSource"] = Settings.m_bSelfUpdateSource;
 		ApplicationJson["Files"] = Application.m_Files;
 
@@ -268,7 +268,7 @@ namespace NMib::NCloud::NAppManager
 				for (auto &Destination : Settings.m_Backup_IncludeWildcards)
 				{
 					auto &DestinationJson = Json[Settings.m_Backup_IncludeWildcards.fs_GetKey(Destination)];
-					
+
 					if (Destination)
 						DestinationJson = *Destination;
 					else
@@ -301,16 +301,16 @@ namespace NMib::NCloud::NAppManager
 			auto &RegisterInfo = ApplicationJson["RegisterInfo"] = CEJsonSorted();
 			RegisterInfo.f_Object();
 			RegisterInfo["UpdateType"] = Application.m_RegisterInfo.m_UpdateType;
-			
+
 			if (Application.m_RegisterInfo.m_Resources_Files)
 				RegisterInfo["ResourcesFiles"] = *Application.m_RegisterInfo.m_Resources_Files;
-			
+
 			if (Application.m_RegisterInfo.m_Resources_FilesPerProcess)
 				RegisterInfo["ResourcesFilesPerProcess"] = *Application.m_RegisterInfo.m_Resources_FilesPerProcess;
-			
+
 			if (Application.m_RegisterInfo.m_Resources_Threads)
 				RegisterInfo["ResourcesThreads"] = *Application.m_RegisterInfo.m_Resources_Threads;
-			
+
 			if (Application.m_RegisterInfo.m_Resources_Processes)
 				RegisterInfo["ResourcesProcesses"] = *Application.m_RegisterInfo.m_Resources_Processes;
 
@@ -324,7 +324,7 @@ namespace NMib::NCloud::NAppManager
 				Array.f_Insert(Dependency);
 		}
 		ApplicationJson["StopOnDependencyFailure"] = Settings.m_bStopOnDependencyFailure;
-		
+
 		ApplicationJson["PreventLaunchUser"] = Application.m_bPreventLaunch_User;
 		ApplicationJson["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update;
 		ApplicationJson["AppManagerVersion"] = Settings.m_AppManagerVersion;
@@ -332,7 +332,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return co_await mp_State.m_StateDatabase.f_Save();
 	}
-	
+
 	void CAppManagerActor::fsp_CreateApplicationUserGroup
 		(
 			CApplicationSettings const &_Settings
@@ -379,7 +379,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 	}
-	
+
 	void CAppManagerActor::fsp_UpdateApplicationFilePermissions
 		(
 			CStr const &_ApplicationDir
@@ -441,7 +441,7 @@ namespace NMib::NCloud::NAppManager
 		CFile::fs_CreateDirectory(_ApplicationDir + "/.tmp");
 		fSetOwners(_ApplicationDir + "/.home");
 		fSetOwners(_ApplicationDir + "/.tmp");
-		
+
 		CFile::fs_SetAttributes(_ApplicationDir, gc_RootAttributes);
 	}
 
@@ -454,7 +454,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StartApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
@@ -464,7 +464,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return 0;
 	}
-	
+
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
@@ -474,20 +474,20 @@ namespace NMib::NCloud::NAppManager
 
 		co_return 0;
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_ClearPreventLaunch(TCSharedPointer<CApplication> _pApplication)
 	{
 		if (!_pApplication->m_bPreventLaunch_User && !_pApplication->m_bPreventLaunch_Update && !_pApplication->m_bPreventLaunch_DelayAfterFailure)
 			co_return {};
-		
+
 		_pApplication->m_bPreventLaunch_User = false;
 		_pApplication->m_bPreventLaunch_Update = false;
 		_pApplication->m_bPreventLaunch_DelayAfterFailure = false;
-	
+
 		co_await (fp_UpdateApplicationJson(_pApplication) % "Failed to save application state");
 		co_return {};
 	}
-	
+
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Start(NStr::CStr _Name)
 	{
 		auto pThis = m_pThis;
@@ -539,7 +539,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 	}
-	
+
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Stop(NStr::CStr _Name)
 	{
 		auto pThis = m_pThis;
@@ -570,7 +570,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(pApplication, "Start") % Auditor);
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
-		
+
 		if (pApplication->m_bStopped)
 			co_return Auditor.f_Exception("Application already stopped");
 
@@ -592,7 +592,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 	}
-	
+
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Restart(NStr::CStr _Name)
 	{
 		auto pThis = m_pThis;

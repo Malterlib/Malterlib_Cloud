@@ -23,7 +23,7 @@ namespace NMib::NCloud::NAppManager
 		DMibNeverGetHere;
 		return m_PreUpdate;
 	}
-	
+
 	CStr CAppManagerActor::CUpdateScripts::f_GetName(EUpdateScript _Script) const
 	{
 		switch (_Script)
@@ -76,11 +76,11 @@ namespace NMib::NCloud::NAppManager
 			return pState->m_Promise <<= g_Void;
 
 		CStr Description = fg_Format("{}/{}", _pApplication->m_Name, _pApplication->m_Settings.m_UpdateScripts.f_GetName(_Script));
-		
+
 		pState->m_LaunchActor = fg_ConstructActor<CProcessLaunchActor>();
-		
+
 		CStr FileName = CFile::fs_GetExpandedPath(Script, _pApplication->f_GetDirectory());
-	
+
 		auto fReportError = [pState, Description](CStr const &_Error)
 			{
 				if (pState->m_bReplied)
@@ -89,7 +89,7 @@ namespace NMib::NCloud::NAppManager
 				pState->f_Replied();
 			}
 		;
-		
+
 		DMibLogWithCategory
 			(
 				Malterlib/Cloud/AppManager
@@ -98,7 +98,7 @@ namespace NMib::NCloud::NAppManager
 				, Description
 			)
 		;
-		
+
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 			(
 				CProcessLaunch::fs_GetBashPath()
@@ -108,7 +108,7 @@ namespace NMib::NCloud::NAppManager
 				{
 					if (!pState->m_LaunchActor)
 						return;
-					
+
 					switch (_State.f_GetTypeID())
 					{
 					case NProcess::EProcessLaunchState_Launched:
@@ -162,7 +162,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		
+
 		LaunchParams.m_fOnOutput = [pState, Description](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
 			{
 				if (!pState->m_LaunchActor)
@@ -186,7 +186,7 @@ namespace NMib::NCloud::NAppManager
 				}
 			}
 		;
-		
+
 		LaunchParams.m_RunAsUser = fp_GetRunAsUser(_pApplication->m_Settings);
 #ifdef DPlatformFamily_Windows
 		LaunchParams.m_RunAsUserPassword = _pApplication->m_Settings.m_RunAsUserPassword;
@@ -199,7 +199,7 @@ namespace NMib::NCloud::NAppManager
 		LaunchParams.m_Environment["TMP"] = _pApplication->f_GetDirectory() + "/.tmp";
 		LaunchParams.m_Environment["TEMP"] = _pApplication->f_GetDirectory() + "/.tmp";
 #endif
-		
+
 		LaunchParams.m_Environment["MalterlibCloud_TimeSinceStart"] = fg_Format("{fe1}", _TimeSinceUpdateStart);
 		LaunchParams.m_Environment["MalterlibCloud_Application"] = _pApplication->m_Name;
 		LaunchParams.m_Environment["MalterlibCloud_VersionApplication"] = _pApplication->m_Settings.m_VersionManagerApplication;
@@ -271,7 +271,7 @@ namespace NMib::NCloud::NAppManager
 
 		LaunchParams.m_bMergeEnvironment = true;
 		LaunchParams.m_bAllowExecutableLocate = true;
-		
+
 		pState->m_LaunchActor
 			(
 				&CProcessLaunchActor::f_Launch
@@ -290,7 +290,7 @@ namespace NMib::NCloud::NAppManager
 				pState->m_LaunchSubscription = fg_Move(*_Subscription);
 			}
 		;
-		
+
 		return pState->m_Promise.f_Future();
 	}
 }

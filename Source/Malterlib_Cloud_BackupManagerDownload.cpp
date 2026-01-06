@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include "Malterlib_Cloud_BackupManagerDownload.h"
@@ -27,9 +27,9 @@ namespace NMib::NCloud
 			TCActor<CDirectorySyncReceive> m_DownloadBackupReceive;
 			bool m_bAborted = false;
 		};
-		
+
 		TCSharedPointer<CState> pState = fg_Construct();
-		
+
 		o_Subscription.f_Get() = g_ActorSubscription / [pState]() -> TCFuture<void>
 			{
 				pState->m_bAborted = true;
@@ -38,7 +38,7 @@ namespace NMib::NCloud
 				co_return {};
 			}
 		;
-		
+
 		TCDistributedActorInterfaceWithID<CDirectorySyncClient> SyncClient = co_await
 			(
 				_BackupManager.f_CallActor(&CBackupManager::f_DownloadBackup)

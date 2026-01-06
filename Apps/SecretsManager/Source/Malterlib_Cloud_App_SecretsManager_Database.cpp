@@ -13,7 +13,7 @@ namespace NMib::NCloud::NSecretsManager
 		, mp_EncryptionState{.m_Key = _Key}
 	{
 	}
-	
+
 	CSecretsManagerServerDatabase::~CSecretsManagerServerDatabase()
 	{
 	}
@@ -64,7 +64,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CSecretsManagerServerDatabase::f_WriteDatabase(CSecretsDatabase _Database)
 	{
 		if (!mp_pPendingWrite)
@@ -112,7 +112,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		co_return co_await mp_PendingWritePromises.f_Insert().f_Future();
 	}
-	
+
 	TCFuture<CSecretsDatabase> CSecretsManagerServerDatabase::f_ReadDatabase()
 	{
 		auto SequenceSubscription = co_await mp_Sequencer.f_Sequence();

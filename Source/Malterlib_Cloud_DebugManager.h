@@ -117,7 +117,7 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NConcurrency::TCAsyncGenerator<NContainer::TCVector<CAsset>> m_AssetsGenerator;
 			};
 
@@ -136,10 +136,10 @@ namespace NMib::NCloud
 
 				NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()> m_fFinish;
 			};
-			
+
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-		
+
 			EAssetType m_AssetType = EAssetType::mc_Executable;
 
 			uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
@@ -154,7 +154,7 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NConcurrency::CActorSubscription m_Subscription;
 				NConcurrency::TCAsyncGenerator<CDownloadFile> m_FilesGenerator;
 			};
@@ -172,7 +172,7 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				uint64 m_nAssetsDeleted = 0;
 				uint64 m_nFilesDeleted = 0;
 				uint64 m_nBytesDeleted = 0;
@@ -190,7 +190,7 @@ namespace NMib::NCloud
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NStorage::TCOptional<NStr::CStr> m_ID;
 			NStorage::TCOptional<NStr::CStr> m_FileName;
 			NStorage::TCOptional<NTime::CTime> m_TimestampStart;
@@ -216,7 +216,7 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NConcurrency::TCAsyncGenerator<NContainer::TCVector<CCrashDump>> m_CrashDumpsGenerator;
 			};
 
@@ -238,7 +238,7 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-		
+
 			NStr::CStr m_ID;
 
 			uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
@@ -254,7 +254,7 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NConcurrency::CActorSubscription m_Subscription;
 				NConcurrency::TCAsyncGenerator<CDownloadFile> m_FilesGenerator;
 			};
@@ -273,7 +273,7 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				uint64 m_nCrashDumpsDeleted = 0;
 				uint64 m_nFilesDeleted = 0;
 				uint64 m_nBytesDeleted = 0;

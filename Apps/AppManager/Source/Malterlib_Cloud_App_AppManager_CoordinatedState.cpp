@@ -51,29 +51,29 @@ namespace NMib::NCloud::NAppManager
 		TCVector<TCSharedPointerSupportWeak<COnAppUpdateInfoChange>> ToProcess;
 		for (auto &pOnChange : mp_OnAppUpdateInfoChange)
 			ToProcess.f_Insert(pOnChange);
-		
+
 		for (auto &pOnChange : ToProcess)
 			pOnChange->m_fOnChanged();
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_NewRemoteAppManager(CRemoteAppManager *_pAppManager)
 	{
 		CStr HostID = _pAppManager->f_GetHostID();
 		auto Actor = _pAppManager->m_Actor;
-		
+
 		auto Subscription = co_await Actor.f_CallActor(&CAppManagerCoordinationInterface::f_SubscribeToAppChanges)
 			(
 				g_ActorFunctor / [this, HostID, AllowDestroy = g_AllowWrongThreadDestroy]
 				(TCVector<CAppManagerCoordinationInterface::CAppChange> _Changes, bool _bInitial) -> TCFuture<void>
 				{
 					auto &RemoteAppManager = mp_RemoteAppManagerState[HostID];
-					
+
 					if (_bInitial)
 					{
 						RemoteAppManager.f_Clear();
 						RemoteAppManager.m_bInitialStateReceived = true;
 					}
-					
+
 					for (auto &Change : _Changes)
 					{
 						switch (Change.f_GetTypeID())
@@ -84,7 +84,7 @@ namespace NMib::NCloud::NAppManager
 								RemoteAppManager.m_AppInfos[ChangeData.m_Application].m_AppInfo = ChangeData;
 
 								CRemoteApplicationKey RemoteKey{ChangeData};
-								
+
 								if (mp_KnownRemoteApplications[RemoteKey](HostID).f_WasCreated())
 									fp_NewRemoteKnownApplication(RemoteKey, HostID);
 								break;
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NAppManager
 						case CAppManagerCoordinationInterface::EAppChange_Remove:
 							{
 								auto &ChangeData = Change.f_Get<CAppManagerCoordinationInterface::EAppChange_Remove>();
-								RemoteAppManager.m_AppInfos.f_Remove(ChangeData.m_Application); 
+								RemoteAppManager.m_AppInfos.f_Remove(ChangeData.m_Application);
 								break;
 							}
 						case CAppManagerCoordinationInterface::EAppChange_AddKnownHosts:
@@ -102,13 +102,13 @@ namespace NMib::NCloud::NAppManager
 								CRemoteApplicationKey RemoteKey;
 								RemoteKey.m_Group = ChangeData.m_Group;
 								RemoteKey.m_VersionManagerApplication = ChangeData.m_VersionManagerApplication;
-								
+
 								RemoteAppManager.m_KnownApplications[RemoteKey] += ChangeData.m_KnownHosts;
 								break;
 							}
 						}
 					}
-					
+
 					fp_OnAppUpdateInfoChange();
 					co_return {};
 				}
@@ -120,7 +120,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 	}
-	
+
 	auto CAppManagerActor::CAppManagerCoordinationInterfaceImplementation::f_SubscribeToAppChanges
 		(
 			TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> _Changes, bool _bInitial)> _fOnChange
@@ -133,9 +133,9 @@ namespace NMib::NCloud::NAppManager
 		auto &RemoteAppManager = pThis->mp_RemoteAppManagerState[CallingHostID];
 		RemoteAppManager.m_fOnChange = fg_Move(_fOnChange);
 		mint SubscriptionSequence = ++RemoteAppManager.m_iOnChangeSubscriptionSequence;
-		
+
 		pThis->fp_SendInitialInfoToRemoteAppManager(RemoteAppManager);
-		
+
 		co_return g_ActorSubscription / [pThis, CallingHostID, SubscriptionSequence]() -> TCFuture<void>
 			{
 				auto &RemoteAppManager = pThis->mp_RemoteAppManagerState[CallingHostID];
@@ -158,7 +158,7 @@ namespace NMib::NCloud::NAppManager
 				for (auto iKnownHosts = o_KnownApplications.f_GetIterator(); iKnownHosts;)
 				{
 					auto &RemoteKey = iKnownHosts.f_GetKey();
-					
+
 					if (!_Group.f_IsEmpty() && RemoteKey.m_Group != _Group)
 						continue;
 					if (!_Application.f_IsEmpty() && RemoteKey.m_VersionManagerApplication != _Application)
@@ -201,13 +201,13 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
-		
+
 		for (auto &RemoteAppManager : pThis->mp_RemoteAppManagerState)
 			fRemoveRemote(RemoteAppManager.m_KnownApplications, nullptr);
-			
+
 		if (!bChanged)
 			co_return {};
-		
+
 		pThis->mp_State.m_StateDatabase.m_Data["KnownRemoteApplications"].f_RemoveMember(_HostID);
 		co_await pThis->fp_SaveStateDatabase();
 
@@ -219,7 +219,7 @@ namespace NMib::NCloud::NAppManager
 		m_KnownApplications.f_Clear();
 		m_AppInfos.f_Clear();
 	}
-	
+
 	EDistributedAppUpdateType CAppManagerActor::CApplication::f_GetUpdateType(bool _bBypassCoordination) const
 	{
 		if (_bBypassCoordination)
@@ -227,7 +227,7 @@ namespace NMib::NCloud::NAppManager
 
 		if (m_Settings.m_bSelfUpdateSource)
 			return EDistributedAppUpdateType_OneAtATime;
-		
+
 		return m_RegisterInfo.m_UpdateType;
 	}
 
@@ -273,7 +273,7 @@ namespace NMib::NCloud::NAppManager
 					switch (_Severity)
 					{
 					case CAppManagerInterface::EStatusSeverity_None: return CDistributedAppSensorReporter::EStatusSeverity_Ok;
-					case CAppManagerInterface::EStatusSeverity_Warning: 
+					case CAppManagerInterface::EStatusSeverity_Warning:
 						{
 							if (_pApplication->m_LastReporterSensorStatus)
 								return fg_Max(_pApplication->m_LastReporterSensorStatus->m_Severity, CDistributedAppSensorReporter::EStatusSeverity_Info);
@@ -319,7 +319,7 @@ namespace NMib::NCloud::NAppManager
 		AppInfo.m_Group = m_Settings.m_UpdateGroup;
 		AppInfo.m_VersionManagerApplication = m_Settings.m_VersionManagerApplication;
 		AppInfo.m_VersionID = m_LastInstalledVersionFinished;
-		AppInfo.m_VersionTime = m_LastInstalledVersionInfoFinished.m_Time; 
+		AppInfo.m_VersionTime = m_LastInstalledVersionInfoFinished.m_Time;
 		AppInfo.m_FailedVersionID = m_LastFailedInstalledVersion;
 		AppInfo.m_FailedVersionTime = m_LastFailedInstalledVersionTime;
 		AppInfo.m_FailedVersionRetrySequence = m_LastFailedInstalledVersionRetrySequence;
@@ -330,33 +330,33 @@ namespace NMib::NCloud::NAppManager
 		AppInfo.m_bAutoUpdate = m_Settings.m_bAutoUpdate;
 		return AppInfo;
 	}
-	
+
 	void CAppManagerActor::fp_NewRemoteKnownApplication(CRemoteApplicationKey const &_RemoteKey, CStr const &_HostID)
 	{
 		CAppManagerCoordinationInterface::CAppChange_AddKnownHosts AppChange;
 		AppChange.m_Group = _RemoteKey.m_Group;
 		AppChange.m_VersionManagerApplication = _RemoteKey.m_VersionManagerApplication;
 		AppChange.m_KnownHosts[_HostID];
-		
+
 		TCVector<CAppManagerCoordinationInterface::CAppChange> Changes;
 		Changes.f_Insert(fg_Move(AppChange));
-		
+
 		for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 		{
 			if (!RemoteAppManager.m_fOnChange)
 				continue;
 			RemoteAppManager.m_fOnChange(Changes, false).f_DiscardResult();
 		}
-		
+
 		mp_State.m_StateDatabase.m_Data["KnownRemoteApplications"][_RemoteKey.m_Group][_RemoteKey.m_VersionManagerApplication][_HostID] = true;
 		fp_SaveStateDatabase().f_DiscardResult();
 	}
-	
+
 	void CAppManagerActor::fp_BroadcastRemoteAppChange(CAppManagerCoordinationInterface::CAppChange &&_Change)
 	{
 		TCVector<CAppManagerCoordinationInterface::CAppChange> Changes;
 		Changes.f_Insert(fg_Move(_Change));
-		
+
 		for (auto &RemoteAppManager : mp_RemoteAppManagerState)
 		{
 			if (!RemoteAppManager.m_fOnChange)
@@ -364,63 +364,63 @@ namespace NMib::NCloud::NAppManager
 			RemoteAppManager.m_fOnChange(Changes, false).f_DiscardResult();
 		}
 	}
-	
+
 	void CAppManagerActor::fp_SendAppToRemoteAppManagers(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		auto &Application = *_pApplication;
 		CAppManagerCoordinationInterface::CAppChange_Update Change;
 		Change.m_Application = Application.m_Name;
 		Change = Application.f_GetRemoteAppInfo();
-		
+
 		fp_BroadcastRemoteAppChange(fg_Move(Change));
 
 		CRemoteApplicationKey RemoteKey{Change};
-		
+
 		if (mp_KnownRemoteApplications[RemoteKey](mp_State.m_HostID).f_WasCreated())
 			fp_NewRemoteKnownApplication(RemoteKey, mp_State.m_HostID);
 	}
-	
+
 	void CAppManagerActor::fp_SendRemovedAppToRemoteAppManagers(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		auto &Application = *_pApplication;
 		CAppManagerCoordinationInterface::CAppChange_Remove Change;
 		Change.m_Application = Application.m_Name;
-		
+
 		fp_BroadcastRemoteAppChange(fg_Move(Change));
 	}
-	
+
 	void CAppManagerActor::fp_OnAppUpdateInfoChange(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		fp_SendAppToRemoteAppManagers(_pApplication);
 		fp_OnAppUpdateInfoChange(); // Process our own changes
 	}
-	
+
 	void CAppManagerActor::fp_SendInitialInfoToRemoteAppManager(CRemoteAppManager &_AppManager)
 	{
 		DRequire(_AppManager.m_fOnChange);
 		TCVector<CAppManagerCoordinationInterface::CAppChange> Changes;
-		
+
 		for (auto &pApplication : mp_Applications)
 		{
 			auto &Application = *pApplication;
 			if (Application.m_Settings.m_VersionManagerApplication.f_IsEmpty())
 				continue;
-			
+
 			auto &Change = Changes.f_Insert().f_Set<CAppManagerCoordinationInterface::EAppChange_Update>();
 			Change.m_Application = Application.m_Name;
 			Change = Application.f_GetRemoteAppInfo();
 		}
-		
+
 		for (auto &KnownHosts : mp_KnownRemoteApplications)
 		{
 			auto &RemoteKey = mp_KnownRemoteApplications.fs_GetKey(KnownHosts);
-			
+
 			auto &Change = Changes.f_Insert().f_Set<CAppManagerCoordinationInterface::EAppChange_AddKnownHosts>();
 			Change.m_Group = RemoteKey.m_Group;
 			Change.m_VersionManagerApplication = RemoteKey.m_VersionManagerApplication;
 			Change.m_KnownHosts = KnownHosts;
 		}
-		
+
 		_AppManager.m_fOnChange(fg_Move(Changes), true).f_DiscardResult();
 	}
 }

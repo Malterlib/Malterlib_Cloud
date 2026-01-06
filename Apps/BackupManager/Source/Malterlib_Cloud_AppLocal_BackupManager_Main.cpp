@@ -25,7 +25,7 @@ class CBackupManagerApplication : public CApplication
 			}
 		;
 		return Daemon.f_Run();
-	}	
+	}
 };
 
 DAppImplement(CBackupManagerApplication);

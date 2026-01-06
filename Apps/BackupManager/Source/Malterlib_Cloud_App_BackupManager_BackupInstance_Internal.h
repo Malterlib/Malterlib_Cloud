@@ -19,21 +19,21 @@ namespace NMib::NCloud::NBackupManager
 			CStr m_RelativeFileName;
 			CStr m_AbsoluteFileName;
 			uint64 m_FileLength = 0;
-			
+
 			TCBinaryStreamFile<> m_File;
 			TCBinaryStreamFile<> m_SourceFile;
 			TCBinaryStreamFile<> m_TempFile;
-			
+
 			TCUniquePointer<CRSyncClient> m_pClient;
-			
+
 			FRunRSyncProtocol m_fRunProtocol;
-			
+
 			TCVector<CStr> m_TempFileNames;
-			
+
 			TCOptional<NCryptography::CHashDigest_SHA256> m_ExpectedDigest;
 
 			CActorSubscription m_SequenceSyncsCleanup;
-			
+
 			uint64 m_BytesTransferredIn = 0;
 			uint64 m_BytesTransferredOut = 0;
 

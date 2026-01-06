@@ -17,17 +17,17 @@ namespace NMib::NCloud::NCloudAPIManager
 {
 	TCFuture<CCloudAPIManagerDaemonActor::CServer::COpenStackServiceInfo> CCloudAPIManagerDaemonActor::CServer::fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext)
 	{
-		if 
+		if
 			(
-				!_CloudContext.m_pGetToken 
-				|| 
-				(
-					_CloudContext.m_bLastWasError 
-					&& _CloudContext.m_LastErrorClock.f_GetTime() > 5.0
-				) 
+				!_CloudContext.m_pGetToken
 				||
 				(
-					_CloudContext.m_TokenExpiresAt.f_IsValid() 
+					_CloudContext.m_bLastWasError
+					&& _CloudContext.m_LastErrorClock.f_GetTime() > 5.0
+				)
+				||
+				(
+					_CloudContext.m_TokenExpiresAt.f_IsValid()
 					&& (_CloudContext.m_TokenExpiresAt - CTime::fs_NowUTC()) < CTimeSpanConvert::fs_CreateHourSpan(1)
 				)
 			)
@@ -43,9 +43,9 @@ namespace NMib::NCloud::NCloudAPIManager
 								, [KeystoneInfo]() -> COpenStackServiceInfo
 								{
 									NException::CDisableExceptionTraceScope DisableTracing;
-									
+
 									CStr URL(KeystoneInfo.m_IdentityURL + "auth/tokens");
-									
+
 									CEJsonSorted AuthRequest =
 										{
 											"auth"_=
@@ -77,22 +77,22 @@ namespace NMib::NCloud::NCloudAPIManager
 											}
 										}
 									;
-				
+
 									CStr PostData = AuthRequest.f_ToString();
 									TCMap<CStr, CStr> Headers;
-									
+
 									COpenStackServiceInfo ServiceInfo;
-									
+
 									CCurlResult Result = fg_Curl(ECurlMethod_POST, URL, Headers, PostData);
 
 									if (!Result.m_Headers.f_Exists("x-subject-token"))
 										DMibError("No token in response");
-									
+
 									ServiceInfo.m_Token = Result.m_Headers["x-subject-token"];
-									
+
 									auto const Json = CJsonSorted::fs_FromString(Result.m_Body);
 									auto Token = Json["token"];
-									
+
 									CStr ExpiresAt = Token["expires_at"].f_String();	// Example: "2016-09-30T08:36:31.932109Z"
 									int64 Year;
 									aint Month, Day, Hour, Minute, Second, nParsed;
@@ -109,9 +109,9 @@ namespace NMib::NCloud::NCloudAPIManager
 										.f_Parse(ExpiresAt, nParsed)
 									;
 									ServiceInfo.m_TokenExpiresAt = NTime::CTimeConvert::fs_CreateTime(Year, Month, Day, Hour, Minute, Second);
-									
+
 									auto Catalog = Token["catalog"].f_Array();
-									
+
 									for (auto &Service : Catalog)
 									{
 										auto Endpoints = Service["endpoints"].f_Array();

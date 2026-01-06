@@ -11,23 +11,23 @@ namespace NMib::NCloud::NAppManager
 	struct CAppManagerCoordinationInterface : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/AppManagerCoordination";
-		
+
 		CAppManagerCoordinationInterface();
 		~CAppManagerCoordinationInterface();
-		
+
 		enum : uint32
 		{
 			EProtocolVersion_Min = 0x103
 			, EProtocolVersion_Current = 0x104
 		};
-		
+
 		enum EAppChange
 		{
 			EAppChange_Update
 			, EAppChange_Remove
 			, EAppChange_AddKnownHosts
 		};
-		
+
 		using EUpdateStage = CAppManagerInterface::EUpdateStage;
 
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
@@ -38,7 +38,7 @@ namespace NMib::NCloud::NAppManager
 			using CVersionManager::CVersionIDAndPlatform::CVersionIDAndPlatform;
 			using CVersionManager::CVersionIDAndPlatform::operator =;
 		};
-		
+
 		struct CAppInfo
 		{
 			template <typename tf_CStream>
@@ -57,22 +57,22 @@ namespace NMib::NCloud::NAppManager
 			uint64 m_UpdateStartSequence = TCLimitsInt<uint64>::mc_Max;
 			bool m_bAutoUpdate = true;
 		};
-		
+
 		struct CAppChange_Update : public CAppInfo
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			using CAppInfo::operator =;
-			
+
 			CStr m_Application;
 		};
-		
+
 		struct CAppChange_Remove
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			CStr m_Application;
 		};
 
@@ -85,7 +85,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_VersionManagerApplication;
 			TCSet<CStr> m_KnownHosts;
 		};
-		
+
 		using CAppChange = TCStreamableVariant
 			<
 				EAppChange
@@ -94,10 +94,10 @@ namespace NMib::NCloud::NAppManager
 				, NStorage::TCMember<CAppChange_AddKnownHosts, EAppChange_AddKnownHosts>
 			>
 		;
-		
+
 		virtual TCFuture<void> f_RemoveKnownHost(CStr _Group, CStr _Application, CStr _HostID) = 0;
 		virtual auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> _Changes, bool _bInitial)> _fOnChange)
-			-> TCFuture<TCActorSubscriptionWithID<>> = 0 
+			-> TCFuture<TCActorSubscriptionWithID<>> = 0
 		;
 	};
 }

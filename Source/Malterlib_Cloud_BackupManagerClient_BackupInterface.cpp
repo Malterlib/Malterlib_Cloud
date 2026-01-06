@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -16,7 +16,7 @@ namespace NMib::NCloud
 		_BackupInstance(&NPrivate::CBackupManagerClient_Instance::f_BackupFinishedStarting) > [this](TCAsyncResult<void> &&_Result)
 			{
 				(void)this;
-				
+
 				if (!_Result)
 				{
 					DMibLogCategoryStr(m_Config.m_LogCategory);
@@ -43,19 +43,19 @@ namespace NMib::NCloud
 
 		if (!_Config.m_ExcludeWildcards.f_IsEmpty())
 			co_return DMibErrorInstance("You cannot add exclude wildcards when appending manifest");
-		
+
 		if (!_Config.m_AddSyncFlagsWildcards.f_IsEmpty() || !_Config.m_RemoveSyncFlagsWildcards.f_IsEmpty())
 			co_return DMibErrorInstance("You cannot change sync flags when appending manifest");
-		
+
 		auto &Internal = *m_pThis->mp_pInternal;
 
 		CDirectoryManifestConfig NewConfig = Internal.m_Config.m_ManifestConfig;
 		NewConfig.m_IncludeWildcards.f_Clear();
-		
+
 		for (auto &Destination : _Config.m_IncludeWildcards)
 		{
 			auto &Wildcard = _Config.m_IncludeWildcards.fs_GetKey(Destination);
-			
+
 			auto *pOldDestination = Internal.m_Config.m_ManifestConfig.m_IncludeWildcards.f_FindEqual(Wildcard);
 			if (pOldDestination)
 			{
@@ -67,7 +67,7 @@ namespace NMib::NCloud
 		}
 
 		Internal.m_Config.m_ManifestConfig.m_IncludeWildcards += _Config.m_IncludeWildcards;
-		
+
 		if (NewConfig.m_IncludeWildcards.f_IsEmpty())
 			co_return {};
 
@@ -202,7 +202,7 @@ namespace NMib::NCloud
 				{
 					if (!RunningInstance.m_Instance2)
 						continue;
-					
+
 					RunningInstance.m_Instance2(&NPrivate::CBackupManagerClient_Instance::f_ManifestChanged, _Path, _ManifestChange, _bDirty, _ChecksumState) > ManifestChangedResults;
 				}
 			}

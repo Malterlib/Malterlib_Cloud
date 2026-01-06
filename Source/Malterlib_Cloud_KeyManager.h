@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -115,7 +115,7 @@ namespace NMib::NCloud
 
 		CKeyManagerServerSync();
 		~CKeyManagerServerSync();
-		
+
 		virtual NConcurrency::TCFuture<CReadDatabase> f_ReadDatabase() = 0;
 		virtual NConcurrency::TCFuture<void> f_CreateNewKeys(NContainer::TCMap<CHostKeyID, CSymmetricKey> _Keys) = 0;
 		virtual NConcurrency::TCFuture<CUseAvailableKeyResult> f_UseAvailableKey(CSymmetricKey _Key) = 0;
@@ -128,7 +128,7 @@ namespace NMib::NCloud
 	struct CKeyManager : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/KeyManager";
-		
+
 		enum : uint32
 		{
 			EProtocolVersion_Min = EKeyManagerProtocolVersion_Min
@@ -137,7 +137,7 @@ namespace NMib::NCloud
 
 		CKeyManager();
 		~CKeyManager();
-		
+
 		virtual NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr _Identifier, uint32 _KeySize) = 0;
 		virtual auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
 			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>>

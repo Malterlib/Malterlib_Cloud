@@ -15,7 +15,7 @@ namespace NMib::NCloud::NBackupManager
 		o_CommandLine.f_SetProgramDescription
 			(
 				"Malterlib Cloud Backup Manager"
-				, "Manages backups for malterlib cloud applications." 
+				, "Manages backups for malterlib cloud applications."
 			)
 		;
 	}

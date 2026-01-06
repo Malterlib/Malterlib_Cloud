@@ -27,7 +27,7 @@ class CDebugManagerClientApplication : public CApplication
 			}
 		;
 		return Daemon.f_Run();
-	}	
+	}
 };
 
 DAppImplement(CDebugManagerClientApplication);

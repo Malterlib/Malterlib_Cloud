@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -25,7 +25,7 @@ namespace NMib::NCloud
 		uint32 m_Minor = 0;
 		uint32 m_Revision = 0;
 	};
-	
+
 	struct CCloudVersionInfo
 	{
 		NStr::CStr m_Application;
@@ -37,7 +37,7 @@ namespace NMib::NCloud
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 	};
-	
+
 	CCloudVersionInfo fg_ParseVersionInfo(NStr::CStr const &_String);
 	extern NStorage::TCAggregate<CCloudVersionInfo> g_CloudVersion;
 }

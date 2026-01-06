@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -13,14 +13,14 @@ namespace NMib::NCloud
 	{
 	public:
 		CKeyManagerServerDatabase_EncryptedFile(NStr::CStr const &_Path, NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt);
-		
+
 		~CKeyManagerServerDatabase_EncryptedFile();
-		
+
 		NConcurrency::TCFuture<void> f_Initialize() override;
 		NConcurrency::TCFuture<void> f_ChangePassword(NStr::CStrSecure _Password, NContainer::CSecureByteVector _Salt) override;
 		NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase _Database) override;
 		NConcurrency::TCFuture<CDatabase> f_ReadDatabase() override;
-	
+
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 

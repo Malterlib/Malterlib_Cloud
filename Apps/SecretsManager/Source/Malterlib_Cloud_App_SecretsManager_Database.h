@@ -68,7 +68,7 @@ namespace NMib::NCloud::NSecretsManager
 	public:
 		CSecretsManagerServerDatabase(NStr::CStr const &_Path, NContainer::CSecureByteVector const &_Key);
 		~CSecretsManagerServerDatabase();
-		
+
 		NConcurrency::TCFuture<void> f_Initialize();
 		NConcurrency::TCFuture<void> f_WriteDatabase(CSecretsDatabase _Database);
 		NConcurrency::TCFuture<CSecretsDatabase> f_ReadDatabase();

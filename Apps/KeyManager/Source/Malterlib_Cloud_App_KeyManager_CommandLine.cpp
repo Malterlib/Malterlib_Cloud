@@ -405,13 +405,13 @@ namespace NMib::NCloud::NKeyManager
 		PasswordPrompt.m_Prompt = "Type password for key database: ";
 
 		CStrSecure Password = co_await _pCommandLine->f_ReadPrompt(PasswordPrompt);
-		
+
 		auto Result = co_await
 			(
 				g_Dispatch / [this, Password = fg_Move(Password)]() mutable -> TCFuture<void>
 				{
 					auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
-					
+
 					if (mp_bDatabaseDecrypted)
 						co_return DErrorInstance("A correct password has already been provided");
 
@@ -422,7 +422,7 @@ namespace NMib::NCloud::NKeyManager
 								g_ActorFunctor / [this](NStr::CStrSecure _Password) -> TCFuture<void>
 								{
 									auto CheckDestroyOnResume = co_await fp_CheckStoppedOrDestroyedOnResume();
-									
+
 									CSecureByteVector Salt{(uint8 const *)gc_Salt, 8};
 									TCActor<CKeyManagerServerDatabase_EncryptedFile> DatabaseActor = fg_ConstructActor<CKeyManagerServerDatabase_EncryptedFile>
 										(

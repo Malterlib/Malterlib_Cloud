@@ -13,12 +13,12 @@
 namespace NMib::NCloud::NDebugManagerClient
 {
 	struct CDebugManagerClientServer;
-	
+
 	struct CDebugManagerClientApp : public CDistributedAppActor
 	{
 		CDebugManagerClientApp();
 		~CDebugManagerClientApp();
-		
+
 	private:
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;

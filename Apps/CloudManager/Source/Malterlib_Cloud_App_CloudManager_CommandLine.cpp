@@ -18,7 +18,7 @@ namespace NMib::NCloud::NCloudManager
 		o_CommandLine.f_SetProgramDescription
 			(
 				"Malterlib Cloud Manager"
-				, "Manages cloud applications." 
+				, "Manages cloud applications."
 			)
 		;
 

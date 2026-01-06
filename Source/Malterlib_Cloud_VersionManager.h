@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -46,12 +46,12 @@ namespace NMib::NCloud
 			void f_Format(tf_CStr &o_Str) const;
 
 			bool f_IsValid() const;
-			
+
 			NStr::CStr f_EncodeFileName() const;
 			static NStr::CStr fs_DecodeFileName(NStr::CStr const &_FileName);
-			
+
 			auto operator <=> (CVersionID const &_Right) const = default;
-			
+
 			NEncoding::CEJsonSorted f_ToJson() const;
 			static CVersionID fs_FromJson(NEncoding::CEJsonSorted const &_Json);
 		};
@@ -60,7 +60,7 @@ namespace NMib::NCloud
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
 
@@ -71,14 +71,14 @@ namespace NMib::NCloud
 			static NStr::CStr fs_ConvertFromOldPlatform(NStr::CStr const &_Platform);
 
 			auto operator <=> (CVersionIDAndPlatform const &_Right) const = default;
-			
+
 			NEncoding::CEJsonSorted f_ToJson() const;
 			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJsonSorted const &_Json);
-			
+
 			CVersionID m_VersionID;
 			NStr::CStr m_Platform;
 		};
-		
+
 		struct CVersionInformation
 		{
 			template <typename tf_CStream>
@@ -104,7 +104,7 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NContainer::TCSet<NStr::CStr> m_Applications;
 			};
 
@@ -168,7 +168,7 @@ namespace NMib::NCloud
 
 			CFileTransferContextDeprecated m_TransferContextDeprecated;
 		};
-		
+
 		struct CStartUploadVersion
 		{
 			struct CResult
@@ -179,7 +179,7 @@ namespace NMib::NCloud
 				NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()> m_fFinish;
 				NContainer::TCSet<NStr::CStr> m_DeniedTags;
 			};
-			
+
 			enum EFlag
 			{
 				EFlag_None = 0
@@ -188,7 +188,7 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-		
+
 			NStr::CStr m_Application;
 			CVersionIDAndPlatform m_VersionIDAndPlatform;
 			CVersionInformation m_VersionInfo;
@@ -210,7 +210,7 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NConcurrency::CActorSubscription m_Subscription;
 				CVersionInformation m_VersionInfo;
 				NStorage::TCOptional<NConcurrency::TCAsyncGenerator<CDownloadFile>> m_FilesGenerator;
@@ -218,18 +218,18 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NStr::CStr m_Application;
 			CVersionIDAndPlatform m_VersionIDAndPlatform;
 			NStorage::TCOptional<CFileTransferContextDeprecated> m_TransferContextDeprecated;
 			NConcurrency::CActorSubscription m_Subscription;
 		};
-		
+
 		struct CNewVersionNotification
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NStr::CStr m_Application;
 			CVersionIDAndPlatform m_VersionIDAndPlatform;
 			CVersionInformation m_VersionInfo;
@@ -253,20 +253,20 @@ namespace NMib::NCloud
 			// processed for this version, it indicates a loop in the sync configuration.
 			NStr::CStr m_OriginID;
 		};
-		
+
 		struct CSubscribeToUpdates
 		{
 			struct CResult
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NConcurrency::TCActorSubscriptionWithID<> m_Subscription;
 			};
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NStr::CStr m_Application; /// Leave empty to subscribe to all applications
 			NContainer::TCSet<NStr::CStr> m_Platforms; /// Leave empty to subscribe to all platforms
 			NContainer::TCSet<NStr::CStr> m_Tags; /// Leave empty to subscribe to all tags
@@ -280,13 +280,13 @@ namespace NMib::NCloud
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NContainer::TCSet<NStr::CStr> m_DeniedTags;
 			};
-			
+
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NStr::CStr m_Application;
 			CVersionID m_VersionID;
 			NStr::CStr m_Platform; /// Leave empty to tag all platforms for version
@@ -302,10 +302,10 @@ namespace NMib::NCloud
 		static bool fs_IsValidVersionIdentifier(NStr::CStr const &_String, NStr::CStr &o_Error, CVersionID *o_pVersionID);
 		static bool fs_IsValidVersionIdentifier(CVersionID const &_VersionID, NStr::CStr &o_Error);
 		static bool fs_IsValidPlatform(NStr::CStr const &_String);
-		
+
 		CVersionManager();
 		~CVersionManager();
-		
+
 		virtual NConcurrency::TCFuture<CListApplications::CResult> f_ListApplications(CListApplications _Params) = 0;
 		virtual NConcurrency::TCFuture<CListVersions::CResult> f_ListVersions(CListVersions _Params) = 0;
 		virtual NConcurrency::TCFuture<CStartUploadVersion::CResult> f_UploadVersion(CStartUploadVersion _Params) = 0;
@@ -313,7 +313,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<CSubscribeToUpdates::CResult> f_SubscribeToUpdates(CSubscribeToUpdates _Params) = 0;
 		virtual NConcurrency::TCFuture<CChangeTags::CResult> f_ChangeTags(CChangeTags _Params) = 0;
 	};
-	
+
 	struct CVersionManagerHelper
 	{
 		CVersionManagerHelper
@@ -329,19 +329,19 @@ namespace NMib::NCloud
 		CVersionManagerHelper(CVersionManagerHelper &&);
 		CVersionManagerHelper &operator = (CVersionManagerHelper const &);
 		CVersionManagerHelper &operator = (CVersionManagerHelper &&);
-		
+
 		struct CUploadResult
 		{
 			NContainer::TCSet<NStr::CStr> m_DeniedTags;
 			CFileTransferResult m_TransferResult;
 		};
-		
+
 		struct CPackageInfo
 		{
 			CVersionManager::CVersionIDAndPlatform m_VersionID;
 			CVersionManager::CVersionInformation m_VersionInfo;
 		};
-		
+
 		NConcurrency::TCUnsafeFuture<CUploadResult> f_Upload
 			(
 				NConcurrency::TCDistributedActor<CVersionManager> _VersionManager
@@ -353,7 +353,7 @@ namespace NMib::NCloud
 				, uint64 _QueueSize = 0
 			) const
 		;
-		
+
 		NConcurrency::TCUnsafeFuture<CFileTransferResult> f_Download
 			(
 				NConcurrency::TCDistributedActor<CVersionManager> _VersionManager
@@ -364,11 +364,11 @@ namespace NMib::NCloud
 				, uint64 _QueueSize = 0
 			) const
 		;
-		
+
 		NConcurrency::TCUnsafeFuture<CPackageInfo> f_CreatePackage(NStr::CStr _SourceDirectory, NStr::CStr _DestinationFileName, uint32 _CompressionLevel) const;
 		NConcurrency::TCFuture<CPackageInfo> f_GetPackageInfo(NStr::CStr const &_PackageFile) const;
 		NConcurrency::TCFuture<void> f_AbortAll() const;
-		
+
 	private:
 		NStorage::TCSharedPointer<CVersionManagerHelperInternal> mp_pInternal;
 	};

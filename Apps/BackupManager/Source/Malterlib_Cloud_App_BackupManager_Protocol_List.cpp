@@ -32,11 +32,11 @@ namespace NMib::NCloud::NBackupManager
 	{
 		auto pThis = m_pThis;
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
-			
+
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
 		Auditor.f_Info("Listing backup sources");
-		
+
 		auto Sources = co_await (pThis->fp_FilterBackupSourcesByPermissions(pThis->fp_EnumBackupSources()) % "Permission denied listing backup sources" % Auditor);
 
 		Auditor.f_Info(fg_Format("Listed backup sources: {vs,vb}", Sources));

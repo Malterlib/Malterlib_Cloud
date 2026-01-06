@@ -26,17 +26,17 @@ namespace NMib::NCloud::NBackupManager
 	{
 		return CFile::fs_AppendPath(m_BackupDirectory, CFile::fs_AppendPath(CStr{"Files"}, _Path));
 	}
-	
+
 	CStr CBackupInstance::CInternal::f_GetTempPath(CStr const &_Path)
 	{
 		return CFile::fs_AppendPath(m_TempDirectory, _Path);
 	}
-	
+
 	CStr CBackupInstance::CInternal::f_GetLatestPath(CStr const &_Path)
 	{
 		return CFile::fs_AppendPath(m_RootBackupDirectory, CFile::fs_AppendPath(CStr{"Latest"}, _Path));
 	}
-	
+
 	CExceptionPointer CBackupInstance::CInternal::f_CheckFileName(CStr const &_FileName, CDirectoryManifestFile **o_pManifestFile)
 	{
 		CStr Error;
@@ -45,17 +45,17 @@ namespace NMib::NCloud::NBackupManager
 
 		if (!o_pManifestFile)
 			return nullptr;
-		
+
 		auto *pManifestFile = m_Manifest.m_Files.f_FindEqual(_FileName);
-		
+
 		if (!pManifestFile)
 		{
 			DMibCloudBackupManagerDebugOut("NOT EXISTS: {}\n", _FileName);
 			return fg_MakeException(DMibErrorInstance("File does not exists in manifest"));
 		}
-		
-		*o_pManifestFile = pManifestFile; 
-	
+
+		*o_pManifestFile = pManifestFile;
+
 		return nullptr;
 	}
 
@@ -70,7 +70,7 @@ namespace NMib::NCloud::NBackupManager
 
 		co_return {};
 	}
-	
+
 	auto CBackupInstance::f_StartBackup() -> TCFuture<CStartBackupResult>
 	{
 		auto &Internal = *mp_pInternal;

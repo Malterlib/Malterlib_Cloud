@@ -70,7 +70,7 @@ namespace NMib::NCloud
 				TCPromiseFuturePair<void> Promise;
 
 				fg_AllDone(Destroys) > fg_Move(Promise.m_Promise).f_ReceiveAny();
-				
+
 				return fg_Move(Promise.m_Future);
 			}
 

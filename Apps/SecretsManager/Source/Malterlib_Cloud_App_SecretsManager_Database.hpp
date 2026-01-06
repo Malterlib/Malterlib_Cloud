@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -50,7 +50,7 @@ namespace NMib::NCloud::NSecretsManager
 		_Stream % m_InternalSalt;
 		_Stream % m_ExternalSalt;
 	}
-	
+
 	inline CSecretsManager::CSecretID const &CSecretPropertiesInternal::f_GetSecretID() const
 	{
 		return TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal>::fs_GetKey(*this);

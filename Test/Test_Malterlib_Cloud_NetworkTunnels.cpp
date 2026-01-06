@@ -187,7 +187,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 		DMibTestSuite("General")
 		{
 			CActorRunLoopTestHelper RunLoopHelper;
-			
+
 			CStr SocketPath = CFile::fs_GetProgramDirectory() / "Sockets/NetworkTunnelGeneral";
 
 			CDistributedActorTestHelperCombined TestServer{SocketPath, RunLoopHelper.m_pRunLoop};

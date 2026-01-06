@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -15,7 +15,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CKeyManager::f_RequestKey);
 		DMibPublishActorFunction(CKeyManager::f_GetServerSyncInterface);
 	}
-	
+
 	CKeyManager::~CKeyManager() = default;
 
 	CKeyManagerServerSync::CKeyManagerServerSync()
@@ -28,6 +28,6 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CKeyManagerServerSync::f_KeysVerifiedOnServers);
 		DMibPublishActorFunction(CKeyManagerServerSync::f_RemoveVerifiedHosts);
 	}
-	
+
 	CKeyManagerServerSync::~CKeyManagerServerSync() = default;
 }

@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -12,10 +12,10 @@ namespace NMib::NCloud
 	{
 		if (_FileName.f_IsEmpty())
 			co_return CUpdateManifestResult{};
-			
+
 		bool bDirty = _bDirtyHint;
 		TCSharedPointer<CAppendFileState> pAppendState;
-		
+
 		{
 			auto pFile = m_Manifest.m_Files.f_FindEqual(_FileName);
 			if (pFile && (pFile->m_Flags & EDirectoryManifestSyncFlag_Append))

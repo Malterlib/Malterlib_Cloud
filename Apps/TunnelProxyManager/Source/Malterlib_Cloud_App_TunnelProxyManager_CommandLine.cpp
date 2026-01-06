@@ -17,7 +17,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 		o_CommandLine.f_SetProgramDescription
 			(
 				"Malterlib Cloud Manager"
-				, "Manages cloud applications." 
+				, "Manages cloud applications."
 			)
 		;
 

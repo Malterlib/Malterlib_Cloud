@@ -62,7 +62,7 @@ namespace NMib::NCloud
 	struct CCloudManager : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/CloudManager";
-		
+
 		enum : uint32
 		{
 			EProtocolVersion_Min = ECloudManagerProtocolVersion_Min

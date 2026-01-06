@@ -27,7 +27,7 @@ class CTunnelProxyManagerApplication : public CApplication
 			}
 		;
 		return Daemon.f_Run();
-	}	
+	}
 };
 
 DAppImplement(CTunnelProxyManagerApplication);

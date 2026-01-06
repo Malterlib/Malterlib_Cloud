@@ -332,7 +332,7 @@ namespace NMib::NCloud::NCloudManager
 				-> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
-				
+
 					auto WriteTransaction = fg_Move(_Transaction);
 					if (_bCompacting)
 						WriteTransaction = fg_Move((co_await ThisActor(&CCloudManagerServer::fp_CleanupDatabase, fg_Move(WriteTransaction), fg_Construct())).m_Transaction);

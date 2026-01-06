@@ -60,11 +60,11 @@ namespace NMib::NCloud::NAppManager
 		CProcessLaunchParams Params;
 		Params.m_bAllowExecutableLocate = true;
 		Params.m_WorkingDirectory = _WorkingDir;
-		
+
 		Params.m_bMergeEnvironment = true;
-		
+
 		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{cc}", _Description);
-		
+
 		CStr StdOut;
 		CStr StdErr;
 		uint32 ExitCode;
@@ -99,9 +99,9 @@ namespace NMib::NCloud::NAppManager
 			CActorSubscription m_LaunchSubscription;
 			CStr m_ErrorOutput;
 			CStr m_StdOutput;
-			
+
 			CAppManagerActor::CBashScriptOutput m_Output;
-			
+
 			bool m_bReplied = false;
 			void f_Replied()
 			{
@@ -109,12 +109,12 @@ namespace NMib::NCloud::NAppManager
 				fg_Move(m_LaunchActor).f_Destroy().f_DiscardResult();
 			}
 		};
-		
+
 		TCSharedPointer<CState> pState = fg_Construct();
 		pState->m_LaunchActor = fg_ConstructActor<CProcessLaunchActor>();
-		
+
 		CStr FileName = fg_Format("{}/TempScripts/Bash_{}.sh", mp_State.m_RootDirectory, CHash_MD5::fs_DigestFromData(_Script.f_GetStr(), _Script.f_GetLen()).f_GetString());
-	
+
 		auto BlockingActorCheckout = fg_BlockingActor();
 		auto BlockingActor = BlockingActorCheckout.f_Actor();
 
@@ -137,7 +137,7 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 			)
-			> pState->m_Promise % fg_Format("[{}] Failed to save temporary script", _Description) 
+			> pState->m_Promise % fg_Format("[{}] Failed to save temporary script", _Description)
 			/ [this, FileName, _Description, _Environment, _fOnStdOutput, pState, _WarningErrorStatus, BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
 			{
 				auto fReportError = [pState, _Description](CStr const &_Error)
@@ -149,7 +149,7 @@ namespace NMib::NCloud::NAppManager
 						pState->f_Replied();
 					}
 				;
-				
+
 				CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 					(
 						CProcessLaunch::fs_GetBashPath()
@@ -159,7 +159,7 @@ namespace NMib::NCloud::NAppManager
 						{
 							if (!pState->m_LaunchActor)
 								return;
-							
+
 							switch (_State.f_GetTypeID())
 							{
 							case NProcess::EProcessLaunchState_Launched:
@@ -221,7 +221,7 @@ namespace NMib::NCloud::NAppManager
 						}
 					)
 				;
-				
+
 				LaunchParams.m_fOnOutput = [pState, _Description, _fOnStdOutput](EProcessLaunchOutputType _OutputType, NMib::NStr::CStr const &_Output)
 					{
 						if (!pState->m_LaunchActor)
@@ -250,12 +250,12 @@ namespace NMib::NCloud::NAppManager
 						}
 					}
 				;
-				
+
 				LaunchParams.m_Environment += _Environment;
 				LaunchParams.m_bMergeEnvironment = true;
-				
+
 				LaunchParams.m_bAllowExecutableLocate = true;
-				
+
 				pState->m_LaunchActor
 					(
 						&CProcessLaunchActor::f_Launch
@@ -276,7 +276,7 @@ namespace NMib::NCloud::NAppManager
 				;
 			}
 		;
-		
+
 		return pState->m_Promise.f_Future();
 	}
 }

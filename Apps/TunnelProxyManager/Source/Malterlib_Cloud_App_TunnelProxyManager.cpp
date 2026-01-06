@@ -16,7 +16,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 		: CDistributedAppActor(CDistributedAppActor_Settings{"TunnelProxyManager"})
 	{
 	}
-	
+
 	CTunnelProxyManagerApp::~CTunnelProxyManagerApp()
 	{
 	}
@@ -231,7 +231,7 @@ namespace NMib::NCloud::NTunnelProxyManager
 	}
 
 	TCFuture<void> CTunnelProxyManagerApp::fp_StopApp()
-	{	
+	{
 		co_return {};
 	}
 

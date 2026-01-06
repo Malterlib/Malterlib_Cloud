@@ -89,17 +89,17 @@ namespace NMib::NCloud::NAppDistributionManager
 			// Ephemeral state
 			TCMap<CVersionManager::CVersionIDAndPlatform, TCVector<TCActor<CDeployDestination>>> m_RunningDeploys;
 		};
-		
+
 		struct CVersionManagerApplication;
 		struct CVersionManagerState;
-		
+
 		struct CVersionManagerVersion
 		{
 			struct CCompareApplicationByTime
 			{
 				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
 			};
-			
+
 			struct CCompareApplication
 			{
 				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
@@ -111,14 +111,14 @@ namespace NMib::NCloud::NAppDistributionManager
 			~CVersionManagerVersion();
 			void f_SetApplication(CVersionManagerApplication *_pApplication);
 			CVersionManager::CVersionIDAndPlatform const &f_GetVersionID() const;
-			
+
 			CVersionManagerState *m_pVersionManager;
 			CVersionManagerApplication *m_pApplication = nullptr;
 			CVersionManager::CVersionInformation m_VersionInfo;
 			TCAVLLink<> m_ApplicationTimeLink;
 			TCAVLLink<> m_ApplicationLink;
 		};
-		
+
 		struct CVersionManagerApplication
 		{
 			CVersionManagerApplication(CAppDistributionManagerActor &_This);
@@ -126,7 +126,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			{
 				return TCMap<CStr, CVersionManagerApplication>::fs_GetKey(*this);
 			}
-			
+
 			TCAVLTree<&CVersionManagerVersion::m_ApplicationTimeLink, CVersionManagerVersion::CCompareApplicationByTime> m_VersionsByTime;
 			TCAVLTree<&CVersionManagerVersion::m_ApplicationLink, CVersionManagerVersion::CCompareApplication> m_Versions;
 			CAppDistributionManagerActor &m_This;
@@ -136,16 +136,16 @@ namespace NMib::NCloud::NAppDistributionManager
 		{
 			TCDistributedActor<CVersionManager> const &f_GetManager() const
 			{
-				return TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState>::fs_GetKey(*this); 
+				return TCMap<TCDistributedActor<CVersionManager>, CVersionManagerState>::fs_GetKey(*this);
 			}
-			
+
 			TCMap<CStr, TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManagerVersion>> m_Versions;
-			
+
 			CTrustedActorInfo m_HostInfo;
 			CActorSubscription m_Subscription;
 			mint m_SubscribeSequence = 0;
 		};
-		
+
 		struct CVersionManagerDownloadState
 		{
 			TCActor<CFileTransferReceive> m_DownloadVersionReceive;
@@ -201,7 +201,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				, CStr _DestinationDir
 			)
 		;
-		
+
 		TCFuture<CVersionInformation> fp_DownloadApplication
 			(
 				CStr _ApplicationName
@@ -209,7 +209,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				, CStr _DestinationDir
 			)
 		;
-		
+
 		void fp_AutoUpdate_Update();
 		TCFuture<TCSet<CStr>> fp_AutoUpdate_DeployDistribution
 			(

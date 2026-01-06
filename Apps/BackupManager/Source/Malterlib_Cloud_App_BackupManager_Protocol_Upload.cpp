@@ -11,7 +11,7 @@ namespace NMib::NCloud::NBackupManager
 		CTime g_MinBackupTime = CTimeConvert::fs_CreateTime(1970);
 		CTimeSpan g_BackupTimeMaxInFuture = CTimeSpanConvert::fs_CreateHourSpan(2);
 	}
-	
+
 	CExceptionPointer CBackupManagerServer::fp_CheckBackupKey
 		(
 			CBackupManager::CBackupKey const &_BackupKey
@@ -34,19 +34,19 @@ namespace NMib::NCloud::NBackupManager
 			<< _BackupKey.m_FriendlyName // This makes sure that backups can never be mixed between different hosts
 			<< _Auditor.f_HostInfo().f_GetRealHostID()
 		;
-		
+
 		if (o_BackupKey.m_BackupName.f_GetLen() > 128)
 			return _Auditor.f_Exception({"Backup key friendly name is too long", fg_Format("'{}'", o_BackupKey.m_BackupName)}).f_ExceptionPointer();
 
 		return nullptr;
-	}		
-	
+	}
+
 	TCFuture<void> CBackupManagerServer::fp_DestroyBackupInstance(CBackupKey _Key, CDistributedAppAuditor _Auditor, bool _bError, CStr _Reason)
 	{
 		auto *pBackupInstance = mp_BackupInstances.f_FindEqual(_Key);
 		if (!pBackupInstance || pBackupInstance->m_OwningHost.f_HostInfo() != _Auditor.f_HostInfo())
 			co_return {};
-		
+
 		if (!pBackupInstance->m_BackupInstance)
 		{
 			if (!pBackupInstance->m_bPendingDestroy)
@@ -63,7 +63,7 @@ namespace NMib::NCloud::NBackupManager
 			_Auditor.f_Error(Message);
 		else
 			_Auditor.f_Info(Message);
-	
+
 		auto pCanDestroyTracker = mp_pCanDestroyTracker;
 		pBackupInstance->m_bPendingDestroy = true;
 		auto DestroyResult = co_await fg_Move(pBackupInstance->m_BackupInstance).f_Destroy().f_Wrap();
@@ -101,18 +101,18 @@ namespace NMib::NCloud::NBackupManager
 		-> NConcurrency::TCFuture<TCDistributedActorInterfaceWithID<CBackupManagerBackup>>
 	{
 		auto pThis = m_pThis;
-		
+
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
-			
+
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 		auto CallingHostID = fg_GetCallingHostID();
-			
+
 		CBackupManagerServer::CBackupKey BackupKey;
 		if (auto pException = pThis->fp_CheckBackupKey(_Params.m_BackupKey, BackupKey, Auditor))
 			co_return fg_Move(pException);
 
 		TCVector<CStr> Permissions = {"Backup/WriteSelf"};
-		
+
 		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Start backup", Permissions) % "Permission denied starting backup" % Auditor);
 		if (!bHasPermission)
 			co_return Auditor.f_AccessDenied("(Start backup)", Permissions);

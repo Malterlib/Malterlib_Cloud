@@ -23,7 +23,7 @@ class CCloudClient : public CApplication
 				}
 			)
 		;
-	}	
+	}
 };
 
 DAppImplement(CCloudClient);

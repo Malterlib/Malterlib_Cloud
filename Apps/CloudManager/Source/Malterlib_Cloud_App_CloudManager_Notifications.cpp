@@ -220,7 +220,7 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		co_await f_PostSlackMessage(EType_Startup, Message, fg_Default());
-		
+
 		co_return {};
 	}
 

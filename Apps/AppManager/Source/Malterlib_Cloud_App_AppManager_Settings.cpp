@@ -28,21 +28,21 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_SelfUpdateSource;
 			m_bSelfUpdateSource = pValue->f_Boolean();
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("UpdateGroup"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateGroup;
 			m_UpdateGroup = pValue->f_String();
 		}
-		
+
 		bool bStorageSpecified = false;
 		if (auto *pValue = _Params.f_GetMember("EncryptionStorage"))
 		{
 			o_ChangedSettings |= EApplicationSetting_EncryptionStorage;
 			m_EncryptionStorage = pValue->f_String();
-			bStorageSpecified = !m_EncryptionStorage.f_IsEmpty(); 
+			bStorageSpecified = !m_EncryptionStorage.f_IsEmpty();
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("EncryptionFileSystem"))
 		{
 			o_ChangedSettings |= EApplicationSetting_EncryptionFileSystem;
@@ -53,7 +53,7 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_EncryptionFileSystem;
 			m_EncryptionFileSystem = "xfs";
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("ParentApplication"))
 		{
 			o_ChangedSettings |= EApplicationSetting_ParentApplication;
@@ -76,19 +76,19 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
 			m_bStopOnDependencyFailure = pValue->f_Boolean();
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("VersionManagerApplication"))
 		{
 			o_ChangedSettings |= EApplicationSetting_VersionManagerApplication;
 			m_VersionManagerApplication = pValue->f_String();
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("Executable"))
 		{
 			o_ChangedSettings |= EApplicationSetting_Executable;
 			m_Executable = pValue->f_String();
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("ExecutableParameters"))
 		{
 			if (!_bRelaxed || !m_bSelfUpdateSource)
@@ -99,7 +99,7 @@ namespace NMib::NCloud::NAppManager
 					m_ExecutableParameters.f_Insert(Parameter.f_String());
 			}
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("RunAsUser"))
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsUser;
@@ -112,7 +112,7 @@ namespace NMib::NCloud::NAppManager
 			m_RunAsUserPassword = pValue->f_String();
 		}
 #endif
-		
+
 		if (auto *pValue = _Params.f_GetMember("RunAsGroup"))
 		{
 			o_ChangedSettings |= EApplicationSetting_RunAsGroup;
@@ -168,7 +168,7 @@ namespace NMib::NCloud::NAppManager
 			for (auto &Wildcard : pValue->f_Object())
 				m_Backup_RemoveSyncFlagsWildcards[Wildcard.f_Name()] = CDirectoryManifestFile::fs_ParseSyncFlags(Wildcard.f_Value());
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("BackupNewBackupIntervalHours"))
 		{
 			o_ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
@@ -208,7 +208,7 @@ namespace NMib::NCloud::NAppManager
 				m_UpdateTags[Tag];
 			}
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("UpdateBranches"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateBranches;
@@ -224,25 +224,25 @@ namespace NMib::NCloud::NAppManager
 				m_UpdateBranches[Branch];
 			}
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("UpdateScript_PreUpdate"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_PreUpdate;
 			m_UpdateScripts.m_PreUpdate = pValue->f_String();
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostUpdate"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_PostUpdate;
 			m_UpdateScripts.m_PostUpdate = pValue->f_String();
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("UpdateScript_PostLaunch"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_PostLaunch;
 			m_UpdateScripts.m_PostLaunch = pValue->f_String();
 		}
-		
+
 		if (auto *pValue = _Params.f_GetMember("UpdateScript_OnError"))
 		{
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_OnError;
@@ -250,7 +250,7 @@ namespace NMib::NCloud::NAppManager
 		}
 		return true;
 	}
-	
+
 	void CAppManagerActor::CApplicationSettings::f_ApplySettings(EApplicationSetting _ChangedSettings, CApplicationSettings const &_Source)
 	{
 		if (_ChangedSettings & EApplicationSetting_EncryptionStorage)
@@ -354,10 +354,10 @@ namespace NMib::NCloud::NAppManager
 					return fError("For child application you cannot specify encryption file system");
 			}
 		}
-		
+
 		return true;
 	}
-	
+
 	auto CAppManagerActor::CApplicationSettings::f_ChangedSettings(CApplicationSettings const &_Other) const -> EApplicationSetting
 	{
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
@@ -367,7 +367,7 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_EncryptionFileSystem;
 		if (m_ParentApplication != _Other.m_ParentApplication)
 			ChangedSettings |= EApplicationSetting_ParentApplication;
-			
+
 		if (m_Executable != _Other.m_Executable)
 			ChangedSettings |= EApplicationSetting_Executable;
 		if (m_ExecutableParameters != _Other.m_ExecutableParameters)
@@ -395,7 +395,7 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
 		if (m_bBackupEnabled != _Other.m_bBackupEnabled)
 			ChangedSettings |= EApplicationSetting_BackupEnabled;
-			
+
 		if (m_bDistributedApp != _Other.m_bDistributedApp)
 			ChangedSettings |= EApplicationSetting_DistributedApp;
 		if (m_VersionManagerApplication != _Other.m_VersionManagerApplication)
@@ -441,9 +441,9 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EApplicationSetting_EncryptionStorage;
 			m_EncryptionStorage = _Settings.m_EncryptionStorage;
-			bStorageSpecified = true; 
+			bStorageSpecified = true;
 		}
-		
+
 		if (!_Settings.m_EncryptionFileSystem.f_IsEmpty())
 		{
 			o_ChangedSettings |= EApplicationSetting_EncryptionFileSystem;
@@ -455,27 +455,27 @@ namespace NMib::NCloud::NAppManager
 			m_EncryptionFileSystem = "xfs";
 		}
 	}
-	
+
 	void CAppManagerActor::CApplicationSettings::f_FromInterfaceSettings(CAppManagerInterface::CApplicationSettings const &_Settings, EApplicationSetting &o_ChangedSettings)
 	{
 		if (_Settings.m_VersionManagerApplication)
 		{
-			m_VersionManagerApplication = *_Settings.m_VersionManagerApplication; 
+			m_VersionManagerApplication = *_Settings.m_VersionManagerApplication;
 			o_ChangedSettings |= EApplicationSetting_VersionManagerApplication;
 		}
 		if (_Settings.m_Executable)
 		{
-			m_Executable = *_Settings.m_Executable; 
+			m_Executable = *_Settings.m_Executable;
 			o_ChangedSettings |= EApplicationSetting_Executable;
 		}
 		if (_Settings.m_ExecutableParameters)
 		{
-			m_ExecutableParameters = *_Settings.m_ExecutableParameters; 
+			m_ExecutableParameters = *_Settings.m_ExecutableParameters;
 			o_ChangedSettings |= EApplicationSetting_ExecutableParameters;
 		}
 		if (_Settings.m_RunAsUser)
 		{
-			m_RunAsUser = *_Settings.m_RunAsUser; 
+			m_RunAsUser = *_Settings.m_RunAsUser;
 			o_ChangedSettings |= EApplicationSetting_RunAsUser;
 		}
 		if (_Settings.m_RunAsGroup)
@@ -491,38 +491,38 @@ namespace NMib::NCloud::NAppManager
 
 		if (_Settings.m_Backup_IncludeWildcards)
 		{
-			m_Backup_IncludeWildcards = *_Settings.m_Backup_IncludeWildcards; 
+			m_Backup_IncludeWildcards = *_Settings.m_Backup_IncludeWildcards;
 			o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
 		}
 		if (_Settings.m_Backup_ExcludeWildcards)
 		{
-			m_Backup_ExcludeWildcards = *_Settings.m_Backup_ExcludeWildcards; 
+			m_Backup_ExcludeWildcards = *_Settings.m_Backup_ExcludeWildcards;
 			o_ChangedSettings |= EApplicationSetting_BackupExcludeWildcards;
 		}
 		if (_Settings.m_Backup_AddSyncFlagsWildcards)
 		{
-			m_Backup_AddSyncFlagsWildcards = *_Settings.m_Backup_AddSyncFlagsWildcards; 
+			m_Backup_AddSyncFlagsWildcards = *_Settings.m_Backup_AddSyncFlagsWildcards;
 			o_ChangedSettings |= EApplicationSetting_BackupAddSyncFlagsWildcards;
 		}
 		if (_Settings.m_Backup_RemoveSyncFlagsWildcards)
 		{
-			m_Backup_RemoveSyncFlagsWildcards = *_Settings.m_Backup_RemoveSyncFlagsWildcards; 
+			m_Backup_RemoveSyncFlagsWildcards = *_Settings.m_Backup_RemoveSyncFlagsWildcards;
 			o_ChangedSettings |= EApplicationSetting_BackupRemoveSyncFlagsWildcards;
 		}
 		if (_Settings.m_Backup_NewBackupInterval)
 		{
-			m_Backup_NewBackupInterval = *_Settings.m_Backup_NewBackupInterval; 
+			m_Backup_NewBackupInterval = *_Settings.m_Backup_NewBackupInterval;
 			o_ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
 		}
 		if (_Settings.m_bBackupEnabled)
 		{
-			m_bBackupEnabled = *_Settings.m_bBackupEnabled; 
+			m_bBackupEnabled = *_Settings.m_bBackupEnabled;
 			o_ChangedSettings |= EApplicationSetting_BackupEnabled;
 		}
-		
+
 		if (_Settings.m_bDistributedApp)
 		{
-			m_bDistributedApp = *_Settings.m_bDistributedApp; 
+			m_bDistributedApp = *_Settings.m_bDistributedApp;
 			o_ChangedSettings |= EApplicationSetting_DistributedApp;
 		}
 		if (_Settings.m_bAutoUpdate)
@@ -542,42 +542,42 @@ namespace NMib::NCloud::NAppManager
 		}
 		if (_Settings.m_UpdateScriptPreUpdate)
 		{
-			m_UpdateScripts.m_PreUpdate = *_Settings.m_UpdateScriptPreUpdate; 
+			m_UpdateScripts.m_PreUpdate = *_Settings.m_UpdateScriptPreUpdate;
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_PreUpdate;
 		}
 		if (_Settings.m_UpdateScriptPostUpdate)
 		{
-			m_UpdateScripts.m_PostUpdate = *_Settings.m_UpdateScriptPostUpdate; 
+			m_UpdateScripts.m_PostUpdate = *_Settings.m_UpdateScriptPostUpdate;
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_PostUpdate;
 		}
 		if (_Settings.m_UpdateScriptPostLaunch)
 		{
-			m_UpdateScripts.m_PostLaunch = *_Settings.m_UpdateScriptPostLaunch; 
+			m_UpdateScripts.m_PostLaunch = *_Settings.m_UpdateScriptPostLaunch;
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_PostLaunch;
 		}
 		if (_Settings.m_UpdateScriptOnError)
 		{
-			m_UpdateScripts.m_OnError = *_Settings.m_UpdateScriptOnError; 
+			m_UpdateScripts.m_OnError = *_Settings.m_UpdateScriptOnError;
 			o_ChangedSettings |= EApplicationSetting_UpdateScript_OnError;
 		}
 		if (_Settings.m_bSelfUpdateSource)
 		{
-			m_bSelfUpdateSource = *_Settings.m_bSelfUpdateSource; 
+			m_bSelfUpdateSource = *_Settings.m_bSelfUpdateSource;
 			o_ChangedSettings |= EApplicationSetting_SelfUpdateSource;
 		}
 		if (_Settings.m_UpdateGroup)
 		{
-			m_UpdateGroup = *_Settings.m_UpdateGroup; 
+			m_UpdateGroup = *_Settings.m_UpdateGroup;
 			o_ChangedSettings |= EApplicationSetting_UpdateGroup;
 		}
 		if (_Settings.m_Dependencies)
 		{
-			m_Dependencies = *_Settings.m_Dependencies; 
+			m_Dependencies = *_Settings.m_Dependencies;
 			o_ChangedSettings |= EApplicationSetting_Dependencies;
 		}
 		if (_Settings.m_bStopOnDependencyFailure)
 		{
-			m_bStopOnDependencyFailure = *_Settings.m_bStopOnDependencyFailure; 
+			m_bStopOnDependencyFailure = *_Settings.m_bStopOnDependencyFailure;
 			o_ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
 		}
 		if (_Settings.m_bLaunchInProcess)
@@ -586,7 +586,7 @@ namespace NMib::NCloud::NAppManager
 			o_ChangedSettings |= EApplicationSetting_LaunchInProcess;
 		}
 	}
-	
+
 	void CAppManagerActor::CApplicationSettings::f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings)
 	{
 		auto &ExtraInfo = _Info.m_ExtraInfo;
@@ -617,7 +617,7 @@ namespace NMib::NCloud::NAppManager
 		if (auto *pValue = ExtraInfo.f_GetMember("Backup", EJsonType_Object))
 		{
 			auto &BackupJson = *pValue;
-			
+
 			if (auto pValue = BackupJson.f_GetMember("IncludeWildcards", EJsonType_Array))
 			{
 				o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
@@ -675,13 +675,13 @@ namespace NMib::NCloud::NAppManager
 				m_ExecutableParameters.f_Insert(Param.f_String());
 			}
 		}
-		
+
 		if (auto *pValue = ExtraInfo.f_GetMember("DistributedApp", EJsonType_Boolean))
 		{
 			o_ChangedSettings |= EApplicationSetting_DistributedApp;
 			m_bDistributedApp = pValue->f_Boolean();
 		}
-		
+
 		if (auto *pValue = ExtraInfo.f_GetMember("Dependencies"))
 		{
 			o_ChangedSettings |= EApplicationSetting_Dependencies;

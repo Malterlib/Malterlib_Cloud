@@ -27,10 +27,10 @@ namespace NMib::NCloud::NCloudClient
 				}
 			)
 		;
-		
+
 		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 		(void)DefaultSection;
-		
+
 		DefaultSection.f_RegisterCommand
 			(
 				{

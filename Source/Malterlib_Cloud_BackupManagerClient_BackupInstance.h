@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -11,13 +11,13 @@
 #include "Malterlib_Cloud_BackupManagerClient.h"
 #include "Malterlib_Cloud_BackupManagerClient_Internal.h"
 
-using namespace NMib; 
-using namespace NMib::NConcurrency; 
-using namespace NMib::NContainer; 
-using namespace NMib::NStorage; 
-using namespace NMib::NFile; 
-using namespace NMib::NStr; 
-using namespace NMib::NCryptography; 
+using namespace NMib;
+using namespace NMib::NConcurrency;
+using namespace NMib::NContainer;
+using namespace NMib::NStorage;
+using namespace NMib::NFile;
+using namespace NMib::NStr;
+using namespace NMib::NCryptography;
 using namespace NMib::NStream;
 using namespace NMib::NFunction;
 
@@ -40,7 +40,7 @@ namespace NMib::NCloud::NPrivate
 			)
 		;
 		~CBackupManagerClient_Instance();
-		
+
 		void f_BackupFinishedStarting();
 		void f_MarkActive(bool _bActive);
 		TCFuture<void> f_ManifestChanged
@@ -53,7 +53,7 @@ namespace NMib::NCloud::NPrivate
 		;
 
 	private:
-		
+
 		struct CRunningSyncState
 		{
 			CRunningSyncState();
@@ -69,7 +69,7 @@ namespace NMib::NCloud::NPrivate
 			CDirectoryManifestFile m_ManifestFile;
 			uint32 m_PendingQueue = 0;
 		};
-		
+
 		struct CManifestSyncState
 		{
 			CIntrusiveRefCountWithWeak m_RefCount;
@@ -78,20 +78,20 @@ namespace NMib::NCloud::NPrivate
 			CActorSubscription m_RSyncSubscription;
 			bool m_bDone = false;
 		};
-		
+
 		struct CPendingBackupFile
 		{
 			CStr const &f_GetFileName() const
 			{
 				return TCMap<CStr, CPendingBackupFile>::fs_GetKey(*this);
 			}
-			
+
 			~CPendingBackupFile();
-			
+
 			DMibListLinkDS_Link(CPendingBackupFile, m_Link);
 
 			TCWeakPointer<CRunningSyncState> m_pRunningState;
-			
+
 			CActorSubscription m_RSyncSubscription;
 			mint m_SyncSequence = 0;
 
@@ -104,14 +104,14 @@ namespace NMib::NCloud::NPrivate
 
 			bool m_bFinished = false;
 		};
-		
+
 		struct CManifestChangeInfo
 		{
 			CBackupManagerBackup::CManifestChange m_ManifestChange;
 			TCPromise<void> m_Promise;
 			bool m_bDirty = false;
 		};
-		
+
 		struct CAppendFileCache
 		{
 			CFile m_File;
@@ -148,7 +148,7 @@ namespace NMib::NCloud::NPrivate
 		void fp_ReportBackupError(CStr const &_Error, bool _bFatal);
 
 		TCFuture<void> fp_SyncManifest();
-		
+
 		void fp_ProcessBackupQueue();
 		void fp_RSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, CPendingBackupFile &_PendingFile, mint _SyncSequence);
 		void fp_SendAppendSyncFile
@@ -184,12 +184,12 @@ namespace NMib::NCloud::NPrivate
 		void fp_RunSequencedSyncs(CStr const &_FileName);
 
 		TCSharedPointer<CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
-		
+
 		TCDistributedActor<CBackupManager> mp_BackupManager;
 		TCWeakActor<CBackupManagerClient> mp_BackupManagerClient;
 		CBackupManagerClient::CConfig mp_Config;
 		CTrustedActorInfo mp_ActorInfo;
-		
+
 		CDirectoryManifest mp_Manifest;
 
 		TCSharedPointer<CManifestSyncState> mp_pManifestSyncState;
@@ -200,12 +200,12 @@ namespace NMib::NCloud::NPrivate
 		TCDistributedActorInterface<CBackupManagerBackup> mp_Backup;
 		TCSet<CStr> mp_InitialBackupPendingAdded;
 		TCSet<CStr> mp_InitialBackupPending;
-		
+
 		TCMap<CStr, CPendingBackupFile> mp_PendingFiles;
 		DMibListLinkDS_List(CPendingBackupFile, m_Link) mp_PendingFilesQueue;
 
 		TCVector<CPendingManifestChange> mp_PendingManifestChanges;
-		
+
 		TCMap<CStr, TCSharedPointer<CAppendFileCache>> mp_AppendFileCache;
 		TCMap<CStr, CAppendFileState> mp_AppendFileState;
 
@@ -213,7 +213,7 @@ namespace NMib::NCloud::NPrivate
 		mint mp_nMaxRunningSyncs = 8;
 		mint mp_SyncSequence = 0;
 		mint mp_nPendingManifestChanges = 0;
-		
+
 		bool mp_bBackupStarted = false;
 		bool mp_bBackupStartFailed = false;
 		bool mp_bInitialBackupFinished = false;

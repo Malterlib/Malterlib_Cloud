@@ -151,7 +151,7 @@ namespace NMib::NCloud
 			{
 				NConcurrency::CDistributedAppSensorReporter::CSensorInfoKey Key;
 				_Stream >> Key;
-				
+
 				m_Filter.m_HostID = Key.m_HostID;
 				m_Filter.m_Scope = Key.m_Scope;
 				m_Filter.m_Identifier = Key.m_Identifier;
@@ -215,14 +215,14 @@ namespace NMib::NCloud
 			}
 		}
 	}
-	
+
 	template <typename tf_CStream>
 	void CCloudManager::CSnoozeSensor::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Filter;
 		_Stream % m_SnoozeDuration;
 	}
-	
+
 	template <typename tf_CStream>
 	void CCloudManager::CRemoveAppManagerReturn::f_Stream(tf_CStream &_Stream)
 	{

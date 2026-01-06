@@ -191,7 +191,7 @@ namespace NMib::NCloud
 					++EditDateTime->m_Year;
 
 				EditDateTime->m_DayOfMonth = 1;
-				
+
 				fResetHourMinute(EditDateTime);
 
 				EditDateTime->m_Month = *m_Month;

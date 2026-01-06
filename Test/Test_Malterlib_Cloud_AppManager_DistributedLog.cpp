@@ -16,7 +16,7 @@ public:
 	{
 		DMibTestSuite("General") -> TCFuture<void>
 		{
-			CAppManagerTestHelper::EOption Options 
+			CAppManagerTestHelper::EOption Options
 				= CAppManagerTestHelper::EOption_LaunchTestAppInApp
 				| CAppManagerTestHelper::EOption_EnableVersionManager
 				| CAppManagerTestHelper::EOption_DisablePatchMonitoring
@@ -372,7 +372,7 @@ public:
 		)
 	{
 		CAppManagerTestHelper::EOption Options = CAppManagerTestHelper::EOption_LaunchTestAppInApp
-			| CAppManagerTestHelper::EOption_EnableVersionManager 
+			| CAppManagerTestHelper::EOption_EnableVersionManager
 			| CAppManagerTestHelper::EOption_DisablePatchMonitoring
 			| CAppManagerTestHelper::EOption_DisableDiskMonitoring
 			| CAppManagerTestHelper::EOption_DisableApplicationStatusSensors

@@ -37,13 +37,13 @@ namespace NMib::NCloud::NVersionManager
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListApplications(CListApplications _Params) -> TCFuture<CListApplications::CResult>
 	{
 		auto pThis = m_pThis;
-		
+
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
 
 		Auditor.f_Info("Listing applications");
-		
+
 		auto Applications = co_await (pThis->fp_FilterApplicationsByPermissions("List applications", pThis->fp_ApplicationSet()) % "Permission denied listing applications" % Auditor);
 
 		Auditor.f_Info("Listed applications: {vs,vb}"_f << Applications);
@@ -56,20 +56,20 @@ namespace NMib::NCloud::NVersionManager
 	auto CVersionManagerDaemonActor::CServer::CVersionManagerImplementation::f_ListVersions(CListVersions _Params) -> TCFuture<CListVersions::CResult>
 	{
 		auto pThis = m_pThis;
-		
+
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		
+
 		Auditor.f_Info("Listing versions");
-		
+
 		TCSet<CStr> Applications;
 
 		if (!_Params.m_ForApplication.f_IsEmpty())
 		{
 			if (!CVersionManager::fs_IsValidApplicationName(_Params.m_ForApplication))
 				co_return Auditor.f_Exception("Invalid application format");
-			
+
 			Applications[_Params.m_ForApplication];
 		}
 		else

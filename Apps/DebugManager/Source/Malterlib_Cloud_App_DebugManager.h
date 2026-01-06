@@ -14,12 +14,12 @@
 namespace NMib::NCloud::NDebugManager
 {
 	struct CDebugManagerServer;
-	
+
 	struct CDebugManagerApp : public CDistributedAppActor
 	{
 		CDebugManagerApp();
 		~CDebugManagerApp();
-		
+
 	private:
 		struct CDebugManagerImplementation : public CDebugManager
 		{

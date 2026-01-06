@@ -16,7 +16,7 @@ namespace NMib::NCloud::NDebugManager
 		: CDistributedAppActor(CDistributedAppActor_Settings{"DebugManager"})
 	{
 	}
-	
+
 	CDebugManagerApp::~CDebugManagerApp()
 	{
 	}
@@ -31,7 +31,7 @@ namespace NMib::NCloud::NDebugManager
 	}
 
 	TCFuture<void> CDebugManagerApp::fp_StopApp()
-	{	
+	{
 		co_await fp_DestroyAll();
 
 		co_return {};

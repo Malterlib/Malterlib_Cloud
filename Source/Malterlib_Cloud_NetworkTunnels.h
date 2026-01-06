@@ -13,7 +13,7 @@ namespace NMib::NCloud
 	struct ICNetworkTunnels : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/NetworkTunnel";
-		
+
 		ICNetworkTunnels();
 		~ICNetworkTunnels();
 

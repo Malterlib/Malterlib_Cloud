@@ -239,7 +239,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto InProgressScope = co_await (fp_SetInProgressWithWait(pApplication, "ChangeApplicationSettings") % Auditor);
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
-		
+
 		if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !_bForce)
 		{
 			Application.m_Settings = NewSettings;

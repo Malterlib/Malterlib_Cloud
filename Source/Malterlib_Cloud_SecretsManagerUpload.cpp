@@ -66,7 +66,7 @@ namespace NMib::NCloud
 			bool m_bAborted = false;
 		};
 	}
-	
+
 	TCFuture<CDirectorySyncSend::CSyncResult> DMibWorkaroundUBSanSectionErrors fg_UploadSecretFile
 		(
 			TCDistributedActor<CSecretsManager> _SecretsManager

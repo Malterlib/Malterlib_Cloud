@@ -451,7 +451,7 @@ namespace NMib::NCloud::NBackupManager
 					}
 				}
 			;
-			
+
 			auto &Change = _ManifestChange;
 			switch (Change.f_GetTypeID())
 			{

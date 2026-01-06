@@ -53,7 +53,7 @@ class CAppManager : public CApplication
 		;
 
 		return Daemon.f_Run();
-	}	
+	}
 };
 
 DAppImplement(CAppManager);

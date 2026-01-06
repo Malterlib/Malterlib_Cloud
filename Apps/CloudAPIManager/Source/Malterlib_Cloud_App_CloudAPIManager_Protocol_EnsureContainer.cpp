@@ -13,23 +13,23 @@
 
 namespace NMib::NCloud::NCloudAPIManager
 {
-	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_EnsureContainer(CEnsureContainer _Params) -> TCFuture<CEnsureContainer::CResult> 
+	auto CCloudAPIManagerDaemonActor::CServer::CCloudAPIManagerImplementation::f_EnsureContainer(CEnsureContainer _Params) -> TCFuture<CEnsureContainer::CResult>
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		
+
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
 			co_return Auditor.f_Exception("Cloud context format not valid");
-		
+
 		if (!CCloudAPIManager::fs_IsValidContainerName(_Params.m_ContainerName))
 			co_return Auditor.f_Exception("Container name format not valid");
-		
+
 		// Empty key locks the container
 		if (!_Params.m_TempURLKey.f_IsEmpty() &&  !CCloudAPIManager::fs_IsValidTempURLKey(_Params.m_TempURLKey))
 			co_return Auditor.f_Exception("Temp URL key format not valid");
 
 		TCVector<CStr> Permissions = {"ObjectStorage/EnsureContainerAll", "ObjectStorage/EnsureContainer/{}"_f << _Params.m_CloudContext};
-		
+
 		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Ensure container in cloud API manager", Permissions) % "Permission denied ensuring container" % Auditor);
 
 		if (bHasPermission)

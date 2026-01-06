@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -31,7 +31,7 @@ namespace NMib::NCloud
 		: mp_pInternal(fg_Construct(this, _Config, _TrustManager, fg_Move(_fOnNewBackup)))
 	{
 		auto &Internal = *mp_pInternal;
-		
+
 		Internal.f_Construct(_DistributionManager);
 	}
 
@@ -155,12 +155,12 @@ namespace NMib::NCloud
 					-> TCTuple<CDirectoryManifest, TCMap<CStr, CUniqueFileIdentifier>, TCMap<CStr, TCSharedPointer<CAppendFileState>>>
 					{
 						TCMap<CStr, CFile::CFileChecksumState_SHA256> SourceAppendStates;
-						
+
 						auto Manifest = CDirectoryManifest::fs_GetManifest(Config, [&]{ fs_CheckDestroy(pDestroyed); }, &SourceAppendStates, gc_ChecksumFileFlags);
 						Manifest.m_Files.f_Remove("");
 						TCMap<CStr, CUniqueFileIdentifier> FileIDs;
 						TCMap<CStr, TCSharedPointer<CAppendFileState>> AppendStates;
-						
+
 						for (auto &File : Manifest.m_Files)
 						{
 							if (File.m_Attributes & (EFileAttrib_Link | EFileAttrib_Directory))
@@ -170,7 +170,7 @@ namespace NMib::NCloud
 
 							auto AbsolutePath = CFile::fs_AppendPath(Config.m_Root, File.m_OriginalPath);
 							FileIDs[FileName] = CFile::fs_GetUniqueIdentifier(AbsolutePath);
-							
+
 							if (auto *pSourceAppendState = SourceAppendStates.f_FindEqual(FileName))
 							{
 								auto &AppendState = *(AppendStates[FileName] = fg_Construct());
@@ -204,7 +204,7 @@ namespace NMib::NCloud
 							m_ChecksumState[m_AppendStates.fs_GetKey(pAppendState)] = pAppendState->m_ChecksumState;
 
 						f_NewBackupKey();
-						
+
 						if (m_fOnNewBackup)
 						{
 							m_fOnNewBackup
@@ -230,7 +230,7 @@ namespace NMib::NCloud
 						}
 						else
 							f_BackupFinishedStarting();
-						
+
 						f_Subscribe();
 					}
 				;

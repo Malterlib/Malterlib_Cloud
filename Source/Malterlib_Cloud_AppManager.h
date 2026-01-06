@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -34,10 +34,10 @@ namespace NMib::NCloud
 			, EProtocolVersion_ResumableUpdateNotifications = 0x119
 			, EProtocolVersion_Current = 0x119
 		};
-		
+
 		CAppManagerInterface();
 		~CAppManagerInterface();
-		
+
 		enum EUpdateStage : uint32
 		{
 			EUpdateStage_Failed						= 0x70000000
@@ -84,12 +84,12 @@ namespace NMib::NCloud
 			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other) : CVersionManager::CVersionIDAndPlatform(_Other) { }
 			CVersionIDAndPlatform &operator = (CVersionManager::CVersionIDAndPlatform const &_Right) { static_cast<CVersionManager::CVersionIDAndPlatform &>(*this) = _Right; return *this; }
 		};
-		
+
 		struct CVersionID : public CVersionManager::CVersionID
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			CVersionID() = default;
 			CVersionID(CVersionID const &) = default;
 			CVersionID(CVersionID &&) = default;
@@ -99,12 +99,12 @@ namespace NMib::NCloud
 			CVersionID(CVersionManager::CVersionID const &_Other) : CVersionManager::CVersionID(_Other) { }
 			CVersionID &operator = (CVersionManager::CVersionID const &_Right) { static_cast<CVersionManager::CVersionID &>(*this) = _Right; return *this; }
 		};
-		
+
 		struct CVersionInformation : public CVersionManager::CVersionInformation
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			CVersionInformation() = default;
 			CVersionInformation(CVersionInformation const &) = default;
 			CVersionInformation(CVersionInformation &&) = default;
@@ -114,14 +114,14 @@ namespace NMib::NCloud
 			CVersionInformation(CVersionManager::CVersionInformation const &_Other) : CVersionManager::CVersionInformation(_Other) { }
 			CVersionInformation &operator = (CVersionManager::CVersionInformation const &_Right) { static_cast<CVersionManager::CVersionInformation &>(*this) = _Right; return *this; }
 		};
-		
+
 		struct CApplicationSettings
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NStorage::TCOptional<NStr::CStr> m_VersionManagerApplication;	/// If left empty when adding an application an null application is added. 
-																			/// Useful for using as encrypted parent application 
+			NStorage::TCOptional<NStr::CStr> m_VersionManagerApplication;	/// If left empty when adding an application an null application is added.
+																			/// Useful for using as encrypted parent application
 			NStorage::TCOptional<NStr::CStr> m_UpdateGroup;
 			NStorage::TCOptional<NStr::CStr> m_Executable;
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ExecutableParameters;
@@ -134,7 +134,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag>> m_Backup_AddSyncFlagsWildcards;
 			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag>> m_Backup_RemoveSyncFlagsWildcards;
 			NStorage::TCOptional<NTime::CTimeSpan> m_Backup_NewBackupInterval;
-			
+
 			NStorage::TCOptional<bool> m_bAutoUpdate;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_UpdateTags;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_UpdateBranches; // Are wild cards
@@ -143,14 +143,14 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptPostLaunch;
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptOnError;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Dependencies;
-			
+
 			NStorage::TCOptional<bool> m_bDistributedApp;
 			NStorage::TCOptional<bool> m_bSelfUpdateSource;
 			NStorage::TCOptional<bool> m_bStopOnDependencyFailure;
 			NStorage::TCOptional<bool> m_bBackupEnabled;
 			NStorage::TCOptional<bool> m_bLaunchInProcess;
 		};
-		
+
 		struct CApplicationInfo
 		{
 			template <typename tf_CStream>
@@ -162,7 +162,7 @@ namespace NMib::NCloud
 			{
 				return NContainer::TCMap<NStr::CStr, CApplicationInfo>::fs_GetKey(*this);
 			}
-			
+
 			// State
 			NStr::CStr m_Status;
 			EStatusSeverity m_StatusSeverity = EStatusSeverity_None;
@@ -174,7 +174,7 @@ namespace NMib::NCloud
 
 			// Updatable
 			NStr::CStr m_HostID;
-			
+
 			CVersionIDAndPlatform m_Version;
 			CVersionInformation m_VersionInfo;
 
@@ -202,7 +202,7 @@ namespace NMib::NCloud
 			NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
 			NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
 			NTime::CTimeSpan m_Backup_NewBackupInterval;
-			
+
 			bool m_bAutoUpdate = false;
 			NContainer::TCSet<NStr::CStr> m_UpdateTags;
 			NContainer::TCSet<NStr::CStr> m_UpdateBranches;
@@ -211,23 +211,23 @@ namespace NMib::NCloud
 			NStr::CStr m_UpdateScriptPostLaunch;
 			NStr::CStr m_UpdateScriptOnError;
 			NContainer::TCSet<NStr::CStr> m_Dependencies;
-			
+
 			bool m_bSelfUpdateSource = false;
 			bool m_bDistributedApp = false;
 			bool m_bStopOnDependencyFailure = true;
 			bool m_bBackupEnabled = false;
 			bool m_bLaunchInProcess = false;
 		};
-		
+
 		struct CApplicationVersion
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			CVersionIDAndPlatform m_VersionID;
 			CVersionInformation m_VersionInfo;
 		};
-		
+
 		struct CUpdateNotification
 		{
 			template <typename tf_CStream>
@@ -254,31 +254,31 @@ namespace NMib::NCloud
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NStr::CStr m_ParentApplication;
 			NStr::CStr m_EncryptionStorage;
 			NStr::CStr m_EncryptionFileSystem;
-			NStorage::TCOptional<CVersionIDAndPlatform> m_Version; // If not specified the latest known version will be used 
-			
+			NStorage::TCOptional<CVersionIDAndPlatform> m_Version; // If not specified the latest known version will be used
+
 			bool m_bForceOverwriteEncryption = false; // If an encrypted volume is found to be used already, force it to be overwritten
 			bool m_bForceInstall = false; // Force application install even if application directory already exists
 			bool m_bSettingsFromVersionInfo = true; // Get settings from version downloaded
 		};
-		
+
 		struct CApplicationUpdate
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_RequireTags; // Defaults to tags in application settings
 			NStorage::TCOptional<NStr::CStr> m_Platform; // Defaults to same as last installed version
 			NStorage::TCOptional<CVersionID> m_Version; // Defaults to newest version available
-			
+
 			bool m_bUpdateSettings = true; // Update settings from from downloaded version info
 			bool m_bDryRun = false; // Just download and extract application, don't actually update
 			bool m_bBypassCoordination = false; // Behave as if application is has independent update type
 		};
-		
+
 		struct CApplicationChangeSettings
 		{
 			template <typename tf_CStream>
@@ -287,7 +287,7 @@ namespace NMib::NCloud
 			bool m_bUpdateFromVersionInfo = false; // Update settings from the last installed version manager application info.
 			bool m_bForce = false; // Force running the update process even if no settings are changed.
 		};
-		
+
 		using CVersionsAvailableForUpdate = NContainer::TCMap<NStr::CStr, NContainer::TCVector<CApplicationVersion>>;
 
 		struct CApplicationChange_AddOrChangeInfo
@@ -369,12 +369,12 @@ namespace NMib::NCloud
 										/// applications with the same platform as it's running under and all platforms of any application it has installed.
 			) = 0
 		;
-		
+
 		virtual NConcurrency::TCFuture<void> f_Add(NStr::CStr _Name, CApplicationAdd _Add, CApplicationSettings _Settings) = 0;
 		virtual NConcurrency::TCFuture<void> f_Remove(NStr::CStr _Name) = 0;
 
 		virtual NConcurrency::TCFuture<void> f_Update(NStr::CStr _Name, CApplicationUpdate _Update) = 0;
-		
+
 		virtual NConcurrency::TCFuture<void> f_Start(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_Stop(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_Restart(NStr::CStr _Name) = 0;

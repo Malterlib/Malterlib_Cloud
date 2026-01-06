@@ -14,14 +14,14 @@ namespace NMib::NCloud::NCloudAPIManager
 	TCFuture<void> CCloudAPIManagerDaemonActor::CServer::fp_SetupDDPBridge()
 	{
 		mp_DDPBridge = fg_ConstructActor<CDistributedTrustDDPBridge>(mp_AppState.m_TrustManager);
-		
+
 		mp_DDPBridgeSubscription = co_await mp_DDPBridge(&CDistributedTrustDDPBridge::f_RegisterMethods, fp_GetDDPMethods());
 
 		co_await mp_DDPBridge(&CDistributedTrustDDPBridge::f_Startup);
 
 		co_return {};
 	}
-	
+
 	TCVector<CDistributedTrustDDPBridge::CMethod> CCloudAPIManagerDaemonActor::CServer::fp_GetDDPMethods()
 	{
 		return NContainer::fg_CreateVector<CDistributedTrustDDPBridge::CMethod>
@@ -56,7 +56,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 							NException::CDisableExceptionTraceScope DisableTracing;
 							auto &InputParams = _Params[0];
-							Params.m_CloudContext = InputParams["cloudContext"].f_String(); 
+							Params.m_CloudContext = InputParams["cloudContext"].f_String();
 							Params.m_ContainerName = InputParams["containerName"].f_String();
 							Params.m_TempURLKey = InputParams["tempURLKey"].f_String();
 						}
@@ -102,11 +102,11 @@ namespace NMib::NCloud::NCloudAPIManager
 
 							NException::CDisableExceptionTraceScope DisableTracing;
 							auto &InputParams = _Params[0];
-							Params.m_CloudContext = InputParams["cloudContext"].f_String(); 
+							Params.m_CloudContext = InputParams["cloudContext"].f_String();
 							Params.m_ContainerName = InputParams["containerName"].f_String();
 							Params.m_ObjectId = InputParams["objectId"].f_String();
 						}
-						
+
 						co_await mp_ProtocolInterface.m_pActor->f_DeleteObject(fg_Move(Params));
 
 						co_return {};

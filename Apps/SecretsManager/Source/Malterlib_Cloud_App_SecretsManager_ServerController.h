@@ -18,7 +18,7 @@ namespace NMib::NCloud::NSecretsManager
 	{
 	public:
 		using CActorHolder = CDelegatedActorHolder;
-		
+
 		CServerController(TCActor<> const &_Delegator, CDistributedAppState &_AppState);
 		~CServerController();
 
@@ -31,7 +31,7 @@ namespace NMib::NCloud::NSecretsManager
 	private:
 		TCFuture<void> fp_Destroy() override;
 		TCFuture<void> fp_KeyManagerAvailable(TCDistributedActor<CKeyManager> _KeyManager);
-		
+
 		TCActor<CSecretsManagerDaemonActor::CServer> mp_ServerActor;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
 		TCSet<TCActor<CSecretsManagerServerDatabase>> mp_PendingDatabases;

@@ -12,7 +12,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		auto Auditor = f_Auditor();
 
 		CStr Name = _Params["Distribution"].f_String();
-		
+
 		if (!mp_Distributions.f_FindEqual(Name))
 			co_return Auditor.f_Exception(fg_Format("No such distribution '{}'", Name));
 

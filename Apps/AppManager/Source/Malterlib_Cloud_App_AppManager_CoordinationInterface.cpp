@@ -9,16 +9,16 @@ namespace NMib::NCloud::NAppManager
 {
 	CAppManagerCoordinationInterface::CAppManagerCoordinationInterface()
 	{
-		DPublishActorFunction(CAppManagerCoordinationInterface::f_RemoveKnownHost); 
+		DPublishActorFunction(CAppManagerCoordinationInterface::f_RemoveKnownHost);
 		DPublishActorFunction(CAppManagerCoordinationInterface::f_SubscribeToAppChanges);
 	}
-	
+
 	CAppManagerCoordinationInterface::~CAppManagerCoordinationInterface()
 	{
 	}
 
 	static_assert(CVersionManager::EProtocolVersion_Min <= 0x105);
-	
+
 	template <typename tf_CStream>
 	void CAppManagerCoordinationInterface::CVersionIDAndPlatform::f_Stream(tf_CStream &_Stream)
 	{
@@ -33,7 +33,7 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_Group;
 		_Stream % m_VersionManagerApplication;
 		_Stream % m_VersionID;
-		_Stream % m_VersionTime;	
+		_Stream % m_VersionTime;
 		_Stream % m_FailedVersionID;
 		_Stream % m_FailedVersionTime;
 		_Stream % m_FailedVersionRetrySequence;
@@ -45,14 +45,14 @@ namespace NMib::NCloud::NAppManager
 			_Stream % m_bAutoUpdate;
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppInfo);
-	
+
 	template <typename tf_CStream>
 	void CAppManagerCoordinationInterface::CAppChange_Remove::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Application;
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppChange_Remove);
-	
+
 	template <typename tf_CStream>
 	void CAppManagerCoordinationInterface::CAppChange_Update::f_Stream(tf_CStream &_Stream)
 	{
@@ -60,8 +60,8 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_Application;
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppChange_Update);
-	
-	
+
+
 	template <typename tf_CStream>
 	void CAppManagerCoordinationInterface::CAppChange_AddKnownHosts::f_Stream(tf_CStream &_Stream)
 	{
@@ -70,7 +70,7 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_KnownHosts;
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppChange_AddKnownHosts);
-	
+
 	TCFuture<void> CAppManagerActor::fp_PublishCoordinationInterface()
 	{
 		return mp_AppManagerCoordinationInterface.f_Publish<CAppManagerCoordinationInterface>(mp_State.m_DistributionManager, this);

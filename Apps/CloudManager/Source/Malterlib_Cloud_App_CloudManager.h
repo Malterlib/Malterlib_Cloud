@@ -11,12 +11,12 @@
 namespace NMib::NCloud::NCloudManager
 {
 	struct CCloudManagerServer;
-	
+
 	struct CCloudManagerApp : public CDistributedAppActor
 	{
 		CCloudManagerApp();
 		~CCloudManagerApp();
-		
+
 	private:
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;

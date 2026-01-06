@@ -13,10 +13,10 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		CSecretsManagerDaemonActor();
 		~CSecretsManagerDaemonActor();
-		
+
 		struct CServer;
 		struct CServerController;
-		
+
 	private:
 		TCFuture<void> fp_StartApp(CEJsonSorted const _Params) override;
 		TCFuture<void> fp_StopApp() override;

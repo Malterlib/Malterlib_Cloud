@@ -27,7 +27,7 @@ class CVersionManager : public CApplication
 			}
 		;
 		return Daemon.f_Run();
-	}	
+	}
 };
 
 DAppImplement(CVersionManager);

@@ -15,7 +15,7 @@ namespace NMib::NCloud::NDebugManagerClient
 		: CDistributedAppActor(CDistributedAppActor_Settings{"DebugManagerClient"})
 	{
 	}
-	
+
 	CDebugManagerClientApp::~CDebugManagerClientApp()
 	{
 	}
@@ -40,7 +40,7 @@ namespace NMib::NCloud::NDebugManagerClient
 	}
 
 	TCFuture<void> CDebugManagerClientApp::fp_StopApp()
-	{	
+	{
 		co_return {};
 	}
 

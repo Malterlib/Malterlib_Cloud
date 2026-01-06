@@ -108,7 +108,7 @@ namespace NMib::NCloud
 				auto &Subscription = Internal.m_ChangeSubscriptions[SubscriptionID];
 				Subscription.m_Subscription = fg_Move(_Subscribe);
 				Subscription.m_CallingHostInfo = CallingHostInfo;
-				
+
 				auto SubscriptionHandle = g_ActorSubscription / [pThis = m_pThis, SubscriptionID]() -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
@@ -149,7 +149,7 @@ namespace NMib::NCloud
 
 					if (!bAccessAll && !HasPermissions[TunnelName])
 						continue;
-					
+
 					Change.m_Tunnels[TunnelName].m_Metadata = Tunnel.m_Metadata;
 				}
 
@@ -358,7 +358,7 @@ namespace NMib::NCloud
 		for (auto &SubscriptionEntry : m_ChangeSubscriptions.f_Entries())
 		{
 			auto &SubscriptionID = SubscriptionEntry.f_Key();
-			
+
 			m_Permissions.f_HasPermission
 				(
 					"Open connection"

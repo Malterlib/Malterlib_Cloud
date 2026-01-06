@@ -16,7 +16,7 @@ namespace NMib::NCloud::NCloudManager
 		: CDistributedAppActor(CDistributedAppActor_Settings{"CloudManager"})
 	{
 	}
-	
+
 	CCloudManagerApp::~CCloudManagerApp()
 	{
 	}
@@ -30,7 +30,7 @@ namespace NMib::NCloud::NCloudManager
 	}
 
 	TCFuture<void> CCloudManagerApp::fp_StopApp()
-	{	
+	{
 		if (!mp_Server)
 			co_return {};
 

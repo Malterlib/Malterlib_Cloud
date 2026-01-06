@@ -31,7 +31,7 @@ namespace NMib::NCloud
 		CDebugManagerHelper(CDebugManagerHelper &&);
 		CDebugManagerHelper &operator = (CDebugManagerHelper const &);
 		CDebugManagerHelper &operator = (CDebugManagerHelper &&);
-		
+
 		struct CUploadResult
 		{
 			CFileTransferResult m_TransferResult;
@@ -50,7 +50,7 @@ namespace NMib::NCloud
 				, int32 _CompressionLevel = 3
 			) const
 		;
-		
+
 		NConcurrency::TCUnsafeFuture<CFileTransferResult> f_Asset_Download
 			(
 				NConcurrency::TCDistributedActor<CDebugManager> _DebugManager
@@ -73,7 +73,7 @@ namespace NMib::NCloud
 				, int32 _CompressionLevel = 3
 			) const
 		;
-		
+
 		NConcurrency::TCUnsafeFuture<CFileTransferResult> f_CrashDump_Download
 			(
 				NConcurrency::TCDistributedActor<CDebugManager> _DebugManager

@@ -8,7 +8,7 @@
 namespace NMib::NCloud
 {
 	using namespace NStr;
-	
+
 	ICNetworkTunnels::ICNetworkTunnels()
 	{
 		DMibPublishActorFunction(ICNetworkTunnels::f_EnumerateTunnels);

@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -37,12 +37,12 @@ namespace NMib::NCloud
 
 	struct CBackupManagerBackup : public NConcurrency::CActor
 	{
-		enum : uint32 
+		enum : uint32
 		{
 			EProtocolVersion_Min = EBackupManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EBackupManagerProtocolVersion_Current
 		};
-		
+
 		enum EManifestChange
 		{
 			EManifestChange_Change
@@ -72,7 +72,7 @@ namespace NMib::NCloud
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NContainer::TCMap<NStr::CStr, NCryptography::CHashDigest_SHA256> m_FilesNotUpToDate;
 		};
 
@@ -102,7 +102,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 		};
 
-		struct CManifestChange_Rename : public CManifestChange_Change 
+		struct CManifestChange_Rename : public CManifestChange_Change
 		{
 			CManifestChange_Rename() = default;
 			CManifestChange_Rename(CManifestChange_Rename &&) = default;
@@ -180,21 +180,21 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCFuture<CInitialBackupFinishedResult> f_InitialBackupFinished(EInitialBackupFinishedFlag _FinishedFlags) = 0;
 	};
-	
+
 	struct CBackupManager : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/BackupManager";
-		
+
 		enum : uint32
 		{
 			EProtocolVersion_Min = EBackupManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EBackupManagerProtocolVersion_Current
 		};
-		
+
 		CBackupManager();
-		
+
 		static bool fs_IsValidProtocolVersion(uint32 _Version);
-	
+
 		static bool fs_IsValidHostname(NStr::CStr const &_String);
 		static bool fs_IsValidBackupSource(NStr::CStr const &_String, NStr::CStr *o_pFriendlyName, NStr::CStr *o_pHostID);
 		static bool fs_IsValidBackup(NStr::CStr const &_String, NStr::CStr *o_pBackupID, NTime::CTime *o_pTime);
@@ -209,7 +209,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 		};
-		
+
 		struct CBackupID
 		{
 			template <typename tf_CStream>
@@ -221,7 +221,7 @@ namespace NMib::NCloud
 			NTime::CTime m_Time;
 			NStr::CStr m_ID;
 		};
-		
+
 		enum EInitBackupFlag
 		{
 			EInitBackupFlag_None = 0
@@ -261,7 +261,7 @@ namespace NMib::NCloud
 			NTime::CTime m_Latest;
 			NContainer::TCVector<NTime::CTime> m_Snapshots;
 		};
-		
+
 		// Deprecated - Start
 		struct CStartBackup
 		{
@@ -277,11 +277,11 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			CBackupKey m_BackupKey;
 			uint32 m_Version = 0;
 		};
-		
+
 		struct CUploadData
 		{
 			struct CResult
@@ -291,7 +291,7 @@ namespace NMib::NCloud
 
 				uint32 m_Version = 0;
 			};
-			
+
 			enum EFlag
 			{
 				EFlag_None = 0
@@ -308,7 +308,7 @@ namespace NMib::NCloud
 			EFlag m_Flags = EFlag_None;
 			NContainer::CIOByteVector m_Data;
 		};
-		
+
 		struct CStopBackup
 		{
 			struct CResult
@@ -319,31 +319,31 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			CBackupKey m_BackupKey;
 		};
-		
+
 		struct CStartDownloadBackup
 		{
 			struct CResult
 			{
 				template <typename tf_CStream>
 				void f_Stream(tf_CStream &_Stream);
-				
+
 				NConcurrency::CActorSubscription m_Subscription;
 			};
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-			
+
 			NStr::CStr f_GetDesc() const;
-			
+
 			NStr::CStr m_BackupSource;
 			CBackupID m_BackupID;
 			NStorage::TCOptional<CFileTransferContextDeprecated> m_TransferContextDeprecated;
 		};
 		// Deprecated - End
-		
+
 		// Deprecated - Start
 		virtual NConcurrency::TCFuture<CStartBackup::CResult> f_StartBackup(CStartBackup _Params);
 		virtual NConcurrency::TCFuture<CStopBackup::CResult> f_StopBackup(CStopBackup _Params);
@@ -354,10 +354,10 @@ namespace NMib::NCloud
 		virtual auto f_InitBackup(CInitBackup _Params)
 			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CBackupManagerBackup>> = 0
 		;
-		
+
 		virtual NConcurrency::TCFuture<NContainer::TCVector<NStr::CStr>> f_ListBackupSources() = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CBackupInfo>> f_ListBackups(NStr::CStr _ForBackupSource) = 0;
-		
+
 		virtual auto f_DownloadBackup(CDownloadBackup _DownloadBackup)
 			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>>
 			= 0

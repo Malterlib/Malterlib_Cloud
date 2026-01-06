@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -10,7 +10,7 @@ namespace NMib::NCloud
 	DMibImpErrorClassImplement(CExceptionSecretsManagerUnexpectedValue);
 
 	using namespace NStr;
-	
+
 	CSecretsManager::CSecretsManager()
 	{
 		DMibPublishActorFunction(CSecretsManager::f_EnumerateSecrets);
@@ -63,31 +63,31 @@ namespace NMib::NCloud
 		m_Secret = fg_Move(_Secret);
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_SetUserName(NStr::CStrSecure const &_UserName) && -> CSecretProperties &&
 	{
 		m_UserName = _UserName;
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_SetURL(NStr::CStrSecure const &_URL) && -> CSecretProperties &&
 	{
 		m_URL = _URL;
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_SetExpires(NTime::CTime const &_Expires) && -> CSecretProperties &&
 	{
 		m_Expires = _Expires;
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_SetNotes(NStr::CStrSecure const &_Notes) && -> CSecretProperties &&
 	{
 		m_Notes = _Notes;
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_SetMetadata(NStr::CStrSecure const &_MetadataKey, NEncoding::CEJsonSorted &&_MetadataValue) && -> CSecretProperties &&
 	{
 		if (!m_Metadata)
@@ -95,31 +95,31 @@ namespace NMib::NCloud
 		(*m_Metadata)[_MetadataKey] = _MetadataValue;
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_SetCreated(NTime::CTime const &_Created) && -> CSecretProperties &&
 	{
 		m_Created = _Created;
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_SetModified(NTime::CTime const &_Modified) && -> CSecretProperties &&
 	{
 		m_Modified = _Modified;
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_SetSemanticID(NStr::CStrSecure const &_SemanticID) && -> CSecretProperties &&
 	{
 		m_SemanticID = _SemanticID;
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_SetTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) && -> CSecretProperties &&
 	{
 		m_Tags = fg_Move(_Tags);
 		return fg_Move(*this);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_AddTags(NContainer::TCSet<NStr::CStrSecure> &&_Tags) && -> CSecretProperties &&
 	{
 		if (!m_Tags)
@@ -215,49 +215,49 @@ namespace NMib::NCloud
 		static CSecret s_Secret;
 		return m_Secret.f_Get(s_Secret);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_GetUserName() const -> NStr::CStrSecure const &
 	{
 		static NStr::CStrSecure s_UserName;
 		return m_UserName.f_Get(s_UserName);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_GetURL() const -> NStr::CStrSecure const &
 	{
 		static NStr::CStrSecure s_URL;
 		return m_URL.f_Get(s_URL);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_GetExpires() const -> NTime::CTime const &
 	{
 		static NTime::CTime s_Expires;
 		return m_Expires.f_Get(s_Expires);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_GetNotes() const -> NStr::CStrSecure const &
 	{
 		static NStr::CStrSecure s_Notes;
 		return m_Notes.f_Get(s_Notes);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_GetMetadata() const -> NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJsonSorted> const &
 	{
 		static NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJsonSorted> s_Metadata;
 		return m_Metadata.f_Get(s_Metadata);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_GetCreated() const -> NTime::CTime const &
 	{
 		static NTime::CTime s_Created;
 		return m_Created.f_Get(s_Created);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_GetModified() const -> NTime::CTime const &
 	{
 		static NTime::CTime s_Modified;
 		return m_Modified.f_Get(s_Modified);
 	}
-	
+
 	auto CSecretsManager::CSecretProperties::f_GetSemanticID() const -> NStr::CStrSecure const &
 	{
 		static NStr::CStrSecure s_SemanticID;
@@ -311,7 +311,7 @@ namespace NMib::NCloud
 			}
 		};
 	};
-	
+
 	bool CSecretsManager::CSecret::operator == (CSecret const &_Right) const
 	{
 		return fg_VisitRet<bool>(NPrivate::CSecretEqualsVisitor(), *this, _Right);

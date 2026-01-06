@@ -19,7 +19,7 @@ namespace NMib::NCloud::NSecretsManager
 				, "Manages secrets for Malterlib cloud apps."
 			)
 		;
-		
+
 		[[maybe_unused]] auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 	}
 }

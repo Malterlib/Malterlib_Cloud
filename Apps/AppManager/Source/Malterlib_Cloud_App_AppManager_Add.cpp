@@ -37,7 +37,7 @@ namespace NMib::NCloud::NAppManager
 				, _Add.m_bForceOverwriteEncryption
 				, _Add.m_bForceInstall
 				, _Add.m_bSettingsFromVersionInfo
-				, [](CStr const &_Info) 
+				, [](CStr const &_Info)
 				{
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Add: {}", _Info);
 				}
@@ -54,7 +54,7 @@ namespace NMib::NCloud::NAppManager
 		CStr Name = _Params["Name"].f_String();
 		bool bForceOverwrite = _Params["ForceOverwrite"].f_Boolean();
 		bool bForceInstall = _Params["ForceInstall"].f_Boolean();
-		
+
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		CApplicationSettings Settings;
 		{
@@ -68,14 +68,14 @@ namespace NMib::NCloud::NAppManager
 			Version = pValue->f_String();
 
 		bool bNullPackage = _Params["Package"].f_Type() == EJsonType_Null;
-		
+
 		CStr Package;
 		if (!bNullPackage)
 			Package = _Params["Package"].f_String();
-		
+
 		if (Package.f_IsEmpty() && !bNullPackage)
 			co_return DMibErrorInstance("You have to specify a package");
-		
+
 		bool bFromFile = _Params["FromFile"].f_Boolean();
 
 		if (bFromFile && bNullPackage)
@@ -90,10 +90,10 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		bool bSettingsFromVersionInfo = _Params["SettingsFromVersionInfo"].f_Boolean();
-		
+
 		CStr Platform;
 		TCOptional<CVersionManager::CVersionIDAndPlatform> VersionID;
-		
+
 		if (!bFromFile && !bNullPackage)
 		{
 			CVersionManager::CVersionIDAndPlatform VersionIDTemp;
@@ -113,7 +113,7 @@ namespace NMib::NCloud::NAppManager
 		}
 		else if (!bNullPackage)
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
-		
+
 		auto Result = co_await fp_AddApplication
 			(
 				Name
@@ -127,7 +127,7 @@ namespace NMib::NCloud::NAppManager
 					*_pCommandLine += _Info + DMibNewLine;
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Add: {}", _Info);
 				}
-				, bFromFile ? Package : CStr() 
+				, bFromFile ? Package : CStr()
 				, VersionID
 				, CallingHostInfo
 			)
@@ -136,7 +136,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return _pCommandLine->f_AddAsyncResult(Result);
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_AddApplication
 		(
 			NStr::CStr _Name

@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -15,7 +15,7 @@ namespace NMib::NCloud
 	{
 		auto const Json = NEncoding::CEJsonSorted::fs_FromString(_String);
 		CCloudVersionInfo VersionInfo;
-		
+
 		NStr::CStr Error;
 		CVersionManager::CVersionID VersionID;
 		CVersionManager::fs_IsValidVersionIdentifier(Json["Version"].f_String(), Error, &VersionID);
@@ -25,14 +25,14 @@ namespace NMib::NCloud
 		VersionInfo.m_Configuration = Json["Configuration"].f_String();
 		VersionInfo.m_Application = Json["Application"].f_String();
 		VersionInfo.m_ExtraInfo = Json["ExtraInfo"];
-		
+
 		return VersionInfo;
 	}
 
 	NEncoding::CEJsonSorted CCloudVersion::f_ToJson() const
 	{
 		using namespace NEncoding;
-		
+
 		CEJsonSorted Return;
 		Return["Branch"] = fg_ToJson(m_Branch);
 		Return["Major"] = fg_ToJson(m_Major);

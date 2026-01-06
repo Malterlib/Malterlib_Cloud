@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -18,16 +18,16 @@ namespace NMib::NCloud
 	{
 		struct CBackupManagerClient_Instance;
 	}
-	
+
 	/// \brief Implements a client that backs up through backup manager interface
 	struct CBackupManagerClient : public NConcurrency::CActor
 	{
 		using EManifestSyncFlag = NFile::EDirectoryManifestSyncFlag;
-		
+
 		struct CConfig /// \brief Config for backup manager client. \headerfile Mib/Cloud/BackupManagerClient
 		{
 			CConfig const &f_Validate() const; ///< Throws exception if settings are invalid
-			
+
 			NStr::CStr m_BackupIdentifier;
 
 			NFile::CDirectoryManifestConfig m_ManifestConfig;										///< The config to generate the manifest
@@ -37,7 +37,7 @@ namespace NMib::NCloud
 			fp32 m_ChangeAggregationTime = 1.0;														///< The number of seconds to aggregate changes over
 			bool m_bReportChangesInInitialFinished = false;											///< Include added/removed/updated files in InitialFinished notification
 		};
-		
+
 		enum ENotification /// Notification from backup manager client
 		{
 			ENotification_None = 0							///< Used to specify no notification when subscribing. \sa f_SubscribeNotifications
@@ -82,7 +82,7 @@ namespace NMib::NCloud
 				o_String += "Backup Aborted";
 			}
 		};
-		
+
 		struct CNotification_BackupError /// \brief Notification info for #ENotification_BackupError. \headerfile Mib/Cloud/BackupManagerClient
 		{
 			auto operator <=> (CNotification_BackupError const &_Right) const = default;
@@ -96,7 +96,7 @@ namespace NMib::NCloud
 			NStr::CStr m_ErrorMessage; ///< The error from exception that caused the backup to fail
 			bool m_bFatal = false; ///< If this is set to true the backup is in a fatal state, and cannot recover automatically.
 		};
-		
+
 		struct CNotification_FileFinished /// \brief Notification info for #ENotification_FileFinished. \headerfile Mib/Cloud/BackupManagerClient
 		{
 			auto operator <=> (CNotification_FileFinished const &_Right) const = default;
@@ -110,7 +110,7 @@ namespace NMib::NCloud
 			NStr::CStr m_FileName; ///< The file that finished backing up. Relative to root.
 			CFileTransferStats m_TransferStats; ///< Statistics for the file transfer;
 		};
-		
+
 		struct CNotification_Quiescent /// \brief Notification info for #ENotification_Quiescent. \headerfile Mib/Cloud/BackupManagerClient
 		{
 			auto operator <=> (CNotification_Quiescent const &_Right) const = default;
@@ -147,7 +147,7 @@ namespace NMib::NCloud
 			NContainer::TCVector<NStr::CStr> m_RemovedFiles;
 			NContainer::TCVector<NStr::CStr> m_UpdatedFiles;
 		};
-		
+
 		using CNotification
 			= NStorage::TCStreamableVariant
 			<
@@ -185,7 +185,7 @@ namespace NMib::NCloud
 
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SubscribeNotifications /// \brief Subscribe to notification. \sa ENotification
 			(
-				ENotification _ToSubscribeTo	/// Specify the notifications to subscribe to 
+				ENotification _ToSubscribeTo	/// Specify the notifications to subscribe to
 				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NConcurrency::CHostInfo _RemoteHost, CNotification _Notification)> _fOnNotification
 				/// The actor functor to receive notifications
 			)
@@ -196,9 +196,9 @@ namespace NMib::NCloud
 	protected:
 		struct CInternal;
 		friend struct NPrivate::CBackupManagerClient_Instance;
-		
+
 		NConcurrency::TCFuture<void> fp_Destroy() override;
-		
+
 		void fp_OnNotification(NConcurrency::CHostInfo const &_RemoteHost, CNotification &&_Notification);
 		void fp_HashMismatch(NStr::CStr const &_File);
 

@@ -150,7 +150,7 @@ namespace NMib::NCloud
 		_Stream % m_Metadata;
 		_Stream % m_ExceptionInfo;
 	}
-	
+
 	template <typename tf_CStream>
 	void CDebugManager::CCrashDumpList::f_Stream(tf_CStream &_Stream)
 	{

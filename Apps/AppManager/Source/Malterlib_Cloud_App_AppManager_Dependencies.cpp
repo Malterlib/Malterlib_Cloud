@@ -226,7 +226,7 @@ namespace NMib::NCloud::NAppManager
 			if (!!mp_EncryptionSensorReporter.m_fReportReadings)
 			{
 				auto SequenceSubscription = co_await mp_EncryptionSensorReporterSequencer.f_Sequence();
-				
+
 				if (!!mp_EncryptionSensorReporter.m_fReportReadings)
 				{
 					CDistributedAppSensorReporter::CStatus NewStatus

@@ -18,18 +18,18 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		
+
 		if (!CCloudAPIManager::fs_IsValidCloudContext(_Params.m_CloudContext))
 			co_return Auditor.f_Exception("Cloud context format not valid");
-		
+
 		if (!CCloudAPIManager::fs_IsValidContainerName(_Params.m_ContainerName))
 			co_return Auditor.f_Exception("Container name format not valid");
-		
+
 		if (!CCloudAPIManager::fs_IsValidObjectId(_Params.m_ObjectId))
 			co_return Auditor.f_Exception("Object id format not valid");
 
 		TCVector<CStr> Permissions = {"ObjectStorage/DeleteObjectAll", "ObjectStorage/DeleteObject/{}"_f << _Params.m_CloudContext};
-		
+
 		bool bHasPermission = co_await
 			(
 				pThis->mp_Permissions.f_HasPermission("Delete object from cloud API manager", Permissions)

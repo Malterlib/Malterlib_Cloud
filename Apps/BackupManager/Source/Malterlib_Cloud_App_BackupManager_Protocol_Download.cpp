@@ -12,7 +12,7 @@ namespace NMib::NCloud::NBackupManager
 		if (m_DirectorySyncSend)
 			fg_Move(m_DirectorySyncSend).f_Destroy() > fg_LogWarning("Mib/Cloud/SecretsManager", "Failed to destroy directory sync send in destructor");
 	}
-	
+
 	TCUnsafeFuture<void> CBackupManagerServer::CBackupDownload::f_Destroy()
 	{
 		auto DirectorySend = fg_Move(m_DirectorySyncSend);
@@ -41,14 +41,14 @@ namespace NMib::NCloud::NBackupManager
 		-> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 	{
 		auto pThis = m_pThis;
-		
+
 		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
-			
+
 		auto Auditor = pThis->mp_AppState.f_Auditor();
-		
+
 		CStr FriendlyName;
 		CStr HostID;
-		
+
 		if (!CBackupManager::fs_IsValidBackupSource(_DownloadBackup.m_BackupSource, &FriendlyName, &HostID))
 			co_return Auditor.f_Exception({"Invalid backup source format", "(Download backup)"});
 
@@ -56,7 +56,7 @@ namespace NMib::NCloud::NBackupManager
 			co_return Auditor.f_Exception({"Currently only latest backup download is supported", "(Download backup)"});
 
 		auto &CallingHostID = fg_GetCallingHostID();
-		
+
 		TCVector<CStr> Permissions = {"Backup/ReadAll", fg_Format("Backup/Read/{}", _DownloadBackup.m_BackupSource)};
 		if (HostID == CallingHostID)
 			Permissions.f_Push("Backup/ReadSelf");

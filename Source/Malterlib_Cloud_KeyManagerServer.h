@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -61,7 +61,7 @@ namespace NMib::NCloud
 
 				NContainer::TCMap<NStr::CStr, CClientKey> m_Keys;
 			};
-			
+
 			auto operator <=> (CDatabase const &) const = default;
 
 			template <typename tf_CStream>
@@ -72,13 +72,13 @@ namespace NMib::NCloud
 			NContainer::TCMap<NStr::CStr, CClientStore> m_Clients;
 			NContainer::TCMap<uint32, NContainer::TCSet<CSymmetricKey>> m_AvailableKeys;
 		};
-		
+
 		virtual NConcurrency::TCFuture<void> f_Initialize() = 0;
 		virtual NConcurrency::TCFuture<void> f_ChangePassword(NStr::CStrSecure _Password, NContainer::CSecureByteVector _Salt) = 0;
 		virtual NConcurrency::TCFuture<void> f_WriteDatabase(CDatabase _Database) = 0;
 		virtual NConcurrency::TCFuture<CDatabase> f_ReadDatabase() = 0;
 	};
-	
+
 	struct CKeyManagerServerConfig
 	{
 		NConcurrency::TCActor<ICKeyManagerServerDatabase> m_DatabaseActor;
@@ -121,7 +121,7 @@ namespace NMib::NCloud
 
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy() override;
-		
+
 		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};

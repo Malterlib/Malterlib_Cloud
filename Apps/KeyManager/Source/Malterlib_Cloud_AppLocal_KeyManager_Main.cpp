@@ -27,7 +27,7 @@ class CKeyManagerApp : public CApplication
 			}
 		;
 		return Daemon.f_Run();
-	}	
+	}
 };
 
 DAppImplement(CKeyManagerApp);

@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -20,12 +20,12 @@ namespace NMib::NCloud
 		{
 			CSendPart() = default;
 			CSendPart(uint32 _Version);
-			
+
 			struct CResult
 			{
 				void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 				void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
-				
+
 				uint32 m_Version = 0;
 			};
 
@@ -34,7 +34,7 @@ namespace NMib::NCloud
 			void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
 
 			uint32 m_Version = 0;
-			
+
 			NStr::CStr m_FilePath;
 			uint64 m_FilePosition;
 			NContainer::CIOByteVector m_Data;
@@ -49,7 +49,7 @@ namespace NMib::NCloud
 			, EState_Error
 			, EState_Finished
 		};
-		
+
 		struct CStateChange
 		{
 			CStateChange() = default;
@@ -59,10 +59,10 @@ namespace NMib::NCloud
 			{
 				void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 				void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
-				
+
 				uint32 m_Version = 0;
 			};
-			
+
 			CResult f_GetResult() const;
 			void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
@@ -81,7 +81,7 @@ namespace NMib::NCloud
 			NStr::CStr const &f_GetPath() const;
 			uint64 m_FileSize = 0;
 		};
-		
+
 		struct CManifest
 		{
 			void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
@@ -92,9 +92,9 @@ namespace NMib::NCloud
 
 		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream);
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
-		
+
 		uint32 m_Version = EProtocolVersion_Current;
-		
+
 		CManifest m_Manifest;
 		uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
 		NConcurrency::TCActor<> m_DispatchActor;

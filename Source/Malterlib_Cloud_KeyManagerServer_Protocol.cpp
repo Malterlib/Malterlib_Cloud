@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Core/Core>
@@ -178,7 +178,7 @@ namespace NMib::NCloud
 
 		if (!co_await Internal.m_Permissions.f_HasPermission("Get Server Sync Interface", Permissions, Auditor.f_HostInfo()))
 			co_return Auditor.f_AccessDenied("(Get Server Sync Interface)", Permissions);
-		
+
 		TCDistributedActorInterfaceWithID<CKeyManagerServerSync> SyncInterface
 			{
 				Internal.m_KeyManagerServerSyncInstance.m_Actor->f_ShareInterface<CKeyManagerServerSync>()
@@ -188,7 +188,7 @@ namespace NMib::NCloud
 				}
 			}
 		;
-		
+
 		co_return fg_Move(SyncInterface);
 	}
 }

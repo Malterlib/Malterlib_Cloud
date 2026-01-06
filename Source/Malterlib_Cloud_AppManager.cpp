@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include "Malterlib_Cloud_AppManager.h"
@@ -31,7 +31,7 @@ namespace NMib::NCloud
 	DMibDistributedStreamImplement(CAppManagerInterface::CApplicationInfo);
 	DMibDistributedStreamImplement(CAppManagerInterface::CApplicationUpdate);
 	DMibDistributedStreamImplement(CAppManagerInterface::CUpdateNotification);
-	
+
 	CAppManagerInterface::~CAppManagerInterface() = default;
 
 	static_assert(CVersionManager::EProtocolVersion_Min <= 0x105);

@@ -32,7 +32,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		struct CParsedVersion
 		{
 			auto operator <=> (CParsedVersion const &_Right) const = default;
-			
+
 			static CParsedVersion fs_Parse(CStr const &_String)
 			{
 				CParsedVersion Return;

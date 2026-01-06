@@ -28,7 +28,7 @@ class CSecretsManagerApp : public CApplication
 		;
 		return Daemon.f_Run();
 	}
-	
+
 };
 
 DAppImplement(CSecretsManagerApp);

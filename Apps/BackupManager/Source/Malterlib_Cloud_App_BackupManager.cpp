@@ -14,7 +14,7 @@ namespace NMib::NCloud::NBackupManager
 		: CDistributedAppActor(CDistributedAppActor_Settings{"BackupManager"})
 	{
 	}
-	
+
 	CBackupManagerApp::~CBackupManagerApp()
 	{
 	}
@@ -27,19 +27,19 @@ namespace NMib::NCloud::NBackupManager
 
 		co_return {};
 	}
-	
+
 	TCFuture<void> CBackupManagerApp::fp_StopApp()
-	{	
+	{
 		if (mp_Server)
 		{
 			DMibLogWithCategory(Mib/Cloud/BackupManager/Daemon, Info, "Shutting down");
-			
+
 			auto Result = co_await fg_Move(mp_Server).f_Destroy().f_Wrap();
 
 			if (!Result)
 				DMibLogWithCategory(Mib/Cloud/BackupManager/Daemon, Error, "Failed to shut down server: {}", Result.f_GetExceptionStr());
 		}
-		
+
 		co_return {};
 	}
 }

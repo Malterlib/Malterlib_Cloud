@@ -164,7 +164,7 @@ namespace NMib::NCloud
 
 		{
 			TCFutureVector<void> Results;
-			
+
 			for (auto &Config : Internal.m_MonitoredConfigs)
 			{
 				for (auto &File : Config.m_Files)

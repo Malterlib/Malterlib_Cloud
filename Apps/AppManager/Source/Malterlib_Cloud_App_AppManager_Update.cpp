@@ -20,16 +20,16 @@ namespace NMib::NCloud::NAppManager
 		default: DNeverGetHere; return "unknown";
 		}
 	}
-	
+
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Update(NStr::CStr _Name, CApplicationUpdate _Update)
 	{
 		return m_pThis->fp_UpdateApplication
 			(
 				_Name
 				, _Update
-				, {} 
 				, {}
-				, [_Name](CStr const &_Info) 
+				, {}
+				, [_Name](CStr const &_Info)
 				{
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Update application '{}': {}", _Name, _Info);
 				}
@@ -37,7 +37,7 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 	}
-	
+
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CancelAllUpdates(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		for (auto &pUpdateWeak : mp_RunningUpdates)
@@ -46,20 +46,20 @@ namespace NMib::NCloud::NAppManager
 			if (pUpdate)
 				pUpdate->m_bCancel = true;
 		}
-		
+
 		fp_OnAppUpdateInfoChange();
-		
+
 		co_return {};
 	}
-	
+
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_UpdateApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr Name = _Params["Name"].f_String();
-		
+
 		CStr Package;
 		CAppManagerInterface::CApplicationUpdate Update;
 		Update.m_bBypassCoordination = true;
-		
+
 		if (auto *pValue = _Params.f_GetMember("Package"))
 		{
 			Package = pValue->f_String();
@@ -71,10 +71,10 @@ namespace NMib::NCloud::NAppManager
 		{
 			Update.m_bDryRun = _Params["DryRun"].f_Boolean();
 			Update.m_bUpdateSettings = _Params["UpdateSettings"].f_Boolean();
-			
+
 			CStr Version = _Params["Version"].f_String();
 			if (auto *pValue = _Params.f_GetMember("VersionManagerPlatform"))
-				Update.m_Platform = pValue->f_String(); 
+				Update.m_Platform = pValue->f_String();
 
 			if (auto *pValue = _Params.f_GetMember("RequiredTags"))
 			{
@@ -83,7 +83,7 @@ namespace NMib::NCloud::NAppManager
 					RequiredTags[TagJson.f_String()];
 				Update.m_RequireTags = fg_Move(RequiredTags);
 			}
-			
+
 			if (!Version.f_IsEmpty())
 			{
 				CStr ErrorStr;
@@ -93,12 +93,12 @@ namespace NMib::NCloud::NAppManager
 				Update.m_Version = VersionID;
 			}
 		}
-		
+
 		auto Result = co_await fp_UpdateApplication
 			(
 				Name
 				, Update
-				, {} 
+				, {}
 				, Package
 				, [=](CStr const &_Info)
 				{
@@ -112,7 +112,7 @@ namespace NMib::NCloud::NAppManager
 
 		co_return _pCommandLine->f_AddAsyncResult(Result);
 	}
-	
+
 	TCFuture<void> CAppManagerActor::fp_UpdateApplication
 		(
 			CStr _Name
@@ -156,7 +156,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto InProgressScope = co_await (fp_SetInProgressWithWait(pApplication, "UpdateApplication") % Auditor);
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
-		
+
 		bool bDownloadVersion = true;
 		bool bUpdateSettings = false;
 		bool bDryRun = false;
@@ -296,7 +296,7 @@ namespace NMib::NCloud::NAppManager
 			Auditor.f_Info(fg_Format("Application '{}' updated successfully", pState->m_pApplication->m_Name));
 
 			co_await fp_SyncNotifications(_Name);
-			
+
 			co_return {};
 		}
 
@@ -370,7 +370,7 @@ namespace NMib::NCloud::NAppManager
 			co_return {};
 
 		bool bNeedCancel = false;
-		
+
 		for (auto &pUpdateWeak : mp_RunningUpdates)
 		{
 			auto pUpdate = pUpdateWeak.f_Lock();
@@ -391,7 +391,7 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		fp_OnAppUpdateInfoChange();
-		
+
 		co_return co_await fg_Move(Promise.m_Future);
 	}
 }

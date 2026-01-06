@@ -38,11 +38,11 @@ namespace NMib::NCloud::NCloudManager
 			CStr m_IconEmoji = ":malterlib:";
 			EType m_ReportFlags = EType_None;
 		};
-		
+
 		TCFuture<void> fp_SendStartupMessage(CStr _Error);
 
 		CCloudManagerServer &mp_This;
-		
+
 		TCMap<CStr, CSlackNotificationChannel> mp_SlackChannels;
 		TCActor<CCurlActor> mp_CurlActor;
 		TCActor<CSlackActor> mp_SlackActor;

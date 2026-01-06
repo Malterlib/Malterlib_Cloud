@@ -25,7 +25,7 @@ class CCloudManagerApplication : public CApplication
 			}
 		;
 		return Daemon.f_Run();
-	}	
+	}
 };
 
 DAppImplement(CCloudManagerApplication);

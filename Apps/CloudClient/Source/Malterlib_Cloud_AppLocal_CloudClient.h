@@ -10,16 +10,16 @@ namespace NMib::NCloud::NCloudClient
 	struct CCloudClientAppLocalActor : public CCloudClientAppActor
 	{
 	private:
-		
+
 		struct CSelfUpdateVersion
 		{
 			TCDistributedActor<CVersionManager> m_Actor;
 			CVersionManager::CVersionID m_VersionID;
 		};
-		
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		TCFuture<void> fp_PreRunCommandLine(CStr _Command, NEncoding::CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) override;
-		
+
 		TCFuture<CSelfUpdateVersion> fp_GetSelfUpdateVersion();
 		TCFuture<uint32> fp_CommandLine_SelfUpdate(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 	};

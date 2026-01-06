@@ -21,10 +21,10 @@ namespace NMib::NCloud::NCloudAPIManager
 		o_CommandLine.f_SetProgramDescription
 			(
 				"Malterlib Cloud Cloud API Manager"
-				, "Manages updates for Malterlib cloud apps." 
+				, "Manages updates for Malterlib cloud apps."
 			)
 		;
-		
+
 		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 		(void)DefaultSection;
 	}
