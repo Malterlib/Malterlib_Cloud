@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/DistributedApp>
+#include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Cloud/SecretsManager>
 #include <Mib/Container/Map>
 
@@ -37,5 +38,6 @@ namespace NMib::NCloud::NSecretsManager
 		TCSet<TCActor<CSecretsManagerServerDatabase>> mp_PendingDatabases;
 		CDistributedAppState &mp_AppState;
 		TCActor<> mp_Delegator;
+		CSequencer mp_InitSequencer{"SecretsManagerServerController"};
 	};
 }
