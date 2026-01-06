@@ -279,7 +279,7 @@ namespace NMib::NCloud::NAppManager
 					if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
 					{
 						auto Files = CFile::fs_FindFiles(SourcePath + "/*");
-						if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar")))
+						if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar.zst") || Files[0].f_EndsWith(".tar")))
 							SourcePath = Files[0];
 					}
 

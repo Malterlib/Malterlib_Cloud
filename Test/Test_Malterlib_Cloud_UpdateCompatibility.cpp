@@ -52,7 +52,7 @@ using namespace NMib::NTime;
 #define DTestUpdateCompatibilityEnableOtherOutput 0
 
 static fp64 g_Timeout = 2_minutes * gc_TimeoutMultiplier;
-static uint32 g_CompressionLevel = 1;
+static uint32 g_CompressionLevel = 4;
 
 static constexpr ch8 const *gc_AccessDeniedErrorMessage =
 	"Failed to download application from version manager: Failed to download the application from any manager: Failed to start download on remote server: Access denied"
@@ -960,7 +960,7 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibLogWithCategory(Test, Info, "Update App ({})", _Name);
 
-				CStr AppArchive = "{}/TestApps/Dynamic/{}/{}.tar"_f << ProgramDirectory << _UniqueName << _Name;
+				CStr AppArchive = "{}/TestApps/Dynamic/{}/{}.tar.zst"_f << ProgramDirectory << _UniqueName << _Name;
 				CStr SourceTempPath = "{}/TestApps/LatestSource/{}/{}"_f << ProgramDirectory << _UniqueName << _Name;
 
 				{
@@ -2291,11 +2291,13 @@ public:
 				CStr AppName = CFile::fs_GetFile(AppDir);
 				for (auto &PackagePath : CFile::fs_FindFiles(AppDir / "*.tar.gz", EFileAttrib_File, true))
 					Packages[AppName].f_Insert(PackagePath);
+				for (auto &PackagePath : CFile::fs_FindFiles(AppDir / "*.tar.zst", EFileAttrib_File, true))
+					Packages[AppName].f_Insert(PackagePath);
 			}
 
 			for (auto &AppName : {"KeyManager", "AppManager", "VersionManager"})
 			{
-				CStr AppArchive = "Latest/{}.tar.gz"_f << AppName;
+				CStr AppArchive = "Latest/{}.tar.zst"_f << AppName;
 				Packages[AppName].f_Insert(AppArchive);
 			}
 

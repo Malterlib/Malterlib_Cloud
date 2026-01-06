@@ -118,7 +118,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Names"_o= _o["--settings-file-from-package"]
 							, "Default"_o= true
-							, "Description"_o= "If the uploaded file is a tar.gz file, look inside it for VersionInfo.json and use as settings file.\n"
+							, "Description"_o= "If the uploaded file is a tar.gz or tar.zst file, look inside it for VersionInfo.json and use as settings file.\n"
 							"If --settings-file is specified that will override the settings file inside the uploaded package.\n"
 							"Settings in the settings file is overridden by settings specified on the command line.\n"
 						}
@@ -671,7 +671,7 @@ namespace NMib::NCloud::NCloudClient
 		TCVariant<CStr, CEJsonSorted> SettingsFileOrSettings;
 		if (!SettingsFile.f_IsEmpty())
 			SettingsFileOrSettings = SettingsFile;
-		else if (_Params["SettingsFileFromPackage"].f_Boolean() && (Source.f_EndsWith(".tar.gz") || Source.f_EndsWith(".tar")))
+		else if (_Params["SettingsFileFromPackage"].f_Boolean() && (Source.f_EndsWith(".tar.gz") || Source.f_EndsWith(".tar.zst") || Source.f_EndsWith(".tar")))
 		{
 			// tar -xOf AppManager.tar.gz VersionInfo.json
 

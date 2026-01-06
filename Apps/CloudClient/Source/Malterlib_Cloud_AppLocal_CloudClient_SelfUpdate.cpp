@@ -129,6 +129,8 @@ namespace NMib::NCloud::NCloudClient
 					CStr PackageFile = DestinationDirectory + "/MalterlibCloud.tar";
 					if (!CFile::fs_FileExists(PackageFile))
 						PackageFile = DestinationDirectory + "/MalterlibCloud.tar.gz";
+					if (!CFile::fs_FileExists(PackageFile))
+						PackageFile = DestinationDirectory + "/MalterlibCloud.tar.zst";
 
 					bool bLaunchSuccess = CProcessLaunch::fs_LaunchBlock
 						(

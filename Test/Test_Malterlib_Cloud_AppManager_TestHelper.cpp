@@ -785,7 +785,7 @@ namespace NMib::NCloud
 		State.m_CloudManager = co_await State.m_Subscriptions->f_SubscribeAsync<CCloudManager>();
 
 		{
-			State.m_TestAppArchive = State.m_RootDirectory / "TestApp.tar.gz";
+			State.m_TestAppArchive = State.m_RootDirectory / "TestApp.tar.zst";
 
 			DMibTestMark;
 
@@ -793,7 +793,7 @@ namespace NMib::NCloud
 				(
 					g_Dispatch / [VersionManagerHelper = State.m_VersionManagerHelper, Directory = State.m_ProgramDirectory + "/TestApps/TestApp", TestAppArchive = State.m_TestAppArchive]
 					{
-						return VersionManagerHelper.f_CreatePackage(Directory, TestAppArchive, 1);
+						return VersionManagerHelper.f_CreatePackage(Directory, TestAppArchive, 4);
 					}
 				)
 				.f_Timeout(State.m_Timeout, "Timed out waiting for create test app package")

@@ -527,17 +527,14 @@ namespace NMib::NCloud
 			}
 		;
 
-		if (_CompressionLevel > 0)
+		if (_CompressionLevel > 0 && !_DestinationFileName.f_EndsWith(".tar"))
 		{
-			Params.f_Insert
-				(
-					{
-						"--options"
-						, "gzip:compression-level={}"_f << _CompressionLevel
-						, "-czf"
-					}
-				)
-			;
+			if (_DestinationFileName.f_EndsWith(".tar.gz"))
+				Params.f_Insert({"--options", "gzip:compression-level={}"_f << _CompressionLevel});
+			else if (_DestinationFileName.f_EndsWith(".tar.zst"))
+				Params.f_Insert({"--options", "zstd:compression-level={}"_f << _CompressionLevel});
+
+			Params.f_Insert("-caf");
 		}
 		else
 			Params.f_Insert({"-cf"});
