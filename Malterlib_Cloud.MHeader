@@ -561,6 +561,7 @@ Property
 				, Dependency.TargetProperties: {
 					MalterlibGenerateScheme: false
 				}
+				, Dependency.Link: false
 			}
 		}
 		, {
@@ -570,6 +571,7 @@ Property
 				, Dependency.TargetProperties: {
 					MalterlibGenerateScheme: false
 				}
+				, Dependency.Link: false
 			}
 		}
 		, {
@@ -579,6 +581,7 @@ Property
 				, Dependency.TargetProperties: {
 					MalterlibGenerateScheme: false
 				}
+				, Dependency.Link: false
 			}
 		}
 		, {
@@ -588,6 +591,7 @@ Property
 				, Dependency.TargetProperties: {
 					MalterlibGenerateScheme: false
 				}
+				, Dependency.Link: false
 			}
 		}
 		, {
@@ -597,6 +601,7 @@ Property
 				, Dependency.TargetProperties: {
 					MalterlibGenerateScheme: false
 				}
+				, Dependency.Link: false
 			}
 		}
 		, {
@@ -606,6 +611,7 @@ Property
 				, Dependency.TargetProperties: {
 					MalterlibGenerateScheme: false
 				}
+				, Dependency.Link: false
 			}
 		}
 		, "Lib_Malterlib_Cloud_AppManager"
