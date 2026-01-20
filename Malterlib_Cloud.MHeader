@@ -313,7 +313,7 @@ Property
 											`}\r\n`
 	{
 		!HostPlatformFamily "Windows"
-		!!ScriptWindowsBash true
+		!!ScriptWindowsBat false
 	}
 
 	MalterlibCloudVersionInfo_Backup_IncludeWildcards: [type(CMalterlibCloudBackupIncludeWildcards)]?
@@ -562,6 +562,7 @@ Property
 					MalterlibGenerateScheme: false
 				}
 				, Dependency.Link: false
+				, Dependency.Stage: "Runtime"
 			}
 		}
 		, {
@@ -572,6 +573,7 @@ Property
 					MalterlibGenerateScheme: false
 				}
 				, Dependency.Link: false
+				, Dependency.Stage: "Runtime"
 			}
 		}
 		, {
@@ -582,6 +584,7 @@ Property
 					MalterlibGenerateScheme: false
 				}
 				, Dependency.Link: false
+				, Dependency.Stage: "Runtime"
 			}
 		}
 		, {
@@ -592,6 +595,7 @@ Property
 					MalterlibGenerateScheme: false
 				}
 				, Dependency.Link: false
+				, Dependency.Stage: "Runtime"
 			}
 		}
 		, {
@@ -602,6 +606,7 @@ Property
 					MalterlibGenerateScheme: false
 				}
 				, Dependency.Link: false
+				, Dependency.Stage: "Runtime"
 			}
 		}
 		, {
@@ -612,6 +617,7 @@ Property
 					MalterlibGenerateScheme: false
 				}
 				, Dependency.Link: false
+				, Dependency.Stage: "Runtime"
 			}
 		}
 		, "Lib_Malterlib_Cloud_AppManager"
@@ -788,7 +794,7 @@ Property
 		&
 		{
 			MalterilbCloud_DoVersionManagerUpload true
-			!GeneratorFamily "VisualStudio"
+			!ScriptWindowsBat true
 		}
 	}
 
@@ -803,7 +809,7 @@ Property
 		&
 		{
 			MalterilbCloud_DoVersionManagerUpload true
-			GeneratorFamily "VisualStudio"
+			ScriptWindowsBat true
 		}
 	}
 }
