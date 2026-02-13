@@ -44,7 +44,7 @@ namespace NMib::NCloud::NCloudManager
 		CCloudManagerServer &mp_This;
 
 		TCMap<CStr, CSlackNotificationChannel> mp_SlackChannels;
-		TCActor<CCurlActor> mp_CurlActor;
+		TCActor<CHttpClientActor> mp_HttpClientActor;
 		TCActor<CSlackActor> mp_SlackActor;
 	};
 }

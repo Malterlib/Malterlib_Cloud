@@ -50,11 +50,11 @@ namespace NMib::NCloud::NCloudManager
 
 		if (!mp_SlackChannels.f_IsEmpty())
 		{
-			if (!mp_CurlActor)
-				mp_CurlActor = fg_Construct(fg_Construct(), "Curl actor");
+			if (!mp_HttpClientActor)
+				mp_HttpClientActor = fg_Construct(fg_Construct(), "HTTP client actor");
 
 			if (!mp_SlackActor)
-				mp_SlackActor = fg_Construct(mp_CurlActor);
+				mp_SlackActor = fg_Construct(mp_HttpClientActor);
 		}
 
 		TCFutureVector<void> InitResults;
@@ -81,8 +81,8 @@ namespace NMib::NCloud::NCloudManager
 		if (mp_SlackActor)
 			co_await fg_Move(mp_SlackActor).f_Destroy();
 
-		if (mp_CurlActor)
-			co_await fg_Move(mp_CurlActor).f_Destroy();
+		if (mp_HttpClientActor)
+			co_await fg_Move(mp_HttpClientActor).f_Destroy();
 
 		co_return {};
 	}

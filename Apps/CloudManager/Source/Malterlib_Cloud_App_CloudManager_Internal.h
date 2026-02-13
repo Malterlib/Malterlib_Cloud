@@ -11,7 +11,7 @@
 #include <Mib/Cloud/CloudManager>
 #include <Mib/Cloud/FileTransfer>
 #include <Mib/Database/DatabaseActor>
-#include <Mib/Web/Curl>
+#include <Mib/Web/HttpClient>
 #include <Mib/Web/Slack>
 
 #include "Malterlib_Cloud_App_CloudManager.h"
