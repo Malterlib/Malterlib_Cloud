@@ -420,14 +420,14 @@ namespace NMib::NCloud
 		return _Version >= EProtocolVersion_Min && _Version <= EProtocolVersion_Current;
 	}
 
-	void CBackupManager::CBackupInfo::f_Format(NStr::CStrAggregate &o_Str) const
+	void CBackupManager::CBackupInfo::f_Format(NStr::CStr &o_Str) const
 	{
 		using namespace NStr;
 
 		o_Str += "{tc5} -> {tc5}"_f << m_Earliest << m_Latest;
 	}
 
-	void CBackupManager::CBackupID::f_Format(NStr::CStrAggregate &o_Str) const
+	void CBackupManager::CBackupID::f_Format(NStr::CStr &o_Str) const
 	{
 		if (m_Time.f_IsValid())
 			o_Str += NStr::CStr::CFormat("{tst.,tsb_}_{}") << m_Time << m_ID;

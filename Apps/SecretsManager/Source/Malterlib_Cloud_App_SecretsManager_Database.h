@@ -14,7 +14,7 @@ namespace NMib::NCloud::NSecretsManager
 	{
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
-		void f_Format(CStrAggregate &o_Str) const;
+		void f_Format(CStr &o_Str) const;
 		CSecretsManager::CSecretID const &f_GetSecretID() const;
 		CSecretsManager::CSecretProperties f_ToSecretProperties() const;
 

@@ -201,7 +201,7 @@ namespace NMib::NCloud::NSecretsManager
 		return SaltIV;
 	}
 
-	void NSecretsManager::CSecretPropertiesInternal::f_Format(CStrAggregate &o_Str) const
+	void NSecretsManager::CSecretPropertiesInternal::f_Format(CStr &o_Str) const
 	{
 		o_Str += "Username: {} URL: {} Expires: {} Notes: {} Metadata: {} Created: {} Modified: {} SemanticID: {} Tags: {} Immutable: {}"_f
 			<< m_UserName
