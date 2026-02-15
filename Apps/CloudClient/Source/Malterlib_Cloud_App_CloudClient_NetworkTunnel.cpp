@@ -136,7 +136,7 @@ namespace NMib::NCloud::NCloudClient
 			for (auto &Tunnel : Tunnels)
 			{
 				auto &TunnelName = Tunnels.fs_GetKey(Tunnel);
-				if (!Wildcards.f_IsEmpty() && !fg_StrMatchesAnyWildcardInMap(TunnelName, Wildcards))
+				if (!Wildcards.f_IsEmpty() && !fg_StrMatchesAnyWildcardInContainerKeys(TunnelName, Wildcards))
 					continue;
 				Return[HostID][TunnelName] = fg_Move(Tunnel);
 			}

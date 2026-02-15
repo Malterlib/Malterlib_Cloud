@@ -457,7 +457,7 @@ namespace NMib::NCloud
 		if (!bIsIncluded)
 			return false;
 
-		if (fg_StrMatchesAnyWildcardInMap(_Path, ManifestConfig.m_ExcludeWildcards))
+		if (fg_StrMatchesAnyWildcardInContainerKeys(_Path, ManifestConfig.m_ExcludeWildcards))
 			return false;
 
 		return true;
