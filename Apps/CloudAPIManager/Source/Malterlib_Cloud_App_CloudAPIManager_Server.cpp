@@ -112,8 +112,8 @@ namespace NMib::NCloud::NCloudAPIManager
 	{
 		auto pCanDestroy = fg_Move(mp_pCanDestroyTracker);
 		mp_ProtocolInterface.f_Destroy() > pCanDestroy->f_Track();
-		if (mp_CURLQueryActor)
-			fg_Move(mp_CURLQueryActor).f_Destroy() > pCanDestroy->f_Track();
+		if (mp_HttpQueryActor)
+			fg_Move(mp_HttpQueryActor).f_Destroy() > pCanDestroy->f_Track();
 
 		auto CanDestroyFuture = pCanDestroy->f_Future();
 		pCanDestroy.f_Clear();
@@ -122,13 +122,13 @@ namespace NMib::NCloud::NCloudAPIManager
 		co_return {};
 	}
 
-	TCActor<CSeparateThreadActor> const &CCloudAPIManagerDaemonActor::CServer::fp_GetCURLQueryActor()
+	TCActor<CHttpClientActor> const &CCloudAPIManagerDaemonActor::CServer::fp_GetHttpQueryActor()
 	{
-		if (mp_CURLQueryActor)
-			return mp_CURLQueryActor;
+		if (mp_HttpQueryActor)
+			return mp_HttpQueryActor;
 
-		mp_CURLQueryActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Cloud API manager CURL query file actor"));
-		return mp_CURLQueryActor;
+		mp_HttpQueryActor = fg_Construct(fg_Construct(), "Cloud API manager CURL query file actor");
+		return mp_HttpQueryActor;
 	}
 
 	TCVector<CStr> CCloudAPIManagerDaemonActor::CServer::fsp_AuditMessages(CStr const &_Error, CExceptionPointer _pException)

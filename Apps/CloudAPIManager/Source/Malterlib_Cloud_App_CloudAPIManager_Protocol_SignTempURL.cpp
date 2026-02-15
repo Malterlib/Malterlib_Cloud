@@ -10,7 +10,6 @@
 
 #include "Malterlib_Cloud_App_CloudAPIManager.h"
 #include "Malterlib_Cloud_App_CloudAPIManager_Server.h"
-#include "Malterlib_Cloud_App_CloudAPIManager_CurlWrapper.h"
 
 namespace NMib::NCloud::NCloudAPIManager
 {
@@ -46,7 +45,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		auto Value = co_await
 			(
-				g_Dispatch(pThis->fp_GetCURLQueryActor()) / [ServiceInfo = fg_Move(ServiceInfo), _Params]() -> CStr
+				g_Dispatch(fg_ConcurrentActorHighCPU()) / [ServiceInfo = fg_Move(ServiceInfo), _Params]() -> CStr
 				{
 					if (!ServiceInfo.m_URLs.f_Exists("swift"))
 						DErrorCloudAPI("Swift service not available");

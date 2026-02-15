@@ -21,20 +21,12 @@
 	{
 		Dependency.Indirect true
 	}
+	%Dependency "Lib_Malterlib_Web"
+	{
+		Dependency.Indirect true
+	}
 	%Dependency "Lib_Malterlib"
 	{
-		Dependency.Indirect true
-	}
-	%Dependency "Lib_CURL_libcurl_static"
-	{
-		!DocumentationEnabled true
-
-		Dependency.Indirect true
-	}
-	%Dependency "Lib_zlib"
-	{
-		!DocumentationEnabled true
-
 		Dependency.Indirect true
 	}
 }
@@ -59,7 +51,7 @@
 		BaseFileName "CloudAPIManager"
 		Group "Apps"
 	}
-	
+
 	%Group "Source"
 	{
 		%File "Source/Malterlib_Cloud_AppLocal_*"

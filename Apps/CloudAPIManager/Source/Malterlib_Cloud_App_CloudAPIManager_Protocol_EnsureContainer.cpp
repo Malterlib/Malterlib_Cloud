@@ -9,7 +9,6 @@
 
 #include "Malterlib_Cloud_App_CloudAPIManager.h"
 #include "Malterlib_Cloud_App_CloudAPIManager_Server.h"
-#include "Malterlib_Cloud_App_CloudAPIManager_CurlWrapper.h"
 
 namespace NMib::NCloud::NCloudAPIManager
 {
@@ -43,54 +42,48 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		auto ServiceInfo = co_await pThis->fp_GetOpenStackServiceInfo(*pCloudContext);
 
-		auto Value = co_await
-			(
-				(
-					g_Dispatch(pThis->fp_GetCURLQueryActor()) / [ServiceInfo = fg_Move(ServiceInfo), _Params, StoragePolicy]() -> CStr
-					{
-						NException::CDisableExceptionTraceScope DisableTracing;
+		NException::CDisableExceptionTraceScope DisableTracing;
 
-						if (!ServiceInfo.m_URLs.f_Exists("swift"))
-							DErrorCloudAPI("Swift service not available");
+		if (!ServiceInfo.m_URLs.f_Exists("swift"))
+			DErrorCloudAPI("Swift service not available");
 
-						if (_Params.m_ContainerName.f_IsEmpty())
-							DErrorCloudAPI("Parameter containerName is empty");
+		if (_Params.m_ContainerName.f_IsEmpty())
+			DErrorCloudAPI("Parameter containerName is empty");
 
-						CStr URL(fg_Format("{}/{}", ServiceInfo.m_URLs["swift"], _Params.m_ContainerName));
+		CStr URL(fg_Format("{}/{}", ServiceInfo.m_URLs["swift"], _Params.m_ContainerName));
 
-						TCMap<CStr, CStr> Headers;
+		TCMap<CStr, CStr> Headers;
 
-						Headers["X-Auth-Token"] = ServiceInfo.m_Token;
-						Headers["X-Storage-Policy"] = StoragePolicy;
+		Headers["X-Auth-Token"] = ServiceInfo.m_Token;
+		Headers["X-Storage-Policy"] = StoragePolicy;
 
-						if (_Params.m_TempURLKey.f_IsEmpty())
-						{
-							Headers["X-Remove-Container-Read"] = "true";
-							Headers["X-Remove-Container-Meta-Temp-URL-Key"] = "true";
-							Headers["X-Remove-Container-Meta-Access-Control-Allow-Origin"] = "true";
-						}
-						else
-						{
-							Headers["X-Container-Read"] = ".r:*";
-							Headers["X-Container-Meta-Temp-URL-Key"] = _Params.m_TempURLKey;
-							Headers["X-Container-Meta-Access-Control-Allow-Origin"] = "*";
-						}
+		if (_Params.m_TempURLKey.f_IsEmpty())
+		{
+			Headers["X-Remove-Container-Read"] = "true";
+			Headers["X-Remove-Container-Meta-Temp-URL-Key"] = "true";
+			Headers["X-Remove-Container-Meta-Access-Control-Allow-Origin"] = "true";
+		}
+		else
+		{
+			Headers["X-Container-Read"] = ".r:*";
+			Headers["X-Container-Meta-Temp-URL-Key"] = _Params.m_TempURLKey;
+			Headers["X-Container-Meta-Access-Control-Allow-Origin"] = "*";
+		}
 
-						CCurlResult Result = fg_Curl(ECurlMethod_PUT, URL, Headers, CStr());
-						if (Result.m_StatusCode >= 300)
-							DErrorCloudAPI(fg_Format("Unexpected result {} {}", Result.m_StatusCode, Result.m_StatusMessage));
-
-						return URL;
-					}
-				 )
-				.f_Wrap()
-			 )
-		;
-
-		if (!Value)
+		auto RequestResult = co_await pThis->fp_GetHttpQueryActor()(&CHttpClientActor::f_Put, URL, Headers, CStr()).f_Wrap();
+		if (!RequestResult)
 		{
 			CStr Error = fg_Format("Failed to ensure container {} on {}", _Params.m_ContainerName, _Params.m_CloudContext);
-			co_return Auditor.f_Exception(fsp_AuditMessages(Error, Value.f_GetException()));
+			co_return Auditor.f_Exception(fsp_AuditMessages(Error, RequestResult.f_GetException()));
+		}
+		else if (RequestResult->m_StatusCode >= 300)
+		{
+			CStr Error = fg_Format("Failed to ensure container {} on {}", _Params.m_ContainerName, _Params.m_CloudContext);
+			co_return Auditor.f_Exception
+				(
+					fsp_AuditMessages(Error, DErrorCloudAPIInstance(fg_Format("Unexpected result {} {}", RequestResult->m_StatusCode, RequestResult->m_StatusMessage)))
+				)
+			;
 		}
 
 		CCloudAPIManager::CEnsureContainer::CResult Result;

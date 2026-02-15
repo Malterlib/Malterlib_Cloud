@@ -10,6 +10,7 @@
 #include <Mib/Concurrency/DistributedTrustDDPBridge>
 #include <Mib/Cloud/CloudAPIManager>
 #include <Mib/Daemon/Daemon>
+#include <Mib/Web/HttpClient>
 
 namespace NMib::NCloud::NCloudAPIManager
 {
@@ -79,7 +80,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		static TCVector<CStr> fsp_AuditMessages(CStr const &_Error, CExceptionPointer _pException);
 
-		TCActor<CSeparateThreadActor> const &fp_GetCURLQueryActor();
+		TCActor<CHttpClientActor> const &fp_GetHttpQueryActor();
 
 		TCMap<CStr, CCloudContext> mp_CloudContexts;
 
@@ -91,7 +92,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		CTrustedPermissionSubscription mp_Permissions;
 
-		TCActor<CSeparateThreadActor> mp_CURLQueryActor;
+		TCActor<CHttpClientActor> mp_HttpQueryActor;
 
 		TCActor<CDistributedTrustDDPBridge> mp_DDPBridge;
 		CActorSubscription mp_DDPBridgeSubscription;

@@ -13,9 +13,11 @@ namespace NMib::NCloud
 	DMibImpErrorClassDefine(CExceptionCloudAPI, NException::CException);
 
 #	define DMibErrorCloudAPI(_Description) DMibImpError(NMib::NCloud::CExceptionCloudAPI, _Description)
+#	define DMibErrorCloudAPIInstance(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionCloudAPI, _Description)
 
 #	ifndef DMibPNoShortCuts
 #		define DErrorCloudAPI(_Description) DMibErrorCloudAPI(_Description)
+#		define DErrorCloudAPIInstance(_Description) DMibErrorCloudAPIInstance(_Description)
 #	endif
 
 	struct CCloudAPIManager : public NConcurrency::CActor

@@ -10,7 +10,6 @@
 
 #include "Malterlib_Cloud_App_CloudAPIManager.h"
 #include "Malterlib_Cloud_App_CloudAPIManager_Server.h"
-#include "Malterlib_Cloud_App_CloudAPIManager_CurlWrapper.h"
 
 namespace NMib::NCloud::NCloudAPIManager
 {
@@ -47,42 +46,31 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		auto ServiceInfo = co_await (pThis->fp_GetOpenStackServiceInfo(*pCloudContext) % Auditor);
 
-		auto Value = co_await
-			(
-				(
-					g_Dispatch(pThis->fp_GetCURLQueryActor()) / [ServiceInfo = fg_Move(ServiceInfo), _Params]() -> CStr
-					{
-						NException::CDisableExceptionTraceScope DisableTracing;
+		if (!ServiceInfo.m_URLs.f_Exists("swift"))
+			co_return DErrorCloudAPIInstance("Swift service not available");
 
-						if (!ServiceInfo.m_URLs.f_Exists("swift"))
-							DErrorCloudAPI("Swift service not available");
+		CStr URL(fg_Format("{}/{}/{}", ServiceInfo.m_URLs["swift"], _Params.m_ContainerName, _Params.m_ObjectId));
 
-						CStr URL(fg_Format("{}/{}/{}", ServiceInfo.m_URLs["swift"], _Params.m_ContainerName, _Params.m_ObjectId));
+		TCMap<CStr, CStr> Headers;
+		Headers["X-Auth-Token"] = ServiceInfo.m_Token;
 
-						TCMap<CStr, CStr> Headers;
-						Headers["X-Auth-Token"] = ServiceInfo.m_Token;
+		auto Result = co_await pThis->fp_GetHttpQueryActor()(&CHttpClientActor::f_Delete, URL, Headers).f_Wrap();
 
-						CCurlResult Result = fg_Curl(ECurlMethod_DELETE, URL, Headers, CStr());
-						if (Result.m_StatusCode != 204 && Result.m_StatusCode != 404)
-							DErrorCloudAPI(fg_Format("Unexpected result {} {}", Result.m_StatusCode, Result.m_StatusMessage));
-
-						return URL;
-					}
-				)
-				.f_Wrap()
-			)
-		;
-
-		if (!Value)
+		if (!Result)
 		{
 			CStr Error = fg_Format("Failed to delete object {}/{} on {}", _Params.m_ContainerName, _Params.m_ObjectId, _Params.m_CloudContext);
-			co_return Auditor.f_Exception(fsp_AuditMessages(Error, Value.f_GetException()));
+			co_return Auditor.f_Exception(fsp_AuditMessages(Error, Result.f_GetException()));
+		}
+		else if (Result->m_StatusCode != 204 && Result->m_StatusCode != 404)
+		{
+			CStr Error = fg_Format("Failed to delete object {}/{} on {}", _Params.m_ContainerName, _Params.m_ObjectId, _Params.m_CloudContext);
+			co_return Auditor.f_Exception(fsp_AuditMessages(Error, DErrorCloudAPIInstance(fg_Format("Unexpected result {} {}", Result->m_StatusCode, Result->m_StatusMessage))));
 		}
 
-		CCloudAPIManager::CDeleteObject::CResult Result;
+		CCloudAPIManager::CDeleteObject::CResult ReturnResult;
 		Auditor.f_Info(fg_Format("Deleted object {}/{} on {}", _Params.m_ContainerName, _Params.m_ObjectId, _Params.m_CloudContext));
 
-		co_return fg_Move(Result);
+		co_return fg_Move(ReturnResult);
 	}
 }
 
