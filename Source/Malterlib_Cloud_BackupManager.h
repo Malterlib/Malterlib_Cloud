@@ -30,7 +30,7 @@ namespace NMib::NCloud
 //#	define DMibCloudBackupManagerDebug
 
 #	if defined(DMibCloudBackupManagerDebug)
-#		define DMibCloudBackupManagerDebugOut DMibConOut2
+#		define DMibCloudBackupManagerDebugOut DMibConOut
 #	else
 #		define DMibCloudBackupManagerDebugOut(...)  (void)0
 #	endif

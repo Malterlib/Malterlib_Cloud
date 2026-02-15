@@ -131,19 +131,19 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 							, .m_fOnConnection = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo) -> TCFuture<void> // New connection
 							{
 								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-									DMibConErrOut2("New connection: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort));
+									DMibConErrOut("New connection: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort));
 								co_return {};
 							}
 							, .m_fOnClose = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, NStr::CStr _Message) -> TCFuture<void> // On Close
 							{
 								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-									DMibConErrOut2("Connection from '{}' closed: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Message);
+									DMibConErrOut("Connection from '{}' closed: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Message);
 								co_return {};
 							}
 							, .m_fOnError = g_ActorFunctor / [](CNetworkTunnelsClient::CCallbackInfo _CallbackInfo, CStr _Error) -> TCFuture<void> // On Error
 							{
 								if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
-									DMibConErrOut2("Connection from '{}' error: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Error);
+									DMibConErrOut("Connection from '{}' error: {}\n", _CallbackInfo.m_Address.f_GetString(NNetwork::ENetAddressStringFlag_IncludePort), _Error);
 								co_return {};
 							}
 							, .m_ListenHost = _Params["ListenHost"].f_String()

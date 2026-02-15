@@ -41,7 +41,7 @@ namespace NMib::NCloud
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)
-#		define DMibCloudCloudManagerDebugOut DMibConOut2
+#		define DMibCloudCloudManagerDebugOut DMibConOut
 #	else
 #		define DMibCloudCloudManagerDebugOut(...)  (void)0
 #	endif

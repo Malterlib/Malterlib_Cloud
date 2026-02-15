@@ -186,7 +186,7 @@ namespace NMib::NCloud::NAppManager
 					}
 
 #if DDebugAppTurnUpdateLogic > 1
-					DMibConOut2
+					DMibConOut
 						(
 							"[{}, {a-,sj20}, {a-,sj8}] # {vs} - {vs} - {vs}\n"
 							, this
@@ -205,7 +205,7 @@ namespace NMib::NCloud::NAppManager
 					if (WinningApplications.fs_GetKey(*pWinning) == OurRemoteKey)
 					{
 #if DDebugAppTurnUpdateLogic > 0
-						DMibConOut2("[{}, {a-,sj20}, {a-,sj8}] # UPDATE\n", this, OurRemoteKey, _pState->m_pApplication->m_Name);
+						DMibConOut("[{}, {a-,sj20}, {a-,sj8}] # UPDATE\n", this, OurRemoteKey, _pState->m_pApplication->m_Name);
 #endif
 						_pState->m_fOnInfo(fg_Format("Our apps '{}' turn to update", OurRemoteKey));
 						return true;
@@ -398,7 +398,7 @@ namespace NMib::NCloud::NAppManager
 						if (_pState->m_pApplication->m_Name == SmallestApplication)
 						{
 #if DDebugAppTurnUpdateLogic > 0
-							DMibConOut2("[{}, {a-,sj20}, {a-,sj8}] # Smallest updating\n", this, RemoteKey, _pState->m_pApplication->m_Name);
+							DMibConOut("[{}, {a-,sj20}, {a-,sj8}] # Smallest updating\n", this, RemoteKey, _pState->m_pApplication->m_Name);
 #endif
 							_pState->m_fOnInfo("Our turn to update");
 							o_Promise.f_SetResult();
@@ -407,7 +407,7 @@ namespace NMib::NCloud::NAppManager
 						else
 						{
 #if DDebugAppTurnUpdateLogic > 1
-							DMibConOut2("[{}, {a-,sj20}, {a-,sj8}] # NOT Smallest {2} != {3}\n", this, RemoteKey, _pState->m_pApplication->m_Name, SmallestApplication);
+							DMibConOut("[{}, {a-,sj20}, {a-,sj8}] # NOT Smallest {2} != {3}\n", this, RemoteKey, _pState->m_pApplication->m_Name, SmallestApplication);
 #endif
 						}
 					}
