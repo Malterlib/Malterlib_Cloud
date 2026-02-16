@@ -812,6 +812,11 @@ Property
 			ScriptWindowsBat true
 		}
 	}
+
+	MalterlibPostBuildScriptInputs =+ fg_ExpandCopyOptions(MalterlibCloud_VersionUploadSources)->ForEach(&f_ExtractPlainFilesFromCopyOptions)
+	{
+		!!MalterilbCloud_DoVersionManagerUpload true
+	}
 }
 
 %Group "{Malterlib}/{CloudTarBinaries}"
