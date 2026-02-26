@@ -112,7 +112,7 @@ namespace NMib::NCloud
 
 	void CBackupManagerClient::CInternal::fs_CheckDestroy(TCSharedPointer<NAtomic::TCAtomic<bool>> const &_pDestroyed)
 	{
-		if (_pDestroyed->f_Load(NAtomic::EMemoryOrder_Relaxed))
+		if (_pDestroyed->f_Load(NAtomic::gc_MemoryOrder_Relaxed))
 			DMibError("Backup client destroyed");
 	}
 
