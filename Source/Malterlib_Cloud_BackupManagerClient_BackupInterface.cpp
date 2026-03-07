@@ -10,7 +10,6 @@
 
 namespace NMib::NCloud
 {
-
 	void CBackupManagerClient::CInternal::f_BackupInstance_ReportFinishedStarting(TCActor<NPrivate::CBackupManagerClient_Instance> const &_BackupInstance)
 	{
 		_BackupInstance(&NPrivate::CBackupManagerClient_Instance::f_BackupFinishedStarting) > [this](TCAsyncResult<void> &&_Result)

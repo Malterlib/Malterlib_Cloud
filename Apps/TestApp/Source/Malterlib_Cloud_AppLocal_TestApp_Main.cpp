@@ -9,7 +9,7 @@
 
 using namespace NMib;
 
-class CTestAppApp : public CApplication
+struct CTestAppApp : public CApplication
 {
 	aint f_Main()
 	{

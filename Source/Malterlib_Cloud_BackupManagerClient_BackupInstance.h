@@ -53,7 +53,6 @@ namespace NMib::NCloud::NPrivate
 		;
 
 	private:
-
 		struct CRunningSyncState
 		{
 			CRunningSyncState();

@@ -18,6 +18,11 @@ namespace NMib::NCloud
 {
 	struct CDebugManagerHelper
 	{
+		struct CUploadResult
+		{
+			CFileTransferResult m_TransferResult;
+		};
+
 		CDebugManagerHelper
 			(
 				NStr::CStr const &_RootDirectory
@@ -31,11 +36,6 @@ namespace NMib::NCloud
 		CDebugManagerHelper(CDebugManagerHelper &&);
 		CDebugManagerHelper &operator = (CDebugManagerHelper const &);
 		CDebugManagerHelper &operator = (CDebugManagerHelper &&);
-
-		struct CUploadResult
-		{
-			CFileTransferResult m_TransferResult;
-		};
 
 		NConcurrency::TCFuture<void> f_AbortAll() const;
 

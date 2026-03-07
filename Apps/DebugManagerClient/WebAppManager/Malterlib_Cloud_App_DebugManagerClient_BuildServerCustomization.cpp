@@ -1,3 +1,5 @@
+// Copyright © 2026 Unbroken AB
+// Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 struct CWebAppManagerCustomization_DebugManagerClient: public ICWebAppManagerCustomization
 {

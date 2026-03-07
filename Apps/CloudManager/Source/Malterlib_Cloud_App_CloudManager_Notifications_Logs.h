@@ -15,7 +15,6 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> f_Destroy();
 
 	private:
-
 		struct CLogStatus
 		{
 			CDistributedAppLogReporter::CLogInfo const *f_GetInfo();

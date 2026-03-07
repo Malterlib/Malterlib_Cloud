@@ -150,13 +150,13 @@ namespace NMib::NCloud::NAppManager
 			co_return CAppLaunchResult{};
 		}
 
-		if (Application.m_Settings.m_AppManagerVersion < mc_CurrentAppMangerVersion)
+		if (Application.m_Settings.m_AppManagerVersion < mcp_CurrentAppMangerVersion)
 		{
 			fp_AppLaunchStateChanged(_pApplication, "Upgrading app manager version", CAppManagerInterface::EStatusSeverity_Warning);
 
 			co_await fp_UpdateAppManagerApplicationVersion(_pApplication, Application.m_Settings.m_AppManagerVersion);
 
-			Application.m_Settings.m_AppManagerVersion = mc_CurrentAppMangerVersion;
+			Application.m_Settings.m_AppManagerVersion = mcp_CurrentAppMangerVersion;
 			co_await fp_UpdateApplicationJson(_pApplication);
 		}
 

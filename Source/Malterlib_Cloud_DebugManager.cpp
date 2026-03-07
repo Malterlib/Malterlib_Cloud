@@ -51,12 +51,12 @@ namespace NMib::NCloud
 	}
 
 	auto CDebugManager::fs_GatherCrashDumpInfos
-	(
-		TCVector<CStr> _Sources
-		, CMetadata _DefaultMetadata
-		, TCOptional<CStr> _DefaultExceptionInfo
-	)
-	-> TCFuture<CCrashDumpInfos>
+		(
+			TCVector<CStr> _Sources
+			, CMetadata _DefaultMetadata
+			, TCOptional<CStr> _DefaultExceptionInfo
+		)
+		-> TCFuture<CCrashDumpInfos>
 	{
 		auto BlockingActorCheckout = fg_BlockingActor();
 		co_return co_await

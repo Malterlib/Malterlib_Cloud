@@ -9,9 +9,8 @@
 
 namespace NMib::NCloud::NBackupManager
 {
-	class CBackupInstance : public CBackupManagerBackup
+	struct CBackupInstance : public CBackupManagerBackup
 	{
-	public:
 		using CActorHolder = CSeparateThreadActorHolder;
 
 		CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID, CStr const &_RootDirectory, bool _bForceNew, TCActor<CBackupSource> const &_BackupSource);

@@ -9,11 +9,9 @@
 
 namespace NMib::NCloud
 {
-	class CKeyManagerServerDatabase_EncryptedFile : public ICKeyManagerServerDatabase
+	struct CKeyManagerServerDatabase_EncryptedFile : public ICKeyManagerServerDatabase
 	{
-	public:
 		CKeyManagerServerDatabase_EncryptedFile(NStr::CStr const &_Path, NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt);
-
 		~CKeyManagerServerDatabase_EncryptedFile();
 
 		NConcurrency::TCFuture<void> f_Initialize() override;
@@ -22,9 +20,10 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<CDatabase> f_ReadDatabase() override;
 
 	private:
+		struct CInternal;
+
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 
-		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }

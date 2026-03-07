@@ -46,8 +46,8 @@ namespace NMib::NCloud
 			void f_Format(tf_CStr &o_Str) const;
 
 			bool f_IsValid() const;
-
 			NStr::CStr f_EncodeFileName() const;
+
 			static NStr::CStr fs_DecodeFileName(NStr::CStr const &_FileName);
 
 			auto operator <=> (CVersionID const &_Right) const = default;
@@ -65,15 +65,13 @@ namespace NMib::NCloud
 			void f_Format(tf_CStr &o_Str) const;
 
 			bool f_IsValid() const;
-
 			NStr::CStr f_EncodeFileName() const;
+			NEncoding::CEJsonSorted f_ToJson() const;
 
 			static NStr::CStr fs_ConvertFromOldPlatform(NStr::CStr const &_Platform);
+			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJsonSorted const &_Json);
 
 			auto operator <=> (CVersionIDAndPlatform const &_Right) const = default;
-
-			NEncoding::CEJsonSorted f_ToJson() const;
-			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJsonSorted const &_Json);
 
 			CVersionID m_VersionID;
 			NStr::CStr m_Platform;
@@ -85,6 +83,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NEncoding::CEJsonSorted f_ToJson() const;
+
 			static CVersionInformation fs_FromJson(NEncoding::CEJsonSorted const &_Json);
 
 			auto operator <=> (CVersionInformation const &_Right) const = default;
@@ -200,7 +199,6 @@ namespace NMib::NCloud
 				>
 				m_fStartTransferDeprecated
 			;
-
 			NStorage::TCOptional<NConcurrency::TCAsyncGeneratorWithID<CDownloadFile>> m_FilesGenerator;
 		};
 
@@ -295,6 +293,9 @@ namespace NMib::NCloud
 			bool m_bIncreaseRetrySequence = false;
 		};
 
+		CVersionManager();
+		~CVersionManager();
+
 		static bool fs_IsValidApplicationName(NStr::CStr const &_String);
 		static bool fs_IsValidProtocolVersion(uint32 _Version);
 		static bool fs_IsValidTag(NStr::CStr const &_String);
@@ -302,9 +303,6 @@ namespace NMib::NCloud
 		static bool fs_IsValidVersionIdentifier(NStr::CStr const &_String, NStr::CStr &o_Error, CVersionID *o_pVersionID);
 		static bool fs_IsValidVersionIdentifier(CVersionID const &_VersionID, NStr::CStr &o_Error);
 		static bool fs_IsValidPlatform(NStr::CStr const &_String);
-
-		CVersionManager();
-		~CVersionManager();
 
 		virtual NConcurrency::TCFuture<CListApplications::CResult> f_ListApplications(CListApplications _Params) = 0;
 		virtual NConcurrency::TCFuture<CListVersions::CResult> f_ListVersions(CListVersions _Params) = 0;

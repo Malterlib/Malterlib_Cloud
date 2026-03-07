@@ -24,8 +24,6 @@ namespace NMib::NCloud
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/SecretsManager";
 
-		CSecretsManager();
-
 		enum : uint32
 		{
 			EProtocolVersion_Min = 0x101
@@ -52,9 +50,6 @@ namespace NMib::NCloud
 
 		struct CSecretID
 		{
-			auto operator <=> (CSecretID const &_Right) const = default;
-
-			operator NStr::CStr() const;
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -64,16 +59,20 @@ namespace NMib::NCloud
 
 			static CSecretID fs_Parse(NStr::CStr const &_CompoundID);
 
+			auto operator <=> (CSecretID const &_Right) const = default;
+
+			operator NStr::CStr() const;
+
 			NStr::CStr m_Folder;
 			NStr::CStr m_Name;
 		};
 
 		struct CSecretFile
 		{
-			bool operator == (CSecretFile const &_Right) const;
-
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
+
+			bool operator == (CSecretFile const &_Right) const;
 
 			NFile::CDirectoryManifestFile m_Manifest;
 		};
@@ -113,32 +112,20 @@ namespace NMib::NCloud
 			{
 			}
 
-			CSuper &operator *();
-			CSuper const &operator *() const;
-			bool operator == (CSecret const &_Right) const;
-
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
+
+			CSuper &operator *();
+			CSuper const &operator *() const;
+			bool operator == (CSecret const &_Right) const;
 		};
 
 		struct CSecretProperties
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-
-			NStorage::TCOptional<CSecret> m_Secret;
-			NStorage::TCOptional<NStr::CStrSecure> m_UserName;
-			NStorage::TCOptional<NStr::CStrSecure> m_URL;
-			NStorage::TCOptional<NTime::CTime> m_Expires;
-			NStorage::TCOptional<NStr::CStrSecure> m_Notes;
-			NStorage::TCOptional<NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJsonSorted>> m_Metadata;
-			NStorage::TCOptional<NTime::CTime> m_Created;
-			NStorage::TCOptional<NTime::CTime> m_Modified;
-			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID;
-			NStorage::TCOptional<NContainer::TCSet<NStr::CStrSecure>> m_Tags;
-			NStorage::TCOptional<bool> m_Immutable; // Does not allow the secret to be changed after being set
 
 			CSecretProperties &&f_SetSecret(CSecret &&_Secret) &&;
 			CSecretProperties &&f_SetUserName(NStr::CStrSecure const &_UserName) &&;
@@ -182,6 +169,18 @@ namespace NMib::NCloud
 			void f_Format(tf_CStr &o_Str) const;
 
 			bool operator == (CSecretProperties const &_Right) const;
+
+			NStorage::TCOptional<CSecret> m_Secret;
+			NStorage::TCOptional<NStr::CStrSecure> m_UserName;
+			NStorage::TCOptional<NStr::CStrSecure> m_URL;
+			NStorage::TCOptional<NTime::CTime> m_Expires;
+			NStorage::TCOptional<NStr::CStrSecure> m_Notes;
+			NStorage::TCOptional<NContainer::TCMap<NStr::CStrSecure, NEncoding::CEJsonSorted>> m_Metadata;
+			NStorage::TCOptional<NTime::CTime> m_Created;
+			NStorage::TCOptional<NTime::CTime> m_Modified;
+			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID;
+			NStorage::TCOptional<NContainer::TCSet<NStr::CStrSecure>> m_Tags;
+			NStorage::TCOptional<bool> m_Immutable; // Does not allow the secret to be changed after being set
 		};
 
 		struct CSecretChanges
@@ -252,6 +251,8 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NEncoding::CEJsonSorted> m_ExpectedValue;
 			NStorage::TCOptional<NTime::CTime> m_ModifiedTime;
 		};
+
+		CSecretsManager();
 
 		static bool fs_IsValidFolder(NStr::CStr const &_Folder);
 		static bool fs_IsValidName(NStr::CStr const &_Name);

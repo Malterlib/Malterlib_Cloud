@@ -16,9 +16,6 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> f_UpdatePeriodicSensorNotifications(bool _bForceAtOnce);
 
 	private:
-		void fp_SchedulePeriodicSensorNotificationsOutOfBand(bool _bForceAtOnce);
-		TCFuture<void> fp_UpdateSensorFromReading(CDistributedAppSensorReporter::CSensorInfoKey _SensorKey, CTime _Now);
-
 		struct CSensorStatus
 		{
 			CDistributedAppSensorReporter::CSensorInfo const *f_GetInfo();
@@ -35,6 +32,9 @@ namespace NMib::NCloud::NCloudManager
 			bool m_bInfoValid = false;
 			bool m_bLastCombinedStatusValid = false;
 		};
+
+		void fp_SchedulePeriodicSensorNotificationsOutOfBand(bool _bForceAtOnce);
+		TCFuture<void> fp_UpdateSensorFromReading(CDistributedAppSensorReporter::CSensorInfoKey _SensorKey, CTime _Now);
 
 		CCloudManagerServer &mp_This;
 		CActorSubscription mp_SensorSubscription;

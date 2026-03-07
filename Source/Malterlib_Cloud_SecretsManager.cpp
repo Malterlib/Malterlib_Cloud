@@ -278,19 +278,16 @@ namespace NMib::NCloud
 
 	bool CSecretsManager::CSecretProperties::operator == (CSecretsManager::CSecretProperties const &_Right) const
 	{
-		return
-			(
-				m_Secret == _Right.m_Secret
-				&& m_UserName == _Right.m_UserName
-				&& m_URL == _Right.m_URL
-				&& m_Expires == _Right.m_Expires
-				&& m_Notes == _Right.m_Notes
-				&& m_Metadata == _Right.m_Metadata
-				&& m_Created == _Right.m_Created
-				&& m_Modified == _Right.m_Modified
-				&& m_SemanticID == _Right.m_SemanticID
-				&& m_Immutable == _Right.m_Immutable
-			 )
+		return m_Secret == _Right.m_Secret
+			&& m_UserName == _Right.m_UserName
+			&& m_URL == _Right.m_URL
+			&& m_Expires == _Right.m_Expires
+			&& m_Notes == _Right.m_Notes
+			&& m_Metadata == _Right.m_Metadata
+			&& m_Created == _Right.m_Created
+			&& m_Modified == _Right.m_Modified
+			&& m_SemanticID == _Right.m_SemanticID
+			&& m_Immutable == _Right.m_Immutable
 		;
 	}
 

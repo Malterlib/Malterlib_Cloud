@@ -73,4 +73,3 @@ namespace NMib::NCloud::NCloudAPIManager
 		co_return fg_Move(ReturnResult);
 	}
 }
-

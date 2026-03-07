@@ -9,7 +9,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NCloudManager;
 
-class CCloudManagerApplication : public CApplication
+struct CCloudManagerApplication : public CApplication
 {
 	aint f_Main()
 	{

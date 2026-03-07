@@ -55,7 +55,6 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-
 	NConcurrency::TCFuture<void> CBackupManagerClient::fp_Destroy()
 	{
 		auto &Internal = *mp_pInternal;

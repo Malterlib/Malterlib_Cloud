@@ -13,14 +13,6 @@ namespace NMib::NCloud
 {
 	struct CNetworkTunnelsClient : public NConcurrency::CActor
 	{
-		CNetworkTunnelsClient
-			(
-				NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
-				, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
-			)
-		;
-		~CNetworkTunnelsClient();
-
 		struct CTunnel
 		{
 			NConcurrency::CActorSubscription m_Subscription;
@@ -45,16 +37,23 @@ namespace NMib::NCloud
 			bool m_bWaitForTunnel = false;
 		};
 
+		CNetworkTunnelsClient
+			(
+				NConcurrency::TCActor<NConcurrency::CActorDistributionManager> const &_DistributionManager
+				, NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> const &_TrustManager
+			)
+		;
+		~CNetworkTunnelsClient();
+
 		NConcurrency::TCFuture<void> f_Start();
-
 		NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, NContainer::TCMap<ICNetworkTunnels::CNetworkTunnelName, ICNetworkTunnels::CNetworkTunnel>>> f_EnumTunnels();
-
 		NConcurrency::TCFuture<CTunnel> f_OpenTunnel(COpenTunnel _OpenTunnel);
 
 	private:
+		struct CInternal;
+
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 
-		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }

@@ -16,11 +16,7 @@ namespace NMib::NCloud::NCloudAPIManager
 {
 	struct CCloudAPIManagerDaemonActor::CServer : public CActor
 	{
-	public:
 		using CActorHolder = CDelegatedActorHolder;
-
-		CServer(CDistributedAppState &_AppState);
-		~CServer();
 
 		struct CCloudAPIManagerImplementation : public CCloudAPIManager
 		{
@@ -65,6 +61,9 @@ namespace NMib::NCloud::NCloudAPIManager
 			bool m_bLastWasError = false;
 			CTime m_TokenExpiresAt;
 		};
+
+		CServer(CDistributedAppState &_AppState);
+		~CServer();
 
 	private:
 		TCFuture<void> fp_Destroy() override;

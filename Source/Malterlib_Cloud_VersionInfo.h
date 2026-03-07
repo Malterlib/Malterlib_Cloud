@@ -28,14 +28,14 @@ namespace NMib::NCloud
 
 	struct CCloudVersionInfo
 	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
 		NStr::CStr m_Application;
 		CCloudVersion m_Version;
 		NStr::CStr m_Platform;
 		NStr::CStr m_Configuration;
 		NMib::NEncoding::CEJsonSorted m_ExtraInfo;
-
-		template <typename tf_CStream>
-		void f_Stream(tf_CStream &_Stream);
 	};
 
 	CCloudVersionInfo fg_ParseVersionInfo(NStr::CStr const &_String);

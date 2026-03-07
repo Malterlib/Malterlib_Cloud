@@ -9,9 +9,8 @@
 
 static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 
-class CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
+struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 {
-public:
 	void fp_TestGeneral()
 	{
 		DMibTestSuite("General") -> TCFuture<void>

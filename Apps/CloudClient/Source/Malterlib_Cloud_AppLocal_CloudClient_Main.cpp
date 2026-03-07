@@ -11,7 +11,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NCloudClient;
 
-class CCloudClient : public CApplication
+struct CCloudClient : public CApplication
 {
 	aint f_Main()
 	{

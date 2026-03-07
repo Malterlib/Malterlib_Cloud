@@ -63,9 +63,8 @@ namespace NMib::NCloud::NSecretsManager
 	};
 
 
-	class CSecretsManagerServerDatabase : public CActor
+	struct CSecretsManagerServerDatabase : public CActor
 	{
-	public:
 		CSecretsManagerServerDatabase(NStr::CStr const &_Path, NContainer::CSecureByteVector const &_Key);
 		~CSecretsManagerServerDatabase();
 

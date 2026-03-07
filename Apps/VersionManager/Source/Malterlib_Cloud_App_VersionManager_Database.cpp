@@ -445,9 +445,11 @@ namespace NMib::NCloud::NVersionManager
 			auto *pApplication = mp_Applications.f_FindEqual(AppName);
 			if (!pApplication)
 				continue;
+
 			auto *pVersion = pApplication->m_Versions.f_FindEqual(VersionID);
 			if (!pVersion)
 				continue;
+
 			fp_NewVersion(AppName, pVersion->f_GetIdentifier(), pVersion->m_VersionInfo, OriginID) > NotificationResults;
 		}
 

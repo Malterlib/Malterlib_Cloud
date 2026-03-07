@@ -25,8 +25,6 @@ namespace NMib::NCloud
 	{
 		struct CFileCache
 		{
-			CStr m_FileName;
-			CFile m_File;
 			~CFileCache()
 			{
 				if (m_File.f_IsValid())
@@ -46,6 +44,9 @@ namespace NMib::NCloud
 					;
 				}
 			}
+
+			CStr m_FileName;
+			CFile m_File;
 		};
 
 		CStr m_BasePath;

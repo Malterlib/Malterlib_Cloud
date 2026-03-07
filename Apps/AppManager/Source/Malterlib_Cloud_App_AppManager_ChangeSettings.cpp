@@ -81,7 +81,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		fOnInfo("Upgrading from {nfh} to {nfh}"_f << _OldVersion << mc_CurrentAppMangerVersion);
+		fOnInfo("Upgrading from {nfh} to {nfh}"_f << _OldVersion << mcp_CurrentAppMangerVersion);
 
 		auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -136,7 +136,7 @@ namespace NMib::NCloud::NAppManager
 				_pApplication->m_Settings.m_bDistributedApp = true;
 		}
 
-		fOnInfo("Upgrading from {nfh} to {nfh} finished"_f << _OldVersion << mc_CurrentAppMangerVersion);
+		fOnInfo("Upgrading from {nfh} to {nfh} finished"_f << _OldVersion << mcp_CurrentAppMangerVersion);
 
 		co_return {};
 	}

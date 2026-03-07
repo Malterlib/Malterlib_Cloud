@@ -32,9 +32,6 @@ namespace NMib::NCloud::NCloudManager
 
 		using CActorHolder = CDelegatedActorHolder;
 
-		CCloudManagerServer(CDistributedAppState &_AppState);
-		~CCloudManagerServer();
-
 		struct CCloudManagerImplementation : public CCloudManager
 		{
 			TCFuture<CRegisterAppManagerResult> f_RegisterAppManager(TCDistributedActorInterfaceWithID<CAppManagerInterface> _AppManager, CAppManagerInfo _AppManagerInfo) override;
@@ -113,6 +110,9 @@ namespace NMib::NCloud::NCloudManager
 
 			DMibDelegatedActorImplementation(CCloudManagerServer);
 		};
+
+		CCloudManagerServer(CDistributedAppState &_AppState);
+		~CCloudManagerServer();
 
 		TCFuture<void> f_Init();
 		TCFuture<void> f_DumpDatabaseEntries(TCSharedPointer<CCommandLineControl> _pCommandLine, CStr _Prefix);
@@ -208,8 +208,8 @@ namespace NMib::NCloud::NCloudManager
 		static TCVector<CStr> fsp_SensorReadPermissions();
 		static TCVector<CStr> fsp_LogReadPermissions();
 
-		static CStr const mc_DatabasePrefixLog;
-		static CStr const mc_DatabasePrefixSensor;
+		static CStr const mcp_DatabasePrefixLog;
+		static CStr const mcp_DatabasePrefixSensor;
 
 		TCDistributedActorInstance<CCloudManagerImplementation> mp_ProtocolInterface;
 		TCDistributedActorInstance<CDistributedAppSensorReporterImplementation> mp_SensorReporterInterface;

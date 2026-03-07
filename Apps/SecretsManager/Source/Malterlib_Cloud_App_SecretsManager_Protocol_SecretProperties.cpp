@@ -20,20 +20,20 @@ namespace NMib::NCloud::NSecretsManager
 			return true;
 		}
 
-		template<class t_CFunctor>
+		template <typename t_CFunctor>
 		void fg_CollectMatchingSecrets
 			(
 				TCMap<CSecretsManager::CSecretID, CSecretPropertiesInternal> &_Secrets
 				, TCOptional<CStrSecure> const &_SemanticID
 				, TCOptional<CStrSecure> const &_Name
 				, TCSet<CStrSecure> const &_TagsExclusive
-				, t_CFunctor _Func
+				, t_CFunctor &&_fFunc
 			)
 		{
 			for (auto const &SecretProperties : _Secrets)
 			{
 				if (CSecretsManagerDaemonActor::CServer::fs_MatchSecret(SecretProperties, _SemanticID, _Name, _TagsExclusive))
-					_Func(SecretProperties);
+					_fFunc(SecretProperties);
 			}
 		}
 

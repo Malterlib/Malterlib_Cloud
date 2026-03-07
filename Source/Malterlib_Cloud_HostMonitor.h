@@ -204,13 +204,13 @@ namespace NMib::NCloud
 
 	struct CHostMonitorRebootSchedule
 	{
+		NTime::CTime f_GetNextRebootTime(NTime::CTime const &_EarliestRebootTime, bool _bLocalTime = true) const;
+
 		NStorage::TCOptional<uint8> m_Month;
 		NStorage::TCOptional<uint8> m_DayOfMonth;
 		NStorage::TCOptional<uint8> m_DayOfWeek;
 		NStorage::TCOptional<uint8> m_Hour;
 		NStorage::TCOptional<uint8> m_Minute;
-
-		NTime::CTime f_GetNextRebootTime(NTime::CTime const &_EarliestRebootTime, bool _bLocalTime = true) const;
 	};
 }
 

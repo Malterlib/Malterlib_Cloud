@@ -11,7 +11,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NTunnelProxyManager;
 
-class CTunnelProxyManagerApplication : public CApplication
+struct CTunnelProxyManagerApplication : public CApplication
 {
 	aint f_Main()
 	{

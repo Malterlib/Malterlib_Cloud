@@ -56,18 +56,9 @@ namespace
 {
 	// This class makes it possible to control the order of events for parallel uploads and downloads
 	template <typename t_CStreamType = NStream::CBinaryStreamDefault>
-	class TCBinaryStreamFileDelayed : public TCBinaryStreamFile<t_CStreamType>
+	struct TCBinaryStreamFileDelayed : public TCBinaryStreamFile<t_CStreamType>
 	{
-		using CParent = TCBinaryStreamFile<t_CStreamType>;
-
-	protected:
-		DMibStreamImplementProtected(TCBinaryStreamFileDelayed);
-	public:
 		DMibStreamImplementOperators(TCBinaryStreamFileDelayed);
-
-		CFile m_File;
-		NThread::CEvent *m_pOpenEvent;
-		NThread::CEvent *m_pCloseEvent;
 
 		TCBinaryStreamFileDelayed(NThread::CEvent *_pOpenEvent, NThread::CEvent *_pCloseEvent)
 			: m_pOpenEvent(_pOpenEvent)
@@ -82,7 +73,8 @@ namespace
 			{
 				m_pOpenEvent->f_WaitTimeout(60.0);
 			}
-			CParent::m_File.f_Open(_FileName, _OpenFlags, _Attributes);
+
+			TCBinaryStreamFile<t_CStreamType>::m_File.f_Open(_FileName, _OpenFlags, _Attributes);
 		}
 
 		void f_Close()
@@ -91,8 +83,16 @@ namespace
 			{
 				m_pCloseEvent->f_WaitTimeout(60.0);
 			}
-			CParent::m_File.f_Close();
+
+			TCBinaryStreamFile<t_CStreamType>::m_File.f_Close();
 		}
+
+		CFile m_File;
+		NThread::CEvent *m_pOpenEvent;
+		NThread::CEvent *m_pCloseEvent;
+
+	protected:
+		DMibStreamImplementProtected(TCBinaryStreamFileDelayed);
 	};
 
 	template <typename tf_CKey, typename tf_CValue, typename... tf_CParams>
@@ -134,9 +134,8 @@ namespace
 	}
 };
 
-class CSecretsManager_Tests : public NMib::NTest::CTest
+struct CSecretsManager_Tests : public NMib::NTest::CTest
 {
-public:
 	void f_DoTests()
 	{
 		DMibTestSuite("General")

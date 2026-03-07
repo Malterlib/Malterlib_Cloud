@@ -26,6 +26,7 @@ namespace NMib::NCloud::NTest
 				, "Test App."
 			)
 		;
+
 		o_CommandLine.f_RegisterGlobalOptions
 			(
 				{
@@ -135,6 +136,7 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
@@ -191,6 +193,7 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
@@ -234,6 +237,7 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
@@ -276,6 +280,7 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
@@ -304,6 +309,7 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{
@@ -374,6 +380,7 @@ namespace NMib::NCloud::NTest
 				}
 			)
 		;
+
 		o_CommandLine.f_GetDefaultSection().f_RegisterCommand
 			(
 				{

@@ -11,7 +11,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NCloudAPIManager;
 
-class CCloudAPIManager : public CApplication
+struct CCloudAPIManager : public CApplication
 {
 	aint f_Main()
 	{

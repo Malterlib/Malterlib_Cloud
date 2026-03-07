@@ -35,8 +35,6 @@ namespace NMib::NCloud::NAppManager
 		using EUpdateStage = CAppManagerInterface::EUpdateStage;
 		struct CFirstApplicationUpdate;
 
-		static constexpr uint32 mc_CurrentAppMangerVersion = 0x101;
-
 		enum EUpdateScript
 		{
 			EUpdateScript_PreUpdate
@@ -137,7 +135,7 @@ namespace NMib::NCloud::NAppManager
 #ifdef DPlatformFamily_Windows
 			CStrSecure m_RunAsUserPassword;
 #endif
-			uint32 m_AppManagerVersion = mc_CurrentAppMangerVersion;
+			uint32 m_AppManagerVersion = mcp_CurrentAppMangerVersion;
 			bool m_bAutoUpdate = false;
 			bool m_bSelfUpdateSource = false;
 			bool m_bStopOnDependencyFailure = true;
@@ -1009,6 +1007,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_RebootPrevention_WatchInitialSensors();
 		TCFuture<void> fp_RebootPrevention_UpdateApplications();
 		void fp_RebootPrevention_UpdateApplicationFlags(CSensorRebootWatch const &_Watch, NTime::CTime const &_Now);
+
+		static constexpr uint32 mcp_CurrentAppMangerVersion = 0x101;
 
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);

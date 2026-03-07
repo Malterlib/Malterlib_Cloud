@@ -43,6 +43,14 @@ namespace NMib::NCloud
 				fp_CallFunctor();
 			}
 
+			TCPromise<CDirectorySyncSend::CSyncResult> m_Promise;
+			TCActorFunctorWithID<TCFuture<void> ()> m_fFunctor;
+			TCDistributedActor<CDirectorySyncSend> m_DirectorySyncSend;
+			CDirectorySyncSend::CSyncResult m_SyncResults;
+			bool m_bSeenResult = false;
+			bool m_bSeenException = false;
+			bool m_bAborted = false;
+
 		private:
 			void fp_CallFunctor()
 			{
@@ -55,15 +63,6 @@ namespace NMib::NCloud
 					;
 				}
 			}
-
-		public:
-			TCPromise<CDirectorySyncSend::CSyncResult> m_Promise;
-			TCActorFunctorWithID<TCFuture<void> ()> m_fFunctor;
-			TCDistributedActor<CDirectorySyncSend> m_DirectorySyncSend;
-			CDirectorySyncSend::CSyncResult m_SyncResults;
-			bool m_bSeenResult = false;
-			bool m_bSeenException = false;
-			bool m_bAborted = false;
 		};
 	}
 

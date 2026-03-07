@@ -11,10 +11,6 @@
 
 struct CRefreshResult
 {
-	mint m_nAdded = 0;
-	mint m_nUpdated = 0;
-	mint m_nRemoved = 0;
-
 	static CRefreshResult fs_Parse(CStr const &_Output)
 	{
 		CRefreshResult Result;
@@ -22,6 +18,10 @@ struct CRefreshResult
 		(CStr::CParse("Refreshed versions: {} added, {} updated, {} removed") >> Result.m_nAdded >> Result.m_nUpdated >> Result.m_nRemoved).f_Parse(_Output, nParsed);
 		return Result;
 	}
+
+	mint m_nAdded = 0;
+	mint m_nUpdated = 0;
+	mint m_nRemoved = 0;
 };
 
 namespace
@@ -29,9 +29,8 @@ namespace
 	fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 }
 
-class CVersionManager_Refresh_Tests : public NMib::NTest::CTest
+struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 {
-public:
 	void f_DoTests()
 	{
 		DMibTestSuite("Basic") -> TCFuture<void>

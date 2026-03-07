@@ -16,11 +16,6 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> f_ProcessApplicationUpdateNotification(CStr _AppManagerID, CAppManagerInterface::CUpdateNotification _Notification);
 
 	private:
-		TCFuture<TCMap<CStr, CStr>> fp_ReportApplicationUpdateToSlack(CStr _AppManagerID, NCloudManagerDatabase::CApplicationUpdateStateValue _UpdateState);
-
-		void fp_ScheduleDeferredNotifications();
-		TCFuture<void> fp_SendDeferredNotifications();
-
 		struct CDeferredUpdates
 		{
 			struct CUpdate
@@ -38,6 +33,11 @@ namespace NMib::NCloud::NCloudManager
 			TCMap<CStr, CAppManager> m_AppManagers;
 			DLinkDS_List(CUpdate, m_Link) m_OrderedUpdates;
 		};
+
+		TCFuture<TCMap<CStr, CStr>> fp_ReportApplicationUpdateToSlack(CStr _AppManagerID, NCloudManagerDatabase::CApplicationUpdateStateValue _UpdateState);
+
+		void fp_ScheduleDeferredNotifications();
+		TCFuture<void> fp_SendDeferredNotifications();
 
 		CCloudManagerServer &mp_This;
 

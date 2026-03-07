@@ -13,7 +13,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NAppDistributionManager;
 
-class CAppDistributionManager : public CApplication
+struct CAppDistributionManager : public CApplication
 {
 	aint f_Main()
 	{

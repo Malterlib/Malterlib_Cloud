@@ -14,7 +14,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NAppManager;
 
-class CAppManager : public CApplication
+struct CAppManager : public CApplication
 {
 	aint f_Main()
 	{

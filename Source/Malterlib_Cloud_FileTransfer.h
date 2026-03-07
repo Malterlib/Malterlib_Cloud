@@ -14,13 +14,13 @@ namespace NMib::NCloud
 
 	struct CFileTransferResult
 	{
-		uint64 m_nBytes = 0;
-		fp64 m_nSeconds = 0.0;
-
 		fp64 f_BytesPerSecond() const;
 
 		void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 		void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
+
+		uint64 m_nBytes = 0;
+		fp64 m_nSeconds = 0.0;
 	};
 
 	struct CFileTransferContextDeprecated
@@ -38,7 +38,9 @@ namespace NMib::NCloud
 	private:
 		friend struct CFileTransferSend;
 		friend struct CFileTransferReceive;
+
 		struct CInternal;
+
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 
@@ -53,15 +55,15 @@ namespace NMib::NCloud
 	{
 		using CDownloadFileContents = CFileTransferSendDownloadFileContents;
 
+		template <typename tf_CTypeTo, typename tf_CTypeFrom>
+		static NConcurrency::TCAsyncGenerator<tf_CTypeTo> fs_TranslateGenerator(NConcurrency::TCAsyncGenerator<tf_CTypeFrom> _FilesGenerator);
+
 		NStr::CStr m_FilePath;
 		NFile::EFileAttrib m_FileAttributes = NFile::EFileAttrib_None;
 		NTime::CTime m_WriteTime;
 		uint64 m_FileSize = 0;
 		NStr::CStr m_SymlinkContents;
 		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<CDownloadFileContents> (uint64 _StartPosition, NCryptography::CHashDigest_SHA256 _StartDigest)> m_fGetDataGenerator;
-
-		template <typename tf_CTypeTo, typename tf_CTypeFrom>
-		static NConcurrency::TCAsyncGenerator<tf_CTypeTo> fs_TranslateGenerator(NConcurrency::TCAsyncGenerator<tf_CTypeFrom> _FilesGenerator);
 	};
 
 	struct CFileTransferSend : public NConcurrency::CActor
@@ -92,32 +94,23 @@ namespace NMib::NCloud
 			NStr::CStr m_Name;
 		};
 
-		~CFileTransferSend();
 		CFileTransferSend(NStr::CStr const &_BasePath, uint64 _MaxQueueSize = NFile::gc_IdealNetworkQueueSize);
 		CFileTransferSend(NContainer::TCVector<CBasePath> &&_BasePaths, uint64 _MaxQueueSize = NFile::gc_IdealNetworkQueueSize);
+		~CFileTransferSend();
 
 		NConcurrency::TCFuture<CSendFilesResultDeprecated> f_SendFilesDeprecated(CFileTransferContextDeprecated _TransferContext);
-
 		NConcurrency::TCFuture<CSendFilesResult> f_SendFiles(CSendFilesOptions _Options);
 
 	private:
+		struct CInternal;
+
 		NConcurrency::TCFuture<void> fp_Destroy();
 
-		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 
 	struct CFileTransferReceive : public NConcurrency::CActor
 	{
-		~CFileTransferReceive();
-		CFileTransferReceive
-			(
-				NStr::CStr const &_BasePath
-				, NFile::EFileAttrib _AttributeMask = NFile::EFileAttrib_UserRead | NFile::EFileAttrib_UserWrite | NFile::EFileAttrib_UserExecute | NFile::EFileAttrib_UnixAttributesValid
-				, NFile::EFileAttrib _AttributeAdd = NFile::EFileAttrib_None
-			)
-		;
-
 		enum EReceiveFlag
 		{
 			EReceiveFlag_None = 0
@@ -127,17 +120,25 @@ namespace NMib::NCloud
 			, EReceiveFlag_DecompressZstandard = DMibBit(3)
 		};
 
+		CFileTransferReceive
+			(
+				NStr::CStr const &_BasePath
+				, NFile::EFileAttrib _AttributeMask = NFile::EFileAttrib_UserRead | NFile::EFileAttrib_UserWrite | NFile::EFileAttrib_UserExecute | NFile::EFileAttrib_UnixAttributesValid
+				, NFile::EFileAttrib _AttributeAdd = NFile::EFileAttrib_None
+			)
+		;
+		~CFileTransferReceive();
+
 		NConcurrency::TCFuture<CFileTransferContextDeprecated> f_ReceiveFilesDeprecated(uint64 _QueueSize, EReceiveFlag _Flags);
 		NConcurrency::TCFuture<CFileTransferResult> f_GetResultDeprecated();
-
 		NConcurrency::TCFuture<CFileTransferResult> f_ReceiveFiles(NConcurrency::TCAsyncGenerator<CFileTransferSendDownloadFile> _FilesGenerator, uint64 _QueueSize, EReceiveFlag _Flags);
-
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_GetAbortSubscription();
 
 	private:
+		struct CInternal;
+
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 
-		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }

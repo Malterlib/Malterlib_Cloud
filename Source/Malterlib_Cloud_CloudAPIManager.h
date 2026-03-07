@@ -27,8 +27,6 @@ namespace NMib::NCloud
 		using CDistributedActorWriteStream = NConcurrency::CDistributedActorWriteStream;
 		using CDistributedActorReadStream = NConcurrency::CDistributedActorReadStream;
 
-		CCloudAPIManager();
-
 		enum : uint32
 		{
 			EProtocolVersion_Min = 0x101
@@ -102,6 +100,8 @@ namespace NMib::NCloud
 			NStr::CStr m_ContainerName;
 			NStr::CStr m_ObjectId;
 		};
+
+		CCloudAPIManager();
 
 		static bool fs_IsValidCloudContext(NStr::CStr const &_String);
 		static bool fs_IsValidContainerName(NStr::CStr const &_String);

@@ -6,6 +6,36 @@
 
 namespace NMib::NCloud::NBackupManager
 {
+	CBackupInstance::CInternal::CInternal
+		(
+			CBackupInstance *_pThis
+			, CStr const &_Name
+			, CTime const &_StartTime
+			, CStr const &_ID
+			, CStr const &_RootDirectory
+			, bool _bForceNew
+			, TCActor<CBackupSource> const &_BackupSource
+		)
+		: m_pThis(_pThis)
+		, m_Name(_Name)
+		, m_StartTime(_StartTime)
+		, m_ID(_ID)
+		, m_RootDirectory(_RootDirectory)
+		, m_bForceNew(_bForceNew)
+		, m_BackupSource(_BackupSource)
+	{
+		g_Dispatch / [this]
+			{
+				f_InitBackupDirectory();
+			}
+			> [](TCAsyncResult<void> &&_Result)
+			{
+				if (!_Result)
+					DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "Failed to init backup directory: {}", _Result.f_GetExceptionStr());
+			}
+		;
+	}
+
 	CBackupInstance::CBackupInstance(CStr const &_Name, CTime const &_StartTime, CStr const &_ID, CStr const &_RootDirectory, bool _bForceNew, TCActor<CBackupSource> const &_BackupSource)
 		: mp_pInternal(fg_Construct(this, _Name, _StartTime, _ID, _RootDirectory, _bForceNew, _BackupSource))
 	{

@@ -38,9 +38,6 @@ namespace NMib::NCloud
 
 		struct CDownloadState : public CState
 		{
-			TCActor<CFileTransferReceive> m_DownloadVersionReceive;
-			CActorSubscription m_DownloadVersionSubscription;
-
 			TCFuture<void> f_Abort()
 			{
 				auto This = co_await fg_MoveThis(*this);
@@ -53,13 +50,13 @@ namespace NMib::NCloud
 
 				co_return {};
 			}
+
+			TCActor<CFileTransferReceive> m_DownloadVersionReceive;
+			CActorSubscription m_DownloadVersionSubscription;
 		};
 
 		struct CUploadState : public CState
 		{
-			TCActor<CFileTransferSend> m_UploadVersionSend;
-			TCActorFunctor<NConcurrency::TCFuture<void> ()> m_fFinish;
-
 			TCFuture<void> f_Abort()
 			{
 				auto This = co_await fg_MoveThis(*this);
@@ -70,13 +67,13 @@ namespace NMib::NCloud
 
 				co_return {};
 			}
+
+			TCActor<CFileTransferSend> m_UploadVersionSend;
+			TCActorFunctor<NConcurrency::TCFuture<void> ()> m_fFinish;
 		};
 
 		struct CProcessLaunchState : public CState
 		{
-			TCActor<CProcessLaunchActor> m_Launch;
-			TCActor<CProcessLaunchActor> m_Launch2;
-
 			TCFuture<void> f_Abort()
 			{
 				auto This = co_await fg_MoveThis(*this);
@@ -89,6 +86,9 @@ namespace NMib::NCloud
 
 				co_return {};
 			}
+
+			TCActor<CProcessLaunchActor> m_Launch;
+			TCActor<CProcessLaunchActor> m_Launch2;
 		};
 	}
 

@@ -12,7 +12,7 @@ namespace NMib::NCloud::NCloudManager
 {
 	using namespace NCloudManagerDatabase;
 
-	constexpr double gc_LogAggregationTime = 10.0;
+	constexpr fp64 gc_LogAggregationTime = 10.0;
 
 	CLogNotifications::CLogNotifications(CCloudManagerServer &_This)
 		: mp_This(_This)
@@ -172,7 +172,7 @@ namespace NMib::NCloud::NCloudManager
 		SubscribeLogEntriesParams.m_fOnEntry = g_ActorFunctor / [this](CDistributedAppLogReader_LogKeyAndEntry _Entry) -> TCFuture<void>
 			{
 				CStr ThisHostID;
-				NLogStore::CFilterLogKeyContext FilterContext{.m_ThisHostID = ThisHostID, .m_Prefix = mp_This.mc_DatabasePrefixLog};
+				NLogStore::CFilterLogKeyContext FilterContext{.m_ThisHostID = ThisHostID, .m_Prefix = mp_This.mcp_DatabasePrefixLog};
 
 				mp_LastSeenTimestamp = fg_Max(mp_LastSeenTimestamp, _Entry.m_Entry.m_Timestamp);
 

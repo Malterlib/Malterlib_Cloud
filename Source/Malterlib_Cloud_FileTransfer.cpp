@@ -20,7 +20,6 @@ namespace NMib::NCloud
 	CFileTransferContextDeprecated::CFileTransferContextDeprecated(CFileTransferContextDeprecated &&_Other) = default;
 	CFileTransferContextDeprecated &CFileTransferContextDeprecated::operator =(CFileTransferContextDeprecated &&_Other) = default;
 
-
 	void CFileTransferContextDeprecated::f_Feed(CDistributedActorWriteStream &_Stream) const
 	{
 		mp_pInternal->f_Feed(_Stream);

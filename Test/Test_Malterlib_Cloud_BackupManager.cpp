@@ -37,9 +37,8 @@ using namespace NMib::NTest;
 
 static fp64 g_Timeout = NSys::fg_System_BeingDebugged() ? 600.0 : 60.0 * gc_TimeoutMultiplier;
 
-class CBackupManager_Tests : public NMib::NTest::CTest
+struct CBackupManager_Tests : public NMib::NTest::CTest
 {
-public:
 	void f_DoTests()
 	{
 		// File change notifications are not working as expected on Windowms for now

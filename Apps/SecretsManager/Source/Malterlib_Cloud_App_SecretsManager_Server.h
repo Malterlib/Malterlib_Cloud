@@ -18,7 +18,6 @@ namespace NMib::NCloud::NSecretsManager
 {
 	struct CSecretsManagerDaemonActor::CServer : public CActor
 	{
-	public:
 		using CActorHolder = CDelegatedActorHolder;
 
 		struct CSecretsManagerImplementation : public CSecretsManager
@@ -79,11 +78,11 @@ namespace NMib::NCloud::NSecretsManager
 			{
 				return TCMap<CStr, CChangeSubscription>::fs_GetKey(*this);
 			}
-			CCallingHostInfo m_CallingHostInfo;
-
-			CSecretsManager::CSubscribeToChanges m_SubscriptionParams;
 
 			NConcurrency::TCFuture<void> f_SendChanges(CSecretsManager::CSecretChanges &&_Changes) const;
+
+			CCallingHostInfo m_CallingHostInfo;
+			CSecretsManager::CSubscribeToChanges m_SubscriptionParams;
 		};
 
 		CServer(CDistributedAppState &_AppState, TCActor<CSecretsManagerServerDatabase> const &_DatabaseActor);
@@ -145,7 +144,6 @@ namespace NMib::NCloud::NSecretsManager
 #if DMibConfig_Tests_Enable
 		TCFuture<CEJsonSorted> f_SyncFileOperations();
 #endif
-
 		TCFuture<void> fp_SendSubscriptionInitial(CStr _SubscriptionID);
 		TCFuture<void> fp_UpdateSubscriptionsForChangedPermissions(CPermissionIdentifiers _Identity);
 		void fp_SecretUpdated(CSecretPropertiesInternal const &_SecretProperties, bool _bRemoved);

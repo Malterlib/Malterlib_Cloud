@@ -10,7 +10,6 @@ namespace NMib::NCloud::NCloudClient
 	struct CCloudClientAppLocalActor : public CCloudClientAppActor
 	{
 	private:
-
 		struct CSelfUpdateVersion
 		{
 			TCDistributedActor<CVersionManager> m_Actor;

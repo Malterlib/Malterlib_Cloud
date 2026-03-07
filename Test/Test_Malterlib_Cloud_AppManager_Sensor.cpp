@@ -25,9 +25,8 @@ namespace
 	}
 }
 
-class CAppManager_Sensor_Tests : public NMib::NTest::CTest
+struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 {
-public:
 	void f_DoTests()
 	{
 		DMibTestSuite("General") -> TCFuture<void>

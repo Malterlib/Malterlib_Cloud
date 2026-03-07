@@ -66,47 +66,6 @@ namespace NMib::NCloud
 			CStr m_Name;
 		};
 
-		CAppManagerTestHelper(CStr const &_RootDirectory, EOption _Options, fp64 _Timeout);
-
-		template <typename tf_CHostID, typename tf_CPermissions>
-		static auto fs_Permissions(tf_CHostID &&_HostID, tf_CPermissions &&_Permissions)
-		{
-			return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, mc_WaitForSubscriptions};
-		}
-
-		template <typename tf_CNamespace, typename tf_CHosts>
-		static auto fs_NamespaceHosts(tf_CNamespace &&_Namespace, tf_CHosts &&_Hosts)
-		{
-			return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, mc_WaitForSubscriptions};
-		}
-
-		TCFuture<void> f_SetupTrust();
-		TCFuture<void> f_InstallTestApp(CStr _Name = "TestApp", CStr _Tag = "TestTag", CStr _Group = "TestGroup", CStr _VersionManagerApplication = "TestApp");
-		TCFuture<void> f_CheckCloudManager(mint _Sequence);
-		TCFuture<void> f_Setup(mint _nAppManagers);
-		TCFuture<void> f_StopCloudManager();
-		TCFuture<void> f_StartCloudManager();
-		TCFuture<void> f_Destroy();
-		CStr f_RootDirectory();
-
-		TCFuture<NStr::CStr> f_LaunchTool
-			(
-				NStr::CStr _Executable
-				, NContainer::TCVector<NStr::CStr> _Params
-				, NStr::CStr _WorkingDir = {}
-			)
-		;
-
-		TCFuture<CProcessLaunchActor::CSimpleLaunchResult> f_LaunchSimple
-			(
-				NStr::CStr _Executable
-				, NContainer::TCVector<NStr::CStr> _Params
-				, NStr::CStr _WorkingDir = {}
-			)
-		;
-
-		static auto constexpr mc_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
-
 		struct CState
 		{
 			CState(CStr const &_RootDirectory, EOption _Options, fp64 _Timeout);
@@ -158,6 +117,47 @@ namespace NMib::NCloud
 			fp64 m_Timeout = 60.0;
 			EOption m_Options = EOption_None;
 		};
+
+		CAppManagerTestHelper(CStr const &_RootDirectory, EOption _Options, fp64 _Timeout);
+
+		template <typename tf_CHostID, typename tf_CPermissions>
+		static auto fs_Permissions(tf_CHostID &&_HostID, tf_CPermissions &&_Permissions)
+		{
+			return CDistributedActorTrustManagerInterface::CAddPermissions{{_HostID, ""}, _Permissions, mc_WaitForSubscriptions};
+		}
+
+		template <typename tf_CNamespace, typename tf_CHosts>
+		static auto fs_NamespaceHosts(tf_CNamespace &&_Namespace, tf_CHosts &&_Hosts)
+		{
+			return CDistributedActorTrustManagerInterface::CChangeNamespaceHosts{_Namespace, _Hosts, mc_WaitForSubscriptions};
+		}
+
+		TCFuture<void> f_SetupTrust();
+		TCFuture<void> f_InstallTestApp(CStr _Name = "TestApp", CStr _Tag = "TestTag", CStr _Group = "TestGroup", CStr _VersionManagerApplication = "TestApp");
+		TCFuture<void> f_CheckCloudManager(mint _Sequence);
+		TCFuture<void> f_Setup(mint _nAppManagers);
+		TCFuture<void> f_StopCloudManager();
+		TCFuture<void> f_StartCloudManager();
+		TCFuture<void> f_Destroy();
+		CStr f_RootDirectory();
+
+		TCFuture<NStr::CStr> f_LaunchTool
+			(
+				NStr::CStr _Executable
+				, NContainer::TCVector<NStr::CStr> _Params
+				, NStr::CStr _WorkingDir = {}
+			)
+		;
+
+		TCFuture<CProcessLaunchActor::CSimpleLaunchResult> f_LaunchSimple
+			(
+				NStr::CStr _Executable
+				, NContainer::TCVector<NStr::CStr> _Params
+				, NStr::CStr _WorkingDir = {}
+			)
+		;
+
+		static auto constexpr mc_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 
 		TCSharedPointer<CState> m_pState;
 	};

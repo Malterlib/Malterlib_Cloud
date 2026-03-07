@@ -9,7 +9,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NBackupManager;
 
-class CBackupManagerApplication : public CApplication
+struct CBackupManagerApplication : public CApplication
 {
 	aint f_Main()
 	{

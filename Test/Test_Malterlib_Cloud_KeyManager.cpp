@@ -23,16 +23,10 @@ using namespace NMib::NTest;
 
 static fp64 g_Timeout = 60.0 * NMib::NTest::gc_TimeoutMultiplier;
 
-class CKeyManager_Tests : public NMib::NTest::CTest
+struct CKeyManager_Tests : public NMib::NTest::CTest
 {
-public:
-
 	struct CKeyManagerServerDatabaseImpl : public ICKeyManagerServerDatabase
 	{
-		static constexpr bool mc_bAllowInternalAccess = true;
-
-		CDatabase m_Database;
-
 		TCFuture<void> f_Initialize() override
 		{
 			co_return {};
@@ -53,6 +47,9 @@ public:
 		{
 			co_return m_Database;
 		}
+
+		static constexpr bool mc_bAllowInternalAccess = true;
+		CDatabase m_Database;
 	};
 
 	struct CTestState : public CAllowUnsafeThis

@@ -18,18 +18,6 @@ namespace NMib::NCloud
 
 	struct CNetworkTunnelsClient::CInternal : public CActorInternal
 	{
-		CInternal
-			(
-				CNetworkTunnelsClient *_pThis
-				, TCActor<CActorDistributionManager> const &_DistributionManager
-				, TCActor<CDistributedActorTrustManager> const &_TrustManager
-			)
-			: m_pThis(_pThis)
-			, m_DistributionManager(_DistributionManager)
-			, m_TrustManager(_TrustManager)
-		{
-		}
-
 		struct CConnection
 		{
 			TCFuture<void> f_Destroy()
@@ -128,6 +116,18 @@ namespace NMib::NCloud
 			DMibListLinkDS_List(CTunnel, m_ByNameLink) m_OpenedTunnels;
 			TCSet<TCWeakDistributedActor<ICNetworkTunnels>> m_AvailableOnNetworkTunnels;
 		};
+
+		CInternal
+			(
+				CNetworkTunnelsClient *_pThis
+				, TCActor<CActorDistributionManager> const &_DistributionManager
+				, TCActor<CDistributedActorTrustManager> const &_TrustManager
+			)
+			: m_pThis(_pThis)
+			, m_DistributionManager(_DistributionManager)
+			, m_TrustManager(_TrustManager)
+		{
+		}
 
 		TCFuture<void> f_Subscribe();
 

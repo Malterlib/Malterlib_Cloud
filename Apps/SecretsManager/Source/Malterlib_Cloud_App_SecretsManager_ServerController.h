@@ -17,7 +17,6 @@ namespace NMib::NCloud::NSecretsManager
 {
 	struct CSecretsManagerDaemonActor::CServerController : public CActor
 	{
-	public:
 		using CActorHolder = CDelegatedActorHolder;
 
 		CServerController(TCActor<> const &_Delegator, CDistributedAppState &_AppState);

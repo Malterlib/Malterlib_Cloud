@@ -36,9 +36,10 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<void> f_Start();
 
 	private:
+		struct CInternal;
+
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 
-		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }

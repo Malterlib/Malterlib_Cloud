@@ -11,7 +11,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NSecretsManager;
 
-class CSecretsManagerApp : public CApplication
+struct CSecretsManagerApp : public CApplication
 {
 	aint f_Main()
 	{
@@ -26,6 +26,7 @@ class CSecretsManagerApp : public CApplication
 				}
 			}
 		;
+
 		return Daemon.f_Run();
 	}
 

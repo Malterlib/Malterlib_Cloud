@@ -18,9 +18,6 @@ namespace NMib::NCloud
 
 		struct CSendPart
 		{
-			CSendPart() = default;
-			CSendPart(uint32 _Version);
-
 			struct CResult
 			{
 				void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
@@ -28,6 +25,9 @@ namespace NMib::NCloud
 
 				uint32 m_Version = 0;
 			};
+
+			CSendPart() = default;
+			CSendPart(uint32 _Version);
 
 			CResult f_GetResult() const;
 			void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
@@ -77,8 +77,8 @@ namespace NMib::NCloud
 		{
 			void f_Feed(NConcurrency::CDistributedActorWriteStream &_Stream) const;
 			void f_Consume(NConcurrency::CDistributedActorReadStream &_Stream);
-
 			NStr::CStr const &f_GetPath() const;
+
 			uint64 m_FileSize = 0;
 		};
 

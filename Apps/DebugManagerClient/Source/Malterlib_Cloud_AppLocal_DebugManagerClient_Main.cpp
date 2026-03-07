@@ -11,7 +11,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NDebugManagerClient;
 
-class CDebugManagerClientApplication : public CApplication
+struct CDebugManagerClientApplication : public CApplication
 {
 	aint f_Main()
 	{

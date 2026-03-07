@@ -116,14 +116,6 @@ namespace NVersionManagerSyncTests
 	// Helper structure for dual VersionManager sync tests
 	struct CSyncTestHelper : public CAllowUnsafeThis
 	{
-		CAppManagerTestHelper::EOption m_Options;
-		CAppManagerTestHelper m_SourceHelper;
-		CStr m_DestDirectory;
-		TCOptional<CDistributedApp_LaunchInfo> m_DestLaunch;
-		CDistributedActorTrustManager_Address m_DestServerAddress;
-		CStr m_DestHostID;
-		TCDistributedActor<CVersionManager> m_DestVersionManager;
-
 		CSyncTestHelper(CStr _TestName, CAppManagerTestHelper::EOption _Options)
 			: m_Options(_Options)
 			, m_SourceHelper(_TestName + "_Source", _Options, g_Timeout)
@@ -368,30 +360,19 @@ namespace NVersionManagerSyncTests
 				co_return Status;
 			}
 		}
+
+		CAppManagerTestHelper::EOption m_Options;
+		CAppManagerTestHelper m_SourceHelper;
+		CStr m_DestDirectory;
+		TCOptional<CDistributedApp_LaunchInfo> m_DestLaunch;
+		CDistributedActorTrustManager_Address m_DestServerAddress;
+		CStr m_DestHostID;
+		TCDistributedActor<CVersionManager> m_DestVersionManager;
 	};
 
 	// Helper structure for three-way VersionManager sync tests
 	struct CTripleSyncTestHelper : public CAllowUnsafeThis
 	{
-		CAppManagerTestHelper::EOption m_Options;
-
-		// Manager A - uses existing CAppManagerTestHelper infrastructure
-		CAppManagerTestHelper m_ManagerAHelper;
-
-		// Manager B
-		CStr m_ManagerBDirectory;
-		TCOptional<CDistributedApp_LaunchInfo> m_ManagerBLaunch;
-		CDistributedActorTrustManager_Address m_ManagerBServerAddress;
-		CStr m_ManagerBHostID;
-		TCDistributedActor<CVersionManager> m_VersionManagerB;
-
-		// Manager C
-		CStr m_ManagerCDirectory;
-		TCOptional<CDistributedApp_LaunchInfo> m_ManagerCLaunch;
-		CDistributedActorTrustManager_Address m_ManagerCServerAddress;
-		CStr m_ManagerCHostID;
-		TCDistributedActor<CVersionManager> m_VersionManagerC;
-
 		CTripleSyncTestHelper(CStr _TestName, CAppManagerTestHelper::EOption _Options)
 			: m_Options(_Options)
 			, m_ManagerAHelper(_TestName + "_ManagerA", _Options, g_Timeout)
@@ -628,7 +609,12 @@ namespace NVersionManagerSyncTests
 		}
 
 		// Enum for which manager to restart
-		enum class EManager { mc_ManagerA, mc_ManagerB, mc_ManagerC };
+		enum class EManager
+		{
+			mc_ManagerA
+			, mc_ManagerB
+			, mc_ManagerC
+		};
 
 		// Restart a manager with a new sync config
 		// Host ID and trust remain valid since they're persisted on disk
@@ -751,16 +737,30 @@ namespace NVersionManagerSyncTests
 		{
 			return *m_ManagerAHelper.m_pState;
 		}
+
+		CAppManagerTestHelper::EOption m_Options;
+
+		// Manager A - uses existing CAppManagerTestHelper infrastructure
+		CAppManagerTestHelper m_ManagerAHelper;
+
+		// Manager B
+		CStr m_ManagerBDirectory;
+		TCOptional<CDistributedApp_LaunchInfo> m_ManagerBLaunch;
+		CDistributedActorTrustManager_Address m_ManagerBServerAddress;
+		CStr m_ManagerBHostID;
+		TCDistributedActor<CVersionManager> m_VersionManagerB;
+
+		// Manager C
+		CStr m_ManagerCDirectory;
+		TCOptional<CDistributedApp_LaunchInfo> m_ManagerCLaunch;
+		CDistributedActorTrustManager_Address m_ManagerCServerAddress;
+		CStr m_ManagerCHostID;
+		TCDistributedActor<CVersionManager> m_VersionManagerC;
 	};
 
 	// Helper for counting notifications to detect infinite loops
 	struct CNotificationCounter
 	{
-		std::atomic<mint> m_nNotifications{0};
-		TCPromiseFuturePair<void> m_LoopDetected;
-		mint m_nExpectedMax = 0;
-		std::atomic<bool> m_bLoopSignaled{false};
-
 		void f_OnNotification()
 		{
 			mint nCount = ++m_nNotifications;
@@ -768,7 +768,7 @@ namespace NVersionManagerSyncTests
 			{
 				// Signal loop detected - only set once
 				bool bExpected = false;
-				if (m_bLoopSignaled.compare_exchange_strong(bExpected, true))
+				if (m_bLoopSignaled.f_CompareExchangeStrong(bExpected, true))
 					m_LoopDetected.m_Promise.f_SetResult();
 			}
 		}
@@ -777,11 +777,15 @@ namespace NVersionManagerSyncTests
 		{
 			return fg_Move(m_LoopDetected.m_Future);
 		}
+
+		TCAtomic<mint> m_nNotifications{0};
+		TCPromiseFuturePair<void> m_LoopDetected;
+		mint m_nExpectedMax = 0;
+		TCAtomic<bool> m_bLoopSignaled{false};
 	};
 
-	class CVersionManager_Sync_Tests : public NMib::NTest::CTest
+	struct CVersionManager_Sync_Tests : public NMib::NTest::CTest
 	{
-	public:
 		void f_DoTests()
 		{
 			DMibTestSuite("Basic") -> TCFuture<void>

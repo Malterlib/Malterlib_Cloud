@@ -11,7 +11,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NVersionManager;
 
-class CVersionManager : public CApplication
+struct CVersionManager : public CApplication
 {
 	aint f_Main()
 	{

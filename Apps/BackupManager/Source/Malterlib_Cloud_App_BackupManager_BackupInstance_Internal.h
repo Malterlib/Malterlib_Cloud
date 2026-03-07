@@ -61,26 +61,7 @@ namespace NMib::NCloud::NBackupManager
 				, bool _bForceNew
 				, TCActor<CBackupSource> const &_BackupSource
 			)
-			: m_pThis(_pThis)
-			, m_Name(_Name)
-			, m_StartTime(_StartTime)
-			, m_ID(_ID)
-			, m_RootDirectory(_RootDirectory)
-			, m_bForceNew(_bForceNew)
-			, m_BackupSource(_BackupSource)
-		{
-			g_Dispatch / [this]
-				{
-					f_InitBackupDirectory();
-				}
-				> [](TCAsyncResult<void> &&_Result)
-				{
-					if (!_Result)
-						DMibLogWithCategory(Mib/Cloud/BackupManager, Debug, "Failed to init backup directory: {}", _Result.f_GetExceptionStr());
-				}
-			;
-		}
-
+		;
 		void f_RunRSyncProtocol(CRSyncContext &_Context, CIOByteVector &&_ServerPacket);
 		CExceptionPointer f_CheckFileName(CStr const &_FileName, CDirectoryManifestFile **o_pManifestFile);
 		CStr f_GetTempPath(CStr const &_Path);
@@ -111,7 +92,6 @@ namespace NMib::NCloud::NBackupManager
 
 		COnScopeExitShared f_FilePending(CStr const &_FileName);
 		void f_OnPendingQuiescence(TCFunctionMutable<void ()> &&_fOnQuiescence);
-		void fp_UpdatePendingQuiescence();
 
 		CBackupInstance *m_pThis = nullptr;
 
@@ -145,5 +125,8 @@ namespace NMib::NCloud::NBackupManager
 		bool m_bManifestRSyncDone = false;
 		bool m_bForceNew = false;
 		bool m_bInitialBackupFinished = false;
+
+	private:
+		void fp_UpdatePendingQuiescence();
 	};
 }

@@ -132,8 +132,6 @@ namespace NMib::NCloud::NDebugManager
 			;
 		}
 		else
-		{
 			static_assert(false);
-		}
 	}
 }

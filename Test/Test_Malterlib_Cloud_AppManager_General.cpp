@@ -13,9 +13,8 @@ static ch8 const *g_pFailingPreUpdateScript =
 #	include "Test_Malterlib_Cloud_AppManager_General_FailingPreUpdate.sh"
 ;
 
-class CAppManager_General_Tests : public NMib::NTest::CTest
+struct CAppManager_General_Tests : public NMib::NTest::CTest
 {
-public:
 	struct CApplicationKey
 	{
 		auto operator <=> (CApplicationKey const &_Right) const = default;
@@ -32,20 +31,6 @@ public:
 
 	struct CUpdateNotificationsApplicationState
 	{
-		TCSet<CApplicationKey> m_InProgress;
-		mint m_nMaxInProgress = 0;
-
-		TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStage;
-		TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStageCoordination;
-		TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStage;
-		TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStageCoordination;
-
-		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStage;
-		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStageCoordination;
-		TCVector<CStr> m_Errors;
-		TCAtomic<mint> m_nSuccess = 0;
-		TCAtomic<mint> m_nFinished = 0;
-
 		template <typename tf_CStr>
 		void f_Format(tf_CStr &o_Str) const
 		{
@@ -71,6 +56,20 @@ public:
 			m_nSuccess = 0;
 			m_nFinished = 0;
 		}
+
+		TCSet<CApplicationKey> m_InProgress;
+		mint m_nMaxInProgress = 0;
+
+		TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStage;
+		TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStageCoordination;
+		TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStage;
+		TCMap<CAppManagerInterface::EUpdateStage, TCSet<CApplicationKey>> m_InStageCoordination;
+
+		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStage;
+		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStageCoordination;
+		TCVector<CStr> m_Errors;
+		TCAtomic<mint> m_nSuccess = 0;
+		TCAtomic<mint> m_nFinished = 0;
 	};
 
 	struct CUpdateNotificationsState : CAllowUnsafeThis

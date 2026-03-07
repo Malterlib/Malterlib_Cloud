@@ -18,11 +18,7 @@ namespace NMib::NCloud::NVersionManager
 {
 	struct CVersionManagerDaemonActor::CServer : public CActor
 	{
-	public:
 		using CActorHolder = CDelegatedActorHolder;
-
-		CServer(CDistributedAppState &_AppState);
-		~CServer();
 
 		struct CVersionDownload
 		{
@@ -127,6 +123,9 @@ namespace NMib::NCloud::NVersionManager
 			mint m_nRemoved = 0;
 		};
 
+		CServer(CDistributedAppState &_AppState);
+		~CServer();
+
 		TCFuture<CRefreshResult> f_RefreshDatabaseFromDisk();
 		TCFuture<void> f_Init();
 
@@ -136,6 +135,12 @@ namespace NMib::NCloud::NVersionManager
 			TCSet<CStr> m_DeniedTags;
 			TCSet<CStr> m_TagsAdded;
 			TCSet<CStr> m_TagsRemoved;
+		};
+
+		struct CMatchingConfig
+		{
+			CStr m_Name;
+			CSyncSourceConfig const *m_pConfig;
 		};
 
 		TCFuture<void> fp_Destroy() override;
@@ -162,13 +167,6 @@ namespace NMib::NCloud::NVersionManager
 		TCFuture<CSizeInfo> fp_SaveVersionInfo(CStr _VersionPath, CVersionManager::CVersionInformation _VersionInfo);
 		bool fp_VersionMatchesSubscription(CSubscription const &_Subscription, CVersion const &_Version);
 		CSubscription const *fp_GetSubscription(CStr const &_ApplicationName, CStr const &_SubscriptionID) const;
-
-		// Sync types
-		struct CMatchingConfig
-		{
-			CStr m_Name;
-			CSyncSourceConfig const *m_pConfig;
-		};
 
 		// Sync lifecycle
 		TCFuture<void> fp_SyncInit();

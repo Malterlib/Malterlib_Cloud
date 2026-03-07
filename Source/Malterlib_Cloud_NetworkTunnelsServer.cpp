@@ -22,24 +22,6 @@ namespace NMib::NCloud
 
 	struct CNetworkTunnelsServer::CInternal : public CActorInternal
 	{
-		CInternal
-			(
-				CNetworkTunnelsServer *_pThis
-				, TCActor<CActorDistributionManager> const &_DistributionManager
-				, TCActor<CDistributedActorTrustManager> const &_TrustManager
-				, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
-				, CStr const &_LogCategory
-				, CStr const &_PermissionPrefix
-			)
-			: m_pThis(_pThis)
-			, m_DistributionManager(_DistributionManager)
-			, m_TrustManager(_TrustManager)
-			, m_AuditorFactory(fg_Move(_AuditorFactory))
-			, m_LogCategory(_LogCategory)
-			, m_PermissionPrefix(_PermissionPrefix)
-		{
-		}
-
 		struct CNetworkTunnel
 		{
 			CStr m_Host;
@@ -275,6 +257,24 @@ namespace NMib::NCloud
 			ICNetworkTunnels::CSubscribeTunnels m_Subscription;
 			CCallingHostInfo m_CallingHostInfo;
 		};
+
+		CInternal
+			(
+				CNetworkTunnelsServer *_pThis
+				, TCActor<CActorDistributionManager> const &_DistributionManager
+				, TCActor<CDistributedActorTrustManager> const &_TrustManager
+				, TCFunctionMovable<CDistributedAppAuditor (CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> &&_AuditorFactory
+				, CStr const &_LogCategory
+				, CStr const &_PermissionPrefix
+			)
+			: m_pThis(_pThis)
+			, m_DistributionManager(_DistributionManager)
+			, m_TrustManager(_TrustManager)
+			, m_AuditorFactory(fg_Move(_AuditorFactory))
+			, m_LogCategory(_LogCategory)
+			, m_PermissionPrefix(_PermissionPrefix)
+		{
+		}
 
 		TCFuture<void> f_SetupPermissions();
 		TCFuture<void> f_SendChange(ICNetworkTunnels::CTunnelChange _Change, CStr _Name);

@@ -11,8 +11,7 @@ namespace NMib::NCloud
 {
 	void CBackupManagerClient::CInternal::f_Subscribe()
 	{
-		m_TrustManager->f_SubscribeTrustedActors<CBackupManager>()
-			> [this](TCAsyncResult<TCTrustedActorSubscription<CBackupManager>> &&_Subscription)
+		m_TrustManager->f_SubscribeTrustedActors<CBackupManager>() > [this](TCAsyncResult<TCTrustedActorSubscription<CBackupManager>> &&_Subscription)
 			{
 				if (!_Subscription)
 				{

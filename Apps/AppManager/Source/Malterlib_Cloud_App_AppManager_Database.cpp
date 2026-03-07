@@ -1,4 +1,4 @@
- // Copyright © 2023 Favro Holding AB
+// Copyright © 2023 Favro Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include "Malterlib_Cloud_App_AppManager.h"

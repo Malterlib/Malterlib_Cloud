@@ -11,10 +11,10 @@ namespace NMib::NCloud::NCloudManager
 {
 	using namespace NCloudManagerDatabase;
 
-	constexpr double gc_MinProblemUpdateTime = 5.0;
-	constexpr double gc_ProblemTemporaryTime = 10.0;
+	constexpr fp64 gc_MinProblemUpdateTime = 5.0;
+	constexpr fp64 gc_ProblemTemporaryTime = 10.0;
 
-	static_assert(gc_MinProblemUpdateTime <= gc_ProblemTemporaryTime);
+	static_assert(gc_MinProblemUpdateTime.f_Get() <= gc_ProblemTemporaryTime.f_Get());
 
 	CSensorNotifications::CSensorNotifications(CCloudManagerServer &_This)
 		: mp_This(_This)
@@ -281,7 +281,7 @@ namespace NMib::NCloud::NCloudManager
 						(
 							[
 								SecondsOfPauseRemaining
-								, Key = NSensorStoreLocalDatabase::CKnownHostKey{.m_DbPrefix = CCloudManagerServer::mc_DatabasePrefixSensor, .m_HostID = SensorInfoKey.m_HostID}
+								, Key = NSensorStoreLocalDatabase::CKnownHostKey{.m_DbPrefix = CCloudManagerServer::mcp_DatabasePrefixSensor, .m_HostID = SensorInfoKey.m_HostID}
 								, Now
 								, SensorInfo
 							]

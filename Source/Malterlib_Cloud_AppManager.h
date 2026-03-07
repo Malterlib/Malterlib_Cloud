@@ -35,9 +35,6 @@ namespace NMib::NCloud
 			, EProtocolVersion_Current = 0x119
 		};
 
-		CAppManagerInterface();
-		~CAppManagerInterface();
-
 		enum EUpdateStage : uint32
 		{
 			EUpdateStage_Failed						= 0x70000000
@@ -72,9 +69,6 @@ namespace NMib::NCloud
 
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
 		{
-			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream);
-
 			CVersionIDAndPlatform() = default;
 			CVersionIDAndPlatform(CVersionIDAndPlatform const &) = default;
 			CVersionIDAndPlatform(CVersionIDAndPlatform &&) = default;
@@ -83,13 +77,13 @@ namespace NMib::NCloud
 
 			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other) : CVersionManager::CVersionIDAndPlatform(_Other) { }
 			CVersionIDAndPlatform &operator = (CVersionManager::CVersionIDAndPlatform const &_Right) { static_cast<CVersionManager::CVersionIDAndPlatform &>(*this) = _Right; return *this; }
+
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 		};
 
 		struct CVersionID : public CVersionManager::CVersionID
 		{
-			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream);
-
 			CVersionID() = default;
 			CVersionID(CVersionID const &) = default;
 			CVersionID(CVersionID &&) = default;
@@ -98,13 +92,13 @@ namespace NMib::NCloud
 
 			CVersionID(CVersionManager::CVersionID const &_Other) : CVersionManager::CVersionID(_Other) { }
 			CVersionID &operator = (CVersionManager::CVersionID const &_Right) { static_cast<CVersionManager::CVersionID &>(*this) = _Right; return *this; }
+
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 		};
 
 		struct CVersionInformation : public CVersionManager::CVersionInformation
 		{
-			template <typename tf_CStream>
-			void f_Stream(tf_CStream &_Stream);
-
 			CVersionInformation() = default;
 			CVersionInformation(CVersionInformation const &) = default;
 			CVersionInformation(CVersionInformation &&) = default;
@@ -113,6 +107,9 @@ namespace NMib::NCloud
 
 			CVersionInformation(CVersionManager::CVersionInformation const &_Other) : CVersionManager::CVersionInformation(_Other) { }
 			CVersionInformation &operator = (CVersionManager::CVersionInformation const &_Right) { static_cast<CVersionManager::CVersionInformation &>(*this) = _Right; return *this; }
+
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
 		};
 
 		struct CApplicationSettings
@@ -234,7 +231,6 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NEncoding::CEJsonSorted f_ToJson() const;
-
 			bool f_IsDone() const;
 
 			uint64 m_UniqueSequence = 0;
@@ -360,6 +356,9 @@ namespace NMib::NCloud
 			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (COnChangeNotificationParams _Params)> m_fOnNotification;
 			bool m_bWaitForNotification = true;
 		};
+
+		CAppManagerInterface();
+		~CAppManagerInterface();
 
 		static NStr::CStr fs_UpdateStageToStr(EUpdateStage _Stage);
 

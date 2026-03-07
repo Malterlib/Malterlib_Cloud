@@ -13,9 +13,8 @@
 
 namespace NMib::NCloud
 {
-	class ICKeyManagerServerDatabase : public NConcurrency::CActor
+	struct ICKeyManagerServerDatabase : public NConcurrency::CActor
 	{
-	public:
 		struct CDatabase
 		{
 			enum class EVersion : uint32
@@ -27,8 +26,6 @@ namespace NMib::NCloud
 
 			struct CClientKey
 			{
-				auto operator <=> (CClientKey const &) const = default;
-
 				NStr::CStr const &f_GetID() const;
 
 				template <typename tf_CStream>
@@ -40,14 +37,14 @@ namespace NMib::NCloud
 					o_Str += typename tf_CStr::CFormat("Key: {}   Verified: {vs}") << m_Key << m_VerifiedOnServers;
 				}
 
+				auto operator <=> (CClientKey const &) const = default;
+
 				CSymmetricKey m_Key;
 				NContainer::TCSet<NStr::CStr> m_VerifiedOnServers;
 			};
 
 			struct CClientStore
 			{
-				auto operator <=> (CClientStore const &) const = default;
-
 				NStr::CStr const &f_GetID() const;
 
 				template <typename tf_CStream>
@@ -59,6 +56,8 @@ namespace NMib::NCloud
 					o_Str += typename tf_CStr::CFormat("{}") << m_Keys;
 				}
 
+				auto operator <=> (CClientStore const &) const = default;
+
 				NContainer::TCMap<NStr::CStr, CClientKey> m_Keys;
 			};
 
@@ -66,7 +65,6 @@ namespace NMib::NCloud
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
-
 			bool f_HasAvailableKey(CSymmetricKey _Key);
 
 			NContainer::TCMap<NStr::CStr, CClientStore> m_Clients;
@@ -120,9 +118,10 @@ namespace NMib::NCloud
 		NConcurrency::TCFuture<void> f_ForceWriteDatabase();
 
 	private:
+		struct CInternal;
+
 		NConcurrency::TCFuture<void> fp_Destroy() override;
 
-		struct CInternal;
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 	};
 }

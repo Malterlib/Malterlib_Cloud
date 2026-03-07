@@ -34,14 +34,15 @@ namespace NMib::NCloud
 		{
 			struct CEntry
 			{
-				CStr m_FileName;
-				CStr m_RelativeFileName;
-				uint64 m_Position;
-				uint64 m_Size;
 				bool f_IsFinished() const
 				{
 					return m_Position == m_Size;
 				}
+
+				CStr m_FileName;
+				CStr m_RelativeFileName;
+				uint64 m_Position;
+				uint64 m_Size;
 			};
 
 			TCLinkedList<CEntry> m_Queue;

@@ -99,7 +99,7 @@ namespace
 	}
 }
 
-class CUpdateCompatibility_Tests : public NMib::NTest::CTest
+struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 {
 	static auto constexpr mcp_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 
@@ -205,7 +205,6 @@ class CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		}
 
 	private:
-
 		TCFuture<void> fp_Destroy() override
 		{
 			co_await fg_Move(mp_Sequencer).f_Destroy().f_Wrap() > fg_LogError("Test", "Failed to destroy sequencer");

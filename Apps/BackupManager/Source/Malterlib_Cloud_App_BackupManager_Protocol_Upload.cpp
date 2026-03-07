@@ -8,7 +8,7 @@ namespace NMib::NCloud::NBackupManager
 {
 	namespace
 	{
-		CTime g_MinBackupTime = CTimeConvert::fs_CreateTime(1970);
+		constexpr CTime gc_MinBackupTime = CTimeConvert::fs_FromUnixSeconds(0);
 		CTimeSpan g_BackupTimeMaxInFuture = CTimeSpanConvert::fs_CreateHourSpan(2);
 	}
 
@@ -25,7 +25,7 @@ namespace NMib::NCloud::NBackupManager
 		if (!CBackupManager::fs_IsValidHostname(_BackupKey.m_ID))
 			return _Auditor.f_Exception({"Backup key ID name does not adhere to RFC 1123", fg_Format("'{}'", _BackupKey.m_ID)}).f_ExceptionPointer();
 
-		if (_BackupKey.m_Time < g_MinBackupTime || _BackupKey.m_Time > CTime::fs_NowUTC() + g_BackupTimeMaxInFuture)
+		if (_BackupKey.m_Time < gc_MinBackupTime || _BackupKey.m_Time > CTime::fs_NowUTC() + g_BackupTimeMaxInFuture)
 			return _Auditor.f_Exception({"Backup key time is out of range", fg_Format("'{}'", _BackupKey.m_Time)}).f_ExceptionPointer();
 
 		o_BackupKey.m_BackupID = _BackupKey.m_ID;

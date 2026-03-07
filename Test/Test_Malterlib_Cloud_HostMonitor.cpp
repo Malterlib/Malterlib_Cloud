@@ -8,9 +8,8 @@ using namespace NMib::NCloud;
 using namespace NMib::NTime;
 using namespace NMib::NStr;
 
-class CHostMonitor_Tests : public NMib::NTest::CTest
+struct CHostMonitor_Tests : public NMib::NTest::CTest
 {
-public:
 	static CTime fs_Time(CStr const &_Time)
 	{
 		uint32 Year;

@@ -17,7 +17,7 @@ namespace NMib::NCloud::NCloudManager
 			(
 				&CDistributedAppSensorStoreLocal::f_StartWithDatabase
 				, fg_TempCopy(mp_DatabaseActor)
-				, mc_DatabasePrefixSensor
+				, mcp_DatabasePrefixSensor
 				, g_ActorFunctor / [this](NDatabase::CDatabaseActor::CTransactionWrite _WriteTransaction) -> TCFuture<NDatabase::CDatabaseActor::CTransactionWrite>
 				{
 					co_return fg_Move((co_await fp_CleanupDatabase(fg_Move(_WriteTransaction), fg_Construct())).m_Transaction);

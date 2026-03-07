@@ -67,7 +67,6 @@ namespace NMib::NCloud::NAppDistributionManager
 		~CAppDistributionManagerActor();
 
 	private:
-
 		struct CDeployedVersionInfo
 		{
 			CTime m_Time;
@@ -109,6 +108,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 			CVersionManagerVersion(CVersionManagerState *_pVersionManager);
 			~CVersionManagerVersion();
+
 			void f_SetApplication(CVersionManagerApplication *_pApplication);
 			CVersionManager::CVersionIDAndPlatform const &f_GetVersionID() const;
 
@@ -122,6 +122,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		struct CVersionManagerApplication
 		{
 			CVersionManagerApplication(CAppDistributionManagerActor &_This);
+
 			CStr const &f_GetApplicationName() const
 			{
 				return TCMap<CStr, CVersionManagerApplication>::fs_GetKey(*this);

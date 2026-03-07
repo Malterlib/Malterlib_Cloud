@@ -11,7 +11,7 @@
 using namespace NMib;
 using namespace NMib::NCloud::NKeyManager;
 
-class CKeyManagerApp : public CApplication
+struct CKeyManagerApp : public CApplication
 {
 	aint f_Main()
 	{

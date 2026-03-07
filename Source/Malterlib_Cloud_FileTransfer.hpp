@@ -12,8 +12,7 @@ namespace NMib::NCloud
 			= fg_Construct(co_await fg_Move(_FilesGenerator).f_GetPipelinedIterator())
 		;
 
-		auto &iGenerator = *pIterator;
-		for (; iGenerator; co_await ++iGenerator)
+		for (auto &iGenerator = *pIterator; iGenerator; co_await ++iGenerator)
 		{
 			auto Subscription = fg_Move((*iGenerator).m_fGetDataGenerator.f_GetSubscription());
 			co_yield tf_CTypeTo

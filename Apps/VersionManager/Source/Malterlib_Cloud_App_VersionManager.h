@@ -12,10 +12,10 @@ namespace NMib::NCloud::NVersionManager
 {
 	struct CVersionManagerDaemonActor : public CDistributedAppActor
 	{
+		struct CServer;
+
 		CVersionManagerDaemonActor();
 		~CVersionManagerDaemonActor();
-
-		struct CServer;
 
 	private:
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
