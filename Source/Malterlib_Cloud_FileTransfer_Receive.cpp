@@ -358,7 +358,7 @@ namespace NMib::NCloud
 		auto DownloadPipelineLength = _QueueSize / gc_IdealIoSize;
 
 		CFileTransferResult Result;
-		CClock Clock{true};
+		CStopwatch Stopwatch{true};
 
 		auto iFile = co_await (fg_Move(_FilesGenerator).f_GetPipelinedIterator() % "GetPipelined File");
 		auto DestroyIterator = co_await NConcurrency::fg_AsyncDestroy(iFile);
@@ -568,7 +568,7 @@ namespace NMib::NCloud
 		if (LastSubscriptions)
 			co_await fg_Exchange(LastSubscriptions, nullptr)->f_Destroy();
 
-		Result.m_nSeconds = Clock.f_GetTime();
+		Result.m_nSeconds = Stopwatch.f_GetTime();
 
 		co_return Result;
 	}

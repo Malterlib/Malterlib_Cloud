@@ -502,7 +502,7 @@ namespace NMib::NCloud::NPrivate
 					bool bFinished = PendingFile.m_bFinished;
 
 					CBackupManagerClient::CFileTransferStats Stats = PendingFile.m_TransferStats;
-					Stats.m_nSeconds = PendingFile.m_Clock.f_GetTime();
+					Stats.m_nSeconds = PendingFile.m_Stopwatch.f_GetTime();
 					if (Stats.m_nSeconds == 0.0)
 						Stats.m_nSeconds = 0.000000001;
 
@@ -1027,7 +1027,7 @@ namespace NMib::NCloud::NPrivate
 							fp_NewPendingFile(_FileName);
 
 						mp_Backup.f_CallActor(&CBackupManagerBackup::f_ManifestChange)(_FileName, ManifestChange)
-							> [=, this, Clock = NTime::CClock{true}](TCAsyncResult<void> &&_Result) mutable
+							> [=, this, Stopwatch = NTime::CStopwatch{true}](TCAsyncResult<void> &&_Result) mutable
 							{
 								(void)Cleanup;
 								(void)_pScope;
@@ -1048,7 +1048,7 @@ namespace NMib::NCloud::NPrivate
 										{
 											CBackupManagerClient::CFileTransferStats Stats;
 											Stats.m_Type = CBackupManagerClient::EFileTransferType_Delete;
-											Stats.m_nSeconds = Clock.f_GetTime();
+											Stats.m_nSeconds = Stopwatch.f_GetTime();
 											if (Stats.m_nSeconds == 0.0)
 												Stats.m_nSeconds = 0.000000001;
 											fp_BackupNotification(CBackupManagerClient::CNotification_FileFinished{_FileName, Stats});
@@ -1066,7 +1066,7 @@ namespace NMib::NCloud::NPrivate
 										{
 											CBackupManagerClient::CFileTransferStats Stats;
 											Stats.m_Type = CBackupManagerClient::EFileTransferType_Rename;
-											Stats.m_nSeconds = Clock.f_GetTime();
+											Stats.m_nSeconds = Stopwatch.f_GetTime();
 											if (Stats.m_nSeconds == 0.0)
 												Stats.m_nSeconds = 0.000000001;
 											fp_BackupNotification(CBackupManagerClient::CNotification_FileFinished{_FileName, Stats});

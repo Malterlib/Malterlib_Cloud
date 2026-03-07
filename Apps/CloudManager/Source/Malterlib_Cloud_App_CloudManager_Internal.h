@@ -167,7 +167,7 @@ namespace NMib::NCloud::NCloudManager
 			bool m_bForcedCompaction = true;
 
 		private:
-			CClock mp_StatsClock{true};
+			CStopwatch mp_StatsStopwatch{true};
 			CDatabaseSizeStatistics mp_OriginalStats;
 			CDatabaseSizeStatistics mp_CurrentStats;
 			CDatabaseOffset mp_TargetSize;

@@ -45,8 +45,8 @@ namespace NMib::NCloud::NCloudManager
 
 							if (SensorStatus.m_State.m_bInProblemState)
 							{
-								SensorStatus.m_ProblemClock.f_Start();
-								SensorStatus.m_ProblemClock.f_AddOffset(-SensorStatus.m_State.m_TimeInProblemState); // Could be off by the time the CloudManager was down
+								SensorStatus.m_ProblemStopwatch.f_Start();
+								SensorStatus.m_ProblemStopwatch.f_AddOffset(-SensorStatus.m_State.m_TimeInProblemState); // Could be off by the time the CloudManager was down
 							}
 						}
 
@@ -325,7 +325,7 @@ namespace NMib::NCloud::NCloudManager
 					if (Sensor.m_State.m_bInProblemState)
 					{
 						Sensor.m_State.m_bInProblemState = false;
-						Sensor.m_State.m_TimeInProblemState = Sensor.m_ProblemClock.f_GetTime();
+						Sensor.m_State.m_TimeInProblemState = Sensor.m_ProblemStopwatch.f_GetTime();
 					}
 				}
 				else
@@ -334,10 +334,10 @@ namespace NMib::NCloud::NCloudManager
 					{
 						Sensor.m_State.m_bInProblemState = true;
 						Sensor.m_State.m_TimeInProblemState = 0.0;
-						Sensor.m_ProblemClock.f_Start();
+						Sensor.m_ProblemStopwatch.f_Start();
 					}
 					else
-						Sensor.m_State.m_TimeInProblemState = Sensor.m_ProblemClock.f_GetTime();
+						Sensor.m_State.m_TimeInProblemState = Sensor.m_ProblemStopwatch.f_GetTime();
 				}
 
 				if (!Sensor.m_State.m_bInProblemState || bPaused || bSnoozed)

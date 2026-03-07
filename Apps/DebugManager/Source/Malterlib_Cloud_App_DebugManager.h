@@ -67,7 +67,7 @@ namespace NMib::NCloud::NDebugManager
 			TCVector<CStr> m_FileNames;
 			CDebugDatabase::CMetadata m_Metadata;
 			TCOptional<NStr::CStr> m_ExceptionInfo;
-			CClock m_LastAdded;
+			CStopwatch m_LastAdded;
 		};
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;

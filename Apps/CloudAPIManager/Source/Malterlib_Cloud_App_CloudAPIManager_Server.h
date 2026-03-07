@@ -57,7 +57,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 			TCUniquePointer<TCActorCallOnce<COpenStackServiceInfo>> m_pGetToken;
 
-			CClock m_LastErrorClock;
+			CStopwatch m_LastErrorStopwatch;
 			bool m_bLastWasError = false;
 			CTime m_TokenExpiresAt;
 		};

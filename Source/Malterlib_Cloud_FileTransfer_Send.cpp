@@ -27,7 +27,7 @@ namespace NMib::NCloud
 		struct CTransferStats
 		{
 			uint64 m_nTransferredBytes = 0;
-			CClock m_Clock{true};
+			CStopwatch m_Stopwatch{true};
 		};
 
 		struct CWorkQueueDeprecated
@@ -155,7 +155,7 @@ namespace NMib::NCloud
 		CFileTransferContextDeprecated::CInternal::CStateChange StateChange{m_Version};
 		StateChange.m_State = CFileTransferContextDeprecated::CInternal::EState_Finished;
 		StateChange.m_Finished.m_nBytes = m_pInternal->m_TransferStats.m_nTransferredBytes;
-		StateChange.m_Finished.m_nSeconds = m_pInternal->m_TransferStats.m_Clock.f_GetTime();
+		StateChange.m_Finished.m_nSeconds = m_pInternal->m_TransferStats.m_Stopwatch.f_GetTime();
 		auto Future = m_fStateCallback(fg_TempCopy(StateChange));
 		m_bDelayedFinish = true;
 		fg_Move(Future) > [this, Finished = StateChange.m_Finished](TCAsyncResult<CFileTransferContextDeprecated::CInternal::CStateChange::CResult> &&_Result)
@@ -181,7 +181,7 @@ namespace NMib::NCloud
 		{
 			CFileTransferResult Result;
 			Result.m_nBytes = m_TransferStats.m_nTransferredBytes;
-			Result.m_nSeconds = m_TransferStats.m_Clock.f_GetTime();
+			Result.m_nSeconds = m_TransferStats.m_Stopwatch.f_GetTime();
 
 			m_Promise.f_SetResult(fg_Move(Result));
 		}

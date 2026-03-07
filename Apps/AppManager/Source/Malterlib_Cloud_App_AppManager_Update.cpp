@@ -253,7 +253,7 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception("This version is already installed");
 		}
 
-		TCSharedPointer<NTime::CClock> pClock = fg_Construct(true);
+		TCSharedPointer<NTime::CStopwatch> pStopwatch = fg_Construct(true);
 
 		TCSharedPointerSupportWeak<CUpdateApplicationState> pState = fg_Construct();
 		pState->m_pApplication = pApplication;
@@ -269,7 +269,7 @@ namespace NMib::NCloud::NAppManager
 		pState->m_bBypassCoordination = _Update.m_bBypassCoordination;
 		pState->m_Auditor = Auditor;
 		pState->m_bUpdateSettings = bUpdateSettings;
-		pState->m_pClock = pClock;
+		pState->m_pStopwatch = pStopwatch;
 		pState->m_StartUpdateTime = NTime::CTime::fs_NowUTC();
 		if (!bDownloadVersion)
 			pState->m_SourcePath = _FromFileName;
@@ -322,7 +322,7 @@ namespace NMib::NCloud::NAppManager
 									, pState->m_pVersionInfo.f_Get()
 									, pState->m_LastInstalledVersion
 									, pState->m_LastInstalledVersionInfo
-									, pClock->f_GetTime()
+									, pStopwatch->f_GetTime()
 								)
 								.f_Wrap()
 							;

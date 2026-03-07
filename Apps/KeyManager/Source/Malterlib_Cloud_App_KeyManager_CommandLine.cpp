@@ -432,15 +432,15 @@ namespace NMib::NCloud::NKeyManager
 										)
 									;
 
-									CClock Clock;
-									Clock.f_Start();
+									CStopwatch Stopwatch;
+									Stopwatch.f_Start();
 
 									auto Result = co_await DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_Initialize).f_Wrap();
 
 									if (!Result)
 									{
 										// Delay reply to be same response time every time
-										co_await fg_Timeout(fg_Max(fp64(0.5) - Clock.f_GetTime(), fp64(0.01)));
+										co_await fg_Timeout(fg_Max(fp64(0.5) - Stopwatch.f_GetTime(), fp64(0.01)));
 										co_return DMibErrorInstance("Failed to initialize database: {}"_f << Result.f_GetExceptionStr());
 									}
 									mp_bDatabaseDecrypted = true;
@@ -514,15 +514,15 @@ namespace NMib::NCloud::NKeyManager
 							)
 						;
 
-						CClock Clock;
-						Clock.f_Start();
+						CStopwatch Stopwatch;
+						Stopwatch.f_Start();
 
 						auto Result = co_await DatabaseActor(&CKeyManagerServerDatabase_EncryptedFile::f_Initialize).f_Wrap();
 
 						if (!Result)
 						{
 							// Delay reply to be same response time every time
-							co_await fg_Timeout(fg_Max(fp64(0.5) - Clock.f_GetTime(), fp64(0.01)));
+							co_await fg_Timeout(fg_Max(fp64(0.5) - Stopwatch.f_GetTime(), fp64(0.01)));
 							co_return DMibErrorInstance("Failed to read database with old password: {}"_f << Result.f_GetExceptionStr());
 						}
 					}

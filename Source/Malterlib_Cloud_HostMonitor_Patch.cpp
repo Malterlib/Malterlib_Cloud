@@ -19,15 +19,15 @@ namespace NMib::NCloud
 
 		auto SequenceSubscription = co_await m_UpdatePeriodicPatch.f_Sequence();
 
-		bool bIsOverTime = m_PatchClock && (*m_PatchClock).f_GetTime() >= m_Config.m_PatchInterval;
+		bool bIsOverTime = m_PatchStopwatch && (*m_PatchStopwatch).f_GetTime() >= m_Config.m_PatchInterval;
 
-		if (!m_PatchClock)
-			m_PatchClock = CClock{true};
+		if (!m_PatchStopwatch)
+			m_PatchStopwatch = CStopwatch{true};
 		else if (_bCanSkip && !bIsOverTime)
 			co_return {};
 
 		if (bIsOverTime)
-			(*m_PatchClock).f_AddOffset(m_Config.m_PatchInterval);
+			(*m_PatchStopwatch).f_AddOffset(m_Config.m_PatchInterval);
 
 		CLogError LogError("Malterlib/Cloud/HostMonitor");
 

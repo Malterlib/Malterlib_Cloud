@@ -22,7 +22,7 @@ namespace NMib::NCloud::NCloudAPIManager
 				||
 				(
 					_CloudContext.m_bLastWasError
-					&& _CloudContext.m_LastErrorClock.f_GetTime() > 5.0
+					&& _CloudContext.m_LastErrorStopwatch.f_GetTime() > 5.0
 				)
 				||
 				(
@@ -81,7 +81,7 @@ namespace NMib::NCloud::NCloudAPIManager
 						{
 							if (pCloudContext)
 							{
-								pCloudContext->m_LastErrorClock.f_Start();
+								pCloudContext->m_LastErrorStopwatch.f_Start();
 								pCloudContext->m_bLastWasError = true;
 								DLogWithCategory(Malterlib/Cloud/CloudAPIManager, Error, "Failed to generate OpenStack service info: {}", Result.f_GetExceptionStr());
 							}

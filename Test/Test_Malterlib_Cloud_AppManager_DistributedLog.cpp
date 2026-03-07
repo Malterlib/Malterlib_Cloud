@@ -431,7 +431,7 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 		if (_bStopCloudManager)
 		{
 			co_await AppManagerTestHelper.f_StartCloudManager();
-			NTime::CClock Clock{true};
+			NTime::CStopwatch Stopwatch{true};
 			while (true)
 			{
 				try
@@ -456,7 +456,7 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 
 				co_await fg_Timeout(0.1);
 
-				if (Clock.f_GetTime() > g_Timeout)
+				if (Stopwatch.f_GetTime() > g_Timeout)
 					co_return DMibErrorInstance("Timeout waiting for cloud manager to be fully started");
 			}
 		}

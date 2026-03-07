@@ -702,10 +702,10 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fGetAppInfo = [&](CAppManager const &_AppManager, CStr const &_Application)
 			{
-				CClock Clock{true};
+				CStopwatch Stopwatch{true};
 				CStr LastError;
 
-				while (Clock.f_GetTime() < g_Timeout)
+				while (Stopwatch.f_GetTime() < g_Timeout)
 				{
 					try
 					{
@@ -896,10 +896,10 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibLogWithCategory(Test, Info, "Wait Version Available ({}, {})", CFile::fs_GetFile(_AppManager.m_RootPath), _Application);
 
-				CClock Timeout{true};
+				CStopwatch Stopwatch{true};
 				while (_AppManager.m_AppManager.f_CallActor(&CAppManagerInterface::f_GetAvailableVersions)(_Application).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout).f_IsEmpty())
 				{
-					if (Timeout.f_GetTime() > g_Timeout)
+					if (Stopwatch.f_GetTime() > g_Timeout)
 						DMibError("Timed out waiting for version manager application to become available in AppManager");
 					RunLoopHelper.m_pRunLoop->f_Sleep(0.01f);
 				}
@@ -1038,7 +1038,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibLogWithCategory(Test, Info, "Wait For App ({}, {})", CFile::fs_GetFile(_AppManager.m_RootPath), _Application);
 
-				CClock Timeout{true};
+				CStopwatch Stopwatch{true};
 				CAppManagerInterface::CApplicationInfo AppInfo;
 				auto fVersionIsEqual = [&]
 					{
@@ -1051,7 +1051,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				;
 				while (!fVersionIsEqual())
 				{
-					if (Timeout.f_GetTime() > g_Timeout)
+					if (Stopwatch.f_GetTime() > g_Timeout)
 					{
 						DMibError
 							(
@@ -1069,14 +1069,14 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					RunLoopHelper.m_pRunLoop->f_Sleep(0.01f);
 				}
 
-				Timeout.f_Start();
+				Stopwatch.f_Start();
 				while (true)
 				{
 					auto AppInfo = fGetAppInfo(_AppManager, _Application);
 					if (_ExpectedStatuses.f_Contains(AppInfo.m_Status) >= 0)
 						break;
 
-					if (Timeout.f_GetTime() > g_Timeout)
+					if (Stopwatch.f_GetTime() > g_Timeout)
 					{
 						DMibError
 							(
@@ -1881,8 +1881,8 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				CProcessLaunch::fs_LaunchTool(_AppManager.m_RootPath / "AppManager", Params, _AppManager.m_RootPath);
 
 				// Wait for launch
-				CClock Timeout{true};
-				while (Timeout.f_GetTime() < g_Timeout)
+				CStopwatch Stopwatch{true};
+				while (Stopwatch.f_GetTime() < g_Timeout)
 				{
 					try
 					{

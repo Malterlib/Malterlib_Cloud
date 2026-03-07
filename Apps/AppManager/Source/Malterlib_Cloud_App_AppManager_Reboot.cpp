@@ -16,20 +16,20 @@ namespace NMib::NCloud::NAppManager
 #ifndef DPlatformFamily_Linux
 		co_return ERebootResult::mc_NotSupported;
 #else
-		CClock Clock{true};
+		CStopwatch Stopwatch{true};
 
 		while (true)
 		{
 			if (mp_bRebooting)
 				co_return ERebootResult::mc_AlreadyScheduled;
 
-			if (Clock.f_GetTime() > 10_minutes)
+			if (Stopwatch.f_GetTime() > 10_minutes)
 			{
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Critical, "Aborted reboot due to timeout. Reboot has to be scheduled manually.");
 				co_return ERebootResult::mc_AlreadyScheduled;
 			}
 
-			if (!co_await fp_CheckAndLogPreventedReboot({.m_bErrorOnPreventReboot = _bErrorOnPreventReboot, .m_bCriticalLog = Clock.f_GetTime() > 5_minutes}))
+			if (!co_await fp_CheckAndLogPreventedReboot({.m_bErrorOnPreventReboot = _bErrorOnPreventReboot, .m_bCriticalLog = Stopwatch.f_GetTime() > 5_minutes}))
 				break;
 
 			co_await fg_Timeout(10.0);

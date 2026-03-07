@@ -137,15 +137,15 @@ namespace NMib::NCloud::NAppManager
 	fp64 CAppManagerActor::CApplication::f_InProgressTime() const
 	{
 		if (m_bOperationInProgress)
-			return m_OperationInProgressClock.f_GetTime();
+			return m_OperationInProgressStopwatch.f_GetTime();
 
 		if (m_pParentApplication && m_pParentApplication->m_bOperationInProgress)
-			return m_pParentApplication->m_OperationInProgressClock.f_GetTime();
+			return m_pParentApplication->m_OperationInProgressStopwatch.f_GetTime();
 
 		for (auto &Child : m_Children)
 		{
 			if (Child.m_bOperationInProgress)
-				return Child.m_OperationInProgressClock.f_GetTime();
+				return Child.m_OperationInProgressStopwatch.f_GetTime();
 		}
 
 		DNeverGetHere;
@@ -158,7 +158,7 @@ namespace NMib::NCloud::NAppManager
 		DRequire(!f_IsInProgress());
 		m_bOperationInProgress = true;
 		m_OperationInProgressDescription = _Description;
-		m_OperationInProgressClock.f_Start();
+		m_OperationInProgressStopwatch.f_Start();
 		return g_ActorSubscription / [pThis = m_pThis, pApplication = TCSharedPointer<CApplication>(fg_Explicit(this))]
 			{
 				DCheck(pApplication->m_bOperationInProgress);
@@ -178,7 +178,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		if (_pApplication->f_IsInProgress())
 		{
-			CClock WaitTime{true};
+			CStopwatch WaitTime{true};
 			fp64 TimeoutTime = c_InProgressWaitTimeout;
 			while (_pApplication->f_IsInProgress())
 			{

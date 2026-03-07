@@ -25,7 +25,7 @@ namespace NMib::NCloud::NCloudManager
 
 			NCloudManagerDatabase::CSensorNotificationStateValue m_State;
 
-			CClock m_ProblemClock;
+			CStopwatch m_ProblemStopwatch;
 
 			CDistributedAppSensorReporter::EStatusSeverity m_LastCombinedStatus;
 

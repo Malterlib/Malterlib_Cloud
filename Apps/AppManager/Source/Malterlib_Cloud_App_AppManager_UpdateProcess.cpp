@@ -29,14 +29,14 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		TCSharedPointer<NTime::CClock> pClock = fg_Construct(true);
+		TCSharedPointer<NTime::CStopwatch> pStopwatch = fg_Construct(true);
 
-		pClock->f_AddOffset((_Pending.m_StartUpdateTime - CTime::fs_NowUTC()).f_GetSecondsFraction());
+		pStopwatch->f_AddOffset((_Pending.m_StartUpdateTime - CTime::fs_NowUTC()).f_GetSecondsFraction());
 
 		TCSharedPointerSupportWeak<CUpdateApplicationState> pUpdateState = fg_Construct();
 		pUpdateState->m_pApplication = *pApplication;
 		pUpdateState->m_UniqueUpdateID = _Pending.m_UniqueUpdateID;
-		pUpdateState->m_pClock = pClock;
+		pUpdateState->m_pStopwatch = pStopwatch;
 		pUpdateState->m_StartUpdateTime = _Pending.m_StartUpdateTime;
 		pUpdateState->m_VersionID = _Pending.m_VersionID;
 		pUpdateState->m_VersionTime = _Pending.m_VersionTime;
@@ -359,7 +359,7 @@ namespace NMib::NCloud::NAppManager
 				, State.m_pVersionInfo.f_Get()
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
-				, State.m_pClock->f_GetTime()
+				, State.m_pStopwatch->f_GetTime()
 			)
 		;
 		co_return {};
@@ -504,7 +504,7 @@ namespace NMib::NCloud::NAppManager
 				, State.m_pVersionInfo.f_Get()
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
-				, State.m_pClock->f_GetTime()
+				, State.m_pStopwatch->f_GetTime()
 			)
 		;
 		co_return {};
@@ -557,7 +557,7 @@ namespace NMib::NCloud::NAppManager
 					, State.m_pVersionInfo.f_Get()
 					, State.m_LastInstalledVersion
 					, State.m_LastInstalledVersionInfo
-					, State.m_pClock->f_GetTime()
+					, State.m_pStopwatch->f_GetTime()
 				)
 				> fg_LogError("Malterlib/Cloud/AppManager", "Error script failed")
 			;
@@ -594,7 +594,7 @@ namespace NMib::NCloud::NAppManager
 				, State.m_pVersionInfo.f_Get()
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
-				, State.m_pClock->f_GetTime()
+				, State.m_pStopwatch->f_GetTime()
 			).f_Wrap()
 		;
 

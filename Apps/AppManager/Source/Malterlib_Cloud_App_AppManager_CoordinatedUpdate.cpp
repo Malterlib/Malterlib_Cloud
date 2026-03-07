@@ -443,7 +443,7 @@ namespace NMib::NCloud::NAppManager
 
 		struct CState
 		{
-			CClock m_DisconnectClock;
+			CStopwatch m_DisconnectStopwatch;
 			bool m_bWasDisconnected = false;
 		};
 
@@ -559,7 +559,7 @@ namespace NMib::NCloud::NAppManager
 					if (!pState->m_bWasDisconnected)
 					{
 						pState->m_bWasDisconnected = true;
-						pState->m_DisconnectClock.f_Start();
+						pState->m_DisconnectStopwatch.f_Start();
 					}
 					return; // Wait for missing to connect
 				}
@@ -583,7 +583,7 @@ namespace NMib::NCloud::NAppManager
 				1.0*60.0
 				, [=, this, pOnAppUpdateInfoChangeWeak = pOnAppUpdateInfoChange.f_Weak()]() -> TCFuture<void>
 				{
-					if (pState->m_bWasDisconnected && pState->m_DisconnectClock.f_GetTime() >= DisconnectTimeout)
+					if (pState->m_bWasDisconnected && pState->m_DisconnectStopwatch.f_GetTime() >= DisconnectTimeout)
 					{
 						if (!Promise.f_IsSet())
 							Promise.f_SetException(DErrorInstance(_DisconnectedError));

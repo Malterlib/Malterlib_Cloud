@@ -337,12 +337,12 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 			auto fWaitForAllUpdated = [&](CStr _Application) -> CUnsafeFuture
 				{
 					auto &ApplicationState = pUpdateNotificationsState->m_Applications[_Application];
-					NTime::CClock Clock{true};
+					NTime::CStopwatch Stopwatch{true};
 					while (true)
 					{
 						if (ApplicationState.m_nFinished == nAppManagers)
 							break;
-						if (Clock.f_GetTime() > g_Timeout * 4.0)
+						if (Stopwatch.f_GetTime() > g_Timeout * 4.0)
 							DMibError("Timed out waiting for all apps to update.\n{}\n"_f << ApplicationState);
 						co_await pUpdateNotificationsState->f_Wait();
 					}

@@ -242,7 +242,7 @@ namespace NMib::NCloud::NAppManager
 			CDistributedAppSensorReporter::ESensorInfoFlag m_PreventRebootSensorFlags = CDistributedAppSensorReporter::ESensorInfoFlag::mc_None;
 
 			CStr m_OperationInProgressDescription;
-			CClock m_OperationInProgressClock;
+			CStopwatch m_OperationInProgressStopwatch;
 			TCVector<TCPromise<void>> m_OnOperationInProgressFinished;
 
 			TCVector<TCPromise<void>> m_OnRegisterDistributedApp;
@@ -591,7 +591,7 @@ namespace NMib::NCloud::NAppManager
 			uint32 m_VersionRetrySequence = 0;
 			TCSet<CStr> m_RequiredTags;
 			TCSharedPointer<CVersionManager::CVersionInformation> m_pVersionInfo;
-			TCSharedPointer<NTime::CClock> m_pClock;
+			TCSharedPointer<NTime::CStopwatch> m_pStopwatch;
 			CTime m_StartUpdateTime;
 			CStr m_UniqueUpdateID;
 			TCVector<CStr> m_Files;

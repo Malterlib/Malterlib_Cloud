@@ -35,7 +35,7 @@ namespace NMib::NCloud::NBackupManager
 		struct CTransferStats
 		{
 			uint64 m_nTransferredBytes = 0;
-			CClock m_Clock{true};
+			CStopwatch m_Stopwatch{true};
 		};
 
 		struct CBackupInstanceManager;

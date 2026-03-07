@@ -322,7 +322,7 @@ namespace NMib::NCloud
 		co_await fg_AllDone(SetupTrustResults).f_Timeout(State.m_Timeout, "Timed out waiting for trust setup");
 
 		DMibTestMark;
-		for (NTime::CClock Timer(true); true; co_await fg_Timeout(1.0))
+		for (NTime::CStopwatch Stopwatch(true); true; co_await fg_Timeout(1.0))
 		{
 			bool bAllFinished = true;
 			CStr VersionManagers;
@@ -343,7 +343,7 @@ namespace NMib::NCloud
 			if (bAllFinished)
 				break;
 
-			if (Timer.f_GetTime() > State.m_Timeout / 2)
+			if (Stopwatch.f_GetTime() > State.m_Timeout / 2)
 				DMibError("Timed out waiting for version manager and cloud manager subscriptions:\nVersionManagers: {}\nCloudManagers: {}"_f << VersionManagers << CloudManagers);
 		}
 		DMibTestMark;
@@ -425,8 +425,8 @@ namespace NMib::NCloud
 		DMibTestPath("CloudManager{}"_f << _Sequence);
 
 		auto AppManagers = co_await State.m_CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_Timeout(State.m_Timeout, "Timed out waiting for app manager enumeration 1");
-		NTime::CClock Clock{true};
-		while (AppManagers.f_GetLen() < State.m_nAppManagers && Clock.f_GetTime() < State.m_Timeout)
+		NTime::CStopwatch Stopwatch{true};
+		while (AppManagers.f_GetLen() < State.m_nAppManagers && Stopwatch.f_GetTime() < State.m_Timeout)
 			AppManagers = co_await State.m_CloudManager.f_CallActor(&CCloudManager::f_EnumAppManagers)().f_Timeout(State.m_Timeout, "Timed out waiting for app manager enumeration 2");
 		DMibExpect(AppManagers.f_GetLen(), ==, State.m_nAppManagers);
 
@@ -458,7 +458,7 @@ namespace NMib::NCloud
 			}
 		;
 
-		while (!fApplicationsDone() && Clock.f_GetTime() < State.m_Timeout)
+		while (!fApplicationsDone() && Stopwatch.f_GetTime() < State.m_Timeout)
 		{
 			co_await fg_Timeout(0.005);
 			Applications = co_await State.m_CloudManager.f_CallActor(&CCloudManager::f_EnumApplications)().f_Timeout(State.m_Timeout, "Timed out waiting for app manager enumeration 4");

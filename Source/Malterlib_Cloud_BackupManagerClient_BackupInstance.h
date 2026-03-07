@@ -95,7 +95,7 @@ namespace NMib::NCloud::NPrivate
 			mint m_SyncSequence = 0;
 
 			CBackupManagerClient::CFileTransferStats m_TransferStats;
-			NTime::CClock m_Clock{true};
+			NTime::CStopwatch m_Stopwatch{true};
 
 			CDirectoryManifestFile m_ManifestFile;
 

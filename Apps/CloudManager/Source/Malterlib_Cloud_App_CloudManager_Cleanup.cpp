@@ -190,18 +190,18 @@ namespace NMib::NCloud::NCloudManager
 							co_return {.m_Transaction = fg_Move(WriteTransaction)};
 					}
 
-					CClock RuntimeClock(true);
-					CClock YieldClock(true);
+					CStopwatch RuntimeStopwatch(true);
+					CStopwatch YieldStopwatch(true);
 
 					if ((bHasLog && NextLogTime.f_IsValid()) || (bHasSensor && NextSensorTime.f_IsValid()))
 						State.f_LogStartup();
 
 					auto fCheckStatsLog = [&]()
 						{
-							fp64 StatsTime = State.mp_StatsClock.f_GetTime();
+							fp64 StatsTime = State.mp_StatsStopwatch.f_GetTime();
 							if (StatsTime > gc_LogStatsInterval)
 							{
-								State.mp_StatsClock.f_AddOffset(fp64(gc_LogStatsInterval) * (StatsTime / gc_LogStatsInterval).f_Floor());
+								State.mp_StatsStopwatch.f_AddOffset(fp64(gc_LogStatsInterval) * (StatsTime / gc_LogStatsInterval).f_Floor());
 								State.f_Log(true);
 							}
 						}
@@ -268,18 +268,18 @@ namespace NMib::NCloud::NCloudManager
 								break;
 						}
 
-						fp64 YieldTime = YieldClock.f_GetTime();
+						fp64 YieldTime = YieldStopwatch.f_GetTime();
 						if (YieldTime > gc_YieldInterval)
 						{
 							++State.mp_nYields;
-							YieldClock.f_AddOffset(fp64(gc_YieldInterval) * (YieldTime / gc_YieldInterval).f_Floor());
+							YieldStopwatch.f_AddOffset(fp64(gc_YieldInterval) * (YieldTime / gc_YieldInterval).f_Floor());
 							co_await g_Yield;
 
 							fCheckStatsLog();
 
 							if (!State.m_bForcedCompaction)
 							{
-								if (RuntimeClock.f_GetTime() > gc_MaxRunTime)
+								if (RuntimeStopwatch.f_GetTime() > gc_MaxRunTime)
 								{
 									++State.mp_nDatabaseYields;
 									co_return {.m_Transaction = fg_Move(WriteTransaction), .m_bMoreWork = true};

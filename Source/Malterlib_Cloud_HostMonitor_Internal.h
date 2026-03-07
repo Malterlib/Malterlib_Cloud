@@ -150,12 +150,12 @@ namespace NMib::NCloud
 		TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_OsVersionReporter;
 		TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_OsVersionStatusReporter;
 		TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_OsPatchStatusReporter;
-		TCOptional<CClock> m_PatchClock;
+		TCOptional<CStopwatch> m_PatchStopwatch;
 		CCloudManager::CExpectedVersions m_ExpectedOsVersions;
 		CDistributedAppSensorReporter::CVersion m_CurrentOsVersion;
 
 		CSequencer m_UpdatePeriodicMemory{"HostMonitor UpdatePeriodicMemory"};
-		TCOptional<CClock> m_MemoryClock;
+		TCOptional<CStopwatch> m_MemoryStopwatch;
 		TCMap<CStr, CMemoryStatistic> m_MemoryReporters;
 
 		bool m_bInitialized = false;
