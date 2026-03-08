@@ -983,6 +983,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					VersionInfo["Version"] = CStr::fs_ToStr(VersionID);
 					VersionInfo["Platform"] = Platform;
 					CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString(), false);
+					CFile::fs_SetWriteTime(VersionInfoFile, CTime::fs_NowUTC());
 				}
 
 				CFile::fs_CreateDirectory(CFile::fs_GetPath(AppArchive));
@@ -2264,6 +2265,7 @@ public:
 							++VersionID.m_Revision;
 							VersionInfo["Version"] = CStr::fs_ToStr(VersionID);
 							CFile::fs_WriteStringToFile(VersionInfoFile, VersionInfo.f_ToString(), false);
+							CFile::fs_SetWriteTime(VersionInfoFile, CTime::fs_NowUTC());
 
 							CVersionManagerHelper VersionManagerHelper(BinaryDirectory);
 
