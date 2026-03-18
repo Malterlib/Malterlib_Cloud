@@ -468,7 +468,7 @@ namespace NMib::NCloud::NAppManager
 			{
 			}
 
-			auto operator <=> (CRemoteApplicationKey const &_Right) const = default;
+			auto operator <=> (CRemoteApplicationKey const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const
@@ -501,7 +501,7 @@ namespace NMib::NCloud::NAppManager
 				return *this;
 			}
 
-			auto operator <=> (CRemoteApplicationWithTypeKey const &_Right) const = default;
+			auto operator <=> (CRemoteApplicationWithTypeKey const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const

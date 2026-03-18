@@ -18,7 +18,7 @@ namespace NMib::NCloud
 
 		NEncoding::CEJsonSorted f_ToJson() const;
 
-		auto operator <=> (CCloudVersion const &_Right) const = default;
+		auto operator <=> (CCloudVersion const &_Right) const noexcept = default;
 
 		NStr::CStr m_Branch;
 		uint32 m_Major = 0;

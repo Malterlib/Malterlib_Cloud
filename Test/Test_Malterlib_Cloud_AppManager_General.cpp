@@ -17,7 +17,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 {
 	struct CApplicationKey
 	{
-		auto operator <=> (CApplicationKey const &_Right) const = default;
+		auto operator <=> (CApplicationKey const &_Right) const noexcept = default;
 
 		template <typename tf_CStr>
 		void f_Format(tf_CStr &o_Str) const

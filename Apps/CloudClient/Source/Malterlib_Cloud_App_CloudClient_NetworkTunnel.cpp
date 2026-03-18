@@ -173,7 +173,7 @@ namespace NMib::NCloud::NCloudClient
 		CStr m_HostID;
 		CStr m_TunnelName;
 
-		auto operator <=> (CTunnelKey const &_Right) const = default;
+		auto operator <=> (CTunnelKey const &_Right) const noexcept = default;
 	};
 
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_NetworkTunnel_OpenTunnels(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)

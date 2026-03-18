@@ -59,7 +59,7 @@ namespace NMib::NCloud
 
 			static CSecretID fs_Parse(NStr::CStr const &_CompoundID);
 
-			auto operator <=> (CSecretID const &_Right) const = default;
+			auto operator <=> (CSecretID const &_Right) const noexcept = default;
 
 			operator NStr::CStr() const;
 
@@ -72,7 +72,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			bool operator == (CSecretFile const &_Right) const;
+			bool operator == (CSecretFile const &_Right) const noexcept;
 
 			NFile::CDirectoryManifestFile m_Manifest;
 		};
@@ -119,7 +119,7 @@ namespace NMib::NCloud
 
 			CSuper &operator *();
 			CSuper const &operator *() const;
-			bool operator == (CSecret const &_Right) const;
+			bool operator == (CSecret const &_Right) const noexcept;
 		};
 
 		struct CSecretProperties
@@ -168,7 +168,7 @@ namespace NMib::NCloud
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
 
-			bool operator == (CSecretProperties const &_Right) const;
+			bool operator == (CSecretProperties const &_Right) const noexcept;
 
 			NStorage::TCOptional<CSecret> m_Secret;
 			NStorage::TCOptional<NStr::CStrSecure> m_UserName;

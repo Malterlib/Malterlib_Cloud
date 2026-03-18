@@ -539,7 +539,7 @@ namespace NMib::NCloud::NCloudClient
 
 		struct CRow
 		{
-			auto operator <=> (CRow const &_Right) const
+			auto operator <=> (CRow const &_Right) const noexcept
 			{
 				return m_VersionInformation.m_Time <=> _Right.m_VersionInformation.m_Time;
 			}
@@ -552,7 +552,7 @@ namespace NMib::NCloud::NCloudClient
 
 		struct CUniqueVersionKey
 		{
-			auto operator <=> (CUniqueVersionKey const &_Right) const = default;
+			auto operator <=> (CUniqueVersionKey const &_Right) const noexcept = default;
 
 			CStr m_Application;
 			CVersionManager::CVersionID m_VersionID;
@@ -560,7 +560,7 @@ namespace NMib::NCloud::NCloudClient
 
 		struct CVersionPlatforms
 		{
-			auto operator <=> (CVersionPlatforms const &_Right) const
+			auto operator <=> (CVersionPlatforms const &_Right) const noexcept
 			{
 				return m_EndTime <=> _Right.m_EndTime;
 			}

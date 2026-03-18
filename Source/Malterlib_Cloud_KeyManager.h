@@ -87,7 +87,7 @@ namespace NMib::NCloud
 
 		struct CHostKeyID
 		{
-			auto operator <=> (CHostKeyID const &) const = default;
+			auto operator <=> (CHostKeyID const &) const noexcept = default;
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream)

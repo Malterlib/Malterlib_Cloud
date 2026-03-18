@@ -18,7 +18,7 @@ namespace NMib::NCloud::NHostMonitor
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		auto operator <=> (CConfigFileContents_GeneralText const &_Right) const = default;
+		auto operator <=> (CConfigFileContents_GeneralText const &_Right) const noexcept = default;
 
 		NStr::CStr m_Parsed;
 	};
@@ -28,7 +28,7 @@ namespace NMib::NCloud::NHostMonitor
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		auto operator <=> (CConfigFileContents_GeneralBinary const &_Right) const = default;
+		auto operator <=> (CConfigFileContents_GeneralBinary const &_Right) const noexcept = default;
 
 	};
 
@@ -37,7 +37,7 @@ namespace NMib::NCloud::NHostMonitor
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		auto operator <=> (CConfigFileContents_Registry const &_Right) const = default;
+		auto operator <=> (CConfigFileContents_Registry const &_Right) const noexcept = default;
 
 		NContainer::CRegistryPreserveAllFull m_Parsed;
 	};
@@ -47,7 +47,7 @@ namespace NMib::NCloud::NHostMonitor
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		auto operator <=> (CConfigFileContents_Json const &_Right) const = default;
+		auto operator <=> (CConfigFileContents_Json const &_Right) const noexcept = default;
 
 		NEncoding::CEJsonSorted m_Parsed;
 	};
@@ -67,7 +67,7 @@ namespace NMib::NCloud::NHostMonitor
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		auto operator <=> (CConfigFileContents const &_Right) const = default;
+		auto operator <=> (CConfigFileContents const &_Right) const noexcept = default;
 
 		NContainer::CByteVector m_Raw;
 		CConfigFileContentsParsed m_Parsed;
@@ -75,7 +75,7 @@ namespace NMib::NCloud::NHostMonitor
 
 	struct CConfigFileVersionKey
 	{
-		auto operator <=> (CConfigFileVersionKey const &_Right) const = default;
+		auto operator <=> (CConfigFileVersionKey const &_Right) const noexcept = default;
 
 		NStr::CStr m_FileName;
 		uint64 m_Sequence = 0;
@@ -86,7 +86,7 @@ namespace NMib::NCloud::NHostMonitor
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		auto operator <=> (CConfigFileUniqueProperties const &_Right) const = default;
+		auto operator <=> (CConfigFileUniqueProperties const &_Right) const noexcept = default;
 
 		NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType m_ConfigType = NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_GeneralText;
 		NCryptography::CHashDigest_SHA256 m_Digest;
@@ -104,7 +104,7 @@ namespace NMib::NCloud::NHostMonitor
 		template <typename tf_CStream>
 		void f_Stream(tf_CStream &_Stream);
 
-		auto operator <=> (CConfigFileProperties const &_Right) const = default;
+		auto operator <=> (CConfigFileProperties const &_Right) const noexcept = default;
 
 		CConfigFileUniqueProperties m_UniqueProperties;
 		NTime::CTime m_Timestamp;
@@ -131,8 +131,7 @@ namespace NMib::NCloud
 
 		struct CMonitorPathOptions
 		{
-			auto f_Tuple() const;
-			bool operator == (CMonitorPathOptions const &_Other) const;
+			bool operator <=> (CMonitorPathOptions const &_Other) const noexcept = default;
 
 			NStr::CStr m_Path;
 			uint64 m_WarnFree = TCLimitsInt<uint64>::mc_Max;

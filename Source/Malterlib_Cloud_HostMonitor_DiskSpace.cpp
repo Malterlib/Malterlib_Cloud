@@ -9,16 +9,6 @@
 
 namespace NMib::NCloud
 {
-	auto CHostMonitor::CMonitorPathOptions::f_Tuple() const
-	{
-		return fg_TupleReferences(m_Path, m_WarnFree, m_CriticalFree, m_WarnFreePercent, m_CriticalFreePercent);
-	}
-
-	bool CHostMonitor::CMonitorPathOptions::operator == (CMonitorPathOptions const &_Other) const
-	{
-		return f_Tuple() == _Other.f_Tuple();
-	}
-
 	TCFuture<CActorSubscription> CHostMonitor::f_MonitorPath(CMonitorPathOptions _Options)
 	{
 		auto &Internal = *mp_pInternal;

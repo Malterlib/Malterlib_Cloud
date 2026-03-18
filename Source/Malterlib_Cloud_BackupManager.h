@@ -216,7 +216,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 			void f_Format(NStr::CStr &o_Str) const;
 
-			auto operator <=> (CBackupID const &_Right) const = default;
+			auto operator <=> (CBackupID const &_Right) const noexcept = default;
 
 			NTime::CTime m_Time;
 			NStr::CStr m_ID;

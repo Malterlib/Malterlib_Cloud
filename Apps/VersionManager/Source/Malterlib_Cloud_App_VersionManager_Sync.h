@@ -67,7 +67,7 @@ namespace NMib::NCloud::NVersionManager
 		NStr::CStr m_Application;
 		CVersionManager::CVersionIDAndPlatform m_VersionIDAndPlatform;
 
-		auto operator <=> (CSyncVersionKey const &_Right) const = default;
+		auto operator <=> (CSyncVersionKey const &_Right) const noexcept = default;
 	};
 
 	/// State for tracking sync processing of a specific version

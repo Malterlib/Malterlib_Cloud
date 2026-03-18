@@ -29,7 +29,7 @@ namespace NMib::NCloud::NBackupManager
 
 			CStr f_GetDesc() const;
 
-			auto operator <=> (CBackupKey const &_Right) const = default;
+			auto operator <=> (CBackupKey const &_Right) const noexcept = default;
 		};
 
 		struct CTransferStats

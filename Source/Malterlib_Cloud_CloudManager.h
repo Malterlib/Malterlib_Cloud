@@ -76,7 +76,7 @@ namespace NMib::NCloud
 
 			NEncoding::CEJsonSorted f_ToJson() const;
 
-			auto operator <=> (CAppManagerInfo const &_Right) const = default;
+			auto operator <=> (CAppManagerInfo const &_Right) const noexcept = default;
 
 			NStr::CStr m_Environment;
 			NStr::CStr m_HostName;
@@ -108,7 +108,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			auto operator <=> (CApplicationKey const &_Right) const = default;
+			auto operator <=> (CApplicationKey const &_Right) const noexcept = default;
 
 			NStr::CStr m_AppManagerID;
 			NStr::CStr m_Name;
@@ -133,7 +133,7 @@ namespace NMib::NCloud
 
 			static NConcurrency::TCFuture<CVersion> fs_ParseVersion(NStr::CStr _Version);
 
-			auto operator <=> (CVersion const &_Right) const = default;
+			auto operator <=> (CVersion const &_Right) const noexcept = default;
 
 			uint32 m_Major = 0;
 			uint32 m_Minor = 0;
@@ -153,7 +153,7 @@ namespace NMib::NCloud
 
 			NEncoding::CEJsonSorted f_ToJson() const;
 
-			auto operator <=> (CCurrentVersion const &_Right) const = default;
+			auto operator <=> (CCurrentVersion const &_Right) const noexcept = default;
 
 			NStorage::TCOptional<uint32> m_Major;
 			NStorage::TCOptional<uint32> m_Minor;
@@ -168,7 +168,7 @@ namespace NMib::NCloud
 
 			NEncoding::CEJsonSorted f_ToJson() const;
 
-			auto operator <=> (CExpectedVersionRange const &_Right) const = default;
+			auto operator <=> (CExpectedVersionRange const &_Right) const noexcept = default;
 
 			bool f_IsSet() const;
 			bool f_IsDeprecated() const;
@@ -183,7 +183,7 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			auto operator <=> (CExpectedVersions const &_Right) const = default;
+			auto operator <=> (CExpectedVersions const &_Right) const noexcept = default;
 
 			void f_ApplyChanges(CExpectedVersions const &_Changes);
 

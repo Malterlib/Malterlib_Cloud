@@ -59,7 +59,7 @@ namespace NMib::NCloud
 
 		struct CFileTransferStats
 		{
-			auto operator <=> (CFileTransferStats const &_Right) const = default;
+			auto operator <=> (CFileTransferStats const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
@@ -74,7 +74,7 @@ namespace NMib::NCloud
 
 		struct CNotification_BackupAborted /// \brief Notification info for #ENotification_BackupAborted. \headerfile Mib/Cloud/BackupManagerClient
 		{
-			auto operator <=> (CNotification_BackupAborted const &_Right) const = default;
+			auto operator <=> (CNotification_BackupAborted const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_String) const
@@ -85,7 +85,7 @@ namespace NMib::NCloud
 
 		struct CNotification_BackupError /// \brief Notification info for #ENotification_BackupError. \headerfile Mib/Cloud/BackupManagerClient
 		{
-			auto operator <=> (CNotification_BackupError const &_Right) const = default;
+			auto operator <=> (CNotification_BackupError const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr& o_String) const
@@ -99,7 +99,7 @@ namespace NMib::NCloud
 
 		struct CNotification_FileFinished /// \brief Notification info for #ENotification_FileFinished. \headerfile Mib/Cloud/BackupManagerClient
 		{
-			auto operator <=> (CNotification_FileFinished const &_Right) const = default;
+			auto operator <=> (CNotification_FileFinished const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr& o_String) const
@@ -113,7 +113,7 @@ namespace NMib::NCloud
 
 		struct CNotification_Quiescent /// \brief Notification info for #ENotification_Quiescent. \headerfile Mib/Cloud/BackupManagerClient
 		{
-			auto operator <=> (CNotification_Quiescent const &_Right) const = default;
+			auto operator <=> (CNotification_Quiescent const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_String) const
@@ -124,7 +124,7 @@ namespace NMib::NCloud
 
 		struct CNotification_Unquiescent /// \brief Notification info for #ENotification_Unquiescent. \headerfile Mib/Cloud/BackupManagerClient
 		{
-			auto operator <=> (CNotification_Unquiescent const &_Right) const = default;
+			auto operator <=> (CNotification_Unquiescent const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr& o_String) const
@@ -135,7 +135,7 @@ namespace NMib::NCloud
 
 		struct CNotification_InitialFinished /// \brief Notification info for #ENotification_InitialFinished. \headerfile Mib/Cloud/BackupManagerClient
 		{
-			auto operator <=> (CNotification_InitialFinished const &_Right) const = default;
+			auto operator <=> (CNotification_InitialFinished const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
 			void f_Format(tf_CStr& o_String) const

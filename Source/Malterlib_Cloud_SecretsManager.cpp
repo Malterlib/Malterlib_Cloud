@@ -276,7 +276,7 @@ namespace NMib::NCloud
 		return m_Immutable.f_Get(s_Immutable);
 	}
 
-	bool CSecretsManager::CSecretProperties::operator == (CSecretsManager::CSecretProperties const &_Right) const
+	bool CSecretsManager::CSecretProperties::operator == (CSecretsManager::CSecretProperties const &_Right) const noexcept
 	{
 		return m_Secret == _Right.m_Secret
 			&& m_UserName == _Right.m_UserName
@@ -309,7 +309,7 @@ namespace NMib::NCloud
 		};
 	};
 
-	bool CSecretsManager::CSecret::operator == (CSecret const &_Right) const
+	bool CSecretsManager::CSecret::operator == (CSecret const &_Right) const noexcept
 	{
 		return fg_VisitRet<bool>(NPrivate::CSecretEqualsVisitor(), *this, _Right);
 	}

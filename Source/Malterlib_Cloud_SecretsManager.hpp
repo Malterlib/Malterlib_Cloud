@@ -54,7 +54,7 @@ namespace NMib::NCloud
 		m_Manifest.f_Stream(_Stream, Version);
 	}
 
-	inline bool CSecretsManager::CSecretFile::operator == (CSecretsManager::CSecretFile const &_Right) const
+	inline bool CSecretsManager::CSecretFile::operator == (CSecretsManager::CSecretFile const &_Right) const noexcept
 	{
 		return m_Manifest == _Right.m_Manifest;
 	}

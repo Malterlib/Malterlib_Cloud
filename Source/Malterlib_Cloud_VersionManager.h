@@ -50,7 +50,7 @@ namespace NMib::NCloud
 
 			static NStr::CStr fs_DecodeFileName(NStr::CStr const &_FileName);
 
-			auto operator <=> (CVersionID const &_Right) const = default;
+			auto operator <=> (CVersionID const &_Right) const noexcept = default;
 
 			NEncoding::CEJsonSorted f_ToJson() const;
 			static CVersionID fs_FromJson(NEncoding::CEJsonSorted const &_Json);
@@ -71,7 +71,7 @@ namespace NMib::NCloud
 			static NStr::CStr fs_ConvertFromOldPlatform(NStr::CStr const &_Platform);
 			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJsonSorted const &_Json);
 
-			auto operator <=> (CVersionIDAndPlatform const &_Right) const = default;
+			auto operator <=> (CVersionIDAndPlatform const &_Right) const noexcept = default;
 
 			CVersionID m_VersionID;
 			NStr::CStr m_Platform;
@@ -86,7 +86,7 @@ namespace NMib::NCloud
 
 			static CVersionInformation fs_FromJson(NEncoding::CEJsonSorted const &_Json);
 
-			auto operator <=> (CVersionInformation const &_Right) const = default;
+			auto operator <=> (CVersionInformation const &_Right) const noexcept = default;
 
 			NTime::CTime m_Time;
 			NStr::CStr m_Configuration;

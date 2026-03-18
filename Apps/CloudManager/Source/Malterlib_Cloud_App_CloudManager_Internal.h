@@ -138,7 +138,7 @@ namespace NMib::NCloud::NCloudManager
 
 		struct CExpectedOsVersionSubscriptionKey
 		{
-			auto operator <=> (CExpectedOsVersionSubscriptionKey const &_Right) const = default;
+			auto operator <=> (CExpectedOsVersionSubscriptionKey const &_Right) const noexcept = default;
 
 			CStr m_OsName;
 			mint m_ID = 0;

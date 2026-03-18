@@ -37,7 +37,7 @@ namespace NMib::NCloud
 					o_Str += typename tf_CStr::CFormat("Key: {}   Verified: {vs}") << m_Key << m_VerifiedOnServers;
 				}
 
-				auto operator <=> (CClientKey const &) const = default;
+				auto operator <=> (CClientKey const &) const noexcept = default;
 
 				CSymmetricKey m_Key;
 				NContainer::TCSet<NStr::CStr> m_VerifiedOnServers;
@@ -56,12 +56,12 @@ namespace NMib::NCloud
 					o_Str += typename tf_CStr::CFormat("{}") << m_Keys;
 				}
 
-				auto operator <=> (CClientStore const &) const = default;
+				auto operator <=> (CClientStore const &) const noexcept = default;
 
 				NContainer::TCMap<NStr::CStr, CClientKey> m_Keys;
 			};
 
-			auto operator <=> (CDatabase const &) const = default;
+			auto operator <=> (CDatabase const &) const noexcept = default;
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);

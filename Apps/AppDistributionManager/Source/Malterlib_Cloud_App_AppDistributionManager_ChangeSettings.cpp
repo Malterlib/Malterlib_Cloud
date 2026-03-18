@@ -5,7 +5,7 @@
 
 namespace NMib::NCloud::NAppDistributionManager
 {
-	bool CDistributionSettings::operator == (CDistributionSettings const &_Right) const
+	bool CDistributionSettings::operator == (CDistributionSettings const &_Right) const noexcept
 	{
 		return fg_TupleReferences(m_VersionManagerApplication, m_RenameTemplate, m_BranchWildcards, m_Tags, m_Platforms, m_DeployDestinations)
 			== fg_TupleReferences(_Right.m_VersionManagerApplication, _Right.m_RenameTemplate, _Right.m_BranchWildcards, _Right.m_Tags, _Right.m_Platforms, _Right.m_DeployDestinations)

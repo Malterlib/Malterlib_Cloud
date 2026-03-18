@@ -18,7 +18,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 	struct CDistributionSettings
 	{
-		bool operator == (CDistributionSettings const &_Right) const;
+		bool operator == (CDistributionSettings const &_Right) const noexcept;
 
 		CStr m_VersionManagerApplication;
 		CStr m_RenameTemplate;
