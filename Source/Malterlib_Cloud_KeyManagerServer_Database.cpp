@@ -49,8 +49,8 @@ namespace NMib::NCloud
 
 		NContainer::TCSet<CSymmetricKey> GeneratedKeys;
 
-		mint nKeysToAdd = _nKeys - CurrentKeys.f_GetLen();
-		for (mint i = 0; i < nKeysToAdd; ++i)
+		umint nKeysToAdd = _nKeys - CurrentKeys.f_GetLen();
+		for (umint i = 0; i < nKeysToAdd; ++i)
 		{
 			CSymmetricKey ToAdd;
 			ToAdd.f_SetLen(_KeySize);
@@ -59,7 +59,7 @@ namespace NMib::NCloud
 			GeneratedKeys[ToAdd];
 		}
 
-		mint nCreated = GeneratedKeys.f_GetLen();
+		umint nCreated = GeneratedKeys.f_GetLen();
 
 		Internal.m_Database.m_AvailableKeys[_KeySize] += GeneratedKeys;
 
@@ -102,7 +102,7 @@ namespace NMib::NCloud
 		if (RemovedKeys.f_IsEmpty())
 			co_return 0;
 
-		mint nRemoved = RemovedKeys.f_GetLen();
+		umint nRemoved = RemovedKeys.f_GetLen();
 
 		co_await Internal.f_ForwardRemovePreCreatedKeys(Internal.m_ThisHostID, fg_Move(RemovedKeys));
 

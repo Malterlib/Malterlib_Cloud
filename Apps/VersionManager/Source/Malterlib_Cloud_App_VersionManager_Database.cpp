@@ -104,7 +104,7 @@ namespace NMib::NCloud::NVersionManager
 			co_return false;
 
 		// Populate mp_Applications from loaded data
-		mint nVersions = 0;
+		umint nVersions = 0;
 		for (auto &ApplicationVersionsEntry : Result.m_Versions.f_Entries())
 		{
 			auto &Application = mp_Applications[ApplicationVersionsEntry.f_Key()];
@@ -232,9 +232,9 @@ namespace NMib::NCloud::NVersionManager
 		{
 			TCMap<CStr, TCMap<CVersionManager::CVersionIDAndPlatform, CVersionManager::CVersionInformation>> m_DiskVersions;
 			TCSet<CStr> m_KnownTags;
-			mint m_nAdded = 0;
-			mint m_nUpdated = 0;
-			mint m_nRemoved = 0;
+			umint m_nAdded = 0;
+			umint m_nUpdated = 0;
+			umint m_nRemoved = 0;
 			TCVector<TCTuple<CStr, CVersionManager::CVersionIDAndPlatform>> m_AddedOrUpdated;
 			CDatabaseActor::CTransactionWrite m_WriteTransaction;
 		};

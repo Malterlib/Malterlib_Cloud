@@ -57,9 +57,9 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 			m_LastNotifications.f_Clear();
 		}
 
-		mint f_ClaimNotifications(CBackupManagerClient::ENotification _Type)
+		umint f_ClaimNotifications(CBackupManagerClient::ENotification _Type)
 		{
-			mint nNotifications = m_nNotifications[_Type];
+			umint nNotifications = m_nNotifications[_Type];
 			m_nNotifications.f_Remove(_Type);
 			return nNotifications;
 		}
@@ -340,14 +340,14 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 			return ManifestFinished;
 		}
 
-		void f_CreateFile(CStr const &_Name, mint _Size)
+		void f_CreateFile(CStr const &_Name, umint _Size)
 		{
 			DMibCloudBackupManagerDebugOut("Create file      {} {}\n", _Name, _Size);
 			CByteVector Data;
-			mint BufferSize = fg_AlignUp(_Size, 4);
+			umint BufferSize = fg_AlignUp(_Size, 4);
 			Data.f_SetLen(BufferSize);
 
-			for (mint i = 0; i < BufferSize; i += 4)
+			for (umint i = 0; i < BufferSize; i += 4)
 				*((uint32 *)(Data.f_GetArray() + i)) = NMisc::fg_GetRandomUnsigned();
 
 			Data.f_SetLen(_Size);
@@ -408,7 +408,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 			DMibCloudBackupManagerDebugOut("Rename file      {} -> {}\n", _FromName, _ToName);
 
 #ifdef DPlatformFamily_Windows
-			for (mint i = 0; i < 200; ++i)
+			for (umint i = 0; i < 200; ++i)
 			{
 				try
 				{
@@ -428,7 +428,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 #endif
 		}
 
-		void f_ModifyFile(CStr const &_Name, mint _Pos)
+		void f_ModifyFile(CStr const &_Name, umint _Pos)
 		{
 			CFile File;
 			File.f_Open(m_BackupConfig.m_ManifestConfig.m_Root / _Name, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
@@ -448,11 +448,11 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 			CFile File;
 			File.f_Open(m_BackupConfig.m_ManifestConfig.m_Root / _Name, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 
-			mint Length = File.f_GetLength();
-			mint Start = _Random.f_GetValue(Length);
-			mint End = Start + fg_Min(_Random.f_GetValue(Length), fg_Min(Length - Start, 8192u));
+			umint Length = File.f_GetLength();
+			umint Start = _Random.f_GetValue(Length);
+			umint End = Start + fg_Min(_Random.f_GetValue(Length), fg_Min(Length - Start, 8192u));
 
-			for (mint Position = Start; Position < End; ++Position)
+			for (umint Position = Start; Position < End; ++Position)
 			{
 				uint8 Data;
 				File.f_SetPosition(Position);
@@ -470,19 +470,19 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 			CFile File;
 			File.f_Open(m_BackupConfig.m_ManifestConfig.m_Root / _Name, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 
-			mint Length = File.f_GetLength();
-			mint NewLen = fg_Max(_Random.f_GetValue(Length), 1u);
+			umint Length = File.f_GetLength();
+			umint NewLen = fg_Max(_Random.f_GetValue(Length), 1u);
 			File.f_SetLength(NewLen);
 		}
 
-		void f_AppendFile(CStr const &_Name, mint _Size)
+		void f_AppendFile(CStr const &_Name, umint _Size)
 		{
 			DMibCloudBackupManagerDebugOut("Append file      {} {}\n", _Name, _Size);
 			CByteVector Data;
-			mint BufferSize = fg_AlignUp(_Size, 4);
+			umint BufferSize = fg_AlignUp(_Size, 4);
 			Data.f_SetLen(BufferSize);
 
-			for (mint i = 0; i < BufferSize; i += 4)
+			for (umint i = 0; i < BufferSize; i += 4)
 				*((uint32 *)(Data.f_GetArray() + i)) = NMisc::fg_GetRandomUnsigned();
 
 			Data.f_SetLen(_Size);
@@ -582,10 +582,10 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 		CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/MalterlibCloud", CloudClientDirectory, nullptr);
 
 		// Copy BackupManagers to their directories
-		mint nBackupManagers = 1;
+		umint nBackupManagers = 1;
 		{
 			TCFutureVector<void> BackupManagerLaunchesResults;
-			for (mint i = 0; i < nBackupManagers; ++i)
+			for (umint i = 0; i < nBackupManagers; ++i)
 			{
 				auto BlockingActorCheckout = fg_BlockingActor();
 				auto BlockingActor = BlockingActorCheckout.f_Actor();
@@ -612,7 +612,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 				BackupManagerLaunches.f_Clear();
 				BackupManagerLaunchesResults = {};
 
-				for (mint i = 0; i < nBackupManagers; ++i)
+				for (umint i = 0; i < nBackupManagers; ++i)
 				{
 					CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << i;
 					CStr BackupManagerDirectory = RootDirectory + "/" + BackupManagerName;
@@ -653,7 +653,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 				AllBackupManagerHosts.f_Clear();
 				AllBackupManagers.f_Clear();
 				TCFutureVector<void> ListenResults;
-				mint iBackupManager = 0;
+				umint iBackupManager = 0;
 				for (auto &BackupManager : BackupManagerLaunches)
 				{
 					CStr BackupManagerName = "BackupManager{sf0,sl2}"_f << iBackupManager;
@@ -1741,22 +1741,22 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 				for (auto &Symlink : DefaultSymlinks)
 					Symlinks.f_Insert(Symlink);
 
-				mint nSymlinks = Symlinks.f_GetLen();
+				umint nSymlinks = Symlinks.f_GetLen();
 				DMibAssert(nSymlinks, >, 0u);
 
-				mint nFiles = Files.f_GetLen();
+				umint nFiles = Files.f_GetLen();
 				DMibAssert(nFiles, >, 0u);
 
-				mint iFileSequence = 3;
+				umint iFileSequence = 3;
 
 				TCLinkedList<CStr> Directories = {"", "Dir1", "Dir2"};
 
-				mint nDirectories = Directories.f_GetLen();
+				umint nDirectories = Directories.f_GetLen();
 				DMibAssert(nDirectories, >, 0u);
 
 				auto fGetDirectory = [&]() -> CStr &
 					{
-						mint FileIndex = Random.f_GetValue(nDirectories);
+						umint FileIndex = Random.f_GetValue(nDirectories);
 						auto iFile = Directories.f_GetIterator();
 						for (; FileIndex; --FileIndex)
 							++iFile;
@@ -1767,7 +1767,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 
 				auto fGetFile = [&]() -> CStr &
 					{
-						mint FileIndex = Random.f_GetValue(nFiles);
+						umint FileIndex = Random.f_GetValue(nFiles);
 						auto iFile = Files.f_GetIterator();
 						for (; FileIndex; --FileIndex)
 							++iFile;
@@ -1778,7 +1778,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 
 				auto fGetSymlink = [&]() -> CStr &
 					{
-						mint FileIndex = Random.f_GetValue(nSymlinks);
+						umint FileIndex = Random.f_GetValue(nSymlinks);
 						auto iFile = Symlinks.f_GetIterator();
 						for (; FileIndex; --FileIndex)
 							++iFile;
@@ -1787,9 +1787,9 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 					}
 				;
 
-				mint nRandomTests = 2000;
+				umint nRandomTests = 2000;
 
-				for (mint i = 0; i < nRandomTests; ++i)
+				for (umint i = 0; i < nRandomTests; ++i)
 				{
 					switch (Random.f_GetValue(26u))
 					{

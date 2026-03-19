@@ -185,7 +185,7 @@ namespace NMib::NCloud::NVersionManager
 			co_return Auditor.f_Exception({"Failed to save version infos. See Version Manager log.", fg_Format("Error: {}", Results.f_GetExceptionStr())});
 
 		bool bFailed = false;
-		mint nVersions = 0;
+		umint nVersions = 0;
 		for (auto &Version : *Results)
 		{
 			if (!Version)

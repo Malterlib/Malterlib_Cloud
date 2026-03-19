@@ -114,7 +114,7 @@ namespace NMib::NCloud::NPrivate
 		mp_BackupManagerClient(&CBackupManagerClient::fp_HashMismatch, _pRunningState->m_ManifestFile.m_OriginalPath).f_DiscardResult();
 	}
 
-	void CBackupManagerClient_Instance::fp_RSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, CPendingBackupFile &_PendingFile, mint _SyncSequence)
+	void CBackupManagerClient_Instance::fp_RSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, CPendingBackupFile &_PendingFile, umint _SyncSequence)
 	{
 		auto &RunningState = *_pRunningState;
 
@@ -317,7 +317,7 @@ namespace NMib::NCloud::NPrivate
 		while ((bForceSync || Position < _Length) && RunningState.m_PendingQueue < mp_Config.m_MaxSendQueue)
 		{
 			bForceSync = false;
-			mint ThisTime = fg_Min(_Length - Position, mp_Config.m_MaxSendQueue - RunningState.m_PendingQueue);
+			umint ThisTime = fg_Min(_Length - Position, mp_Config.m_MaxSendQueue - RunningState.m_PendingQueue);
 
 			CIOByteVector Data;
 			Data.f_SetLen(ThisTime);
@@ -411,7 +411,7 @@ namespace NMib::NCloud::NPrivate
 		}
 	}
 
-	void CBackupManagerClient_Instance::fp_AppendSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, mint _SyncSequence)
+	void CBackupManagerClient_Instance::fp_AppendSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, umint _SyncSequence)
 	{
 		auto &RunningState = *_pRunningState;
 
@@ -475,7 +475,7 @@ namespace NMib::NCloud::NPrivate
 
 			CStr FileName = PendingFile.f_GetFileName();
 
-			mint SyncSequence = ++mp_SyncSequence;
+			umint SyncSequence = ++mp_SyncSequence;
 			PendingFile.m_SyncSequence = SyncSequence;
 
 			TCSharedPointerSupportWeak<CRunningSyncState> pRunningState = fg_Construct();

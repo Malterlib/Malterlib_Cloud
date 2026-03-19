@@ -37,7 +37,7 @@ namespace NMib::NCloud::NDebugManager
 				(
 					[AssetGenerator = fg_Move(AssetGenerator), Auditor]() mutable -> NConcurrency::TCAsyncGenerator<NContainer::TCVector<CAssetList::CAsset>>
 					{
-						mint nAssets = 0;
+						umint nAssets = 0;
 						bool bDone = false;
 
 						auto Cleanup = g_OnScopeExit / [&]

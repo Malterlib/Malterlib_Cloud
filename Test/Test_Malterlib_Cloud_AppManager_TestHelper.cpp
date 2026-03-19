@@ -418,7 +418,7 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	TCFuture<void> CAppManagerTestHelper::f_CheckCloudManager(mint _Sequence)
+	TCFuture<void> CAppManagerTestHelper::f_CheckCloudManager(umint _Sequence)
 	{
 		auto &State = *m_pState;
 
@@ -505,14 +505,14 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	TCFuture<void> CAppManagerTestHelper::f_Setup(mint _nAppManagers)
+	TCFuture<void> CAppManagerTestHelper::f_Setup(umint _nAppManagers)
 	{
 		auto &State = *m_pState;
 
 		State.m_nAppManagers = _nAppManagers;
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, State.m_RootDirectory, 10.0);
 
-		for (mint i = 0; i < 5; ++i)
+		for (umint i = 0; i < 5; ++i)
 		{
 			try
 			{
@@ -597,7 +597,7 @@ namespace NMib::NCloud
 		// Copy AppManagers to their directories
 		{
 			TCFutureVector<void> AppManagerLaunchesResults;
-			for (mint iAppManager = 0; iAppManager < _nAppManagers; ++iAppManager)
+			for (umint iAppManager = 0; iAppManager < _nAppManagers; ++iAppManager)
 			{
 				auto BlockingActorCheckout = fg_BlockingActor();
 				auto BlockingActor = BlockingActorCheckout.f_Actor();
@@ -616,9 +616,9 @@ namespace NMib::NCloud
 		}
 		{
 			// Launch AppManagers
-			TCFutureMap<mint, CDistributedApp_LaunchInfo> AppManagerLaunchesResults;
+			TCFutureMap<umint, CDistributedApp_LaunchInfo> AppManagerLaunchesResults;
 
-			for (mint iAppManager = 0; iAppManager < _nAppManagers; ++iAppManager)
+			for (umint iAppManager = 0; iAppManager < _nAppManagers; ++iAppManager)
 			{
 				CStr AppManagerName = "AppManager{sf0,sl2}"_f << iAppManager;
 				CStr AppManagerDirectory = State.m_RootDirectory + "/" + AppManagerName;
@@ -656,7 +656,7 @@ namespace NMib::NCloud
 			auto Results = co_await fg_AllDoneWrapped(AppManagerLaunchesResults).f_Timeout(State.m_Timeout, "Timed out waiting for app manager launches");
 			for (auto &LaunchResult : Results)
 			{
-				mint iAppManager = Results.fs_GetKey(LaunchResult);
+				umint iAppManager = Results.fs_GetKey(LaunchResult);
 
 				auto &AppManager = State.m_AppManagerInfos[LaunchResult->m_HostID];
 				State.m_AppManagerHosts[LaunchResult->m_HostID];

@@ -91,7 +91,7 @@ namespace NMib::NCloud::NSecretsManager
 			)
 		;
 
-		static const mint c_KeyBits = 512;
+		static const umint c_KeyBits = 512;
 		CSymmetricKey Key = co_await _KeyManager.f_CallActor(&CKeyManager::f_RequestKey)("SecretsManagerDB", c_KeyBits / 8);
 
 		DMibLogWithCategory(Mib/Cloud/SecretsManager, Info, "Keymanager available, reading database");

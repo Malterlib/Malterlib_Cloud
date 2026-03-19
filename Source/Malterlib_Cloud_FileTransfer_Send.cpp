@@ -109,7 +109,7 @@ namespace NMib::NCloud
 		uint64 m_MaxQueueSize = 0;
 		NConcurrency::TCPromise<CFileTransferResult> m_Promise;
 		CTransferStats m_TransferStats;
-		mint m_nTransfers = 0;
+		umint m_nTransfers = 0;
 
 		bool m_bCalled = false;
 	};

@@ -163,7 +163,7 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 			;
 
 			CEJsonSorted ExpectedSensorReadings;
-			for (mint i = 0; i < 5; ++i)
+			for (umint i = 0; i < 5; ++i)
 			{
 				ExpectedSensorReadings.f_Array().f_Insert
 					(

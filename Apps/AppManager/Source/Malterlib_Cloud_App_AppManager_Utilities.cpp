@@ -21,18 +21,18 @@ namespace NMib::NCloud::NAppManager
 		return DMibNewLine + Ret;
 	}
 
-	CStr CAppManagerActor::fsp_LimitErrorLogSize(CStr const &_String, mint _ExtraSize)
+	CStr CAppManagerActor::fsp_LimitErrorLogSize(CStr const &_String, umint _ExtraSize)
 	{
 #if DMibPPtrBits < 64
-		mint MaxSize = 64 * 1024 - _ExtraSize;
+		umint MaxSize = 64 * 1024 - _ExtraSize;
 #else
-		mint MaxSize = 512 * 1024 - _ExtraSize;
+		umint MaxSize = 512 * 1024 - _ExtraSize;
 #endif
 
 		auto Lines = _String.f_SplitLine().f_Reverse();
 
 		TCVector<CStr> OutLines;
-		mint Size = 0;
+		umint Size = 0;
 		for (auto &Line : Lines)
 		{
 			auto LineSize = Line.f_GetLen() + 1;

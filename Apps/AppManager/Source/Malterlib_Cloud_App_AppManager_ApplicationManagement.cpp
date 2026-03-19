@@ -159,7 +159,7 @@ namespace NMib::NCloud::NAppManager
 
 		CFile::fs_SetAttributes(_Destination, gc_RootAttributes);
 
-		mint PrefixLen = _Destination.f_GetLen() + 1;
+		umint PrefixLen = _Destination.f_GetLen() + 1;
 		for (auto &File : Files)
 		{
 			bool bFound = false;

@@ -37,7 +37,7 @@ namespace NMib::NCloud::NDebugManager
 				(
 					[CrashDumpGenerator = fg_Move(CrashDumpGenerator), Auditor]() mutable -> NConcurrency::TCAsyncGenerator<NContainer::TCVector<CCrashDumpList::CCrashDump>>
 					{
-						mint nCrashDumps = 0;
+						umint nCrashDumps = 0;
 						bool bDone = false;
 
 						auto Cleanup = g_OnScopeExit / [&]

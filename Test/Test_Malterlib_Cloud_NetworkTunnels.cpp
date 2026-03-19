@@ -199,7 +199,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			fg_TestAddCleanupPath(RootDirectory);
 
 
-			for (mint i = 0; i < 5; ++i)
+			for (umint i = 0; i < 5; ++i)
 			{
 				try
 				{

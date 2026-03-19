@@ -338,7 +338,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 0.5);
 
-		for (mint i = 0; i < 5; ++i)
+		for (umint i = 0; i < 5; ++i)
 		{
 			try
 			{
@@ -1002,7 +1002,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		auto fTagApp = [&](CStr _Name, CVersionManagerHelper::CPackageInfo _PackageInfo, TCSet<CStr> _Tags) -> TCUnsafeFuture<void>
 			{
-				for (mint i = 0; i < 3; ++i)
+				for (umint i = 0; i < 3; ++i)
 				{
 					DMibLogWithCategory(Test, Info, "Tag App ({})", _Name);
 					CVersionManager::CChangeTags ChangeTags;
@@ -1401,7 +1401,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 0.5);
 
-		for (mint i = 0; i < 5; ++i)
+		for (umint i = 0; i < 5; ++i)
 		{
 			try
 			{
@@ -1721,7 +1721,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					SimpleLaunch.m_LogName = CFile::fs_GetFile(_Executable);
 				}
 
-				SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pResult, StdInBuffer = CStr(), nStdInIndex = mint(0), _StdInLines](EProcessLaunchOutputType _OutputType, CStr const &_Output) mutable
+				SimpleLaunch.m_Params.m_fOnOutput = [LaunchActor, pResult, StdInBuffer = CStr(), nStdInIndex = umint(0), _StdInLines](EProcessLaunchOutputType _OutputType, CStr const &_Output) mutable
 					{
 						if (_OutputType == EProcessLaunchOutputType_StdErr)
 							pResult->m_StdErr += _Output;
@@ -2139,7 +2139,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					TCVector<CBlockingActorCheckout> Checkouts;
 					TCVector<TCVector<CStr>> ExpectedErrors;
 
-					for (mint i = 0; i < 5; ++i)
+					for (umint i = 0; i < 5; ++i)
 					{
 						bool bShouldSucceed;
 						switch (_Mode)
@@ -2199,7 +2199,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					}
 
 					// Wait for all downloads and verify expected results
-					for (mint i = 0; i < 5; ++i)
+					for (umint i = 0; i < 5; ++i)
 					{
 						CStr AppName = "ParallelTestApp{}_{}"_f << _TestName << i;
 						DMibTestPath(AppName);

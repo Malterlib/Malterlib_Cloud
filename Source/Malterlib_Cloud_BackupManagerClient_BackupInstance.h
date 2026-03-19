@@ -92,7 +92,7 @@ namespace NMib::NCloud::NPrivate
 			TCWeakPointer<CRunningSyncState> m_pRunningState;
 
 			CActorSubscription m_RSyncSubscription;
-			mint m_SyncSequence = 0;
+			umint m_SyncSequence = 0;
 
 			CBackupManagerClient::CFileTransferStats m_TransferStats;
 			NTime::CStopwatch m_Stopwatch{true};
@@ -128,8 +128,8 @@ namespace NMib::NCloud::NPrivate
 
 		struct CSequencedSync
 		{
-			mint m_nReading = 0;
-			mint m_nWriting = 0;
+			umint m_nReading = 0;
+			umint m_nWriting = 0;
 
 			TCLinkedList<TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)>> m_ReadWaiting;
 			TCLinkedList<TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)>> m_WriteWaiting;
@@ -149,7 +149,7 @@ namespace NMib::NCloud::NPrivate
 		TCFuture<void> fp_SyncManifest();
 
 		void fp_ProcessBackupQueue();
-		void fp_RSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, CPendingBackupFile &_PendingFile, mint _SyncSequence);
+		void fp_RSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, CPendingBackupFile &_PendingFile, umint _SyncSequence);
 		void fp_SendAppendSyncFile
 			(
 				TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState
@@ -159,7 +159,7 @@ namespace NMib::NCloud::NPrivate
 				, bool _bForceSync
 			)
 		;
-		void fp_AppendSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, mint _SyncSequence);
+		void fp_AppendSyncFile(TCSharedPointerSupportWeak<CRunningSyncState> const &_pRunningState, umint _SyncSequence);
 
 		void fp_NewPendingFile(CStr const &_FileName);
 		void fp_FileFinished(CStr const &_FileName);
@@ -208,10 +208,10 @@ namespace NMib::NCloud::NPrivate
 		TCMap<CStr, TCSharedPointer<CAppendFileCache>> mp_AppendFileCache;
 		TCMap<CStr, CAppendFileState> mp_AppendFileState;
 
-		mint mp_nRunningSyncs = 0;
-		mint mp_nMaxRunningSyncs = 8;
-		mint mp_SyncSequence = 0;
-		mint mp_nPendingManifestChanges = 0;
+		umint mp_nRunningSyncs = 0;
+		umint mp_nMaxRunningSyncs = 8;
+		umint mp_SyncSequence = 0;
+		umint mp_nPendingManifestChanges = 0;
 
 		bool mp_bBackupStarted = false;
 		bool mp_bBackupStartFailed = false;

@@ -147,7 +147,7 @@ namespace NMib::NCloud
 					;
 
 					auto LastException = DMibImpErrorInstance(NFile::CExceptionFile, "DUMMY");
-					mint nRetries = 0;
+					umint nRetries = 0;
 					while (true)
 					{
 						try

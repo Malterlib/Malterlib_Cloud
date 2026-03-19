@@ -260,7 +260,7 @@ namespace NMib::NCloud::NCloudManager
 		{
 			CDistributedAppLogReader_LogKeyAndEntry *m_pFirstLogEntry = nullptr;
 			CDistributedAppLogReader_LogKeyAndEntry *m_pLastLogEntry = nullptr;
-			mint m_nMessages = 0;
+			umint m_nMessages = 0;
 			DLinkDS_Link(CAggregatedLogData, m_Link);
 		};
 

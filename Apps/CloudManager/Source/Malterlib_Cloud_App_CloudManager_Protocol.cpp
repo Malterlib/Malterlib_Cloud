@@ -63,7 +63,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<void> CCloudManagerServer::fp_ReportFiltered(CStr _AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied)
+	TCFuture<void> CCloudManagerServer::fp_ReportFiltered(CStr _AppManagerID, umint _RegisterSequence, bool _bFiltered, bool _bAccessDenied)
 	{
 		auto OnResume = co_await f_CheckDestroyedOnResume();
 
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<void> CCloudManagerServer::fp_ChangeOtherErrors(CStr _AppManagerID, mint _RegisterSequence, TCSet<CStr> _Remove, TCMap<CStr, CStr> _Add)
+	TCFuture<void> CCloudManagerServer::fp_ChangeOtherErrors(CStr _AppManagerID, umint _RegisterSequence, TCSet<CStr> _Remove, TCMap<CStr, CStr> _Add)
 	{
 		auto OnResume = co_await f_CheckDestroyedOnResume();
 

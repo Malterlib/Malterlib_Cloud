@@ -144,7 +144,7 @@ namespace NMib::NCloud
 		CConfigFileHistoryEntryValue Value;
 		Value.m_Properties.m_UniqueProperties.m_ConfigType = Type;
 
-		for (mint iRetry = 0; true; ++iRetry)
+		for (umint iRetry = 0; true; ++iRetry)
 		{
 			TCAsyncResult<CConfigFileHistoryEntryValue> Result;
 			{
@@ -401,7 +401,7 @@ namespace NMib::NCloud
 				{
 					auto iOld = _Old.f_Array().f_GetIterator();
 					auto iNew = _New.f_Array().f_GetIterator();
-					mint iArray = 0;
+					umint iArray = 0;
 					for (;iOld && iNew; ++iOld, ++iNew, ++iArray)
 						fg_FindJsonDiffsRecursive(*iOld, *iNew, o_Changed, o_Added, o_Deleted, "{}.[{}]"_f << _Context << iArray);
 

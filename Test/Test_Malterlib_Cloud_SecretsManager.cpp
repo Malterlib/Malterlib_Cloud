@@ -166,7 +166,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 
 		CProcessLaunch::fs_KillProcessesInDirectory("*", {}, RootDirectory, 10.0);
 
-		for (mint i = 0; i < 5; ++i)
+		for (umint i = 0; i < 5; ++i)
 		{
 			try
 			{
@@ -223,10 +223,10 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 		CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory + "/TestApps/MalterlibCloud", CloudClientDirectory, nullptr);
 
 		// Copy SecretsManagers to their directories
-		mint nSecretsManagers = 1;
+		umint nSecretsManagers = 1;
 		{
 			TCFutureVector<void> SecretsManagerLaunchesResults;
-			for (mint i = 0; i < nSecretsManagers; ++i)
+			for (umint i = 0; i < nSecretsManagers; ++i)
 			{
 				auto BlockingActorCheckout = fg_BlockingActor();
 				auto BlockingActor = BlockingActorCheckout.f_Actor();
@@ -253,7 +253,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 				SecretsManagerLaunches.f_Clear();
 				SecretsManagerLaunchesResults = {};
 
-				for (mint i = 0; i < nSecretsManagers; ++i)
+				for (umint i = 0; i < nSecretsManagers; ++i)
 				{
 					CStr SecretsManagerName = fg_Format("SecretsManager{sf0,sl2}", i);
 					CStr SecretsManagerDirectory = RootDirectory + "/" + SecretsManagerName;
@@ -363,7 +363,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 				AllSecretsManagerHosts.f_Clear();
 				AllSecretsManagers.f_Clear();
 				TCFutureVector<void> ListenResults;
-				mint iSecretsManager = 0;
+				umint iSecretsManager = 0;
 				for (auto &SecretsManager : SecretsManagerLaunches)
 				{
 					CStr SecretsManagerName = fg_Format("SecretsManager{sf0,sl2}", iSecretsManager);
@@ -676,11 +676,11 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					return Return;
 				}
 
-				mint f_GetNonFullResendNumChanges()
+				umint f_GetNonFullResendNumChanges()
 				{
 					DMibLock(m_Lock);
 
-					mint nChanges = 0;
+					umint nChanges = 0;
 					for (auto &Change : m_Changes)
 					{
 						if (!Change.m_bFullResend)
@@ -1957,7 +1957,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					// Same file, new content => transfer, remove old file, create new one
 					fWriteFile(File2, "0123456789klmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz");
 					CActorSubscription Subscription;
-					mint nUploaded = fUpload(ID, File2, RootDirectory, Subscription).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+					umint nUploaded = fUpload(ID, File2, RootDirectory, Subscription).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					DMibExpect(nUploaded, ==, 1);
 					fSyncFileOperations("SyncFileOperations").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					auto Files3 = fFindFiles();

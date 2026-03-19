@@ -94,10 +94,10 @@ namespace NMib::NCloud::NTest
 					if (!SensorReporter.m_fReportReadings)
 						co_return DMibErrorInstance("Invalid sensor reporter returned");
 
-					mint nReadings = _Params["NumReadings"].f_Integer();
+					umint nReadings = _Params["NumReadings"].f_Integer();
 
 					TCVector<CDistributedAppSensorReporter::CSensorReading> Readings;
-					for (mint i = 0; i < nReadings; ++i)
+					for (umint i = 0; i < nReadings; ++i)
 					{
 						CDistributedAppSensorReporter::CSensorReading SensorReading;
 						if (bIsVersion)
@@ -210,7 +210,7 @@ namespace NMib::NCloud::NTest
 				}
 				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
-					mint nEntries = _Params["NumEntries"].f_Integer();
+					umint nEntries = _Params["NumEntries"].f_Integer();
 
 					CDistributedAppLogReporter::CLogInfo LogInfo;
 
@@ -222,7 +222,7 @@ namespace NMib::NCloud::NTest
 
 					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
 
-					for (mint i = 0; i < nEntries; ++i)
+					for (umint i = 0; i < nEntries; ++i)
 					{
 						CDistributedAppLogReporter::CLogEntry LogEntry;
 						LogEntry.m_Data.m_Message = "Test Log {}"_f << i;
@@ -263,12 +263,12 @@ namespace NMib::NCloud::NTest
 				}
 				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
-					mint nEntries = _Params["NumEntries"].f_Integer();
-					mint bError = _Params["Error"].f_Boolean();
+					umint nEntries = _Params["NumEntries"].f_Integer();
+					umint bError = _Params["Error"].f_Boolean();
 
 					auto Auditor = mp_State.f_Auditor();
 
-					for (mint i = 0; i < nEntries; ++i)
+					for (umint i = 0; i < nEntries; ++i)
 					{
 						if (bError)
 							Auditor.f_Error("Test Log {}"_f << i);
@@ -339,9 +339,9 @@ namespace NMib::NCloud::NTest
 				}
 				, [this](CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine) -> TCFuture<uint32>
 				{
-					mint nEntries = _Params["NumEntries"].f_Integer();
-					mint EntrySize = _Params["EntrySize"].f_Integer();
-					mint LineSize = _Params["LineSize"].f_Integer();
+					umint nEntries = _Params["NumEntries"].f_Integer();
+					umint EntrySize = _Params["EntrySize"].f_Integer();
+					umint LineSize = _Params["LineSize"].f_Integer();
 
 					if (LineSize < 1 || LineSize > EntrySize)
 						co_return DMibErrorInstance("Invalid line size");
@@ -356,12 +356,12 @@ namespace NMib::NCloud::NTest
 
 					TCVector<CDistributedAppLogReporter::CLogEntry> LogEntries;
 
-					for (mint i = 0; i < nEntries; ++i)
+					for (umint i = 0; i < nEntries; ++i)
 					{
 						CDistributedAppLogReporter::CLogEntry LogEntry;
-						for (mint iData = 0; iData < EntrySize;)
+						for (umint iData = 0; iData < EntrySize;)
 						{
-							mint ThisTime = fg_Min(EntrySize - iData, LineSize);
+							umint ThisTime = fg_Min(EntrySize - iData, LineSize);
 							if (ThisTime >= 3)
 								LogEntry.m_Data.m_Message += "<{sj*,sf }>\n"_f << "" << (ThisTime - 3);
 							else

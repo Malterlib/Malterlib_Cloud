@@ -122,7 +122,7 @@ namespace NVersionManagerSyncTests
 		{
 		}
 
-		TCFuture<void> f_SetupSource(mint _nAppManagers = 0)
+		TCFuture<void> f_SetupSource(umint _nAppManagers = 0)
 		{
 			co_await m_SourceHelper.f_Setup(_nAppManagers);
 			co_return {};
@@ -379,7 +379,7 @@ namespace NVersionManagerSyncTests
 		{
 		}
 
-		TCFuture<void> f_SetupManagerA(mint _nAppManagers = 0)
+		TCFuture<void> f_SetupManagerA(umint _nAppManagers = 0)
 		{
 			co_await m_ManagerAHelper.f_Setup(_nAppManagers);
 			co_return {};
@@ -763,7 +763,7 @@ namespace NVersionManagerSyncTests
 	{
 		void f_OnNotification()
 		{
-			mint nCount = ++m_nNotifications;
+			umint nCount = ++m_nNotifications;
 			if (m_nExpectedMax > 0 && nCount > m_nExpectedMax)
 			{
 				// Signal loop detected - only set once
@@ -778,9 +778,9 @@ namespace NVersionManagerSyncTests
 			return fg_Move(m_LoopDetected.m_Future);
 		}
 
-		TCAtomic<mint> m_nNotifications{0};
+		TCAtomic<umint> m_nNotifications{0};
 		TCPromiseFuturePair<void> m_LoopDetected;
-		mint m_nExpectedMax = 0;
+		umint m_nExpectedMax = 0;
 		TCAtomic<bool> m_bLoopSignaled{false};
 	};
 
@@ -857,7 +857,7 @@ namespace NVersionManagerSyncTests
 				{
 					DMibTestPath("SyncMultipleVersions");
 
-					for (mint i = 0; i < 3; ++i)
+					for (umint i = 0; i < 3; ++i)
 					{
 						DMibTestPath("{}"_f << i);
 
@@ -1832,7 +1832,7 @@ namespace NVersionManagerSyncTests
 					TCFutureVector<CVersionManagerHelper::CUploadResult> UploadFutures;
 
 					// Upload 5 versions rapidly
-					for (mint i = 0; i < 5; ++i)
+					for (umint i = 0; i < 5; ++i)
 					{
 						CVersionManager::CVersionIDAndPlatform VersionID;
 						VersionID.m_VersionID.m_Branch = SourceState.m_PackageInfo.m_VersionID.m_VersionID.m_Branch;
@@ -1863,7 +1863,7 @@ namespace NVersionManagerSyncTests
 					DMibAssertNoException(UploadResults.f_Access());
 
 					// Verify all versions synced to destination (sync completes when uploads return)
-					for (mint i = 0; i < 5; ++i)
+					for (umint i = 0; i < 5; ++i)
 					{
 						DMibTestPath("{}"_f << i);
 

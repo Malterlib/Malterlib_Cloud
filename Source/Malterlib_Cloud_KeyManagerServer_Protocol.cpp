@@ -84,7 +84,7 @@ namespace NMib::NCloud
 			}
 
 			pAvailableKeys->f_Remove(pUsedKey);
-			mint KeysLeft = pAvailableKeys->f_GetLen();
+			umint KeysLeft = pAvailableKeys->f_GetLen();
 			if (pAvailableKeys->f_IsEmpty())
 				m_Database.m_AvailableKeys.f_Remove(_KeySize);
 

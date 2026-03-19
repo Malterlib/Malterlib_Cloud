@@ -165,7 +165,7 @@ namespace NMib::NCloud
 					)
 				;
 
-				mint ConnectionID = ++Internal.m_ConnectionID;
+				umint ConnectionID = ++Internal.m_ConnectionID;
 
 				auto &Connection = Internal.m_Connections[ConnectionID];
 
@@ -291,10 +291,10 @@ namespace NMib::NCloud
 
 		TCMap<CStr, CNetworkTunnel> m_NetworkTunnels;
 		TCActor<CAsyncSocketClientActor> m_SocketClient = fg_Construct();
-		TCMap<mint, CConnection> m_Connections;
+		TCMap<umint, CConnection> m_Connections;
 		TCMap<CStr, CTunnelsChangeSubscription> m_ChangeSubscriptions;
 
-		mint m_ConnectionID = 0;
+		umint m_ConnectionID = 0;
 	};
 
 	CNetworkTunnelsServer::CNetworkTunnelsServer

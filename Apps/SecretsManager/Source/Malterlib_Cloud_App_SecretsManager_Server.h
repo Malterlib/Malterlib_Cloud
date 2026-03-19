@@ -68,7 +68,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		struct CReservedFile
 		{
-			mint m_RefCount = 0;
+			umint m_RefCount = 0;
 			TCFunctionMutable<void ()> m_fPendingDelete;
 		};
 

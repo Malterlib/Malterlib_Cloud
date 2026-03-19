@@ -139,13 +139,13 @@ namespace NMib::NCloud
 		TCTrustedActorSubscription<ICNetworkTunnels> m_NetworkTunnelSubscription;
 		TCMap<TCWeakDistributedActor<CActor>, CNetworkTunnelsState> m_NetworkTunnelsState;
 		TCActor<CAsyncSocketServerActor> m_SocketServer = fg_Construct();
-		TCMap<mint, CConnection> m_Connections;
-		TCMap<mint, TCSharedPointer<CTunnel>> m_Tunnels;
+		TCMap<umint, CConnection> m_Connections;
+		TCMap<umint, TCSharedPointer<CTunnel>> m_Tunnels;
 		TCMap<CStr, CByNameState> m_ByNameStates;
 		TCActor<NNetwork::CResolveActor> m_AddressResolver;
 
-		mint m_ConnectionID = 0;
-		mint m_TunnelID = 0;
+		umint m_ConnectionID = 0;
+		umint m_TunnelID = 0;
 	};
 
 	CNetworkTunnelsClient::CNetworkTunnelsClient
@@ -251,7 +251,7 @@ namespace NMib::NCloud
 
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
 
-		mint TunnelID = ++Internal.m_TunnelID;
+		umint TunnelID = ++Internal.m_TunnelID;
 		TCSharedPointer<CInternal::CTunnel> pTunnel = fg_Construct();
 
 		Internal.m_Tunnels[TunnelID] = pTunnel;
@@ -324,7 +324,7 @@ namespace NMib::NCloud
 		Callbacks.m_fNewConnection = g_ActorFunctor / [this, pTunnel, AllowDestroy = g_AllowWrongThreadDestroy](CAsyncSocketNewServerConnection _Connection) mutable -> TCFuture<void>
 			{
 				auto &Internal = *mp_pInternal;
-				mint ConnectionID = ++Internal.m_ConnectionID;
+				umint ConnectionID = ++Internal.m_ConnectionID;
 
 				CCallbackInfo CallbackInfo{.m_Address = _Connection.m_Info.m_PeerAddress, .m_ConnectionID = CStr::fs_ToStr(ConnectionID)};
 

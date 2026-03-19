@@ -19,9 +19,9 @@ struct CRefreshResult
 		return Result;
 	}
 
-	mint m_nAdded = 0;
-	mint m_nUpdated = 0;
-	mint m_nRemoved = 0;
+	umint m_nAdded = 0;
+	umint m_nUpdated = 0;
+	umint m_nRemoved = 0;
 };
 
 namespace
@@ -327,7 +327,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 
 				TCFutureVector<CVersionManagerHelper::CUploadResult> UploadFutures;
 
-				for (mint i = 0; i < 3; ++i)
+				for (umint i = 0; i < 3; ++i)
 				{
 					CVersionManager::CVersionIDAndPlatform VersionID;
 					VersionID.m_VersionID.m_Branch = State.m_PackageInfo.m_VersionID.m_VersionID.m_Branch;
@@ -356,7 +356,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 
 				// Verify all versions are present
 				auto Versions = co_await fg_CallSafe(fListVersions, "TestApp");
-				for (mint i = 0; i < 3; ++i)
+				for (umint i = 0; i < 3; ++i)
 				{
 					DMibTestPath("{}"_f << i);
 					CVersionManager::CVersionIDAndPlatform VersionID;

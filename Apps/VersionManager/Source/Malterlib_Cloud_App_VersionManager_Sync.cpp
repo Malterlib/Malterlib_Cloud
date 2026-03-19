@@ -540,7 +540,7 @@ namespace NMib::NCloud::NVersionManager
 						)
 					;
 
-					mint nVersions = Config.m_nMinSyncVersions;
+					umint nVersions = Config.m_nMinSyncVersions;
 					for (auto pNotification : Versions)
 					{
 						ConfigBypassSet[CSyncVersionKey{pNotification->m_Application, pNotification->m_VersionIDAndPlatform}];

@@ -126,7 +126,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			}
 		;
 
-		mint SubscribeSequence = ++pVersionManagerState->m_SubscribeSequence;
+		umint SubscribeSequence = ++pVersionManagerState->m_SubscribeSequence;
 
 		auto Result = co_await pVersionManagerState->f_GetManager().f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscriptionParams)).f_Wrap();
 

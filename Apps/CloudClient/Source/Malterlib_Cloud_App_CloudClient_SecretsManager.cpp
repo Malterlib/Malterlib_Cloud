@@ -1312,7 +1312,7 @@ namespace NMib::NCloud::NCloudClient
 		Filename = CFile::fs_GetExpandedPath(Filename, _Params["CurrentDirectory"].f_String());
 
 		// If link, resolve it so we transfer the actual file content and a not a link to it
-		mint nLinks = 0;
+		umint nLinks = 0;
 		while (CFile::fs_FileExists(Filename, NFile::EFileAttrib_Link))
 		{
 			auto NewFilename = NFile::CFile::fs_ResolveSymbolicLink(Filename);

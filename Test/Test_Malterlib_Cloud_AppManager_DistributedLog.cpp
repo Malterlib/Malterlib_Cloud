@@ -503,7 +503,7 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 		co_return {};
 	}
 
-	void fp_CheckLimitedEntries(CEJsonSorted const &_Entries, mint _LineLen, mint _TotalSize)
+	void fp_CheckLimitedEntries(CEJsonSorted const &_Entries, umint _LineLen, umint _TotalSize)
 	{
 		CStr AllEntries;
 		for (auto &LogEntry : _Entries.f_Array())
@@ -527,8 +527,8 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 	{
 		DMibTestSuite("Big Entry") -> TCFuture<void>
 		{
-			mint EntrySize = CActorDistributionManager::mc_MaxMessageSize * 2;
-			mint LineSize = 256;
+			umint EntrySize = CActorDistributionManager::mc_MaxMessageSize * 2;
+			umint LineSize = 256;
 
 			co_return co_await fp_TestLimitsImpl
 				(
@@ -554,8 +554,8 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 		};
 		DMibTestSuite("Big Line") -> TCFuture<void>
 		{
-			mint EntrySize = CActorDistributionManager::mc_MaxMessageSize * 2;
-			mint LineSize = EntrySize;
+			umint EntrySize = CActorDistributionManager::mc_MaxMessageSize * 2;
+			umint LineSize = EntrySize;
 
 			co_return co_await fp_TestLimitsImpl
 				(
@@ -581,10 +581,10 @@ struct CAppManager_DistributedLog_Tests : public NMib::NTest::CTest
 		};
 		DMibTestSuite("Many Entries") -> TCFuture<void>
 		{
-			mint TotalSize = CActorDistributionManager::mc_MaxMessageSize * 2;
-			mint nEntries = 256;
-			mint EntrySize = TotalSize / nEntries;
-			mint LineSize = 256;
+			umint TotalSize = CActorDistributionManager::mc_MaxMessageSize * 2;
+			umint nEntries = 256;
+			umint EntrySize = TotalSize / nEntries;
+			umint LineSize = 256;
 
 			co_return co_await fp_TestLimitsImpl
 				(

@@ -229,9 +229,9 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		, mc_NoPermissions = DMibBit(4)
 	};
 
-	mint fs_CountAvailableKeys(auto &_Container)
+	umint fs_CountAvailableKeys(auto &_Container)
 	{
-		mint nAvailaible = 0;
+		umint nAvailaible = 0;
 
 		for (auto &Keys : _Container)
 			nAvailaible += Keys.f_GetLen();
@@ -353,7 +353,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		else
 			DMibExpect(Database0.m_Clients, ==, Database1.m_Clients);
 
-		mint ExpectedAvailableKeys = 8 + 2;
+		umint ExpectedAvailableKeys = 8 + 2;
 		if (fg_IsSet(_Test, EServerSyncTestFlag::mc_PreCreateKeysAfter))
 			ExpectedAvailableKeys = 8 + 4;
 
@@ -903,7 +903,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 		};
 		DMibTestSuite("ServerSync") -> TCFuture<void>
 		{
-			for (mint i = 0; i < 1; ++i)
+			for (umint i = 0; i < 1; ++i)
 			{
 				DMibTestPath(i == 0 ? "PreCreate Before" : "PreCreate After");
 

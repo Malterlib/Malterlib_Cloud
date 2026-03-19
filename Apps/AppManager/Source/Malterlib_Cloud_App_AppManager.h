@@ -194,7 +194,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_AssociatedHostID;
 			CStr m_LaunchID;
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AppInterface;
-			mint m_AppInterfaceAssignSequence = 0;
+			umint m_AppInterfaceAssignSequence = 0;
 			CDistributedAppInterfaceServer::CRegisterInfo m_RegisterInfo;
 
 			// Specific version state
@@ -333,7 +333,7 @@ namespace NMib::NCloud::NAppManager
 
 			CTrustedActorInfo m_HostInfo;
 			CActorSubscription m_Subscription;
-			mint m_SubscribeSequence = 0;
+			umint m_SubscribeSequence = 0;
 		};
 
 		struct CVersionManagerDownloadState
@@ -535,7 +535,7 @@ namespace NMib::NCloud::NAppManager
 			CTrustedActorInfo m_HostInfo;
 			TCActorFunctor<TCFuture<void> (TCVector<CAppManagerCoordinationInterface::CAppChange> _Changes, bool _bInitial)> m_fOnChange;
 			CActorSubscription m_OnChangeSubscription;
-			mint m_iOnChangeSubscriptionSequence = 0;
+			umint m_iOnChangeSubscriptionSequence = 0;
 			bool m_bInitialStateReceived = false;
 
 			TCMap<CStr, CRemoteAppManagerApp> m_AppInfos;
@@ -1000,7 +1000,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_StoredUpdateNotificationClear(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
-		static CStr fsp_LimitErrorLogSize(CStr const &_String, mint _ExtraSize);
+		static CStr fsp_LimitErrorLogSize(CStr const &_String, umint _ExtraSize);
 
 		TCFuture<void> fp_RebootPrevention_WatchSensor(CStr _Application, CDistributedAppSensorReporter::CSensorInfo _SensorInfo);
 		TCFuture<void> fp_RebootPrevention_RemoveApplication(CStr _Application);
@@ -1069,7 +1069,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCPromise<void> mp_InitialStartupResult;
 		TCFuture<void> mp_InitialStartupResultFuture;
-		mint mp_PendingAutoLaunches = 0;
+		umint mp_PendingAutoLaunches = 0;
 
 		uint64 mp_AppStageChangeSequence = 0;
 

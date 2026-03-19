@@ -62,7 +62,7 @@ namespace NMib::NCloud::NAppManager
 		bool bDoRetention = mp_RetentionDays > 0;
 		NTime::CTime OldestAllowedNotification = NTime::CTime::fs_NowUTC() - NTime::CTimeSpanConvert::fs_CreateDaySpan(mp_RetentionDays);
 		auto CurrentStats = OriginalStats;
-		[[maybe_unused]] mint nNotificationsDeleted = 0;
+		[[maybe_unused]] umint nNotificationsDeleted = 0;
 		NTime::CTime StartTime = NTime::CTime::fs_EndOfTime();
 		NTime::CTime EndTime = NTime::CTime::fs_StartOfTime();
 

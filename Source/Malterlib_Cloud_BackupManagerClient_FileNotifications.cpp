@@ -577,7 +577,7 @@ namespace NMib::NCloud
 		if (RelativePath.f_IsEmpty())
 			return; // We don't support root path
 
-		mint Sequence = m_FileNotificationSequence++;
+		umint Sequence = m_FileNotificationSequence++;
 
 		auto pActive = f_MarkInstancesActive();
 

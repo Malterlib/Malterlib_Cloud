@@ -167,7 +167,7 @@ namespace NMib::NCloud
 	{
 		TCFutureMap<CHostInfo, CKeyManagerServerSync::CUseAvailableKeyResult> Results;
 
-		mint nTotalKeyManagers = m_OtherKeyManagers.f_GetLen() + 1;
+		umint nTotalKeyManagers = m_OtherKeyManagers.f_GetLen() + 1;
 		if (nTotalKeyManagers < m_Config.m_CreateNewKeyMinServers)
 			co_return DMibErrorInstance("Only {} of {} key managers available to verify available key use"_f << nTotalKeyManagers << m_Config.m_CreateNewKeyMinServers);
 
@@ -176,7 +176,7 @@ namespace NMib::NCloud
 
 		auto UnwrappedResults = co_await (fg_AllDoneWrapped(Results) % "Failed to use available key on remote key managers");
 
-		mint nVerified = 1;
+		umint nVerified = 1;
 		for (auto &Result : UnwrappedResults.f_Entries())
 		{
 			if (!Result.f_Value())
@@ -324,7 +324,7 @@ namespace NMib::NCloud
 
 				auto fAddKeys = [&](auto &_Keys)
 					{
-						mint nAdded = 0;
+						umint nAdded = 0;
 						for (auto &Key : _Keys)
 						{
 							if (!AlreadyExistingKeys(Key).f_WasCreated())
@@ -535,7 +535,7 @@ namespace NMib::NCloud
 
 		for (auto &Key : _Keys)
 		{
-			mint KeySize = Key.f_GetLen();
+			umint KeySize = Key.f_GetLen();
 			auto &AvailableKeys = Internal.m_Database.m_AvailableKeys[KeySize];
 			if (AvailableKeys(Key).f_WasCreated())
 				ForwardPreCreateKeys[Key];
@@ -566,7 +566,7 @@ namespace NMib::NCloud
 
 		for (auto &Key : _Keys)
 		{
-			mint KeySize = Key.f_GetLen();
+			umint KeySize = Key.f_GetLen();
 			auto *pKeys = Internal.m_Database.m_AvailableKeys.f_FindEqual(KeySize);
 			if (!pKeys)
 				continue;
@@ -724,7 +724,7 @@ namespace NMib::NCloud
 					pAvailableKeys->f_Remove(pExistingKey);
 					bDatabaseChanged = true;
 
-					mint nAvailable = pAvailableKeys->f_GetLen();
+					umint nAvailable = pAvailableKeys->f_GetLen();
 					AppAuditor.f_Info
 						(
 							"Removed pre-created key of {} bytes as result of another server using it for host '{}' with ID '{}'. There are now {} keys left."_f

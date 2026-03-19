@@ -144,7 +144,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 			CTrustedActorInfo m_HostInfo;
 			CActorSubscription m_Subscription;
-			mint m_SubscribeSequence = 0;
+			umint m_SubscribeSequence = 0;
 		};
 
 		struct CVersionManagerDownloadState

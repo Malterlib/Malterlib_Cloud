@@ -174,8 +174,8 @@ namespace NMib::NCloud::NVersionManager
 				if (pSubscription && bHasPermissions)
 				{
 					auto *pApplication = mp_Applications.f_FindEqual(_Application);
-					mint nToSend = pSubscription->m_nInitial;
-					mint nVersions = pApplication->m_VersionsByTime.f_GetLen();
+					umint nToSend = pSubscription->m_nInitial;
+					umint nVersions = pApplication->m_VersionsByTime.f_GetLen();
 					(void)nVersions;
 					decltype(pApplication->m_VersionsByTime.f_GetIterator()) iVersion;
 					for (iVersion.f_StartBackward(pApplication->m_VersionsByTime); iVersion && nToSend; --iVersion)

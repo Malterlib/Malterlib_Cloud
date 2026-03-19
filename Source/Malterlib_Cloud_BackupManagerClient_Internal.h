@@ -168,10 +168,10 @@ namespace NMib::NCloud
 
 		CBackupManager::CBackupKey m_BackupKey;
 
-		mint m_nActive = 0;
+		umint m_nActive = 0;
 
-		mint m_FileNotificationSequence = 1;
-		mint m_LastSeenNotificationSequence = 0;
+		umint m_FileNotificationSequence = 1;
+		umint m_LastSeenNotificationSequence = 0;
 
 		CSequencer m_ManifestSequencer{"Manifest"};
 

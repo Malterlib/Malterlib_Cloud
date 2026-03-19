@@ -132,7 +132,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto &RemoteAppManager = pThis->mp_RemoteAppManagerState[CallingHostID];
 		RemoteAppManager.m_fOnChange = fg_Move(_fOnChange);
-		mint SubscriptionSequence = ++RemoteAppManager.m_iOnChangeSubscriptionSequence;
+		umint SubscriptionSequence = ++RemoteAppManager.m_iOnChangeSubscriptionSequence;
 
 		pThis->fp_SendInitialInfoToRemoteAppManager(RemoteAppManager);
 

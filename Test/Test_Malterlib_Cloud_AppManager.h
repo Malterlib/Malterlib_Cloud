@@ -113,7 +113,7 @@ namespace NMib::NCloud
 
 			TCActor<CDistributedAppLogForwarder> m_LogForwarder;
 
-			mint m_nAppManagers = 0;
+			umint m_nAppManagers = 0;
 			fp64 m_Timeout = 60.0;
 			EOption m_Options = EOption_None;
 		};
@@ -134,8 +134,8 @@ namespace NMib::NCloud
 
 		TCFuture<void> f_SetupTrust();
 		TCFuture<void> f_InstallTestApp(CStr _Name = "TestApp", CStr _Tag = "TestTag", CStr _Group = "TestGroup", CStr _VersionManagerApplication = "TestApp");
-		TCFuture<void> f_CheckCloudManager(mint _Sequence);
-		TCFuture<void> f_Setup(mint _nAppManagers);
+		TCFuture<void> f_CheckCloudManager(umint _Sequence);
+		TCFuture<void> f_Setup(umint _nAppManagers);
 		TCFuture<void> f_StopCloudManager();
 		TCFuture<void> f_StartCloudManager();
 		TCFuture<void> f_Destroy();

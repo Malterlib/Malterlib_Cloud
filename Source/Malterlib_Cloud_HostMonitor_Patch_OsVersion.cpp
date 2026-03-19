@@ -41,14 +41,14 @@ namespace NMib::NCloud
 			CStr Contents = CFile::fs_ReadStringFromFile(CStr("/etc/os-release"), true);
 
 			CStr VersionString;
-			mint nVersionStringDots = 0;
+			umint nVersionStringDots = 0;
 
 			auto fAddVersionString = [&](CStr const &_Version)
 				{
 					CStr VersionParse = _Version;
 					CStr Version = fg_GetStrSep(VersionParse, " ");
 
-					mint nDots = 0;
+					umint nDots = 0;
 					for (auto const *pParse = _Version.f_GetStr(); *pParse; ++pParse)
 					{
 						if (*pParse == '.')

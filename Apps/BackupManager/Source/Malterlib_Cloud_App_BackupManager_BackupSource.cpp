@@ -302,7 +302,7 @@ namespace NMib::NCloud::NBackupManager
 				}
 
 #ifdef DPlatformFamily_Windows
-				for (mint i = 0; i < 200; ++i)
+				for (umint i = 0; i < 200; ++i)
 				{
 					try
 					{

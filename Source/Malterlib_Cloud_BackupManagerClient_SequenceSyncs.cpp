@@ -62,7 +62,7 @@ namespace NMib::NCloud::NPrivate
 	{
 		struct CMultipleSyncsState
 		{
-			mint m_nWaiting = 0;
+			umint m_nWaiting = 0;
 			TCVector<COnScopeExitShared> m_CleanupScopes;
 			TCFunctionMovable<void (COnScopeExitShared &&_pCleanup)> m_fToRun;
 		};

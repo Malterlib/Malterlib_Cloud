@@ -128,7 +128,7 @@ namespace NMib::NCloud::NCloudManager
 			TCDistributedActorInterfaceWithID<CAppManagerInterface> m_Interface;
 			NCloudManagerDatabase::CAppManagerValue m_Data;
 			CStr m_UniqueHostID;
-			mint m_RegisterSequence = 0;
+			umint m_RegisterSequence = 0;
 			CActorSubscription m_ChangeNotificationsSubscription;
 			CActorSubscription m_UpdateNotificationsSubscription;
 			bool m_bUpdatedOnce = false;;
@@ -141,7 +141,7 @@ namespace NMib::NCloud::NCloudManager
 			auto operator <=> (CExpectedOsVersionSubscriptionKey const &_Right) const noexcept = default;
 
 			CStr m_OsName;
-			mint m_ID = 0;
+			umint m_ID = 0;
 		};
 
 		struct CExpectedOsVersionSubscription
@@ -177,10 +177,10 @@ namespace NMib::NCloud::NCloudManager
 			NTime::CTime mp_EndTime;
 			NTime::CTimeSpan mp_UtcOffset;
 
-			mint mp_nReadingsDeletedSensor = 0;
-			mint mp_nReadingsDeletedLog = 0;
-			mint mp_nYields = 0;
-			mint mp_nDatabaseYields = 0;
+			umint mp_nReadingsDeletedSensor = 0;
+			umint mp_nReadingsDeletedLog = 0;
+			umint mp_nYields = 0;
+			umint mp_nDatabaseYields = 0;
 
 			bool mp_bLoggedStart = false;
 			bool mp_bInitialized = false;
@@ -202,8 +202,8 @@ namespace NMib::NCloud::NCloudManager
 		TCFuture<void> fp_SaveAppManagerData(NCloudManagerDatabase::CAppManagerKey _Key, NCloudManagerDatabase::CAppManagerValue _Data);
 		TCFuture<CCloudManager::CRemoveAppManagerReturn> fp_RemoveAppManagerData(CStr _HostID);
 		TCFuture<void> fp_ProcessApplicationChanges(CStr _AppManagerID, CAppManagerInterface::COnChangeNotificationParams _Params);
-		TCFuture<void> fp_ChangeOtherErrors(CStr _AppManagerID, mint _RegisterSequence, TCSet<CStr> _Remove, TCMap<CStr, CStr> _Add);
-		TCFuture<void> fp_ReportFiltered(CStr _AppManagerID, mint _RegisterSequence, bool _bFiltered, bool _bAccessDenied);
+		TCFuture<void> fp_ChangeOtherErrors(CStr _AppManagerID, umint _RegisterSequence, TCSet<CStr> _Remove, TCMap<CStr, CStr> _Add);
+		TCFuture<void> fp_ReportFiltered(CStr _AppManagerID, umint _RegisterSequence, bool _bFiltered, bool _bAccessDenied);
 
 		static TCVector<CStr> fsp_SensorReadPermissions();
 		static TCVector<CStr> fsp_LogReadPermissions();
@@ -225,7 +225,7 @@ namespace NMib::NCloud::NCloudManager
 		CTrustedPermissionSubscription mp_Permissions;
 
 		TCActor<CDatabaseActor> mp_DatabaseActor;
-		mint mp_AppManagerRegisterSequence = 0;
+		umint mp_AppManagerRegisterSequence = 0;
 		TCMap<CStr, CAppManagerState> mp_AppManagers;
 
 		CActorSubscription mp_MonitorTimerSubscription;
@@ -242,7 +242,7 @@ namespace NMib::NCloud::NCloudManager
 		CLogNotifications mp_LogNotifications{*this};
 
 		TCMap<CExpectedOsVersionSubscriptionKey, CExpectedOsVersionSubscription> mp_ExpectedOsVersionSubscriptions;
-		mint mp_ExpectedOsVersionSubscriptionNextID = 0;
+		umint mp_ExpectedOsVersionSubscriptionNextID = 0;
 
 		bool mp_bDoingCleanup = false;
 	};

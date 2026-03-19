@@ -26,7 +26,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 		}
 
 		CStr m_AppName;
-		mint m_iAppManager;
+		umint m_iAppManager;
 	};
 
 	struct CUpdateNotificationsApplicationState
@@ -58,7 +58,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 		}
 
 		TCSet<CApplicationKey> m_InProgress;
-		mint m_nMaxInProgress = 0;
+		umint m_nMaxInProgress = 0;
 
 		TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStage;
 		TCMap<CApplicationKey, CAppManagerInterface::EUpdateStage> m_LastInStageCoordination;
@@ -68,8 +68,8 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStage;
 		TCMap<CAppManagerInterface::EUpdateStage, zmint> m_MaxInStageCoordination;
 		TCVector<CStr> m_Errors;
-		TCAtomic<mint> m_nSuccess = 0;
-		TCAtomic<mint> m_nFinished = 0;
+		TCAtomic<umint> m_nSuccess = 0;
+		TCAtomic<umint> m_nFinished = 0;
 	};
 
 	struct CUpdateNotificationsState : CAllowUnsafeThis
@@ -124,13 +124,13 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 		bool m_bSignalCompletion = false;
 		TCVector<CActorSubscription> m_Subscriptions;
 		TCMap<CStr, CUpdateNotificationsApplicationState> m_Applications;
-		TCMap<mint, TCMap<CStr, CUpdateNotificationsApplicationState>> m_ApplicationsPerAppmanager;
+		TCMap<umint, TCMap<CStr, CUpdateNotificationsApplicationState>> m_ApplicationsPerAppmanager;
 		CUpdateNotificationsApplicationState m_AllApplications;
-		mint m_nAppsInProgress = 0;
-		mint m_nMaxAppsInProgress = 0;
-		TCMap<mint, zmint> m_AppsInProgressPerAppManager;
-		TCMap<mint, zmint> m_MaxAppsInProgressPerAppManager;
-		mint m_nMaxAppsInProgressPerAppManager = 0;
+		umint m_nAppsInProgress = 0;
+		umint m_nMaxAppsInProgress = 0;
+		TCMap<umint, zmint> m_AppsInProgressPerAppManager;
+		TCMap<umint, zmint> m_MaxAppsInProgressPerAppManager;
+		umint m_nMaxAppsInProgressPerAppManager = 0;
 		TCVector<TCPromise<void>> m_WaitingSignals;
 	};
 
@@ -154,7 +154,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 			auto &AppManagers = AppManagerTestHelper.m_pState->m_AppManagerInfos;
 
 			// Copy AppManagers to their directories
-			mint nAppManagers = 10;
+			umint nAppManagers = 10;
 #if DMibPPtrBits <= 32
 			nAppManagers = 2;
 #elif defined(DMibSanitizerEnabled_Address) || defined(DMibSanitizerEnabled_Thread)
@@ -259,7 +259,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 			// Subscribe for notifications
 			{
 				TCFutureVector<void> AppCommandResults;
-				mint iAppManager = 0;
+				umint iAppManager = 0;
 				for (auto &AppManager : AppManagers)
 				{
 					TCPromiseFuturePair<void> Promise;
@@ -490,7 +490,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 
 			co_await AppManagerTestHelper.f_InstallTestApp("TestApp2", "TestTag2", "TestGroup2");
 
-			for (mint i = 0; i < 2; ++i)
+			for (umint i = 0; i < 2; ++i)
 			{
 				CStr Path;
 				if (i == 0)

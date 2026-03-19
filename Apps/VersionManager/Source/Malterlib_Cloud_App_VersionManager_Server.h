@@ -118,9 +118,9 @@ namespace NMib::NCloud::NVersionManager
 
 		struct CRefreshResult
 		{
-			mint m_nAdded = 0;
-			mint m_nUpdated = 0;
-			mint m_nRemoved = 0;
+			umint m_nAdded = 0;
+			umint m_nUpdated = 0;
+			umint m_nRemoved = 0;
 		};
 
 		CServer(CDistributedAppState &_AppState);
@@ -257,7 +257,7 @@ namespace NMib::NCloud::NVersionManager
 		// Synchronization for refresh/upload mutual exclusion
 		CSequencer mp_RefreshSequencer{"VersionManagerRefreshSequencer"};
 		TCVector<TCPromise<void>> mp_UploadsEmptyWaiters;
-		mint mp_nInProgressUploads = 0;
+		umint mp_nInProgressUploads = 0;
 		bool mp_bRefreshInProgress = false;
 
 		// Sync configuration and state

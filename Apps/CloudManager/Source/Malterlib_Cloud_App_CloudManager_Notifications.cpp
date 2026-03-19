@@ -226,8 +226,8 @@ namespace NMib::NCloud::NCloudManager
 
 	void CNotifications::fs_LimitMessage(CSlackActor::CMessage &o_Message, CStr const &_ErrorType)
 	{
-		mint nAttachments = o_Message.m_Attachments.f_GetLen();
-		constexpr mint c_MaxAttachments = 10;
+		umint nAttachments = o_Message.m_Attachments.f_GetLen();
+		constexpr umint c_MaxAttachments = 10;
 		if (nAttachments > c_MaxAttachments)
 		{
 			o_Message.m_Attachments.f_SetLen(c_MaxAttachments);
