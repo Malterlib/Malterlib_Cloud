@@ -1,8 +1,17 @@
-// Copyright © 2015 Hansoft AB
-// Distributed under the MIT license, see license text in LICENSE.Malterlib
+// Copyright © Unbroken AB
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 Import "../Core/Lib_Malterlib.MTarget"
 Import "Apps/*/*.MHeader"
+
+Repository
+{
+	!!MalterlibRepoName "Malterlib_Cloud.git"
+
+	MalterlibRepoReusePaths =+ [
+		"Apps/DebugManagerClient/DistributionFiles/DebugManagerClientServe/dummy.txt"
+	]
+}
 
 %Group "{Malterlib}/{Lib_Malterlib_Cloud}/{TargetInjection}"
 {
@@ -199,6 +208,44 @@ Property
 					EnableArchitecture_arm64 true
 				}
 			}
+		}
+	}
+}
+
+Repository
+{
+	&
+	{
+		Repository.Type "Malterlib"
+		MalterlibRepoName->StartsWith("MalterlibTestBinaries_Cloud_") true
+	}
+
+	CheckLicense true
+
+	License {
+		Include: ["*"]
+		, Exclude: [
+			"LICENSE"
+			, ".gitattributes"
+			, "*/AppManager.tar.*"
+			, "*/KeyManager.tar.*"
+			, "*/VersionManager.tar.*"
+		]
+		, Disallowed: ["LICENSE.Malterlib"]
+		, LicenseFiles: {
+			"LICENSE": [
+				{ Source: "../Core/LICENSE"->MakeAbsolute(), Name: "Malterlib (https://github.com/Malterlib/Malterlib)" }
+				, { Source: "../../External/boringssl/LICENSE"->MakeAbsolute(), Name: "BoringSSL (https://github.com/Malterlib/boringssl, https://github.com/google/boringssl)" }
+				, { Source: "../../External/curl/COPYING"->MakeAbsolute(), Name: "curl (https://github.com/Malterlib/curl, https://github.com/curl/curl)" }
+				, { Source: "../../External/hidapi/LICENSE-bsd.txt"->MakeAbsolute(), Name: "HIDAPI (https://github.com/Malterlib/hidapi, https://github.com/libusb/hidapi)" }
+				, { Source: "../../External/libarchive/COPYING"->MakeAbsolute(), Name: "libarchive (https://github.com/Malterlib/libarchive, https://github.com/libarchive/libarchive)" }
+				, { Source: "../../External/libjpeg-turbo/LICENSE.md"->MakeAbsolute(), Name: "libjpeg-turbo (https://github.com/Malterlib/libjpeg-turbo, https://github.com/libjpeg-turbo/libjpeg-turbo)" }
+				, { Source: "../../External/libpng/LICENSE"->MakeAbsolute(), Name: "libpng (https://github.com/Malterlib/libpng, https://github.com/glennrp/libpng)" }
+				, { Source: "../../External/llvm-project/LICENSE.TXT"->MakeAbsolute(), Name: "LLVM (https://github.com/Malterlib/llvm-project, https://github.com/llvm/llvm-project)" }
+				, { Source: "../../External/zlib/LICENSE"->MakeAbsolute(), Name: "zlib (https://github.com/Malterlib/zlib, https://github.com/madler/zlib)" }
+				, { Source: "../../External/zstd/LICENSE"->MakeAbsolute(), Name: "Zstandard (https://github.com/Malterlib/zstd, https://github.com/facebook/zstd)" }
+				, { Source: "../Tool/ThirdPartyLicenses/lmdb/LICENSE"->MakeAbsolute(), Name: "lmdb (https://github.com/LMDB/lmdb.git)" }
+			]
 		}
 	}
 }

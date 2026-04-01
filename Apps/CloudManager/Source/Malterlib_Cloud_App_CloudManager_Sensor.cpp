@@ -1,5 +1,5 @@
-// Copyright © 2020 Favro Holding AB
-// Distributed under the MIT license, see license text in LICENSE.Malterlib
+// Copyright © Unbroken AB
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "Malterlib_Cloud_App_CloudManager.h"
 #include "Malterlib_Cloud_App_CloudManager_Internal.h"
