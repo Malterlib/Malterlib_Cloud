@@ -7,8 +7,11 @@
 namespace NMib::NCloud::NAppManager
 {
 #ifndef DPlatformFamily_Windows
-	static ch8 const *g_pLimitsSetupScript =
-#		include "Malterlib_Cloud_App_AppManager_Limits_Setup.sh"
+	constexpr static ch8 const gc_pLimitsSetupScript[] =
+		{
+			#embed "Malterlib_Cloud_App_AppManager_Limits_Setup.sh"
+			, '\0'
+		}
 	;
 #endif
 
@@ -61,7 +64,7 @@ namespace NMib::NCloud::NAppManager
 			(
 				fp_RunBashScript
 				(
-					g_pLimitsSetupScript
+					gc_pLimitsSetupScript
 					, "SetupLimits"
 					, fg_Move(Environment)
 					, nullptr

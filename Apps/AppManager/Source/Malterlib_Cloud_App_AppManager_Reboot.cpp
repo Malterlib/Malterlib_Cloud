@@ -7,9 +7,14 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	ch8 const *g_pRebootScript =
-#		include "Malterlib_Cloud_App_AppManager_Reboot.sh"
+#ifdef DPlatformFamily_Linux
+	constexpr static ch8 const gc_pRebootScript[] =
+		{
+			#embed "Malterlib_Cloud_App_AppManager_Reboot.sh"
+			, '\0'
+		}
 	;
+#endif
 
 	auto CAppManagerActor::fp_Reboot(bool _bErrorOnPreventReboot) -> TCFuture<ERebootResult>
 	{
@@ -85,7 +90,7 @@ namespace NMib::NCloud::NAppManager
 					else
 						DError("Program not running as daemon or in daemon debug mode, so reboot is not supported");
 
-					CStr Script = g_pRebootScript;
+					CStr Script = gc_pRebootScript;
 
 					CStr FileName = fg_Format("{}/TempScripts/Bash_{}.sh", ProgramDir, CHash_MD5::fs_DigestFromData(Script.f_GetStr(), Script.f_GetLen()).f_GetString());
 					if (!CFile::fs_FileExists(FileName))

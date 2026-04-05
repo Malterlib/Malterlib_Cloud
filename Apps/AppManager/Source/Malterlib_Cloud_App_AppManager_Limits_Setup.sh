@@ -1,4 +1,4 @@
-R"-----(#!/bin/bash
+#!/bin/bash
 
 set -e
 
@@ -36,5 +36,3 @@ else
 fi
 
 exit $ReturnValue
-
-)-----"

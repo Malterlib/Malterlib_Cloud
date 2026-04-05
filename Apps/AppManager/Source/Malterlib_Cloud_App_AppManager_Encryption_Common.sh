@@ -1,4 +1,4 @@
-R"-----(#!/bin/bash
+#!/bin/bash
 
 set -e
 
@@ -18,5 +18,3 @@ fi
 if cryptsetup status $MibCloudApp_DeviceName 2>/dev/null 1>/dev/null ; then
 	cryptsetup close $MibCloudApp_DeviceName
 fi
-
-)-----"

@@ -1,4 +1,4 @@
-R"-----(#!/bin/bash
+#!/bin/bash
 
 set -e
 
@@ -91,5 +91,3 @@ else
 fi
 
 Log "Successfully launched. New PID: $NewProcessID"
-
-)-----"

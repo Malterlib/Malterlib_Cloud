@@ -6,18 +6,30 @@
 namespace NMib::NCloud::NAppManager
 {
 #ifdef DPlatformFamily_Linux
-	ch8 const *g_pSetupEncryptionScript =
-#		include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
-#		include "Malterlib_Cloud_App_AppManager_Encryption_SetupLinux.sh"
+	constexpr static ch8 const gc_pSetupEncryptionScript[] =
+		{
+			#embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
+			,
+			#embed "Malterlib_Cloud_App_AppManager_Encryption_SetupLinux.sh"
+			, '\0'
+		}
 	;
-	ch8 const *g_pOpenEncryptionScript =
-#		include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
-#		include "Malterlib_Cloud_App_AppManager_Encryption_OpenLinux.sh"
+	constexpr static ch8 const gc_pOpenEncryptionScript[] =
+		{
+			#embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
+			,
+			#embed "Malterlib_Cloud_App_AppManager_Encryption_OpenLinux.sh"
+			, '\0'
+		}
 	;
-	ch8 const *g_pCloseEncryptionScript =
-#		include "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
-#		include "Malterlib_Cloud_App_AppManager_Encryption_CloseLinux.sh"
-	;
+	constexpr static ch8 const gc_pCloseEncryptionScript[] =
+		{
+			#embed "Malterlib_Cloud_App_AppManager_Encryption_Common.sh"
+			,
+			#embed "Malterlib_Cloud_App_AppManager_Encryption_CloseLinux.sh"
+			, '\0'
+		}
+	;	
 #endif
 
 	void CAppManagerActor::fp_AppEncryptionStateChanged(TCSharedPointer<CApplication> const &_pApplication, bool _bEncrypted)
@@ -98,15 +110,15 @@ namespace NMib::NCloud::NAppManager
 		switch (_Operation)
 		{
 		case EEncryptOperation_Setup:
-			pScript = g_pSetupEncryptionScript;
+			pScript = gc_pSetupEncryptionScript;
 			pDesc = "SetupEncryption";
 			break;
 		case EEncryptOperation_Open:
-			pScript = g_pOpenEncryptionScript;
+			pScript = gc_pOpenEncryptionScript;
 			pDesc = "OpenEncryption";
 			break;
 		case EEncryptOperation_Close:
-			pScript = g_pCloseEncryptionScript;
+			pScript = gc_pCloseEncryptionScript;
 			pDesc = "CloseEncryption";
 			break;
 		default:

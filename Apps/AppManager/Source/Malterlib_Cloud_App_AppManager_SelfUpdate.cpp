@@ -7,8 +7,11 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	ch8 const *g_pSelfUpdateScript =
-#		include "Malterlib_Cloud_App_AppManager_SelfUpdate.sh"
+	constexpr static ch8 gc_pSelfUpdateScript[] =
+		{
+			#embed "Malterlib_Cloud_App_AppManager_SelfUpdate.sh"
+			, '\0'
+		}
 	;
 
 	TCFuture<bool> CAppManagerActor::fp_SelfUpdate(TCSharedPointer<CApplication> _pApplication)
@@ -52,7 +55,7 @@ namespace NMib::NCloud::NAppManager
 						return false;
 					}
 
-					CStr Script = g_pSelfUpdateScript;
+					CStr Script = gc_pSelfUpdateScript;
 
 					CStr FileName = fg_Format("{}/TempScripts/Bash_{}.sh", ProgramDir, CHash_MD5::fs_DigestFromData(Script.f_GetStr(), Script.f_GetLen()).f_GetString());
 					if (!CFile::fs_FileExists(FileName))

@@ -1,4 +1,4 @@
-R"-----(#!/bin/bash
+#!/bin/bash
 
 set -e
 
@@ -88,6 +88,3 @@ sleep 5
 Log "Rebooting"
 
 reboot
-
-)-----"
-

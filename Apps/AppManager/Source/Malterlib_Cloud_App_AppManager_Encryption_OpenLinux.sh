@@ -1,4 +1,4 @@
-R"-----(
+#!/bin/bash
 
 echo PROVIDE KEY
 cryptsetup --hash=plain --cipher=aes-xts-plain64 --offset=0 --key-file=- --key-size=512 open --type=plain $MibCloudApp_EncryptionStorage $MibCloudApp_DeviceName < /dev/stdin
@@ -24,5 +24,3 @@ else
 fi
 
 exit 0
-
-)-----"

@@ -9,8 +9,11 @@
 
 static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 
-static ch8 const *g_pFailingPreUpdateScript =
-#	include "Test_Malterlib_Cloud_AppManager_General_FailingPreUpdate.sh"
+constexpr static ch8 const gc_pFailingPreUpdateScript[] =
+	{
+		#embed "Test_Malterlib_Cloud_AppManager_General_FailingPreUpdate.sh"
+		, '\0'
+	}
 ;
 
 struct CAppManager_General_Tests : public NMib::NTest::CTest
@@ -458,7 +461,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 				UpdateNotificationState.f_Clear();
 				DMibTestMark;
 				CStr ScriptPath = RootDirectory / "FailingPreUpdate.sh";
-				CFile::fs_WriteStringToFile(ScriptPath, g_pFailingPreUpdateScript, false);
+				CFile::fs_WriteStringToFile(ScriptPath, gc_pFailingPreUpdateScript, false);
 
 				co_await fSetPreUpdateScriptApp0("TestApp", ScriptPath);
 				DMibTestMark;

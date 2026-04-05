@@ -1,4 +1,4 @@
-R"-----(#!/bin/bash
+#!/bin/bash
 
 set -e
 
@@ -8,5 +8,3 @@ for ((i = 0 ; i < 50000 ; i++ )); do
 done
 
 exit 1
-
-)-----"
