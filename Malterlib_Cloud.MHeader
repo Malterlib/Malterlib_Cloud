@@ -732,7 +732,7 @@ Property
 	}
 
 	MalterlibCloud_VersionUploadToBuildServerPath: string?
-	MalterlibCloud_VersionUploadToBuildServerPathFull: string? = `@(MalterlibCloud_VersionUploadToBuildServerPath)/@(MalterlibCloudPlatform)`
+	MalterlibCloud_VersionUploadToBuildServerPathFull: string? = MalterlibCloud_VersionUploadToBuildServerPath / MalterlibCloudPlatform
 
 	MalterlibCloud_VersionUploadCloudClientCommand	function([string] _Hosts) string
 	MalterlibCloud_VersionUploadCloudClientCommand	`@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --settings-file @(MalterlibCloudVersionInfoFileName->EscapeHost()) --tags @(MalterlibCloud_VersionUploadTags->EJSONToString("")->EscapeHost())@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified(_Hosts)) @(MalterlibCloud_VersionUploadTarArchivePath->EscapeHost())\r\n`
@@ -839,7 +839,7 @@ Property
 				Dependency.Target: "Com_libarchive_bsdtar"
 				, Dependency.TargetProperties: {
 					MalterlibPostCopyProject: MalterlibPostCopyProject
-					, MalterlibPostCopyDestination: `@(MalterlibPostCopyDestination)@(MalterlibCloudTarBinDirectory)/`
+					, MalterlibPostCopyDestination: MalterlibPostCopyDestination / MalterlibCloudTarBinDirectory
 					, Target.Name: `Com_@(BsdTarUniqueName)_bsdtar`
 					, Target.Group: `ExternalBinaries/@(BsdTarUniqueName)`
 					, <<: BsdTarGenerateScheme
