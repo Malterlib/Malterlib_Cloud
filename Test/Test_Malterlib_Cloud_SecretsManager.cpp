@@ -298,7 +298,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 
 		{
 			TCActor<CProcessLaunchActor> KeyManagerCommandLine = fg_Construct();
-			CProcessLaunchActor::CSimpleLaunch LaunchParams{KeyManagerDirectory + "/KeyManager", {"--provide-password"}};
+			CProcessLaunchActor::CSimpleLaunch LaunchParams{KeyManagerDirectory + "/KeyManager", {"--provide-password"}, {}, CProcessLaunchActor::ESimpleLaunchFlag_None};
 			LaunchParams.m_DestructFlags = EProcessLaunchCloseFlag_BlockOnExit;
 			LaunchParams.m_ToLog = CProcessLaunchActor::ELogFlag_All;
 			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)

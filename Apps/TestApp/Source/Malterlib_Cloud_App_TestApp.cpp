@@ -429,9 +429,8 @@ namespace NMib::NCloud::NTest
 
 					auto Excutable = _Params["Executable"].f_String();
 
-					CProcessLaunchActor::CSimpleLaunch SimpleLaunch(Excutable);
+					CProcessLaunchActor::CSimpleLaunch SimpleLaunch(Excutable, {}, {}, CProcessLaunchActor::ESimpleLaunchFlag::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode);
 					SimpleLaunch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
-					SimpleLaunch.m_SimpleFlags = CProcessLaunchActor::ESimpleLaunchFlag::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode;
 					SimpleLaunch.m_Params.m_Parameters = CProcessLaunchParams::fs_GetParams(_Params["CommandLineParams"].f_StringArray());
 					SimpleLaunch.m_Params.m_bAllowExecutableLocate = true;
 					SimpleLaunch.m_Params.m_bLaunchInUserSession = _Params["LaunchInUserSession"].f_Boolean();

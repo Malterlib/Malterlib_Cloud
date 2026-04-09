@@ -217,7 +217,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 		TCFuture<void> fp_ProvidePassword()
 		{
-			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(mp_RootPath / "KeyManager", {"--provide-password"}, mp_RootPath);
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(mp_RootPath / "KeyManager", {"--provide-password"}, mp_RootPath, CProcessLaunchActor::ESimpleLaunchFlag_None);
 
 			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 			{
@@ -1712,8 +1712,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 				TCActor<CProcessLaunchActor> LaunchActor = fg_Construct();
 				TCPromise<void> LaunchFinished;
 
-				CProcessLaunchActor::CSimpleLaunch SimpleLaunch(_Executable, _Params, _WorkingDir);
-				SimpleLaunch.m_SimpleFlags = CProcessLaunchActor::ESimpleLaunchFlag_None;
+				CProcessLaunchActor::CSimpleLaunch SimpleLaunch(_Executable, _Params, _WorkingDir, CProcessLaunchActor::ESimpleLaunchFlag_None);
 
 				if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
 				{
