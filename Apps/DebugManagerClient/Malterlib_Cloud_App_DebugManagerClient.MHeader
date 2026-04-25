@@ -106,7 +106,12 @@
 
 Property
 {
-	Malterlib_App_Enable_DebugManagerClient: bool = true
+	Malterlib_App_Enable_DebugManagerClient: bool = false // User(Cloud)=true: Enable debug manager client
+
+	MalterlibModules =+ "WebApp"
+	{
+		!!Malterlib_App_Enable_DebugManagerClient true
+	}
 
 	Malterlib_Cloud_App_ExtraGroups =+ ["{Malterlib_Cloud}/WebApp/DebugManagerClient", "{Malterlib}/{WebApp}/{WebAppManagerVariables}"]
 	{
