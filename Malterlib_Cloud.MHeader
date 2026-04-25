@@ -149,6 +149,8 @@ Property
 {
 	MalterlibCloudCompatibilityTests: bool = false // User(Tests)=true: Set to true to enable compatibility tests for Cloud applications
 
+	MalterlibModuleCloud_Version: int = 1
+
 	MalterlibCloudCompatibilityTestsSupported: bool = false
 	MalterlibCloudCompatibilityTestsSupported true
 	{
@@ -269,23 +271,6 @@ Property
 
 	MalterlibCloudVersionInfo_PackageExtension: string = ".tar.gz"
 
-	MalterlibCloudVersionInfo_Branch: string = MalterlibFullBranch
-	MalterlibCloudVersionInfo_BranchForVersion: string = MalterlibCloudVersionInfo_Branch->Replace(' ', '')->Replace('(', '-')->Replace(')', '')
-
-	MalterlibCloudVersionInfo_Version: string
-	MalterlibCloudVersionInfo_Version MalterlibCloud_VersionUploadVersion
-	{
-		&
-		{
-			MalterlibCloudVersionInfo_Version undefined
-			!MalterlibCloud_VersionUploadVersion undefined
-		}
-	}
-	MalterlibCloudVersionInfo_Version Format("{}/{}.{}.{}", MalterlibCloudVersionInfo_BranchForVersion, ProductVersionMajor->AsInteger(), ProductVersionMinor->AsInteger(), ProductVersionRevision->AsInteger())
-	{
-		!!MalterlibCloudVersionInfo_Version undefined
-	}
-
 	MalterlibCloudVersionInfo_NoExecutable: bool = false
 
 	MalterlibCloudVersionInfo_Executable: string?
@@ -304,10 +289,6 @@ Property
 
 	MalterlibCloudVersionInfo_PackageSuffix: string = ""
 
-	MalterlibCloudVersionInfo_Tags: [string] = []
-	MalterlibCloudVersionInfo_Product: string = Workspace:Workspace.Name
-	MalterlibCloudVersionInfo_Application: string = Target.FileName
-	MalterlibCloudVersionInfo_Configuration: string = FullConfiguration
 	MalterlibCloudVersionInfo_DistributedApp: bool = true
 	MalterlibCloudVersionInfo_RunAsUserHasShell: bool = false
 	MalterlibCloudVersionInfo_LowPortExecutables: [string]?
@@ -527,7 +508,6 @@ Property
 
 Property
 {
-	MalterlibCloudPlatform: string = `@(Platform->Replace(' ',''))-@(Architecture->Replace(' ',''))`
 	MalterlibCloud_EnableVersionUpload: bool = false
 }
 
@@ -711,7 +691,6 @@ Property
 Property
 {
 	MalterlibCloud_CloudClientExecutable: string? // User(Cloud Debug)="/opt/Deploy/Malterlib_Cloud/MalterlibCloud": Configure client executable to test local deploy to version manager
-	MalterlibCloud_VersionUploadVersion: string? // User(Cloud Debug): Allows you to override the version uploaded to version manager for debug purposes
 	MalterlibCloud_VersionUploadForce: bool = false // User(Cloud Debug)=true: Force uploads to version manager even if version already exists
 	MalterlibCloud_VersionUploadTags: [string] = [] // User(Cloud Debug)=["Debug"]: Set the tags to use when uploading to version managers
 	MalterlibCloud_VersionUploadHostsDefault: [string] = []
