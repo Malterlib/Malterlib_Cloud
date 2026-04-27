@@ -152,13 +152,141 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
+	namespace
+	{
+		using CTrustInterfacePtr = TCSharedPointer<TCDistributedActorInterfaceWithID<CDistributedActorTrustManagerInterface>>;
+
+		TCFuture<void> fg_SetupAppManagerConnection
+			(
+				CTrustInterfacePtr _pServerTrust
+				, CTrustInterfacePtr _pClientTrust
+				, CDistributedActorTrustManager_Address _ServerAddress
+				, fp64 _Timeout
+			)
+		{
+			auto Ticket = co_await _pServerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
+				(
+					CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{_ServerAddress}
+				)
+			;
+
+			co_await _pClientTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(Ticket.m_Ticket, _Timeout, -1);
+
+			co_return {};
+		}
+
+		TCFuture<void> fg_SetupVersionManagerTrust
+			(
+				CTrustInterfacePtr _pAppManagerTrust
+				, CTrustInterfacePtr _pVersionManagerTrust
+				, CDistributedActorTrustManager_Address _VersionManagerAddress
+				, CStr _AppManagerHostID
+				, CStr _VersionManagerHostID
+				, fp64 _Timeout
+			)
+		{
+			auto [Ticket, _, _] = co_await
+				(
+					_pVersionManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
+					(
+						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{_VersionManagerAddress}
+					)
+					+ _pVersionManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+					(
+						CAppManagerTestHelper::fs_Permissions
+						(
+							_AppManagerHostID
+							, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}}
+						)
+					)
+					+ _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
+					(
+						CAppManagerTestHelper::fs_NamespaceHosts(CVersionManager::mc_pDefaultNamespace, TCSet<CStr>{_VersionManagerHostID})
+					)
+				)
+			;
+
+			co_await _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(Ticket.m_Ticket, _Timeout, -1);
+
+			co_return {};
+		}
+
+		TCFuture<void> fg_SetupCloudManagerTrust
+			(
+				CTrustInterfacePtr _pAppManagerTrust
+				, CTrustInterfacePtr _pCloudManagerTrust
+				, CDistributedActorTrustManager_Address _CloudManagerAddress
+				, CStr _AppManagerHostID
+				, CStr _CloudManagerHostID
+				, CStr _TestHostID
+				, fp64 _Timeout
+			)
+		{
+			auto [Ticket, _, _, _, _] = co_await
+				(
+					_pCloudManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
+					(
+						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{_CloudManagerAddress}
+					)
+					+ _pCloudManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+					(
+						CAppManagerTestHelper::fs_Permissions
+						(
+							_AppManagerHostID
+							, TCMap<CStr, CPermissionRequirements>
+							{
+								{"CloudManager/RegisterAppManager", {}}
+								, {"CloudManager/ReportSensorReadings", {}}
+								, {"CloudManager/ReportSensorReadingsOnBehalfOf/All", {}}
+								, {"CloudManager/ReportLogEntries", {}}
+								, {"CloudManager/ReportLogEntriesOnBehalfOf/All", {}}
+							}
+						)
+					)
+					+ _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+					(
+						CAppManagerTestHelper::fs_Permissions
+						(
+							_TestHostID
+							, TCMap<CStr, CPermissionRequirements>
+							{
+								{"AppManager/VersionAppAll", {}}
+								, {"AppManager/CommandAll", {}}
+								, {"AppManager/AppAll", {}}
+							}
+						)
+					)
+					+ _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
+					(
+						CAppManagerTestHelper::fs_Permissions
+						(
+							_CloudManagerHostID
+							, TCMap<CStr, CPermissionRequirements>
+							{
+								{"AppManager/Command/ApplicationSubscribeChanges", {}}
+								, {"AppManager/Command/ApplicationSubscribeUpdates", {}}
+								, {"AppManager/AppAll", {}}
+							}
+						)
+					)
+					+ _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
+					(
+						CAppManagerTestHelper::fs_NamespaceHosts(CCloudManager::mc_pDefaultNamespace, TCSet<CStr>{_CloudManagerHostID})
+					)
+				)
+			;
+
+			co_await _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(Ticket.m_Ticket, _Timeout, -1);
+
+			co_return {};
+		}
+	}
+
 	TCFuture<void> CAppManagerTestHelper::f_SetupTrust()
 	{
-		TCFutureVector<void> SetupTrustResults;
-
 		auto &State = *m_pState;
 
-		// Trust between app managers
+		TCFutureVector<void> InitialTrustResults;
 		for (auto &AppManager : State.m_AppManagerInfos)
 		{
 			auto pAppManagerTrust = AppManager.m_pTrustInterface;
@@ -172,7 +300,7 @@ namespace NMib::NCloud
 					(
 						fs_NamespaceHosts("com.malterlib/Cloud/AppManagerCoordination", TrustAppManagers)
 					)
-					> SetupTrustResults
+					> InitialTrustResults
 				;
 			}
 
@@ -182,8 +310,20 @@ namespace NMib::NCloud
 					, TCSet<CStr>{AppManagerHostID}
 					, mc_WaitForSubscriptions
 				)
-				> SetupTrustResults
+				> InitialTrustResults
 			;
+		}
+
+		DMibTestMark;
+		co_await fg_AllDone(InitialTrustResults).f_Timeout(State.m_Timeout, "Timed out waiting for initial trust setup");
+
+		TCFutureVector<void> SetupTrustResults;
+
+		// Trust between app managers
+		for (auto &AppManager : State.m_AppManagerInfos)
+		{
+			auto pAppManagerTrust = AppManager.m_pTrustInterface;
+			CStr AppManagerHostID = AppManager.f_GetHostID();
 
 			for (auto &AppManagerInner : State.m_AppManagerInfos)
 			{
@@ -193,130 +333,53 @@ namespace NMib::NCloud
 
 				auto pAppManagerTrustInner = AppManagerInner.m_pTrustInterface;
 
-				TCPromise<void> Promise;
-				AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
+				fg_SetupAppManagerConnection
 					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{AppManager.m_Address}
+						pAppManagerTrust
+						, pAppManagerTrustInner
+						, AppManager.m_Address
+						, State.m_Timeout
 					)
-					> Promise / [=, this](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
-					{
-						auto &State = *m_pState;
-						auto &AppManagerTrustInner = *pAppManagerTrustInner;
-						AppManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, State.m_Timeout, -1) > Promise.f_ReceiveAny();
-					}
+					> SetupTrustResults
 				;
-				Promise.f_MoveFuture() > SetupTrustResults;
 			}
 		}
 
 		for (auto &AppManager : State.m_AppManagerInfos)
 		{
 			auto pAppManagerTrust = AppManager.m_pTrustInterface;
-			auto &AppManagerTrust = *pAppManagerTrust;
 			auto pCloudManagerTrust = State.m_CloudManagerLaunch->m_pTrustInterface;
-			auto &CloudManagerTrust = *pCloudManagerTrust;
 			CStr AppManagerHostID = AppManager.f_GetHostID();
 
 			if (State.m_Options & EOption_EnableVersionManager)
 			{
 				auto pVersionManagerTrust = State.m_VersionManagerLaunch->m_pTrustInterface;
-				auto &VersionManagerTrust = *pVersionManagerTrust;
-				TCPromise<void> Promise;
 
-				VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
+				fg_SetupVersionManagerTrust
 					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{State.m_VersionManagerServerAddress}
+						pAppManagerTrust
+						, pVersionManagerTrust
+						, State.m_VersionManagerServerAddress
+						, AppManagerHostID
+						, State.m_VersionManagerHostID
+						, State.m_Timeout
 					)
-					> Promise / [=, this, VersionManagerHostID = State.m_VersionManagerHostID]
-					(
-						CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_VersionManagerTicket
-					)
-					{
-						auto &State = *m_pState;
-						auto &AppManagerTrust = *pAppManagerTrust;
-						auto &VersionManagerTrust = *pVersionManagerTrust;
-						AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_VersionManagerTicket.m_Ticket, State.m_Timeout, -1)
-							+ VersionManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-							(
-								fs_Permissions(AppManagerHostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}})
-							)
-							+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-							(
-								fs_NamespaceHosts(CVersionManager::mc_pDefaultNamespace, TCSet<CStr>{VersionManagerHostID})
-							)
-							> Promise / [=]()
-							{
-								Promise.f_SetResult();
-							}
-						;
-					}
+					> SetupTrustResults
 				;
-				Promise.f_MoveFuture() > SetupTrustResults;
 			}
 
-			{
-				TCPromise<void> Promise;
-
-				CloudManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{State.m_CloudManagerServerAddress}
-					)
-					+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-					(
-						fs_Permissions(State.m_TestHostID, TCMap<CStr, CPermissionRequirements>{{"AppManager/VersionAppAll", {}}, {"AppManager/CommandAll", {}}, {"AppManager/AppAll", {}}})
-					)
-					+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-					(
-						fs_Permissions
-						(
-							State.m_CloudManagerHostID
-							, TCMap<CStr, CPermissionRequirements>
-							{
-								{"AppManager/Command/ApplicationSubscribeChanges", {}}
-								, {"AppManager/Command/ApplicationSubscribeUpdates", {}}
-								, {"AppManager/AppAll", {}}
-							}
-						)
-					)
-					> Promise / [=, this, CloudManagerHostID = State.m_CloudManagerHostID]
-					(
-						CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_CloudManagerTicket
-						, CVoidTag
-						, CVoidTag
-					)
-					{
-						auto &State = *m_pState;
-						auto &AppManagerTrust = *pAppManagerTrust;
-						auto &CloudManagerTrust = *pCloudManagerTrust;
-						AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_CloudManagerTicket.m_Ticket, State.m_Timeout, -1)
-							+ CloudManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-							(
-								fs_Permissions
-								(
-									AppManagerHostID
-									, TCMap<CStr, CPermissionRequirements>
-									{
-										{"CloudManager/RegisterAppManager", {}}
-										, {"CloudManager/ReportSensorReadings", {}}
-										, {"CloudManager/ReportSensorReadingsOnBehalfOf/All", {}}
-										, {"CloudManager/ReportLogEntries", {}}
-										, {"CloudManager/ReportLogEntriesOnBehalfOf/All", {}}
-									}
-								)
-							)
-							+ AppManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-							(
-								fs_NamespaceHosts(CCloudManager::mc_pDefaultNamespace, TCSet<CStr>{CloudManagerHostID})
-							)
-							> Promise / [=]()
-							{
-								Promise.f_SetResult();
-							}
-						;
-					}
-				;
-				Promise.f_MoveFuture() > SetupTrustResults;
-			}
+			fg_SetupCloudManagerTrust
+				(
+					pAppManagerTrust
+					, pCloudManagerTrust
+					, State.m_CloudManagerServerAddress
+					, AppManagerHostID
+					, State.m_CloudManagerHostID
+					, State.m_TestHostID
+					, State.m_Timeout
+				)
+				> SetupTrustResults
+			;
 		}
 		DMibTestMark;
 		co_await fg_AllDone(SetupTrustResults).f_Timeout(State.m_Timeout, "Timed out waiting for trust setup");
@@ -333,10 +396,13 @@ namespace NMib::NCloud
 	#ifdef DPlatformFamily_Windows
 				ExecutableName += ".exe";
 	#endif
-				CStr VersionManagers = co_await f_LaunchTool(ExecutableName, {"--version-manager-list", "--no-color", "--table-type", "tab-separated"});
-				CStr CloudManagers = co_await f_LaunchTool(ExecutableName, {"--cloud-manager-list", "--no-color", "--table-type", "tab-separated"});
+				CStr AppManagerVersionManagers = co_await f_LaunchTool(ExecutableName, {"--version-manager-list", "--no-color", "--table-type", "tab-separated"});
+				CStr AppManagerCloudManagers = co_await f_LaunchTool(ExecutableName, {"--cloud-manager-list", "--no-color", "--table-type", "tab-separated"});
 
-				if (VersionManagers.f_SplitLine<true>().f_GetLen() < 1 || CloudManagers.f_SplitLine<true>().f_GetLen() < 1)
+				VersionManagers += "{}:\n{}\n"_f << AppManager.m_Name << AppManagerVersionManagers;
+				CloudManagers += "{}:\n{}\n"_f << AppManager.m_Name << AppManagerCloudManagers;
+
+				if (AppManagerVersionManagers.f_SplitLine<true>().f_GetLen() < 1 || AppManagerCloudManagers.f_SplitLine<true>().f_GetLen() < 1)
 					bAllFinished = false;
 			}
 
