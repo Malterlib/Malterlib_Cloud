@@ -18,7 +18,6 @@ namespace
 			(
 				fg_Move(_String)
 				, CStr()
-				, false
 				, gc_JsonFlags
 			)
 		;

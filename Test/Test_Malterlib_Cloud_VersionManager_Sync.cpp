@@ -336,7 +336,7 @@ namespace NVersionManagerSyncTests
 			{
 				auto CaptureScope = co_await (g_CaptureExceptions % "Error parsing sensor status JSON");
 
-				CEJsonSorted Json = CEJsonSorted::fs_FromString(fg_Move(Output), "", false, EJsonDialectFlag_All);
+				CEJsonSorted Json = CEJsonSorted::fs_FromString(fg_Move(Output), "", EJsonDialectFlag_All);
 
 				if (!Json.f_IsArray() || Json.f_Array().f_IsEmpty())
 					co_return {};
