@@ -730,7 +730,7 @@ Property
 	MalterlibCloud_VersionUploadDestinationDir: string = ""
 
 	MalterlibCloud_VersionUploadCopyTempTemplate function(type(CFileCopyOptionsDetailed) _CopyOptions) string = ""
-	MalterlibCloud_VersionUploadCopyTempTemplate =+	`MTool DiffCopy @(_CopyOptions<Pattern>->EscapeHost()) @(MalterlibCloud_VersionUploadTempPath->AppendPath(MalterlibCloud_VersionUploadDestinationDir, _CopyOptions<Destination>)->EscapeHost()) "" @(_CopyOptions<Recursive> ? "1" : "0") 0 @(_CopyOptions<FindDirectory> ? "1" : "0") @(_CopyOptions<AbsoluteDestination> ? "1" : "0")\r\n`
+	MalterlibCloud_VersionUploadCopyTempTemplate =+	`MTool DiffCopy @(_CopyOptions<Pattern>->f_ScriptNativeEscapedPath()) @(MalterlibCloud_VersionUploadTempPath->AppendPath(MalterlibCloud_VersionUploadDestinationDir, _CopyOptions<Destination>)->f_ScriptNativeEscapedPath()) "" @(_CopyOptions<Recursive> ? "1" : "0") 0 @(_CopyOptions<FindDirectory> ? "1" : "0") @(_CopyOptions<AbsoluteDestination> ? "1" : "0")\r\n`
 
 	MalterlibCloud_VersionUploadCopyTempContents: string
 	MalterlibCloud_VersionUploadCopyTempContents =+ fg_ExpandCopyOptions(MalterlibCloud_VersionUploadSources)->ForEach(&MalterlibCloud_VersionUploadCopyTempTemplate)
@@ -740,7 +740,7 @@ Property
 Property
 {
 	MalterlibCloud_VersionUploadCloudClientVersionSpecified: string = ""
-	MalterlibCloud_VersionUploadCloudClientVersionSpecified ` --version @(MalterlibCloud_VersionUploadVersion->EscapeHost())`
+	MalterlibCloud_VersionUploadCloudClientVersionSpecified ` --version @(MalterlibCloud_VersionUploadVersion->f_ScriptNativeEscapedPath())`
 	{
 		!MalterlibCloud_VersionUploadVersion undefined
 	}
@@ -761,13 +761,13 @@ Property
 	MalterlibCloud_VersionUploadToBuildServerPathFull: string? = MalterlibCloud_VersionUploadToBuildServerPath / MalterlibCloudPlatform
 
 	MalterlibCloud_VersionUploadCloudClientCommand	function([string] _Hosts) string
-	MalterlibCloud_VersionUploadCloudClientCommand	`@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --settings-file @(MalterlibCloudVersionInfoFileName->EscapeHost()) --tags @(MalterlibCloud_VersionUploadTags->EJSONToString("")->EscapeHost())@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified(_Hosts)) @(MalterlibCloud_VersionUploadTarArchivePath->EscapeHost())\r\n`
+	MalterlibCloud_VersionUploadCloudClientCommand	`@(MalterlibCloud_CloudClientCommand) --version-manager-upload-version --no-self-update-check --settings-file @(MalterlibCloudVersionInfoFileName->f_ScriptNativeEscapedPath()) --tags @(MalterlibCloud_VersionUploadTags->EJSONToString("")->f_ScriptNativeEscapedPath())@(MalterlibCloud_VersionUploadCloudClientVersionSpecified)@(MalterlibCloud_VersionUploadCloudClientForceSpecified)@(MalterlibCloud_VersionUploadCloudClientHostSpecified(_Hosts)) @(MalterlibCloud_VersionUploadTarArchivePath->f_ScriptNativeEscapedPath())\r\n`
 	{
 		!!MalterlibCloud_VersionUploadToBuildServerPath undefined
 	}
 
-	MalterlibCloud_VersionUploadCloudClientCommand	`@(MalterlibBuildServerCommandPrefix)MTool BuildServerPut Recursive=0 @(`Source=@(MalterlibCloud_VersionUploadTarArchivePath)`->EscapeHost()) @(`DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPathFull)`->EscapeHost())\r\n`\
-													`@(MalterlibBuildServerCommandPrefix)MTool BuildServerPut Recursive=0 @(`Source=@(MalterlibCloudVersionInfoFileName)`->EscapeHost()) @(`DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPathFull)`->EscapeHost())\r\n`
+	MalterlibCloud_VersionUploadCloudClientCommand	`@(MalterlibBuildServerCommandPrefix)MTool BuildServerPut Recursive=0 @(`Source=@(MalterlibCloud_VersionUploadTarArchivePath)`->f_ScriptEscapeString()) @(`DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPathFull)`->f_ScriptEscapeString())\r\n`\
+													`@(MalterlibBuildServerCommandPrefix)MTool BuildServerPut Recursive=0 @(`Source=@(MalterlibCloudVersionInfoFileName)`->f_ScriptEscapeString()) @(`DestinationDir=@(MalterlibCloud_VersionUploadToBuildServerPathFull)`->f_ScriptEscapeString())\r\n`
 	{
 		&
 		{
@@ -777,8 +777,8 @@ Property
 	}
 
 	MalterlibCloud_VersionUploadCloudClientCommand	`@(ScriptExport("MalterlibDeployRoot", MalterlibDeployRoot))\r\n`\
-													`MTool PostCopy @(`@(MalterlibCloud_VersionUploadTarArchivePath)`->EscapeHost()) @(`Config=@(MalterlibPostCopyConfigFile)`->EscapeHost()) @(`Project=SimulateBuildServerStore`->EscapeHost()) @(`OutFolder=@(MalterlibCloud_VersionUploadToBuildServerPathFull)`->EscapeHost())\r\n`\
-													`MTool PostCopy @(`@(MalterlibCloudVersionInfoFileName)`->EscapeHost()) @(`Config=@(MalterlibPostCopyConfigFile)`->EscapeHost()) "Project=SimulateBuildServerStore" @(`OutFolder=@(MalterlibCloud_VersionUploadToBuildServerPathFull)`->EscapeHost())\r\n`
+													`MTool PostCopy @(`@(MalterlibCloud_VersionUploadTarArchivePath)`->f_ScriptNativeEscapedPath()) @(`Config=@(MalterlibPostCopyConfigFile)`->f_ScriptEscapeString()) @(`Project=SimulateBuildServerStore`->f_ScriptEscapeString()) @(`OutFolder=@(MalterlibCloud_VersionUploadToBuildServerPathFull)`->f_ScriptEscapeString())\r\n`\
+													`MTool PostCopy @(`@(MalterlibCloudVersionInfoFileName)`->f_ScriptNativeEscapedPath()) @(`Config=@(MalterlibPostCopyConfigFile)`->f_ScriptEscapeString()) "Project=SimulateBuildServerStore" @(`OutFolder=@(MalterlibCloud_VersionUploadToBuildServerPathFull)`->f_ScriptEscapeString())\r\n`
 	{
 		&
 		{
@@ -809,11 +809,11 @@ Property
 	MalterlibCloud_VersionUploadTarArchivePath: string = `@(Target.OutputDirectory)@(MalterlibCloudVersionInfo_Application)@(MalterlibCloudVersionInfo_PackageSuffix)@(MalterlibCloudVersionInfo_PackageExtension)`
 	MalterlibCloud_VersionUploadTarArchivePathTar: string = MalterlibCloud_VersionUploadTarArchivePath
 
-	MalterlibPostBuildScript_Last =+	`[ -e @(MalterlibCloud_VersionUploadTempPath->EscapeHost()) ] && rm -rf @(MalterlibCloud_VersionUploadTempPath->EscapeHost())\r\n`\
+	MalterlibPostBuildScript_Last =+	`[ -e @(MalterlibCloud_VersionUploadTempPath->f_ScriptNativeEscapedPath()) ] && rm -rf @(MalterlibCloud_VersionUploadTempPath->f_ScriptNativeEscapedPath())\r\n`\
 										`@(ScriptMkDir(MalterlibCloud_VersionUploadTempPath))\r\n`\
 										`@(MalterlibCloud_VersionUploadCopyTempContents)\r\n`\
-										`pushd @(MalterlibCloud_VersionUploadTempPath->EscapeHost()) > /dev/null\r\n`\
-										`bsdtar @(TarOptions) -c @(TarCompressionOptions) -f @(MalterlibCloud_VersionUploadTarArchivePathTar->EscapeHost()) .\r\n`\
+										`pushd @(MalterlibCloud_VersionUploadTempPath->f_ScriptNativeEscapedPath()) > /dev/null\r\n`\
+										`bsdtar @(TarOptions) -c @(TarCompressionOptions) -f @(MalterlibCloud_VersionUploadTarArchivePathTar->f_ScriptNativeEscapedPath()) .\r\n`\
 										`popd > /dev/null\r\n`\
 										`@(MalterlibCloud_VersionUploadCloudClientContents)\r\n`
 	{
@@ -824,11 +824,11 @@ Property
 		}
 	}
 
-	MalterlibPostBuildScript_Last =+	`IF EXIST @(MalterlibCloud_VersionUploadTempPath->NativePath()->EscapeHost()) rmdir /s /q @(MalterlibCloud_VersionUploadTempPath->NativePath()->EscapeHost())\r\n`\
-										`mkdir @(MalterlibCloud_VersionUploadTempPath->NativePath()->EscapeHost())\r\n`\
+	MalterlibPostBuildScript_Last =+	`IF EXIST @(MalterlibCloud_VersionUploadTempPath->f_ScriptNativeEscapedPath()) rmdir /s /q @(MalterlibCloud_VersionUploadTempPath->f_ScriptNativeEscapedPath())\r\n`\
+										`mkdir @(MalterlibCloud_VersionUploadTempPath->f_ScriptNativeEscapedPath())\r\n`\
 										`@(MalterlibCloud_VersionUploadCopyTempContents)\r\n`\
-										`pushd @(MalterlibCloud_VersionUploadTempPath->NativePath()->EscapeHost())\r\n`\
-										`bsdtar @(TarOptions) -c @(TarCompressionOptions) -f @(MalterlibCloud_VersionUploadTarArchivePathTar->NativePath()->EscapeHost()) *\r\n`\
+										`pushd @(MalterlibCloud_VersionUploadTempPath->f_ScriptNativeEscapedPath())\r\n`\
+										`bsdtar @(TarOptions) -c @(TarCompressionOptions) -f @(MalterlibCloud_VersionUploadTarArchivePathTar->f_ScriptNativeEscapedPath()) *\r\n`\
 										`popd\r\n`\
 										`@(MalterlibCloud_VersionUploadCloudClientContents)\r\n`
 	{
