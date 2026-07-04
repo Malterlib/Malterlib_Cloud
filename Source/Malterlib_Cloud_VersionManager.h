@@ -52,8 +52,11 @@ namespace NMib::NCloud
 
 			auto operator <=> (CVersionID const &_Right) const noexcept = default;
 
-			NEncoding::CEJsonSorted f_ToJson() const;
-			static CVersionID fs_FromJson(NEncoding::CEJsonSorted const &_Json);
+			template <typename tf_CJson = NEncoding::CEJsonSorted>
+			tf_CJson f_ToJson() const;
+
+			template <typename tf_CJson>
+			static CVersionID fs_FromJson(tf_CJson const &_Json);
 		};
 
 		struct CVersionIDAndPlatform
@@ -66,10 +69,14 @@ namespace NMib::NCloud
 
 			bool f_IsValid() const;
 			NStr::CStr f_EncodeFileName() const;
-			NEncoding::CEJsonSorted f_ToJson() const;
+
+			template <typename tf_CJson = NEncoding::CEJsonSorted>
+			tf_CJson f_ToJson() const;
 
 			static NStr::CStr fs_ConvertFromOldPlatform(NStr::CStr const &_Platform);
-			static CVersionIDAndPlatform fs_FromJson(NEncoding::CEJsonSorted const &_Json);
+
+			template <typename tf_CJson>
+			static CVersionIDAndPlatform fs_FromJson(tf_CJson const &_Json);
 
 			auto operator <=> (CVersionIDAndPlatform const &_Right) const noexcept = default;
 
@@ -82,9 +89,11 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NEncoding::CEJsonSorted f_ToJson() const;
+			template <typename tf_CJson = NEncoding::CEJsonSorted>
+			tf_CJson f_ToJson() const;
 
-			static CVersionInformation fs_FromJson(NEncoding::CEJsonSorted const &_Json);
+			template <typename tf_CJson>
+			static CVersionInformation fs_FromJson(tf_CJson const &_Json);
 
 			auto operator <=> (CVersionInformation const &_Right) const noexcept = default;
 

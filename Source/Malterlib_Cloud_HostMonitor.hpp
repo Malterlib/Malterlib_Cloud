@@ -29,6 +29,12 @@ namespace NMib::NCloud::NHostMonitor
 	}
 
 	template <typename tf_CStream>
+	void CConfigFileContents_Yaml::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Parsed;
+	}
+
+	template <typename tf_CStream>
 	void CConfigFileContents::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Raw;
