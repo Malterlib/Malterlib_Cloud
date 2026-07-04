@@ -211,18 +211,18 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJson["EncryptionFileSystem"] = Settings.m_EncryptionFileSystem;
 		ApplicationJson["ParentApplication"] = Settings.m_ParentApplication;
 		ApplicationJson["VersionManagerApplication"] = Settings.m_VersionManagerApplication;
-		ApplicationJson["LastInstalledVersion"] = Application.m_LastInstalledVersion.f_ToJson();
-		ApplicationJson["LastInstalledVersionInfo"] = Application.m_LastInstalledVersionInfo.f_ToJson();
-		ApplicationJson["LastInstalledVersionFinished"] = Application.m_LastInstalledVersionFinished.f_ToJson();
-		ApplicationJson["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJson();
-		ApplicationJson["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJson();
-		ApplicationJson["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJson();
+		ApplicationJson["LastInstalledVersion"] = Application.m_LastInstalledVersion.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["LastInstalledVersionInfo"] = Application.m_LastInstalledVersionInfo.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["LastInstalledVersionFinished"] = Application.m_LastInstalledVersionFinished.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["LastInstalledVersionInfoFinished"] = Application.m_LastInstalledVersionInfoFinished.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJson<CEJsonSortedYaml>();
 		ApplicationJson["LastTriedInstalledVersionError"] = Application.m_LastTriedInstalledVersionError;
 
-		ApplicationJson["WantVersion"] = Application.m_WantVersion.f_ToJson();
-		ApplicationJson["WantVersionInfo"] = Application.m_WantVersionInfo.f_ToJson();
-		ApplicationJson["NewestUnconditionalVersion"] = Application.m_NewestUnconditionalVersion.f_ToJson();
-		ApplicationJson["NewestUnconditionalVersionInfo"] = Application.m_NewestUnconditionalVersionInfo.f_ToJson();
+		ApplicationJson["WantVersion"] = Application.m_WantVersion.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["WantVersionInfo"] = Application.m_WantVersionInfo.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["NewestUnconditionalVersion"] = Application.m_NewestUnconditionalVersion.f_ToJson<CEJsonSortedYaml>();
+		ApplicationJson["NewestUnconditionalVersionInfo"] = Application.m_NewestUnconditionalVersionInfo.f_ToJson<CEJsonSortedYaml>();
 
 		ApplicationJson["LastFailedInstalledVersionFailureStage"] = (uint32)Application.m_LastFailedInstalledVersionFailureStage;
 		ApplicationJson["AutoUpdate"] = Settings.m_bAutoUpdate;
@@ -242,7 +242,7 @@ namespace NMib::NCloud::NAppManager
 				Array.f_Insert(Branch);
 		}
 		{
-			auto &UpdateScripts = ApplicationJson["UpdateScripts"] = CEJsonSorted();
+			auto &UpdateScripts = ApplicationJson["UpdateScripts"] = CEJsonSortedYaml();
 			UpdateScripts.f_Object();
 			UpdateScripts["PreUpdate"] = Settings.m_UpdateScripts.m_PreUpdate;
 			UpdateScripts["PostUpdate"] = Settings.m_UpdateScripts.m_PostUpdate;
@@ -260,10 +260,10 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 		{
-			auto &BackupJson = ApplicationJson["Backup"] = CEJsonSorted();
+			auto &BackupJson = ApplicationJson["Backup"] = CEJsonSortedYaml();
 			BackupJson.f_Object();
 			{
-				auto &Json = BackupJson["IncludeWildcards"] = CEJsonSorted();
+				auto &Json = BackupJson["IncludeWildcards"] = CEJsonSortedYaml();
 				Json.f_Object();
 				for (auto &Destination : Settings.m_Backup_IncludeWildcards)
 				{
@@ -282,23 +282,23 @@ namespace NMib::NCloud::NAppManager
 					Json.f_Insert(Wildcard);
 			}
 			{
-				auto &Json = BackupJson["AddSyncFlagsWildcards"] = CEJsonSorted();
+				auto &Json = BackupJson["AddSyncFlagsWildcards"] = CEJsonSortedYaml();
 				Json.f_Object();
 				for (auto &Flags : Settings.m_Backup_AddSyncFlagsWildcards)
-					Json[Settings.m_Backup_AddSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
+					Json[Settings.m_Backup_AddSyncFlagsWildcards.fs_GetKey(Flags)] = CEJsonSortedYaml::fs_FromCompatible(CDirectoryManifestFile::fs_GenerateSyncFlags(Flags));
 			}
 			{
-				auto &Json = BackupJson["RemoveSyncFlagsWildcards"] = CEJsonSorted();
+				auto &Json = BackupJson["RemoveSyncFlagsWildcards"] = CEJsonSortedYaml();
 				Json.f_Object();
 				for (auto &Flags : Settings.m_Backup_RemoveSyncFlagsWildcards)
-					Json[Settings.m_Backup_RemoveSyncFlagsWildcards.fs_GetKey(Flags)] = CDirectoryManifestFile::fs_GenerateSyncFlags(Flags);
+					Json[Settings.m_Backup_RemoveSyncFlagsWildcards.fs_GetKey(Flags)] = CEJsonSortedYaml::fs_FromCompatible(CDirectoryManifestFile::fs_GenerateSyncFlags(Flags));
 			}
 			BackupJson["NewBackupIntervalHours"] = CTimeSpanConvert(Settings.m_Backup_NewBackupInterval).f_GetHoursFloat();
 			BackupJson["Enabled"] = Settings.m_bBackupEnabled;
 		}
 
 		{
-			auto &RegisterInfo = ApplicationJson["RegisterInfo"] = CEJsonSorted();
+			auto &RegisterInfo = ApplicationJson["RegisterInfo"] = CEJsonSortedYaml();
 			RegisterInfo.f_Object();
 			RegisterInfo["UpdateType"] = Application.m_RegisterInfo.m_UpdateType;
 

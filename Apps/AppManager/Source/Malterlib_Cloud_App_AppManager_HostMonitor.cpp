@@ -50,7 +50,7 @@ namespace NMib::NCloud::NAppManager
 			if (pAutoUpdate->f_GetMemberValue("AutomaticReboot", false).f_Boolean())
 			{
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_AutomaticReboot;
-				Config.m_fOnRebootNeeded = fp_HostMonitorRebootNeededFunctor(*pAutoUpdate);
+				Config.m_fOnRebootNeeded = fp_HostMonitorRebootNeededFunctor(CEJsonSorted::fs_FromCompatible(*pAutoUpdate));
 			}
 		}
 
@@ -70,7 +70,14 @@ namespace NMib::NCloud::NAppManager
 
 		{
 			NConcurrency::CDistributedAppInterfaceServer::CConfigFiles ConfigFiles;
-			ConfigFiles.m_Files[mp_State.m_ConfigDatabase.f_GetFileName()].m_Type = NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Json;
+
+			auto const &ConfigFileName = mp_State.m_ConfigDatabase.f_GetFileName();
+			bool bYamlConfig = ConfigFileName.f_EndsWith(".yaml") || ConfigFileName.f_EndsWith(".yml");
+			ConfigFiles.m_Files[ConfigFileName].m_Type =
+				bYamlConfig
+				? NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Yaml
+				: NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Json
+			;
 
 			auto ConfigResult = co_await mp_HostMonitor(&CHostMonitor::f_MonitorConfigs, fg_Move(ConfigFiles)).f_Wrap();
 			if (ConfigResult)

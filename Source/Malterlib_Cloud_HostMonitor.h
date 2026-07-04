@@ -52,6 +52,16 @@ namespace NMib::NCloud::NHostMonitor
 		NEncoding::CEJsonSorted m_Parsed;
 	};
 
+	struct CConfigFileContents_Yaml
+	{
+		template <typename tf_CStream>
+		void f_Stream(tf_CStream &_Stream);
+
+		auto operator <=> (CConfigFileContents_Yaml const &_Right) const noexcept = default;
+
+		NEncoding::CEJsonSorted m_Parsed;
+	};
+
 	using CConfigFileContentsParsed = NStorage::TCStreamableVariant
 		<
 			NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType
@@ -59,6 +69,7 @@ namespace NMib::NCloud::NHostMonitor
 			, NStorage::TCMember<CConfigFileContents_GeneralBinary, NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_GeneralBinary>
 			, NStorage::TCMember<CConfigFileContents_Registry, NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Registry>
 			, NStorage::TCMember<CConfigFileContents_Json, NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Json>
+			, NStorage::TCMember<CConfigFileContents_Yaml, NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Yaml>
 		>
 	;
 

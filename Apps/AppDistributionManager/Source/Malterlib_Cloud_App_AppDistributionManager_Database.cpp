@@ -113,7 +113,7 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		Distributions.f_RemoveMember(_Distribution.f_GetName());
 		auto &Distribution = Distributions[_Distribution.f_GetName()];
-		Distribution["Settings"] = fp_SaveSettings(_Distribution.m_Settings);
+		Distribution["Settings"] = CEJsonSortedYaml::fs_FromCompatible(fp_SaveSettings(_Distribution.m_Settings));
 		{
 			auto &DeployedVersionsJson = Distribution["DeployedVersions"];
 			DeployedVersionsJson.f_Array();
@@ -121,7 +121,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			{
 				auto &VersionID = _Distribution.m_DeployedVersions.fs_GetKey(VersionInfo);
 				auto &DistributedVersionJson = DeployedVersionsJson.f_Insert();
-				DistributedVersionJson["Version"] = VersionID.f_ToJson();
+				DistributedVersionJson["Version"] = VersionID.f_ToJson<CEJsonSortedYaml>();
 				DistributedVersionJson["Time"] = VersionInfo.m_Time;
 				DistributedVersionJson["RetrySequence"] = VersionInfo.m_RetrySequence;
 			}
@@ -144,7 +144,7 @@ namespace NMib::NCloud::NAppDistributionManager
 			auto &DistributionJson = DistributionObject.f_Value();
 
 			CDistributionSettings Settings;
-			fp_ParseSettings(DistributionJson["Settings"], Settings);
+			fp_ParseSettings(CEJsonSorted::fs_FromCompatible(DistributionJson["Settings"]), Settings);
 
 			TCMap<CVersionManager::CVersionIDAndPlatform, CDeployedVersionInfo> DeployedVersions;
 			if (auto *pDeployedVersions = DistributionJson.f_GetMember("DeployedVersions"))

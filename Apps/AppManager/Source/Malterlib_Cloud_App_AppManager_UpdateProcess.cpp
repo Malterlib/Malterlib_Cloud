@@ -71,7 +71,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto &Application = *_pState->m_pApplication;
 
-		mp_State.m_StateDatabase.m_Data["PendingSelfUpdateProcess"] = _=
+		CEJsonSorted PendingSelfUpdate =
 			{
 				"Name"_= Application.m_Name
 				, "VersionID"_= _pState->m_VersionID.f_ToJson()
@@ -81,6 +81,8 @@ namespace NMib::NCloud::NAppManager
 				, "UniqueUpdateID"_= _pState->m_UniqueUpdateID
 			}
 		;
+
+		mp_State.m_StateDatabase.m_Data["PendingSelfUpdateProcess"] = CEJsonSortedYaml::fs_FromCompatible(fg_Move(PendingSelfUpdate));
 
 		co_await (fp_SaveStateDatabase() % "Failed save state database");
 		co_return {};

@@ -169,29 +169,9 @@ namespace NMib::NCloud
 		return fg_Format("{}/{}", Branch, _FileName.f_Extract(iVersionStart + 1));
 	}
 
-	NEncoding::CEJsonSorted CVersionManager::CVersionID::f_ToJson() const
-	{
-		NEncoding::CEJsonSorted Ret;
-		Ret["Branch"] = m_Branch;
-		Ret["Major"] = m_Major;
-		Ret["Minor"] = m_Minor;
-		Ret["Revision"] = m_Revision;
-		return Ret;
-	}
-
 	bool CVersionManager::CVersionID::f_IsValid() const
 	{
 		return !m_Branch.f_IsEmpty();
-	}
-
-	auto CVersionManager::CVersionID::fs_FromJson(NEncoding::CEJsonSorted const &_Json) -> CVersionID
-	{
-		CVersionID Ret;
-		Ret.m_Branch = _Json["Branch"].f_String();
-		Ret.m_Major = _Json["Major"].f_Integer();
-		Ret.m_Minor = _Json["Minor"].f_Integer();
-		Ret.m_Revision = _Json["Revision"].f_Integer();
-		return Ret;
 	}
 
 	// CVersionIDAndPlatform
@@ -201,62 +181,9 @@ namespace NMib::NCloud
 		return fg_Format("{}/{}", m_VersionID.f_EncodeFileName(), m_Platform);
 	}
 
-	NEncoding::CEJsonSorted CVersionManager::CVersionIDAndPlatform::f_ToJson() const
-	{
-		NEncoding::CEJsonSorted Ret;
-		Ret["VersionID"] = m_VersionID.f_ToJson();
-		Ret["Platform"] = m_Platform;
-		return Ret;
-	}
-
 	bool CVersionManager::CVersionIDAndPlatform::f_IsValid() const
 	{
 		return m_VersionID.f_IsValid() && !m_Platform.f_IsEmpty();
-	}
-
-	auto CVersionManager::CVersionIDAndPlatform::fs_FromJson(NEncoding::CEJsonSorted const &_Json) -> CVersionIDAndPlatform
-	{
-		CVersionIDAndPlatform Ret;
-		Ret.m_VersionID = CVersionID::fs_FromJson(_Json["VersionID"]);
-		Ret.m_Platform = _Json["Platform"].f_String();
-		return Ret;
-	}
-
-	// CVersionInformation
-
-	NEncoding::CEJsonSorted CVersionManager::CVersionInformation::f_ToJson() const
-	{
-		NEncoding::CEJsonSorted Ret;
-		Ret["Time"] = m_Time;
-		Ret["Configuration"] = m_Configuration;
-		auto &TagArray = Ret["Tags"].f_Array();
-		for (auto &Tag : m_Tags)
-			TagArray.f_Insert(Tag);
-		if (m_ExtraInfo.f_IsObject())
-			Ret["ExtraInfo"] = m_ExtraInfo;
-		Ret["NumFiles"] = m_nFiles;
-		Ret["NumBytes"] = m_nBytes;
-		Ret["RetrySequence"] = m_RetrySequence;
-		return Ret;
-	}
-
-	auto CVersionManager::CVersionInformation::fs_FromJson(NEncoding::CEJsonSorted const &_Json) -> CVersionInformation
-	{
-		CVersionInformation Ret;
-		Ret.m_Time = _Json["Time"].f_Date();
-		Ret.m_Configuration = _Json["Configuration"].f_String();
-		if (auto *pValue = _Json.f_GetMember("Tags", NEncoding::EJsonType_Array))
-		{
-			for (auto &Tag : pValue->f_Array())
-				Ret.m_Tags[Tag.f_String()];
-		}
-		if (auto *pValue = _Json.f_GetMember("ExtraInfo", NEncoding::EJsonType_Object))
-			Ret.m_ExtraInfo = *pValue;
-		Ret.m_nFiles = _Json["NumFiles"].f_Integer();
-		Ret.m_nBytes = _Json["NumBytes"].f_Integer();
-		if (auto *pValue = _Json.f_GetMember("RetrySequence", NEncoding::EJsonType_Integer))
-			Ret.m_RetrySequence = pValue->f_Integer();
-		return Ret;
 	}
 
 	// CListApplications
