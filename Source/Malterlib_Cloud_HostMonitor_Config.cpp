@@ -214,7 +214,24 @@ namespace NMib::NCloud
 									auto String = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
 									try
 									{
-										Contents.m_Parsed = CEJsonSorted::fs_FromString(String, _FileName, EJsonDialectFlag_AllowUndefined | EJsonDialectFlag_AllowInvalidFloat);
+										Contents.m_Parsed = CEJsonSorted::fs_FromStringJsonC(String, _FileName, EJsonDialectFlag_AllowUndefined | EJsonDialectFlag_AllowInvalidFloat);
+									}
+									catch (CException const &_Exception)
+									{
+										UniqueProperties.m_ParseError = _Exception.f_GetErrorStr();
+									}
+
+									Value.m_Contents.m_Parsed = fg_Move(Contents);
+								}
+								break;
+							case CDistributedAppInterfaceServer::EMonitorConfigType_Yaml:
+								{
+									CConfigFileContents_Yaml Contents;
+
+									auto String = CFile::fs_ReadStringFromVector(Value.m_Contents.m_Raw, true);
+									try
+									{
+										Contents.m_Parsed = CEJsonSorted::fs_FromStringYaml(String, _FileName, EJsonDialectFlag_AllowUndefined | EJsonDialectFlag_AllowInvalidFloat);
 									}
 									catch (CException const &_Exception)
 									{
@@ -530,6 +547,26 @@ namespace NMib::NCloud
 							auto &New = _NewValue.m_Contents.m_Parsed.f_GetAsType<CConfigFileContents_Json>();
 
 							MessageParagraphs.f_Insert("JSON contents changed:");
+
+							if (!NewProperties.m_ParseError)
+							{
+								TCVector<CStr> Changed;
+								TCVector<CStr> Added;
+								TCVector<CStr> Deleted;
+								fg_FindJsonDiffs(Old.m_Parsed, New.m_Parsed, Changed, Added, Deleted);
+
+								fAddChangedSection("Added paths", Added);
+								fAddChangedSection("Removed paths", Deleted);
+								fAddChangedSection("Changed paths", Changed);
+							}
+						}
+						break;
+					case CDistributedAppInterfaceServer::EMonitorConfigType_Yaml:
+						{
+							auto &Old = _OldValue.m_Contents.m_Parsed.f_GetAsType<CConfigFileContents_Yaml>();
+							auto &New = _NewValue.m_Contents.m_Parsed.f_GetAsType<CConfigFileContents_Yaml>();
+
+							MessageParagraphs.f_Insert("YAML contents changed:");
 
 							if (!NewProperties.m_ParseError)
 							{
