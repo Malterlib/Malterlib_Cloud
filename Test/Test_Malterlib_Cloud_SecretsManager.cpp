@@ -2093,6 +2093,9 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					fDownload(ID, fDestination(12), RootDirectory).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					DMibExpectTrue(fAreIdentical(File3, fDestination(12)));
 
+					// Flush file ops (removal of the superseded file after the File3 upload is fire-and-forget) before counting files
+					fSyncFileOperations("SyncFileOperations").f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+
 					auto Files7 = fFindFiles();
 					DMibExpect(Files5.f_GetLen(), ==, 1);
 					DMibExpect(Files7.f_GetLen(), ==, 1);
