@@ -32,7 +32,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_HostIDInApplicationInfo = 0x118
 			, EProtocolVersion_OptionalWaitForNotificationResult = 0x119
 			, EProtocolVersion_ResumableUpdateNotifications = 0x119
-			, EProtocolVersion_Current = 0x119
+			, EProtocolVersion_AddLaunchEnvironment = 0x11a
+			, EProtocolVersion_Current = 0x11a
 		};
 
 		enum EUpdateStage : uint32
@@ -141,6 +142,8 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptOnError;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Dependencies;
 
+			NStorage::TCOptional<NStr::CStr> m_LaunchEnvironment; /// Name of the environment to launch the application in. Empty means launching directly on the host.
+
 			NStorage::TCOptional<bool> m_bDistributedApp;
 			NStorage::TCOptional<bool> m_bSelfUpdateSource;
 			NStorage::TCOptional<bool> m_bStopOnDependencyFailure;
@@ -208,6 +211,8 @@ namespace NMib::NCloud
 			NStr::CStr m_UpdateScriptPostLaunch;
 			NStr::CStr m_UpdateScriptOnError;
 			NContainer::TCSet<NStr::CStr> m_Dependencies;
+
+			NStr::CStr m_LaunchEnvironment;
 
 			bool m_bSelfUpdateSource = false;
 			bool m_bDistributedApp = false;

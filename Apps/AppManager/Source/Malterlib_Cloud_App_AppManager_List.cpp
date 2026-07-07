@@ -86,6 +86,7 @@ namespace NMib::NCloud::NAppManager
 
 		OutApplication.m_bBackupEnabled = Settings.m_bBackupEnabled;
 		OutApplication.m_bLaunchInProcess = Settings.m_bLaunchInProcess;
+		OutApplication.m_LaunchEnvironment = Settings.m_LaunchEnvironment;
 
 		return OutApplication;
 	}
@@ -255,6 +256,7 @@ namespace NMib::NCloud::NAppManager
 			fAddProperty(Other, "User", Application.m_RunAsUser);
 			fAddProperty(Other, "Group", Application.m_RunAsGroup);
 			fAddProperty(Other, "User has shell", fSyntaxHighlight(Application.m_bRunAsUserHasShell));
+			fAddProperty(Other, "Environment", Application.m_LaunchEnvironment);
 
 			CStr Backup;
 			fAddProperty(Backup, "Enabled", fSyntaxHighlight(Application.m_bBackupEnabled));

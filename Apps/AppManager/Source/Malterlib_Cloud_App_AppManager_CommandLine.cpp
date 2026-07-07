@@ -164,6 +164,14 @@ namespace NMib::NCloud::NAppManager
 				" The default AppManager executable does not include any bundled applications inside the executable."
 			}
 		;
+		auto SettingsOption_LaunchEnvironment = "LaunchEnvironment?"_o=
+			{
+				"Names"_o= _o["--launch-environment"]
+				, "Type"_o= ""
+				, "Description"_o= "Launch the application inside the named environment (a container or virtual machine managed by this AppManager).\n"
+				"Set to an empty string to launch directly on the host (the default). See --environment-add."
+			}
+		;
 		auto SettingsOption_DistributedApp = "DistributedApp?"_o=
 			{
 				"Names"_o= _o["--distributed-app"]
@@ -417,6 +425,7 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_RunAsGroup
 						, SettingsOption_RunAsUserHasShell
 						, SettingsOption_LaunchInProcess
+						, SettingsOption_LaunchEnvironment
 						, SettingsOption_DistributedApp
 						, SettingsOption_BackupEnabled
 						, SettingsOption_BackupIncludeWildcards
@@ -582,6 +591,7 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_RunAsGroup
 						, SettingsOption_RunAsUserHasShell
 						, SettingsOption_LaunchInProcess
+						, SettingsOption_LaunchEnvironment
 						, SettingsOption_DistributedApp
 						, SettingsOption_BackupEnabled
 						, SettingsOption_BackupIncludeWildcards
