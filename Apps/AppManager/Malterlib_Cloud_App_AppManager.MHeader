@@ -52,6 +52,17 @@
 		%File "Source/Malterlib_Cloud_AppLocal_*"
 	}
 
+	Property
+	{
+		// The AppManager controls virtual machines through Virtualization.framework for VM
+		// environments, which requires the com.apple.security.virtualization entitlement.
+		// It is applied through the normal macOS signing that every executable goes through.
+		MalterlibSignMacOSEntitlements "Resources/macOS/Virtualization.entitlements"->MakeAbsolute()
+		{
+			!!PlatformIsDarwin true
+		}
+	}
+
 	%Dependency "Lib_Malterlib_Cloud_AppManager"
 }
 
