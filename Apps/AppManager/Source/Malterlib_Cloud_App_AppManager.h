@@ -275,6 +275,77 @@ namespace NMib::NCloud::NAppManager
 			TCOptional<CDistributedAppSensorReporter::CStatus> m_LastReporterSensorStatus;
 		};
 
+		enum EEnvironmentSetting
+		{
+			EEnvironmentSetting_None = 0
+			, EEnvironmentSetting_Type = DBit(0)
+			, EEnvironmentSetting_AgentApplication = DBit(1)
+			, EEnvironmentSetting_AutoStart = DBit(2)
+			, EEnvironmentSetting_ContainerRuntime = DBit(3)
+			, EEnvironmentSetting_ContainerImage = DBit(4)
+			, EEnvironmentSetting_ContainerNetwork = DBit(5)
+			, EEnvironmentSetting_ContainerExtraMounts = DBit(6)
+			, EEnvironmentSetting_ContainerExtraArguments = DBit(7)
+			, EEnvironmentSetting_MemoryLimit = DBit(8)
+			, EEnvironmentSetting_CPULimit = DBit(9)
+			, EEnvironmentSetting_VMImage = DBit(10)
+			, EEnvironmentSetting_VMBackend = DBit(11)
+			, EEnvironmentSetting_VMCPUCount = DBit(12)
+			, EEnvironmentSetting_VMMemoryMB = DBit(13)
+		};
+
+		struct CEnvironmentSettings
+		{
+			using EEnvironmentType = CAppManagerInterface::EEnvironmentType;
+
+			EEnvironmentType m_Type = CAppManagerInterface::EEnvironmentType_Container;
+			CStr m_AgentApplication;
+
+			CStr m_ContainerRuntime;
+			CStr m_ContainerImage;
+			CStr m_ContainerNetwork;
+			TCMap<CStr, CStr> m_ContainerExtraMounts;
+			TCVector<CStr> m_ContainerExtraArguments;
+
+			CStr m_MemoryLimit;
+			fp64 m_CPULimit = 0.0;
+
+			CStr m_VMImage;
+			CStr m_VMBackend;
+			uint32 m_VMCPUCount = 0;
+			uint32 m_VMMemoryMB = 0;
+
+			bool m_bAutoStart = true;
+
+			bool f_ParseSettings(CEJsonSorted const &_Params, EEnvironmentSetting &o_ChangedSettings, CStr &o_Error);
+			void f_ApplySettings(EEnvironmentSetting _ChangedSettings, CEnvironmentSettings const &_Source);
+			void f_FromInterfaceSettings(CAppManagerInterface::CEnvironmentSettings const &_Settings, EEnvironmentSetting &o_ChangedSettings);
+			EEnvironmentSetting f_ChangedSettings(CEnvironmentSettings const &_Other) const;
+			bool f_Validate(CStr &o_Error) const;
+		};
+
+		struct CEnvironment
+		{
+			CEnvironment(CStr const &_Name, CAppManagerActor *_pThis)
+				: m_Name(_Name)
+				, m_pThis(_pThis)
+			{
+			}
+
+			CIntrusiveRefCount m_RefCount;
+
+			CStr const m_Name;
+
+			CEnvironmentSettings m_Settings;
+
+			CStr m_Status = "Not started";
+			CAppManagerInterface::EStatusSeverity m_StatusSeverity = CAppManagerInterface::EStatusSeverity_Warning;
+
+			bool m_bDeleted = false;
+
+			CAppManagerActor *m_pThis;
+		};
+
 		struct CBashScriptOutput
 		{
 			CStr m_StdOut;
@@ -402,6 +473,14 @@ namespace NMib::NCloud::NAppManager
 
 			auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
 			auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
+
+			TCFuture<void> f_EnvironmentAdd(CStr _Name, CEnvironmentSettings _Settings) override;
+			TCFuture<void> f_EnvironmentRemove(CStr _Name) override;
+			TCFuture<void> f_EnvironmentChangeSettings(CStr _Name, CEnvironmentSettings _Settings) override;
+			TCFuture<void> f_EnvironmentStart(CStr _Name) override;
+			TCFuture<void> f_EnvironmentStop(CStr _Name) override;
+			TCFuture<void> f_EnvironmentRestart(CStr _Name) override;
+			TCFuture<TCMap<CStr, CEnvironmentInfo>> f_GetEnvironments() override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -760,6 +839,44 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_StopApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_RestartApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
+		void fp_BuildCommandLine_Environments(CDistributedAppCommandLineSpecification &o_CommandLine);
+		void fp_ReadEnvironmentsState();
+		TCFuture<void> fp_UpdateEnvironmentJson(TCSharedPointer<CEnvironment> _pEnvironment);
+		CAppManagerInterface::CEnvironmentInfo fp_GetEnvironmentInfo(CEnvironment const &_Environment);
+		TCFuture<void> fp_RegisterEnvironmentPermissions(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_UnregisterEnvironmentPermissions(TCSharedPointer<CEnvironment> _pEnvironment);
+
+		TCFuture<void> fp_AddEnvironment
+			(
+				CStr _Name
+				, CEnvironmentSettings _Settings
+				, EEnvironmentSetting _ChangedSettings
+				, TCFunction<void (CStr const &_Info)> _fOnInfo
+				, CCallingHostInfo _CallingHostInfo
+			)
+		;
+		TCFuture<void> fp_RemoveEnvironment(CStr _Name, TCFunction<void (CStr const &_Info)> _fOnInfo, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_ChangeEnvironmentSettings
+			(
+				CStr _Name
+				, CEnvironmentSettings _Settings
+				, EEnvironmentSetting _ChangedSettings
+				, TCFunction<void (CStr const &_Info)> _fOnInfo
+				, CCallingHostInfo _CallingHostInfo
+			)
+		;
+		TCFuture<void> fp_StartEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_StopEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_RestartEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo);
+
+		TCFuture<uint32> fp_CommandLine_EnumEnvironments(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_AddEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ChangeEnvironmentSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RemoveEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StopEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RestartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+
 		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_VersionManagerList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CloudManagerList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -1020,6 +1137,7 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
+		TCMap<CStr, TCSharedPointer<CEnvironment>> mp_Environments;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagerSubscription;
 		TCTrustedActorSubscription<CCloudManager> mp_CloudManagerSubscription;

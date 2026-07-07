@@ -19,6 +19,13 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CAppManagerInterface::f_GetInstalled);
 		DMibPublishActorFunction(CAppManagerInterface::f_SubscribeUpdateNotifications);
 		DMibPublishActorFunction(CAppManagerInterface::f_SubscribeChangeNotifications);
+		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentAdd);
+		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentRemove);
+		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentChangeSettings);
+		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentStart);
+		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentStop);
+		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentRestart);
+		DMibPublishActorFunction(CAppManagerInterface::f_GetEnvironments);
 	}
 
 	DMibDistributedStreamImplement(CAppManagerInterface::CVersionIDAndPlatform);
@@ -31,6 +38,8 @@ namespace NMib::NCloud
 	DMibDistributedStreamImplement(CAppManagerInterface::CApplicationInfo);
 	DMibDistributedStreamImplement(CAppManagerInterface::CApplicationUpdate);
 	DMibDistributedStreamImplement(CAppManagerInterface::CUpdateNotification);
+	DMibDistributedStreamImplement(CAppManagerInterface::CEnvironmentSettings);
+	DMibDistributedStreamImplement(CAppManagerInterface::CEnvironmentInfo);
 
 	CAppManagerInterface::~CAppManagerInterface() = default;
 
@@ -58,6 +67,31 @@ namespace NMib::NCloud
 
 		DMibNeverGetHere;
 		return NStr::gc_Str<"unknown">;
+	}
+
+	NStr::CStr CAppManagerInterface::fs_EnvironmentTypeToStr(EEnvironmentType _Type)
+	{
+		switch (_Type)
+		{
+		case EEnvironmentType_Local: return NStr::gc_Str<"Local">;
+		case EEnvironmentType_Container: return NStr::gc_Str<"Container">;
+		case EEnvironmentType_VM: return NStr::gc_Str<"VM">;
+		}
+
+		DMibNeverGetHere;
+		return NStr::gc_Str<"unknown">;
+	}
+
+	auto CAppManagerInterface::fs_EnvironmentTypeFromStr(NStr::CStr const &_Type) -> NStorage::TCOptional<EEnvironmentType>
+	{
+		if (_Type == "Local")
+			return EEnvironmentType_Local;
+		else if (_Type == "Container")
+			return EEnvironmentType_Container;
+		else if (_Type == "VM")
+			return EEnvironmentType_VM;
+
+		return {};
 	}
 
 	bool CAppManagerInterface::CUpdateNotification::f_IsDone() const
@@ -129,6 +163,32 @@ namespace NMib::NCloud
 		Return["bBackupEnabled"] = fg_ToJson(m_bBackupEnabled);
 		Return["bLaunchInProcess"] = fg_ToJson(m_bLaunchInProcess);
 		Return["LaunchEnvironment"] = fg_ToJson(m_LaunchEnvironment);
+		return Return;
+	}
+
+	NEncoding::CEJsonSorted CAppManagerInterface::CEnvironmentInfo::f_ToJson() const
+	{
+		using namespace NEncoding;
+
+		CEJsonSorted Return;
+		Return["Status"] = fg_ToJson(m_Status);
+		Return["StatusSeverity"] = fg_ToJson(m_StatusSeverity);
+		Return["HostID"] = fg_ToJson(m_HostID);
+		Return["Type"] = fg_ToJson(fs_EnvironmentTypeToStr(m_Type));
+		Return["AgentApplication"] = fg_ToJson(m_AgentApplication);
+		Return["bAutoStart"] = fg_ToJson(m_bAutoStart);
+		Return["ContainerRuntime"] = fg_ToJson(m_ContainerRuntime);
+		Return["ContainerImage"] = fg_ToJson(m_ContainerImage);
+		Return["ContainerNetwork"] = fg_ToJson(m_ContainerNetwork);
+		Return["ContainerExtraMounts"] = fg_ToJson(m_ContainerExtraMounts);
+		Return["ContainerExtraArguments"] = fg_ToJson(m_ContainerExtraArguments);
+		Return["MemoryLimit"] = fg_ToJson(m_MemoryLimit);
+		Return["CPULimit"] = fg_ToJson(m_CPULimit);
+		Return["VMImage"] = fg_ToJson(m_VMImage);
+		Return["VMBackend"] = fg_ToJson(m_VMBackend);
+		Return["VMCPUCount"] = fg_ToJson(m_VMCPUCount);
+		Return["VMMemoryMB"] = fg_ToJson(m_VMMemoryMB);
+		Return["Applications"] = fg_ToJson(m_Applications);
 		return Return;
 	}
 }

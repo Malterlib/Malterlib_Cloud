@@ -352,6 +352,8 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
+		fp_ReadEnvironmentsState();
+
 		if (!PendingSelfUpdate.m_Name.f_IsEmpty())
 			fp_StartPendingSelfUpdateReporting(PendingSelfUpdate);
 
