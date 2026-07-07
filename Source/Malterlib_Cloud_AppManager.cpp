@@ -176,6 +176,7 @@ namespace NMib::NCloud
 		Return["HostID"] = fg_ToJson(m_HostID);
 		Return["Type"] = fg_ToJson(fs_EnvironmentTypeToStr(m_Type));
 		Return["AgentApplication"] = fg_ToJson(m_AgentApplication);
+		Return["ParentApplication"] = fg_ToJson(m_ParentApplication);
 		Return["bAutoStart"] = fg_ToJson(m_bAutoStart);
 		Return["ContainerRuntime"] = fg_ToJson(m_ContainerRuntime);
 		Return["ContainerImage"] = fg_ToJson(m_ContainerImage);

@@ -30,6 +30,12 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication)
 			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 
+		for (auto &pEnvironment : pThis->mp_Environments)
+		{
+			if (pEnvironment->m_Settings.m_ParentApplication == _Name)
+				co_return Auditor.f_Exception(fg_Format("Cannot remove application '{}' because environment '{}' stores its data inside it", _Name, pEnvironment->m_Name));
+		}
+
 		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(*pApplication, "Remove") % Auditor);
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 

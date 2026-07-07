@@ -508,15 +508,30 @@ namespace NMib::NCloud::NAppManager
 
 		co_await (fp_SetupDatabaseCleanup() % "Failed to setup database cleanup");
 
-		// Kill environment agents that survived an earlier AppManager instance
+		// Kill environment agents that survived an earlier AppManager instance.
+		// Environments confined to a parent application store their data inside that
+		// application's directory, so those locations are swept as well when they exist
+		// (encrypted parent storage may not be mounted yet, in which case nothing runs there).
 		{
+			TCVector<CStr> EnvironmentDirectories;
+			EnvironmentDirectories.f_Insert(mp_State.m_RootDirectory / "Environment");
+			for (auto &pEnvironment : mp_Environments)
+			{
+				if (!pEnvironment->m_Settings.m_ParentApplication.f_IsEmpty())
+					EnvironmentDirectories.f_Insert(fp_GetEnvironmentStorageDirectory(*pEnvironment));
+			}
+
 			auto BlockingActorCheckout = fg_BlockingActor();
 
 			co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [EnvironmentsDirectory = mp_State.m_RootDirectory / "Environment"]()
+					g_Dispatch(BlockingActorCheckout) / [EnvironmentDirectories = fg_Move(EnvironmentDirectories)]()
 					{
-						CProcessLaunch::fs_KillProcessesInDirectory("*", {}, EnvironmentsDirectory, 10.0);
+						for (auto &EnvironmentDirectory : EnvironmentDirectories)
+						{
+							if (CFile::fs_FileExists(EnvironmentDirectory, EFileAttrib_Directory))
+								CProcessLaunch::fs_KillProcessesInDirectory("*", {}, EnvironmentDirectory, 10.0);
+						}
 					}
 				)
 				.f_Wrap() > LogError("Failed to kill stale environment agents")

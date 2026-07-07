@@ -244,6 +244,7 @@ namespace NMib::NCloud
 
 			NStorage::TCOptional<EEnvironmentType> m_Type;
 			NStorage::TCOptional<NStr::CStr> m_AgentApplication; /// Application that provides the agent executable for the environment
+			NStorage::TCOptional<NStr::CStr> m_ParentApplication; /// Application whose storage confines the environment storage, supporting encrypted storage
 			NStorage::TCOptional<bool> m_bAutoStart;
 
 			NStorage::TCOptional<NStr::CStr> m_ContainerRuntime; /// Empty selects the default runtime for the host platform
@@ -276,6 +277,7 @@ namespace NMib::NCloud
 			// Settings
 			EEnvironmentType m_Type = EEnvironmentType_Container;
 			NStr::CStr m_AgentApplication;
+			NStr::CStr m_ParentApplication;
 			bool m_bAutoStart = true;
 
 			NStr::CStr m_ContainerRuntime;

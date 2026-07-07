@@ -205,6 +205,7 @@ namespace NMib::NCloud
 	{
 		_Stream % m_Type;
 		_Stream % m_AgentApplication;
+		_Stream % m_ParentApplication;
 		_Stream % m_bAutoStart;
 
 		_Stream % m_ContainerRuntime;
@@ -231,6 +232,7 @@ namespace NMib::NCloud
 
 		_Stream % m_Type;
 		_Stream % m_AgentApplication;
+		_Stream % m_ParentApplication;
 		_Stream % m_bAutoStart;
 
 		_Stream % m_ContainerRuntime;
