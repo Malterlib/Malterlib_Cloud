@@ -201,6 +201,56 @@ namespace NMib::NCloud
 	}
 
 	template <typename tf_CStream>
+	void CAppManagerInterface::CEnvironmentSettings::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Type;
+		_Stream % m_AgentApplication;
+		_Stream % m_bAutoStart;
+
+		_Stream % m_ContainerRuntime;
+		_Stream % m_ContainerImage;
+		_Stream % m_ContainerNetwork;
+		_Stream % m_ContainerExtraMounts;
+		_Stream % m_ContainerExtraArguments;
+
+		_Stream % m_MemoryLimit;
+		_Stream % m_CPULimit;
+
+		_Stream % m_VMImage;
+		_Stream % m_VMBackend;
+		_Stream % m_VMCPUCount;
+		_Stream % m_VMMemoryMB;
+	}
+
+	template <typename tf_CStream>
+	void CAppManagerInterface::CEnvironmentInfo::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Status;
+		_Stream % m_StatusSeverity;
+		_Stream % m_HostID;
+
+		_Stream % m_Type;
+		_Stream % m_AgentApplication;
+		_Stream % m_bAutoStart;
+
+		_Stream % m_ContainerRuntime;
+		_Stream % m_ContainerImage;
+		_Stream % m_ContainerNetwork;
+		_Stream % m_ContainerExtraMounts;
+		_Stream % m_ContainerExtraArguments;
+
+		_Stream % m_MemoryLimit;
+		_Stream % m_CPULimit;
+
+		_Stream % m_VMImage;
+		_Stream % m_VMBackend;
+		_Stream % m_VMCPUCount;
+		_Stream % m_VMMemoryMB;
+
+		_Stream % m_Applications;
+	}
+
+	template <typename tf_CStream>
 	void CAppManagerInterface::CApplicationChange_AddOrChangeInfo::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Info;
