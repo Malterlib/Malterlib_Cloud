@@ -174,6 +174,7 @@ namespace NMib::NCloud::NAppManager
 			, EEnvironmentSetting_VMBackend = DBit(11)
 			, EEnvironmentSetting_VMCPUCount = DBit(12)
 			, EEnvironmentSetting_VMMemoryMB = DBit(13)
+			, EEnvironmentSetting_ParentApplication = DBit(14)
 		};
 
 		struct CEnvironmentSettings
@@ -182,6 +183,7 @@ namespace NMib::NCloud::NAppManager
 
 			EEnvironmentType m_Type = CAppManagerInterface::EEnvironmentType_Container;
 			CStr m_AgentApplication;
+			CStr m_ParentApplication; /// Application whose storage confines the environment storage, supporting encrypted storage
 
 			CStr m_ContainerRuntime;
 			CStr m_ContainerImage;
@@ -927,6 +929,10 @@ namespace NMib::NCloud::NAppManager
 
 		// Environment agent handling (host side)
 		TCSharedPointer<CEnvironment> fp_EnvironmentFromHostID(CStr const &_HostID);
+		TCSharedPointer<CApplication> fp_GetEnvironmentParentApplication(CEnvironment const &_Environment);
+		CStr fp_GetEnvironmentStorageDirectory(CEnvironment const &_Environment);
+		bool fp_EnvironmentStorageReady(CEnvironment const &_Environment, CStr &o_Error, CAppManagerInterface::EStatusSeverity &o_Severity);
+		void fp_AutoStartEnvironments();
 		TCFuture<void> fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);

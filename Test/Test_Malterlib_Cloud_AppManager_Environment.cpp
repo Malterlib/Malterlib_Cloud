@@ -109,6 +109,21 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				DMibExpectFalse(Result);
 			}
 
+			// Adding an environment with a missing parent application fails
+			{
+				DMibTestPath("Parent Application Missing");
+
+				CAppManagerInterface::CEnvironmentSettings Settings;
+				Settings.m_Type = CAppManagerInterface::EEnvironmentType_Local;
+				Settings.m_ParentApplication = CStr("NoSuchApp");
+
+				auto Result = co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("ConfinedEnv", Settings)
+					.f_Timeout(g_Timeout, "Timed out adding environment")
+					.f_Wrap()
+				;
+				DMibExpectFalse(Result);
+			}
+
 			// Adding a container environment with an image succeeds
 			{
 				DMibTestPath("Add Container");
@@ -419,6 +434,79 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				DMibExpect(pTestApp->m_LaunchEnvironment, ==, "");
 
 				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentRemove)("TestEnv")
+					.f_Timeout(g_Timeout, "Timed out removing environment")
+				;
+			}
+
+			// An environment confined to a parent application stores its data inside
+			// that application's directory, so it can live on encrypted storage
+			{
+				DMibTestPath("Confined To Parent Application");
+
+				CAppManagerInterface::CEnvironmentSettings Settings;
+				Settings.m_Type = CAppManagerInterface::EEnvironmentType_Local;
+				Settings.m_bAutoStart = false;
+				Settings.m_AgentApplication = CStr("Agent");
+				Settings.m_ParentApplication = CStr("Agent");
+
+				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("ConfinedEnv", Settings)
+					.f_Timeout(g_Timeout, "Timed out adding environment")
+				;
+
+				auto Environments = co_await fGetEnvironments();
+				auto pEnvironment = Environments.f_FindEqual("ConfinedEnv");
+				DMibExpectTrue(pEnvironment != nullptr);
+				DMibExpect(pEnvironment->m_ParentApplication, ==, "Agent");
+			}
+
+			// Launching an application in the confined environment creates the agent
+			// root inside the parent application directory
+			{
+				DMibTestPath("Confined Launch");
+
+				CAppManagerInterface::CApplicationChangeSettings ChangeSettings;
+				CAppManagerInterface::CApplicationSettings Settings;
+				Settings.m_LaunchEnvironment = CStr("ConfinedEnv");
+
+				co_await Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)("TestApp", ChangeSettings, Settings)
+					.f_Timeout(g_Timeout, "Timed out changing application settings")
+				;
+
+				auto Installed = co_await fGetInstalled();
+				auto pTestApp = Installed.f_FindEqual("TestApp");
+				DMibExpectTrue(pTestApp != nullptr);
+				DMibExpect(pTestApp->m_Status, ==, "Launched");
+
+				CStr ConfinedRoot = AppManagerInfo.m_RootDirectory / "App/Agent/Environment/ConfinedEnv";
+				CStr UnconfinedRoot = AppManagerInfo.m_RootDirectory / "Environment/ConfinedEnv";
+				DMibExpectTrue(CFile::fs_FileExists(ConfinedRoot, EFileAttrib_Directory));
+				DMibExpectFalse(CFile::fs_FileExists(UnconfinedRoot, EFileAttrib_Directory));
+			}
+
+			// The parent application cannot be removed while an environment stores its data inside it
+			{
+				DMibTestPath("Parent Application Remove Protected");
+
+				auto Result = co_await Interface.f_CallActor(&CAppManagerInterface::f_Remove)("Agent")
+					.f_Timeout(g_Timeout, "Timed out removing application")
+					.f_Wrap()
+				;
+				DMibExpectFalse(Result);
+			}
+
+			// Move TestApp back to the host and remove the confined environment
+			{
+				DMibTestPath("Confined Cleanup");
+
+				CAppManagerInterface::CApplicationChangeSettings ChangeSettings;
+				CAppManagerInterface::CApplicationSettings Settings;
+				Settings.m_LaunchEnvironment = CStr("");
+
+				co_await Interface.f_CallActor(&CAppManagerInterface::f_ChangeSettings)("TestApp", ChangeSettings, Settings)
+					.f_Timeout(g_Timeout, "Timed out changing application settings")
+				;
+
+				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentRemove)("ConfinedEnv")
 					.f_Timeout(g_Timeout, "Timed out removing environment")
 				;
 			}

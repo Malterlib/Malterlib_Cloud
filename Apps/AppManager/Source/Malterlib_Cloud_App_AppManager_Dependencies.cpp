@@ -214,6 +214,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (mp_bPendingAutoUpdate)
 			fp_AutoUpdate_Update();
+
+		fp_AutoStartEnvironments();
 	}
 
 	TCFuture<void> CAppManagerActor::fp_UpdateEncryptionSensorStatus(bool _bNeedEncryption)
