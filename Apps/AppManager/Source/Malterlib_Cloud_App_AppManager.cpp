@@ -164,6 +164,16 @@ namespace NMib::NCloud::NAppManager
 				if (auto pValue = ApplicationJson.f_GetMember("RunAsUserHasShell", EJsonType_Boolean))
 					Settings.m_bRunAsUserHasShell = pValue->f_Boolean();
 
+				if (auto *pValue = ApplicationJson.f_GetMember("OSDependencies", EJsonType_Object))
+				{
+					for (auto &Selector : pValue->f_Object())
+					{
+						auto &Packages = Settings.m_OSDependencies[Selector.f_Name()];
+						for (auto &Package : Selector.f_Value().f_Array())
+							Packages.f_Insert(Package.f_String());
+					}
+				}
+
 				if (auto *pValue = ApplicationJson.f_GetMember("Backup"))
 				{
 					auto &BackupJson = *pValue;
