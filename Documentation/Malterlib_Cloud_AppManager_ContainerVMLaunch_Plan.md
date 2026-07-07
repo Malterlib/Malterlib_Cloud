@@ -29,19 +29,25 @@ Implemented and committed:
   interface with a Virtualization.framework backend (macOS guests, NAT, virtiofs, graceful
   stop). VM environments create and start a machine from `<Root>/VMImages/<VMImage>` and run
   the agent-connected flow.
-- Phase 5 (partial): running environments restart when their agent application updates, and
+- Phase 5: running environments restart when their agent application updates, and
   environment status is reported through a status sensor mirroring application status.
+- VM guest image provisioning (§5.3): `--vm-image-create` creates a guest image bundle under
+  `VMImages` in the AppManager root and installs macOS into it from an IPSW restore image
+  through `fg_CreateMacOSVMImage` (VZMacOSRestoreImage/VZMacOSInstaller), with install
+  progress on the command line. Running it requires supplying a macOS IPSW (~14 GB download).
+- The AppManager is signed with the `com.apple.security.virtualization` entitlement through
+  the standard macOS signing every executable goes through (verified with
+  `codesign -d --entitlements`), alongside the default `get-task-allow` entitlement.
 
-Remaining (larger infrastructure / greenfield, out of reach without external assets):
+Remaining follow-ups:
 
+- Guest-side agent bootstrap for macOS VMs: installing the agent LaunchDaemon inside a
+  freshly provisioned guest (console/Screen Sharing based; needs a provisioned guest to
+  develop against, which in turn needs an IPSW download).
 - Container end-to-end tests on a Linux CI host or a macOS docker setup that live-shares the
   AppManager root (the machinery is verified; the gated test runs where the mount works).
-- VM guest image provisioning (§5.3): downloading a macOS IPSW and installing a guest with an
-  agent LaunchDaemon, and the console-based agent bootstrap that depends on a provisioned guest.
-- The `com.apple.security.virtualization` entitlement signing step in the build system
-  (ad-hoc signing suffices for local development).
-- A dedicated Cloud AppManager web UI for environments (no such UI exists today; the CLI
-  `--environment-list` and remote API are the current surface).
+- A dedicated Cloud AppManager web UI for environments (greenfield; no such UI exists today —
+  the CLI `--environment-list` and the remote API are the current surface).
 
 ## 1. Goal and Scope
 
