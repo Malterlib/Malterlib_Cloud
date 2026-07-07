@@ -1573,45 +1573,60 @@ namespace NMib::NCloud::NAppManager
 		co_return 0;
 	}
 
-	CStr CAppManagerActor::fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr &o_Error)
+	TCFuture<CStr> CAppManagerActor::fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError)
 	{
 		if (_pEnvironment->m_Settings.m_AgentApplication.f_IsEmpty())
 		{
 			if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Local)
-				return CFile::fs_GetProgramPath();
+				co_return CFile::fs_GetProgramPath();
 
-			o_Error = "Environment '{}' has no agent application configured. Set one with --agent-application."_f << _pEnvironment->m_Name;
-			return {};
+			*_pError = "Environment '{}' has no agent application configured. Set one with --agent-application."_f << _pEnvironment->m_Name;
+			co_return {};
 		}
 
 		auto *pFindApplication = mp_Applications.f_FindEqual(_pEnvironment->m_Settings.m_AgentApplication);
 		if (!pFindApplication)
 		{
-			o_Error = "Agent application '{}' for environment '{}' is not installed"_f << _pEnvironment->m_Settings.m_AgentApplication << _pEnvironment->m_Name;
-			return {};
+			*_pError = "Agent application '{}' for environment '{}' is not installed"_f << _pEnvironment->m_Settings.m_AgentApplication << _pEnvironment->m_Name;
+			co_return {};
 		}
 
 		CStr Directory = (*pFindApplication)->f_GetDirectory();
 
 		TCVector<CStr> Candidates;
 		if (!(*pFindApplication)->m_Settings.m_Executable.f_IsEmpty())
-			Candidates.f_Insert((*pFindApplication)->m_Settings.m_Executable);
-		Candidates.f_Insert(CFile::fs_GetFile(CFile::fs_GetProgramPath()));
+			Candidates.f_Insert(Directory / (*pFindApplication)->m_Settings.m_Executable);
+		Candidates.f_Insert(Directory / CFile::fs_GetFile(CFile::fs_GetProgramPath()));
 #ifdef DPlatformFamily_Windows
-		Candidates.f_Insert("AppManager.exe");
+		Candidates.f_Insert(Directory / "AppManager.exe");
 #else
-		Candidates.f_Insert("AppManager");
+		Candidates.f_Insert(Directory / "AppManager");
 #endif
 
-		for (auto &Candidate : Candidates)
+		CStr Executable;
 		{
-			CStr Executable = Directory / Candidate;
-			if (CFile::fs_FileExists(Executable))
-				return Executable;
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			Executable = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [Candidates = fg_Move(Candidates)]() -> CStr
+					{
+						for (auto &Candidate : Candidates)
+						{
+							if (CFile::fs_FileExists(Candidate))
+								return Candidate;
+						}
+
+						return {};
+					}
+				)
+			;
 		}
 
-		o_Error = "Found no agent executable in '{}' for environment '{}'"_f << Directory << _pEnvironment->m_Name;
-		return {};
+		if (Executable.f_IsEmpty())
+			*_pError = "Found no agent executable in '{}' for environment '{}'"_f << Directory << _pEnvironment->m_Name;
+
+		co_return Executable;
 	}
 
 	TCSharedPointer<CAppManagerActor::CApplication> CAppManagerActor::fp_GetEnvironmentParentApplication(CEnvironment const &_Environment)
@@ -1726,12 +1741,12 @@ namespace NMib::NCloud::NAppManager
 		if (bVM)
 			co_return co_await fp_StartEnvironmentVM(_pEnvironment);
 
-		CStr Error;
-		CStr AgentExecutable = fp_GetEnvironmentAgentExecutable(_pEnvironment, Error);
+		TCSharedPointer<CStr> pError = fg_Construct();
+		CStr AgentExecutable = co_await fp_GetEnvironmentAgentExecutable(_pEnvironment, pError);
 		if (AgentExecutable.f_IsEmpty())
 		{
-			_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
-			co_return DMibErrorInstance(Error);
+			_pEnvironment->f_SetStatus(*pError, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(*pError);
 		}
 
 		_pEnvironment->m_bStarting = true;
