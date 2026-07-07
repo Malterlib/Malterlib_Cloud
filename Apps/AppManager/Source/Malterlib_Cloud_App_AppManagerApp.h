@@ -24,6 +24,7 @@ namespace NMib::NCloud
 		NStr::CStr m_Network;
 		NStr::CStr m_MemoryLimit;
 		fp64 m_CPULimit = 0.0;
+		bool m_bReadOnly = false; /// Read-only container filesystem; all writes must go to mounted paths
 		NContainer::TCMap<NStr::CStr, NStr::CStr> m_Mounts; /// Host path to path inside the container
 		NContainer::TCVector<NStr::CStr> m_ExtraArguments;
 		NContainer::TCMap<NStr::CStr, NStr::CStr> m_AddHosts; /// Hostname to address, for example host-gateway

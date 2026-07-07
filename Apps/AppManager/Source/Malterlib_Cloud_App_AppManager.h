@@ -175,6 +175,7 @@ namespace NMib::NCloud::NAppManager
 			, EEnvironmentSetting_VMCPUCount = DBit(12)
 			, EEnvironmentSetting_VMMemoryMB = DBit(13)
 			, EEnvironmentSetting_ParentApplication = DBit(14)
+			, EEnvironmentSetting_ContainerReadOnly = DBit(15)
 		};
 
 		struct CEnvironmentSettings
@@ -193,6 +194,7 @@ namespace NMib::NCloud::NAppManager
 
 			CStr m_MemoryLimit;
 			fp64 m_CPULimit = 0.0;
+			bool m_bContainerReadOnly = false; /// Read-only container filesystem; writes are confined to the mounted storage
 
 			CStr m_VMImage;
 			CStr m_VMBackend;
