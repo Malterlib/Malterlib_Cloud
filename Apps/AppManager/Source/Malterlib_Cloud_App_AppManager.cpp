@@ -8,9 +8,25 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	CAppManagerActor::CAppManagerActor()
-		: CDistributedAppActor(CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager"))
+	namespace
 	{
+		CDistributedAppActor_Settings fg_MakeAppManagerSettings()
+		{
+			auto Settings = CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager");
+
+			// When launched as an environment agent the root directory is provided by the launching AppManager
+			CStr AgentRootDirectory = fg_GetSys()->f_GetEnvironmentVariable("MalterlibAppManagerEnvironmentAgentRoot");
+			if (!AgentRootDirectory.f_IsEmpty())
+				return fg_Move(Settings).f_RootDirectory(AgentRootDirectory);
+
+			return Settings;
+		}
+	}
+
+	CAppManagerActor::CAppManagerActor()
+		: CDistributedAppActor(fg_MakeAppManagerSettings())
+	{
+		mp_bEnvironmentAgent = !fg_GetSys()->f_GetEnvironmentVariable("MalterlibAppManagerEnvironmentAgentRoot").f_IsEmpty();
 		mp_InitialStartupResultFuture = mp_InitialStartupResult.f_Future();
 	}
 
@@ -386,24 +402,43 @@ namespace NMib::NCloud::NAppManager
 
 		co_await fp_InitSensor();
 		co_await fp_InitLog();
-		co_await fp_InitHostMonitor();
+
+		if (!mp_bEnvironmentAgent)
+			co_await fp_InitHostMonitor();
 
 		co_await fp_ReadState();
 
-		co_await fp_RebootPrevention_WatchInitialSensors();
+		if (!mp_bEnvironmentAgent)
+			co_await fp_RebootPrevention_WatchInitialSensors();
 
-		co_await (fp_PublishAppInterface() + fp_SetupLimits());
+		if (mp_bEnvironmentAgent)
+			co_await fp_PublishAppInterface();
+		else
+			co_await (fp_PublishAppInterface() + fp_SetupLimits());
 
 		fp_InitApplications();
 		fp_UpdateApplicationDependencies();
 
 		CLogError LogError("Malterlib/Cloud/AppManager");
 
-		fp_PublishCoordinationInterface() > LogError("Failed to publish coordination interface");
-		fp_SubscribeCoordinationInterface() > LogError("Failed to subscribe to coordination interface");
+		if (!mp_bEnvironmentAgent)
+		{
+			fp_PublishCoordinationInterface() > LogError("Failed to publish coordination interface");
+			fp_SubscribeCoordinationInterface() > LogError("Failed to subscribe to coordination interface");
+		}
 
 		co_await (fp_SetupAppManagerInterfacePermissions() % "Failed to setup permissions");
 		co_await (fp_PublishAppManagerInterface() % "Failed to publish app manager interface");
+
+		co_await (mp_EnvironmentInterface.f_Publish<CAppManagerEnvironmentInterface>(mp_State.m_DistributionManager, this) % "Failed to publish environment interface");
+		co_await (mp_EnvironmentHostInterface.f_Publish<CAppManagerEnvironmentHostInterface>(mp_State.m_DistributionManager, this) % "Failed to publish environment host interface");
+
+		if (mp_bEnvironmentAgent)
+		{
+			co_await (fp_RegisterWithEnvironmentHost() % "Failed to register with environment host");
+
+			co_return {};
+		}
 
 		auto [KeySubscription, VersionSubscription, CloudSubscription] = co_await
 			(
@@ -472,6 +507,27 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		co_await (fp_SetupDatabaseCleanup() % "Failed to setup database cleanup");
+
+		// Kill environment agents that survived an earlier AppManager instance
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [EnvironmentsDirectory = mp_State.m_RootDirectory / "Environment"]()
+					{
+						CProcessLaunch::fs_KillProcessesInDirectory("*", {}, EnvironmentsDirectory, 10.0);
+					}
+				)
+				.f_Wrap() > LogError("Failed to kill stale environment agents")
+			;
+		}
+
+		for (auto &pEnvironment : mp_Environments)
+		{
+			if (pEnvironment->m_Settings.m_bAutoStart)
+				fp_EnsureEnvironmentStarted(pEnvironment) > LogError("Failed to auto-start environment");
+		}
 
 		co_return {};
 	}
@@ -613,6 +669,14 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		{
+			TCFutureVector<void> EnvironmentStops;
+			for (auto &pEnvironment : mp_Environments)
+				fp_StopEnvironmentInternal(pEnvironment) > EnvironmentStops;
+
+			co_await fg_AllDone(EnvironmentStops).f_Wrap() > LogError.f_Warning("Failed to stop environments");
+		}
+
+		{
 			TCFutureVector<void> Destroys;
 
 			for (auto &Launch : mp_LaunchActors)
@@ -684,6 +748,22 @@ namespace NMib::NCloud::NAppManager
 				AppManagerCoordinationInterfaceDestroyResult > LogError.f_Warning("Failed to destroy app manager coordination interface");
 		}
 
+		if (mp_EnvironmentHostRegistration)
+			co_await fg_Exchange(mp_EnvironmentHostRegistration, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy environment host registration");
+
+		mp_EnvironmentHostActor = nullptr;
+
+		{
+			auto [EnvironmentInterfaceDestroyResult, EnvironmentHostInterfaceDestroyResult] =
+				co_await (mp_EnvironmentInterface.f_Destroy() + mp_EnvironmentHostInterface.f_Destroy()).f_Wrap()
+			;
+			if (!EnvironmentInterfaceDestroyResult)
+				EnvironmentInterfaceDestroyResult > LogError.f_Warning("Failed to destroy environment interface");
+			if (!EnvironmentHostInterfaceDestroyResult)
+				EnvironmentHostInterfaceDestroyResult > LogError.f_Warning("Failed to destroy environment host interface");
+		}
+
+		co_await mp_EnvironmentHostActors.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy environment host interface subscription");
 		co_await mp_RemoteAppManagers.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy remote app managers interface subscription");
 		co_await mp_AppInterfaceServer.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app interface server");
 

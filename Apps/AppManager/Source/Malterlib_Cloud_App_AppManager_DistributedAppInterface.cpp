@@ -33,6 +33,20 @@ namespace NMib::NCloud::NAppManager
 		return nullptr;
 	}
 
+	auto CAppManagerActor::fp_EnvironmentFromHostID(CStr const &_HostID) -> TCSharedPointer<CEnvironment>
+	{
+		if (_HostID.f_IsEmpty())
+			return nullptr;
+
+		for (auto &pEnvironment : mp_Environments)
+		{
+			if (pEnvironment->m_AgentHostID == _HostID)
+				return pEnvironment;
+		}
+
+		return nullptr;
+	}
+
 	NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterDistributedApp
 		(
 			NConcurrency::TCDistributedActorInterfaceWithID<CDistributedAppInterfaceClient> _ClientInterface
@@ -59,6 +73,45 @@ namespace NMib::NCloud::NAppManager
 
 		if (!pApplication)
 		{
+			// Environment agents register with the launch id of their environment
+			for (auto &pEnvironment : pThis->mp_Environments)
+			{
+				bool bMatch = _RegisterInfo.m_LaunchID && !pEnvironment->m_LaunchID.f_IsEmpty() && pEnvironment->m_LaunchID == *_RegisterInfo.m_LaunchID;
+				if (!bMatch)
+					bMatch = !pEnvironment->m_AgentHostID.f_IsEmpty() && pEnvironment->m_AgentHostID == HostID;
+
+				if (!bMatch)
+					continue;
+
+				pEnvironment->m_AgentAppInterface = fg_Move(_ClientInterface);
+				pEnvironment->m_AgentHostID = HostID;
+
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Info
+						, "Environment agent for '{}' registered from host '{}'"
+						, pEnvironment->m_Name
+						, CallingHostInfo.f_GetHostInfo().f_GetDesc()
+					)
+				;
+
+				co_return g_ActorSubscription / [pEnvironment, HostInfo = CallingHostInfo.f_GetHostInfo()]() -> TCFuture<void>
+					{
+						if (pEnvironment->m_bDeleted)
+							co_return {};
+
+						TCFuture<void> DestroyFuture = pEnvironment->m_AgentAppInterface.f_Destroy();
+						pEnvironment->m_AgentAppInterface.f_Clear();
+
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Environment agent registration lost: {}", HostInfo.f_GetDesc());
+
+						co_await fg_Move(DestroyFuture);
+						co_return {};
+					}
+				;
+			}
+
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application registered: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
 			co_return DErrorInstance("Application not associated with your host");
 		}
@@ -155,7 +208,7 @@ namespace NMib::NCloud::NAppManager
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
 
 		auto pApplication = pThis->fp_ApplicationFromHostID(CallingHostInfo.f_GetRealHostID());
-		if (!pApplication)
+		if (!pApplication && !pThis->fp_EnvironmentFromHostID(CallingHostInfo.f_GetRealHostID()))
 		{
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application requested sensor reporter: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
 			co_return DErrorInstance("Application not associated with your host");
@@ -178,7 +231,7 @@ namespace NMib::NCloud::NAppManager
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
 
 		auto pApplication = pThis->fp_ApplicationFromHostID(CallingHostInfo.f_GetRealHostID());
-		if (!pApplication)
+		if (!pApplication && !pThis->fp_EnvironmentFromHostID(CallingHostInfo.f_GetRealHostID()))
 		{
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application requested log reporter: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
 			co_return DErrorInstance("Application not associated with your host");

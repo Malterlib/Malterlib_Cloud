@@ -193,6 +193,9 @@ namespace NMib::NCloud::NAppManager
 		if (Application.m_bDeleted)
 			co_return DMibErrorInstance("Application has been deleted");
 
+		if (Application.m_bEphemeral)
+			co_return {};
+
 		auto &Settings = Application.m_Settings;
 
 		auto &ApplicationJson = mp_State.m_StateDatabase.m_Data["Applications"][Application.m_Name];

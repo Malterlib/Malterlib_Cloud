@@ -10,6 +10,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		m_ProcessLaunch.f_Set<0>();
 		m_ProcessLaunchSubscription.f_Clear();
+		m_pLaunchedEnvironment = nullptr;
 		m_bLaunched = false;
 	}
 
@@ -281,7 +282,22 @@ namespace NMib::NCloud::NAppManager
 							co_return DMibErrorInstance(fg_Format("Errors stopping child applications: {}", ChildCloseErrors));
 
 						TCAsyncResult<uint32> StopResult;
-						if (pApplication->m_ProcessLaunch.f_IsOfType<void>() || bWasStopped || pApplication->m_bDeleted)
+						if (pApplication->m_pLaunchedEnvironment)
+						{
+							auto pEnvironment = fg_Exchange(pApplication->m_pLaunchedEnvironment, nullptr);
+
+							if (pEnvironment->m_AgentInterface && !pApplication->m_bDeleted)
+							{
+								DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Stopping application '{}' in environment '{}'", pApplication->m_Name, pEnvironment->m_Name);
+								StopResult = co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_StopApplication)(pApplication->m_Name)
+									.f_Timeout(60.0 * 60.0, "Timed out stopping application in environment (1 hour)")
+									.f_Wrap()
+								;
+							}
+							else
+								StopResult.f_SetResult(0);
+						}
+						else if (pApplication->m_ProcessLaunch.f_IsOfType<void>() || bWasStopped || pApplication->m_bDeleted)
 							StopResult.f_SetResult(0);
 						else
 						{
@@ -390,6 +406,9 @@ namespace NMib::NCloud::NAppManager
 
 	CStr CAppManagerActor::CApplication::f_GetDirectory()
 	{
+		if (!m_DirectoryOverride.f_IsEmpty())
+			return m_DirectoryOverride;
+
 		if (f_IsChildApp())
 			return fg_Format("{}/App/{}/{}", m_pThis->mp_State.m_RootDirectory, m_Settings.m_ParentApplication, m_Name);
 		else

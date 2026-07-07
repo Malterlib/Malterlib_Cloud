@@ -41,17 +41,7 @@ namespace NMib::NCloud::NAppManager
 		return "Unknown";
 	}
 
-	TCFuture<void> CAppManagerActor::fp_RunUpdateScript
-		(
-			TCSharedPointer<CApplication> const &_pApplication
-			, EUpdateScript _Script
-			, CStr const &_Param
-			, CVersionManager::CVersionIDAndPlatform const &_VersionID
-			, CVersionManager::CVersionInformation const *_pVersionInformation
-			, CVersionManager::CVersionIDAndPlatform const &_PreviousVersionID
-			, CVersionManager::CVersionInformation const &_PreviousVersionInformation
-			, fp64 _TimeSinceUpdateStart
-		)
+	TCFuture<void> CAppManagerActor::fp_RunBashScript(CAppManagerEnvironmentInterface::CEnvironmentScript _Script, NStr::CStrSecure _RunAsUserPassword)
 	{
 		struct CState
 		{
@@ -71,15 +61,14 @@ namespace NMib::NCloud::NAppManager
 		};
 		TCSharedPointer<CState> pState = fg_Construct();
 
-		CStr Script = _pApplication->m_Settings.m_UpdateScripts.f_GetScript(_Script);
-		if (Script.f_IsEmpty())
+		if (_Script.m_Script.f_IsEmpty())
 			return pState->m_Promise <<= g_Void;
 
-		CStr Description = fg_Format("{}/{}", _pApplication->m_Name, _pApplication->m_Settings.m_UpdateScripts.f_GetName(_Script));
+		CStr Description = _Script.m_Description;
 
 		pState->m_LaunchActor = fg_ConstructActor<CProcessLaunchActor>();
 
-		CStr FileName = CFile::fs_GetExpandedPath(Script, _pApplication->f_GetDirectory());
+		CStr FileName = CFile::fs_GetExpandedPath(_Script.m_Script, _Script.m_Directory);
 
 		auto fReportError = [pState, Description](CStr const &_Error)
 			{
@@ -102,8 +91,8 @@ namespace NMib::NCloud::NAppManager
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 			(
 				CProcessLaunch::fs_GetBashPath()
-				, fg_CreateVector<CStr>(FileName, _Param)
-				, _pApplication->f_GetDirectory()
+				, fg_CreateVector<CStr>(FileName, _Script.m_Parameter)
+				, _Script.m_Directory
 				, [pState, Description, fReportError](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 				{
 					if (!pState->m_LaunchActor)
@@ -187,87 +176,14 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		LaunchParams.m_RunAsUser = fp_GetRunAsUser(_pApplication->m_Settings);
+		LaunchParams.m_RunAsUser = _Script.m_RunAsUser;
 #ifdef DPlatformFamily_Windows
-		LaunchParams.m_RunAsUserPassword = _pApplication->m_Settings.m_RunAsUserPassword;
+		LaunchParams.m_RunAsUserPassword = _RunAsUserPassword;
 #endif
-		LaunchParams.m_RunAsGroup = fp_GetRunAsGroup(_pApplication->m_Settings);
+		LaunchParams.m_RunAsGroup = _Script.m_RunAsGroup;
 
-		LaunchParams.m_Environment["HOME"] = _pApplication->f_GetDirectory() + "/.home";
-		LaunchParams.m_Environment["TMPDIR"] = _pApplication->f_GetDirectory() + "/.tmp";
-#ifdef DPlatformFamily_Windows
-		LaunchParams.m_Environment["TMP"] = _pApplication->f_GetDirectory() + "/.tmp";
-		LaunchParams.m_Environment["TEMP"] = _pApplication->f_GetDirectory() + "/.tmp";
-#endif
-
-		LaunchParams.m_Environment["MalterlibCloud_TimeSinceStart"] = fg_Format("{fe1}", _TimeSinceUpdateStart);
-		LaunchParams.m_Environment["MalterlibCloud_Application"] = _pApplication->m_Name;
-		LaunchParams.m_Environment["MalterlibCloud_VersionApplication"] = _pApplication->m_Settings.m_VersionManagerApplication;
-
-		auto fAddVersionInformation = [&](CStr const &_Prefix, CVersionManager::CVersionIDAndPlatform const &_VersionID, CVersionManager::CVersionInformation const *_pVersionInformation)
-			{
-				auto fPrefixName = [&](CStr const &_Name) -> CStr
-					{
-						return "MalterlibCloud_{}{}"_f << _Prefix << _Name;
-					}
-				;
-
-				if (_VersionID.f_IsValid())
-				{
-					LaunchParams.m_Environment[fPrefixName("Version")] = CStr::fs_ToStr(_VersionID);
-					LaunchParams.m_Environment[fPrefixName("VersionID")] = CStr::fs_ToStr(_VersionID.m_VersionID);
-					LaunchParams.m_Environment[fPrefixName("VersionBranch")] = _VersionID.m_VersionID.m_Branch;
-					LaunchParams.m_Environment[fPrefixName("VersionMajor")] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Major);
-					LaunchParams.m_Environment[fPrefixName("VersionMinor")] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Minor);
-					LaunchParams.m_Environment[fPrefixName("VersionRevision")] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Revision);
-					LaunchParams.m_Environment[fPrefixName("VersionPlatform")] = _VersionID.m_Platform;
-				}
-				else
-				{
-					LaunchParams.m_Environment[fPrefixName("Version")] = "Unknown";
-					LaunchParams.m_Environment[fPrefixName("VersionID")] = "Unknown";
-				}
-
-				if (!_pVersionInformation)
-					return;
-
-				LaunchParams.m_Environment[fPrefixName("Time")] = "{}"_f << _pVersionInformation->m_Time.f_ToLocal();
-				LaunchParams.m_Environment[fPrefixName("Configuration")] = "{}"_f << _pVersionInformation->m_Configuration;
-				LaunchParams.m_Environment[fPrefixName("Tags")] = "{vs,vb}"_f << _pVersionInformation->m_Tags;
-				LaunchParams.m_Environment[fPrefixName("RetrySequence")] = "{}"_f << _pVersionInformation->m_RetrySequence;
-				LaunchParams.m_Environment[fPrefixName("ExtraInfo")] = _pVersionInformation->m_ExtraInfo.f_ToString(nullptr);
-				LaunchParams.m_Environment[fPrefixName("NumFiles")] = "{}"_f << _pVersionInformation->m_nFiles;
-				LaunchParams.m_Environment[fPrefixName("NumBytes")] = "{}"_f << _pVersionInformation->m_nBytes;
-			}
-		;
-
-		fAddVersionInformation("", _VersionID, _pVersionInformation);
-		fAddVersionInformation("Previous", _PreviousVersionID, &_PreviousVersionInformation);
-
-		if (_pVersionInformation)
-		{
-			if (auto pUpdateScriptEnv = _pVersionInformation->m_ExtraInfo.f_GetMember("UpdateScriptEnvironment", EJsonType_Object))
-			{
-				for (auto &Member : pUpdateScriptEnv->f_Object())
-				{
-					if (!Member.f_Value().f_IsString())
-					{
-						DMibLogWithCategory
-							(
-								Malterlib/Cloud/AppManager
-								, Info
-								, "[{}] Invalid type in UpdateScriptEnvironment.{}"
-								, Description
-								, Member.f_Name()
-							)
-						;
-						continue;
-					}
-
-					LaunchParams.m_Environment[Member.f_Name()] = Member.f_Value().f_String();
-				}
-			}
-		}
+		for (auto &Value : _Script.m_Environment)
+			LaunchParams.m_Environment[_Script.m_Environment.fs_GetKey(Value)] = Value;
 
 		LaunchParams.m_bMergeEnvironment = true;
 		LaunchParams.m_bAllowExecutableLocate = true;
@@ -292,5 +208,129 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		return pState->m_Promise.f_Future();
+	}
+
+	TCFuture<void> CAppManagerActor::fp_RunUpdateScript
+		(
+			TCSharedPointer<CApplication> _pApplication
+			, EUpdateScript _Script
+			, CStr _Param
+			, CVersionManager::CVersionIDAndPlatform _VersionID
+			, CVersionManager::CVersionInformation const *_pVersionInformation
+			, CVersionManager::CVersionIDAndPlatform _PreviousVersionID
+			, CVersionManager::CVersionInformation _PreviousVersionInformation
+			, fp64 _TimeSinceUpdateStart
+		)
+	{
+		CStr Script = _pApplication->m_Settings.m_UpdateScripts.f_GetScript(_Script);
+		if (Script.f_IsEmpty())
+			co_return {};
+
+		CAppManagerEnvironmentInterface::CEnvironmentScript EnvironmentScript;
+		EnvironmentScript.m_Description = fg_Format("{}/{}", _pApplication->m_Name, _pApplication->m_Settings.m_UpdateScripts.f_GetName(_Script));
+		EnvironmentScript.m_Script = Script;
+		EnvironmentScript.m_Directory = _pApplication->f_GetDirectory();
+		EnvironmentScript.m_Parameter = _Param;
+		EnvironmentScript.m_RunAsUser = fp_GetRunAsUser(_pApplication->m_Settings);
+		EnvironmentScript.m_RunAsGroup = fp_GetRunAsGroup(_pApplication->m_Settings);
+
+		auto &Environment = EnvironmentScript.m_Environment;
+
+		Environment["HOME"] = _pApplication->f_GetDirectory() + "/.home";
+		Environment["TMPDIR"] = _pApplication->f_GetDirectory() + "/.tmp";
+#ifdef DPlatformFamily_Windows
+		Environment["TMP"] = _pApplication->f_GetDirectory() + "/.tmp";
+		Environment["TEMP"] = _pApplication->f_GetDirectory() + "/.tmp";
+#endif
+
+		Environment["MalterlibCloud_TimeSinceStart"] = fg_Format("{fe1}", _TimeSinceUpdateStart);
+		Environment["MalterlibCloud_Application"] = _pApplication->m_Name;
+		Environment["MalterlibCloud_VersionApplication"] = _pApplication->m_Settings.m_VersionManagerApplication;
+
+		auto fAddVersionInformation = [&](CStr const &_Prefix, CVersionManager::CVersionIDAndPlatform const &_VersionID, CVersionManager::CVersionInformation const *_pVersionInformation)
+			{
+				auto fPrefixName = [&](CStr const &_Name) -> CStr
+					{
+						return "MalterlibCloud_{}{}"_f << _Prefix << _Name;
+					}
+				;
+
+				if (_VersionID.f_IsValid())
+				{
+					Environment[fPrefixName("Version")] = CStr::fs_ToStr(_VersionID);
+					Environment[fPrefixName("VersionID")] = CStr::fs_ToStr(_VersionID.m_VersionID);
+					Environment[fPrefixName("VersionBranch")] = _VersionID.m_VersionID.m_Branch;
+					Environment[fPrefixName("VersionMajor")] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Major);
+					Environment[fPrefixName("VersionMinor")] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Minor);
+					Environment[fPrefixName("VersionRevision")] = CStr::fs_ToStr(_VersionID.m_VersionID.m_Revision);
+					Environment[fPrefixName("VersionPlatform")] = _VersionID.m_Platform;
+				}
+				else
+				{
+					Environment[fPrefixName("Version")] = "Unknown";
+					Environment[fPrefixName("VersionID")] = "Unknown";
+				}
+
+				if (!_pVersionInformation)
+					return;
+
+				Environment[fPrefixName("Time")] = "{}"_f << _pVersionInformation->m_Time.f_ToLocal();
+				Environment[fPrefixName("Configuration")] = "{}"_f << _pVersionInformation->m_Configuration;
+				Environment[fPrefixName("Tags")] = "{vs,vb}"_f << _pVersionInformation->m_Tags;
+				Environment[fPrefixName("RetrySequence")] = "{}"_f << _pVersionInformation->m_RetrySequence;
+				Environment[fPrefixName("ExtraInfo")] = _pVersionInformation->m_ExtraInfo.f_ToString(nullptr);
+				Environment[fPrefixName("NumFiles")] = "{}"_f << _pVersionInformation->m_nFiles;
+				Environment[fPrefixName("NumBytes")] = "{}"_f << _pVersionInformation->m_nBytes;
+			}
+		;
+
+		fAddVersionInformation("", _VersionID, _pVersionInformation);
+		fAddVersionInformation("Previous", _PreviousVersionID, &_PreviousVersionInformation);
+
+		if (_pVersionInformation)
+		{
+			if (auto pUpdateScriptEnv = _pVersionInformation->m_ExtraInfo.f_GetMember("UpdateScriptEnvironment", EJsonType_Object))
+			{
+				for (auto &Member : pUpdateScriptEnv->f_Object())
+				{
+					if (!Member.f_Value().f_IsString())
+					{
+						DMibLogWithCategory
+							(
+								Malterlib/Cloud/AppManager
+								, Info
+								, "[{}] Invalid type in UpdateScriptEnvironment.{}"
+								, EnvironmentScript.m_Description
+								, Member.f_Name()
+							)
+						;
+						continue;
+					}
+
+					Environment[Member.f_Name()] = Member.f_Value().f_String();
+				}
+			}
+		}
+
+		if (!_pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty())
+		{
+			auto *pFindEnvironment = mp_Environments.f_FindEqual(_pApplication->m_Settings.m_LaunchEnvironment);
+			if (!pFindEnvironment)
+				co_return DMibErrorInstance("Cannot run update script: no such environment '{}'"_f << _pApplication->m_Settings.m_LaunchEnvironment);
+
+			auto pEnvironment = *pFindEnvironment;
+
+			co_await fp_EnsureEnvironmentStarted(pEnvironment);
+
+			co_return co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_RunScript)(fg_Move(EnvironmentScript))
+				.f_Timeout(60.0 * 60.0, "Timed out running update script in environment (1 hour)")
+			;
+		}
+
+#ifdef DPlatformFamily_Windows
+		co_return co_await fp_RunBashScript(fg_Move(EnvironmentScript), _pApplication->m_Settings.m_RunAsUserPassword);
+#else
+		co_return co_await fp_RunBashScript(fg_Move(EnvironmentScript));
+#endif
 	}
 }

@@ -308,6 +308,17 @@ namespace NMib::NCloud::NAppManager
 		_pApplication->m_LaunchStatus = _LaunchStatus;
 		_pApplication->m_LaunchStatusSeverity = _Severity;
 
+		if (mp_bEnvironmentAgent && _pApplication->m_bEphemeral)
+		{
+			CAppManagerEnvironmentInterface::CApplicationStateChange Change;
+			Change.m_Application = _pApplication->m_Name;
+			Change.m_State = CAppManagerEnvironmentInterface::EApplicationState_Status;
+			Change.m_Status = _LaunchStatus;
+			Change.m_StatusSeverity = _Severity;
+
+			fp_ForwardApplicationStateChange(fg_Move(Change));
+		}
+
 		fp_SetApplicationSensorStatus(_pApplication, _LaunchStatus, _Severity) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to report application sensor status");
 
 		fp_SendAppChange_Status(*_pApplication);
