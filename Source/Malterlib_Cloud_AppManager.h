@@ -471,6 +471,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<void> f_EnvironmentRemove(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_EnvironmentChangeSettings(NStr::CStr _Name, CEnvironmentSettings _Settings) = 0;
 		virtual NConcurrency::TCFuture<void> f_EnvironmentStart(NStr::CStr _Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_EnvironmentPull(NStr::CStr _Name) = 0; /// Pulls the container image and recreates the environment container from it
 		virtual NConcurrency::TCFuture<void> f_EnvironmentStop(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_EnvironmentRestart(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CEnvironmentInfo>> f_GetEnvironments() = 0;

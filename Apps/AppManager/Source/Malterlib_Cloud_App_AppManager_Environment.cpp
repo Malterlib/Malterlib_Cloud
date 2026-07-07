@@ -396,6 +396,27 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentManagement.f_RegisterCommand
 			(
 				{
+					"Names"_o= _o["--environment-pull"]
+					, "Description"_o=
+						"Pulls the newest container image for the environment and recreates the container from it.\n"
+						"This resets changes made inside the container filesystem, including OS updates made by an\n"
+						"agent inside it; data in the mounted storage is unaffected. The environment is restarted\n"
+						"when it was running."
+					, "Options"_o=
+					{
+						NameOption
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_PullEnvironment(fg_Move(_Params), fg_Move(_pCommandLine));
+				}
+			)
+		;
+
+		EnvironmentManagement.f_RegisterCommand
+			(
+				{
 					"Names"_o= _o["--vm-image-create"]
 					, "Description"_o=
 						"Creates a macOS guest VM image bundle and installs macOS into it from a restore image (IPSW).\n"
@@ -801,6 +822,13 @@ namespace NMib::NCloud::NAppManager
 				Settings.m_VMCPUCount = (uint32)pValue->f_Integer();
 			if (auto pValue = EnvironmentJson.f_GetMember("VMMemoryMB", EJsonType_Integer))
 				Settings.m_VMMemoryMB = (uint32)pValue->f_Integer();
+
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerFingerprint", EJsonType_String))
+				Environment.m_ContainerFingerprint = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerLaunchID", EJsonType_String))
+				Environment.m_ContainerLaunchID = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerRequestTicketMagic", EJsonType_String))
+				Environment.m_ContainerRequestTicketMagic = pValue->f_String();
 		}
 	}
 
@@ -842,6 +870,10 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentJson["VMBackend"] = Settings.m_VMBackend;
 		EnvironmentJson["VMCPUCount"] = Settings.m_VMCPUCount;
 		EnvironmentJson["VMMemoryMB"] = Settings.m_VMMemoryMB;
+
+		EnvironmentJson["ContainerFingerprint"] = Environment.m_ContainerFingerprint;
+		EnvironmentJson["ContainerLaunchID"] = Environment.m_ContainerLaunchID;
+		EnvironmentJson["ContainerRequestTicketMagic"] = Environment.m_ContainerRequestTicketMagic;
 
 		co_return co_await mp_State.m_StateDatabase.f_Save();
 	}
@@ -991,6 +1023,9 @@ namespace NMib::NCloud::NAppManager
 
 		co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
 
+		if (pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+			co_await fp_RemoveEnvironmentContainer(pEnvironment);
+
 		pEnvironment->m_bDeleted = true;
 		mp_Environments.f_Remove(_Name);
 
@@ -1109,6 +1144,57 @@ namespace NMib::NCloud::NAppManager
 		co_await (fp_EnsureEnvironmentStarted(*pFindEnvironment) % "Failed to start environment" % Auditor);
 
 		Auditor.f_Info(fg_Format("Started environment '{}'", _Name));
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_PullEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo)
+	{
+		auto Auditor = f_Auditor({}, _CallingHostInfo);
+
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+
+		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/EnvironmentPull"}};
+		Permissions["Environment"] = {CPermissionQuery{"AppManager/EnvironmentAll", fg_Format("AppManager/Environment/{}", _Name)}.f_Description("Access environment {} in AppManager"_f << _Name)};
+
+		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
+			(
+				mp_Permissions.f_HasPermissions("Pull environment in AppManager", Permissions, _CallingHostInfo) % "Permission denied pulling environment" % Auditor
+			)
+		;
+
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(Environment pull, command)", Permissions["Command"]);
+
+		if (!HasPermissions["Environment"])
+			co_return Auditor.f_AccessDenied("(Environment pull, environment name)", Permissions["Environment"]);
+
+		auto *pFindEnvironment = mp_Environments.f_FindEqual(_Name);
+		if (!pFindEnvironment)
+			co_return Auditor.f_Exception(fg_Format("No such environment '{}'", _Name));
+
+		auto pEnvironment = *pFindEnvironment;
+
+		if (pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Container)
+			co_return Auditor.f_Exception(fg_Format("Environment '{}' is not a container environment", _Name));
+
+		bool bWasStarted = pEnvironment->f_IsStarted() || pEnvironment->m_bStarting;
+
+		co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
+
+		co_await fp_RemoveEnvironmentContainer(pEnvironment);
+
+		co_await (fp_PullEnvironmentContainerImage(pEnvironment) % "Failed to pull environment image" % Auditor);
+
+		// The container is recreated from the pulled image on the next start
+		pEnvironment->m_ContainerFingerprint = {};
+
+		co_await (fp_UpdateEnvironmentJson(pEnvironment) % "Failed to save environment state" % Auditor);
+
+		if (bWasStarted)
+			co_await (fp_EnsureEnvironmentStarted(pEnvironment) % "Failed to start environment" % Auditor);
+
+		Auditor.f_Info(fg_Format("Pulled environment '{}'", _Name));
 
 		co_return {};
 	}
@@ -1237,6 +1323,11 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_EnvironmentStart(CStr _Name)
 	{
 		co_return co_await m_pThis->fp_StartEnvironment(_Name, fg_GetCallingHostInfo());
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_EnvironmentPull(CStr _Name)
+	{
+		co_return co_await m_pThis->fp_PullEnvironment(_Name, fg_GetCallingHostInfo());
 	}
 
 	TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_EnvironmentStop(CStr _Name)
@@ -1391,6 +1482,13 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RestartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto Result = co_await fp_RestartEnvironment(_Params["Name"].f_String(), fg_GetCallingHostInfo()).f_Wrap();
+
+		co_return _pCommandLine->f_AddAsyncResult(Result);
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_PullEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		auto Result = co_await fp_PullEnvironment(_Params["Name"].f_String(), fg_GetCallingHostInfo()).f_Wrap();
 
 		co_return _pCommandLine->f_AddAsyncResult(Result);
 	}
@@ -1673,15 +1771,6 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
-		if (bContainer)
-		{
-			// Remove any stale container left behind by an earlier agent
-			co_await fp_RemoveEnvironmentContainer(_pEnvironment);
-
-			if (_pEnvironment->m_bDeleted)
-				co_return DMibErrorInstance("Environment has been deleted");
-		}
-
 		_pEnvironment->m_LaunchID = fg_RandomID();
 
 		TCPromiseFuturePair<void> LaunchedPromise;
@@ -1692,7 +1781,61 @@ namespace NMib::NCloud::NAppManager
 		if (bContainer)
 		{
 			LaunchExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
-			LaunchParameters = fg_AppManager_BuildContainerRunArguments(fp_BuildEnvironmentContainerLaunch(_pEnvironment, AgentExecutable, AgentRootDirectory));
+			TCVector<CStr> RunArguments = fg_AppManager_BuildContainerRunArguments(fp_BuildEnvironmentContainerLaunch(_pEnvironment, AgentExecutable, AgentRootDirectory));
+
+			// The container keeps its creation-time process environment, so it can only be
+			// reused while everything that shaped it is unchanged; the fingerprint covers
+			// the full run command plus the values forwarded through the environment
+			CStr FingerprintData = LaunchExecutable;
+			for (auto &Argument : RunArguments)
+				FingerprintData += "\n" + Argument;
+			FingerprintData += "\n" + mp_State.m_LocalAddress.f_Encode();
+			FingerprintData += "\n" + mp_State.m_HostID;
+			CStr Fingerprint = NCryptography::CHash_SHA256::fs_DigestFromData(FingerprintData.f_GetStr(), FingerprintData.f_GetLen()).f_GetString();
+
+			bool bReuse
+				= Fingerprint == _pEnvironment->m_ContainerFingerprint
+				&& !_pEnvironment->m_ContainerLaunchID.f_IsEmpty()
+				&& co_await fp_EnvironmentContainerExists(_pEnvironment)
+			;
+
+			if (_pEnvironment->m_bDeleted)
+				co_return DMibErrorInstance("Environment has been deleted");
+
+			if (bReuse)
+			{
+				// Stop a still-running instance left behind by an earlier AppManager, then
+				// restart it with attached standard streams for the ticket handshake. The
+				// container filesystem survives, keeping OS updates made inside it.
+				co_await fp_StopEnvironmentContainer(_pEnvironment);
+
+				LaunchParameters = fg_CreateVector<CStr>("start", "--attach", "--interactive", fp_GetContainerName(_pEnvironment));
+			}
+			else
+			{
+				// Recreating the container resets its filesystem to the image, so take the
+				// chance to pull the newest image for the reference first
+				co_await fp_RemoveEnvironmentContainer(_pEnvironment);
+
+				co_await fp_PullEnvironmentContainerImage(_pEnvironment).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to pull environment container image")
+				;
+
+				_pEnvironment->m_ContainerLaunchID = fg_RandomID();
+				_pEnvironment->m_ContainerRequestTicketMagic = fg_RandomID();
+				_pEnvironment->m_ContainerFingerprint = Fingerprint;
+
+				co_await fp_UpdateEnvironmentJson(_pEnvironment).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to save environment container state")
+				;
+
+				LaunchParameters = fg_Move(RunArguments);
+			}
+
+			if (_pEnvironment->m_bDeleted)
+				co_return DMibErrorInstance("Environment has been deleted");
+
+			_pEnvironment->m_LaunchID = _pEnvironment->m_ContainerLaunchID;
 		}
 
 		CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
@@ -1785,6 +1928,7 @@ namespace NMib::NCloud::NAppManager
 				, fg_Format("Environment/{}", _pEnvironment->m_Name)
 				, _pEnvironment->m_LaunchID
 				, false
+				, bContainer ? _pEnvironment->m_ContainerRequestTicketMagic : CStr()
 			)
 		;
 
@@ -1988,8 +2132,10 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
+		// The container is stopped but kept, so its filesystem (including OS updates
+		// made inside it) survives across environment restarts
 		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
-			co_await fp_RemoveEnvironmentContainer(_pEnvironment);
+			co_await fp_StopEnvironmentContainer(_pEnvironment);
 
 		_pEnvironment->f_SetStatus("Stopped", CAppManagerInterface::EStatusSeverity_Warning);
 
