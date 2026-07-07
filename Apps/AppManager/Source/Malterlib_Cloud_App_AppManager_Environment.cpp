@@ -15,6 +15,76 @@ namespace NMib::NCloud::NAppManager
 	{
 		m_Status = _Status;
 		m_StatusSeverity = _Severity;
+
+		m_pThis->fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment>(fg_Explicit(this)), _Status, _Severity)
+			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to report environment sensor status")
+		;
+	}
+
+	TCFuture<void> CAppManagerActor::fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity)
+	{
+		if (!mp_bEnableApplicationStatusSensors)
+			co_return {};
+
+		auto OnResume = co_await fg_OnResume
+			(
+				[_pEnvironment]() -> CExceptionPointer
+				{
+					if (_pEnvironment->m_bDeleted)
+						return DMibErrorInstance("Environment was deleted");
+
+					return nullptr;
+				}
+			)
+		;
+
+		if (!_pEnvironment->m_StatusSensorReporter.m_fReportReadings)
+		{
+			auto SequenceSubscription = co_await _pEnvironment->m_StatusSensorReporterSequencer.f_Sequence();
+			if (!_pEnvironment->m_StatusSensorReporter.m_fReportReadings)
+			{
+				CDistributedAppSensorReporter::CSensorInfo SensorInfo;
+				SensorInfo.m_Identifier = "org.malterlib.appmanager.environment.status";
+				SensorInfo.m_Name = "Environment Status";
+				SensorInfo.m_IdentifierScope = _pEnvironment->m_Name;
+				SensorInfo.m_Type = NConcurrency::CDistributedAppSensorReporter::ESensorDataType_Status;
+
+				_pEnvironment->m_StatusSensorReporter = co_await fp_OpenSensorReporter(fg_Move(SensorInfo));
+			}
+		}
+
+		if (!_pEnvironment->m_StatusSensorReporter.m_fReportReadings)
+			co_return {};
+
+		auto NewStatus = CDistributedAppSensorReporter::CStatus
+			{
+				.m_Severity = [&]
+				{
+					switch (_Severity)
+					{
+					case CAppManagerInterface::EStatusSeverity_None: return CDistributedAppSensorReporter::EStatusSeverity_Ok;
+					case CAppManagerInterface::EStatusSeverity_Warning: return CDistributedAppSensorReporter::EStatusSeverity_Info;
+					case CAppManagerInterface::EStatusSeverity_Error: return CDistributedAppSensorReporter::EStatusSeverity_Error;
+					}
+
+					return CDistributedAppSensorReporter::EStatusSeverity_Info;
+				}
+				()
+				, .m_Description = _Status
+			}
+		;
+
+		if (_pEnvironment->m_LastReporterSensorStatus && NewStatus == *_pEnvironment->m_LastReporterSensorStatus)
+			co_return {};
+
+		_pEnvironment->m_LastReporterSensorStatus = NewStatus;
+
+		TCVector<CDistributedAppSensorReporter::CSensorReading> Readings;
+		Readings.f_Insert().m_Data = fg_Move(NewStatus);
+
+		co_await _pEnvironment->m_StatusSensorReporter.m_fReportReadings(fg_Move(Readings));
+
+		co_return {};
 	}
 
 	bool CAppManagerActor::CEnvironment::f_IsStarted() const
