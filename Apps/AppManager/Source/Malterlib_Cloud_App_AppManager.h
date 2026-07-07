@@ -20,6 +20,7 @@
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
 #include <Mib/Concurrency/DistributedAppLogStoreLocal>
 
+#include "Malterlib_Cloud_App_AppManagerApp.h"
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
 #include "Malterlib_Cloud_App_AppManager_EnvironmentInterface.h"
 
@@ -926,6 +927,16 @@ namespace NMib::NCloud::NAppManager
 		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_OnEnvironmentApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change);
 		CStr fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr &o_Error);
+		CStr fp_GetContainerRuntimeExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment);
+		CStr fp_GetContainerName(TCSharedPointer<CEnvironment> const &_pEnvironment);
+		CAppManagerContainerLaunch fp_BuildEnvironmentContainerLaunch
+			(
+				TCSharedPointer<CEnvironment> const &_pEnvironment
+				, CStr const &_AgentExecutable
+				, CStr const &_AgentRootDirectory
+			)
+		;
+		TCFuture<void> fp_RemoveEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 
 		// Environment agent handling (agent side)

@@ -1360,7 +1360,7 @@ namespace NMib::NCloud::NAppManager
 		if (_pEnvironment->f_IsStarted())
 			co_return {};
 
-		if (_pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
+		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
 		{
 			CStr Error = "Cannot start environment '{}': environment type {} is not yet supported"_f
 				<< _pEnvironment->m_Name
@@ -1369,6 +1369,8 @@ namespace NMib::NCloud::NAppManager
 			_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
 			co_return DMibErrorInstance(Error);
 		}
+
+		bool bContainer = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container;
 
 		CStr Error;
 		CStr AgentExecutable = fp_GetEnvironmentAgentExecutable(_pEnvironment, Error);
@@ -1415,14 +1417,32 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
+		if (bContainer)
+		{
+			// Remove any stale container left behind by an earlier agent
+			co_await fp_RemoveEnvironmentContainer(_pEnvironment);
+
+			if (_pEnvironment->m_bDeleted)
+				co_return DMibErrorInstance("Environment has been deleted");
+		}
+
 		_pEnvironment->m_LaunchID = fg_RandomID();
 
 		TCPromiseFuturePair<void> LaunchedPromise;
 
+		CStr LaunchExecutable = AgentExecutable;
+		TCVector<CStr> LaunchParameters = {"--daemon-run-standalone"};
+
+		if (bContainer)
+		{
+			LaunchExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
+			LaunchParameters = fg_AppManager_BuildContainerRunArguments(fp_BuildEnvironmentContainerLaunch(_pEnvironment, AgentExecutable, AgentRootDirectory));
+		}
+
 		CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
 			(
-				AgentExecutable
-				, fg_CreateVector<CStr>("--daemon-run-standalone")
+				LaunchExecutable
+				, LaunchParameters
 				, AgentRootDirectory
 				, [this, _pEnvironment, LaunchedPromise = LaunchedPromise.m_Promise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 				{
@@ -1468,6 +1488,7 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_LogName = fg_Format("Environment/{}", _pEnvironment->m_Name);
 
 		auto &LaunchParams = Launch.m_Params;
+		LaunchParams.m_bAllowExecutableLocate = bContainer;
 		LaunchParams.m_Environment["MalterlibAppManagerEnvironmentAgentRoot"] = AgentRootDirectory;
 		LaunchParams.m_Environment["MalterlibAppManagerEnvironmentHostID"] = mp_State.m_HostID;
 		LaunchParams.m_Environment["HOME"] = AgentRootDirectory + "/.home";
@@ -1692,6 +1713,9 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		_pEnvironment->m_AgentLaunchSubscription.f_Clear();
+
+		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+			co_await fp_RemoveEnvironmentContainer(_pEnvironment);
 
 		_pEnvironment->f_SetStatus("Stopped", CAppManagerInterface::EStatusSeverity_Warning);
 
