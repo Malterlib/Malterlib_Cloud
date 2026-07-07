@@ -37,7 +37,22 @@ namespace NMib::NCloud::NAppManager
 			VMImagesBaseDirectory = pParentApplication->f_GetDirectory();
 
 		CStr BundleDirectory = fg_Format("{}/VMImages/{}", VMImagesBaseDirectory, Settings.m_VMImage);
-		if (!CFile::fs_FileExists(BundleDirectory, EFileAttrib_Directory))
+
+		bool bBundleExists;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			bBundleExists = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [BundleDirectory]()
+					{
+						return CFile::fs_FileExists(BundleDirectory, EFileAttrib_Directory);
+					}
+				)
+			;
+		}
+
+		if (!bBundleExists)
 		{
 			CStr Error = "Cannot start environment '{}': VM image bundle '{}' does not exist"_f << _pEnvironment->m_Name << BundleDirectory;
 			_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
@@ -147,7 +162,22 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		CStr BundleDirectory = fg_Format("{}/VMImages/{}", BaseDirectory, Name);
-		if (CFile::fs_FileExists(BundleDirectory, EFileAttrib_Directory))
+
+		bool bBundleExists;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			bBundleExists = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [BundleDirectory]()
+					{
+						return CFile::fs_FileExists(BundleDirectory, EFileAttrib_Directory);
+					}
+				)
+			;
+		}
+
+		if (bBundleExists)
 		{
 			co_await _pCommandLine->f_StdErr("The VM image '{}' already exists\n"_f << Name);
 			co_return 1;

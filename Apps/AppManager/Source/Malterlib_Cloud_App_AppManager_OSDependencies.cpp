@@ -258,8 +258,22 @@ namespace NMib::NCloud::NAppManager
 		if (Fingerprint == _pApplication->m_InstalledOSDependenciesFingerprint)
 			co_return {};
 
+		CAppManagerOSIdentity Identity;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			Identity = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / []()
+					{
+						return fg_AppManager_GetOSIdentity();
+					}
+				)
+			;
+		}
+
 		CStr Error;
-		CStr Script = fg_AppManager_BuildOSDependencyInstallScript(fg_AppManager_GetOSIdentity(), Dependencies, Error);
+		CStr Script = fg_AppManager_BuildOSDependencyInstallScript(Identity, Dependencies, Error);
 		if (!Error.f_IsEmpty())
 			co_return DMibErrorInstance("Cannot install OS dependencies for '{}': {}"_f << _pApplication->m_Name << Error);
 
