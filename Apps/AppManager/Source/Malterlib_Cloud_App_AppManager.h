@@ -226,6 +226,10 @@ namespace NMib::NCloud::NAppManager
 			CStr m_Status = "Not started";
 			CAppManagerInterface::EStatusSeverity m_StatusSeverity = CAppManagerInterface::EStatusSeverity_Warning;
 
+			CDistributedAppSensorReporter::CSensorReporter m_StatusSensorReporter;
+			CSequencer m_StatusSensorReporterSequencer{"EnvironmentStatusSensorReporterSequencer"};
+			TCOptional<CDistributedAppSensorReporter::CStatus> m_LastReporterSensorStatus;
+
 			bool m_bDeleted = false;
 
 			// Runtime state
@@ -927,6 +931,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
+		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface);
 		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);
