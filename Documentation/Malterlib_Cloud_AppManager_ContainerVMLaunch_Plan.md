@@ -35,6 +35,14 @@ Implemented and committed:
   `VMImages` in the AppManager root and installs macOS into it from an IPSW restore image
   through `fg_CreateMacOSVMImage` (VZMacOSRestoreImage/VZMacOSInstaller), with install
   progress on the command line. Running it requires supplying a macOS IPSW (~14 GB download).
+- Encrypted storage: environments take `--parent-application` (also on `--vm-image-create`),
+  confining the agent root to `<AppDirectory>/Environment/<Name>` and VM images to
+  `<AppDirectory>/VMImages/<Image>`, so environment data lives on the parent application's
+  encrypted storage. Containers mount the confined storage explicitly (nested encrypted
+  mounts are not visible through the root bind mount), VMs share only the confined storage
+  with the guest, starts gate on opened encryption with automatic retry when it opens,
+  environments stop before the encryption closes, and the parent application cannot be
+  removed while an environment stores data inside it.
 - The AppManager is signed with the `com.apple.security.virtualization` entitlement through
   the standard macOS signing every executable goes through (verified with
   `codesign -d --entitlements`), alongside the default `get-task-allow` entitlement.
