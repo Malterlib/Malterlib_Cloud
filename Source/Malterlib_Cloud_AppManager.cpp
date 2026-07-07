@@ -183,6 +183,7 @@ namespace NMib::NCloud
 		Return["ContainerNetwork"] = fg_ToJson(m_ContainerNetwork);
 		Return["ContainerExtraMounts"] = fg_ToJson(m_ContainerExtraMounts);
 		Return["ContainerExtraArguments"] = fg_ToJson(m_ContainerExtraArguments);
+		Return["bContainerReadOnly"] = fg_ToJson(m_bContainerReadOnly);
 		Return["MemoryLimit"] = fg_ToJson(m_MemoryLimit);
 		Return["CPULimit"] = fg_ToJson(m_CPULimit);
 		Return["VMImage"] = fg_ToJson(m_VMImage);
