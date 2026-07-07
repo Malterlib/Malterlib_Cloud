@@ -128,8 +128,9 @@ namespace NMib::NCloud::NAppManager
 			Launch.m_Mounts[Settings.m_ContainerExtraMounts.fs_GetKey(Mount)] = Mount;
 
 		// Make the host reachable by the name used in the local address when the
-		// container is not sharing the host network
-		if (Launch.m_Network != "host")
+		// container is not sharing the host network. The Apple container runtime has
+		// no --add-host option; on its vmnet network the host is reached through DNS.
+		if (Launch.m_Network != "host" && fp_GetContainerRuntimeExecutable(_pEnvironment) != "container")
 		{
 			CStr Host = mp_State.m_LocalAddress.f_GetHost();
 			if (!Host.f_IsEmpty() && !Host.f_StartsWith("UNIX("))
