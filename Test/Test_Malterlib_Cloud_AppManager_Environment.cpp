@@ -448,19 +448,18 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 			// live-share the root directory, which this test requires. Probe it and skip when
 			// the bind mount is not usable; the E2E still runs on Linux hosts and shared setups.
 			{
-				CStr ProbeDirectory = CFile::fs_GetTemporaryDirectory() / fg_RandomID();
+				CStr ProbeDirectory = CFile::fs_GetProgramDirectory() / "AppManagerEnvironmentDockerProbe";
 				CStr ProbeFile = ProbeDirectory / "probe";
 
-				auto Cleanup = g_OnScopeExit / [ProbeDirectory]
-					{
-						try { CFile::fs_DeleteDirectoryRecursive(ProbeDirectory); } catch (...) { }
-					}
-				;
+				NTest::fg_TestAddCleanupPath(ProbeDirectory);
 
 				co_await
 					(
 						g_Dispatch / [ProbeDirectory, ProbeFile]() -> TCFuture<void>
 						{
+							if (CFile::fs_FileExists(ProbeDirectory, EFileAttrib_Directory))
+								CFile::fs_DeleteDirectoryRecursive(ProbeDirectory, true);
+
 							CFile::fs_CreateDirectory(ProbeDirectory);
 							CFile::fs_WriteStringToFile(ProbeFile, "probe");
 							co_return {};
