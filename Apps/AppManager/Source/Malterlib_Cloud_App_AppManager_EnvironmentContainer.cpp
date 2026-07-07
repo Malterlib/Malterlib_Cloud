@@ -124,6 +124,13 @@ namespace NMib::NCloud::NAppManager
 		// The root directory is mounted at the same path inside the container so that
 		// application directories and local socket addresses stay valid inside it
 		Launch.m_Mounts[mp_State.m_RootDirectory] = mp_State.m_RootDirectory;
+
+		// Environments confined to a parent application store their data inside that
+		// application's directory, which can be a separate (encrypted) mount. Nested
+		// mounts are not visible through the root bind mount, so it is mounted explicitly
+		if (!Settings.m_ParentApplication.f_IsEmpty())
+			Launch.m_Mounts[_AgentRootDirectory] = _AgentRootDirectory;
+
 		for (auto &Mount : Settings.m_ContainerExtraMounts)
 			Launch.m_Mounts[Settings.m_ContainerExtraMounts.fs_GetKey(Mount)] = Mount;
 

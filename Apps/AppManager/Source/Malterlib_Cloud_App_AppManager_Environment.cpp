@@ -111,6 +111,15 @@ namespace NMib::NCloud::NAppManager
 				"See --application-enable-self-update for installing agent executables for other platforms."
 			}
 		;
+		auto SettingsOption_ParentApplication = "ParentApplication?"_o=
+			{
+				"Names"_o= _o["--parent-application"]
+				, "Type"_o= ""
+				, "Description"_o= "Name of the application whose storage confines the environment storage.\n"
+				"The environment agent root and VM images live inside that application's directory, so they can be\n"
+				"placed on encrypted storage by using an application with encryption storage."
+			}
+		;
 		auto SettingsOption_AutoStart = "AutoStart?"_o=
 			{
 				"Names"_o= _o["--auto-start"]
@@ -222,6 +231,7 @@ namespace NMib::NCloud::NAppManager
 							"Defaults to Container."
 						}
 						, SettingsOption_AgentApplication
+						, SettingsOption_ParentApplication
 						, SettingsOption_AutoStart
 						, SettingsOption_ContainerRuntime
 						, SettingsOption_ContainerImage
@@ -252,6 +262,7 @@ namespace NMib::NCloud::NAppManager
 					{
 						NameOption
 						, SettingsOption_AgentApplication
+						, SettingsOption_ParentApplication
 						, SettingsOption_AutoStart
 						, SettingsOption_ContainerRuntime
 						, SettingsOption_ContainerImage
@@ -382,6 +393,7 @@ namespace NMib::NCloud::NAppManager
 					, "Options"_o=
 					{
 						NameOption
+						, SettingsOption_ParentApplication
 						, "RestoreImage"_o=
 						{
 							"Names"_o= _o["--restore-image"]
@@ -425,6 +437,12 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EEnvironmentSetting_AgentApplication;
 			m_AgentApplication = pValue->f_String();
+		}
+
+		if (auto *pValue = _Params.f_GetMember("ParentApplication"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_ParentApplication;
+			m_ParentApplication = pValue->f_String();
 		}
 
 		if (auto *pValue = _Params.f_GetMember("AutoStart"))
@@ -512,6 +530,8 @@ namespace NMib::NCloud::NAppManager
 			m_Type = _Source.m_Type;
 		if (_ChangedSettings & EEnvironmentSetting_AgentApplication)
 			m_AgentApplication = _Source.m_AgentApplication;
+		if (_ChangedSettings & EEnvironmentSetting_ParentApplication)
+			m_ParentApplication = _Source.m_ParentApplication;
 		if (_ChangedSettings & EEnvironmentSetting_AutoStart)
 			m_bAutoStart = _Source.m_bAutoStart;
 		if (_ChangedSettings & EEnvironmentSetting_ContainerRuntime)
@@ -549,6 +569,11 @@ namespace NMib::NCloud::NAppManager
 		{
 			m_AgentApplication = *_Settings.m_AgentApplication;
 			o_ChangedSettings |= EEnvironmentSetting_AgentApplication;
+		}
+		if (_Settings.m_ParentApplication)
+		{
+			m_ParentApplication = *_Settings.m_ParentApplication;
+			o_ChangedSettings |= EEnvironmentSetting_ParentApplication;
 		}
 		if (_Settings.m_bAutoStart)
 		{
@@ -619,6 +644,8 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EEnvironmentSetting_Type;
 		if (m_AgentApplication != _Other.m_AgentApplication)
 			ChangedSettings |= EEnvironmentSetting_AgentApplication;
+		if (m_ParentApplication != _Other.m_ParentApplication)
+			ChangedSettings |= EEnvironmentSetting_ParentApplication;
 		if (m_bAutoStart != _Other.m_bAutoStart)
 			ChangedSettings |= EEnvironmentSetting_AutoStart;
 		if (m_ContainerRuntime != _Other.m_ContainerRuntime)
@@ -703,6 +730,8 @@ namespace NMib::NCloud::NAppManager
 
 			if (auto pValue = EnvironmentJson.f_GetMember("AgentApplication", EJsonType_String))
 				Settings.m_AgentApplication = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ParentApplication", EJsonType_String))
+				Settings.m_ParentApplication = pValue->f_String();
 			if (auto pValue = EnvironmentJson.f_GetMember("AutoStart", EJsonType_Boolean))
 				Settings.m_bAutoStart = pValue->f_Boolean();
 
@@ -757,6 +786,7 @@ namespace NMib::NCloud::NAppManager
 		auto &EnvironmentJson = mp_State.m_StateDatabase.m_Data["Environments"][Environment.m_Name];
 		EnvironmentJson["Type"] = CAppManagerInterface::fs_EnvironmentTypeToStr(Settings.m_Type);
 		EnvironmentJson["AgentApplication"] = Settings.m_AgentApplication;
+		EnvironmentJson["ParentApplication"] = Settings.m_ParentApplication;
 		EnvironmentJson["AutoStart"] = Settings.m_bAutoStart;
 
 		EnvironmentJson["ContainerRuntime"] = Settings.m_ContainerRuntime;
@@ -797,6 +827,7 @@ namespace NMib::NCloud::NAppManager
 
 		OutEnvironment.m_Type = Settings.m_Type;
 		OutEnvironment.m_AgentApplication = Settings.m_AgentApplication;
+		OutEnvironment.m_ParentApplication = Settings.m_ParentApplication;
 		OutEnvironment.m_bAutoStart = Settings.m_bAutoStart;
 
 		OutEnvironment.m_ContainerRuntime = Settings.m_ContainerRuntime;
@@ -876,6 +907,9 @@ namespace NMib::NCloud::NAppManager
 			if (!NewSettings.f_Validate(Error))
 				co_return Auditor.f_Exception(Error);
 		}
+
+		if (!NewSettings.m_ParentApplication.f_IsEmpty() && !mp_Applications.f_FindEqual(NewSettings.m_ParentApplication))
+			co_return Auditor.f_Exception(fg_Format("Parent application '{}' does not exist", NewSettings.m_ParentApplication));
 
 		auto pEnvironment = mp_Environments[_Name] = fg_Construct(_Name, this);
 		pEnvironment->m_Settings = NewSettings;
@@ -994,6 +1028,15 @@ namespace NMib::NCloud::NAppManager
 		{
 			_fOnInfo("No settings were changed");
 			co_return {};
+		}
+
+		if (ChangedSettings & EEnvironmentSetting_ParentApplication)
+		{
+			if (!NewSettings.m_ParentApplication.f_IsEmpty() && !mp_Applications.f_FindEqual(NewSettings.m_ParentApplication))
+				co_return Auditor.f_Exception(fg_Format("Parent application '{}' does not exist", NewSettings.m_ParentApplication));
+
+			if (pEnvironment->f_IsStarted() || pEnvironment->m_bStarting)
+				co_return Auditor.f_Exception("Stop the environment before changing the parent application, because it moves the environment storage");
 		}
 
 		pEnvironment->m_Settings = NewSettings;
@@ -1347,6 +1390,8 @@ namespace NMib::NCloud::NAppManager
 
 			CStr Settings;
 			fAddProperty(Settings, "Agent application", Environment.m_AgentApplication);
+			if (!Environment.m_ParentApplication.f_IsEmpty())
+				fAddProperty(Settings, "Parent application", Environment.m_ParentApplication);
 			fAddProperty(Settings, "Auto start", Environment.m_bAutoStart);
 
 			if (Environment.m_Type == CAppManagerInterface::EEnvironmentType_Container)
@@ -1438,6 +1483,76 @@ namespace NMib::NCloud::NAppManager
 		return {};
 	}
 
+	TCSharedPointer<CAppManagerActor::CApplication> CAppManagerActor::fp_GetEnvironmentParentApplication(CEnvironment const &_Environment)
+	{
+		if (_Environment.m_Settings.m_ParentApplication.f_IsEmpty())
+			return {};
+
+		auto *pFindApplication = mp_Applications.f_FindEqual(_Environment.m_Settings.m_ParentApplication);
+		if (!pFindApplication)
+			return {};
+
+		return *pFindApplication;
+	}
+
+	CStr CAppManagerActor::fp_GetEnvironmentStorageDirectory(CEnvironment const &_Environment)
+	{
+		if (auto pParentApplication = fp_GetEnvironmentParentApplication(_Environment))
+			return fg_Format("{}/Environment/{}", pParentApplication->f_GetDirectory(), _Environment.m_Name);
+
+		return fg_Format("{}/Environment/{}", mp_State.m_RootDirectory, _Environment.m_Name);
+	}
+
+	bool CAppManagerActor::fp_EnvironmentStorageReady(CEnvironment const &_Environment, CStr &o_Error, CAppManagerInterface::EStatusSeverity &o_Severity)
+	{
+		if (_Environment.m_Settings.m_ParentApplication.f_IsEmpty())
+			return true;
+
+		auto pParentApplication = fp_GetEnvironmentParentApplication(_Environment);
+		if (!pParentApplication)
+		{
+			o_Error = fg_Format("Parent application '{}' does not exist", _Environment.m_Settings.m_ParentApplication);
+			o_Severity = CAppManagerInterface::EStatusSeverity_Error;
+			return false;
+		}
+
+		if (pParentApplication->f_NeedsEncryption() && !pParentApplication->f_EncryptionOpened())
+		{
+			o_Error = "Parent application encryption not yet opened";
+			o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
+			return false;
+		}
+
+		return true;
+	}
+
+	void CAppManagerActor::fp_AutoStartEnvironments()
+	{
+		if (mp_bEnvironmentAgent)
+			return;
+
+		for (auto &pEnvironment : mp_Environments)
+		{
+			auto &Environment = *pEnvironment;
+			if (!Environment.m_Settings.m_bAutoStart || Environment.m_Settings.m_ParentApplication.f_IsEmpty())
+				continue;
+
+			if (Environment.f_IsStarted() || Environment.m_bStarting || Environment.m_bStopping)
+				continue;
+
+			CStr Error;
+			CAppManagerInterface::EStatusSeverity Severity;
+			if (!fp_EnvironmentStorageReady(Environment, Error, Severity))
+			{
+				if (Environment.m_Status != Error)
+					Environment.f_SetStatus(Error, Severity);
+				continue;
+			}
+
+			fp_EnsureEnvironmentStarted(pEnvironment) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to auto-start environment");
+		}
+	}
+
 	TCFuture<void> CAppManagerActor::fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
@@ -1463,6 +1578,16 @@ namespace NMib::NCloud::NAppManager
 
 		if (_pEnvironment->f_IsStarted())
 			co_return {};
+
+		{
+			CStr Error;
+			CAppManagerInterface::EStatusSeverity Severity;
+			if (!fp_EnvironmentStorageReady(*_pEnvironment, Error, Severity))
+			{
+				_pEnvironment->f_SetStatus(Error, Severity);
+				co_return DMibErrorInstance("Cannot start environment '{}': {}"_f << _pEnvironment->m_Name << Error);
+			}
+		}
 
 		bool bContainer = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container;
 		bool bVM = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM;
@@ -1497,7 +1622,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		CStr AgentRootDirectory = fg_Format("{}/Environment/{}", mp_State.m_RootDirectory, _pEnvironment->m_Name);
+		CStr AgentRootDirectory = fp_GetEnvironmentStorageDirectory(*_pEnvironment);
 
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();

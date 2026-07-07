@@ -32,7 +32,11 @@ namespace NMib::NCloud::NAppManager
 			co_return DMibErrorInstance(Error);
 		}
 
-		CStr BundleDirectory = fg_Format("{}/VMImages/{}", mp_State.m_RootDirectory, Settings.m_VMImage);
+		CStr VMImagesBaseDirectory = mp_State.m_RootDirectory;
+		if (auto pParentApplication = fp_GetEnvironmentParentApplication(*_pEnvironment))
+			VMImagesBaseDirectory = pParentApplication->f_GetDirectory();
+
+		CStr BundleDirectory = fg_Format("{}/VMImages/{}", VMImagesBaseDirectory, Settings.m_VMImage);
 		if (!CFile::fs_FileExists(BundleDirectory, EFileAttrib_Directory))
 		{
 			CStr Error = "Cannot start environment '{}': VM image bundle '{}' does not exist"_f << _pEnvironment->m_Name << BundleDirectory;
@@ -65,7 +69,13 @@ namespace NMib::NCloud::NAppManager
 		Config.m_BundleDirectory = BundleDirectory;
 		Config.m_CPUCount = Settings.m_VMCPUCount;
 		Config.m_MemoryMB = Settings.m_VMMemoryMB;
-		Config.m_SharedFolders["MalterlibRoot"] = mp_State.m_RootDirectory;
+
+		// Environments confined to a parent application only share their own storage with
+		// the guest, so all guest-visible data stays inside the parent application directory
+		if (_pEnvironment->m_Settings.m_ParentApplication.f_IsEmpty())
+			Config.m_SharedFolders["MalterlibRoot"] = mp_State.m_RootDirectory;
+		else
+			Config.m_SharedFolders["MalterlibRoot"] = fp_GetEnvironmentStorageDirectory(*_pEnvironment);
 
 		_pEnvironment->m_VMActor = fg_CreateVirtualMachine(Backend, fg_Move(Config));
 
@@ -115,7 +125,28 @@ namespace NMib::NCloud::NAppManager
 			co_return 1;
 		}
 
-		CStr BundleDirectory = fg_Format("{}/VMImages/{}", mp_State.m_RootDirectory, Name);
+		CStr BaseDirectory = mp_State.m_RootDirectory;
+
+		CStr ParentApplication = _Params["ParentApplication"].f_AsString();
+		if (!ParentApplication.f_IsEmpty())
+		{
+			auto *pFindApplication = mp_Applications.f_FindEqual(ParentApplication);
+			if (!pFindApplication)
+			{
+				co_await _pCommandLine->f_StdErr("Parent application '{}' does not exist\n"_f << ParentApplication);
+				co_return 1;
+			}
+
+			if ((*pFindApplication)->f_NeedsEncryption() && !(*pFindApplication)->f_EncryptionOpened())
+			{
+				co_await _pCommandLine->f_StdErr("Parent application '{}' encryption is not yet opened\n"_f << ParentApplication);
+				co_return 1;
+			}
+
+			BaseDirectory = (*pFindApplication)->f_GetDirectory();
+		}
+
+		CStr BundleDirectory = fg_Format("{}/VMImages/{}", BaseDirectory, Name);
 		if (CFile::fs_FileExists(BundleDirectory, EFileAttrib_Directory))
 		{
 			co_await _pCommandLine->f_StdErr("The VM image '{}' already exists\n"_f << Name);
