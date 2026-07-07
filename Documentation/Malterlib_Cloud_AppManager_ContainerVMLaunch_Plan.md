@@ -51,6 +51,12 @@ Implemented and committed:
   `--environment-pull` does this explicitly. `--container-read-only` (default false) confines
   all writes to the mounted storage instead. Planned follow-up: run the HostMonitor inside
   environments so containers and VMs auto-update their OS the same way hosts do.
+- OS dependencies: applications declare needed OS packages with
+  `MalterlibCloudVersionInfo_OSDependencies` (map of OS selector to packages, matched against
+  the os-release ID / ID_LIKE, generic `Linux`, and `macOS`), and the AppManager installs
+  them with the platform package manager (apt-get/dnf/apk/pacman/zypper/brew) before launch,
+  once per AppManager instance and dependency set — so agents in recreated containers
+  repopulate the reset OS automatically.
 - The AppManager is signed with the `com.apple.security.virtualization` entitlement through
   the standard macOS signing every executable goes through (verified with
   `codesign -d --entitlements`), alongside the default `get-task-allow` entitlement.
