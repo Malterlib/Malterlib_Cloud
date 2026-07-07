@@ -883,6 +883,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_AddApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_EnableSelfUpdate(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_ChangeApplicationSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_RemoveApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_UpdateApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
