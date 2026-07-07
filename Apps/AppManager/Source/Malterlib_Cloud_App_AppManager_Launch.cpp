@@ -152,14 +152,17 @@ namespace NMib::NCloud::NAppManager
 
 		if (!Application.m_Settings.m_LaunchEnvironment.f_IsEmpty())
 		{
-			CStr Error;
-			if (!mp_Environments.f_FindEqual(Application.m_Settings.m_LaunchEnvironment))
-				Error = "Cannot launch: no such environment '{}'. Add it with --environment-add."_f << Application.m_Settings.m_LaunchEnvironment;
-			else
-				Error = "Cannot launch in environment '{}': environment launches are not yet supported"_f << Application.m_Settings.m_LaunchEnvironment;
+			auto *pFindEnvironment = mp_Environments.f_FindEqual(Application.m_Settings.m_LaunchEnvironment);
+			if (!pFindEnvironment)
+			{
+				CStr Error = "Cannot launch: no such environment '{}'. Add it with --environment-add."_f << Application.m_Settings.m_LaunchEnvironment;
+				fp_AppLaunchStateChanged(_pApplication, Error, CAppManagerInterface::EStatusSeverity_Error);
+				co_return DMibErrorInstance(Error);
+			}
 
-			fp_AppLaunchStateChanged(_pApplication, Error, CAppManagerInterface::EStatusSeverity_Error);
-			co_return DMibErrorInstance(Error);
+			fp_AppLaunchStateChanged(_pApplication, "Launching in environment '{}'"_f << Application.m_Settings.m_LaunchEnvironment, CAppManagerInterface::EStatusSeverity_Warning);
+
+			co_return co_await fp_LaunchAppInEnvironment(_pApplication, *pFindEnvironment);
 		}
 
 		if (Application.m_Settings.m_AppManagerVersion < mcp_CurrentAppMangerVersion)
