@@ -128,6 +128,7 @@ namespace NMib::NCloud
 		Return["bStopOnDependencyFailure"] = fg_ToJson(m_bStopOnDependencyFailure);
 		Return["bBackupEnabled"] = fg_ToJson(m_bBackupEnabled);
 		Return["bLaunchInProcess"] = fg_ToJson(m_bLaunchInProcess);
+		Return["LaunchEnvironment"] = fg_ToJson(m_LaunchEnvironment);
 		return Return;
 	}
 }
