@@ -1,6 +1,24 @@
 # Plan: Launching AppManager Applications in Containers and VMs
 
-Status: Draft 2 (2026-07-07)
+Status: In implementation (2026-07-07)
+
+Implementation progress:
+
+- Phase 0 (done): `LaunchEnvironment` application setting, environment entities with
+  settings/persistence/CLI/remote API/permissions, protocol version 0x11a.
+- Phase 1 (done): environment agent mode (`MalterlibAppManagerEnvironmentAgentRoot`),
+  `CAppManagerEnvironmentInterface`/`CAppManagerEnvironmentHostInterface` with reversed
+  registration (the agent registers its interface through the host-published interface;
+  WithID interfaces pair with WithID subscriptions), ephemeral applications in the agent,
+  launch/stop/update-script delegation, agent-pushed status changes, Local environments
+  with end-to-end tests, teardown and stale-agent cleanup. A trust manager init race with
+  removed-while-connecting client connections was fixed in the Concurrency module.
+- Phase 2 (machinery done): docker dialect container launches through the agent flow with
+  pure, unit-tested argument building, root-directory bind mount, --env passthrough,
+  host-gateway reachability, stale container removal. End-to-end container tests still
+  require a cross-built Linux agent executable and docker and are not yet automated.
+- Phases 3-5 (not started): Apple `container` dialect, `Malterlib/Virtualization` module
+  with VM environments, and polish (statistics, coordinated agent updates, UI).
 
 ## 1. Goal and Scope
 
