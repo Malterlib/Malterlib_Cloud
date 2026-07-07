@@ -614,6 +614,47 @@ namespace NMib::NCloud::NAppManager
 
 		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_Finished, {}).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed waiting for finished event");
 
+		fp_RestartEnvironmentsForAgentApplication(_pState->m_pApplication->m_Name);
+
 		co_return {};
+	}
+
+	void CAppManagerActor::fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName)
+	{
+		for (auto &pEnvironment : mp_Environments)
+		{
+			if (pEnvironment->m_Settings.m_AgentApplication != _ApplicationName)
+				continue;
+
+			if (!pEnvironment->f_IsStarted() && !pEnvironment->m_bStarting)
+				continue;
+
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Info
+					, "Restarting environment '{}' after update of agent application '{}'"
+					, pEnvironment->m_Name
+					, _ApplicationName
+				)
+			;
+
+			auto pRestartEnvironment = pEnvironment;
+			fg_CallSafe
+				(
+					TCFunctionMovable<TCFuture<void> ()>
+					(
+						[this, pRestartEnvironment]() -> TCFuture<void>
+						{
+							co_await fp_StopEnvironmentInternal(pRestartEnvironment);
+							co_await fp_EnsureEnvironmentStarted(pRestartEnvironment);
+
+							co_return {};
+						}
+					)
+				)
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to restart environment after agent application update")
+			;
+		}
 	}
 }
