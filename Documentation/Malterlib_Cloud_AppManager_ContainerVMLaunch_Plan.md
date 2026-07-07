@@ -15,9 +15,10 @@ Implementation progress:
   removed-while-connecting client connections was fixed in the Concurrency module.
 - Phase 2 (machinery done): docker dialect container launches through the agent flow with
   pure, unit-tested argument building, root-directory bind mount, --env passthrough,
-  host-gateway reachability, stale container removal. End-to-end container tests still
-  require a cross-built Linux agent executable and docker and are not yet automated; the
-  `Platforms=` extension to --application-enable-self-update also remains.
+  host-gateway reachability, stale container removal, and agent platform installs
+  through `--application-enable-self-update --agent-platforms`. End-to-end container
+  tests still require a cross-built Linux agent executable (Linux SDK build) and docker
+  and are not yet automated.
 - Phase 3 (dialect done): the Apple `container` CLI is selected with
   `ContainerRuntime AppleContainer`; it accepts the same run options as docker except
   --add-host, which is skipped for it. End-to-end verification remains.
