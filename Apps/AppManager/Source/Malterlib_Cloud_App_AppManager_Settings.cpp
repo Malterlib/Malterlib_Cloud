@@ -282,6 +282,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (_ChangedSettings & EApplicationSetting_BackupIncludeWildcards)
 			m_Backup_IncludeWildcards = _Source.m_Backup_IncludeWildcards;
+		if (_ChangedSettings & EApplicationSetting_OSDependencies)
+			m_OSDependencies = _Source.m_OSDependencies;
 		if (_ChangedSettings & EApplicationSetting_BackupExcludeWildcards)
 			m_Backup_ExcludeWildcards = _Source.m_Backup_ExcludeWildcards;
 		if (_ChangedSettings & EApplicationSetting_BackupAddSyncFlagsWildcards)
@@ -401,6 +403,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (m_Backup_IncludeWildcards != _Other.m_Backup_IncludeWildcards)
 			ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
+		if (m_OSDependencies != _Other.m_OSDependencies)
+			ChangedSettings |= EApplicationSetting_OSDependencies;
 		if (m_Backup_ExcludeWildcards != _Other.m_Backup_ExcludeWildcards)
 			ChangedSettings |= EApplicationSetting_BackupExcludeWildcards;
 		if (m_Backup_AddSyncFlagsWildcards != _Other.m_Backup_AddSyncFlagsWildcards)
@@ -684,6 +688,18 @@ namespace NMib::NCloud::NAppManager
 					o_ChangedSettings |= EApplicationSetting_BackupNewBackupInterval;
 					m_Backup_NewBackupInterval = CTimeSpanConvert::fs_CreateSpanFromHours(pValue->f_AsFloat());
 				}
+			}
+		}
+
+		if (auto *pValue = ExtraInfo.f_GetMember("OSDependencies", EJsonType_Object))
+		{
+			o_ChangedSettings |= EApplicationSetting_OSDependencies;
+			m_OSDependencies.f_Clear();
+			for (auto &Selector : pValue->f_Object())
+			{
+				auto &Packages = m_OSDependencies[Selector.f_Name()];
+				for (auto &Package : Selector.f_Value().f_Array())
+					Packages.f_Insert(Package.f_String());
 			}
 		}
 

@@ -59,6 +59,7 @@ namespace NMib::NCloud::NAppManager
 		OutApplication.m_RunAsGroup = Settings.m_RunAsGroup;
 		OutApplication.m_bRunAsUserHasShell = Settings.m_bRunAsUserHasShell;
 
+		OutApplication.m_OSDependencies = Settings.m_OSDependencies;
 		OutApplication.m_Backup_IncludeWildcards = Settings.m_Backup_IncludeWildcards;
 		OutApplication.m_Backup_ExcludeWildcards = Settings.m_Backup_ExcludeWildcards;
 		OutApplication.m_Backup_AddSyncFlagsWildcards = Settings.m_Backup_AddSyncFlagsWildcards;

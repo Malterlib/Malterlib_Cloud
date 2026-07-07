@@ -90,6 +90,7 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_AutoUpdate = DBit(27)
 			, EApplicationSetting_LaunchInProcess = DBit(28)
 			, EApplicationSetting_LaunchEnvironment = DBit(29)
+			, EApplicationSetting_OSDependencies = DBit(30)
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
 			| EApplicationSetting_ExecutableParameters
@@ -129,6 +130,7 @@ namespace NMib::NCloud::NAppManager
 			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
 			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
 			NTime::CTimeSpan m_Backup_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);
+			TCMap<CStr, TCVector<CStr>> m_OSDependencies; /// OS selector to packages installed with the platform package manager before launch
 
 			// Settings that can be updated by app manager (command line or protocol)
 			TCSet<CStr> m_Dependencies;
@@ -399,6 +401,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bEphemeral = false; /// Application exists only for the lifetime of the environment agent and is never persisted
 
 			CApplication *m_pParentApplication = nullptr;
+			CStr m_InstalledOSDependenciesFingerprint; /// OS dependencies installed by this AppManager instance
 			DLinkDS_Link(CApplication, m_ChildrenLink);
 			DLinkDS_List(CApplication, m_ChildrenLink) m_Children;
 
@@ -943,6 +946,7 @@ namespace NMib::NCloud::NAppManager
 		CStr fp_GetEnvironmentStorageDirectory(CEnvironment const &_Environment);
 		bool fp_EnvironmentStorageReady(CEnvironment const &_Environment, CStr &o_Error, CAppManagerInterface::EStatusSeverity &o_Severity);
 		void fp_AutoStartEnvironments();
+		TCFuture<void> fp_EnsureOSDependencies(TCSharedPointer<CApplication> _pApplication);
 		TCFuture<void> fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);

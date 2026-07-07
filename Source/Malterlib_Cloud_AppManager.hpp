@@ -127,6 +127,7 @@ namespace NMib::NCloud
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddRunAsUserHasShell)
 			_Stream % m_bRunAsUserHasShell;
 
+		_Stream % m_OSDependencies;
 		_Stream % m_Backup_IncludeWildcards;
 		_Stream % m_Backup_ExcludeWildcards;
 		_Stream % m_Backup_AddSyncFlagsWildcards;

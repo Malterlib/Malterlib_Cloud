@@ -263,6 +263,18 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 		{
+			auto &Json = ApplicationJson["OSDependencies"] = CEJsonSortedYaml();
+			Json.f_Object();
+			for (auto &Packages : Settings.m_OSDependencies)
+			{
+				auto &PackagesJson = Json[Settings.m_OSDependencies.fs_GetKey(Packages)];
+				PackagesJson.f_Array().f_Clear();
+				for (auto &Package : Packages)
+					PackagesJson.f_Insert(Package);
+			}
+		}
+
+		{
 			auto &BackupJson = ApplicationJson["Backup"] = CEJsonSortedYaml();
 			BackupJson.f_Object();
 			{
