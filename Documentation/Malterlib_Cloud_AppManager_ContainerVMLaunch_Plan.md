@@ -43,6 +43,14 @@ Implemented and committed:
   with the guest, starts gate on opened encryption with automatic retry when it opens,
   environments stop before the encryption closes, and the parent application cannot be
   removed while an environment stores data inside it.
+- OS updates: environment containers are persistent (no `--rm`) — a stopped container is
+  reused on the next start (`start --attach --interactive`, with a per-container launch id
+  and ticket magic persisted because the container keeps its creation-time environment), so
+  OS updates made inside it survive restarts. Any launch-affecting settings change recreates
+  the container (SHA256 fingerprint over the run command) and pulls the newest image first;
+  `--environment-pull` does this explicitly. `--container-read-only` (default false) confines
+  all writes to the mounted storage instead. Planned follow-up: run the HostMonitor inside
+  environments so containers and VMs auto-update their OS the same way hosts do.
 - The AppManager is signed with the `com.apple.security.virtualization` entitlement through
   the standard macOS signing every executable goes through (verified with
   `codesign -d --entitlements`), alongside the default `get-task-allow` entitlement.
