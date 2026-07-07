@@ -1,0 +1,103 @@
+// Copyright © Unbroken AB
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include <Mib/Concurrency/LogError>
+#include <Mib/Cryptography/RandomID>
+
+#include "Malterlib_Cloud_App_AppManager.h"
+
+namespace NMib::NCloud::NAppManager
+{
+	TCFuture<void> CAppManagerActor::fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		using namespace NVirtualization;
+
+		auto &Settings = _pEnvironment->m_Settings;
+
+		EVirtualizationBackend Backend = EVirtualizationBackend_Default;
+		if (Settings.m_VMBackend == "MacOSVirtualization")
+			Backend = EVirtualizationBackend_MacOSVirtualization;
+		else if (!Settings.m_VMBackend.f_IsEmpty())
+		{
+			CStr Error = "Cannot start environment '{}': unknown VM backend '{}'"_f << _pEnvironment->m_Name << Settings.m_VMBackend;
+			_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(Error);
+		}
+
+		if (!fg_IsVirtualizationBackendAvailable(Backend))
+		{
+			CStr Error = "Cannot start environment '{}': no virtualization backend is available on this host"_f << _pEnvironment->m_Name;
+			_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(Error);
+		}
+
+		CStr BundleDirectory = fg_Format("{}/VMImages/{}", mp_State.m_RootDirectory, Settings.m_VMImage);
+		if (!CFile::fs_FileExists(BundleDirectory, EFileAttrib_Directory))
+		{
+			CStr Error = "Cannot start environment '{}': VM image bundle '{}' does not exist"_f << _pEnvironment->m_Name << BundleDirectory;
+			_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(Error);
+		}
+
+		_pEnvironment->m_bStarting = true;
+		_pEnvironment->m_bStopping = false;
+		_pEnvironment->f_SetStatus("Starting VM", CAppManagerInterface::EStatusSeverity_Warning);
+
+		bool bConnected = false;
+		auto Cleanup = g_OnScopeExit / [&, _pEnvironment]
+			{
+				_pEnvironment->m_bStarting = false;
+				auto OnAgentConnected = fg_Move(_pEnvironment->m_OnAgentConnected);
+				for (auto &Promise : OnAgentConnected)
+				{
+					if (bConnected)
+						Promise.f_SetResult();
+					else
+						Promise.f_SetException(DMibErrorInstance("Environment '{}' failed to start"_f << _pEnvironment->m_Name));
+				}
+			}
+		;
+
+		_pEnvironment->m_LaunchID = fg_RandomID();
+
+		CVirtualMachineConfig Config;
+		Config.m_BundleDirectory = BundleDirectory;
+		Config.m_CPUCount = Settings.m_VMCPUCount;
+		Config.m_MemoryMB = Settings.m_VMMemoryMB;
+		Config.m_SharedFolders["MalterlibRoot"] = mp_State.m_RootDirectory;
+
+		_pEnvironment->m_VMActor = fg_CreateVirtualMachine(Backend, fg_Move(Config));
+
+		auto StartResult = co_await _pEnvironment->m_VMActor(&CVirtualMachineActor::f_Start).f_Wrap();
+
+		if (!StartResult)
+		{
+			_pEnvironment->f_SetStatus(fg_Format("Failed to start VM: {}", StartResult.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
+			fp_StopEnvironmentInternal(_pEnvironment).f_DiscardResult();
+			co_return StartResult.f_GetException();
+		}
+
+		_pEnvironment->f_SetStatus("VM running, waiting for agent", CAppManagerInterface::EStatusSeverity_Warning);
+
+		// The guest image is expected to run an installed agent that connects back
+		// to this AppManager and registers its environment interface
+		if (!_pEnvironment->f_IsStarted())
+		{
+			auto ConnectedResult = co_await _pEnvironment->m_OnAgentConnected.f_Insert().f_Future()
+				.f_Timeout(300.0, "Timed out waiting for the environment agent in the VM to connect")
+				.f_Wrap()
+			;
+
+			if (!ConnectedResult)
+			{
+				_pEnvironment->f_SetStatus(fg_Format("Agent failed to connect: {}", ConnectedResult.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
+				fp_StopEnvironmentInternal(_pEnvironment).f_DiscardResult();
+				co_return ConnectedResult.f_GetException();
+			}
+		}
+
+		bConnected = true;
+
+		co_return {};
+	}
+}

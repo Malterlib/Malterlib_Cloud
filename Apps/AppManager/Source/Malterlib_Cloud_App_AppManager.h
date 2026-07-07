@@ -19,6 +19,7 @@
 #include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
 #include <Mib/Concurrency/DistributedAppLogStoreLocal>
+#include <Mib/Virtualization/VirtualMachine>
 
 #include "Malterlib_Cloud_App_AppManagerApp.h"
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
@@ -232,6 +233,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_AgentHostID;
 			TCActor<CDistributedAppInterfaceLaunchActor> m_AgentLaunch;
 			CActorSubscription m_AgentLaunchSubscription;
+			TCActor<NVirtualization::CVirtualMachineActor> m_VMActor;
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AgentAppInterface;
 			TCDistributedActorInterface<CAppManagerEnvironmentInterface> m_AgentInterface;
 			TCVector<TCPromise<void>> m_OnAgentConnected;
@@ -922,6 +924,7 @@ namespace NMib::NCloud::NAppManager
 		TCSharedPointer<CEnvironment> fp_EnvironmentFromHostID(CStr const &_HostID);
 		TCFuture<void> fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface);
 		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);

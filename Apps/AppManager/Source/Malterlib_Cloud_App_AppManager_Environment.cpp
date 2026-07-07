@@ -1360,17 +1360,11 @@ namespace NMib::NCloud::NAppManager
 		if (_pEnvironment->f_IsStarted())
 			co_return {};
 
-		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
-		{
-			CStr Error = "Cannot start environment '{}': environment type {} is not yet supported"_f
-				<< _pEnvironment->m_Name
-				<< CAppManagerInterface::fs_EnvironmentTypeToStr(_pEnvironment->m_Settings.m_Type)
-			;
-			_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
-			co_return DMibErrorInstance(Error);
-		}
-
 		bool bContainer = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container;
+		bool bVM = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM;
+
+		if (bVM)
+			co_return co_await fp_StartEnvironmentVM(_pEnvironment);
 
 		CStr Error;
 		CStr AgentExecutable = fp_GetEnvironmentAgentExecutable(_pEnvironment, Error);
@@ -1713,6 +1707,17 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		_pEnvironment->m_AgentLaunchSubscription.f_Clear();
+
+		if (_pEnvironment->m_VMActor)
+		{
+			co_await fg_TempCopy(_pEnvironment->m_VMActor)(&NVirtualization::CVirtualMachineActor::f_Stop).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop environment virtual machine")
+			;
+
+			co_await fg_Move(_pEnvironment->m_VMActor).f_Destroy().f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy environment virtual machine")
+			;
+		}
 
 		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
 			co_await fp_RemoveEnvironmentContainer(_pEnvironment);
