@@ -16,9 +16,18 @@ Implementation progress:
 - Phase 2 (machinery done): docker dialect container launches through the agent flow with
   pure, unit-tested argument building, root-directory bind mount, --env passthrough,
   host-gateway reachability, stale container removal. End-to-end container tests still
-  require a cross-built Linux agent executable and docker and are not yet automated.
-- Phases 3-5 (not started): Apple `container` dialect, `Malterlib/Virtualization` module
-  with VM environments, and polish (statistics, coordinated agent updates, UI).
+  require a cross-built Linux agent executable and docker and are not yet automated; the
+  `Platforms=` extension to --application-enable-self-update also remains.
+- Phase 3 (dialect done): the Apple `container` CLI is selected with
+  `ContainerRuntime AppleContainer`; it accepts the same run options as docker except
+  --add-host, which is skipped for it. End-to-end verification remains.
+- Phase 4 (module and wiring done): the `Malterlib/Virtualization` module provides the
+  virtual `CVirtualMachineActor` interface with the Virtualization.framework backend
+  (macOS guests, NAT, virtiofs shares, graceful stop). VM environments create and start
+  the machine from `<Root>/VMImages/<VMImage>` and wait for the agent. Remaining: guest
+  image provisioning (§5.3), the entitlement signing step for
+  `com.apple.security.virtualization`, and console-based agent bootstrap.
+- Phase 5 (not started): statistics, coordinated agent updates, WebAppManager UI.
 
 ## 1. Goal and Scope
 
