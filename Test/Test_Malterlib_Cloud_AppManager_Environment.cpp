@@ -425,6 +425,77 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 
 			co_return {};
 		};
+
+		DMibTestSuite("Container Arguments") -> TCFuture<void>
+		{
+			// Minimal launch
+			{
+				DMibTestPath("Minimal");
+
+				CAppManagerContainerLaunch Launch;
+				Launch.m_ContainerName = "mib-env-TestEnv";
+				Launch.m_Image = "ubuntu:24.04";
+				Launch.m_Executable = "/opt/M/App/Agent/AppManager";
+				Launch.m_Parameters = {"--daemon-run-standalone"};
+
+				auto Arguments = fg_AppManager_BuildContainerRunArguments(Launch);
+				TCVector<CStr> Expected =
+					{
+						"run"
+						, "--name", "mib-env-TestEnv"
+						, "--rm"
+						, "--interactive"
+						, "ubuntu:24.04"
+						, "/opt/M/App/Agent/AppManager"
+						, "--daemon-run-standalone"
+					}
+				;
+				DMibExpect(Arguments, ==, Expected);
+			}
+
+			// Full launch
+			{
+				DMibTestPath("Full");
+
+				CAppManagerContainerLaunch Launch;
+				Launch.m_ContainerName = "mib-env-TestEnv";
+				Launch.m_Image = "ubuntu:24.04";
+				Launch.m_Network = "bridge";
+				Launch.m_MemoryLimit = "512m";
+				Launch.m_CPULimit = 2.0;
+				Launch.m_Mounts["/opt/M"] = "/opt/M";
+				Launch.m_AddHosts["myhost"] = "host-gateway";
+				Launch.m_PassEnvironment = {"MalterlibAppManagerEnvironmentAgentRoot"};
+				Launch.m_WorkingDirectory = "/opt/M/Environment/TestEnv";
+				Launch.m_ExtraArguments = {"--pull", "never"};
+				Launch.m_Executable = "/opt/M/App/Agent/AppManager";
+				Launch.m_Parameters = {"--daemon-run-standalone"};
+
+				auto Arguments = fg_AppManager_BuildContainerRunArguments(Launch);
+				TCVector<CStr> Expected =
+					{
+						"run"
+						, "--name", "mib-env-TestEnv"
+						, "--rm"
+						, "--interactive"
+						, "--network", "bridge"
+						, "--memory", "512m"
+						, "--cpus", "2.0"
+						, "--volume", "/opt/M:/opt/M"
+						, "--add-host", "myhost:host-gateway"
+						, "--env", "MalterlibAppManagerEnvironmentAgentRoot"
+						, "--workdir", "/opt/M/Environment/TestEnv"
+						, "--pull", "never"
+						, "ubuntu:24.04"
+						, "/opt/M/App/Agent/AppManager"
+						, "--daemon-run-standalone"
+					}
+				;
+				DMibExpect(Arguments, ==, Expected);
+			}
+
+			co_return {};
+		};
 	}
 };
 
