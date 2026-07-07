@@ -236,6 +236,13 @@ namespace NMib::NCloud::NAppManager
 
 			bool m_bDeleted = false;
 
+			// Persistent container identity: the container keeps its creation-time process
+			// environment, so the launch id and ticket request magic must stay stable while
+			// the container is reused, and the fingerprint decides when to recreate it
+			CStr m_ContainerFingerprint;
+			CStr m_ContainerLaunchID;
+			CStr m_ContainerRequestTicketMagic;
+
 			// Runtime state
 			CStr m_LaunchID;
 			CStr m_AgentHostID;
@@ -536,6 +543,7 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<void> f_EnvironmentRemove(CStr _Name) override;
 			TCFuture<void> f_EnvironmentChangeSettings(CStr _Name, CEnvironmentSettings _Settings) override;
 			TCFuture<void> f_EnvironmentStart(CStr _Name) override;
+			TCFuture<void> f_EnvironmentPull(CStr _Name) override;
 			TCFuture<void> f_EnvironmentStop(CStr _Name) override;
 			TCFuture<void> f_EnvironmentRestart(CStr _Name) override;
 			TCFuture<TCMap<CStr, CEnvironmentInfo>> f_GetEnvironments() override;
@@ -941,6 +949,10 @@ namespace NMib::NCloud::NAppManager
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
 		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_PullEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_StopEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<bool> fp_EnvironmentContainerExists(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_PullEnvironmentContainerImage(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface);
 		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_OnEnvironmentApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change);
@@ -968,6 +980,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_StartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_StopEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_RestartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_PullEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CreateVMImage(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);

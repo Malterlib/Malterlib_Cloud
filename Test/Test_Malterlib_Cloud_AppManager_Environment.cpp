@@ -704,7 +704,6 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 					{
 						"run"
 						, "--name", "mib-env-TestEnv"
-						, "--rm"
 						, "--interactive"
 						, "ubuntu:24.04"
 						, "/opt/M/App/Agent/AppManager"
@@ -737,7 +736,6 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 					{
 						"run"
 						, "--name", "mib-env-TestEnv"
-						, "--rm"
 						, "--interactive"
 						, "--network", "bridge"
 						, "--memory", "512m"

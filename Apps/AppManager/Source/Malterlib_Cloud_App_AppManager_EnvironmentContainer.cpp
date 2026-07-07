@@ -16,7 +16,6 @@ namespace NMib::NCloud
 		Arguments.f_Insert("run");
 		Arguments.f_Insert("--name");
 		Arguments.f_Insert(_Launch.m_ContainerName);
-		Arguments.f_Insert("--rm");
 		Arguments.f_Insert("--interactive");
 
 		if (_Launch.m_bReadOnly)
@@ -201,6 +200,93 @@ namespace NMib::NCloud::NAppManager
 				)
 			;
 		}
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_StopEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		CStr RuntimeExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
+		CStr ContainerName = fp_GetContainerName(_pEnvironment);
+
+		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+			(
+				RuntimeExecutable
+				, fg_CreateVector<CStr>("stop", ContainerName)
+				, mp_State.m_RootDirectory
+				, {}
+			)
+		;
+		LaunchParams.m_bAllowExecutableLocate = true;
+		LaunchParams.m_bMergeEnvironment = true;
+
+		co_await CProcessLaunchActor::fs_LaunchSimple
+			(
+				CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None)
+			)
+			.f_Wrap()
+			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop environment container")
+		;
+
+		co_return {};
+	}
+
+	TCFuture<bool> CAppManagerActor::fp_EnvironmentContainerExists(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		CStr RuntimeExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
+		CStr ContainerName = fp_GetContainerName(_pEnvironment);
+
+		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+			(
+				RuntimeExecutable
+				, fg_CreateVector<CStr>("inspect", ContainerName)
+				, mp_State.m_RootDirectory
+				, {}
+			)
+		;
+		LaunchParams.m_bAllowExecutableLocate = true;
+		LaunchParams.m_bMergeEnvironment = true;
+
+		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
+			(
+				CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None)
+			)
+			.f_Wrap()
+		;
+
+		co_return Result && Result->m_ExitCode == 0;
+	}
+
+	TCFuture<void> CAppManagerActor::fp_PullEnvironmentContainerImage(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		CStr RuntimeExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
+
+		TCVector<CStr> Arguments;
+		if (RuntimeExecutable == "container")
+			Arguments = fg_CreateVector<CStr>("image", "pull", _pEnvironment->m_Settings.m_ContainerImage);
+		else
+			Arguments = fg_CreateVector<CStr>("pull", _pEnvironment->m_Settings.m_ContainerImage);
+
+		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+			(
+				RuntimeExecutable
+				, fg_Move(Arguments)
+				, mp_State.m_RootDirectory
+				, {}
+			)
+		;
+		LaunchParams.m_bAllowExecutableLocate = true;
+		LaunchParams.m_bMergeEnvironment = true;
+
+		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
+			(
+				CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode)
+			)
+			.f_Wrap()
+		;
+
+		if (!Result)
+			co_return DMibErrorInstance("Failed to pull image '{}': {}"_f << _pEnvironment->m_Settings.m_ContainerImage << Result.f_GetExceptionStr());
 
 		co_return {};
 	}

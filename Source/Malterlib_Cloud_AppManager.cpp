@@ -23,6 +23,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentRemove);
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentChangeSettings);
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentStart);
+		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentPull);
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentStop);
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentRestart);
 		DMibPublishActorFunction(CAppManagerInterface::f_GetEnvironments);
