@@ -926,6 +926,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);
+		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
 		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface);
 		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);
