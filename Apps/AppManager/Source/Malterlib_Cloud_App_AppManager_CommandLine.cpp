@@ -548,6 +548,15 @@ namespace NMib::NCloud::NAppManager
 						, AddOption_UpdateScriptPostLaunch
 						, AddOption_UpdateScriptOnError
 						, SettingsOption_UpdateGroup
+						, "AgentPlatforms?"_o=
+						{
+							"Names"_o= _o["--agent-platforms"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
+							, "Description"_o= "Additionally install the AppManager distribution for these platforms as applications named SelfUpdate.<Platform>.\n"
+							"These applications provide up to date agent executables for environments whose guests run another platform, "
+							"for example Linux-arm64 for container environments on macOS hosts. They are kept current through the normal update pipeline."
+						}
 					}
 					, "Parameters"_o=
 					{
@@ -560,7 +569,7 @@ namespace NMib::NCloud::NAppManager
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return fp_CommandLine_AddApplication(fg_Move(_Params), fg_Move(_pCommandLine));
+					return fp_CommandLine_EnableSelfUpdate(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;

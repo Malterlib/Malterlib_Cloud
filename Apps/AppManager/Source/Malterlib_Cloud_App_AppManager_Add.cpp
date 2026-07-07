@@ -48,6 +48,31 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnableSelfUpdate(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		uint32 Status = co_await fp_CommandLine_AddApplication(_Params, _pCommandLine);
+		if (Status != 0)
+			co_return Status;
+
+		if (auto *pPlatforms = _Params.f_GetMember("AgentPlatforms"))
+		{
+			for (auto &Platform : pPlatforms->f_Array())
+			{
+				CEJsonSorted PlatformParams = _Params;
+				PlatformParams["Name"] = "SelfUpdate.{}"_f << Platform.f_String();
+				PlatformParams["VersionManagerPlatform"] = Platform.f_String();
+				PlatformParams["SelfUpdateSource"] = false;
+				PlatformParams["SettingsFromVersionInfo"] = false;
+
+				Status = co_await fp_CommandLine_AddApplication(fg_Move(PlatformParams), _pCommandLine);
+				if (Status != 0)
+					co_return Status;
+			}
+		}
+
+		co_return 0;
+	}
+
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CallingHostInfo = fg_GetCallingHostInfo();
