@@ -370,6 +370,40 @@ namespace NMib::NCloud::NAppManager
 				}
 			)
 		;
+
+		EnvironmentManagement.f_RegisterCommand
+			(
+				{
+					"Names"_o= _o["--vm-image-create"]
+					, "Description"_o=
+						"Creates a macOS guest VM image bundle and installs macOS into it from a restore image (IPSW).\n"
+						"The image is created under VMImages in the AppManager root and is referenced from VM environments with --vm-image.\n"
+						"Only supported on Apple silicon macOS hosts."
+					, "Options"_o=
+					{
+						NameOption
+						, "RestoreImage"_o=
+						{
+							"Names"_o= _o["--restore-image"]
+							, "Type"_o= ""
+							, "Description"_o= "Path to the macOS IPSW restore image to install from."
+						}
+						, SettingsOption_VMCPUCount
+						, SettingsOption_VMMemoryMB
+						, "DiskSizeGB?"_o=
+						{
+							"Names"_o= _o["--disk-size"]
+							, "Type"_o= 0
+							, "Description"_o= "Size of the guest disk image in gigabytes. Set to 0 to use the default."
+						}
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_CreateVMImage(fg_Move(_Params), fg_Move(_pCommandLine));
+				}
+			)
+		;
 	}
 
 	bool CAppManagerActor::CEnvironmentSettings::f_ParseSettings(CEJsonSorted const &_Params, EEnvironmentSetting &o_ChangedSettings, CStr &o_Error)
