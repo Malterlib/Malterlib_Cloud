@@ -85,7 +85,7 @@ namespace NMib::NCloud
 
 		try
 		{
-			Contents = NFile::CFile::fs_ReadStringFromFile("/etc/os-release");
+			Contents = NFile::CFile::fs_ReadStringFromFile(CStr("/etc/os-release"));
 		}
 		catch (...)
 		{
