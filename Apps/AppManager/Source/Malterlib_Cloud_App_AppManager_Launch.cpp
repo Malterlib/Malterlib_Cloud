@@ -119,6 +119,18 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
+		{
+			auto Result = co_await fp_EnsureOSDependencies(_pApplication).f_Wrap();
+			if (!Result)
+			{
+				fp_AppLaunchStateChanged(_pApplication, Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+				if (!_pApplication->m_bStopped && !_pApplication->m_bDeleted)
+					fp_ScheduleRelaunchApp(_pApplication);
+
+				co_return Result.f_GetException();
+			}
+		}
+
 		auto &Application = *_pApplication;
 
 		if (Application.m_Settings.m_bSelfUpdateSource)

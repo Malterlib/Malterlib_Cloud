@@ -204,6 +204,7 @@ namespace NMib::NCloud
 			NStr::CStr m_RunAsGroup;
 			bool m_bRunAsUserHasShell = false;
 
+			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_OSDependencies;
 			NContainer::TCMap<NStr::CStr, NFile::CDirectoryManifestConfig::CDestination> m_Backup_IncludeWildcards;
 			NContainer::TCSet<NStr::CStr> m_Backup_ExcludeWildcards;
 			NContainer::TCMap<NStr::CStr, NFile::EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;

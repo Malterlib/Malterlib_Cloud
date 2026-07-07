@@ -372,6 +372,13 @@ Property
 
 	MalterlibCloudVersionInfo_AppDistribution_DeployDestinations: [string]?
 	MalterlibCloudVersionInfo_AppDistribution_ReleaseNotes: string = ""
+
+	// OS packages the application needs on the host it runs on, keyed by OS selector.
+	// Selectors match case-insensitively against the os-release ID (for example "ubuntu",
+	// "debian", "fedora", "alpine", "arch"), the ID_LIKE entries, the generic "Linux" for
+	// any Linux distribution, and "macOS". The AppManager installs the packages with the
+	// platform package manager (apt-get, dnf, apk, pacman, zypper or brew) before launching.
+	MalterlibCloudVersionInfo_OSDependencies: {...: [string]}?
 }
 
 Property
@@ -465,6 +472,11 @@ Property
 	MalterlibCloudVersionInfo #<ExtraInfo> =+ {LowPortExecutables: MalterlibCloudVersionInfo_LowPortExecutables}
 	{
 		!MalterlibCloudVersionInfo_LowPortExecutables undefined
+	}
+
+	MalterlibCloudVersionInfo #<ExtraInfo> =+ {OSDependencies: MalterlibCloudVersionInfo_OSDependencies}
+	{
+		!MalterlibCloudVersionInfo_OSDependencies undefined
 	}
 
 	MalterlibCloudVersionInfo #<ExtraInfo.AppDistribution> =+ {DeployDestinations: MalterlibCloudVersionInfo_AppDistribution_DeployDestinations}
