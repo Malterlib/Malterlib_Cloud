@@ -86,6 +86,7 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_RunAsUserHasShell = DBit(26)
 			, EApplicationSetting_AutoUpdate = DBit(27)
 			, EApplicationSetting_LaunchInProcess = DBit(28)
+			, EApplicationSetting_LaunchEnvironment = DBit(29)
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
 			| EApplicationSetting_ExecutableParameters
@@ -93,6 +94,7 @@ namespace NMib::NCloud::NAppManager
 			| EApplicationSetting_RunAsGroup
 			| EApplicationSetting_SelfUpdateSource
 			| EApplicationSetting_LaunchInProcess
+			| EApplicationSetting_LaunchEnvironment
 		};
 
 		enum EStopFlag
@@ -129,6 +131,7 @@ namespace NMib::NCloud::NAppManager
 			TCSet<CStr> m_Dependencies;
 			CStr m_VersionManagerApplication;
 			CStr m_UpdateGroup;
+			CStr m_LaunchEnvironment;
 			TCSet<CStr> m_UpdateTags;
 			TCSet<CStr> m_UpdateBranches;
 			CUpdateScripts m_UpdateScripts;

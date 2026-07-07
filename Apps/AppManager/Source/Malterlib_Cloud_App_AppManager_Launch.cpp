@@ -160,6 +160,13 @@ namespace NMib::NCloud::NAppManager
 			co_await fp_UpdateApplicationJson(_pApplication);
 		}
 
+		if (!Application.m_Settings.m_LaunchEnvironment.f_IsEmpty())
+		{
+			CStr Error = "Cannot launch in environment '{}': environment launches are not yet supported"_f << Application.m_Settings.m_LaunchEnvironment;
+			fp_AppLaunchStateChanged(_pApplication, Error, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(Error);
+		}
+
 		fp_AppLaunchStateChanged(_pApplication, "Launching", CAppManagerInterface::EStatusSeverity_Warning);
 
 		if (Application.m_Settings.m_bBackupEnabled && !Application.m_BackupClient)

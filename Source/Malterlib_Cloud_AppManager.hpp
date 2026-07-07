@@ -67,6 +67,8 @@ namespace NMib::NCloud
 		_Stream % m_bBackupEnabled;
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchInProcess)
 			_Stream % m_bLaunchInProcess;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchEnvironment)
+			_Stream % m_LaunchEnvironment;
 	}
 
 	template <typename tf_CStream>
@@ -152,6 +154,8 @@ namespace NMib::NCloud
 		_Stream % m_bBackupEnabled;
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchInProcess)
 			_Stream % m_bLaunchInProcess;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchEnvironment)
+			_Stream % m_LaunchEnvironment;
 	}
 
 	template <typename tf_CStream>
