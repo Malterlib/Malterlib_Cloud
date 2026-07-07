@@ -960,7 +960,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface);
 		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_OnEnvironmentApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change);
-		CStr fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr &o_Error);
+		TCFuture<CStr> fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError);
 		CStr fp_GetContainerRuntimeExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment);
 		CStr fp_GetContainerName(TCSharedPointer<CEnvironment> const &_pEnvironment);
 		CAppManagerContainerLaunch fp_BuildEnvironmentContainerLaunch
