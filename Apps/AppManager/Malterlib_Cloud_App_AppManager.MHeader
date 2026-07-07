@@ -59,6 +59,8 @@ Property
 {
 	Malterlib_App_Enable_AppManager: bool = true
 
+	MalterlibModules =+ "Virtualization"
+
 	Malterlib_Cloud_App_Targets =+ "Malterlib_Cloud_AppManager"
 	{
 		!!Malterlib_App_Enable_AppManager true
