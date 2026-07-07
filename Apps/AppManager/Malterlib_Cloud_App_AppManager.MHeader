@@ -37,6 +37,7 @@
 		{
 			!!MalterlibPostCopyProject undefined
 		}
+		MalterlibPostCopyProject2 "Malterlib_Cloud_AppManager"
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_Executable ""
 	}
