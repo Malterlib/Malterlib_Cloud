@@ -147,8 +147,8 @@ namespace NMib::NCloud::NAppManager
 				, "MalterlibProtectedEnvironment"
 				, "MalterlibAppManagerEnvironmentAgentRoot"
 				, "MalterlibAppManagerEnvironmentHostID"
-				, "HOME"
-				, "TMPDIR"
+				, "HOME={}/.home"_f << _AgentRootDirectory
+				, "TMPDIR={}/.tmp"_f << _AgentRootDirectory
 			}
 		;
 

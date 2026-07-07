@@ -1485,8 +1485,15 @@ namespace NMib::NCloud::NAppManager
 		LaunchParams.m_bAllowExecutableLocate = bContainer;
 		LaunchParams.m_Environment["MalterlibAppManagerEnvironmentAgentRoot"] = AgentRootDirectory;
 		LaunchParams.m_Environment["MalterlibAppManagerEnvironmentHostID"] = mp_State.m_HostID;
-		LaunchParams.m_Environment["HOME"] = AgentRootDirectory + "/.home";
-		LaunchParams.m_Environment["TMPDIR"] = AgentRootDirectory + "/.tmp";
+
+		// The container runtime client must keep the launching environment (for example
+		// the docker context configuration in HOME); the agent environment inside the
+		// container is set with explicit --env values instead
+		if (!bContainer)
+		{
+			LaunchParams.m_Environment["HOME"] = AgentRootDirectory + "/.home";
+			LaunchParams.m_Environment["TMPDIR"] = AgentRootDirectory + "/.tmp";
+		}
 		LaunchParams.m_bMergeEnvironment = true;
 		LaunchParams.m_bCreateNewProcessGroup = true;
 		LaunchParams.m_bShowLaunched = false;
