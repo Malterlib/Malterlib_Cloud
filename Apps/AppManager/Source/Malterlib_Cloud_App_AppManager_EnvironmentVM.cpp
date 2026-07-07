@@ -1,6 +1,7 @@
 // Copyright © Unbroken AB
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <Mib/Atomic/Atomic>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
 
@@ -99,5 +100,77 @@ namespace NMib::NCloud::NAppManager
 		bConnected = true;
 
 		co_return {};
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CreateVMImage(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		using namespace NVirtualization;
+
+		CStr Name = _Params["Name"].f_String();
+		CStr RestoreImage = _Params["RestoreImage"].f_String();
+
+		if (!fg_IsVirtualizationBackendAvailable(EVirtualizationBackend_Default))
+		{
+			co_await _pCommandLine->f_StdErr("No virtualization backend is available on this host\n");
+			co_return 1;
+		}
+
+		CStr BundleDirectory = fg_Format("{}/VMImages/{}", mp_State.m_RootDirectory, Name);
+		if (CFile::fs_FileExists(BundleDirectory, EFileAttrib_Directory))
+		{
+			co_await _pCommandLine->f_StdErr("The VM image '{}' already exists\n"_f << Name);
+			co_return 1;
+		}
+
+		CMacOSVMImageCreateParams CreateParams;
+		CreateParams.m_BundleDirectory = BundleDirectory;
+		CreateParams.m_RestoreImagePath = RestoreImage;
+		CreateParams.m_CPUCount = (uint32)_Params["VMCPUCount"].f_AsInteger();
+		CreateParams.m_MemoryMB = (uint64)_Params["VMMemoryMB"].f_AsInteger();
+		CreateParams.m_DiskSizeGB = (uint64)_Params["DiskSizeGB"].f_AsInteger();
+
+		co_await _pCommandLine->f_StdOut("Creating VM image '{}' and installing macOS from {}\n"_f << Name << RestoreImage);
+
+		NStorage::TCSharedPointer<NAtomic::TCAtomic<fp64>> pProgress = fg_Construct(0.0);
+		NStorage::TCSharedPointer<NAtomic::TCAtomic<bool>> pDone = fg_Construct(false);
+
+		TCPromiseFuturePair<void> DonePromise;
+		{
+			auto Promise = DonePromise.m_Promise;
+			fg_CreateMacOSVMImage
+				(
+					fg_Move(CreateParams)
+					, [pProgress](fp64 _Progress)
+					{
+						*pProgress = _Progress;
+					}
+				)
+				> [Promise, pDone](TCAsyncResult<void> _Result) mutable
+				{
+					*pDone = true;
+					if (!_Result)
+						Promise.f_SetException(_Result.f_GetException());
+					else
+						Promise.f_SetResult();
+				}
+			;
+		}
+
+		fp64 LastReportedProgress = -1.0;
+		while (!*pDone)
+		{
+			co_await fg_Timeout(2.0);
+
+			fp64 Progress = *pProgress;
+			if (Progress > LastReportedProgress)
+			{
+				LastReportedProgress = Progress;
+				co_await _pCommandLine->f_StdOut("Installing: {}%\n"_f << aint((Progress * 100.0).f_Get()));
+			}
+		}
+
+		auto Result = co_await fg_Move(DonePromise.m_Future).f_Wrap();
+
+		co_return _pCommandLine->f_AddAsyncResult(Result);
 	}
 }
