@@ -19,6 +19,9 @@ namespace NMib::NCloud
 		Arguments.f_Insert("--rm");
 		Arguments.f_Insert("--interactive");
 
+		if (_Launch.m_bReadOnly)
+			Arguments.f_Insert("--read-only");
+
 		if (!_Launch.m_Network.f_IsEmpty())
 		{
 			Arguments.f_Insert("--network");
@@ -109,6 +112,7 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_Image = Settings.m_ContainerImage;
 		Launch.m_MemoryLimit = Settings.m_MemoryLimit;
 		Launch.m_CPULimit = Settings.m_CPULimit;
+		Launch.m_bReadOnly = Settings.m_bContainerReadOnly;
 		Launch.m_ExtraArguments = Settings.m_ContainerExtraArguments;
 		Launch.m_WorkingDirectory = _AgentRootDirectory;
 		Launch.m_Executable = _AgentExecutable;

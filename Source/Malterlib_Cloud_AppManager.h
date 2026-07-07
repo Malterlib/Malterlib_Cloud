@@ -252,6 +252,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_ContainerNetwork;
 			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NStr::CStr>> m_ContainerExtraMounts;
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ContainerExtraArguments;
+			NStorage::TCOptional<bool> m_bContainerReadOnly;
 
 			NStorage::TCOptional<NStr::CStr> m_MemoryLimit;
 			NStorage::TCOptional<fp64> m_CPULimit;
@@ -285,6 +286,7 @@ namespace NMib::NCloud
 			NStr::CStr m_ContainerNetwork;
 			NContainer::TCMap<NStr::CStr, NStr::CStr> m_ContainerExtraMounts;
 			NContainer::TCVector<NStr::CStr> m_ContainerExtraArguments;
+			bool m_bContainerReadOnly = false;
 
 			NStr::CStr m_MemoryLimit;
 			fp64 m_CPULimit = 0.0;
