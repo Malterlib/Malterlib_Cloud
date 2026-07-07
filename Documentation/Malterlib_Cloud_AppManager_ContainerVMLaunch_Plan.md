@@ -4,31 +4,44 @@ Status: In implementation (2026-07-07)
 
 Implementation progress:
 
-- Phase 0 (done): `LaunchEnvironment` application setting, environment entities with
-  settings/persistence/CLI/remote API/permissions, protocol version 0x11a.
-- Phase 1 (done): environment agent mode (`MalterlibAppManagerEnvironmentAgentRoot`),
-  `CAppManagerEnvironmentInterface`/`CAppManagerEnvironmentHostInterface` with reversed
-  registration (the agent registers its interface through the host-published interface;
-  WithID interfaces pair with WithID subscriptions), ephemeral applications in the agent,
-  launch/stop/update-script delegation, agent-pushed status changes, Local environments
-  with end-to-end tests, teardown and stale-agent cleanup. A trust manager init race with
-  removed-while-connecting client connections was fixed in the Concurrency module.
-- Phase 2 (machinery done): docker dialect container launches through the agent flow with
-  pure, unit-tested argument building, root-directory bind mount, --env passthrough,
-  host-gateway reachability, stale container removal, and agent platform installs
-  through `--application-enable-self-update --agent-platforms`. End-to-end container
-  tests still require a cross-built Linux agent executable (Linux SDK build) and docker
-  and are not yet automated.
-- Phase 3 (dialect done): the Apple `container` CLI is selected with
-  `ContainerRuntime AppleContainer`; it accepts the same run options as docker except
-  --add-host, which is skipped for it. End-to-end verification remains.
-- Phase 4 (module and wiring done): the `Malterlib/Virtualization` module provides the
-  virtual `CVirtualMachineActor` interface with the Virtualization.framework backend
-  (macOS guests, NAT, virtiofs shares, graceful stop). VM environments create and start
-  the machine from `<Root>/VMImages/<VMImage>` and wait for the agent. Remaining: guest
-  image provisioning (§5.3), the entitlement signing step for
-  `com.apple.security.virtualization`, and console-based agent bootstrap.
-- Phase 5 (not started): statistics, coordinated agent updates, WebAppManager UI.
+Implemented and committed:
+
+- Phase 0: `LaunchEnvironment` application setting through all layers and environments as
+  first-class entities (settings, JSON persistence, permissions, remote API, CLI, protocol
+  version 0x11a).
+- Phase 1: environment agent mode, host/agent distributed-actor interfaces with ticket-based
+  registration, ephemeral applications in the agent, launch/stop/update-script delegation,
+  agent-pushed status, Local environments with end-to-end tests, teardown and stale-agent
+  cleanup. A trust-manager init race (removed-while-connecting client connections) was fixed
+  in the Concurrency module.
+- Phase 2: docker container launches through the agent flow with pure, unit-tested argument
+  building, identical-path root bind mount, --env passthrough, host-gateway reachability and
+  stale-container removal. Verified end-to-end at runtime: the Linux agent cross-builds and
+  executes inside an ubuntu container with a live bind mount. A gated end-to-end test
+  (`Malterlib/Cloud/AppManager/Environment/Docker Launch`) starts and stops a docker
+  environment; it probes the bind mount and skips when the host docker setup does not
+  live-share the AppManager root (for example colima with a limited mount config) or when no
+  Linux agent / docker daemon is available. Agent executables for other platforms install
+  through `--application-enable-self-update --agent-platforms`.
+- Phase 3: the Apple `container` CLI is selected with `ContainerRuntime AppleContainer`;
+  it takes the same run options as docker except --add-host, which is skipped for it.
+- Phase 4: the `Malterlib/Virtualization` module provides the virtual `CVirtualMachineActor`
+  interface with a Virtualization.framework backend (macOS guests, NAT, virtiofs, graceful
+  stop). VM environments create and start a machine from `<Root>/VMImages/<VMImage>` and run
+  the agent-connected flow.
+- Phase 5 (partial): running environments restart when their agent application updates, and
+  environment status is reported through a status sensor mirroring application status.
+
+Remaining (larger infrastructure / greenfield, out of reach without external assets):
+
+- Container end-to-end tests on a Linux CI host or a macOS docker setup that live-shares the
+  AppManager root (the machinery is verified; the gated test runs where the mount works).
+- VM guest image provisioning (§5.3): downloading a macOS IPSW and installing a guest with an
+  agent LaunchDaemon, and the console-based agent bootstrap that depends on a provisioned guest.
+- The `com.apple.security.virtualization` entitlement signing step in the build system
+  (ad-hoc signing suffices for local development).
+- A dedicated Cloud AppManager web UI for environments (no such UI exists today; the CLI
+  `--environment-list` and remote API are the current surface).
 
 ## 1. Goal and Scope
 
