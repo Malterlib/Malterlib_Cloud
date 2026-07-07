@@ -150,6 +150,18 @@ namespace NMib::NCloud::NAppManager
 			co_return CAppLaunchResult{};
 		}
 
+		if (!Application.m_Settings.m_LaunchEnvironment.f_IsEmpty())
+		{
+			CStr Error;
+			if (!mp_Environments.f_FindEqual(Application.m_Settings.m_LaunchEnvironment))
+				Error = "Cannot launch: no such environment '{}'. Add it with --environment-add."_f << Application.m_Settings.m_LaunchEnvironment;
+			else
+				Error = "Cannot launch in environment '{}': environment launches are not yet supported"_f << Application.m_Settings.m_LaunchEnvironment;
+
+			fp_AppLaunchStateChanged(_pApplication, Error, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(Error);
+		}
+
 		if (Application.m_Settings.m_AppManagerVersion < mcp_CurrentAppMangerVersion)
 		{
 			fp_AppLaunchStateChanged(_pApplication, "Upgrading app manager version", CAppManagerInterface::EStatusSeverity_Warning);
@@ -158,13 +170,6 @@ namespace NMib::NCloud::NAppManager
 
 			Application.m_Settings.m_AppManagerVersion = mcp_CurrentAppMangerVersion;
 			co_await fp_UpdateApplicationJson(_pApplication);
-		}
-
-		if (!Application.m_Settings.m_LaunchEnvironment.f_IsEmpty())
-		{
-			CStr Error = "Cannot launch in environment '{}': environment launches are not yet supported"_f << Application.m_Settings.m_LaunchEnvironment;
-			fp_AppLaunchStateChanged(_pApplication, Error, CAppManagerInterface::EStatusSeverity_Error);
-			co_return DMibErrorInstance(Error);
 		}
 
 		fp_AppLaunchStateChanged(_pApplication, "Launching", CAppManagerInterface::EStatusSeverity_Warning);

@@ -330,6 +330,8 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
+		fp_BuildCommandLine_Environments(o_CommandLine);
+
 		ApplicationManagement.f_RegisterCommand
 			(
 				{
