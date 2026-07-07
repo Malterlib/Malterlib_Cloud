@@ -3,11 +3,25 @@
 
 #include <Mib/Encoding/JsonShortcuts>
 #include <Mib/CommandLine/TableRenderer>
+#include <Mib/Cryptography/RandomID>
+
+#include <Mib/Concurrency/LogError>
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
 {
+	void CAppManagerActor::CEnvironment::f_SetStatus(CStr const &_Status, CAppManagerInterface::EStatusSeverity _Severity)
+	{
+		m_Status = _Status;
+		m_StatusSeverity = _Severity;
+	}
+
+	bool CAppManagerActor::CEnvironment::f_IsStarted() const
+	{
+		return m_bStarted && m_AgentInterface;
+	}
+
 	void CAppManagerActor::fp_BuildCommandLine_Environments(CDistributedAppCommandLineSpecification &o_CommandLine)
 	{
 		auto EnvironmentManagement = o_CommandLine.f_AddSection("Environment Management", "Commands to manage AppManager launch environments (containers and virtual machines).");
@@ -805,6 +819,9 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		auto pEnvironment = *pFindEnvironment;
+
+		co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
+
 		pEnvironment->m_bDeleted = true;
 		mp_Environments.f_Remove(_Name);
 
@@ -911,7 +928,11 @@ namespace NMib::NCloud::NAppManager
 		if (!pFindEnvironment)
 			co_return Auditor.f_Exception(fg_Format("No such environment '{}'", _Name));
 
-		co_return Auditor.f_Exception("Starting environments is not yet supported");
+		co_await (fp_EnsureEnvironmentStarted(*pFindEnvironment) % "Failed to start environment" % Auditor);
+
+		Auditor.f_Info(fg_Format("Started environment '{}'", _Name));
+
+		co_return {};
 	}
 
 	TCFuture<void> CAppManagerActor::fp_StopEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo)
@@ -939,7 +960,11 @@ namespace NMib::NCloud::NAppManager
 		if (!pFindEnvironment)
 			co_return Auditor.f_Exception(fg_Format("No such environment '{}'", _Name));
 
-		co_return Auditor.f_Exception("Stopping environments is not yet supported");
+		co_await (fp_StopEnvironmentInternal(*pFindEnvironment) % "Failed to stop environment" % Auditor);
+
+		Auditor.f_Info(fg_Format("Stopped environment '{}'", _Name));
+
+		co_return {};
 	}
 
 	TCFuture<void> CAppManagerActor::fp_RestartEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo)
@@ -967,7 +992,14 @@ namespace NMib::NCloud::NAppManager
 		if (!pFindEnvironment)
 			co_return Auditor.f_Exception(fg_Format("No such environment '{}'", _Name));
 
-		co_return Auditor.f_Exception("Restarting environments is not yet supported");
+		auto pEnvironment = *pFindEnvironment;
+
+		co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
+		co_await (fp_EnsureEnvironmentStarted(pEnvironment) % "Failed to start environment" % Auditor);
+
+		Auditor.f_Info(fg_Format("Restarted environment '{}'", _Name));
+
+		co_return {};
 	}
 
 	TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_EnvironmentAdd(CStr _Name, CEnvironmentSettings _Settings)
@@ -1259,5 +1291,489 @@ namespace NMib::NCloud::NAppManager
 		TableRenderer.f_Output(_Params);
 
 		co_return 0;
+	}
+
+	CStr CAppManagerActor::fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr &o_Error)
+	{
+		if (_pEnvironment->m_Settings.m_AgentApplication.f_IsEmpty())
+		{
+			if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Local)
+				return CFile::fs_GetProgramPath();
+
+			o_Error = "Environment '{}' has no agent application configured. Set one with --agent-application."_f << _pEnvironment->m_Name;
+			return {};
+		}
+
+		auto *pFindApplication = mp_Applications.f_FindEqual(_pEnvironment->m_Settings.m_AgentApplication);
+		if (!pFindApplication)
+		{
+			o_Error = "Agent application '{}' for environment '{}' is not installed"_f << _pEnvironment->m_Settings.m_AgentApplication << _pEnvironment->m_Name;
+			return {};
+		}
+
+		CStr Directory = (*pFindApplication)->f_GetDirectory();
+
+		TCVector<CStr> Candidates;
+		if (!(*pFindApplication)->m_Settings.m_Executable.f_IsEmpty())
+			Candidates.f_Insert((*pFindApplication)->m_Settings.m_Executable);
+		Candidates.f_Insert(CFile::fs_GetFile(CFile::fs_GetProgramPath()));
+#ifdef DPlatformFamily_Windows
+		Candidates.f_Insert("AppManager.exe");
+#else
+		Candidates.f_Insert("AppManager");
+#endif
+
+		for (auto &Candidate : Candidates)
+		{
+			CStr Executable = Directory / Candidate;
+			if (CFile::fs_FileExists(Executable))
+				return Executable;
+		}
+
+		o_Error = "Found no agent executable in '{}' for environment '{}'"_f << Directory << _pEnvironment->m_Name;
+		return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
+		if (_pEnvironment->f_IsStarted())
+			co_return {};
+
+		if (_pEnvironment->m_bStarting)
+		{
+			co_await _pEnvironment->m_OnAgentConnected.f_Insert().f_Future();
+			co_return {};
+		}
+
+		co_return co_await fp_StartEnvironmentInternal(_pEnvironment);
+	}
+
+	TCFuture<void> CAppManagerActor::fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
+		if (_pEnvironment->m_bDeleted)
+			co_return DMibErrorInstance("Environment has been deleted");
+
+		if (_pEnvironment->f_IsStarted())
+			co_return {};
+
+		if (_pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
+		{
+			CStr Error = "Cannot start environment '{}': environment type {} is not yet supported"_f
+				<< _pEnvironment->m_Name
+				<< CAppManagerInterface::fs_EnvironmentTypeToStr(_pEnvironment->m_Settings.m_Type)
+			;
+			_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(Error);
+		}
+
+		CStr Error;
+		CStr AgentExecutable = fp_GetEnvironmentAgentExecutable(_pEnvironment, Error);
+		if (AgentExecutable.f_IsEmpty())
+		{
+			_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(Error);
+		}
+
+		_pEnvironment->m_bStarting = true;
+		_pEnvironment->m_bStopping = false;
+		_pEnvironment->f_SetStatus("Starting", CAppManagerInterface::EStatusSeverity_Warning);
+
+		bool bConnected = false;
+		auto Cleanup = g_OnScopeExit / [&, _pEnvironment]
+			{
+				_pEnvironment->m_bStarting = false;
+				auto OnAgentConnected = fg_Move(_pEnvironment->m_OnAgentConnected);
+				for (auto &Promise : OnAgentConnected)
+				{
+					if (bConnected)
+						Promise.f_SetResult();
+					else
+						Promise.f_SetException(DMibErrorInstance("Environment '{}' failed to start"_f << _pEnvironment->m_Name));
+				}
+			}
+		;
+
+		CStr AgentRootDirectory = fg_Format("{}/Environment/{}", mp_State.m_RootDirectory, _pEnvironment->m_Name);
+
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) / [AgentRootDirectory]()
+						{
+							CFile::fs_CreateDirectory(AgentRootDirectory);
+						}
+					)
+					% "Failed to create environment agent root directory"
+				)
+			;
+		}
+
+		_pEnvironment->m_LaunchID = fg_RandomID();
+
+		TCPromiseFuturePair<void> LaunchedPromise;
+
+		CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
+			(
+				AgentExecutable
+				, fg_CreateVector<CStr>("--daemon-run-standalone")
+				, AgentRootDirectory
+				, [this, _pEnvironment, LaunchedPromise = LaunchedPromise.m_Promise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+				{
+					if (_pEnvironment->m_bDeleted)
+						return;
+
+					switch (_State.f_GetTypeID())
+					{
+					case NProcess::EProcessLaunchState_Launched:
+						break;
+					case NProcess::EProcessLaunchState_LaunchFailed:
+						{
+							auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
+							_pEnvironment->f_SetStatus(fg_Format("Failed to launch agent: {}", LaunchError), CAppManagerInterface::EStatusSeverity_Error);
+
+							if (!LaunchedPromise.f_IsSet())
+								LaunchedPromise.f_SetException(DMibErrorInstance(LaunchError));
+
+							fp_OnEnvironmentAgentDisconnected(_pEnvironment);
+						}
+						break;
+					case NProcess::EProcessLaunchState_Exited:
+						{
+							auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
+
+							if (!_pEnvironment->m_bStopping)
+								_pEnvironment->f_SetStatus(fg_Format("Agent exited with {}", ExitStatus), CAppManagerInterface::EStatusSeverity_Error);
+
+							if (!LaunchedPromise.f_IsSet())
+								LaunchedPromise.f_SetException(DMibErrorInstance(fg_Format("Environment agent exited with '{}' before connecting", ExitStatus)));
+
+							fp_OnEnvironmentAgentDisconnected(_pEnvironment);
+						}
+						break;
+					}
+				}
+			)
+		;
+
+		Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+		if (mp_bLogLaunchesToStdErr)
+			Launch.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
+		Launch.m_LogName = fg_Format("Environment/{}", _pEnvironment->m_Name);
+
+		auto &LaunchParams = Launch.m_Params;
+		LaunchParams.m_Environment["MalterlibAppManagerEnvironmentAgentRoot"] = AgentRootDirectory;
+		LaunchParams.m_Environment["MalterlibAppManagerEnvironmentHostID"] = mp_State.m_HostID;
+		LaunchParams.m_Environment["HOME"] = AgentRootDirectory + "/.home";
+		LaunchParams.m_Environment["TMPDIR"] = AgentRootDirectory + "/.tmp";
+		LaunchParams.m_bMergeEnvironment = true;
+		LaunchParams.m_bCreateNewProcessGroup = true;
+		LaunchParams.m_bShowLaunched = false;
+
+		_pEnvironment->m_AgentLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
+			(
+				mp_State.m_LocalAddress
+				, mp_State.m_TrustManager
+				, g_ActorFunctor / [_pEnvironment](CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _Certificate) -> TCFuture<void>
+				{
+					if (_pEnvironment->m_bDeleted)
+						co_return DMibErrorInstance("Environment deleted");
+
+					_pEnvironment->m_AgentHostID = _HostID;
+
+					co_return {};
+				}
+				, g_ActorFunctor / [_pEnvironment](NStr::CStr _Error) -> TCFuture<void>
+				{
+					if (_pEnvironment->m_bDeleted || _pEnvironment->f_IsStarted())
+						co_return {};
+
+					_pEnvironment->f_SetStatus(fg_Format("Agent failed to start: {}", _Error), CAppManagerInterface::EStatusSeverity_Error);
+
+					co_return {};
+				}
+				, fg_Format("Environment/{}", _pEnvironment->m_Name)
+				, _pEnvironment->m_LaunchID
+				, false
+			)
+		;
+
+		auto LaunchSubscription = co_await _pEnvironment->m_AgentLaunch
+			(
+				&CProcessLaunchActor::f_Launch
+				, Launch
+				, fg_ThisActor(this)
+			)
+			.f_Wrap()
+		;
+
+		if (!LaunchSubscription)
+		{
+			_pEnvironment->f_SetStatus(fg_Format("Failed to launch agent: {}", LaunchSubscription.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
+
+			if (_pEnvironment->m_AgentLaunch)
+			{
+				co_await fg_Move(_pEnvironment->m_AgentLaunch).f_Destroy().f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy environment agent launch")
+				;
+			}
+
+			co_return LaunchSubscription.f_GetException();
+		}
+
+		_pEnvironment->m_AgentLaunchSubscription = fg_Move(*LaunchSubscription);
+
+		// The agent can already have connected while the launch was being set up
+		if (!_pEnvironment->f_IsStarted())
+		{
+			// Wait until the agent has connected and its environment interface has been registered.
+			// The launch promise resolves the wait early when the agent fails to launch or exits.
+			auto ConnectedFuture = _pEnvironment->m_OnAgentConnected.f_Insert().f_Future();
+
+			fg_Move(LaunchedPromise.m_Future) > [_pEnvironment](TCAsyncResult<void> &&_Result)
+				{
+					if (_Result)
+						return;
+
+					auto OnAgentConnected = fg_Move(_pEnvironment->m_OnAgentConnected);
+					for (auto &Promise : OnAgentConnected)
+						Promise.f_SetException(_Result.f_GetException());
+				}
+			;
+
+			auto ConnectedResult = co_await fg_Move(ConnectedFuture)
+				.f_Timeout(120.0, "Timed out waiting for the environment agent to connect")
+				.f_Wrap()
+			;
+
+			if (!ConnectedResult)
+			{
+				_pEnvironment->f_SetStatus(fg_Format("Agent failed to connect: {}", ConnectedResult.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
+				fp_StopEnvironmentInternal(_pEnvironment).f_DiscardResult();
+				co_return ConnectedResult.f_GetException();
+			}
+		}
+		else
+			fg_Move(LaunchedPromise.m_Future).f_DiscardResult();
+
+		bConnected = true;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface)
+	{
+		if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStopping)
+			co_return {};
+
+		_pEnvironment->m_AgentInterface = fg_Move(_Interface);
+
+		_pEnvironment->m_bStarted = true;
+		_pEnvironment->f_SetStatus("Running", CAppManagerInterface::EStatusSeverity_None);
+
+		auto OnAgentConnected = fg_Move(_pEnvironment->m_OnAgentConnected);
+		for (auto &Promise : OnAgentConnected)
+			Promise.f_SetResult();
+
+		co_return {};
+	}
+
+	void CAppManagerActor::fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		bool bWasStarted = _pEnvironment->m_bStarted;
+
+		_pEnvironment->m_bStarted = false;
+		if (_pEnvironment->m_AgentInterface)
+		{
+			_pEnvironment->m_AgentInterface.f_Destroy().f_DiscardResult();
+			_pEnvironment->m_AgentInterface.f_Clear();
+		}
+		if (_pEnvironment->m_AgentAppInterface)
+		{
+			_pEnvironment->m_AgentAppInterface.f_Destroy().f_DiscardResult();
+			_pEnvironment->m_AgentAppInterface.f_Clear();
+		}
+		_pEnvironment->m_AgentHostID = {};
+
+		if (!_pEnvironment->m_bStopping && bWasStarted)
+			_pEnvironment->f_SetStatus("Agent disconnected", CAppManagerInterface::EStatusSeverity_Error);
+
+		for (auto &pApplication : mp_Applications)
+		{
+			if (pApplication->m_pLaunchedEnvironment != _pEnvironment)
+				continue;
+
+			pApplication->m_pLaunchedEnvironment = nullptr;
+			pApplication->f_Clear();
+
+			if (!_pEnvironment->m_bStopping && !pApplication->m_bStopped && !pApplication->m_bDeleted)
+			{
+				fp_AppLaunchStateChanged
+					(
+						pApplication
+						, "Environment '{}' stopped unexpectedly. Waiting to retry launching."_f << _pEnvironment->m_Name
+						, CAppManagerInterface::EStatusSeverity_Error
+					)
+				;
+				fp_ScheduleRelaunchApp(pApplication);
+			}
+		}
+	}
+
+	TCFuture<void> CAppManagerActor::fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		if (_pEnvironment->m_bStopping)
+			co_return {};
+
+		_pEnvironment->m_bStopping = true;
+
+		auto Cleanup = g_OnScopeExit / [_pEnvironment]
+			{
+				_pEnvironment->m_bStopping = false;
+			}
+		;
+
+		// Stop applications launched in the environment first
+		{
+			TCFutureVector<uint32> ApplicationStops;
+			for (auto &pApplication : mp_Applications)
+			{
+				if (pApplication->m_pLaunchedEnvironment == _pEnvironment)
+					pApplication->f_Stop(EStopFlag_AutoStart) > ApplicationStops;
+			}
+
+			auto StopResults = co_await fg_AllDoneWrapped(ApplicationStops);
+			for (auto &StopResult : StopResults)
+			{
+				if (!StopResult)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to stop application in environment '{}': {}", _pEnvironment->m_Name, StopResult.f_GetExceptionStr());
+			}
+		}
+
+		_pEnvironment->m_bStarted = false;
+
+		{
+			TCFutureVector<void> InterfaceDestroys;
+
+			if (_pEnvironment->m_AgentInterface)
+			{
+				_pEnvironment->m_AgentInterface.f_Destroy() > InterfaceDestroys;
+				_pEnvironment->m_AgentInterface.f_Clear();
+			}
+
+			if (_pEnvironment->m_AgentAppInterface)
+			{
+				_pEnvironment->m_AgentAppInterface.f_Destroy() > InterfaceDestroys;
+				_pEnvironment->m_AgentAppInterface.f_Clear();
+			}
+
+			co_await fg_AllDone(InterfaceDestroys).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy environment agent interfaces")
+			;
+		}
+
+		_pEnvironment->m_AgentHostID = {};
+
+		if (_pEnvironment->m_AgentLaunch)
+		{
+			auto StopResult = co_await fg_TempCopy(_pEnvironment->m_AgentLaunch)(&CProcessLaunchActor::f_StopProcess).f_Wrap();
+			if (!StopResult)
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to stop agent for environment '{}': {}", _pEnvironment->m_Name, StopResult.f_GetExceptionStr());
+
+			co_await fg_Move(_pEnvironment->m_AgentLaunch).f_Destroy().f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy environment agent launch")
+			;
+		}
+
+		_pEnvironment->m_AgentLaunchSubscription.f_Clear();
+
+		_pEnvironment->f_SetStatus("Stopped", CAppManagerInterface::EStatusSeverity_Warning);
+
+		co_return {};
+	}
+
+	void CAppManagerActor::fp_OnEnvironmentApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change)
+	{
+		auto *pFindApplication = mp_Applications.f_FindEqual(_Change.m_Application);
+		if (!pFindApplication)
+			return;
+
+		auto pApplication = *pFindApplication;
+
+		if (!pApplication->m_pLaunchedEnvironment)
+			return;
+
+		fp_SetAppLaunchStatus(pApplication, _Change.m_Status, _Change.m_StatusSeverity);
+	}
+
+	auto CAppManagerActor::fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment) -> TCFuture<CAppLaunchResult>
+	{
+		auto EnsureResult = co_await fp_EnsureEnvironmentStarted(_pEnvironment).f_Wrap();
+
+		if (_pApplication->m_bDeleted)
+			co_return DMibErrorInstance("Application deleted");
+
+		if (!EnsureResult)
+		{
+			fp_AppLaunchStateChanged
+				(
+					_pApplication
+					, "Failed to start environment '{}': {}"_f << _pEnvironment->m_Name << EnsureResult.f_GetExceptionStr()
+					, CAppManagerInterface::EStatusSeverity_Error
+				)
+			;
+
+			if (!_pApplication->m_bStopped)
+				fp_ScheduleRelaunchApp(_pApplication);
+
+			co_return EnsureResult.f_GetException();
+		}
+
+		CAppManagerEnvironmentInterface::CEnvironmentLaunch Launch;
+		Launch.m_Name = _pApplication->m_Name;
+		Launch.m_Directory = _pApplication->f_GetDirectory();
+		Launch.m_Executable = _pApplication->m_Settings.m_Executable;
+		Launch.m_Parameters = _pApplication->m_Settings.m_ExecutableParameters;
+		Launch.m_RunAsUser = _pApplication->m_Settings.m_RunAsUser;
+		Launch.m_RunAsGroup = _pApplication->m_Settings.m_RunAsGroup;
+		Launch.m_bRunAsUserHasShell = _pApplication->m_Settings.m_bRunAsUserHasShell;
+		Launch.m_bDistributedApp = _pApplication->m_Settings.m_bDistributedApp;
+
+		auto LaunchResult = co_await _pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_LaunchApplication)(fg_Move(Launch))
+			.f_Timeout(60.0 * 60.0, "Timed out launching application in environment (1 hour)")
+			.f_Wrap()
+		;
+
+		if (_pApplication->m_bDeleted)
+			co_return DMibErrorInstance("Application deleted");
+
+		if (!LaunchResult)
+		{
+			fp_AppLaunchStateChanged
+				(
+					_pApplication
+					, "Failed launch in environment '{}': {}"_f << _pEnvironment->m_Name << LaunchResult.f_GetExceptionStr()
+					, CAppManagerInterface::EStatusSeverity_Error
+				)
+			;
+
+			if (!_pApplication->m_bStopped)
+				fp_ScheduleRelaunchApp(_pApplication);
+
+			co_return LaunchResult.f_GetException();
+		}
+
+		_pApplication->m_pLaunchedEnvironment = _pEnvironment;
+		_pApplication->m_bLaunched = true;
+
+		fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
+
+		co_return CAppLaunchResult{};
 	}
 }
