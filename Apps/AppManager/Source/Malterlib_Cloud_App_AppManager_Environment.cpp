@@ -2584,8 +2584,9 @@ namespace NMib::NCloud::NAppManager
 				)
 			;
 
-			if (!_pApplication->m_bStopped)
-				fp_ScheduleRelaunchApp(_pApplication);
+			// The agent can have launched the application even though the launch
+			// call failed, so stop it in the environment before the retry
+			co_await fp_AbortEnvironmentLaunch(_pApplication, _pEnvironment);
 
 			co_return LaunchResult.f_GetException();
 		}
