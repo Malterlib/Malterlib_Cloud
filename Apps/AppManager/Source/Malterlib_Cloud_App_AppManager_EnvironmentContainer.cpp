@@ -211,42 +211,222 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		CStr AppRoot = fp_GetAppleContainerAppRoot();
+		CStr KernelMarkerFile = AppRoot / ".MalterlibKernelInstalled";
 
+		struct CPrepareResult
+		{
+			CStr m_Error;
+			CStr m_PlistFile;
+			bool m_bKernelInstalled = false;
+		};
+
+		CPrepareResult Prepared;
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
-			co_await
+			Prepared = co_await
 				(
-					(
-						g_Dispatch(BlockingActorCheckout) / [AppRoot]()
+					g_Dispatch(BlockingActorCheckout) / [AppRoot, KernelMarkerFile]() -> CPrepareResult
+					{
+						CPrepareResult Result;
+
+						// Find the Apple container CLI and resolve it to the real binary; the
+						// API server executable lives next to it and launchd must reference it
+						// by its true path for the code signature validation to pass
+						CStr Executable;
+						for (auto &Candidate : {CStr("/usr/local/bin/container"), CStr("/opt/homebrew/bin/container")})
 						{
-							CFile::fs_CreateDirectory(AppRoot);
+							if (CFile::fs_FileExists(Candidate))
+							{
+								Executable = Candidate;
+								break;
+							}
 						}
-					)
-					% "Failed to create the container system directory"
+						if (Executable.f_IsEmpty())
+							Executable = NProcess::NPlatform::fg_FindExecutable("container");
+						if (Executable.f_IsEmpty())
+						{
+							Result.m_Error = "The Apple container CLI was not found";
+							return Result;
+						}
+
+						for (aint Depth = 0; Depth < 16 && CFile::fs_FileExists(Executable, EFileAttrib_Link); ++Depth)
+						{
+							CStr Target = CFile::fs_ResolveSymbolicLink(Executable);
+							if (!Target.f_StartsWith("/"))
+								Target = CFile::fs_GetPath(Executable) / Target;
+							Executable = Target;
+						}
+
+						CStr BinaryDirectory = CFile::fs_GetPath(Executable);
+						CStr ApiServer = BinaryDirectory / "container-apiserver";
+						if (!CFile::fs_FileExists(ApiServer))
+						{
+							Result.m_Error = "Found no container-apiserver next to '{}'"_f << Executable;
+							return Result;
+						}
+
+						CStr InstallRoot = CFile::fs_GetPath(BinaryDirectory);
+
+						auto fEscapeXml = [](CStr const &_Text)
+							{
+								CStr Escaped = _Text;
+								Escaped.f_Replace("&", "&amp;");
+								Escaped.f_Replace("<", "&lt;");
+								return Escaped;
+							}
+						;
+
+						// The same launchd job `container system start` would register, but
+						// written and bootstrapped by the AppManager so the registration does
+						// not depend on the session-derived domain of the calling process
+						CStr Plist = fg_Format
+							(
+								"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+								"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+								"<plist version=\"1.0\">\n"
+								"<dict>\n"
+								"\t<key>Label</key>\n"
+								"\t<string>com.apple.container.apiserver</string>\n"
+								"\t<key>ProgramArguments</key>\n"
+								"\t<array>\n"
+								"\t\t<string>{}</string>\n"
+								"\t\t<string>start</string>\n"
+								"\t</array>\n"
+								"\t<key>EnvironmentVariables</key>\n"
+								"\t<dict>\n"
+								"\t\t<key>CONTAINER_APP_ROOT</key>\n"
+								"\t\t<string>{}</string>\n"
+								"\t\t<key>CONTAINER_INSTALL_ROOT</key>\n"
+								"\t\t<string>{}</string>\n"
+								"\t</dict>\n"
+								"\t<key>MachServices</key>\n"
+								"\t<dict>\n"
+								"\t\t<key>com.apple.container.apiserver</key>\n"
+								"\t\t<true/>\n"
+								"\t</dict>\n"
+								"\t<key>RunAtLoad</key>\n"
+								"\t<true/>\n"
+								"\t<key>LimitLoadToSessionType</key>\n"
+								"\t<array>\n"
+								"\t\t<string>Aqua</string>\n"
+								"\t\t<string>Background</string>\n"
+								"\t\t<string>System</string>\n"
+								"\t</array>\n"
+								"</dict>\n"
+								"</plist>\n"
+								, fEscapeXml(ApiServer)
+								, fEscapeXml(AppRoot)
+								, fEscapeXml(InstallRoot)
+							)
+						;
+
+						CFile::fs_CreateDirectory(AppRoot);
+						CFile::fs_CreateDirectory(AppRoot / "apiserver");
+
+						Result.m_PlistFile = AppRoot / "apiserver" / "apiserver.plist";
+						CFile::fs_WriteStringToFile(Result.m_PlistFile, Plist);
+
+						Result.m_bKernelInstalled = CFile::fs_FileExists(KernelMarkerFile);
+
+						return Result;
+					}
 				)
 			;
 		}
 
-		// The container system keeps running after the AppManager exits, like the
-		// containers it hosts; starting it while it is running is a no-op health check.
-		// The first start also downloads the default kernel and the init filesystem
-		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams
-			(
-				_pEnvironment
-				, fg_CreateVector<CStr>("system", "start", "--app-root", AppRoot, "--enable-kernel-install")
-			)
+		if (!Prepared.m_Error.f_IsEmpty())
+			co_return DMibErrorInstance("Failed to start the AppManager container system: {}"_f << Prepared.m_Error);
+
+		auto fLaunchctl = [this](TCVector<CStr> &&_Arguments)
+			{
+				CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+					(
+						"/bin/launchctl"
+						, fg_Move(_Arguments)
+						, mp_State.m_RootDirectory
+						, {}
+					)
+				;
+				LaunchParams.m_bMergeEnvironment = true;
+
+				return CProcessLaunchActor::fs_LaunchSimple
+					(
+						CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None)
+					)
+				;
+			}
 		;
 
-		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
-			(
-				CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode)
-			)
-			.f_Wrap()
-		;
+		// Registration is idempotent: bootstrapping an already loaded label fails and the
+		// health check below decides. The API service keeps running after the AppManager
+		// exits, like the containers it hosts
+		auto BootstrapResult = co_await fLaunchctl(fg_CreateVector<CStr>("bootstrap", "system", Prepared.m_PlistFile)).f_Wrap();
 
-		if (!Result)
-			co_return DMibErrorInstance("Failed to start the AppManager container system: {}"_f << Result.f_GetExceptionStr());
+		CStr LastError;
+		bool bHealthy = false;
+		for (aint Attempt = 0; !bHealthy && Attempt < 6; ++Attempt)
+		{
+			if (Attempt == 3)
+			{
+				// The service may be registered with a stale configuration; replace it
+				auto BootOutResult = co_await fLaunchctl(fg_CreateVector<CStr>("bootout", "system/com.apple.container.apiserver")).f_Wrap();
+				BootstrapResult = co_await fLaunchctl(fg_CreateVector<CStr>("bootstrap", "system", Prepared.m_PlistFile)).f_Wrap();
+			}
+			else if (Attempt != 0)
+				co_await fg_Timeout(2.0);
+
+			auto Health = co_await CProcessLaunchActor::fs_LaunchSimple
+				(
+					CProcessLaunchActor::CSimpleLaunch
+						(
+							fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("list"))
+							, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+						)
+				)
+				.f_Wrap()
+			;
+
+			if (Health)
+				bHealthy = true;
+			else
+				LastError = Health.f_GetExceptionStr();
+		}
+
+		if (!bHealthy)
+			co_return DMibErrorInstance("Failed to start the AppManager container system: {}"_f << LastError);
+
+		// Containers cannot boot without a default kernel; install the recommended one
+		// once per app root. The init filesystem image is pulled on demand
+		if (!Prepared.m_bKernelInstalled)
+		{
+			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
+				(
+					CProcessLaunchActor::CSimpleLaunch
+						(
+							fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("system", "kernel", "set", "--recommended", "--force"))
+							, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+						)
+				)
+				.f_Wrap()
+			;
+
+			if (!Result)
+				co_return DMibErrorInstance("Failed to install the default container kernel: {}"_f << Result.f_GetExceptionStr());
+
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [KernelMarkerFile]()
+						{
+							CFile::fs_WriteStringToFile(KernelMarkerFile, "installed");
+						}
+					)
+				;
+			}
+		}
 
 		bReady = true;
 
