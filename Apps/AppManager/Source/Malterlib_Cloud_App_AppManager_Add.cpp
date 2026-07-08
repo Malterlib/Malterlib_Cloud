@@ -50,6 +50,19 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnableSelfUpdate(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		if (_Params["FromFile"].f_Boolean())
+		{
+			if (auto *pPlatforms = _Params.f_GetMember("AgentPlatforms"); pPlatforms && !pPlatforms->f_Array().f_IsEmpty())
+			{
+				co_return DMibErrorInstance
+					(
+						"You cannot combine --agent-platforms with --from-file, because one local directory only provides binaries for one platform. "
+						"Add the agent applications separately with --application-add --from-file --name SelfUpdate.<Platform>."
+					)
+				;
+			}
+		}
+
 		uint32 Status = co_await fp_CommandLine_AddApplication(_Params, _pCommandLine);
 		if (Status != 0)
 			co_return Status;
