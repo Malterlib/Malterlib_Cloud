@@ -868,6 +868,8 @@ namespace NMib::NCloud::NAppManager
 				Environment.m_ContainerLaunchID = pValue->f_String();
 			if (auto pValue = EnvironmentJson.f_GetMember("ContainerRequestTicketMagic", EJsonType_String))
 				Environment.m_ContainerRequestTicketMagic = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ListenPort", EJsonType_Integer))
+				Environment.m_ListenPort = (uint32)pValue->f_Integer();
 		}
 	}
 
@@ -913,6 +915,7 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentJson["ContainerFingerprint"] = Environment.m_ContainerFingerprint;
 		EnvironmentJson["ContainerLaunchID"] = Environment.m_ContainerLaunchID;
 		EnvironmentJson["ContainerRequestTicketMagic"] = Environment.m_ContainerRequestTicketMagic;
+		EnvironmentJson["ListenPort"] = Environment.m_ListenPort;
 
 		co_return co_await mp_State.m_StateDatabase.f_Save();
 	}
@@ -1782,6 +1785,128 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 
+	TCFuture<NWeb::NHTTP::CURL> CAppManagerActor::fp_EnsureEnvironmentListen(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		bool bVM = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM;
+		bool bAppleContainer
+			= _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container
+			&& fp_GetContainerRuntimeExecutable(_pEnvironment) == "container"
+		;
+
+		if (!bVM && !bAppleContainer)
+			co_return mp_State.m_LocalAddress;
+
+		// Unix domain sockets cannot cross the virtiofs shares that containers and VMs
+		// use, so guests connect to a listen address on the host side of the shared
+		// network instead of the primary local address
+		CStr HostAddress;
+		if (bAppleContainer)
+		{
+			CStr Network = _pEnvironment->m_Settings.m_ContainerNetwork;
+			if (Network.f_IsEmpty())
+				Network = "default";
+
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch
+				(
+					fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("network", "inspect", Network))
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+				)
+			;
+			SimpleLaunch.m_LogName = "AppleContainer/NetworkInspect";
+
+			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
+			if (!Result)
+				co_return DMibErrorInstance("Failed to inspect container network '{}': {}"_f << Network << Result.f_GetExceptionStr());
+
+			{
+				auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the container network inspect output");
+
+				CJsonOrdered Json = CJsonOrdered::fs_FromString(Result->f_GetStdOut());
+				if (Json.f_IsArray())
+				{
+					for (auto &Item : Json.f_Array())
+					{
+						if (auto *pStatus = Item.f_GetMember("status"))
+						{
+							if (auto *pGateway = pStatus->f_GetMember("ipv4Gateway"))
+								HostAddress = pGateway->f_AsString();
+						}
+
+						break;
+					}
+				}
+			}
+
+			if (HostAddress.f_IsEmpty())
+				co_return DMibErrorInstance("Found no gateway address for container network '{}'"_f << Network);
+		}
+		else
+		{
+			// The virtualization framework NAT network is the macOS shared network; its
+			// host address is kept in the vmnet system configuration
+			CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+				(
+					"/usr/bin/defaults"
+					, fg_CreateVector<CStr>("read", "/Library/Preferences/SystemConfiguration/com.apple.vmnet", "Shared_Net_Address")
+					, mp_State.m_RootDirectory
+					, {}
+				)
+			;
+
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
+			SimpleLaunch.m_LogName = "Environment/{}/VMNetAddress"_f << _pEnvironment->m_Name;
+
+			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
+			if (Result && Result->m_ExitCode == 0)
+				HostAddress = CStr(Result->f_GetStdOut().f_Trim());
+			if (HostAddress.f_IsEmpty())
+				HostAddress = "192.168.64.1";
+		}
+
+		for (aint Attempt = 0;; ++Attempt)
+		{
+			if (!_pEnvironment->m_ListenPort)
+			{
+				CStr Random = fg_RandomID();
+				uint32 Seed = 0;
+				ch8 const *pRandom = Random.f_GetStr();
+				for (umint i = 0; i < Random.f_GetLen(); ++i)
+					Seed = Seed * 31 + uint32(uint8(pRandom[i]));
+
+				_pEnvironment->m_ListenPort = 20000 + Seed % 40000;
+			}
+
+			NWeb::NHTTP::CURL Url;
+			if (!Url.f_Decode("wss://{}:{}/"_f << HostAddress << _pEnvironment->m_ListenPort))
+				co_return DMibErrorInstance("Failed to create the environment listen address for host '{}'"_f << HostAddress);
+
+			CDistributedActorTrustManager_Address Address;
+			Address.m_URL = Url;
+
+			bool bHasListen = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_HasListen, Address);
+			if (bHasListen)
+				co_return Url;
+
+			auto AddResult = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_AddListen, Address).f_Wrap();
+			if (AddResult)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Added listen '{}' for environment '{}'", Url.f_Encode(), _pEnvironment->m_Name);
+
+				co_await fp_UpdateEnvironmentJson(_pEnvironment).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to save environment listen state")
+				;
+
+				co_return Url;
+			}
+
+			if (Attempt == 2)
+				co_return DMibErrorInstance("Failed to add environment listen '{}': {}"_f << Url.f_Encode() << AddResult.f_GetExceptionStr());
+
+			// The chosen port can collide with another service; retry with a new one
+			_pEnvironment->m_ListenPort = 0;
+		}
+	}
+
 	TCFuture<void> CAppManagerActor::fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
@@ -1891,6 +2016,8 @@ namespace NMib::NCloud::NAppManager
 		CStr LaunchExecutable = AgentExecutable;
 		TCVector<CStr> LaunchParameters = {"--daemon-run-standalone", "--log-to-stderr"};
 
+		NWeb::NHTTP::CURL AgentAddress = mp_State.m_LocalAddress;
+
 		if (bContainer)
 		{
 			{
@@ -1902,6 +2029,17 @@ namespace NMib::NCloud::NAppManager
 				}
 			}
 
+			{
+				auto Result = co_await fp_EnsureEnvironmentListen(_pEnvironment).f_Wrap();
+				if (!Result)
+				{
+					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+					co_return Result.f_GetException();
+				}
+
+				AgentAddress = *Result;
+			}
+
 			LaunchExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
 			TCVector<CStr> RunArguments = fg_AppManager_BuildContainerRunArguments(fp_BuildEnvironmentContainerLaunch(_pEnvironment, AgentExecutable, AgentRootDirectory));
 
@@ -1911,7 +2049,7 @@ namespace NMib::NCloud::NAppManager
 			CStr FingerprintData = LaunchExecutable;
 			for (auto &Argument : RunArguments)
 				FingerprintData += "\n" + Argument;
-			FingerprintData += "\n" + mp_State.m_LocalAddress.f_Encode();
+			FingerprintData += "\n" + AgentAddress.f_Encode();
 			FingerprintData += "\n" + mp_State.m_HostID;
 			CStr Fingerprint = NCryptography::CHash_SHA256::fs_DigestFromData(FingerprintData.f_GetStr(), FingerprintData.f_GetLen()).f_GetString();
 
@@ -2031,7 +2169,7 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_AgentLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
 			(
-				mp_State.m_LocalAddress
+				AgentAddress
 				, mp_State.m_TrustManager
 				, g_ActorFunctor / [_pEnvironment](CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _Certificate) -> TCFuture<void>
 				{
