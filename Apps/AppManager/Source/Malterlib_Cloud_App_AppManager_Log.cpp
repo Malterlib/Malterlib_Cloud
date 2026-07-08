@@ -26,14 +26,10 @@ namespace NMib::NCloud::NAppManager
 
 		auto pApplication = pThis->fp_ApplicationFromHostID(ReportingHostID);
 
-		TCSharedPointer<CEnvironment> pEnvironment;
-		if (!pApplication)
-			pEnvironment = pThis->fp_EnvironmentFromHostID(ReportingHostID);
-
 		CStr ScopeName;
 		if (pApplication)
 			ScopeName = pApplication->m_Name;
-		else if (pEnvironment)
+		else if (auto pEnvironment = pThis->fp_EnvironmentFromHostID(ReportingHostID))
 			ScopeName = fg_Format("Environment/{}", pEnvironment->m_Name);
 
 		if (ScopeName.f_IsEmpty())
@@ -43,53 +39,36 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		CDistributedAppLogReporter::CLogInfo LogInfo = fg_Move(_LogInfo);
-		if (pEnvironment && LogInfo.m_HostID)
+		if (LogInfo.m_HostID)
 		{
-			// The environment agent forwards its local log store on behalf of the
-			// applications running inside the environment, so keep the reporting
-			// host and scope the application under the environment
-			if (LogInfo.m_Scope.f_IsOfType<CDistributedAppLogReporter::CLogScope_Application>())
-			{
-				auto &ApplicationName = LogInfo.m_Scope.f_GetAsType<CDistributedAppLogReporter::CLogScope_Application>().m_ApplicationName;
-				if (!ApplicationName.f_IsEmpty())
-					ScopeName = fg_Format("{}/{}", ScopeName, ApplicationName);
-			}
-
-			LogInfo.m_Scope = CDistributedAppLogReporter::CLogScope_Application{ScopeName};
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Error
+					, "[{}] Application tried to open log reporter with a specified host id: {}"
+					, CallingHostInfo.f_GetHostInfo().f_GetDesc()
+					, LogInfo.m_HostID
+				)
+			;
+			co_return DErrorInstance("You cannot specify host id, it's automatically populated with your host id");
 		}
-		else
+		if (LogInfo.m_Scope.f_IsOfType<CDistributedAppLogReporter::CLogScope_Application>())
 		{
-			if (LogInfo.m_HostID)
-			{
-				DMibLogWithCategory
-					(
-						Malterlib/Cloud/AppManager
-						, Error
-						, "[{}] Application tried to open log reporter with a specified host id: {}"
-						, CallingHostInfo.f_GetHostInfo().f_GetDesc()
-						, LogInfo.m_HostID
-					)
-				;
-				co_return DErrorInstance("You cannot specify host id, it's automatically populated with your host id");
-			}
-			if (LogInfo.m_Scope.f_IsOfType<CDistributedAppLogReporter::CLogScope_Application>())
-			{
-				DMibLogWithCategory
-					(
-						Malterlib/Cloud/AppManager
-						, Error
-						, "[{}] Application tried to open log reporter with a specified application scope: {}"
-						, CallingHostInfo.f_GetHostInfo().f_GetDesc()
-						, LogInfo.m_Scope.f_GetAsType<CDistributedAppLogReporter::CLogScope_Application>().m_ApplicationName
-					)
-				;
-				co_return DErrorInstance("You cannot specify application, it's automatically populated with application");
-			}
-
-			LogInfo.m_HostID = ReportingHostID;
-			LogInfo.m_HostName = CallingHostInfo.f_GetHostInfo().m_FriendlyName;
-			LogInfo.m_Scope = CDistributedAppLogReporter::CLogScope_Application{ScopeName};
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Error
+					, "[{}] Application tried to open log reporter with a specified application scope: {}"
+					, CallingHostInfo.f_GetHostInfo().f_GetDesc()
+					, LogInfo.m_Scope.f_GetAsType<CDistributedAppLogReporter::CLogScope_Application>().m_ApplicationName
+				)
+			;
+			co_return DErrorInstance("You cannot specify application, it's automatically populated with application");
 		}
+
+		LogInfo.m_HostID = ReportingHostID;
+		LogInfo.m_HostName = CallingHostInfo.f_GetHostInfo().m_FriendlyName;
+		LogInfo.m_Scope = CDistributedAppLogReporter::CLogScope_Application{ScopeName};
 
 		for (auto &Metadata : pThis->mp_LogMetadata.f_Entries())
 		{
