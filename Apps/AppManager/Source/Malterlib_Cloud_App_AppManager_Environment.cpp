@@ -109,6 +109,8 @@ namespace NMib::NCloud::NAppManager
 				, "Type"_o= ""
 				, "Default"_o= ""
 				, "Description"_o= "Name of the application that provides the AppManager agent executable for the environment.\n"
+				"When empty, container and VM environments default to the SelfUpdate.<Platform> application\n"
+				"matching the guest platform, and local environments run the AppManager executable itself.\n"
 				"See --application-enable-self-update for installing agent executables for other platforms."
 			}
 		;
@@ -1001,6 +1003,20 @@ namespace NMib::NCloud::NAppManager
 
 		CEnvironmentSettings NewSettings;
 		NewSettings.f_ApplySettings(_ChangedSettings, _Settings);
+
+		// Containers run Linux guests and VM images run macOS guests, both with the host
+		// architecture, so the matching self-update agent application is the default.
+		// Local environments run the AppManager's own executable when no agent application is set
+		if (NewSettings.m_AgentApplication.f_IsEmpty() && NewSettings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
+		{
+			CStr HostPlatform = DMalterlibCloudPlatform;
+			CStr Architecture = HostPlatform.f_Extract(HostPlatform.f_FindReverse("-") + 1);
+
+			if (NewSettings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+				NewSettings.m_AgentApplication = "SelfUpdate.Linux-{}"_f << Architecture;
+			else
+				NewSettings.m_AgentApplication = "SelfUpdate.macOS-{}"_f << Architecture;
+		}
 
 		{
 			CStr Error;

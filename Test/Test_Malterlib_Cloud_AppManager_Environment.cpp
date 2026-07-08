@@ -132,7 +132,6 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				Settings.m_Type = CAppManagerInterface::EEnvironmentType_Container;
 				Settings.m_ContainerRuntime = CStr("Docker");
 				Settings.m_ContainerImage = CStr("ubuntu:24.04");
-				Settings.m_AgentApplication = CStr("SelfUpdate.Linux-arm64");
 
 				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("ContainerEnv", Settings)
 					.f_Timeout(g_Timeout, "Timed out adding environment")
@@ -157,7 +156,7 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				DMibExpect(pEnvironment->m_ContainerNetwork, ==, "host");
 				DMibExpect(pEnvironment->m_MemoryLimitMB, ==, 512u);
 				DMibExpect(pEnvironment->m_ContainerImage, ==, "ubuntu:24.04");
-				DMibExpect(pEnvironment->m_AgentApplication, ==, "SelfUpdate.Linux-arm64");
+				DMibExpectTrue(pEnvironment->m_AgentApplication.f_StartsWith("SelfUpdate.Linux-"));
 			}
 
 			// Changing settings to an invalid configuration fails
