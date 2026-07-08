@@ -194,12 +194,12 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_o= "Additional arguments appended to the container run command."
 			}
 		;
-		auto SettingsOption_MemoryLimit = "MemoryLimit?"_o=
+		auto SettingsOption_MemoryLimitMB = "MemoryLimitMB?"_o=
 			{
 				"Names"_o= _o["--memory-limit"]
-				, "Type"_o= ""
-				, "Default"_o= ""
-				, "Description"_o= "Memory limit for the environment, for example 512m or 4g."
+				, "Type"_o= 0
+				, "Default"_o= 0
+				, "Description"_o= "Memory limit in megabytes for the environment. Set to 0 for no limit."
 			}
 		;
 		auto SettingsOption_CPULimit = "CPULimit?"_o=
@@ -282,7 +282,7 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_ContainerExtraMounts
 						, SettingsOption_ContainerExtraArguments
 						, SettingsOption_ContainerReadOnly
-						, SettingsOption_MemoryLimit
+						, SettingsOption_MemoryLimitMB
 						, SettingsOption_CPULimit
 						, SettingsOption_VMImage
 						, SettingsOption_VMBackend
@@ -314,7 +314,7 @@ namespace NMib::NCloud::NAppManager
 						, fStripDefault(SettingsOption_ContainerExtraMounts)
 						, fStripDefault(SettingsOption_ContainerExtraArguments)
 						, fStripDefault(SettingsOption_ContainerReadOnly)
-						, fStripDefault(SettingsOption_MemoryLimit)
+						, fStripDefault(SettingsOption_MemoryLimitMB)
 						, fStripDefault(SettingsOption_CPULimit)
 						, fStripDefault(SettingsOption_VMImage)
 						, fStripDefault(SettingsOption_VMBackend)
@@ -560,10 +560,10 @@ namespace NMib::NCloud::NAppManager
 			m_bContainerReadOnly = pValue->f_Boolean();
 		}
 
-		if (auto *pValue = _Params.f_GetMember("MemoryLimit"))
+		if (auto *pValue = _Params.f_GetMember("MemoryLimitMB"))
 		{
 			o_ChangedSettings |= EEnvironmentSetting_MemoryLimit;
-			m_MemoryLimit = pValue->f_String();
+			m_MemoryLimitMB = (uint32)pValue->f_AsInteger();
 		}
 
 		if (auto *pValue = _Params.f_GetMember("CPULimit"))
@@ -622,7 +622,7 @@ namespace NMib::NCloud::NAppManager
 		if (_ChangedSettings & EEnvironmentSetting_ContainerReadOnly)
 			m_bContainerReadOnly = _Source.m_bContainerReadOnly;
 		if (_ChangedSettings & EEnvironmentSetting_MemoryLimit)
-			m_MemoryLimit = _Source.m_MemoryLimit;
+			m_MemoryLimitMB = _Source.m_MemoryLimitMB;
 		if (_ChangedSettings & EEnvironmentSetting_CPULimit)
 			m_CPULimit = _Source.m_CPULimit;
 		if (_ChangedSettings & EEnvironmentSetting_VMImage)
@@ -687,9 +687,9 @@ namespace NMib::NCloud::NAppManager
 			m_bContainerReadOnly = *_Settings.m_bContainerReadOnly;
 			o_ChangedSettings |= EEnvironmentSetting_ContainerReadOnly;
 		}
-		if (_Settings.m_MemoryLimit)
+		if (_Settings.m_MemoryLimitMB)
 		{
-			m_MemoryLimit = *_Settings.m_MemoryLimit;
+			m_MemoryLimitMB = *_Settings.m_MemoryLimitMB;
 			o_ChangedSettings |= EEnvironmentSetting_MemoryLimit;
 		}
 		if (_Settings.m_CPULimit)
@@ -742,7 +742,7 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EEnvironmentSetting_ContainerExtraArguments;
 		if (m_bContainerReadOnly != _Other.m_bContainerReadOnly)
 			ChangedSettings |= EEnvironmentSetting_ContainerReadOnly;
-		if (m_MemoryLimit != _Other.m_MemoryLimit)
+		if (m_MemoryLimitMB != _Other.m_MemoryLimitMB)
 			ChangedSettings |= EEnvironmentSetting_MemoryLimit;
 		if (m_CPULimit != _Other.m_CPULimit)
 			ChangedSettings |= EEnvironmentSetting_CPULimit;
@@ -841,8 +841,8 @@ namespace NMib::NCloud::NAppManager
 			if (auto pValue = EnvironmentJson.f_GetMember("ContainerReadOnly", EJsonType_Boolean))
 				Settings.m_bContainerReadOnly = pValue->f_Boolean();
 
-			if (auto pValue = EnvironmentJson.f_GetMember("MemoryLimit", EJsonType_String))
-				Settings.m_MemoryLimit = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("MemoryLimitMB", EJsonType_Integer))
+				Settings.m_MemoryLimitMB = (uint32)pValue->f_Integer();
 			{
 				auto pValue = EnvironmentJson.f_GetMember("CPULimit", EJsonType_Float);
 				if (!pValue)
@@ -900,7 +900,7 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		EnvironmentJson["ContainerReadOnly"] = Settings.m_bContainerReadOnly;
-		EnvironmentJson["MemoryLimit"] = Settings.m_MemoryLimit;
+		EnvironmentJson["MemoryLimitMB"] = Settings.m_MemoryLimitMB;
 		EnvironmentJson["CPULimit"] = Settings.m_CPULimit;
 
 		EnvironmentJson["VMImage"] = Settings.m_VMImage;
@@ -936,7 +936,7 @@ namespace NMib::NCloud::NAppManager
 		OutEnvironment.m_ContainerExtraArguments = Settings.m_ContainerExtraArguments;
 		OutEnvironment.m_bContainerReadOnly = Settings.m_bContainerReadOnly;
 
-		OutEnvironment.m_MemoryLimit = Settings.m_MemoryLimit;
+		OutEnvironment.m_MemoryLimitMB = Settings.m_MemoryLimitMB;
 		OutEnvironment.m_CPULimit = Settings.m_CPULimit;
 
 		OutEnvironment.m_VMImage = Settings.m_VMImage;
@@ -1581,8 +1581,8 @@ namespace NMib::NCloud::NAppManager
 				fAddProperty(Settings, "Memory MB", Environment.m_VMMemoryMB);
 			}
 
-			if (!Environment.m_MemoryLimit.f_IsEmpty())
-				fAddProperty(Settings, "Memory limit", Environment.m_MemoryLimit);
+			if (Environment.m_MemoryLimitMB != 0)
+				fAddProperty(Settings, "Memory limit MB", Environment.m_MemoryLimitMB);
 			if (Environment.m_CPULimit != 0.0)
 				fAddProperty(Settings, "CPU limit", Environment.m_CPULimit);
 

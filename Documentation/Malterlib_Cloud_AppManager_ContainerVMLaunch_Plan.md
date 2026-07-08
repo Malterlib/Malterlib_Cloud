@@ -184,7 +184,7 @@ Environment settings:
 | `ContainerImage` | string | Container (required) | Base image reference |
 | `ContainerNetwork` | string | Container | Network mode (default `host` on Linux docker; bridge + host-gateway on macOS docker; default vmnet network for Apple `container`) |
 | `ContainerExtraMounts` / `ContainerExtraArguments` | map / vector | Container | Escape hatches |
-| `MemoryLimit` / `CPULimit` | string / fp64 | Container + VM | `--memory`/`--cpus` or VZ memory/CPU-count |
+| `MemoryLimitMB` / `CPULimit` | uint32 / fp64 | Container + VM | `--memory`/`--cpus` or VZ memory/CPU-count |
 | `VMImage` | string | VM (required) | Prepared guest bundle under `<Root>/VMImages/<name>/` |
 | `VMBackend` | string | VM | Virtualization backend (default `Default` = platform choice; initially only `MacOSVirtualization`, §5.1) |
 

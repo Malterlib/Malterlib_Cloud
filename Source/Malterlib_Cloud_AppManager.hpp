@@ -216,7 +216,7 @@ namespace NMib::NCloud
 		_Stream % m_ContainerExtraArguments;
 		_Stream % m_bContainerReadOnly;
 
-		_Stream % m_MemoryLimit;
+		_Stream % m_MemoryLimitMB;
 		_Stream % m_CPULimit;
 
 		_Stream % m_VMImage;
@@ -244,7 +244,7 @@ namespace NMib::NCloud
 		_Stream % m_ContainerExtraArguments;
 		_Stream % m_bContainerReadOnly;
 
-		_Stream % m_MemoryLimit;
+		_Stream % m_MemoryLimitMB;
 		_Stream % m_CPULimit;
 
 		_Stream % m_VMImage;
