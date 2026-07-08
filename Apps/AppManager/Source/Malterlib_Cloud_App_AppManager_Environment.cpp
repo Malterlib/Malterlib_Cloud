@@ -1199,6 +1199,10 @@ namespace NMib::NCloud::NAppManager
 
 		co_await (fp_EnsureEnvironmentStarted(*pFindEnvironment) % "Failed to start environment" % Auditor);
 
+		// Relaunch the applications a previous environment stop stopped with the
+		// auto start flag
+		fp_UpdateApplicationDependencies();
+
 		Auditor.f_Info(fg_Format("Started environment '{}'", _Name));
 
 		co_return {};
@@ -1250,7 +1254,13 @@ namespace NMib::NCloud::NAppManager
 		co_await (fp_UpdateEnvironmentJson(pEnvironment) % "Failed to save environment state" % Auditor);
 
 		if (bWasStarted)
+		{
 			co_await (fp_EnsureEnvironmentStarted(pEnvironment) % "Failed to start environment" % Auditor);
+
+			// Relaunch the applications the environment stop stopped with the auto
+			// start flag
+			fp_UpdateApplicationDependencies();
+		}
 
 		Auditor.f_Info(fg_Format("Pulled environment '{}'", _Name));
 
