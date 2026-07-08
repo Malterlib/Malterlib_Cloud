@@ -973,7 +973,6 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_RemoveEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment);
 		bool fp_UseOwnAppleContainerSystem();
 		CStr fp_GetAppleContainerAppRoot();
-		void fp_AdjustAppleContainerCommand(CStr &_Executable, TCVector<CStr> &_Arguments);
 		void fp_ApplyAppleContainerLaunchEnvironment(CProcessLaunchParams &_LaunchParams);
 		CProcessLaunchParams fp_BuildContainerCommandParams(TCSharedPointer<CEnvironment> const &_pEnvironment, TCVector<CStr> &&_Arguments);
 		TCFuture<void> fp_EnsureAppleContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment);
