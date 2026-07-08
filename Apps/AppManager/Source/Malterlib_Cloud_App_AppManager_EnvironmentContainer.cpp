@@ -394,7 +394,19 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		if (!bHealthy)
-			co_return DMibErrorInstance("Failed to start the AppManager container system: {}"_f << LastError);
+		{
+			// The API server binds fixed localhost DNS ports (1053 and 2053), so a
+			// container system already running in a login session makes the AppManager
+			// one crash loop on bind until the session one is stopped
+			co_return DMibErrorInstance
+				(
+					"Failed to start the AppManager container system: {}\n"
+					"If a container system is running in a login session it holds the localhost DNS ports the "
+					"AppManager container system needs; stop it with `container system stop` as the logged in user."_f
+					<< LastError
+				)
+			;
+		}
 
 		// Containers cannot boot without a default kernel; install the recommended one
 		// once per app root. The init filesystem image is pulled on demand
