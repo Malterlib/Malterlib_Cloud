@@ -187,7 +187,7 @@ namespace NMib::NCloud::NAppManager
 		CreateParams.m_BundleDirectory = BundleDirectory;
 		CreateParams.m_RestoreImagePath = RestoreImage;
 		CreateParams.m_CPUCount = (uint32)_Params["VMCPUCount"].f_AsInteger();
-		CreateParams.m_MemoryMB = (uint64)_Params["VMMemoryMB"].f_AsInteger();
+		CreateParams.m_MemoryMB = (uint32)_Params["VMMemoryMB"].f_AsInteger();
 		CreateParams.m_DiskSizeGB = (uint64)_Params["DiskSizeGB"].f_AsInteger();
 
 		co_await _pCommandLine->f_StdOut("Creating VM image '{}' and installing macOS from {}\n"_f << Name << RestoreImage);
