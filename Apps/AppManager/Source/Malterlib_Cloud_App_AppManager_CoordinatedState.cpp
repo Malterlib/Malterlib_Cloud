@@ -318,8 +318,12 @@ namespace NMib::NCloud::NAppManager
 
 			fp_ForwardApplicationStateChange(fg_Move(Change));
 		}
-
-		fp_SetApplicationSensorStatus(_pApplication, _LaunchStatus, _Severity) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to report application sensor status");
+		else
+		{
+			// The environment host tracks the application status itself, so an agent
+			// reporting a status sensor as well would only duplicate it
+			fp_SetApplicationSensorStatus(_pApplication, _LaunchStatus, _Severity) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to report application sensor status");
+		}
 
 		fp_SendAppChange_Status(*_pApplication);
 	}
