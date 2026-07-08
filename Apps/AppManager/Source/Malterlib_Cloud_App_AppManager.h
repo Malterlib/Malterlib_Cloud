@@ -245,6 +245,10 @@ namespace NMib::NCloud::NAppManager
 			CStr m_ContainerLaunchID;
 			CStr m_ContainerRequestTicketMagic;
 
+			// Host port of the environment listen address on the shared guest network,
+			// chosen once and persisted so the container fingerprint stays stable
+			uint32 m_ListenPort = 0;
+
 			// Runtime state
 			CStr m_LaunchID;
 			CStr m_AgentHostID;
@@ -948,6 +952,7 @@ namespace NMib::NCloud::NAppManager
 		void fp_AutoStartEnvironments();
 		TCFuture<void> fp_EnsureOSDependencies(TCSharedPointer<CApplication> _pApplication);
 		TCFuture<void> fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<NWeb::NHTTP::CURL> fp_EnsureEnvironmentListen(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);

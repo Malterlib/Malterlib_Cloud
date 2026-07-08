@@ -61,6 +61,9 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->f_SetStatus("Starting VM", CAppManagerInterface::EStatusSeverity_Warning);
 
+		// The guest agent connects to the listen address on the shared network host side
+		co_await (fp_EnsureEnvironmentListen(_pEnvironment) % "Failed to add environment listen");
+
 		_pEnvironment->m_LaunchID = fg_RandomID();
 
 		CVirtualMachineConfig Config;
