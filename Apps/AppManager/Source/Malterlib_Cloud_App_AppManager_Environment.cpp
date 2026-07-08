@@ -323,7 +323,7 @@ namespace NMib::NCloud::NAppManager
 						"Name?"_o=
 						{
 							"Names"_o= _o["--name"]
-							, "Type"_o= ""
+							, "Default"_o= ""
 							, "Description"_o= "Only list the environment with this name."
 						}
 						, "Verbose?"_o=
@@ -425,19 +425,35 @@ namespace NMib::NCloud::NAppManager
 					, "Options"_o=
 					{
 						NameOption
-						, SettingsOption_ParentApplication
+						, "ParentApplication?"_o=
+						{
+							"Names"_o= _o["--parent-application"]
+							, "Default"_o= ""
+							, "Description"_o= "Name of the application whose storage the image is created inside, under its VMImages directory.\n"
+							"Use an application with encryption storage to place the image on encrypted storage."
+						}
 						, "RestoreImage"_o=
 						{
 							"Names"_o= _o["--restore-image"]
 							, "Type"_o= ""
 							, "Description"_o= "Path to the macOS IPSW restore image to install from."
 						}
-						, SettingsOption_VMCPUCount
-						, SettingsOption_VMMemoryMB
+						, "VMCPUCount?"_o=
+						{
+							"Names"_o= _o["--vm-cpu-count"]
+							, "Default"_o= 0
+							, "Description"_o= "Number of CPUs for the install VM. Set to 0 to use the default."
+						}
+						, "VMMemoryMB?"_o=
+						{
+							"Names"_o= _o["--vm-memory"]
+							, "Default"_o= 0
+							, "Description"_o= "Memory in megabytes for the install VM. Set to 0 to use the default."
+						}
 						, "DiskSizeGB?"_o=
 						{
 							"Names"_o= _o["--disk-size"]
-							, "Type"_o= 0
+							, "Default"_o= 0
 							, "Description"_o= "Size of the guest disk image in gigabytes. Set to 0 to use the default."
 						}
 					}
@@ -1496,7 +1512,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumEnvironments(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
-		CStr Name = _Params.f_GetMemberValue("Name", "").f_AsString();
+		CStr Name = _Params["Name"].f_String();
 
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
