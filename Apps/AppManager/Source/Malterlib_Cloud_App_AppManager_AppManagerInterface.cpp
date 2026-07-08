@@ -114,7 +114,14 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_SetupAppManagerInterfacePermissions()
 	{
-		NContainer::TCMap<NStr::CStr, CPermissionRequirements> CommandLinePermissions = {{"AppManager/VersionAppAll", {}}, {"AppManager/AppAll", {}}, {"AppManager/CommandAll", {}}};
+		NContainer::TCMap<NStr::CStr, CPermissionRequirements> CommandLinePermissions =
+			{
+				{"AppManager/VersionAppAll", {}}
+				, {"AppManager/AppAll", {}}
+				, {"AppManager/CommandAll", {}}
+				, {"AppManager/EnvironmentAll", {}}
+			}
+		;
 
 		co_await
 			(
