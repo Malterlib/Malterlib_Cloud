@@ -255,13 +255,13 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ContainerExtraArguments;
 			NStorage::TCOptional<bool> m_bContainerReadOnly;
 
-			NStorage::TCOptional<uint32> m_MemoryLimitMB;
+			NStorage::TCOptional<uint64> m_MemoryLimitMB;
 			NStorage::TCOptional<fp64> m_CPULimit;
 
 			NStorage::TCOptional<NStr::CStr> m_VMImage;
 			NStorage::TCOptional<NStr::CStr> m_VMBackend; /// Empty selects the default virtualization backend for the host platform
 			NStorage::TCOptional<uint32> m_VMCPUCount;
-			NStorage::TCOptional<uint32> m_VMMemoryMB;
+			NStorage::TCOptional<uint64> m_VMMemoryMB;
 		};
 
 		struct CEnvironmentInfo
@@ -289,13 +289,13 @@ namespace NMib::NCloud
 			NContainer::TCVector<NStr::CStr> m_ContainerExtraArguments;
 			bool m_bContainerReadOnly = false;
 
-			uint32 m_MemoryLimitMB = 0;
+			uint64 m_MemoryLimitMB = 0;
 			fp64 m_CPULimit = 0.0;
 
 			NStr::CStr m_VMImage;
 			NStr::CStr m_VMBackend;
 			uint32 m_VMCPUCount = 0;
-			uint32 m_VMMemoryMB = 0;
+			uint64 m_VMMemoryMB = 0;
 
 			NContainer::TCSet<NStr::CStr> m_Applications; /// Applications configured to launch in this environment
 		};

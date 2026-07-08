@@ -194,14 +194,14 @@ namespace NMib::NCloud::NAppManager
 			TCMap<CStr, CStr> m_ContainerExtraMounts;
 			TCVector<CStr> m_ContainerExtraArguments;
 
-			uint32 m_MemoryLimitMB = 0;
+			uint64 m_MemoryLimitMB = 0;
 			fp64 m_CPULimit = 0.0;
 			bool m_bContainerReadOnly = false; /// Read-only container filesystem; writes are confined to the mounted storage
 
 			CStr m_VMImage;
 			CStr m_VMBackend;
 			uint32 m_VMCPUCount = 0;
-			uint32 m_VMMemoryMB = 0;
+			uint64 m_VMMemoryMB = 0;
 
 			bool m_bAutoStart = true;
 
