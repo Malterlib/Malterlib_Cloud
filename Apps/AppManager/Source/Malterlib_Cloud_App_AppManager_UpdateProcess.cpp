@@ -649,6 +649,10 @@ namespace NMib::NCloud::NAppManager
 							co_await fp_StopEnvironmentInternal(pRestartEnvironment);
 							co_await fp_EnsureEnvironmentStarted(pRestartEnvironment);
 
+							// Relaunch the applications the environment stop stopped with the
+							// auto start flag
+							fp_UpdateApplicationDependencies();
+
 							co_return {};
 						}
 					)
