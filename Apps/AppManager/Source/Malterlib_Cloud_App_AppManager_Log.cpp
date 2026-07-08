@@ -25,13 +25,18 @@ namespace NMib::NCloud::NAppManager
 		auto ReportingHostID = CallingHostInfo.f_GetRealHostID();
 
 		auto pApplication = pThis->fp_ApplicationFromHostID(ReportingHostID);
-		if (!pApplication)
+
+		CStr ScopeName;
+		if (pApplication)
+			ScopeName = pApplication->m_Name;
+		else if (auto pEnvironment = pThis->fp_EnvironmentFromHostID(ReportingHostID))
+			ScopeName = fg_Format("Environment/{}", pEnvironment->m_Name);
+
+		if (ScopeName.f_IsEmpty())
 		{
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "[{}] Unassociated application tried to open log reporter", CallingHostInfo.f_GetHostInfo().f_GetDesc());
 			co_return DErrorInstance("Application not associated with your host");
 		}
-
-		auto &Application = *pApplication;
 
 		CDistributedAppLogReporter::CLogInfo LogInfo = fg_Move(_LogInfo);
 		if (LogInfo.m_HostID)
@@ -63,7 +68,7 @@ namespace NMib::NCloud::NAppManager
 
 		LogInfo.m_HostID = ReportingHostID;
 		LogInfo.m_HostName = CallingHostInfo.f_GetHostInfo().m_FriendlyName;
-		LogInfo.m_Scope = CDistributedAppLogReporter::CLogScope_Application{Application.m_Name};
+		LogInfo.m_Scope = CDistributedAppLogReporter::CLogScope_Application{ScopeName};
 
 		for (auto &Metadata : pThis->mp_LogMetadata.f_Entries())
 		{
@@ -83,7 +88,7 @@ namespace NMib::NCloud::NAppManager
 				, Info
 				, "[{}] Application '{}' opened log reporter:\n{}"
 				, CallingHostInfo.f_GetHostInfo().f_GetDesc()
-				, Application.m_Name
+				, ScopeName
 				, LogInfo
 			)
 		;
