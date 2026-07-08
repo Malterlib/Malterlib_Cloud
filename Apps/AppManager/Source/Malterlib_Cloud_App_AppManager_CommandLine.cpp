@@ -486,10 +486,9 @@ namespace NMib::NCloud::NAppManager
 						}
 						, "FromFile?"_o=
 						{
-							"Names"_o= _o[]
-							, "Hidden"_o= true
-							, "Description"_o= "Hidden"
+							"Names"_o= _o["--from-file"]
 							, "Default"_o= false
+							, "Description"_o= "Install the self update application from a local file or directory instead of downloading from version manager."
 						}
 						, "EncryptionStorage?"_o=
 						{
@@ -563,7 +562,8 @@ namespace NMib::NCloud::NAppManager
 						"Package?"_o=
 						{
 							"Default"_o= "AppManager"
-							, "Description"_o= "Package AppManager defaulted for self update."
+							, "Description"_o= "Package AppManager defaulted for self update.\n"
+							"With --from-file this is instead the local file or directory to install from."
 						}
 					}
 				}
