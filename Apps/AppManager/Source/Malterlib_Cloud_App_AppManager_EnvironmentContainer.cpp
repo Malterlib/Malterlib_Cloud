@@ -82,7 +82,16 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto &Runtime = _pEnvironment->m_Settings.m_ContainerRuntime;
 
-		if (Runtime == "Docker" || Runtime.f_IsEmpty())
+		if (Runtime.f_IsEmpty())
+		{
+#ifdef DPlatformFamily_macOS
+			return "container";
+#else
+			return "docker";
+#endif
+		}
+
+		if (Runtime == "Docker")
 			return "docker";
 
 		if (Runtime == "AppleContainer")

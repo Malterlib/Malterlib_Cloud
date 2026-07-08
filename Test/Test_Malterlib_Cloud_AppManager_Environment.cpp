@@ -130,6 +130,7 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 
 				CAppManagerInterface::CEnvironmentSettings Settings;
 				Settings.m_Type = CAppManagerInterface::EEnvironmentType_Container;
+				Settings.m_ContainerRuntime = CStr("Docker");
 				Settings.m_ContainerImage = CStr("ubuntu:24.04");
 				Settings.m_AgentApplication = CStr("SelfUpdate.Linux-arm64");
 
@@ -652,6 +653,7 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 
 				CAppManagerInterface::CEnvironmentSettings Settings;
 				Settings.m_Type = CAppManagerInterface::EEnvironmentType_Container;
+				Settings.m_ContainerRuntime = CStr("Docker");
 				Settings.m_ContainerImage = CStr("ubuntu:24.04");
 				Settings.m_AgentApplication = CStr("Agent");
 				Settings.m_bAutoStart = false;
