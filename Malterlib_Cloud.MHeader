@@ -154,6 +154,23 @@ Property
 
 	MalterlibModuleCloud_Version: int = 1
 
+	MalterlibCloud_PerAppPostCopy: bool = false // User(Cloud)=true: Set to true to enable a secondary post copy per cloud app
+
+	// Only the Apps_Malterlib_Cloud workspace makes secondary copies, since no build tracks the per-app destinations as outputs. A destination
+	// holds what the configuration that copied last wrote, and parallel first copies can drop each other's PostCopy.MConfig entries
+	MalterlibCloud_PerAppPostCopyWorkspace: bool = false
+	MalterlibCloud_PerAppPostCopyActive: bool = false
+	MalterlibCloud_PerAppPostCopyActive true
+	{
+		&
+		{
+			MalterlibCloud_PerAppPostCopy true
+			MalterlibCloud_PerAppPostCopyWorkspace true
+			!DisablePostCopy true
+			!MalterlibBuildServerBuild true
+		}
+	}
+
 	MalterlibCloudCompatibilityTestsSupported: bool = false
 	MalterlibCloudCompatibilityTestsSupported true
 	{
@@ -681,6 +698,8 @@ Property
 			!!TargetIsExecutable true
 		}
 
+		MalterlibCloud_PerAppPostCopyWorkspace true
+
 		MalterlibLog_Severities ["Error", "Critical", "Warning", "Info"]
 		{
 			!!MalterlibLog_EnableVerboseDebugLog false
@@ -862,7 +881,15 @@ Property
 			"Target.GenerateScheme": false
 		}
 
+		// Each destination gets one bsdtar, so the applications that share the primary copy share its build and no two builds write the same
+		// file. A secondary copy gets a bsdtar of its own
 		BsdTarUniqueName: string = `@(MalterlibPostCopyProject)_@(MalterlibPostCopyDestination)@(MalterlibCloudTarBinDirectory)`->Replace("/", "_")
+
+		BsdTarUniqueName2: string = ""
+		BsdTarUniqueName2 `@(MalterlibPostCopyProject2)_@(MalterlibPostCopyDestination2)@(MalterlibCloudTarBinDirectory)`->Replace("/", "_")
+		{
+			!MalterlibPostCopyProject2 undefined
+		}
 	}
 
 	%Dependency [
@@ -881,6 +908,29 @@ Property
 		}
 	]
 	{
+		Dependency.Link false
+	}
+
+	%Dependency [
+		{
+			Name: `Com_@(BsdTarUniqueName2)_bsdtar`
+			, Properties: {
+				Dependency.Target: "Com_libarchive_bsdtar"
+				, Dependency.TargetProperties: {
+					MalterlibPostCopyProject: MalterlibPostCopyProject2
+					, MalterlibPostCopyDestination: MalterlibPostCopyDestination2 / MalterlibCloudTarBinDirectory
+					, Target.Name: `Com_@(BsdTarUniqueName2)_bsdtar`
+					, Target.Group: `ExternalBinaries/@(BsdTarUniqueName2)`
+					, <<: BsdTarGenerateScheme
+				}
+			}
+		}
+	]
+	{
+		&
+		{
+			!MalterlibPostCopyProject2 undefined
+		}
 		Dependency.Link false
 	}
 

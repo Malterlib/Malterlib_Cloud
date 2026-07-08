@@ -38,6 +38,10 @@
 		{
 			!!MalterlibPostCopyProject undefined
 		}
+		MalterlibPostCopyProject2 "Malterlib_Cloud_CloudClient"
+		{
+			!!MalterlibCloud_PerAppPostCopyActive true
+		}
 		MalterlibTargetNameType "Normal"
 
 		MalterlibCloudVersionInfo_NoExecutable true

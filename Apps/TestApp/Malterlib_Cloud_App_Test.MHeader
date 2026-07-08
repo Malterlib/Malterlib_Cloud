@@ -37,6 +37,12 @@
 		{
 			!!MalterlibPostCopyProject undefined
 		}
+		// The primary copy falls back to Malterlib_Cloud_Test, where the executable is in a TestApp directory that a file of that name
+		// would replace
+		MalterlibPostCopyProject2 "Malterlib_Cloud_TestApp"
+		{
+			!!MalterlibCloud_PerAppPostCopyActive true
+		}
 		MalterlibPostCopyDestination "TestApp"
 		{
 			!!MalterlibPostCopyDestination undefined
