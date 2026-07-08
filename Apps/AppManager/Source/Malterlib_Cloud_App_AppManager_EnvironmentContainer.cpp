@@ -338,11 +338,10 @@ namespace NMib::NCloud::NAppManager
 				;
 				LaunchParams.m_bMergeEnvironment = true;
 
-				return CProcessLaunchActor::fs_LaunchSimple
-					(
-						CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None)
-					)
-				;
+				CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
+				SimpleLaunch.m_LogName = "AppleContainer/Launchctl";
+
+				return CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch);
 			}
 		;
 
@@ -364,16 +363,15 @@ namespace NMib::NCloud::NAppManager
 			else if (Attempt != 0)
 				co_await fg_Timeout(2.0);
 
-			auto Health = co_await CProcessLaunchActor::fs_LaunchSimple
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch
 				(
-					CProcessLaunchActor::CSimpleLaunch
-						(
-							fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("list"))
-							, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
-						)
+					fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("list"))
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
 				)
-				.f_Wrap()
 			;
+			SimpleLaunch.m_LogName = "AppleContainer/HealthCheck";
+
+			auto Health = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
 
 			if (Health)
 				bHealthy = true;
@@ -440,16 +438,15 @@ namespace NMib::NCloud::NAppManager
 		// once per app root. The init filesystem image is pulled on demand
 		if (!Prepared.m_bKernelInstalled)
 		{
-			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch
 				(
-					CProcessLaunchActor::CSimpleLaunch
-						(
-							fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("system", "kernel", "set", "--recommended", "--force"))
-							, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
-						)
+					fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("system", "kernel", "set", "--recommended", "--force"))
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
 				)
-				.f_Wrap()
 			;
+			SimpleLaunch.m_LogName = "AppleContainer/KernelInstall";
+
+			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
 
 			if (!Result)
 				co_return DMibErrorInstance("Failed to install the default container kernel: {}"_f << Result.f_GetExceptionStr());
@@ -546,14 +543,15 @@ namespace NMib::NCloud::NAppManager
 	{
 		CStr ContainerName = fp_GetContainerName(_pEnvironment);
 
-		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("rm", "--force", ContainerName));
-
-		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
+		CProcessLaunchActor::CSimpleLaunch SimpleLaunch
 			(
-				CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode)
+				fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("rm", "--force", ContainerName))
+				, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
 			)
-			.f_Wrap()
 		;
+		SimpleLaunch.m_LogName = "Environment/{}/ContainerRemove"_f << _pEnvironment->m_Name;
+
+		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
 
 		if (!Result)
 		{
@@ -575,13 +573,15 @@ namespace NMib::NCloud::NAppManager
 	{
 		CStr ContainerName = fp_GetContainerName(_pEnvironment);
 
-		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("stop", ContainerName));
-
-		co_await CProcessLaunchActor::fs_LaunchSimple
+		CProcessLaunchActor::CSimpleLaunch SimpleLaunch
 			(
-				CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None)
+				fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("stop", ContainerName))
+				, CProcessLaunchActor::ESimpleLaunchFlag_None
 			)
-			.f_Wrap()
+		;
+		SimpleLaunch.m_LogName = "Environment/{}/ContainerStop"_f << _pEnvironment->m_Name;
+
+		co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap()
 			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop environment container")
 		;
 
@@ -592,14 +592,15 @@ namespace NMib::NCloud::NAppManager
 	{
 		CStr ContainerName = fp_GetContainerName(_pEnvironment);
 
-		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("inspect", ContainerName));
-
-		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
+		CProcessLaunchActor::CSimpleLaunch SimpleLaunch
 			(
-				CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None)
+				fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("inspect", ContainerName))
+				, CProcessLaunchActor::ESimpleLaunchFlag_None
 			)
-			.f_Wrap()
 		;
+		SimpleLaunch.m_LogName = "Environment/{}/ContainerInspect"_f << _pEnvironment->m_Name;
+
+		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
 
 		co_return Result && Result->m_ExitCode == 0;
 	}
@@ -612,14 +613,15 @@ namespace NMib::NCloud::NAppManager
 		else
 			Arguments = fg_CreateVector<CStr>("pull", _pEnvironment->m_Settings.m_ContainerImage);
 
-		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams(_pEnvironment, fg_Move(Arguments));
-
-		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
+		CProcessLaunchActor::CSimpleLaunch SimpleLaunch
 			(
-				CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode)
+				fp_BuildContainerCommandParams(_pEnvironment, fg_Move(Arguments))
+				, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
 			)
-			.f_Wrap()
 		;
+		SimpleLaunch.m_LogName = "Environment/{}/ContainerPull"_f << _pEnvironment->m_Name;
+
+		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
 
 		if (!Result)
 			co_return DMibErrorInstance("Failed to pull image '{}': {}"_f << _pEnvironment->m_Settings.m_ContainerImage << Result.f_GetExceptionStr());
