@@ -1233,6 +1233,8 @@ namespace NMib::NCloud::NAppManager
 
 		bool bWasStarted = pEnvironment->f_IsStarted() || pEnvironment->m_bStarting;
 
+		co_await (fp_EnsureAppleContainerSystem(pEnvironment) % "Failed to start the container system" % Auditor);
+
 		co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
 
 		co_await fp_RemoveEnvironmentContainer(pEnvironment);
@@ -1848,6 +1850,15 @@ namespace NMib::NCloud::NAppManager
 
 		if (bContainer)
 		{
+			{
+				auto Result = co_await fp_EnsureAppleContainerSystem(_pEnvironment).f_Wrap();
+				if (!Result)
+				{
+					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+					co_return Result.f_GetException();
+				}
+			}
+
 			LaunchExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
 			TCVector<CStr> RunArguments = fg_AppManager_BuildContainerRunArguments(fp_BuildEnvironmentContainerLaunch(_pEnvironment, AgentExecutable, AgentRootDirectory));
 
@@ -1905,6 +1916,9 @@ namespace NMib::NCloud::NAppManager
 
 			_pEnvironment->m_LaunchID = _pEnvironment->m_ContainerLaunchID;
 		}
+
+		bool bOwnAppleContainerSystem = bContainer && LaunchExecutable == "container" && fp_UseOwnAppleContainerSystem();
+		fp_AdjustAppleContainerCommand(LaunchExecutable, LaunchParameters);
 
 		CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
 			(
@@ -1967,6 +1981,8 @@ namespace NMib::NCloud::NAppManager
 			LaunchParams.m_Environment["HOME"] = AgentRootDirectory + "/.home";
 			LaunchParams.m_Environment["TMPDIR"] = AgentRootDirectory + "/.tmp";
 		}
+		if (bOwnAppleContainerSystem)
+			fp_ApplyAppleContainerLaunchEnvironment(LaunchParams);
 		LaunchParams.m_bMergeEnvironment = true;
 		LaunchParams.m_bCreateNewProcessGroup = true;
 		LaunchParams.m_bShowLaunched = false;
