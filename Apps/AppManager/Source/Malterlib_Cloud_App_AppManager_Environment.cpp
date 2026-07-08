@@ -2219,6 +2219,13 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_AgentHostID = {};
 
+		// Stop the container through the runtime first: the attached client then exits by
+		// itself. Signalling the client instead does not stop the container; the Apple
+		// container client cannot even forward the signal, which leaves it running until
+		// the stop escalates to killing it
+		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container && _pEnvironment->m_AgentLaunch)
+			co_await fp_StopEnvironmentContainer(_pEnvironment);
+
 		if (_pEnvironment->m_AgentLaunch)
 		{
 			auto StopResult = co_await fg_TempCopy(_pEnvironment->m_AgentLaunch)(&CProcessLaunchActor::f_StopProcess).f_Wrap();
