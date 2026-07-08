@@ -356,6 +356,7 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_o= false
 							, "Description"_o= "Show more details."
 						}
+						, CTableRenderHelper::fs_OutputTypeOption()
 					}
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
