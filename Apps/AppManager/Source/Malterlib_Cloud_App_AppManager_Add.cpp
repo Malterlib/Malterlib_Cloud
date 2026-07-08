@@ -50,37 +50,137 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnableSelfUpdate(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
-		if (_Params["FromFile"].f_Boolean())
+		bool bFromFile = _Params["FromFile"].f_Boolean();
+
+		// A local package carries its platform in its version info, so an agent
+		// distribution for another platform is detected and installed as the agent
+		// application for that platform instead of as this host's self update source
+		CStr DetectedPlatform;
+		if (bFromFile)
 		{
-			if (auto *pPlatforms = _Params.f_GetMember("AgentPlatforms"); pPlatforms && !pPlatforms->f_Array().f_IsEmpty())
+			CStr Package = _Params["Package"].f_AsString();
+			if (!Package.f_IsEmpty())
 			{
-				co_return DMibErrorInstance
+				CStr FromLocalFile = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
+
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				CStr VersionInfoContents = co_await
 					(
-						"You cannot combine --agent-platforms with --from-file, because one local directory only provides binaries for one platform. "
-						"Add the agent applications separately with --application-add --from-file --name SelfUpdate.<Platform>."
+						g_Dispatch(BlockingActorCheckout) / [FromLocalFile]() -> CStr
+						{
+							if (!CFile::fs_FileExists(FromLocalFile, EFileAttrib_Directory))
+								return {};
+
+							CStr VersionInfoFile = FromLocalFile / "VersionInfo.json";
+							if (!CFile::fs_FileExists(VersionInfoFile))
+							{
+								auto Files = CFile::fs_FindFiles(FromLocalFile / "*VersionInfo.json");
+								if (Files.f_GetLen() != 1)
+									return {};
+
+								VersionInfoFile = Files[0];
+							}
+
+							return CFile::fs_ReadStringFromFile(VersionInfoFile, true);
+						}
 					)
 				;
+
+				if (!VersionInfoContents.f_IsEmpty())
+				{
+					try
+					{
+						DetectedPlatform = CEJsonSorted::fs_FromString(VersionInfoContents)["Platform"].f_AsString();
+					}
+					catch (...)
+					{
+					}
+				}
 			}
 		}
 
-		uint32 Status = co_await fp_CommandLine_AddApplication(_Params, _pCommandLine);
-		if (Status != 0)
-			co_return Status;
+		bool bPackageIsAgent = bFromFile && !DetectedPlatform.f_IsEmpty() && DetectedPlatform != DMalterlibCloudPlatform;
 
+		struct CAgentPlatform
+		{
+			CStr m_Platform;
+			CStr m_LocalPath;
+		};
+
+		// Agent platforms are either version manager platform names or <Platform>=<Path>
+		// entries installing that platform's agent from a local file or directory
+		TCVector<CAgentPlatform> AgentPlatforms;
 		if (auto *pPlatforms = _Params.f_GetMember("AgentPlatforms"))
 		{
 			for (auto &Platform : pPlatforms->f_Array())
 			{
-				CEJsonSorted PlatformParams = _Params;
-				PlatformParams["Name"] = "SelfUpdate.{}"_f << Platform.f_String();
-				PlatformParams["VersionManagerPlatform"] = Platform.f_String();
-				PlatformParams["SelfUpdateSource"] = false;
-				PlatformParams["SettingsFromVersionInfo"] = false;
+				CAgentPlatform AgentPlatform;
+				AgentPlatform.m_Platform = Platform.f_String();
 
-				Status = co_await fp_CommandLine_AddApplication(fg_Move(PlatformParams), _pCommandLine);
-				if (Status != 0)
-					co_return Status;
+				auto iEquals = AgentPlatform.m_Platform.f_Find("=");
+				if (iEquals >= 0)
+				{
+					AgentPlatform.m_LocalPath = AgentPlatform.m_Platform.f_Extract(iEquals + 1);
+					AgentPlatform.m_Platform = AgentPlatform.m_Platform.f_Left(iEquals);
+				}
+
+				// The package itself already provides this agent platform
+				if (bPackageIsAgent && AgentPlatform.m_LocalPath.f_IsEmpty() && AgentPlatform.m_Platform == DetectedPlatform)
+					continue;
+
+				if (AgentPlatform.m_LocalPath.f_IsEmpty() && bFromFile)
+				{
+					co_return DMibErrorInstance
+						(
+							"Agent platform '{}' needs a local file or directory when using --from-file. "
+							"Specify it as <Platform>=<Path>, for example {}=/opt/Deploy/AppManager_Linux_arm64."_f
+								<< AgentPlatform.m_Platform
+								<< AgentPlatform.m_Platform
+						)
+					;
+				}
+
+				AgentPlatforms.f_Insert(fg_Move(AgentPlatform));
 			}
+		}
+
+		uint32 Status;
+		if (bPackageIsAgent)
+		{
+			// The package is an agent distribution for another platform, so it installs
+			// as the agent application for that platform and not as a self update source
+			CEJsonSorted AgentParams = _Params;
+			AgentParams["Name"] = "SelfUpdate.{}"_f << DetectedPlatform;
+			AgentParams["VersionManagerPlatform"] = DetectedPlatform;
+			AgentParams["SelfUpdateSource"] = false;
+			AgentParams["SettingsFromVersionInfo"] = false;
+
+			Status = co_await fp_CommandLine_AddApplication(fg_Move(AgentParams), _pCommandLine);
+		}
+		else
+			Status = co_await fp_CommandLine_AddApplication(_Params, _pCommandLine);
+
+		if (Status != 0)
+			co_return Status;
+
+		for (auto &AgentPlatform : AgentPlatforms)
+		{
+			CEJsonSorted PlatformParams = _Params;
+			PlatformParams["Name"] = "SelfUpdate.{}"_f << AgentPlatform.m_Platform;
+			PlatformParams["VersionManagerPlatform"] = AgentPlatform.m_Platform;
+			PlatformParams["SelfUpdateSource"] = false;
+			PlatformParams["SettingsFromVersionInfo"] = false;
+
+			if (!AgentPlatform.m_LocalPath.f_IsEmpty())
+			{
+				PlatformParams["FromFile"] = true;
+				PlatformParams["Package"] = AgentPlatform.m_LocalPath;
+			}
+
+			Status = co_await fp_CommandLine_AddApplication(fg_Move(PlatformParams), _pCommandLine);
+			if (Status != 0)
+				co_return Status;
 		}
 
 		co_return 0;
