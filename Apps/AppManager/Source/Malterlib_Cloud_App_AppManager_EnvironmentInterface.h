@@ -84,7 +84,11 @@ namespace NMib::NCloud::NAppManager
 		};
 
 		virtual NConcurrency::TCFuture<CAgentInfo> f_GetAgentInfo() = 0;
-		virtual NConcurrency::TCFuture<void> f_LaunchApplication(CEnvironmentLaunch _Launch) = 0;
+
+		/// Returns the launch id the application runs with: the provided one for a
+		/// new launch, or the previous one when a matching application was already
+		/// running in the environment
+		virtual NConcurrency::TCFuture<NStr::CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) = 0;
 		virtual NConcurrency::TCFuture<uint32> f_StopApplication(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_RunScript(CEnvironmentScript _Script) = 0;
 	};

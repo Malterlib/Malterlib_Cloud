@@ -870,6 +870,11 @@ namespace NMib::NCloud::NAppManager
 				Environment.m_ContainerRequestTicketMagic = pValue->f_String();
 			if (auto pValue = EnvironmentJson.f_GetMember("ListenPort", EJsonType_Integer))
 				Environment.m_ListenPort = (uint32)pValue->f_Integer();
+
+			// An agent in a persistent container keeps running across AppManager
+			// restarts and reconnects with the launch id frozen into the container, so
+			// expect that launch id right away
+			Environment.m_LaunchID = Environment.m_ContainerLaunchID;
 		}
 	}
 
@@ -2584,6 +2589,10 @@ namespace NMib::NCloud::NAppManager
 
 			co_return LaunchResult.f_GetException();
 		}
+
+		// An application that kept running in the environment across a restart is
+		// adopted with the launch id it already runs with
+		_pApplication->m_LaunchID = fg_Move(*LaunchResult);
 
 		_pApplication->m_pLaunchedEnvironment = _pEnvironment;
 		_pApplication->m_bLaunched = true;
