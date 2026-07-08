@@ -1658,27 +1658,55 @@ namespace NMib::NCloud::NAppManager
 		Candidates.f_Insert(Directory / "AppManager");
 #endif
 
+		CStr StorageDirectory = fp_GetEnvironmentStorageDirectory(*_pEnvironment);
+
 		CStr Executable;
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
 			Executable = co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [Candidates = fg_Move(Candidates)]() -> CStr
+					g_Dispatch(BlockingActorCheckout) / [Candidates = fg_Move(Candidates), StorageDirectory, _pError]() -> CStr
 					{
+						CStr Source;
 						for (auto &Candidate : Candidates)
 						{
 							if (CFile::fs_FileExists(Candidate))
-								return Candidate;
+							{
+								Source = Candidate;
+								break;
+							}
 						}
 
-						return {};
+						if (Source.f_IsEmpty())
+							return {};
+
+						// The agent application directory is only a source for the executable:
+						// several environments can share the same agent application and self
+						// updates replace its files, so each environment runs its own copy
+						// inside its storage directory
+						CStr AgentDirectory = StorageDirectory / ".agent";
+						CStr AgentExecutable = AgentDirectory / CFile::fs_GetFile(Source);
+
+						try
+						{
+							CFile::fs_CreateDirectory(StorageDirectory);
+							CFile::fs_CreateDirectory(AgentDirectory);
+							CFile::fs_DiffCopyFileOrDirectory(Source, AgentExecutable, nullptr);
+						}
+						catch (CException const &_Exception)
+						{
+							*_pError = "Failed to copy the agent executable to '{}': {}"_f << AgentExecutable << _Exception;
+							return {};
+						}
+
+						return AgentExecutable;
 					}
 				)
 			;
 		}
 
-		if (Executable.f_IsEmpty())
+		if (Executable.f_IsEmpty() && _pError->f_IsEmpty())
 			*_pError = "Found no agent executable in '{}' for environment '{}'"_f << Directory << _pEnvironment->m_Name;
 
 		co_return Executable;
@@ -1846,7 +1874,7 @@ namespace NMib::NCloud::NAppManager
 		TCPromiseFuturePair<void> LaunchedPromise;
 
 		CStr LaunchExecutable = AgentExecutable;
-		TCVector<CStr> LaunchParameters = {"--daemon-run-standalone"};
+		TCVector<CStr> LaunchParameters = {"--daemon-run-standalone", "--log-to-stderr"};
 
 		if (bContainer)
 		{

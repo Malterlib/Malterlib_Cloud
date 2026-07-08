@@ -492,7 +492,7 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_ExtraArguments = Settings.m_ContainerExtraArguments;
 		Launch.m_WorkingDirectory = _AgentRootDirectory;
 		Launch.m_Executable = _AgentExecutable;
-		Launch.m_Parameters = {"--daemon-run-standalone"};
+		Launch.m_Parameters = {"--daemon-run-standalone", "--log-to-stderr"};
 
 		if (!Settings.m_ContainerNetwork.f_IsEmpty())
 			Launch.m_Network = Settings.m_ContainerNetwork;
