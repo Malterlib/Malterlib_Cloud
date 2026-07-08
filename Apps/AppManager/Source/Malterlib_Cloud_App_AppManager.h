@@ -971,6 +971,12 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 		TCFuture<void> fp_RemoveEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment);
+		bool fp_UseOwnAppleContainerSystem();
+		CStr fp_GetAppleContainerAppRoot();
+		void fp_AdjustAppleContainerCommand(CStr &_Executable, TCVector<CStr> &_Arguments);
+		void fp_ApplyAppleContainerLaunchEnvironment(CProcessLaunchParams &_LaunchParams);
+		CProcessLaunchParams fp_BuildContainerCommandParams(TCSharedPointer<CEnvironment> const &_pEnvironment, TCVector<CStr> &&_Arguments);
+		TCFuture<void> fp_EnsureAppleContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 
 		// Environment agent handling (agent side)
@@ -1260,6 +1266,9 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bPendingSelfUpdateInProgress = false;
 		bool mp_bEnableApplicationStatusSensors = true;
 		bool mp_bEnableEncryptionStatusSensors = true;
+		bool mp_bAppleContainerSystemReady = false;
+		bool mp_bAppleContainerSystemStarting = false;
+		TCVector<TCPromise<void>> mp_OnAppleContainerSystemReady;
 
 		fp64 mp_AutoUpdateDelay = mc_DefaultAutoUpdateDelay;
 

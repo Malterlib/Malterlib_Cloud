@@ -105,6 +105,154 @@ namespace NMib::NCloud::NAppManager
 		return "mib-env-{}"_f << _pEnvironment->m_Name;
 	}
 
+	bool CAppManagerActor::fp_UseOwnAppleContainerSystem()
+	{
+#ifdef DPlatformFamily_macOS
+		return CProcessLaunch::fs_GetElevation() == NProcess::EProcessElevation_IsRoot;
+#else
+		return false;
+#endif
+	}
+
+	CStr CAppManagerActor::fp_GetAppleContainerAppRoot()
+	{
+		return mp_State.m_RootDirectory / "AppleContainer";
+	}
+
+	void CAppManagerActor::fp_AdjustAppleContainerCommand(CStr &_Executable, TCVector<CStr> &_Arguments)
+	{
+		if (_Executable != "container" || !fp_UseOwnAppleContainerSystem())
+			return;
+
+		// The Apple container API server only accepts clients with its own effective user
+		// id and is looked up through the caller's launchd namespace. Executing the client
+		// in the bootstrap namespace of pid 1 keeps the lookup in the system domain, away
+		// from any login session's per-user service, so a root AppManager always reaches
+		// the AppManager-owned service that `container system start` registers there
+		TCVector<CStr> Arguments = fg_CreateVector<CStr>("bsexec", "1", "/usr/bin/env", "container");
+		for (auto &Argument : _Arguments)
+			Arguments.f_Insert(fg_Move(Argument));
+
+		_Executable = "/bin/launchctl";
+		_Arguments = fg_Move(Arguments);
+	}
+
+	void CAppManagerActor::fp_ApplyAppleContainerLaunchEnvironment(CProcessLaunchParams &_LaunchParams)
+	{
+		// The client and the AppManager-owned API server must agree on the data location
+		_LaunchParams.m_Environment["CONTAINER_APP_ROOT"] = fp_GetAppleContainerAppRoot();
+
+		// The AppManager can run as a daemon whose PATH misses the CLI install location
+		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
+		if (Path.f_Find("/usr/local/bin") < 0)
+			Path = "/usr/local/bin:" + Path;
+		if (Path.f_Find("/opt/homebrew/bin") < 0)
+			Path = "/opt/homebrew/bin:" + Path;
+		_LaunchParams.m_Environment["PATH"] = Path;
+	}
+
+	auto CAppManagerActor::fp_BuildContainerCommandParams
+		(
+			TCSharedPointer<CEnvironment> const &_pEnvironment
+			, TCVector<CStr> &&_Arguments
+		)
+		-> CProcessLaunchParams
+	{
+		CStr Executable = fp_GetContainerRuntimeExecutable(_pEnvironment);
+		TCVector<CStr> Arguments = fg_Move(_Arguments);
+
+		bool bOwnAppleContainerSystem = Executable == "container" && fp_UseOwnAppleContainerSystem();
+		fp_AdjustAppleContainerCommand(Executable, Arguments);
+
+		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+			(
+				Executable
+				, fg_Move(Arguments)
+				, mp_State.m_RootDirectory
+				, {}
+			)
+		;
+		LaunchParams.m_bAllowExecutableLocate = true;
+		LaunchParams.m_bMergeEnvironment = true;
+
+		if (bOwnAppleContainerSystem)
+			fp_ApplyAppleContainerLaunchEnvironment(LaunchParams);
+
+		return LaunchParams;
+	}
+
+	TCFuture<void> CAppManagerActor::fp_EnsureAppleContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		if (fp_GetContainerRuntimeExecutable(_pEnvironment) != "container" || !fp_UseOwnAppleContainerSystem())
+			co_return {};
+
+		if (mp_bAppleContainerSystemReady)
+			co_return {};
+
+		if (mp_bAppleContainerSystemStarting)
+			co_return co_await mp_OnAppleContainerSystemReady.f_Insert().f_Future();
+
+		mp_bAppleContainerSystemStarting = true;
+
+		bool bReady = false;
+		auto Cleanup = g_OnScopeExit / [&, this]
+			{
+				mp_bAppleContainerSystemStarting = false;
+				mp_bAppleContainerSystemReady = bReady;
+				auto Waiters = fg_Move(mp_OnAppleContainerSystemReady);
+				for (auto &Promise : Waiters)
+				{
+					if (bReady)
+						Promise.f_SetResult();
+					else
+						Promise.f_SetException(DMibErrorInstance("Failed to start the AppManager container system"));
+				}
+			}
+		;
+
+		CStr AppRoot = fp_GetAppleContainerAppRoot();
+
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) / [AppRoot]()
+						{
+							CFile::fs_CreateDirectory(AppRoot);
+						}
+					)
+					% "Failed to create the container system directory"
+				)
+			;
+		}
+
+		// The container system keeps running after the AppManager exits, like the
+		// containers it hosts; starting it while it is running is a no-op health check.
+		// The first start also downloads the default kernel and the init filesystem
+		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams
+			(
+				_pEnvironment
+				, fg_CreateVector<CStr>("system", "start", "--app-root", AppRoot, "--enable-kernel-install")
+			)
+		;
+
+		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
+			(
+				CProcessLaunchActor::CSimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode)
+			)
+			.f_Wrap()
+		;
+
+		if (!Result)
+			co_return DMibErrorInstance("Failed to start the AppManager container system: {}"_f << Result.f_GetExceptionStr());
+
+		bReady = true;
+
+		co_return {};
+	}
+
 	auto CAppManagerActor::fp_BuildEnvironmentContainerLaunch
 		(
 			TCSharedPointer<CEnvironment> const &_pEnvironment
@@ -176,19 +324,9 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_RemoveEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
-		CStr RuntimeExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
 		CStr ContainerName = fp_GetContainerName(_pEnvironment);
 
-		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
-			(
-				RuntimeExecutable
-				, fg_CreateVector<CStr>("rm", "--force", ContainerName)
-				, mp_State.m_RootDirectory
-				, {}
-			)
-		;
-		LaunchParams.m_bAllowExecutableLocate = true;
-		LaunchParams.m_bMergeEnvironment = true;
+		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("rm", "--force", ContainerName));
 
 		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
 			(
@@ -215,19 +353,9 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_StopEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
-		CStr RuntimeExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
 		CStr ContainerName = fp_GetContainerName(_pEnvironment);
 
-		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
-			(
-				RuntimeExecutable
-				, fg_CreateVector<CStr>("stop", ContainerName)
-				, mp_State.m_RootDirectory
-				, {}
-			)
-		;
-		LaunchParams.m_bAllowExecutableLocate = true;
-		LaunchParams.m_bMergeEnvironment = true;
+		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("stop", ContainerName));
 
 		co_await CProcessLaunchActor::fs_LaunchSimple
 			(
@@ -242,19 +370,9 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<bool> CAppManagerActor::fp_EnvironmentContainerExists(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
-		CStr RuntimeExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
 		CStr ContainerName = fp_GetContainerName(_pEnvironment);
 
-		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
-			(
-				RuntimeExecutable
-				, fg_CreateVector<CStr>("inspect", ContainerName)
-				, mp_State.m_RootDirectory
-				, {}
-			)
-		;
-		LaunchParams.m_bAllowExecutableLocate = true;
-		LaunchParams.m_bMergeEnvironment = true;
+		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("inspect", ContainerName));
 
 		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
 			(
@@ -268,24 +386,13 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_PullEnvironmentContainerImage(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
-		CStr RuntimeExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
-
 		TCVector<CStr> Arguments;
-		if (RuntimeExecutable == "container")
+		if (fp_GetContainerRuntimeExecutable(_pEnvironment) == "container")
 			Arguments = fg_CreateVector<CStr>("image", "pull", _pEnvironment->m_Settings.m_ContainerImage);
 		else
 			Arguments = fg_CreateVector<CStr>("pull", _pEnvironment->m_Settings.m_ContainerImage);
 
-		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
-			(
-				RuntimeExecutable
-				, fg_Move(Arguments)
-				, mp_State.m_RootDirectory
-				, {}
-			)
-		;
-		LaunchParams.m_bAllowExecutableLocate = true;
-		LaunchParams.m_bMergeEnvironment = true;
+		CProcessLaunchParams LaunchParams = fp_BuildContainerCommandParams(_pEnvironment, fg_Move(Arguments));
 
 		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple
 			(
