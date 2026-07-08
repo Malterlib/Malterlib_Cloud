@@ -1876,31 +1876,59 @@ namespace NMib::NCloud::NAppManager
 				_pEnvironment->m_ListenPort = 20000 + Seed % 40000;
 			}
 
-			NWeb::NHTTP::CURL Url;
-			if (!Url.f_Decode("wss://{}:{}/"_f << HostAddress << _pEnvironment->m_ListenPort))
-				co_return DMibErrorInstance("Failed to create the environment listen address for host '{}'"_f << HostAddress);
+			// The listen binds the wildcard address: the host side of the shared network
+			// only has its address while the network is active, so binding it directly
+			// fails when the trust manager restores the persisted listen at startup. The
+			// guests are given the shared network host address to connect to
+			NWeb::NHTTP::CURL ListenUrl;
+			if (!ListenUrl.f_Decode("wss://0.0.0.0:{}/"_f << _pEnvironment->m_ListenPort))
+				co_return DMibErrorInstance("Failed to create the environment listen address");
+
+			NWeb::NHTTP::CURL AgentUrl;
+			if (!AgentUrl.f_Decode("wss://{}:{}/"_f << HostAddress << _pEnvironment->m_ListenPort))
+				co_return DMibErrorInstance("Failed to create the environment agent address for host '{}'"_f << HostAddress);
+
+			// Remove a listen bound directly to the shared network host address left
+			// behind by earlier versions; it cannot bind while the network is inactive
+			{
+				CDistributedActorTrustManager_Address DirectAddress;
+				DirectAddress.m_URL = AgentUrl;
+
+				bool bHasDirectListen = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_HasListen, DirectAddress);
+				if (bHasDirectListen)
+					co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RemoveListen, DirectAddress);
+			}
 
 			CDistributedActorTrustManager_Address Address;
-			Address.m_URL = Url;
+			Address.m_URL = ListenUrl;
 
 			bool bHasListen = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_HasListen, Address);
 			if (bHasListen)
-				co_return Url;
+				co_return AgentUrl;
 
 			auto AddResult = co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_AddListen, Address).f_Wrap();
 			if (AddResult)
 			{
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Added listen '{}' for environment '{}'", Url.f_Encode(), _pEnvironment->m_Name);
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Info
+						, "Added listen '{}' for environment '{}' reached through '{}'"
+						, ListenUrl.f_Encode()
+						, _pEnvironment->m_Name
+						, AgentUrl.f_Encode()
+					)
+				;
 
 				co_await fp_UpdateEnvironmentJson(_pEnvironment).f_Wrap()
 					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to save environment listen state")
 				;
 
-				co_return Url;
+				co_return AgentUrl;
 			}
 
 			if (Attempt == 2)
-				co_return DMibErrorInstance("Failed to add environment listen '{}': {}"_f << Url.f_Encode() << AddResult.f_GetExceptionStr());
+				co_return DMibErrorInstance("Failed to add environment listen '{}': {}"_f << ListenUrl.f_Encode() << AddResult.f_GetExceptionStr());
 
 			// The chosen port can collide with another service; retry with a new one
 			_pEnvironment->m_ListenPort = 0;
