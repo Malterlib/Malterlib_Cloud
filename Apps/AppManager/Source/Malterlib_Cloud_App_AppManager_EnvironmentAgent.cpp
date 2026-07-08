@@ -155,7 +155,25 @@ namespace NMib::NCloud::NAppManager
 		CAppLaunchResult Result = co_await pThis->fp_LaunchApp(pApplication, false);
 
 		if (Result.m_StartupError)
+		{
+			// The host retries the launch periodically; remove the failed ephemeral
+			// application so the retry does not hit the already-launched check
+			if (!pApplication->m_bDeleted)
+			{
+				co_await pApplication->f_Stop(EStopFlag_PreventLaunchUser).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop application after failed environment launch")
+				;
+
+				pApplication->f_AbortPendingLaunches();
+				pApplication->f_Delete();
+
+				auto *pFindCurrent = pThis->mp_Applications.f_FindEqual(_Launch.m_Name);
+				if (pFindCurrent && *pFindCurrent == pApplication)
+					pThis->mp_Applications.f_Remove(_Launch.m_Name);
+			}
+
 			co_return DMibErrorInstance(fg_Move(Result.m_StartupError));
+		}
 
 		co_return {};
 	}
