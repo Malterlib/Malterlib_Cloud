@@ -49,6 +49,10 @@
 		{
 			!!MalterlibPostCopyProject undefined
 		}
+		MalterlibPostCopyProject2 "Malterlib_Cloud_TunnelProxyManager"
+		{
+			!!MalterlibCloud_PerAppPostCopy true
+		}
 		MalterlibCloud_EnableVersionUpload true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudTunnelProxyManager"
