@@ -107,6 +107,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--agent-application"]
 				, "Type"_o= ""
+				, "Default"_o= ""
 				, "Description"_o= "Name of the application that provides the AppManager agent executable for the environment.\n"
 				"See --application-enable-self-update for installing agent executables for other platforms."
 			}
@@ -115,6 +116,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--parent-application"]
 				, "Type"_o= ""
+				, "Default"_o= ""
 				, "Description"_o= "Name of the application whose storage confines the environment storage.\n"
 				"The environment agent root and VM images live inside that application's directory, so they can be\n"
 				"placed on encrypted storage by using an application with encryption storage."
@@ -124,6 +126,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--auto-start"]
 				, "Type"_o= true
+				, "Default"_o= true
 				, "Description"_o= "Start the environment automatically when the AppManager starts. Defaults to true."
 			}
 		;
@@ -131,6 +134,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--container-runtime"]
 				, "Type"_o= ""
+				, "Default"_o= ""
 				, "Description"_o= "The container runtime to use: Docker or AppleContainer.\n"
 				"Leave empty to select the default runtime for the host platform."
 			}
@@ -139,6 +143,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--container-image"]
 				, "Type"_o= ""
+				, "Default"_o= ""
 				, "Description"_o= "The container image reference to run the environment from."
 			}
 		;
@@ -146,6 +151,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--container-network"]
 				, "Type"_o= ""
+				, "Default"_o= ""
 				, "Description"_o= "The container network mode.\n"
 				"Leave empty to select the default network mode for the host platform and runtime."
 			}
@@ -166,6 +172,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--container-read-only"]
 				, "Type"_o= true
+				, "Default"_o= false
 				, "Description"_o= "Run the container with a read-only filesystem, so all writes are confined to the\n"
 				"mounted storage. Writes outside the mounted paths would otherwise go to the container\n"
 				"runtime's own storage, which is not confined by --parent-application. Defaults to false."
@@ -174,6 +181,7 @@ namespace NMib::NCloud::NAppManager
 		auto SettingsOption_ContainerExtraArguments = "ContainerExtraArguments?"_o=
 			{
 				"Names"_o= _o["--container-extra-arguments"]
+				, "Default"_o= _o[]
 				, "Type"_o= _o[""]
 				, "Description"_o= "Additional arguments appended to the container run command."
 			}
@@ -182,6 +190,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--memory-limit"]
 				, "Type"_o= ""
+				, "Default"_o= ""
 				, "Description"_o= "Memory limit for the environment, for example 512m or 4g."
 			}
 		;
@@ -189,6 +198,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--cpu-limit"]
 				, "Type"_o= 0.0
+				, "Default"_o= 0.0
 				, "Description"_o= "Number of CPUs the environment may use. Set to 0 for no limit."
 			}
 		;
@@ -196,6 +206,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--vm-image"]
 				, "Type"_o= ""
+				, "Default"_o= ""
 				, "Description"_o= "Name of the prepared guest image bundle to run the VM environment from."
 			}
 		;
@@ -203,6 +214,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--vm-backend"]
 				, "Type"_o= ""
+				, "Default"_o= ""
 				, "Description"_o= "The virtualization backend to use.\n"
 				"Leave empty to select the default backend for the host platform."
 			}
@@ -211,6 +223,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--vm-cpu-count"]
 				, "Type"_o= 0
+				, "Default"_o= 0
 				, "Description"_o= "Number of CPUs for the VM. Set to 0 to use the backend default."
 			}
 		;
@@ -218,7 +231,16 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--vm-memory"]
 				, "Type"_o= 0
+				, "Default"_o= 0
 				, "Description"_o= "Memory in megabytes for the VM. Set to 0 to use the backend default."
+			}
+		;
+
+		auto fStripDefault = [](auto &&_Template)
+			{
+				auto Return = _Template;
+				Return.m_Value.f_RemoveMember("Default");
+				return Return;
 			}
 		;
 
@@ -236,6 +258,7 @@ namespace NMib::NCloud::NAppManager
 						{
 							"Names"_o= _o["--type"]
 							, "Type"_o= ""
+							, "Default"_o= "Container"
 							, "Description"_o= "The environment type: Local, Container or VM.\n"
 							"Defaults to Container."
 						}
@@ -271,21 +294,21 @@ namespace NMib::NCloud::NAppManager
 					, "Options"_o=
 					{
 						NameOption
-						, SettingsOption_AgentApplication
-						, SettingsOption_ParentApplication
-						, SettingsOption_AutoStart
-						, SettingsOption_ContainerRuntime
-						, SettingsOption_ContainerImage
-						, SettingsOption_ContainerNetwork
-						, SettingsOption_ContainerExtraMounts
-						, SettingsOption_ContainerExtraArguments
-						, SettingsOption_ContainerReadOnly
-						, SettingsOption_MemoryLimit
-						, SettingsOption_CPULimit
-						, SettingsOption_VMImage
-						, SettingsOption_VMBackend
-						, SettingsOption_VMCPUCount
-						, SettingsOption_VMMemoryMB
+						, fStripDefault(SettingsOption_AgentApplication)
+						, fStripDefault(SettingsOption_ParentApplication)
+						, fStripDefault(SettingsOption_AutoStart)
+						, fStripDefault(SettingsOption_ContainerRuntime)
+						, fStripDefault(SettingsOption_ContainerImage)
+						, fStripDefault(SettingsOption_ContainerNetwork)
+						, fStripDefault(SettingsOption_ContainerExtraMounts)
+						, fStripDefault(SettingsOption_ContainerExtraArguments)
+						, fStripDefault(SettingsOption_ContainerReadOnly)
+						, fStripDefault(SettingsOption_MemoryLimit)
+						, fStripDefault(SettingsOption_CPULimit)
+						, fStripDefault(SettingsOption_VMImage)
+						, fStripDefault(SettingsOption_VMBackend)
+						, fStripDefault(SettingsOption_VMCPUCount)
+						, fStripDefault(SettingsOption_VMMemoryMB)
 					}
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
@@ -323,6 +346,7 @@ namespace NMib::NCloud::NAppManager
 						"Name?"_o=
 						{
 							"Names"_o= _o["--name"]
+							, "Type"_o= ""
 							, "Default"_o= ""
 							, "Description"_o= "Only list the environment with this name."
 						}
@@ -425,34 +449,19 @@ namespace NMib::NCloud::NAppManager
 					, "Options"_o=
 					{
 						NameOption
-						, "ParentApplication?"_o=
-						{
-							"Names"_o= _o["--parent-application"]
-							, "Default"_o= ""
-							, "Description"_o= "Name of the application whose storage the image is created inside, under its VMImages directory.\n"
-							"Use an application with encryption storage to place the image on encrypted storage."
-						}
+						, SettingsOption_ParentApplication
 						, "RestoreImage"_o=
 						{
 							"Names"_o= _o["--restore-image"]
 							, "Type"_o= ""
 							, "Description"_o= "Path to the macOS IPSW restore image to install from."
 						}
-						, "VMCPUCount?"_o=
-						{
-							"Names"_o= _o["--vm-cpu-count"]
-							, "Default"_o= 0
-							, "Description"_o= "Number of CPUs for the install VM. Set to 0 to use the default."
-						}
-						, "VMMemoryMB?"_o=
-						{
-							"Names"_o= _o["--vm-memory"]
-							, "Default"_o= 0
-							, "Description"_o= "Memory in megabytes for the install VM. Set to 0 to use the default."
-						}
+						, SettingsOption_VMCPUCount
+						, SettingsOption_VMMemoryMB
 						, "DiskSizeGB?"_o=
 						{
 							"Names"_o= _o["--disk-size"]
+							, "Type"_o= 0
 							, "Default"_o= 0
 							, "Description"_o= "Size of the guest disk image in gigabytes. Set to 0 to use the default."
 						}
