@@ -45,6 +45,10 @@
 		{
 			!!MalterlibPostCopyProject undefined
 		}
+		MalterlibPostCopyProject2 "Malterlib_Cloud_BackupManager"
+		{
+			!!MalterlibCloud_PerAppPostCopyActive true
+		}
 		MalterlibCloud_EnableVersionUpload true
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudBackupManager"
