@@ -25,13 +25,18 @@ namespace NMib::NCloud::NAppManager
 		auto ReportingHostID = CallingHostInfo.f_GetRealHostID();
 
 		auto pApplication = pThis->fp_ApplicationFromHostID(ReportingHostID);
-		if (!pApplication)
+
+		CStr ScopeName;
+		if (pApplication)
+			ScopeName = pApplication->m_Name;
+		else if (auto pEnvironment = pThis->fp_EnvironmentFromHostID(ReportingHostID))
+			ScopeName = fg_Format("Environment/{}", pEnvironment->m_Name);
+
+		if (ScopeName.f_IsEmpty())
 		{
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "[{}] Unassociated application tried to open sensor reporter", CallingHostInfo.f_GetHostInfo().f_GetDesc());
 			co_return DErrorInstance("Application not associated with your host");
 		}
-
-		auto &Application = *pApplication;
 
 		CDistributedAppSensorReporter::CSensorInfo SensorInfo = fg_Move(_SensorInfo);
 		if (SensorInfo.m_HostID)
@@ -63,7 +68,7 @@ namespace NMib::NCloud::NAppManager
 
 		SensorInfo.m_HostID = ReportingHostID;
 		SensorInfo.m_HostName = CallingHostInfo.f_GetHostInfo().m_FriendlyName;
-		SensorInfo.m_Scope = CDistributedAppSensorReporter::CSensorScope_Application{Application.m_Name};
+		SensorInfo.m_Scope = CDistributedAppSensorReporter::CSensorScope_Application{ScopeName};
 
 		for (auto &Metadata : pThis->mp_SensorMetadata.f_Entries())
 		{
@@ -77,7 +82,8 @@ namespace NMib::NCloud::NAppManager
 
 		auto Reporter = co_await pThis->mp_SensorStore(&CDistributedAppSensorStoreLocal::f_OpenSensorReporter, fg_TempCopy(SensorInfo));
 
-		co_await pThis->fp_RebootPrevention_WatchSensor(pApplication->m_Name, SensorInfo);
+		if (pApplication)
+			co_await pThis->fp_RebootPrevention_WatchSensor(pApplication->m_Name, SensorInfo);
 
 		DMibLogWithCategory
 			(
@@ -85,7 +91,7 @@ namespace NMib::NCloud::NAppManager
 				, Info
 				, "[{}] Application '{}' opened sensor reporter:\n{}"
 				, CallingHostInfo.f_GetHostInfo().f_GetDesc()
-				, Application.m_Name
+				, ScopeName
 				, SensorInfo
 			)
 		;
