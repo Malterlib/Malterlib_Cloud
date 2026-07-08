@@ -19,8 +19,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x101
-			, EProtocolVersion_Current = 0x101
+			EProtocolVersion_Min = 0x102
+			, EProtocolVersion_Current = 0x102
 		};
 
 		enum EApplicationState : uint32
@@ -53,6 +53,8 @@ namespace NMib::NCloud::NAppManager
 			NStr::CStr m_RunAsGroup;
 			bool m_bRunAsUserHasShell = false;
 			bool m_bDistributedApp = false;
+			NStr::CStr m_InterfaceAddress; /// Host AppManager address the application connects its distributed app interface to
+			NStr::CStr m_LaunchID; /// Host AppManager launch id the application registers with
 		};
 
 		struct CEnvironmentScript
@@ -98,8 +100,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x101
-			, EProtocolVersion_Current = 0x101
+			EProtocolVersion_Min = 0x102
+			, EProtocolVersion_Current = 0x102
 		};
 
 		virtual auto f_RegisterEnvironmentAgent
@@ -110,5 +112,10 @@ namespace NMib::NCloud::NAppManager
 			-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0
 		;
 		virtual NConcurrency::TCFuture<void> f_ReportApplicationState(CAppManagerEnvironmentInterface::CApplicationStateChange _Change) = 0;
+
+		/// Generates a connection ticket for an application launched in the calling
+		/// agent's environment; the application uses it to connect its distributed
+		/// app interface to the host AppManager
+		virtual NConcurrency::TCFuture<NStr::CStr> f_RequestApplicationConnectionTicket(NStr::CStr _LaunchID) = 0;
 	};
 }

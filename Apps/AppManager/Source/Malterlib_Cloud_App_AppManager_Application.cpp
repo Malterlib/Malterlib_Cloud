@@ -288,6 +288,22 @@ namespace NMib::NCloud::NAppManager
 
 							if (pEnvironment->m_AgentInterface && !pApplication->m_bDeleted)
 							{
+								// The application registers its distributed app interface with this
+								// AppManager, so the pre stop runs here before the agent stops the
+								// process
+								if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= CDistributedAppInterfaceClient::EProtocolVersion_SupportPreStop)
+								{
+									DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pre-stopping application '{}'", pApplication->m_Name);
+
+									auto PreStopResult = co_await pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_PreStop)()
+										.f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)")
+										.f_Wrap()
+									;
+
+									if (!PreStopResult)
+										DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", PreStopResult.f_GetExceptionStr());
+								}
+
 								DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Stopping application '{}' in environment '{}'", pApplication->m_Name, pEnvironment->m_Name);
 								StopResult = co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_StopApplication)(pApplication->m_Name)
 									.f_Timeout(60.0 * 60.0, "Timed out stopping application in environment (1 hour)")

@@ -25,6 +25,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_RegisterEnvironmentAgent);
 		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_ReportApplicationState);
+		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_RequestApplicationConnectionTicket);
 	}
 
 	CAppManagerEnvironmentHostInterface::~CAppManagerEnvironmentHostInterface()
@@ -50,6 +51,8 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_RunAsGroup;
 		_Stream % m_bRunAsUserHasShell;
 		_Stream % m_bDistributedApp;
+		_Stream % m_InterfaceAddress;
+		_Stream % m_LaunchID;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CEnvironmentLaunch);
 
@@ -111,6 +114,8 @@ namespace NMib::NCloud::NAppManager
 		auto &Application = *pApplication;
 		Application.m_bEphemeral = true;
 		Application.m_DirectoryOverride = _Launch.m_Directory;
+		Application.m_EnvironmentHostAddress = _Launch.m_InterfaceAddress;
+		Application.m_EnvironmentHostLaunchID = _Launch.m_LaunchID;
 
 		auto &Settings = Application.m_Settings;
 		Settings.m_Executable = _Launch.m_Executable;
@@ -337,5 +342,87 @@ namespace NMib::NCloud::NAppManager
 		pThis->fp_OnEnvironmentApplicationStateChange(_Change);
 
 		co_return {};
+	}
+
+	TCFuture<CStr> CAppManagerActor::CAppManagerEnvironmentHostInterfaceImplementation::f_RequestApplicationConnectionTicket(CStr _LaunchID)
+	{
+		auto pThis = m_pThis;
+
+		CCallingHostInfo CallingHostInfo = fg_GetCallingHostInfo();
+
+		auto pEnvironment = pThis->fp_EnvironmentFromHostID(CallingHostInfo.f_GetRealHostID());
+		if (!pEnvironment)
+			co_return DErrorInstance("Environment agent not associated with your host");
+
+		auto pApplication = pThis->fp_ApplicationFromLaunchID(_LaunchID);
+		if (!pApplication || pApplication->m_pLaunchedEnvironment != pEnvironment)
+			co_return DErrorInstance("No application with the launch id is launched in your environment");
+
+		auto Address = co_await pThis->fp_EnsureEnvironmentListen(pEnvironment);
+
+		if (pApplication->m_bDeleted)
+			co_return DErrorInstance("Application deleted");
+
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Generating connection ticket for '{}' in environment '{}'"
+				, pApplication->m_Name
+				, pEnvironment->m_Name
+			)
+		;
+
+		CStr NotificationID = NCryptography::fg_RandomID(pThis->mp_EnvironmentTicketNotifications);
+
+		auto Ticket = co_await pThis->mp_State.m_TrustManager
+			(
+				&CDistributedActorTrustManager::f_GenerateConnectionTicket
+				, Address
+				, g_ActorFunctor
+				(
+					g_ActorSubscription / [pThis, NotificationID]
+					{
+						pThis->mp_EnvironmentTicketNotifications.f_Remove(NotificationID);
+					}
+				)
+				/ [pThis, NotificationID, pApplication](CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _CertificateRequest) -> TCFuture<void>
+				{
+					pThis->mp_EnvironmentTicketNotifications.f_Remove(NotificationID);
+
+					if (pApplication->m_bDeleted)
+						co_return DMibErrorInstance("Application deleted");
+
+					if (pApplication->m_AssociatedHostID != _HostID)
+					{
+						pApplication->m_AssociatedHostID = _HostID;
+						pThis->fp_SendAppChange_AddedOrChanged(*pApplication);
+					}
+
+					auto Result = co_await pThis->fp_UpdateApplicationJson(pApplication).f_Wrap();
+
+					if (!Result)
+					{
+						DMibLogWithCategory
+							(
+								Malterlib/Cloud/AppManager
+								, Info
+								, "Failed to update application JSON when granting connection ticket for '{}': {}"
+								, pApplication->m_Name
+								, Result.f_GetExceptionStr()
+							)
+						;
+						co_return DMibErrorInstance("Failed to update application JSON, see AppManager log for details");
+					}
+
+					co_return {};
+				}
+				, nullptr
+			)
+		;
+
+		pThis->mp_EnvironmentTicketNotifications[NotificationID] = fg_Move(Ticket.m_NotificationsSubscription);
+
+		co_return Ticket.m_Ticket.f_ToStringTicket();
 	}
 }
