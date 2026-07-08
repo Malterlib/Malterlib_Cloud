@@ -285,6 +285,7 @@ namespace NMib::NCloud::NAppManager
 				-> TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override
 			;
 			TCFuture<void> f_ReportApplicationState(CAppManagerEnvironmentInterface::CApplicationStateChange _Change) override;
+			TCFuture<CStr> f_RequestApplicationConnectionTicket(CStr _LaunchID) override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -403,6 +404,8 @@ namespace NMib::NCloud::NAppManager
 			// Agent side
 			CStr m_DirectoryOverride; /// Used instead of the derived directory for applications launched by an environment agent
 			bool m_bEphemeral = false; /// Application exists only for the lifetime of the environment agent and is never persisted
+			CStr m_EnvironmentHostAddress; /// Host AppManager address the application connects its distributed app interface to
+			CStr m_EnvironmentHostLaunchID; /// Host AppManager launch id the application registers with
 
 			CApplication *m_pParentApplication = nullptr;
 			CStr m_InstalledOSDependenciesFingerprint; /// OS dependencies installed by this AppManager instance
@@ -982,6 +985,7 @@ namespace NMib::NCloud::NAppManager
 		CProcessLaunchParams fp_BuildContainerCommandParams(TCSharedPointer<CEnvironment> const &_pEnvironment, TCVector<CStr> &&_Arguments);
 		TCFuture<void> fp_EnsureAppleContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_AbortEnvironmentLaunch(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 
 		// Environment agent handling (agent side)
 		TCFuture<void> fp_RegisterWithEnvironmentHost();
@@ -1300,6 +1304,7 @@ namespace NMib::NCloud::NAppManager
 		TCDistributedActor<CAppManagerEnvironmentHostInterface> mp_EnvironmentHostActor;
 		CActorSubscription mp_EnvironmentHostRegistration;
 		bool mp_bEnvironmentAgent = false;
+		TCMap<CStr, CActorSubscription> mp_EnvironmentTicketNotifications; /// Keeps environment application connection tickets alive until they are used
 
 		CTrustedPermissionSubscription mp_Permissions;
 

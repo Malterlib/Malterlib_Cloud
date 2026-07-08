@@ -367,7 +367,10 @@ namespace NMib::NCloud::NAppManager
 						{
 						case NProcess::EProcessLaunchState_Launched:
 							{
-								if (_pApplication->m_Settings.m_bDistributedApp)
+								// Applications launched for an environment host register with that
+								// host instead of this agent, so the agent is done once the process
+								// is running
+								if (_pApplication->m_Settings.m_bDistributedApp && _pApplication->m_EnvironmentHostAddress.f_IsEmpty())
 								{
 									fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)", CAppManagerInterface::EStatusSeverity_Warning);
 
@@ -588,71 +591,101 @@ namespace NMib::NCloud::NAppManager
 			LaunchParams.m_bShowLaunched = false;
 
 			Application.m_LaunchID = fg_RandomID();
-			Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
-				(
-					mp_State.m_LocalAddress
-					, mp_State.m_TrustManager
-					, g_ActorFunctor / [_pApplication, this]
-					(CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _Certificate) -> TCFuture<void>
-					{
-						if (_pApplication->m_bDeleted)
-							co_return DMibErrorInstance("Application deleted");
 
-						_pApplication->m_AssociatedHostID = _HostID;
-
-						if (_pApplication->m_AssociatedHostID != _HostID)
-						{
-							_pApplication->m_AssociatedHostID = _HostID;
-							fp_SendAppChange_AddedOrChanged(*_pApplication);
-						}
-
-						auto Result = co_await fp_UpdateApplicationJson(_pApplication).f_Wrap();
-
-						if (!Result)
-						{
-							DMibLogWithCategory
-								(
-									Malterlib/Cloud/AppManager
-									, Info
-									, "Failed to update application JSON when granting connection ticket for '{}': {}"
-									, _pApplication->m_Name
-									, Result.f_GetExceptionStr()
-								)
-							;
-							co_return DMibErrorInstance("Failed to update application JSON, see AppManager log for details");
-						}
-
+			auto fOnLaunchError = g_ActorFunctor / [this, _pApplication, pState, LaunchPromise = LaunchPromise.m_Promise](NStr::CStr _Error) -> TCFuture<void>
+				{
+					if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
 						co_return {};
-					}
-					, g_ActorFunctor / [this, _pApplication, pState, LaunchPromise = LaunchPromise.m_Promise](NStr::CStr _Error) -> TCFuture<void>
-					{
-						if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
-							co_return {};
 
-						DMibLogWithCategory
-							(
-								Malterlib/Cloud/AppManager
-								, Error
-								, "Launched app '{}' failed to start up before registering: {}"
-								, _pApplication->m_Name
-								, _Error
-							)
-						;
+					DMibLogWithCategory
+						(
+							Malterlib/Cloud/AppManager
+							, Error
+							, "Launched app '{}' failed to start up before registering: {}"
+							, _pApplication->m_Name
+							, _Error
+						)
+					;
 
-						fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Error, CAppManagerInterface::EStatusSeverity_Error);
+					fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Error, CAppManagerInterface::EStatusSeverity_Error);
 
-						if (!LaunchPromise.f_IsSet())
-							LaunchPromise.f_SetResult(CAppLaunchResult{_Error});
+					if (!LaunchPromise.f_IsSet())
+						LaunchPromise.f_SetResult(CAppLaunchResult{_Error});
 
-						pState->m_pCleanup.f_Clear();
+					pState->m_pCleanup.f_Clear();
 
-						co_return {};
-					}
-					, Application.m_Name
-					, Application.m_LaunchID
-					, false
-				)
+					co_return {};
+				}
 			;
+
+			if (!Application.m_EnvironmentHostAddress.f_IsEmpty())
+			{
+				// The application connects its distributed app interface to the host
+				// AppManager that owns the environment; this agent only supervises the
+				// process and forwards connection ticket requests to the host
+				NWeb::NHTTP::CURL HostAddress;
+				if (!HostAddress.f_Decode(Application.m_EnvironmentHostAddress))
+					co_return DMibErrorInstance("Invalid environment host interface address '{}'"_f << Application.m_EnvironmentHostAddress);
+
+				Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
+					(
+						HostAddress
+						, g_ActorFunctor / [this, LaunchID = Application.m_EnvironmentHostLaunchID]() -> TCFuture<CStr>
+						{
+							if (!mp_EnvironmentHostActor)
+								co_return DMibErrorInstance("No environment host connected");
+
+							co_return co_await mp_EnvironmentHostActor.f_CallActor(&CAppManagerEnvironmentHostInterface::f_RequestApplicationConnectionTicket)(LaunchID);
+						}
+						, fg_Move(fOnLaunchError)
+						, Application.m_Name
+						, Application.m_EnvironmentHostLaunchID
+					)
+				;
+			}
+			else
+			{
+				Application.m_ProcessLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
+					(
+						mp_State.m_LocalAddress
+						, mp_State.m_TrustManager
+						, g_ActorFunctor / [_pApplication, this]
+						(CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _Certificate) -> TCFuture<void>
+						{
+							if (_pApplication->m_bDeleted)
+								co_return DMibErrorInstance("Application deleted");
+
+							if (_pApplication->m_AssociatedHostID != _HostID)
+							{
+								_pApplication->m_AssociatedHostID = _HostID;
+								fp_SendAppChange_AddedOrChanged(*_pApplication);
+							}
+
+							auto Result = co_await fp_UpdateApplicationJson(_pApplication).f_Wrap();
+
+							if (!Result)
+							{
+								DMibLogWithCategory
+									(
+										Malterlib/Cloud/AppManager
+										, Info
+										, "Failed to update application JSON when granting connection ticket for '{}': {}"
+										, _pApplication->m_Name
+										, Result.f_GetExceptionStr()
+									)
+								;
+								co_return DMibErrorInstance("Failed to update application JSON, see AppManager log for details");
+							}
+
+							co_return {};
+						}
+						, fg_Move(fOnLaunchError)
+						, Application.m_Name
+						, Application.m_LaunchID
+						, false
+					)
+				;
+			}
 
 			auto LaunchSubscription = co_await Application.m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInterfaceLaunchActor>>()
 				(
