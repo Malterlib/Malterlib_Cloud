@@ -1993,7 +1993,7 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
 		if (mp_bLogLaunchesToStdErr)
 			Launch.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
-		Launch.m_LogName = fg_Format("Environment/{}", _pEnvironment->m_Name);
+		Launch.m_LogName = fg_Format("Environment/{}/Agent", _pEnvironment->m_Name);
 
 		auto &LaunchParams = Launch.m_Params;
 		LaunchParams.m_bAllowExecutableLocate = bContainer;
