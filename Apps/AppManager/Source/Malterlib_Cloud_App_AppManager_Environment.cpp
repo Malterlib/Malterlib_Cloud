@@ -563,7 +563,7 @@ namespace NMib::NCloud::NAppManager
 		if (auto *pValue = _Params.f_GetMember("MemoryLimitMB"))
 		{
 			o_ChangedSettings |= EEnvironmentSetting_MemoryLimit;
-			m_MemoryLimitMB = (uint32)pValue->f_AsInteger();
+			m_MemoryLimitMB = (uint64)pValue->f_AsInteger();
 		}
 
 		if (auto *pValue = _Params.f_GetMember("CPULimit"))
@@ -593,7 +593,7 @@ namespace NMib::NCloud::NAppManager
 		if (auto *pValue = _Params.f_GetMember("VMMemoryMB"))
 		{
 			o_ChangedSettings |= EEnvironmentSetting_VMMemoryMB;
-			m_VMMemoryMB = (uint32)pValue->f_AsInteger();
+			m_VMMemoryMB = (uint64)pValue->f_AsInteger();
 		}
 
 		return true;
@@ -842,7 +842,7 @@ namespace NMib::NCloud::NAppManager
 				Settings.m_bContainerReadOnly = pValue->f_Boolean();
 
 			if (auto pValue = EnvironmentJson.f_GetMember("MemoryLimitMB", EJsonType_Integer))
-				Settings.m_MemoryLimitMB = (uint32)pValue->f_Integer();
+				Settings.m_MemoryLimitMB = (uint64)pValue->f_Integer();
 			{
 				auto pValue = EnvironmentJson.f_GetMember("CPULimit", EJsonType_Float);
 				if (!pValue)
@@ -858,7 +858,7 @@ namespace NMib::NCloud::NAppManager
 			if (auto pValue = EnvironmentJson.f_GetMember("VMCPUCount", EJsonType_Integer))
 				Settings.m_VMCPUCount = (uint32)pValue->f_Integer();
 			if (auto pValue = EnvironmentJson.f_GetMember("VMMemoryMB", EJsonType_Integer))
-				Settings.m_VMMemoryMB = (uint32)pValue->f_Integer();
+				Settings.m_VMMemoryMB = (uint64)pValue->f_Integer();
 
 			if (auto pValue = EnvironmentJson.f_GetMember("ContainerFingerprint", EJsonType_String))
 				Environment.m_ContainerFingerprint = pValue->f_String();
