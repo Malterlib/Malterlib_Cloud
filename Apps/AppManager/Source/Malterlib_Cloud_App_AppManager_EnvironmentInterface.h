@@ -19,8 +19,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x102
-			, EProtocolVersion_Current = 0x102
+			EProtocolVersion_Min = 0x103
+			, EProtocolVersion_Current = 0x103
 		};
 
 		enum EApplicationState : uint32
@@ -104,8 +104,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x102
-			, EProtocolVersion_Current = 0x102
+			EProtocolVersion_Min = 0x103
+			, EProtocolVersion_Current = 0x103
 		};
 
 		virtual auto f_RegisterEnvironmentAgent
