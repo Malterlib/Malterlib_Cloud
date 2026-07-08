@@ -89,7 +89,7 @@ namespace NMib::NCloud::NAppManager
 		co_return fg_Move(Info);
 	}
 
-	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_LaunchApplication(CEnvironmentLaunch _Launch)
+	TCFuture<CStr> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_LaunchApplication(CEnvironmentLaunch _Launch)
 	{
 		auto pThis = m_pThis;
 
@@ -102,10 +102,30 @@ namespace NMib::NCloud::NAppManager
 		auto *pFindApplication = pThis->mp_Applications.f_FindEqual(_Launch.m_Name);
 		if (pFindApplication)
 		{
-			if ((*pFindApplication)->f_IsLaunched() || (*pFindApplication)->m_bLaunching)
-				co_return DMibErrorInstance("Application '{}' is already launched in the environment"_f << _Launch.m_Name);
+			auto pExisting = *pFindApplication;
+			if (pExisting->f_IsLaunched() || pExisting->m_bLaunching)
+			{
+				auto &ExistingSettings = pExisting->m_Settings;
 
-			(*pFindApplication)->f_Delete();
+				bool bSameLaunch
+					= pExisting->m_DirectoryOverride == _Launch.m_Directory
+					&& ExistingSettings.m_Executable == _Launch.m_Executable
+					&& ExistingSettings.m_ExecutableParameters == _Launch.m_Parameters
+					&& ExistingSettings.m_RunAsUser == _Launch.m_RunAsUser
+					&& ExistingSettings.m_RunAsGroup == _Launch.m_RunAsGroup
+					&& ExistingSettings.m_bDistributedApp == _Launch.m_bDistributedApp
+				;
+
+				// The application keeps running in the environment while the host
+				// AppManager restarts, so a matching launch adopts it; the host takes
+				// over with the launch id the application already runs with
+				if (bSameLaunch)
+					co_return fg_TempCopy(pExisting->m_EnvironmentHostLaunchID);
+
+				co_return DMibErrorInstance("Application '{}' is already launched in the environment with different settings"_f << _Launch.m_Name);
+			}
+
+			pExisting->f_Delete();
 			pThis->mp_Applications.f_Remove(_Launch.m_Name);
 		}
 
@@ -180,7 +200,7 @@ namespace NMib::NCloud::NAppManager
 			co_return DMibErrorInstance(fg_Move(Result.m_StartupError));
 		}
 
-		co_return {};
+		co_return fg_Move(_Launch.m_LaunchID);
 	}
 
 	TCFuture<uint32> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_StopApplication(CStr _Name)
@@ -353,6 +373,9 @@ namespace NMib::NCloud::NAppManager
 		auto pEnvironment = pThis->fp_EnvironmentFromHostID(CallingHostInfo.f_GetRealHostID());
 		if (!pEnvironment)
 			co_return DErrorInstance("Environment agent not associated with your host");
+
+		if (_LaunchID.f_IsEmpty())
+			co_return DErrorInstance("A launch id is required to request an application connection ticket");
 
 		auto pApplication = pThis->fp_ApplicationFromLaunchID(_LaunchID);
 		if (!pApplication || pApplication->m_pLaunchedEnvironment != pEnvironment)

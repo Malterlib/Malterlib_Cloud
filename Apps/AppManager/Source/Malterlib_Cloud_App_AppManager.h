@@ -268,7 +268,7 @@ namespace NMib::NCloud::NAppManager
 		struct CAppManagerEnvironmentInterfaceImplementation : public CAppManagerEnvironmentInterface
 		{
 			TCFuture<CAgentInfo> f_GetAgentInfo() override;
-			TCFuture<void> f_LaunchApplication(CEnvironmentLaunch _Launch) override;
+			TCFuture<CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) override;
 			TCFuture<uint32> f_StopApplication(CStr _Name) override;
 			TCFuture<void> f_RunScript(CEnvironmentScript _Script) override;
 
