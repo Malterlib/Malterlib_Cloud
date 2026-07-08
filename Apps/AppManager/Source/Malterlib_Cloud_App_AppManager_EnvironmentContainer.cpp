@@ -536,6 +536,12 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
+		// Unix domain sockets cannot live on the virtiofs shares the Apple container
+		// runtime uses for mounts, so the agent places its local command line socket on
+		// the container filesystem instead
+		if (fp_GetContainerRuntimeExecutable(_pEnvironment) == "container")
+			Launch.m_PassEnvironment.f_Insert("MalterlibDistributedAppLocalSocketPrefix=/tmp");
+
 		return Launch;
 	}
 
