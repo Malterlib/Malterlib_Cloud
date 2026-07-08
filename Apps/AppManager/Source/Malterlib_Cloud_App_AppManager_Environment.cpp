@@ -127,7 +127,7 @@ namespace NMib::NCloud::NAppManager
 				"Names"_o= _o["--auto-start"]
 				, "Type"_o= true
 				, "Default"_o= true
-				, "Description"_o= "Start the environment automatically when the AppManager starts. Defaults to true."
+				, "Description"_o= "Start the environment automatically when the AppManager starts."
 			}
 		;
 		auto SettingsOption_ContainerRuntime = "ContainerRuntime?"_o=
@@ -183,7 +183,7 @@ namespace NMib::NCloud::NAppManager
 				, "Default"_o= false
 				, "Description"_o= "Run the container with a read-only filesystem, so all writes are confined to the\n"
 				"mounted storage. Writes outside the mounted paths would otherwise go to the container\n"
-				"runtime's own storage, which is not confined by --parent-application. Defaults to false."
+				"runtime's own storage, which is not confined by --parent-application."
 			}
 		;
 		auto SettingsOption_ContainerExtraArguments = "ContainerExtraArguments?"_o=
