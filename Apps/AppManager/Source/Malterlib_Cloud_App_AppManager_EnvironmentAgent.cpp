@@ -210,9 +210,11 @@ namespace NMib::NCloud::NAppManager
 		if (!pThis->mp_bEnvironmentAgent)
 			co_return DMibErrorInstance("Not running as an environment agent");
 
+		// Stopping is idempotent: the application can already have been cleaned up
+		// after a failed launch
 		auto *pFindApplication = pThis->mp_Applications.f_FindEqual(_Name);
 		if (!pFindApplication)
-			co_return DMibErrorInstance("No such application '{}' in the environment"_f << _Name);
+			co_return 0;
 
 		auto pApplication = *pFindApplication;
 
