@@ -2452,7 +2452,45 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication->m_pLaunchedEnvironment)
 			return;
 
+		if (_Change.m_StatusSeverity == CAppManagerInterface::EStatusSeverity_Error)
+		{
+			// A failed launch attempt inside the environment aborts any pending wait
+			// for the application to register its distributed app interface
+			for (auto &Promise : pApplication->m_OnRegisterDistributedApp)
+				Promise.f_SetException(DMibErrorInstance(_Change.m_Status));
+
+			for (auto &Promise : pApplication->m_OnStartedDistributedApp)
+				Promise.f_SetException(DMibErrorInstance(_Change.m_Status));
+
+			pApplication->m_OnRegisterDistributedApp.f_Clear();
+			pApplication->m_OnStartedDistributedApp.f_Clear();
+		}
+
 		fp_SetAppLaunchStatus(pApplication, _Change.m_Status, _Change.m_StatusSeverity);
+	}
+
+	TCFuture<void> CAppManagerActor::fp_AbortEnvironmentLaunch(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		// Stop the application inside the environment so a later relaunch attempt
+		// does not hit the already-launched check in the agent
+		if (_pEnvironment->m_AgentInterface && !_pApplication->m_bDeleted)
+		{
+			co_await _pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_StopApplication)(_pApplication->m_Name)
+				.f_Timeout(60.0 * 60.0, "Timed out stopping application in environment (1 hour)")
+				.f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop application after failed environment launch")
+			;
+		}
+
+		if (_pApplication->m_pLaunchedEnvironment == _pEnvironment)
+			_pApplication->m_pLaunchedEnvironment = nullptr;
+
+		_pApplication->m_bLaunched = false;
+
+		if (!_pApplication->m_bStopped && !_pApplication->m_bDeleted)
+			fp_ScheduleRelaunchApp(_pApplication);
+
+		co_return {};
 	}
 
 	auto CAppManagerActor::fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment) -> TCFuture<CAppLaunchResult>
@@ -2478,6 +2516,29 @@ namespace NMib::NCloud::NAppManager
 			co_return EnsureResult.f_GetException();
 		}
 
+		auto InterfaceAddress = co_await fp_EnsureEnvironmentListen(_pEnvironment).f_Wrap();
+
+		if (_pApplication->m_bDeleted)
+			co_return DMibErrorInstance("Application deleted");
+
+		if (!InterfaceAddress)
+		{
+			fp_AppLaunchStateChanged
+				(
+					_pApplication
+					, "Failed to ensure listen for environment '{}': {}"_f << _pEnvironment->m_Name << InterfaceAddress.f_GetExceptionStr()
+					, CAppManagerInterface::EStatusSeverity_Error
+				)
+			;
+
+			if (!_pApplication->m_bStopped)
+				fp_ScheduleRelaunchApp(_pApplication);
+
+			co_return InterfaceAddress.f_GetException();
+		}
+
+		_pApplication->m_LaunchID = fg_RandomID();
+
 		CAppManagerEnvironmentInterface::CEnvironmentLaunch Launch;
 		Launch.m_Name = _pApplication->m_Name;
 		Launch.m_Directory = _pApplication->f_GetDirectory();
@@ -2487,6 +2548,8 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_RunAsGroup = _pApplication->m_Settings.m_RunAsGroup;
 		Launch.m_bRunAsUserHasShell = _pApplication->m_Settings.m_bRunAsUserHasShell;
 		Launch.m_bDistributedApp = _pApplication->m_Settings.m_bDistributedApp;
+		Launch.m_InterfaceAddress = InterfaceAddress->f_Encode();
+		Launch.m_LaunchID = _pApplication->m_LaunchID;
 
 		auto LaunchResult = co_await _pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_LaunchApplication)(fg_Move(Launch))
 			.f_Timeout(60.0 * 60.0, "Timed out launching application in environment (1 hour)")
@@ -2514,6 +2577,99 @@ namespace NMib::NCloud::NAppManager
 
 		_pApplication->m_pLaunchedEnvironment = _pEnvironment;
 		_pApplication->m_bLaunched = true;
+
+		if (!_pApplication->m_Settings.m_bDistributedApp)
+		{
+			fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
+
+			co_return CAppLaunchResult{};
+		}
+
+		// The application connects its distributed app interface directly to this
+		// AppManager through the environment listen
+		if (!_pApplication->m_AppInterface)
+		{
+			fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for distributed app register)", CAppManagerInterface::EStatusSeverity_Warning);
+
+			auto RegisterResult = co_await _pApplication->m_OnRegisterDistributedApp.f_Insert().f_Future()
+				.f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)")
+				.f_Wrap()
+			;
+
+			if (_pApplication->m_bDeleted)
+				co_return {};
+
+			if (!RegisterResult)
+			{
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Error
+						, "Launched app '{}' failed to register: {}"
+						, _pApplication->m_Name
+						, RegisterResult.f_GetExceptionStr()
+					)
+				;
+
+				fp_AppLaunchStateChanged
+					(
+						_pApplication
+						, "Launched (app register failed: '{}')"_f << RegisterResult.f_GetExceptionStr()
+						, CAppManagerInterface::EStatusSeverity_Error
+					)
+				;
+
+				co_await fp_AbortEnvironmentLaunch(_pApplication, _pEnvironment);
+
+				co_return {RegisterResult.f_GetExceptionStr()};
+			}
+		}
+
+		if (!_pApplication->m_AppInterface)
+			co_return DMibErrorInstance("Internal error: No app interface");
+
+		fp_AppLaunchStateChanged(_pApplication, "Launched (waiting for app to fully start)", CAppManagerInterface::EStatusSeverity_Warning);
+
+		auto StartResult = co_await _pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_GetAppStartResult)()
+			.f_Timeout(60.0 * 60.0, "Timed out waiting for application start result (1 hour)")
+			.f_Wrap()
+		;
+
+		if (_pApplication->m_bDeleted)
+			co_return {};
+
+		if (_pApplication->m_bLaunching)
+			_pApplication->m_bDistributedStartupFinished = true;
+
+		if (!StartResult)
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Error
+					, "Launched app '{}' failed to start up: {}"
+					, _pApplication->m_Name
+					, StartResult.f_GetExceptionStr()
+				)
+			;
+
+			fp_AppLaunchStateChanged
+				(
+					_pApplication
+					, "Launched (app startup failed: '{}')"_f << StartResult.f_GetExceptionStr()
+					, CAppManagerInterface::EStatusSeverity_Error
+				)
+			;
+
+			co_await fp_AbortEnvironmentLaunch(_pApplication, _pEnvironment);
+
+			co_return {StartResult.f_GetExceptionStr()};
+		}
+
+		for (auto &fOnStartedDistributedApp : _pApplication->m_OnStartedDistributedApp)
+			fOnStartedDistributedApp.f_SetResult();
+
+		_pApplication->m_OnStartedDistributedApp.f_Clear();
 
 		fp_AppLaunchStateChanged(_pApplication, "Launched", CAppManagerInterface::EStatusSeverity_None);
 
