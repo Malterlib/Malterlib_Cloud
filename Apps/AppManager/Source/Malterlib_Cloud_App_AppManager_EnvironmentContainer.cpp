@@ -299,6 +299,8 @@ namespace NMib::NCloud::NAppManager
 								"\t\t<string>{}</string>\n"
 								"\t\t<key>CONTAINER_INSTALL_ROOT</key>\n"
 								"\t\t<string>{}</string>\n"
+								"\t\t<key>CONTAINER_LOG_ROOT</key>\n"
+								"\t\t<string>{}</string>\n"
 								"\t</dict>\n"
 								"\t<key>MachServices</key>\n"
 								"\t<dict>\n"
@@ -318,11 +320,13 @@ namespace NMib::NCloud::NAppManager
 								, fEscapeXml(ApiServer)
 								, fEscapeXml(AppRoot)
 								, fEscapeXml(InstallRoot)
+								, fEscapeXml(AppRoot / "logs")
 							)
 						;
 
 						CFile::fs_CreateDirectory(AppRoot);
 						CFile::fs_CreateDirectory(AppRoot / "apiserver");
+						CFile::fs_CreateDirectory(AppRoot / "logs");
 
 						Result.m_PlistFile = AppRoot / "apiserver" / "apiserver.plist";
 						CFile::fs_WriteStringToFile(Result.m_PlistFile, Plist);
@@ -395,15 +399,55 @@ namespace NMib::NCloud::NAppManager
 
 		if (!bHealthy)
 		{
-			// The API server binds fixed localhost DNS ports (1053 and 2053), so a
-			// container system already running in a login session makes the AppManager
-			// one crash loop on bind until the session one is stopped
+			CStr LogFile = AppRoot / "logs" / "container-apiserver.log";
+
+			CStr LogTail;
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				LogTail = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [LogFile]() -> CStr
+						{
+							try
+							{
+								if (!CFile::fs_FileExists(LogFile))
+									return {};
+
+								constexpr umint c_MaxTailLen = 4096;
+
+								CStr Contents = CFile::fs_ReadStringFromFile(LogFile);
+								if (Contents.f_GetLen() <= c_MaxTailLen)
+									return Contents;
+
+								CStr Tail = Contents.f_Extract(Contents.f_GetLen() - c_MaxTailLen);
+
+								// Start the tail at a line boundary
+								aint iNewline = Tail.f_Find("\n");
+								if (iNewline >= 0)
+									Tail = Tail.f_Extract(iNewline + 1);
+
+								return Tail;
+							}
+							catch (CException const &)
+							{
+								return {};
+							}
+						}
+					)
+				;
+			}
+
+			if (LogTail.f_IsEmpty())
+				co_return DMibErrorInstance("Failed to start the AppManager container system: {}"_f << LastError);
+
 			co_return DMibErrorInstance
 				(
 					"Failed to start the AppManager container system: {}\n"
-					"If a container system is running in a login session it holds the localhost DNS ports the "
-					"AppManager container system needs; stop it with `container system stop` as the logged in user."_f
+					"API server log tail:\n"
+					"{}"_f
 					<< LastError
+					<< LogTail
 				)
 			;
 		}
