@@ -133,10 +133,14 @@ namespace NMib::NCloud::NAppManager
 		auto SettingsOption_ContainerRuntime = "ContainerRuntime?"_o=
 			{
 				"Names"_o= _o["--container-runtime"]
-				, "Type"_o= ""
-				, "Default"_o= ""
-				, "Description"_o= "The container runtime to use: Docker or AppleContainer.\n"
-				"Leave empty to select the default runtime for the host platform."
+#ifdef DPlatformFamily_macOS
+				, "Type"_o= COneOf{"Docker", "AppleContainer"}
+				, "Default"_o= "AppleContainer"
+#else
+				, "Type"_o= COneOf{"Docker"}
+				, "Default"_o= "Docker"
+#endif
+				, "Description"_o= "The container runtime to use."
 			}
 		;
 		auto SettingsOption_ContainerImage = "ContainerImage?"_o=
@@ -151,9 +155,13 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--container-network"]
 				, "Type"_o= ""
+#ifdef DPlatformFamily_Linux
+				, "Default"_o= "host"
+#else
 				, "Default"_o= ""
+#endif
 				, "Description"_o= "The container network mode.\n"
-				"Leave empty to select the default network mode for the host platform and runtime."
+				"Leave empty to use the container runtime's default network."
 			}
 		;
 		auto SettingsOption_ContainerExtraMounts = "ContainerExtraMounts?"_o=
@@ -213,10 +221,14 @@ namespace NMib::NCloud::NAppManager
 		auto SettingsOption_VMBackend = "VMBackend?"_o=
 			{
 				"Names"_o= _o["--vm-backend"]
-				, "Type"_o= ""
+#ifdef DPlatformFamily_macOS
+				, "Type"_o= COneOf{"MacOSVirtualization", ""}
+				, "Default"_o= "MacOSVirtualization"
+#else
+				, "Type"_o= COneOf{""}
 				, "Default"_o= ""
-				, "Description"_o= "The virtualization backend to use.\n"
-				"Leave empty to select the default backend for the host platform."
+#endif
+				, "Description"_o= "The virtualization backend to use."
 			}
 		;
 		auto SettingsOption_VMCPUCount = "VMCPUCount?"_o=
@@ -257,10 +269,9 @@ namespace NMib::NCloud::NAppManager
 						, "Type?"_o=
 						{
 							"Names"_o= _o["--type"]
-							, "Type"_o= ""
+							, "Type"_o= COneOf{"Local", "Container", "VM"}
 							, "Default"_o= "Container"
-							, "Description"_o= "The environment type: Local, Container or VM.\n"
-							"Defaults to Container."
+							, "Description"_o= "The environment type."
 						}
 						, SettingsOption_AgentApplication
 						, SettingsOption_ParentApplication
