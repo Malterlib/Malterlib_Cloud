@@ -16,7 +16,7 @@
 	{
 		%File "Source/Malterlib_Cloud_App_*"
 	}
-	
+
 	%Dependency "Lib_Malterlib_Cloud"
 	{
 		Dependency.Indirect true
@@ -40,6 +40,10 @@
 		MalterlibPostCopyProject "Malterlib_Cloud_VersionManager"
 		{
 			!!MalterlibPostCopyProject undefined
+		}
+		MalterlibPostCopyProject2 "Malterlib_Cloud_VersionManager"
+		{
+			!!MalterlibCloud_PerAppPostCopy true
 		}
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudVersionManager"

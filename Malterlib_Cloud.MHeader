@@ -151,6 +151,8 @@ Property
 
 	MalterlibModuleCloud_Version: int = 1
 
+	MalterlibCloud_PerAppPostCopy: bool = false // User(Cloud)=true: Set to true to enable a secondary post copy per cloud app
+
 	MalterlibCloudCompatibilityTestsSupported: bool = false
 	MalterlibCloudCompatibilityTestsSupported true
 	{
@@ -857,6 +859,12 @@ Property
 		}
 
 		BsdTarUniqueName: string = `@(MalterlibPostCopyProject)_@(MalterlibPostCopyDestination)@(MalterlibCloudTarBinDirectory)`->Replace("/", "_")
+
+		// The target copies to the secondary destination too, so applications sharing a primary destination need their own
+		BsdTarUniqueName `@(MalterlibPostCopyProject)_@(MalterlibPostCopyDestination)@(MalterlibCloudTarBinDirectory)_@(MalterlibPostCopyProject2)_@(MalterlibPostCopyDestination2)`->Replace("/", "_")
+		{
+			!MalterlibPostCopyProject2 undefined
+		}
 	}
 
 	%Dependency [
@@ -867,6 +875,8 @@ Property
 				, Dependency.TargetProperties: {
 					MalterlibPostCopyProject: MalterlibPostCopyProject
 					, MalterlibPostCopyDestination: MalterlibPostCopyDestination / MalterlibCloudTarBinDirectory
+					, MalterlibPostCopyProject2: MalterlibPostCopyProject2
+					, MalterlibPostCopyDestination2: MalterlibPostCopyDestination2 / MalterlibCloudTarBinDirectory
 					, Target.Name: `Com_@(BsdTarUniqueName)_bsdtar`
 					, Target.Group: `ExternalBinaries/@(BsdTarUniqueName)`
 					, <<: BsdTarGenerateScheme

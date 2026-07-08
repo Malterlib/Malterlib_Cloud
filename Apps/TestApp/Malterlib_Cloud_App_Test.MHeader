@@ -37,6 +37,10 @@
 		{
 			!!MalterlibPostCopyProject undefined
 		}
+		MalterlibPostCopyProject2 "Malterlib_Cloud_Test"
+		{
+			!!MalterlibCloud_PerAppPostCopy true
+		}
 		MalterlibPostCopyDestination "TestApp"
 		{
 			!!MalterlibPostCopyDestination undefined
