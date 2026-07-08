@@ -37,6 +37,10 @@
 		{
 			!!MalterlibPostCopyProject undefined
 		}
+		MalterlibPostCopyProject2 "Malterlib_Cloud_KeyManager"
+		{
+			!!MalterlibCloud_PerAppPostCopy true
+		}
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_RunAsUser "MalterlibCloudKeyManager"
 		MalterlibCloudVersionInfo_RunAsGroup "MalterlibCloudKeyManager"
