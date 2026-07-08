@@ -59,24 +59,7 @@ namespace NMib::NCloud::NAppManager
 			co_return DMibErrorInstance(Error);
 		}
 
-		_pEnvironment->m_bStarting = true;
-		_pEnvironment->m_bStopping = false;
 		_pEnvironment->f_SetStatus("Starting VM", CAppManagerInterface::EStatusSeverity_Warning);
-
-		bool bConnected = false;
-		auto Cleanup = g_OnScopeExit / [&, _pEnvironment]
-			{
-				_pEnvironment->m_bStarting = false;
-				auto OnAgentConnected = fg_Move(_pEnvironment->m_OnAgentConnected);
-				for (auto &Promise : OnAgentConnected)
-				{
-					if (bConnected)
-						Promise.f_SetResult();
-					else
-						Promise.f_SetException(DMibErrorInstance("Environment '{}' failed to start"_f << _pEnvironment->m_Name));
-				}
-			}
-		;
 
 		_pEnvironment->m_LaunchID = fg_RandomID();
 
@@ -121,8 +104,6 @@ namespace NMib::NCloud::NAppManager
 				co_return ConnectedResult.f_GetException();
 			}
 		}
-
-		bConnected = true;
 
 		co_return {};
 	}

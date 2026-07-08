@@ -1808,6 +1808,14 @@ namespace NMib::NCloud::NAppManager
 		if (_pEnvironment->f_IsStarted())
 			co_return {};
 
+		// The starting flag must be set before the first suspension: a concurrent start
+		// would otherwise slip past the guard and attach to the same container twice
+		if (_pEnvironment->m_bStarting)
+		{
+			co_await _pEnvironment->m_OnAgentConnected.f_Insert().f_Future();
+			co_return {};
+		}
+
 		{
 			CStr Error;
 			CAppManagerInterface::EStatusSeverity Severity;
@@ -1821,20 +1829,8 @@ namespace NMib::NCloud::NAppManager
 		bool bContainer = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container;
 		bool bVM = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM;
 
-		if (bVM)
-			co_return co_await fp_StartEnvironmentVM(_pEnvironment);
-
-		TCSharedPointer<CStr> pError = fg_Construct();
-		CStr AgentExecutable = co_await fp_GetEnvironmentAgentExecutable(_pEnvironment, pError);
-		if (AgentExecutable.f_IsEmpty())
-		{
-			_pEnvironment->f_SetStatus(*pError, CAppManagerInterface::EStatusSeverity_Error);
-			co_return DMibErrorInstance(*pError);
-		}
-
 		_pEnvironment->m_bStarting = true;
 		_pEnvironment->m_bStopping = false;
-		_pEnvironment->f_SetStatus("Starting", CAppManagerInterface::EStatusSeverity_Warning);
 
 		bool bConnected = false;
 		auto Cleanup = g_OnScopeExit / [&, _pEnvironment]
@@ -1850,6 +1846,25 @@ namespace NMib::NCloud::NAppManager
 				}
 			}
 		;
+
+		if (bVM)
+		{
+			co_await fp_StartEnvironmentVM(_pEnvironment);
+
+			bConnected = true;
+
+			co_return {};
+		}
+
+		_pEnvironment->f_SetStatus("Starting", CAppManagerInterface::EStatusSeverity_Warning);
+
+		TCSharedPointer<CStr> pError = fg_Construct();
+		CStr AgentExecutable = co_await fp_GetEnvironmentAgentExecutable(_pEnvironment, pError);
+		if (AgentExecutable.f_IsEmpty())
+		{
+			_pEnvironment->f_SetStatus(*pError, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(*pError);
+		}
 
 		CStr AgentRootDirectory = fp_GetEnvironmentStorageDirectory(*_pEnvironment);
 
