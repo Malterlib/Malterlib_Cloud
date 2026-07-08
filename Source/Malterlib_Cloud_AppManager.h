@@ -255,7 +255,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ContainerExtraArguments;
 			NStorage::TCOptional<bool> m_bContainerReadOnly;
 
-			NStorage::TCOptional<NStr::CStr> m_MemoryLimit;
+			NStorage::TCOptional<uint32> m_MemoryLimitMB;
 			NStorage::TCOptional<fp64> m_CPULimit;
 
 			NStorage::TCOptional<NStr::CStr> m_VMImage;
@@ -289,7 +289,7 @@ namespace NMib::NCloud
 			NContainer::TCVector<NStr::CStr> m_ContainerExtraArguments;
 			bool m_bContainerReadOnly = false;
 
-			NStr::CStr m_MemoryLimit;
+			uint32 m_MemoryLimitMB = 0;
 			fp64 m_CPULimit = 0.0;
 
 			NStr::CStr m_VMImage;

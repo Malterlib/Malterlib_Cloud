@@ -27,10 +27,10 @@ namespace NMib::NCloud
 			Arguments.f_Insert(_Launch.m_Network);
 		}
 
-		if (!_Launch.m_MemoryLimit.f_IsEmpty())
+		if (_Launch.m_MemoryLimitMB != 0)
 		{
 			Arguments.f_Insert("--memory");
-			Arguments.f_Insert(_Launch.m_MemoryLimit);
+			Arguments.f_Insert("{}m"_f << _Launch.m_MemoryLimitMB);
 		}
 
 		if (_Launch.m_CPULimit != 0.0)
@@ -118,7 +118,7 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerContainerLaunch Launch;
 		Launch.m_ContainerName = fp_GetContainerName(_pEnvironment);
 		Launch.m_Image = Settings.m_ContainerImage;
-		Launch.m_MemoryLimit = Settings.m_MemoryLimit;
+		Launch.m_MemoryLimitMB = Settings.m_MemoryLimitMB;
 		Launch.m_CPULimit = Settings.m_CPULimit;
 		Launch.m_bReadOnly = Settings.m_bContainerReadOnly;
 		Launch.m_ExtraArguments = Settings.m_ContainerExtraArguments;

@@ -145,7 +145,7 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 
 				CAppManagerInterface::CEnvironmentSettings Settings;
 				Settings.m_ContainerNetwork = CStr("host");
-				Settings.m_MemoryLimit = CStr("512m");
+				Settings.m_MemoryLimitMB = 512;
 
 				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentChangeSettings)("ContainerEnv", Settings)
 					.f_Timeout(g_Timeout, "Timed out changing environment settings")
@@ -155,7 +155,7 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				auto pEnvironment = Environments.f_FindEqual("ContainerEnv");
 				DMibExpectTrue(pEnvironment != nullptr);
 				DMibExpect(pEnvironment->m_ContainerNetwork, ==, "host");
-				DMibExpect(pEnvironment->m_MemoryLimit, ==, "512m");
+				DMibExpect(pEnvironment->m_MemoryLimitMB, ==, 512u);
 				DMibExpect(pEnvironment->m_ContainerImage, ==, "ubuntu:24.04");
 				DMibExpect(pEnvironment->m_AgentApplication, ==, "SelfUpdate.Linux-arm64");
 			}
@@ -723,7 +723,7 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				Launch.m_ContainerName = "mib-env-TestEnv";
 				Launch.m_Image = "ubuntu:24.04";
 				Launch.m_Network = "bridge";
-				Launch.m_MemoryLimit = "512m";
+				Launch.m_MemoryLimitMB = 512;
 				Launch.m_CPULimit = 2.0;
 				Launch.m_Mounts["/opt/M"] = "/opt/M";
 				Launch.m_AddHosts["myhost"] = "host-gateway";
