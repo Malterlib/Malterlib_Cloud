@@ -119,27 +119,13 @@ namespace NMib::NCloud::NAppManager
 		return mp_State.m_RootDirectory / "AppleContainer";
 	}
 
-	void CAppManagerActor::fp_AdjustAppleContainerCommand(CStr &_Executable, TCVector<CStr> &_Arguments)
-	{
-		if (_Executable != "container" || !fp_UseOwnAppleContainerSystem())
-			return;
-
-		// The Apple container API server only accepts clients with its own effective user
-		// id and is looked up through the caller's launchd namespace. Executing the client
-		// in the bootstrap namespace of pid 1 keeps the lookup in the system domain, away
-		// from any login session's per-user service, so a root AppManager always reaches
-		// the AppManager-owned service that `container system start` registers there
-		TCVector<CStr> Arguments = fg_CreateVector<CStr>("bsexec", "1", "/usr/bin/env", "container");
-		for (auto &Argument : _Arguments)
-			Arguments.f_Insert(fg_Move(Argument));
-
-		_Executable = "/bin/launchctl";
-		_Arguments = fg_Move(Arguments);
-	}
-
 	void CAppManagerActor::fp_ApplyAppleContainerLaunchEnvironment(CProcessLaunchParams &_LaunchParams)
 	{
-		// The client and the AppManager-owned API server must agree on the data location
+		// The client and the AppManager-owned API server must agree on the data location.
+		// The mach service lookup falls through the login session and per-user launchd
+		// domains to the system domain, so the client reaches the AppManager-owned
+		// service as long as no login session runs its own container system; a session
+		// one cannot coexist anyway because the API server binds fixed localhost ports
 		_LaunchParams.m_Environment["CONTAINER_APP_ROOT"] = fp_GetAppleContainerAppRoot();
 
 		// The AppManager can run as a daemon whose PATH misses the CLI install location
@@ -159,15 +145,13 @@ namespace NMib::NCloud::NAppManager
 		-> CProcessLaunchParams
 	{
 		CStr Executable = fp_GetContainerRuntimeExecutable(_pEnvironment);
-		TCVector<CStr> Arguments = fg_Move(_Arguments);
 
 		bool bOwnAppleContainerSystem = Executable == "container" && fp_UseOwnAppleContainerSystem();
-		fp_AdjustAppleContainerCommand(Executable, Arguments);
 
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 			(
 				Executable
-				, fg_Move(Arguments)
+				, fg_Move(_Arguments)
 				, mp_State.m_RootDirectory
 				, {}
 			)

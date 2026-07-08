@@ -1918,7 +1918,6 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		bool bOwnAppleContainerSystem = bContainer && LaunchExecutable == "container" && fp_UseOwnAppleContainerSystem();
-		fp_AdjustAppleContainerCommand(LaunchExecutable, LaunchParameters);
 
 		CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
 			(
