@@ -1496,7 +1496,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumEnvironments(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
-		CStr Name = _Params["Name"].f_String();
+		CStr Name = _Params.f_GetMemberValue("Name", "").f_AsString();
 
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
