@@ -726,7 +726,7 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				Launch.m_CPULimit = 2.0;
 				Launch.m_Mounts["/opt/M"] = "/opt/M";
 				Launch.m_AddHosts["myhost"] = "host-gateway";
-				Launch.m_PassEnvironment = {"MalterlibAppManagerEnvironmentAgentRoot"};
+				Launch.m_PassEnvironment = {"MalterlibTestPassVariable"};
 				Launch.m_WorkingDirectory = "/opt/M/Environment/TestEnv";
 				Launch.m_ExtraArguments = {"--pull", "never"};
 				Launch.m_Executable = "/opt/M/App/Agent/AppManager";
@@ -743,7 +743,7 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 						, "--cpus", "2.0"
 						, "--volume", "/opt/M:/opt/M"
 						, "--add-host", "myhost:host-gateway"
-						, "--env", "MalterlibAppManagerEnvironmentAgentRoot"
+						, "--env", "MalterlibTestPassVariable"
 						, "--workdir", "/opt/M/Environment/TestEnv"
 						, "--pull", "never"
 						, "ubuntu:24.04"

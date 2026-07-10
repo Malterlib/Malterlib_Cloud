@@ -10,19 +10,61 @@ namespace NMib::NCloud::NAppManager
 {
 	namespace
 	{
+		struct CAgentDeploymentSettings
+		{
+			bool m_bEnvironmentAgent = false;
+			CStr m_EnvironmentHostID;
+			CStr m_EnvironmentHostName;
+		};
+
+		CAgentDeploymentSettings const &fg_GetAgentDeploymentSettings()
+		{
+			// The launching AppManager writes deployment settings next to the agent
+			// executable. The process environment cannot identify the agent: it is
+			// inherited by everything in the environment, so a nested AppManager or a
+			// manually started one would mistake itself for the agent
+			static CAgentDeploymentSettings s_Settings = []
+				{
+					CAgentDeploymentSettings Settings;
+
+					try
+					{
+						CStr SettingsFile = CFile::fs_GetProgramDirectory() / "AppManagerSettings.json";
+						if (CFile::fs_FileExists(SettingsFile))
+						{
+							CEJsonSorted Json = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile, true));
+
+							Settings.m_bEnvironmentAgent = Json.f_GetMemberValue("EnvironmentAgent", false).f_Boolean();
+							if (auto *pValue = Json.f_GetMember("EnvironmentHostID", EJsonType_String))
+								Settings.m_EnvironmentHostID = pValue->f_String();
+							if (auto *pValue = Json.f_GetMember("EnvironmentHostName", EJsonType_String))
+								Settings.m_EnvironmentHostName = pValue->f_String();
+						}
+					}
+					catch (CException const &_Exception)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to read the deployment settings: {}", _Exception);
+					}
+
+					return Settings;
+				}
+				()
+			;
+
+			return s_Settings;
+		}
+
 		CDistributedAppActor_Settings fg_MakeAppManagerSettings()
 		{
 			auto Settings = CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager");
 
-			// When launched as an environment agent the root directory is provided by the launching AppManager
-			CStr AgentRootDirectory = fg_GetSys()->f_GetEnvironmentVariable("MalterlibAppManagerEnvironmentAgentRoot");
-			if (!AgentRootDirectory.f_IsEmpty())
+			auto &Deployment = fg_GetAgentDeploymentSettings();
+			if (Deployment.m_bEnvironmentAgent)
 			{
 				// The environment host name must be applied before the distributed
 				// identity derives the friendly host name from it
-				CStr HostName = fg_GetSys()->f_GetEnvironmentVariable("MalterlibAppManagerEnvironmentHostName");
-				if (!HostName.f_IsEmpty())
-					CAppManagerActor::fs_ApplyEnvironmentHostName(HostName);
+				if (!Deployment.m_EnvironmentHostName.f_IsEmpty())
+					CAppManagerActor::fs_ApplyEnvironmentHostName(Deployment.m_EnvironmentHostName);
 
 				// The launching AppManager points HOME and TMPDIR into the agent root,
 				// but nothing creates them inside a fresh environment; child processes
@@ -43,8 +85,6 @@ namespace NMib::NCloud::NAppManager
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to create '{}' directory '{}': {}", pVariable, Directory, _Exception);
 					}
 				}
-
-				return fg_Move(Settings).f_RootDirectory(AgentRootDirectory);
 			}
 
 			return Settings;
@@ -54,7 +94,9 @@ namespace NMib::NCloud::NAppManager
 	CAppManagerActor::CAppManagerActor()
 		: CDistributedAppActor(fg_MakeAppManagerSettings())
 	{
-		mp_bEnvironmentAgent = !fg_GetSys()->f_GetEnvironmentVariable("MalterlibAppManagerEnvironmentAgentRoot").f_IsEmpty();
+		auto &Deployment = fg_GetAgentDeploymentSettings();
+		mp_bEnvironmentAgent = Deployment.m_bEnvironmentAgent;
+		mp_EnvironmentHostID = Deployment.m_EnvironmentHostID;
 		mp_InitialStartupResultFuture = mp_InitialStartupResult.f_Future();
 	}
 
