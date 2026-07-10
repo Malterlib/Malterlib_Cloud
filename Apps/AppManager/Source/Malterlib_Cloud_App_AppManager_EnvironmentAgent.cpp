@@ -5,6 +5,11 @@
 
 #include <Mib/Concurrency/LogError>
 
+#ifdef DPlatformFamily_Linux
+	#include <Mib/Core/PlatformSpecific/PosixErrNo>
+	#include <unistd.h>
+#endif
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -15,7 +20,7 @@ namespace NMib::NCloud::NAppManager
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_LaunchApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_StopApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_RunScript);
-		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ConfigureHostMonitor);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ConfigureAgent);
 	}
 
 	CAppManagerEnvironmentInterface::~CAppManagerEnvironmentInterface()
@@ -82,6 +87,14 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_ExitStatus;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CApplicationStateChange);
+
+	template <typename tf_CStream>
+	void CAppManagerEnvironmentInterface::CAgentConfig::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_HostName;
+		_Stream % m_AutoUpdateConfig;
+	}
+	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CAgentConfig);
 
 	auto CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_GetAgentInfo() -> TCFuture<CAgentInfo>
 	{
@@ -454,14 +467,95 @@ namespace NMib::NCloud::NAppManager
 		co_return Ticket.m_Ticket.f_ToStringTicket();
 	}
 
-	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_ConfigureHostMonitor(CStr _AutoUpdateConfig)
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_ConfigureAgent(CAgentConfig _Config)
 	{
 		auto pThis = m_pThis;
 
 		if (!pThis->mp_bEnvironmentAgent)
 			co_return DMibErrorInstance("Not running as an environment agent");
 
-		co_return co_await pThis->fp_ConfigureHostMonitorFromHost(fg_Move(_AutoUpdateConfig));
+		if (!_Config.m_HostName.f_IsEmpty())
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) / [HostName = _Config.m_HostName]()
+						{
+							fs_ApplyEnvironmentHostName(HostName);
+						}
+					)
+					% "Failed to apply the environment host name"
+				)
+			;
+		}
+
+		co_return co_await pThis->fp_ConfigureHostMonitorFromHost(fg_Move(_Config.m_AutoUpdateConfig));
+	}
+
+	void CAppManagerActor::fs_ApplyEnvironmentHostName(CStr const &_HostName)
+	{
+#ifdef DPlatformFamily_Linux
+		// The agent runs as root with its own UTS namespace (a container) or kernel
+		// (a virtual machine), so setting the host name only affects the environment.
+		// There is no platform abstraction for setting the host name; environments
+		// are Linux guests
+		if (NProcess::NPlatform::fg_Process_GetComputerName() != _HostName)
+		{
+			if (sethostname(_HostName.f_GetStr(), _HostName.f_GetLen()) != 0)
+			{
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Warning
+						, "Failed to set the environment host name to '{}': {}"
+						, _HostName
+						, NPlatform::fg_FormatErrno(errno)
+					)
+				;
+				return;
+			}
+
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Set the environment host name to '{}'", _HostName);
+		}
+
+		try
+		{
+			// Persist the name for processes that read it from the configuration and
+			// across virtual machine reboots
+			CStr HostNameFile = "/etc/hostname";
+			CStr HostNameLine = _HostName + "\n";
+			if (!CFile::fs_FileExists(HostNameFile) || CFile::fs_ReadStringFromFile(HostNameFile) != HostNameLine)
+				CFile::fs_WriteStringToFile(HostNameFile, HostNameLine);
+
+			// Keep the host name resolvable so tools that look up their own name work
+			CStr HostsFile = "/etc/hosts";
+			CStr Hosts;
+			if (CFile::fs_FileExists(HostsFile))
+				Hosts = CFile::fs_ReadStringFromFile(HostsFile);
+
+			if (Hosts.f_Find(_HostName) < 0)
+			{
+				if (!Hosts.f_IsEmpty() && !Hosts.f_EndsWith("\n"))
+					Hosts += "\n";
+				Hosts += "127.0.0.1\t" + _HostName + "\n";
+				CFile::fs_WriteStringToFile(HostsFile, Hosts);
+			}
+		}
+		catch (CException const &_Exception)
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Warning
+					, "Failed to persist the environment host name '{}': {}"
+					, _HostName
+					, _Exception
+				)
+			;
+		}
+#endif
 	}
 
 	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentHostInterfaceImplementation::f_ReportEnvironmentUpdateState(bool _bUpdating, CStr _Description)

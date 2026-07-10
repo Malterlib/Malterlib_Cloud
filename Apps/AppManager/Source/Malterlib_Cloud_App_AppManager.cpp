@@ -17,7 +17,15 @@ namespace NMib::NCloud::NAppManager
 			// When launched as an environment agent the root directory is provided by the launching AppManager
 			CStr AgentRootDirectory = fg_GetSys()->f_GetEnvironmentVariable("MalterlibAppManagerEnvironmentAgentRoot");
 			if (!AgentRootDirectory.f_IsEmpty())
+			{
+				// The environment host name must be applied before the distributed
+				// identity derives the friendly host name from it
+				CStr HostName = fg_GetSys()->f_GetEnvironmentVariable("MalterlibAppManagerEnvironmentHostName");
+				if (!HostName.f_IsEmpty())
+					CAppManagerActor::fs_ApplyEnvironmentHostName(HostName);
+
 				return fg_Move(Settings).f_RootDirectory(AgentRootDirectory);
+			}
 
 			return Settings;
 		}
