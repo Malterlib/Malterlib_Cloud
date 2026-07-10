@@ -935,6 +935,9 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		// Environment variables forwarded from the launching process into the container
+		// The agent identity, host id and host name come from the deployment
+		// settings next to the agent executable, not from the environment: the
+		// container environment is inherited by everything running inside it
 		Launch.m_PassEnvironment =
 			{
 				"MalterlibDistributedAppInterfaceServerAddress"
@@ -942,8 +945,6 @@ namespace NMib::NCloud::NAppManager
 				, "MalterlibDistributedAppInterfaceServerLaunchID"
 				, "MalterlibDistributedAppInterfaceServerOptions"
 				, "MalterlibProtectedEnvironment"
-				, "MalterlibAppManagerEnvironmentAgentRoot"
-				, "MalterlibAppManagerEnvironmentHostID"
 				, "HOME={}/.home"_f << _AgentRootDirectory
 				, "TMPDIR={}/.tmp"_f << _AgentRootDirectory
 			}
@@ -954,11 +955,6 @@ namespace NMib::NCloud::NAppManager
 		// line socket on the container filesystem instead
 		if (fp_GetContainerRuntimeExecutable(_pEnvironment) == "container" || fp_UseOwnColimaSystem(_pEnvironment))
 			Launch.m_PassEnvironment.f_Insert("MalterlibDistributedAppLocalSocketPrefix=/tmp");
-
-		// The agent sets the environment host name at startup, carrying the host
-		// computer name as a prefix so the host an environment comes from is visible
-		// wherever host names are shown
-		Launch.m_PassEnvironment.f_Insert("MalterlibAppManagerEnvironmentHostName={}"_f << fp_GetEnvironmentHostName(*_pEnvironment));
 
 		return Launch;
 	}

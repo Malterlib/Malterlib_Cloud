@@ -1885,35 +1885,55 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<CStr> CAppManagerActor::fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError)
 	{
+		CStr Directory;
+		TCVector<CStr> Candidates;
+
 		if (_pEnvironment->m_Settings.m_AgentApplication.f_IsEmpty())
 		{
-			if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Local)
-				co_return CFile::fs_GetProgramPath();
+			if (_pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
+			{
+				*_pError = "Environment '{}' has no agent application configured. Set one with --agent-application."_f << _pEnvironment->m_Name;
+				co_return {};
+			}
 
-			*_pError = "Environment '{}' has no agent application configured. Set one with --agent-application."_f << _pEnvironment->m_Name;
-			co_return {};
+			// A local environment without an agent application runs a copy of this
+			// AppManager
+			Candidates.f_Insert(CFile::fs_GetProgramPath());
 		}
-
-		auto *pFindApplication = mp_Applications.f_FindEqual(_pEnvironment->m_Settings.m_AgentApplication);
-		if (!pFindApplication)
+		else
 		{
-			*_pError = "Agent application '{}' for environment '{}' is not installed"_f << _pEnvironment->m_Settings.m_AgentApplication << _pEnvironment->m_Name;
-			co_return {};
-		}
+			auto *pFindApplication = mp_Applications.f_FindEqual(_pEnvironment->m_Settings.m_AgentApplication);
+			if (!pFindApplication)
+			{
+				*_pError = "Agent application '{}' for environment '{}' is not installed"_f << _pEnvironment->m_Settings.m_AgentApplication << _pEnvironment->m_Name;
+				co_return {};
+			}
 
-		CStr Directory = (*pFindApplication)->f_GetDirectory();
+			Directory = (*pFindApplication)->f_GetDirectory();
 
-		TCVector<CStr> Candidates;
-		if (!(*pFindApplication)->m_Settings.m_Executable.f_IsEmpty())
-			Candidates.f_Insert(Directory / (*pFindApplication)->m_Settings.m_Executable);
-		Candidates.f_Insert(Directory / CFile::fs_GetFile(CFile::fs_GetProgramPath()));
+			if (!(*pFindApplication)->m_Settings.m_Executable.f_IsEmpty())
+				Candidates.f_Insert(Directory / (*pFindApplication)->m_Settings.m_Executable);
+			Candidates.f_Insert(Directory / CFile::fs_GetFile(CFile::fs_GetProgramPath()));
 #ifdef DPlatformFamily_Windows
-		Candidates.f_Insert(Directory / "AppManager.exe");
+			Candidates.f_Insert(Directory / "AppManager.exe");
 #else
-		Candidates.f_Insert(Directory / "AppManager");
+			Candidates.f_Insert(Directory / "AppManager");
 #endif
+		}
 
 		CStr StorageDirectory = fp_GetEnvironmentStorageDirectory(*_pEnvironment);
+
+		// The deployment settings written next to the agent executable identify the
+		// installation as this environment's agent; the process environment cannot,
+		// since it is inherited by everything running in the environment
+		CStr DeploymentSettings;
+		{
+			CEJsonSorted SettingsJson(EJsonType_Object);
+			SettingsJson["EnvironmentAgent"] = true;
+			SettingsJson["EnvironmentHostID"] = mp_State.m_HostID;
+			SettingsJson["EnvironmentHostName"] = fp_GetEnvironmentHostName(*_pEnvironment);
+			DeploymentSettings = SettingsJson.f_ToString();
+		}
 
 		CStr Executable;
 		{
@@ -1921,7 +1941,7 @@ namespace NMib::NCloud::NAppManager
 
 			Executable = co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [Candidates = fg_Move(Candidates), Directory, StorageDirectory, _pError]() -> CStr
+					g_Dispatch(BlockingActorCheckout) / [Candidates = fg_Move(Candidates), Directory, StorageDirectory, DeploymentSettings, _pError]() -> CStr
 					{
 						CStr Source;
 						for (auto &Candidate : Candidates)
@@ -1947,28 +1967,49 @@ namespace NMib::NCloud::NAppManager
 						try
 						{
 							CFile::fs_CreateDirectory(StorageDirectory);
-							CFile::fs_DiffCopyFileOrDirectory
-								(
-									Directory
-									, StorageDirectory
-									, [](CFile::EDiffCopyChange _Change, NStr::CStr const &, NStr::CStr const &, NStr::CStr const &) -> CFile::EDiffCopyChangeAction
-									{
-										if
-											(
-												_Change == CFile::EDiffCopyChange_DirectoryDeleted
-												|| _Change == CFile::EDiffCopyChange_FileDeleted
-												|| _Change == CFile::EDiffCopyChange_LinkDeleted
-											)
-										{
-											return CFile::EDiffCopyChangeAction_Skip;
-										}
 
-										return CFile::EDiffCopyChangeAction_Perform;
-									}
-									, {"*/.home", "*/.tmp", "*/TempVersion", "*/TempVersionDownload"}
-									, 0.0
-								)
-							;
+							if (Directory.f_IsEmpty())
+							{
+								// This AppManager's directory holds the whole host
+								// installation, so only the agent files are copied
+								CStr ProgramDirectory = CFile::fs_GetPath(Source);
+								CStr ExecutableName = CFile::fs_GetFile(Source);
+
+								for (auto &File : {ExecutableName, CStr("MalterlibHelper"), CFile::fs_GetFileNoExt(ExecutableName) + "VersionInfo.json"})
+								{
+									if (CFile::fs_FileExists(ProgramDirectory / File))
+										CFile::fs_DiffCopyFileOrDirectory(ProgramDirectory / File, StorageDirectory / File, nullptr);
+								}
+							}
+							else
+							{
+								CFile::fs_DiffCopyFileOrDirectory
+									(
+										Directory
+										, StorageDirectory
+										, [](CFile::EDiffCopyChange _Change, NStr::CStr const &, NStr::CStr const &, NStr::CStr const &) -> CFile::EDiffCopyChangeAction
+										{
+											if
+												(
+													_Change == CFile::EDiffCopyChange_DirectoryDeleted
+													|| _Change == CFile::EDiffCopyChange_FileDeleted
+													|| _Change == CFile::EDiffCopyChange_LinkDeleted
+												)
+											{
+												return CFile::EDiffCopyChangeAction_Skip;
+											}
+
+											return CFile::EDiffCopyChangeAction_Perform;
+										}
+										, {"*/.home", "*/.tmp", "*/TempVersion", "*/TempVersionDownload"}
+										, 0.0
+									)
+								;
+							}
+
+							CStr SettingsFile = StorageDirectory / "AppManagerSettings.json";
+							if (!CFile::fs_FileExists(SettingsFile) || CFile::fs_ReadStringFromFile(SettingsFile, true) != DeploymentSettings)
+								CFile::fs_WriteStringToFile(SettingsFile, DeploymentSettings);
 
 							// Remove the directory earlier versions copied the agent to
 							CStr LegacyAgentDirectory = StorageDirectory / ".agent";
@@ -1988,7 +2029,7 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		if (Executable.f_IsEmpty() && _pError->f_IsEmpty())
-			*_pError = "Found no agent executable in '{}' for environment '{}'"_f << Directory << _pEnvironment->m_Name;
+			*_pError = "Found no agent executable for environment '{}'"_f << _pEnvironment->m_Name;
 
 		co_return Executable;
 	}
@@ -2483,8 +2524,6 @@ namespace NMib::NCloud::NAppManager
 
 		auto &LaunchParams = Launch.m_Params;
 		LaunchParams.m_bAllowExecutableLocate = bContainer;
-		LaunchParams.m_Environment["MalterlibAppManagerEnvironmentAgentRoot"] = AgentRootDirectory;
-		LaunchParams.m_Environment["MalterlibAppManagerEnvironmentHostID"] = mp_State.m_HostID;
 
 		// The container runtime client must keep the launching environment (for example
 		// the docker context configuration in HOME); the agent environment inside the

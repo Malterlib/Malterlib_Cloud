@@ -1350,6 +1350,7 @@ namespace NMib::NCloud::NAppManager
 		TCDistributedActor<CAppManagerEnvironmentHostInterface> mp_EnvironmentHostActor;
 		CActorSubscription mp_EnvironmentHostRegistration;
 		bool mp_bEnvironmentAgent = false;
+		CStr mp_EnvironmentHostID; /// Agent side: host id of the launching AppManager, from the deployment settings
 		TCMap<CStr, CActorSubscription> mp_EnvironmentTicketNotifications; /// Keeps environment application connection tickets alive until they are used
 
 		CTrustedPermissionSubscription mp_Permissions;
