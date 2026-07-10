@@ -68,6 +68,8 @@ namespace NMib::NCloud::NAppManager
 			if (Package.f_IsEmpty())
 				co_return DMibErrorInstance("You have to specify a package");
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
+
+			Update.m_bUpdateSettings = _Params.f_GetMemberValue("UpdateSettings", true).f_Boolean();
 		}
 		else
 		{
@@ -168,7 +170,13 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerInterface::CVersionInformation VersionInfo;
 
 		if (!_FromFileName.f_IsEmpty())
+		{
 			bDownloadVersion = false;
+
+			// The package settings apply as for an update from the version manager, which the update permission covers, run-as user included,
+			// since packages are trusted. One that clears the run-as user keeps the owners of the files, like a change of the settings
+			bUpdateSettings = _Update.m_bUpdateSettings;
+		}
 		else
 		{
 			bDryRun = _Update.m_bDryRun;
@@ -319,7 +327,7 @@ namespace NMib::NCloud::NAppManager
 									pApplication
 									, EUpdateScript_OnError
 									, Error
-									, VersionID
+									, pState->m_VersionID
 									, pState->m_pVersionInfo.f_Get()
 									, pState->m_LastInstalledVersion
 									, pState->m_LastInstalledVersionInfo

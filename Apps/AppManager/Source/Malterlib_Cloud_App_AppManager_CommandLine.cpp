@@ -757,6 +757,13 @@ namespace NMib::NCloud::NAppManager
 							, "Type"_o= ""
 							, "Description"_o= "Unique name of the application to update."
 						}
+						, "UpdateSettings?"_o=
+						{
+							// No default, so that the commands of clients that predate the option stay valid; the handler defaults it
+							"Names"_o= _o["--update-settings"]
+							, "Type"_o= true
+							, "Description"_o= "Update settings with settings from the package. Defaults to true."
+						}
 					}
 					, "Parameters"_o=
 					{
