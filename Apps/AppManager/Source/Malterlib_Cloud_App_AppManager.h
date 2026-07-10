@@ -32,6 +32,8 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerActor();
 		~CAppManagerActor();
 
+		static void fs_ApplyEnvironmentHostName(NStr::CStr const &_HostName);
+
 		static constexpr double mc_DefaultAutoUpdateDelay = 15.0;
 
 	private:
@@ -1027,8 +1029,10 @@ namespace NMib::NCloud::NAppManager
 		void fp_OnEnvironmentApplicationStateChange(TCSharedPointer<CEnvironment> const &_pEnvironment, CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change);
 		TCFuture<CStr> fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError);
 		CStr fp_GetContainerRuntimeExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment);
+		static CStr fsp_GetContainerRuntimeExecutable(CEnvironmentSettings const &_Settings);
 		CStr fp_GetContainerName(TCSharedPointer<CEnvironment> const &_pEnvironment);
-		CAppManagerContainerLaunch fp_BuildEnvironmentContainerLaunch(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr const &_AgentExecutableName);
+		CStr fp_GetEnvironmentHostName(CEnvironment const &_Environment, CStr &o_Error);
+		CAppManagerContainerLaunch fp_BuildEnvironmentContainerLaunch(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr const &_AgentExecutableName, CStr &o_Error);
 		TCFuture<void> fp_RemoveEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_RemoveEnvironmentContainerByName(TCSharedPointer<CEnvironment> _pEnvironment);
 		bool fp_UseOwnAppleContainerSystem();

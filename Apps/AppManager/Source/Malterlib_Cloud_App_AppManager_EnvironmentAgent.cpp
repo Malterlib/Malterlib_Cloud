@@ -6,12 +6,45 @@
 #include <Mib/Concurrency/LogError>
 #include <Mib/Cloud/FileTransfer>
 
+#ifdef DPlatformFamily_Linux
+#	include <Mib/Core/PlatformSpecific/PosixErrNo>
+#	include <unistd.h>
+#endif
+
 #ifdef DPlatformFamily_macOS
 #	include <sys/param.h>
 #	include <sys/mount.h>
 #endif
 
 #include "Malterlib_Cloud_App_AppManager.h"
+
+namespace NMib::NCloud
+{
+	bool fg_AppManager_HostsFileHasHostName(NStr::CStr const &_Hosts, NStr::CStr const &_HostName)
+	{
+		for (auto &Line : _Hosts.f_SplitLine<true>())
+		{
+			ch8 const *pParse = Line.f_GetStr();
+			bool bAddress = true;
+			while (true)
+			{
+				NStr::fg_ParseWhiteSpace(pParse);
+				if (!*pParse || *pParse == '#')
+					break;
+
+				ch8 const *pStart = pParse;
+				NStr::fg_ParseNonWhiteSpaceAndSeparators(pParse, "#");
+
+				if (!bAddress && NStr::CStr(pStart, pParse - pStart).f_CmpNoCase(_HostName) == 0)
+					return true;
+
+				bAddress = false;
+			}
+		}
+
+		return false;
+	}
+}
 
 namespace NMib::NCloud::NAppManager
 {
@@ -1567,6 +1600,81 @@ namespace NMib::NCloud::NAppManager
 		fg_ShutdownEnvironmentAfterDelay().f_DiscardResult();
 
 		co_return {};
+#endif
+	}
+
+	void CAppManagerActor::fs_ApplyEnvironmentHostName(CStr const &_HostName)
+	{
+#ifdef DPlatformFamily_Linux
+		// Local agents get no host name, since they share the host's UTS namespace. There is no platform abstraction for setting the host name
+		if (NProcess::NPlatform::fg_Process_GetComputerName() != _HostName)
+		{
+			if (sethostname(_HostName.f_GetStr(), _HostName.f_GetLen()) != 0)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to set the environment host name to '{}': {}", _HostName, NPlatform::fg_FormatErrno(errno));
+				return;
+			}
+
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Set the environment host name to '{}'", _HostName);
+		}
+
+		try
+		{
+			// Persist the name for processes that read it from the configuration and
+			// across virtual machine reboots
+			CStr HostNameFile = "/etc/hostname";
+			CStr HostNameLine = _HostName + "\n";
+			if (!CFile::fs_FileExists(HostNameFile) || CFile::fs_ReadStringFromFile(HostNameFile, true) != HostNameLine)
+				CFile::fs_WriteStringToFile(HostNameFile, HostNameLine, false);
+
+			// Keep the host name resolvable so tools that look up their own name work. The entry is appended to the bytes of the file, which
+			// can be in any encoding
+			CStr HostsFile = "/etc/hosts";
+			CByteVector HostsBytes;
+			if (CFile::fs_FileExists(HostsFile))
+				HostsBytes = CFile::fs_ReadFile(HostsFile);
+
+			CStr Hosts(reinterpret_cast<ch8 const *>(HostsBytes.f_GetArray()), HostsBytes.f_GetLen());
+			if (!fg_AppManager_HostsFileHasHostName(Hosts, _HostName))
+			{
+				CStr Entry;
+				if (!Hosts.f_IsEmpty() && !Hosts.f_EndsWith("\n"))
+					Entry += "\n";
+				Entry += "127.0.0.1\t" + _HostName + "\n";
+				HostsBytes.f_Insert(reinterpret_cast<uint8 const *>(Entry.f_GetStr()), Entry.f_GetLen());
+				CFile::fs_WriteFile(HostsFile, HostsBytes);
+			}
+		}
+		catch (CException const &_Exception)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to persist the environment host name '{}': {}", _HostName, _Exception);
+		}
+#elif defined(DPlatformFamily_macOS)
+		bool bRenamed = NProcess::NPlatform::fg_Process_GetComputerName() != _HostName;
+
+		// macOS guests keep the names in the system configuration, which persists them across reboots
+		for (auto *pName : {"HostName", "LocalHostName", "ComputerName"})
+		{
+			try
+			{
+				CProcessLaunch::fs_LaunchTool("/usr/sbin/scutil", {"--set", pName, _HostName});
+			}
+			catch (CException const &_Exception)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to set the environment {} to '{}': {}", pName, _HostName, _Exception);
+			}
+		}
+
+		// configd changes the kernel host name after scutil returns, and the distributed identity reads it once, before it connects
+		if (bRenamed)
+		{
+			CStopwatch Stopwatch{true};
+			while (NProcess::NPlatform::fg_Process_GetComputerName() != _HostName && Stopwatch.f_GetTime() < 10.0)
+				NSys::fg_Thread_Sleep(0.1);
+
+			if (NProcess::NPlatform::fg_Process_GetComputerName() != _HostName)
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "The host name did not change to '{}' within 10 seconds", _HostName);
+		}
 #endif
 	}
 

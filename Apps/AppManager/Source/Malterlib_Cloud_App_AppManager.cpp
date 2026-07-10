@@ -211,6 +211,12 @@ namespace NMib::NCloud::NAppManager
 							Settings.m_InterfaceSettings.m_ServerAddress = Json["Address"].f_AsString();
 							Settings.m_InterfaceSettings.m_LaunchID = Json["LaunchID"].f_AsString();
 
+							// The host name must be applied before the distributed identity derives the friendly host name from it. Commands run
+							// with the agent executable leave the names of the guest alone
+							CStr HostName = Json.f_GetMemberValue("EnvironmentHostName", "").f_AsString();
+							if (!HostName.f_IsEmpty() && fg_IsDaemonRun())
+								CAppManagerActor::fs_ApplyEnvironmentHostName(HostName);
+
 							NStorage::TCSharedPointer<TCActorFunctor<TCFuture<CDistributedActorTrustManager::CTrustTicket> ()>> pRequestTicket = fg_Construct
 								(
 									g_ActorFunctor / []

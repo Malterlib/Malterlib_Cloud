@@ -23,6 +23,7 @@ namespace NMib::NCloud
 	struct CAppManagerContainerLaunch
 	{
 		NStr::CStr m_ContainerName;
+		NStr::CStr m_Hostname;                                      /// Host name inside the container; empty keeps the runtime default
 		NStr::CStr m_Image;
 		NStr::CStr m_Network;
 		uint64 m_MemoryLimitMB = 0;
@@ -77,6 +78,10 @@ namespace NMib::NCloud
 		-> CAppManagerEnvironmentSocketDirectory
 	;
 	void fg_AppManager_PrepareEnvironmentSocketDirectory(CAppManagerEnvironmentSocketDirectory const &_Directory);
+
+	bool fg_AppManager_HostsFileHasHostName(NStr::CStr const &_Hosts, NStr::CStr const &_HostName);
+	NStr::CStr fg_AppManager_EnvironmentHostName(NStr::CStr const &_ComputerName, NStr::CStr const &_EnvironmentName);
+	bool fg_AppManager_ContainerSharesHostName(NContainer::TCVector<NStr::CStr> const &_ExtraArguments, NStr::CStr const &_Network);
 
 	/// Identity of the operating system the AppManager runs on, used to select OS dependencies
 	struct CAppManagerOSIdentity

@@ -164,8 +164,6 @@ namespace NMib::NCloud::NAppManager
 		virtual NConcurrency::TCFuture<void> f_DiscardApplicationStage(NStr::CStr _Name, NStr::CStr _StageID) = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveApplicationStorage(NStr::CStr _Name) = 0;
 
-		/// Configures the agent with the automatic update settings inherited from
-		/// the host AppManager
 		virtual NConcurrency::TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) = 0;
 
 		virtual NConcurrency::TCFuture<void> f_ShutdownEnvironment() = 0;
