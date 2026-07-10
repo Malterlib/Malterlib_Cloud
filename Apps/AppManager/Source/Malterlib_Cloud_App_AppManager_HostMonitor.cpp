@@ -136,7 +136,18 @@ namespace NMib::NCloud::NAppManager
 
 		mp_AppliedHostMonitorConfig = _AutoUpdateConfig;
 
-		co_return co_await fp_InitHostMonitor(fg_Move(Config));
+		co_await fp_InitHostMonitor(fg_Move(Config));
+
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Configured the host monitor from the environment host{}"
+				, _AutoUpdateConfig.f_IsEmpty() ? "" : " with automatic update settings"
+			)
+		;
+
+		co_return {};
 	}
 
 	void CAppManagerActor::fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine)
