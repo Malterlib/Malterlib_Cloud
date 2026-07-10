@@ -136,50 +136,83 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
+		CVersionManager::CVersionInformation VersionInfo;
+
 		if (!State.m_SourcePath.f_IsEmpty())
-			co_return {}; // Already specified
+		{
+			auto PackageInfo = co_await fp_ReadPackageVersionInfo(State.m_SourcePath, State.m_fOnInfo);
+			if (!PackageInfo)
+				co_return {};
 
-		State.m_fOnInfo(fg_Format("Downloading version '{}' from version managers", State.m_VersionID));
+			// The time of a package depends on how its files were written, and an upload can record another, like the time of the archive. A package
+			// of the installed version keeps the installed time, so that the version manager doesn't offer the same version as a newer one. A
+			// package of a version that isn't installed has the time of its files, which a version that an upload published with another time
+			// doesn't match, so the version manager offers that version as newer, and an automatic update installs it again
+			auto &Installed = *State.m_pApplication;
+			if (PackageInfo->m_VersionID == Installed.m_LastInstalledVersion && Installed.m_LastInstalledVersionInfo.m_Time.f_IsValid())
+				PackageInfo->m_VersionInfo.m_Time = Installed.m_LastInstalledVersionInfo.m_Time;
 
-		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_DownloadVersion, {});
-
-		if (auto pException = State.f_CheckAbort())
-			co_return pException;
-
-		CStr DownloadDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersionDownload";
-		CStr DownloadDirectory = DownloadDirectoryRoot / fg_FastRandomID();
-		State.m_SourcePath = DownloadDirectory;
-		State.m_AllowSourceExist[DownloadDirectoryRoot];
-
-		State.m_DownloadDirectoryCleanup = g_BlockingActorSubscription / [DownloadDirectoryRoot]
+			// The versions of another application don't compare with the versions the update source offers. An upload can publish a package under
+			// another name, and such a package installs its files without its version info and settings, as packages without version info do
+			auto &VersionManagerApplication = State.m_pApplication->m_Settings.m_VersionManagerApplication;
+			if (!VersionManagerApplication.f_IsEmpty() && PackageInfo->m_Application != VersionManagerApplication)
 			{
-				try
-				{
-					if (CFile::fs_FileExists(DownloadDirectoryRoot))
-						CFile::fs_DeleteDirectoryRecursive(DownloadDirectoryRoot);
-				}
-				catch (CExceptionFile const &_Exception)
-				{
-					[[maybe_unused]] auto &Exception = _Exception;
-					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up version download: {}", Exception);
-				}
-			}
-		;
+				CStr Mismatch
+					= "The package is for application '{}', but application '{}' updates from version manager application '{}'"_f
+					<< PackageInfo->m_Application
+					<< State.m_pApplication->m_Name
+					<< VersionManagerApplication
+				;
 
-		CVersionManager::CVersionInformation VersionInfo = co_await fp_DownloadApplication
-			(
-				State.m_pApplication->m_Settings.m_VersionManagerApplication
-				, State.m_VersionID
-				, DownloadDirectory
-			)
-		;
+				State.m_fOnInfo("{}, so its version info isn't applied"_f << Mismatch);
+				co_return {};
+			}
+
+			// The time only tells packages of the same version apart: fp_FindVersion takes the newest offered version by the times the version
+			// managers recorded and compares it with the installed version by its ID, so a later time of the files holds back no higher version
+			State.m_VersionID = PackageInfo->m_VersionID;
+			State.m_VersionTime = PackageInfo->m_VersionInfo.m_Time;
+			VersionInfo = fg_Move(PackageInfo->m_VersionInfo);
+		}
+		else
+		{
+			State.m_fOnInfo(fg_Format("Downloading version '{}' from version managers", State.m_VersionID));
+
+			co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_DownloadVersion, {});
+
+			if (auto pException = State.f_CheckAbort())
+				co_return pException;
+
+			CStr DownloadDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersionDownload";
+			CStr DownloadDirectory = DownloadDirectoryRoot / fg_FastRandomID();
+			State.m_SourcePath = DownloadDirectory;
+			State.m_AllowSourceExist[DownloadDirectoryRoot];
+
+			State.m_DownloadDirectoryCleanup = g_BlockingActorSubscription / [DownloadDirectoryRoot]
+				{
+					try
+					{
+						if (CFile::fs_FileExists(DownloadDirectoryRoot))
+							CFile::fs_DeleteDirectoryRecursive(DownloadDirectoryRoot);
+					}
+					catch (CExceptionFile const &_Exception)
+					{
+						[[maybe_unused]] auto &Exception = _Exception;
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up version download: {}", Exception);
+					}
+				}
+			;
+
+			VersionInfo = co_await fp_DownloadApplication(State.m_pApplication->m_Settings.m_VersionManagerApplication, State.m_VersionID, DownloadDirectory);
+
+			State.m_fOnInfo(fg_Format("Application downloaded, unpacking"));
+		}
 
 		auto &Application = *State.m_pApplication;
 
 		if (Application.m_bDeleted)
 			co_return DMibErrorInstance("Application has been deleted, aborting");
 
-		State.m_fOnInfo(fg_Format("Application downloaded, unpacking"));
 		State.m_pVersionInfo = fg_Construct(VersionInfo);
 
 		for (auto &Tag : State.m_RequiredTags)
@@ -200,6 +233,44 @@ namespace NMib::NCloud::NAppManager
 				auto CaptureScope = co_await (g_CaptureExceptions % "Failed to get settings from version info");
 				NewSettings.f_FromVersionInfo(VersionInfo, NewChangedSettings);
 			}
+
+#ifdef DPlatformFamily_Windows
+			// The account of a new run-as user is created with a password of its own, as fp_ChangeApplicationSettings creates it. The update can't
+			// change the password of an account that already exists, so another run-as user that has an account takes the password of an
+			// application that runs as it, unless the version info gives one, and is refused without one, like an account that an earlier attempt
+			// of the update created
+			if (!NewSettings.m_RunAsUser.f_IsEmpty() && NewSettings.m_RunAsUser != Application.m_Settings.m_RunAsUser)
+			{
+				bool bAccountExists = false;
+				{
+					auto CaptureScope = co_await (g_CaptureExceptions % "Failed to look up the account of the run-as user");
+
+					CStr UserID;
+					bAccountExists = NSys::fg_UserManagement_UserExists(mp_pUniqueUserGroup->f_GetUser(NewSettings.m_RunAsUser), UserID);
+				}
+
+				if (!bAccountExists)
+					NewSettings.m_RunAsUserPassword = fg_HighEntropyRandomID("23456789ABCDEFGHJKLMNPQRSTWXYZabcdefghijkmnopqrstuvwxyz&=*!@~^") + "2Dg&";
+				else if (!(NewChangedSettings & EApplicationSetting_RunAsUserPassword))
+				{
+					NewSettings.m_RunAsUserPassword.f_Clear();
+					for (auto &pOtherApplication : mp_Applications)
+					{
+						auto &OtherSettings = pOtherApplication->m_Settings;
+						if (OtherSettings.m_RunAsUser == NewSettings.m_RunAsUser && !OtherSettings.m_RunAsUserPassword.f_IsEmpty())
+						{
+							NewSettings.m_RunAsUserPassword = OtherSettings.m_RunAsUserPassword;
+							break;
+						}
+					}
+
+					if (NewSettings.m_RunAsUserPassword.f_IsEmpty())
+						co_return DMibErrorInstance("The account of run-as user '{}' exists, but no application runs as it, so its password is unknown"_f << NewSettings.m_RunAsUser);
+				}
+			}
+			else if (!NewSettings.m_RunAsUser.f_IsEmpty() && NewSettings.m_RunAsUserPassword.f_IsEmpty())
+				NewSettings.m_RunAsUserPassword = fg_HighEntropyRandomID("23456789ABCDEFGHJKLMNPQRSTWXYZabcdefghijkmnopqrstuvwxyz&=*!@~^") + "2Dg&";
+#endif
 
 			CStr Error;
 			if (!NewSettings.f_Validate(Error))
@@ -473,6 +544,10 @@ namespace NMib::NCloud::NAppManager
 		{
 			State.m_fUpdateVersionInfo();
 			bSettingsChange = true;
+
+			// A package from file can be for a platform that no installed version had, which the version manager subscriptions filter out
+			if (mp_KnownPlatforms(State.m_pApplication->m_LastInstalledVersion.m_Platform).f_WasCreated())
+				fp_VersionManagerResubscribeAll() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to resubscribe to version managers");
 		}
 
 		if (bSettingsChange)

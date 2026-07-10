@@ -592,6 +592,13 @@ namespace NMib::NCloud::NAppManager
 			, mc_AlreadyScheduled
 		};
 
+		struct CPackageVersionInfo
+		{
+			CVersionManager::CVersionIDAndPlatform m_VersionID;
+			CVersionManager::CVersionInformation m_VersionInfo;
+			CStr m_Application;
+		};
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		void fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine);
 
@@ -774,6 +781,8 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		TCFuture<CVersionManager::CVersionInformation> fp_DownloadApplication(CStr _ApplicationName, CVersionManager::CVersionIDAndPlatform _VersionID, CStr _DestinationDir);
+
+		auto fp_ReadPackageVersionInfo(CStr _Package, TCFunction<void (CStr const &_Info)> _fOnInfo) -> TCFuture<NStorage::TCOptional<CPackageVersionInfo>>;
 
 		void fp_AutoUpdate_Update();
 

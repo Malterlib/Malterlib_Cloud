@@ -338,198 +338,26 @@ namespace NMib::NCloud::NAppManager
 
 		if (!_FromLocalFile.f_IsEmpty() || bNullApplication)
 		{
-			auto fApplyVersionInfo = [&](CStr const &_VersionInfoContents, CTime const &_VersionTime)
+			auto PackageInfo = co_await (fp_ReadPackageVersionInfo(_FromLocalFile, _fOnInfo) % "Failed to read version info from package" % Auditor);
+
+			if (PackageInfo)
+			{
+				try
 				{
-					try
-					{
-						CEJsonSorted VersionInfoJson = CEJsonSorted::fs_FromString(_VersionInfoContents);
+					fApplyVersion(PackageInfo->m_VersionID, PackageInfo->m_VersionInfo);
 
-						CStr Application;
-						CStr Version;
-						CStr Configuration;
-						CStr Platform;
-						CEJsonSorted ExtraInfo;
-
-						auto fApplySettings = [&](CEJsonSorted const &_Settings)
-							{
-								if (auto *pValue = _Settings.f_GetMember("Application", EJsonType_String))
-									Application = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Version", EJsonType_String))
-									Version = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Configuration", EJsonType_String))
-									Configuration = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Platform", EJsonType_String))
-									Platform = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJsonType_Object))
-									ExtraInfo = pValue->f_Object();
-							}
-						;
-
-						fApplySettings(VersionInfoJson);
-
-						if (Application.f_IsEmpty())
-							DMibError("Application must be specified");
-						if (Version.f_IsEmpty())
-							DMibError("Version must be specified");
-
-						if (!CVersionManager::fs_IsValidApplicationName(Application))
-							DMibError("Application format is invalid");
-
-						CVersionManager::CVersionIDAndPlatform VersionID;
-						{
-							CStr Error;
-							if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
-								DMibError(fg_Format("Version identifier format is invalid: {}", Error));
-						}
-
-						if (!CVersionManager::fs_IsValidPlatform(Platform))
-							DMibError("Invalid version platform format");
-
-						VersionID.m_Platform = Platform;
-
-						CVersionManager::CVersionInformation VersionInfo;
-						VersionInfo.m_Configuration = Configuration;
-						VersionInfo.m_ExtraInfo = ExtraInfo;
-						VersionInfo.m_Time = _VersionTime;
-
-						fApplyVersion(VersionID, VersionInfo);
-
-						pApplication->m_Settings.m_VersionManagerApplication = Application;
-					}
-					catch (CException const &_Exception)
-					{
-						_fOnInfo("Failed to parse version info from VersionInfo.json in package: {}"_f << _Exception);
-					}
+					// The update source is a setting of the package, which an add without settings from the version info leaves unset, so that
+					// the version manager doesn't replace the package
+					if (_bSettingsFromVersionInfo)
+						pApplication->m_Settings.m_VersionManagerApplication = PackageInfo->m_Application;
 				}
-			;
-
-			if (_bSettingsFromVersionInfo && (_FromLocalFile.f_EndsWith(".tar.gz") || _FromLocalFile.f_EndsWith(".tar.zst") || _FromLocalFile.f_EndsWith(".tar")))
-			{
-				auto &LaunchActor = mp_LaunchActors.f_Insert() = fg_Construct();
-				CProcessLaunchActor::CSimpleLaunch Launch
-					{
-						mp_State.m_RootDirectory / "bin/bsdtar"
-						,
-						{
-							"-xqOf"
-							, _FromLocalFile
-							, "*VersionInfo.json"
-						}
-						, CFile::fs_GetPath(_FromLocalFile)
-						, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
-					}
-				;
-
-				auto &LaunchListActor = mp_LaunchActors.f_Insert() = fg_Construct();
-				CProcessLaunchActor::CSimpleLaunch LaunchList
-					{
-						mp_State.m_RootDirectory / "bin/bsdtar"
-						,
-						{
-							"-tvvf"
-							, _FromLocalFile
-						}
-						, CFile::fs_GetPath(_FromLocalFile)
-						, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
-					}
-				;
-
-				auto [LaunchResult, LaunchListResult] = co_await
-					(
-						LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch)) + LaunchListActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))
-					)
-					.f_Wrap()
-				;
-
-				if (!LaunchResult)
-					_fOnInfo("Failed to extract version info from package: {}"_f << LaunchResult.f_GetExceptionStr());
-
-				if (!LaunchListResult)
-					_fOnInfo("Failed to extract version time from package: {}"_f << LaunchListResult.f_GetExceptionStr());
-
-				auto fGetVersionTime = [&]() -> CTime
-					{
-						if (!LaunchListResult)
-							return {};
-
-						auto ListStr = (*LaunchListResult).f_GetStdOut();
-						CTime Newest;
-						for (auto &Line : ListStr.f_SplitLine<true>())
-						{
-							ch8 const *pParse = Line.f_GetStr();
-
-							auto fParseField = [&]() -> CStr
-								{
-									ch8 const *pStart = pParse;
-									fg_ParseNonWhiteSpaceAndSeparators(pParse, "");
-									CStr Field(pStart, pParse - pStart);
-									fg_ParseWhiteSpace(pParse);
-									return Field;
-								}
-							;
-
-							fParseField(); // Permissions
-							fParseField(); // ?
-							fParseField(); // User
-							fParseField(); // Group
-							fParseField(); // Size
-
-							CStr UnixSeconds = fParseField();
-							CStr NanoSeconds = fParseField();
-
-							auto FileTime = CTimeConvert::fs_FromUnixSeconds(UnixSeconds.f_ToInt(int64(0)));
-							FileTime.f_SetFraction(fp64(NanoSeconds.f_ToInt(int32(0))) / fp64(1'000'000'000.0));
-
-							if (!Newest.f_IsValid() || FileTime > Newest)
-								Newest = FileTime;
-						}
-
-						return CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
-					}
-				;
-
-				if (LaunchResult)
-					fApplyVersionInfo(LaunchResult->f_GetStdOut(), fGetVersionTime());
-
-				SourcePath = _FromLocalFile;
+				catch (CException const &_Exception)
+				{
+					_fOnInfo("Failed to apply version info from package: {}"_f << _Exception);
+				}
 			}
-			else
-			{
-				auto BlockingActorCheckout = fg_BlockingActor();
-				auto [VersionInfoContents, VersionTime] = co_await
-					(
-						g_Dispatch(BlockingActorCheckout)
-						/ [_FromLocalFile]
-						{
-							if (!CFile::fs_FileExists(_FromLocalFile, EFileAttrib_Directory))
-								return fg_Tuple(CStr{}, CTime{});
 
-							CStr VersionInfoFile;
-
-							if (CFile::fs_FileExists(_FromLocalFile / "VersionInfo.json", EFileAttrib_Directory))
-								VersionInfoFile = _FromLocalFile / "VersionInfo.json";
-							else
-							{
-								auto Files = CFile::fs_FindFiles(_FromLocalFile / "*VersionInfo.json");
-
-								if (Files.f_GetLen() != 1)
-									return fg_Tuple(CStr{}, CTime{});
-
-								VersionInfoFile = Files[0];
-							}
-
-							return fg_Tuple(CFile::fs_ReadStringFromFile(VersionInfoFile, true), CFile::fs_GetWriteTime(VersionInfoFile));
-						}
-						% "Failed to unpack application"
-						% Auditor
-					)
-				;
-
-				if (!VersionInfoContents.f_IsEmpty())
-					fApplyVersionInfo(VersionInfoContents, VersionTime);
-
-				SourcePath = _FromLocalFile;
-			}
+			SourcePath = _FromLocalFile;
 		}
 		else
 		{
@@ -642,5 +470,247 @@ namespace NMib::NCloud::NAppManager
 		co_await fp_SyncNotifications(_Name);
 
 		co_return {};
+	}
+
+	// _Package is a package, or a directory that only holds a .tar, .tar.gz or .tar.zst archive, which is read as that archive.
+	// Returns no value when the package metadata is missing, fails to extract or doesn't parse; extraction and parse failures are reported through
+	// _fOnInfo. Errors reading a directory package fail the future
+	auto CAppManagerActor::fp_ReadPackageVersionInfo(CStr _Package, TCFunction<void (CStr const &_Info)> _fOnInfo) -> TCFuture<TCOptional<CPackageVersionInfo>>
+	{
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			_Package = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [_Package]() -> CStr
+					{
+						if (!CFile::fs_FileExists(_Package, EFileAttrib_Directory))
+							return _Package;
+
+						auto Files = CFile::fs_FindFiles(_Package / "*");
+						if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar.zst") || Files[0].f_EndsWith(".tar")))
+							return Files[0];
+
+						return _Package;
+					}
+				)
+			;
+		}
+
+		CStr VersionInfoContents;
+		CTime VersionTime;
+
+		if (_Package.f_EndsWith(".tar.gz") || _Package.f_EndsWith(".tar.zst") || _Package.f_EndsWith(".tar"))
+		{
+			TCActor<CProcessLaunchActor> LaunchActor(fg_Construct());
+			auto AutoDestroyLaunch = co_await fg_AsyncDestroy(LaunchActor);
+
+			CProcessLaunchActor::CSimpleLaunch Launch
+				{
+					mp_State.m_RootDirectory / "bin/bsdtar"
+					,
+					{
+						"-xqOf"
+						, _Package
+						, "*VersionInfo.json"
+					}
+					, CFile::fs_GetPath(_Package)
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+				}
+			;
+
+			TCActor<CProcessLaunchActor> LaunchListActor(fg_Construct());
+			auto AutoDestroyLaunchList = co_await fg_AsyncDestroy(LaunchListActor);
+
+			CProcessLaunchActor::CSimpleLaunch LaunchList
+				{
+					mp_State.m_RootDirectory / "bin/bsdtar"
+					,
+					{
+						"-tvvf"
+						, _Package
+					}
+					, CFile::fs_GetPath(_Package)
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+				}
+			;
+
+			auto [LaunchResult, LaunchListResult] = co_await
+				(
+					LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch)) + LaunchListActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))
+				)
+				.f_Wrap()
+			;
+
+			if (!LaunchResult)
+			{
+				_fOnInfo("Failed to extract version info from package: {}"_f << LaunchResult.f_GetExceptionStr());
+				co_return {};
+			}
+
+			if (!LaunchListResult)
+				_fOnInfo("Failed to extract version time from package: {}"_f << LaunchListResult.f_GetExceptionStr());
+			else
+			{
+				auto ListStr = (*LaunchListResult).f_GetStdOut();
+				CTime Newest;
+				for (auto &Line : ListStr.f_SplitLine<true>())
+				{
+					ch8 const *pParse = Line.f_GetStr();
+
+					auto fParseField = [&]() -> CStr
+						{
+							ch8 const *pStart = pParse;
+							fg_ParseNonWhiteSpaceAndSeparators(pParse, "");
+							CStr Field(pStart, pParse - pStart);
+							fg_ParseWhiteSpace(pParse);
+							return Field;
+						}
+					;
+
+					// The columns are read as CVersionManagerHelper reads them for an archive it uploads, so that a package has the same time
+					// on both sides, also when a user or group name with spaces shifts them
+					fParseField(); // Permissions
+					fParseField(); // ?
+					fParseField(); // User
+					fParseField(); // Group
+					fParseField(); // Size or device number
+
+					CStr UnixSeconds = fParseField();
+					CStr NanoSeconds = fParseField();
+
+					auto FileTime = CTimeConvert::fs_FromUnixSeconds(UnixSeconds.f_ToInt(int64(0)));
+					FileTime.f_SetFraction(fp64(NanoSeconds.f_ToInt(int32(0))) / fp64(1'000'000'000.0));
+
+					if (!Newest.f_IsValid() || FileTime > Newest)
+						Newest = FileTime;
+				}
+
+				VersionTime = CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
+			}
+
+			VersionInfoContents = LaunchResult->f_GetStdOut();
+		}
+		else
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+			auto [Contents, Time] = co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) / [_Package]
+						{
+							if (!CFile::fs_FileExists(_Package, EFileAttrib_Directory))
+								return fg_Tuple(CStr{}, CTime{});
+
+							CStr VersionInfoFile;
+
+							if (CFile::fs_FileExists(_Package / "VersionInfo.json", EFileAttrib_File))
+								VersionInfoFile = _Package / "VersionInfo.json";
+							else
+							{
+								auto Files = CFile::fs_FindFiles(_Package / "*VersionInfo.json", EFileAttrib_File, false);
+
+								if (Files.f_GetLen() != 1)
+									return fg_Tuple(CStr{}, CTime{});
+
+								VersionInfoFile = Files[0];
+							}
+
+							// The newest file of the package in milliseconds, as CVersionManagerHelper::f_CreatePackage chooses the version time of a
+							// directory it uploads
+							CFile::CFindFilesOptions FindOptions{_Package + "/*", true};
+							FindOptions.m_AttribMask = EFileAttrib_File;
+							CTime Newest;
+							for (auto &FoundFile : CFile::fs_FindFiles(FindOptions))
+							{
+								// A link can name a target that only exists where the package is installed, like in a guest, and has the time of
+								// the link itself then, which the unpack copies as a link
+								CTime FoundTime;
+								if (FoundFile.m_Attribs & EFileAttrib_Link)
+								{
+									try
+									{
+										FoundTime = CFile::fs_GetWriteTime(FoundFile.m_Path);
+									}
+									catch (CExceptionFile const &)
+									{
+										FoundTime = CFile::fs_GetWriteTimeOnLink(FoundFile.m_Path);
+									}
+								}
+								else
+									FoundTime = CFile::fs_GetWriteTime(FoundFile.m_Path);
+
+								if (!Newest.f_IsValid() || FoundTime > Newest)
+									Newest = FoundTime;
+							}
+
+							CTime VersionTime = CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
+							return fg_Tuple(CFile::fs_ReadStringFromFile(VersionInfoFile, true), VersionTime);
+						}
+					)
+					% "Failed to read version info from package"
+				)
+			;
+
+			VersionInfoContents = fg_Move(Contents);
+			VersionTime = Time;
+		}
+
+		if (VersionInfoContents.f_IsEmpty())
+			co_return {};
+
+		CPackageVersionInfo PackageInfo;
+
+		try
+		{
+			CEJsonSorted VersionInfoJson = CEJsonSorted::fs_FromString(VersionInfoContents);
+
+			CStr Application;
+			CStr Version;
+			CStr Configuration;
+			CStr Platform;
+			CEJsonSorted ExtraInfo;
+
+			if (auto *pValue = VersionInfoJson.f_GetMember("Application", EJsonType_String))
+				Application = pValue->f_String();
+			if (auto *pValue = VersionInfoJson.f_GetMember("Version", EJsonType_String))
+				Version = pValue->f_String();
+			if (auto *pValue = VersionInfoJson.f_GetMember("Configuration", EJsonType_String))
+				Configuration = pValue->f_String();
+			if (auto *pValue = VersionInfoJson.f_GetMember("Platform", EJsonType_String))
+				Platform = pValue->f_String();
+			if (auto *pValue = VersionInfoJson.f_GetMember("ExtraInfo", EJsonType_Object))
+				ExtraInfo = pValue->f_Object();
+
+			if (Application.f_IsEmpty())
+				DMibError("Application must be specified");
+			if (Version.f_IsEmpty())
+				DMibError("Version must be specified");
+
+			if (!CVersionManager::fs_IsValidApplicationName(Application))
+				DMibError("Application format is invalid");
+
+			{
+				CStr Error;
+				if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &PackageInfo.m_VersionID.m_VersionID))
+					DMibError(fg_Format("Version identifier format is invalid: {}", Error));
+			}
+
+			if (!CVersionManager::fs_IsValidPlatform(Platform))
+				DMibError("Invalid version platform format");
+
+			PackageInfo.m_VersionID.m_Platform = Platform;
+			PackageInfo.m_VersionInfo.m_Configuration = Configuration;
+			PackageInfo.m_VersionInfo.m_ExtraInfo = fg_Move(ExtraInfo);
+			PackageInfo.m_VersionInfo.m_Time = VersionTime;
+			PackageInfo.m_Application = fg_Move(Application);
+		}
+		catch (CException const &_Exception)
+		{
+			_fOnInfo("Failed to parse version info from VersionInfo.json in package: {}"_f << _Exception);
+			co_return {};
+		}
+
+		co_return fg_Move(PackageInfo);
 	}
 }

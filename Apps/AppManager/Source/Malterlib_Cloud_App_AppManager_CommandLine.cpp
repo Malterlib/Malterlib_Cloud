@@ -757,6 +757,15 @@ namespace NMib::NCloud::NAppManager
 							, "Type"_o= ""
 							, "Description"_o= "Unique name of the application to update."
 						}
+						, "UpdateSettings?"_o=
+						{
+							// As in automatic updates from the version manager, the settings a trusted package declares, its run-as accounts included,
+							// replace the configured ones; --update-settings=false keeps the configured settings. Without a default, so that the
+							// command of a client that predates the option, which leaves it out, is valid; the handler defaults it
+							"Names"_o= _o["--update-settings"]
+							, "Type"_o= true
+							, "Description"_o= "Update settings with settings from the package. Defaults to true."
+						}
 					}
 					, "Parameters"_o=
 					{
