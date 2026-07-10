@@ -25,6 +25,14 @@ namespace NMib::NCloud
 		Arguments.f_Insert("--user");
 		Arguments.f_Insert("0:0");
 
+		// Docker also resolves the host name on a user-defined network, which the administrator who shares the network with other services
+		// chooses the host and environment names for
+		if (!_Launch.m_Hostname.f_IsEmpty())
+		{
+			Arguments.f_Insert("--hostname");
+			Arguments.f_Insert(_Launch.m_Hostname);
+		}
+
 		if (_Launch.m_bReadOnly)
 		{
 			Arguments.f_Insert("--read-only");
@@ -134,7 +142,12 @@ namespace NMib::NCloud::NAppManager
 {
 	CStr CAppManagerActor::fp_GetContainerRuntimeExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment)
 	{
-		auto &Runtime = _pEnvironment->m_Settings.m_ContainerRuntime;
+		return fsp_GetContainerRuntimeExecutable(_pEnvironment->m_Settings);
+	}
+
+	CStr CAppManagerActor::fsp_GetContainerRuntimeExecutable(CEnvironmentSettings const &_Settings)
+	{
+		auto &Runtime = _Settings.m_ContainerRuntime;
 
 		if (Runtime.f_IsEmpty())
 		{
@@ -1012,8 +1025,9 @@ namespace NMib::NCloud::NAppManager
 	}
 
 	// The container gets the host-written agent directory read-only, its data storage read-write and nothing else of the host but the agent socket
-	// and the extra mounts the host allowed. Everything the agent and the applications write lives in the data storage
-	auto CAppManagerActor::fp_BuildEnvironmentContainerLaunch(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr const &_AgentExecutableName) -> CAppManagerContainerLaunch
+	// and the extra mounts the host allowed. Sets o_Error when the launch can't be built
+	auto CAppManagerActor::fp_BuildEnvironmentContainerLaunch(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr const &_AgentExecutableName, CStr &o_Error)
+		-> CAppManagerContainerLaunch
 	{
 		auto &Settings = _pEnvironment->m_Settings;
 
@@ -1024,6 +1038,13 @@ namespace NMib::NCloud::NAppManager
 
 		CAppManagerContainerLaunch Launch;
 		Launch.m_ContainerName = fp_GetContainerName(_pEnvironment);
+
+		// Docker's default capabilities keep the container from changing its host name, so it is set at creation. The name tells hosts apart, not
+		// the AppManagers of one host
+		Launch.m_Hostname = fp_GetEnvironmentHostName(*_pEnvironment, o_Error);
+		if (!o_Error.f_IsEmpty())
+			return {};
+
 		Launch.m_Image = Settings.m_ContainerImage;
 		Launch.m_MemoryLimitMB = Settings.m_MemoryLimitMB;
 		Launch.m_CPULimit = Settings.m_CPULimit;
@@ -1069,9 +1090,7 @@ namespace NMib::NCloud::NAppManager
 				Launch.m_AddHosts[Host] = "host-gateway";
 		}
 
-		// The agent identity and host id come from the deployment settings next
-		// to the agent executable, not from the environment: the container
-		// environment is inherited by everything running inside it
+		// The environment carries only launch and connection parameters, since other processes in the container can inherit it; the agent identity is in its deployment settings
 		Launch.m_PassEnvironment =
 			{
 				"MalterlibDistributedAppInterfaceServerAddress"

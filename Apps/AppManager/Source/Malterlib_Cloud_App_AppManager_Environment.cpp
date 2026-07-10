@@ -13,6 +13,133 @@
 
 namespace NMib::NCloud
 {
+	namespace
+	{
+		// Characters that a DNS label doesn't allow become '-', and the ends lose their '-'
+		NStr::CStr fg_SanitizeHostNameLabel(NStr::CStr const &_Name)
+		{
+			NStr::CStr Sanitized;
+			for (ch8 const *pChar = _Name.f_GetStr(); *pChar; ++pChar)
+			{
+				ch8 Char = *pChar;
+				bool bValid = (Char >= 'a' && Char <= 'z') || (Char >= 'A' && Char <= 'Z') || (Char >= '0' && Char <= '9') || Char == '-';
+
+				ch8 Append[2] = {bValid ? Char : ch8('-'), 0};
+				Sanitized += Append;
+			}
+
+			while (Sanitized.f_StartsWith("-"))
+				Sanitized = Sanitized.f_Extract(1);
+			while (Sanitized.f_EndsWith("-"))
+				Sanitized = Sanitized.f_Left(Sanitized.f_GetLen() - 1);
+
+			return Sanitized;
+		}
+	}
+
+	// Returns <ComputerName>-<EnvironmentName> as one DNS label of at most 63 bytes. An environment name that sanitizing changes, or either name
+	// when it is cut, gets a suffix from a hash of both original names. The name is for people, who tell the agents of different pairs of host
+	// computer and environment apart by their host IDs also when the names look alike
+	NStr::CStr fg_AppManager_EnvironmentHostName(NStr::CStr const &_ComputerName, NStr::CStr const &_EnvironmentName)
+	{
+		using namespace NStr;
+
+		constexpr umint c_MaxLabelLength = 63;
+		constexpr umint c_MaxEnvironmentLength = c_MaxLabelLength - 17;
+
+		CStr FullComputer = fg_SanitizeHostNameLabel(_ComputerName);
+		CStr Environment = fg_SanitizeHostNameLabel(_EnvironmentName);
+		if
+		(
+			Environment != _EnvironmentName
+			|| Environment.f_GetLen() > c_MaxEnvironmentLength
+			|| (!FullComputer.f_IsEmpty() && FullComputer.f_GetLen() + 1 + Environment.f_GetLen() > c_MaxLabelLength)
+		)
+		{
+			CStr HashData = _ComputerName + "\n" + _EnvironmentName;
+			CStr Hash = NCryptography::CHash_SHA256::fs_DigestFromData(HashData.f_GetStr(), HashData.f_GetLen()).f_GetString().f_Left(12);
+			if (Environment.f_GetLen() + 1 + Hash.f_GetLen() > c_MaxEnvironmentLength)
+				Environment = fg_SanitizeHostNameLabel(Environment.f_Left(c_MaxEnvironmentLength - 1 - Hash.f_GetLen()));
+
+			Environment = Environment.f_IsEmpty() ? Hash : CStr("{}-{}"_f << Environment << Hash);
+		}
+
+		CStr Computer = fg_SanitizeHostNameLabel(FullComputer.f_Left(c_MaxLabelLength - Environment.f_GetLen() - 1));
+		if (Computer.f_IsEmpty())
+			return Environment;
+
+		return "{}-{}"_f << Computer << Environment;
+	}
+
+	// Docker refuses a host name for a container that shares the UTS namespace of the host or the network of another container, and an agent that
+	// renamed itself there would rename the host or that container. A container on the host network keeps the host name of the host, the only
+	// one that the hosts file it gets from the host resolves. The extra arguments can select any of them
+	bool fg_AppManager_ContainerSharesHostName(NContainer::TCVector<NStr::CStr> const &_ExtraArguments, NStr::CStr const &_Network)
+	{
+		// In the comma separated key=value form the last name key names the network; Docker reads the fields as CSV, lower cased and trimmed
+		auto fSharesNetworkHostName = [](NStr::CStr const &_Value)
+			{
+				if (_Value.f_Find("=") < 0)
+					return _Value.f_StartsWith("container:") || _Value == "host";
+
+				NStr::CStr Name;
+				for (auto &Field : _Value.f_Split(","))
+				{
+					NStr::CStr Trimmed = Field.f_Trim().f_LowerCase();
+					if (Trimmed.f_GetLen() >= 2 && Trimmed.f_StartsWith("\"") && Trimmed.f_EndsWith("\""))
+						Trimmed = Trimmed.f_Extract(1, Trimmed.f_GetLen() - 2);
+
+					aint iEquals = Trimmed.f_Find("=");
+					if (iEquals < 0)
+						continue;
+
+					NStr::CStr Key = Trimmed.f_Left(iEquals).f_Trim();
+					NStr::CStr NetworkValue = Trimmed.f_Extract(iEquals + 1).f_Trim();
+					if (Key == "name")
+						Name = NetworkValue;
+				}
+
+				return Name.f_StartsWith("container:") || Name == "host";
+			}
+		;
+
+		if (fSharesNetworkHostName(_Network))
+			return true;
+
+		auto fOptionValue = [&](umint _iArgument, NStr::CStr const &_Option, NStr::CStr &o_Value)
+			{
+				auto &Argument = _ExtraArguments[_iArgument];
+				if (Argument.f_StartsWith(_Option + "="))
+				{
+					o_Value = Argument.f_Extract(_Option.f_GetLen() + 1);
+					return true;
+				}
+
+				if (Argument == _Option && _iArgument + 1 < _ExtraArguments.f_GetLen())
+				{
+					o_Value = _ExtraArguments[_iArgument + 1];
+					return true;
+				}
+
+				return false;
+			}
+		;
+
+		// The last UTS namespace option is the one that applies
+		NStr::CStr UTS;
+		for (umint iArgument = 0; iArgument < _ExtraArguments.f_GetLen(); ++iArgument)
+		{
+			NStr::CStr Value;
+			if (fOptionValue(iArgument, "--uts", Value))
+				UTS = Value;
+
+			if ((fOptionValue(iArgument, "--network", Value) || fOptionValue(iArgument, "--net", Value)) && fSharesNetworkHostName(Value))
+				return true;
+		}
+
+		return UTS == "host";
+	}
+
 	// Returns the encoded AutoUpdate settings of the host for the agent of an environment of _Type, or empty, with which the agent only monitors.
 	// A Local agent shares the OS of the host, and a read-only container can't change its packages
 	NStr::CStr fg_AppManager_EnvironmentAgentAutoUpdateConfig(CAppManagerInterface::EEnvironmentType _Type, bool _bReadOnly, NEncoding::CEJsonSortedYaml const &_HostConfig)
@@ -4264,13 +4391,25 @@ namespace NMib::NCloud::NAppManager
 				}
 
 				LaunchExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
-				CAppManagerContainerLaunch ContainerLaunch = fp_BuildEnvironmentContainerLaunch(_pEnvironment, CFile::fs_GetFile(AgentExecutable));
+				CStr LaunchError;
+				CAppManagerContainerLaunch ContainerLaunch = fp_BuildEnvironmentContainerLaunch(_pEnvironment, CFile::fs_GetFile(AgentExecutable), LaunchError);
+				if (!LaunchError.f_IsEmpty())
+				{
+					_pEnvironment->f_SetStatus(LaunchError, CAppManagerInterface::EStatusSeverity_Error);
+					co_return DMibErrorInstance(LaunchError);
+				}
+
 				TCVector<CStr> RunArguments = fg_AppManager_BuildContainerRunArguments(ContainerLaunch);
 
-				// A reused container keeps its creation-time process environment, so a changed agent address or host ID recreates it
+				// A reused container keeps its creation-time process environment, so a changed agent address or host ID recreates it. The host name
+				// is left out, see fp_GetEnvironmentHostName
 				CStr FingerprintData = LaunchExecutable;
-				for (auto &Argument : RunArguments)
-					FingerprintData += "\n" + Argument;
+				{
+					auto FingerprintLaunch = ContainerLaunch;
+					FingerprintLaunch.m_Hostname.f_Clear();
+					for (auto &Argument : fg_AppManager_BuildContainerRunArguments(FingerprintLaunch))
+						FingerprintData += "\n" + Argument;
+				}
 				FingerprintData += "\n" + AgentAddress.f_Encode();
 				FingerprintData += "\n" + mp_State.m_HostID;
 				CStr Fingerprint = NCryptography::CHash_SHA256::fs_DigestFromData(FingerprintData.f_GetStr(), FingerprintData.f_GetLen()).f_GetString();
@@ -4510,6 +4649,35 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	// Sets o_Error and returns an empty name when the computer name can't be read
+	CStr CAppManagerActor::fp_GetEnvironmentHostName(CEnvironment const &_Environment, CStr &o_Error)
+	{
+		// A local agent shares the host's UTS namespace and /etc, so naming it would rename the host
+		if (_Environment.m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Local)
+			return {};
+
+		auto &Settings = _Environment.m_Settings;
+		if (Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container && fg_AppManager_ContainerSharesHostName(Settings.m_ContainerExtraArguments, Settings.m_ContainerNetwork))
+			return {};
+
+		// The Apple container runtime has no hostname option and names the host after the container, and its default capabilities keep the agent
+		// from renaming it
+		if (Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container && fsp_GetContainerRuntimeExecutable(Settings) == "container")
+			return {};
+
+		// The name isn't in the container fingerprint, so a container takes a new name when it is next created, and a VM guest agent when the host
+		// next sets it up
+		try
+		{
+			return fg_AppManager_EnvironmentHostName(NProcess::NPlatform::fg_Process_GetComputerName(), _Environment.m_Name);
+		}
+		catch (CException const &_Exception)
+		{
+			o_Error = "Failed to get the computer name for the host name of environment '{}': {}"_f << _Environment.m_Name << _Exception;
+			return {};
+		}
+	}
+
 	void CAppManagerActor::fp_SendEnvironmentAgentConfig(CEnvironment &_Environment)
 	{
 		if (!_Environment.m_AgentInterface)
@@ -4615,8 +4783,6 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_AgentInterface = fg_Move(_Interface);
 
-		// The agent monitors the environment with the update settings inherited
-		// from this AppManager
 		fp_SendEnvironmentAgentConfig(*_pEnvironment);
 
 		_pEnvironment->m_bStarted = true;

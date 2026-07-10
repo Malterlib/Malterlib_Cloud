@@ -835,8 +835,8 @@ namespace NMib::NCloud::NAppManager
 				co_return DMibErrorInstance(Error);
 			}
 
-			// Reuse the installed launch ID only when the sizes and second-resolution write times of the agent files match; a new ID keeps the installed agent from
-			// registering by it. Without provisioning the host can't install the agent, so the agent already installed in the guest keeps its ID
+			// Reuse the installed launch ID when the sizes and second-resolution write times of the agent files match, or when the host can't install
+			// the agent without provisioning; a new ID keeps an outdated agent from registering
 			if (!_pEnvironment->m_VMAgentLaunchID.f_IsEmpty() && (!bCanBootstrap || _pEnvironment->m_VMAgentFingerprint == _pEnvironment->m_VMAgentDesiredFingerprint))
 				_pEnvironment->m_LaunchID = _pEnvironment->m_VMAgentLaunchID;
 			else
@@ -871,6 +871,17 @@ namespace NMib::NCloud::NAppManager
 				ConnectJson["Ticket"] = CStr(Ticket.m_Ticket.f_ToStringTicket());
 				ConnectJson["HostPort"] = int64(mcp_VMAgentHostPort);
 				ConnectJson["SocketPath"] = fp_GetEnvironmentAgentSocketPath(*_pEnvironment);
+
+				// The agent applies it when it starts, before its distributed identity reads the name; see fp_GetEnvironmentHostName
+				{
+					CStr HostNameError;
+					ConnectJson["EnvironmentHostName"] = fp_GetEnvironmentHostName(*_pEnvironment, HostNameError);
+					if (!HostNameError.f_IsEmpty())
+					{
+						_pEnvironment->f_SetStatus(HostNameError, CAppManagerInterface::EStatusSeverity_Error);
+						co_return DMibErrorInstance(HostNameError);
+					}
+				}
 
 				ConnectSettings = ConnectJson.f_ToString();
 			}
@@ -966,6 +977,8 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->f_SetStatus("VM running, setting up the agent", CAppManagerInterface::EStatusSeverity_Warning);
 
+		// An agent installed in the guest that registers first keeps the host name it was installed with, like a container keeps its name
+		// until it is created again; the host name follows a renamed host computer when the host next installs the agent
 		if (!_pEnvironment->f_IsStarted())
 		{
 			// Without provisioning the start waits for an agent already installed in the guest to boot and connect
@@ -1384,14 +1397,14 @@ namespace NMib::NCloud::NAppManager
 			AgentFileList += NStr::fg_StrEscapeBashSingleQuotes(File);
 		}
 
-		// The agent reads its connect settings when it starts. The ticket changes with every start and is not part of the
-		// identity
+		// The agent reads its connect settings when it starts, so a kept agent restarts when the address, the launch ID or the host name changes.
+		// The ticket changes with every start and is not part of the identity
 		CStr ConnectIdentity;
 		{
 			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the agent connect settings");
 
 			CEJsonSorted ConnectJson = CEJsonSorted::fs_FromString(_ConnectSettings);
-			CStr IdentityData = ConnectJson["Address"].f_String() + "\n" + ConnectJson["LaunchID"].f_String();
+			CStr IdentityData = ConnectJson["Address"].f_String() + "\n" + ConnectJson["LaunchID"].f_String() + "\n" + ConnectJson["EnvironmentHostName"].f_AsString();
 			ConnectIdentity = NCryptography::CHash_SHA256::fs_DigestFromData(IdentityData.f_GetStr(), IdentityData.f_GetLen()).f_GetString();
 		}
 

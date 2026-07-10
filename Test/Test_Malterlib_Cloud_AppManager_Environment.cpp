@@ -2355,6 +2355,168 @@ void CAppManager_Environment_Tests::f_DoTests()
 			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit * 2 + 10)));
 		}
 	};
+
+	DMibTestSuite("Hosts File")
+	{
+		{
+			DMibTestPath("Alias");
+			DMibExpectTrue
+				(
+					fg_AppManager_HostsFileHasHostName
+					(
+						"127.0.0.1\tlocalhost\n"
+						"127.0.1.1 Host-Env host-env.local\n"
+						, "host-env"
+					)
+				)
+			;
+		}
+
+		{
+			DMibTestPath("Empty");
+			DMibExpectFalse(fg_AppManager_HostsFileHasHostName("", "host-env"));
+		}
+
+		{
+			DMibTestPath("Longer Name");
+			DMibExpectFalse(fg_AppManager_HostsFileHasHostName("127.0.0.1 localhost host-env2\n", "host-env"));
+		}
+
+		{
+			DMibTestPath("Address Only");
+			DMibExpectFalse(fg_AppManager_HostsFileHasHostName("host-env localhost\n", "host-env"));
+		}
+
+		{
+			DMibTestPath("Comment");
+			DMibExpectFalse
+				(
+					fg_AppManager_HostsFileHasHostName
+					(
+						"# host-env\n"
+						"127.0.0.1 localhost #host-env\n"
+						, "host-env"
+					)
+				)
+			;
+		}
+
+		{
+			DMibTestPath("Name Before Comment");
+			DMibExpectTrue(fg_AppManager_HostsFileHasHostName("127.0.0.1 host-env# Environment\n", "host-env"));
+		}
+	};
+
+	DMibTestSuite("Environment Host Name")
+	{
+		{
+			DMibTestPath("Plain");
+			DMibExpect(fg_AppManager_EnvironmentHostName("Host", "Env"), ==, "Host-Env");
+		}
+
+		{
+			DMibTestPath("Sanitized Names Stay Apart");
+
+			CStr Dotted = fg_AppManager_EnvironmentHostName("Host", "api.blue");
+			DMibExpectTrue(Dotted.f_StartsWith("Host-api-blue-"));
+			DMibExpect(Dotted, !=, fg_AppManager_EnvironmentHostName("Host", "api-blue"));
+		}
+
+		{
+			DMibTestPath("Long Computer Name");
+
+			// The computer name is shortened to 46 characters to make room for "-Env-<Hash>", which would end it with its '-'
+			CStr Computer;
+			for (umint iCharacter = 0; iCharacter < 45; ++iCharacter)
+				Computer += "a";
+			Computer += "-bcdefghijklmnop";
+
+			CStr HostName = fg_AppManager_EnvironmentHostName(Computer, "Env");
+			DMibExpect(HostName.f_GetLen(), <=, 63u);
+			DMibExpectTrue(HostName.f_StartsWith(Computer.f_Left(45) + "-Env-"));
+			DMibExpectFalse(HostName.f_StartsWith("-"));
+			DMibExpectFalse(HostName.f_Find("--") >= 0);
+		}
+
+		{
+			DMibTestPath("Shortened Computer Name Stays Apart");
+
+			// Without the suffix both are development-node-eu-west-01-analytics-warehouse-us-east-prod-01
+			CStr Computer = "development-node-eu-west-01";
+			CStr Short = fg_AppManager_EnvironmentHostName(Computer, "analytics-warehouse-us-east-prod-01");
+			CStr Long = fg_AppManager_EnvironmentHostName(Computer, "eu-west-01-analytics-warehouse-us-east-prod-01");
+			DMibExpect(Short, ==, "development-node-eu-west-01-analytics-warehouse-us-east-prod-01");
+			DMibExpect(Short, !=, Long);
+			DMibExpect(Long.f_GetLen(), <=, 63u);
+		}
+
+		{
+			DMibTestPath("Hosts With Shortened Computer Names Stay Apart");
+
+			// Both computer names are cut to production-worker
+			CStr First = fg_AppManager_EnvironmentHostName("production-worker-us-east-001", "analytics-warehouse-us-east-prod-01");
+			CStr Second = fg_AppManager_EnvironmentHostName("production-worker-us-east-002", "analytics-warehouse-us-east-prod-01");
+			DMibExpectTrue(First.f_StartsWith("production-worker-analytics-"));
+			DMibExpect(First, !=, Second);
+			DMibExpect(First.f_GetLen(), <=, 63u);
+		}
+
+		{
+			DMibTestPath("Long Environment Names Stay Apart");
+
+			// A first label of 63 characters makes the generated host name shorten the environment name
+			CStr Start;
+			for (umint iCharacter = 0; iCharacter < 63; ++iCharacter)
+				Start += "a";
+
+			CStr First = fg_AppManager_EnvironmentHostName("Host", Start + ".first");
+			CStr Second = fg_AppManager_EnvironmentHostName("Host", Start + ".second");
+			DMibExpect(First, !=, Second);
+			DMibExpect(First.f_GetLen(), <=, 63u);
+			DMibExpect(Second.f_GetLen(), <=, 63u);
+			DMibExpectTrue(First.f_StartsWith("Host-"));
+
+			// The suffixes of these names collide in a DJB2 hash
+			DMibExpect(fg_AppManager_EnvironmentHostName("Host", Start + ".Aq"), !=, fg_AppManager_EnvironmentHostName("Host", Start + ".BP"));
+
+			CStr Undotted = fg_AppManager_EnvironmentHostName("Host", Start);
+			DMibExpect(Undotted.f_GetLen(), <=, 63u);
+			DMibExpectTrue(Undotted.f_StartsWith("Host-"));
+		}
+
+		{
+			DMibTestPath("Shared Host Name");
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--uts=host"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--uts", "host"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({}, "container:Other"));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network=container:Other"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network", "container:Other"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--net=container:Other"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network=name=container:Other"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({}, "name=container:Other"));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network=NAME=container:Other"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network=alias=a, name = container:Other"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network=\"name=container:Other\""}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network=name=CONTAINER:Other"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({}, "Name=Container:Other"));
+			DMibExpectFalse(fg_AppManager_ContainerSharesHostName({}, "CONTAINER:Other"));
+			DMibExpectFalse(fg_AppManager_ContainerSharesHostName({"--network=name=bridge,alias=container:Other"}, ""));
+			DMibExpectFalse(fg_AppManager_ContainerSharesHostName({"--network=bridge"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({}, "host"));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network=host"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--net", "host"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network=name=Host"}, ""));
+			DMibExpectFalse(fg_AppManager_ContainerSharesHostName({}, "hostnet"));
+			DMibExpectFalse(fg_AppManager_ContainerSharesHostName({"--uts", "private"}, "bridge"));
+
+			// The last option and the last name field apply
+			DMibExpectFalse(fg_AppManager_ContainerSharesHostName({"--uts=host", "--uts="}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--uts=private", "--uts", "host"}, ""));
+			DMibExpectFalse(fg_AppManager_ContainerSharesHostName({"--network=name=container:Other,name=bridge"}, ""));
+			DMibExpectTrue(fg_AppManager_ContainerSharesHostName({"--network=name=bridge,name=container:Other"}, ""));
+			DMibExpectFalse(fg_AppManager_ContainerSharesHostName({}, "name=container:Other,name=bridge"));
+		}
+	};
 }
 
 DMibTestRegister(CAppManager_Environment_Tests, Malterlib::Cloud);
