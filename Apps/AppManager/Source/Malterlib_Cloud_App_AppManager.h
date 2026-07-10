@@ -259,6 +259,7 @@ namespace NMib::NCloud::NAppManager
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AgentAppInterface;
 			TCDistributedActorInterface<CAppManagerEnvironmentInterface> m_AgentInterface;
 			TCVector<TCPromise<void>> m_OnAgentConnected;
+			CStr m_AgentUpdateInProgress; /// Description of an update the agent is installing; prevents host reboots while set
 			bool m_bStarting = false;
 			bool m_bStarted = false;
 			bool m_bStopping = false;
@@ -272,6 +273,7 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) override;
 			TCFuture<uint32> f_StopApplication(CStr _Name) override;
 			TCFuture<void> f_RunScript(CEnvironmentScript _Script) override;
+			TCFuture<void> f_ConfigureHostMonitor(CStr _AutoUpdateConfig) override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -287,6 +289,8 @@ namespace NMib::NCloud::NAppManager
 			;
 			TCFuture<void> f_ReportApplicationState(CAppManagerEnvironmentInterface::CApplicationStateChange _Change) override;
 			TCFuture<CStr> f_RequestApplicationConnectionTicket(CStr _LaunchID) override;
+			TCFuture<void> f_ReportEnvironmentUpdateState(bool _bUpdating, CStr _Description) override;
+			TCFuture<void> f_RequestEnvironmentRestart(CStr _Reason) override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -854,7 +858,8 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<void> fp_InitSensor();
 		TCFuture<void> fp_InitLog();
-		TCFuture<void> fp_InitHostMonitor();
+		TCFuture<void> fp_InitHostMonitor(NEncoding::CEJsonSorted _AutoUpdateConfig);
+		TCFuture<void> fp_ConfigureHostMonitorFromHost(CStr _AutoUpdateConfig);
 		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> fp_HostMonitorRebootNeededFunctor(NEncoding::CEJsonSorted const &_AutoUpdateConfig);
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
@@ -995,10 +1000,13 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_EnsureContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_AbortEnvironmentLaunch(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_RestartEnvironmentWhenIdle(TCSharedPointer<CEnvironment> _pEnvironment);
 
 		// Environment agent handling (agent side)
 		TCFuture<void> fp_RegisterWithEnvironmentHost();
 		void fp_ForwardApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange _Change);
+		TCFuture<void> fp_ReportEnvironmentUpdateStateToHost(bool _bUpdating);
+		TCFuture<void> fp_RequestEnvironmentRestartFromHost();
 
 		TCFuture<uint32> fp_CommandLine_EnumEnvironments(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_AddEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -1361,6 +1369,7 @@ namespace NMib::NCloud::NAppManager
 		fp64 mp_HostMonitorMemoryInterval = CHostMonitor::mc_DefaultHostMonitorMemoryInterval;
 
 		TCActor<CHostMonitor> mp_HostMonitor;
+		CStr mp_AppliedHostMonitorConfig; /// Agent side: the configuration the host monitor was last initialized with
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
 		CActorSubscription mp_MainConfigFileMonitorSubscription;
 		CStr mp_OsName;

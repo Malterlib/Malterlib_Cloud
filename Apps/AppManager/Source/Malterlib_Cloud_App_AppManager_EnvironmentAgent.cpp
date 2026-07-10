@@ -15,6 +15,7 @@ namespace NMib::NCloud::NAppManager
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_LaunchApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_StopApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_RunScript);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ConfigureHostMonitor);
 	}
 
 	CAppManagerEnvironmentInterface::~CAppManagerEnvironmentInterface()
@@ -26,6 +27,8 @@ namespace NMib::NCloud::NAppManager
 		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_RegisterEnvironmentAgent);
 		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_ReportApplicationState);
 		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_RequestApplicationConnectionTicket);
+		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_ReportEnvironmentUpdateState);
+		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_RequestEnvironmentRestart);
 	}
 
 	CAppManagerEnvironmentHostInterface::~CAppManagerEnvironmentHostInterface()
@@ -449,5 +452,99 @@ namespace NMib::NCloud::NAppManager
 		pThis->mp_EnvironmentTicketNotifications[NotificationID] = fg_Move(Ticket.m_NotificationsSubscription);
 
 		co_return Ticket.m_Ticket.f_ToStringTicket();
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_ConfigureHostMonitor(CStr _AutoUpdateConfig)
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_bEnvironmentAgent)
+			co_return DMibErrorInstance("Not running as an environment agent");
+
+		co_return co_await pThis->fp_ConfigureHostMonitorFromHost(fg_Move(_AutoUpdateConfig));
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentHostInterfaceImplementation::f_ReportEnvironmentUpdateState(bool _bUpdating, CStr _Description)
+	{
+		auto pThis = m_pThis;
+
+		auto pEnvironment = pThis->fp_EnvironmentFromHostID(fg_GetCallingHostInfo().f_GetRealHostID());
+		if (!pEnvironment)
+			co_return DErrorInstance("Environment agent not associated with your host");
+
+		if (_bUpdating)
+			pEnvironment->m_AgentUpdateInProgress = _Description.f_IsEmpty() ? CStr("Installing updates") : fg_Move(_Description);
+		else
+			pEnvironment->m_AgentUpdateInProgress = {};
+
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Environment '{}' update state: {}"
+				, pEnvironment->m_Name
+				, _bUpdating ? pEnvironment->m_AgentUpdateInProgress : CStr("Finished")
+			)
+		;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentHostInterfaceImplementation::f_RequestEnvironmentRestart(CStr _Reason)
+	{
+		auto pThis = m_pThis;
+
+		auto pEnvironment = pThis->fp_EnvironmentFromHostID(fg_GetCallingHostInfo().f_GetRealHostID());
+		if (!pEnvironment)
+			co_return DErrorInstance("Environment agent not associated with your host");
+
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Environment '{}' requested a restart: {}"
+				, pEnvironment->m_Name
+				, _Reason
+			)
+		;
+
+		// The restart stops the agent making this call, so it runs detached after
+		// the reply
+		fg_CallSafe
+			(
+				TCFunctionMovable<TCFuture<void> ()>
+				(
+					[pThis, pEnvironment]() -> TCFuture<void>
+					{
+						co_return co_await pThis->fp_RestartEnvironmentWhenIdle(pEnvironment);
+					}
+				)
+			)
+			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to restart environment after agent request")
+		;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_ReportEnvironmentUpdateStateToHost(bool _bUpdating)
+	{
+		if (!mp_EnvironmentHostActor)
+			co_return {};
+
+		co_return co_await mp_EnvironmentHostActor.f_CallActor(&CAppManagerEnvironmentHostInterface::f_ReportEnvironmentUpdateState)(_bUpdating, CStr("Installing OS updates"))
+			.f_Timeout(60.0, "Timed out reporting the environment update state")
+		;
+	}
+
+	TCFuture<void> CAppManagerActor::fp_RequestEnvironmentRestartFromHost()
+	{
+		if (!mp_EnvironmentHostActor)
+			co_return DMibErrorInstance("Not connected to the environment host");
+
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Requesting an environment restart to finish OS updates");
+
+		co_return co_await mp_EnvironmentHostActor.f_CallActor(&CAppManagerEnvironmentHostInterface::f_RequestEnvironmentRestart)(CStr("OS updates require a restart"))
+			.f_Timeout(60.0, "Timed out requesting the environment restart")
+		;
 	}
 }
