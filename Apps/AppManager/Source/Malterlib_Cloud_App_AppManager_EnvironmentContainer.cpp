@@ -18,6 +18,12 @@ namespace NMib::NCloud
 		Arguments.f_Insert(_Launch.m_ContainerName);
 		Arguments.f_Insert("--interactive");
 
+		if (!_Launch.m_Hostname.f_IsEmpty())
+		{
+			Arguments.f_Insert("--hostname");
+			Arguments.f_Insert(_Launch.m_Hostname);
+		}
+
 		if (_Launch.m_bReadOnly)
 			Arguments.f_Insert("--read-only");
 
@@ -873,6 +879,13 @@ namespace NMib::NCloud::NAppManager
 
 		CAppManagerContainerLaunch Launch;
 		Launch.m_ContainerName = fp_GetContainerName(_pEnvironment);
+
+		// Docker does not let the container change its host name at runtime, so it
+		// is set at creation; the Apple container runtime has no hostname option and
+		// the agent sets it instead, which its virtual machine allows
+		if (fp_GetContainerRuntimeExecutable(_pEnvironment) != "container")
+			Launch.m_Hostname = fp_GetEnvironmentHostName(*_pEnvironment);
+
 		Launch.m_Image = Settings.m_ContainerImage;
 		Launch.m_MemoryLimitMB = Settings.m_MemoryLimitMB;
 		Launch.m_CPULimit = Settings.m_CPULimit;
@@ -942,16 +955,10 @@ namespace NMib::NCloud::NAppManager
 		if (fp_GetContainerRuntimeExecutable(_pEnvironment) == "container" || fp_UseOwnColimaSystem(_pEnvironment))
 			Launch.m_PassEnvironment.f_Insert("MalterlibDistributedAppLocalSocketPrefix=/tmp");
 
-		// Hosts inside the environment carry the host computer name as a prefix, so
-		// the host an environment host comes from is visible wherever host names are
-		// shown
-		Launch.m_PassEnvironment.f_Insert
-			(
-				"MalterlibDistributedAppComputerName={}-{}"_f
-					<< NProcess::NPlatform::fg_Process_GetComputerName()
-					<< _pEnvironment->m_Name
-			)
-		;
+		// The agent sets the environment host name at startup, carrying the host
+		// computer name as a prefix so the host an environment comes from is visible
+		// wherever host names are shown
+		Launch.m_PassEnvironment.f_Insert("MalterlibAppManagerEnvironmentHostName={}"_f << fp_GetEnvironmentHostName(*_pEnvironment));
 
 		return Launch;
 	}
