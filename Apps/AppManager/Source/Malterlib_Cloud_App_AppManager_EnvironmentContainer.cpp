@@ -541,7 +541,9 @@ namespace NMib::NCloud::NAppManager
 
 		// The virtual machine can only share host paths configured when it starts, so
 		// it is started with every path the colima environments bind mount into their
-		// containers and restarted whenever that set changes
+		// containers and restarted whenever that set changes. The whole root directory
+		// is shared so that the app set can change without a restart; the containers
+		// only see the bind mounts they were created with, not the machine's shares
 		TCSet<CStr> Mounts;
 		Mounts.f_Insert(fg_TempCopy(mp_State.m_RootDirectory));
 		for (auto &pOtherEnvironment : mp_Environments)
@@ -560,6 +562,23 @@ namespace NMib::NCloud::NAppManager
 			// separate mount not visible through the root directory share
 			if (!Environment.m_Settings.m_ParentApplication.f_IsEmpty())
 				Mounts.f_Insert(fp_GetEnvironmentStorageDirectory(Environment));
+
+			// Application directories outside the root directory are not visible
+			// through the root directory share either
+			for (auto &pApplication : mp_Applications)
+			{
+				if (pApplication->m_bDeleted)
+					continue;
+
+				if (pApplication->m_Settings.m_LaunchEnvironment != Environment.m_Name)
+					continue;
+
+				CStr Directory = pApplication->f_GetDirectory();
+				if (Directory == mp_State.m_RootDirectory || Directory.f_StartsWith(mp_State.m_RootDirectory + "/"))
+					continue;
+
+				Mounts.f_Insert(fg_Move(Directory));
+			}
 
 			for (auto &Mount : Environment.m_Settings.m_ContainerExtraMounts)
 				Mounts.f_Insert(fg_TempCopy(Environment.m_Settings.m_ContainerExtraMounts.fs_GetKey(Mount)));
@@ -870,15 +889,24 @@ namespace NMib::NCloud::NAppManager
 			Launch.m_Network = "host";
 #endif
 
-		// The root directory is mounted at the same path inside the container so that
-		// application directories and local socket addresses stay valid inside it
-		Launch.m_Mounts[mp_State.m_RootDirectory] = mp_State.m_RootDirectory;
+		// The container gets the minimum mount surface: the environment storage, the
+		// directories of the applications launched in the environment and the
+		// configured extra mounts. Every path is mounted at its host path so that
+		// application directories stay valid inside the container, and the rest of
+		// the host root directory stays invisible to the environment
+		Launch.m_Mounts[_AgentRootDirectory] = _AgentRootDirectory;
 
-		// Environments confined to a parent application store their data inside that
-		// application's directory, which can be a separate (encrypted) mount. Nested
-		// mounts are not visible through the root bind mount, so it is mounted explicitly
-		if (!Settings.m_ParentApplication.f_IsEmpty())
-			Launch.m_Mounts[_AgentRootDirectory] = _AgentRootDirectory;
+		for (auto &pApplication : mp_Applications)
+		{
+			if (pApplication->m_bDeleted)
+				continue;
+
+			if (pApplication->m_Settings.m_LaunchEnvironment != _pEnvironment->m_Name)
+				continue;
+
+			CStr Directory = pApplication->f_GetDirectory();
+			Launch.m_Mounts[Directory] = Directory;
+		}
 
 		for (auto &Mount : Settings.m_ContainerExtraMounts)
 			Launch.m_Mounts[Settings.m_ContainerExtraMounts.fs_GetKey(Mount)] = Mount;

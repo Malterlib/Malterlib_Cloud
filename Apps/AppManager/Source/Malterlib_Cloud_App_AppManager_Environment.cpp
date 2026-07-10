@@ -947,6 +947,11 @@ namespace NMib::NCloud::NAppManager
 				Environment.m_ContainerLaunchID = pValue->f_String();
 			if (auto pValue = EnvironmentJson.f_GetMember("ContainerRequestTicketMagic", EJsonType_String))
 				Environment.m_ContainerRequestTicketMagic = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerMounts", EJsonType_Array))
+			{
+				for (auto &Mount : pValue->f_Array())
+					Environment.m_ContainerMounts.f_Insert(fg_TempCopy(Mount.f_String()));
+			}
 			if (auto pValue = EnvironmentJson.f_GetMember("ListenPort", EJsonType_Integer))
 				Environment.m_ListenPort = (uint32)pValue->f_Integer();
 
@@ -999,6 +1004,12 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentJson["ContainerFingerprint"] = Environment.m_ContainerFingerprint;
 		EnvironmentJson["ContainerLaunchID"] = Environment.m_ContainerLaunchID;
 		EnvironmentJson["ContainerRequestTicketMagic"] = Environment.m_ContainerRequestTicketMagic;
+		{
+			auto &MountsJson = EnvironmentJson["ContainerMounts"].f_Array();
+			MountsJson.f_Clear();
+			for (auto &Mount : Environment.m_ContainerMounts)
+				MountsJson.f_Insert(Mount);
+		}
 		EnvironmentJson["ListenPort"] = Environment.m_ListenPort;
 
 		co_return co_await mp_State.m_StateDatabase.f_Save();
@@ -2333,7 +2344,8 @@ namespace NMib::NCloud::NAppManager
 			}
 
 			LaunchExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
-			TCVector<CStr> RunArguments = fg_AppManager_BuildContainerRunArguments(fp_BuildEnvironmentContainerLaunch(_pEnvironment, AgentExecutable, AgentRootDirectory));
+			CAppManagerContainerLaunch ContainerLaunch = fp_BuildEnvironmentContainerLaunch(_pEnvironment, AgentExecutable, AgentRootDirectory);
+			TCVector<CStr> RunArguments = fg_AppManager_BuildContainerRunArguments(ContainerLaunch);
 
 			// The container keeps its creation-time process environment, so it can only be
 			// reused while everything that shaped it is unchanged; the fingerprint covers
@@ -2376,6 +2388,9 @@ namespace NMib::NCloud::NAppManager
 				_pEnvironment->m_ContainerLaunchID = fg_RandomID();
 				_pEnvironment->m_ContainerRequestTicketMagic = fg_RandomID();
 				_pEnvironment->m_ContainerFingerprint = Fingerprint;
+				_pEnvironment->m_ContainerMounts.f_Clear();
+				for (auto &Mount : ContainerLaunch.m_Mounts)
+					_pEnvironment->m_ContainerMounts.f_Insert(fg_TempCopy(ContainerLaunch.m_Mounts.fs_GetKey(Mount)));
 
 				co_await fp_UpdateEnvironmentJson(_pEnvironment).f_Wrap()
 					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to save environment container state")
@@ -2761,6 +2776,48 @@ namespace NMib::NCloud::NAppManager
 
 	auto CAppManagerActor::fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment) -> TCFuture<CAppLaunchResult>
 	{
+		// A container only sees the mounts it was created with, so when the
+		// application directory is not covered the environment is restarted and the
+		// container recreated with the new mount set
+		bool bRestartedEnvironment = false;
+		if
+		(
+			_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container
+			&& _pEnvironment->f_IsStarted()
+		)
+		{
+			CStr Directory = _pApplication->f_GetDirectory();
+
+			bool bCovered = false;
+			for (auto &Mount : _pEnvironment->m_ContainerMounts)
+			{
+				if (Directory == Mount || Directory.f_StartsWith(Mount + "/"))
+				{
+					bCovered = true;
+					break;
+				}
+			}
+
+			if (!bCovered)
+			{
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Info
+						, "Restarting environment '{}' to mount the directory of application '{}'"
+						, _pEnvironment->m_Name
+						, _pApplication->m_Name
+					)
+				;
+
+				co_await fp_StopEnvironmentInternal(_pEnvironment);
+				bRestartedEnvironment = true;
+
+				if (_pApplication->m_bDeleted)
+					co_return DMibErrorInstance("Application deleted");
+			}
+		}
+
 		auto EnsureResult = co_await fp_EnsureEnvironmentStarted(_pEnvironment).f_Wrap();
 
 		if (_pApplication->m_bDeleted)
@@ -2781,6 +2838,11 @@ namespace NMib::NCloud::NAppManager
 
 			co_return EnsureResult.f_GetException();
 		}
+
+		// Relaunch the applications the environment restart stopped with the auto
+		// start flag
+		if (bRestartedEnvironment)
+			fp_UpdateApplicationDependencies();
 
 		auto InterfaceAddress = co_await fp_EnsureEnvironmentListen(_pEnvironment).f_Wrap();
 
