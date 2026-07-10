@@ -1921,7 +1921,7 @@ namespace NMib::NCloud::NAppManager
 
 			Executable = co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [Candidates = fg_Move(Candidates), StorageDirectory, _pError]() -> CStr
+					g_Dispatch(BlockingActorCheckout) / [Candidates = fg_Move(Candidates), Directory, StorageDirectory, _pError]() -> CStr
 					{
 						CStr Source;
 						for (auto &Candidate : Candidates)
@@ -1936,10 +1936,10 @@ namespace NMib::NCloud::NAppManager
 						if (Source.f_IsEmpty())
 							return {};
 
-						// The agent application directory is only a source for the executable:
-						// several environments can share the same agent application and self
-						// updates replace its files, so each environment runs its own copy
-						// inside its storage directory
+						// The agent application directory is only a source for the
+						// distribution files: several environments can share the same agent
+						// application and self updates replace its files, so each
+						// environment runs its own copy inside its storage directory
 						CStr AgentDirectory = StorageDirectory / ".agent";
 						CStr AgentExecutable = AgentDirectory / CFile::fs_GetFile(Source);
 
@@ -1947,11 +1947,19 @@ namespace NMib::NCloud::NAppManager
 						{
 							CFile::fs_CreateDirectory(StorageDirectory);
 							CFile::fs_CreateDirectory(AgentDirectory);
-							CFile::fs_DiffCopyFileOrDirectory(Source, AgentExecutable, nullptr);
+							CFile::fs_DiffCopyFileOrDirectory
+								(
+									Directory
+									, AgentDirectory
+									, nullptr
+									, {"*/.home", "*/.tmp", "*/TempVersion", "*/TempVersionDownload"}
+									, 0.0
+								)
+							;
 						}
 						catch (CException const &_Exception)
 						{
-							*_pError = "Failed to copy the agent executable to '{}': {}"_f << AgentExecutable << _Exception;
+							*_pError = "Failed to copy the agent files to '{}': {}"_f << AgentDirectory << _Exception;
 							return {};
 						}
 
