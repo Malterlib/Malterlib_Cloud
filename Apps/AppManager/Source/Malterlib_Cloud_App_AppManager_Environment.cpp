@@ -456,6 +456,32 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentManagement.f_RegisterCommand
 			(
 				{
+					"Names"_o= _o["--environment-bash"]
+					, "Description"_o=
+						"Prints the command that opens an interactive bash in the environment's container.\n"
+						"Run it directly with: `sudo ./AppManager --environment-bash --name Name`"
+					, "Options"_o=
+					{
+						NameOption
+						, "Shell?"_o=
+						{
+							"Names"_o= _o["--shell"]
+							, "Type"_o= ""
+							, "Default"_o= "/bin/bash"
+							, "Description"_o= "The shell to run inside the environment."
+						}
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_EnvironmentBash(fg_Move(_Params), fg_Move(_pCommandLine));
+				}
+			)
+		;
+
+		EnvironmentManagement.f_RegisterCommand
+			(
+				{
 					"Names"_o= _o["--vm-image-create"]
 					, "Description"_o=
 						"Creates a macOS guest VM image bundle and installs macOS into it from a restore image (IPSW).\n"
@@ -1565,6 +1591,68 @@ namespace NMib::NCloud::NAppManager
 		auto Result = co_await fp_PullEnvironment(_Params["Name"].f_String(), fg_GetCallingHostInfo()).f_Wrap();
 
 		co_return _pCommandLine->f_AddAsyncResult(Result);
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnvironmentBash(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		CStr Name = _Params["Name"].f_String();
+		CStr Shell = _Params["Shell"].f_String();
+
+		auto *pFindEnvironment = mp_Environments.f_FindEqual(Name);
+		if (!pFindEnvironment)
+		{
+			co_await _pCommandLine->f_StdErr("No such environment '{}'\n"_f << Name);
+			co_return 1;
+		}
+
+		auto pEnvironment = *pFindEnvironment;
+
+		if (pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Container)
+		{
+			co_await _pCommandLine->f_StdErr("Environment '{}' is not a container environment\n"_f << Name);
+			co_return 1;
+		}
+
+		CStr Executable = fp_GetContainerRuntimeExecutable(pEnvironment);
+		bool bOwnAppleContainerSystem = Executable == "container" && fp_UseOwnAppleContainerSystem();
+		bool bOwnColimaSystem = fp_UseOwnColimaSystem(pEnvironment);
+
+		TCVector<CStr> Parts;
+
+		// The AppManager-owned container systems are reached with the data location
+		// their daemons were started with, which needs an elevated client
+		if (bOwnAppleContainerSystem || bOwnColimaSystem)
+		{
+			Parts.f_Insert("sudo");
+			Parts.f_Insert("env");
+			if (bOwnAppleContainerSystem)
+				Parts.f_Insert("CONTAINER_APP_ROOT=" + fp_GetAppleContainerAppRoot());
+			else
+				Parts.f_Insert("DOCKER_HOST=unix://" + (fp_GetColimaAppRoot() / "colima" / "default" / "docker.sock"));
+		}
+
+		Parts.f_Insert(fg_Move(Executable));
+		Parts.f_Insert("exec");
+		Parts.f_Insert("--interactive");
+		Parts.f_Insert("--tty");
+		Parts.f_Insert(fp_GetContainerName(pEnvironment));
+		Parts.f_Insert(fg_Move(Shell));
+
+		CStr Command;
+		for (auto &Part : Parts)
+		{
+			if (!Command.f_IsEmpty())
+				Command += " ";
+
+			if (NStr::fg_StrEscapeBashQuotesNeeded(Part))
+				Command += NStr::fg_StrEscapeBashSingleQuotes(Part);
+			else
+				Command += Part;
+		}
+
+		co_await _pCommandLine->f_StdOut("{}\n"_f << Command);
+
+		co_return 0;
 	}
 
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumEnvironments(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
