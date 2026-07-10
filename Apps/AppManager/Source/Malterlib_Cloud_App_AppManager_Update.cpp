@@ -66,6 +66,8 @@ namespace NMib::NCloud::NAppManager
 			if (Package.f_IsEmpty())
 				co_return DMibErrorInstance("You have to specify a package");
 			Package = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
+
+			Update.m_bUpdateSettings = _Params["UpdateSettings"].f_Boolean();
 		}
 		else
 		{
@@ -167,7 +169,10 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerInterface::CVersionInformation VersionInfo;
 
 		if (!_FromFileName.f_IsEmpty())
+		{
 			bDownloadVersion = false;
+			bUpdateSettings = _Update.m_bUpdateSettings;
+		}
 		else
 		{
 			bDryRun = _Update.m_bDryRun;

@@ -499,9 +499,15 @@ namespace NMib::NCloud::NAppManager
 			CStr Fingerprint = fsp_GetOSDependenciesFingerprint(_Config.m_OSDependencies);
 			if (Fingerprint != pThis->mp_AppliedAgentOSDependencies)
 			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Installing the agent OS dependencies");
+
 				auto Result = co_await pThis->fp_InstallOSDependencies(fg_Move(_Config.m_OSDependencies)).f_Wrap();
 				if (Result)
+				{
 					pThis->mp_AppliedAgentOSDependencies = fg_Move(Fingerprint);
+
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Installed the agent OS dependencies");
+				}
 				else
 				{
 					DMibLogWithCategory
