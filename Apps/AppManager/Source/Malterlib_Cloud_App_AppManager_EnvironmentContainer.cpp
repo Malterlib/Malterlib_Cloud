@@ -18,6 +18,12 @@ namespace NMib::NCloud
 		Arguments.f_Insert(_Launch.m_ContainerName);
 		Arguments.f_Insert("--interactive");
 
+		if (!_Launch.m_Hostname.f_IsEmpty())
+		{
+			Arguments.f_Insert("--hostname");
+			Arguments.f_Insert(_Launch.m_Hostname);
+		}
+
 		if (_Launch.m_bReadOnly)
 			Arguments.f_Insert("--read-only");
 
@@ -878,6 +884,13 @@ namespace NMib::NCloud::NAppManager
 
 		CAppManagerContainerLaunch Launch;
 		Launch.m_ContainerName = fp_GetContainerName(_pEnvironment);
+
+		// Docker does not let the container change its host name at runtime, so it
+		// is set at creation; the Apple container runtime has no hostname option and
+		// the agent sets it instead, which its virtual machine allows
+		if (fp_GetContainerRuntimeExecutable(_pEnvironment) != "container")
+			Launch.m_Hostname = fp_GetEnvironmentHostName(*_pEnvironment);
+
 		Launch.m_Image = Settings.m_ContainerImage;
 		Launch.m_MemoryLimitMB = Settings.m_MemoryLimitMB;
 		Launch.m_CPULimit = Settings.m_CPULimit;
@@ -942,9 +955,9 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		// Environment variables forwarded from the launching process into the container
-		// The agent identity and host id come from the deployment settings next
-		// to the agent executable, not from the environment: the container
-		// environment is inherited by everything running inside it
+		// The agent identity, host id and host name come from the deployment
+		// settings next to the agent executable, not from the environment: the
+		// container environment is inherited by everything running inside it
 		Launch.m_PassEnvironment =
 			{
 				"MalterlibDistributedAppInterfaceServerAddress"

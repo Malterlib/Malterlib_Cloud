@@ -15,6 +15,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bEnvironmentAgent = false;
 			bool m_bEnvironmentContainer = false;
 			CStr m_EnvironmentHostID;
+			CStr m_EnvironmentHostName;
 			CStr m_EnvironmentDataRoot;
 		};
 
@@ -39,6 +40,8 @@ namespace NMib::NCloud::NAppManager
 							Settings.m_bEnvironmentContainer = Json.f_GetMemberValue("EnvironmentContainer", false).f_Boolean();
 							if (auto *pValue = Json.f_GetMember("EnvironmentHostID", EJsonType_String))
 								Settings.m_EnvironmentHostID = pValue->f_String();
+							if (auto *pValue = Json.f_GetMember("EnvironmentHostName", EJsonType_String))
+								Settings.m_EnvironmentHostName = pValue->f_String();
 							if (auto *pValue = Json.f_GetMember("EnvironmentDataRoot", EJsonType_String))
 								Settings.m_EnvironmentDataRoot = pValue->f_String();
 						}
@@ -105,6 +108,11 @@ namespace NMib::NCloud::NAppManager
 			auto &Deployment = fg_GetAgentDeploymentSettings();
 			if (Deployment.m_bEnvironmentAgent)
 			{
+				// The environment host name must be applied before the distributed
+				// identity derives the friendly host name from it
+				if (!Deployment.m_EnvironmentHostName.f_IsEmpty())
+					CAppManagerActor::fs_ApplyEnvironmentHostName(Deployment.m_EnvironmentHostName);
+
 				// VM guest agents have no launching process to receive the interface
 				// settings from, so the launching AppManager writes them next to the
 				// agent executable on the shared storage instead

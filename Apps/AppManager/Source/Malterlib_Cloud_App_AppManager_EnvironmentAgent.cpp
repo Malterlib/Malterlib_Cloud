@@ -6,6 +6,11 @@
 #include <Mib/Concurrency/LogError>
 #include <Mib/Cloud/FileTransfer>
 
+#ifdef DPlatformFamily_Linux
+	#include <Mib/Core/PlatformSpecific/PosixErrNo>
+	#include <unistd.h>
+#endif
+
 #ifdef DPlatformFamily_macOS
 	#include <sys/param.h>
 	#include <sys/mount.h>
@@ -136,6 +141,7 @@ namespace NMib::NCloud::NAppManager
 	template <typename tf_CStream>
 	void CAppManagerEnvironmentInterface::CAgentConfig::f_Stream(tf_CStream &_Stream)
 	{
+		_Stream % m_HostName;
 		_Stream % m_AutoUpdateConfig;
 		_Stream % m_OSDependencies;
 	}
@@ -1177,6 +1183,23 @@ namespace NMib::NCloud::NAppManager
 		if (!pThis->mp_bEnvironmentAgent)
 			co_return DMibErrorInstance("Not running as an environment agent");
 
+		if (!_Config.m_HostName.f_IsEmpty())
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) / [HostName = _Config.m_HostName]()
+						{
+							fs_ApplyEnvironmentHostName(HostName);
+						}
+					)
+					% "Failed to apply the environment host name"
+				)
+			;
+		}
+
 		// The agent application's OS dependencies are installed inside the
 		// environment before the host monitor needs them
 		if (!_Config.m_OSDependencies.f_IsEmpty())
@@ -1259,6 +1282,70 @@ namespace NMib::NCloud::NAppManager
 		fg_ShutdownEnvironmentAfterDelay().f_DiscardResult();
 
 		co_return {};
+#endif
+	}
+
+	void CAppManagerActor::fs_ApplyEnvironmentHostName(CStr const &_HostName)
+	{
+#ifdef DPlatformFamily_Linux
+		// The agent runs as root with its own UTS namespace (a container) or kernel
+		// (a virtual machine), so setting the host name only affects the environment.
+		// There is no platform abstraction for setting the host name; environments
+		// are Linux guests
+		if (NProcess::NPlatform::fg_Process_GetComputerName() != _HostName)
+		{
+			if (sethostname(_HostName.f_GetStr(), _HostName.f_GetLen()) != 0)
+			{
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Warning
+						, "Failed to set the environment host name to '{}': {}"
+						, _HostName
+						, NPlatform::fg_FormatErrno(errno)
+					)
+				;
+				return;
+			}
+
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Set the environment host name to '{}'", _HostName);
+		}
+
+		try
+		{
+			// Persist the name for processes that read it from the configuration and
+			// across virtual machine reboots
+			CStr HostNameFile = "/etc/hostname";
+			CStr HostNameLine = _HostName + "\n";
+			if (!CFile::fs_FileExists(HostNameFile) || CFile::fs_ReadStringFromFile(HostNameFile) != HostNameLine)
+				CFile::fs_WriteStringToFile(HostNameFile, HostNameLine);
+
+			// Keep the host name resolvable so tools that look up their own name work
+			CStr HostsFile = "/etc/hosts";
+			CStr Hosts;
+			if (CFile::fs_FileExists(HostsFile))
+				Hosts = CFile::fs_ReadStringFromFile(HostsFile);
+
+			if (Hosts.f_Find(_HostName) < 0)
+			{
+				if (!Hosts.f_IsEmpty() && !Hosts.f_EndsWith("\n"))
+					Hosts += "\n";
+				Hosts += "127.0.0.1\t" + _HostName + "\n";
+				CFile::fs_WriteStringToFile(HostsFile, Hosts);
+			}
+		}
+		catch (CException const &_Exception)
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Warning
+					, "Failed to persist the environment host name '{}': {}"
+					, _HostName
+					, _Exception
+				)
+			;
+		}
 #endif
 	}
 

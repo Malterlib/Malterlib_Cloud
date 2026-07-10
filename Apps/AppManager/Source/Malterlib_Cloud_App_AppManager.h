@@ -34,6 +34,9 @@ namespace NMib::NCloud::NAppManager
 
 		static constexpr double mc_DefaultAutoUpdateDelay = 15.0;
 
+		/// Sets the OS host name of the environment the process runs in
+		static void fs_ApplyEnvironmentHostName(NStr::CStr const &_HostName);
+
 	private:
 		using EUpdateStage = CAppManagerInterface::EUpdateStage;
 		struct CFirstApplicationUpdate;
@@ -1033,6 +1036,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<CStr> fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError);
 		CStr fp_GetContainerRuntimeExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment);
 		CStr fp_GetContainerName(TCSharedPointer<CEnvironment> const &_pEnvironment);
+		CStr fp_GetEnvironmentHostName(CEnvironment const &_Environment);
 		CAppManagerContainerLaunch fp_BuildEnvironmentContainerLaunch
 			(
 				TCSharedPointer<CEnvironment> const &_pEnvironment
