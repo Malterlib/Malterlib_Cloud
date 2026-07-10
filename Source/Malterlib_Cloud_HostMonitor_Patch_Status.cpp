@@ -145,7 +145,13 @@ namespace NMib::NCloud
 				|| (PatchesNeeded.m_nNormalPatches && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_NormalUpdates))
 			)
 		{
+			if (m_Config.m_fOnPatchingChanged)
+				co_await m_Config.m_fOnPatchingChanged(true).f_Wrap() > LogError("Failed to report patching start (OS patch status)");
+
 			co_await f_Patch_InstallPatches().f_Wrap() > LogError("Failed to install patches automatically (OS patch status)");
+
+			if (m_Config.m_fOnPatchingChanged)
+				co_await m_Config.m_fOnPatchingChanged(false).f_Wrap() > LogError("Failed to report patching end (OS patch status)");
 
 			// Update patch state after install
 			PatchesNeeded = co_await f_Patch_PatchesNeeded();
