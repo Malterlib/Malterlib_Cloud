@@ -19,8 +19,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x103
-			, EProtocolVersion_Current = 0x103
+			EProtocolVersion_Min = 0x104
+			, EProtocolVersion_Current = 0x104
 		};
 
 		enum EApplicationState : uint32
@@ -91,6 +91,11 @@ namespace NMib::NCloud::NAppManager
 		virtual NConcurrency::TCFuture<NStr::CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) = 0;
 		virtual NConcurrency::TCFuture<uint32> f_StopApplication(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_RunScript(CEnvironmentScript _Script) = 0;
+
+		/// Configures the agent's host monitor with the automatic update settings
+		/// inherited from the host AppManager; _AutoUpdateConfig is the encoded
+		/// AutoUpdate configuration object, or empty for no automatic updates
+		virtual NConcurrency::TCFuture<void> f_ConfigureHostMonitor(NStr::CStr _AutoUpdateConfig) = 0;
 	};
 
 	/// Interface published by the host AppManager. Environment agents use it to
@@ -104,8 +109,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x103
-			, EProtocolVersion_Current = 0x103
+			EProtocolVersion_Min = 0x104
+			, EProtocolVersion_Current = 0x104
 		};
 
 		virtual auto f_RegisterEnvironmentAgent
@@ -121,5 +126,14 @@ namespace NMib::NCloud::NAppManager
 		/// agent's environment; the application uses it to connect its distributed
 		/// app interface to the host AppManager
 		virtual NConcurrency::TCFuture<NStr::CStr> f_RequestApplicationConnectionTicket(NStr::CStr _LaunchID) = 0;
+
+		/// Reports that the calling agent's environment is installing updates; the
+		/// host prevents reboots while an environment update is in progress
+		virtual NConcurrency::TCFuture<void> f_ReportEnvironmentUpdateState(bool _bUpdating, NStr::CStr _Description) = 0;
+
+		/// Asks the host to restart the calling agent's environment, for example
+		/// after OS updates that require a reboot; the host restarts the environment
+		/// when no operations are in progress on its applications
+		virtual NConcurrency::TCFuture<void> f_RequestEnvironmentRestart(NStr::CStr _Reason) = 0;
 	};
 }

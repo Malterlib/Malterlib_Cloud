@@ -413,8 +413,16 @@ namespace NMib::NCloud::NAppManager
 		co_await fp_InitSensor();
 		co_await fp_InitLog();
 
+		// An environment agent initializes its host monitor when the environment
+		// host sends the inherited update configuration after connecting
 		if (!mp_bEnvironmentAgent)
-			co_await fp_InitHostMonitor();
+		{
+			CEJsonSorted AutoUpdateConfig;
+			if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
+				AutoUpdateConfig = CEJsonSorted::fs_FromCompatible(*pAutoUpdate);
+
+			co_await fp_InitHostMonitor(fg_Move(AutoUpdateConfig));
+		}
 
 		co_await fp_ReadState();
 

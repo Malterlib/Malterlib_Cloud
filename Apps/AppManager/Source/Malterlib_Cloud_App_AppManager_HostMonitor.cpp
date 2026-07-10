@@ -10,7 +10,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCFuture<void> CAppManagerActor::fp_InitHostMonitor()
+	TCFuture<void> CAppManagerActor::fp_InitHostMonitor(CEJsonSorted _AutoUpdateConfig)
 	{
 		mp_HostMonitor = fg_Construct(mp_SensorStore, mp_LogStore, mp_DatabaseActor, mp_LogMetadata, mp_SensorMetadata);
 
@@ -39,19 +39,30 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
+		if (_AutoUpdateConfig.f_IsObject())
 		{
-			if (pAutoUpdate->f_GetMemberValue("NormalUpdates", false).f_Boolean())
+			if (_AutoUpdateConfig.f_GetMemberValue("NormalUpdates", false).f_Boolean())
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_NormalUpdates;
 
-			if (pAutoUpdate->f_GetMemberValue("SecurityUpdates", false).f_Boolean())
+			if (_AutoUpdateConfig.f_GetMemberValue("SecurityUpdates", false).f_Boolean())
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_SecurityUpdates;
 
-			if (pAutoUpdate->f_GetMemberValue("AutomaticReboot", false).f_Boolean())
+			if (_AutoUpdateConfig.f_GetMemberValue("AutomaticReboot", false).f_Boolean())
 			{
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_AutomaticReboot;
-				Config.m_fOnRebootNeeded = fp_HostMonitorRebootNeededFunctor(CEJsonSorted::fs_FromCompatible(*pAutoUpdate));
+				Config.m_fOnRebootNeeded = fp_HostMonitorRebootNeededFunctor(_AutoUpdateConfig);
 			}
+		}
+
+		// An update in the environment must prevent host reboots, so the agent
+		// reports the patching state to the environment host
+		if (mp_bEnvironmentAgent)
+		{
+			Config.m_fOnPatchingChanged = g_ActorFunctor / [this](bool _bPatching) -> TCFuture<void>
+				{
+					co_return co_await fp_ReportEnvironmentUpdateStateToHost(_bPatching);
+				}
+			;
 		}
 
 		auto InitResult = co_await mp_HostMonitor(&CHostMonitor::f_Init, fg_Move(Config));
@@ -87,6 +98,38 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_ConfigureHostMonitorFromHost(CStr _AutoUpdateConfig)
+	{
+		if (mp_HostMonitor && _AutoUpdateConfig == mp_AppliedHostMonitorConfig)
+			co_return {};
+
+		CEJsonSorted Config;
+		if (!_AutoUpdateConfig.f_IsEmpty())
+		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the host monitor configuration from the environment host");
+
+			Config = CEJsonSorted::fs_FromString(_AutoUpdateConfig);
+		}
+
+		// The host monitor configuration is fixed at initialization, so a changed
+		// configuration recreates the monitor
+		if (mp_HostMonitor)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Restarting the host monitor with a changed configuration from the environment host");
+
+			mp_MainDirectoryMonitorSubscription = {};
+			mp_MainConfigFileMonitorSubscription = {};
+
+			co_await fg_Move(mp_HostMonitor).f_Destroy().f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the host monitor")
+			;
+		}
+
+		mp_AppliedHostMonitorConfig = _AutoUpdateConfig;
+
+		co_return co_await fp_InitHostMonitor(fg_Move(Config));
 	}
 
 	void CAppManagerActor::fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine)

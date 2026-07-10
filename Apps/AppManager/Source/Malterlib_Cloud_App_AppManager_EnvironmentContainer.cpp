@@ -942,6 +942,17 @@ namespace NMib::NCloud::NAppManager
 		if (fp_GetContainerRuntimeExecutable(_pEnvironment) == "container" || fp_UseOwnColimaSystem(_pEnvironment))
 			Launch.m_PassEnvironment.f_Insert("MalterlibDistributedAppLocalSocketPrefix=/tmp");
 
+		// Hosts inside the environment carry the host computer name as a prefix, so
+		// the host an environment host comes from is visible wherever host names are
+		// shown
+		Launch.m_PassEnvironment.f_Insert
+			(
+				"MalterlibDistributedAppComputerName={}-{}"_f
+					<< NProcess::NPlatform::fg_Process_GetComputerName()
+					<< _pEnvironment->m_Name
+			)
+		;
+
 		return Launch;
 	}
 

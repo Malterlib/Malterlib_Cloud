@@ -167,6 +167,7 @@ namespace NMib::NCloud
 			fp64 m_ReportErrorAfter_RebootRequired = 2_weeks;
 
 			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> m_fOnRebootNeeded;
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (bool _bPatching)> m_fOnPatchingChanged; ///< Called around automatic patch installation
 			EAutomaticUpdatesFlag m_AutomaticUpdateFlags = EAutomaticUpdatesFlag::mc_None;
 		};
 
