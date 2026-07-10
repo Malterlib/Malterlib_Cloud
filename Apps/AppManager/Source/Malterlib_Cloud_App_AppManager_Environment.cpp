@@ -2607,6 +2607,9 @@ namespace NMib::NCloud::NAppManager
 			SettingsJson["EnvironmentHostID"] = mp_State.m_HostID;
 			SettingsJson["UserGroupNameTransform"] = mp_pUniqueUserGroup->m_UserGroupNameTransform;
 
+			// Empty for a local environment, whose agent shares the host name with this host; the agent skips an empty name
+			SettingsJson["EnvironmentHostName"] = fp_GetEnvironmentHostName(*_pEnvironment);
+
 			if (fp_EnvironmentUsesRemoteStorage(*_pEnvironment))
 			{
 				if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
@@ -3638,12 +3641,48 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	CStr CAppManagerActor::fp_GetEnvironmentHostName(CEnvironment const &_Environment)
+	{
+		// A local agent shares the host's UTS namespace and /etc, so naming it would rename the host
+		if (_Environment.m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Local)
+			return {};
+
+		CStr HostName = "{}-{}"_f << NProcess::NPlatform::fg_Process_GetComputerName() << _Environment.m_Name;
+
+		// Keep the name a valid host name label: letters, digits and hyphens
+		CStr Sanitized;
+		for (ch8 const *pChar = HostName.f_GetStr(); *pChar; ++pChar)
+		{
+			ch8 Char = *pChar;
+			bool bValid
+				= (Char >= 'a' && Char <= 'z')
+				|| (Char >= 'A' && Char <= 'Z')
+				|| (Char >= '0' && Char <= '9')
+				|| Char == '-'
+			;
+
+			ch8 Append[2] = {bValid ? Char : ch8('-'), 0};
+			Sanitized += Append;
+		}
+
+		while (Sanitized.f_StartsWith("-"))
+			Sanitized = Sanitized.f_Extract(1);
+		while (Sanitized.f_EndsWith("-"))
+			Sanitized = Sanitized.f_Left(Sanitized.f_GetLen() - 1);
+
+		if (Sanitized.f_GetLen() > 63)
+			Sanitized = Sanitized.f_Left(63);
+
+		return Sanitized;
+	}
+
 	void CAppManagerActor::fp_SendEnvironmentAgentConfig(CEnvironment &_Environment)
 	{
 		if (!_Environment.m_AgentInterface)
 			return;
 
 		CAppManagerEnvironmentInterface::CAgentConfig AgentConfig;
+		AgentConfig.m_HostName = fp_GetEnvironmentHostName(_Environment);
 
 		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
 			AgentConfig.m_AutoUpdateConfig = CEJsonSorted::fs_FromCompatible(*pAutoUpdate).f_ToString();
@@ -3729,8 +3768,8 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_AgentInterface = fg_Move(_Interface);
 
-		// The agent monitors the environment with the update settings inherited
-		// from this AppManager
+		// The agent names the environment host after this host and monitors the
+		// environment with the update settings inherited from this AppManager
 		fp_SendEnvironmentAgentConfig(*_pEnvironment);
 
 		_pEnvironment->m_bStarted = true;
