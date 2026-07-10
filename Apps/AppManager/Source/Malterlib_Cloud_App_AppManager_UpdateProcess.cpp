@@ -140,46 +140,61 @@ namespace NMib::NCloud::NAppManager
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
 
+		CVersionManager::CVersionInformation VersionInfo;
+
 		if (!State.m_SourcePath.f_IsEmpty())
-			co_return {}; // Already specified
+		{
+			// A from-file update reads the version information from the package, so
+			// the settings can be updated from it like for a downloaded version
+			auto PackageInfo = co_await fp_ReadPackageVersionInfo(State.m_SourcePath, State.m_fOnInfo);
+			if (!PackageInfo)
+				co_return {}; // The package carries no version information
 
-		State.m_fOnInfo(fg_Format("Downloading version '{}' from version managers", State.m_VersionID));
+			State.m_VersionID = PackageInfo->m_VersionID;
+			State.m_VersionTime = PackageInfo->m_VersionInfo.m_Time;
+			VersionInfo = fg_Move(PackageInfo->m_VersionInfo);
+		}
+		else
+		{
+			State.m_fOnInfo(fg_Format("Downloading version '{}' from version managers", State.m_VersionID));
 
-		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_DownloadVersion, {});
+			co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_DownloadVersion, {});
 
-		if (auto pException = State.f_CheckAbort())
-			co_return pException;
+			if (auto pException = State.f_CheckAbort())
+				co_return pException;
 
-		CStr DownloadDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersionDownload";
-		CStr DownloadDirectory = DownloadDirectoryRoot / fg_FastRandomID();
-		State.m_SourcePath = DownloadDirectory;
-		State.m_AllowSourceExist[DownloadDirectoryRoot];
+			CStr DownloadDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersionDownload";
+			CStr DownloadDirectory = DownloadDirectoryRoot / fg_FastRandomID();
+			State.m_SourcePath = DownloadDirectory;
+			State.m_AllowSourceExist[DownloadDirectoryRoot];
 
-		State.m_DownloadDirectoryCleanup = g_BlockingActorSubscription / [DownloadDirectoryRoot]
-			{
-				try
+			State.m_DownloadDirectoryCleanup = g_BlockingActorSubscription / [DownloadDirectoryRoot]
 				{
-					if (CFile::fs_FileExists(DownloadDirectoryRoot))
-						CFile::fs_DeleteDirectoryRecursive(DownloadDirectoryRoot);
+					try
+					{
+						if (CFile::fs_FileExists(DownloadDirectoryRoot))
+							CFile::fs_DeleteDirectoryRecursive(DownloadDirectoryRoot);
+					}
+					catch (CExceptionFile const &_Exception)
+					{
+						[[maybe_unused]] auto &Exception = _Exception;
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up version download: {}", Exception);
+					}
 				}
-				catch (CExceptionFile const &_Exception)
-				{
-					[[maybe_unused]] auto &Exception = _Exception;
-					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up version download: {}", Exception);
-				}
-			}
-		;
+			;
 
-		CVersionManager::CVersionInformation VersionInfo = co_await
-			fp_DownloadApplication(State.m_pApplication->m_Settings.m_VersionManagerApplication, State.m_VersionID, DownloadDirectory)
-		;
+			VersionInfo = co_await
+				fp_DownloadApplication(State.m_pApplication->m_Settings.m_VersionManagerApplication, State.m_VersionID, DownloadDirectory)
+			;
+
+			State.m_fOnInfo(fg_Format("Application downloaded, unpacking"));
+		}
 
 		auto &Application = *State.m_pApplication;
 
 		if (Application.m_bDeleted)
 			co_return DMibErrorInstance("Application has been deleted, aborting");
 
-		State.m_fOnInfo(fg_Format("Application downloaded, unpacking"));
 		State.m_pVersionInfo = fg_Construct(VersionInfo);
 
 		for (auto &Tag : State.m_RequiredTags)

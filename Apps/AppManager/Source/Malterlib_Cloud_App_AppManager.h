@@ -1139,6 +1139,20 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		struct CPackageVersionInfo
+		{
+			CVersionManager::CVersionIDAndPlatform m_VersionID;
+			CVersionManager::CVersionInformation m_VersionInfo;
+			CStr m_Application;
+		};
+
+		/// Reads and parses the version information from an application package (a
+		/// directory or a tar file); returns an empty optional when the package
+		/// carries no parsable version information, reported through _fOnInfo
+		auto fp_ReadPackageVersionInfo(CStr _Package, TCFunction<void (CStr const &_Info)> _fOnInfo)
+			-> TCFuture<NStorage::TCOptional<CPackageVersionInfo>>
+		;
+
 		void fp_AutoUpdate_Update();
 
 		bool fp_VersionIsNewer
