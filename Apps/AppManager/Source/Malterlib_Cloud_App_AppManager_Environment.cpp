@@ -479,6 +479,48 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+#ifdef DPlatformFamily_macOS
+		EnvironmentManagement.f_RegisterCommand
+			(
+				{
+					"Names"_o= _o["--colima-settings"]
+					, "Description"_o=
+						"Shows or changes the sizing of the colima virtual machine shared by all Colima environments.\n"
+						"Changing a value restarts the virtual machine and the running Colima environments."
+					, "Options"_o=
+					{
+						"CPUCount?"_o=
+						{
+							"Names"_o= _o["--cpu-count"]
+							, "Type"_o= 0
+							, "Default"_o= -1
+							, "Description"_o= "Number of CPUs for the virtual machine. Set to 0 to use the colima default."
+						}
+						, "MemoryMB?"_o=
+						{
+							"Names"_o= _o["--memory"]
+							, "Type"_o= 0
+							, "Default"_o= -1
+							, "Description"_o= "Memory for the virtual machine in megabytes. Set to 0 to use the colima default."
+						}
+						, "DiskGB?"_o=
+						{
+							"Names"_o= _o["--disk-size"]
+							, "Type"_o= 0
+							, "Default"_o= -1
+							, "Description"_o= "Disk size for the virtual machine in gigabytes. The disk can only grow.\n"
+								"Set to 0 to use the colima default."
+						}
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_ColimaSettings(fg_Move(_Params), fg_Move(_pCommandLine));
+				}
+			)
+		;
+#endif
+
 		EnvironmentManagement.f_RegisterCommand
 			(
 				{
@@ -822,6 +864,16 @@ namespace NMib::NCloud::NAppManager
 
 	void CAppManagerActor::fp_ReadEnvironmentsState()
 	{
+		if (auto pColima = mp_State.m_StateDatabase.m_Data.f_GetMember("ColimaSettings"))
+		{
+			if (auto pValue = pColima->f_GetMember("CPUCount", EJsonType_Integer))
+				mp_ColimaCPUCount = (uint32)pValue->f_Integer();
+			if (auto pValue = pColima->f_GetMember("MemoryMB", EJsonType_Integer))
+				mp_ColimaMemoryMB = (uint64)pValue->f_Integer();
+			if (auto pValue = pColima->f_GetMember("DiskGB", EJsonType_Integer))
+				mp_ColimaDiskGB = (uint64)pValue->f_Integer();
+		}
+
 		auto pEnvironments = mp_State.m_StateDatabase.m_Data.f_GetMember("Environments");
 		if (!pEnvironments)
 			return;
@@ -1651,6 +1703,91 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		co_await _pCommandLine->f_StdOut("{}\n"_f << Command);
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ColimaSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		int64 CPUCount = _Params["CPUCount"].f_Integer();
+		int64 MemoryMB = _Params["MemoryMB"].f_Integer();
+		int64 DiskGB = _Params["DiskGB"].f_Integer();
+
+		bool bChanged = false;
+		if (CPUCount >= 0 && uint32(CPUCount) != mp_ColimaCPUCount)
+		{
+			mp_ColimaCPUCount = uint32(CPUCount);
+			bChanged = true;
+		}
+		if (MemoryMB >= 0 && uint64(MemoryMB) != mp_ColimaMemoryMB)
+		{
+			mp_ColimaMemoryMB = uint64(MemoryMB);
+			bChanged = true;
+		}
+		if (DiskGB >= 0 && uint64(DiskGB) != mp_ColimaDiskGB)
+		{
+			mp_ColimaDiskGB = uint64(DiskGB);
+			bChanged = true;
+		}
+
+		auto fFormatValue = [](uint64 _Value) -> CStr
+			{
+				if (!_Value)
+					return "default";
+
+				return CStr::fs_ToStr(_Value);
+			}
+		;
+
+		co_await _pCommandLine->f_StdOut
+			(
+				"CPU count: {}\nMemory MB: {}\nDisk GB: {}\n"_f
+					<< fFormatValue(mp_ColimaCPUCount)
+					<< fFormatValue(mp_ColimaMemoryMB)
+					<< fFormatValue(mp_ColimaDiskGB)
+			)
+		;
+
+		if (!bChanged)
+			co_return 0;
+
+		{
+			auto &ColimaJson = mp_State.m_StateDatabase.m_Data["ColimaSettings"];
+			ColimaJson["CPUCount"] = int64(mp_ColimaCPUCount);
+			ColimaJson["MemoryMB"] = int64(mp_ColimaMemoryMB);
+			ColimaJson["DiskGB"] = int64(mp_ColimaDiskGB);
+		}
+
+		co_await mp_State.m_StateDatabase.f_Save();
+
+		// Restart the running colima environments; the first start after the change
+		// restarts the virtual machine with the new configuration
+		TCVector<TCSharedPointer<CEnvironment>> RestartEnvironments;
+		for (auto &pEnvironment : mp_Environments)
+		{
+			if (!fp_UseOwnColimaSystem(pEnvironment))
+				continue;
+
+			if (!pEnvironment->f_IsStarted() && !pEnvironment->m_bStarting)
+				continue;
+
+			RestartEnvironments.f_Insert(fg_TempCopy(pEnvironment));
+		}
+
+		for (auto &pEnvironment : RestartEnvironments)
+		{
+			co_await _pCommandLine->f_StdOut("Restarting environment '{}'\n"_f << pEnvironment->m_Name);
+
+			co_await fp_StopEnvironmentInternal(pEnvironment);
+			co_await fp_EnsureEnvironmentStarted(pEnvironment);
+		}
+
+		if (!RestartEnvironments.f_IsEmpty())
+		{
+			// Relaunch the applications the environment stops stopped with the auto
+			// start flag
+			fp_UpdateApplicationDependencies();
+		}
 
 		co_return 0;
 	}

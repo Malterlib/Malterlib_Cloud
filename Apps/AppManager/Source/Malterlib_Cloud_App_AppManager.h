@@ -1007,6 +1007,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_StopEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_RestartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_EnvironmentBash(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ColimaSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_PullEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CreateVMImage(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
@@ -1288,8 +1289,11 @@ namespace NMib::NCloud::NAppManager
 		TCVector<TCPromise<void>> mp_OnAppleContainerSystemReady;
 		bool mp_bColimaSystemReady = false;
 		bool mp_bColimaSystemStarting = false;
-		CStr mp_ColimaMountsFingerprint;
+		CStr mp_ColimaConfigFingerprint;
 		TCVector<TCPromise<void>> mp_OnColimaSystemReady;
+		uint32 mp_ColimaCPUCount = 0; /// 0 uses the colima default
+		uint64 mp_ColimaMemoryMB = 0; /// 0 uses the colima default
+		uint64 mp_ColimaDiskGB = 0; /// 0 uses the colima default
 
 		fp64 mp_AutoUpdateDelay = mc_DefaultAutoUpdateDelay;
 

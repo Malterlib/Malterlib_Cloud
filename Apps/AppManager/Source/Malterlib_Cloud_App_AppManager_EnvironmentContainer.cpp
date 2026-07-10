@@ -565,19 +565,22 @@ namespace NMib::NCloud::NAppManager
 				Mounts.f_Insert(fg_TempCopy(Environment.m_Settings.m_ContainerExtraMounts.fs_GetKey(Mount)));
 		}
 
-		CStr MountsFingerprint;
+		CStr ConfigFingerprint;
 		for (auto &Mount : Mounts)
-			MountsFingerprint += Mount + "\n";
+			ConfigFingerprint += Mount + "\n";
+		ConfigFingerprint += "CPUCount={}\n"_f << mp_ColimaCPUCount;
+		ConfigFingerprint += "MemoryMB={}\n"_f << mp_ColimaMemoryMB;
+		ConfigFingerprint += "DiskGB={}\n"_f << mp_ColimaDiskGB;
 
-		if (mp_bColimaSystemReady && mp_ColimaMountsFingerprint == MountsFingerprint)
+		if (mp_bColimaSystemReady && mp_ColimaConfigFingerprint == ConfigFingerprint)
 			co_return {};
 
 		if (mp_bColimaSystemStarting)
 		{
 			co_await mp_OnColimaSystemReady.f_Insert().f_Future();
 
-			// The concurrent start can have applied a different mount set
-			if (mp_ColimaMountsFingerprint == MountsFingerprint)
+			// The concurrent start can have applied a different configuration
+			if (mp_ColimaConfigFingerprint == ConfigFingerprint)
 				co_return {};
 
 			co_return co_await fp_EnsureColimaSystem(_pEnvironment);
@@ -604,14 +607,14 @@ namespace NMib::NCloud::NAppManager
 		CStr AppRoot = fp_GetColimaAppRoot();
 		CStr User = fp_GetColimaUser();
 		CStr Group = fp_GetColimaGroup();
-		CStr MarkerFile = AppRoot / ".MalterlibColimaMounts";
+		CStr MarkerFile = AppRoot / ".MalterlibColimaConfig";
 
 		struct CPrepareResult
 		{
 			CStr m_Error;
 			CStr m_Info;
 			CStr m_Executable;
-			CStr m_PreviousMounts;
+			CStr m_PreviousConfig;
 		};
 
 		CPrepareResult Prepared;
@@ -646,7 +649,7 @@ namespace NMib::NCloud::NAppManager
 						CFile::fs_CreateDirectory(AppRoot / "home");
 
 						if (CFile::fs_FileExists(MarkerFile))
-							Result.m_PreviousMounts = CFile::fs_ReadStringFromFile(MarkerFile);
+							Result.m_PreviousConfig = CFile::fs_ReadStringFromFile(MarkerFile);
 
 						if (!User.f_IsEmpty())
 						{
@@ -718,9 +721,9 @@ namespace NMib::NCloud::NAppManager
 			bRunning = Status && Status->m_ExitCode == 0;
 		}
 
-		if (!bRunning || Prepared.m_PreviousMounts != MountsFingerprint)
+		if (!bRunning || Prepared.m_PreviousConfig != ConfigFingerprint)
 		{
-			// The mount set can only change with a restart
+			// The mount set and the virtual machine sizing can only change with a restart
 			if (bRunning)
 			{
 				co_await fColima(fg_CreateVector<CStr>("stop"), CProcessLaunchActor::ESimpleLaunchFlag_None).f_Wrap()
@@ -729,6 +732,21 @@ namespace NMib::NCloud::NAppManager
 			}
 
 			TCVector<CStr> StartArguments = fg_CreateVector<CStr>("start", "--vm-type", "vz", "--mount-type", "virtiofs");
+			if (mp_ColimaCPUCount)
+			{
+				StartArguments.f_Insert("--cpu");
+				StartArguments.f_Insert("{}"_f << mp_ColimaCPUCount);
+			}
+			if (mp_ColimaMemoryMB)
+			{
+				StartArguments.f_Insert("--memory");
+				StartArguments.f_Insert(CStr::fs_ToStr(fp64(mp_ColimaMemoryMB) / 1024.0));
+			}
+			if (mp_ColimaDiskGB)
+			{
+				StartArguments.f_Insert("--disk");
+				StartArguments.f_Insert("{}"_f << mp_ColimaDiskGB);
+			}
 			for (auto &Mount : Mounts)
 			{
 				StartArguments.f_Insert("--mount");
@@ -745,12 +763,12 @@ namespace NMib::NCloud::NAppManager
 				co_await
 					(
 						(
-							g_Dispatch(BlockingActorCheckout) / [MarkerFile, MountsFingerprint]()
+							g_Dispatch(BlockingActorCheckout) / [MarkerFile, ConfigFingerprint]()
 							{
-								CFile::fs_WriteStringToFile(MarkerFile, MountsFingerprint);
+								CFile::fs_WriteStringToFile(MarkerFile, ConfigFingerprint);
 							}
 						)
-						% "Failed to save the colima mount state"
+						% "Failed to save the colima configuration state"
 					)
 				;
 			}
@@ -782,7 +800,7 @@ namespace NMib::NCloud::NAppManager
 		if (!bHealthy)
 			co_return DMibErrorInstance("The docker daemon in the colima virtual machine is not responding: {}"_f << LastError);
 
-		mp_ColimaMountsFingerprint = MountsFingerprint;
+		mp_ColimaConfigFingerprint = ConfigFingerprint;
 		bReady = true;
 
 		co_return {};
