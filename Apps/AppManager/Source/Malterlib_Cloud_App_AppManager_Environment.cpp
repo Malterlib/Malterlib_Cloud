@@ -1638,16 +1638,16 @@ namespace NMib::NCloud::NAppManager
 		Parts.f_Insert(fp_GetContainerName(pEnvironment));
 		Parts.f_Insert(fg_Move(Shell));
 
+		// The output is meant to be executed with backticks, where the shell only
+		// splits words and does not interpret quotes, so the parts are printed as
+		// they are
 		CStr Command;
 		for (auto &Part : Parts)
 		{
 			if (!Command.f_IsEmpty())
 				Command += " ";
 
-			if (NStr::fg_StrEscapeBashQuotesNeeded(Part))
-				Command += NStr::fg_StrEscapeBashSingleQuotes(Part);
-			else
-				Command += Part;
+			Command += Part;
 		}
 
 		co_await _pCommandLine->f_StdOut("{}\n"_f << Command);
