@@ -984,6 +984,14 @@ namespace NMib::NCloud::NAppManager
 		void fp_ApplyAppleContainerLaunchEnvironment(CProcessLaunchParams &_LaunchParams);
 		CProcessLaunchParams fp_BuildContainerCommandParams(TCSharedPointer<CEnvironment> const &_pEnvironment, TCVector<CStr> &&_Arguments);
 		TCFuture<void> fp_EnsureAppleContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment);
+		bool fp_UseOwnColimaSystem(TCSharedPointer<CEnvironment> const &_pEnvironment);
+		CStr fp_GetColimaAppRoot();
+		CStr fp_GetColimaUser();
+		CStr fp_GetColimaGroup();
+		void fp_ApplyColimaLaunchEnvironment(CProcessLaunchParams &_LaunchParams);
+		TCFuture<void> fp_EnsureColimaSystem(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_EnsureColimaOwnership(CStr _Directory);
+		TCFuture<void> fp_EnsureContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_AbortEnvironmentLaunch(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 
@@ -1277,6 +1285,10 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bAppleContainerSystemReady = false;
 		bool mp_bAppleContainerSystemStarting = false;
 		TCVector<TCPromise<void>> mp_OnAppleContainerSystemReady;
+		bool mp_bColimaSystemReady = false;
+		bool mp_bColimaSystemStarting = false;
+		CStr mp_ColimaMountsFingerprint;
+		TCVector<TCPromise<void>> mp_OnColimaSystemReady;
 
 		fp64 mp_AutoUpdateDelay = mc_DefaultAutoUpdateDelay;
 

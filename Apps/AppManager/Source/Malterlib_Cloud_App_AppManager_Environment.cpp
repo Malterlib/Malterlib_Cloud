@@ -136,13 +136,14 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--container-runtime"]
 #ifdef DPlatformFamily_macOS
-				, "Type"_o= COneOf{"Docker", "AppleContainer"}
+				, "Type"_o= COneOf{"Docker", "AppleContainer", "Colima"}
 				, "Default"_o= "AppleContainer"
 #else
 				, "Type"_o= COneOf{"Docker"}
 				, "Default"_o= "Docker"
 #endif
-				, "Description"_o= "The container runtime to use."
+				, "Description"_o= "The container runtime to use.\n"
+				"'Colima' runs docker containers in a colima virtual machine owned by the AppManager."
 			}
 		;
 		auto SettingsOption_ContainerImage = "ContainerImage?"_o=
@@ -1245,7 +1246,7 @@ namespace NMib::NCloud::NAppManager
 
 		bool bWasStarted = pEnvironment->f_IsStarted() || pEnvironment->m_bStarting;
 
-		co_await (fp_EnsureAppleContainerSystem(pEnvironment) % "Failed to start the container system" % Auditor);
+		co_await (fp_EnsureContainerSystem(pEnvironment) % "Failed to start the container system" % Auditor);
 
 		co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
 
@@ -1807,15 +1808,26 @@ namespace NMib::NCloud::NAppManager
 			= _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container
 			&& fp_GetContainerRuntimeExecutable(_pEnvironment) == "container"
 		;
+		bool bColima
+			= _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container
+			&& fp_UseOwnColimaSystem(_pEnvironment)
+		;
 
-		if (!bVM && !bAppleContainer)
+		if (!bVM && !bAppleContainer && !bColima)
 			co_return mp_State.m_LocalAddress;
 
 		// Unix domain sockets cannot cross the virtiofs shares that containers and VMs
 		// use, so guests connect to a listen address on the host side of the shared
 		// network instead of the primary local address
 		CStr HostAddress;
-		if (bAppleContainer)
+		if (bColima)
+		{
+			// The lima user-mode network places the host at a fixed address, published
+			// to guests as host.lima.internal; containers reach it through the docker
+			// bridge and the virtual machine's outbound network
+			HostAddress = "192.168.5.2";
+		}
+		else if (bAppleContainer)
 		{
 			CStr Network = _pEnvironment->m_Settings.m_ContainerNetwork;
 			if (Network.f_IsEmpty())
@@ -2064,7 +2076,19 @@ namespace NMib::NCloud::NAppManager
 		if (bContainer)
 		{
 			{
-				auto Result = co_await fp_EnsureAppleContainerSystem(_pEnvironment).f_Wrap();
+				auto Result = co_await fp_EnsureContainerSystem(_pEnvironment).f_Wrap();
+				if (!Result)
+				{
+					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+					co_return Result.f_GetException();
+				}
+			}
+
+			// Everything a colima environment writes through its mounts is written on
+			// the host by the colima user, so it must own the environment storage
+			if (fp_UseOwnColimaSystem(_pEnvironment))
+			{
+				auto Result = co_await fp_EnsureColimaOwnership(AgentRootDirectory).f_Wrap();
 				if (!Result)
 				{
 					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
@@ -2206,6 +2230,8 @@ namespace NMib::NCloud::NAppManager
 		}
 		if (bOwnAppleContainerSystem)
 			fp_ApplyAppleContainerLaunchEnvironment(LaunchParams);
+		else if (bContainer && fp_UseOwnColimaSystem(_pEnvironment))
+			fp_ApplyColimaLaunchEnvironment(LaunchParams);
 		LaunchParams.m_bMergeEnvironment = true;
 		LaunchParams.m_bCreateNewProcessGroup = true;
 		LaunchParams.m_bShowLaunched = false;
@@ -2550,6 +2576,32 @@ namespace NMib::NCloud::NAppManager
 				fp_ScheduleRelaunchApp(_pApplication);
 
 			co_return InterfaceAddress.f_GetException();
+		}
+
+		// Everything the application writes through the colima mounts is written on
+		// the host by the colima user, so it must own the application directory
+		if (fp_UseOwnColimaSystem(_pEnvironment))
+		{
+			auto OwnershipResult = co_await fp_EnsureColimaOwnership(_pApplication->f_GetDirectory()).f_Wrap();
+
+			if (_pApplication->m_bDeleted)
+				co_return DMibErrorInstance("Application deleted");
+
+			if (!OwnershipResult)
+			{
+				fp_AppLaunchStateChanged
+					(
+						_pApplication
+						, "Failed to prepare directory for environment '{}': {}"_f << _pEnvironment->m_Name << OwnershipResult.f_GetExceptionStr()
+						, CAppManagerInterface::EStatusSeverity_Error
+					)
+				;
+
+				if (!_pApplication->m_bStopped)
+					fp_ScheduleRelaunchApp(_pApplication);
+
+				co_return OwnershipResult.f_GetException();
+			}
 		}
 
 		_pApplication->m_LaunchID = fg_RandomID();

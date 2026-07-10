@@ -97,6 +97,11 @@ namespace NMib::NCloud::NAppManager
 		if (Runtime == "AppleContainer")
 			return "container";
 
+		// The colima runtime is docker with an AppManager-owned colima virtual machine
+		// hosting the daemon
+		if (Runtime == "Colima")
+			return "docker";
+
 		return Runtime;
 	}
 
@@ -137,6 +142,63 @@ namespace NMib::NCloud::NAppManager
 		_LaunchParams.m_Environment["PATH"] = Path;
 	}
 
+	bool CAppManagerActor::fp_UseOwnColimaSystem(TCSharedPointer<CEnvironment> const &_pEnvironment)
+	{
+#ifdef DPlatformFamily_macOS
+		return _pEnvironment->m_Settings.m_ContainerRuntime == "Colima";
+#else
+		return false;
+#endif
+	}
+
+	CStr CAppManagerActor::fp_GetColimaAppRoot()
+	{
+		return mp_State.m_RootDirectory / "Colima";
+	}
+
+	CStr CAppManagerActor::fp_GetColimaUser()
+	{
+#ifdef DPlatformFamily_macOS
+		// limactl refuses to run as the root user, so a root AppManager runs the
+		// colima virtual machine as a dedicated user. That user performs every
+		// host-side file operation on the virtiofs mounts, no matter which user a
+		// process inside the environment runs as
+		if (CProcessLaunch::fs_GetElevation() == NProcess::EProcessElevation_IsRoot)
+			return mp_pUniqueUserGroup->f_GetUser("MalterlibColima");
+#endif
+		return {};
+	}
+
+	CStr CAppManagerActor::fp_GetColimaGroup()
+	{
+#ifdef DPlatformFamily_macOS
+		if (CProcessLaunch::fs_GetElevation() == NProcess::EProcessElevation_IsRoot)
+			return mp_pUniqueUserGroup->f_GetGroup("MalterlibColima");
+#endif
+		return {};
+	}
+
+	void CAppManagerActor::fp_ApplyColimaLaunchEnvironment(CProcessLaunchParams &_LaunchParams)
+	{
+		CStr AppRoot = fp_GetColimaAppRoot();
+
+		// The colima and docker clients must agree with the AppManager-owned virtual
+		// machine on the data location; the explicit docker endpoint bypasses any
+		// docker context configuration of the calling user
+		_LaunchParams.m_Environment["COLIMA_HOME"] = AppRoot / "colima";
+		_LaunchParams.m_Environment["DOCKER_CONFIG"] = AppRoot / "docker";
+		_LaunchParams.m_Environment["DOCKER_HOST"] = "unix://" + (AppRoot / "colima" / "default" / "docker.sock");
+		_LaunchParams.m_Environment["HOME"] = AppRoot / "home";
+
+		// The AppManager can run as a daemon whose PATH misses the CLI install location
+		CStr Path = fg_GetSys()->f_GetEnvironmentVariable("PATH");
+		if (Path.f_Find("/usr/local/bin") < 0)
+			Path = "/usr/local/bin:" + Path;
+		if (Path.f_Find("/opt/homebrew/bin") < 0)
+			Path = "/opt/homebrew/bin:" + Path;
+		_LaunchParams.m_Environment["PATH"] = Path;
+	}
+
 	auto CAppManagerActor::fp_BuildContainerCommandParams
 		(
 			TCSharedPointer<CEnvironment> const &_pEnvironment
@@ -161,6 +223,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (bOwnAppleContainerSystem)
 			fp_ApplyAppleContainerLaunchEnvironment(LaunchParams);
+		else if (fp_UseOwnColimaSystem(_pEnvironment))
+			fp_ApplyColimaLaunchEnvironment(LaunchParams);
 
 		return LaunchParams;
 	}
@@ -470,6 +534,296 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	TCFuture<void> CAppManagerActor::fp_EnsureColimaSystem(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		if (!fp_UseOwnColimaSystem(_pEnvironment))
+			co_return {};
+
+		// The virtual machine can only share host paths configured when it starts, so
+		// it is started with every path the colima environments bind mount into their
+		// containers and restarted whenever that set changes
+		TCSet<CStr> Mounts;
+		Mounts.f_Insert(fg_TempCopy(mp_State.m_RootDirectory));
+		for (auto &pOtherEnvironment : mp_Environments)
+		{
+			auto &Environment = *pOtherEnvironment;
+			if (Environment.m_bDeleted)
+				continue;
+
+			if (Environment.m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Container)
+				continue;
+
+			if (!fp_UseOwnColimaSystem(pOtherEnvironment))
+				continue;
+
+			// Environment storage inside a parent application directory can be a
+			// separate mount not visible through the root directory share
+			if (!Environment.m_Settings.m_ParentApplication.f_IsEmpty())
+				Mounts.f_Insert(fp_GetEnvironmentStorageDirectory(Environment));
+
+			for (auto &Mount : Environment.m_Settings.m_ContainerExtraMounts)
+				Mounts.f_Insert(fg_TempCopy(Environment.m_Settings.m_ContainerExtraMounts.fs_GetKey(Mount)));
+		}
+
+		CStr MountsFingerprint;
+		for (auto &Mount : Mounts)
+			MountsFingerprint += Mount + "\n";
+
+		if (mp_bColimaSystemReady && mp_ColimaMountsFingerprint == MountsFingerprint)
+			co_return {};
+
+		if (mp_bColimaSystemStarting)
+		{
+			co_await mp_OnColimaSystemReady.f_Insert().f_Future();
+
+			// The concurrent start can have applied a different mount set
+			if (mp_ColimaMountsFingerprint == MountsFingerprint)
+				co_return {};
+
+			co_return co_await fp_EnsureColimaSystem(_pEnvironment);
+		}
+
+		mp_bColimaSystemStarting = true;
+
+		bool bReady = false;
+		auto Cleanup = g_OnScopeExit / [&, this]
+			{
+				mp_bColimaSystemStarting = false;
+				mp_bColimaSystemReady = bReady;
+				auto Waiters = fg_Move(mp_OnColimaSystemReady);
+				for (auto &Promise : Waiters)
+				{
+					if (bReady)
+						Promise.f_SetResult();
+					else
+						Promise.f_SetException(DMibErrorInstance("Failed to start the AppManager colima system"));
+				}
+			}
+		;
+
+		CStr AppRoot = fp_GetColimaAppRoot();
+		CStr User = fp_GetColimaUser();
+		CStr Group = fp_GetColimaGroup();
+		CStr MarkerFile = AppRoot / ".MalterlibColimaMounts";
+
+		struct CPrepareResult
+		{
+			CStr m_Error;
+			CStr m_Info;
+			CStr m_Executable;
+			CStr m_PreviousMounts;
+		};
+
+		CPrepareResult Prepared;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			Prepared = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [AppRoot, User, Group, MarkerFile]() -> CPrepareResult
+					{
+						CPrepareResult Result;
+
+						for (auto &Candidate : {CStr("/usr/local/bin/colima"), CStr("/opt/homebrew/bin/colima")})
+						{
+							if (CFile::fs_FileExists(Candidate))
+							{
+								Result.m_Executable = Candidate;
+								break;
+							}
+						}
+						if (Result.m_Executable.f_IsEmpty())
+							Result.m_Executable = NProcess::NPlatform::fg_FindExecutable("colima");
+						if (Result.m_Executable.f_IsEmpty())
+						{
+							Result.m_Error = "The colima CLI was not found";
+							return Result;
+						}
+
+						CFile::fs_CreateDirectory(AppRoot);
+						CFile::fs_CreateDirectory(AppRoot / "colima");
+						CFile::fs_CreateDirectory(AppRoot / "docker");
+						CFile::fs_CreateDirectory(AppRoot / "home");
+
+						if (CFile::fs_FileExists(MarkerFile))
+							Result.m_PreviousMounts = CFile::fs_ReadStringFromFile(MarkerFile);
+
+						if (!User.f_IsEmpty())
+						{
+							CStr GroupID;
+							if (!NSys::fg_UserManagement_GroupExists(Group, GroupID))
+							{
+								NSys::fg_UserManagement_CreateGroup(Group, GroupID);
+								Result.m_Info += fg_Format("Created group '{}' with resulting group ID: {}\n", Group, GroupID);
+							}
+
+							CStr UserID;
+							if (!NSys::fg_UserManagement_UserExists(User, UserID))
+							{
+								NSys::fg_UserManagement_CreateUser
+									(
+										Group
+										, User
+										, ""
+										, User
+										, AppRoot / "home"
+										, UserID
+										, NSys::EUserManagementCreateUserFlag_None
+									)
+								;
+								Result.m_Info += fg_Format("Created user '{}' with resulting user ID: {}\n", User, UserID);
+							}
+
+							if (CFile::fs_GetOwner(AppRoot) != User)
+								CFile::fs_SetOwnerAndGroupRecursive(AppRoot, User, Group);
+						}
+
+						return Result;
+					}
+				)
+			;
+		}
+
+		if (!Prepared.m_Error.f_IsEmpty())
+			co_return DMibErrorInstance("Failed to start the AppManager colima system: {}"_f << Prepared.m_Error);
+
+		if (!Prepared.m_Info.f_IsEmpty())
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "{}", CStr(Prepared.m_Info.f_Trim()));
+
+		auto fColima = [this, &Prepared, &User, &Group](TCVector<CStr> &&_Arguments, auto _Flags)
+			{
+				CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+					(
+						Prepared.m_Executable
+						, fg_Move(_Arguments)
+						, fp_GetColimaAppRoot()
+						, {}
+					)
+				;
+				LaunchParams.m_bMergeEnvironment = true;
+				LaunchParams.m_RunAsUser = User;
+				LaunchParams.m_RunAsGroup = Group;
+				fp_ApplyColimaLaunchEnvironment(LaunchParams);
+
+				CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, _Flags);
+				SimpleLaunch.m_LogName = "Colima/System";
+
+				return CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch);
+			}
+		;
+
+		bool bRunning = false;
+		{
+			auto Status = co_await fColima(fg_CreateVector<CStr>("status"), CProcessLaunchActor::ESimpleLaunchFlag_None).f_Wrap();
+			bRunning = Status && Status->m_ExitCode == 0;
+		}
+
+		if (!bRunning || Prepared.m_PreviousMounts != MountsFingerprint)
+		{
+			// The mount set can only change with a restart
+			if (bRunning)
+			{
+				co_await fColima(fg_CreateVector<CStr>("stop"), CProcessLaunchActor::ESimpleLaunchFlag_None).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop the colima virtual machine")
+				;
+			}
+
+			TCVector<CStr> StartArguments = fg_CreateVector<CStr>("start", "--vm-type", "vz", "--mount-type", "virtiofs");
+			for (auto &Mount : Mounts)
+			{
+				StartArguments.f_Insert("--mount");
+				StartArguments.f_Insert("{}:w"_f << Mount);
+			}
+
+			auto StartResult = co_await fColima(fg_Move(StartArguments), CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode).f_Wrap();
+			if (!StartResult)
+				co_return DMibErrorInstance("Failed to start the AppManager colima system: {}"_f << StartResult.f_GetExceptionStr());
+
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				co_await
+					(
+						(
+							g_Dispatch(BlockingActorCheckout) / [MarkerFile, MountsFingerprint]()
+							{
+								CFile::fs_WriteStringToFile(MarkerFile, MountsFingerprint);
+							}
+						)
+						% "Failed to save the colima mount state"
+					)
+				;
+			}
+		}
+
+		CStr LastError;
+		bool bHealthy = false;
+		for (aint Attempt = 0; !bHealthy && Attempt < 6; ++Attempt)
+		{
+			if (Attempt != 0)
+				co_await fg_Timeout(2.0);
+
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch
+				(
+					fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("ps"))
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+				)
+			;
+			SimpleLaunch.m_LogName = "Colima/HealthCheck";
+
+			auto Health = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
+
+			if (Health)
+				bHealthy = true;
+			else
+				LastError = Health.f_GetExceptionStr();
+		}
+
+		if (!bHealthy)
+			co_return DMibErrorInstance("The docker daemon in the colima virtual machine is not responding: {}"_f << LastError);
+
+		mp_ColimaMountsFingerprint = MountsFingerprint;
+		bReady = true;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_EnsureColimaOwnership(CStr _Directory)
+	{
+		CStr User = fp_GetColimaUser();
+		if (User.f_IsEmpty())
+			co_return {};
+
+		CStr Group = fp_GetColimaGroup();
+
+		auto BlockingActorCheckout = fg_BlockingActor();
+
+		co_await
+			(
+				(
+					g_Dispatch(BlockingActorCheckout) / [_Directory, User, Group]()
+					{
+						// Host-side file operations on the colima virtiofs mounts run as
+						// the colima user, so everything the environment writes to must
+						// be owned by it
+						CFile::fs_SetOwnerAndGroupRecursive(_Directory, User, Group);
+					}
+				)
+				% "Failed to change owner to the colima user"
+			)
+		;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_EnsureContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		if (fp_UseOwnColimaSystem(_pEnvironment))
+			co_return co_await fp_EnsureColimaSystem(_pEnvironment);
+
+		co_return co_await fp_EnsureAppleContainerSystem(_pEnvironment);
+	}
+
 	auto CAppManagerActor::fp_BuildEnvironmentContainerLaunch
 		(
 			TCSharedPointer<CEnvironment> const &_pEnvironment
@@ -537,9 +891,9 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		// Unix domain sockets cannot live on the virtiofs shares the Apple container
-		// runtime uses for mounts, so the agent places its local command line socket on
-		// the container filesystem instead
-		if (fp_GetContainerRuntimeExecutable(_pEnvironment) == "container")
+		// runtime and colima use for mounts, so the agent places its local command
+		// line socket on the container filesystem instead
+		if (fp_GetContainerRuntimeExecutable(_pEnvironment) == "container" || fp_UseOwnColimaSystem(_pEnvironment))
 			Launch.m_PassEnvironment.f_Insert("MalterlibDistributedAppLocalSocketPrefix=/tmp");
 
 		return Launch;
