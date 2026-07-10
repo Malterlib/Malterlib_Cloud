@@ -40,6 +40,15 @@ namespace NMib::NCloud::NAppManager
 			NStr::CStr m_PlatformFamily;
 		};
 
+		struct CAgentConfig
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStr m_HostName; /// OS host name the agent sets for the environment; empty leaves it unchanged
+			NStr::CStr m_AutoUpdateConfig; /// Encoded AutoUpdate configuration object inherited from the host AppManager; empty for no automatic updates
+		};
+
 		struct CEnvironmentLaunch
 		{
 			template <typename tf_CStream>
@@ -92,10 +101,9 @@ namespace NMib::NCloud::NAppManager
 		virtual NConcurrency::TCFuture<uint32> f_StopApplication(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_RunScript(CEnvironmentScript _Script) = 0;
 
-		/// Configures the agent's host monitor with the automatic update settings
-		/// inherited from the host AppManager; _AutoUpdateConfig is the encoded
-		/// AutoUpdate configuration object, or empty for no automatic updates
-		virtual NConcurrency::TCFuture<void> f_ConfigureHostMonitor(NStr::CStr _AutoUpdateConfig) = 0;
+		/// Configures the agent with the environment host name and the automatic
+		/// update settings inherited from the host AppManager
+		virtual NConcurrency::TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) = 0;
 	};
 
 	/// Interface published by the host AppManager. Environment agents use it to

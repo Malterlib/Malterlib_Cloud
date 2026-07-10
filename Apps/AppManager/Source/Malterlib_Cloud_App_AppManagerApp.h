@@ -20,6 +20,7 @@ namespace NMib::NCloud
 	struct CAppManagerContainerLaunch
 	{
 		NStr::CStr m_ContainerName;
+		NStr::CStr m_Hostname; /// Host name inside the container; empty keeps the runtime default
 		NStr::CStr m_Image;
 		NStr::CStr m_Network;
 		uint64 m_MemoryLimitMB = 0;
