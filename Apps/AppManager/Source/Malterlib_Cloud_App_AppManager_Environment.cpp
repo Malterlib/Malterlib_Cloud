@@ -1939,27 +1939,45 @@ namespace NMib::NCloud::NAppManager
 						// The agent application directory is only a source for the
 						// distribution files: several environments can share the same agent
 						// application and self updates replace its files, so each
-						// environment runs its own copy inside its storage directory
-						CStr AgentDirectory = StorageDirectory / ".agent";
-						CStr AgentExecutable = AgentDirectory / CFile::fs_GetFile(Source);
+						// environment runs its own copy inside its storage directory, next
+						// to the agent state like the root AppManager layout. Deletions are
+						// skipped since the storage also holds the state
+						CStr AgentExecutable = StorageDirectory / CFile::fs_GetFile(Source);
 
 						try
 						{
 							CFile::fs_CreateDirectory(StorageDirectory);
-							CFile::fs_CreateDirectory(AgentDirectory);
 							CFile::fs_DiffCopyFileOrDirectory
 								(
 									Directory
-									, AgentDirectory
-									, nullptr
+									, StorageDirectory
+									, [](CFile::EDiffCopyChange _Change, NStr::CStr const &, NStr::CStr const &, NStr::CStr const &) -> CFile::EDiffCopyChangeAction
+									{
+										if
+											(
+												_Change == CFile::EDiffCopyChange_DirectoryDeleted
+												|| _Change == CFile::EDiffCopyChange_FileDeleted
+												|| _Change == CFile::EDiffCopyChange_LinkDeleted
+											)
+										{
+											return CFile::EDiffCopyChangeAction_Skip;
+										}
+
+										return CFile::EDiffCopyChangeAction_Perform;
+									}
 									, {"*/.home", "*/.tmp", "*/TempVersion", "*/TempVersionDownload"}
 									, 0.0
 								)
 							;
+
+							// Remove the directory earlier versions copied the agent to
+							CStr LegacyAgentDirectory = StorageDirectory / ".agent";
+							if (CFile::fs_FileExists(LegacyAgentDirectory))
+								CFile::fs_DeleteDirectoryRecursive(LegacyAgentDirectory);
 						}
 						catch (CException const &_Exception)
 						{
-							*_pError = "Failed to copy the agent files to '{}': {}"_f << AgentDirectory << _Exception;
+							*_pError = "Failed to copy the agent files to '{}': {}"_f << StorageDirectory << _Exception;
 							return {};
 						}
 
