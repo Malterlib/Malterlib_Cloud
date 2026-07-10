@@ -266,9 +266,9 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_RegisterWithEnvironmentHost()
 	{
-		CStr EnvironmentHostID = fg_GetSys()->f_GetEnvironmentVariable("MalterlibAppManagerEnvironmentHostID");
+		CStr EnvironmentHostID = mp_EnvironmentHostID;
 		if (EnvironmentHostID.f_IsEmpty())
-			co_return DMibErrorInstance("No environment host id provided");
+			co_return DMibErrorInstance("No environment host id provided in the deployment settings");
 
 		CStr LaunchID = mp_Settings.m_InterfaceSettings.m_LaunchID;
 
