@@ -244,6 +244,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_ContainerFingerprint;
 			CStr m_ContainerLaunchID;
 			CStr m_ContainerRequestTicketMagic;
+			NContainer::TCSet<NStr::CStr> m_ContainerMounts; /// Host paths mounted into the active container
 
 			// Host port of the environment listen address on the shared guest network,
 			// chosen once and persisted so the container fingerprint stays stable
