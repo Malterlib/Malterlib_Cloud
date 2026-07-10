@@ -24,6 +24,26 @@ namespace NMib::NCloud::NAppManager
 				if (!HostName.f_IsEmpty())
 					CAppManagerActor::fs_ApplyEnvironmentHostName(HostName);
 
+				// The launching AppManager points HOME and TMPDIR into the agent root,
+				// but nothing creates them inside a fresh environment; child processes
+				// like package installs fail without a temporary directory
+				for (auto pVariable : {"HOME", "TMPDIR"})
+				{
+					CStr Directory = fg_GetSys()->f_GetEnvironmentVariable(pVariable);
+					if (Directory.f_IsEmpty())
+						continue;
+
+					try
+					{
+						if (!CFile::fs_FileExists(Directory))
+							CFile::fs_CreateDirectory(Directory);
+					}
+					catch (CException const &_Exception)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to create '{}' directory '{}': {}", pVariable, Directory, _Exception);
+					}
+				}
+
 				return fg_Move(Settings).f_RootDirectory(AgentRootDirectory);
 			}
 
