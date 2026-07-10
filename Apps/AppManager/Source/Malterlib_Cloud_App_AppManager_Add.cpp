@@ -63,40 +63,20 @@ namespace NMib::NCloud::NAppManager
 			{
 				CStr FromLocalFile = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
 
-				auto BlockingActorCheckout = fg_BlockingActor();
-
-				CStr VersionInfoContents = co_await
+				// Detection is best effort; a package without version info installs
+				// as a self update source like before
+				auto PackageInfo = co_await fp_ReadPackageVersionInfo
 					(
-						g_Dispatch(BlockingActorCheckout) / [FromLocalFile]() -> CStr
+						FromLocalFile
+						, [](CStr const &)
 						{
-							if (!CFile::fs_FileExists(FromLocalFile, EFileAttrib_Directory))
-								return {};
-
-							CStr VersionInfoFile = FromLocalFile / "VersionInfo.json";
-							if (!CFile::fs_FileExists(VersionInfoFile))
-							{
-								auto Files = CFile::fs_FindFiles(FromLocalFile / "*VersionInfo.json");
-								if (Files.f_GetLen() != 1)
-									return {};
-
-								VersionInfoFile = Files[0];
-							}
-
-							return CFile::fs_ReadStringFromFile(VersionInfoFile, true);
 						}
 					)
+					.f_Wrap()
 				;
 
-				if (!VersionInfoContents.f_IsEmpty())
-				{
-					try
-					{
-						DetectedPlatform = CEJsonSorted::fs_FromString(VersionInfoContents)["Platform"].f_AsString();
-					}
-					catch (...)
-					{
-					}
-				}
+				if (PackageInfo && *PackageInfo)
+					DetectedPlatform = (**PackageInfo).m_VersionID.m_Platform;
 			}
 		}
 
@@ -478,196 +458,22 @@ namespace NMib::NCloud::NAppManager
 
 		if (!_FromLocalFile.f_IsEmpty() || bNullApplication)
 		{
-			auto fApplyVersionInfo = [&](CStr const &_VersionInfoContents, CTime const &_VersionTime)
+			auto PackageInfo = co_await (fp_ReadPackageVersionInfo(_FromLocalFile, _fOnInfo) % "Failed to read version info from package" % Auditor);
+
+			if (PackageInfo)
+			{
+				try
 				{
-					try
-					{
-						CEJsonSorted VersionInfoJson = CEJsonSorted::fs_FromString(_VersionInfoContents);
-
-						CStr Application;
-						CStr Version;
-						CStr Configuration;
-						CStr Platform;
-						CEJsonSorted ExtraInfo;
-
-						auto fApplySettings = [&](CEJsonSorted const &_Settings)
-							{
-								if (auto *pValue = _Settings.f_GetMember("Application", EJsonType_String))
-									Application = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Version", EJsonType_String))
-									Version = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Configuration", EJsonType_String))
-									Configuration = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("Platform", EJsonType_String))
-									Platform = pValue->f_String();
-								if (auto *pValue = _Settings.f_GetMember("ExtraInfo", EJsonType_Object))
-									ExtraInfo = pValue->f_Object();
-							}
-						;
-
-						fApplySettings(VersionInfoJson);
-
-						if (Application.f_IsEmpty())
-							DMibError("Application must be specified");
-						if (Version.f_IsEmpty())
-							DMibError("Version must be specified");
-
-						if (!CVersionManager::fs_IsValidApplicationName(Application))
-							DMibError("Application format is invalid");
-
-						CVersionManager::CVersionIDAndPlatform VersionID;
-						{
-							CStr Error;
-							if (!CVersionManager::fs_IsValidVersionIdentifier(Version, Error, &VersionID.m_VersionID))
-								DMibError(fg_Format("Version identifier format is invalid: {}", Error));
-						}
-
-						if (!CVersionManager::fs_IsValidPlatform(Platform))
-							DMibError("Invalid version platform format");
-
-						VersionID.m_Platform = Platform;
-
-						CVersionManager::CVersionInformation VersionInfo;
-						VersionInfo.m_Configuration = Configuration;
-						VersionInfo.m_ExtraInfo = ExtraInfo;
-						VersionInfo.m_Time = _VersionTime;
-
-						fApplyVersion(VersionID, VersionInfo);
-
-						pApplication->m_Settings.m_VersionManagerApplication = Application;
-					}
-					catch (CException const &_Exception)
-					{
-						_fOnInfo("Failed to parse version info from VersionInfo.json in package: {}"_f << _Exception);
-					}
+					fApplyVersion(PackageInfo->m_VersionID, PackageInfo->m_VersionInfo);
+					pApplication->m_Settings.m_VersionManagerApplication = PackageInfo->m_Application;
 				}
-			;
-
-			if (_bSettingsFromVersionInfo && (_FromLocalFile.f_EndsWith(".tar.gz") || _FromLocalFile.f_EndsWith(".tar.zst") || _FromLocalFile.f_EndsWith(".tar")))
-			{
-				auto &LaunchActor = mp_LaunchActors.f_Insert() = fg_Construct();
-				CProcessLaunchActor::CSimpleLaunch Launch
-					{
-						mp_State.m_RootDirectory / "bin/bsdtar"
-						,
-						{
-							"-xqOf"
-							, _FromLocalFile
-							, "*VersionInfo.json"
-						}
-						, CFile::fs_GetPath(_FromLocalFile)
-						, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
-					}
-				;
-
-				auto &LaunchListActor = mp_LaunchActors.f_Insert() = fg_Construct();
-				CProcessLaunchActor::CSimpleLaunch LaunchList
-					{
-						mp_State.m_RootDirectory / "bin/bsdtar"
-						,
-						{
-							"-tvvf"
-							, _FromLocalFile
-						}
-						, CFile::fs_GetPath(_FromLocalFile)
-						, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
-					}
-				;
-
-				auto [LaunchResult, LaunchListResult] = co_await
-					(
-						LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))
-						+ LaunchListActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))
-					).f_Wrap()
-				;
-
-				if (!LaunchResult)
-					_fOnInfo("Failed to extract version info from package: {}"_f << LaunchResult.f_GetExceptionStr());
-
-				if (!LaunchListResult)
-					_fOnInfo("Failed to extract version time from package: {}"_f << LaunchListResult.f_GetExceptionStr());
-
-				auto fGetVersionTime = [&]() -> CTime
-					{
-						if (!LaunchListResult)
-							return {};
-
-						auto ListStr = (*LaunchListResult).f_GetStdOut();
-						CTime Newest;
-						for (auto &Line : ListStr.f_SplitLine<true>())
-						{
-							ch8 const *pParse = Line.f_GetStr();
-
-							auto fParseField = [&]() -> CStr
-								{
-									ch8 const *pStart = pParse;
-									fg_ParseNonWhiteSpaceAndSeparators(pParse, "");
-									CStr Field(pStart, pParse - pStart);
-									fg_ParseWhiteSpace(pParse);
-									return Field;
-								}
-							;
-
-							fParseField(); // Permissions
-							fParseField(); // ?
-							fParseField(); // User
-							fParseField(); // Group
-							fParseField(); // Size
-
-							CStr UnixSeconds = fParseField();
-							CStr NanoSeconds = fParseField();
-
-							auto FileTime = CTimeConvert::fs_FromUnixSeconds(UnixSeconds.f_ToInt(int64(0)));
-							FileTime.f_SetFraction(fp64(NanoSeconds.f_ToInt(int32(0))) / fp64(1'000'000'000.0));
-
-							if (!Newest.f_IsValid() || FileTime > Newest)
-								Newest = FileTime;
-						}
-
-						return CTimeConvert::fs_FromUnixMilliseconds(CTimeConvert(Newest).f_UnixMilliseconds());
-					}
-				;
-
-				if (LaunchResult)
-					fApplyVersionInfo(LaunchResult->f_GetStdOut(), fGetVersionTime());
-
-				SourcePath = _FromLocalFile;
+				catch (CException const &_Exception)
+				{
+					_fOnInfo("Failed to apply version info from package: {}"_f << _Exception);
+				}
 			}
-			else
-			{
-				auto BlockingActorCheckout = fg_BlockingActor();
-				auto [VersionInfoContents, VersionTime] = co_await
-					(
-						g_Dispatch(BlockingActorCheckout) / [_FromLocalFile]
-						{
-							if (!CFile::fs_FileExists(_FromLocalFile, EFileAttrib_Directory))
-								return fg_Tuple(CStr{}, CTime{});
 
-							CStr VersionInfoFile;
-
-							if (CFile::fs_FileExists(_FromLocalFile / "VersionInfo.json", EFileAttrib_Directory))
-								VersionInfoFile = _FromLocalFile / "VersionInfo.json";
-							else
-							{
-								auto Files = CFile::fs_FindFiles(_FromLocalFile / "*VersionInfo.json");
-
-								if (Files.f_GetLen() != 1)
-									return fg_Tuple(CStr{}, CTime{});
-
-								VersionInfoFile = Files[0];
-							}
-
-							return fg_Tuple(CFile::fs_ReadStringFromFile(VersionInfoFile, true), CFile::fs_GetWriteTime(VersionInfoFile));
-						}
-						% "Failed to unpack application" % Auditor
-					)
-				;
-
-				if (!VersionInfoContents.f_IsEmpty())
-					fApplyVersionInfo(VersionInfoContents, VersionTime);
-
-				SourcePath = _FromLocalFile;
-			}
+			SourcePath = _FromLocalFile;
 		}
 		else
 		{
