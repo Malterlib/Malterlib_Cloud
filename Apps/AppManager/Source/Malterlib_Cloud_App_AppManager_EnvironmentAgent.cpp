@@ -93,6 +93,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		_Stream % m_HostName;
 		_Stream % m_AutoUpdateConfig;
+		_Stream % m_OSDependencies;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CAgentConfig);
 
@@ -489,6 +490,30 @@ namespace NMib::NCloud::NAppManager
 					% "Failed to apply the environment host name"
 				)
 			;
+		}
+
+		// The agent application's OS dependencies are installed inside the
+		// environment before the host monitor needs them
+		if (!_Config.m_OSDependencies.f_IsEmpty())
+		{
+			CStr Fingerprint = fsp_GetOSDependenciesFingerprint(_Config.m_OSDependencies);
+			if (Fingerprint != pThis->mp_AppliedAgentOSDependencies)
+			{
+				auto Result = co_await pThis->fp_InstallOSDependencies(fg_Move(_Config.m_OSDependencies)).f_Wrap();
+				if (Result)
+					pThis->mp_AppliedAgentOSDependencies = fg_Move(Fingerprint);
+				else
+				{
+					DMibLogWithCategory
+						(
+							Malterlib/Cloud/AppManager
+							, Error
+							, "Failed to install the agent OS dependencies: {}"
+							, Result.f_GetExceptionStr()
+						)
+					;
+				}
+			}
 		}
 
 		co_return co_await pThis->fp_ConfigureHostMonitorFromHost(fg_Move(_Config.m_AutoUpdateConfig));
