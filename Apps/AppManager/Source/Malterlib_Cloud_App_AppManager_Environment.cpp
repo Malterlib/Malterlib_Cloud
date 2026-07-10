@@ -2661,6 +2661,11 @@ namespace NMib::NCloud::NAppManager
 			if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
 				AgentConfig.m_AutoUpdateConfig = CEJsonSorted::fs_FromCompatible(*pAutoUpdate).f_ToString();
 
+			// The agent installs the OS dependencies of its own application inside
+			// the environment
+			if (auto *pFindAgentApplication = mp_Applications.f_FindEqual(_pEnvironment->m_Settings.m_AgentApplication))
+				AgentConfig.m_OSDependencies = (*pFindAgentApplication)->m_Settings.m_OSDependencies;
+
 			_pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ConfigureAgent)(fg_Move(AgentConfig))
 				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to configure the environment agent")
 			;

@@ -863,6 +863,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_InitLog();
 		TCFuture<void> fp_InitHostMonitor(NEncoding::CEJsonSorted _AutoUpdateConfig);
 		TCFuture<void> fp_ConfigureHostMonitorFromHost(CStr _AutoUpdateConfig);
+		static CStr fsp_GetOSDependenciesFingerprint(TCMap<CStr, TCVector<CStr>> const &_Dependencies);
+		TCFuture<void> fp_InstallOSDependencies(TCMap<CStr, TCVector<CStr>> _Dependencies);
 		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> fp_HostMonitorRebootNeededFunctor(NEncoding::CEJsonSorted const &_AutoUpdateConfig);
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
@@ -1374,6 +1376,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCActor<CHostMonitor> mp_HostMonitor;
 		CStr mp_AppliedHostMonitorConfig; /// Agent side: the configuration the host monitor was last initialized with
+		CStr mp_AppliedAgentOSDependencies; /// Agent side: fingerprint of the OS dependencies installed for the agent
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
 		CActorSubscription mp_MainConfigFileMonitorSubscription;
 		CStr mp_OsName;

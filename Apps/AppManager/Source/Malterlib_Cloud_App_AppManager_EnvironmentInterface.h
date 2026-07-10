@@ -19,8 +19,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x104
-			, EProtocolVersion_Current = 0x104
+			EProtocolVersion_Min = 0x105
+			, EProtocolVersion_Current = 0x105
 		};
 
 		enum EApplicationState : uint32
@@ -47,6 +47,7 @@ namespace NMib::NCloud::NAppManager
 
 			NStr::CStr m_HostName; /// OS host name the agent sets for the environment; empty leaves it unchanged
 			NStr::CStr m_AutoUpdateConfig; /// Encoded AutoUpdate configuration object inherited from the host AppManager; empty for no automatic updates
+			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// OS dependencies of the agent application, installed by the agent inside the environment
 		};
 
 		struct CEnvironmentLaunch
@@ -117,8 +118,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x104
-			, EProtocolVersion_Current = 0x104
+			EProtocolVersion_Min = 0x105
+			, EProtocolVersion_Current = 0x105
 		};
 
 		virtual auto f_RegisterEnvironmentAgent

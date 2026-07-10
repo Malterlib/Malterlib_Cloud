@@ -238,26 +238,22 @@ namespace NMib::NCloud
 
 namespace NMib::NCloud::NAppManager
 {
-	TCFuture<void> CAppManagerActor::fp_EnsureOSDependencies(TCSharedPointer<CApplication> _pApplication)
+	CStr CAppManagerActor::fsp_GetOSDependenciesFingerprint(TCMap<CStr, TCVector<CStr>> const &_Dependencies)
 	{
-		auto &Dependencies = _pApplication->m_Settings.m_OSDependencies;
-		if (Dependencies.f_IsEmpty())
-			co_return {};
-
 		CStr Fingerprint;
-		for (auto &Packages : Dependencies)
+		for (auto &Packages : _Dependencies)
 		{
-			Fingerprint += Dependencies.fs_GetKey(Packages) + ":";
+			Fingerprint += _Dependencies.fs_GetKey(Packages) + ":";
 			for (auto &Package : Packages)
 				Fingerprint += " " + Package;
 			Fingerprint += "\n";
 		}
 
-		// Installs run once per AppManager instance and dependency set; a recreated
-		// container starts a fresh agent, so its reset OS is populated again
-		if (Fingerprint == _pApplication->m_InstalledOSDependenciesFingerprint)
-			co_return {};
+		return Fingerprint;
+	}
 
+	TCFuture<void> CAppManagerActor::fp_InstallOSDependencies(TCMap<CStr, TCVector<CStr>> _Dependencies)
+	{
 		CAppManagerOSIdentity Identity;
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
@@ -273,17 +269,12 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		CStr Error;
-		CStr Script = fg_AppManager_BuildOSDependencyInstallScript(Identity, Dependencies, Error);
+		CStr Script = fg_AppManager_BuildOSDependencyInstallScript(Identity, _Dependencies, Error);
 		if (!Error.f_IsEmpty())
-			co_return DMibErrorInstance("Cannot install OS dependencies for '{}': {}"_f << _pApplication->m_Name << Error);
+			co_return DMibErrorInstance(fg_Move(Error));
 
 		if (Script.f_IsEmpty())
-		{
-			_pApplication->m_InstalledOSDependenciesFingerprint = Fingerprint;
 			co_return {};
-		}
-
-		fp_SetAppLaunchStatus(_pApplication, "Installing OS dependencies", CAppManagerInterface::EStatusSeverity_Warning);
 
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 			(
@@ -302,6 +293,28 @@ namespace NMib::NCloud::NAppManager
 			.f_Wrap()
 		;
 
+		if (!Result)
+			co_return Result.f_GetException();
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_EnsureOSDependencies(TCSharedPointer<CApplication> _pApplication)
+	{
+		auto &Dependencies = _pApplication->m_Settings.m_OSDependencies;
+		if (Dependencies.f_IsEmpty())
+			co_return {};
+
+		CStr Fingerprint = fsp_GetOSDependenciesFingerprint(Dependencies);
+
+		// Installs run once per AppManager instance and dependency set; a recreated
+		// container starts a fresh agent, so its reset OS is populated again
+		if (Fingerprint == _pApplication->m_InstalledOSDependenciesFingerprint)
+			co_return {};
+
+		fp_SetAppLaunchStatus(_pApplication, "Installing OS dependencies", CAppManagerInterface::EStatusSeverity_Warning);
+
+		auto Result = co_await fp_InstallOSDependencies(fg_TempCopy(Dependencies)).f_Wrap();
 		if (!Result)
 			co_return DMibErrorInstance("Failed to install OS dependencies for '{}': {}"_f << _pApplication->m_Name << Result.f_GetExceptionStr());
 
