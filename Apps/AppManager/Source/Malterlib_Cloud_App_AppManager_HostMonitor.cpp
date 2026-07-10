@@ -70,7 +70,14 @@ namespace NMib::NCloud::NAppManager
 
 		{
 			CHostMonitor::CMonitorPathOptions PathOptions;
-			PathOptions.m_Path = mp_State.m_RootDirectory;
+
+			// An agent's root directory is a bind mount that reports the disk of the
+			// host; the environment's own filesystem is the one that can fill up from
+			// OS updates and writes outside the mounts
+			if (mp_bEnvironmentAgent)
+				PathOptions.m_Path = "/";
+			else
+				PathOptions.m_Path = mp_State.m_RootDirectory;
 
 			auto MonitorResult = co_await mp_HostMonitor(&CHostMonitor::f_MonitorPath, PathOptions).f_Wrap();
 			if (MonitorResult)
