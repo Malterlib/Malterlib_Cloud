@@ -116,6 +116,9 @@ namespace NMib::NCloud
 		auto fMatchesIdentity = [&](CStr const &_Selector)
 			{
 				CStr Selector = _Selector.f_LowerCase();
+				if (Selector == "*")
+					return true;
+
 				if (Selector == _Identity.m_ID)
 					return true;
 
