@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <Mib/Encoding/JsonShortcuts>
+#include <Mib/Concurrency/LogError>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace
@@ -130,6 +131,100 @@ namespace NMib::NCloud::NAppManager
 
 				co_return Result.f_GetException();
 			}
+		}
+
+		// The agent installs the OS dependencies of an application in a launch environment when it launches the executable, so
+		// the pre and post update scripts cannot rely on dependencies a new version adds. The host installs them only for the
+		// executables it launches: a self update source is the distribution of the AppManager, whose dependencies are for the
+		// agents that run it in environments, and its self update doesn't wait for a package manager
+		if (_pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty() && !_pApplication->m_Settings.m_bSelfUpdateSource && !_pApplication->m_Settings.m_Executable.f_IsEmpty())
+		{
+			auto Result = co_await fp_EnsureOSDependencies(_pApplication).f_Wrap();
+			if (_pApplication->m_bDeleted)
+				co_return DMibErrorInstance("Application deleted");
+
+			// A dependency can have stopped the application while the installation ran
+			if (_pApplication->m_bStopped)
+				co_return DMibErrorInstance("Application was stopped while installing its OS dependencies");
+
+			if (!Result)
+			{
+				fp_AppLaunchStateChanged(_pApplication, Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+				if (!_pApplication->m_bStopped && !_pApplication->m_bDeleted)
+					fp_ScheduleRelaunchApp(_pApplication);
+
+				co_return Result.f_GetException();
+			}
+
+#ifdef DPlatformFamily_Linux
+			// The dependencies can provide the tools that set the capabilities, which the install of the files tried before. Only the files the
+			// install wrote get them, see fg_AppManager_InstalledLowPortExecutablePath
+			if (!_pApplication->m_LowPortExecutablesToGrant.f_IsEmpty())
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				auto HandledResult = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [Directory = _pApplication->f_GetDirectory(), ToGrant = _pApplication->m_LowPortExecutablesToGrant]()
+						{
+							// The executables that got their capabilities or are no longer the installed files
+							TCMap<CStr, CStr> Handled;
+							for (auto &Digest : ToGrant)
+							{
+								auto &Executable = ToGrant.fs_GetKey(Digest);
+								try
+								{
+									CStr ExecutablePath = fg_AppManager_InstalledLowPortExecutablePath(Directory, Executable, Digest);
+									if (!ExecutablePath.f_IsEmpty())
+										CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+
+									Handled[Executable] = Digest;
+								}
+								catch (CException const &_Exception)
+								{
+									DMibLogWithCategory
+										(
+											Malterlib/Cloud/AppManager
+											, Warning
+											, "Failed to set the capabilities of the low port executable '{}': {}"
+											, Directory / Executable
+											, _Exception
+										)
+									;
+								}
+							}
+
+							return Handled;
+						}
+					)
+					.f_Wrap()
+				;
+
+				if (_pApplication->m_bDeleted)
+					co_return DMibErrorInstance("Application deleted");
+
+				if (!HandledResult)
+					fg_Move(HandledResult) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to set the capabilities of the low port executables");
+				else if (!HandledResult->f_IsEmpty())
+				{
+					// A new install can have replaced them while the capabilities were set
+					for (auto &Digest : *HandledResult)
+					{
+						auto &Executable = HandledResult->fs_GetKey(Digest);
+						if (auto *pCurrent = _pApplication->m_LowPortExecutablesToGrant.f_FindEqual(Executable); pCurrent && *pCurrent == Digest)
+							_pApplication->m_LowPortExecutablesToGrant.f_Remove(pCurrent);
+					}
+
+					co_await fp_UpdateApplicationJson(_pApplication).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to save application state");
+
+					if (_pApplication->m_bDeleted)
+						co_return DMibErrorInstance("Application deleted");
+				}
+
+				if (_pApplication->m_bStopped)
+					co_return DMibErrorInstance("Application was stopped while setting the capabilities of its low port executables");
+			}
+#endif
 		}
 
 		auto &Application = *_pApplication;

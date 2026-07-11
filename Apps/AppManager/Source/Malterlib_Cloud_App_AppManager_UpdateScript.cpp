@@ -288,6 +288,8 @@ namespace NMib::NCloud::NAppManager
 
 			co_await fp_EnsureEnvironmentStarted(pEnvironment);
 
+			co_await (fp_WaitForEnvironmentAgentConfiguration(pEnvironment) % "Cannot run update script: failed to configure the environment");
+
 			// The agent resolves the configured names to the accounts inside the environment
 			EnvironmentScript.m_RunAsUser = _pApplication->m_Settings.m_RunAsUser;
 			EnvironmentScript.m_RunAsGroup = _pApplication->m_Settings.m_RunAsGroup;

@@ -496,6 +496,190 @@ void CAppManager_Environment_Tests::f_DoTests()
 		}
 #endif
 
+		{
+			DMibTestPath("OS Dependencies Without Executable");
+
+			CStr PackageDirectory = AppManagerTestHelper.f_RootDirectory() / "DependenciesWithoutExecutable";
+
+			// An invalid package name fails the installation before a package manager runs
+			co_await
+				(
+					g_Dispatch / [PackageDirectory]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						CEJsonSorted VersionInfo;
+						VersionInfo["Application"] = "DependenciesWithoutExecutable";
+						VersionInfo["Version"] = "master/1.0.0";
+						VersionInfo["Platform"] = "TestPlatform";
+						auto &Dependencies = VersionInfo["ExtraInfo"]["OSDependencies"];
+						for (auto &Selector : {CStr("Linux"), CStr("macOS"), CStr("Windows")})
+							Dependencies[Selector] = _["invalid;package"];
+
+						CFile::fs_CreateDirectory(PackageDirectory);
+						CFile::fs_WriteStringToFile(PackageDirectory / "DependenciesWithoutExecutableVersionInfo.json", VersionInfo.f_ToString());
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating package")
+			;
+
+			auto AddResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-add", "--from-file", PackageDirectory, "--name", "DependenciesWithoutExecutable"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out adding application")
+			;
+			DMibAssert(AddResult.m_ExitCode, ==, 0u);
+
+			CStr Status;
+			NTime::CStopwatch Stopwatch{true};
+			while (true)
+			{
+				auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+				if (auto pApplication = Installed.f_FindEqual("DependenciesWithoutExecutable"))
+					Status = pApplication->m_Status;
+
+				if (Status == "No exe" || Status.f_Find("OS dependencies") >= 0 || Stopwatch.f_GetTime() > g_Timeout)
+					break;
+
+				co_await fg_Timeout(0.1);
+			}
+
+			DMibExpect(Status, ==, "No exe");
+
+			auto RemoveResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-remove", "DependenciesWithoutExecutable"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out removing application")
+			;
+			DMibExpect(RemoveResult.m_ExitCode, ==, 0u);
+		}
+
+		{
+			DMibTestPath("Settings From Version Info Without OS Dependencies");
+
+			CStr PackagesDirectory = AppManagerTestHelper.f_RootDirectory() / "DroppedDependenciesPackages";
+
+			co_await
+				(
+					g_Dispatch / [PackagesDirectory]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						for (auto &Version : {CStr("1.0.0"), CStr("1.0.1")})
+						{
+							CStr PackageDirectory = PackagesDirectory / Version;
+
+							CEJsonSorted VersionInfo;
+							VersionInfo["Application"] = "DroppedDependencies";
+							VersionInfo["Version"] = "master/{}"_f << Version;
+							VersionInfo["Platform"] = "TestPlatform";
+
+							// The selector matches no OS, so nothing is installed
+							if (Version == "1.0.0")
+								VersionInfo["ExtraInfo"]["OSDependencies"]["NoSuchOS"] = _["curl"];
+
+							CFile::fs_CreateDirectory(PackageDirectory);
+							CFile::fs_WriteStringToFile(PackageDirectory / "DroppedDependenciesVersionInfo.json", VersionInfo.f_ToString());
+						}
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating packages")
+			;
+
+			auto fLaunch = [&](TCVector<CStr> _Parameters) -> TCUnsafeFuture<uint32>
+				{
+					auto Result = co_await AppManagerTestHelper.f_LaunchSimple(AppManagerInfo.m_RootDirectory / "AppManager", fg_Move(_Parameters), AppManagerInfo.m_RootDirectory)
+						.f_Timeout(g_Timeout, "Timed out running AppManager command")
+					;
+					co_return Result.m_ExitCode;
+				}
+			;
+
+			auto fHasDependencies = [&]() -> TCUnsafeFuture<bool>
+				{
+					auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+					auto pApplication = Installed.f_FindEqual("DroppedDependencies");
+					co_return pApplication && !pApplication->m_OSDependencies.f_IsEmpty();
+				}
+			;
+
+			DMibAssert(co_await fLaunch({"--application-add", "--from-file", PackagesDirectory / "1.0.0", "--name", "DroppedDependencies"}), ==, 0u);
+			bool bAddedHasDependencies = co_await fHasDependencies();
+			DMibExpectTrue(bAddedHasDependencies);
+
+			DMibAssert(co_await fLaunch({"--application-update-from-file", "--name", "DroppedDependencies", "--update-settings=false", PackagesDirectory / "1.0.1"}), ==, 0u);
+			bool bUpdatedHasDependencies = co_await fHasDependencies();
+			DMibExpectTrue(bUpdatedHasDependencies);
+
+			DMibAssert(co_await fLaunch({"--application-change-settings", "--name", "DroppedDependencies", "--update-from-version-info"}), ==, 0u);
+			bool bReappliedHasDependencies = co_await fHasDependencies();
+			DMibExpectFalse(bReappliedHasDependencies);
+
+			DMibExpect(co_await fLaunch({"--application-remove", "DroppedDependencies"}), ==, 0u);
+		}
+
+		{
+			DMibTestPath("Add Without Settings From Version Info");
+
+			// The version time of a directory package is the time of its newest file, as the upload records it
+			CStr PackageDirectory = AppManagerTestHelper.f_RootDirectory() / "NoSettingsPackage";
+			NTime::CTime PayloadTime = NTime::CTimeConvert::fs_FromUnixMilliseconds(1'700'000'000'123);
+
+			auto BlockingActorCheckout = fg_BlockingActor();
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [PackageDirectory, PayloadTime]
+					{
+						CEJsonSorted VersionInfo;
+						VersionInfo["Application"] = "NoSettings";
+						VersionInfo["Version"] = "master/1.0.0";
+						VersionInfo["Platform"] = "TestPlatform";
+
+						CFile::fs_CreateDirectory(PackageDirectory / "Sub");
+						CFile::fs_WriteStringToFile(PackageDirectory / "NoSettingsVersionInfo.json", VersionInfo.f_ToString());
+						CFile::fs_WriteStringToFile(PackageDirectory / "Sub/Data.txt", "Data");
+						CFile::fs_SetWriteTime(PackageDirectory / "NoSettingsVersionInfo.json", PayloadTime - NTime::CTimeSpanConvert::fs_CreateSpanFromSeconds(60.0));
+						CFile::fs_SetWriteTime(PackageDirectory / "Sub/Data.txt", PayloadTime);
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating package")
+			;
+
+			auto AddResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-add", "--from-file", PackageDirectory, "--name", "NoSettings", "--settings-from-version-info=false"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out adding application")
+			;
+			DMibAssert(AddResult.m_ExitCode, ==, 0u);
+
+			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+			auto pApplication = Installed.f_FindEqual("NoSettings");
+			DMibAssertTrue(pApplication != nullptr);
+			DMibExpect(pApplication->m_VersionManagerApplication, ==, "");
+			DMibExpect(pApplication->m_VersionInfo.m_Time, ==, PayloadTime);
+
+			auto RemoveResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-remove", "NoSettings"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out removing application")
+			;
+			DMibExpect(RemoveResult.m_ExitCode, ==, 0u);
+		}
+
 		co_return {};
 	};
 

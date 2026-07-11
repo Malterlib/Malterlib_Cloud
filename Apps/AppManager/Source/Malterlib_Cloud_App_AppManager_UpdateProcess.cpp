@@ -496,7 +496,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
-			co_await
+			State.m_pApplication->m_LowPortExecutablesToGrant = co_await
 				(
 					g_Dispatch(BlockingActorCheckout) /
 					[
@@ -545,7 +545,7 @@ namespace NMib::NCloud::NAppManager
 							}
 						}
 
-						fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Files, pUniqueUserGroup, fOnInfo);
+						return fsp_UpdateApplicationFilePermissions(OutputDirectory, pApplication, Files, pUniqueUserGroup, fOnInfo);
 					}
 				)
 			;
