@@ -717,10 +717,10 @@ namespace NMib::NCloud::NAppManager
 		TCVector<CStr> Files;
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
-			Files = co_await
+			auto [UnpackedFiles, LowPortExecutablesToGrant] = co_await
 				(
-					g_Dispatch(BlockingActorCheckout)
-					/ [=, pUniqueUserGroup = mp_pUniqueUserGroup, RootDirectory = mp_State.m_RootDirectory]() mutable
+					g_Dispatch(BlockingActorCheckout) / [=, pUniqueUserGroup = mp_pUniqueUserGroup, RootDirectory = mp_State.m_RootDirectory]
+					() mutable -> TCTuple<TCVector<CStr>, TCMap<CStr, CStr>>
 					{
 						auto &Settings = pApplication->m_Settings;
 						fsp_CreateApplicationUserGroup(Settings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
@@ -758,14 +758,16 @@ namespace NMib::NCloud::NAppManager
 								_fOnInfo(Output.f_TrimRight());
 						}
 
-						fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
+						auto LowPortExecutablesToGrant = fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 
-						return Files;
+						return {fg_Move(Files), fg_Move(LowPortExecutablesToGrant)};
 					}
-					% "Failed to unpack application"
-					% Auditor
+					% "Failed to unpack application" % Auditor
 				)
 			;
+
+			Files = fg_Move(UnpackedFiles);
+			pApplication->m_LowPortExecutablesToGrant = fg_Move(LowPortExecutablesToGrant);
 		}
 
 		if (auto *pApplicationsState = mp_State.m_StateDatabase.m_Data.f_GetMember("Applications"))

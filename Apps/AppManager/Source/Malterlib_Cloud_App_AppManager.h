@@ -20,6 +20,7 @@
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
 #include <Mib/Concurrency/DistributedAppLogStoreLocal>
 
+#include "Malterlib_Cloud_App_AppManagerApp.h"
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
 #include "Malterlib_Cloud_App_AppManager_EnvironmentInterface.h"
 
@@ -88,6 +89,7 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_AutoUpdate                     = DBit(27)
 			, EApplicationSetting_LaunchInProcess                = DBit(28)
 			, EApplicationSetting_LaunchEnvironment              = DBit(29)
+			, EApplicationSetting_OSDependencies                 = DBit(30)
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
 			| EApplicationSetting_ExecutableParameters
@@ -135,6 +137,7 @@ namespace NMib::NCloud::NAppManager
 			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_AddSyncFlagsWildcards;
 			NContainer::TCMap<NStr::CStr, EDirectoryManifestSyncFlag> m_Backup_RemoveSyncFlagsWildcards;
 			NTime::CTimeSpan m_Backup_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);
+			TCMap<CStr, TCVector<CStr>> m_OSDependencies; /// OS selector to packages installed with the platform package manager before launch
 
 			// Settings that can be updated by app manager (command line or protocol)
 			TCSet<CStr> m_Dependencies;
@@ -162,6 +165,7 @@ namespace NMib::NCloud::NAppManager
 			, EEnvironmentSetting_AgentApplication  = DBit(1)
 			, EEnvironmentSetting_AutoStart         = DBit(2)
 			, EEnvironmentSetting_ParentApplication = DBit(3)
+			, EEnvironmentSetting_OSDependencies    = DBit(4)
 		};
 
 		struct CEnvironmentSettings
@@ -178,6 +182,8 @@ namespace NMib::NCloud::NAppManager
 			CStr m_ParentApplication; /// Application whose storage confines the environment storage, supporting encrypted storage
 
 			bool m_bAutoStart = true;
+
+			TCVector<CStr> m_OSDependencies; /// Additional packages the agent installs inside the environment, in addition to the agent application's OS dependencies
 		};
 
 		struct CEnvironment
@@ -214,6 +220,10 @@ namespace NMib::NCloud::NAppManager
 			umint m_AgentInterfaceAssignSequence = 0;    /// Lets a lost registration of m_AgentInterface tell whether a newer one replaced it
 			TCVector<TCPromise<void>> m_OnAgentConnected;
 			TCVector<TCPromise<void>> m_OnStopFinished;
+			umint m_nPendingAgentConfigurations = 0;
+			umint m_AgentConfigurationSequence = 0;      /// Sequence of the newest agent configuration sent, whose result sets m_AgentConfigurationError
+			TCVector<TCPromise<void>> m_OnAgentConfigured;
+			CStr m_AgentConfigurationError;              /// Failure of the newest agent configuration; launches retry the configuration
 			bool m_bStarting = false;
 			bool m_bStarted = false;
 			bool m_bStopping = false;
@@ -228,6 +238,7 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) override;
 			TCFuture<uint32> f_StopApplication(CStr _Name) override;
 			TCFuture<void> f_RunScript(CEnvironmentScript _Script) override;
+			TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -292,6 +303,7 @@ namespace NMib::NCloud::NAppManager
 
 			// Specific version state
 			TCVector<CStr> m_Files;
+			TCMap<CStr, CStr> m_LowPortExecutablesToGrant; /// Low port executables whose capabilities couldn't be set, to the SHA-256 read then
 			CVersionManager::CVersionIDAndPlatform m_LastInstalledVersion;
 			CVersionManager::CVersionInformation m_LastInstalledVersionInfo;
 
@@ -737,6 +749,8 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_InitSensor();
 		TCFuture<void> fp_InitLog();
 		TCFuture<void> fp_InitHostMonitor();
+		static CStr fsp_GetOSDependenciesFingerprint(TCMap<CStr, TCVector<CStr>> const &_Dependencies);
+		TCFuture<void> fp_InstallOSDependencies(TCMap<CStr, TCVector<CStr>> _Dependencies);
 		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> fp_HostMonitorRebootNeededFunctor(NEncoding::CEJsonSorted const &_AutoUpdateConfig);
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override;
@@ -762,7 +776,7 @@ namespace NMib::NCloud::NAppManager
 				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			)
 		;
-		static void fsp_UpdateApplicationFilePermissions
+		static auto fsp_UpdateApplicationFilePermissions
 			(
 				CStr const &_ApplicationDir
 				, TCSharedPointer<CApplication> const &_pApplication
@@ -770,6 +784,7 @@ namespace NMib::NCloud::NAppManager
 				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 				, TCFunction<void (CStr const &_Info)> const &_fLogInfo
 			)
+			-> TCMap<CStr, CStr>
 		;
 		TCFuture<void> fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> _pApplication, uint32 _OldVersion);
 
@@ -847,6 +862,7 @@ namespace NMib::NCloud::NAppManager
 		void fp_AutoStartEnvironments();
 		bool fp_EnvironmentAcceptsApplications(CStr const &_Name);
 		TCFuture<void> fp_CheckEnvironmentAccess(CStr _Name, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_EnsureOSDependencies(TCSharedPointer<CApplication> _pApplication);
 		TCFuture<void> fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
@@ -860,6 +876,8 @@ namespace NMib::NCloud::NAppManager
 		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_AbortPendingDistributedAppWaits(CApplication &_Application, CStr const &_Error);
 		TCFuture<void> fp_ConfirmEnvironmentAppStart(TCSharedPointer<CApplication> _pApplication);
+		void fp_SendEnvironmentAgentConfig(CEnvironment &_Environment);
+		TCFuture<void> fp_WaitForEnvironmentAgentConfiguration(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_OnEnvironmentApplicationStateChange(TCSharedPointer<CEnvironment> const &_pEnvironment, CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change);
 		TCFuture<CStr> fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
@@ -1211,6 +1229,9 @@ namespace NMib::NCloud::NAppManager
 		fp64 mp_HostMonitorMemoryInterval = CHostMonitor::mc_DefaultHostMonitorMemoryInterval;
 
 		TCActor<CHostMonitor> mp_HostMonitor;
+		CStr mp_AppliedAgentOSDependenciesFingerprint;                           /// Agent side
+		CSequencer mp_OSDependenciesSequencer{"AppManagerActor OSDependencies"}; /// Package managers hold exclusive locks, so installs run one at a time
+		TCSet<CStr> mp_InstalledOSDependenciesFingerprints;                      /// Fingerprints of the installed application OS dependencies; not persisted
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
 		CActorSubscription mp_MainConfigFileMonitorSubscription;
 		CStr mp_OsName;

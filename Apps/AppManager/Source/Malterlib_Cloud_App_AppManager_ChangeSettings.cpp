@@ -80,9 +80,9 @@ namespace NMib::NCloud::NAppManager
 
 		auto BlockingActorCheckout = fg_BlockingActor();
 
-		co_await
+		auto LowPortExecutablesToGrant = co_await
 			(
-				g_Dispatch(BlockingActorCheckout) / [=, Directory = _pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]() mutable
+				g_Dispatch(BlockingActorCheckout) / [=, Directory = _pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]() mutable -> TCOptional<TCMap<CStr, CStr>>
 				{
 					if (_OldVersion < 0x101)
 					{
@@ -119,11 +119,16 @@ namespace NMib::NCloud::NAppManager
 							}
 						}
 
-						fsp_UpdateApplicationFilePermissions(Directory, _pApplication, _pApplication->m_Files, pUniqueUserGroup, fOnInfo);
+						return fsp_UpdateApplicationFilePermissions(Directory, _pApplication, _pApplication->m_Files, pUniqueUserGroup, fOnInfo);
 					}
+
+					return {};
 				}
 			)
 		;
+
+		if (LowPortExecutablesToGrant)
+			_pApplication->m_LowPortExecutablesToGrant = fg_Move(*LowPortExecutablesToGrant);
 
 		if (_OldVersion < 0x101)
 		{
@@ -324,7 +329,7 @@ namespace NMib::NCloud::NAppManager
 						g_Dispatch(BlockingActorCheckout) / [=, Directory = pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]()
 						{
 							fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
-							fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
+							return fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 						}
 					)
 					+ fp_UpdateApplicationJson(pApplication)
@@ -346,6 +351,13 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception("Failed to save application state: {}"_f << UpdateJsonResults.f_GetExceptionStr());
 			else
 				_fOnInfo("Application state successfully stored, so any changes will persist");
+
+			// The owner changes clear the capabilities, and the state was saved before it was known which of them couldn't be set again
+			if (pApplication->m_LowPortExecutablesToGrant != *Result)
+			{
+				pApplication->m_LowPortExecutablesToGrant = fg_Move(*Result);
+				co_await (fp_UpdateApplicationJson(pApplication) % "Failed to save application state" % Auditor);
+			}
 		}
 
 		if (pApplication->m_bDeleted)

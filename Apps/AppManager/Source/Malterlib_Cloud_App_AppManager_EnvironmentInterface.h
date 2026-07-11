@@ -27,22 +27,31 @@ namespace NMib::NCloud::NAppManager
 			NStr::CStr m_PlatformFamily;
 		};
 
+		struct CAgentConfig
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// OS dependencies of the agent application and the environment by OS selector
+		};
+
 		struct CEnvironmentLaunch
 		{
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
 			NStr::CStr m_Name;
-			NStr::CStr m_Directory;               /// Absolute application directory. The path is the same inside the environment as on the host.
+			NStr::CStr m_Directory;                                                           /// Absolute application directory. The path is the same inside the environment as on the host.
 			NStr::CStr m_Executable;
 			NContainer::TCVector<NStr::CStr> m_Parameters;
 			NStr::CStr m_RunAsUser;
 			NStr::CStr m_RunAsGroup;
 			bool m_bRunAsUserHasShell = false;
-			NStr::CStrSecure m_RunAsUserPassword; /// Set on Windows, where a local agent logs on with the account the host created
+			NStr::CStrSecure m_RunAsUserPassword;                                             /// Set on Windows, where a local agent logs on with the account the host created
 			bool m_bDistributedApp = false;
-			NStr::CStr m_InterfaceAddress;        /// Host AppManager address the application connects its distributed app interface to
-			NStr::CStr m_LaunchID;                /// Host AppManager launch id the application registers with
+			NStr::CStr m_InterfaceAddress;                                                    /// Host AppManager address the application connects its distributed app interface to
+			NStr::CStr m_LaunchID;                                                            /// Launch ID the host assigned to the application, which it registers with
+			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// OS dependencies of the application, installed by the agent inside the environment
 		};
 
 		struct CEnvironmentScript
@@ -78,6 +87,9 @@ namespace NMib::NCloud::NAppManager
 		virtual NConcurrency::TCFuture<NStr::CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) = 0;
 		virtual NConcurrency::TCFuture<uint32> f_StopApplication(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_RunScript(CEnvironmentScript _Script) = 0;
+
+		/// Configures the agent with the OS dependencies to install inside the environment
+		virtual NConcurrency::TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) = 0;
 
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/AppManagerEnvironment";
 	};

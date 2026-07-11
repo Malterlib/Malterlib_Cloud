@@ -395,6 +395,9 @@ Property
 
 	MalterlibCloudVersionInfo_AppDistribution_DeployDestinations: [string]?
 	MalterlibCloudVersionInfo_AppDistribution_ReleaseNotes: string = ""
+
+	// OS selectors mapped to the packages the application needs installed before it launches
+	MalterlibCloudVersionInfo_OSDependencies: {...: [string]}?
 }
 
 Property
@@ -494,6 +497,11 @@ Property
 	MalterlibCloudVersionInfo #<ExtraInfo> =+ {LowPortExecutables: MalterlibCloudVersionInfo_LowPortExecutables}
 	{
 		!MalterlibCloudVersionInfo_LowPortExecutables undefined
+	}
+
+	MalterlibCloudVersionInfo #<ExtraInfo> =+ {OSDependencies: MalterlibCloudVersionInfo_OSDependencies}
+	{
+		!MalterlibCloudVersionInfo_OSDependencies undefined
 	}
 
 	MalterlibCloudVersionInfo #<ExtraInfo.AppDistribution> =+ {DeployDestinations: MalterlibCloudVersionInfo_AppDistribution_DeployDestinations}

@@ -4,6 +4,7 @@
 #include <Mib/Encoding/JsonShortcuts>
 #include <Mib/Concurrency/AsyncDestroy>
 #include <Mib/Cryptography/RandomID>
+#include <Mib/File/FileBeneath>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 #ifdef DPlatformFamily_Windows
@@ -225,6 +226,12 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJson["LastTriedInstalledVersion"] = Application.m_LastTriedInstalledVersion.f_ToJson<CEJsonSortedYaml>();
 		ApplicationJson["LastTriedInstalledVersionInfo"] = Application.m_LastTriedInstalledVersionInfo.f_ToJson<CEJsonSortedYaml>();
 		ApplicationJson["LastTriedInstalledVersionError"] = Application.m_LastTriedInstalledVersionError;
+		{
+			auto &ToGrant = ApplicationJson["LowPortExecutablesToGrant"] = CEJsonSortedYaml();
+			ToGrant.f_Object();
+			for (auto &Digest : Application.m_LowPortExecutablesToGrant)
+				ToGrant[Application.m_LowPortExecutablesToGrant.fs_GetKey(Digest)] = Digest;
+		}
 
 		ApplicationJson["WantVersion"] = Application.m_WantVersion.f_ToJson<CEJsonSortedYaml>();
 		ApplicationJson["WantVersionInfo"] = Application.m_WantVersionInfo.f_ToJson<CEJsonSortedYaml>();
@@ -265,6 +272,18 @@ namespace NMib::NCloud::NAppManager
 #ifdef DPlatformFamily_Windows
 		ApplicationJson["RunAsUserPassword"] = Settings.m_RunAsUserPassword;
 #endif
+
+		{
+			auto &Json = ApplicationJson["OSDependencies"] = CEJsonSortedYaml();
+			Json.f_Object();
+			for (auto &Packages : Settings.m_OSDependencies)
+			{
+				auto &PackagesJson = Json[Settings.m_OSDependencies.fs_GetKey(Packages)];
+				PackagesJson.f_Array().f_Clear();
+				for (auto &Package : Packages)
+					PackagesJson.f_Insert(Package);
+			}
+		}
 
 		{
 			auto &BackupJson = ApplicationJson["Backup"] = CEJsonSortedYaml();
@@ -388,7 +407,9 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 
-	void CAppManagerActor::fsp_UpdateApplicationFilePermissions
+	// Returns the low port executables whose capabilities couldn't be set, with their digests, for a launch to grant once it has installed the OS
+	// dependencies
+	auto CAppManagerActor::fsp_UpdateApplicationFilePermissions
 		(
 			CStr const &_ApplicationDir
 			, TCSharedPointer<CApplication> const &_pApplication
@@ -396,7 +417,10 @@ namespace NMib::NCloud::NAppManager
 			, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			, TCFunction<void (CStr const &_Info)> const &_fLogInfo
 		)
+		-> TCMap<CStr, CStr>
 	{
+		TCMap<CStr, CStr> LowPortExecutablesToGrant;
+
 		auto &Settings = _pApplication->m_Settings;
 		auto User = _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser);
 		auto Group = _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup);
@@ -437,6 +461,17 @@ namespace NMib::NCloud::NAppManager
 				catch (CException const &_Exception)
 				{
 					_fLogInfo("Failed to setup low port executable support running 'setcap cap_net_bind_service=ep {}': {}"_f << ExecutablePath << _Exception);
+
+					// The OS dependencies that the launch installs can provide setcap. Reading a FIFO without a writer would block
+					try
+					{
+						if (CFileBeneath::fs_GetType(_ApplicationDir, Executable.f_String()) == EFileBeneathType::mc_File)
+							LowPortExecutablesToGrant[Executable.f_String()] = fg_AppManager_LowPortExecutableDigest(ExecutablePath);
+					}
+					catch (CException const &_Exception)
+					{
+						_fLogInfo("Failed to read low port executable '{}', which its launch won't set the capabilities of: {}"_f << ExecutablePath << _Exception);
+					}
 				}
 			}
 		}
@@ -448,6 +483,8 @@ namespace NMib::NCloud::NAppManager
 		fSetOwners(_ApplicationDir + "/.tmp");
 
 		CFile::fs_SetAttributes(_ApplicationDir, gc_RootAttributes);
+
+		return LowPortExecutablesToGrant;
 	}
 
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_StopApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
@@ -661,3 +698,35 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 }
+
+#ifdef DPlatformFamily_Linux
+namespace NMib::NCloud
+{
+	// Blocking. The digest that tells whether a low port executable changed since its capabilities couldn't be set
+	NStr::CStr fg_AppManager_LowPortExecutableDigest(NStr::CStr const &_Path)
+	{
+		return NFile::CFile::fs_GetFileChecksum_SHA256(_Path).f_GetString();
+	}
+
+	// Blocking. The path to give setcap for a low port executable, or empty when fg_AppManager_LowPortExecutablePath gives none, it isn't a regular
+	// file or its digest differs from _InstalledDigest, read when its capabilities couldn't be set. Throws when the file can't be read
+	NStr::CStr fg_AppManager_InstalledLowPortExecutablePath(NStr::CStr const &_Directory, NStr::CStr const &_Executable, NStr::CStr const &_InstalledDigest)
+	{
+		NStr::CStr Path = _Directory / _Executable;
+		if (!NFile::CFile::fs_FileExists(Path, NFile::EFileAttrib_File))
+			return {};
+
+		// Reading a FIFO without a writer would block
+		if (NFile::CFileBeneath::fs_GetType(_Directory, _Executable) != NFile::EFileBeneathType::mc_File)
+			return {};
+
+		if (fg_AppManager_LowPortExecutableDigest(Path) != _InstalledDigest)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Not setting the capabilities of the low port executable '{}', which changed after its install", Path);
+			return {};
+		}
+
+		return Path;
+	}
+}
+#endif
