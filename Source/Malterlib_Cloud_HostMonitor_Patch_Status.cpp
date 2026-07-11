@@ -43,10 +43,16 @@ namespace NMib::NCloud
 			TCActor<CProcessLaunchActor> LaunchActor(fg_Construct());
 			auto AutoDestroy = co_await fg_AsyncDestroy(LaunchActor);
 
+			TCVector<CStr> Arguments = {"-p"};
+
+			// Restrict to the library check when the kernel is managed outside this OS installation, as the kernel check cannot resolve there and reports UNKN
+			if (m_Config.m_bKernelManagedExternally)
+				Arguments.f_InsertLast("-l");
+
 			CProcessLaunchActor::CSimpleLaunch Launch
 				{
 					c_NeedRestartExecutable
-					, {"-p"}
+					, Arguments
 					, CFile::fs_GetPath(c_NeedRestartExecutable)
 					, CProcessLaunchActor::ESimpleLaunchFlag_None
 				}

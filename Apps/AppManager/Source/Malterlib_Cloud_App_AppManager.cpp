@@ -13,6 +13,7 @@ namespace NMib::NCloud::NAppManager
 		struct CAgentDeploymentSettings
 		{
 			bool m_bEnvironmentAgent = false;
+			bool m_bEnvironmentContainer = false;
 			CStr m_EnvironmentHostID;
 			CStr m_EnvironmentHostName;
 		};
@@ -35,6 +36,7 @@ namespace NMib::NCloud::NAppManager
 							CEJsonSorted Json = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile, true));
 
 							Settings.m_bEnvironmentAgent = Json.f_GetMemberValue("EnvironmentAgent", false).f_Boolean();
+							Settings.m_bEnvironmentContainer = Json.f_GetMemberValue("EnvironmentContainer", false).f_Boolean();
 							if (auto *pValue = Json.f_GetMember("EnvironmentHostID", EJsonType_String))
 								Settings.m_EnvironmentHostID = pValue->f_String();
 							if (auto *pValue = Json.f_GetMember("EnvironmentHostName", EJsonType_String))
@@ -96,6 +98,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto &Deployment = fg_GetAgentDeploymentSettings();
 		mp_bEnvironmentAgent = Deployment.m_bEnvironmentAgent;
+		mp_bEnvironmentContainer = Deployment.m_bEnvironmentContainer;
 		mp_EnvironmentHostID = Deployment.m_EnvironmentHostID;
 		mp_InitialStartupResultFuture = mp_InitialStartupResult.f_Future();
 	}

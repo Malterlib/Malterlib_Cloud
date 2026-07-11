@@ -58,6 +58,9 @@ namespace NMib::NCloud::NAppManager
 		// reports the patching state to the environment host
 		if (mp_bEnvironmentAgent)
 		{
+			// A container shares the kernel of whatever runs it, while a VM guest
+			// manages its own kernel and keeps the full check
+			Config.m_bKernelManagedExternally = mp_bEnvironmentContainer;
 			Config.m_fOnPatchingChanged = g_ActorFunctor / [this](bool _bPatching) -> TCFuture<void>
 				{
 					co_return co_await fp_ReportEnvironmentUpdateStateToHost(_bPatching);

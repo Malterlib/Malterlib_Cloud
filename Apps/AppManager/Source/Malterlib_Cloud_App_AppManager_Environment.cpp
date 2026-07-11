@@ -1930,6 +1930,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			CEJsonSorted SettingsJson(EJsonType_Object);
 			SettingsJson["EnvironmentAgent"] = true;
+			SettingsJson["EnvironmentContainer"] = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container;
 			SettingsJson["EnvironmentHostID"] = mp_State.m_HostID;
 			SettingsJson["EnvironmentHostName"] = fp_GetEnvironmentHostName(*_pEnvironment);
 			DeploymentSettings = SettingsJson.f_ToString();
