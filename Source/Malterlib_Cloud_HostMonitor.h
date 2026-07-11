@@ -169,6 +169,7 @@ namespace NMib::NCloud
 			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> m_fOnRebootNeeded;
 			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (bool _bPatching)> m_fOnPatchingChanged; ///< Called around automatic patch installation
 			EAutomaticUpdatesFlag m_AutomaticUpdateFlags = EAutomaticUpdatesFlag::mc_None;
+			bool m_bKernelManagedExternally = false; ///< The kernel is not managed by this OS installation (containers/VM guests), so skip kernel/microcode reboot checks
 		};
 
 		struct [[nodiscard]] CInitResult
