@@ -127,6 +127,7 @@ namespace NMib::NCloud
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddRunAsUserHasShell)
 			_Stream % m_bRunAsUserHasShell;
 
+		_Stream % m_OSDependencies;
 		_Stream % m_Backup_IncludeWildcards;
 		_Stream % m_Backup_ExcludeWildcards;
 		_Stream % m_Backup_AddSyncFlagsWildcards;
@@ -207,6 +208,9 @@ namespace NMib::NCloud
 		_Stream % m_AgentApplication;
 		_Stream % m_ParentApplication;
 		_Stream % m_bAutoStart;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentOSDependencies)
+			_Stream % m_OSDependencies;
 	}
 
 	template <typename tf_CStream>
@@ -222,6 +226,9 @@ namespace NMib::NCloud
 		_Stream % m_bAutoStart;
 
 		_Stream % m_Applications;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentOSDependencies)
+			_Stream % m_OSDependencies;
 	}
 
 	template <typename tf_CStream>

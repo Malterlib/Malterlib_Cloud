@@ -133,6 +133,16 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_o= "Start the environment automatically when the AppManager starts."
 			}
 		;
+		auto SettingsOption_OSDependencies = "OSDependencies?"_o=
+			{
+				"Names"_o= _o["--os-dependencies"]
+				, "Default"_o= _o[]
+				, "Type"_o= _o[""]
+				, "Description"_o= "Additional OS packages installed inside the environment by the agent, in addition\n"
+				"to the OS dependencies of the agent application.\n"
+				"Example: '[\"htop\", \"strace\"]'\n"
+			}
+		;
 		auto fStripDefault = [](auto &&_Template)
 			{
 				auto Return = _Template;
@@ -161,6 +171,7 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_AgentApplication
 						, SettingsOption_ParentApplication
 						, SettingsOption_AutoStart
+						, SettingsOption_OSDependencies
 					}
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
@@ -181,6 +192,7 @@ namespace NMib::NCloud::NAppManager
 						, fStripDefault(SettingsOption_AgentApplication)
 						, fStripDefault(SettingsOption_ParentApplication)
 						, fStripDefault(SettingsOption_AutoStart)
+						, fStripDefault(SettingsOption_OSDependencies)
 					}
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
@@ -319,6 +331,14 @@ namespace NMib::NCloud::NAppManager
 			m_bAutoStart = pValue->f_Boolean();
 		}
 
+		if (auto *pValue = _Params.f_GetMember("OSDependencies"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_OSDependencies;
+			m_OSDependencies.f_Clear();
+			for (auto &Package : pValue->f_Array())
+				m_OSDependencies.f_Insert(Package.f_String());
+		}
+
 		return true;
 	}
 
@@ -332,6 +352,8 @@ namespace NMib::NCloud::NAppManager
 			m_ParentApplication = _Source.m_ParentApplication;
 		if (_ChangedSettings & EEnvironmentSetting_AutoStart)
 			m_bAutoStart = _Source.m_bAutoStart;
+		if (_ChangedSettings & EEnvironmentSetting_OSDependencies)
+			m_OSDependencies = _Source.m_OSDependencies;
 	}
 
 	void CAppManagerActor::CEnvironmentSettings::f_FromInterfaceSettings(CAppManagerInterface::CEnvironmentSettings const &_Settings, EEnvironmentSetting &o_ChangedSettings)
@@ -356,6 +378,11 @@ namespace NMib::NCloud::NAppManager
 			m_bAutoStart = *_Settings.m_bAutoStart;
 			o_ChangedSettings |= EEnvironmentSetting_AutoStart;
 		}
+		if (_Settings.m_OSDependencies)
+		{
+			m_OSDependencies = *_Settings.m_OSDependencies;
+			o_ChangedSettings |= EEnvironmentSetting_OSDependencies;
+		}
 	}
 
 	auto CAppManagerActor::CEnvironmentSettings::f_ChangedSettings(CEnvironmentSettings const &_Other) const -> EEnvironmentSetting
@@ -369,6 +396,8 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EEnvironmentSetting_ParentApplication;
 		if (m_bAutoStart != _Other.m_bAutoStart)
 			ChangedSettings |= EEnvironmentSetting_AutoStart;
+		if (m_OSDependencies != _Other.m_OSDependencies)
+			ChangedSettings |= EEnvironmentSetting_OSDependencies;
 
 		return ChangedSettings;
 	}
@@ -400,6 +429,12 @@ namespace NMib::NCloud::NAppManager
 				Settings.m_ParentApplication = pValue->f_String();
 			if (auto pValue = EnvironmentJson.f_GetMember("AutoStart", EJsonType_Boolean))
 				Settings.m_bAutoStart = pValue->f_Boolean();
+
+			if (auto pValue = EnvironmentJson.f_GetMember("OSDependencies", EJsonType_Array))
+			{
+				for (auto &Package : pValue->f_Array())
+					Settings.m_OSDependencies.f_Insert(Package.f_String());
+			}
 		}
 	}
 
@@ -417,6 +452,13 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentJson["ParentApplication"] = Settings.m_ParentApplication;
 		EnvironmentJson["AutoStart"] = Settings.m_bAutoStart;
 
+		{
+			auto &DependenciesJson = EnvironmentJson["OSDependencies"].f_Array();
+			DependenciesJson.f_Clear();
+			for (auto &Package : Settings.m_OSDependencies)
+				DependenciesJson.f_Insert(Package);
+		}
+
 		co_return co_await mp_State.m_StateDatabase.f_Save();
 	}
 
@@ -433,6 +475,8 @@ namespace NMib::NCloud::NAppManager
 		OutEnvironment.m_AgentApplication = Settings.m_AgentApplication;
 		OutEnvironment.m_ParentApplication = Settings.m_ParentApplication;
 		OutEnvironment.m_bAutoStart = Settings.m_bAutoStart;
+
+		OutEnvironment.m_OSDependencies = Settings.m_OSDependencies;
 
 		for (auto &pApplication : mp_Applications)
 		{
@@ -621,6 +665,14 @@ namespace NMib::NCloud::NAppManager
 
 		_fOnInfo("Saving environment state");
 		co_await (fp_UpdateEnvironmentJson(pEnvironment) % "Failed to save environment state" % Auditor);
+
+		// A running agent installs the changed OS dependencies right away; the
+		// configuration is otherwise applied when the agent connects
+		if ((ChangedSettings & EEnvironmentSetting_OSDependencies) && pEnvironment->f_IsStarted())
+		{
+			_fOnInfo("Configuring the running environment agent with the changed OS dependencies");
+			fp_SendEnvironmentAgentConfig(*pEnvironment);
+		}
 
 		_fOnInfo("Environment settings were successfully changed");
 		Auditor.f_Info(fg_Format("Updated settings for environment '{}'", _Name));
@@ -974,6 +1026,9 @@ namespace NMib::NCloud::NAppManager
 			if (!Environment.m_ParentApplication.f_IsEmpty())
 				fAddProperty(Settings, "Parent application", Environment.m_ParentApplication);
 			fAddProperty(Settings, "Auto start", Environment.m_bAutoStart);
+
+			if (!Environment.m_OSDependencies.f_IsEmpty())
+				fAddProperty(Settings, "OS dependencies", "{vs}"_f << Environment.m_OSDependencies);
 
 			CStr Status;
 			if (Environment.m_StatusSeverity == CAppManagerInterface::EStatusSeverity_Error)
@@ -1485,12 +1540,37 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	void CAppManagerActor::fp_SendEnvironmentAgentConfig(CEnvironment &_Environment)
+	{
+		if (!_Environment.m_AgentInterface)
+			return;
+
+		CAppManagerEnvironmentInterface::CAgentConfig AgentConfig;
+
+		// The agent installs the OS dependencies of its own application inside
+		// the environment
+		if (auto pAgentApplication = fp_FindEnvironmentAgentApplication(_Environment))
+			AgentConfig.m_OSDependencies = pAgentApplication->m_Settings.m_OSDependencies;
+
+		// The environment's own OS dependencies install in addition to the agent
+		// application's. The environment runs one concrete OS, so they ride the
+		// selector matching every OS
+		if (!_Environment.m_Settings.m_OSDependencies.f_IsEmpty())
+			AgentConfig.m_OSDependencies["*"] = _Environment.m_Settings.m_OSDependencies;
+
+		_Environment.m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ConfigureAgent)(fg_Move(AgentConfig))
+			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to configure the environment agent")
+		;
+	}
+
 	TCFuture<void> CAppManagerActor::fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface)
 	{
 		if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStopping)
 			co_return {};
 
 		_pEnvironment->m_AgentInterface = fg_Move(_Interface);
+
+		fp_SendEnvironmentAgentConfig(*_pEnvironment);
 
 		_pEnvironment->m_bStarted = true;
 		_pEnvironment->f_SetStatus("Running", CAppManagerInterface::EStatusSeverity_None);

@@ -172,6 +172,7 @@ namespace NMib::NCloud
 		Return["AgentApplication"] = fg_ToJson(m_AgentApplication);
 		Return["ParentApplication"] = fg_ToJson(m_ParentApplication);
 		Return["bAutoStart"] = fg_ToJson(m_bAutoStart);
+		Return["OSDependencies"] = fg_ToJson(m_OSDependencies);
 		Return["Applications"] = fg_ToJson(m_Applications);
 		return Return;
 	}

@@ -15,6 +15,7 @@ namespace NMib::NCloud::NAppManager
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_LaunchApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_StopApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_RunScript);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ConfigureAgent);
 	}
 
 	CAppManagerEnvironmentInterface::~CAppManagerEnvironmentInterface()
@@ -79,6 +80,13 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_ExitStatus;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CApplicationStateChange);
+
+	template <typename tf_CStream>
+	void CAppManagerEnvironmentInterface::CAgentConfig::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_OSDependencies;
+	}
+	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CAgentConfig);
 
 	auto CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_GetAgentInfo() -> TCFuture<CAgentInfo>
 	{
@@ -444,5 +452,43 @@ namespace NMib::NCloud::NAppManager
 		pThis->mp_EnvironmentTicketNotifications[NotificationID] = fg_Move(Ticket.m_NotificationsSubscription);
 
 		co_return Ticket.m_Ticket.f_ToStringTicket();
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_ConfigureAgent(CAgentConfig _Config)
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_bEnvironmentAgent)
+			co_return DMibErrorInstance("Not running as an environment agent");
+
+		if (!_Config.m_OSDependencies.f_IsEmpty())
+		{
+			CStr Fingerprint = fsp_GetOSDependenciesFingerprint(_Config.m_OSDependencies);
+			if (Fingerprint != pThis->mp_AppliedAgentOSDependencies)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Installing the agent OS dependencies");
+
+				auto Result = co_await pThis->fp_InstallOSDependencies(fg_Move(_Config.m_OSDependencies)).f_Wrap();
+				if (Result)
+				{
+					pThis->mp_AppliedAgentOSDependencies = fg_Move(Fingerprint);
+
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Installed the agent OS dependencies");
+				}
+				else
+				{
+					DMibLogWithCategory
+						(
+							Malterlib/Cloud/AppManager
+							, Error
+							, "Failed to install the agent OS dependencies: {}"
+							, Result.f_GetExceptionStr()
+						)
+					;
+				}
+			}
+		}
+
+		co_return {};
 	}
 }
