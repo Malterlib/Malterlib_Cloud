@@ -335,6 +335,7 @@ namespace NMib::NCloud::NAppManager
 			co_await fg_Exchange(mp_RebootScheduleTimerSubscrption, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy reboot timer subscription");
 
 		co_await fg_Move(mp_ChangeNotificationsPermissionsChangedSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy sequencer");
+		co_await fg_Move(mp_HostMonitorConfigureSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy host monitor configure sequencer");
 
 		if (mp_SensorRebootPreventionTimerSubscription)
 			co_await fg_Exchange(mp_SensorRebootPreventionTimerSubscription, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy reboot prevention timer");
@@ -756,8 +757,50 @@ namespace NMib::NCloud::NAppManager
 		co_await fp_InitSensor();
 		co_await fp_InitLog();
 
+		// A container start is the reboot of the environment, but the container keeps /run, so the reboot markers of
+		// installed updates would request restarts forever
+		if (mp_bEnvironmentAgent && mp_bEnvironmentContainer)
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / []()
+					{
+						for (auto &File : {CStr("/run/reboot-required"), CStr("/run/reboot-required.pkgs"), CStr("/var/run/reboot-required"), CStr("/var/run/reboot-required.pkgs")})
+						{
+							if (CFile::fs_FileExists(File))
+								CFile::fs_DeleteFile(File);
+						}
+					}
+				)
+				.f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to remove the reboot markers of the container")
+			;
+		}
+
+		// A restart request saved before this start counts toward the reboot loop guard, whether or not the environment restarted
+		if (mp_bEnvironmentAgent)
+		{
+			if (auto *pPending = mp_State.m_StateDatabase.m_Data.f_GetMember("PendingHostMonitorReboot", EEJsonType_Date))
+			{
+				CTime PendingTime = pPending->f_Date();
+				mp_State.m_StateDatabase.m_Data["LastHostMonitorReboot"] = PendingTime;
+				mp_State.m_StateDatabase.m_Data.f_RemoveMember("PendingHostMonitorReboot");
+				co_await mp_State.m_StateDatabase.f_Save().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to save the environment restart");
+			}
+		}
+
+		// An environment agent initializes its host monitor when the environment
+		// host sends the inherited update configuration after connecting
 		if (!mp_bEnvironmentAgent)
-			co_await fp_InitHostMonitor();
+		{
+			CEJsonSorted AutoUpdateConfig;
+			if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
+				AutoUpdateConfig = CEJsonSorted::fs_FromCompatible(*pAutoUpdate);
+
+			co_await fp_InitHostMonitor(fg_Move(AutoUpdateConfig));
+		}
 
 		co_await fp_ReadState();
 
@@ -1027,6 +1070,26 @@ namespace NMib::NCloud::NAppManager
 
 		co_await fp_CancelAllApplicationUpdatesOnStopAppManager();
 
+		// Stopping a container during an OS package installation breaks its packages, and closing the encryption of a parent application below stops
+		// the environments in its storage. The shutdown refuses new updates, and those of a container or VM defer it only within the guest deferral limit
+		while (true)
+		{
+			bool bAgentUpdates = false;
+			for (auto &pEnvironment : mp_Environments)
+			{
+				if (pEnvironment->f_AgentUpdateDefers())
+				{
+					bAgentUpdates = true;
+					break;
+				}
+			}
+
+			if (!bAgentUpdates)
+				break;
+
+			co_await fg_Timeout(1.0);
+		}
+
 		{
 			TCFutureVector<uint32> ApplicationStops;
 			for (auto &pApplication : mp_Applications)
@@ -1041,8 +1104,7 @@ namespace NMib::NCloud::NAppManager
 			pApplication->f_Clear();
 		}
 
-		// Shutting down skips the environment idle wait: a virtual machine runs in this process, and the shutdown must not wait
-		// the hour that wait can take
+		// The shutdown skips the idle wait of the environments, which can last an hour
 		{
 			TCFutureVector<void> EnvironmentStops;
 			for (auto &pEnvironment : mp_Environments)
@@ -1152,11 +1214,17 @@ namespace NMib::NCloud::NAppManager
 		if (mp_MainDirectoryMonitorSubscription)
 			co_await fg_Exchange(mp_MainDirectoryMonitorSubscription, nullptr)->f_Destroy();
 
+		if (mp_EnvironmentDataRootMonitorSubscription)
+			co_await fg_Exchange(mp_EnvironmentDataRootMonitorSubscription, nullptr)->f_Destroy();
+
 		if (mp_MainConfigFileMonitorSubscription)
 			co_await fg_Exchange(mp_MainConfigFileMonitorSubscription, nullptr)->f_Destroy();
 
 		if (mp_HostMonitor)
 			co_await fg_Move(mp_HostMonitor).f_Destroy();
+
+		if (mp_PatchingOSDependenciesSequence)
+			co_await fg_Exchange(mp_PatchingOSDependenciesSequence, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to end the patching turn of the package manager");
 
 		co_await fg_Move(mp_OSDependenciesSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy OS dependencies sequencer");
 		co_await fg_Move(mp_EncryptionSensorReporterSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy encryption sensor reporter sequencer");

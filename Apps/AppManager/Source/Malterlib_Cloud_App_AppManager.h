@@ -231,6 +231,8 @@ namespace NMib::NCloud::NAppManager
 
 			void f_SetStatus(CStr const &_Status, CAppManagerInterface::EStatusSeverity _Severity);
 			bool f_IsStarted() const;
+			bool f_AgentUpdateDefers() const;
+			void f_SetAgentUpdateInProgress(CStr &&_Description);
 
 			CIntrusiveRefCount m_RefCount;
 
@@ -273,6 +275,7 @@ namespace NMib::NCloud::NAppManager
 			umint m_nStorageRemovals = 0;                /// Application storage removals that need the agent; the last one stops a manually stopped environment
 			bool m_bWindowOpen = false;                  /// Set while a window session is prepared or runs; it reserves the guest image bundle
 			umint m_nPendingInstalls = 0;                /// Adds of applications assigned to the environment that have reached unpacking
+			umint m_nRunningScripts = 0;                 /// Update script calls to the agent awaiting a reply or timeout; stops and restarts wait for them
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AgentAppInterface;
 			TCDistributedActorInterface<CAppManagerEnvironmentInterface> m_AgentInterface;
 			umint m_AgentAppInterfaceAssignSequence = 0; /// Lets a lost registration of m_AgentAppInterface tell whether a newer one replaced it
@@ -283,6 +286,9 @@ namespace NMib::NCloud::NAppManager
 			umint m_AgentConfigurationSequence = 0;      /// Sequence of the newest agent configuration sent, whose result sets m_AgentConfigurationError
 			TCVector<TCPromise<void>> m_OnAgentConfigured;
 			CStr m_AgentConfigurationError;              /// Failure of the newest agent configuration; launches retry the configuration
+			CStr m_AgentUpdateInProgress;                /// Description of the OS updates or dependency installs the agent reports; see f_AgentUpdateDefers
+			CAppManagerGuestDeferral m_AgentUpdateDeferral;
+			umint m_nUpdateAdmissionClosed = 0;          /// Stops, restarts and removals that waited for the agent updates refuse new ones until the environment stops
 			bool m_bStarting = false;
 			bool m_bStartAbortRequested = false;         /// A stop waits for the start, which gives up its retries and its wait for the agent
 			bool m_bStartEnsuredContainerSystem = false; /// Set while a start runs on the container system it ensured; a colima restart waits for that start
@@ -290,6 +296,8 @@ namespace NMib::NCloud::NAppManager
 			bool m_bStopping = false;
 			bool m_bRemoving = false;
 			bool m_bReplacingContainerAfterPull = false; /// New starts fail and automatic launches are deferred while the container is replaced
+			umint m_nStops = 0;                          /// Stops so far, which tell a restart that waits whether another restart came first
+			bool m_bRestartWhenIdlePending = false;      /// A restart waits for the environment to become idle, which later requests join
 
 			CAppManagerActor *m_pThis;
 		};
@@ -317,6 +325,8 @@ namespace NMib::NCloud::NAppManager
 			;
 			TCFuture<void> f_ReportApplicationState(CAppManagerEnvironmentInterface::CApplicationStateChange _Change) override;
 			TCFuture<CStr> f_RequestApplicationConnectionTicket(CStr _LaunchID) override;
+			TCFuture<void> f_ReportEnvironmentUpdateState(bool _bUpdating, CStr _Description) override;
+			TCFuture<void> f_RequestEnvironmentRestart(CStr _Reason) override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -843,7 +853,9 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<void> fp_InitSensor();
 		TCFuture<void> fp_InitLog();
-		TCFuture<void> fp_InitHostMonitor();
+		TCFuture<void> fp_InitHostMonitor(NEncoding::CEJsonSorted _AutoUpdateConfig);
+		TCFuture<void> fp_ConfigureHostMonitorFromHost(CStr _AutoUpdateConfig);
+		void fp_ApplyPendingHostMonitorConfig();
 		static CStr fsp_GetOSDependenciesFingerprint(TCMap<CStr, TCVector<CStr>> const &_Dependencies);
 		TCFuture<void> fp_InstallOSDependencies(TCMap<CStr, TCVector<CStr>> _Dependencies);
 		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> fp_HostMonitorRebootNeededFunctor(NEncoding::CEJsonSorted const &_AutoUpdateConfig);
@@ -1068,6 +1080,9 @@ namespace NMib::NCloud::NAppManager
 		// Environment agent handling (agent side)
 		TCFuture<void> fp_RegisterWithEnvironmentHost();
 		void fp_ForwardApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange _Change);
+		TCFuture<void> fp_ReportEnvironmentUpdateStateToHost(bool _bUpdating);
+		TCFuture<void> fp_ReportEnvironmentBusyToHost();
+		TCFuture<void> fp_RequestEnvironmentRestartFromHost();
 
 		TCFuture<uint32> fp_CommandLine_EnumEnvironments(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_AddEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -1405,9 +1420,11 @@ namespace NMib::NCloud::NAppManager
 		CActorSubscription mp_EnvironmentHostRegistration;
 		bool mp_bEnvironmentAgent = false;
 		bool mp_bStoppingApp = false;                                       /// The shutdown waits for environment starts, so long start retries give up
-		bool mp_bEnvironmentContainer = false;                              /// Agent side: the environment is a container
+		bool mp_bEnvironmentContainer = false;                              /// Agent side: the environment is a container, so the kernel belongs to the host/VM outside it
 		CStr mp_EnvironmentHostID;                                          /// Agent side: host id of the launching AppManager, from the deployment settings
 		CStr mp_EnvironmentDataRoot;                                        /// Agent side: root of the environment-managed application storage, from the deployment settings
+		bool mp_bEnvironmentPatching = false;                               /// Agent side: OS updates are installing; reported again to a host that reconnects
+		umint mp_nEnvironmentOSDependencyInstalls = 0;                      /// Running OS dependency installations; prevent reboots, and agents report them like OS updates
 		bool mp_bEnvironmentDataRootReady = false;
 		bool mp_bEnvironmentDataRootPreparing = false;
 		TCVector<TCPromise<void>> mp_OnEnvironmentDataRootReady;
@@ -1454,10 +1471,15 @@ namespace NMib::NCloud::NAppManager
 		fp64 mp_HostMonitorMemoryInterval = CHostMonitor::mc_DefaultHostMonitorMemoryInterval;
 
 		TCActor<CHostMonitor> mp_HostMonitor;
-		CStr mp_AppliedAgentOSDependenciesFingerprint;                           /// Agent side
-		CSequencer mp_OSDependenciesSequencer{"AppManagerActor OSDependencies"}; /// Package managers hold exclusive locks, so installs run one at a time
-		TCSet<CStr> mp_InstalledOSDependenciesFingerprints;                      /// Fingerprints of the installed application OS dependencies; not persisted
+		CStr mp_AppliedHostMonitorConfig;                                                             /// Agent side: the configuration of the last successful host monitor initialization
+		TCOptional<CStr> mp_PendingHostMonitorConfig;                                                 /// Agent side: a host configuration that waits for the patching to end
+		CSequencer mp_HostMonitorConfigureSequencer{"AppManagerActor HostMonitorConfigureSequencer"}; /// Agent side: one host configuration replaces the monitor at a time
+		CSequencer mp_OSDependenciesSequencer{"AppManagerActor OSDependencies"};                      /// Package managers hold exclusive locks, so installs run one at a time
+		CActorSubscription mp_PatchingOSDependenciesSequence;                                         /// The turn of mp_OSDependenciesSequencer that automatic patching holds
+		umint mp_HostMonitorGeneration = 0;                                                           /// Agent side: advanced for each host monitor; a replaced one's functors give up
+		TCSet<CStr> mp_InstalledOSDependenciesFingerprints;                                           /// Fingerprints of the installed OS dependencies; not persisted
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
+		CActorSubscription mp_EnvironmentDataRootMonitorSubscription;                                 /// Agent side: monitors the environment-managed application storage volume, if any
 		CActorSubscription mp_MainConfigFileMonitorSubscription;
 		CStr mp_OsName;
 

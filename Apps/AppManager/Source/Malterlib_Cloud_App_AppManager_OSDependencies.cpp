@@ -1,6 +1,8 @@
 // Copyright © Unbroken AB
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <Mib/Concurrency/LogError>
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud
@@ -427,6 +429,28 @@ namespace NMib::NCloud::NAppManager
 
 		if (Script.f_IsEmpty())
 			co_return {};
+
+		// An interrupted installation leaves the packages broken, so an agent installs only once the host admits it, which the host refuses once it
+		// stops the environment or reboots
+		if (mp_bEnvironmentAgent && !mp_EnvironmentHostActor)
+			co_return DMibErrorInstance("Not connected to the environment host, which admits the installation");
+
+		++mp_nEnvironmentOSDependencyInstalls;
+		auto ReportFinished = g_OnScopeExit / [this]
+			{
+				--mp_nEnvironmentOSDependencyInstalls;
+				if (mp_bEnvironmentAgent)
+					fp_ReportEnvironmentBusyToHost() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to report the environment update state");
+			}
+		;
+
+		// A failed report also ends with the report of the finished installation, since one that timed out can have reached the host
+		if (mp_bEnvironmentAgent)
+		{
+			auto ReportResult = co_await fp_ReportEnvironmentBusyToHost().f_Wrap();
+			if (!ReportResult)
+				co_return DMibErrorInstance("The environment host did not admit the installation: {}"_f << ReportResult.f_GetExceptionStr());
+		}
 
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable("/bin/sh", fg_CreateVector<CStr>("-ec", Script), mp_State.m_RootDirectory, {});
 		LaunchParams.m_bMergeEnvironment = true;

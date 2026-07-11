@@ -28,6 +28,8 @@ namespace NMib::NCloud
 
 namespace NMib::NCloud
 {
+	TCFuture<void> fg_RunApt(CStr _Application, TCVector<CStr> _Params);
+
 	struct CHostMonitor::CInternal : public CActorInternal
 	{
 		enum ESensorType
@@ -79,6 +81,7 @@ namespace NMib::NCloud
 
 		struct CPatchesNeeded
 		{
+			NStr::CStr m_Unavailable; ///< Why the pending patches are unknown, empty when the counts are known
 			uint32 m_nSecurityPatches = 0;
 			uint32 m_nNormalPatches = 0;
 		};
@@ -111,7 +114,7 @@ namespace NMib::NCloud
 		TCFuture<void> f_PeriodicUpdate_Memory(bool _bCanSkip);
 
 		TCFuture<bool> f_Patch_RebootNeeded();
-		TCFuture<CPatchesNeeded> f_Patch_PatchesNeeded();
+		TCFuture<CPatchesNeeded> f_Patch_PatchesNeeded(bool _bRefreshPackageIndexes);
 		TCFuture<void> f_Patch_InstallPatches();
 
 		CExceptionPointer f_ConfigFile_CheckFilePrerequisites(CMonitoredConfigFile * &o_pConfigFile, CStr const &_ConfigID, CStr const &_FileName);
@@ -155,6 +158,7 @@ namespace NMib::NCloud
 		TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_OsVersionStatusReporter;
 		TCOptional<CDistributedAppSensorReporter::CSensorReporter> m_OsPatchStatusReporter;
 		TCOptional<CStopwatch> m_PatchStopwatch;
+		bool m_bPatchesInstalledWithExternalKernel = false; // The installed patches take effect only once the environment restarts
 		CCloudManager::CExpectedVersions m_ExpectedOsVersions;
 		CDistributedAppSensorReporter::CVersion m_CurrentOsVersion;
 
