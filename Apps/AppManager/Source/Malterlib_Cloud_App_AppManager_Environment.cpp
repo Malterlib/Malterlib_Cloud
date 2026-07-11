@@ -1895,6 +1895,14 @@ namespace NMib::NCloud::NAppManager
 			if (_pEnvironment->m_nPendingInstalls)
 				bInProgress = true;
 
+			// Stopping a container in the middle of an OS package installation leaves the packages broken
+			if (!_pEnvironment->m_AgentUpdateInProgress.f_IsEmpty())
+				bInProgress = true;
+
+			// An error script can outlive the operation of its application
+			if (_pEnvironment->m_nRunningScripts)
+				bInProgress = true;
+
 			if (!bInProgress)
 				co_return {};
 
@@ -3637,6 +3645,9 @@ namespace NMib::NCloud::NAppManager
 
 		CAppManagerEnvironmentInterface::CAgentConfig AgentConfig;
 
+		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
+			AgentConfig.m_AutoUpdateConfig = CEJsonSorted::fs_FromCompatible(*pAutoUpdate).f_ToString();
+
 		// The agent installs the OS dependencies of its own application inside
 		// the environment. They come from the installed version info, since agent
 		// distributions are installed without settings from version info
@@ -3718,6 +3729,8 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_AgentInterface = fg_Move(_Interface);
 
+		// The agent monitors the environment with the update settings inherited
+		// from this AppManager
 		fp_SendEnvironmentAgentConfig(*_pEnvironment);
 
 		_pEnvironment->m_bStarted = true;
@@ -3746,6 +3759,10 @@ namespace NMib::NCloud::NAppManager
 			_pEnvironment->m_AgentAppInterface.f_Clear();
 		}
 		_pEnvironment->m_AgentHostID = {};
+
+		// An agent that disappears mid-update must not keep preventing reboots: without the agent nothing reports the end
+		// of the update, and the runtime is stopped below. A reconnecting agent reports its update again
+		_pEnvironment->m_AgentUpdateInProgress = {};
 
 		if (!_pEnvironment->m_bStopping && bWasStarted)
 			_pEnvironment->f_SetStatus("Agent disconnected", CAppManagerInterface::EStatusSeverity_Error);
@@ -3807,6 +3824,9 @@ namespace NMib::NCloud::NAppManager
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Environment '{}' start before stop failed: {}", _pEnvironment->m_Name, StartResult.f_GetExceptionStr());
 		}
 
+		// An OS update the agent starts after the caller waited for the environment to be idle is not waited for: the host
+		// monitor of the agent does not ask the host before patching
+		//
 		// Callers rely on the environment being down when the stop returns
 		if (_pEnvironment->m_bStopping)
 		{
@@ -3891,6 +3911,9 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		_pEnvironment->m_AgentHostID = {};
+
+		// The stopped agent cannot report the end of its update
+		_pEnvironment->m_AgentUpdateInProgress = {};
 
 		// Stop the container through the runtime first: the attached client then exits by
 		// itself. Signalling the client instead does not stop the container; the Apple
@@ -4154,6 +4177,20 @@ namespace NMib::NCloud::NAppManager
 		for (auto &Mount : _pEnvironment->m_ContainerSamePathMounts)
 		{
 			if (Directory == Mount || Directory.f_StartsWith(Mount + "/"))
+				co_return false;
+		}
+
+		// Stopping a container in the middle of an OS package installation leaves the packages broken, and an update
+		// script stopped midway leaves its application half updated
+		CStopwatch Stopwatch{true};
+		while (!_pEnvironment->m_AgentUpdateInProgress.f_IsEmpty() || _pEnvironment->m_nRunningScripts)
+		{
+			if (Stopwatch.f_GetTime() > 1_hours)
+				co_return DMibErrorInstance("An OS update or update scripts kept environment '{}' busy for an hour"_f << _pEnvironment->m_Name);
+
+			co_await fg_Timeout(10.0);
+
+			if (_pEnvironment->m_bDeleted || !_pEnvironment->f_IsStarted())
 				co_return false;
 		}
 

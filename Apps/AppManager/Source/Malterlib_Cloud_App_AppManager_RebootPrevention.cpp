@@ -224,6 +224,29 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
+		if (mp_nEnvironmentOSDependencyInstalls)
+		{
+			fg_AddStrSep(PreventRebootDescription, "    OS dependency installations in progress: {}"_f << mp_nEnvironmentOSDependencyInstalls, "\n");
+			bPreventReboot = true;
+		}
+
+		// A reboot would interrupt updates the environment agents are installing
+		for (auto &pEnvironment : mp_Environments)
+		{
+			auto &Environment = *pEnvironment;
+			if (Environment.m_AgentUpdateInProgress.f_IsEmpty())
+				continue;
+
+			fg_AddStrSep
+				(
+					PreventRebootDescription
+					, "    Environment update in progress ({}): {}"_f << Environment.m_Name << Environment.m_AgentUpdateInProgress
+					, "\n"
+				)
+			;
+			bPreventReboot = true;
+		}
+
 		if (PreventRebootDescription != mp_LastPreventRebootDescription)
 		{
 			if (bPreventReboot)

@@ -88,7 +88,21 @@ namespace NMib::NCloud::NAppManager
 				mp_State.m_StateDatabase.m_Data["LastHostMonitorReboot"] = CTime::fs_NowUTC();
 				co_await (mp_State.m_StateDatabase.f_Save() % "Failed to save state database");
 
-				co_await fp_Reboot(false);
+				// An environment agent cannot reboot; it asks the environment host to
+				// restart the environment instead
+				if (mp_bEnvironmentAgent)
+				{
+					auto Result = co_await fp_RequestEnvironmentRestartFromHost().f_Wrap();
+
+					// The host can still abort an accepted restart, and the restart ends this agent, so a later patch cycle
+					// can request it again
+					mp_bRebootScheduled = false;
+
+					if (!Result)
+						co_return Result.f_GetException();
+				}
+				else
+					co_await fp_Reboot(false);
 
 				co_return {};
 			}

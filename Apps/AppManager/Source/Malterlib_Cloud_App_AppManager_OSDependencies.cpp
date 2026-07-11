@@ -1,6 +1,8 @@
 // Copyright © Unbroken AB
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <Mib/Concurrency/LogError>
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud
@@ -299,6 +301,19 @@ namespace NMib::NCloud::NAppManager
 
 		if (Script.f_IsEmpty())
 			co_return {};
+
+		// Stopping the environment or rebooting the host in the middle of an installation leaves the packages broken
+		++mp_nEnvironmentOSDependencyInstalls;
+		if (mp_bEnvironmentAgent)
+			co_await fp_ReportEnvironmentBusyToHost().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to report the environment update state");
+
+		auto ReportFinished = g_OnScopeExit / [this]
+			{
+				--mp_nEnvironmentOSDependencyInstalls;
+				if (mp_bEnvironmentAgent)
+					fp_ReportEnvironmentBusyToHost() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to report the environment update state");
+			}
+		;
 
 		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 			(

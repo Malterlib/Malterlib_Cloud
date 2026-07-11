@@ -43,6 +43,10 @@
 		}
 		MalterlibTargetNameType "Normal"
 		MalterlibCloudVersionInfo_Executable ""
+
+		// The host monitor patch and reboot checks need these tools, which minimal
+		// installations like container images do not include
+		MalterlibCloudVersionInfo_OSDependencies {ubuntu: ["update-notifier-common", "needrestart"]}
 	}
 	Target
 	{

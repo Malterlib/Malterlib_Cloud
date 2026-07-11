@@ -38,6 +38,8 @@ namespace NMib::NCloud::NAppManager
 		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_RegisterEnvironmentAgent);
 		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_ReportApplicationState);
 		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_RequestApplicationConnectionTicket);
+		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_ReportEnvironmentUpdateState);
+		DPublishActorFunction(CAppManagerEnvironmentHostInterface::f_RequestEnvironmentRestart);
 	}
 
 	CAppManagerEnvironmentHostInterface::~CAppManagerEnvironmentHostInterface()
@@ -165,6 +167,7 @@ namespace NMib::NCloud::NAppManager
 	template <typename tf_CStream>
 	void CAppManagerEnvironmentInterface::CAgentConfig::f_Stream(tf_CStream &_Stream)
 	{
+		_Stream % m_AutoUpdateConfig;
 		_Stream % m_OSDependencies;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CAgentConfig);
@@ -1539,6 +1542,8 @@ namespace NMib::NCloud::NAppManager
 		if (!pThis->mp_bEnvironmentAgent)
 			co_return DMibErrorInstance("Not running as an environment agent");
 
+		// The agent application's OS dependencies are installed inside the
+		// environment before the host monitor needs them
 		CStr DependencyError;
 		if (!_Config.m_OSDependencies.f_IsEmpty())
 		{
@@ -1558,6 +1563,12 @@ namespace NMib::NCloud::NAppManager
 					DependencyError = "Failed to install the agent OS dependencies: {}"_f << Result.f_GetExceptionStr();
 			}
 		}
+
+		co_await pThis->fp_ConfigureHostMonitorFromHost(fg_Move(_Config.m_AutoUpdateConfig));
+
+		// The host configures the agent after every connect, and a reconnected host has lost the update state
+		if (pThis->mp_bEnvironmentPatching || pThis->mp_nEnvironmentOSDependencyInstalls)
+			co_await pThis->fp_ReportEnvironmentBusyToHost();
 
 		// The host holds back launches in the environment on the failure
 		if (!DependencyError.f_IsEmpty())
@@ -1616,5 +1627,94 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 #endif
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentHostInterfaceImplementation::f_ReportEnvironmentUpdateState(bool _bUpdating, CStr _Description)
+	{
+		auto pThis = m_pThis;
+
+		auto pEnvironment = pThis->fp_EnvironmentFromHostID(fg_GetCallingHostInfo().f_GetRealHostID());
+		if (!pEnvironment)
+			co_return DErrorInstance("Environment agent not associated with your host");
+
+		if (_bUpdating)
+			pEnvironment->m_AgentUpdateInProgress = _Description.f_IsEmpty() ? CStr("Installing updates") : fg_Move(_Description);
+		else
+			pEnvironment->m_AgentUpdateInProgress = {};
+
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Environment '{}' update state: {}"
+				, pEnvironment->m_Name
+				, _bUpdating ? pEnvironment->m_AgentUpdateInProgress : CStr("Finished")
+			)
+		;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentHostInterfaceImplementation::f_RequestEnvironmentRestart(CStr _Reason)
+	{
+		auto pThis = m_pThis;
+
+		auto pEnvironment = pThis->fp_EnvironmentFromHostID(fg_GetCallingHostInfo().f_GetRealHostID());
+		if (!pEnvironment)
+			co_return DErrorInstance("Environment agent not associated with your host");
+
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Environment '{}' requested a restart: {}"
+				, pEnvironment->m_Name
+				, _Reason
+			)
+		;
+
+		// The restart stops the agent making this call, so it runs detached after
+		// the reply
+		fg_CallSafe
+			(
+				TCFunctionMovable<TCFuture<void> ()>
+				(
+					[pThis, pEnvironment]() -> TCFuture<void>
+					{
+						co_return co_await pThis->fp_RestartEnvironmentWhenIdle(pEnvironment);
+					}
+				)
+			)
+			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to restart environment after agent request")
+		;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_ReportEnvironmentUpdateStateToHost(bool _bUpdating)
+	{
+		if (!mp_EnvironmentHostActor)
+			co_return {};
+
+		co_return co_await mp_EnvironmentHostActor.f_CallActor(&CAppManagerEnvironmentHostInterface::f_ReportEnvironmentUpdateState)(_bUpdating, CStr("Installing OS updates"))
+			.f_Timeout(60.0, "Timed out reporting the environment update state")
+		;
+	}
+
+	TCFuture<void> CAppManagerActor::fp_ReportEnvironmentBusyToHost()
+	{
+		co_return co_await fp_ReportEnvironmentUpdateStateToHost(mp_bEnvironmentPatching || mp_nEnvironmentOSDependencyInstalls);
+	}
+
+	TCFuture<void> CAppManagerActor::fp_RequestEnvironmentRestartFromHost()
+	{
+		if (!mp_EnvironmentHostActor)
+			co_return DMibErrorInstance("Not connected to the environment host");
+
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Requesting an environment restart to finish OS updates");
+
+		co_return co_await mp_EnvironmentHostActor.f_CallActor(&CAppManagerEnvironmentHostInterface::f_RequestEnvironmentRestart)(CStr("OS updates require a restart"))
+			.f_Timeout(60.0, "Timed out requesting the environment restart")
+		;
 	}
 }
