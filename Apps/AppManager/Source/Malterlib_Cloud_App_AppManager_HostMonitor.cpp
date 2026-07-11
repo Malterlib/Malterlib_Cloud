@@ -10,8 +10,9 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCFuture<void> CAppManagerActor::fp_InitHostMonitor()
+	TCFuture<void> CAppManagerActor::fp_InitHostMonitor(CEJsonSorted _AutoUpdateConfig)
 	{
+		++mp_HostMonitorGeneration;
 		mp_HostMonitor = fg_Construct(mp_SensorStore, mp_LogStore, mp_DatabaseActor, mp_LogMetadata, mp_SensorMetadata);
 
 		auto OnResume = co_await fg_OnResume
@@ -39,33 +40,155 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
+		if (_AutoUpdateConfig.f_IsObject())
 		{
-			if (pAutoUpdate->f_GetMemberValue("NormalUpdates", false).f_Boolean())
+			if (_AutoUpdateConfig.f_GetMemberValue("NormalUpdates", false).f_Boolean())
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_NormalUpdates;
 
-			if (pAutoUpdate->f_GetMemberValue("SecurityUpdates", false).f_Boolean())
+			if (_AutoUpdateConfig.f_GetMemberValue("SecurityUpdates", false).f_Boolean())
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_SecurityUpdates;
 
-			if (pAutoUpdate->f_GetMemberValue("AutomaticReboot", false).f_Boolean())
+			if (_AutoUpdateConfig.f_GetMemberValue("AutomaticReboot", false).f_Boolean())
 			{
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_AutomaticReboot;
-				Config.m_fOnRebootNeeded = fp_HostMonitorRebootNeededFunctor(CEJsonSorted::fs_FromCompatible(*pAutoUpdate));
+				Config.m_fOnRebootNeeded = fp_HostMonitorRebootNeededFunctor(_AutoUpdateConfig);
 			}
 		}
+
+		// Package managers hold exclusive locks, so patching and OS dependency installations take turns. An update in the environment must
+		// prevent host reboots and environment stops, so the agent patches only once the environment host has admitted the update, which it
+		// refuses once it stops the environment. The monitor is only replaced while it doesn't patch, so a call of a replaced monitor changes
+		// nothing after a suspension
+		Config.m_fOnPatchingChanged = g_ActorFunctor / [this, Generation = mp_HostMonitorGeneration](bool _bPatching) -> TCFuture<void>
+			{
+				if (Generation != mp_HostMonitorGeneration)
+					co_return DMibErrorInstance("The host monitor was replaced");
+
+				if (_bPatching)
+				{
+					auto Sequence = co_await mp_OSDependenciesSequencer.f_Sequence();
+					if (Generation != mp_HostMonitorGeneration)
+					{
+						co_await Sequence->f_Destroy();
+						co_return DMibErrorInstance("The host monitor was replaced");
+					}
+
+					mp_PatchingOSDependenciesSequence = fg_Move(Sequence);
+				}
+				else if (mp_PatchingOSDependenciesSequence)
+				{
+					co_await fg_Exchange(mp_PatchingOSDependenciesSequence, nullptr)->f_Destroy();
+					if (Generation != mp_HostMonitorGeneration)
+						co_return DMibErrorInstance("The host monitor was replaced");
+				}
+
+				if (!mp_bEnvironmentAgent)
+					co_return {};
+
+				if (_bPatching && !mp_EnvironmentHostActor)
+				{
+					co_await fg_Exchange(mp_PatchingOSDependenciesSequence, nullptr)->f_Destroy();
+					fp_ApplyPendingHostMonitorConfig();
+					co_return DMibErrorInstance("Not connected to the environment host");
+				}
+
+				mp_bEnvironmentPatching = _bPatching;
+				if (!_bPatching)
+					fp_ApplyPendingHostMonitorConfig();
+
+				auto Result = co_await fp_ReportEnvironmentBusyToHost().f_Wrap();
+				if (!Result && _bPatching && Generation == mp_HostMonitorGeneration)
+				{
+					mp_bEnvironmentPatching = false;
+					if (mp_PatchingOSDependenciesSequence)
+						co_await fg_Exchange(mp_PatchingOSDependenciesSequence, nullptr)->f_Destroy();
+
+					// A report that timed out can have reached the host
+					fp_ReportEnvironmentBusyToHost() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to report the environment update state");
+					fp_ApplyPendingHostMonitorConfig();
+				}
+
+				co_return Result;
+			}
+		;
+
+		if (mp_bEnvironmentAgent)
+		{
+			// A container shares the kernel of whatever runs it, so its kernel reboot check is skipped
+			Config.m_bKernelManagedExternally = mp_bEnvironmentContainer;
+
+			// Only apt-check tells the patches a container lacks, which the agent installs in Ubuntu as an OS dependency of its distribution, and a
+			// read-only container can't
+			Config.m_bPatchCheckRequired = mp_bEnvironmentContainer;
+
+			Config.m_fPackageManagerTurn = g_ActorFunctor / [this]() -> TCFuture<CActorSubscription>
+				{
+					co_return co_await mp_OSDependenciesSequencer.f_Sequence();
+				}
+			;
+
+			// A container has no timer that refreshes the package indexes, which the patch check reads
+			Config.m_bRefreshPackageIndexes
+				= mp_bEnvironmentContainer
+				&&
+				(
+					fg_IsSet(Config.m_AutomaticUpdateFlags, CHostMonitor::EAutomaticUpdatesFlag::mc_NormalUpdates)
+					|| fg_IsSet(Config.m_AutomaticUpdateFlags, CHostMonitor::EAutomaticUpdatesFlag::mc_SecurityUpdates)
+				)
+			;
+		}
+
+#ifndef DPlatformFamily_Linux
+		if
+		(
+			mp_bEnvironmentAgent
+			&&
+			(
+				fg_IsSet(Config.m_AutomaticUpdateFlags, CHostMonitor::EAutomaticUpdatesFlag::mc_NormalUpdates)
+				|| fg_IsSet(Config.m_AutomaticUpdateFlags, CHostMonitor::EAutomaticUpdatesFlag::mc_SecurityUpdates)
+			)
+		)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "The environment host configures automatic OS updates, which only Linux environments install");
+		}
+#endif
 
 		auto InitResult = co_await mp_HostMonitor(&CHostMonitor::f_Init, fg_Move(Config));
 		mp_OsName = InitResult.m_OsName;
 
 		{
 			CHostMonitor::CMonitorPathOptions PathOptions;
-			PathOptions.m_Path = mp_State.m_RootDirectory;
+
+			// The environment's own root filesystem is the one that OS updates and writes outside the application storage fill up
+			if (mp_bEnvironmentAgent)
+				PathOptions.m_Path = "/";
+			else
+				PathOptions.m_Path = mp_State.m_RootDirectory;
 
 			auto MonitorResult = co_await mp_HostMonitor(&CHostMonitor::f_MonitorPath, PathOptions).f_Wrap();
 			if (MonitorResult)
 				mp_MainDirectoryMonitorSubscription = fg_Move(*MonitorResult);
 			else
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to monitor main directory: {}", MonitorResult.f_GetExceptionStr());
+		}
+
+		// The applications in environment-managed storage fill a volume of their own
+		if (mp_bEnvironmentAgent && !mp_EnvironmentDataRoot.f_IsEmpty())
+		{
+			auto DataRootResult = co_await fp_EnsureEnvironmentDataRoot().f_Wrap();
+			if (DataRootResult)
+			{
+				CHostMonitor::CMonitorPathOptions PathOptions;
+				PathOptions.m_Path = mp_EnvironmentDataRoot;
+
+				auto MonitorResult = co_await mp_HostMonitor(&CHostMonitor::f_MonitorPath, PathOptions).f_Wrap();
+				if (MonitorResult)
+					mp_EnvironmentDataRootMonitorSubscription = fg_Move(*MonitorResult);
+				else
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to monitor the environment data root: {}", MonitorResult.f_GetExceptionStr());
+			}
+			else
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to prepare the environment data root for monitoring: {}", DataRootResult.f_GetExceptionStr());
 		}
 
 		{
@@ -85,6 +208,95 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_ConfigureHostMonitorFromHost(CStr _AutoUpdateConfig)
+	{
+		auto SequenceSubscription = co_await mp_HostMonitorConfigureSequencer.f_Sequence();
+
+		if (mp_HostMonitor && _AutoUpdateConfig == mp_AppliedHostMonitorConfig)
+		{
+			mp_PendingHostMonitorConfig.f_Clear();
+			co_return {};
+		}
+
+		// Destroying the monitor stops the package manager that its patching runs and leaves the packages broken, so the configuration
+		// replaces the monitor when the patching ends
+		if (mp_HostMonitor && (mp_bEnvironmentPatching || mp_PatchingOSDependenciesSequence))
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Restarting the host monitor with a changed configuration from the environment host once its patching ends");
+			mp_PendingHostMonitorConfig = fg_Move(_AutoUpdateConfig);
+			co_return {};
+		}
+
+		mp_PendingHostMonitorConfig.f_Clear();
+
+		CEJsonSorted Config;
+		if (!_AutoUpdateConfig.f_IsEmpty())
+		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the host monitor configuration from the environment host");
+
+			Config = CEJsonSorted::fs_FromString(_AutoUpdateConfig);
+		}
+
+		// The host monitor configuration is fixed at initialization, so a changed
+		// configuration recreates the monitor
+		if (mp_HostMonitor)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Restarting the host monitor with a changed configuration from the environment host");
+
+			// The calls of the replaced monitor that are still running give up what they get from here on
+			++mp_HostMonitorGeneration;
+
+			mp_MainDirectoryMonitorSubscription = {};
+			mp_EnvironmentDataRootMonitorSubscription = {};
+			mp_MainConfigFileMonitorSubscription = {};
+
+			// A restart timer set under the previous configuration does not apply anymore
+			if (mp_RebootScheduleTimerSubscrption)
+			{
+				co_await fg_Exchange(mp_RebootScheduleTimerSubscrption, nullptr)->f_Destroy().f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to cancel the scheduled environment restart")
+				;
+			}
+			mp_bRebootScheduled = false;
+
+			co_await fg_Move(mp_HostMonitor).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the host monitor");
+		}
+
+		auto InitResult = co_await fp_InitHostMonitor(fg_Move(Config)).f_Wrap();
+		if (!InitResult)
+		{
+			// A failed initialization stays retryable with the same configuration
+			if (mp_HostMonitor)
+				co_await fg_Move(mp_HostMonitor).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the host monitor");
+
+			co_return InitResult.f_GetException();
+		}
+
+		mp_AppliedHostMonitorConfig = _AutoUpdateConfig;
+
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Configured the host monitor from the environment host{}"
+				, _AutoUpdateConfig.f_IsEmpty() ? "" : " with automatic update settings"
+			)
+		;
+
+		co_return {};
+	}
+
+	void CAppManagerActor::fp_ApplyPendingHostMonitorConfig()
+	{
+		if (!mp_PendingHostMonitorConfig)
+			return;
+
+		CStr Config = fg_Move(*mp_PendingHostMonitorConfig);
+		mp_PendingHostMonitorConfig.f_Clear();
+
+		fp_ConfigureHostMonitorFromHost(fg_Move(Config)) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to configure the host monitor from the environment host");
 	}
 
 	void CAppManagerActor::fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine)

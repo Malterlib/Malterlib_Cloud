@@ -43,10 +43,16 @@ namespace NMib::NCloud
 			TCActor<CProcessLaunchActor> LaunchActor(fg_Construct());
 			auto AutoDestroy = co_await fg_AsyncDestroy(LaunchActor);
 
+			TCVector<CStr> Arguments = {"-p"};
+
+			// Check only libraries: the kernel check reports UNKN for a kernel managed outside this OS installation
+			if (m_Config.m_bKernelManagedExternally)
+				Arguments.f_InsertLast("-l");
+
 			CProcessLaunchActor::CSimpleLaunch Launch
 				{
 					c_NeedRestartExecutable
-					, {"-p"}
+					, Arguments
 					, CFile::fs_GetPath(c_NeedRestartExecutable)
 					, CProcessLaunchActor::ESimpleLaunchFlag_None
 				}
@@ -78,7 +84,7 @@ namespace NMib::NCloud
 	static constexpr CStr gc_AptCheckExecutable = gc_Str<"/usr/lib/update-notifier/apt-check">;
 #endif
 
-	auto CHostMonitor::CInternal::f_Patch_PatchesNeeded() -> TCFuture<CPatchesNeeded>
+	auto CHostMonitor::CInternal::f_Patch_PatchesNeeded(bool _bRefreshPackageIndexes) -> TCFuture<CPatchesNeeded>
 	{
 #ifndef DPlatformFamily_Linux
 		co_return {};
@@ -99,8 +105,40 @@ namespace NMib::NCloud
 
 		CPatchesNeeded PatchesNeeded;
 
+		// Hosts without apt-check, like those of other distributions than Ubuntu, report no pending patches. Where the patches are installed
+		// automatically, which configures the refresh, or where the check is required, a missing apt-check would report them as up to date
+		if (!bAptCheckExists && (_bRefreshPackageIndexes || m_Config.m_bPatchCheckRequired))
+			PatchesNeeded.m_Unavailable = "{} is not installed"_f << gc_AptCheckExecutable;
+
 		if (bAptCheckExists)
 		{
+			if (_bRefreshPackageIndexes)
+			{
+				// A refresh fails on the lock of the package lists while another use of the package manager holds it
+				CActorSubscription Turn;
+				if (m_Config.m_fPackageManagerTurn)
+				{
+					auto TurnResult = co_await m_Config.m_fPackageManagerTurn().f_Wrap();
+					if (TurnResult)
+						Turn = fg_Move(*TurnResult);
+					else
+						DMibLogWithCategory(Malterlib/Cloud/HostMonitor, Error, "Failed to wait for the package manager: {}", TurnResult.f_GetExceptionStr());
+				}
+
+				// A repository that fails to refresh only warns unless the error mode is strict, and keeps its old or missing lists
+				auto RefreshResult = co_await fg_RunApt("apt-get", {"-o", "APT::Update::Error-Mode=any", "update"}).f_Wrap();
+
+				if (Turn)
+					co_await fg_Exchange(Turn, nullptr)->f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/HostMonitor", "Failed to end the turn of the package manager");
+
+				// The old or missing package lists of a failed refresh would report pending patches as none
+				if (!RefreshResult)
+				{
+					PatchesNeeded.m_Unavailable = "Failed to refresh the package indexes: {}"_f << RefreshResult.f_GetExceptionStr();
+					co_return fg_Move(PatchesNeeded);
+				}
+			}
+
 			TCActor<CProcessLaunchActor> LaunchActor(fg_Construct());
 			auto AutoDestroy = co_await fg_AsyncDestroy(LaunchActor);
 
@@ -137,22 +175,56 @@ namespace NMib::NCloud
 
 		CLogError LogError("Malterlib/Cloud/HostMonitor");
 
-		auto PatchesNeeded = co_await f_Patch_PatchesNeeded();
+		// The reboot check below is local, so it runs also when the pending patches are unknown
+		auto fPatchesNeeded = [](TCAsyncResult<CPatchesNeeded> &&_Result) -> CPatchesNeeded
+			{
+				if (_Result)
+					return fg_Move(*_Result);
 
+				CPatchesNeeded PatchesNeeded;
+				PatchesNeeded.m_Unavailable = _Result.f_GetExceptionStr();
+				return PatchesNeeded;
+			}
+		;
+
+		auto PatchesNeeded = fPatchesNeeded(co_await f_Patch_PatchesNeeded(m_Config.m_bRefreshPackageIndexes).f_Wrap());
+
+		// The flags choose which pending patches start an installation, which then installs every pending update, security or not, since
+		// f_Patch_InstallPatches has no installation of security updates alone
 		if
 		(
 			(PatchesNeeded.m_nSecurityPatches && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_SecurityUpdates))
 			|| (PatchesNeeded.m_nNormalPatches && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_NormalUpdates))
 		)
 		{
-			co_await f_Patch_InstallPatches().f_Wrap() > LogError("Failed to install patches automatically (OS patch status)");
+			// A failed start of patching means the installation must not run now
+			bool bInstall = true;
+			if (m_Config.m_fOnPatchingChanged)
+			{
+				auto StartResult = co_await m_Config.m_fOnPatchingChanged(true).f_Wrap();
+				if (!StartResult)
+				{
+					DMibLogWithCategory(Malterlib/Cloud/HostMonitor, Warning, "Skipped installing patches automatically: {}", StartResult.f_GetExceptionStr());
+					bInstall = false;
+				}
+			}
 
-			// Update patch state after install
-			PatchesNeeded = co_await f_Patch_PatchesNeeded();
+			if (bInstall)
+			{
+				co_await f_Patch_InstallPatches().f_Wrap() > LogError("Failed to install patches automatically (OS patch status)");
+
+				if (m_Config.m_fOnPatchingChanged)
+					co_await m_Config.m_fOnPatchingChanged(false).f_Wrap() > LogError("Failed to report patching end (OS patch status)");
+
+				// Update patch state after install
+				PatchesNeeded = fPatchesNeeded(co_await f_Patch_PatchesNeeded(false).f_Wrap());
+			}
 		}
 
 		bool bRebootRequired = co_await f_Patch_RebootNeeded();
-		bool bSecurityPatchesNeeded = PatchesNeeded.m_nSecurityPatches > 0;
+
+		// Unknown pending patches keep the age of the security patches that were pending, which only a check that finds none ends
+		bool bSecurityPatchesNeeded = PatchesNeeded.m_Unavailable.f_IsEmpty() ? PatchesNeeded.m_nSecurityPatches > 0 : m_PatchDatabaseState.m_ProblemStart_SecurityPatches.f_IsValid();
 
 		if (!m_OsPatchStatusReporter)
 		{
@@ -228,6 +300,12 @@ namespace NMib::NCloud
 				, m_Config.m_ReportErrorAfter_SecurityPatch
 			)
 		;
+
+		if (!PatchesNeeded.m_Unavailable.f_IsEmpty())
+		{
+			Status.m_Severity = fg_Max(Status.m_Severity, CDistributedAppSensorReporter::EStatusSeverity_Warning);
+			fg_AddStrSep(Status.m_Description, "Pending patches unknown: {}"_f << PatchesNeeded.m_Unavailable, "\n");
+		}
 
 		if (PatchesNeeded.m_nNormalPatches)
 			fg_AddStrSep(Status.m_Description, "{} normal patches available to be installed"_f << PatchesNeeded.m_nNormalPatches, "\n");

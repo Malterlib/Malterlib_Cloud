@@ -166,7 +166,13 @@ namespace NMib::NCloud
 			fp64 m_ReportErrorAfter_RebootRequired = 2_weeks;
 
 			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> m_fOnRebootNeeded;
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (bool _bPatching)> m_fOnPatchingChanged; ///< Called around automatic patch installation, which a failed start skips
 			EAutomaticUpdatesFlag m_AutomaticUpdateFlags = EAutomaticUpdatesFlag::mc_None;
+			bool m_bKernelManagedExternally = false;                                                           ///< The OS does not manage its kernel: needrestart checks only libraries
+			bool m_bRefreshPackageIndexes = false;                                                             ///< Nothing else refreshes the package indexes, so the patch check does
+			bool m_bPatchCheckRequired = false;                                                                ///< A missing apt-check makes the pending patches unknown instead of none
+			/// Held around the index refresh, so it takes turns with the other users of the package manager
+			NConcurrency::TCActorFunctor<NConcurrency::TCFuture<NConcurrency::CActorSubscription> ()> m_fPackageManagerTurn;
 		};
 
 		struct [[nodiscard]] CInitResult

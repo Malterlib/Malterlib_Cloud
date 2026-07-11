@@ -4,6 +4,7 @@
 #pragma once
 
 #include <Mib/Concurrency/DistributedApp>
+#include <Mib/Cloud/AppManager>
 
 namespace NMib::NCloud
 {
@@ -41,6 +42,27 @@ namespace NMib::NCloud
 	NContainer::TCVector<NStr::CStr> fg_AppManager_BuildContainerRunArguments(CAppManagerContainerLaunch const &_Launch);
 	bool fg_AppManager_ContainerErrorReportsMissing(NStr::CStr const &_RuntimeExecutable, NStr::CStr const &_ErrorOutput);
 	bool fg_AppManager_ContainerVolumeErrorReportsMissing(NStr::CStr const &_RuntimeExecutable, NStr::CStr const &_ErrorOutput);
+
+	/// Limits how long a guest of a container or VM environment defers host reboots and environment stops and restarts. A deferral that starts within
+	/// mc_LimitSeconds of the end of the previous one continues it, so a guest cannot renew it by ending and starting deferrals. The times are monotonic
+	/// seconds from fs_Now, which changes of the system time don't move
+	struct CAppManagerGuestDeferral
+	{
+		void f_Update(bool _bActive, fp64 _Now);
+		bool f_Defers(fp64 _Now) const;
+
+		static fp64 fs_Now();
+
+		static constexpr fp64 mc_LimitSeconds = 60.0 * 60.0;
+
+		fp64 m_Start = 0.0;
+		fp64 m_Finished = 0.0;
+		bool m_bActive = false;
+		bool m_bFinished = false;
+	};
+
+	NStr::CStr fg_AppManager_EnvironmentAgentAutoUpdateConfig(CAppManagerInterface::EEnvironmentType _Type, bool _bReadOnly, NEncoding::CEJsonSortedYaml const &_HostConfig);
+	NStr::CStr fg_AppManager_SanitizeGuestText(NStr::CStr const &_Text, umint _MaxLength);
 
 	/// Where the agent of a docker or VM environment reaches the environment listen of the host
 	struct CAppManagerEnvironmentSocketDirectory

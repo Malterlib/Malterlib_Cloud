@@ -52,9 +52,9 @@ namespace NMib::NCloud::NAppManager
 
 	NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> CAppManagerActor::fp_HostMonitorRebootNeededFunctor(NEncoding::CEJsonSorted const &_AutoUpdateConfig)
 	{
-		return g_ActorFunctor / [this, RebootSchedule = fg_ParseRebootSchedule(_AutoUpdateConfig)]() -> TCFuture<void>
+		return g_ActorFunctor / [this, RebootSchedule = fg_ParseRebootSchedule(_AutoUpdateConfig), Generation = mp_HostMonitorGeneration]() -> TCFuture<void>
 			{
-				if (mp_bRebootScheduled)
+				if (mp_bRebootScheduled || Generation != mp_HostMonitorGeneration)
 					co_return {};
 
 				mp_bRebootScheduled = true;
@@ -78,17 +78,48 @@ namespace NMib::NCloud::NAppManager
 
 					auto TimeoutAbortable = co_await fg_TimeoutAbortable(RebootInSeconds);
 
-					mp_RebootScheduleTimerSubscrption = fg_Move(TimeoutAbortable.m_Subscription);
+					// The replacement of the host monitor cancels the timer it finds and schedules again under the new configuration, so the timer of
+					// a replaced monitor is aborted here and the wait below fails
+					if (Generation != mp_HostMonitorGeneration)
+						co_await TimeoutAbortable.m_Subscription->f_Destroy();
+					else
+						mp_RebootScheduleTimerSubscrption = fg_Move(TimeoutAbortable.m_Subscription);
 
 					co_await fg_Move(TimeoutAbortable.m_Future);
 				}
 				else
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Rebooting at once");
 
-				mp_State.m_StateDatabase.m_Data["LastHostMonitorReboot"] = CTime::fs_NowUTC();
-				co_await (mp_State.m_StateDatabase.f_Save() % "Failed to save state database");
+				// The environment host coordinates the restart with the operations on the environment's applications. The host can fail or abort a
+				// restart it accepted, so the restart counts as done only when the agent starts again
+				if (mp_bEnvironmentAgent)
+				{
+					mp_State.m_StateDatabase.m_Data["PendingHostMonitorReboot"] = CTime::fs_NowUTC();
+					if (auto SaveResult = co_await mp_State.m_StateDatabase.f_Save().f_Wrap(); !SaveResult)
+					{
+						// A later patch check requests the restart again
+						if (Generation == mp_HostMonitorGeneration)
+							mp_bRebootScheduled = false;
 
-				co_await fp_Reboot(false);
+						co_return DMibErrorInstance("Failed to save state database: {}"_f << SaveResult.f_GetExceptionStr());
+					}
+
+					auto Result = co_await fp_RequestEnvironmentRestartFromHost().f_Wrap();
+
+					// The host can still abort an accepted restart, and the restart ends this agent, so a later patch cycle
+					// can request it again
+					mp_bRebootScheduled = false;
+
+					if (!Result)
+						co_return Result.f_GetException();
+				}
+				else
+				{
+					mp_State.m_StateDatabase.m_Data["LastHostMonitorReboot"] = CTime::fs_NowUTC();
+					co_await (mp_State.m_StateDatabase.f_Save() % "Failed to save state database");
+
+					co_await fp_Reboot(false);
+				}
 
 				co_return {};
 			}

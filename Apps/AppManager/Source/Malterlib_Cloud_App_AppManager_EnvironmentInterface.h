@@ -33,7 +33,9 @@ namespace NMib::NCloud::NAppManager
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// OS dependencies of the agent application and the environment by OS selector
+			NStr::CStr m_AutoUpdateConfig;                                                         /// Encoded AutoUpdate configuration of the host AppManager; empty for none
+			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_OSDependencies;      /// OS dependencies of the environment by OS selector, which its launches need
+			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_AgentOSDependencies; /// OS dependencies of the agent application, the tools of its host monitor
 		};
 
 		struct CEnvironmentLaunch
@@ -162,7 +164,8 @@ namespace NMib::NCloud::NAppManager
 		virtual NConcurrency::TCFuture<void> f_DiscardApplicationStage(NStr::CStr _Name, NStr::CStr _StageID) = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveApplicationStorage(NStr::CStr _Name) = 0;
 
-		/// Configures the agent with the OS dependencies to install inside the environment
+		/// Configures the agent with the automatic update settings inherited from
+		/// the host AppManager
 		virtual NConcurrency::TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) = 0;
 
 		virtual NConcurrency::TCFuture<void> f_ShutdownEnvironment() = 0;
@@ -188,6 +191,10 @@ namespace NMib::NCloud::NAppManager
 		virtual NConcurrency::TCFuture<void> f_ReportApplicationState(CAppManagerEnvironmentInterface::CApplicationStateChange _Change) = 0;
 
 		virtual NConcurrency::TCFuture<NStr::CStr> f_RequestApplicationConnectionTicket(NStr::CStr _LaunchID) = 0;
+
+		virtual NConcurrency::TCFuture<void> f_ReportEnvironmentUpdateState(bool _bUpdating, NStr::CStr _Description) = 0;
+
+		virtual NConcurrency::TCFuture<void> f_RequestEnvironmentRestart(NStr::CStr _Reason) = 0;
 
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/AppManagerEnvironmentHost";
 	};

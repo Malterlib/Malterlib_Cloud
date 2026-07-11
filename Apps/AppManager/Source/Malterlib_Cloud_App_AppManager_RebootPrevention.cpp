@@ -5,6 +5,38 @@
 
 #include <Mib/Concurrency/LogError>
 
+namespace NMib::NCloud
+{
+	void CAppManagerGuestDeferral::f_Update(bool _bActive, fp64 _Now)
+	{
+		if (_bActive == m_bActive)
+			return;
+
+		m_bActive = _bActive;
+
+		if (!_bActive)
+		{
+			m_Finished = _Now;
+			m_bFinished = true;
+			return;
+		}
+
+		bool bContinues = m_bFinished && _Now - m_Finished < mc_LimitSeconds;
+		if (!bContinues)
+			m_Start = _Now;
+	}
+
+	bool CAppManagerGuestDeferral::f_Defers(fp64 _Now) const
+	{
+		return m_bActive && _Now - m_Start < mc_LimitSeconds;
+	}
+
+	fp64 CAppManagerGuestDeferral::fs_Now()
+	{
+		return fp64(NTime::CSystem_Time::fs_GetTimerValue()) * NTime::CSystem_Time::fs_TimerFrequencyReciprocal();
+	}
+}
+
 namespace NMib::NCloud::NAppManager
 {
 	TCFuture<void> CAppManagerActor::fp_RebootPrevention_WatchInitialSensors()
@@ -225,6 +257,23 @@ namespace NMib::NCloud::NAppManager
 				;
 				bPreventReboot = true;
 			}
+		}
+
+		if (mp_nEnvironmentOSDependencyInstalls)
+		{
+			fg_AddStrSep(PreventRebootDescription, "    OS dependency installations in progress: {}"_f << mp_nEnvironmentOSDependencyInstalls, "\n");
+			bPreventReboot = true;
+		}
+
+		// A reboot would interrupt updates the environment agents are installing
+		for (auto &pEnvironment : mp_Environments)
+		{
+			auto &Environment = *pEnvironment;
+			if (!Environment.f_AgentUpdateDefers())
+				continue;
+
+			fg_AddStrSep(PreventRebootDescription, "    Environment update in progress ({}): {}"_f << Environment.m_Name << Environment.m_AgentUpdateInProgress, "\n");
+			bPreventReboot = true;
 		}
 
 		if (PreventRebootDescription != mp_LastPreventRebootDescription)

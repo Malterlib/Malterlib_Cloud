@@ -307,6 +307,13 @@ namespace NMib::NCloud::NAppManager
 			if (!pEnvironment->m_AgentInterface)
 				co_return DMibErrorInstance("Cannot run update script: the agent of environment '{}' disconnected"_f << pEnvironment->m_Name);
 
+			++pEnvironment->m_nRunningScripts;
+			auto RunningScript = g_OnScopeExit / [pEnvironment]
+				{
+					--pEnvironment->m_nRunningScripts;
+				}
+			;
+
 			co_return co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_RunScript)
 				(fg_Move(EnvironmentScript))
 				.f_Timeout(60.0 * 60.0, "Timed out running update script in environment (1 hour)")

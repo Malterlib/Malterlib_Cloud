@@ -2058,6 +2058,57 @@ void CAppManager_Environment_Tests::f_DoTests()
 		co_return {};
 	};
 
+	DMibTestSuite("Guest Text")
+	{
+		DMibExpect(fg_AppManager_SanitizeGuestText("Installing updates", 256), ==, "Installing updates");
+		DMibExpect(fg_AppManager_SanitizeGuestText("Line\nTab\tEnd", 256), ==, "Line\nTab\tEnd");
+		DMibExpect(fg_AppManager_SanitizeGuestText("\x1B[2JCleared\rBack\x7F", 256), ==, "?[2JCleared?Back?");
+		DMibExpect(fg_AppManager_SanitizeGuestText("C1 \xC2\x9B" "2J", 256), ==, "C1 ?2J");
+		DMibExpect(fg_AppManager_SanitizeGuestText("\xC3\xA5\xC3\xA4", 256), ==, "\xC3\xA5\xC3\xA4");
+
+		// A cut keeps whole characters
+		DMibExpect(fg_AppManager_SanitizeGuestText("ab\xC3\xA5", 3), ==, "ab");
+		DMibExpect(fg_AppManager_SanitizeGuestText("abcdef", 3), ==, "abc");
+	};
+
+	DMibTestSuite("Agent AutoUpdate Config")
+	{
+		CEJsonSortedYaml HostConfig;
+		HostConfig["AutoUpdate"]["SecurityUpdates"] = true;
+		HostConfig["AutoUpdate"]["AutomaticReboot"] = true;
+
+		{
+			DMibTestPath("Container");
+
+			CStr Config = fg_AppManager_EnvironmentAgentAutoUpdateConfig(CAppManagerInterface::EEnvironmentType_Container, false, HostConfig);
+			DMibAssertFalse(Config.f_IsEmpty());
+
+			auto Json = CEJsonSorted::fs_FromString(Config);
+			DMibExpectTrue(Json.f_GetMemberValue("SecurityUpdates", false).f_Boolean());
+			DMibExpectTrue(Json.f_GetMemberValue("AutomaticReboot", false).f_Boolean());
+		}
+
+		{
+			DMibTestPath("VM");
+			DMibExpectFalse(fg_AppManager_EnvironmentAgentAutoUpdateConfig(CAppManagerInterface::EEnvironmentType_VM, false, HostConfig).f_IsEmpty());
+		}
+
+		{
+			DMibTestPath("Local");
+			DMibExpectTrue(fg_AppManager_EnvironmentAgentAutoUpdateConfig(CAppManagerInterface::EEnvironmentType_Local, false, HostConfig).f_IsEmpty());
+		}
+
+		{
+			DMibTestPath("Read Only Container");
+			DMibExpectTrue(fg_AppManager_EnvironmentAgentAutoUpdateConfig(CAppManagerInterface::EEnvironmentType_Container, true, HostConfig).f_IsEmpty());
+		}
+
+		{
+			DMibTestPath("No AutoUpdate");
+			DMibExpectTrue(fg_AppManager_EnvironmentAgentAutoUpdateConfig(CAppManagerInterface::EEnvironmentType_Container, false, CEJsonSortedYaml()).f_IsEmpty());
+		}
+	};
+
 	DMibTestSuite("Container Arguments") -> TCFuture<void>
 	{
 		{
@@ -2231,6 +2282,60 @@ void CAppManager_Environment_Tests::f_DoTests()
 		}
 
 		co_return {};
+	};
+
+	DMibTestSuite("Guest Deferral")
+	{
+		fp64 Start = CAppManagerGuestDeferral::fs_Now();
+		auto fAt = [&](fp64 _Seconds)
+			{
+				return Start + _Seconds;
+			}
+		;
+		constexpr fp64 c_Limit = CAppManagerGuestDeferral::mc_LimitSeconds;
+
+		{
+			DMibTestPath("Limited");
+
+			CAppManagerGuestDeferral Deferral;
+			DMibExpectFalse(Deferral.f_Defers(fAt(0)));
+
+			Deferral.f_Update(true, fAt(0));
+			DMibExpectTrue(Deferral.f_Defers(fAt(c_Limit - 1)));
+			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit)));
+
+			Deferral.f_Update(true, fAt(c_Limit + 10));
+			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit + 10)));
+		}
+
+		{
+			DMibTestPath("Toggling Continues");
+
+			CAppManagerGuestDeferral Deferral;
+			Deferral.f_Update(true, fAt(0));
+			Deferral.f_Update(false, fAt(c_Limit - 10));
+			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit - 10)));
+
+			Deferral.f_Update(true, fAt(c_Limit - 5));
+			DMibExpectTrue(Deferral.f_Defers(fAt(c_Limit - 5)));
+			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit + 5)));
+
+			Deferral.f_Update(false, fAt(c_Limit + 20));
+			Deferral.f_Update(true, fAt(c_Limit + 30));
+			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit + 30)));
+		}
+
+		{
+			DMibTestPath("Quiet Period Resets");
+
+			CAppManagerGuestDeferral Deferral;
+			Deferral.f_Update(true, fAt(0));
+			Deferral.f_Update(false, fAt(10));
+			Deferral.f_Update(true, fAt(c_Limit + 10));
+			DMibExpectTrue(Deferral.f_Defers(fAt(c_Limit + 10)));
+			DMibExpectTrue(Deferral.f_Defers(fAt(c_Limit * 2 + 9)));
+			DMibExpectFalse(Deferral.f_Defers(fAt(c_Limit * 2 + 10)));
+		}
 	};
 }
 

@@ -13,6 +13,56 @@
 
 namespace NMib::NCloud
 {
+	// Returns the encoded AutoUpdate settings of the host for the agent of an environment of _Type, or empty for no automatic updates, with which
+	// the agent only monitors. A local agent shares the OS of the host, whose own AppManager patches it and handles its reboots, and a read-only
+	// container can't change its packages
+	NStr::CStr fg_AppManager_EnvironmentAgentAutoUpdateConfig(CAppManagerInterface::EEnvironmentType _Type, bool _bReadOnly, NEncoding::CEJsonSortedYaml const &_HostConfig)
+	{
+		using namespace NMib::NEncoding;
+
+		if (_Type == CAppManagerInterface::EEnvironmentType_Local || (_Type == CAppManagerInterface::EEnvironmentType_Container && _bReadOnly))
+			return {};
+
+		if (auto pAutoUpdate = _HostConfig.f_GetMember("AutoUpdate", EJsonType_Object))
+			return CEJsonSorted::fs_FromCompatible(*pAutoUpdate).f_ToString();
+
+		return {};
+	}
+
+	// Text that a guest reports is shown to the operators of the host in logs, statuses and terminals, so the control characters that could rewrite
+	// what a terminal shows become '?', all but line feeds and tabs, also the C1 controls in UTF-8. It is cut to at most _MaxLength bytes at the
+	// start of a character
+	NStr::CStr fg_AppManager_SanitizeGuestText(NStr::CStr const &_Text, umint _MaxLength)
+	{
+		umint Length = _Text.f_GetLen();
+		if (Length > _MaxLength)
+		{
+			Length = _MaxLength;
+			while (Length && (uint8(_Text.f_GetStr()[Length]) & 0xC0) == 0x80)
+				--Length;
+		}
+
+		ch8 const *pText = _Text.f_GetStr();
+		NContainer::TCVector<ch8> Sanitized;
+		Sanitized.f_SetLen(Length);
+		umint nSanitized = 0;
+		for (umint iText = 0; iText < Length; ++iText)
+		{
+			uint8 Byte = uint8(pText[iText]);
+			if (Byte == 0xC2 && iText + 1 < Length && uint8(pText[iText + 1]) >= 0x80 && uint8(pText[iText + 1]) <= 0x9F)
+			{
+				Sanitized[nSanitized++] = '?';
+				++iText;
+			}
+			else if ((Byte < 0x20 && Byte != '\n' && Byte != '\t') || Byte == 0x7F)
+				Sanitized[nSanitized++] = '?';
+			else
+				Sanitized[nSanitized++] = ch8(Byte);
+		}
+
+		return NStr::CStr(Sanitized.f_GetArray(), nSanitized);
+	}
+
 	// Host accounts can't create the directories first, which would block the listen: the root directory is the AppManager's, and only root
 	// writes /var/run. An AppManager that doesn't run as root uses its temporary directory when a socket path in its root directory is too long,
 	// where they can. The socket directory is dedicated to the socket, so mounting it into a container exposes no other AppManager files. A VM
@@ -170,6 +220,26 @@ namespace NMib::NCloud::NAppManager
 	bool CAppManagerActor::CEnvironment::f_IsStarted() const
 	{
 		return m_bStarted && m_AgentInterface;
+	}
+
+	// The agent of a container or VM is a guest, so its updates defer host reboots and environment stops only within the limit of
+	// CAppManagerGuestDeferral. A Local agent runs on the host, like the host AppManager's own updates
+	bool CAppManagerActor::CEnvironment::f_AgentUpdateDefers() const
+	{
+		if (m_AgentUpdateInProgress.f_IsEmpty())
+			return false;
+
+		if (m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Local)
+			return true;
+
+		return m_AgentUpdateDeferral.f_Defers(CAppManagerGuestDeferral::fs_Now());
+	}
+
+	// An empty description ends the update
+	void CAppManagerActor::CEnvironment::f_SetAgentUpdateInProgress(CStr &&_Description)
+	{
+		m_AgentUpdateDeferral.f_Update(!_Description.f_IsEmpty(), CAppManagerGuestDeferral::fs_Now());
+		m_AgentUpdateInProgress = fg_Move(_Description);
 	}
 
 	void CAppManagerActor::fp_BuildCommandLine_Environments(CDistributedAppCommandLineSpecification &o_CommandLine)
@@ -1625,6 +1695,14 @@ namespace NMib::NCloud::NAppManager
 		// virtual machine image or on the host of a local environment
 		co_await (fp_WaitForEnvironmentIdle(pEnvironment) % "Failed to wait for the environment operations" % Auditor);
 
+		// The stop suspends before it starts, and an update admitted meanwhile would be cut off
+		++pEnvironment->m_nUpdateAdmissionClosed;
+		auto ReopenUpdateAdmission = g_OnScopeExit / [pEnvironment]
+			{
+				--pEnvironment->m_nUpdateAdmissionClosed;
+			}
+		;
+
 		bool bContainer = pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container;
 
 		// The storage of an environment with a parent application is in the parent's directory, which is missing while its encryption is closed
@@ -2084,6 +2162,14 @@ namespace NMib::NCloud::NAppManager
 		if (pEnvironment->m_bDeleted)
 			co_return Auditor.f_Exception(fg_Format("Environment '{}' was removed", _Name));
 
+		// The stop suspends before it starts, and an update admitted meanwhile would be cut off
+		++pEnvironment->m_nUpdateAdmissionClosed;
+		auto ReopenUpdateAdmission = g_OnScopeExit / [pEnvironment]
+			{
+				--pEnvironment->m_nUpdateAdmissionClosed;
+			}
+		;
+
 		// The window client hosts the virtual machine, which only a shutdown through the agent in the guest reaches from here
 		if (pEnvironment->m_bWindowOpen && !pEnvironment->m_AgentInterface)
 			co_return Auditor.f_Exception(fg_Format("Environment '{}' runs in a window and its agent is not connected. Close the window to stop it.", _Name));
@@ -2135,8 +2221,6 @@ namespace NMib::NCloud::NAppManager
 		if (pEnvironment->m_bDeleted)
 			co_return Auditor.f_Exception(fg_Format("Environment '{}' was removed", _Name));
 
-		co_await (fp_SetEnvironmentStoppedManually(pEnvironment, false) % "Failed to save environment state" % Auditor);
-
 		// The launches of the applications the stop stops are refused while it runs, and wait for this also when the restart fails
 		auto UpdateDependencies = g_OnScopeExit / [this]
 			{
@@ -2145,7 +2229,19 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
+		{
+			// The stop suspends before it starts, and an update admitted meanwhile would be cut off
+			++pEnvironment->m_nUpdateAdmissionClosed;
+			auto ReopenUpdateAdmission = g_OnScopeExit / [pEnvironment]
+				{
+					--pEnvironment->m_nUpdateAdmissionClosed;
+				}
+			;
+
+			co_await (fp_SetEnvironmentStoppedManually(pEnvironment, false) % "Failed to save environment state" % Auditor);
+			co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
+		}
+
 		co_await (fp_EnsureEnvironmentStarted(pEnvironment) % "Failed to start environment" % Auditor);
 
 		Auditor.f_Info(fg_Format("Restarted environment '{}'", _Name));
@@ -2184,6 +2280,14 @@ namespace NMib::NCloud::NAppManager
 			if (_pEnvironment->m_nPendingInstalls)
 				bInProgress = true;
 
+			// Stopping a container in the middle of an OS package installation leaves the packages broken
+			if (_pEnvironment->f_AgentUpdateDefers())
+				bInProgress = true;
+
+			// An error script can outlive the operation of its application
+			if (_pEnvironment->m_nRunningScripts)
+				bInProgress = true;
+
 			if (!bInProgress)
 				co_return {};
 
@@ -2214,6 +2318,26 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
 
+		// A guest can request restarts at any rate, so the requests that come while one waits join it
+		if (_pEnvironment->m_bRestartWhenIdlePending)
+			co_return {};
+
+		_pEnvironment->m_bRestartWhenIdlePending = true;
+		auto ClearRestartPending = g_OnScopeExit / [_pEnvironment]
+			{
+				_pEnvironment->m_bRestartWhenIdlePending = false;
+			}
+		;
+
+		// A stop while this waits, like a manual restart, gives the requests their restart, and a restart of the environment it started would be
+		// one too many
+		umint nStops = _pEnvironment->m_nStops;
+		auto fSuperseded = [&]
+			{
+				return _pEnvironment->m_bDeleted || _pEnvironment->m_bStopping || _pEnvironment->m_bStoppedManually || _pEnvironment->m_nStops != nStops;
+			}
+		;
+
 		// An application can prevent the restart while the operations of the others finish, so both are checked together
 		auto fRestartPrevented = [&]
 			{
@@ -2224,14 +2348,14 @@ namespace NMib::NCloud::NAppManager
 		CStopwatch Stopwatch{true};
 		while (true)
 		{
-			if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStopping || _pEnvironment->m_bStoppedManually)
+			if (fSuperseded())
 				co_return {};
 
 			if (!fRestartPrevented())
 			{
 				co_await (fp_WaitForEnvironmentIdle(_pEnvironment) % CStr("Aborted the restart of environment '{}'"_f << _pEnvironment->m_Name));
 
-				if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStopping || _pEnvironment->m_bStoppedManually)
+				if (fSuperseded())
 					co_return {};
 
 				if (!fRestartPrevented())
@@ -2244,6 +2368,10 @@ namespace NMib::NCloud::NAppManager
 			co_await fg_Timeout(10.0);
 		}
 
+		// A request from now on can need a newer agent than the start below runs, so it waits for a restart of its own
+		ClearRestartPending.f_Clear();
+		_pEnvironment->m_bRestartWhenIdlePending = false;
+
 		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Restarting environment '{}'", _pEnvironment->m_Name);
 
 		// The launches of the applications the stop stops are refused while it runs, and wait for this also when the restart fails
@@ -2254,7 +2382,17 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		co_await fp_StopEnvironmentInternal(_pEnvironment);
+		{
+			// The stop suspends before it starts, and an update admitted meanwhile would be cut off
+			++_pEnvironment->m_nUpdateAdmissionClosed;
+			auto ReopenUpdateAdmission = g_OnScopeExit / [_pEnvironment]
+				{
+					--_pEnvironment->m_nUpdateAdmissionClosed;
+				}
+			;
+
+			co_await fp_StopEnvironmentInternal(_pEnvironment);
+		}
 
 		// The stop suspends, so a manual stop or a removal can supersede this restart
 		if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStoppedManually)
@@ -4331,17 +4469,27 @@ namespace NMib::NCloud::NAppManager
 
 		CAppManagerEnvironmentInterface::CAgentConfig AgentConfig;
 
+		AgentConfig.m_AutoUpdateConfig = fg_AppManager_EnvironmentAgentAutoUpdateConfig
+			(
+				_Environment.m_Settings.m_Type
+				, _Environment.m_Settings.m_bContainerReadOnly
+				, mp_State.m_ConfigDatabase.m_Data
+			)
+		;
+
 		// The agent installs the OS dependencies of its own application inside
 		// the environment. They come from the installed version info, since agent
-		// distributions are installed without settings from version info
-		if (auto pAgentApplication = fp_FindEnvironmentAgentApplication(_Environment))
+		// distributions are installed without settings from version info. They are
+		// the tools of OS patching, which cannot change a read-only container
+		auto pAgentApplication = fp_FindEnvironmentAgentApplication(_Environment);
+		if (pAgentApplication && !(_Environment.m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container && _Environment.m_Settings.m_bContainerReadOnly))
 		{
 			try
 			{
 				CApplicationSettings VersionInfoSettings;
 				EApplicationSetting ChangedSettings = EApplicationSetting_None;
 				VersionInfoSettings.f_FromVersionInfo(pAgentApplication->m_LastInstalledVersionInfo, ChangedSettings);
-				AgentConfig.m_OSDependencies = fg_Move(VersionInfoSettings.m_OSDependencies);
+				AgentConfig.m_AgentOSDependencies = fg_Move(VersionInfoSettings.m_OSDependencies);
 			}
 			catch (CException const &_Exception)
 			{
@@ -4376,12 +4524,14 @@ namespace NMib::NCloud::NAppManager
 			.f_Timeout(60.0 * 60.0, "Timed out configuring the environment agent (1 hour)")
 			> [pEnvironment, Sequence](TCAsyncResult<void> &&_Result)
 			{
+				// The error comes from the guest, and --environment-list shows it
+				CStr Error = _Result ? CStr() : fg_AppManager_SanitizeGuestText(_Result.f_GetExceptionStr(), 16 * 1024);
 				if (!_Result)
-					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to configure the agent of environment '{}': {}", pEnvironment->m_Name, _Result.f_GetExceptionStr());
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to configure the agent of environment '{}': {}", pEnvironment->m_Name, Error);
 
 				// The newest configuration replaces what the older ones installed, which can finish after it
 				if (Sequence == pEnvironment->m_AgentConfigurationSequence)
-					pEnvironment->m_AgentConfigurationError = _Result ? CStr() : _Result.f_GetExceptionStr();
+					pEnvironment->m_AgentConfigurationError = fg_Move(Error);
 
 				if (--pEnvironment->m_nPendingAgentConfigurations)
 					return;
@@ -4417,6 +4567,8 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_AgentInterface = fg_Move(_Interface);
 
+		// The agent monitors the environment with the update settings inherited
+		// from this AppManager
 		fp_SendEnvironmentAgentConfig(*_pEnvironment);
 
 		_pEnvironment->m_bStarted = true;
@@ -4445,6 +4597,10 @@ namespace NMib::NCloud::NAppManager
 			_pEnvironment->m_AgentAppInterface.f_Clear();
 		}
 		_pEnvironment->m_AgentHostID = {};
+
+		// An agent that disappears mid-update must not keep preventing reboots, since nothing else reports the end of the update.
+		// A reconnecting agent reports its update again
+		_pEnvironment->f_SetAgentUpdateInProgress({});
 
 		if (!_pEnvironment->m_bStopping && bWasStarted)
 			_pEnvironment->f_SetStatus("Agent disconnected", CAppManagerInterface::EStatusSeverity_Error);
@@ -4511,7 +4667,8 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 
-	// Returns once the environment is down
+	// Does not wait for idle or for the updates of the agent: callers that need them finished wait for them first and refuse new ones meanwhile.
+	// Agent and virtual machine teardown failures are only logged; only a failed final container stop fails the stop
 	TCFuture<void> CAppManagerActor::fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
 		// The start finishes first, since it would otherwise launch the environment after the stop finished. It can wait minutes for the guest, so
@@ -4578,6 +4735,7 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		_pEnvironment->m_bStarted = false;
+		++_pEnvironment->m_nStops;
 
 		// A guest with a logged-in console session turns the host-side stop request
 		// into a confirmation dialog, so a virtual machine is shut down from inside
@@ -4623,6 +4781,9 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		_pEnvironment->m_AgentHostID = {};
+
+		// The stopped agent cannot report the end of its update
+		_pEnvironment->f_SetAgentUpdateInProgress({});
 
 		// Stop the container through the runtime first: the attached client then exits by itself. Signalling the client
 		// is not a reliable stop, since the Apple container client does not forward the signal to the container
@@ -5046,7 +5207,7 @@ namespace NMib::NCloud::NAppManager
 			fp_AppLaunchStateChanged
 				(
 					_pApplication
-					, "Failed launch in environment '{}': {}"_f << _pEnvironment->m_Name << LaunchResult.f_GetExceptionStr()
+					, "Failed launch in environment '{}': {}"_f << _pEnvironment->m_Name << fg_AppManager_SanitizeGuestText(LaunchResult.f_GetExceptionStr(), 16 * 1024)
 					, CAppManagerInterface::EStatusSeverity_Error
 				)
 			;
