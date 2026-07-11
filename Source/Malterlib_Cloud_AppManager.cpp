@@ -191,6 +191,7 @@ namespace NMib::NCloud
 		Return["VMBackend"] = fg_ToJson(m_VMBackend);
 		Return["VMCPUCount"] = fg_ToJson(m_VMCPUCount);
 		Return["VMMemoryMB"] = fg_ToJson(m_VMMemoryMB);
+		Return["OSDependencies"] = fg_ToJson(m_OSDependencies);
 		Return["Applications"] = fg_ToJson(m_Applications);
 		return Return;
 	}

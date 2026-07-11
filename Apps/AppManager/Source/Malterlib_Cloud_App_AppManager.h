@@ -181,6 +181,7 @@ namespace NMib::NCloud::NAppManager
 			, EEnvironmentSetting_VMMemoryMB = DBit(13)
 			, EEnvironmentSetting_ParentApplication = DBit(14)
 			, EEnvironmentSetting_ContainerReadOnly = DBit(15)
+			, EEnvironmentSetting_OSDependencies = DBit(16)
 		};
 
 		struct CEnvironmentSettings
@@ -207,6 +208,8 @@ namespace NMib::NCloud::NAppManager
 			uint64 m_VMMemoryMB = 0;
 
 			bool m_bAutoStart = true;
+
+			TCVector<CStr> m_OSDependencies; /// Additional packages the agent installs inside the environment, in addition to the agent application's OS dependencies
 
 			bool f_ParseSettings(CEJsonSorted const &_Params, EEnvironmentSetting &o_ChangedSettings, CStr &o_Error);
 			void f_ApplySettings(EEnvironmentSetting _ChangedSettings, CEnvironmentSettings const &_Source);
@@ -978,6 +981,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_PullEnvironmentContainerImage(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface);
 		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);
+		void fp_SendEnvironmentAgentConfig(CEnvironment &_Environment);
 		void fp_OnEnvironmentApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change);
 		TCFuture<CStr> fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError);
 		CStr fp_GetContainerRuntimeExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment);

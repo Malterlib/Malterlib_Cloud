@@ -223,6 +223,9 @@ namespace NMib::NCloud
 		_Stream % m_VMBackend;
 		_Stream % m_VMCPUCount;
 		_Stream % m_VMMemoryMB;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentOSDependencies)
+			_Stream % m_OSDependencies;
 	}
 
 	template <typename tf_CStream>
@@ -253,6 +256,9 @@ namespace NMib::NCloud
 		_Stream % m_VMMemoryMB;
 
 		_Stream % m_Applications;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentOSDependencies)
+			_Stream % m_OSDependencies;
 	}
 
 	template <typename tf_CStream>
