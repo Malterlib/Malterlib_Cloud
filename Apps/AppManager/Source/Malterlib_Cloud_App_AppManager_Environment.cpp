@@ -197,6 +197,16 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_o= "Additional arguments appended to the container run command."
 			}
 		;
+		auto SettingsOption_OSDependencies = "OSDependencies?"_o=
+			{
+				"Names"_o= _o["--os-dependencies"]
+				, "Default"_o= _o[]
+				, "Type"_o= _o[""]
+				, "Description"_o= "Additional OS packages installed inside the environment by the agent, in addition\n"
+				"to the OS dependencies of the agent application.\n"
+				"Example: '[\"htop\", \"strace\"]'\n"
+			}
+		;
 		auto SettingsOption_MemoryLimitMB = "MemoryLimitMB?"_o=
 			{
 				"Names"_o= _o["--memory-limit"]
@@ -285,6 +295,7 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_ContainerExtraMounts
 						, SettingsOption_ContainerExtraArguments
 						, SettingsOption_ContainerReadOnly
+						, SettingsOption_OSDependencies
 						, SettingsOption_MemoryLimitMB
 						, SettingsOption_CPULimit
 						, SettingsOption_VMImage
@@ -317,6 +328,7 @@ namespace NMib::NCloud::NAppManager
 						, fStripDefault(SettingsOption_ContainerExtraMounts)
 						, fStripDefault(SettingsOption_ContainerExtraArguments)
 						, fStripDefault(SettingsOption_ContainerReadOnly)
+						, fStripDefault(SettingsOption_OSDependencies)
 						, fStripDefault(SettingsOption_MemoryLimitMB)
 						, fStripDefault(SettingsOption_CPULimit)
 						, fStripDefault(SettingsOption_VMImage)
@@ -631,6 +643,14 @@ namespace NMib::NCloud::NAppManager
 			m_bContainerReadOnly = pValue->f_Boolean();
 		}
 
+		if (auto *pValue = _Params.f_GetMember("OSDependencies"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_OSDependencies;
+			m_OSDependencies.f_Clear();
+			for (auto &Package : pValue->f_Array())
+				m_OSDependencies.f_Insert(Package.f_String());
+		}
+
 		if (auto *pValue = _Params.f_GetMember("MemoryLimitMB"))
 		{
 			o_ChangedSettings |= EEnvironmentSetting_MemoryLimit;
@@ -692,6 +712,8 @@ namespace NMib::NCloud::NAppManager
 			m_ContainerExtraArguments = _Source.m_ContainerExtraArguments;
 		if (_ChangedSettings & EEnvironmentSetting_ContainerReadOnly)
 			m_bContainerReadOnly = _Source.m_bContainerReadOnly;
+		if (_ChangedSettings & EEnvironmentSetting_OSDependencies)
+			m_OSDependencies = _Source.m_OSDependencies;
 		if (_ChangedSettings & EEnvironmentSetting_MemoryLimit)
 			m_MemoryLimitMB = _Source.m_MemoryLimitMB;
 		if (_ChangedSettings & EEnvironmentSetting_CPULimit)
@@ -758,6 +780,11 @@ namespace NMib::NCloud::NAppManager
 			m_bContainerReadOnly = *_Settings.m_bContainerReadOnly;
 			o_ChangedSettings |= EEnvironmentSetting_ContainerReadOnly;
 		}
+		if (_Settings.m_OSDependencies)
+		{
+			m_OSDependencies = *_Settings.m_OSDependencies;
+			o_ChangedSettings |= EEnvironmentSetting_OSDependencies;
+		}
 		if (_Settings.m_MemoryLimitMB)
 		{
 			m_MemoryLimitMB = *_Settings.m_MemoryLimitMB;
@@ -813,6 +840,8 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EEnvironmentSetting_ContainerExtraArguments;
 		if (m_bContainerReadOnly != _Other.m_bContainerReadOnly)
 			ChangedSettings |= EEnvironmentSetting_ContainerReadOnly;
+		if (m_OSDependencies != _Other.m_OSDependencies)
+			ChangedSettings |= EEnvironmentSetting_OSDependencies;
 		if (m_MemoryLimitMB != _Other.m_MemoryLimitMB)
 			ChangedSettings |= EEnvironmentSetting_MemoryLimit;
 		if (m_CPULimit != _Other.m_CPULimit)
@@ -922,6 +951,12 @@ namespace NMib::NCloud::NAppManager
 			if (auto pValue = EnvironmentJson.f_GetMember("ContainerReadOnly", EJsonType_Boolean))
 				Settings.m_bContainerReadOnly = pValue->f_Boolean();
 
+			if (auto pValue = EnvironmentJson.f_GetMember("OSDependencies", EJsonType_Array))
+			{
+				for (auto &Package : pValue->f_Array())
+					Settings.m_OSDependencies.f_Insert(Package.f_String());
+			}
+
 			if (auto pValue = EnvironmentJson.f_GetMember("MemoryLimitMB", EJsonType_Integer))
 				Settings.m_MemoryLimitMB = (uint64)pValue->f_Integer();
 			{
@@ -993,6 +1028,12 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		EnvironmentJson["ContainerReadOnly"] = Settings.m_bContainerReadOnly;
+		{
+			auto &DependenciesJson = EnvironmentJson["OSDependencies"].f_Array();
+			DependenciesJson.f_Clear();
+			for (auto &Package : Settings.m_OSDependencies)
+				DependenciesJson.f_Insert(Package);
+		}
 		EnvironmentJson["MemoryLimitMB"] = Settings.m_MemoryLimitMB;
 		EnvironmentJson["CPULimit"] = Settings.m_CPULimit;
 
@@ -1043,6 +1084,8 @@ namespace NMib::NCloud::NAppManager
 		OutEnvironment.m_VMBackend = Settings.m_VMBackend;
 		OutEnvironment.m_VMCPUCount = Settings.m_VMCPUCount;
 		OutEnvironment.m_VMMemoryMB = Settings.m_VMMemoryMB;
+
+		OutEnvironment.m_OSDependencies = Settings.m_OSDependencies;
 
 		for (auto &pApplication : mp_Applications)
 		{
@@ -1260,6 +1303,14 @@ namespace NMib::NCloud::NAppManager
 
 		_fOnInfo("Saving environment state");
 		co_await (fp_UpdateEnvironmentJson(pEnvironment) % "Failed to save environment state" % Auditor);
+
+		// A running agent installs the changed OS dependencies right away; the
+		// configuration is otherwise applied when the agent connects
+		if ((ChangedSettings & EEnvironmentSetting_OSDependencies) && pEnvironment->f_IsStarted())
+		{
+			_fOnInfo("Configuring the running environment agent with the changed OS dependencies");
+			fp_SendEnvironmentAgentConfig(*pEnvironment);
+		}
 
 		_fOnInfo("Environment settings were successfully changed");
 		Auditor.f_Info(fg_Format("Updated settings for environment '{}'", _Name));
@@ -1858,6 +1909,9 @@ namespace NMib::NCloud::NAppManager
 				fAddProperty(Settings, "Memory limit MB", Environment.m_MemoryLimitMB);
 			if (Environment.m_CPULimit != 0.0)
 				fAddProperty(Settings, "CPU limit", Environment.m_CPULimit);
+
+			if (!Environment.m_OSDependencies.f_IsEmpty())
+				fAddProperty(Settings, "OS dependencies", "{vs}"_f << Environment.m_OSDependencies);
 
 			CStr Status;
 			if (Environment.m_StatusSeverity == CAppManagerInterface::EStatusSeverity_Error)
@@ -2711,6 +2765,33 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	void CAppManagerActor::fp_SendEnvironmentAgentConfig(CEnvironment &_Environment)
+	{
+		if (!_Environment.m_AgentInterface)
+			return;
+
+		CAppManagerEnvironmentInterface::CAgentConfig AgentConfig;
+		AgentConfig.m_HostName = fp_GetEnvironmentHostName(_Environment);
+
+		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
+			AgentConfig.m_AutoUpdateConfig = CEJsonSorted::fs_FromCompatible(*pAutoUpdate).f_ToString();
+
+		// The agent installs the OS dependencies of its own application inside
+		// the environment
+		if (auto *pFindAgentApplication = mp_Applications.f_FindEqual(_Environment.m_Settings.m_AgentApplication))
+			AgentConfig.m_OSDependencies = (*pFindAgentApplication)->m_Settings.m_OSDependencies;
+
+		// The environment's own OS dependencies install in addition to the agent
+		// application's. The environment runs one concrete OS, so they ride the
+		// selector matching every OS
+		if (!_Environment.m_Settings.m_OSDependencies.f_IsEmpty())
+			AgentConfig.m_OSDependencies["*"] = _Environment.m_Settings.m_OSDependencies;
+
+		_Environment.m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ConfigureAgent)(fg_Move(AgentConfig))
+			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to configure the environment agent")
+		;
+	}
+
 	TCFuture<void> CAppManagerActor::fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface)
 	{
 		if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStopping)
@@ -2720,22 +2801,7 @@ namespace NMib::NCloud::NAppManager
 
 		// The agent names the environment host after this host and monitors the
 		// environment with the update settings inherited from this AppManager
-		{
-			CAppManagerEnvironmentInterface::CAgentConfig AgentConfig;
-			AgentConfig.m_HostName = fp_GetEnvironmentHostName(*_pEnvironment);
-
-			if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
-				AgentConfig.m_AutoUpdateConfig = CEJsonSorted::fs_FromCompatible(*pAutoUpdate).f_ToString();
-
-			// The agent installs the OS dependencies of its own application inside
-			// the environment
-			if (auto *pFindAgentApplication = mp_Applications.f_FindEqual(_pEnvironment->m_Settings.m_AgentApplication))
-				AgentConfig.m_OSDependencies = (*pFindAgentApplication)->m_Settings.m_OSDependencies;
-
-			_pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ConfigureAgent)(fg_Move(AgentConfig))
-				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to configure the environment agent")
-			;
-		}
+		fp_SendEnvironmentAgentConfig(*_pEnvironment);
 
 		_pEnvironment->m_bStarted = true;
 		_pEnvironment->f_SetStatus("Running", CAppManagerInterface::EStatusSeverity_None);

@@ -33,7 +33,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_OptionalWaitForNotificationResult = 0x119
 			, EProtocolVersion_ResumableUpdateNotifications = 0x119
 			, EProtocolVersion_AddLaunchEnvironment = 0x11a
-			, EProtocolVersion_Current = 0x11a
+			, EProtocolVersion_AddEnvironmentOSDependencies = 0x11b
+			, EProtocolVersion_Current = 0x11b
 		};
 
 		enum EUpdateStage : uint32
@@ -247,6 +248,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_AgentApplication; /// Application that provides the agent executable for the environment
 			NStorage::TCOptional<NStr::CStr> m_ParentApplication; /// Application whose storage confines the environment storage, supporting encrypted storage
 			NStorage::TCOptional<bool> m_bAutoStart;
+			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// Additional packages installed by the agent inside the environment, in addition to the agent application's OS dependencies
 
 			NStorage::TCOptional<NStr::CStr> m_ContainerRuntime; /// Empty selects the default runtime for the host platform
 			NStorage::TCOptional<NStr::CStr> m_ContainerImage;
@@ -281,6 +283,7 @@ namespace NMib::NCloud
 			NStr::CStr m_AgentApplication;
 			NStr::CStr m_ParentApplication;
 			bool m_bAutoStart = true;
+			NContainer::TCVector<NStr::CStr> m_OSDependencies; /// Additional packages installed by the agent inside the environment
 
 			NStr::CStr m_ContainerRuntime;
 			NStr::CStr m_ContainerImage;

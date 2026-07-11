@@ -57,7 +57,7 @@ namespace NMib::NCloud::NAppManagerDatabase
 
 			static_assert
 				(
-					CAppManagerInterface::EProtocolVersion_Current == CAppManagerInterface::EProtocolVersion_AddLaunchEnvironment
+					CAppManagerInterface::EProtocolVersion_Current == CAppManagerInterface::EProtocolVersion_AddEnvironmentOSDependencies
 					, "Add a new version mapping if m_Notification streaming changed"
 				)
 			;
