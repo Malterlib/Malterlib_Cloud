@@ -277,6 +277,7 @@ namespace NMib::NCloud::NAppManager
 			TCDistributedActorInterface<CAppManagerEnvironmentInterface> m_AgentInterface;
 			TCVector<TCPromise<void>> m_OnAgentConnected;
 			TCVector<TCPromise<void>> m_OnStopFinished;
+			CStr m_AgentUpdateInProgress; /// Description of an update the agent is installing; prevents host reboots while set
 			bool m_bStarting = false;
 			bool m_bStarted = false;
 			bool m_bStopping = false;
@@ -311,6 +312,8 @@ namespace NMib::NCloud::NAppManager
 			;
 			TCFuture<void> f_ReportApplicationState(CAppManagerEnvironmentInterface::CApplicationStateChange _Change) override;
 			TCFuture<CStr> f_RequestApplicationConnectionTicket(CStr _LaunchID) override;
+			TCFuture<void> f_ReportEnvironmentUpdateState(bool _bUpdating, CStr _Description) override;
+			TCFuture<void> f_RequestEnvironmentRestart(CStr _Reason) override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -888,7 +891,8 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<void> fp_InitSensor();
 		TCFuture<void> fp_InitLog();
-		TCFuture<void> fp_InitHostMonitor();
+		TCFuture<void> fp_InitHostMonitor(NEncoding::CEJsonSorted _AutoUpdateConfig);
+		TCFuture<void> fp_ConfigureHostMonitorFromHost(CStr _AutoUpdateConfig);
 		static CStr fsp_GetOSDependenciesFingerprint(TCMap<CStr, TCVector<CStr>> const &_Dependencies);
 		TCFuture<void> fp_InstallOSDependencies(TCMap<CStr, TCVector<CStr>> _Dependencies);
 		NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> ()> fp_HostMonitorRebootNeededFunctor(NEncoding::CEJsonSorted const &_AutoUpdateConfig);
@@ -1052,6 +1056,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_EnsureContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_AbortEnvironmentLaunch(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_RestartEnvironmentWhenIdle(TCSharedPointer<CEnvironment> _pEnvironment);
 
 		// Application storage managed inside environments (host side)
 		bool fp_EnvironmentUsesRemoteStorage(CEnvironment const &_Environment);
@@ -1072,6 +1077,8 @@ namespace NMib::NCloud::NAppManager
 		// Environment agent handling (agent side)
 		TCFuture<void> fp_RegisterWithEnvironmentHost();
 		void fp_ForwardApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange _Change);
+		TCFuture<void> fp_ReportEnvironmentUpdateStateToHost(bool _bUpdating);
+		TCFuture<void> fp_RequestEnvironmentRestartFromHost();
 
 		TCFuture<uint32> fp_CommandLine_EnumEnvironments(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_AddEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -1422,7 +1429,7 @@ namespace NMib::NCloud::NAppManager
 		TCDistributedActor<CAppManagerEnvironmentHostInterface> mp_EnvironmentHostActor;
 		CActorSubscription mp_EnvironmentHostRegistration;
 		bool mp_bEnvironmentAgent = false;
-		bool mp_bEnvironmentContainer = false; /// Agent side: the environment is a container
+		bool mp_bEnvironmentContainer = false; /// Agent side: the environment is a container, so the kernel belongs to the host/VM outside it
 		CStr mp_EnvironmentHostID; /// Agent side: host id of the launching AppManager, from the deployment settings
 		CStr mp_EnvironmentDataRoot; /// Agent side: root of the environment-managed application storage, from the deployment settings
 		bool mp_bEnvironmentDataRootReady = false;
@@ -1477,6 +1484,7 @@ namespace NMib::NCloud::NAppManager
 		fp64 mp_HostMonitorMemoryInterval = CHostMonitor::mc_DefaultHostMonitorMemoryInterval;
 
 		TCActor<CHostMonitor> mp_HostMonitor;
+		CStr mp_AppliedHostMonitorConfig; /// Agent side: the configuration the host monitor was last initialized with
 		CStr mp_AppliedAgentOSDependencies; /// Agent side: fingerprint of the OS dependencies installed for the agent
 		CActorSubscription mp_MainDirectoryMonitorSubscription;
 		CActorSubscription mp_MainConfigFileMonitorSubscription;

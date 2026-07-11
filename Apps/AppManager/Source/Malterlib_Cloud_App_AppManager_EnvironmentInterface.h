@@ -46,6 +46,7 @@ namespace NMib::NCloud::NAppManager
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
+			NStr::CStr m_AutoUpdateConfig; /// Encoded AutoUpdate configuration object inherited from the host AppManager; empty for no automatic updates
 			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// OS dependencies of the agent application, installed by the agent inside the environment
 		};
 
@@ -153,7 +154,8 @@ namespace NMib::NCloud::NAppManager
 		virtual NConcurrency::TCFuture<void> f_DiscardApplicationStage(NStr::CStr _Name, NStr::CStr _StageID) = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveApplicationStorage(NStr::CStr _Name) = 0;
 
-		/// Configures the agent with the OS dependencies to install inside the environment
+		/// Configures the agent with the automatic update settings inherited from
+		/// the host AppManager
 		virtual NConcurrency::TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) = 0;
 
 		/// Shuts the environment down from inside after the reply has been sent. A
@@ -191,5 +193,14 @@ namespace NMib::NCloud::NAppManager
 		/// agent's environment; the application uses it to connect its distributed
 		/// app interface to the host AppManager
 		virtual NConcurrency::TCFuture<NStr::CStr> f_RequestApplicationConnectionTicket(NStr::CStr _LaunchID) = 0;
+
+		/// Reports that the calling agent's environment is installing updates; the
+		/// host prevents reboots while an environment update is in progress
+		virtual NConcurrency::TCFuture<void> f_ReportEnvironmentUpdateState(bool _bUpdating, NStr::CStr _Description) = 0;
+
+		/// Asks the host to restart the calling agent's environment, for example
+		/// after OS updates that require a reboot; the host restarts the environment
+		/// when no operations are in progress on its applications
+		virtual NConcurrency::TCFuture<void> f_RequestEnvironmentRestart(NStr::CStr _Reason) = 0;
 	};
 }

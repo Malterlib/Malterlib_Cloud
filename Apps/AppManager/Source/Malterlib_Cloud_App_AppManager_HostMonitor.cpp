@@ -10,7 +10,7 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	TCFuture<void> CAppManagerActor::fp_InitHostMonitor()
+	TCFuture<void> CAppManagerActor::fp_InitHostMonitor(CEJsonSorted _AutoUpdateConfig)
 	{
 		mp_HostMonitor = fg_Construct(mp_SensorStore, mp_LogStore, mp_DatabaseActor, mp_LogMetadata, mp_SensorMetadata);
 
@@ -39,19 +39,33 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
+		if (_AutoUpdateConfig.f_IsObject())
 		{
-			if (pAutoUpdate->f_GetMemberValue("NormalUpdates", false).f_Boolean())
+			if (_AutoUpdateConfig.f_GetMemberValue("NormalUpdates", false).f_Boolean())
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_NormalUpdates;
 
-			if (pAutoUpdate->f_GetMemberValue("SecurityUpdates", false).f_Boolean())
+			if (_AutoUpdateConfig.f_GetMemberValue("SecurityUpdates", false).f_Boolean())
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_SecurityUpdates;
 
-			if (pAutoUpdate->f_GetMemberValue("AutomaticReboot", false).f_Boolean())
+			if (_AutoUpdateConfig.f_GetMemberValue("AutomaticReboot", false).f_Boolean())
 			{
 				Config.m_AutomaticUpdateFlags |= CHostMonitor::EAutomaticUpdatesFlag::mc_AutomaticReboot;
-				Config.m_fOnRebootNeeded = fp_HostMonitorRebootNeededFunctor(CEJsonSorted::fs_FromCompatible(*pAutoUpdate));
+				Config.m_fOnRebootNeeded = fp_HostMonitorRebootNeededFunctor(_AutoUpdateConfig);
 			}
+		}
+
+		// An update in the environment must prevent host reboots, so the agent
+		// reports the patching state to the environment host
+		if (mp_bEnvironmentAgent)
+		{
+			// A container shares the kernel of whatever runs it, while a VM guest
+			// manages its own kernel and keeps the full check
+			Config.m_bKernelManagedExternally = mp_bEnvironmentContainer;
+			Config.m_fOnPatchingChanged = g_ActorFunctor / [this](bool _bPatching) -> TCFuture<void>
+				{
+					co_return co_await fp_ReportEnvironmentUpdateStateToHost(_bPatching);
+				}
+			;
 		}
 
 		auto InitResult = co_await mp_HostMonitor(&CHostMonitor::f_Init, fg_Move(Config));
@@ -59,7 +73,14 @@ namespace NMib::NCloud::NAppManager
 
 		{
 			CHostMonitor::CMonitorPathOptions PathOptions;
-			PathOptions.m_Path = mp_State.m_RootDirectory;
+
+			// An agent's root directory is a bind mount that reports the disk of the
+			// host; the environment's own filesystem is the one that can fill up from
+			// OS updates and writes outside the mounts
+			if (mp_bEnvironmentAgent)
+				PathOptions.m_Path = "/";
+			else
+				PathOptions.m_Path = mp_State.m_RootDirectory;
 
 			auto MonitorResult = co_await mp_HostMonitor(&CHostMonitor::f_MonitorPath, PathOptions).f_Wrap();
 			if (MonitorResult)
@@ -85,6 +106,49 @@ namespace NMib::NCloud::NAppManager
 			else
 				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to monitor config files: {}", ConfigResult.f_GetExceptionStr());
 		}
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_ConfigureHostMonitorFromHost(CStr _AutoUpdateConfig)
+	{
+		if (mp_HostMonitor && _AutoUpdateConfig == mp_AppliedHostMonitorConfig)
+			co_return {};
+
+		CEJsonSorted Config;
+		if (!_AutoUpdateConfig.f_IsEmpty())
+		{
+			auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the host monitor configuration from the environment host");
+
+			Config = CEJsonSorted::fs_FromString(_AutoUpdateConfig);
+		}
+
+		// The host monitor configuration is fixed at initialization, so a changed
+		// configuration recreates the monitor
+		if (mp_HostMonitor)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Restarting the host monitor with a changed configuration from the environment host");
+
+			mp_MainDirectoryMonitorSubscription = {};
+			mp_MainConfigFileMonitorSubscription = {};
+
+			co_await fg_Move(mp_HostMonitor).f_Destroy().f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the host monitor")
+			;
+		}
+
+		mp_AppliedHostMonitorConfig = _AutoUpdateConfig;
+
+		co_await fp_InitHostMonitor(fg_Move(Config));
+
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Configured the host monitor from the environment host{}"
+				, _AutoUpdateConfig.f_IsEmpty() ? "" : " with automatic update settings"
+			)
+		;
 
 		co_return {};
 	}

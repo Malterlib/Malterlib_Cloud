@@ -2980,12 +2980,61 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	TCFuture<void> CAppManagerActor::fp_RestartEnvironmentWhenIdle(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
+
+		// A restart in the middle of an update operation on an application would
+		// corrupt it, so the restart waits until the environment applications are idle
+		CStopwatch Stopwatch{true};
+		while (true)
+		{
+			if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStopping)
+				co_return {};
+
+			bool bInProgress = false;
+			for (auto &pApplication : mp_Applications)
+			{
+				if (pApplication->m_Settings.m_LaunchEnvironment != _pEnvironment->m_Name)
+					continue;
+
+				if (pApplication->f_IsInProgress())
+				{
+					bInProgress = true;
+					break;
+				}
+			}
+
+			if (!bInProgress)
+				break;
+
+			if (Stopwatch.f_GetTime() > 1_hours)
+				co_return DMibErrorInstance("Aborted the restart of environment '{}': operations kept its applications busy for an hour"_f << _pEnvironment->m_Name);
+
+			co_await fg_Timeout(10.0);
+		}
+
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Restarting environment '{}'", _pEnvironment->m_Name);
+
+		co_await fp_StopEnvironmentInternal(_pEnvironment);
+		co_await fp_EnsureEnvironmentStarted(_pEnvironment);
+
+		// Relaunch the applications the environment stop stopped with the auto
+		// start flag
+		fp_UpdateApplicationDependencies();
+
+		co_return {};
+	}
+
 	void CAppManagerActor::fp_SendEnvironmentAgentConfig(CEnvironment &_Environment)
 	{
 		if (!_Environment.m_AgentInterface)
 			return;
 
 		CAppManagerEnvironmentInterface::CAgentConfig AgentConfig;
+
+		if (auto pAutoUpdate = mp_State.m_ConfigDatabase.m_Data.f_GetMember("AutoUpdate", EJsonType_Object))
+			AgentConfig.m_AutoUpdateConfig = CEJsonSorted::fs_FromCompatible(*pAutoUpdate).f_ToString();
 
 		// The agent installs the OS dependencies of its own application inside
 		// the environment
@@ -3010,6 +3059,8 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_AgentInterface = fg_Move(_Interface);
 
+		// The agent monitors the environment with the update settings inherited
+		// from this AppManager
 		fp_SendEnvironmentAgentConfig(*_pEnvironment);
 
 		_pEnvironment->m_bStarted = true;
@@ -3038,6 +3089,9 @@ namespace NMib::NCloud::NAppManager
 			_pEnvironment->m_AgentAppInterface.f_Clear();
 		}
 		_pEnvironment->m_AgentHostID = {};
+
+		// An agent that disappears mid-update must not keep preventing reboots
+		_pEnvironment->m_AgentUpdateInProgress = {};
 
 		if (!_pEnvironment->m_bStopping && bWasStarted)
 			_pEnvironment->f_SetStatus("Agent disconnected", CAppManagerInterface::EStatusSeverity_Error);
