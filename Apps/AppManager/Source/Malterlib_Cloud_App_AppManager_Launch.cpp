@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <Mib/Encoding/JsonShortcuts>
+#include <Mib/Concurrency/LogError>
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace
@@ -129,6 +130,66 @@ namespace NMib::NCloud::NAppManager
 
 				co_return Result.f_GetException();
 			}
+		}
+
+		// An application in a launch environment gets its OS dependencies installed inside it by the agent. The dependencies
+		// install when the application launches, so update scripts cannot rely on dependencies a new version adds
+		if (_pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty())
+		{
+			auto Result = co_await fp_EnsureOSDependencies(_pApplication).f_Wrap();
+			if (_pApplication->m_bDeleted)
+				co_return DMibErrorInstance("Application deleted");
+
+			// A dependency can have stopped the application while the installation ran
+			if (_pApplication->m_bStopped)
+				co_return DMibErrorInstance("Application was stopped while installing its OS dependencies");
+
+			if (!Result)
+			{
+				fp_AppLaunchStateChanged(_pApplication, Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+				if (!_pApplication->m_bStopped && !_pApplication->m_bDeleted)
+					fp_ScheduleRelaunchApp(_pApplication);
+
+				co_return Result.f_GetException();
+			}
+
+#ifdef DPlatformFamily_Linux
+			// The dependencies can provide the tools that set the capabilities, which the install of the files tried before
+			TCVector<CStr> LowPortExecutables;
+			if (auto pLowPortExecutables = _pApplication->m_LastInstalledVersionInfo.m_ExtraInfo.f_GetMember("LowPortExecutables", EJsonType_Array))
+			{
+				for (auto &Executable : pLowPortExecutables->f_Array())
+				{
+					if (Executable.f_IsString())
+						LowPortExecutables.f_Insert(_pApplication->f_GetDirectory() / Executable.f_String());
+				}
+			}
+
+			if (!LowPortExecutables.f_IsEmpty())
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [LowPortExecutables]()
+						{
+							for (auto &ExecutablePath : LowPortExecutables)
+							{
+								if (CFile::fs_FileExists(ExecutablePath))
+									CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+							}
+						}
+					)
+					.f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to set the capabilities of the low port executables")
+				;
+
+				if (_pApplication->m_bDeleted)
+					co_return DMibErrorInstance("Application deleted");
+
+				if (_pApplication->m_bStopped)
+					co_return DMibErrorInstance("Application was stopped while setting the capabilities of its low port executables");
+			}
+#endif
 		}
 
 		auto &Application = *_pApplication;

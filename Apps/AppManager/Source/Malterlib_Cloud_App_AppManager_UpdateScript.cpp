@@ -324,6 +324,9 @@ namespace NMib::NCloud::NAppManager
 
 			co_await fp_EnsureEnvironmentStarted(pEnvironment);
 
+			// The agent configuration installs the environment OS dependencies that the script can rely on
+			co_await (fp_WaitForEnvironmentAgentConfiguration(pEnvironment) % "Cannot run update script: failed to configure the environment");
+
 			// The agent creates the application users and groups, so it resolves their names itself
 			EnvironmentScript.m_RunAsUser = _pApplication->m_Settings.m_RunAsUser;
 			EnvironmentScript.m_RunAsGroup = _pApplication->m_Settings.m_RunAsGroup;

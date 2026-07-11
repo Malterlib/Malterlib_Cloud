@@ -232,6 +232,16 @@ namespace NMib::NCloud::NAppManager
 				if (auto pValue = ApplicationJson.f_GetMember("RunAsUserHasShell", EJsonType_Boolean))
 					Settings.m_bRunAsUserHasShell = pValue->f_Boolean();
 
+				if (auto *pValue = ApplicationJson.f_GetMember("OSDependencies", EJsonType_Object))
+				{
+					for (auto &Selector : pValue->f_Object())
+					{
+						auto &Packages = Settings.m_OSDependencies[Selector.f_Name()];
+						for (auto &Package : Selector.f_Value().f_Array())
+							Packages.f_Insert(Package.f_String());
+					}
+				}
+
 				if (auto *pValue = ApplicationJson.f_GetMember("Backup"))
 				{
 					auto &BackupJson = *pValue;
@@ -870,6 +880,7 @@ namespace NMib::NCloud::NAppManager
 		if (mp_HostMonitor)
 			co_await fg_Move(mp_HostMonitor).f_Destroy();
 
+		co_await fg_Move(mp_OSDependenciesSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy OS dependencies sequencer");
 		co_await fg_Move(mp_EncryptionSensorReporterSequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy encryption sensor reporter sequencer");
 		co_await fg_Move(mp_EncryptionSensorReporter.m_fReportReadings).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy encryption sensor reporter");
 

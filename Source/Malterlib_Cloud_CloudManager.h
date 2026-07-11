@@ -37,8 +37,9 @@ namespace NMib::NCloud
 		, ECloudManagerProtocolVersion_DistinguishReportedAndActualProblemState = 0x120
 		, ECloudManagerProtocolVersion_StatisticsInAppManagerRemove = 0x121
 		, ECloudManagerProtocolVersion_AppManagerVersionIncreased5 = 0x122
+		, ECloudManagerProtocolVersion_AppManagerVersionIncreased6 = 0x123
 
-		, ECloudManagerProtocolVersion_Current = 0x122
+		, ECloudManagerProtocolVersion_Current = 0x123
 	};
 
 #	if defined(DMibCloudCloudManagerDebug)

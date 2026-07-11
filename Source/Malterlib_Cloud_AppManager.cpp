@@ -151,6 +151,7 @@ namespace NMib::NCloud
 		Return["UpdateScriptPostLaunch"] = fg_ToJson(m_UpdateScriptPostLaunch);
 		Return["UpdateScriptOnError"] = fg_ToJson(m_UpdateScriptOnError);
 		Return["Dependencies"] = fg_ToJson(m_Dependencies);
+		Return["OSDependencies"] = fg_ToJson(m_OSDependencies);
 		Return["bSelfUpdateSource"] = fg_ToJson(m_bSelfUpdateSource);
 		Return["bDistributedApp"] = fg_ToJson(m_bDistributedApp);
 		Return["bStopOnDependencyFailure"] = fg_ToJson(m_bStopOnDependencyFailure);
@@ -172,6 +173,7 @@ namespace NMib::NCloud
 		Return["AgentApplication"] = fg_ToJson(m_AgentApplication);
 		Return["ParentApplication"] = fg_ToJson(m_ParentApplication);
 		Return["bAutoStart"] = fg_ToJson(m_bAutoStart);
+		Return["OSDependencies"] = fg_ToJson(m_OSDependencies);
 		Return["Applications"] = fg_ToJson(m_Applications);
 		return Return;
 	}

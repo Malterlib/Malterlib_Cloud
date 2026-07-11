@@ -15,6 +15,7 @@ namespace NMib::NCloud::NAppManager
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_LaunchApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_StopApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_RunScript);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ConfigureAgent);
 	}
 
 	CAppManagerEnvironmentInterface::~CAppManagerEnvironmentInterface()
@@ -54,6 +55,7 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_bDistributedApp;
 		_Stream % m_InterfaceAddress;
 		_Stream % m_LaunchID;
+		_Stream % m_OSDependencies;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CEnvironmentLaunch);
 
@@ -82,6 +84,13 @@ namespace NMib::NCloud::NAppManager
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CApplicationStateChange);
 
+	template <typename tf_CStream>
+	void CAppManagerEnvironmentInterface::CAgentConfig::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_OSDependencies;
+	}
+	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CAgentConfig);
+
 	auto CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_GetAgentInfo() -> TCFuture<CAgentInfo>
 	{
 		CAgentInfo Info;
@@ -100,6 +109,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (_Launch.m_Name.f_IsEmpty() || _Launch.m_Directory.f_IsEmpty() || _Launch.m_Executable.f_IsEmpty())
 			co_return DMibErrorInstance("Invalid launch of application in environment: name, directory and executable are required");
+
+		CStr InstalledOSDependenciesFingerprint;
 
 		// A process that is stopping is not adopted: the stop removes the application when it finishes
 		while (true)
@@ -140,6 +151,9 @@ namespace NMib::NCloud::NAppManager
 				co_return DMibErrorInstance("Application '{}' is already launched in the environment with different settings"_f << _Launch.m_Name);
 			}
 
+			// The installed OS dependencies outlive the replaced application, so a relaunch does not install them again
+			InstalledOSDependenciesFingerprint = fg_Move(pExisting->m_InstalledOSDependenciesFingerprint);
+
 			pExisting->f_Delete();
 			pThis->mp_Applications.f_Remove(_Launch.m_Name);
 		}
@@ -154,6 +168,7 @@ namespace NMib::NCloud::NAppManager
 		Application.m_DirectoryOverride = _Launch.m_Directory;
 		Application.m_EnvironmentHostAddress = _Launch.m_InterfaceAddress;
 		Application.m_EnvironmentHostLaunchID = _Launch.m_LaunchID;
+		Application.m_InstalledOSDependenciesFingerprint = fg_Move(InstalledOSDependenciesFingerprint);
 
 		auto &Settings = Application.m_Settings;
 		Settings.m_Executable = _Launch.m_Executable;
@@ -165,6 +180,7 @@ namespace NMib::NCloud::NAppManager
 		Settings.m_RunAsUserPassword = _Launch.m_RunAsUserPassword;
 #endif
 		Settings.m_bDistributedApp = _Launch.m_bDistributedApp;
+		Settings.m_OSDependencies = fg_Move(_Launch.m_OSDependencies);
 		Settings.m_bBackupEnabled = false;
 		Settings.m_bAutoUpdate = false;
 
@@ -491,5 +507,39 @@ namespace NMib::NCloud::NAppManager
 		pApplication->m_EnvironmentTicketSubscription = fg_Move(Ticket.m_NotificationsSubscription);
 
 		co_return Ticket.m_Ticket.f_ToStringTicket();
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_ConfigureAgent(CAgentConfig _Config)
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_bEnvironmentAgent)
+			co_return DMibErrorInstance("Not running as an environment agent");
+
+		CStr DependencyError;
+		if (!_Config.m_OSDependencies.f_IsEmpty())
+		{
+			CStr Fingerprint = fsp_GetOSDependenciesFingerprint(_Config.m_OSDependencies);
+			if (Fingerprint != pThis->mp_AppliedAgentOSDependencies)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Installing the agent OS dependencies");
+
+				auto Result = co_await pThis->fp_InstallOSDependencies(fg_Move(_Config.m_OSDependencies)).f_Wrap();
+				if (Result)
+				{
+					pThis->mp_AppliedAgentOSDependencies = fg_Move(Fingerprint);
+
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Installed the agent OS dependencies");
+				}
+				else
+					DependencyError = "Failed to install the agent OS dependencies: {}"_f << Result.f_GetExceptionStr();
+			}
+		}
+
+		// The host holds back launches in the environment on the failure
+		if (!DependencyError.f_IsEmpty())
+			co_return DMibErrorInstance(DependencyError);
+
+		co_return {};
 	}
 }
