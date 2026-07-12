@@ -9,6 +9,32 @@
 
 namespace NMib::NCloud::NAppManager
 {
+	CStr CAppManagerActor::fp_GetEnvironmentVMBundleDirectory(CEnvironment const &_Environment)
+	{
+		CStr VMImagesBaseDirectory = mp_State.m_RootDirectory;
+		if (auto pParentApplication = fp_GetEnvironmentParentApplication(_Environment))
+			VMImagesBaseDirectory = pParentApplication->f_GetDirectory();
+
+		return fg_Format("{}/VMImages/{}", VMImagesBaseDirectory, _Environment.m_Settings.m_VMImage);
+	}
+
+	NVirtualization::CVirtualMachineConfig CAppManagerActor::fp_BuildEnvironmentVMConfig(CEnvironment const &_Environment)
+	{
+		NVirtualization::CVirtualMachineConfig Config;
+		Config.m_BundleDirectory = fp_GetEnvironmentVMBundleDirectory(_Environment);
+		Config.m_CPUCount = _Environment.m_Settings.m_VMCPUCount;
+		Config.m_MemoryMB = _Environment.m_Settings.m_VMMemoryMB;
+
+		// Environments confined to a parent application only share their own storage with
+		// the guest, so all guest-visible data stays inside the parent application directory
+		if (_Environment.m_Settings.m_ParentApplication.f_IsEmpty())
+			Config.m_SharedFolders["MalterlibRoot"] = mp_State.m_RootDirectory;
+		else
+			Config.m_SharedFolders["MalterlibRoot"] = fp_GetEnvironmentStorageDirectory(_Environment);
+
+		return Config;
+	}
+
 	TCFuture<void> CAppManagerActor::fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
 		using namespace NVirtualization;
@@ -32,11 +58,7 @@ namespace NMib::NCloud::NAppManager
 			co_return DMibErrorInstance(Error);
 		}
 
-		CStr VMImagesBaseDirectory = mp_State.m_RootDirectory;
-		if (auto pParentApplication = fp_GetEnvironmentParentApplication(*_pEnvironment))
-			VMImagesBaseDirectory = pParentApplication->f_GetDirectory();
-
-		CStr BundleDirectory = fg_Format("{}/VMImages/{}", VMImagesBaseDirectory, Settings.m_VMImage);
+		CStr BundleDirectory = fp_GetEnvironmentVMBundleDirectory(*_pEnvironment);
 
 		bool bBundleExists;
 		{
@@ -66,19 +88,7 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_LaunchID = fg_RandomID();
 
-		CVirtualMachineConfig Config;
-		Config.m_BundleDirectory = BundleDirectory;
-		Config.m_CPUCount = Settings.m_VMCPUCount;
-		Config.m_MemoryMB = Settings.m_VMMemoryMB;
-
-		// Environments confined to a parent application only share their own storage with
-		// the guest, so all guest-visible data stays inside the parent application directory
-		if (_pEnvironment->m_Settings.m_ParentApplication.f_IsEmpty())
-			Config.m_SharedFolders["MalterlibRoot"] = mp_State.m_RootDirectory;
-		else
-			Config.m_SharedFolders["MalterlibRoot"] = fp_GetEnvironmentStorageDirectory(*_pEnvironment);
-
-		_pEnvironment->m_VMActor = fg_CreateVirtualMachine(Backend, fg_Move(Config));
+		_pEnvironment->m_VMActor = fg_CreateVirtualMachine(Backend, fp_BuildEnvironmentVMConfig(*_pEnvironment));
 
 		auto StartResult = co_await _pEnvironment->m_VMActor(&CVirtualMachineActor::f_Start).f_Wrap();
 
@@ -110,6 +120,114 @@ namespace NMib::NCloud::NAppManager
 
 		co_return {};
 	}
+
+#ifdef DPlatformFamily_macOS
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnvironmentWindow(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		using namespace NVirtualization;
+
+		CStr Name = _Params["Name"].f_String();
+
+		auto *pFindEnvironment = mp_Environments.f_FindEqual(Name);
+		if (!pFindEnvironment)
+		{
+			co_await _pCommandLine->f_StdErr("No such environment '{}'\n"_f << Name);
+			co_return 1;
+		}
+
+		auto pEnvironment = *pFindEnvironment;
+
+		if (pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_VM)
+		{
+			co_await _pCommandLine->f_StdErr("Environment '{}' is not a VM environment\n"_f << Name);
+			co_return 1;
+		}
+
+		CVirtualMachineConfig Config = fp_BuildEnvironmentVMConfig(*pEnvironment);
+
+		bool bBundleExists;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			CStr BundleDirectory = Config.m_BundleDirectory;
+			bBundleExists = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [BundleDirectory]()
+					{
+						return CFile::fs_FileExists(BundleDirectory, EFileAttrib_Directory);
+					}
+				)
+			;
+		}
+
+		if (!bBundleExists)
+		{
+			co_await _pCommandLine->f_StdErr("VM image bundle '{}' does not exist\n"_f << Config.m_BundleDirectory);
+			co_return 1;
+		}
+
+		// The window session hosts the virtual machine in the command line client
+		// process instead of the AppManager, so the environment is stopped first to
+		// release the guest image bundle
+		bool bWasStarted = pEnvironment->f_IsStarted() || pEnvironment->m_bStarting;
+		if (bWasStarted)
+		{
+			co_await _pCommandLine->f_StdOut("Stopping environment '{}'\n"_f << Name);
+
+			auto StopResult = co_await fp_StopEnvironmentInternal(pEnvironment).f_Wrap();
+			if (!StopResult)
+				co_return _pCommandLine->f_AddAsyncResult(StopResult);
+		}
+
+		// The guest agent connects to the listen address on the shared network host
+		// side, so an agent installed through the window can register right away
+		co_await (fp_EnsureEnvironmentListen(pEnvironment) % "Failed to add environment listen");
+
+		pEnvironment->f_SetStatus("Environment window open", CAppManagerInterface::EStatusSeverity_Warning);
+
+		CEJsonSorted ActionParams;
+		ActionParams["BundleDirectory"] = Config.m_BundleDirectory;
+		ActionParams["Backend"] = pEnvironment->m_Settings.m_VMBackend;
+		ActionParams["CPUCount"] = (int64)Config.m_CPUCount;
+		ActionParams["MemoryMB"] = (int64)Config.m_MemoryMB;
+		ActionParams["Title"] = fg_Format("AppManager Environment '{}'", Name);
+
+		auto &SharedFolders = ActionParams["SharedFolders"];
+		SharedFolders.f_Object();
+		for (auto &SharedFolder : Config.m_SharedFolders)
+			SharedFolders[Config.m_SharedFolders.fs_GetKey(SharedFolder)] = SharedFolder;
+
+		co_await _pCommandLine->f_StdOut
+			(
+				"Opening a window for environment '{}'\n"
+				"Closing the window asks the guest to shut down; closing it again forces the stop\n"_f << Name
+			)
+		;
+
+		auto WindowResult = co_await _pCommandLine->f_RunClientAction("VirtualMachineWindow", fg_Move(ActionParams)).f_Wrap();
+
+		// The environment is restored no matter how the window session ended, so a
+		// closed terminal or a failed window does not leave the environment stopped
+		if (bWasStarted)
+		{
+			auto StartResult = co_await fp_EnsureEnvironmentStarted(pEnvironment).f_Wrap();
+			if (StartResult)
+			{
+				// Relaunch the applications the environment stop stopped with the
+				// auto start flag
+				fp_UpdateApplicationDependencies();
+			}
+			else if (WindowResult)
+				co_return _pCommandLine->f_AddAsyncResult(StartResult);
+			else
+				(void)_pCommandLine->f_AddAsyncResult(StartResult);
+		}
+		else
+			pEnvironment->f_SetStatus("Not started", CAppManagerInterface::EStatusSeverity_Warning);
+
+		co_return _pCommandLine->f_AddAsyncResult(WindowResult);
+	}
+#endif
 
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CreateVMImage(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
