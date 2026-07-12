@@ -495,6 +495,29 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentManagement.f_RegisterCommand
 			(
 				{
+					"Names"_o= _o["--environment-window"]
+					, "Description"_o=
+						"Opens a window showing the display of a VM environment, for setting up and\n"
+						"debugging the guest system interactively.\n"
+						"The AppManager hands the virtual machine over to this command while the window is\n"
+						"open: the environment is stopped first, the window hosts the virtual machine, and\n"
+						"the environment is started again when the window closes.\n"
+						"Closing the window asks the guest to shut down; closing it again forces the stop."
+					, "Options"_o=
+					{
+						NameOption
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_EnvironmentWindow(fg_Move(_Params), fg_Move(_pCommandLine));
+				}
+			)
+		;
+
+		EnvironmentManagement.f_RegisterCommand
+			(
+				{
 					"Names"_o= _o["--colima-settings"]
 					, "Description"_o=
 						"Shows or changes the sizing of the colima virtual machine shared by all Colima environments.\n"
