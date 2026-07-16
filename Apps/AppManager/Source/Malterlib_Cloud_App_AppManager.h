@@ -974,6 +974,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);
 		CStr fp_GetEnvironmentVMBundleDirectory(CEnvironment const &_Environment);
 		NVirtualization::CVirtualMachineConfig fp_BuildEnvironmentVMConfig(CEnvironment const &_Environment);
+		TCFuture<NVirtualization::CMacOSGuestProvisioning> fp_LoadVMImageProvisioning(CStr _BundleDirectory);
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
 		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
