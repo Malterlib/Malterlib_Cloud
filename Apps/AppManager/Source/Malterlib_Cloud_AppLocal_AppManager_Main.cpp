@@ -51,6 +51,15 @@ namespace
 				pRun->m_Config.m_SharedFolders[SharedFolder.f_Name()] = SharedFolder.f_Value().f_String();
 		}
 
+		if (auto *pProvisioning = _Params.f_GetMember("Provisioning"))
+		{
+			pRun->m_Config.m_Provisioning.m_Username = (*pProvisioning)["Username"].f_AsString();
+			pRun->m_Config.m_Provisioning.m_Password = (*pProvisioning)["Password"].f_AsString();
+			pRun->m_Config.m_Provisioning.m_FullName = (*pProvisioning)["FullName"].f_AsString();
+			pRun->m_Config.m_Provisioning.m_bAutoLogin = (*pProvisioning)["AutoLogin"].f_AsBoolean(true);
+			pRun->m_Config.m_Provisioning.m_bEnableRemoteLogin = (*pProvisioning)["EnableRemoteLogin"].f_AsBoolean(true);
+		}
+
 		if (_Params["Backend"].f_AsString() == "MacOSVirtualization")
 			pRun->m_Backend = EVirtualizationBackend_MacOSVirtualization;
 

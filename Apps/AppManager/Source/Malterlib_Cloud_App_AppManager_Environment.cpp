@@ -583,6 +583,47 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_o= 0
 							, "Description"_o= "Size of the guest disk image in gigabytes. Set to 0 to use the default."
 						}
+						, "ProvisionUsername?"_o=
+						{
+							"Names"_o= _o["--provision-username"]
+							, "Type"_o= ""
+							, "Default"_o= ""
+							, "Description"_o= "Automatically create this user account in the guest on its first boot instead\n"
+							"of running the interactive setup assistant.\n"
+							"The provisioning is stored in the image bundle and applied by the first start\n"
+							"of an environment or environment window using the image.\n"
+							"Requires a macOS 27 host and a macOS 27 restore image; earlier guests ignore\n"
+							"the provisioning and boot into the setup assistant."
+						}
+						, "ProvisionPassword?"_o=
+						{
+							"Names"_o= _o["--provision-password"]
+							, "Type"_o= ""
+							, "Default"_o= ""
+							, "Description"_o= "The password for the provisioned user account.\n"
+							"Stored in Provisioning.json inside the image bundle."
+						}
+						, "ProvisionFullName?"_o=
+						{
+							"Names"_o= _o["--provision-full-name"]
+							, "Type"_o= ""
+							, "Default"_o= ""
+							, "Description"_o= "The full name for the provisioned user account. Defaults to the username."
+						}
+						, "ProvisionAutoLogin?"_o=
+						{
+							"Names"_o= _o["--provision-auto-login"]
+							, "Type"_o= true
+							, "Default"_o= true
+							, "Description"_o= "Log the provisioned user in automatically when the guest starts."
+						}
+						, "ProvisionEnableSSH?"_o=
+						{
+							"Names"_o= _o["--provision-enable-ssh"]
+							, "Type"_o= true
+							, "Default"_o= true
+							, "Description"_o= "Enable Remote Login (SSH) in the guest for the provisioned user."
+						}
 					}
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
