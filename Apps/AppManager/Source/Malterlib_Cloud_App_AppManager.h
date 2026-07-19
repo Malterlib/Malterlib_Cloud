@@ -256,11 +256,16 @@ namespace NMib::NCloud::NAppManager
 			// chosen once and persisted so the container fingerprint stays stable
 			uint32 m_ListenPort = 0;
 
+			// Stable MAC address of the VM network device, chosen once and persisted so
+			// the guest can be found in the DHCP leases across restarts
+			CStr m_VMMACAddress;
+
 			// Runtime state
 			CStr m_LaunchID;
 			CStr m_AgentHostID;
 			TCActor<CDistributedAppInterfaceLaunchActor> m_AgentLaunch;
 			CActorSubscription m_AgentLaunchSubscription;
+			CActorSubscription m_AgentTicketSubscription;
 			TCActor<NVirtualization::CVirtualMachineActor> m_VMActor;
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AgentAppInterface;
 			TCDistributedActorInterface<CAppManagerEnvironmentInterface> m_AgentInterface;
@@ -975,6 +980,14 @@ namespace NMib::NCloud::NAppManager
 		CStr fp_GetEnvironmentVMBundleDirectory(CEnvironment const &_Environment);
 		NVirtualization::CVirtualMachineConfig fp_BuildEnvironmentVMConfig(CEnvironment const &_Environment);
 		TCFuture<NVirtualization::CMacOSGuestProvisioning> fp_LoadVMImageProvisioning(CStr _BundleDirectory);
+		TCFuture<void> fp_BootstrapVMAgentOverSSH
+			(
+				TCSharedPointer<CEnvironment> _pEnvironment
+				, NVirtualization::CMacOSGuestProvisioning _Provisioning
+				, CStr _MountPoint
+				, CStr _AgentExecutable
+			)
+		;
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
 		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);

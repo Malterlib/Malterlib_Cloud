@@ -4,11 +4,145 @@
 #include <Mib/Atomic/Atomic>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Cryptography/RandomID>
+#include <Mib/Cryptography/RandomData>
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
 {
+	namespace
+	{
+		CStr fg_GenerateVMMACAddress()
+		{
+			uint8 Bytes[6];
+			NCryptography::fg_GenerateRandomData(Bytes, sizeof(Bytes));
+
+			// Locally administered unicast address
+			Bytes[0] = uint8((Bytes[0] | 0x02) & 0xFE);
+
+			ch8 const *pHexDigits = "0123456789abcdef";
+
+			CStr Address;
+			for (umint i = 0; i < 6; ++i)
+			{
+				if (i)
+					Address += ":";
+
+				ch8 Hex[3] = {pHexDigits[Bytes[i] >> 4], pHexDigits[Bytes[i] & 0xF], 0};
+				Address += Hex;
+			}
+
+			return Address;
+		}
+
+		bool fg_ParseMACOctets(ch8 const *_pStr, umint _Len, uint8 (&o_Octets)[6])
+		{
+			umint iOctet = 0;
+			umint i = 0;
+			while (iOctet < 6)
+			{
+				uint32 Value = 0;
+				umint nDigits = 0;
+				for (; i < _Len && nDigits < 2; ++i, ++nDigits)
+				{
+					ch8 Char = _pStr[i];
+					if (Char >= '0' && Char <= '9')
+						Value = Value * 16 + umint(Char - '0');
+					else if (Char >= 'a' && Char <= 'f')
+						Value = Value * 16 + umint(Char - 'a' + 10);
+					else if (Char >= 'A' && Char <= 'F')
+						Value = Value * 16 + umint(Char - 'A' + 10);
+					else
+						break;
+				}
+
+				if (!nDigits)
+					return false;
+
+				o_Octets[iOctet++] = uint8(Value);
+
+				if (iOctet < 6)
+				{
+					if (i >= _Len || _pStr[i] != ':')
+						return false;
+					++i;
+				}
+			}
+
+			return iOctet == 6 && i == _Len;
+		}
+
+		// Finds the IPv4 address the shared network DHCP server leased to the MAC
+		// address; the leases file stores the octets without leading zeros
+		CStr fg_FindVMDHCPLease(CStr const &_MACAddress)
+		{
+			uint8 TargetOctets[6];
+			if (!fg_ParseMACOctets(_MACAddress.f_GetStr(), _MACAddress.f_GetLen(), TargetOctets))
+				return {};
+
+			CStr const LeasesPath = "/var/db/dhcpd_leases";
+			if (!CFile::fs_FileExists(LeasesPath))
+				return {};
+
+			CStr Contents = CFile::fs_ReadStringFromFile(LeasesPath);
+
+			ch8 const *pContents = Contents.f_GetStr();
+			umint Len = Contents.f_GetLen();
+
+			CStr EntryIP;
+			umint iLineStart = 0;
+			for (umint i = 0; i <= Len; ++i)
+			{
+				if (i < Len && pContents[i] != '\n')
+					continue;
+
+				umint iStart = iLineStart;
+				umint iEnd = i;
+				iLineStart = i + 1;
+
+				while (iStart < iEnd && (pContents[iStart] == ' ' || pContents[iStart] == '\t'))
+					++iStart;
+				while (iEnd > iStart && (pContents[iEnd - 1] == ' ' || pContents[iEnd - 1] == '\r'))
+					--iEnd;
+
+				CStr Line = Contents.f_Extract(iStart, iEnd - iStart);
+
+				if (Line == "{")
+				{
+					EntryIP = {};
+					continue;
+				}
+
+				if (Line.f_StartsWith("ip_address="))
+				{
+					EntryIP = Line.f_Extract(11, Line.f_GetLen() - 11);
+					continue;
+				}
+
+				if (Line.f_StartsWith("hw_address=1,"))
+				{
+					CStr EntryMAC = Line.f_Extract(13, Line.f_GetLen() - 13);
+
+					uint8 EntryOctets[6];
+					if (!fg_ParseMACOctets(EntryMAC.f_GetStr(), EntryMAC.f_GetLen(), EntryOctets))
+						continue;
+
+					bool bMatch = true;
+					for (umint iOctet = 0; iOctet < 6; ++iOctet)
+					{
+						if (EntryOctets[iOctet] != TargetOctets[iOctet])
+							bMatch = false;
+					}
+
+					if (bMatch && !EntryIP.f_IsEmpty())
+						return EntryIP;
+				}
+			}
+
+			return {};
+		}
+	}
+
 	CStr CAppManagerActor::fp_GetEnvironmentVMBundleDirectory(CEnvironment const &_Environment)
 	{
 		CStr VMImagesBaseDirectory = mp_State.m_RootDirectory;
@@ -123,15 +257,84 @@ namespace NMib::NCloud::NAppManager
 		_pEnvironment->f_SetStatus("Starting VM", CAppManagerInterface::EStatusSeverity_Warning);
 
 		// The guest agent connects to the listen address on the shared network host side
-		co_await (fp_EnsureEnvironmentListen(_pEnvironment) % "Failed to add environment listen");
+		NWeb::NHTTP::CURL AgentAddress = co_await (fp_EnsureEnvironmentListen(_pEnvironment) % "Failed to add environment listen");
+
+		// The agent files and deployment identity are placed inside the shared
+		// storage, where the guest reaches them through the mounted share
+		TCSharedPointer<CStr> pError = fg_Construct();
+		CStr AgentExecutable = co_await fp_GetEnvironmentAgentExecutable(_pEnvironment, pError);
+		if (AgentExecutable.f_IsEmpty())
+		{
+			_pEnvironment->f_SetStatus(*pError, CAppManagerInterface::EStatusSeverity_Error);
+			co_return DMibErrorInstance(*pError);
+		}
 
 		_pEnvironment->m_LaunchID = fg_RandomID();
 
+		// A fresh connection ticket lets the guest agent connect without the
+		// standard stream handshake container agents use; the agent reads it from
+		// the connect settings written next to its executable on the share
+		_pEnvironment->m_AgentTicketSubscription.f_Clear();
+		{
+			auto Ticket = co_await mp_State.m_TrustManager
+				(
+					&CDistributedActorTrustManager::f_GenerateConnectionTicket
+					, AgentAddress
+					, g_ActorFunctor / [_pEnvironment](CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _CertificateRequest) -> TCFuture<void>
+					{
+						if (_pEnvironment->m_bDeleted)
+							co_return DMibErrorInstance("Environment deleted");
+
+						_pEnvironment->m_AgentHostID = _HostID;
+
+						co_return {};
+					}
+					, nullptr
+				)
+			;
+
+			_pEnvironment->m_AgentTicketSubscription = fg_Move(Ticket.m_NotificationsSubscription);
+
+			CEJsonSorted ConnectJson;
+			ConnectJson["Address"] = AgentAddress.f_Encode();
+			ConnectJson["LaunchID"] = _pEnvironment->m_LaunchID;
+			ConnectJson["Ticket"] = CStr(Ticket.m_Ticket.f_ToStringTicket());
+
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			CStr ConnectPath = fp_GetEnvironmentStorageDirectory(*_pEnvironment) / "AppManagerAgentConnect.json";
+			CStr ConnectContents = ConnectJson.f_ToString();
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [ConnectPath, ConnectContents]()
+					{
+						CFile::fs_WriteStringToFile(ConnectPath, ConnectContents);
+					}
+					% "Failed to write the agent connect settings"
+				)
+			;
+		}
+
+		// A stable MAC address lets the host find the guest address in the DHCP
+		// leases for the SSH agent setup
+		if (_pEnvironment->m_VMMACAddress.f_IsEmpty())
+		{
+			_pEnvironment->m_VMMACAddress = fg_GenerateVMMACAddress();
+
+			co_await fp_UpdateEnvironmentJson(_pEnvironment).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to save the environment MAC address")
+			;
+		}
+
 		CVirtualMachineConfig Config = fp_BuildEnvironmentVMConfig(*_pEnvironment);
+		Config.m_MACAddress = _pEnvironment->m_VMMACAddress;
 
 		// Guest provisioning stored with the image is applied by the guest on its
 		// first boot after restore and ignored afterwards
 		Config.m_Provisioning = co_await fp_LoadVMImageProvisioning(BundleDirectory);
+
+		CMacOSGuestProvisioning Provisioning = Config.m_Provisioning;
+		CStr MountPoint = Config.m_SharedFolders["MalterlibRoot"];
 
 		_pEnvironment->m_VMActor = fg_CreateVirtualMachine(Backend, fg_Move(Config));
 
@@ -146,16 +349,44 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->f_SetStatus("VM running, waiting for agent", CAppManagerInterface::EStatusSeverity_Warning);
 
-		// The guest image is expected to run an installed agent that connects back
-		// to this AppManager and registers its environment interface
+		// The guest runs the installed agent, which connects back to this AppManager
+		// and registers its environment interface. When it does not connect and the
+		// image carries provisioning credentials, the agent is installed through SSH
 		if (!_pEnvironment->f_IsStarted())
 		{
+			bool bCanBootstrap = (bool)Provisioning && Provisioning.m_bEnableRemoteLogin;
+
 			auto ConnectedResult = co_await _pEnvironment->m_OnAgentConnected.f_Insert().f_Future()
-				.f_Timeout(300.0, "Timed out waiting for the environment agent in the VM to connect")
+				.f_Timeout(bCanBootstrap ? 60.0 : 300.0, "Timed out waiting for the environment agent in the VM to connect")
 				.f_Wrap()
 			;
 
-			if (!ConnectedResult)
+			if (!ConnectedResult && bCanBootstrap && !_pEnvironment->f_IsStarted())
+			{
+				_pEnvironment->f_SetStatus("Setting up the environment agent through SSH", CAppManagerInterface::EStatusSeverity_Warning);
+
+				auto BootstrapResult = co_await fp_BootstrapVMAgentOverSSH(_pEnvironment, Provisioning, MountPoint, AgentExecutable).f_Wrap();
+
+				if (!BootstrapResult && !_pEnvironment->f_IsStarted())
+				{
+					CStr Error = fg_Format("Failed to set up the environment agent through SSH: {}", BootstrapResult.f_GetExceptionStr());
+					_pEnvironment->f_SetStatus(Error, CAppManagerInterface::EStatusSeverity_Error);
+					fp_StopEnvironmentInternal(_pEnvironment).f_DiscardResult();
+					co_return BootstrapResult.f_GetException();
+				}
+
+				if (!_pEnvironment->f_IsStarted())
+				{
+					_pEnvironment->f_SetStatus("Agent installed, waiting for agent", CAppManagerInterface::EStatusSeverity_Warning);
+
+					ConnectedResult = co_await _pEnvironment->m_OnAgentConnected.f_Insert().f_Future()
+						.f_Timeout(120.0, "Timed out waiting for the environment agent in the VM to connect")
+						.f_Wrap()
+					;
+				}
+			}
+
+			if (!ConnectedResult && !_pEnvironment->f_IsStarted())
 			{
 				_pEnvironment->f_SetStatus(fg_Format("Agent failed to connect: {}", ConnectedResult.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
 				fp_StopEnvironmentInternal(_pEnvironment).f_DiscardResult();
@@ -164,6 +395,213 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_BootstrapVMAgentOverSSH
+		(
+			TCSharedPointer<CEnvironment> _pEnvironment
+			, NVirtualization::CMacOSGuestProvisioning _Provisioning
+			, CStr _MountPoint
+			, CStr _AgentExecutable
+		)
+	{
+		CStr MACAddress = _pEnvironment->m_VMMACAddress;
+		CStr StorageDirectory = fp_GetEnvironmentStorageDirectory(*_pEnvironment);
+
+		// The ask pass helper lets ssh take the password from the process
+		// environment instead of a terminal prompt
+		CStr AskPassPath = StorageDirectory / ".AgentBootstrapAskPass.sh";
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [AskPassPath]()
+					{
+						CFile::fs_WriteStringToFile
+							(
+								AskPassPath
+								, "#!/bin/sh\nprintf '%s\\n' \"$MALTERLIB_VM_SSH_PASSWORD\"\n"
+								, false
+								, EFileAttrib_Executable
+							)
+						;
+					}
+					% "Failed to write the SSH ask pass helper"
+				)
+			;
+		}
+
+		// The launch daemon script mounts the share and runs the agent from the
+		// environment storage, so the agent and its per boot connect settings are
+		// always the ones the host placed there
+		CStr GuestScriptPath = "/usr/local/libexec/malterlib-appmanager-agent.sh";
+		CStr GuestScript = fg_Format
+			(
+				"#!/bin/sh\n"
+				"mkdir -p '{}'\n"
+				"/sbin/mount | /usr/bin/grep -qF ' on {} (' || /sbin/mount_virtiofs MalterlibRoot '{}'\n"
+				"export HOME='{}/.home'\n"
+				"export TMPDIR='{}/.tmp'\n"
+				"export MalterlibDistributedAppLocalSocketPrefix=/tmp\n"
+				"mkdir -p \"$HOME\" \"$TMPDIR\"\n"
+				"cd '{}'\n"
+				"exec '{}' --daemon-run-standalone --log-to-stderr\n"
+				, _MountPoint
+				, _MountPoint
+				, _MountPoint
+				, StorageDirectory
+				, StorageDirectory
+				, StorageDirectory
+				, _AgentExecutable
+			)
+		;
+
+		CStr GuestPlist =
+			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+			"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+			"<plist version=\"1.0\">\n"
+			"<dict>\n"
+			"\t<key>Label</key><string>com.malterlib.appmanager.agent</string>\n"
+			"\t<key>ProgramArguments</key><array><string>/bin/sh</string><string>" + GuestScriptPath + "</string></array>\n"
+			"\t<key>RunAtLoad</key><true/>\n"
+			"\t<key>KeepAlive</key><true/>\n"
+			"</dict>\n"
+			"</plist>\n"
+		;
+
+		CStr BootstrapScript = fg_Format
+			(
+				"set -e\n"
+				"mkdir -p /usr/local/libexec\n"
+				"cat > '{}' <<'MALTERLIB_BOOTSTRAP_EOF'\n"
+				"{}"
+				"MALTERLIB_BOOTSTRAP_EOF\n"
+				"chmod 755 '{}'\n"
+				"cat > /Library/LaunchDaemons/com.malterlib.appmanager.agent.plist <<'MALTERLIB_BOOTSTRAP_EOF'\n"
+				"{}"
+				"MALTERLIB_BOOTSTRAP_EOF\n"
+				"chown root:wheel /Library/LaunchDaemons/com.malterlib.appmanager.agent.plist\n"
+				"chmod 644 /Library/LaunchDaemons/com.malterlib.appmanager.agent.plist\n"
+				"launchctl bootout system/com.malterlib.appmanager.agent 2>/dev/null || true\n"
+				"launchctl bootstrap system /Library/LaunchDaemons/com.malterlib.appmanager.agent.plist\n"
+				, GuestScriptPath
+				, GuestScript
+				, GuestScriptPath
+				, GuestPlist
+			)
+		;
+
+		// The guest needs time to finish its provisioning first boot before SSH
+		// accepts connections, so the setup is retried until it succeeds
+		CStr LastError = "The guest never appeared in the DHCP leases";
+		for (umint Attempt = 0; Attempt < 90; ++Attempt)
+		{
+			if (Attempt)
+				co_await fg_Timeout(5.0);
+
+			if (_pEnvironment->f_IsStarted())
+				co_return {};
+
+			if (_pEnvironment->m_bDeleted || _pEnvironment->m_bStopping)
+				co_return DMibErrorInstance("Environment is stopping");
+
+			CStr GuestIP;
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				GuestIP = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [MACAddress]()
+						{
+							return fg_FindVMDHCPLease(MACAddress);
+						}
+					)
+				;
+			}
+
+			if (GuestIP.f_IsEmpty())
+				continue;
+
+			CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+				(
+					"/usr/bin/ssh"
+					, fg_CreateVector<CStr>
+						(
+							"-o", "StrictHostKeyChecking=no"
+							, "-o", "UserKnownHostsFile=/dev/null"
+							, "-o", "GlobalKnownHostsFile=/dev/null"
+							, "-o", "ConnectTimeout=10"
+							, "-o", "NumberOfPasswordPrompts=1"
+							, "-o", "ServerAliveInterval=15"
+							, "-o", "ServerAliveCountMax=4"
+							, "-o", "LogLevel=ERROR"
+							, fg_Format("{}@{}", _Provisioning.m_Username, GuestIP)
+							, "sudo", "-S", "-p", "''", "/bin/sh", "-s"
+						)
+					, mp_State.m_RootDirectory
+					, {}
+				)
+			;
+
+			LaunchParams.m_Environment["SSH_ASKPASS"] = AskPassPath;
+			LaunchParams.m_Environment["SSH_ASKPASS_REQUIRE"] = "force";
+			LaunchParams.m_Environment["DISPLAY"] = ":0";
+			LaunchParams.m_Environment["MALTERLIB_VM_SSH_PASSWORD"] = _Provisioning.m_Password;
+			LaunchParams.m_bMergeEnvironment = true;
+
+			TCActor<CProcessLaunchActor> pLaunchActor = fg_ConstructActor<CProcessLaunchActor>();
+
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
+			SimpleLaunch.m_LogName = "Environment/{}/AgentBootstrap"_f << _pEnvironment->m_Name;
+
+			auto ResultFuture = pLaunchActor(&CProcessLaunchActor::f_LaunchSimple, SimpleLaunch);
+
+			// sudo takes the password from the first line of standard input and hands
+			// the rest to the shell as the setup script
+			CStrIO StdInData;
+			StdInData += _Provisioning.m_Password;
+			StdInData += "\n";
+			StdInData += BootstrapScript;
+
+			co_await pLaunchActor(&CProcessLaunchActor::f_SendStdIn, fg_Move(StdInData)).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to send the agent setup script")
+			;
+			co_await pLaunchActor(&CProcessLaunchActor::f_CloseStdIn).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to close the agent setup input")
+			;
+
+			auto Result = co_await fg_Move(ResultFuture)
+				.f_Timeout(120.0, "The SSH agent setup attempt timed out")
+				.f_Wrap()
+			;
+
+			co_await fg_Move(pLaunchActor).f_Destroy().f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the agent setup launch")
+			;
+
+			if (Result && Result->m_ExitCode == 0)
+			{
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Info
+						, "Installed the agent for environment '{}' in the guest at {}"
+						, _pEnvironment->m_Name
+						, GuestIP
+					)
+				;
+
+				co_return {};
+			}
+
+			if (!Result)
+				LastError = Result.f_GetExceptionStr();
+			else
+				LastError = fg_Format("SSH exited with status {}: {}", Result->m_ExitCode, CStr(Result->f_GetCombinedOut().f_Trim()));
+		}
+
+		co_return DMibErrorInstance("Failed to set up the agent in the guest: {}"_f << LastError);
 	}
 
 #ifdef DPlatformFamily_macOS
@@ -398,9 +836,13 @@ namespace NMib::NCloud::NAppManager
 		CStr ProvisionUsername = _Params["ProvisionUsername"].f_AsString();
 		if (Result && !ProvisionUsername.f_IsEmpty())
 		{
+			CStr ProvisionPassword = _Params["ProvisionPassword"].f_AsString();
+			if (ProvisionPassword.f_IsEmpty())
+				ProvisionPassword = NCryptography::fg_RandomID(20);
+
 			CEJsonSorted Provisioning;
 			Provisioning["Username"] = ProvisionUsername;
-			Provisioning["Password"] = _Params["ProvisionPassword"].f_AsString();
+			Provisioning["Password"] = ProvisionPassword;
 			Provisioning["FullName"] = _Params["ProvisionFullName"].f_AsString();
 			Provisioning["AutoLogin"] = _Params["ProvisionAutoLogin"].f_AsBoolean(true);
 			Provisioning["EnableRemoteLogin"] = _Params["ProvisionEnableSSH"].f_AsBoolean(true);
@@ -421,7 +863,10 @@ namespace NMib::NCloud::NAppManager
 
 			co_await _pCommandLine->f_StdOut
 				(
-					"Stored guest provisioning for user '{}'; it is applied on the first boot of the image\n"_f << ProvisionUsername
+					"Stored guest provisioning for user '{}' with password '{}'\n"
+					"It is applied on the first boot of the image, which also sets up the environment agent through SSH\n"_f
+						<< ProvisionUsername
+						<< ProvisionPassword
 				)
 			;
 		}
