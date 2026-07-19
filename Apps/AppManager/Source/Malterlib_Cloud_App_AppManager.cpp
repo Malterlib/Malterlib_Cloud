@@ -56,6 +56,48 @@ namespace NMib::NCloud::NAppManager
 			return s_Settings;
 		}
 
+		// Reads the connection ticket the launching AppManager wrote next to the agent
+		// executable; read fresh on every request so a ticket written for the current
+		// start is used
+		TCFuture<CDistributedActorTrustManager::CTrustTicket> fg_ReadAgentConnectTicket()
+		{
+			CStr Contents;
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				CStr ConnectFile = CFile::fs_GetProgramDirectory() / "AppManagerAgentConnect.json";
+				Contents = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [ConnectFile]() -> CStr
+						{
+							if (!CFile::fs_FileExists(ConnectFile))
+								return {};
+
+							return CFile::fs_ReadStringFromFile(ConnectFile, true);
+						}
+					)
+				;
+			}
+
+			if (Contents.f_IsEmpty())
+				co_return DMibErrorInstance("No agent connect settings with a connection ticket found");
+
+			CDistributedActorTrustManager::CTrustTicket TrustTicket;
+			{
+				auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the agent connect settings");
+
+				CEJsonSorted Json = CEJsonSorted::fs_FromString(Contents);
+
+				CStr Ticket = Json["Ticket"].f_AsString();
+				if (Ticket.f_IsEmpty())
+					co_return DMibErrorInstance("The agent connect settings contain no connection ticket");
+
+				TrustTicket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(CStrSecure(Ticket));
+			}
+
+			co_return TrustTicket;
+		}
+
 		CDistributedAppActor_Settings fg_MakeAppManagerSettings()
 		{
 			auto Settings = CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager");
@@ -67,6 +109,39 @@ namespace NMib::NCloud::NAppManager
 				// identity derives the friendly host name from it
 				if (!Deployment.m_EnvironmentHostName.f_IsEmpty())
 					CAppManagerActor::fs_ApplyEnvironmentHostName(Deployment.m_EnvironmentHostName);
+
+				// VM guest agents have no launching process to receive the interface
+				// settings from, so the launching AppManager writes them next to the
+				// agent executable on the shared storage instead
+				if (Settings.m_InterfaceSettings.m_ServerAddress.f_IsEmpty())
+				{
+					try
+					{
+						CStr ConnectFile = CFile::fs_GetProgramDirectory() / "AppManagerAgentConnect.json";
+						if (CFile::fs_FileExists(ConnectFile))
+						{
+							CEJsonSorted Json = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(ConnectFile, true));
+
+							Settings.m_InterfaceSettings.m_ServerAddress = Json["Address"].f_AsString();
+							Settings.m_InterfaceSettings.m_LaunchID = Json["LaunchID"].f_AsString();
+
+							NStorage::TCSharedPointer<TCActorFunctor<TCFuture<CDistributedActorTrustManager::CTrustTicket> ()>> pRequestTicket
+								= fg_Construct
+									(
+										g_ActorFunctor / []
+										{
+											return fg_ReadAgentConnectTicket();
+										}
+									)
+							;
+							Settings.m_InterfaceSettings.m_pRequestTicket = fg_Move(pRequestTicket);
+						}
+					}
+					catch (CException const &_Exception)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to read the agent connect settings: {}", _Exception);
+					}
+				}
 
 				// The launching AppManager points HOME and TMPDIR into the agent root,
 				// but nothing creates them inside a fresh environment; child processes

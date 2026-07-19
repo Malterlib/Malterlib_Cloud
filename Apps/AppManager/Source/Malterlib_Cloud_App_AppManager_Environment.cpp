@@ -587,11 +587,14 @@ namespace NMib::NCloud::NAppManager
 						{
 							"Names"_o= _o["--provision-username"]
 							, "Type"_o= ""
-							, "Default"_o= ""
+							, "Default"_o= "admin"
 							, "Description"_o= "Automatically create this user account in the guest on its first boot instead\n"
-							"of running the interactive setup assistant.\n"
+							"of running the interactive setup assistant, and use it to set up the environment\n"
+							"agent through SSH.\n"
 							"The provisioning is stored in the image bundle and applied by the first start\n"
 							"of an environment or environment window using the image.\n"
+							"Set to an empty string to disable provisioning and set the guest up manually\n"
+							"with --environment-window.\n"
 							"Requires a macOS 27 host and a macOS 27 restore image; earlier guests ignore\n"
 							"the provisioning and boot into the setup assistant."
 						}
@@ -601,6 +604,7 @@ namespace NMib::NCloud::NAppManager
 							, "Type"_o= ""
 							, "Default"_o= ""
 							, "Description"_o= "The password for the provisioned user account.\n"
+							"A random password is generated when left empty.\n"
 							"Stored in Provisioning.json inside the image bundle."
 						}
 						, "ProvisionFullName?"_o=
@@ -1053,6 +1057,8 @@ namespace NMib::NCloud::NAppManager
 			}
 			if (auto pValue = EnvironmentJson.f_GetMember("ListenPort", EJsonType_Integer))
 				Environment.m_ListenPort = (uint32)pValue->f_Integer();
+			if (auto pValue = EnvironmentJson.f_GetMember("VMMACAddress", EJsonType_String))
+				Environment.m_VMMACAddress = pValue->f_String();
 
 			// An agent in a persistent container keeps running across AppManager
 			// restarts and reconnects with the launch id frozen into the container, so
@@ -1116,6 +1122,7 @@ namespace NMib::NCloud::NAppManager
 				MountsJson.f_Insert(Mount);
 		}
 		EnvironmentJson["ListenPort"] = Environment.m_ListenPort;
+		EnvironmentJson["VMMACAddress"] = Environment.m_VMMACAddress;
 
 		co_return co_await mp_State.m_StateDatabase.f_Save();
 	}
@@ -2995,6 +3002,7 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		_pEnvironment->m_AgentLaunchSubscription.f_Clear();
+		_pEnvironment->m_AgentTicketSubscription.f_Clear();
 
 		if (_pEnvironment->m_VMActor)
 		{
