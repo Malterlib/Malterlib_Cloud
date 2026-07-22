@@ -111,6 +111,8 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_o= "Name of the application that provides the AppManager agent executable for the environment.\n"
 				"When empty, container and VM environments default to the SelfUpdate.<Platform> application\n"
 				"matching the guest platform, and local environments run the AppManager executable itself.\n"
+				"The SelfUpdate.<Platform> name for the host platform resolves to the self update source\n"
+				"application, since host platform distributions install as the self update application.\n"
 				"See --application-enable-self-update for installing agent executables for other platforms."
 			}
 		;
@@ -2027,17 +2029,17 @@ namespace NMib::NCloud::NAppManager
 		}
 		else
 		{
-			auto *pFindApplication = mp_Applications.f_FindEqual(_pEnvironment->m_Settings.m_AgentApplication);
-			if (!pFindApplication)
+			auto pAgentApplication = fp_FindEnvironmentAgentApplication(*_pEnvironment);
+			if (!pAgentApplication)
 			{
 				*_pError = "Agent application '{}' for environment '{}' is not installed"_f << _pEnvironment->m_Settings.m_AgentApplication << _pEnvironment->m_Name;
 				co_return {};
 			}
 
-			Directory = (*pFindApplication)->f_GetDirectory();
+			Directory = pAgentApplication->f_GetDirectory();
 
-			if (!(*pFindApplication)->m_Settings.m_Executable.f_IsEmpty())
-				Candidates.f_Insert(Directory / (*pFindApplication)->m_Settings.m_Executable);
+			if (!pAgentApplication->m_Settings.m_Executable.f_IsEmpty())
+				Candidates.f_Insert(Directory / pAgentApplication->m_Settings.m_Executable);
 			Candidates.f_Insert(Directory / CFile::fs_GetFile(CFile::fs_GetProgramPath()));
 #ifdef DPlatformFamily_Windows
 			Candidates.f_Insert(Directory / "AppManager.exe");
@@ -2158,6 +2160,28 @@ namespace NMib::NCloud::NAppManager
 			*_pError = "Found no agent executable for environment '{}'"_f << _pEnvironment->m_Name;
 
 		co_return Executable;
+	}
+
+	TCSharedPointer<CAppManagerActor::CApplication> CAppManagerActor::fp_FindEnvironmentAgentApplication(CEnvironment const &_Environment)
+	{
+		auto *pFindApplication = mp_Applications.f_FindEqual(_Environment.m_Settings.m_AgentApplication);
+		if (pFindApplication)
+			return *pFindApplication;
+
+		// Distributions for the host platform install as the self update source
+		// application instead of a SelfUpdate.<Platform> agent application, so the
+		// default agent application name for host platform guests resolves to the
+		// self update source
+		if (_Environment.m_Settings.m_AgentApplication == CStr("SelfUpdate.{}"_f << DMalterlibCloudPlatform))
+		{
+			for (auto &pApplication : mp_Applications)
+			{
+				if (pApplication->m_Settings.m_bSelfUpdateSource && !pApplication->m_bDeleted)
+					return pApplication;
+			}
+		}
+
+		return {};
 	}
 
 	TCSharedPointer<CAppManagerActor::CApplication> CAppManagerActor::fp_GetEnvironmentParentApplication(CEnvironment const &_Environment)
@@ -2849,8 +2873,8 @@ namespace NMib::NCloud::NAppManager
 
 		// The agent installs the OS dependencies of its own application inside
 		// the environment
-		if (auto *pFindAgentApplication = mp_Applications.f_FindEqual(_Environment.m_Settings.m_AgentApplication))
-			AgentConfig.m_OSDependencies = (*pFindAgentApplication)->m_Settings.m_OSDependencies;
+		if (auto pAgentApplication = fp_FindEnvironmentAgentApplication(_Environment))
+			AgentConfig.m_OSDependencies = pAgentApplication->m_Settings.m_OSDependencies;
 
 		// The environment's own OS dependencies install in addition to the agent
 		// application's. The environment runs one concrete OS, so they ride the
