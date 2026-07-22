@@ -865,6 +865,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<uint32> fp_CommandLine_EnumApplications(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_AddApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_EnableSelfUpdate(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_ChangeApplicationSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_RemoveApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_UpdateApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -905,6 +906,7 @@ namespace NMib::NCloud::NAppManager
 		// Environment agent handling (host side)
 		TCSharedPointer<CEnvironment> fp_EnvironmentFromHostID(CStr const &_HostID);
 		TCSharedPointer<CApplication> fp_GetEnvironmentParentApplication(CEnvironment const &_Environment);
+		TCSharedPointer<CApplication> fp_FindEnvironmentAgentApplication(CEnvironment const &_Environment);
 		CStr fp_GetEnvironmentStorageDirectory(CEnvironment const &_Environment);
 		bool fp_EnvironmentStorageReady(CEnvironment const &_Environment, CStr &o_Error, CAppManagerInterface::EStatusSeverity &o_Severity);
 		void fp_AutoStartEnvironments();
