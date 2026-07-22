@@ -581,6 +581,9 @@ namespace NMib::NCloud::NAppManager
 
 			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
 			SimpleLaunch.m_LogName = "Environment/{}/AgentBootstrap"_f << _pEnvironment->m_Name;
+			SimpleLaunch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+			if (mp_bLogLaunchesToStdErr)
+				SimpleLaunch.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
 
 			auto ResultFuture = pLaunchActor(&CProcessLaunchActor::f_LaunchSimple, SimpleLaunch);
 
