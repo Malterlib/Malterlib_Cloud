@@ -492,9 +492,21 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Setting up the agent for environment '{}' through SSH as user '{}', looking for MAC address {} in the DHCP leases"
+				, _pEnvironment->m_Name
+				, _Provisioning.m_Username
+				, MACAddress
+			)
+		;
+
 		// The guest needs time to finish its provisioning first boot before SSH
 		// accepts connections, so the setup is retried until it succeeds
 		CStr LastError = "The guest never appeared in the DHCP leases";
+		CStr LastGuestIP;
 		for (umint Attempt = 0; Attempt < 90; ++Attempt)
 		{
 			if (Attempt)
@@ -522,6 +534,21 @@ namespace NMib::NCloud::NAppManager
 
 			if (GuestIP.f_IsEmpty())
 				continue;
+
+			if (GuestIP != LastGuestIP)
+			{
+				LastGuestIP = GuestIP;
+
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Info
+						, "Found the guest for environment '{}' at {}; installing the agent through SSH"
+						, _pEnvironment->m_Name
+						, GuestIP
+					)
+				;
+			}
 
 			CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 				(
@@ -595,10 +622,40 @@ namespace NMib::NCloud::NAppManager
 				co_return {};
 			}
 
+			CStr Error;
 			if (!Result)
-				LastError = Result.f_GetExceptionStr();
+				Error = Result.f_GetExceptionStr();
 			else
-				LastError = fg_Format("SSH exited with status {}: {}", Result->m_ExitCode, CStr(Result->f_GetCombinedOut().f_Trim()));
+				Error = fg_Format("SSH exited with status {}: {}", Result->m_ExitCode, CStr(Result->f_GetCombinedOut().f_Trim()));
+
+			if (Error != LastError)
+			{
+				LastError = Error;
+
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Info
+						, "Agent setup attempt for environment '{}' failed, retrying: {}"
+						, _pEnvironment->m_Name
+						, Error
+					)
+				;
+
+				// Surface the current failure in the environment status so the setup
+				// progress is visible without the log
+				CStr StatusError = Error;
+				if (auto iNewLine = StatusError.f_FindChar('\n'); iNewLine >= 0)
+					StatusError = StatusError.f_Left(iNewLine);
+				StatusError = StatusError.f_Left(160);
+
+				_pEnvironment->f_SetStatus
+					(
+						"Setting up the environment agent through SSH: {}"_f << StatusError
+						, CAppManagerInterface::EStatusSeverity_Warning
+					)
+				;
+			}
 		}
 
 		co_return DMibErrorInstance("Failed to set up the agent in the guest: {}"_f << LastError);
