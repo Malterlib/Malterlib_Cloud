@@ -10,6 +10,11 @@ namespace NMib::NCloud::NAppManager
 {
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Remove(NStr::CStr _Name)
 	{
+		co_return co_await f_RemoveInternal(fg_Move(_Name), false);
+	}
+
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_RemoveInternal(NStr::CStr _Name, bool _bForce)
+	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
 
@@ -30,19 +35,40 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication)
 			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 
-		auto pRemovingApplication = *pApplication;
-
-		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(pRemovingApplication, "Remove") % Auditor);
-		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
-
-		if (CStr Error = pThis->fp_GetApplicationStopErrors(co_await pRemovingApplication->f_Stop(EStopFlag_CloseEncryption).f_Wrap(), _Name); !Error.f_IsEmpty())
-			Auditor.f_Warning(Error);
-
-		pApplication = pThis->mp_Applications.f_FindEqual(_Name);
-		if (!pApplication)
-			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
+		if (CStr Environment = pThis->fp_FindEnvironmentStoringDataInApplication(_Name); !Environment.f_IsEmpty())
+			co_return Auditor.f_Exception(fg_Format("Cannot remove application '{}' because environment '{}' stores its data inside it", _Name, Environment));
 
 		auto pApplicationPtr = *pApplication;
+
+		CActorSubscription InProgressScope;
+		if (!_bForce)
+			InProgressScope = co_await (pThis->fp_SetInProgressWithWait(pApplicationPtr, "Remove") % Auditor);
+		else
+		{
+			// A forced remove does not wait for a stuck operation; dispatched file work cannot be cancelled and can still write to a directory a later add reuses
+			pApplicationPtr->m_bPreventLaunch_User = true;
+			pApplicationPtr->f_AbortPendingLaunches();
+		}
+
+		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
+
+		auto StopFuture = pApplicationPtr->f_Stop(EStopFlag_CloseEncryption);
+		if (_bForce)
+			StopFuture = fg_Move(StopFuture).f_Timeout(30.0, "Timed out stopping the application during a forced remove");
+
+		auto StopResult = co_await fg_Move(StopFuture).f_Wrap();
+		if (CStr StopError = pThis->fp_GetApplicationStopErrors(StopResult, _Name); !StopError.f_IsEmpty())
+			Auditor.f_Warning(StopError);
+
+		// A concurrent forced remove and add can replace the entry while the application stops
+		pApplication = pThis->mp_Applications.f_FindEqual(_Name);
+		if (!pApplication || *pApplication != pApplicationPtr)
+			co_return Auditor.f_Exception(fg_Format("Application '{}' was removed while it stopped", _Name));
+
+		// An environment can have been added with the application as parent while it stopped
+		if (CStr Environment = pThis->fp_FindEnvironmentStoringDataInApplication(_Name); !Environment.f_IsEmpty())
+			co_return Auditor.f_Exception(fg_Format("Cannot remove application '{}' because environment '{}' stores its data inside it", _Name, Environment));
+
 		(*pApplication)->f_Delete();
 		pThis->mp_Applications.f_Remove(_Name);
 		pThis->fp_SendRemovedAppToRemoteAppManagers(pApplicationPtr);
@@ -69,9 +95,12 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
-		fp_ReportInProgress(_pCommandLine, ApplicationName);
+		bool bForce = _Params["Force"].f_AsBoolean(false);
 
-		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Remove, _Params["Name"].f_String());
+		if (!bForce)
+			fp_ReportInProgress(_pCommandLine, ApplicationName);
+
+		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_RemoveInternal, ApplicationName, bForce);
 
 		co_return 0;
 	}
