@@ -32,7 +32,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_HostIDInApplicationInfo = 0x118
 			, EProtocolVersion_OptionalWaitForNotificationResult = 0x119
 			, EProtocolVersion_ResumableUpdateNotifications = 0x119
-			, EProtocolVersion_Current = 0x119
+			, EProtocolVersion_AddLaunchEnvironment = 0x11a
+			, EProtocolVersion_Current = 0x11a
 		};
 
 		enum EUpdateStage : uint32
@@ -65,6 +66,11 @@ namespace NMib::NCloud
 			EApplicationChange_AddOrChangeInfo
 			, EApplicationChange_Remove
 			, EApplicationChange_Status
+		};
+
+		enum EEnvironmentType : uint32
+		{
+			EEnvironmentType_Local		/// Agent runs as a plain child process on the host (no isolation, mainly for tests)
 		};
 
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
@@ -141,6 +147,8 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_UpdateScriptOnError;
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_Dependencies;
 
+			NStorage::TCOptional<NStr::CStr> m_LaunchEnvironment; /// Name of the environment to launch the application in. Empty means launching directly on the host.
+
 			NStorage::TCOptional<bool> m_bDistributedApp;
 			NStorage::TCOptional<bool> m_bSelfUpdateSource;
 			NStorage::TCOptional<bool> m_bStopOnDependencyFailure;
@@ -209,6 +217,8 @@ namespace NMib::NCloud
 			NStr::CStr m_UpdateScriptOnError;
 			NContainer::TCSet<NStr::CStr> m_Dependencies;
 
+			NStr::CStr m_LaunchEnvironment;
+
 			bool m_bSelfUpdateSource = false;
 			bool m_bDistributedApp = false;
 			bool m_bStopOnDependencyFailure = true;
@@ -223,6 +233,38 @@ namespace NMib::NCloud
 
 			CVersionIDAndPlatform m_VersionID;
 			CVersionInformation m_VersionInfo;
+		};
+
+		struct CEnvironmentSettings
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStorage::TCOptional<EEnvironmentType> m_Type;
+			NStorage::TCOptional<NStr::CStr> m_AgentApplication; /// Application that provides the agent executable for the environment
+			NStorage::TCOptional<NStr::CStr> m_ParentApplication; /// Application whose storage confines the environment storage, supporting encrypted storage
+			NStorage::TCOptional<bool> m_bAutoStart;
+		};
+
+		struct CEnvironmentInfo
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NEncoding::CEJsonSorted f_ToJson() const;
+
+			// State
+			NStr::CStr m_Status;
+			EStatusSeverity m_StatusSeverity = EStatusSeverity_None;
+			NStr::CStr m_HostID; /// HostID of the connected agent when the environment is running
+
+			// Settings
+			EEnvironmentType m_Type = EEnvironmentType_Local;
+			NStr::CStr m_AgentApplication;
+			NStr::CStr m_ParentApplication;
+			bool m_bAutoStart = true;
+
+			NContainer::TCSet<NStr::CStr> m_Applications; /// Applications configured to launch in this environment
 		};
 
 		struct CUpdateNotification
@@ -361,6 +403,8 @@ namespace NMib::NCloud
 		~CAppManagerInterface();
 
 		static NStr::CStr fs_UpdateStageToStr(EUpdateStage _Stage);
+		static NStr::CStr fs_EnvironmentTypeToStr(EEnvironmentType _Type);
+		static NStorage::TCOptional<EEnvironmentType> fs_EnvironmentTypeFromStr(NStr::CStr const &_Type);
 
 		virtual NConcurrency::TCFuture<CVersionsAvailableForUpdate> f_GetAvailableVersions
 			(
@@ -389,6 +433,15 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CApplicationInfo>> f_GetInstalled() = 0;
 		virtual auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
 		virtual auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
+
+		// Environments (requires EProtocolVersion_AddLaunchEnvironment)
+		virtual NConcurrency::TCFuture<void> f_EnvironmentAdd(NStr::CStr _Name, CEnvironmentSettings _Settings) = 0;
+		virtual NConcurrency::TCFuture<void> f_EnvironmentRemove(NStr::CStr _Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_EnvironmentChangeSettings(NStr::CStr _Name, CEnvironmentSettings _Settings) = 0;
+		virtual NConcurrency::TCFuture<void> f_EnvironmentStart(NStr::CStr _Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_EnvironmentStop(NStr::CStr _Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_EnvironmentRestart(NStr::CStr _Name) = 0;
+		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CEnvironmentInfo>> f_GetEnvironments() = 0;
 	};
 }
 

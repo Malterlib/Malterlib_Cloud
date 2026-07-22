@@ -217,6 +217,16 @@ namespace NMib::NCloud::NAppManager
 
 		ChangedSettings = Application.m_Settings.f_ChangedSettings(NewSettings);
 
+		if
+		(
+			(ChangedSettings & EApplicationSetting_LaunchEnvironment)
+			&& !NewSettings.m_LaunchEnvironment.f_IsEmpty()
+			&& !mp_Environments.f_FindEqual(NewSettings.m_LaunchEnvironment)
+		)
+		{
+			co_return Auditor.f_Exception(fg_Format("Launch environment '{}' does not exist. Add it with --environment-add.", NewSettings.m_LaunchEnvironment));
+		}
+
 #ifdef DPlatformFamily_Windows
 		if (!NewSettings.m_RunAsUser.f_IsEmpty() && ((ChangedSettings & EApplicationSetting_RunAsUser) || NewSettings.m_RunAsUserPassword.f_IsEmpty()))
 		{

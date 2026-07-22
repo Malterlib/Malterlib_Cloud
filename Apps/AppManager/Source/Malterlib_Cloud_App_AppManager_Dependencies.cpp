@@ -171,6 +171,20 @@ namespace NMib::NCloud::NAppManager
 
 				auto &Application = *_pApplication;
 
+				// A launch that failed without scheduling its own delayed relaunch
+				// would be retried again by the next dependency update in the same
+				// instant, spinning on failures that happen without a suspension
+				if
+				(
+					!Application.m_bStopped
+					&& !Application.m_bDeleted
+					&& !Application.m_bPreventLaunch_DelayAfterFailure
+					&& !Application.f_IsLaunched()
+				)
+				{
+					fp_ScheduleRelaunchApp(_pApplication);
+				}
+
 				if (Application.m_LaunchStatus.f_IsEmpty())
 					fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", _Result.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
 
@@ -214,6 +228,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (mp_bPendingAutoUpdate)
 			fp_AutoUpdate_Update();
+
+		fp_AutoStartEnvironments();
 	}
 
 	TCFuture<void> CAppManagerActor::fp_UpdateEncryptionSensorStatus(bool _bNeedEncryption)

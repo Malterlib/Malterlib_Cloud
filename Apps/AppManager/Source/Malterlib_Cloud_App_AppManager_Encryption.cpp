@@ -68,6 +68,16 @@ namespace NMib::NCloud::NAppManager
 		CSymmetricKey Key;
 		if (_Operation == EEncryptOperation_Close)
 		{
+			// Environments storing their data inside this application must release the storage first
+			for (auto &pEnvironment : mp_Environments)
+			{
+				if (pEnvironment->m_Settings.m_ParentApplication != pEncryptionApplication->m_Name)
+					continue;
+
+				if (pEnvironment->f_IsStarted() || pEnvironment->m_bStarting)
+					co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment before closing encryption");
+			}
+
 			if (pEncryptionApplication->m_DirectoryMonitorSubscription)
 				co_await fg_Exchange(pEncryptionApplication->m_DirectoryMonitorSubscription, nullptr)->f_Destroy();
 		}
