@@ -262,6 +262,16 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_o= "Memory in megabytes for the VM. Set to 0 to use the backend default."
 			}
 		;
+		auto SettingsOption_VMDataDiskGB = "VMDataDiskGB?"_o=
+			{
+				"Names"_o= _o["--vm-data-disk-size"]
+				, "Type"_o= 0
+				, "Default"_o= 0
+				, "Description"_o= "Logical size in gigabytes of the persistent data disk holding the application\n"
+				"storage of the VM environment. The disk image is created sparse on the first\n"
+				"start and keeps its size afterwards; set to 0 to use the default of 64."
+			}
+		;
 
 		auto fStripDefault = [](auto &&_Template)
 			{
@@ -304,6 +314,7 @@ namespace NMib::NCloud::NAppManager
 						, SettingsOption_VMBackend
 						, SettingsOption_VMCPUCount
 						, SettingsOption_VMMemoryMB
+						, SettingsOption_VMDataDiskGB
 					}
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
@@ -337,6 +348,7 @@ namespace NMib::NCloud::NAppManager
 						, fStripDefault(SettingsOption_VMBackend)
 						, fStripDefault(SettingsOption_VMCPUCount)
 						, fStripDefault(SettingsOption_VMMemoryMB)
+						, fStripDefault(SettingsOption_VMDataDiskGB)
 					}
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
@@ -809,6 +821,12 @@ namespace NMib::NCloud::NAppManager
 			m_VMMemoryMB = (uint64)pValue->f_AsInteger();
 		}
 
+		if (auto *pValue = _Params.f_GetMember("VMDataDiskGB"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_VMDataDiskGB;
+			m_VMDataDiskGB = (uint64)pValue->f_AsInteger();
+		}
+
 		return true;
 	}
 
@@ -848,6 +866,8 @@ namespace NMib::NCloud::NAppManager
 			m_VMCPUCount = _Source.m_VMCPUCount;
 		if (_ChangedSettings & EEnvironmentSetting_VMMemoryMB)
 			m_VMMemoryMB = _Source.m_VMMemoryMB;
+		if (_ChangedSettings & EEnvironmentSetting_VMDataDiskGB)
+			m_VMDataDiskGB = _Source.m_VMDataDiskGB;
 	}
 
 	void CAppManagerActor::CEnvironmentSettings::f_FromInterfaceSettings(CAppManagerInterface::CEnvironmentSettings const &_Settings, EEnvironmentSetting &o_ChangedSettings)
@@ -937,6 +957,11 @@ namespace NMib::NCloud::NAppManager
 			m_VMMemoryMB = *_Settings.m_VMMemoryMB;
 			o_ChangedSettings |= EEnvironmentSetting_VMMemoryMB;
 		}
+		if (_Settings.m_VMDataDiskGB)
+		{
+			m_VMDataDiskGB = *_Settings.m_VMDataDiskGB;
+			o_ChangedSettings |= EEnvironmentSetting_VMDataDiskGB;
+		}
 	}
 
 	auto CAppManagerActor::CEnvironmentSettings::f_ChangedSettings(CEnvironmentSettings const &_Other) const -> EEnvironmentSetting
@@ -976,6 +1001,8 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EEnvironmentSetting_VMCPUCount;
 		if (m_VMMemoryMB != _Other.m_VMMemoryMB)
 			ChangedSettings |= EEnvironmentSetting_VMMemoryMB;
+		if (m_VMDataDiskGB != _Other.m_VMDataDiskGB)
+			ChangedSettings |= EEnvironmentSetting_VMDataDiskGB;
 
 		return ChangedSettings;
 	}
@@ -1103,6 +1130,8 @@ namespace NMib::NCloud::NAppManager
 				Settings.m_VMCPUCount = (uint32)pValue->f_Integer();
 			if (auto pValue = EnvironmentJson.f_GetMember("VMMemoryMB", EJsonType_Integer))
 				Settings.m_VMMemoryMB = (uint64)pValue->f_Integer();
+			if (auto pValue = EnvironmentJson.f_GetMember("VMDataDiskGB", EJsonType_Integer))
+				Settings.m_VMDataDiskGB = (uint64)pValue->f_Integer();
 
 			if (auto pValue = EnvironmentJson.f_GetMember("ContainerFingerprint", EJsonType_String))
 				Environment.m_ContainerFingerprint = pValue->f_String();
@@ -1171,6 +1200,7 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentJson["VMBackend"] = Settings.m_VMBackend;
 		EnvironmentJson["VMCPUCount"] = Settings.m_VMCPUCount;
 		EnvironmentJson["VMMemoryMB"] = Settings.m_VMMemoryMB;
+		EnvironmentJson["VMDataDiskGB"] = Settings.m_VMDataDiskGB;
 
 		EnvironmentJson["ContainerFingerprint"] = Environment.m_ContainerFingerprint;
 		EnvironmentJson["ContainerLaunchID"] = Environment.m_ContainerLaunchID;
@@ -1215,6 +1245,7 @@ namespace NMib::NCloud::NAppManager
 		OutEnvironment.m_VMBackend = Settings.m_VMBackend;
 		OutEnvironment.m_VMCPUCount = Settings.m_VMCPUCount;
 		OutEnvironment.m_VMMemoryMB = Settings.m_VMMemoryMB;
+		OutEnvironment.m_VMDataDiskGB = Settings.m_VMDataDiskGB;
 
 		OutEnvironment.m_OSDependencies = Settings.m_OSDependencies;
 
@@ -1349,7 +1380,14 @@ namespace NMib::NCloud::NAppManager
 		co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
 
 		if (pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+		{
 			co_await fp_RemoveEnvironmentContainer(pEnvironment);
+
+			// The environment cannot be removed while applications reference it,
+			// so the data volume holds no application storage anymore
+			if (fp_EnvironmentUsesRemoteStorage(*pEnvironment))
+				co_await fp_RemoveEnvironmentDataVolume(pEnvironment);
+		}
 
 		pEnvironment->m_bDeleted = true;
 		mp_Environments.f_Remove(_Name);
@@ -2034,6 +2072,7 @@ namespace NMib::NCloud::NAppManager
 				fAddProperty(Settings, "Backend", Environment.m_VMBackend);
 				fAddProperty(Settings, "CPU count", Environment.m_VMCPUCount);
 				fAddProperty(Settings, "Memory MB", Environment.m_VMMemoryMB);
+				fAddProperty(Settings, "Data disk GB", Environment.m_VMDataDiskGB);
 			}
 
 			if (Environment.m_MemoryLimitMB != 0)
@@ -2118,6 +2157,15 @@ namespace NMib::NCloud::NAppManager
 			SettingsJson["EnvironmentContainer"] = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container;
 			SettingsJson["EnvironmentHostID"] = mp_State.m_HostID;
 			SettingsJson["EnvironmentHostName"] = fp_GetEnvironmentHostName(*_pEnvironment);
+
+			if (fp_EnvironmentUsesRemoteStorage(*_pEnvironment))
+			{
+				if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
+					SettingsJson["EnvironmentDataRoot"] = mcp_pEnvironmentDataRootVM;
+				else
+					SettingsJson["EnvironmentDataRoot"] = mcp_pEnvironmentDataRootContainer;
+			}
+
 			DeploymentSettings = SettingsJson.f_ToString();
 		}
 
@@ -2240,6 +2288,54 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		return {};
+	}
+
+	bool CAppManagerActor::fp_EnvironmentUsesRemoteStorage(CEnvironment const &_Environment)
+	{
+		// The environment manages the application storage itself when host paths
+		// cannot be mounted into it usefully: macOS guests gate virtiofs shares
+		// behind Full Disk Access, and the macOS container runtimes cross a
+		// virtual machine boundary with the same class of problems. Containers on
+		// Linux bind mount host paths natively and keep the host-side storage
+		if (_Environment.m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
+			return true;
+
+#ifdef DPlatformFamily_macOS
+		if (_Environment.m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+			return true;
+#endif
+
+		return false;
+	}
+
+	auto CAppManagerActor::fp_ApplicationRemoteStorageEnvironment(CApplication const &_Application) -> TCSharedPointer<CEnvironment>
+	{
+		if (_Application.m_Settings.m_LaunchEnvironment.f_IsEmpty())
+			return {};
+
+		auto *pFindEnvironment = mp_Environments.f_FindEqual(_Application.m_Settings.m_LaunchEnvironment);
+		if (!pFindEnvironment)
+			return {};
+
+		if (!fp_EnvironmentUsesRemoteStorage(**pFindEnvironment))
+			return {};
+
+		return *pFindEnvironment;
+	}
+
+	TCFuture<void> CAppManagerActor::fp_RemoveApplicationEnvironmentStorage(TCSharedPointer<CApplication> _pApplication)
+	{
+		auto pEnvironment = fp_ApplicationRemoteStorageEnvironment(*_pApplication);
+		if (!pEnvironment)
+			co_return {};
+
+		// The storage lives inside the environment, so its agent must be running
+		// to delete it
+		co_await fp_EnsureEnvironmentStarted(pEnvironment);
+
+		co_return co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_RemoveApplicationStorage)(fg_TempCopy(_pApplication->m_Name))
+			.f_Timeout(600.0, "Timed out removing the application storage in the environment")
+		;
 	}
 
 	TCSharedPointer<CAppManagerActor::CApplication> CAppManagerActor::fp_GetEnvironmentParentApplication(CEnvironment const &_Environment)
@@ -2599,6 +2695,18 @@ namespace NMib::NCloud::NAppManager
 		{
 			{
 				auto Result = co_await fp_EnsureContainerSystem(_pEnvironment).f_Wrap();
+				if (!Result)
+				{
+					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+					co_return Result.f_GetException();
+				}
+			}
+
+			// The data volume carrying the application storage must exist before
+			// the container is created with it
+			if (fp_EnvironmentUsesRemoteStorage(*_pEnvironment))
+			{
+				auto Result = co_await fp_EnsureEnvironmentDataVolume(_pEnvironment).f_Wrap();
 				if (!Result)
 				{
 					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
@@ -3201,12 +3309,14 @@ namespace NMib::NCloud::NAppManager
 
 	auto CAppManagerActor::fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment) -> TCFuture<CAppLaunchResult>
 	{
-		// A container only sees the mounts it was created with and a virtual
-		// machine only the shared folders it was started with, so when the
+		bool bRemoteStorage = fp_EnvironmentUsesRemoteStorage(*_pEnvironment);
+
+		// A container only sees the mounts it was created with, so when the
 		// application directory is not covered the environment is restarted with
-		// the new mount set
+		// the new mount set. Environments that manage the application storage
+		// themselves cover every application through their data volume
 		bool bRestartedEnvironment = false;
-		if (_pEnvironment->f_IsStarted())
+		if (_pEnvironment->f_IsStarted() && !bRemoteStorage)
 		{
 			CStr Directory = _pApplication->f_GetDirectory();
 
@@ -3223,8 +3333,6 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 			}
-			else if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
-				bCovered = _pEnvironment->m_VMShareTags.f_FindEqual(Directory) != nullptr;
 
 			if (!bCovered)
 			{
@@ -3295,7 +3403,7 @@ namespace NMib::NCloud::NAppManager
 
 		// Everything the application writes through the colima mounts is written on
 		// the host by the colima user, so it must own the application directory
-		if (fp_UseOwnColimaSystem(_pEnvironment))
+		if (!bRemoteStorage && fp_UseOwnColimaSystem(_pEnvironment))
 		{
 			auto OwnershipResult = co_await fp_EnsureColimaOwnership(_pApplication->f_GetDirectory()).f_Wrap();
 
@@ -3323,7 +3431,11 @@ namespace NMib::NCloud::NAppManager
 
 		CAppManagerEnvironmentInterface::CEnvironmentLaunch Launch;
 		Launch.m_Name = _pApplication->m_Name;
-		Launch.m_Directory = _pApplication->f_GetDirectory();
+
+		// An environment that manages the application storage derives the
+		// directory from the name itself
+		if (!bRemoteStorage)
+			Launch.m_Directory = _pApplication->f_GetDirectory();
 		Launch.m_Executable = _pApplication->m_Settings.m_Executable;
 		Launch.m_Parameters = _pApplication->m_Settings.m_ExecutableParameters;
 		Launch.m_RunAsUser = _pApplication->m_Settings.m_RunAsUser;
@@ -3332,14 +3444,6 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_bDistributedApp = _pApplication->m_Settings.m_bDistributedApp;
 		Launch.m_InterfaceAddress = InterfaceAddress->f_Encode();
 		Launch.m_LaunchID = _pApplication->m_LaunchID;
-
-		// The agent mounts the shared folder carrying the application directory
-		// before the launch
-		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
-		{
-			if (auto *pTag = _pEnvironment->m_VMShareTags.f_FindEqual(Launch.m_Directory))
-				Launch.m_VMShareTag = *pTag;
-		}
 
 		auto LaunchResult = co_await _pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_LaunchApplication)(fg_Move(Launch))
 			.f_Timeout(60.0 * 60.0, "Timed out launching application in environment (1 hour)")

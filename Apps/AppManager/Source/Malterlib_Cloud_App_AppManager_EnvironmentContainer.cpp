@@ -570,20 +570,25 @@ namespace NMib::NCloud::NAppManager
 				Mounts.f_Insert(fp_GetEnvironmentStorageDirectory(Environment));
 
 			// Application directories outside the root directory are not visible
-			// through the root directory share either
-			for (auto &pApplication : mp_Applications)
+			// through the root directory share either. An environment that
+			// manages the application storage carries it on a named volume with
+			// no host paths to share
+			if (!fp_EnvironmentUsesRemoteStorage(Environment))
 			{
-				if (pApplication->m_bDeleted)
-					continue;
+				for (auto &pApplication : mp_Applications)
+				{
+					if (pApplication->m_bDeleted)
+						continue;
 
-				if (pApplication->m_Settings.m_LaunchEnvironment != Environment.m_Name)
-					continue;
+					if (pApplication->m_Settings.m_LaunchEnvironment != Environment.m_Name)
+						continue;
 
-				CStr Directory = pApplication->f_GetDirectory();
-				if (Directory == mp_State.m_RootDirectory || Directory.f_StartsWith(mp_State.m_RootDirectory + "/"))
-					continue;
+					CStr Directory = pApplication->f_GetDirectory();
+					if (Directory == mp_State.m_RootDirectory || Directory.f_StartsWith(mp_State.m_RootDirectory + "/"))
+						continue;
 
-				Mounts.f_Insert(fg_Move(Directory));
+					Mounts.f_Insert(fg_Move(Directory));
+				}
 			}
 
 			for (auto &Mount : Environment.m_Settings.m_ContainerExtraMounts)
@@ -903,22 +908,32 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 		// The container gets the minimum mount surface: the environment storage, the
-		// directories of the applications launched in the environment and the
-		// configured extra mounts. Every path is mounted at its host path so that
-		// application directories stay valid inside the container, and the rest of
-		// the host root directory stays invisible to the environment
+		// application storage and the configured extra mounts. Bind mounted paths
+		// are mounted at their host path so that application directories stay valid
+		// inside the container, and the rest of the host root directory stays
+		// invisible to the environment
 		Launch.m_Mounts[_AgentRootDirectory] = _AgentRootDirectory;
 
-		for (auto &pApplication : mp_Applications)
+		if (fp_EnvironmentUsesRemoteStorage(*_pEnvironment))
 		{
-			if (pApplication->m_bDeleted)
-				continue;
+			// The application storage lives on a named volume owned by the
+			// container runtime, so it survives container recreation without
+			// crossing the virtual machine boundary as a bind mount
+			Launch.m_Mounts[fp_GetEnvironmentDataVolumeName(*_pEnvironment)] = mcp_pEnvironmentDataRootContainer;
+		}
+		else
+		{
+			for (auto &pApplication : mp_Applications)
+			{
+				if (pApplication->m_bDeleted)
+					continue;
 
-			if (pApplication->m_Settings.m_LaunchEnvironment != _pEnvironment->m_Name)
-				continue;
+				if (pApplication->m_Settings.m_LaunchEnvironment != _pEnvironment->m_Name)
+					continue;
 
-			CStr Directory = pApplication->f_GetDirectory();
-			Launch.m_Mounts[Directory] = Directory;
+				CStr Directory = pApplication->f_GetDirectory();
+				Launch.m_Mounts[Directory] = Directory;
+			}
 		}
 
 		for (auto &Mount : Settings.m_ContainerExtraMounts)
@@ -957,6 +972,75 @@ namespace NMib::NCloud::NAppManager
 			Launch.m_PassEnvironment.f_Insert("MalterlibDistributedAppLocalSocketPrefix=/tmp");
 
 		return Launch;
+	}
+
+	CStr CAppManagerActor::fp_GetEnvironmentDataVolumeName(CEnvironment const &_Environment)
+	{
+		return "mib-env-{}-data"_f << _Environment.m_Name;
+	}
+
+	TCFuture<void> CAppManagerActor::fp_EnsureEnvironmentDataVolume(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		CStr VolumeName = fp_GetEnvironmentDataVolumeName(*_pEnvironment);
+
+		{
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch
+				(
+					fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("volume", "inspect", VolumeName))
+					, CProcessLaunchActor::ESimpleLaunchFlag_None
+				)
+			;
+			SimpleLaunch.m_LogName = "Environment/{}/DataVolumeInspect"_f << _pEnvironment->m_Name;
+
+			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
+			if (Result && Result->m_ExitCode == 0)
+				co_return {};
+		}
+
+		CProcessLaunchActor::CSimpleLaunch SimpleLaunch
+			(
+				fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("volume", "create", VolumeName))
+				, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+			)
+		;
+		SimpleLaunch.m_LogName = "Environment/{}/DataVolumeCreate"_f << _pEnvironment->m_Name;
+
+		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
+
+		if (!Result)
+			co_return DMibErrorInstance("Failed to create the environment data volume '{}': {}"_f << VolumeName << Result.f_GetExceptionStr());
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_RemoveEnvironmentDataVolume(TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		CStr VolumeName = fp_GetEnvironmentDataVolumeName(*_pEnvironment);
+
+		CProcessLaunchActor::CSimpleLaunch SimpleLaunch
+			(
+				fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("volume", "rm", VolumeName))
+				, CProcessLaunchActor::ESimpleLaunchFlag_None
+			)
+		;
+		SimpleLaunch.m_LogName = "Environment/{}/DataVolumeRemove"_f << _pEnvironment->m_Name;
+
+		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
+
+		if (!Result || Result->m_ExitCode != 0)
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Info
+					, "Failed to remove the data volume '{}': {}"
+					, VolumeName
+					, Result ? CStr(Result->f_GetStdErr().f_Trim()) : Result.f_GetExceptionStr()
+				)
+			;
+		}
+
+		co_return {};
 	}
 
 	TCFuture<void> CAppManagerActor::fp_RemoveEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment)
