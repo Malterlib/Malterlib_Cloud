@@ -169,6 +169,13 @@ namespace NMib::NCloud::NAppManager
 			{
 				CStr Error = "Cannot launch: no such environment '{}'. Add it with --environment-add."_f << Application.m_Settings.m_LaunchEnvironment;
 				fp_AppLaunchStateChanged(_pApplication, Error, CAppManagerInterface::EStatusSeverity_Error);
+
+				// The delayed relaunch keeps retrying in case the environment is added,
+				// and its prevent launch flag keeps the auto start from spinning on
+				// this synchronous failure
+				if (!_pApplication->m_bStopped && !_pApplication->m_bDeleted)
+					fp_ScheduleRelaunchApp(_pApplication);
+
 				co_return DMibErrorInstance(Error);
 			}
 
