@@ -844,41 +844,24 @@ namespace NMib::NCloud::NAppManager
 
 	namespace
 	{
-		// Runs one SSH command against the guest, authenticating through the ask
-		// pass helper and feeding the input to the remote command
-		TCFuture<NProcess::CProcessLaunchActor::CSimpleLaunchResult> fg_RunVMBootstrapSSH
+		// Runs one SSH or SCP command against the guest, authenticating through the
+		// ask pass helper so nothing depends on standard input
+		TCFuture<NProcess::CProcessLaunchActor::CSimpleLaunchResult> fg_RunVMBootstrapCommand
 			(
 				CStr _LogName
 				, CStr _WorkingDirectory
 				, bool _bLogToStdErr
-				, CStr _Target
 				, CStr _AskPassPath
 				, CStr _Password
-				, TCVector<CStr> _RemoteCommand
-				, CStrIO _StdInData
+				, CStr _Executable
+				, TCVector<CStr> _Arguments
 				, fp64 _Timeout
 			)
 		{
-			TCVector<CStr> Arguments = fg_CreateVector<CStr>
-				(
-					"-o", "StrictHostKeyChecking=no"
-					, "-o", "UserKnownHostsFile=/dev/null"
-					, "-o", "GlobalKnownHostsFile=/dev/null"
-					, "-o", "ConnectTimeout=10"
-					, "-o", "NumberOfPasswordPrompts=1"
-					, "-o", "ServerAliveInterval=15"
-					, "-o", "ServerAliveCountMax=4"
-					, "-o", "LogLevel=ERROR"
-					, _Target
-				)
-			;
-			for (auto &Word : _RemoteCommand)
-				Arguments.f_Insert(Word);
-
 			CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
 				(
-					"/usr/bin/ssh"
-					, Arguments
+					_Executable
+					, _Arguments
 					, _WorkingDirectory
 					, {}
 				)
@@ -898,16 +881,7 @@ namespace NMib::NCloud::NAppManager
 			if (_bLogToStdErr)
 				SimpleLaunch.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
 
-			auto ResultFuture = pLaunchActor(&CProcessLaunchActor::f_LaunchSimple, SimpleLaunch);
-
-			co_await pLaunchActor(&CProcessLaunchActor::f_SendStdIn, fg_Move(_StdInData)).f_Wrap()
-				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to send the agent setup input")
-			;
-			co_await pLaunchActor(&CProcessLaunchActor::f_CloseStdIn).f_Wrap()
-				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to close the agent setup input")
-			;
-
-			auto Result = co_await fg_Move(ResultFuture)
+			auto Result = co_await fg_TempCopy(pLaunchActor)(&CProcessLaunchActor::f_LaunchSimple, SimpleLaunch)
 				.f_Timeout(_Timeout, "The SSH agent setup attempt timed out")
 				.f_Wrap()
 			;
@@ -937,12 +911,25 @@ namespace NMib::NCloud::NAppManager
 		// The ask pass helper lets ssh take the password from the process
 		// environment instead of a terminal prompt
 		CStr AskPassPath = StorageDirectory / ".AgentBootstrapAskPass.sh";
+
+		// The sudo ask pass helper is copied into the guest so sudo can take the
+		// password without depending on standard input; the guest only has the
+		// provisioned user, and the helper is removed after the setup
+		CStr SudoAskPassPath = StorageDirectory / ".AgentBootstrapSudoAskPass.sh";
+		CStr SudoAskPass;
+		{
+			CStr EscapedPassword = _Provisioning.m_Password;
+			EscapedPassword.f_Replace("'", "'\\''");
+
+			SudoAskPass = fg_Format("#!/bin/sh\nprintf '%s\\n' '{}'\n", EscapedPassword);
+		}
+
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
 			co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [AskPassPath]()
+					g_Dispatch(BlockingActorCheckout) / [AskPassPath, SudoAskPassPath, SudoAskPass]()
 					{
 						CFile::fs_WriteStringToFile
 							(
@@ -952,8 +939,10 @@ namespace NMib::NCloud::NAppManager
 								, EFileAttrib_Executable
 							)
 						;
+
+						CFile::fs_WriteStringToFile(SudoAskPassPath, SudoAskPass, false, EFileAttrib_Executable);
 					}
-					% "Failed to write the SSH ask pass helper"
+					% "Failed to write the SSH ask pass helpers"
 				)
 			;
 		}
@@ -1020,6 +1009,23 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
+		// The setup script is copied into the guest and executed from the file, so
+		// nothing depends on feeding the remote command through standard input
+		CStr BootstrapScriptPath = StorageDirectory / ".AgentBootstrap.sh";
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [BootstrapScriptPath, BootstrapScript]()
+					{
+						CFile::fs_WriteStringToFile(BootstrapScriptPath, BootstrapScript, false);
+					}
+					% "Failed to write the agent setup script"
+				)
+			;
+		}
+
 		DMibLogWithCategory
 			(
 				Malterlib/Cloud/AppManager
@@ -1081,52 +1087,80 @@ namespace NMib::NCloud::NAppManager
 			CStr LogName = "Environment/{}/AgentBootstrap"_f << _pEnvironment->m_Name;
 			CStr Target = fg_Format("{}@{}", _Provisioning.m_Username, GuestIP);
 
-			// The setup script is staged as a file first and then executed with only
-			// the sudo password on standard input: mixing the password and the script
-			// on one input depends on how much input sudo reads ahead, and a shell
-			// reading its script from standard input hangs until the input closes
+			TCVector<CStr> CommonOptions = fg_CreateVector<CStr>
+				(
+					"-o", "StrictHostKeyChecking=no"
+					, "-o", "UserKnownHostsFile=/dev/null"
+					, "-o", "GlobalKnownHostsFile=/dev/null"
+					, "-o", "ConnectTimeout=10"
+					, "-o", "NumberOfPasswordPrompts=1"
+					, "-o", "ServerAliveInterval=15"
+					, "-o", "ServerAliveCountMax=4"
+					, "-o", "LogLevel=ERROR"
+				)
+			;
+
+			// The setup script and the sudo ask pass helper are copied into the guest
+			// first and the script then runs from the file with the password coming
+			// from the helper, so no phase depends on standard input reaching the
+			// guest: sending standard input before the process has launched is
+			// silently dropped by the process launch
 			CStr Error;
 			{
-				CStrIO ScriptInput;
-				ScriptInput += BootstrapScript;
+				TCVector<CStr> Arguments = CommonOptions;
+				Arguments.f_Insert("-p");
+				Arguments.f_Insert(BootstrapScriptPath);
+				Arguments.f_Insert(SudoAskPassPath);
+				Arguments.f_Insert(fg_Format("{}:/tmp/", Target));
 
-				auto StageResult = co_await fg_RunVMBootstrapSSH
+				auto CopyResult = co_await fg_RunVMBootstrapCommand
 					(
 						LogName
 						, mp_State.m_RootDirectory
 						, mp_bLogLaunchesToStdErr
-						, Target
 						, AskPassPath
 						, _Provisioning.m_Password
-						, fg_CreateVector<CStr>("cat", ">", "/tmp/malterlib-agent-bootstrap.sh")
-						, fg_Move(ScriptInput)
+						, "/usr/bin/scp"
+						, fg_Move(Arguments)
 						, 60.0
 					)
 					.f_Wrap()
 				;
 
-				if (!StageResult)
-					Error = StageResult.f_GetExceptionStr();
-				else if (StageResult->m_ExitCode != 0)
-					Error = fg_Format("Staging the setup script failed with status {}: {}", StageResult->m_ExitCode, CStr(StageResult->f_GetCombinedOut().f_Trim()));
+				if (!CopyResult)
+					Error = CopyResult.f_GetExceptionStr();
+				else if (CopyResult->m_ExitCode != 0)
+					Error = fg_Format("Copying the setup files failed with status {}: {}", CopyResult->m_ExitCode, CStr(CopyResult->f_GetCombinedOut().f_Trim()));
 			}
 
 			if (Error.f_IsEmpty())
 			{
-				CStrIO PasswordInput;
-				PasswordInput += _Provisioning.m_Password;
-				PasswordInput += "\n";
+				TCVector<CStr> Arguments = CommonOptions;
+				Arguments.f_Insert(Target);
+				for
+				(
+					auto pWord :
+					{
+						"SUDO_ASKPASS=/tmp/.AgentBootstrapSudoAskPass.sh"
+						, "sudo", "-A", "/bin/sh", "/tmp/.AgentBootstrap.sh"
+						, ";", "MalterlibStatus=$?"
+						, ";", "rm", "-f", "/tmp/.AgentBootstrapSudoAskPass.sh"
+						, ";", "exit", "$MalterlibStatus"
+					}
+				)
+				{
+					Arguments.f_Insert(pWord);
+				}
 
-				auto RunResult = co_await fg_RunVMBootstrapSSH
+				auto RunResult = co_await fg_RunVMBootstrapCommand
 					(
 						LogName
 						, mp_State.m_RootDirectory
 						, mp_bLogLaunchesToStdErr
-						, Target
 						, AskPassPath
 						, _Provisioning.m_Password
-						, fg_CreateVector<CStr>("sudo", "-S", "-p", "''", "/bin/sh", "/tmp/malterlib-agent-bootstrap.sh")
-						, fg_Move(PasswordInput)
+						, "/usr/bin/ssh"
+						, fg_Move(Arguments)
 						, 180.0
 					)
 					.f_Wrap()
