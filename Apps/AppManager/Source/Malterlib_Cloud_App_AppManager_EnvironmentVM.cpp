@@ -6,6 +6,10 @@
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Cryptography/RandomData>
 
+#ifdef DPlatformFamily_macOS
+#include <signal.h>
+#endif
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -208,6 +212,391 @@ namespace NMib::NCloud::NAppManager
 		co_return Provisioning;
 	}
 
+#ifdef DPlatformFamily_macOS
+	CEJsonSorted fg_AppManager_BuildVMWindowConfig
+		(
+			NVirtualization::CVirtualMachineConfig const &_Config
+			, CStr const &_Backend
+			, CStr const &_Title
+		)
+	{
+		CEJsonSorted Json;
+		Json["BundleDirectory"] = _Config.m_BundleDirectory;
+		Json["Backend"] = _Backend;
+		Json["CPUCount"] = (int64)_Config.m_CPUCount;
+		Json["MemoryMB"] = (int64)_Config.m_MemoryMB;
+		Json["MACAddress"] = _Config.m_MACAddress;
+		Json["Title"] = _Title;
+
+		auto &SharedFolders = Json["SharedFolders"];
+		SharedFolders.f_Object();
+		for (auto &SharedFolder : _Config.m_SharedFolders)
+			SharedFolders[_Config.m_SharedFolders.fs_GetKey(SharedFolder)] = SharedFolder;
+
+		// Guest provisioning stored with the image is applied by the guest on its
+		// first boot after restore and ignored afterwards
+		if (_Config.m_Provisioning)
+		{
+			auto &Provisioning = Json["Provisioning"];
+			Provisioning["Username"] = _Config.m_Provisioning.m_Username;
+			Provisioning["Password"] = _Config.m_Provisioning.m_Password;
+			Provisioning["FullName"] = _Config.m_Provisioning.m_FullName;
+			Provisioning["AutoLogin"] = _Config.m_Provisioning.m_bAutoLogin;
+			Provisioning["EnableRemoteLogin"] = _Config.m_Provisioning.m_bEnableRemoteLogin;
+		}
+
+		return Json;
+	}
+
+	NVirtualization::CVirtualMachineConfig fg_AppManager_ParseVMWindowConfig
+		(
+			CEJsonSorted const &_Params
+			, NVirtualization::EVirtualizationBackend &o_Backend
+			, CStr &o_Title
+		)
+	{
+		NVirtualization::CVirtualMachineConfig Config;
+		Config.m_BundleDirectory = _Params["BundleDirectory"].f_String();
+		Config.m_CPUCount = (uint32)_Params["CPUCount"].f_AsInteger();
+		Config.m_MemoryMB = (uint64)_Params["MemoryMB"].f_AsInteger();
+		Config.m_MACAddress = _Params["MACAddress"].f_AsString();
+
+		if (auto *pSharedFolders = _Params.f_GetMember("SharedFolders"))
+		{
+			for (auto &SharedFolder : pSharedFolders->f_Object())
+				Config.m_SharedFolders[SharedFolder.f_Name()] = SharedFolder.f_Value().f_String();
+		}
+
+		if (auto *pProvisioning = _Params.f_GetMember("Provisioning"))
+		{
+			Config.m_Provisioning.m_Username = (*pProvisioning)["Username"].f_AsString();
+			Config.m_Provisioning.m_Password = (*pProvisioning)["Password"].f_AsString();
+			Config.m_Provisioning.m_FullName = (*pProvisioning)["FullName"].f_AsString();
+			Config.m_Provisioning.m_bAutoLogin = (*pProvisioning)["AutoLogin"].f_AsBoolean(true);
+			Config.m_Provisioning.m_bEnableRemoteLogin = (*pProvisioning)["EnableRemoteLogin"].f_AsBoolean(true);
+		}
+
+		o_Backend = NVirtualization::EVirtualizationBackend_Default;
+		if (_Params["Backend"].f_AsString() == "MacOSVirtualization")
+			o_Backend = NVirtualization::EVirtualizationBackend_MacOSVirtualization;
+
+		o_Title = _Params["Title"].f_AsString();
+
+		return Config;
+	}
+
+	namespace
+	{
+		constexpr ch8 const gc_pVMWindowRunningMarker[] = "MalterlibVMWindowRunning";
+	}
+
+	uint32 fg_AppManager_RunVMWindowHost(CStr const &_ConfigPath)
+	{
+		using namespace NVirtualization;
+
+		CStr Error;
+		try
+		{
+			CEJsonSorted Json = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(_ConfigPath, true), _ConfigPath);
+
+			EVirtualizationBackend Backend;
+			CStr Title;
+			CVirtualMachineConfig Config = fg_AppManager_ParseVMWindowConfig(Json, Backend, Title);
+
+			Error = fg_RunVirtualMachineWindow
+				(
+					Backend
+					, fg_Move(Config)
+					, Title
+					, EVirtualMachineWindowFlag_Host
+					, []
+					{
+						// The hosting AppManager waits for this marker before treating
+						// the machine as running
+						DMibConOut("{}\n", gc_pVMWindowRunningMarker);
+					}
+				)
+			;
+		}
+		catch (CException const &_Exception)
+		{
+			Error = "Failed to run the virtual machine window host: {}"_f << _Exception;
+		}
+
+		if (!Error.f_IsEmpty())
+		{
+			DMibConErrOut("{}\n", Error);
+			return 1;
+		}
+
+		return 0;
+	}
+
+	namespace
+	{
+		// Detects the running marker the window host prints once its machine started
+		struct CVMWindowHostLaunchActor : public NProcess::CProcessLaunchActor
+		{
+			CVMWindowHostLaunchActor(TCPromise<void> const &_RunningPromise)
+				: mp_RunningPromise(_RunningPromise)
+			{
+			}
+
+		protected:
+			bool fp_WillFilterOutput() override
+			{
+				return true;
+			}
+
+			void fp_FilterOutput(NProcess::EProcessLaunchOutputType _OutputType, CStr &o_Output) override
+			{
+				if (_OutputType != NProcess::EProcessLaunchOutputType_StdOut)
+					return;
+
+				if (!mp_bRunning && o_Output.f_Find(gc_pVMWindowRunningMarker) >= 0)
+				{
+					mp_bRunning = true;
+					mp_RunningPromise.f_SetResult();
+				}
+			}
+
+		private:
+			TCPromise<void> mp_RunningPromise;
+			bool mp_bRunning = false;
+		};
+
+		// Hosts the environment virtual machine in a separate window process, keeping
+		// the guest display visible in the graphical session while the AppManager
+		// controls the machine through the process lifetime
+		struct CVMWindowHostActor : public NVirtualization::CVirtualMachineActor
+		{
+			CVMWindowHostActor(CStr &&_ConfigPath, CStr &&_WorkingDirectory, CStr &&_LogName)
+				: mp_ConfigPath(fg_Move(_ConfigPath))
+				, mp_WorkingDirectory(fg_Move(_WorkingDirectory))
+				, mp_LogName(fg_Move(_LogName))
+			{
+			}
+
+			TCFuture<void> f_Start() override
+			{
+				using namespace NVirtualization;
+
+				if (mp_State == EVirtualMachineState_Running || mp_State == EVirtualMachineState_Starting)
+					co_return {};
+
+				mp_State = EVirtualMachineState_Starting;
+
+				TCPromiseFuturePair<void> RunningPromise;
+
+				mp_Launch = fg_ConstructActor<CVMWindowHostLaunchActor>(RunningPromise.m_Promise);
+
+				auto Promise = RunningPromise.m_Promise;
+				CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
+					(
+						CFile::fs_GetProgramPath()
+						, fg_CreateVector<CStr>("--vm-window-run", "--config", mp_ConfigPath)
+						, mp_WorkingDirectory
+						, [Promise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+						{
+							switch (_State.f_GetTypeID())
+							{
+							case NProcess::EProcessLaunchState_Launched:
+								break;
+							case NProcess::EProcessLaunchState_LaunchFailed:
+								{
+									auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
+									if (!Promise.f_IsSet())
+										Promise.f_SetException(DMibErrorInstance("Failed to launch the window host: {}"_f << LaunchError).f_ExceptionPointer());
+								}
+								break;
+							case NProcess::EProcessLaunchState_Exited:
+								{
+									auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
+									if (!Promise.f_IsSet())
+										Promise.f_SetException(DMibErrorInstance("The window host exited with '{}' before the machine started"_f << ExitStatus).f_ExceptionPointer());
+								}
+								break;
+							}
+						}
+					)
+				;
+				Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+				Launch.m_LogName = mp_LogName;
+
+				auto LaunchSubscription = co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_Launch, Launch, fg_ThisActor(this)).f_Wrap();
+				if (!LaunchSubscription)
+				{
+					mp_State = EVirtualMachineState_Failed;
+					co_return LaunchSubscription.f_GetException();
+				}
+
+				mp_LaunchSubscription = fg_Move(*LaunchSubscription);
+
+				auto Result = co_await fg_Move(RunningPromise.m_Future)
+					.f_Timeout(120.0, "Timed out waiting for the virtual machine window host to start the machine")
+					.f_Wrap()
+				;
+
+				if (!Result)
+				{
+					mp_State = EVirtualMachineState_Failed;
+					co_return Result.f_GetException();
+				}
+
+				mp_State = EVirtualMachineState_Running;
+
+				co_return {};
+			}
+
+			TCFuture<void> f_Stop() override
+			{
+				using namespace NVirtualization;
+
+				if (!mp_Launch)
+				{
+					mp_State = EVirtualMachineState_Stopped;
+					co_return {};
+				}
+
+				mp_State = EVirtualMachineState_Stopping;
+
+				// The termination signal asks the guest to shut down; the stop
+				// escalates through the process launch when the guest does not
+				co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_StopProcess).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop the virtual machine window host")
+				;
+
+				co_await fg_Move(mp_Launch).f_Destroy().f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the virtual machine window host launch")
+				;
+
+				mp_LaunchSubscription.f_Clear();
+				mp_State = EVirtualMachineState_Stopped;
+
+				co_return {};
+			}
+
+			TCFuture<void> f_ForceStop() override
+			{
+				using namespace NVirtualization;
+
+				if (!mp_Launch)
+				{
+					mp_State = EVirtualMachineState_Stopped;
+					co_return {};
+				}
+
+				mp_State = EVirtualMachineState_Stopping;
+
+				// Killing the host kills the machine with it
+				co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_Signal, int32(SIGKILL)).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to kill the virtual machine window host")
+				;
+
+				co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_StopProcess).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop the virtual machine window host")
+				;
+
+				co_await fg_Move(mp_Launch).f_Destroy().f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the virtual machine window host launch")
+				;
+
+				mp_LaunchSubscription.f_Clear();
+				mp_State = EVirtualMachineState_Stopped;
+
+				co_return {};
+			}
+
+			TCFuture<NVirtualization::EVirtualMachineState> f_GetState() override
+			{
+				co_return mp_State;
+			}
+
+			TCFuture<NVirtualization::EVirtualMachineCapability> f_GetCapabilities() override
+			{
+				using namespace NVirtualization;
+
+				co_return EVirtualMachineCapability_SharedFolders | EVirtualMachineCapability_MacOSGuests;
+			}
+
+		protected:
+			TCFuture<void> fp_Destroy() override
+			{
+				if (mp_Launch)
+				{
+					co_await f_Stop().f_Wrap()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop the virtual machine window host at destroy")
+					;
+				}
+
+				co_return co_await CActor::fp_Destroy();
+			}
+
+		private:
+			CStr mp_ConfigPath;
+			CStr mp_WorkingDirectory;
+			CStr mp_LogName;
+			TCActor<NProcess::CProcessLaunchActor> mp_Launch;
+			CActorSubscription mp_LaunchSubscription;
+			NVirtualization::EVirtualMachineState mp_State = NVirtualization::EVirtualMachineState_Stopped;
+		};
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_VMSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		bool bChanged = false;
+		if (auto *pValue = _Params.f_GetMember("Window"))
+		{
+			bool bWindow = pValue->f_AsBoolean(false);
+			if (bWindow != mp_bVMWindow)
+			{
+				mp_bVMWindow = bWindow;
+				bChanged = true;
+			}
+		}
+
+		co_await _pCommandLine->f_StdOut("Window: {}\n"_f << (mp_bVMWindow ? "true" : "false"));
+
+		if (!bChanged)
+			co_return 0;
+
+		mp_State.m_StateDatabase.m_Data["VMSettings"]["Window"] = mp_bVMWindow;
+
+		co_await mp_State.m_StateDatabase.f_Save();
+
+		// Restart the running VM environments so the change takes effect
+		TCVector<TCSharedPointer<CEnvironment>> RestartEnvironments;
+		for (auto &pEnvironment : mp_Environments)
+		{
+			if (pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_VM)
+				continue;
+
+			if (!pEnvironment->f_IsStarted() && !pEnvironment->m_bStarting)
+				continue;
+
+			RestartEnvironments.f_Insert(fg_TempCopy(pEnvironment));
+		}
+
+		for (auto &pEnvironment : RestartEnvironments)
+		{
+			co_await _pCommandLine->f_StdOut("Restarting environment '{}'\n"_f << pEnvironment->m_Name);
+
+			co_await fp_StopEnvironmentInternal(pEnvironment);
+			co_await fp_EnsureEnvironmentStarted(pEnvironment);
+		}
+
+		if (!RestartEnvironments.f_IsEmpty())
+		{
+			// Relaunch the applications the environment stops stopped with the auto
+			// start flag
+			fp_UpdateApplicationDependencies();
+		}
+
+		co_return 0;
+	}
+
+#endif
+
 	TCFuture<void> CAppManagerActor::fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
 		using namespace NVirtualization;
@@ -336,7 +725,63 @@ namespace NMib::NCloud::NAppManager
 		CMacOSGuestProvisioning Provisioning = Config.m_Provisioning;
 		CStr MountPoint = Config.m_SharedFolders["MalterlibRoot"];
 
-		_pEnvironment->m_VMActor = fg_CreateVirtualMachine(Backend, fg_Move(Config));
+#ifdef DPlatformFamily_macOS
+		bool bWindow = mp_bVMWindow;
+		if (bWindow && !fg_HasGraphicalSession())
+		{
+			bWindow = false;
+
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Warning
+					, "The VM window setting is on but no graphical session is available; starting environment '{}' without a window"
+					, _pEnvironment->m_Name
+				)
+			;
+		}
+
+		if (bWindow)
+		{
+			// The window process hosts the machine in the graphical session; the
+			// configuration hands it everything this start would have used itself
+			CStr ConfigPath = fp_GetEnvironmentStorageDirectory(*_pEnvironment) / ".VMWindowHost.json";
+			CStr ConfigContents = fg_AppManager_BuildVMWindowConfig
+				(
+					Config
+					, Settings.m_VMBackend
+					, fg_Format("AppManager Environment '{}'", _pEnvironment->m_Name)
+				)
+				.f_ToString()
+			;
+
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [ConfigPath, ConfigContents]()
+						{
+							CFile::fs_WriteStringToFile(ConfigPath, ConfigContents);
+						}
+						% "Failed to write the window host configuration"
+					)
+				;
+			}
+
+			_pEnvironment->m_VMActor = fg_ConstructActor<CVMWindowHostActor>
+				(
+					fg_Move(ConfigPath)
+					, CStr(mp_State.m_RootDirectory)
+					, "Environment/{}/VMWindow"_f << _pEnvironment->m_Name
+				)
+			;
+		}
+		else
+#endif
+		{
+			_pEnvironment->m_VMActor = fg_CreateVirtualMachine(Backend, fg_Move(Config));
+		}
 
 		auto StartResult = co_await _pEnvironment->m_VMActor(&CVirtualMachineActor::f_Start).f_Wrap();
 
@@ -729,30 +1174,15 @@ namespace NMib::NCloud::NAppManager
 		pEnvironment->f_SetStatus("Environment window open", CAppManagerInterface::EStatusSeverity_Warning);
 
 		Config.m_Provisioning = co_await fp_LoadVMImageProvisioning(Config.m_BundleDirectory);
+		Config.m_MACAddress = pEnvironment->m_VMMACAddress;
 
-		CEJsonSorted ActionParams;
-		ActionParams["BundleDirectory"] = Config.m_BundleDirectory;
-		ActionParams["Backend"] = pEnvironment->m_Settings.m_VMBackend;
-		ActionParams["CPUCount"] = (int64)Config.m_CPUCount;
-		ActionParams["MemoryMB"] = (int64)Config.m_MemoryMB;
-		ActionParams["Title"] = fg_Format("AppManager Environment '{}'", Name);
-
-		auto &SharedFolders = ActionParams["SharedFolders"];
-		SharedFolders.f_Object();
-		for (auto &SharedFolder : Config.m_SharedFolders)
-			SharedFolders[Config.m_SharedFolders.fs_GetKey(SharedFolder)] = SharedFolder;
-
-		// Guest provisioning stored with the image is applied by the guest on its
-		// first boot after restore and ignored afterwards
-		if (Config.m_Provisioning)
-		{
-			auto &Provisioning = ActionParams["Provisioning"];
-			Provisioning["Username"] = Config.m_Provisioning.m_Username;
-			Provisioning["Password"] = Config.m_Provisioning.m_Password;
-			Provisioning["FullName"] = Config.m_Provisioning.m_FullName;
-			Provisioning["AutoLogin"] = Config.m_Provisioning.m_bAutoLogin;
-			Provisioning["EnableRemoteLogin"] = Config.m_Provisioning.m_bEnableRemoteLogin;
-		}
+		CEJsonSorted ActionParams = fg_AppManager_BuildVMWindowConfig
+			(
+				Config
+				, pEnvironment->m_Settings.m_VMBackend
+				, fg_Format("AppManager Environment '{}'", Name)
+			)
+		;
 
 		co_await _pCommandLine->f_StdOut
 			(
