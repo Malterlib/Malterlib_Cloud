@@ -776,6 +776,17 @@ namespace NMib::NCloud::NAppManager
 							, "Description"_o= "The name of the application to remove."
 						}
 					}
+					, "Options"_o=
+					{
+						"Force?"_o=
+						{
+							"Names"_o= _o["--force"]
+							, "Default"_o= false
+							, "Description"_o= "Remove the application without waiting for an operation in progress.\n"
+							"Pending launches are aborted and the stuck operation unwinds against the\n"
+							"removed application. Use when the application is stuck launching or updating."
+						}
+					}
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{

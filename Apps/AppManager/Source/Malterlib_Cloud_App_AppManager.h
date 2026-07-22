@@ -545,6 +545,7 @@ namespace NMib::NCloud::NAppManager
 
 			TCFuture<void> f_Add(CStr _Name, CApplicationAdd _Add, CApplicationSettings _Settings) override;
 			TCFuture<void> f_Remove(CStr _Name) override;
+			TCFuture<void> f_RemoveInternal(CStr _Name, bool _bForce);
 
 			TCFuture<void> f_Update(CStr _Name, CApplicationUpdate _Update) override;
 

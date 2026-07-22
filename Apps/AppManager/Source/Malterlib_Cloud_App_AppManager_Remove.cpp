@@ -10,6 +10,11 @@ namespace NMib::NCloud::NAppManager
 {
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Remove(NStr::CStr _Name)
 	{
+		co_return co_await f_RemoveInternal(fg_Move(_Name), false);
+	}
+
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_RemoveInternal(NStr::CStr _Name, bool _bForce)
+	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
 
@@ -36,10 +41,25 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception(fg_Format("Cannot remove application '{}' because environment '{}' stores its data inside it", _Name, pEnvironment->m_Name));
 		}
 
-		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(*pApplication, "Remove") % Auditor);
+		CActorSubscription InProgressScope;
+		if (!_bForce)
+			InProgressScope = co_await (pThis->fp_SetInProgressWithWait(*pApplication, "Remove") % Auditor);
+		else
+		{
+			// A forced remove does not wait for a stuck operation; pending launches
+			// are aborted here and the operation unwinds against the deleted
+			// application, which every launch step checks for after suspensions
+			(*pApplication)->m_bPreventLaunch_User = true;
+			(*pApplication)->f_AbortPendingLaunches();
+		}
+
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
-		if (CStr Error = pThis->fp_GetApplicationStopErrors(co_await (*pApplication)->f_Stop(EStopFlag_CloseEncryption).f_Wrap(), _Name); !Error.f_IsEmpty())
+		auto StopFuture = (*pApplication)->f_Stop(EStopFlag_CloseEncryption);
+		if (_bForce)
+			StopFuture = fg_Move(StopFuture).f_Timeout(30.0, "Timed out stopping the application during a forced remove");
+
+		if (CStr Error = pThis->fp_GetApplicationStopErrors(co_await fg_Move(StopFuture).f_Wrap(), _Name); !Error.f_IsEmpty())
 			Auditor.f_Warning(Error);
 
 		pApplication = pThis->mp_Applications.f_FindEqual(_Name);
@@ -73,9 +93,12 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_RemoveApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
-		fp_ReportInProgress(_pCommandLine, ApplicationName);
+		bool bForce = _Params["Force"].f_AsBoolean(false);
 
-		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_Remove, _Params["Name"].f_String());
+		if (!bForce)
+			fp_ReportInProgress(_pCommandLine, ApplicationName);
+
+		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_RemoveInternal, ApplicationName, bForce);
 
 		co_return 0;
 	}
