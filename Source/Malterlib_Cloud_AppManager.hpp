@@ -226,6 +226,9 @@ namespace NMib::NCloud
 
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentOSDependencies)
 			_Stream % m_OSDependencies;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentVMDataDisk)
+			_Stream % m_VMDataDiskGB;
 	}
 
 	template <typename tf_CStream>
@@ -259,6 +262,9 @@ namespace NMib::NCloud
 
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentOSDependencies)
 			_Stream % m_OSDependencies;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentVMDataDisk)
+			_Stream % m_VMDataDiskGB;
 	}
 
 	template <typename tf_CStream>

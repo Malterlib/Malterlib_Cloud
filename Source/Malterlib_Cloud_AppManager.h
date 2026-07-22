@@ -34,7 +34,8 @@ namespace NMib::NCloud
 			, EProtocolVersion_ResumableUpdateNotifications = 0x119
 			, EProtocolVersion_AddLaunchEnvironment = 0x11a
 			, EProtocolVersion_AddEnvironmentOSDependencies = 0x11b
-			, EProtocolVersion_Current = 0x11b
+			, EProtocolVersion_AddEnvironmentVMDataDisk = 0x11c
+			, EProtocolVersion_Current = 0x11c
 		};
 
 		enum EUpdateStage : uint32
@@ -264,6 +265,7 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_VMBackend; /// Empty selects the default virtualization backend for the host platform
 			NStorage::TCOptional<uint32> m_VMCPUCount;
 			NStorage::TCOptional<uint64> m_VMMemoryMB;
+			NStorage::TCOptional<uint64> m_VMDataDiskGB; /// Logical size of the persistent data disk holding the application storage; applied when the disk is created
 		};
 
 		struct CEnvironmentInfo
@@ -299,6 +301,7 @@ namespace NMib::NCloud
 			NStr::CStr m_VMBackend;
 			uint32 m_VMCPUCount = 0;
 			uint64 m_VMMemoryMB = 0;
+			uint64 m_VMDataDiskGB = 0;
 
 			NContainer::TCSet<NStr::CStr> m_Applications; /// Applications configured to launch in this environment
 		};

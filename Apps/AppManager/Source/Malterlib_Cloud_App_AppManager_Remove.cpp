@@ -67,6 +67,15 @@ namespace NMib::NCloud::NAppManager
 			co_return Auditor.f_Exception(fg_Format("No such application '{}'", _Name));
 
 		auto pApplicationPtr = *pApplication;
+
+		// Storage an environment manages for the application is deleted through
+		// its agent; left-over storage would block a later add with the same name
+		{
+			auto RemoveStorageResult = co_await pThis->fp_RemoveApplicationEnvironmentStorage(pApplicationPtr).f_Wrap();
+			if (!RemoveStorageResult)
+				Auditor.f_Warning(fg_Format("Failed to remove the application storage in the environment: {}", RemoveStorageResult.f_GetExceptionStr()));
+		}
+
 		(*pApplication)->f_Delete();
 		pThis->mp_Applications.f_Remove(_Name);
 		pThis->fp_SendRemovedAppToRemoteAppManagers(pApplicationPtr);

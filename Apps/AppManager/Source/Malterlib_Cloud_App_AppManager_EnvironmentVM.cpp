@@ -167,27 +167,18 @@ namespace NMib::NCloud::NAppManager
 		// provisioned user in; without one SSH never starts
 		Config.m_bGraphics = true;
 
-		// Each application directory is its own shared folder, mounted inside the
-		// guest by the agent as the user the application runs as
-		_Environment.m_VMShareTags.f_Clear();
-		for (auto &pApplication : mp_Applications)
+		// The application storage lives on a persistent data disk managed by the
+		// agent inside the guest: virtiofs shares are network volumes gated
+		// behind Full Disk Access there, and a local volume also survives when
+		// the guest image bundle is recreated
 		{
-			if (pApplication->m_bDeleted || pApplication->m_Settings.m_LaunchEnvironment != _Environment.m_Name)
-				continue;
-
-			CStr Directory = pApplication->f_GetDirectory();
-			CStr Tag = fsp_GetVMShareTag(Directory);
-			Config.m_SharedFolders[Tag] = Directory;
-			_Environment.m_VMShareTags[fg_Move(Directory)] = fg_Move(Tag);
+			auto &DataDisk = Config.m_DataDisks.f_Insert();
+			DataDisk.m_ImagePath = fp_GetEnvironmentStorageDirectory(_Environment) / "DataDisk.img";
+			DataDisk.m_SizeGB = _Environment.m_Settings.m_VMDataDiskGB ? _Environment.m_Settings.m_VMDataDiskGB : 64;
+			DataDisk.m_DeviceIdentifier = mcp_pEnvironmentDataVolumeName;
 		}
 
 		return Config;
-	}
-
-	CStr CAppManagerActor::fsp_GetVMShareTag(CStr const &_Directory)
-	{
-		// virtiofs limits tags to 36 bytes, so the tag is a digest of the host path
-		return "Mib{}"_f << NCryptography::CHash_SHA256::fs_DigestFromData(_Directory.f_GetStr(), _Directory.f_GetLen()).f_GetString().f_Left(30);
 	}
 
 	TCFuture<NVirtualization::CMacOSGuestProvisioning> CAppManagerActor::fp_LoadVMImageProvisioning(CStr _BundleDirectory)
@@ -250,6 +241,17 @@ namespace NMib::NCloud::NAppManager
 		for (auto &SharedFolder : _Config.m_SharedFolders)
 			SharedFolders[_Config.m_SharedFolders.fs_GetKey(SharedFolder)] = SharedFolder;
 
+		auto &DataDisks = Json["DataDisks"];
+		DataDisks.f_Array();
+		for (auto &DataDisk : _Config.m_DataDisks)
+		{
+			CEJsonSorted DataDiskJson(EJsonType_Object);
+			DataDiskJson["ImagePath"] = DataDisk.m_ImagePath;
+			DataDiskJson["SizeGB"] = (int64)DataDisk.m_SizeGB;
+			DataDiskJson["DeviceIdentifier"] = DataDisk.m_DeviceIdentifier;
+			DataDisks.f_Insert(fg_Move(DataDiskJson));
+		}
+
 		// Guest provisioning stored with the image is applied by the guest on its
 		// first boot after restore and ignored afterwards
 		if (_Config.m_Provisioning)
@@ -282,6 +284,17 @@ namespace NMib::NCloud::NAppManager
 		{
 			for (auto &SharedFolder : pSharedFolders->f_Object())
 				Config.m_SharedFolders[SharedFolder.f_Name()] = SharedFolder.f_Value().f_String();
+		}
+
+		if (auto *pDataDisks = _Params.f_GetMember("DataDisks"))
+		{
+			for (auto &DataDiskJson : pDataDisks->f_Array())
+			{
+				auto &DataDisk = Config.m_DataDisks.f_Insert();
+				DataDisk.m_ImagePath = DataDiskJson["ImagePath"].f_AsString();
+				DataDisk.m_SizeGB = (uint64)DataDiskJson["SizeGB"].f_AsInteger();
+				DataDisk.m_DeviceIdentifier = DataDiskJson["DeviceIdentifier"].f_AsString();
+			}
 		}
 
 		if (auto *pProvisioning = _Params.f_GetMember("Provisioning"))
