@@ -140,9 +140,17 @@ namespace NMib::NCloud::NAppManager
 
 		if (!State.m_SourcePath.f_IsEmpty())
 		{
+			// Environments of the platform an agent distribution is named after run what it installs, which only the version info tells
+			CStr AgentPlatform = State.m_pApplication->f_AgentDistributionPlatform();
+
 			auto PackageInfo = co_await fp_ReadPackageVersionInfo(State.m_SourcePath, State.m_fOnInfo);
 			if (!PackageInfo)
+			{
+				if (!AgentPlatform.f_IsEmpty())
+					co_return DMibErrorInstance("The package has no readable version info, which application '{}' needs for its agent platform"_f << State.m_pApplication->m_Name);
+
 				co_return {};
+			}
 
 			// The time of a package depends on how its files were written, and an upload can record another, like the time of the archive. A package
 			// of the installed version keeps the installed time, so that the version manager doesn't offer the same version as a newer one. A
@@ -164,8 +172,23 @@ namespace NMib::NCloud::NAppManager
 					<< VersionManagerApplication
 				;
 
+				if (!AgentPlatform.f_IsEmpty())
+					co_return DMibErrorInstance(Mismatch);
+
 				State.m_fOnInfo("{}, so its version info isn't applied"_f << Mismatch);
 				co_return {};
+			}
+
+			if (!AgentPlatform.f_IsEmpty() && PackageInfo->m_VersionID.m_Platform != AgentPlatform)
+			{
+				co_return DMibErrorInstance
+					(
+						"The package is for platform '{}', but application '{}' provides the agent for platform '{}'"_f
+						<< PackageInfo->m_VersionID.m_Platform
+						<< State.m_pApplication->m_Name
+						<< AgentPlatform
+					)
+				;
 			}
 
 			// The time only tells packages of the same version apart: fp_FindVersion takes the newest offered version by the times the version
@@ -224,7 +247,10 @@ namespace NMib::NCloud::NAppManager
 		if (State.m_bDryRun)
 			co_return {};
 
-		if (State.m_bUpdateSettings)
+		// The settings in the version info of an agent distribution describe the guest platform and must not be applied on the host
+		bool bAgentDistribution = !Application.f_AgentDistributionPlatform().f_IsEmpty();
+
+		if (State.m_bUpdateSettings && !bAgentDistribution)
 		{
 			CApplicationSettings NewSettings = Application.m_Settings;
 			EApplicationSetting NewChangedSettings = EApplicationSetting_None;
@@ -705,7 +731,8 @@ namespace NMib::NCloud::NAppManager
 	{
 		for (auto &pEnvironment : mp_Environments)
 		{
-			if (pEnvironment->m_Settings.m_AgentApplication != _ApplicationName)
+			auto pAgentApplication = fp_FindEnvironmentAgentApplication(*pEnvironment);
+			if (!pAgentApplication || pAgentApplication->m_Name != _ApplicationName)
 				continue;
 
 			if (!pEnvironment->f_IsStarted() && !pEnvironment->m_bStarting)

@@ -161,6 +161,341 @@ void CAppManager_Environment_Tests::f_DoTests()
 			DMibExpectFalse(Result);
 		}
 
+		{
+			DMibTestPath("Agent Package For Another Platform");
+
+			CStr PackageDirectory = AppManagerTestHelper.f_RootDirectory() / "WrongPlatformAgent";
+
+			co_await
+				(
+					g_Dispatch / [PackageDirectory]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						CEJsonSorted VersionInfo;
+						VersionInfo["Application"] = "AppManager";
+						VersionInfo["Version"] = "master/1.0.0";
+						VersionInfo["Platform"] = "Windows-x64";
+
+						CFile::fs_CreateDirectory(PackageDirectory);
+						CFile::fs_WriteStringToFile(PackageDirectory / "AppManagerVersionInfo.json", VersionInfo.f_ToString());
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating agent package")
+			;
+
+			auto Result = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-enable-self-update", "--from-file", "--agent-platforms", "[\"Linux-arm64={}\"]"_f << PackageDirectory, PackageDirectory}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out enabling self update")
+			;
+
+			DMibExpect(Result.m_ExitCode, !=, 0u);
+			DMibExpectTrue(Result.f_GetCombinedOut().f_Find("for agent platform 'Linux-arm64' is for platform 'Windows-x64'") >= 0);
+
+			CStr NoVersionInfoDirectory = AppManagerTestHelper.f_RootDirectory() / "NoVersionInfoAgent";
+			auto BlockingActorCheckout = fg_BlockingActor();
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [NoVersionInfoDirectory]
+					{
+						CFile::fs_CreateDirectory(NoVersionInfoDirectory);
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating agent package")
+			;
+
+			auto NoVersionInfoResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-enable-self-update", "--from-file", "--agent-platforms", "[\"Linux-arm64={}\"]"_f << NoVersionInfoDirectory, PackageDirectory}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out enabling self update")
+			;
+
+			DMibExpect(NoVersionInfoResult.m_ExitCode, !=, 0u);
+			DMibExpectTrue(NoVersionInfoResult.f_GetCombinedOut().f_Find("for agent platform 'Linux-arm64' has no readable version info") >= 0);
+
+			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+			DMibExpectTrue(Installed.f_FindEqual("SelfUpdate.Linux-arm64") == nullptr);
+			DMibExpectTrue(Installed.f_FindEqual("SelfUpdate.Windows-x64") == nullptr);
+		}
+
+		{
+			DMibTestPath("Agent Update For Another Platform");
+
+			CStr AgentDirectory = AppManagerTestHelper.f_RootDirectory() / "OtherPlatformAgent";
+			CStr WrongPlatformDirectory = AppManagerTestHelper.f_RootDirectory() / "WrongPlatformAgent";
+
+			co_await
+				(
+					g_Dispatch / [AgentDirectory]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						CEJsonSorted VersionInfo;
+						VersionInfo["Application"] = "AppManager";
+						VersionInfo["Version"] = "master/1.0.0";
+						VersionInfo["Platform"] = "Linux-riscv64";
+
+						CFile::fs_CreateDirectory(AgentDirectory);
+						CFile::fs_WriteStringToFile(AgentDirectory / "AppManagerVersionInfo.json", VersionInfo.f_ToString());
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating agent package")
+			;
+
+			auto AddResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-enable-self-update", "--from-file", AgentDirectory}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out enabling self update")
+			;
+			DMibAssert(AddResult.m_ExitCode, ==, 0u);
+
+			auto AddAgainResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-enable-self-update", "--from-file", "--agent-platforms", "[\"Linux-riscv64={}\"]"_f << AgentDirectory, AgentDirectory}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out enabling self update")
+			;
+			DMibExpect(AddAgainResult.m_ExitCode, ==, 0u);
+			DMibExpectTrue(AddAgainResult.f_GetCombinedOut().f_Find("Application 'SelfUpdate.Linux-riscv64' is already installed") >= 0);
+
+			auto UpdateResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-update-from-file", "--name", "SelfUpdate.Linux-riscv64", WrongPlatformDirectory}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out updating agent application")
+			;
+			DMibExpect(UpdateResult.m_ExitCode, !=, 0u);
+			DMibExpectTrue(UpdateResult.f_GetCombinedOut().f_Find("provides the agent for platform 'Linux-riscv64'") >= 0);
+
+			auto VersionManagerUpdateResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-update", "--name", "SelfUpdate.Linux-riscv64", "--platform", "Linux-x64"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out updating agent application")
+			;
+			DMibExpect(VersionManagerUpdateResult.m_ExitCode, !=, 0u);
+			DMibExpectTrue(VersionManagerUpdateResult.f_GetCombinedOut().f_Find("provides the agent for platform 'Linux-riscv64'") >= 0);
+
+			CStr OtherApplicationDirectory = AppManagerTestHelper.f_RootDirectory() / "OtherApplicationAgent";
+
+			co_await
+				(
+					g_Dispatch / [OtherApplicationDirectory]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						CEJsonSorted VersionInfo;
+						VersionInfo["Application"] = "OtherApplication";
+						VersionInfo["Version"] = "master/2.0.0";
+						VersionInfo["Platform"] = "Linux-riscv64";
+
+						CFile::fs_CreateDirectory(OtherApplicationDirectory);
+						CFile::fs_WriteStringToFile(OtherApplicationDirectory / "OtherApplicationVersionInfo.json", VersionInfo.f_ToString());
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating package")
+			;
+
+			auto OtherApplicationResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-update-from-file", "--name", "SelfUpdate.Linux-riscv64", OtherApplicationDirectory}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out updating agent application")
+			;
+			DMibExpect(OtherApplicationResult.m_ExitCode, !=, 0u);
+			DMibExpectTrue(OtherApplicationResult.f_GetCombinedOut().f_Find("The package is for application 'OtherApplication'") >= 0);
+
+			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+			auto pAgent = Installed.f_FindEqual("SelfUpdate.Linux-riscv64");
+			DMibAssertTrue(pAgent != nullptr);
+			DMibExpect(pAgent->m_Version.m_Platform, ==, "Linux-riscv64");
+
+			auto RemoveResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-remove", "SelfUpdate.Linux-riscv64"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out removing agent application")
+			;
+			DMibExpect(RemoveResult.m_ExitCode, ==, 0u);
+		}
+
+		{
+			DMibTestPath("Agent Application Name Taken");
+
+			CStr OrdinaryDirectory = AppManagerTestHelper.f_RootDirectory() / "OrdinaryAgentName";
+			CStr AgentDirectory = AppManagerTestHelper.f_RootDirectory() / "TakenNameAgent";
+
+			co_await
+				(
+					g_Dispatch / [OrdinaryDirectory, AgentDirectory]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						CFile::fs_CreateDirectory(OrdinaryDirectory);
+						CFile::fs_WriteStringToFile(OrdinaryDirectory / "Data.txt", "Ordinary");
+
+						CEJsonSorted VersionInfo;
+						VersionInfo["Application"] = "AppManager";
+						VersionInfo["Version"] = "master/1.0.0";
+						VersionInfo["Platform"] = "Linux-mips64";
+
+						CFile::fs_CreateDirectory(AgentDirectory);
+						CFile::fs_WriteStringToFile(AgentDirectory / "AppManagerVersionInfo.json", VersionInfo.f_ToString());
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating packages")
+			;
+
+			auto AddResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-add", "--from-file", OrdinaryDirectory, "--name", "SelfUpdate.Linux-mips64"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out adding application")
+			;
+			DMibAssert(AddResult.m_ExitCode, ==, 0u);
+
+			auto EnableResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-enable-self-update", "--from-file", "--agent-platforms", "[\"Linux-mips64={}\"]"_f << AgentDirectory, AgentDirectory}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out enabling self update")
+			;
+			DMibExpect(EnableResult.m_ExitCode, !=, 0u);
+			DMibExpectTrue(EnableResult.f_GetCombinedOut().f_Find("isn't the agent distribution for platform 'Linux-mips64'") >= 0);
+
+			auto RemoveResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-remove", "SelfUpdate.Linux-mips64"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out removing application")
+			;
+			DMibExpect(RemoveResult.m_ExitCode, ==, 0u);
+
+			// An ordinary application with the name of the host installation doesn't enable self update. A removed application keeps its
+			// directory, so the agent is for another platform
+			CStr HostNameAgentDirectory = AppManagerTestHelper.f_RootDirectory() / "HostNameTakenAgent";
+			auto BlockingActorCheckout = fg_BlockingActor();
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [HostNameAgentDirectory]
+					{
+						CEJsonSorted VersionInfo;
+						VersionInfo["Application"] = "AppManager";
+						VersionInfo["Version"] = "master/1.0.0";
+						VersionInfo["Platform"] = "Linux-ppc64le";
+
+						CFile::fs_CreateDirectory(HostNameAgentDirectory);
+						CFile::fs_WriteStringToFile(HostNameAgentDirectory / "AppManagerVersionInfo.json", VersionInfo.f_ToString());
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating package")
+			;
+
+			auto AddHostNameResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-add", "--from-file", OrdinaryDirectory, "--name", "SelfUpdate"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out adding application")
+			;
+			DMibAssert(AddHostNameResult.m_ExitCode, ==, 0u);
+
+			auto EnableHostNameResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-enable-self-update", "--from-file", "--agent-platforms", "[\"Linux-ppc64le={}\"]"_f << HostNameAgentDirectory, OrdinaryDirectory}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out enabling self update")
+			;
+			DMibExpect(EnableHostNameResult.m_ExitCode, !=, 0u);
+			DMibExpectTrue(EnableHostNameResult.f_GetCombinedOut().f_Find("Application 'SelfUpdate' is installed, but isn't the self update source") >= 0);
+
+			for (auto &Name : {CStr("SelfUpdate"), CStr("SelfUpdate.Linux-ppc64le")})
+			{
+				DMibTestPath(Name);
+
+				auto RemoveHostNameResult = co_await AppManagerTestHelper.f_LaunchSimple
+					(
+						AppManagerInfo.m_RootDirectory / "AppManager"
+						, {"--application-remove", Name}
+						, AppManagerInfo.m_RootDirectory
+					)
+					.f_Timeout(g_Timeout, "Timed out removing application")
+				;
+				DMibExpect(RemoveHostNameResult.m_ExitCode, ==, 0u);
+			}
+		}
+
+#ifndef DPlatformFamily_Windows
+		{
+			DMibTestPath("Linked Non-Executable On Host");
+
+			CStr PackageDirectory = AppManagerTestHelper.f_RootDirectory() / "LinkedNonExecutable";
+
+			co_await
+				(
+					g_Dispatch / [PackageDirectory]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						CFile::fs_CreateDirectory(PackageDirectory);
+						CFile::fs_WriteStringToFile(PackageDirectory / "Data.txt", "Not executable");
+						CFile::fs_CreateSymbolicLink("Data.txt", PackageDirectory / "Executable", EFileAttrib_File, ESymbolicLinkFlag_None);
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating package")
+			;
+
+			auto Result = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-add", "--from-file", PackageDirectory, "--name", "LinkedNonExecutable", "--executable", "Executable"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out adding application")
+			;
+
+			DMibExpect(Result.m_ExitCode, !=, 0u);
+			DMibExpectTrue(Result.f_GetCombinedOut().f_Find("does not exist or does not have the executable flag set") >= 0);
+
+			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+			DMibExpectTrue(Installed.f_FindEqual("LinkedNonExecutable") == nullptr);
+		}
+#endif
+
 		co_return {};
 	};
 

@@ -188,6 +188,10 @@ namespace NMib::NCloud::NAppManager
 			if (!CVersionManager::fs_IsValidPlatform(Platform))
 				co_return Auditor.f_Exception("Invalid version platform format");
 
+			// Environments of the platform an agent distribution is named after run what it installs
+			if (CStr AgentPlatform = pApplication->f_AgentDistributionPlatform(); !AgentPlatform.f_IsEmpty() && Platform != AgentPlatform)
+				co_return Auditor.f_Exception("Application '{}' provides the agent for platform '{}' and cannot update to platform '{}'"_f << _Name << AgentPlatform << Platform);
+
 			auto RequiredTags = pApplication->m_Settings.m_UpdateTags;
 			auto AllowedBranches = pApplication->m_Settings.m_UpdateBranches;
 

@@ -112,6 +112,26 @@ namespace NMib::NCloud::NAppManager
 					Version.f_SetApplication(&Application);
 				}
 
+				// A full resend replaces the versions that the adds of agent distributions listed for their platforms
+				if (_NewVersions.m_bFullResend)
+				{
+					auto VersionManager = Manager.f_GetManager();
+
+					TCMap<CStr, TCSet<CStr>> AgentPlatforms;
+					for (auto &pApplication : mp_Applications)
+					{
+						CStr Platform = pApplication->f_AgentDistributionPlatform();
+						if (!Platform.f_IsEmpty() && !pApplication->m_Settings.m_VersionManagerApplication.f_IsEmpty())
+							AgentPlatforms[pApplication->m_Settings.m_VersionManagerApplication][Platform];
+					}
+
+					for (auto &Platforms : AgentPlatforms)
+					{
+						for (auto &Platform : Platforms)
+							co_await fp_VersionManagerListPlatformVersionsFrom(VersionManager, AgentPlatforms.fs_GetKey(Platforms), Platform);
+					}
+				}
+
 				if (_NewVersions.m_bFullResend && mp_AutoUpdateDelay >= 0.01)
 				{
 					DMibLog(Debug, "Delaying after first version notification: {}", mp_AutoUpdateDelay);
@@ -161,6 +181,58 @@ namespace NMib::NCloud::NAppManager
 			fp_VersionManagerSubscribe(Manager.f_GetManager()) > Results;
 
 		co_await fg_AllDone(Results);
+
+		co_return {};
+	}
+
+	// The subscriptions send the newest versions of an application over all its platforms, so a platform whose newest versions are older than
+	// those of the others gets none. Its versions are listed from the version managers when an application of the platform is added, and from a
+	// version manager again when its subscription resends all versions
+	TCFuture<void> CAppManagerActor::fp_VersionManagerListPlatformVersions(CStr _Application, CStr _Platform)
+	{
+		TCVector<TCDistributedActor<CVersionManager>> Managers;
+		for (auto &Manager : mp_VersionManagers)
+			Managers.f_Insert(Manager.f_GetManager());
+
+		for (auto &Manager : Managers)
+			co_await fp_VersionManagerListPlatformVersionsFrom(Manager, _Application, _Platform);
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_VersionManagerListPlatformVersionsFrom(TCDistributedActor<CVersionManager> _Manager, CStr _Application, CStr _Platform)
+	{
+		CVersionManager::CListVersions Params;
+		Params.m_ForApplication = _Application;
+
+		auto Result = co_await _Manager.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(Params)).f_Timeout(60.0, "Timed out listing the versions of the application").f_Wrap();
+
+		if (!Result)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to list the versions of '{}' from a version manager: {}", _Application, Result.f_GetExceptionStr());
+			co_return {};
+		}
+
+		auto *pState = mp_VersionManagers.f_FindEqual(_Manager);
+		if (!pState)
+			co_return {};
+
+		auto *pVersions = Result->m_Versions.f_FindEqual(_Application);
+		if (!pVersions)
+			co_return {};
+
+		for (auto &VersionInfo : *pVersions)
+		{
+			auto &VersionID = pVersions->fs_GetKey(VersionInfo);
+			if (VersionID.m_Platform != _Platform)
+				continue;
+
+			auto &Version = *(pState->m_Versions[_Application](VersionID, pState));
+			Version.f_SetApplication(nullptr);
+			auto &Application = *mp_VersionManagerApplications(_Application, *this);
+			Version.m_VersionInfo = VersionInfo;
+			Version.f_SetApplication(&Application);
+		}
 
 		co_return {};
 	}

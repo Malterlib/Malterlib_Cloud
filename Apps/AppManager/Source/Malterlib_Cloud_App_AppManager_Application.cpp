@@ -91,6 +91,22 @@ namespace NMib::NCloud::NAppManager
 		return !m_Settings.m_ParentApplication.f_IsEmpty();
 	}
 
+	// An agent distribution is named after the platform of the version it installs, which the self update source and other applications whose
+	// names start with SelfUpdate. are not. Returns empty for other applications. The names SelfUpdate.<Platform> belong to the agent
+	// distributions, so an application of such a name whose installed version is of that platform is the agent distribution of the platform,
+	// whoever added it: only the operator and API callers with the add permission name applications, and they are trusted
+	CStr CAppManagerActor::CApplication::f_AgentDistributionPlatform() const
+	{
+		if (m_Settings.m_bSelfUpdateSource || !m_Name.f_StartsWith("SelfUpdate."))
+			return {};
+
+		CStr Platform = m_Name.f_Extract(CStr("SelfUpdate.").f_GetLen());
+		if (Platform != m_LastInstalledVersion.m_Platform)
+			return {};
+
+		return Platform;
+	}
+
 	bool CAppManagerActor::CApplication::f_IsLaunched() const
 	{
 		return m_bLaunching || !m_ProcessLaunch.f_IsOfType<void>() || m_bLaunched;
