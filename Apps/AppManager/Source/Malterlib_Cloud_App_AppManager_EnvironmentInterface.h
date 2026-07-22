@@ -106,6 +106,12 @@ namespace NMib::NCloud::NAppManager
 		/// Configures the agent with the environment host name and the automatic
 		/// update settings inherited from the host AppManager
 		virtual NConcurrency::TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) = 0;
+
+		/// Shuts the environment down from inside after the reply has been sent. A
+		/// virtual machine guest powers off directly this way; a host-side stop
+		/// request goes through the guest console session instead, which asks for
+		/// confirmation when a user is logged in
+		virtual NConcurrency::TCFuture<void> f_ShutdownEnvironment() = 0;
 	};
 
 	/// Interface published by the host AppManager. Environment agents use it to
