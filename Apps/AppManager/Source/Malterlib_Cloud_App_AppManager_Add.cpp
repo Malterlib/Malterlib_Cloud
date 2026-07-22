@@ -370,6 +370,9 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
+		if (!pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty() && !mp_Environments.f_FindEqual(pApplication->m_Settings.m_LaunchEnvironment))
+			co_return Auditor.f_Exception(fg_Format("Launch environment '{}' does not exist. Add it with --environment-add.", pApplication->m_Settings.m_LaunchEnvironment));
+
 		if (pApplication->f_IsChildApp())
 		{
 			auto *pParentApplication = mp_Applications.f_FindEqual(pApplication->m_Settings.m_ParentApplication);
