@@ -43,6 +43,295 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnableSelfUpdate(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		bool bFromFile = _Params["FromFile"].f_Boolean();
+		auto CallingHostInfo = fg_GetCallingHostInfo();
+
+		// Reading the packages at the host paths the caller names needs access to the applications they install. The package of the command is
+		// read only after this check, so it needs access to the application the command names, also when it turns out to be the agent of
+		// another platform, whose application is checked once its platform is read
+		{
+			auto Auditor = f_Auditor({}, CallingHostInfo);
+
+			NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+			Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ApplicationAdd"}};
+
+			auto fAddApplicationPermission = [&](CStr const &_Name)
+				{
+					Permissions[CStr("App/{}"_f << _Name)] =
+						{
+							CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)
+						}
+					;
+				}
+			;
+
+			if (bFromFile && !_Params["Package"].f_AsString().f_IsEmpty())
+				fAddApplicationPermission(_Params["Name"].f_String());
+
+			if (auto *pPlatforms = _Params.f_GetMember("AgentPlatforms"))
+			{
+				for (auto &Platform : pPlatforms->f_Array())
+				{
+					CStr const &Entry = Platform.f_String();
+					auto iEquals = Entry.f_Find("=");
+					if (iEquals >= 0)
+						fAddApplicationPermission("SelfUpdate.{}"_f << Entry.f_Left(iEquals));
+				}
+			}
+
+			NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
+				(
+					mp_Permissions.f_HasPermissions("Enable self update in AppManager", Permissions, CallingHostInfo) % "Permission denied enabling self update" % Auditor
+				)
+			;
+
+			for (auto &bHasPermission : HasPermissions)
+			{
+				if (!bHasPermission)
+				{
+					auto &Key = HasPermissions.fs_GetKey(bHasPermission);
+					co_return Auditor.f_AccessDenied(CStr("(Enable self update, {})"_f << Key), Permissions[Key]);
+				}
+			}
+		}
+
+		CStr DetectedPlatform;
+		if (bFromFile)
+		{
+			CStr Package = _Params["Package"].f_AsString();
+			if (!Package.f_IsEmpty())
+			{
+				CStr FromLocalFile = CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(Package, mp_State.m_RootDirectory));
+
+				// Without readable platform metadata, the package is the host self update source, as before agent distributions
+				// existed: the operator chooses the package, and packages are trusted
+				auto PackageInfo = co_await fp_ReadPackageVersionInfo
+					(
+						FromLocalFile
+						, [](CStr const &_Info)
+						{
+						}
+					)
+					.f_Wrap()
+				;
+
+				if (PackageInfo && *PackageInfo)
+					DetectedPlatform = (**PackageInfo).m_VersionID.m_Platform;
+			}
+		}
+
+		bool bPackageIsAgent = bFromFile && !DetectedPlatform.f_IsEmpty() && DetectedPlatform != DMalterlibCloudPlatform;
+
+		struct CAgentPlatform
+		{
+			CStr m_Platform;
+			CStr m_LocalPath;
+		};
+
+		TCVector<CAgentPlatform> AgentPlatforms;
+		if (auto *pPlatforms = _Params.f_GetMember("AgentPlatforms"))
+		{
+			for (auto &Platform : pPlatforms->f_Array())
+			{
+				CAgentPlatform AgentPlatform;
+				AgentPlatform.m_Platform = Platform.f_String();
+
+				auto iEquals = AgentPlatform.m_Platform.f_Find("=");
+				if (iEquals >= 0)
+				{
+					AgentPlatform.m_LocalPath = AgentPlatform.m_Platform.f_Extract(iEquals + 1);
+					AgentPlatform.m_Platform = AgentPlatform.m_Platform.f_Left(iEquals);
+				}
+
+				if (bPackageIsAgent && AgentPlatform.m_LocalPath.f_IsEmpty() && AgentPlatform.m_Platform == DetectedPlatform)
+					continue;
+
+				// The host installation that this command adds is the agent of the host platform, which another copy would shadow
+				if (!bPackageIsAgent && AgentPlatform.m_Platform == DMalterlibCloudPlatform)
+					continue;
+
+				if (AgentPlatform.m_LocalPath.f_IsEmpty() && bFromFile)
+				{
+					co_return DMibErrorInstance
+						(
+							"Agent platform '{}' needs a local file or directory when using --from-file. "
+							"Specify it as <Platform>=<Path>, for example {}=/opt/Deploy/AppManager_Linux_arm64."_f
+							<< AgentPlatform.m_Platform
+							<< AgentPlatform.m_Platform
+						)
+					;
+				}
+
+				AgentPlatforms.f_Insert(fg_Move(AgentPlatform));
+			}
+		}
+
+		// The declared platform names the application that the environments of that platform run, so a local package with metadata of another
+		// platform is rejected before anything is installed
+		for (auto &AgentPlatform : AgentPlatforms)
+		{
+			if (AgentPlatform.m_LocalPath.f_IsEmpty())
+				continue;
+
+			auto PackageInfo = co_await fp_ReadPackageVersionInfo
+				(
+					CFile::fs_GetExpandedPath(CFile::fs_GetFullPath(AgentPlatform.m_LocalPath, mp_State.m_RootDirectory))
+					, [_pCommandLine](CStr const &_Info)
+					{
+						*_pCommandLine += _Info + DMibNewLine;
+					}
+				)
+			;
+
+			// The installed platform and the update source come from the metadata, and without them the application is no agent distribution
+			if (!PackageInfo)
+				co_return DMibErrorInstance("The package '{}' for agent platform '{}' has no readable version info"_f << AgentPlatform.m_LocalPath << AgentPlatform.m_Platform);
+
+			// The add reads the package again, which is trusted as a file of the operator on the host
+			if (PackageInfo->m_VersionID.m_Platform != AgentPlatform.m_Platform)
+			{
+				co_return DMibErrorInstance
+					(
+						"The package '{}' for agent platform '{}' is for platform '{}'"_f << AgentPlatform.m_LocalPath << AgentPlatform.m_Platform << PackageInfo->m_VersionID.m_Platform
+					)
+				;
+			}
+		}
+
+		CStr MainName = bPackageIsAgent ? CStr("SelfUpdate.{}"_f << DetectedPlatform) : _Params["Name"].f_String();
+
+		// Installed applications are kept, so that agents can be added to an installation with self update and an interrupted run can be
+		// repeated. An installed agent application must be the agent distribution of its platform, and the host application the self update source
+		auto fIsInstalled = [&](CStr const &_Name, CStr const &_AgentPlatform, CStr &o_Error)
+			{
+				auto *pApplication = mp_Applications.f_FindEqual(_Name);
+				if (!pApplication)
+					return false;
+
+				if (!_AgentPlatform.f_IsEmpty() && (*pApplication)->f_AgentDistributionPlatform() != _AgentPlatform)
+				{
+					o_Error = "Application '{}' is installed, but isn't the agent distribution for platform '{}'"_f << _Name << _AgentPlatform;
+					return true;
+				}
+
+				if (_AgentPlatform.f_IsEmpty() && !(*pApplication)->m_Settings.m_bSelfUpdateSource)
+				{
+					o_Error = "Application '{}' is installed, but isn't the self update source"_f << _Name;
+					return true;
+				}
+
+				*_pCommandLine += "Application '{}' is already installed\n"_f << _Name;
+				return true;
+			}
+		;
+
+		// The command reports which of the applications are installed, which only callers with access to them may learn, as from f_GetInstalled
+		if (!AgentPlatforms.f_IsEmpty())
+		{
+			auto Auditor = f_Auditor({}, CallingHostInfo);
+
+			NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+			// The adds below can suspend, during which another caller can add the applications that don't exist yet
+			auto fAddInstalledPermission = [&](CStr const &_Name)
+				{
+					Permissions[_Name] =
+						{
+							CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", _Name)}.f_Description("Access application {} in AppManager"_f << _Name)
+						}
+					;
+				}
+			;
+
+			fAddInstalledPermission(MainName);
+			for (auto &AgentPlatform : AgentPlatforms)
+				fAddInstalledPermission("SelfUpdate.{}"_f << AgentPlatform.m_Platform);
+
+			if (!Permissions.f_IsEmpty())
+			{
+				NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
+					(
+						mp_Permissions.f_HasPermissions("Enable self update in AppManager", Permissions, CallingHostInfo) % "Permission denied enabling self update" % Auditor
+					)
+				;
+
+				for (auto &bHasPermission : HasPermissions)
+				{
+					if (!bHasPermission)
+					{
+						auto &Key = HasPermissions.fs_GetKey(bHasPermission);
+						co_return Auditor.f_AccessDenied(CStr("(Enable self update, App/{})"_f << Key), Permissions[Key]);
+					}
+				}
+			}
+		}
+
+		// Adding the host installation can self update, which restarts this AppManager, so the agents are added first
+		for (auto &AgentPlatform : AgentPlatforms)
+		{
+			CStr InstalledError;
+			if (fIsInstalled(CStr("SelfUpdate.{}"_f << AgentPlatform.m_Platform), AgentPlatform.m_Platform, InstalledError))
+			{
+				if (!InstalledError.f_IsEmpty())
+					co_return DMibErrorInstance(InstalledError);
+
+				continue;
+			}
+
+			CEJsonSorted PlatformParams = _Params;
+			PlatformParams["Name"] = "SelfUpdate.{}"_f << AgentPlatform.m_Platform;
+			PlatformParams["VersionManagerPlatform"] = AgentPlatform.m_Platform;
+			PlatformParams["SelfUpdateSource"] = false;
+			PlatformParams["SettingsFromVersionInfo"] = false;
+
+			// An agent distribution has no launch environment, so its update scripts would run on the host when only the agent updates
+			for (auto *pScript : {"UpdateScript_PreUpdate", "UpdateScript_PostUpdate", "UpdateScript_PostLaunch", "UpdateScript_OnError"})
+			{
+				if (PlatformParams.f_GetMember(pScript))
+					PlatformParams.f_RemoveMember(pScript);
+			}
+
+			if (!AgentPlatform.m_LocalPath.f_IsEmpty())
+			{
+				PlatformParams["FromFile"] = true;
+				PlatformParams["Package"] = AgentPlatform.m_LocalPath;
+			}
+
+			uint32 PlatformStatus = co_await fp_CommandLine_AddApplication(fg_Move(PlatformParams), _pCommandLine);
+			if (PlatformStatus != 0)
+				co_return PlatformStatus;
+		}
+
+		if (!AgentPlatforms.f_IsEmpty())
+		{
+			CStr InstalledError;
+			if (fIsInstalled(MainName, bPackageIsAgent ? DetectedPlatform : CStr(), InstalledError))
+			{
+				if (!InstalledError.f_IsEmpty())
+					co_return DMibErrorInstance(InstalledError);
+
+				co_return 0;
+			}
+		}
+
+		uint32 Status;
+		if (bPackageIsAgent)
+		{
+			CEJsonSorted AgentParams = _Params;
+			AgentParams["Name"] = "SelfUpdate.{}"_f << DetectedPlatform;
+			AgentParams["VersionManagerPlatform"] = DetectedPlatform;
+			AgentParams["SelfUpdateSource"] = false;
+			AgentParams["SettingsFromVersionInfo"] = false;
+
+			Status = co_await fp_CommandLine_AddApplication(fg_Move(AgentParams), _pCommandLine);
+		}
+		else
+			Status = co_await fp_CommandLine_AddApplication(_Params, _pCommandLine);
+
+		co_return Status;
+	}
+
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_AddApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CallingHostInfo = fg_GetCallingHostInfo();
@@ -215,20 +504,36 @@ namespace NMib::NCloud::NAppManager
 					CStr Error;
 					CVersionManager::CVersionInformation VersionInfo;
 					bool bNewestUnconditionalVersionChanged = false;
-					VersionID = CAppManagerActor::fp_FindVersion
-						(
-							pApplication
-							, pApplication->m_Settings.m_UpdateTags
-							, pApplication->m_Settings.m_UpdateBranches
-							, Platform
-							, Error
-							, EFindVersionFlag_ForAdd
-							, VersionInfo
-							, pApplication->m_NewestUnconditionalVersion
-							, pApplication->m_NewestUnconditionalVersionInfo
-							, bNewestUnconditionalVersionChanged
-						)
+					auto fFindVersion = [&]
+						{
+							return CAppManagerActor::fp_FindVersion
+								(
+									pApplication
+									, pApplication->m_Settings.m_UpdateTags
+									, pApplication->m_Settings.m_UpdateBranches
+									, Platform
+									, Error
+									, EFindVersionFlag_ForAdd
+									, VersionInfo
+									, pApplication->m_NewestUnconditionalVersion
+									, pApplication->m_NewestUnconditionalVersionInfo
+									, bNewestUnconditionalVersionChanged
+								)
+							;
+						}
 					;
+
+					// Subscriptions send the newest versions across all platforms, which can leave out those of the agent distribution's platform
+					bool bAgentDistribution = !pApplication->m_Settings.m_bSelfUpdateSource && pApplication->m_Name.f_StartsWith("SelfUpdate.");
+					if (bAgentDistribution)
+						co_await fp_VersionManagerListPlatformVersions(VersionManagerApplication, Platform);
+
+					VersionID = fFindVersion();
+					if (!VersionID.f_IsValid() && !bAgentDistribution)
+					{
+						co_await fp_VersionManagerListPlatformVersions(VersionManagerApplication, Platform);
+						VersionID = fFindVersion();
+					}
 
 					if (!VersionID.f_IsValid())
 						co_return Auditor.f_Exception(fg_Format("No suitable version found for application '{}': {}", VersionManagerApplication, Error));
@@ -345,19 +650,38 @@ namespace NMib::NCloud::NAppManager
 
 			if (PackageInfo)
 			{
+				bool bTakeUpdateSource = false;
 				try
 				{
 					fApplyVersion(PackageInfo->m_VersionID, PackageInfo->m_VersionInfo);
 
-					// The update source is a setting of the package, which an add without settings from the version info leaves unset, so that
-					// the version manager doesn't replace the package
-					if (_bSettingsFromVersionInfo)
-						pApplication->m_Settings.m_VersionManagerApplication = PackageInfo->m_Application;
+					// Without settings from the version info the update source stays unset, so that the version manager doesn't replace the
+					// package; an agent distribution always takes it from the package
+					bTakeUpdateSource = _bSettingsFromVersionInfo || !pApplication->f_AgentDistributionPlatform().f_IsEmpty();
 				}
 				catch (CException const &_Exception)
 				{
 					_fOnInfo("Failed to apply version info from package: {}"_f << _Exception);
 				}
+
+				// The caller needs access to the version manager application that the package names, like to one it names itself
+				if (bTakeUpdateSource && PackageInfo->m_Application != _Settings.m_VersionManagerApplication && !PackageInfo->m_Application.f_IsEmpty())
+				{
+					NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> VersionPermissions;
+					VersionPermissions["Version"] = {{"AppManager/VersionAppAll", fg_Format("AppManager/VersionApp/{}", PackageInfo->m_Application)}};
+
+					NContainer::TCMap<NStr::CStr, bool> HasVersionPermissions = co_await
+						(
+							mp_Permissions.f_HasPermissions("Add application to AppManager", VersionPermissions, _CallingHostInfo) % "Permission denied adding application" % Auditor
+						)
+					;
+
+					if (!HasVersionPermissions["Version"])
+						co_return Auditor.f_AccessDenied("(Application add, version application of the package)", VersionPermissions["Version"]);
+				}
+
+				if (bTakeUpdateSource)
+					pApplication->m_Settings.m_VersionManagerApplication = PackageInfo->m_Application;
 			}
 
 			SourcePath = _FromLocalFile;
@@ -465,6 +789,27 @@ namespace NMib::NCloud::NAppManager
 
 		pApplication->m_LastInstalledVersionFinished = pApplication->m_LastInstalledVersion;
 		pApplication->m_LastInstalledVersionInfoFinished = pApplication->m_LastInstalledVersionInfo;
+
+		// The subscriptions send the newest versions across all platforms, which can leave out the updates of the platform of an agent
+		// distribution added from a file. The resubscription of a new platform can end before the distribution is published here. Until then
+		// the package keeps the time of its files, which only tells it apart from an offered build of the same version ID, since updates
+		// compare the version IDs
+		if (!_FromLocalFile.f_IsEmpty())
+		{
+			CStr AgentPlatform = pApplication->f_AgentDistributionPlatform();
+			CStr const &UpdateSource = pApplication->m_Settings.m_VersionManagerApplication;
+			if (!AgentPlatform.f_IsEmpty() && !UpdateSource.f_IsEmpty())
+			{
+				fp_VersionManagerListPlatformVersions(UpdateSource, AgentPlatform) > [this](TCAsyncResult<void> &&_Result)
+					{
+						if (!_Result)
+							DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to list the versions of an added agent distribution: {}", _Result.f_GetExceptionStr());
+
+						fp_AutoUpdate_Update();
+					}
+				;
+			}
+		}
 
 		co_await (fp_UpdateApplicationJson(pApplication) % "Failed to save state" % Auditor);
 

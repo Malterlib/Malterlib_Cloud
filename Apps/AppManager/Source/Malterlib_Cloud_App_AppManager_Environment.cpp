@@ -109,7 +109,10 @@ namespace NMib::NCloud::NAppManager
 				, "Type"_o= ""
 				, "Default"_o= ""
 				, "Description"_o= "Name of the application that provides the AppManager agent executable for the environment.\n"
-				"When empty, local environments run the AppManager executable itself."
+				"When empty, local environments run the AppManager executable itself.\n"
+				"The SelfUpdate.<Platform> name for the host platform resolves to the self update source\n"
+				"application, since host platform distributions install as the self update application.\n"
+				"See --application-enable-self-update for installing agent executables for other platforms."
 			}
 		;
 		auto SettingsOption_ParentApplication = "ParentApplication?"_o=
@@ -1317,7 +1320,12 @@ namespace NMib::NCloud::NAppManager
 			if (pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
 				continue;
 
-			if (fInDirectoryTree(pEnvironment->m_Settings.m_ParentApplication) || fInDirectoryTree(pEnvironment->m_Settings.m_AgentApplication))
+			// A SelfUpdate.<host platform> agent application can resolve to the self update source, as in fp_CheckLocalEnvironmentAccounts
+			CStr AgentApplication = pEnvironment->m_Settings.m_AgentApplication;
+			if (auto pAgentApplication = fp_FindAgentApplication(AgentApplication))
+				AgentApplication = pAgentApplication->m_Name;
+
+			if (fInDirectoryTree(pEnvironment->m_Settings.m_ParentApplication) || fInDirectoryTree(AgentApplication))
 				return fg_Format("Local environment '{}' uses the directory of the application, which therefore cannot run as its own user", pEnvironment->m_Name);
 		}
 
@@ -1367,7 +1375,12 @@ namespace NMib::NCloud::NAppManager
 		if (CStr Error = fCheckDirectoryTree(_Settings.m_ParentApplication, "store their data in"); !Error.f_IsEmpty())
 			return Error;
 
-		return fCheckDirectoryTree(_Settings.m_AgentApplication, "run their agent from");
+		// The self update source that the alias resolves to can be the child of an application with its own user
+		CStr AgentApplication = _Settings.m_AgentApplication;
+		if (auto pAgentApplication = fp_FindAgentApplication(AgentApplication))
+			AgentApplication = pAgentApplication->m_Name;
+
+		return fCheckDirectoryTree(AgentApplication, "run their agent from");
 	}
 
 	TCFuture<CStr> CAppManagerActor::fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError)
@@ -1385,17 +1398,17 @@ namespace NMib::NCloud::NAppManager
 			Candidates.f_Insert(CFile::fs_GetProgramPath());
 		else
 		{
-			auto *pFindApplication = mp_Applications.f_FindEqual(_pEnvironment->m_Settings.m_AgentApplication);
-			if (!pFindApplication)
+			auto pAgentApplication = fp_FindEnvironmentAgentApplication(*_pEnvironment);
+			if (!pAgentApplication)
 			{
 				*_pError = "Agent application '{}' for environment '{}' is not installed"_f << _pEnvironment->m_Settings.m_AgentApplication << _pEnvironment->m_Name;
 				co_return {};
 			}
 
-			Directory = (*pFindApplication)->f_GetDirectory();
+			Directory = pAgentApplication->f_GetDirectory();
 
-			if (!(*pFindApplication)->m_Settings.m_Executable.f_IsEmpty())
-				Candidates.f_Insert(Directory / (*pFindApplication)->m_Settings.m_Executable);
+			if (!pAgentApplication->m_Settings.m_Executable.f_IsEmpty())
+				Candidates.f_Insert(Directory / pAgentApplication->m_Settings.m_Executable);
 			Candidates.f_Insert(Directory / CFile::fs_GetFile(CFile::fs_GetProgramPath()));
 #ifdef DPlatformFamily_Windows
 			Candidates.f_Insert(Directory / "AppManager.exe");
@@ -1513,6 +1526,38 @@ namespace NMib::NCloud::NAppManager
 			*_pError = "Found no agent executable for environment '{}'"_f << _pEnvironment->m_Name;
 
 		co_return Executable;
+	}
+
+	TCSharedPointer<CAppManagerActor::CApplication> CAppManagerActor::fp_FindEnvironmentAgentApplication(CEnvironment const &_Environment)
+	{
+		return fp_FindAgentApplication(_Environment.m_Settings.m_AgentApplication);
+	}
+
+	TCSharedPointer<CAppManagerActor::CApplication> CAppManagerActor::fp_FindAgentApplication(CStr const &_AgentApplication)
+	{
+		// An application named SelfUpdate.<Platform> provides an agent only as the agent distribution of that platform or the self update source
+		auto *pFindApplication = mp_Applications.f_FindEqual(_AgentApplication);
+		if
+		(
+			pFindApplication
+			&& (!_AgentApplication.f_StartsWith("SelfUpdate.") || (*pFindApplication)->m_Settings.m_bSelfUpdateSource || !(*pFindApplication)->f_AgentDistributionPlatform().f_IsEmpty())
+		)
+		{
+			return *pFindApplication;
+		}
+
+		// Without a SelfUpdate.<host platform> agent distribution, that name resolves to the self update source, which like a default agent needs
+		// only access to the name
+		if (_AgentApplication == CStr("SelfUpdate.{}"_f << DMalterlibCloudPlatform))
+		{
+			for (auto &pApplication : mp_Applications)
+			{
+				if (pApplication->m_Settings.m_bSelfUpdateSource && !pApplication->m_bDeleted)
+					return pApplication;
+			}
+		}
+
+		return {};
 	}
 
 	TCSharedPointer<CAppManagerActor::CApplication> CAppManagerActor::fp_GetEnvironmentParentApplication(CEnvironment const &_Environment)
