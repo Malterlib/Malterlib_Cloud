@@ -842,6 +842,87 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	namespace
+	{
+		// Runs one SSH command against the guest, authenticating through the ask
+		// pass helper and feeding the input to the remote command
+		TCFuture<NProcess::CProcessLaunchActor::CSimpleLaunchResult> fg_RunVMBootstrapSSH
+			(
+				CStr _LogName
+				, CStr _WorkingDirectory
+				, bool _bLogToStdErr
+				, CStr _Target
+				, CStr _AskPassPath
+				, CStr _Password
+				, TCVector<CStr> _RemoteCommand
+				, CStrIO _StdInData
+				, fp64 _Timeout
+			)
+		{
+			TCVector<CStr> Arguments = fg_CreateVector<CStr>
+				(
+					"-o", "StrictHostKeyChecking=no"
+					, "-o", "UserKnownHostsFile=/dev/null"
+					, "-o", "GlobalKnownHostsFile=/dev/null"
+					, "-o", "ConnectTimeout=10"
+					, "-o", "NumberOfPasswordPrompts=1"
+					, "-o", "ServerAliveInterval=15"
+					, "-o", "ServerAliveCountMax=4"
+					, "-o", "LogLevel=ERROR"
+					, _Target
+				)
+			;
+			for (auto &Word : _RemoteCommand)
+				Arguments.f_Insert(Word);
+
+			CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+				(
+					"/usr/bin/ssh"
+					, Arguments
+					, _WorkingDirectory
+					, {}
+				)
+			;
+
+			LaunchParams.m_Environment["SSH_ASKPASS"] = _AskPassPath;
+			LaunchParams.m_Environment["SSH_ASKPASS_REQUIRE"] = "force";
+			LaunchParams.m_Environment["DISPLAY"] = ":0";
+			LaunchParams.m_Environment["MALTERLIB_VM_SSH_PASSWORD"] = _Password;
+			LaunchParams.m_bMergeEnvironment = true;
+
+			TCActor<CProcessLaunchActor> pLaunchActor = fg_ConstructActor<CProcessLaunchActor>();
+
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
+			SimpleLaunch.m_LogName = fg_Move(_LogName);
+			SimpleLaunch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+			if (_bLogToStdErr)
+				SimpleLaunch.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
+
+			auto ResultFuture = pLaunchActor(&CProcessLaunchActor::f_LaunchSimple, SimpleLaunch);
+
+			co_await pLaunchActor(&CProcessLaunchActor::f_SendStdIn, fg_Move(_StdInData)).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to send the agent setup input")
+			;
+			co_await pLaunchActor(&CProcessLaunchActor::f_CloseStdIn).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to close the agent setup input")
+			;
+
+			auto Result = co_await fg_Move(ResultFuture)
+				.f_Timeout(_Timeout, "The SSH agent setup attempt timed out")
+				.f_Wrap()
+			;
+
+			co_await fg_Move(pLaunchActor).f_Destroy().f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the agent setup launch")
+			;
+
+			if (!Result)
+				co_return Result.f_GetException();
+
+			co_return fg_Move(*Result);
+		}
+	}
+
 	TCFuture<void> CAppManagerActor::fp_BootstrapVMAgentOverSSH
 		(
 			TCSharedPointer<CEnvironment> _pEnvironment
@@ -911,6 +992,8 @@ namespace NMib::NCloud::NAppManager
 			"\t<key>ProgramArguments</key><array><string>/bin/sh</string><string>" + GuestScriptPath + "</string></array>\n"
 			"\t<key>RunAtLoad</key><true/>\n"
 			"\t<key>KeepAlive</key><true/>\n"
+			"\t<key>StandardOutPath</key><string>/var/log/malterlib-appmanager-agent.log</string>\n"
+			"\t<key>StandardErrorPath</key><string>/var/log/malterlib-appmanager-agent.log</string>\n"
 			"</dict>\n"
 			"</plist>\n"
 		;
@@ -995,86 +1078,79 @@ namespace NMib::NCloud::NAppManager
 				;
 			}
 
-			CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
-				(
-					"/usr/bin/ssh"
-					, fg_CreateVector<CStr>
-						(
-							"-o", "StrictHostKeyChecking=no"
-							, "-o", "UserKnownHostsFile=/dev/null"
-							, "-o", "GlobalKnownHostsFile=/dev/null"
-							, "-o", "ConnectTimeout=10"
-							, "-o", "NumberOfPasswordPrompts=1"
-							, "-o", "ServerAliveInterval=15"
-							, "-o", "ServerAliveCountMax=4"
-							, "-o", "LogLevel=ERROR"
-							, fg_Format("{}@{}", _Provisioning.m_Username, GuestIP)
-							, "sudo", "-S", "-p", "''", "/bin/sh", "-s"
-						)
-					, mp_State.m_RootDirectory
-					, {}
-				)
-			;
+			CStr LogName = "Environment/{}/AgentBootstrap"_f << _pEnvironment->m_Name;
+			CStr Target = fg_Format("{}@{}", _Provisioning.m_Username, GuestIP);
 
-			LaunchParams.m_Environment["SSH_ASKPASS"] = AskPassPath;
-			LaunchParams.m_Environment["SSH_ASKPASS_REQUIRE"] = "force";
-			LaunchParams.m_Environment["DISPLAY"] = ":0";
-			LaunchParams.m_Environment["MALTERLIB_VM_SSH_PASSWORD"] = _Provisioning.m_Password;
-			LaunchParams.m_bMergeEnvironment = true;
-
-			TCActor<CProcessLaunchActor> pLaunchActor = fg_ConstructActor<CProcessLaunchActor>();
-
-			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
-			SimpleLaunch.m_LogName = "Environment/{}/AgentBootstrap"_f << _pEnvironment->m_Name;
-			SimpleLaunch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
-			if (mp_bLogLaunchesToStdErr)
-				SimpleLaunch.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
-
-			auto ResultFuture = pLaunchActor(&CProcessLaunchActor::f_LaunchSimple, SimpleLaunch);
-
-			// sudo takes the password from the first line of standard input and hands
-			// the rest to the shell as the setup script
-			CStrIO StdInData;
-			StdInData += _Provisioning.m_Password;
-			StdInData += "\n";
-			StdInData += BootstrapScript;
-
-			co_await pLaunchActor(&CProcessLaunchActor::f_SendStdIn, fg_Move(StdInData)).f_Wrap()
-				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to send the agent setup script")
-			;
-			co_await pLaunchActor(&CProcessLaunchActor::f_CloseStdIn).f_Wrap()
-				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to close the agent setup input")
-			;
-
-			auto Result = co_await fg_Move(ResultFuture)
-				.f_Timeout(120.0, "The SSH agent setup attempt timed out")
-				.f_Wrap()
-			;
-
-			co_await fg_Move(pLaunchActor).f_Destroy().f_Wrap()
-				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the agent setup launch")
-			;
-
-			if (Result && Result->m_ExitCode == 0)
+			// The setup script is staged as a file first and then executed with only
+			// the sudo password on standard input: mixing the password and the script
+			// on one input depends on how much input sudo reads ahead, and a shell
+			// reading its script from standard input hangs until the input closes
+			CStr Error;
 			{
-				DMibLogWithCategory
+				CStrIO ScriptInput;
+				ScriptInput += BootstrapScript;
+
+				auto StageResult = co_await fg_RunVMBootstrapSSH
 					(
-						Malterlib/Cloud/AppManager
-						, Info
-						, "Installed the agent for environment '{}' in the guest at {}"
-						, _pEnvironment->m_Name
-						, GuestIP
+						LogName
+						, mp_State.m_RootDirectory
+						, mp_bLogLaunchesToStdErr
+						, Target
+						, AskPassPath
+						, _Provisioning.m_Password
+						, fg_CreateVector<CStr>("cat", ">", "/tmp/malterlib-agent-bootstrap.sh")
+						, fg_Move(ScriptInput)
+						, 60.0
 					)
+					.f_Wrap()
 				;
 
-				co_return {};
+				if (!StageResult)
+					Error = StageResult.f_GetExceptionStr();
+				else if (StageResult->m_ExitCode != 0)
+					Error = fg_Format("Staging the setup script failed with status {}: {}", StageResult->m_ExitCode, CStr(StageResult->f_GetCombinedOut().f_Trim()));
 			}
 
-			CStr Error;
-			if (!Result)
-				Error = Result.f_GetExceptionStr();
-			else
-				Error = fg_Format("SSH exited with status {}: {}", Result->m_ExitCode, CStr(Result->f_GetCombinedOut().f_Trim()));
+			if (Error.f_IsEmpty())
+			{
+				CStrIO PasswordInput;
+				PasswordInput += _Provisioning.m_Password;
+				PasswordInput += "\n";
+
+				auto RunResult = co_await fg_RunVMBootstrapSSH
+					(
+						LogName
+						, mp_State.m_RootDirectory
+						, mp_bLogLaunchesToStdErr
+						, Target
+						, AskPassPath
+						, _Provisioning.m_Password
+						, fg_CreateVector<CStr>("sudo", "-S", "-p", "''", "/bin/sh", "/tmp/malterlib-agent-bootstrap.sh")
+						, fg_Move(PasswordInput)
+						, 180.0
+					)
+					.f_Wrap()
+				;
+
+				if (!RunResult)
+					Error = RunResult.f_GetExceptionStr();
+				else if (RunResult->m_ExitCode != 0)
+					Error = fg_Format("SSH exited with status {}: {}", RunResult->m_ExitCode, CStr(RunResult->f_GetCombinedOut().f_Trim()));
+				else
+				{
+					DMibLogWithCategory
+						(
+							Malterlib/Cloud/AppManager
+							, Info
+							, "Installed the agent for environment '{}' in the guest at {}"
+							, _pEnvironment->m_Name
+							, GuestIP
+						)
+					;
+
+					co_return {};
+				}
+			}
 
 			if (Error != LastError)
 			{
