@@ -1050,6 +1050,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_CreateVMImage(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 #ifdef DPlatformFamily_macOS
 		TCFuture<uint32> fp_CommandLine_EnvironmentWindow(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VMSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 #endif
 
 		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -1350,6 +1351,8 @@ namespace NMib::NCloud::NAppManager
 		uint64 mp_ColimaMemoryMB = 0; /// 0 uses the colima default
 		uint64 mp_ColimaDiskGB = 0; /// 0 uses the colima default
 
+		bool mp_bVMWindow = false; /// Host VM environments in a window showing the guest display
+
 		fp64 mp_AutoUpdateDelay = mc_DefaultAutoUpdateDelay;
 
 		TCActor<CDatabaseActor> mp_DatabaseActor;
@@ -1437,4 +1440,27 @@ namespace NMib::NCloud::NAppManager
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);
+
+#ifdef DPlatformFamily_macOS
+	/// Builds and parses the window host configuration the AppManager writes for the
+	/// VirtualMachineWindow client action and the window host command
+	CEJsonSorted fg_AppManager_BuildVMWindowConfig
+		(
+			NVirtualization::CVirtualMachineConfig const &_Config
+			, CStr const &_Backend
+			, CStr const &_Title
+		)
+	;
+	NVirtualization::CVirtualMachineConfig fg_AppManager_ParseVMWindowConfig
+		(
+			CEJsonSorted const &_Params
+			, NVirtualization::EVirtualizationBackend &o_Backend
+			, CStr &o_Title
+		)
+	;
+
+	/// Hosts a virtual machine with a window from a configuration file; runs in the
+	/// process the AppManager launches with --vm-window-run
+	uint32 fg_AppManager_RunVMWindowHost(CStr const &_ConfigPath);
+#endif
 }
