@@ -270,6 +270,7 @@ namespace NMib::NCloud::NAppManager
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AgentAppInterface;
 			TCDistributedActorInterface<CAppManagerEnvironmentInterface> m_AgentInterface;
 			TCVector<TCPromise<void>> m_OnAgentConnected;
+			TCVector<TCPromise<void>> m_OnStopFinished;
 			CStr m_AgentUpdateInProgress; /// Description of an update the agent is installing; prevents host reboots while set
 			bool m_bStarting = false;
 			bool m_bStarted = false;
