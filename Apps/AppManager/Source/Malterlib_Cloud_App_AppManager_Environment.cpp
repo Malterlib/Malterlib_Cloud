@@ -3176,27 +3176,30 @@ namespace NMib::NCloud::NAppManager
 
 	auto CAppManagerActor::fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment) -> TCFuture<CAppLaunchResult>
 	{
-		// A container only sees the mounts it was created with, so when the
-		// application directory is not covered the environment is restarted and the
-		// container recreated with the new mount set
+		// A container only sees the mounts it was created with and a virtual
+		// machine only the shared folders it was started with, so when the
+		// application directory is not covered the environment is restarted with
+		// the new mount set
 		bool bRestartedEnvironment = false;
-		if
-		(
-			_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container
-			&& _pEnvironment->f_IsStarted()
-		)
+		if (_pEnvironment->f_IsStarted())
 		{
 			CStr Directory = _pApplication->f_GetDirectory();
 
-			bool bCovered = false;
-			for (auto &Mount : _pEnvironment->m_ContainerMounts)
+			bool bCovered = true;
+			if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
 			{
-				if (Directory == Mount || Directory.f_StartsWith(Mount + "/"))
+				bCovered = false;
+				for (auto &Mount : _pEnvironment->m_ContainerMounts)
 				{
-					bCovered = true;
-					break;
+					if (Directory == Mount || Directory.f_StartsWith(Mount + "/"))
+					{
+						bCovered = true;
+						break;
+					}
 				}
 			}
+			else if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
+				bCovered = _pEnvironment->m_VMShareTags.f_FindEqual(Directory) != nullptr;
 
 			if (!bCovered)
 			{
@@ -3304,6 +3307,14 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_bDistributedApp = _pApplication->m_Settings.m_bDistributedApp;
 		Launch.m_InterfaceAddress = InterfaceAddress->f_Encode();
 		Launch.m_LaunchID = _pApplication->m_LaunchID;
+
+		// The agent mounts the shared folder carrying the application directory
+		// before the launch
+		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
+		{
+			if (auto *pTag = _pEnvironment->m_VMShareTags.f_FindEqual(Launch.m_Directory))
+				Launch.m_VMShareTag = *pTag;
+		}
 
 		auto LaunchResult = co_await _pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_LaunchApplication)(fg_Move(Launch))
 			.f_Timeout(60.0 * 60.0, "Timed out launching application in environment (1 hour)")

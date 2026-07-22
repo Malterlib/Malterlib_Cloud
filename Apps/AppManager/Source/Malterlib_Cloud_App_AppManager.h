@@ -260,6 +260,11 @@ namespace NMib::NCloud::NAppManager
 			// the guest can be found in the DHCP leases across restarts
 			CStr m_VMMACAddress;
 
+			// The virtual machine only sees the shared folders it was started with, so
+			// the host application directory to share tag mapping of the running VM
+			// decides when the environment must restart to cover a new application
+			NContainer::TCMap<NStr::CStr, NStr::CStr> m_VMShareTags;
+
 			// Runtime state
 			CStr m_LaunchID;
 			CStr m_AgentHostID;
@@ -981,16 +986,20 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);
 		CStr fp_GetEnvironmentVMBundleDirectory(CEnvironment const &_Environment);
-		NVirtualization::CVirtualMachineConfig fp_BuildEnvironmentVMConfig(CEnvironment const &_Environment);
+		NVirtualization::CVirtualMachineConfig fp_BuildEnvironmentVMConfig(CEnvironment &_Environment);
+		static CStr fsp_GetVMShareTag(CStr const &_Directory);
 		TCFuture<NVirtualization::CMacOSGuestProvisioning> fp_LoadVMImageProvisioning(CStr _BundleDirectory);
 		TCFuture<void> fp_BootstrapVMAgentOverSSH
 			(
 				TCSharedPointer<CEnvironment> _pEnvironment
 				, NVirtualization::CMacOSGuestProvisioning _Provisioning
-				, CStr _MountPoint
 				, CStr _AgentExecutable
+				, CStr _ConnectSettings
 			)
 		;
+#ifdef DPlatformFamily_macOS
+		static void fsp_MountVMApplicationShare(CStr const &_Tag, CStr const &_Directory, CStr const &_User, CStr const &_Group);
+#endif
 		TCFuture<CStr> fp_FetchVMAgentGuestLog(TCSharedPointer<CEnvironment> _pEnvironment, NVirtualization::CMacOSGuestProvisioning _Provisioning);
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
 		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);

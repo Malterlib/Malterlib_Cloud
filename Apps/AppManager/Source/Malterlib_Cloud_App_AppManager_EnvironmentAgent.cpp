@@ -10,6 +10,11 @@
 	#include <unistd.h>
 #endif
 
+#ifdef DPlatformFamily_macOS
+	#include <sys/param.h>
+	#include <sys/mount.h>
+#endif
+
 #include "Malterlib_Cloud_App_AppManager.h"
 
 namespace NMib::NCloud::NAppManager
@@ -61,6 +66,7 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_bDistributedApp;
 		_Stream % m_InterfaceAddress;
 		_Stream % m_LaunchID;
+		_Stream % m_VMShareTag;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CEnvironmentLaunch);
 
@@ -105,6 +111,43 @@ namespace NMib::NCloud::NAppManager
 
 		co_return fg_Move(Info);
 	}
+
+#ifdef DPlatformFamily_macOS
+	void CAppManagerActor::fsp_MountVMApplicationShare(CStr const &_Tag, CStr const &_Directory, CStr const &_User, CStr const &_Group)
+	{
+		// Shared folder mounts survive for the VM lifetime, so a directory that
+		// already is a mount point is left alone
+		{
+			struct statfs FileSystemInfo = {};
+			if (statfs(_Directory.f_GetStr(), &FileSystemInfo) == 0 && _Directory == FileSystemInfo.f_mntonname)
+				return;
+		}
+
+		if (!CFile::fs_FileExists(_Directory, EFileAttrib_Directory))
+			CFile::fs_CreateDirectory(_Directory);
+
+		// The shared folder is mounted as the user the application runs as, which
+		// must own the mount point
+		if (!_User.f_IsEmpty())
+			CFile::fs_SetOwner(_Directory, _User);
+		if (!_Group.f_IsEmpty())
+			CFile::fs_SetGroup(_Directory, _Group);
+
+		CProcessLaunchParams Params;
+		Params.m_bLaunchInUserSession = false;
+		Params.m_RunAsUser = _User;
+		Params.m_RunAsGroup = _Group;
+
+		CStr StdOut;
+		CStr StdErr;
+		uint32 ExitCode = 0;
+		if (!CProcessLaunch::fs_LaunchBlock("/sbin/mount_virtiofs", fg_CreateVector<CStr>(_Tag, _Directory), StdOut, StdErr, ExitCode, Params))
+			DMibError(fg_Format("Failed to launch mount_virtiofs for '{}': {}", _Directory, StdErr));
+
+		if (ExitCode != 0)
+			DMibError(fg_Format("Mounting the shared folder at '{}' failed with status {}: {}", _Directory, ExitCode, fg_ConcatOutput(StdOut, StdErr)));
+	}
+#endif
 
 	TCFuture<CStr> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_LaunchApplication(CEnvironmentLaunch _Launch)
 	{
@@ -171,7 +214,7 @@ namespace NMib::NCloud::NAppManager
 				(
 					(
 						g_Dispatch(BlockingActorCheckout)
-						/ [Settings, Directory = _Launch.m_Directory, pUniqueUserGroup = pThis->mp_pUniqueUserGroup]()
+						/ [Settings, Directory = _Launch.m_Directory, VMShareTag = _Launch.m_VMShareTag, pUniqueUserGroup = pThis->mp_pUniqueUserGroup]()
 						{
 							fsp_CreateApplicationUserGroup
 								(
@@ -184,9 +227,25 @@ namespace NMib::NCloud::NAppManager
 									, pUniqueUserGroup
 								)
 							;
+
+#ifdef DPlatformFamily_macOS
+							// In a VM environment the application directory arrives as a
+							// shared folder, mounted here as the user the application runs as
+							if (!VMShareTag.f_IsEmpty())
+							{
+								fsp_MountVMApplicationShare
+									(
+										VMShareTag
+										, Directory
+										, pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser)
+										, pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup)
+									)
+								;
+							}
+#endif
 						}
 					)
-					% "Failed to create user and group for application in environment"
+					% "Failed to prepare the user, group and shared folder for application in environment"
 				)
 			;
 		}
