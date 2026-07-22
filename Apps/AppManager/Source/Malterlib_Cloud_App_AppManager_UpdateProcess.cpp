@@ -638,7 +638,8 @@ namespace NMib::NCloud::NAppManager
 	{
 		for (auto &pEnvironment : mp_Environments)
 		{
-			if (pEnvironment->m_Settings.m_AgentApplication != _ApplicationName)
+			auto pAgentApplication = fp_FindEnvironmentAgentApplication(*pEnvironment);
+			if (!pAgentApplication || pAgentApplication->m_Name != _ApplicationName)
 				continue;
 
 			if (!pEnvironment->f_IsStarted() && !pEnvironment->m_bStarting)

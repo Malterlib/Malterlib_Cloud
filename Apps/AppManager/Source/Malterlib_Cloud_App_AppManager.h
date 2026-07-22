@@ -970,6 +970,7 @@ namespace NMib::NCloud::NAppManager
 		// Environment agent handling (host side)
 		TCSharedPointer<CEnvironment> fp_EnvironmentFromHostID(CStr const &_HostID);
 		TCSharedPointer<CApplication> fp_GetEnvironmentParentApplication(CEnvironment const &_Environment);
+		TCSharedPointer<CApplication> fp_FindEnvironmentAgentApplication(CEnvironment const &_Environment);
 		CStr fp_GetEnvironmentStorageDirectory(CEnvironment const &_Environment);
 		bool fp_EnvironmentStorageReady(CEnvironment const &_Environment, CStr &o_Error, CAppManagerInterface::EStatusSeverity &o_Severity);
 		void fp_AutoStartEnvironments();
