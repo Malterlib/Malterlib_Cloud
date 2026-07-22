@@ -21,6 +21,7 @@
 #include <Mib/Concurrency/DistributedAppLogStoreLocal>
 
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
+#include "Malterlib_Cloud_App_AppManager_EnvironmentInterface.h"
 
 namespace NMib::NCloud::NAppManager
 {
@@ -86,6 +87,7 @@ namespace NMib::NCloud::NAppManager
 			, EApplicationSetting_RunAsUserHasShell              = DBit(26)
 			, EApplicationSetting_AutoUpdate                     = DBit(27)
 			, EApplicationSetting_LaunchInProcess                = DBit(28)
+			, EApplicationSetting_LaunchEnvironment              = DBit(29)
 			, EApplicationSetting_NeedUpdateSettings
 			= EApplicationSetting_Executable
 			| EApplicationSetting_ExecutableParameters
@@ -93,6 +95,7 @@ namespace NMib::NCloud::NAppManager
 			| EApplicationSetting_RunAsGroup
 			| EApplicationSetting_SelfUpdateSource
 			| EApplicationSetting_LaunchInProcess
+			| EApplicationSetting_LaunchEnvironment
 		};
 
 		enum EStopFlag
@@ -137,6 +140,7 @@ namespace NMib::NCloud::NAppManager
 			TCSet<CStr> m_Dependencies;
 			CStr m_VersionManagerApplication;
 			CStr m_UpdateGroup;
+			CStr m_LaunchEnvironment;
 			TCSet<CStr> m_UpdateTags;
 			TCSet<CStr> m_UpdateBranches;
 			CUpdateScripts m_UpdateScripts;
@@ -151,11 +155,100 @@ namespace NMib::NCloud::NAppManager
 			bool m_bLaunchInProcess = false;
 		};
 
+		enum EEnvironmentSetting
+		{
+			EEnvironmentSetting_None                = 0
+			, EEnvironmentSetting_Type              = DBit(0)
+			, EEnvironmentSetting_AgentApplication  = DBit(1)
+			, EEnvironmentSetting_AutoStart         = DBit(2)
+			, EEnvironmentSetting_ParentApplication = DBit(3)
+		};
+
+		struct CEnvironmentSettings
+		{
+			using EEnvironmentType = CAppManagerInterface::EEnvironmentType;
+
+			bool f_ParseSettings(CEJsonSorted const &_Params, EEnvironmentSetting &o_ChangedSettings, CStr &o_Error);
+			void f_ApplySettings(EEnvironmentSetting _ChangedSettings, CEnvironmentSettings const &_Source);
+			void f_FromInterfaceSettings(CAppManagerInterface::CEnvironmentSettings const &_Settings, EEnvironmentSetting &o_ChangedSettings);
+			EEnvironmentSetting f_ChangedSettings(CEnvironmentSettings const &_Other) const;
+
+			EEnvironmentType m_Type = CAppManagerInterface::EEnvironmentType_Local;
+			CStr m_AgentApplication;
+			CStr m_ParentApplication; /// Application whose storage confines the environment storage, supporting encrypted storage
+
+			bool m_bAutoStart = true;
+		};
+
+		struct CEnvironment
+		{
+			CEnvironment(CStr const &_Name, CAppManagerActor *_pThis);
+
+			void f_SetStatus(CStr const &_Status, CAppManagerInterface::EStatusSeverity _Severity);
+			bool f_IsStarted() const;
+
+			CIntrusiveRefCount m_RefCount;
+
+			CStr const m_Name;
+
+			CEnvironmentSettings m_Settings;
+
+			CStr m_Status = "Not started";
+			CAppManagerInterface::EStatusSeverity m_StatusSeverity = CAppManagerInterface::EStatusSeverity_Warning;
+
+			CDistributedAppSensorReporter::CSensorReporter m_StatusSensorReporter;
+			CSequencer m_StatusSensorReporterSequencer{"EnvironmentStatusSensorReporterSequencer"};
+			TCOptional<CDistributedAppSensorReporter::CStatus> m_LastReporterSensorStatus;
+
+			bool m_bDeleted = false;
+			bool m_bStoppedManually = false; /// Persisted; while set, only an explicit start or restart, which clear it, storage removal and the VM window boot the environment
+
+			// Runtime state
+			CStr m_LaunchID;
+			CStr m_AgentHostID;
+			TCActor<CDistributedAppInterfaceLaunchActor> m_AgentLaunch;
+			CActorSubscription m_AgentLaunchSubscription;
+			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AgentAppInterface;
+			TCDistributedActorInterface<CAppManagerEnvironmentInterface> m_AgentInterface;
+			umint m_AgentAppInterfaceAssignSequence = 0; /// Lets a lost registration of m_AgentAppInterface tell whether a newer one replaced it
+			umint m_AgentInterfaceAssignSequence = 0;    /// Lets a lost registration of m_AgentInterface tell whether a newer one replaced it
+			TCVector<TCPromise<void>> m_OnAgentConnected;
+			TCVector<TCPromise<void>> m_OnStopFinished;
+			bool m_bStarting = false;
+			bool m_bStarted = false;
+			bool m_bStopping = false;
+			bool m_bRemoving = false;
+
+			CAppManagerActor *m_pThis;
+		};
+
+		struct CAppManagerEnvironmentInterfaceImplementation : public CAppManagerEnvironmentInterface
+		{
+			TCFuture<CAgentInfo> f_GetAgentInfo() override;
+			TCFuture<CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) override;
+			TCFuture<uint32> f_StopApplication(CStr _Name) override;
+			TCFuture<void> f_RunScript(CEnvironmentScript _Script) override;
+
+			DMibDelegatedActorImplementation(CAppManagerActor);
+		};
+
+		struct CAppManagerEnvironmentHostInterfaceImplementation : public CAppManagerEnvironmentHostInterface
+		{
+			auto f_RegisterEnvironmentAgent(CStr _LaunchID, NConcurrency::TCDistributedActorInterfaceWithID<CAppManagerEnvironmentInterface> _Interface)
+				-> TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override
+			;
+			TCFuture<void> f_ReportApplicationState(CAppManagerEnvironmentInterface::CApplicationStateChange _Change) override;
+			TCFuture<CStr> f_RequestApplicationConnectionTicket(CStr _LaunchID) override;
+
+			DMibDelegatedActorImplementation(CAppManagerActor);
+		};
+
 		struct CApplication
 		{
 			CApplication(CStr const &_Name, CAppManagerActor *_pThis);
 
 			void f_Clear();
+			void f_ClearEnvironmentLaunch();
 			void f_Delete();
 			void f_AbortPendingLaunches();
 
@@ -168,6 +261,7 @@ namespace NMib::NCloud::NAppManager
 
 			bool f_NeedsEncryption() const;
 			bool f_EncryptionOpened() const;
+			bool f_EncryptionClosing() const;
 			bool f_IsChildApp() const;
 			bool f_IsInProgress() const;
 			CStr f_InProgressDescription() const;
@@ -189,6 +283,8 @@ namespace NMib::NCloud::NAppManager
 
 			CStr m_AssociatedHostID;
 			CStr m_LaunchID;
+			CStr m_EnvironmentTicketID;
+			CActorSubscription m_EnvironmentTicketSubscription; /// Keeps the latest unused environment connection ticket alive; a new one replaces it
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AppInterface;
 			umint m_AppInterfaceAssignSequence = 0;
 			CDistributedAppInterfaceServer::CRegisterInfo m_RegisterInfo;
@@ -229,6 +325,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bAutoStart = false;
 			bool m_bOperationInProgress = false;
 			bool m_bEncryptionOpened = false;
+			bool m_bClosingEncryption = false; /// Blocks new starts of environments confined to the application or its children while its storage closes
 			bool m_bLaunching = false;
 			bool m_bLaunched = false;
 			bool m_bJustUpdated = false;
@@ -254,6 +351,17 @@ namespace NMib::NCloud::NAppManager
 			TCVariant<void, TCActor<CDistributedAppInterfaceLaunchActor>, TCActor<CDistributedAppInProcessActor>> m_ProcessLaunch;
 			CActorSubscription m_ProcessLaunchSubscription;
 			TCVector<TCPromise<void>> m_OnStops;
+
+			// Environment launches (host side)
+			TCSharedPointer<CEnvironment> m_pLaunchedEnvironment; /// Set from before the agent launch call, so ticket requests during the launch find the environment
+			TCSharedPointer<CEnvironment> m_pStoppingEnvironment; /// Set while a stop runs the application down through the agent, which an environment stop waits for
+			TCVector<TCPromise<void>> m_OnEnvironmentStopFinished;
+
+			// Agent side
+			CStr m_DirectoryOverride;
+			bool m_bEphemeral = false;      /// Application exists only for the lifetime of the environment agent and is never persisted
+			CStr m_EnvironmentHostAddress;  /// Host AppManager address the application connects its distributed app interface to
+			CStr m_EnvironmentHostLaunchID; /// Launch ID the host assigned to the application, which it registers with
 
 			CApplication *m_pParentApplication = nullptr;
 			DLinkDS_Link(CApplication, m_ChildrenLink);
@@ -367,6 +475,7 @@ namespace NMib::NCloud::NAppManager
 
 			TCFuture<void> f_Add(CStr _Name, CApplicationAdd _Add, CApplicationSettings _Settings) override;
 			TCFuture<void> f_Remove(CStr _Name) override;
+			TCFuture<void> f_RemoveInternal(CStr _Name, bool _bForce);
 
 			TCFuture<void> f_Update(CStr _Name, CApplicationUpdate _Update) override;
 
@@ -380,6 +489,14 @@ namespace NMib::NCloud::NAppManager
 
 			auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
 			auto f_SubscribeChangeNotifications(CSubscribeChangeNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> override;
+
+			TCFuture<void> f_EnvironmentAdd(CStr _Name, CEnvironmentSettings _Settings) override;
+			TCFuture<void> f_EnvironmentRemove(CStr _Name) override;
+			TCFuture<void> f_EnvironmentChangeSettings(CStr _Name, CEnvironmentSettings _Settings) override;
+			TCFuture<void> f_EnvironmentStart(CStr _Name) override;
+			TCFuture<void> f_EnvironmentStop(CStr _Name) override;
+			TCFuture<void> f_EnvironmentRestart(CStr _Name) override;
+			TCFuture<TCMap<CStr, CEnvironmentInfo>> f_GetEnvironments() override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -634,6 +751,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCFuture<CAppLaunchResult> fp_LaunchApp(TCSharedPointer<CApplication> _pApplication, bool _bOpenEncryption);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInternal(TCSharedPointer<CApplication> _pApplication, bool _bOpenEncryption);
+		void fp_DiscardPreviousAppInterface(CApplication &_Application);
 		void fp_ScheduleRelaunchApp(TCSharedPointer<CApplication> const &_pApplication);
 		static void fsp_CreateApplicationUserGroup
 			(
@@ -657,17 +775,18 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_UpdateApplicationJson(TCSharedPointer<CApplication> _pApplication);
 		auto fp_RunUpdateScript
 			(
-				TCSharedPointer<CApplication> const &_pApplication
+				TCSharedPointer<CApplication> _pApplication
 				, EUpdateScript _Script
-				, CStr const &_Param
-				, CVersionManager::CVersionIDAndPlatform const &_VersionID
+				, CStr _Param
+				, CVersionManager::CVersionIDAndPlatform _VersionID
 				, CVersionManager::CVersionInformation const *_pVersionInformation
-				, CVersionManager::CVersionIDAndPlatform const &_PreviousVersionID
-				, CVersionManager::CVersionInformation const &_PreviousVersionInformation
+				, CVersionManager::CVersionIDAndPlatform _PreviousVersionID
+				, CVersionManager::CVersionInformation _PreviousVersionInformation
 				, fp64 _TimeSinceUpdateStart
 			)
 			-> TCFuture<void>
 		;
+		TCFuture<void> fp_RunBashScript(CAppManagerEnvironmentInterface::CEnvironmentScript _Script, NStr::CStrSecure _RunAsUserPassword = {});
 		TCFuture<bool> fp_SelfUpdate(TCSharedPointer<CApplication> _pApplication);
 		TCFuture<ERebootResult> fp_Reboot(bool _bErrorOnPreventReboot);
 		TCFuture<bool> fp_CheckAndLogPreventedReboot(CCheckAndLogPreventedRebootParams _Params);
@@ -680,6 +799,78 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_StartApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_StopApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_RestartApplication(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+
+		void fp_BuildCommandLine_Environments(CDistributedAppCommandLineSpecification &o_CommandLine);
+		void fp_ReadEnvironmentsState();
+		TCFuture<void> fp_UpdateEnvironmentJson(TCSharedPointer<CEnvironment> _pEnvironment);
+		CAppManagerInterface::CEnvironmentInfo fp_GetEnvironmentInfo(CEnvironment const &_Environment);
+		TCFuture<void> fp_RegisterEnvironmentPermissions(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_UnregisterEnvironmentPermissions(TCSharedPointer<CEnvironment> _pEnvironment);
+
+		auto fp_AddEnvironment
+			(
+				CStr _Name
+				, CEnvironmentSettings _Settings
+				, EEnvironmentSetting _ChangedSettings
+				, TCFunction<void (CStr const &_Info)> _fOnInfo
+				, CCallingHostInfo _CallingHostInfo
+			)
+			-> TCFuture<void>
+		;
+		TCFuture<void> fp_RemoveEnvironment(CStr _Name, TCFunction<void (CStr const &_Info)> _fOnInfo, CCallingHostInfo _CallingHostInfo);
+		auto fp_ChangeEnvironmentSettings
+			(
+				CStr _Name
+				, CEnvironmentSettings _Settings
+				, EEnvironmentSetting _ChangedSettings
+				, TCFunction<void (CStr const &_Info)> _fOnInfo
+				, CCallingHostInfo _CallingHostInfo
+			)
+			-> TCFuture<void>
+		;
+		TCFuture<void> fp_StartEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_StopEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_RestartEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo);
+
+		// Environment agent handling (host side)
+		TCSharedPointer<CEnvironment> fp_EnvironmentFromHostID(CStr const &_HostID);
+		TCSharedPointer<CApplication> fp_GetEnvironmentParentApplication(CEnvironment const &_Environment);
+		CStr fp_GetEnvironmentStorageDirectory(CEnvironment const &_Environment);
+		CStr fp_CheckLocalEnvironmentAccounts(CEnvironmentSettings const &_Settings);
+		CStr fp_CheckLocalEnvironmentApplicationAccount(CStr const &_Application, CApplicationSettings const &_NewSettings);
+		CStr fp_FindEnvironmentStoringDataInApplication(CStr const &_Application);
+		bool fp_EnvironmentStorageReady(CEnvironment const &_Environment, CStr &o_Error, CAppManagerInterface::EStatusSeverity &o_Severity);
+		void fp_AutoStartEnvironments();
+		bool fp_EnvironmentAcceptsApplications(CStr const &_Name);
+		TCFuture<void> fp_CheckEnvironmentAccess(CStr _Name, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
+		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
+		TCFuture<void> fp_WaitForEnvironmentIdle(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_RestartEnvironmentWhenIdle(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);
+		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_SetEnvironmentStoppedManually(TCSharedPointer<CEnvironment> _pEnvironment, bool _bStoppedManually);
+		TCFuture<void> fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface);
+		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);
+		void fp_AbortPendingDistributedAppWaits(CApplication &_Application, CStr const &_Error);
+		TCFuture<void> fp_ConfirmEnvironmentAppStart(TCSharedPointer<CApplication> _pApplication);
+		void fp_OnEnvironmentApplicationStateChange(TCSharedPointer<CEnvironment> const &_pEnvironment, CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change);
+		TCFuture<CStr> fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError);
+		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_AbortEnvironmentLaunch(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
+
+		// Environment agent handling (agent side)
+		TCFuture<void> fp_RegisterWithEnvironmentHost();
+		void fp_ForwardApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange _Change);
+
+		TCFuture<uint32> fp_CommandLine_EnumEnvironments(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_AddEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ChangeEnvironmentSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RemoveEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_StopEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_RestartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 
 		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_VersionManagerList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -922,6 +1113,11 @@ namespace NMib::NCloud::NAppManager
 
 		static constexpr uint32 mcp_CurrentAppMangerVersion = 0x101;
 
+		// Directories in the AppManager root and in application directories, which no application can name, since application names don't start
+		// with a dot, so a child application can't take them
+		static constexpr ch8 const *mcp_pEnvironmentStorageDirectory = ".Environment";
+		static constexpr ch8 const *mcp_pVMImagesDirectory = ".VMImages";
+
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #else
@@ -929,6 +1125,7 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
+		TCMap<CStr, TCSharedPointer<CEnvironment>> mp_Environments;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagerSubscription;
 		TCTrustedActorSubscription<CCloudManager> mp_CloudManagerSubscription;
@@ -962,6 +1159,14 @@ namespace NMib::NCloud::NAppManager
 		TCDistributedActorInstance<CDistributedAppInterfaceServerImplementation> mp_AppInterfaceServer;
 		TCDistributedActorInstance<CAppManagerInterfaceImplementation> mp_AppManagerInterface;
 		TCDistributedActorInstance<CAppManagerCoordinationInterfaceImplementation> mp_AppManagerCoordinationInterface;
+		TCDistributedActorInstance<CAppManagerEnvironmentInterfaceImplementation> mp_EnvironmentInterface;
+		TCDistributedActorInstance<CAppManagerEnvironmentHostInterfaceImplementation> mp_EnvironmentHostInterface;
+		TCTrustedActorSubscription<CAppManagerEnvironmentHostInterface> mp_EnvironmentHostActors;
+		TCDistributedActor<CAppManagerEnvironmentHostInterface> mp_EnvironmentHostActor;
+		CActorSubscription mp_EnvironmentHostRegistration;
+		bool mp_bEnvironmentAgent = false;
+		bool mp_bStoppingApp = false; /// The shutdown waits for environment starts, so long start retries give up
+		CStr mp_EnvironmentHostID;    /// Agent side: host id of the launching AppManager, from the deployment settings
 
 		CTrustedPermissionSubscription mp_Permissions;
 

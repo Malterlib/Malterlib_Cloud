@@ -52,11 +52,12 @@ namespace NMib::NCloud::NAppManagerDatabase
 		_Stream % m_UniqueKey;
 
 		{
+			// Stored notifications stream with a fixed interface version, so a protocol bump does not change the stored format
 			uint32 AppManagerInterfaceVersion = CAppManagerInterface::EProtocolVersion_ResumableUpdateNotifications;
 
 			static_assert
 				(
-					CAppManagerInterface::EProtocolVersion_Current == CAppManagerInterface::EProtocolVersion_ResumableUpdateNotifications
+					CAppManagerInterface::EProtocolVersion_Current == CAppManagerInterface::EProtocolVersion_AddLaunchEnvironment
 					, "Add a new version mapping if m_Notification streaming changed"
 				)
 			;

@@ -44,6 +44,25 @@ namespace NMib::NCloud::NAppManager
 			return false;
 		}
 
+		if (!m_Settings.m_LaunchEnvironment.f_IsEmpty())
+		{
+			auto *pEnvironment = m_pThis->mp_Environments.f_FindEqual(m_Settings.m_LaunchEnvironment);
+			if (pEnvironment && (*pEnvironment)->m_bStoppedManually)
+			{
+				o_State = fg_Format("Environment '{}' was stopped. Start it with --environment-start.", m_Settings.m_LaunchEnvironment);
+				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
+				return false;
+			}
+
+			// A launch during a stop would start the environment again once the stop finishes, and one during a removal fails
+			if (pEnvironment && ((*pEnvironment)->m_bStopping || (*pEnvironment)->m_bRemoving))
+			{
+				o_State = fg_Format("Waiting for an operation on environment '{}'", m_Settings.m_LaunchEnvironment);
+				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
+				return false;
+			}
+		}
+
 		if (f_IsChildApp())
 		{
 			if (!m_pParentApplication)
@@ -163,6 +182,12 @@ namespace NMib::NCloud::NAppManager
 
 				auto &Application = *_pApplication;
 
+				// A launch that failed without scheduling its own delayed relaunch
+				// would be retried again by the next dependency update in the same
+				// instant, spinning on failures that happen without a suspension
+				if (!Application.m_bStopped && !Application.m_bDeleted && !Application.m_bPreventLaunch_DelayAfterFailure && !Application.f_IsLaunched())
+					fp_ScheduleRelaunchApp(_pApplication);
+
 				if (Application.m_LaunchStatus.f_IsEmpty())
 					fp_AppLaunchStateChanged(_pApplication, fg_Format("Failed launch: {}", _Result.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
 
@@ -173,6 +198,7 @@ namespace NMib::NCloud::NAppManager
 		return true;
 	}
 
+	// Launches every application that can launch, including stopped auto start applications
 	void CAppManagerActor::fp_UpdateApplicationDependencies()
 	{
 		bool bAllStarted = true;
@@ -198,6 +224,8 @@ namespace NMib::NCloud::NAppManager
 
 		if (mp_bPendingAutoUpdate)
 			fp_AutoUpdate_Update();
+
+		fp_AutoStartEnvironments();
 	}
 
 	TCFuture<void> CAppManagerActor::fp_UpdateEncryptionSensorStatus(bool _bNeedEncryption)

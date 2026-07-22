@@ -182,6 +182,9 @@ namespace NMib::NCloud::NAppManager
 		if (Application.m_bDeleted)
 			co_return DMibErrorInstance("Application has been deleted");
 
+		if (Application.m_bEphemeral)
+			co_return {};
+
 		auto &Settings = Application.m_Settings;
 
 		auto &ApplicationJson = mp_State.m_StateDatabase.m_Data["Applications"][Application.m_Name];
@@ -318,6 +321,7 @@ namespace NMib::NCloud::NAppManager
 		ApplicationJson["PreventLaunchUpdate"] = Application.m_bPreventLaunch_Update;
 		ApplicationJson["AppManagerVersion"] = Settings.m_AppManagerVersion;
 		ApplicationJson["LaunchInProcess"] = Settings.m_bLaunchInProcess;
+		ApplicationJson["LaunchEnvironment"] = Settings.m_LaunchEnvironment;
 
 		co_return co_await mp_State.m_StateDatabase.f_Save();
 	}
@@ -505,7 +509,8 @@ namespace NMib::NCloud::NAppManager
 		auto InProgressScope = co_await (pThis->fp_SetInProgressWithWait(pApplication, "Start") % Auditor);
 		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
-		if (!pApplication->m_ProcessLaunch.f_IsOfType<void>())
+		// An application in an environment has no process launch on the host
+		if (!pApplication->m_ProcessLaunch.f_IsOfType<void>() || pApplication->m_bLaunched)
 			co_return Auditor.f_Exception("Application already started");
 
 		co_await pThis->fp_ClearPreventLaunch(pApplication);

@@ -30,12 +30,27 @@ namespace NMib::NCloud::NAppManager
 		Permissions["AppManager/Command/ApplicationSubscribeUpdates"];
 		Permissions["AppManager/Command/ApplicationSubscribeChanges"];
 
+		Permissions["AppManager/Command/EnvironmentEnum"];
+		Permissions["AppManager/Command/EnvironmentAdd"];
+		Permissions["AppManager/Command/EnvironmentRemove"];
+		Permissions["AppManager/Command/EnvironmentChangeSettings"];
+		Permissions["AppManager/Command/EnvironmentStart"];
+		Permissions["AppManager/Command/EnvironmentStop"];
+		Permissions["AppManager/Command/EnvironmentRestart"];
+
 		Permissions["AppManager/AppAll"];
+		Permissions["AppManager/EnvironmentAll"];
 
 		for (auto &pApplication : mp_Applications)
 		{
 			auto &Application = *pApplication;
 			Permissions[fg_Format("AppManager/App/{}", Application.m_Name)];
+		}
+
+		for (auto &pEnvironment : mp_Environments)
+		{
+			auto &Environment = *pEnvironment;
+			Permissions[fg_Format("AppManager/Environment/{}", Environment.m_Name)];
 		}
 
 		co_return co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, fg_Move(Permissions));
@@ -99,7 +114,14 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_SetupAppManagerInterfacePermissions()
 	{
-		NContainer::TCMap<NStr::CStr, CPermissionRequirements> CommandLinePermissions = {{"AppManager/VersionAppAll", {}}, {"AppManager/AppAll", {}}, {"AppManager/CommandAll", {}}};
+		NContainer::TCMap<NStr::CStr, CPermissionRequirements> CommandLinePermissions =
+			{
+				{"AppManager/VersionAppAll", {}}
+				, {"AppManager/AppAll", {}}
+				, {"AppManager/CommandAll", {}}
+				, {"AppManager/EnvironmentAll", {}}
+			}
+		;
 
 		co_await
 			(
