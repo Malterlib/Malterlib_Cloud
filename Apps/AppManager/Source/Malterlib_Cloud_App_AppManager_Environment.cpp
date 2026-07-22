@@ -651,7 +651,8 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_o= false
 							, "Description"_o= "Delete the storage of the environment, with the application data of a container or VM environment and the\n"
 							"files that removed applications kept there. Without it the storage is kept, and an environment added later\n"
-							"with the same name, parent application and container runtime uses it."
+							"with the same name, parent application and container runtime uses it. The VM image bundle, with the system\n"
+							"disk the guest wrote, is kept either way."
 						}
 					}
 				}
