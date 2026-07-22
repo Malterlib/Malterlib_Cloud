@@ -520,6 +520,58 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentManagement.f_RegisterCommand
 			(
 				{
+					"Names"_o= _o["--vm-settings"]
+					, "Description"_o=
+						"Shows or changes the settings shared by all VM environments.\n"
+						"Changing a value restarts the running VM environments."
+					, "Options"_o=
+					{
+						"Window?"_o=
+						{
+							"Names"_o= _o["--window"]
+							, "Type"_o= true
+							, "Description"_o= "Host each VM environment with a window showing the guest display.\n"
+							"The window opens in the graphical session of the AppManager; closing the window\n"
+							"hides it while the machine keeps running, and clicking the host application in\n"
+							"the Dock shows it again. Starts fall back to no window when the AppManager has\n"
+							"no graphical session."
+						}
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_VMSettings(fg_Move(_Params), fg_Move(_pCommandLine));
+				}
+			)
+		;
+
+		EnvironmentManagement.f_RegisterDirectCommand
+			(
+				{
+					"Names"_o= _o["--vm-window-run"]
+					, "Description"_o=
+						"Hosts a virtual machine with a window from a window host configuration.\n"
+						"Used internally by the AppManager for VM environments with the window setting."
+					, "Options"_o=
+					{
+						"Config"_o=
+						{
+							"Names"_o= _o["--config"]
+							, "Type"_o= ""
+							, "Description"_o= "Path to the window host configuration file."
+						}
+					}
+				}
+				, [](CEJsonSorted &&_Params, CDistributedAppCommandLineClient &_CommandLineClient) -> uint32
+				{
+					return fg_AppManager_RunVMWindowHost(_Params["Config"].f_String());
+				}
+			)
+		;
+
+		EnvironmentManagement.f_RegisterCommand
+			(
+				{
 					"Names"_o= _o["--colima-settings"]
 					, "Description"_o=
 						"Shows or changes the sizing of the colima virtual machine shared by all Colima environments.\n"
@@ -971,6 +1023,12 @@ namespace NMib::NCloud::NAppManager
 				mp_ColimaMemoryMB = (uint64)pValue->f_Integer();
 			if (auto pValue = pColima->f_GetMember("DiskGB", EJsonType_Integer))
 				mp_ColimaDiskGB = (uint64)pValue->f_Integer();
+		}
+
+		if (auto pVMSettings = mp_State.m_StateDatabase.m_Data.f_GetMember("VMSettings"))
+		{
+			if (auto pValue = pVMSettings->f_GetMember("Window", EJsonType_Boolean))
+				mp_bVMWindow = pValue->f_Boolean();
 		}
 
 		auto pEnvironments = mp_State.m_StateDatabase.m_Data.f_GetMember("Environments");

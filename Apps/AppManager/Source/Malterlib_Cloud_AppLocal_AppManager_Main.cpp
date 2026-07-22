@@ -41,29 +41,7 @@ namespace
 
 		NStorage::TCSharedPointer<CWindowRun> pRun = fg_Construct();
 		pRun->m_Promise = Done.m_Promise;
-
-		pRun->m_Config.m_BundleDirectory = _Params["BundleDirectory"].f_String();
-		pRun->m_Config.m_CPUCount = (uint32)_Params["CPUCount"].f_AsInteger();
-		pRun->m_Config.m_MemoryMB = (uint64)_Params["MemoryMB"].f_AsInteger();
-		if (auto *pSharedFolders = _Params.f_GetMember("SharedFolders"))
-		{
-			for (auto &SharedFolder : pSharedFolders->f_Object())
-				pRun->m_Config.m_SharedFolders[SharedFolder.f_Name()] = SharedFolder.f_Value().f_String();
-		}
-
-		if (auto *pProvisioning = _Params.f_GetMember("Provisioning"))
-		{
-			pRun->m_Config.m_Provisioning.m_Username = (*pProvisioning)["Username"].f_AsString();
-			pRun->m_Config.m_Provisioning.m_Password = (*pProvisioning)["Password"].f_AsString();
-			pRun->m_Config.m_Provisioning.m_FullName = (*pProvisioning)["FullName"].f_AsString();
-			pRun->m_Config.m_Provisioning.m_bAutoLogin = (*pProvisioning)["AutoLogin"].f_AsBoolean(true);
-			pRun->m_Config.m_Provisioning.m_bEnableRemoteLogin = (*pProvisioning)["EnableRemoteLogin"].f_AsBoolean(true);
-		}
-
-		if (_Params["Backend"].f_AsString() == "MacOSVirtualization")
-			pRun->m_Backend = EVirtualizationBackend_MacOSVirtualization;
-
-		pRun->m_Title = _Params["Title"].f_String();
+		pRun->m_Config = fg_AppManager_ParseVMWindowConfig(_Params, pRun->m_Backend, pRun->m_Title);
 
 		// The window must run on the process main thread, which waits on the
 		// run loop while the command runs in the AppManager
