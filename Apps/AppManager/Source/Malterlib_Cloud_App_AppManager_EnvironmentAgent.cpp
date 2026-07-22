@@ -26,6 +26,7 @@ namespace NMib::NCloud::NAppManager
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_StopApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_RunScript);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ConfigureAgent);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ShutdownEnvironment);
 	}
 
 	CAppManagerEnvironmentInterface::~CAppManagerEnvironmentInterface()
@@ -582,6 +583,58 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		co_return co_await pThis->fp_ConfigureHostMonitorFromHost(fg_Move(_Config.m_AutoUpdateConfig));
+	}
+
+#ifndef DPlatformFamily_Windows
+	namespace
+	{
+		// Powers the environment off after the reply to the shutdown request has
+		// been delivered to the host
+		TCFuture<void> fg_ShutdownEnvironmentAfterDelay()
+		{
+			co_await fg_Timeout(2.0);
+
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			auto Result = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / []()
+					{
+						CStr StdOut;
+						CStr StdErr;
+						uint32 ExitCode = 0;
+						if (!CProcessLaunch::fs_LaunchBlock("/sbin/shutdown", fg_CreateVector<CStr>("-h", "now"), StdOut, StdErr, ExitCode))
+							DMibError(fg_Format("Failed to launch shutdown: {}", StdErr));
+
+						if (ExitCode != 0)
+							DMibError(fg_Format("Shutting down failed with status {}: {}", ExitCode, fg_ConcatOutput(StdOut, StdErr)));
+					}
+				)
+				.f_Wrap()
+			;
+
+			if (!Result)
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to shut down the environment: {}", Result.f_GetExceptionStr());
+
+			co_return {};
+		}
+	}
+#endif
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_ShutdownEnvironment()
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_bEnvironmentAgent)
+			co_return DMibErrorInstance("Not running as an environment agent");
+
+#ifdef DPlatformFamily_Windows
+		co_return DMibErrorInstance("Shutting down the environment from inside is not supported on this platform");
+#else
+		fg_ShutdownEnvironmentAfterDelay().f_DiscardResult();
+
+		co_return {};
+#endif
 	}
 
 	void CAppManagerActor::fs_ApplyEnvironmentHostName(CStr const &_HostName)

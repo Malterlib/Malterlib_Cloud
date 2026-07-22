@@ -291,6 +291,7 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<uint32> f_StopApplication(CStr _Name) override;
 			TCFuture<void> f_RunScript(CEnvironmentScript _Script) override;
 			TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) override;
+			TCFuture<void> f_ShutdownEnvironment() override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};

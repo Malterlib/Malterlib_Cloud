@@ -404,16 +404,19 @@ namespace NMib::NCloud::NAppManager
 				mp_State = EVirtualMachineState_Starting;
 
 				TCPromiseFuturePair<void> RunningPromise;
+				TCPromiseFuturePair<void> ExitPromise;
 
 				mp_Launch = fg_ConstructActor<CVMWindowHostLaunchActor>(RunningPromise.m_Promise);
+				mp_ExitFuture = fg_Move(ExitPromise.m_Future);
 
 				auto Promise = RunningPromise.m_Promise;
+				auto HostExitPromise = ExitPromise.m_Promise;
 				CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
 					(
 						CFile::fs_GetProgramPath()
 						, fg_CreateVector<CStr>("--vm-window-run", "--config", mp_ConfigPath)
 						, mp_WorkingDirectory
-						, [Promise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+						, [Promise, HostExitPromise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 						{
 							switch (_State.f_GetTypeID())
 							{
@@ -424,6 +427,8 @@ namespace NMib::NCloud::NAppManager
 									auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
 									if (!Promise.f_IsSet())
 										Promise.f_SetException(DMibErrorInstance("Failed to launch the window host: {}"_f << LaunchError).f_ExceptionPointer());
+									if (!HostExitPromise.f_IsSet())
+										HostExitPromise.f_SetResult();
 								}
 								break;
 							case NProcess::EProcessLaunchState_Exited:
@@ -431,6 +436,8 @@ namespace NMib::NCloud::NAppManager
 									auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
 									if (!Promise.f_IsSet())
 										Promise.f_SetException(DMibErrorInstance("The window host exited with '{}' before the machine started"_f << ExitStatus).f_ExceptionPointer());
+									if (!HostExitPromise.f_IsSet())
+										HostExitPromise.f_SetResult();
 								}
 								break;
 							}
@@ -491,6 +498,22 @@ namespace NMib::NCloud::NAppManager
 				mp_State = EVirtualMachineState_Stopped;
 
 				co_return {};
+			}
+
+			TCFuture<bool> f_WaitForStop(fp64 _TimeoutSeconds) override
+			{
+				using namespace NVirtualization;
+
+				if (!mp_Launch || !mp_ExitFuture.f_IsValid())
+					co_return true;
+
+				// The window host exits by itself once its machine stops
+				auto Result = co_await fg_Move(mp_ExitFuture)
+					.f_Timeout(_TimeoutSeconds, "Timed out waiting for the virtual machine to stop")
+					.f_Wrap()
+				;
+
+				co_return (bool)Result;
 			}
 
 			TCFuture<void> f_ForceStop() override
@@ -555,6 +578,7 @@ namespace NMib::NCloud::NAppManager
 			CStr mp_LogName;
 			TCActor<NProcess::CProcessLaunchActor> mp_Launch;
 			CActorSubscription mp_LaunchSubscription;
+			TCFuture<void> mp_ExitFuture; /// Resolved when the window host process exits, which happens when its machine stops
 			NVirtualization::EVirtualMachineState mp_State = NVirtualization::EVirtualMachineState_Stopped;
 		};
 	}

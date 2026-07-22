@@ -3058,6 +3058,24 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_bStarted = false;
 
+		// A guest with a logged-in console session turns the host-side stop request
+		// into a confirmation dialog, so a virtual machine is shut down from inside
+		// through the agent instead; the machine is awaited below before the host
+		// side stops it
+		bool bGuestShutdown = false;
+		if (_pEnvironment->m_VMActor && _pEnvironment->m_AgentInterface)
+		{
+			auto ShutdownResult = co_await _pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ShutdownEnvironment)()
+				.f_Timeout(30.0, "Timed out requesting the environment shutdown")
+				.f_Wrap()
+			;
+
+			if (ShutdownResult)
+				bGuestShutdown = true;
+			else
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to shut down environment '{}' from inside: {}", _pEnvironment->m_Name, ShutdownResult.f_GetExceptionStr());
+		}
+
 		{
 			TCFutureVector<void> InterfaceDestroys;
 
@@ -3103,6 +3121,13 @@ namespace NMib::NCloud::NAppManager
 
 		if (_pEnvironment->m_VMActor)
 		{
+			if (bGuestShutdown)
+			{
+				auto WaitResult = co_await fg_TempCopy(_pEnvironment->m_VMActor)(&NVirtualization::CVirtualMachineActor::f_WaitForStop, 120.0).f_Wrap();
+				if (!WaitResult || !*WaitResult)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "The guest for environment '{}' did not power off after the shutdown from inside", _pEnvironment->m_Name);
+			}
+
 			co_await fg_TempCopy(_pEnvironment->m_VMActor)(&NVirtualization::CVirtualMachineActor::f_Stop).f_Wrap()
 				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop environment virtual machine")
 			;
