@@ -806,6 +806,7 @@ namespace NMib::NCloud::NAppManager
 				.f_Wrap()
 			;
 
+			bool bBootstrapped = false;
 			if (!ConnectedResult && bCanBootstrap && !_pEnvironment->f_IsStarted())
 			{
 				_pEnvironment->f_SetStatus("Setting up the environment agent through SSH", CAppManagerInterface::EStatusSeverity_Warning);
@@ -820,6 +821,8 @@ namespace NMib::NCloud::NAppManager
 					co_return BootstrapResult.f_GetException();
 				}
 
+				bBootstrapped = true;
+
 				if (!_pEnvironment->f_IsStarted())
 				{
 					_pEnvironment->f_SetStatus("Agent installed, waiting for agent", CAppManagerInterface::EStatusSeverity_Warning);
@@ -833,6 +836,23 @@ namespace NMib::NCloud::NAppManager
 
 			if (!ConnectedResult && !_pEnvironment->f_IsStarted())
 			{
+				// The guest side of the failure is in the agent log inside the guest;
+				// fetch it so the log tells the whole story
+				if (bBootstrapped)
+				{
+					CStr GuestLog = co_await fp_FetchVMAgentGuestLog(_pEnvironment, Provisioning);
+
+					DMibLogWithCategory
+						(
+							Malterlib/Cloud/AppManager
+							, Error
+							, "The agent for environment '{}' did not connect; guest agent log:\n{}"
+							, _pEnvironment->m_Name
+							, GuestLog
+						)
+					;
+				}
+
 				_pEnvironment->f_SetStatus(fg_Format("Agent failed to connect: {}", ConnectedResult.f_GetExceptionStr()), CAppManagerInterface::EStatusSeverity_Error);
 				fp_StopEnvironmentInternal(_pEnvironment).f_DiscardResult();
 				co_return ConnectedResult.f_GetException();
@@ -879,6 +899,22 @@ namespace NMib::NCloud::NAppManager
 			uint32 m_ExitCode = 0;
 			CStr m_Output;
 		};
+
+		TCVector<CStr> fg_CreateVMBootstrapSSHOptions()
+		{
+			return fg_CreateVector<CStr>
+				(
+					"-o", "StrictHostKeyChecking=no"
+					, "-o", "UserKnownHostsFile=/dev/null"
+					, "-o", "GlobalKnownHostsFile=/dev/null"
+					, "-o", "ConnectTimeout=10"
+					, "-o", "NumberOfPasswordPrompts=1"
+					, "-o", "ServerAliveInterval=15"
+					, "-o", "ServerAliveCountMax=4"
+					, "-o", "LogLevel=ERROR"
+				)
+			;
+		}
 
 		// Runs one SSH command against the guest, authenticating through the ask
 		// pass helper and feeding the input to the remote command once the process
@@ -1041,24 +1077,34 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
-		// The launch daemon script mounts the share and runs the agent from the
-		// environment storage, so the agent and its per boot connect settings are
-		// always the ones the host placed there
+		// The launch daemon script mounts the share as root and hands over to the
+		// provisioned user for the agent: the shared folder denies guest root while
+		// the provisioned user has full access. The agent and its per boot connect
+		// settings are always the ones the host placed in the environment storage
 		CStr GuestScriptPath = "/usr/local/libexec/malterlib-appmanager-agent.sh";
 		CStr GuestScript = fg_Format
 			(
 				"#!/bin/sh\n"
 				"mkdir -p '{}'\n"
 				"/sbin/mount | /usr/bin/grep -qF ' on {} (' || /sbin/mount_virtiofs MalterlibRoot '{}'\n"
+				"exec /usr/bin/sudo -u '{}' /bin/sh /usr/local/libexec/malterlib-appmanager-agent-user.sh\n"
+				, _MountPoint
+				, _MountPoint
+				, _MountPoint
+				, _Provisioning.m_Username
+			)
+		;
+
+		CStr GuestUserScriptPath = "/usr/local/libexec/malterlib-appmanager-agent-user.sh";
+		CStr GuestUserScript = fg_Format
+			(
+				"#!/bin/sh\n"
 				"export HOME='{}/.home'\n"
 				"export TMPDIR='{}/.tmp'\n"
 				"export MalterlibDistributedAppLocalSocketPrefix=/tmp\n"
 				"mkdir -p \"$HOME\" \"$TMPDIR\"\n"
 				"cd '{}'\n"
 				"exec '{}' --daemon-run-standalone --log-to-stderr\n"
-				, _MountPoint
-				, _MountPoint
-				, _MountPoint
 				, StorageDirectory
 				, StorageDirectory
 				, StorageDirectory
@@ -1089,6 +1135,10 @@ namespace NMib::NCloud::NAppManager
 				"{}"
 				"MALTERLIB_BOOTSTRAP_EOF\n"
 				"chmod 755 '{}'\n"
+				"cat > '{}' <<'MALTERLIB_BOOTSTRAP_EOF'\n"
+				"{}"
+				"MALTERLIB_BOOTSTRAP_EOF\n"
+				"chmod 755 '{}'\n"
 				"cat > /Library/LaunchDaemons/com.malterlib.appmanager.agent.plist <<'MALTERLIB_BOOTSTRAP_EOF'\n"
 				"{}"
 				"MALTERLIB_BOOTSTRAP_EOF\n"
@@ -1099,6 +1149,9 @@ namespace NMib::NCloud::NAppManager
 				, GuestScriptPath
 				, GuestScript
 				, GuestScriptPath
+				, GuestUserScriptPath
+				, GuestUserScript
+				, GuestUserScriptPath
 				, GuestPlist
 			)
 		;
@@ -1164,18 +1217,7 @@ namespace NMib::NCloud::NAppManager
 			CStr LogName = "Environment/{}/AgentBootstrap"_f << _pEnvironment->m_Name;
 			CStr Target = fg_Format("{}@{}", _Provisioning.m_Username, GuestIP);
 
-			TCVector<CStr> CommonOptions = fg_CreateVector<CStr>
-				(
-					"-o", "StrictHostKeyChecking=no"
-					, "-o", "UserKnownHostsFile=/dev/null"
-					, "-o", "GlobalKnownHostsFile=/dev/null"
-					, "-o", "ConnectTimeout=10"
-					, "-o", "NumberOfPasswordPrompts=1"
-					, "-o", "ServerAliveInterval=15"
-					, "-o", "ServerAliveCountMax=4"
-					, "-o", "LogLevel=ERROR"
-				)
-			;
+			TCVector<CStr> CommonOptions = fg_CreateVMBootstrapSSHOptions();
 
 			// The setup script is staged with a plain cat first and then executed
 			// with only the sudo password on standard input, keeping the password
@@ -1288,6 +1330,53 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		co_return DMibErrorInstance("Failed to set up the agent in the guest: {}"_f << LastError);
+	}
+
+	TCFuture<CStr> CAppManagerActor::fp_FetchVMAgentGuestLog(TCSharedPointer<CEnvironment> _pEnvironment, NVirtualization::CMacOSGuestProvisioning _Provisioning)
+	{
+		CStr MACAddress = _pEnvironment->m_VMMACAddress;
+
+		CStr GuestIP;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			GuestIP = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [MACAddress]()
+					{
+						return fg_FindVMDHCPLease(MACAddress);
+					}
+				)
+			;
+		}
+
+		if (GuestIP.f_IsEmpty())
+			co_return CStr("The guest was not found in the DHCP leases");
+
+		TCVector<CStr> Arguments = fg_CreateVMBootstrapSSHOptions();
+		Arguments.f_Insert(fg_Format("{}@{}", _Provisioning.m_Username, GuestIP));
+		for (auto pWord : {"tail", "-n", "60", "/var/log/malterlib-appmanager-agent.log", "2>&1"})
+			Arguments.f_Insert(pWord);
+
+		auto Result = co_await fg_RunVMBootstrapSSH
+			(
+				fg_ThisActor(this)
+				, "Environment/{}/AgentGuestLog"_f << _pEnvironment->m_Name
+				, mp_State.m_RootDirectory
+				, false
+				, fp_GetEnvironmentStorageDirectory(*_pEnvironment) / ".AgentBootstrapAskPass.sh"
+				, _Provisioning.m_Password
+				, fg_Move(Arguments)
+				, CStrIO()
+				, 30.0
+			)
+			.f_Wrap()
+		;
+
+		if (!Result)
+			co_return CStr(fg_Format("Failed to fetch the guest agent log: {}", Result.f_GetExceptionStr()));
+
+		co_return fg_Move(Result->m_Output);
 	}
 
 #ifdef DPlatformFamily_macOS
