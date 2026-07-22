@@ -262,6 +262,7 @@ namespace NMib::NCloud::NAppManager
 
 		TCSharedPointerSupportWeak<CUpdateApplicationState> pState = fg_Construct();
 		pState->m_pApplication = pApplication;
+		pState->m_pRemoteStorageEnvironment = fp_ApplicationRemoteStorageEnvironment(*pApplication);
 		pState->m_fOnInfo = fg_Move(_fOnInfo);
 		pState->m_UniqueUpdateID = fg_RandomID();
 		pState->m_LastInstalledVersion = pApplication->m_LastInstalledVersion;

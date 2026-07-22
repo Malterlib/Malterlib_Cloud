@@ -182,6 +182,7 @@ namespace NMib::NCloud::NAppManager
 			, EEnvironmentSetting_ParentApplication = DBit(14)
 			, EEnvironmentSetting_ContainerReadOnly = DBit(15)
 			, EEnvironmentSetting_OSDependencies = DBit(16)
+			, EEnvironmentSetting_VMDataDiskGB = DBit(17)
 		};
 
 		struct CEnvironmentSettings
@@ -206,6 +207,7 @@ namespace NMib::NCloud::NAppManager
 			CStr m_VMBackend;
 			uint32 m_VMCPUCount = 0;
 			uint64 m_VMMemoryMB = 0;
+			uint64 m_VMDataDiskGB = 0; /// Logical size of the persistent data disk holding the application storage; 0 selects the default. Applied when the disk is created
 
 			bool m_bAutoStart = true;
 
@@ -260,11 +262,6 @@ namespace NMib::NCloud::NAppManager
 			// the guest can be found in the DHCP leases across restarts
 			CStr m_VMMACAddress;
 
-			// The virtual machine only sees the shared folders it was started with, so
-			// the host application directory to share tag mapping of the running VM
-			// decides when the environment must restart to cover a new application
-			NContainer::TCMap<NStr::CStr, NStr::CStr> m_VMShareTags;
-
 			// Runtime state
 			CStr m_LaunchID;
 			CStr m_AgentHostID;
@@ -290,6 +287,10 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) override;
 			TCFuture<uint32> f_StopApplication(CStr _Name) override;
 			TCFuture<void> f_RunScript(CEnvironmentScript _Script) override;
+			TCFuture<CApplicationStageResult> f_StageApplicationFiles(CApplicationStage _Stage) override;
+			TCFuture<void> f_ApplyApplicationFiles(CApplicationApply _Apply) override;
+			TCFuture<void> f_DiscardApplicationStage(CStr _Name, CStr _StageID) override;
+			TCFuture<void> f_RemoveApplicationStorage(CStr _Name) override;
 			TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) override;
 			TCFuture<void> f_ShutdownEnvironment() override;
 
@@ -764,8 +765,13 @@ namespace NMib::NCloud::NAppManager
 			TCFunction <void ()> m_fUpdateVersionInfo;
 			CActorSubscription m_DownloadDirectoryCleanup;
 			CActorSubscription m_TemporaryDirectoryCleanup;
+			CActorSubscription m_AgentStageCleanup;
 			CStr m_SourcePath;
 			CStr m_TempraryPath;
+
+			// Set when the application storage is managed inside the environment
+			TCSharedPointer<CEnvironment> m_pRemoteStorageEnvironment;
+			CStr m_AgentStageID;
 			TCSharedPointer<CApplicationSettings> m_pNewSettings;
 			TCSet<CStr> m_AllowSourceExist;
 			CAppManagerInterface::CVersionIDAndPlatform m_VersionID;
@@ -914,6 +920,13 @@ namespace NMib::NCloud::NAppManager
 				, TCFunction<void (CStr const &_Info)> const &_fLogInfo
 			)
 		;
+		static void fsp_ApplyStagedApplicationFiles
+			(
+				CAppManagerEnvironmentInterface::CApplicationApply const &_Apply
+				, CStr const &_Directory
+				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+			)
+		;
 		TCFuture<void> fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> _pApplication, uint32 _OldVersion);
 
 		TCFuture<void> fp_UpdateApplicationJson(TCSharedPointer<CApplication> _pApplication);
@@ -988,7 +1001,6 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);
 		CStr fp_GetEnvironmentVMBundleDirectory(CEnvironment const &_Environment);
 		NVirtualization::CVirtualMachineConfig fp_BuildEnvironmentVMConfig(CEnvironment &_Environment);
-		static CStr fsp_GetVMShareTag(CStr const &_Directory);
 		TCFuture<NVirtualization::CMacOSGuestProvisioning> fp_LoadVMImageProvisioning(CStr _BundleDirectory);
 		TCFuture<void> fp_BootstrapVMAgentOverSSH
 			(
@@ -998,9 +1010,6 @@ namespace NMib::NCloud::NAppManager
 				, CStr _ConnectSettings
 			)
 		;
-#ifdef DPlatformFamily_macOS
-		static void fsp_MountVMApplicationShare(CStr const &_Tag, CStr const &_Directory, CStr const &_User, CStr const &_Group);
-#endif
 		TCFuture<CStr> fp_FetchVMAgentGuestLog(TCSharedPointer<CEnvironment> _pEnvironment, NVirtualization::CMacOSGuestProvisioning _Provisioning);
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
 		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);
@@ -1041,6 +1050,19 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_AbortEnvironmentLaunch(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_RestartEnvironmentWhenIdle(TCSharedPointer<CEnvironment> _pEnvironment);
+
+		// Application storage managed inside environments (host side)
+		bool fp_EnvironmentUsesRemoteStorage(CEnvironment const &_Environment);
+		TCSharedPointer<CEnvironment> fp_ApplicationRemoteStorageEnvironment(CApplication const &_Application);
+		CStr fp_GetEnvironmentDataVolumeName(CEnvironment const &_Environment);
+		TCFuture<void> fp_EnsureEnvironmentDataVolume(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_RemoveEnvironmentDataVolume(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_StageApplicationInEnvironment(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState, TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_RemoveApplicationEnvironmentStorage(TCSharedPointer<CApplication> _pApplication);
+
+		// Application storage managed inside environments (agent side)
+		TCFuture<void> fp_EnsureEnvironmentDataRoot();
+		CStr fp_GetAgentApplicationDirectory(CStr const &_Name);
 
 		// Environment agent handling (agent side)
 		TCFuture<void> fp_RegisterWithEnvironmentHost();
@@ -1331,6 +1353,13 @@ namespace NMib::NCloud::NAppManager
 
 		static constexpr uint32 mcp_CurrentAppMangerVersion = 0x101;
 
+		// Environment-managed application storage. The VM data disk volume is
+		// named after the device identifier and automounts under /Volumes in
+		// macOS guests; container environments mount a named volume instead
+		static constexpr ch8 const *mcp_pEnvironmentDataVolumeName = "MalterlibData";
+		static constexpr ch8 const *mcp_pEnvironmentDataRootVM = "/Volumes/MalterlibData";
+		static constexpr ch8 const *mcp_pEnvironmentDataRootContainer = "/opt/Malterlib/Data";
+
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #else
@@ -1392,6 +1421,10 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bEnvironmentAgent = false;
 		bool mp_bEnvironmentContainer = false; /// Agent side: the environment is a container, so the kernel belongs to the host/VM outside it
 		CStr mp_EnvironmentHostID; /// Agent side: host id of the launching AppManager, from the deployment settings
+		CStr mp_EnvironmentDataRoot; /// Agent side: root of the environment-managed application storage, from the deployment settings
+		bool mp_bEnvironmentDataRootReady = false;
+		bool mp_bEnvironmentDataRootPreparing = false;
+		TCVector<TCPromise<void>> mp_OnEnvironmentDataRootReady;
 		TCMap<CStr, CActorSubscription> mp_EnvironmentTicketNotifications; /// Keeps environment application connection tickets alive until they are used
 
 		CTrustedPermissionSubscription mp_Permissions;

@@ -16,6 +16,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bEnvironmentContainer = false;
 			CStr m_EnvironmentHostID;
 			CStr m_EnvironmentHostName;
+			CStr m_EnvironmentDataRoot;
 		};
 
 		CAgentDeploymentSettings const &fg_GetAgentDeploymentSettings()
@@ -41,6 +42,8 @@ namespace NMib::NCloud::NAppManager
 								Settings.m_EnvironmentHostID = pValue->f_String();
 							if (auto *pValue = Json.f_GetMember("EnvironmentHostName", EJsonType_String))
 								Settings.m_EnvironmentHostName = pValue->f_String();
+							if (auto *pValue = Json.f_GetMember("EnvironmentDataRoot", EJsonType_String))
+								Settings.m_EnvironmentDataRoot = pValue->f_String();
 						}
 					}
 					catch (CException const &_Exception)
@@ -175,6 +178,7 @@ namespace NMib::NCloud::NAppManager
 		mp_bEnvironmentAgent = Deployment.m_bEnvironmentAgent;
 		mp_bEnvironmentContainer = Deployment.m_bEnvironmentContainer;
 		mp_EnvironmentHostID = Deployment.m_EnvironmentHostID;
+		mp_EnvironmentDataRoot = Deployment.m_EnvironmentDataRoot;
 		mp_InitialStartupResultFuture = mp_InitialStartupResult.f_Future();
 	}
 

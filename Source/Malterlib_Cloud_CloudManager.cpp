@@ -42,7 +42,7 @@ namespace NMib::NCloud
 	{
 		static_assert
 			(
-				CAppManagerInterface::EProtocolVersion_Current == CAppManagerInterface::EProtocolVersion_AddEnvironmentOSDependencies
+				CAppManagerInterface::EProtocolVersion_Current == CAppManagerInterface::EProtocolVersion_AddEnvironmentVMDataDisk
 				, "Add a new version mapping if streaming of m_ApplicationInfo changed"
 			)
 		;

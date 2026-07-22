@@ -4,6 +4,7 @@
 #pragma once
 
 #include <Mib/Cloud/AppManager>
+#include <Mib/Cloud/VersionManager>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -19,8 +20,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x106
-			, EProtocolVersion_Current = 0x106
+			EProtocolVersion_Min = 0x107
+			, EProtocolVersion_Current = 0x107
 		};
 
 		enum EApplicationState : uint32
@@ -56,7 +57,7 @@ namespace NMib::NCloud::NAppManager
 			void f_Stream(tf_CStream &_Stream);
 
 			NStr::CStr m_Name;
-			NStr::CStr m_Directory; /// Absolute application directory. The path is the same inside the environment as on the host.
+			NStr::CStr m_Directory; /// Absolute application directory, the same path inside the environment as on the host. Empty when the environment manages the application storage; the agent derives the directory from the name
 			NStr::CStr m_Executable;
 			NContainer::TCVector<NStr::CStr> m_Parameters;
 			NStr::CStr m_RunAsUser;
@@ -65,7 +66,6 @@ namespace NMib::NCloud::NAppManager
 			bool m_bDistributedApp = false;
 			NStr::CStr m_InterfaceAddress; /// Host AppManager address the application connects its distributed app interface to
 			NStr::CStr m_LaunchID; /// Host AppManager launch id the application registers with
-			NStr::CStr m_VMShareTag; /// Shared folder tag of the application directory in a VM environment, mounted by the agent before the launch; empty outside VM environments
 		};
 
 		struct CEnvironmentScript
@@ -74,12 +74,55 @@ namespace NMib::NCloud::NAppManager
 			void f_Stream(tf_CStream &_Stream);
 
 			NStr::CStr m_Description;
-			NStr::CStr m_Script; /// Script path, expanded against m_Directory inside the environment
-			NStr::CStr m_Directory;
+			NStr::CStr m_Script; /// Script path, expanded against the directory inside the environment
+			NStr::CStr m_Application; /// Application the script belongs to; used to derive the directory when m_Directory is empty
+			NStr::CStr m_Directory; /// Working directory; empty when the environment manages the application storage
 			NStr::CStr m_Parameter;
 			NContainer::TCMap<NStr::CStr, NStr::CStr> m_Environment;
 			NStr::CStr m_RunAsUser;
 			NStr::CStr m_RunAsGroup;
+		};
+
+		/// Stages a version's files for an application whose storage the environment
+		/// manages: the files stream from the host into a staging directory next to
+		/// the application directory inside the environment
+		struct CApplicationStage
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStr m_Name;
+			uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
+			NStorage::TCOptional<NConcurrency::TCAsyncGeneratorWithID<CVersionManager::CDownloadFile>> m_FilesGenerator;
+		};
+
+		struct CApplicationStageResult
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStr m_StageID;
+			NStr::CStr m_Directory; /// Application directory inside the environment
+			NStr::CStr m_StageDirectory; /// Directory holding the staged files inside the environment
+		};
+
+		/// Applies a staged version to the application directory inside the
+		/// environment: old files are deleted, the staged files move in and the
+		/// ownership and permissions are set up for the run-as user
+		struct CApplicationApply
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			NStr::CStr m_Name;
+			NStr::CStr m_StageID;
+			NContainer::TCVector<NStr::CStr> m_Files; /// Staged files relative to the application directory
+			NContainer::TCVector<NStr::CStr> m_OldFiles; /// Files of the previously installed version, deleted before the staged files move in
+			NStr::CStr m_RunAsUser;
+			NStr::CStr m_RunAsGroup;
+			bool m_bRunAsUserHasShell = false;
+			bool m_bFailOnExisting = false; /// Fail when the application directory already contains files; used by the initial install
+			NStr::CStr m_VersionExtraInfo; /// Encoded version extra info for platform post-processing, for example low port executables
 		};
 
 		struct CApplicationStateChange
@@ -102,6 +145,12 @@ namespace NMib::NCloud::NAppManager
 		virtual NConcurrency::TCFuture<NStr::CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) = 0;
 		virtual NConcurrency::TCFuture<uint32> f_StopApplication(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_RunScript(CEnvironmentScript _Script) = 0;
+
+		// Application storage managed inside the environment
+		virtual NConcurrency::TCFuture<CApplicationStageResult> f_StageApplicationFiles(CApplicationStage _Stage) = 0;
+		virtual NConcurrency::TCFuture<void> f_ApplyApplicationFiles(CApplicationApply _Apply) = 0;
+		virtual NConcurrency::TCFuture<void> f_DiscardApplicationStage(NStr::CStr _Name, NStr::CStr _StageID) = 0;
+		virtual NConcurrency::TCFuture<void> f_RemoveApplicationStorage(NStr::CStr _Name) = 0;
 
 		/// Configures the agent with the environment host name and the automatic
 		/// update settings inherited from the host AppManager
