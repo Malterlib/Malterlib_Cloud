@@ -2435,18 +2435,29 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
 
-		if (_pEnvironment->m_bDeleted)
-			co_return DMibErrorInstance("Environment has been deleted");
-
-		if (_pEnvironment->f_IsStarted())
-			co_return {};
-
-		// The starting flag must be set before the first suspension: a concurrent start
-		// would otherwise slip past the guard and attach to the same container twice
-		if (_pEnvironment->m_bStarting)
+		for (;;)
 		{
-			co_await _pEnvironment->m_OnAgentConnected.f_Insert().f_Future();
-			co_return {};
+			if (_pEnvironment->m_bDeleted)
+				co_return DMibErrorInstance("Environment has been deleted");
+
+			if (_pEnvironment->f_IsStarted())
+				co_return {};
+
+			// The starting flag must be set before the first suspension: a concurrent start
+			// would otherwise slip past the guard and attach to the same container twice
+			if (_pEnvironment->m_bStarting)
+			{
+				co_await _pEnvironment->m_OnAgentConnected.f_Insert().f_Future();
+				co_return {};
+			}
+
+			if (!_pEnvironment->m_bStopping)
+				break;
+
+			// A stop can still be tearing down the previous container or virtual
+			// machine, which holds the shared machine state like the guest image
+			// locks; starting on top of it would race that teardown
+			(void)co_await _pEnvironment->m_OnStopFinished.f_Insert().f_Future().f_Wrap();
 		}
 
 		{
@@ -2963,6 +2974,10 @@ namespace NMib::NCloud::NAppManager
 		auto Cleanup = g_OnScopeExit / [_pEnvironment]
 			{
 				_pEnvironment->m_bStopping = false;
+
+				auto OnStopFinished = fg_Move(_pEnvironment->m_OnStopFinished);
+				for (auto &Promise : OnStopFinished)
+					Promise.f_SetResult();
 			}
 		;
 
