@@ -844,44 +844,142 @@ namespace NMib::NCloud::NAppManager
 
 	namespace
 	{
-		// Runs one SSH or SCP command against the guest, authenticating through the
-		// ask pass helper so nothing depends on standard input
-		TCFuture<NProcess::CProcessLaunchActor::CSimpleLaunchResult> fg_RunVMBootstrapCommand
+		// Captures the SSH output so failures can be reported with it
+		struct CVMBootstrapLaunchActor : public NProcess::CProcessLaunchActor
+		{
+			struct CState
+			{
+				NThread::CMutual m_Lock;
+				CStr m_Output;
+			};
+
+			CVMBootstrapLaunchActor(NStorage::TCSharedPointer<CState> const &_pState)
+				: mp_pState(_pState)
+			{
+			}
+
+		protected:
+			bool fp_WillFilterOutput() override
+			{
+				return true;
+			}
+
+			void fp_FilterOutput(NProcess::EProcessLaunchOutputType _OutputType, CStr &o_Output) override
+			{
+				DMibLock(mp_pState->m_Lock);
+				mp_pState->m_Output += o_Output;
+			}
+
+		private:
+			NStorage::TCSharedPointer<CState> mp_pState;
+		};
+
+		struct CVMBootstrapRunResult
+		{
+			uint32 m_ExitCode = 0;
+			CStr m_Output;
+		};
+
+		// Runs one SSH command against the guest, authenticating through the ask
+		// pass helper and feeding the input to the remote command once the process
+		// has launched: input sent before the launch is silently dropped
+		TCFuture<CVMBootstrapRunResult> fg_RunVMBootstrapSSH
 			(
-				CStr _LogName
+				TCActor<CActor> _CallbackActor
+				, CStr _LogName
 				, CStr _WorkingDirectory
 				, bool _bLogToStdErr
 				, CStr _AskPassPath
 				, CStr _Password
-				, CStr _Executable
 				, TCVector<CStr> _Arguments
+				, CStrIO _StdInData
 				, fp64 _Timeout
 			)
 		{
-			CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+			NStorage::TCSharedPointer<CVMBootstrapLaunchActor::CState> pOutputState = fg_Construct();
+
+			TCPromiseFuturePair<void> LaunchedPromise;
+			TCPromiseFuturePair<uint32> ExitPromise;
+
+			CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
 				(
-					_Executable
+					"/usr/bin/ssh"
 					, _Arguments
 					, _WorkingDirectory
-					, {}
+					, [Launched = LaunchedPromise.m_Promise, Exited = ExitPromise.m_Promise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+					{
+						switch (_State.f_GetTypeID())
+						{
+						case NProcess::EProcessLaunchState_Launched:
+							if (!Launched.f_IsSet())
+								Launched.f_SetResult();
+							break;
+						case NProcess::EProcessLaunchState_LaunchFailed:
+							{
+								auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
+
+								auto Exception = DMibErrorInstance("Failed to launch SSH: {}"_f << LaunchError).f_ExceptionPointer();
+								if (!Launched.f_IsSet())
+									Launched.f_SetException(Exception);
+								if (!Exited.f_IsSet())
+									Exited.f_SetException(Exception);
+							}
+							break;
+						case NProcess::EProcessLaunchState_Exited:
+							{
+								uint32 ExitCode = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
+
+								if (!Launched.f_IsSet())
+									Launched.f_SetResult();
+								if (!Exited.f_IsSet())
+									Exited.f_SetResult(ExitCode);
+							}
+							break;
+						}
+					}
 				)
 			;
 
+			auto &LaunchParams = Launch.m_Params;
 			LaunchParams.m_Environment["SSH_ASKPASS"] = _AskPassPath;
 			LaunchParams.m_Environment["SSH_ASKPASS_REQUIRE"] = "force";
 			LaunchParams.m_Environment["DISPLAY"] = ":0";
 			LaunchParams.m_Environment["MALTERLIB_VM_SSH_PASSWORD"] = _Password;
 			LaunchParams.m_bMergeEnvironment = true;
 
-			TCActor<CProcessLaunchActor> pLaunchActor = fg_ConstructActor<CProcessLaunchActor>();
-
-			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
-			SimpleLaunch.m_LogName = fg_Move(_LogName);
-			SimpleLaunch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
+			Launch.m_LogName = fg_Move(_LogName);
+			Launch.m_ToLog = CProcessLaunchActor::ELogFlag_All;
 			if (_bLogToStdErr)
-				SimpleLaunch.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
+				Launch.m_ToLog |= CProcessLaunchActor::ELogFlag_AdditionallyOutputToStdErr;
 
-			auto Result = co_await fg_TempCopy(pLaunchActor)(&CProcessLaunchActor::f_LaunchSimple, SimpleLaunch)
+			TCActor<NProcess::CProcessLaunchActor> pLaunchActor = fg_ConstructActor<CVMBootstrapLaunchActor>(pOutputState);
+
+			auto LaunchSubscription = co_await fg_TempCopy(pLaunchActor)(&CProcessLaunchActor::f_Launch, Launch, _CallbackActor).f_Wrap();
+			if (!LaunchSubscription)
+			{
+				co_await fg_Move(pLaunchActor).f_Destroy().f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the agent setup launch")
+				;
+
+				co_return LaunchSubscription.f_GetException();
+			}
+
+			auto LaunchedResult = co_await fg_Move(LaunchedPromise.m_Future)
+				.f_Timeout(30.0, "Timed out waiting for SSH to launch")
+				.f_Wrap()
+			;
+
+			if (LaunchedResult)
+			{
+				co_await fg_TempCopy(pLaunchActor)(&CProcessLaunchActor::f_SendStdIn, fg_Move(_StdInData)).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to send the agent setup input")
+				;
+				co_await fg_TempCopy(pLaunchActor)(&CProcessLaunchActor::f_CloseStdIn).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to close the agent setup input")
+				;
+			}
+
+			auto ExitResult = co_await fg_Move(ExitPromise.m_Future)
 				.f_Timeout(_Timeout, "The SSH agent setup attempt timed out")
 				.f_Wrap()
 			;
@@ -890,10 +988,21 @@ namespace NMib::NCloud::NAppManager
 				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the agent setup launch")
 			;
 
-			if (!Result)
-				co_return Result.f_GetException();
+			if (!LaunchedResult)
+				co_return LaunchedResult.f_GetException();
 
-			co_return fg_Move(*Result);
+			if (!ExitResult)
+				co_return ExitResult.f_GetException();
+
+			CVMBootstrapRunResult Result;
+			Result.m_ExitCode = *ExitResult;
+
+			{
+				DMibLock(pOutputState->m_Lock);
+				Result.m_Output = fg_Move(pOutputState->m_Output);
+			}
+
+			co_return Result;
 		}
 	}
 
@@ -911,25 +1020,12 @@ namespace NMib::NCloud::NAppManager
 		// The ask pass helper lets ssh take the password from the process
 		// environment instead of a terminal prompt
 		CStr AskPassPath = StorageDirectory / ".AgentBootstrapAskPass.sh";
-
-		// The sudo ask pass helper is copied into the guest so sudo can take the
-		// password without depending on standard input; the guest only has the
-		// provisioned user, and the helper is removed after the setup
-		CStr SudoAskPassPath = StorageDirectory / ".AgentBootstrapSudoAskPass.sh";
-		CStr SudoAskPass;
-		{
-			CStr EscapedPassword = _Provisioning.m_Password;
-			EscapedPassword.f_Replace("'", "'\\''");
-
-			SudoAskPass = fg_Format("#!/bin/sh\nprintf '%s\\n' '{}'\n", EscapedPassword);
-		}
-
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
 			co_await
 				(
-					g_Dispatch(BlockingActorCheckout) / [AskPassPath, SudoAskPassPath, SudoAskPass]()
+					g_Dispatch(BlockingActorCheckout) / [AskPassPath]()
 					{
 						CFile::fs_WriteStringToFile
 							(
@@ -939,10 +1035,8 @@ namespace NMib::NCloud::NAppManager
 								, EFileAttrib_Executable
 							)
 						;
-
-						CFile::fs_WriteStringToFile(SudoAskPassPath, SudoAskPass, false, EFileAttrib_Executable);
 					}
-					% "Failed to write the SSH ask pass helpers"
+					% "Failed to write the SSH ask pass helper"
 				)
 			;
 		}
@@ -1008,23 +1102,6 @@ namespace NMib::NCloud::NAppManager
 				, GuestPlist
 			)
 		;
-
-		// The setup script is copied into the guest and executed from the file, so
-		// nothing depends on feeding the remote command through standard input
-		CStr BootstrapScriptPath = StorageDirectory / ".AgentBootstrap.sh";
-		{
-			auto BlockingActorCheckout = fg_BlockingActor();
-
-			co_await
-				(
-					g_Dispatch(BlockingActorCheckout) / [BootstrapScriptPath, BootstrapScript]()
-					{
-						CFile::fs_WriteStringToFile(BootstrapScriptPath, BootstrapScript, false);
-					}
-					% "Failed to write the agent setup script"
-				)
-			;
-		}
 
 		DMibLogWithCategory
 			(
@@ -1100,67 +1177,61 @@ namespace NMib::NCloud::NAppManager
 				)
 			;
 
-			// The setup script and the sudo ask pass helper are copied into the guest
-			// first and the script then runs from the file with the password coming
-			// from the helper, so no phase depends on standard input reaching the
-			// guest: sending standard input before the process has launched is
-			// silently dropped by the process launch
+			// The setup script is staged with a plain cat first and then executed
+			// with only the sudo password on standard input, keeping the password
+			// and the script off the guest filesystem
 			CStr Error;
 			{
 				TCVector<CStr> Arguments = CommonOptions;
-				Arguments.f_Insert("-p");
-				Arguments.f_Insert(BootstrapScriptPath);
-				Arguments.f_Insert(SudoAskPassPath);
-				Arguments.f_Insert(fg_Format("{}:/tmp/", Target));
+				Arguments.f_Insert(Target);
+				for (auto pWord : {"cat", ">", "/tmp/malterlib-agent-bootstrap.sh"})
+					Arguments.f_Insert(pWord);
 
-				auto CopyResult = co_await fg_RunVMBootstrapCommand
+				CStrIO ScriptInput;
+				ScriptInput += BootstrapScript;
+
+				auto StageResult = co_await fg_RunVMBootstrapSSH
 					(
-						LogName
+						fg_ThisActor(this)
+						, LogName
 						, mp_State.m_RootDirectory
 						, mp_bLogLaunchesToStdErr
 						, AskPassPath
 						, _Provisioning.m_Password
-						, "/usr/bin/scp"
 						, fg_Move(Arguments)
+						, fg_Move(ScriptInput)
 						, 60.0
 					)
 					.f_Wrap()
 				;
 
-				if (!CopyResult)
-					Error = CopyResult.f_GetExceptionStr();
-				else if (CopyResult->m_ExitCode != 0)
-					Error = fg_Format("Copying the setup files failed with status {}: {}", CopyResult->m_ExitCode, CStr(CopyResult->f_GetCombinedOut().f_Trim()));
+				if (!StageResult)
+					Error = StageResult.f_GetExceptionStr();
+				else if (StageResult->m_ExitCode != 0)
+					Error = fg_Format("Staging the setup script failed with status {}: {}", StageResult->m_ExitCode, CStr(StageResult->m_Output.f_Trim()));
 			}
 
 			if (Error.f_IsEmpty())
 			{
 				TCVector<CStr> Arguments = CommonOptions;
 				Arguments.f_Insert(Target);
-				for
-				(
-					auto pWord :
-					{
-						"SUDO_ASKPASS=/tmp/.AgentBootstrapSudoAskPass.sh"
-						, "sudo", "-A", "/bin/sh", "/tmp/.AgentBootstrap.sh"
-						, ";", "MalterlibStatus=$?"
-						, ";", "rm", "-f", "/tmp/.AgentBootstrapSudoAskPass.sh"
-						, ";", "exit", "$MalterlibStatus"
-					}
-				)
-				{
+				for (auto pWord : {"sudo", "-S", "-p", "''", "/bin/sh", "/tmp/malterlib-agent-bootstrap.sh", ";", "MalterlibStatus=$?", ";", "rm", "-f", "/tmp/malterlib-agent-bootstrap.sh", ";", "exit", "$MalterlibStatus"})
 					Arguments.f_Insert(pWord);
-				}
 
-				auto RunResult = co_await fg_RunVMBootstrapCommand
+				CStrIO PasswordInput;
+				PasswordInput += _Provisioning.m_Password;
+				PasswordInput += "\n";
+
+				auto RunResult = co_await fg_RunVMBootstrapSSH
 					(
-						LogName
+						fg_ThisActor(this)
+						, LogName
 						, mp_State.m_RootDirectory
 						, mp_bLogLaunchesToStdErr
 						, AskPassPath
 						, _Provisioning.m_Password
-						, "/usr/bin/ssh"
 						, fg_Move(Arguments)
+						, fg_Move(PasswordInput)
 						, 180.0
 					)
 					.f_Wrap()
@@ -1169,7 +1240,7 @@ namespace NMib::NCloud::NAppManager
 				if (!RunResult)
 					Error = RunResult.f_GetExceptionStr();
 				else if (RunResult->m_ExitCode != 0)
-					Error = fg_Format("SSH exited with status {}: {}", RunResult->m_ExitCode, CStr(RunResult->f_GetCombinedOut().f_Trim()));
+					Error = fg_Format("SSH exited with status {}: {}", RunResult->m_ExitCode, CStr(RunResult->m_Output.f_Trim()));
 				else
 				{
 					DMibLogWithCategory
