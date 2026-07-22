@@ -19,8 +19,8 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x105
-			, EProtocolVersion_Current = 0x105
+			EProtocolVersion_Min = 0x106
+			, EProtocolVersion_Current = 0x106
 		};
 
 		enum EApplicationState : uint32
@@ -65,6 +65,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bDistributedApp = false;
 			NStr::CStr m_InterfaceAddress; /// Host AppManager address the application connects its distributed app interface to
 			NStr::CStr m_LaunchID; /// Host AppManager launch id the application registers with
+			NStr::CStr m_VMShareTag; /// Shared folder tag of the application directory in a VM environment, mounted by the agent before the launch; empty outside VM environments
 		};
 
 		struct CEnvironmentScript
