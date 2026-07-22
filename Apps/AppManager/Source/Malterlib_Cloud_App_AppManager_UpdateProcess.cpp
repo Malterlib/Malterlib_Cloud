@@ -206,7 +206,11 @@ namespace NMib::NCloud::NAppManager
 		if (State.m_bDryRun)
 			co_return {};
 
-		if (State.m_bUpdateSettings)
+		// The settings in the version info of an agent distribution for another platform apply inside environments, so
+		// they are not applied on the host, like when the distribution was added
+		bool bAgentDistribution = Application.m_Name.f_StartsWith("SelfUpdate.") && !Application.m_Settings.m_bSelfUpdateSource;
+
+		if (State.m_bUpdateSettings && !bAgentDistribution)
 		{
 			CApplicationSettings NewSettings = Application.m_Settings;
 			EApplicationSetting NewChangedSettings = EApplicationSetting_None;
@@ -653,7 +657,8 @@ namespace NMib::NCloud::NAppManager
 	{
 		for (auto &pEnvironment : mp_Environments)
 		{
-			if (pEnvironment->m_Settings.m_AgentApplication != _ApplicationName)
+			auto pAgentApplication = fp_FindEnvironmentAgentApplication(*pEnvironment);
+			if (!pAgentApplication || pAgentApplication->m_Name != _ApplicationName)
 				continue;
 
 			if (!pEnvironment->f_IsStarted() && !pEnvironment->m_bStarting)

@@ -486,10 +486,11 @@ namespace NMib::NCloud::NAppManager
 						}
 						, "FromFile?"_o=
 						{
-							"Names"_o= _o[]
-							, "Hidden"_o= true
-							, "Description"_o= "Hidden"
+							"Names"_o= _o["--from-file"]
 							, "Default"_o= false
+							, "Description"_o= "Install the self update application from a local file or directory instead of downloading from version manager.\n"
+							"When the package is an agent distribution for another platform (detected from its version info), it installs as "
+							"the agent application SelfUpdate.<Platform> for that platform instead."
 						}
 						, "EncryptionStorage?"_o=
 						{
@@ -548,19 +549,33 @@ namespace NMib::NCloud::NAppManager
 						, AddOption_UpdateScriptPostLaunch
 						, AddOption_UpdateScriptOnError
 						, SettingsOption_UpdateGroup
+						, "AgentPlatforms?"_o=
+						{
+							"Names"_o= _o["--agent-platforms"]
+							, "Default"_o= _o[]
+							, "Type"_o= _o[""]
+							, "Description"_o= "Additionally install the AppManager distribution for these platforms as applications named SelfUpdate.<Platform>.\n"
+							"These applications provide up to date agent executables for environments whose guests run another platform. "
+							"They are kept current through the normal update pipeline.\n"
+							"An entry can also be <Platform>=<Path> to install that platform's agent from a local file or directory instead, "
+							"for example Linux-arm64=/opt/Deploy/AppManager_Linux_arm64.\n"
+							"With --from-file the platform of the package is detected from its version info: a package for another platform "
+							"installs as the agent application for that platform instead of as this host's self update source."
+						}
 					}
 					, "Parameters"_o=
 					{
 						"Package?"_o=
 						{
 							"Default"_o= "AppManager"
-							, "Description"_o= "Package AppManager defaulted for self update."
+							, "Description"_o= "Package AppManager defaulted for self update.\n"
+							"With --from-file this is instead the local file or directory to install from."
 						}
 					}
 				}
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
-					return fp_CommandLine_AddApplication(fg_Move(_Params), fg_Move(_pCommandLine));
+					return fp_CommandLine_EnableSelfUpdate(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;

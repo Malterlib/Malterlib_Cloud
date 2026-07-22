@@ -135,9 +135,13 @@ namespace NMib::NCloud::NAppManager
 		if (!Settings.m_Executable.f_IsEmpty())
 		{
 			CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable);
+
+			// A linked executable can point to a file that only exists where the application runs, like inside an environment
+			bool bLink = CFile::fs_FileExists(ExcutableFile, EFileAttrib_Link) && (CFile::fs_GetAttributesOnLink(ExcutableFile) & EFileAttrib_Link);
 			if
 				(
-					!CFile::fs_FileExists
+					!bLink
+					&& !CFile::fs_FileExists
 					(
 						ExcutableFile
 	#ifdef DPlatformFamily_Windows
@@ -173,6 +177,14 @@ namespace NMib::NCloud::NAppManager
 			}
 			if (bFound)
 				continue;
+
+			// The owner and mode changes follow links, and a package for another platform can link to paths that only
+			// exist on that platform
+			if (File.m_Attribs & EFileAttrib_Link)
+			{
+				o_Files.f_Insert(File.m_Path.f_Extract(PrefixLen));
+				continue;
+			}
 
 			if (!Settings.m_RunAsUser.f_IsEmpty())
 				CFile::fs_SetOwner(File.m_Path, _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser));
