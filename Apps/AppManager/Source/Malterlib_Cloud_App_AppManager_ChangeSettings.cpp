@@ -217,6 +217,25 @@ namespace NMib::NCloud::NAppManager
 
 		ChangedSettings = Application.m_Settings.f_ChangedSettings(NewSettings);
 
+		if
+		(
+			(ChangedSettings & EApplicationSetting_LaunchEnvironment)
+			&& !NewSettings.m_LaunchEnvironment.f_IsEmpty()
+			&& !fp_EnvironmentAvailable(NewSettings.m_LaunchEnvironment)
+		)
+		{
+			co_return Auditor.f_Exception(fg_Format("Launch environment '{}' does not exist. Add it with --environment-add.", NewSettings.m_LaunchEnvironment));
+		}
+
+		if ((ChangedSettings & EApplicationSetting_LaunchEnvironment) && !NewSettings.m_LaunchEnvironment.f_IsEmpty())
+			co_await fp_CheckEnvironmentAccess(NewSettings.m_LaunchEnvironment, _CallingHostInfo);
+
+		if (ChangedSettings & (EApplicationSetting_RunAsUser | EApplicationSetting_ParentApplication))
+		{
+			if (CStr Error = fp_CheckLocalEnvironmentApplicationAccount(Application.m_Name, NewSettings); !Error.f_IsEmpty())
+				co_return Auditor.f_Exception(Error);
+		}
+
 #ifdef DPlatformFamily_Windows
 		if (!NewSettings.m_RunAsUser.f_IsEmpty() && ((ChangedSettings & EApplicationSetting_RunAsUser) || NewSettings.m_RunAsUserPassword.f_IsEmpty()))
 		{
@@ -287,6 +306,10 @@ namespace NMib::NCloud::NAppManager
 
 		if (pApplication->m_bDeleted)
 			co_return Auditor.f_Exception("Application has been deleted, aborting");
+
+		// The new launch environment can be removed while the application stops; once the settings refer to it, it cannot
+		if (!NewSettings.m_LaunchEnvironment.f_IsEmpty() && !fp_EnvironmentAvailable(NewSettings.m_LaunchEnvironment))
+			co_return Auditor.f_Exception(fg_Format("Launch environment '{}' was removed while the settings changed", NewSettings.m_LaunchEnvironment));
 
 		pApplication->m_Settings = NewSettings;
 		if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup | EApplicationSetting_AutoUpdate))

@@ -67,6 +67,8 @@ namespace NMib::NCloud
 		_Stream % m_bBackupEnabled;
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchInProcess)
 			_Stream % m_bLaunchInProcess;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchEnvironment)
+			_Stream % m_LaunchEnvironment;
 	}
 
 	template <typename tf_CStream>
@@ -152,6 +154,8 @@ namespace NMib::NCloud
 		_Stream % m_bBackupEnabled;
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchInProcess)
 			_Stream % m_bLaunchInProcess;
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddLaunchEnvironment)
+			_Stream % m_LaunchEnvironment;
 	}
 
 	template <typename tf_CStream>
@@ -194,6 +198,30 @@ namespace NMib::NCloud
 	{
 		_Stream % m_VersionID;
 		_Stream % m_VersionInfo;
+	}
+
+	template <typename tf_CStream>
+	void CAppManagerInterface::CEnvironmentSettings::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Type;
+		_Stream % m_AgentApplication;
+		_Stream % m_ParentApplication;
+		_Stream % m_bAutoStart;
+	}
+
+	template <typename tf_CStream>
+	void CAppManagerInterface::CEnvironmentInfo::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Status;
+		_Stream % m_StatusSeverity;
+		_Stream % m_HostID;
+
+		_Stream % m_Type;
+		_Stream % m_AgentApplication;
+		_Stream % m_ParentApplication;
+		_Stream % m_bAutoStart;
+
+		_Stream % m_Applications;
 	}
 
 	template <typename tf_CStream>

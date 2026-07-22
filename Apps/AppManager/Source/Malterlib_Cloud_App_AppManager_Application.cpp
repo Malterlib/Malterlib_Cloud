@@ -10,6 +10,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		m_ProcessLaunch.f_Set<0>();
 		m_ProcessLaunchSubscription.f_Clear();
+		m_pLaunchedEnvironment = nullptr;
 		m_bLaunched = false;
 	}
 
@@ -36,6 +37,8 @@ namespace NMib::NCloud::NAppManager
 		fg_Move(m_StatusSensorReporter.m_fReportReadings).f_Destroy() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy application status reporter");
 
 		m_bDeleted = true;
+		m_EnvironmentTicketID.f_Clear();
+		m_EnvironmentTicketSubscription = {};
 		m_pParentApplication = nullptr;
 		m_ChildrenLink.f_Unlink();
 		for (auto &Child : m_Children)
@@ -281,7 +284,68 @@ namespace NMib::NCloud::NAppManager
 							co_return DMibErrorInstance(fg_Format("Errors stopping child applications: {}", ChildCloseErrors));
 
 						TCAsyncResult<uint32> StopResult;
-						if (pApplication->m_ProcessLaunch.f_IsOfType<void>() || bWasStopped || pApplication->m_bDeleted)
+						if (pApplication->m_pLaunchedEnvironment)
+						{
+							auto pEnvironment = fg_Exchange(pApplication->m_pLaunchedEnvironment, nullptr);
+
+							// A launch waiting for the application to register or start would otherwise wait for its timeout
+							m_pThis->fp_AbortPendingDistributedAppWaits(*pApplication, "Application was stopped");
+
+							if (pEnvironment->m_AgentInterface && !pApplication->m_bDeleted)
+							{
+								// The application registers its distributed app interface with this
+								// AppManager, so the pre stop runs here before the agent stops the
+								// process
+								if (pApplication->m_AppInterface && pApplication->m_AppInterface->f_InterfaceVersion() >= CDistributedAppInterfaceClient::EProtocolVersion_SupportPreStop)
+								{
+									DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Pre-stopping application '{}'", pApplication->m_Name);
+
+									auto PreStopResult = co_await pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_PreStop)()
+										.f_Timeout(60.0 * 60.0, "Timed out waiting for application pre stop (1 hour)")
+										.f_Wrap()
+									;
+
+									if (!PreStopResult)
+										DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error pre-stopping application: {}", PreStopResult.f_GetExceptionStr());
+									else if (pApplication->m_BackupClient)
+									{
+										// The backup finishes on the state the pre stop left, like for applications on the host
+										auto DestroyBackupResult = co_await fg_Move(pApplication->m_BackupClient).f_Destroy().f_Wrap();
+										if (!DestroyBackupResult)
+											DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Error stopping application backup: {}", DestroyBackupResult.f_GetExceptionStr());
+									}
+								}
+
+								// A forced removal can delete the application during the pre stop, and an application added again
+								// with the same name can then run in the environment under the name the stop uses
+								auto *pCurrentApplication = m_pThis->mp_Applications.f_FindEqual(pApplication->m_Name);
+								bool bReplaced
+									= pCurrentApplication
+									&& *pCurrentApplication != pApplication
+									&& (*pCurrentApplication)->m_pLaunchedEnvironment == pEnvironment
+								;
+
+								if (bReplaced)
+									StopResult.f_SetResult(0);
+								else if (!pEnvironment->m_AgentInterface)
+									StopResult.f_SetException(DMibErrorInstance("The agent of environment '{}' disconnected during the stop"_f << pEnvironment->m_Name));
+								else
+								{
+									DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Stopping application '{}' in environment '{}'", pApplication->m_Name, pEnvironment->m_Name);
+									StopResult = co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_StopApplication)(pApplication->m_Name)
+										.f_Timeout(60.0 * 60.0, "Timed out stopping application in environment (1 hour)")
+										.f_Wrap()
+									;
+								}
+
+								// The application can still run, and a later stop must reach it through the agent
+								if (!StopResult && pEnvironment->m_AgentInterface && !pApplication->m_pLaunchedEnvironment && !pApplication->m_bDeleted)
+									pApplication->m_pLaunchedEnvironment = pEnvironment;
+							}
+							else
+								StopResult.f_SetResult(0);
+						}
+						else if (pApplication->m_ProcessLaunch.f_IsOfType<void>() || bWasStopped || pApplication->m_bDeleted)
 							StopResult.f_SetResult(0);
 						else
 						{
@@ -390,6 +454,9 @@ namespace NMib::NCloud::NAppManager
 
 	CStr CAppManagerActor::CApplication::f_GetDirectory()
 	{
+		if (!m_DirectoryOverride.f_IsEmpty())
+			return m_DirectoryOverride;
+
 		if (f_IsChildApp())
 			return fg_Format("{}/App/{}/{}", m_pThis->mp_State.m_RootDirectory, m_Settings.m_ParentApplication, m_Name);
 		else

@@ -66,8 +66,42 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		CSymmetricKey Key;
+
+		auto ClosingEncryption = g_OnScopeExit / [pEncryptionApplication]
+			{
+				pEncryptionApplication->m_bClosingEncryption = false;
+			}
+		;
+
 		if (_Operation == EEncryptOperation_Close)
 		{
+			pEncryptionApplication->m_bClosingEncryption = true;
+
+			// Environments storing their data inside this application, or inside its children, must release the storage first
+			{
+				TCVector<TCSharedPointer<CEnvironment>> ConfinedEnvironments;
+				for (auto &pEnvironment : mp_Environments)
+				{
+					auto *pParent = mp_Applications.f_FindEqual(pEnvironment->m_Settings.m_ParentApplication);
+					if
+					(
+						pEnvironment->m_Settings.m_ParentApplication == pEncryptionApplication->m_Name
+						|| (pParent && (*pParent)->m_Settings.m_ParentApplication == pEncryptionApplication->m_Name)
+					)
+					{
+						ConfinedEnvironments.f_Insert(fg_TempCopy(pEnvironment));
+					}
+				}
+
+				// Unlike a manual stop this does not wait for the environment to be idle: a removal rejects applications that
+				// environments store their data in, and the shutdown cancels the application updates first
+				for (auto &pEnvironment : ConfinedEnvironments)
+				{
+					if (pEnvironment->f_IsStarted() || pEnvironment->m_bStarting || pEnvironment->m_bStopping)
+						co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment before closing encryption");
+				}
+			}
+
 			if (pEncryptionApplication->m_DirectoryMonitorSubscription)
 				co_await fg_Exchange(pEncryptionApplication->m_DirectoryMonitorSubscription, nullptr)->f_Destroy();
 		}

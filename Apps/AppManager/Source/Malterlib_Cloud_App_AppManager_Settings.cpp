@@ -131,6 +131,12 @@ namespace NMib::NCloud::NAppManager
 			m_bLaunchInProcess = pValue->f_Boolean();
 		}
 
+		if (auto *pValue = _Params.f_GetMember("LaunchEnvironment"))
+		{
+			o_ChangedSettings |= EApplicationSetting_LaunchEnvironment;
+			m_LaunchEnvironment = pValue->f_String();
+		}
+
 		if (auto *pValue = _Params.f_GetMember("BackupIncludeWildcards"))
 		{
 			o_ChangedSettings |= EApplicationSetting_BackupIncludeWildcards;
@@ -315,6 +321,8 @@ namespace NMib::NCloud::NAppManager
 			m_bStopOnDependencyFailure = _Source.m_bStopOnDependencyFailure;
 		if (_ChangedSettings & EApplicationSetting_LaunchInProcess)
 			m_bLaunchInProcess = _Source.m_bLaunchInProcess;
+		if (_ChangedSettings & EApplicationSetting_LaunchEnvironment)
+			m_LaunchEnvironment = _Source.m_LaunchEnvironment;
 	}
 
 	bool CAppManagerActor::CApplicationSettings::f_Validate(CStr &o_Error) const
@@ -325,6 +333,14 @@ namespace NMib::NCloud::NAppManager
 				return false;
 			}
 		;
+		if (!m_LaunchEnvironment.f_IsEmpty())
+		{
+			if (m_bLaunchInProcess)
+				return fError("For launch environment you cannot specify launch in process");
+			else if (m_bSelfUpdateSource)
+				return fError("For launch environment you cannot specify self update source");
+		}
+
 		if (m_bSelfUpdateSource)
 		{
 			if (!m_EncryptionStorage.f_IsEmpty())
@@ -424,6 +440,8 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
 		if (m_bLaunchInProcess != _Other.m_bLaunchInProcess)
 			ChangedSettings |= EApplicationSetting_LaunchInProcess;
+		if (m_LaunchEnvironment != _Other.m_LaunchEnvironment)
+			ChangedSettings |= EApplicationSetting_LaunchEnvironment;
 
 		return ChangedSettings;
 	}
@@ -585,6 +603,11 @@ namespace NMib::NCloud::NAppManager
 			m_bLaunchInProcess = *_Settings.m_bLaunchInProcess;
 			o_ChangedSettings |= EApplicationSetting_LaunchInProcess;
 		}
+		if (_Settings.m_LaunchEnvironment)
+		{
+			m_LaunchEnvironment = *_Settings.m_LaunchEnvironment;
+			o_ChangedSettings |= EApplicationSetting_LaunchEnvironment;
+		}
 	}
 
 	void CAppManagerActor::CApplicationSettings::f_FromVersionInfo(CVersionManager::CVersionInformation const &_Info, EApplicationSetting &o_ChangedSettings)
@@ -697,6 +720,12 @@ namespace NMib::NCloud::NAppManager
 		{
 			o_ChangedSettings |= EApplicationSetting_StopOnDependencyFailure;
 			m_bStopOnDependencyFailure = pValue->f_Boolean();
+		}
+
+		if (auto *pValue = ExtraInfo.f_GetMember("LaunchEnvironment", EJsonType_String))
+		{
+			o_ChangedSettings |= EApplicationSetting_LaunchEnvironment;
+			m_LaunchEnvironment = pValue->f_String();
 		}
 	}
 }

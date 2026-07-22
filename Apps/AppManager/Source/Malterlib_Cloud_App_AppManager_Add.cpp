@@ -252,6 +252,9 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
+		if (!pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty() && !fp_EnvironmentAvailable(pApplication->m_Settings.m_LaunchEnvironment))
+			co_return Auditor.f_Exception(fg_Format("Launch environment '{}' does not exist. Add it with --environment-add.", pApplication->m_Settings.m_LaunchEnvironment));
+
 		if (pApplication->f_IsChildApp())
 		{
 			auto *pParentApplication = mp_Applications.f_FindEqual(pApplication->m_Settings.m_ParentApplication);
@@ -376,6 +379,13 @@ namespace NMib::NCloud::NAppManager
 			*pDeletePath = DownloadDirectoryRoot;
 			SourcePath = DownloadDirectory;
 		}
+
+		// The package settings applied above can set the launch environment
+		if (!pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty() && !fp_EnvironmentAvailable(pApplication->m_Settings.m_LaunchEnvironment))
+			co_return Auditor.f_Exception(fg_Format("Launch environment '{}' does not exist. Add it with --environment-add.", pApplication->m_Settings.m_LaunchEnvironment));
+
+		if (!pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty())
+			co_await fp_CheckEnvironmentAccess(pApplication->m_Settings.m_LaunchEnvironment, _CallingHostInfo);
 
 #ifdef DPlatformFamily_Windows
 		if (!pApplication->m_Settings.m_RunAsUser.f_IsEmpty() && pApplication->m_Settings.m_RunAsUserPassword.f_IsEmpty())

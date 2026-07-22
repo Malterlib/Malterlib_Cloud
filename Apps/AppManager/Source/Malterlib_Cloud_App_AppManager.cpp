@@ -8,9 +8,93 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	CAppManagerActor::CAppManagerActor()
-		: CDistributedAppActor(CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager"))
+	namespace
 	{
+		struct CAgentDeploymentSettings
+		{
+			bool m_bEnvironmentAgent = false;
+			CStr m_EnvironmentHostID;
+			TCOptional<CStr> m_UserGroupNameTransform;
+		};
+
+		CAgentDeploymentSettings const &fg_GetAgentDeploymentSettings()
+		{
+			// The launching AppManager writes deployment settings next to the agent
+			// executable. The process environment cannot identify the agent: it is
+			// inherited by everything in the environment, so a nested AppManager or a
+			// manually started one would mistake itself for the agent
+			static CAgentDeploymentSettings s_Settings = []
+				{
+					CAgentDeploymentSettings Settings;
+
+					try
+					{
+						CStr SettingsFile = CFile::fs_GetProgramDirectory() / "AppManagerSettings.json";
+						if (CFile::fs_FileExists(SettingsFile))
+						{
+							CEJsonSorted Json = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile, true));
+
+							Settings.m_bEnvironmentAgent = Json.f_GetMemberValue("EnvironmentAgent", false).f_Boolean();
+							if (auto *pValue = Json.f_GetMember("EnvironmentHostID", EJsonType_String))
+								Settings.m_EnvironmentHostID = pValue->f_String();
+							if (auto *pValue = Json.f_GetMember("UserGroupNameTransform", EJsonType_String))
+								Settings.m_UserGroupNameTransform = pValue->f_String();
+						}
+					}
+					catch (CException const &_Exception)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to read the deployment settings: {}", _Exception);
+					}
+
+					return Settings;
+				}
+				()
+			;
+
+			return s_Settings;
+		}
+
+		CDistributedAppActor_Settings fg_MakeAppManagerSettings()
+		{
+			auto Settings = CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager");
+
+			auto &Deployment = fg_GetAgentDeploymentSettings();
+			if (Deployment.m_bEnvironmentAgent)
+			{
+				// The launching AppManager points HOME and TMPDIR into the agent root,
+				// but nothing creates them inside a fresh environment; child processes
+				// like package installs fail without a temporary directory
+				for (auto pVariable : {"HOME", "TMPDIR"})
+				{
+					CStr Directory = fg_GetSys()->f_GetEnvironmentVariable(pVariable);
+					if (Directory.f_IsEmpty())
+						continue;
+
+					try
+					{
+						if (!CFile::fs_FileExists(Directory))
+							CFile::fs_CreateDirectory(Directory);
+					}
+					catch (CException const &_Exception)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to create '{}' directory '{}': {}", pVariable, Directory, _Exception);
+					}
+				}
+			}
+
+			return Settings;
+		}
+	}
+
+	CAppManagerActor::CAppManagerActor()
+		: CDistributedAppActor(fg_MakeAppManagerSettings())
+	{
+		auto &Deployment = fg_GetAgentDeploymentSettings();
+		mp_bEnvironmentAgent = Deployment.m_bEnvironmentAgent;
+		mp_EnvironmentHostID = Deployment.m_EnvironmentHostID;
+		// The agent names application users like the host does, so both use the same accounts for the files the host installs
+		if (Deployment.m_UserGroupNameTransform)
+			mp_pUniqueUserGroup->m_UserGroupNameTransform = *Deployment.m_UserGroupNameTransform;
 		mp_InitialStartupResultFuture = mp_InitialStartupResult.f_Future();
 	}
 
@@ -328,6 +412,9 @@ namespace NMib::NCloud::NAppManager
 				if (auto pValue = ApplicationJson.f_GetMember("LaunchInProcess", EJsonType_Boolean))
 					Settings.m_bLaunchInProcess = pValue->f_Boolean();
 
+				if (auto pValue = ApplicationJson.f_GetMember("LaunchEnvironment", EJsonType_String))
+					Settings.m_LaunchEnvironment = pValue->f_String();
+
 				mp_KnownRemoteApplications[CRemoteApplicationKey{Settings}][mp_State.m_HostID];
 			}
 		}
@@ -348,6 +435,8 @@ namespace NMib::NCloud::NAppManager
 				}
 			}
 		}
+
+		fp_ReadEnvironmentsState();
 
 		if (!PendingSelfUpdate.m_Name.f_IsEmpty())
 			fp_StartPendingSelfUpdateReporting(PendingSelfUpdate);
@@ -381,24 +470,78 @@ namespace NMib::NCloud::NAppManager
 
 		co_await fp_InitSensor();
 		co_await fp_InitLog();
-		co_await fp_InitHostMonitor();
+
+		if (!mp_bEnvironmentAgent)
+			co_await fp_InitHostMonitor();
 
 		co_await fp_ReadState();
 
-		co_await fp_RebootPrevention_WatchInitialSensors();
+		if (!mp_bEnvironmentAgent)
+			co_await fp_RebootPrevention_WatchInitialSensors();
 
-		co_await (fp_PublishAppInterface() + fp_SetupLimits());
+		// The applications register with the host AppManager, which sets up the resource limits on the host. Guests of VM
+		// environments keep their own default limits
+		if (mp_bEnvironmentAgent)
+			co_await fp_PublishAppInterface();
+		else
+			co_await (fp_PublishAppInterface() + fp_SetupLimits());
+
+		// Kill environment agents that survived an earlier AppManager instance.
+		// Environments confined to a parent application store their data inside that
+		// application's directory, so those locations are swept as well when they exist
+		// (encrypted parent storage may not be mounted yet, in which case nothing runs there).
+		// This runs before the applications launch, since their launches start environment agents.
+		{
+			TCVector<CStr> EnvironmentDirectories;
+			EnvironmentDirectories.f_Insert(mp_State.m_RootDirectory / "Environment");
+			for (auto &pEnvironment : mp_Environments)
+			{
+				if (!pEnvironment->m_Settings.m_ParentApplication.f_IsEmpty())
+					EnvironmentDirectories.f_Insert(fp_GetEnvironmentStorageDirectory(*pEnvironment));
+			}
+
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [EnvironmentDirectories = fg_Move(EnvironmentDirectories)]()
+					{
+						for (auto &EnvironmentDirectory : EnvironmentDirectories)
+						{
+							if (CFile::fs_FileExists(EnvironmentDirectory, EFileAttrib_Directory))
+								CProcessLaunch::fs_KillProcessesInDirectory("*", {}, EnvironmentDirectory, 10.0);
+						}
+					}
+				)
+				.f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to kill stale environment agents")
+			;
+		}
 
 		fp_InitApplications();
 		fp_UpdateApplicationDependencies();
 
 		CLogError LogError("Malterlib/Cloud/AppManager");
 
-		fp_PublishCoordinationInterface() > LogError("Failed to publish coordination interface");
-		fp_SubscribeCoordinationInterface() > LogError("Failed to subscribe to coordination interface");
+		if (!mp_bEnvironmentAgent)
+		{
+			fp_PublishCoordinationInterface() > LogError("Failed to publish coordination interface");
+			fp_SubscribeCoordinationInterface() > LogError("Failed to subscribe to coordination interface");
+		}
 
 		co_await (fp_SetupAppManagerInterfacePermissions() % "Failed to setup permissions");
 		co_await (fp_PublishAppManagerInterface() % "Failed to publish app manager interface");
+
+		// The agent shares the environment interface with its environment host only: published, every connected host could
+		// launch processes through it as the agent's user
+		mp_EnvironmentInterface.f_Construct(mp_State.m_DistributionManager, this);
+		co_await (mp_EnvironmentHostInterface.f_Publish<CAppManagerEnvironmentHostInterface>(mp_State.m_DistributionManager, this) % "Failed to publish environment host interface");
+
+		if (mp_bEnvironmentAgent)
+		{
+			co_await (fp_RegisterWithEnvironmentHost() % "Failed to register with environment host");
+
+			co_return {};
+		}
 
 		auto [KeySubscription, VersionSubscription, CloudSubscription] = co_await
 			(
@@ -467,6 +610,12 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		co_await (fp_SetupDatabaseCleanup() % "Failed to setup database cleanup");
+
+		for (auto &pEnvironment : mp_Environments)
+		{
+			if (pEnvironment->m_Settings.m_bAutoStart && !pEnvironment->m_bStoppedManually)
+				fp_EnsureEnvironmentStarted(pEnvironment) > LogError("Failed to auto-start environment");
+		}
 
 		co_return {};
 	}
@@ -607,6 +756,16 @@ namespace NMib::NCloud::NAppManager
 			pApplication->f_Clear();
 		}
 
+		// Shutting down does not wait for busy environments: a virtual machine runs in this process, and the shutdown cannot
+		// be held back for the hour an operation can take
+		{
+			TCFutureVector<void> EnvironmentStops;
+			for (auto &pEnvironment : mp_Environments)
+				fp_StopEnvironmentInternal(pEnvironment) > EnvironmentStops;
+
+			co_await fg_AllDone(EnvironmentStops).f_Wrap() > LogError.f_Warning("Failed to stop environments");
+		}
+
 		{
 			TCFutureVector<void> Destroys;
 
@@ -679,6 +838,22 @@ namespace NMib::NCloud::NAppManager
 				AppManagerCoordinationInterfaceDestroyResult > LogError.f_Warning("Failed to destroy app manager coordination interface");
 		}
 
+		if (mp_EnvironmentHostRegistration)
+			co_await fg_Exchange(mp_EnvironmentHostRegistration, nullptr)->f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy environment host registration");
+
+		mp_EnvironmentHostActor = nullptr;
+
+		{
+			auto [EnvironmentInterfaceDestroyResult, EnvironmentHostInterfaceDestroyResult] =
+				co_await (mp_EnvironmentInterface.f_Destroy() + mp_EnvironmentHostInterface.f_Destroy()).f_Wrap()
+			;
+			if (!EnvironmentInterfaceDestroyResult)
+				EnvironmentInterfaceDestroyResult > LogError.f_Warning("Failed to destroy environment interface");
+			if (!EnvironmentHostInterfaceDestroyResult)
+				EnvironmentHostInterfaceDestroyResult > LogError.f_Warning("Failed to destroy environment host interface");
+		}
+
+		co_await mp_EnvironmentHostActors.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy environment host interface subscription");
 		co_await mp_RemoteAppManagers.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy remote app managers interface subscription");
 		co_await mp_AppInterfaceServer.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app interface server");
 

@@ -267,6 +267,7 @@ namespace NMib::NCloud
 								{"AppManager/VersionAppAll", {}}
 								, {"AppManager/CommandAll", {}}
 								, {"AppManager/AppAll", {}}
+								, {"AppManager/EnvironmentAll", {}}
 							}
 						)
 					)
