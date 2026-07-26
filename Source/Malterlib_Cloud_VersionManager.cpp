@@ -148,12 +148,25 @@ namespace NMib::NCloud
 
 	CStr CVersionManager::CVersionID::f_EncodeFileName() const
 	{
-		return fg_Format("{}_{}.{}.{}", m_Branch.f_ReplaceChar('/', '_'), m_Major, m_Minor, m_Revision);
+		// '%' must be escaped before '/' so the encoding stays injective; literal '_' in the
+		// branch is kept as-is, which keeps file names for branches without '/' unchanged
+		return fg_Format("{}_{}.{}.{}", m_Branch.f_Replace("%", "%25").f_Replace("/", "%2F"), m_Major, m_Minor, m_Revision);
 	}
 
 	CStr CVersionManager::CVersionID::fs_DecodeFileName(CStr const &_FileName)
 	{
-		return _FileName.f_ReplaceChar('_', '/');
+		// The previous encoding mapped '/' to '_', which made branches with literal '_' and
+		// branches with '/' collide, so directories written with it cannot be decoded reliably.
+		// They intentionally stay addressable under the literal '_' interpretation instead of
+		// guessing at a migration.
+
+		// The version suffix never contains '_', so the branch is everything before the last '_'
+		aint iVersionStart = _FileName.f_FindCharReverse('_');
+		if (iVersionStart < 0)
+			return _FileName;
+
+		CStr Branch = _FileName.f_Left(iVersionStart).f_Replace("%2F", "/").f_Replace("%25", "%");
+		return fg_Format("{}/{}", Branch, _FileName.f_Extract(iVersionStart + 1));
 	}
 
 	NEncoding::CEJsonSorted CVersionManager::CVersionID::f_ToJson() const
