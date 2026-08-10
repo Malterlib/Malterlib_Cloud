@@ -182,7 +182,9 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 		CFile::fs_CreateDirectory(RootDirectory);
 
 		CTrustManagerTestHelper TrustManagerState;
-		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+
+		// The trust signer requires the same key setting as the launched production apps.
+		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper", {}, true, CActorDistributionCryptographySettings::fs_DefaultKeySetting());
 		auto CleanupTrustManager = g_OnScopeExit / [&]
 			{
 				TrustManager->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());

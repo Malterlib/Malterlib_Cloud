@@ -596,7 +596,8 @@ namespace NMib::NCloud
 		State.m_LogForwarder = fg_Construct(fg_Construct(State.m_RootDirectory), "Log Forwarder Actor");
 		co_await State.m_LogForwarder(&CDistributedAppLogForwarder::f_StartMonitoring).f_Timeout(State.m_Timeout, "Timed out waiting for log forwarder to start");
 
-		State.m_TrustManager = State.m_TrustManagerState.f_TrustManager("TestHelper");
+		// The trust signer requires the same key setting as the launched production apps.
+		State.m_TrustManager = State.m_TrustManagerState.f_TrustManager("TestHelper", {}, true, CActorDistributionCryptographySettings::fs_DefaultKeySetting());
 		State.m_TestHostID = co_await State.m_TrustManager(&CDistributedActorTrustManager::f_GetHostID).f_Timeout(State.m_Timeout, "Timed out waiting for host id of trust manager");
 		State.m_Subscriptions = fg_Construct(State.m_TrustManager);
 
