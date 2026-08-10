@@ -445,6 +445,9 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		CPackageOptions KeyManagerPackageOptions(_KeyManagerPackage);
 		CPackageOptions VersionManagerPackageOptions(_VersionManagerPackage);
 
+		// NoZstdPackages identifies AppManagers whose bundled bsdtar cannot unpack zstd.
+		CStr PackageExtension = AppManagerPackageOptions.f_HasFeatureFlag("NoZstdPackages") ? ".tar.gz" : ".tar.zst";
+
 		CStr BinaryDirectory = ProgramDirectory / "TestApps/VersionManager";
 		CVersionManagerHelper VersionManagerHelper(BinaryDirectory);
 
@@ -960,7 +963,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			{
 				DMibLogWithCategory(Test, Info, "Update App ({})", _Name);
 
-				CStr AppArchive = "{}/TestApps/Dynamic/{}/{}.tar.zst"_f << ProgramDirectory << _UniqueName << _Name;
+				CStr AppArchive = "{}/TestApps/Dynamic/{}/{}{}"_f << ProgramDirectory << _UniqueName << _Name << PackageExtension;
 				CStr SourceTempPath = "{}/TestApps/LatestSource/{}/{}"_f << ProgramDirectory << _UniqueName << _Name;
 
 				{
@@ -2238,6 +2241,10 @@ public:
 
 			auto fInit = [&](CStr &_AppManager, CStr &_VersionManager, CStr &_KeyManager, CStr const &_UniqueName)
 				{
+					// NoZstdPackages identifies AppManagers whose bundled bsdtar cannot unpack zstd.
+					CPackageOptions AppManagerOptions(_AppManager);
+					CStr PackageExtension = AppManagerOptions.f_HasFeatureFlag("NoZstdPackages") ? ".tar.gz" : ".tar.zst";
+
 					auto fInitPackage = [&](CStr &o_PackagePath) -> TCUnsafeFuture<void>
 						{
 							if (!o_PackagePath)
@@ -2256,7 +2263,7 @@ public:
 							if (Version != "Latest")
 								co_return {};
 
-							o_PackagePath = BasePath / o_PackagePath.f_RemovePrefix("Latest/");
+							o_PackagePath = BasePath / ("{}{}"_f << AppName << PackageExtension);
 
 							CStr VersionInfoFile = "{}/{}VersionInfo.json"_f << SourceTempPath << AppName;
 							CEJsonSorted VersionInfo = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(VersionInfoFile));
