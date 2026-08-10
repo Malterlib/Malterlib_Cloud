@@ -451,7 +451,11 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		CFile::fs_CreateDirectory(RootDirectory);
 
 		CTrustManagerTestHelper TrustManagerState;
-		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+		// The harness trust domain includes launched production apps that use the default key
+		// setting, and the trust signer only accepts requests matching its configured setting, so
+		// the controller trust manager must state the same key setting rather than the faster test
+		// one
+		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper", {}, true, CActorDistributionCryptographySettings::fs_DefaultKeySetting());
 		auto CleanupTrustManager = g_OnScopeExit / [&]
 			{
 				TrustManager->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
@@ -1521,7 +1525,11 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		CFile::fs_CreateDirectory(RootDirectory);
 
 		CTrustManagerTestHelper TrustManagerState;
-		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+		// The harness trust domain includes launched production apps that use the default key
+		// setting, and the trust signer only accepts requests matching its configured setting, so
+		// the controller trust manager must state the same key setting rather than the faster test
+		// one
+		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper", {}, true, CActorDistributionCryptographySettings::fs_DefaultKeySetting());
 		auto CleanupTrustManager = g_OnScopeExit / [&]
 			{
 				TrustManager->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
