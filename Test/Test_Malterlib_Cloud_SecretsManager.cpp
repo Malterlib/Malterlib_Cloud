@@ -182,7 +182,12 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 		CFile::fs_CreateDirectory(RootDirectory);
 
 		CTrustManagerTestHelper TrustManagerState;
-		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper");
+
+		// The harness trust domain includes the launched production SecretsManager app that uses
+		// the default key setting, and the trust signer only accepts requests matching its
+		// configured setting, so the controller trust manager must state the same key setting
+		// rather than the faster test one
+		TCActor<CDistributedActorTrustManager> TrustManager = TrustManagerState.f_TrustManager("TestHelper", {}, true, CActorDistributionCryptographySettings::fs_DefaultKeySetting());
 		auto CleanupTrustManager = g_OnScopeExit / [&]
 			{
 				TrustManager->f_BlockDestroy(RunLoopHelper.m_pRunLoop->f_ActorDestroyLoop());
