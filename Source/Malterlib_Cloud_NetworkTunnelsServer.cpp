@@ -207,7 +207,7 @@ namespace NMib::NCloud
 				;
 
 				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
-					(TCSharedPointer<CIOByteVector> _pMessage) -> TCFuture<void>
+					(TCSharedPointer<CIOByteVector const> _pMessage) -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
 
@@ -215,7 +215,7 @@ namespace NMib::NCloud
 						if (!pConnection)
 							co_return DMibErrorInstance("Socket no longer exists");
 
-						co_await pConnection->m_fSendData(fg_Move(*_pMessage));
+						co_await pConnection->m_fSendData(CSharedByteVector(_pMessage));
 						co_return {};
 					}
 				;
@@ -234,7 +234,7 @@ namespace NMib::NCloud
 							co_return {};
 						}
 					)
-					/ [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy, AppAuditor](CIOByteVector _Data) -> TCFuture<void>
+					/ [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy, AppAuditor](CSharedByteVector _Data) -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
 
@@ -242,7 +242,7 @@ namespace NMib::NCloud
 						if (!pConnection)
 							co_return DMibErrorInstance("Socket no longer exists");
 
-						co_await pConnection->m_Socket(&CAsyncSocketActor::f_SendData, fg_Construct(fg_Move(_Data)), 0);
+						co_await pConnection->m_Socket(&CAsyncSocketActor::f_SendData, fg_Move(_Data), 0);
 
 						co_return {};
 					}

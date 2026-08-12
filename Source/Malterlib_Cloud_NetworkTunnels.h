@@ -83,7 +83,10 @@ namespace NMib::NCloud
 			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CTunnelChange _TunnelChange)> m_fOnTunnelChange;
 		};
 
-		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CIOByteVector _Data)>;
+		// Takes a shared byte view so a forwarded payload stays a reference into the packet
+		// buffer it arrived in. Wire compatible with a byte vector: both stream as a length
+		// prefix followed by the bytes
+		using FSendBytes = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (NContainer::CSharedByteVector _Data)>;
 
 		struct COpenConnection
 		{
