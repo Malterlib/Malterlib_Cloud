@@ -207,7 +207,7 @@ namespace NMib::NCloud
 				;
 
 				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
-					(TCSharedPointer<CIOByteVector const> _pMessage) -> TCFuture<void>
+					(CSharedByteVector _Message) -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
 
@@ -215,7 +215,7 @@ namespace NMib::NCloud
 						if (!pConnection)
 							co_return DMibErrorInstance("Socket no longer exists");
 
-						co_await pConnection->m_fSendData(CSharedByteVector(_pMessage));
+						co_await pConnection->m_fSendData(fg_Move(_Message));
 						co_return {};
 					}
 				;
