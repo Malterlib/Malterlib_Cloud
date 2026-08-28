@@ -354,7 +354,12 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		}
 
-		TCActor<CDistributedAppLogForwarder> LogForwarder{fg_Construct(RootDirectory), "Log Forwarder Actor"};
+		TCActor<CDistributedAppLogForwarder> LogForwarder
+			{
+				fg_Construct(RootDirectory, !!(fg_TestAnsiEncodingFlags() & NCommandLine::EAnsiEncodingFlag_Color))
+				, "Log Forwarder Actor"
+			}
+		;
 
 		auto CleanupLogForwarder = g_OnScopeExit / [&]
 			{
@@ -1421,7 +1426,12 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 			}
 		}
 
-		TCActor<CDistributedAppLogForwarder> LogForwarder{fg_Construct(RootDirectory), "Log Forwarder Actor"};
+		TCActor<CDistributedAppLogForwarder> LogForwarder
+			{
+				fg_Construct(RootDirectory, !!(fg_TestAnsiEncodingFlags() & NCommandLine::EAnsiEncodingFlag_Color))
+				, "Log Forwarder Actor"
+			}
+		;
 
 		auto CleanupLogForwarder = g_OnScopeExit / [&]
 			{
