@@ -84,7 +84,12 @@ namespace NMib::NCloud
 		auto &State = *m_pState;
 
 		if (State.m_Options & EOption_EnableOtherOutput)
+		{
 			_Params.f_Insert("--log-to-stderr");
+
+			if (!(fg_TestAnsiEncodingFlags() & NCommandLine::EAnsiEncodingFlag_Color))
+				_Params.f_Insert("--no-color");
+		}
 
 		auto SimpleLaunch = CProcessLaunchActor::CSimpleLaunch(_Executable, _Params, _WorkingDir, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode);
 
@@ -110,7 +115,12 @@ namespace NMib::NCloud
 		auto &State = *m_pState;
 
 		if (State.m_Options & EOption_EnableOtherOutput)
+		{
 			_Params.f_Insert("--log-to-stderr");
+
+			if (!(fg_TestAnsiEncodingFlags() & NCommandLine::EAnsiEncodingFlag_Color))
+				_Params.f_Insert("--no-color");
+		}
 
 		auto SimpleLaunch = CProcessLaunchActor::CSimpleLaunch(_Executable, _Params, _WorkingDir, CProcessLaunchActor::ESimpleLaunchFlag_None);
 
@@ -593,7 +603,12 @@ namespace NMib::NCloud
 
 		CFile::fs_CreateDirectory(State.m_RootDirectory);
 
-		State.m_LogForwarder = fg_Construct(fg_Construct(State.m_RootDirectory), "Log Forwarder Actor");
+		State.m_LogForwarder = fg_Construct
+			(
+				fg_Construct(State.m_RootDirectory, !!(fg_TestAnsiEncodingFlags() & NCommandLine::EAnsiEncodingFlag_Color))
+				, "Log Forwarder Actor"
+			)
+		;
 		co_await State.m_LogForwarder(&CDistributedAppLogForwarder::f_StartMonitoring).f_Timeout(State.m_Timeout, "Timed out waiting for log forwarder to start");
 
 		// The harness trust domain includes launched production apps (AppManager, CloudManager,
@@ -623,7 +638,13 @@ namespace NMib::NCloud
 
 			co_await Dependencies.m_DistributionManager(&CActorDistributionManager::f_SetSecurity, Security).f_Timeout(State.m_Timeout, "Timed out waiting for set security");
 
-			State.m_LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>(Dependencies, (State.m_Options & EOption_EnableOtherOutput) != EOption_None);
+			State.m_LaunchHelper = fg_ConstructActor<CDistributedApp_LaunchHelper>
+				(
+					Dependencies
+					, (State.m_Options & EOption_EnableOtherOutput) != EOption_None
+					, !(fg_TestAnsiEncodingFlags() & NCommandLine::EAnsiEncodingFlag_Color)
+				)
+			;
 		}
 		if (State.m_Options & EOption_EnableVersionManager)
 		{
