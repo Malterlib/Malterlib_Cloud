@@ -156,7 +156,8 @@ namespace NVersionManagerSyncTests
 
 			// Add listen socket for destination
 			m_DestServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/versionmanager.sock"_f << m_DestDirectory));
-			co_await m_DestLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(m_DestServerAddress)
+			co_await m_DestLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+				(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = m_DestServerAddress})
 				.f_Timeout(g_Timeout, "Timed out waiting for destination version manager add listen")
 			;
 
@@ -172,7 +173,7 @@ namespace NVersionManagerSyncTests
 
 				// Add connection from destination to source
 				co_await m_DestLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-					(SourceTicket.m_Ticket, g_Timeout, -1)
+					(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = SourceTicket.m_Ticket, .m_Timeout = g_Timeout})
 					.f_Timeout(g_Timeout, "Timed out adding client connection to source")
 				;
 
@@ -219,6 +220,7 @@ namespace NVersionManagerSyncTests
 						, DestTicket.m_Ticket
 						, g_Timeout
 						, -1
+						, 0
 					)
 					.f_Timeout(g_Timeout, "Timed out adding test connection to destination")
 				;
@@ -425,7 +427,8 @@ namespace NVersionManagerSyncTests
 
 			// Add listen socket
 			Result.m_ServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/versionmanager.sock"_f << Result.m_Directory));
-			co_await Result.m_Launch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(Result.m_ServerAddress)
+			co_await Result.m_Launch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+				(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = Result.m_ServerAddress})
 				.f_Timeout(g_Timeout, "Timed out waiting for version manager add listen")
 			;
 
@@ -451,6 +454,7 @@ namespace NVersionManagerSyncTests
 						, Ticket.m_Ticket
 						, g_Timeout
 						, -1
+						, 0
 					)
 					.f_Timeout(g_Timeout, "Timed out adding test connection to manager")
 				;
@@ -493,7 +497,7 @@ namespace NVersionManagerSyncTests
 				;
 
 				co_await _InfoX.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-					(TicketFromY.m_Ticket, g_Timeout, -1)
+					(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = TicketFromY.m_Ticket, .m_Timeout = g_Timeout})
 					.f_Timeout(g_Timeout, "Timed out X connecting to Y")
 				;
 
@@ -522,7 +526,7 @@ namespace NVersionManagerSyncTests
 				;
 
 				co_await _InfoY.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-					(TicketFromX.m_Ticket, g_Timeout, -1)
+					(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = TicketFromX.m_Ticket, .m_Timeout = g_Timeout})
 					.f_Timeout(g_Timeout, "Timed out Y connecting to X")
 				;
 

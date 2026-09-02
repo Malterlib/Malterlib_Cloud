@@ -558,7 +558,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 		CDistributedActorTrustManager_Address ServerAddress;
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath(RootDirectory / "controller.sock");
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
@@ -663,7 +663,10 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 					auto &BackupManagerInfo = AllBackupManagers[BackupManager.m_HostID];
 					BackupManagerInfo.m_pTrustInterface = BackupManager.m_pTrustInterface;
 					BackupManagerInfo.m_Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/BackupManagerTest.sock"_f << BackupManagerDirectory);
-					BackupManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(BackupManagerInfo.m_Address) > ListenResults;
+					BackupManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+						(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = BackupManagerInfo.m_Address})
+						> ListenResults
+					;
 					++iBackupManager;
 				}
 				fg_CombineResults(fg_AllDoneWrapped(ListenResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout));
@@ -717,7 +720,10 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &BackupManagerTrustInner = *pBackupManagerTrustInner;
-						BackupManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
+						BackupManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
+							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = _Ticket.m_Ticket, .m_Timeout = g_Timeout})
+							> Promise.f_ReceiveAny()
+						;
 					}
 				;
 				Promise.f_MoveFuture() > SetupTrustResults;

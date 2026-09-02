@@ -96,7 +96,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 			CStr ServerHostID = co_await _ServerTrustManager(&CDistributedActorTrustManager::f_GetHostID).f_Timeout(g_Timeout, "Timeout");
 
 			auto Ticket = co_await _ServerTrustManager(&CDistributedActorTrustManager::f_GenerateConnectionTicket, m_ServerAddress, nullptr, nullptr).f_Timeout(g_Timeout, "Timeout");
-			auto HostInfo = co_await _ClientTrustManager(&CDistributedActorTrustManager::f_AddClientConnection, fg_Move(Ticket.m_Ticket), g_Timeout, 1).f_Timeout(g_Timeout, "Timeout");
+			auto HostInfo = co_await _ClientTrustManager(&CDistributedActorTrustManager::f_AddClientConnection, fg_Move(Ticket.m_Ticket), g_Timeout, 1, 0).f_Timeout(g_Timeout, "Timeout");
 
 			co_await _ClientTrustManager
 				(
@@ -117,7 +117,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 			m_Helper1TrustManager = m_Helper1TrustManagerState.f_TrustManager("TestHelper1");
 
 			m_ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/server.sock"_f << m_RootDirectory);
-			co_await m_ServerTrustManager(&CDistributedActorTrustManager::f_AddListen, m_ServerAddress).f_Timeout(g_Timeout, "Timeout");
+			co_await m_ServerTrustManager(&CDistributedActorTrustManager::f_AddListen, m_ServerAddress, 0).f_Timeout(g_Timeout, "Timeout");
 
 			co_await f_ConnectTrustManagers(m_ServerTrustManager, m_Helper0TrustManager);
 			co_await f_ConnectTrustManagers(m_ServerTrustManager, m_Helper1TrustManager);
