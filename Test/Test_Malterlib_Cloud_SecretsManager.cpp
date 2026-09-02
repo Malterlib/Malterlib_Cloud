@@ -199,7 +199,7 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 
 		CDistributedActorTrustManager_Address ServerAddress;
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
@@ -299,7 +299,10 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 		// Add listen socket that secret managers can connect to
 		CDistributedActorTrustManager_Address KeyManagerServerAddress;
 		KeyManagerServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/Keymanager.sock"_f << KeyManagerDirectory);
-		KeyManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(KeyManagerServerAddress).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		KeyManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+			(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = KeyManagerServerAddress})
+			.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+		;
 
 		{
 			TCActor<CProcessLaunchActor> KeyManagerCommandLine = fg_Construct();
@@ -379,7 +382,10 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					SecretsManagerInfo.m_pTrustInterface = SecretsManager.m_pTrustInterface;
 
 					SecretsManagerInfo.m_Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/SecretsManagerTest.sock"_f << SecretsManagerDirectory);
-					SecretsManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(SecretsManagerInfo.m_Address) > ListenResults;
+					SecretsManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+						(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = SecretsManagerInfo.m_Address})
+						> ListenResults
+					;
 					++iSecretsManager;
 				}
 				fg_CombineResults(fg_AllDoneWrapped(ListenResults).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout));
@@ -460,7 +466,10 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &SecretsManagerTrustInner = *pSecretsManagerTrustInner;
-						SecretsManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
+						SecretsManagerTrustInner.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
+							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = _Ticket.m_Ticket, .m_Timeout = g_Timeout})
+							> Promise.f_ReceiveAny()
+						;
 					}
 				;
 				Promise.f_MoveFuture() > SetupTrustResults;
@@ -475,7 +484,10 @@ struct CSecretsManager_Tests : public NMib::NTest::CTest
 				> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 				{
 					auto &SecretsManagerTrust = *pSecretsManagerTrust;
-					SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(_Ticket.m_Ticket, g_Timeout, -1) > Promise.f_ReceiveAny();
+					SecretsManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
+						(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = _Ticket.m_Ticket, .m_Timeout = g_Timeout})
+						> Promise.f_ReceiveAny()
+					;
 				}
 			;
 			Promise.f_MoveFuture() > SetupTrustResults;

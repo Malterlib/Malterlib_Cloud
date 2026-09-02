@@ -180,7 +180,9 @@ namespace NMib::NCloud
 				)
 			;
 
-			co_await _pClientTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(Ticket.m_Ticket, _Timeout, -1);
+			co_await _pClientTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
+				(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket.m_Ticket, .m_Timeout = _Timeout})
+			;
 
 			co_return {};
 		}
@@ -216,7 +218,9 @@ namespace NMib::NCloud
 				)
 			;
 
-			co_await _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(Ticket.m_Ticket, _Timeout, -1);
+			co_await _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
+				(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket.m_Ticket, .m_Timeout = _Timeout})
+			;
 
 			co_return {};
 		}
@@ -286,7 +290,9 @@ namespace NMib::NCloud
 				)
 			;
 
-			co_await _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(Ticket.m_Ticket, _Timeout, -1);
+			co_await _pAppManagerTrust->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
+				(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket.m_Ticket, .m_Timeout = _Timeout})
+			;
 
 			co_return {};
 		}
@@ -620,7 +626,7 @@ namespace NMib::NCloud
 		State.m_Subscriptions = fg_Construct(State.m_TrustManager);
 
 		State.m_ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << State.m_RootDirectory);
-		co_await State.m_TrustManager(&CDistributedActorTrustManager::f_AddListen, State.m_ServerAddress).f_Timeout(State.m_Timeout, "Timed out waiting for listen addition");
+		co_await State.m_TrustManager(&CDistributedActorTrustManager::f_AddListen, State.m_ServerAddress, 0).f_Timeout(State.m_Timeout, "Timed out waiting for listen addition");
 
 		{
 			CDistributedApp_LaunchHelperDependencies Dependencies;
@@ -765,7 +771,8 @@ namespace NMib::NCloud
 			// Add listen socket that app managers can connect to
 			State.m_VersionManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/versionmanager.sock"_f << State.m_VersionManagerDirectory));
 			DMibTestMark;
-			co_await State.m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(State.m_VersionManagerServerAddress)
+			co_await State.m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+				(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = State.m_VersionManagerServerAddress})
 				.f_Timeout(State.m_Timeout, "Timed out waiting for version manager add listen")
 			;
 		}
@@ -775,7 +782,8 @@ namespace NMib::NCloud
 			// Add listen socket that app managers can connect to
 			State.m_CloudManagerServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/cloudmanager.sock"_f << State.m_CloudManagerDirectory));
 			DMibTestMark;
-			co_await State.m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(State.m_CloudManagerServerAddress)
+			co_await State.m_CloudManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+				(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = State.m_CloudManagerServerAddress})
 				.f_Timeout(State.m_Timeout, "Timed out waiting for cloud manager add listen")
 			;
 		}
@@ -919,7 +927,10 @@ namespace NMib::NCloud
 		{
 			TCFutureVector<void> ListenResults;
 			for (auto &AppManager : State.m_AppManagerInfos)
-				AppManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(AppManager.m_Address) > ListenResults;
+				AppManager.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+					(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = AppManager.m_Address})
+					> ListenResults
+				;
 
 			DMibTestMark;
 			co_await fg_AllDone(ListenResults).f_Timeout(State.m_Timeout, "Timed out waiting for app managers add listen");

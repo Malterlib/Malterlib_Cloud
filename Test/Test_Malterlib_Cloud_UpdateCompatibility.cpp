@@ -478,7 +478,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		CDistributedActorTrustManager_Address ServerAddress;
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
@@ -593,7 +593,10 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				CDistributedActorTrustManager_Address Address;
 				Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << _Directory);
-				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(Address).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+					(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = Address})
+					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+				;
 				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 					(
 						CAppManagerInterface::mc_pDefaultNamespace
@@ -797,7 +800,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
 						_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-							(Ticket, g_Timeout, -1).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = g_Timeout}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 						;
 					}
 				}
@@ -856,7 +859,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					auto Ticket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(fGenerateTicket(VersionManagerExecutable));
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
-						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					}
 				}
 
@@ -1557,7 +1560,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 		CDistributedActorTrustManager_Address ServerAddress;
 
 		ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
-		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+		TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 		CDistributedApp_LaunchHelperDependencies Dependencies;
 		Dependencies.m_Address = ServerAddress.m_URL;
@@ -1673,7 +1676,10 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 
 				CDistributedActorTrustManager_Address Address;
 				Address.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/appmanager.sock"_f << _Directory);
-				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(Address).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+					(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = Address})
+					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+				;
 				TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
 					(
 						CAppManagerInterface::mc_pDefaultNamespace
@@ -1868,7 +1874,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
 						_AppManager.m_LaunchInfo.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
-							(Ticket, g_Timeout, -1).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+							(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = Ticket, .m_Timeout = g_Timeout}).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 						;
 					}
 				}
@@ -1951,7 +1957,7 @@ struct CUpdateCompatibility_Tests : public NMib::NTest::CTest
 					auto Ticket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(fGenerateTicket(VersionManagerExecutable));
 					{
 						DMibLogWithCategory(Test, Info, "Add Client Connection");
-						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+						TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AddClientConnection)(Ticket, g_Timeout, -1, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 					}
 				}
 

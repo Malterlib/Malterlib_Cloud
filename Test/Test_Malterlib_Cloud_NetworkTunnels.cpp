@@ -228,7 +228,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			CDistributedActorTrustManager_Address ServerAddress;
 
 			ServerAddress.m_URL = "wss://[UNIX(666):{}]/"_f << fg_GetSafeUnixSocketPath("{}/controller.sock"_f << RootDirectory);
-			TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+			TrustManager(&CDistributedActorTrustManager::f_AddListen, ServerAddress, 0).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
 
 			CDistributedApp_LaunchHelperDependencies Dependencies;
 			Dependencies.m_Address = ServerAddress.m_URL;
@@ -307,7 +307,10 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			CDistributedActorTrustManager_Address TunnelServerAddress;
 			{
 				TunnelServerAddress.m_URL = fg_Format("wss://[UNIX(666):{}]/", fg_GetSafeUnixSocketPath("{}/Tunnel.sock"_f << TunnelServerDirectory));
-				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)(TunnelServerAddress).f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout);
+				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddListen)
+					(CDistributedActorTrustManagerInterface::CAddListen{.m_Address = TunnelServerAddress})
+					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
+				;
 			}
 			{
 				CDistributedActorTrustManagerInterface::CGenerateConnectionTicket GenerateTicket;
@@ -315,7 +318,8 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				auto Ticket = TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)(fg_Move(GenerateTicket))
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
-				auto HostInfo = TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)(fg_Move(Ticket.m_Ticket), g_Timeout, 1)
+				auto HostInfo = TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
+					(CDistributedActorTrustManagerInterface::CAddClientConnection{.m_TrustTicket = fg_Move(Ticket.m_Ticket), .m_Timeout = g_Timeout, .m_ConnectionConcurrency = 1})
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 
