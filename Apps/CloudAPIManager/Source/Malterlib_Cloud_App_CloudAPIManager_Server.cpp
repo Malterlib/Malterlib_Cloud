@@ -127,7 +127,7 @@ namespace NMib::NCloud::NCloudAPIManager
 		if (mp_HttpQueryActor)
 			return mp_HttpQueryActor;
 
-		mp_HttpQueryActor = fg_Construct(fg_Construct(), "Cloud API manager CURL query file actor");
+		mp_HttpQueryActor = fg_Construct();
 		return mp_HttpQueryActor;
 	}
 

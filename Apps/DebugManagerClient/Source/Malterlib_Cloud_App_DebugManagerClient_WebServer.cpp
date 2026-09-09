@@ -22,20 +22,27 @@ namespace NMib::NCloud::NDebugManagerClient
 		TCActor<CResolveActor> ResolveActor = fg_Construct();
 		auto Cleanup = co_await fg_AsyncDestroy(ResolveActor);
 
-		TCFutureVector<CNetAddress> ListenAddresses;
+		TCFutureVector<CResolveActor::CLookup> LookupFutures;
 		if (BindIP.f_StartsWith("UNIX("))
 		{
 			for (uint16 iPort = Port; iPort < Port + PortConcurrency; ++iPort)
-				ResolveActor(&CResolveActor::f_Resolve, CStr("{}.{}"_f << BindIP << iPort), NNetwork::ENetAddressType_None) > ListenAddresses;
+				ResolveActor(&CResolveActor::f_Resolve, CStr("{}.{}"_f << BindIP << iPort), NNetwork::ENetAddressType_None) > LookupFutures;
 		}
 		else
 		{
 			for (uint16 iPort = Port; iPort < Port + PortConcurrency; ++iPort)
-				ResolveActor(&CResolveActor::f_Resolve, CStr("{}:{}"_f << BindIP << iPort), NNetwork::ENetAddressType_None) > ListenAddresses;
+				ResolveActor(&CResolveActor::f_Resolve, CStr("{}:{}"_f << BindIP << iPort), NNetwork::ENetAddressType_None) > LookupFutures;
 		}
 
+		auto Lookups = co_await fg_AllDone(LookupFutures);
+		TCFutureVector<CResolveActor::CAddresses> ListenAddresses;
+		for (auto &Lookup : Lookups)
+			fg_Move(Lookup.m_Result) > ListenAddresses;
+
 		HTTPOptions.m_FastCGIListenStartPort = Port;
-		HTTPOptions.m_FastCGIListenAddresses = co_await fg_AllDone(ListenAddresses);
+		auto ResolvedAddresses = co_await fg_AllDone(ListenAddresses);
+		for (auto &Addresses : ResolvedAddresses)
+			HTTPOptions.m_FastCGIListenAddresses.f_Insert(fg_Move(Addresses[0]));
 		HTTPOptions.m_bUseNginx = false;
 		HTTPOptions.m_nMaxThreads = PortConcurrency;
 

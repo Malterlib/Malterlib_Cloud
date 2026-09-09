@@ -477,7 +477,9 @@ namespace NMib::NCloud
 			if (!Internal.m_AddressResolver)
 				Internal.m_AddressResolver = NConcurrency::fg_ConstructActor<NNetwork::CResolveActor>();
 
-			ListenAddresses.f_Insert(co_await Internal.m_AddressResolver(&NNetwork::CResolveActor::f_Resolve, _OpenTunnel.m_ListenHost, NNetwork::ENetAddressType_TCPv4));
+			auto Lookup = co_await Internal.m_AddressResolver(&NNetwork::CResolveActor::f_Resolve, _OpenTunnel.m_ListenHost, NNetwork::ENetAddressType_TCPv4);
+			auto Addresses = co_await fg_Move(Lookup.m_Result);
+			ListenAddresses.f_Insert(fg_Move(Addresses[0]));
 		}
 		else
 			ListenAddresses.f_Insert(DefaultListenAddress);

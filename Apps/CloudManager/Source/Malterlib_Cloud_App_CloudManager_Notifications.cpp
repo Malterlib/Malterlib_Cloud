@@ -51,7 +51,7 @@ namespace NMib::NCloud::NCloudManager
 		if (!mp_SlackChannels.f_IsEmpty())
 		{
 			if (!mp_HttpClientActor)
-				mp_HttpClientActor = fg_Construct(fg_Construct(), "HTTP client actor");
+				mp_HttpClientActor = fg_Construct();
 
 			if (!mp_SlackActor)
 				mp_SlackActor = fg_Construct(mp_HttpClientActor);
