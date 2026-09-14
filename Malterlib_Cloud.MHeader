@@ -238,6 +238,7 @@ Repository
 			"LICENSE": [
 				{ Source: "../Core/LICENSE"->MakeAbsolute(), Name: "Malterlib (https://github.com/Malterlib/Malterlib)" }
 				, { Source: "../../External/boringssl/LICENSE"->MakeAbsolute(), Name: "BoringSSL (https://github.com/Malterlib/boringssl, https://github.com/google/boringssl)" }
+				, { Source: "../../External/c-ares/LICENSE.md"->MakeAbsolute(), Name: "c-ares (https://github.com/Malterlib/c-ares, https://github.com/c-ares/c-ares)" }
 				, { Source: "../../External/curl/COPYING"->MakeAbsolute(), Name: "curl (https://github.com/Malterlib/curl, https://github.com/curl/curl)" }
 				, { Source: "../../External/hidapi/LICENSE-bsd.txt"->MakeAbsolute(), Name: "HIDAPI (https://github.com/Malterlib/hidapi, https://github.com/libusb/hidapi)" }
 				, { Source: "../../External/libarchive/COPYING"->MakeAbsolute(), Name: "libarchive (https://github.com/Malterlib/libarchive, https://github.com/libarchive/libarchive)" }
