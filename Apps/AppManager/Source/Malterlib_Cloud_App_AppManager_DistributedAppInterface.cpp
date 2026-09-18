@@ -113,6 +113,15 @@ namespace NMib::NCloud::NAppManager
 				;
 			}
 
+			// A launch id this AppManager instance does not know comes from an
+			// application or agent started by an earlier instance; it is expected
+			// to show up while environments restart and gets replaced shortly
+			if (_RegisterInfo.m_LaunchID)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application from an earlier launch registered: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
+				co_return DErrorInstance("Application not associated with your host");
+			}
+
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application registered: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
 			co_return DErrorInstance("Application not associated with your host");
 		}

@@ -74,6 +74,7 @@ namespace NMib::NCloud
 		switch (_Type)
 		{
 		case EEnvironmentType_Local: return NStr::gc_Str<"Local">;
+		case EEnvironmentType_VM: return NStr::gc_Str<"VM">;
 		}
 
 		DMibNeverGetHere;
@@ -84,6 +85,8 @@ namespace NMib::NCloud
 	{
 		if (_Type == "Local")
 			return EEnvironmentType_Local;
+		else if (_Type == "VM")
+			return EEnvironmentType_VM;
 
 		return {};
 	}
@@ -172,6 +175,11 @@ namespace NMib::NCloud
 		Return["AgentApplication"] = fg_ToJson(m_AgentApplication);
 		Return["ParentApplication"] = fg_ToJson(m_ParentApplication);
 		Return["bAutoStart"] = fg_ToJson(m_bAutoStart);
+		Return["VMImage"] = fg_ToJson(m_VMImage);
+		Return["VMBackend"] = fg_ToJson(m_VMBackend);
+		Return["VMCPUCount"] = fg_ToJson(m_VMCPUCount);
+		Return["VMMemoryMB"] = fg_ToJson(m_VMMemoryMB);
+		Return["VMDataDiskGB"] = fg_ToJson(m_VMDataDiskGB);
 		Return["OSDependencies"] = fg_ToJson(m_OSDependencies);
 		Return["Applications"] = fg_ToJson(m_Applications);
 		return Return;

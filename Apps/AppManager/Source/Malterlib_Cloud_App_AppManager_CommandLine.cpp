@@ -168,7 +168,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--launch-environment"]
 				, "Type"_o= ""
-				, "Description"_o= "Launch the application inside the named environment managed by this AppManager.\n"
+				, "Description"_o= "Launch the application inside the named environment (a virtual machine managed by this AppManager).\n"
 				"Set to an empty string to launch directly on the host (the default). See --environment-add."
 			}
 		;

@@ -14,6 +14,7 @@ namespace NMib::NCloud::NAppManager
 		{
 			bool m_bEnvironmentAgent = false;
 			CStr m_EnvironmentHostID;
+			CStr m_EnvironmentDataRoot;
 		};
 
 		CAgentDeploymentSettings const &fg_GetAgentDeploymentSettings()
@@ -36,6 +37,8 @@ namespace NMib::NCloud::NAppManager
 							Settings.m_bEnvironmentAgent = Json.f_GetMemberValue("EnvironmentAgent", false).f_Boolean();
 							if (auto *pValue = Json.f_GetMember("EnvironmentHostID", EJsonType_String))
 								Settings.m_EnvironmentHostID = pValue->f_String();
+							if (auto *pValue = Json.f_GetMember("EnvironmentDataRoot", EJsonType_String))
+								Settings.m_EnvironmentDataRoot = pValue->f_String();
 						}
 					}
 					catch (CException const &_Exception)
@@ -51,6 +54,48 @@ namespace NMib::NCloud::NAppManager
 			return s_Settings;
 		}
 
+		// Reads the connection ticket the launching AppManager wrote next to the agent
+		// executable; read fresh on every request so a ticket written for the current
+		// start is used
+		TCFuture<CDistributedActorTrustManager::CTrustTicket> fg_ReadAgentConnectTicket()
+		{
+			CStr Contents;
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				CStr ConnectFile = CFile::fs_GetProgramDirectory() / "AppManagerAgentConnect.json";
+				Contents = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [ConnectFile]() -> CStr
+						{
+							if (!CFile::fs_FileExists(ConnectFile))
+								return {};
+
+							return CFile::fs_ReadStringFromFile(ConnectFile, true);
+						}
+					)
+				;
+			}
+
+			if (Contents.f_IsEmpty())
+				co_return DMibErrorInstance("No agent connect settings with a connection ticket found");
+
+			CDistributedActorTrustManager::CTrustTicket TrustTicket;
+			{
+				auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the agent connect settings");
+
+				CEJsonSorted Json = CEJsonSorted::fs_FromString(Contents);
+
+				CStr Ticket = Json["Ticket"].f_AsString();
+				if (Ticket.f_IsEmpty())
+					co_return DMibErrorInstance("The agent connect settings contain no connection ticket");
+
+				TrustTicket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(CStrSecure(Ticket));
+			}
+
+			co_return TrustTicket;
+		}
+
 		CDistributedAppActor_Settings fg_MakeAppManagerSettings()
 		{
 			auto Settings = CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager");
@@ -58,6 +103,39 @@ namespace NMib::NCloud::NAppManager
 			auto &Deployment = fg_GetAgentDeploymentSettings();
 			if (Deployment.m_bEnvironmentAgent)
 			{
+				// VM guest agents have no launching process to receive the interface
+				// settings from, so the launching AppManager writes them next to the
+				// agent executable on the shared storage instead
+				if (Settings.m_InterfaceSettings.m_ServerAddress.f_IsEmpty())
+				{
+					try
+					{
+						CStr ConnectFile = CFile::fs_GetProgramDirectory() / "AppManagerAgentConnect.json";
+						if (CFile::fs_FileExists(ConnectFile))
+						{
+							CEJsonSorted Json = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(ConnectFile, true));
+
+							Settings.m_InterfaceSettings.m_ServerAddress = Json["Address"].f_AsString();
+							Settings.m_InterfaceSettings.m_LaunchID = Json["LaunchID"].f_AsString();
+
+							NStorage::TCSharedPointer<TCActorFunctor<TCFuture<CDistributedActorTrustManager::CTrustTicket> ()>> pRequestTicket
+								= fg_Construct
+									(
+										g_ActorFunctor / []
+										{
+											return fg_ReadAgentConnectTicket();
+										}
+									)
+							;
+							Settings.m_InterfaceSettings.m_pRequestTicket = fg_Move(pRequestTicket);
+						}
+					}
+					catch (CException const &_Exception)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to read the agent connect settings: {}", _Exception);
+					}
+				}
+
 				// The launching AppManager points HOME and TMPDIR into the agent root,
 				// but nothing creates them inside a fresh environment; child processes
 				// like package installs fail without a temporary directory
@@ -89,6 +167,7 @@ namespace NMib::NCloud::NAppManager
 		auto &Deployment = fg_GetAgentDeploymentSettings();
 		mp_bEnvironmentAgent = Deployment.m_bEnvironmentAgent;
 		mp_EnvironmentHostID = Deployment.m_EnvironmentHostID;
+		mp_EnvironmentDataRoot = Deployment.m_EnvironmentDataRoot;
 		mp_InitialStartupResultFuture = mp_InitialStartupResult.f_Future();
 	}
 
@@ -119,6 +198,39 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		co_await fg_AllDone(SensorRebootPreventionDestroys).f_Wrap() > LogError.f_Warning("Failed to destroy reboot prevention subscriptions");
+
+		// Pending application file transfers are aborted so their futures resolve
+		// and the coroutines waiting on them unwind; the stage cleanup
+		// subscriptions run here while the distribution layer is still alive so
+		// staged files in the environment are discarded
+		{
+			TCFutureVector<void> Destroys;
+
+			for (auto &pUpdateWeak : mp_RunningUpdates)
+			{
+				auto pUpdate = pUpdateWeak.f_Lock();
+				if (!pUpdate)
+					continue;
+
+				if (!pUpdate->m_fStageFinish.f_IsEmpty())
+					fg_Move(pUpdate->m_fStageFinish).f_Destroy() > Destroys;
+
+				if (pUpdate->m_StageSend)
+					fg_Move(pUpdate->m_StageSend).f_Destroy() > Destroys;
+
+				if (pUpdate->m_AgentStageCleanup)
+					fg_Exchange(pUpdate->m_AgentStageCleanup, nullptr)->f_Destroy() > Destroys;
+			}
+
+			for (auto &StageReceive : mp_ApplicationStageReceives)
+			{
+				if (StageReceive.m_Receive)
+					fg_Move(StageReceive.m_Receive).f_Destroy() > Destroys;
+			}
+			mp_ApplicationStageReceives.f_Clear();
+
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy pending application stage transfers");
+		}
 
 		co_await CDistributedAppActor::fp_Destroy();
 
