@@ -73,6 +73,36 @@ namespace NMib::NCloud::NAppManager
 		if (CStr Environment = pThis->fp_FindEnvironmentStoringDataInApplication(_Name); !Environment.f_IsEmpty())
 			co_return Auditor.f_Exception(fg_Format("Cannot remove application '{}' because environment '{}' stores its data inside it", _Name, Environment));
 
+		// The process can still run on the files
+		if (!StopResult && pThis->fp_ApplicationRemoteStorageEnvironment(*pApplicationPtr))
+			co_return Auditor.f_Exception(fg_Format("Application '{}' did not stop, so it and its files in the environment storage are kept", _Name));
+
+		// Storage an environment manages for the application is deleted through
+		// its agent; left-over storage would block a later add with the same name
+		{
+			auto RemoveStorageResult = co_await pThis->fp_RemoveApplicationEnvironmentStorage(pApplicationPtr).f_Wrap();
+			if (!RemoveStorageResult && !_bForce)
+			{
+				co_return Auditor.f_Exception
+					(
+						fg_Format
+						(
+							"Failed to remove the application storage in the environment, so application '{}' is kept for a retry: {}"
+							, _Name
+							, RemoveStorageResult.f_GetExceptionStr()
+						)
+					)
+				;
+			}
+			else if (!RemoveStorageResult)
+				Auditor.f_Warning(fg_Format("Failed to remove the application storage in the environment: {}", RemoveStorageResult.f_GetExceptionStr()));
+		}
+
+		// A concurrent forced remove, or a remove and add, can replace the entry while the storage is removed
+		pApplication = pThis->mp_Applications.f_FindEqual(_Name);
+		if (!pApplication || *pApplication != pApplicationPtr)
+			co_return Auditor.f_Exception(fg_Format("Application '{}' was removed while its storage was removed", _Name));
+
 		(*pApplication)->f_Delete();
 		pThis->mp_Applications.f_Remove(_Name);
 		pThis->fp_SendRemovedAppToRemoteAppManagers(pApplicationPtr);

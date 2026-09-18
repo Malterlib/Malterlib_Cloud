@@ -371,6 +371,11 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty() && !fp_EnvironmentAvailable(pApplication->m_Settings.m_LaunchEnvironment))
 			co_return Auditor.f_Exception(fg_Format("Launch environment '{}' does not exist. Add it with --environment-add.", pApplication->m_Settings.m_LaunchEnvironment));
 
+		// Applications launched in an environment that manages the application
+		// storage keep no files on the host; the version is staged and applied
+		// through the environment agent instead
+		auto pRemoteStorageEnvironment = fp_ApplicationRemoteStorageEnvironment(*pApplication);
+
 		if (pApplication->f_IsChildApp())
 		{
 			auto *pParentApplication = mp_Applications.f_FindEqual(pApplication->m_Settings.m_ParentApplication);
@@ -478,7 +483,11 @@ namespace NMib::NCloud::NAppManager
 		}
 		else
 		{
-			CStr DownloadDirectoryRoot = Directory / "TempVersionDownload";
+			CStr DownloadDirectoryRoot;
+			if (pRemoteStorageEnvironment)
+				DownloadDirectoryRoot = fp_GetEnvironmentStorageDirectory(*pRemoteStorageEnvironment) / ".AppStage" / pApplication->m_Name / "Download";
+			else
+				DownloadDirectoryRoot = Directory / "TempVersionDownload";
 			CStr DownloadDirectory = DownloadDirectoryRoot / fg_FastRandomID();
 			_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
 			auto VersionInfo = co_await
@@ -503,6 +512,11 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty())
 			co_await fp_CheckEnvironmentAccess(pApplication->m_Settings.m_LaunchEnvironment, _CallingHostInfo);
 
+		pRemoteStorageEnvironment = fp_ApplicationRemoteStorageEnvironment(*pApplication);
+
+		if (CStr Error = fp_CheckParentApplicationStorage(pApplication->m_Settings); !Error.f_IsEmpty())
+			co_return Auditor.f_Exception(Error);
+
 #ifdef DPlatformFamily_Windows
 		if (!pApplication->m_Settings.m_RunAsUser.f_IsEmpty() && pApplication->m_Settings.m_RunAsUserPassword.f_IsEmpty())
 			pApplication->m_Settings.m_RunAsUserPassword = fg_HighEntropyRandomID("23456789ABCDEFGHJKLMNPQRSTWXYZabcdefghijkmnopqrstuvwxyz&=*!@~^") + "2Dg&";
@@ -510,6 +524,123 @@ namespace NMib::NCloud::NAppManager
 		_fOnInfo("Unpacking application");
 
 		TCVector<CStr> Files;
+		// Environment stops and removals wait for the installation like for the operations of added applications, until the
+		// application is added
+		TCSharedPointer<CEnvironment> pPendingInstallEnvironment;
+		if (!pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty())
+		{
+			if (!fp_EnvironmentAvailable(pApplication->m_Settings.m_LaunchEnvironment))
+				co_return Auditor.f_Exception(fg_Format("Launch environment '{}' is being removed", pApplication->m_Settings.m_LaunchEnvironment));
+
+			pPendingInstallEnvironment = *mp_Environments.f_FindEqual(pApplication->m_Settings.m_LaunchEnvironment);
+			++pPendingInstallEnvironment->m_nPendingInstalls;
+		}
+
+		auto PendingInstall = g_OnScopeExit / [pPendingInstallEnvironment]
+			{
+				if (pPendingInstallEnvironment)
+					--pPendingInstallEnvironment->m_nPendingInstalls;
+			}
+		;
+
+		if (pRemoteStorageEnvironment)
+		{
+			// A null application gets no directory in the environment storage, so one that launches an executable
+			// needs a package that provides it
+			if (!bNullApplication)
+			{
+				CStr UnpackRoot = fp_GetEnvironmentStorageDirectory(*pRemoteStorageEnvironment) / ".AppStage" / pApplication->m_Name / "Unpack";
+				CStr UnpackDirectory = UnpackRoot / fg_FastRandomID();
+
+				auto CleanupUnpack = g_BlockingActorSubscription / [UnpackRoot]
+					{
+						try
+						{
+							if (CFile::fs_FileExists(UnpackRoot))
+								CFile::fs_DeleteDirectoryRecursive(UnpackRoot);
+						}
+						catch (CExceptionFile const &_Exception)
+						{
+							[[maybe_unused]] auto &Exception = _Exception;
+							DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up the application unpack: {}", Exception);
+						}
+					}
+				;
+
+				{
+					auto BlockingActorCheckout = fg_BlockingActor();
+
+					Files = co_await
+						(
+							g_Dispatch(BlockingActorCheckout) /
+							[
+								=
+								, Settings = pApplication->m_Settings
+								, ApplicationName = pApplication->m_Name
+								, pUniqueUserGroup = mp_pUniqueUserGroup
+								, RootDirectory = mp_State.m_RootDirectory
+							]
+							() mutable
+							{
+								// The user, the group and the ownership are set up inside
+								// the environment when the staged files are applied there
+								Settings.m_RunAsUser = {};
+								Settings.m_RunAsGroup = {};
+
+								if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
+								{
+									auto SourceFiles = CFile::fs_FindFiles(SourcePath + "/*");
+									if (SourceFiles.f_GetLen() == 1 && (SourceFiles[0].f_EndsWith(".tar.gz") || SourceFiles[0].f_EndsWith(".tar.zst") || SourceFiles[0].f_EndsWith(".tar")))
+										SourcePath = SourceFiles[0];
+								}
+
+								if (CFile::fs_FileExists(UnpackRoot))
+									CFile::fs_DeleteDirectoryRecursive(UnpackRoot);
+
+								TCVector<CStr> Files;
+								CStr Output = fsp_UnpackApplication(RootDirectory, SourcePath, UnpackDirectory, ApplicationName, Settings, Files, {}, false, pUniqueUserGroup);
+								if (!Output.f_IsEmpty())
+									_fOnInfo(Output.f_TrimRight());
+								return Files;
+							}
+							% "Failed to unpack application" % Auditor
+						)
+					;
+				}
+
+				TCSharedPointerSupportWeak<CUpdateApplicationState> pStageState = fg_Construct();
+				pStageState->m_pApplication = pApplication;
+				pStageState->m_pRemoteStorageEnvironment = pRemoteStorageEnvironment;
+				pStageState->m_fOnInfo = _fOnInfo;
+				pStageState->m_TempraryPath = UnpackDirectory;
+				pStageState->m_Files = Files;
+
+				co_await (fp_StageApplicationInEnvironment(pStageState, pRemoteStorageEnvironment) % "Failed to stage the application in the environment" % Auditor);
+
+				CAppManagerEnvironmentInterface::CApplicationApply Apply;
+				Apply.m_Name = pApplication->m_Name;
+				Apply.m_StageID = pStageState->m_AgentStageID;
+				Apply.m_Files = Files;
+				Apply.m_RunAsUser = pApplication->m_Settings.m_RunAsUser;
+				Apply.m_RunAsGroup = pApplication->m_Settings.m_RunAsGroup;
+				Apply.m_bRunAsUserHasShell = pApplication->m_Settings.m_bRunAsUserHasShell;
+				Apply.m_bFailOnExisting = !_bForceInstall;
+				Apply.m_VersionExtraInfo = pApplication->m_LastInstalledVersionInfo.m_ExtraInfo.f_ToString(nullptr);
+
+				co_await
+					(
+						pRemoteStorageEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ApplyApplicationFiles)(fg_Move(Apply))
+							.f_Timeout(60.0 * 60.0, "Timed out applying the application files in the environment (1 hour)")
+						% "Failed to apply the application files in the environment" % Auditor
+					)
+				;
+
+				pStageState->m_AgentStageCleanup.f_Clear();
+
+				co_await CleanupUnpack->f_Destroy();
+			}
+		}
+		else
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 			Files = co_await

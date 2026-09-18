@@ -12,6 +12,23 @@ namespace NMib::NCloud::NAppManager
 	void CAppManagerActor::fp_ApplicationStartBackup(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		auto &Application = *_pApplication;
+
+		// The backup client reads the application directory on the host, which
+		// does not exist when the environment manages the application storage
+		if (fp_ApplicationRemoteStorageEnvironment(Application))
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Warning
+					, "Backups are not supported for application '{}': its storage is managed inside environment '{}'"
+					, Application.m_Name
+					, Application.m_Settings.m_LaunchEnvironment
+				)
+			;
+			return;
+		}
+
 		CBackupManagerClient::CConfig BackupConfig;
 
 		auto &ManifestConfig = BackupConfig.m_ManifestConfig;

@@ -236,6 +236,26 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception(Error);
 		}
 
+		// The installed files stay where they are, so the new launch environment must keep them in the same storage
+		if
+		(
+			(ChangedSettings & EApplicationSetting_LaunchEnvironment)
+			&& fp_LaunchEnvironmentRemoteStorage(NewSettings.m_LaunchEnvironment) != fp_ApplicationRemoteStorageEnvironment(Application)
+		)
+		{
+			co_return Auditor.f_Exception
+				(
+					fg_Format("Launch environment '{}' keeps the application files in another storage. Remove and add the application instead.", NewSettings.m_LaunchEnvironment)
+				)
+			;
+		}
+
+		if (ChangedSettings & (EApplicationSetting_LaunchEnvironment | EApplicationSetting_ParentApplication))
+		{
+			if (CStr Error = fp_CheckParentApplicationStorage(NewSettings); !Error.f_IsEmpty())
+				co_return Auditor.f_Exception(Error);
+		}
+
 #ifdef DPlatformFamily_Windows
 		if (!NewSettings.m_RunAsUser.f_IsEmpty() && ((ChangedSettings & EApplicationSetting_RunAsUser) || NewSettings.m_RunAsUserPassword.f_IsEmpty()))
 		{
@@ -326,8 +346,20 @@ namespace NMib::NCloud::NAppManager
 				(
 					(
 						g_Dispatch(BlockingActorCheckout)
-						/ [=, Directory = pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]()
+						/
+						[
+							=
+							, Directory = pApplication->f_GetDirectory()
+							, pUniqueUserGroup = mp_pUniqueUserGroup
+							, bRemoteStorage = (bool)fp_ApplicationRemoteStorageEnvironment(*pApplication)
+						]
+						()
 						{
+							// The agent prepares the accounts and file owners of an application in environment storage
+							// when it launches the application
+							if (bRemoteStorage)
+								return;
+
 							fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
 							fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 						}
