@@ -916,10 +916,15 @@ namespace NMib::NCloud::NAppManager
 
 		if (fp_EnvironmentUsesRemoteStorage(*_pEnvironment))
 		{
-			// The application storage lives on a named volume owned by the
-			// container runtime, so it survives container recreation without
-			// crossing the virtual machine boundary as a bind mount
-			Launch.m_Mounts[fp_GetEnvironmentDataVolumeName(*_pEnvironment)] = mcp_pEnvironmentDataRootContainer;
+			// The application storage survives container recreation without
+			// crossing the virtual machine boundary as a virtiofs mount: with
+			// colima it is an XFS image loop mounted inside the virtual machine
+			// and bind mounted from there, otherwise a named volume owned by the
+			// container runtime
+			if (fp_UseOwnColimaSystem(_pEnvironment))
+				Launch.m_Mounts[fp_GetEnvironmentDataVolumeMountPath(*_pEnvironment)] = mcp_pEnvironmentDataRootContainer;
+			else
+				Launch.m_Mounts[fp_GetEnvironmentDataVolumeName(*_pEnvironment)] = mcp_pEnvironmentDataRootContainer;
 		}
 		else
 		{
@@ -979,9 +984,76 @@ namespace NMib::NCloud::NAppManager
 		return "mib-env-{}-data"_f << _Environment.m_Name;
 	}
 
+	CStr CAppManagerActor::fp_GetEnvironmentDataVolumeImagePath(CEnvironment const &_Environment)
+	{
+		// The backing image lives in the environment storage on the host, like the
+		// data disk of a VM environment, so it survives a colima virtual machine
+		// rebuild; the colima system mounts the environment storage at the same
+		// path inside the virtual machine, where docker loop mounts the image
+		return fp_GetEnvironmentStorageDirectory(_Environment) / "DataDisk.img";
+	}
+
+	CStr CAppManagerActor::fp_GetEnvironmentDataVolumeMountPath(CEnvironment const &_Environment)
+	{
+		return "/mnt/malterlib/{}"_f << fp_GetEnvironmentDataVolumeName(_Environment);
+	}
+
+	auto CAppManagerActor::fp_RunColimaVMScript(CStr _Script, CStr _LogName) -> TCFuture<CProcessLaunchActor::CSimpleLaunchResult>
+	{
+		CStr User = fp_GetColimaUser();
+		CStr Group = fp_GetColimaGroup();
+
+		CStr Executable;
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			Executable = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / []() -> CStr
+					{
+						for (auto &Candidate : {CStr("/usr/local/bin/colima"), CStr("/opt/homebrew/bin/colima")})
+						{
+							if (CFile::fs_FileExists(Candidate))
+								return fg_TempCopy(Candidate);
+						}
+
+						return NProcess::NPlatform::fg_FindExecutable("colima");
+					}
+				)
+			;
+		}
+
+		if (Executable.f_IsEmpty())
+			co_return DMibErrorInstance("The colima CLI was not found");
+
+		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+			(
+				Executable
+				, fg_CreateVector<CStr>("ssh", "--", "sudo", "/bin/sh", "-c", fg_TempCopy(_Script))
+				, fp_GetColimaAppRoot()
+				, {}
+			)
+		;
+		LaunchParams.m_bMergeEnvironment = true;
+		LaunchParams.m_RunAsUser = User;
+		LaunchParams.m_RunAsGroup = Group;
+		fp_ApplyColimaLaunchEnvironment(LaunchParams);
+
+		CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
+		SimpleLaunch.m_LogName = fg_Move(_LogName);
+
+		co_return co_await CProcessLaunchActor::fs_LaunchSimple(fg_Move(SimpleLaunch));
+	}
+
 	TCFuture<void> CAppManagerActor::fp_EnsureEnvironmentDataVolume(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
 		CStr VolumeName = fp_GetEnvironmentDataVolumeName(*_pEnvironment);
+
+		bool bColima = fp_UseOwnColimaSystem(_pEnvironment);
+
+		CStr ImagePath;
+		if (bColima)
+			ImagePath = fp_GetEnvironmentDataVolumeImagePath(*_pEnvironment);
 
 		{
 			CProcessLaunchActor::CSimpleLaunch SimpleLaunch
@@ -994,7 +1066,99 @@ namespace NMib::NCloud::NAppManager
 
 			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
 			if (Result && Result->m_ExitCode == 0)
-				co_return {};
+			{
+				if (!bColima)
+					co_return {};
+
+				// With colima the storage moved from a named volume to a loop
+				// mounted image; a leftover volume from an earlier version is
+				// removed together with the container that mounts it
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Info
+						, "Replacing the data volume '{}' with a loop mounted backing image"
+						, VolumeName
+					)
+				;
+
+				co_await fp_RemoveEnvironmentContainer(_pEnvironment);
+
+				CProcessLaunchActor::CSimpleLaunch RemoveLaunch
+					(
+						fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("volume", "rm", VolumeName))
+						, CProcessLaunchActor::ESimpleLaunchFlag_None
+					)
+				;
+				RemoveLaunch.m_LogName = "Environment/{}/DataVolumeRemove"_f << _pEnvironment->m_Name;
+
+				auto RemoveResult = co_await CProcessLaunchActor::fs_LaunchSimple(RemoveLaunch).f_Wrap();
+				if (!RemoveResult || RemoveResult->m_ExitCode != 0)
+				{
+					DMibLogWithCategory
+						(
+							Malterlib/Cloud/AppManager
+							, Info
+							, "Failed to remove the legacy data volume '{}': {}"
+							, VolumeName
+							, RemoveResult ? CStr(RemoveResult->f_GetStdErr().f_Trim()) : RemoveResult.f_GetExceptionStr()
+						)
+					;
+				}
+			}
+		}
+
+		if (bColima)
+		{
+			// The application storage is a Malterlib-owned sparse image formatted
+			// as XFS, loop mounted inside the colima virtual machine and bind
+			// mounted into the container from there. The image is a single file
+			// crossing the virtiofs mount of the environment storage, so the
+			// ownership and permissions of everything inside it are handled
+			// natively by the guest kernel.
+			uint64 SizeGB = _pEnvironment->m_Settings.m_VMDataDiskGB ? _pEnvironment->m_Settings.m_VMDataDiskGB : 64;
+
+			CStr MountPath = fp_GetEnvironmentDataVolumeMountPath(*_pEnvironment);
+
+			CStr Script = fg_Format
+				(
+					"set -e\n"
+					"if [ ! -f '{}' ]; then\n"
+					"\tif ! command -v mkfs.xfs >/dev/null 2>&1; then\n"
+					"\t\texport DEBIAN_FRONTEND=noninteractive\n"
+					"\t\tapt-get update -q\n"
+					"\t\tapt-get install -q -y xfsprogs\n"
+					"\tfi\n"
+					"\trm -f '{}.tmp'\n"
+					"\ttruncate -s {}G '{}.tmp'\n"
+					"\tmkfs.xfs -q '{}.tmp'\n"
+					"\tmv '{}.tmp' '{}'\n"
+					"fi\n"
+					"mkdir -p '{}'\n"
+					"if ! mountpoint -q '{}'; then\n"
+					"\tmount -t xfs -o loop '{}' '{}'\n"
+					"fi\n"
+					, ImagePath
+					, ImagePath
+					, SizeGB
+					, ImagePath
+					, ImagePath
+					, ImagePath
+					, ImagePath
+					, MountPath
+					, MountPath
+					, ImagePath
+					, MountPath
+				)
+			;
+
+			auto Result = co_await fp_RunColimaVMScript(fg_Move(Script), "Environment/{}/DataVolumeImage"_f << _pEnvironment->m_Name).f_Wrap();
+			if (!Result)
+				co_return DMibErrorInstance("Failed to prepare the data volume image '{}': {}"_f << ImagePath << Result.f_GetExceptionStr());
+			if (Result->m_ExitCode != 0)
+				co_return DMibErrorInstance("Preparing the data volume image '{}' failed with status {}: {}"_f << ImagePath << Result->m_ExitCode << CStr(Result->f_GetCombinedOut().f_Trim()));
+
+			co_return {};
 		}
 
 		CProcessLaunchActor::CSimpleLaunch SimpleLaunch
@@ -1037,6 +1201,51 @@ namespace NMib::NCloud::NAppManager
 					, VolumeName
 					, Result ? CStr(Result->f_GetStdErr().f_Trim()) : Result.f_GetExceptionStr()
 				)
+			;
+		}
+
+		// The backing image lives on the host, so it is removed there directly;
+		// this also works when the colima virtual machine is not running, in
+		// which case nothing is mounted either and the unmount can fail freely
+		if (fp_UseOwnColimaSystem(_pEnvironment))
+		{
+			CStr ImagePath = fp_GetEnvironmentDataVolumeImagePath(*_pEnvironment);
+			CStr MountPath = fp_GetEnvironmentDataVolumeMountPath(*_pEnvironment);
+
+			auto UnmountResult = co_await fp_RunColimaVMScript
+				(
+					fg_Format("umount '{}' 2>/dev/null || true\nrmdir '{}' 2>/dev/null || true\n", MountPath, MountPath)
+					, "Environment/{}/DataVolumeUnmount"_f << _pEnvironment->m_Name
+				)
+				.f_Wrap()
+			;
+
+			if (!UnmountResult || UnmountResult->m_ExitCode != 0)
+			{
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Info
+						, "Failed to unmount the data volume image of environment '{}': {}"
+						, _pEnvironment->m_Name
+						, UnmountResult ? CStr(UnmountResult->f_GetCombinedOut().f_Trim()) : UnmountResult.f_GetExceptionStr()
+					)
+				;
+			}
+
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / [ImagePath]()
+					{
+						if (CFile::fs_FileExists(ImagePath))
+							CFile::fs_DeleteFile(ImagePath);
+						if (CFile::fs_FileExists(ImagePath + ".tmp"))
+							CFile::fs_DeleteFile(ImagePath + ".tmp");
+					}
+				)
+				.f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to remove the data volume image")
 			;
 		}
 

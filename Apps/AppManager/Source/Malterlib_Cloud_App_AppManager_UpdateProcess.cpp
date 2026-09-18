@@ -371,14 +371,17 @@ namespace NMib::NCloud::NAppManager
 		if (!_pEnvironment->m_AgentInterface)
 			co_return DMibErrorInstance("The environment agent is not connected");
 
-		TCActor<CFileTransferSend> Send = fg_ConstructActor<CFileTransferSend>(fg_TempCopy(State.m_TempraryPath));
+		State.m_StageSend = fg_ConstructActor<CFileTransferSend>(fg_TempCopy(State.m_TempraryPath));
 
-		auto SendFilesResult = co_await fg_TempCopy(Send)(&CFileTransferSend::f_SendFiles, CFileTransferSend::CSendFilesOptions()).f_Wrap();
+		auto SendFilesResult = co_await fg_TempCopy(State.m_StageSend)(&CFileTransferSend::f_SendFiles, CFileTransferSend::CSendFilesOptions()).f_Wrap();
 		if (!SendFilesResult)
 		{
-			co_await fg_Move(Send).f_Destroy().f_Wrap()
-				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send")
-			;
+			if (State.m_StageSend)
+			{
+				co_await fg_Move(State.m_StageSend).f_Destroy().f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send")
+				;
+			}
 
 			co_return SendFilesResult.f_GetException();
 		}
@@ -391,24 +394,68 @@ namespace NMib::NCloud::NAppManager
 		auto TransferResultFuture = fg_Move(SendFilesResult->m_Result);
 
 		auto StageResult = co_await _pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_StageApplicationFiles)(fg_Move(Stage))
-			.f_Timeout(60.0 * 60.0, "Timed out staging the application files in the environment (1 hour)")
+			.f_Timeout(600.0, "Timed out starting to stage the application files in the environment (10 minutes)")
 			.f_Wrap()
-		;
-
-		auto TransferResult = co_await fg_Move(TransferResultFuture)
-			.f_Timeout(60.0, "Timed out waiting for the application file transfer to settle")
-			.f_Wrap()
-		;
-
-		co_await fg_Move(Send).f_Destroy().f_Wrap()
-			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send")
 		;
 
 		if (!StageResult)
-			co_return StageResult.f_GetException();
+		{
+			if (State.m_StageSend)
+			{
+				co_await fg_Move(State.m_StageSend).f_Destroy().f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send")
+				;
+			}
 
-		if (!TransferResult)
+			co_return StageResult.f_GetException();
+		}
+
+		State.m_fStageFinish = fg_Move(StageResult->m_fFinish);
+
+		// The files stream while the agent receives; destroying the finish functor
+		// without calling it aborts the receive and deletes the stage in the
+		// environment
+		auto TransferResult = co_await fg_Move(TransferResultFuture)
+			.f_Timeout(60.0 * 60.0, "Timed out transferring the application files into the environment (1 hour)")
+			.f_Wrap()
+		;
+
+		if (State.m_StageSend)
+		{
+			co_await fg_Move(State.m_StageSend).f_Destroy().f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send")
+			;
+		}
+
+		if (!TransferResult || State.f_CheckAbort())
+		{
+			if (!State.m_fStageFinish.f_IsEmpty())
+			{
+				co_await fg_Move(State.m_fStageFinish).f_Destroy().f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage finish functor")
+				;
+			}
+
+			if (auto pException = State.f_CheckAbort())
+				co_return pException;
+
 			co_return TransferResult.f_GetException();
+		}
+
+		if (State.m_fStageFinish.f_IsEmpty() || !State.m_fStageFinish.f_GetFunctor())
+			co_return DMibErrorInstance("The application staging was aborted");
+
+		auto FinishResult = co_await State.m_fStageFinish().f_Wrap();
+
+		if (!State.m_fStageFinish.f_IsEmpty())
+		{
+			co_await fg_Move(State.m_fStageFinish).f_Destroy().f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage finish functor")
+			;
+		}
+
+		if (!FinishResult)
+			co_return FinishResult.f_GetException();
 
 		State.m_AgentStageID = StageResult->m_StageID;
 

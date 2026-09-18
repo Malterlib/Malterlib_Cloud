@@ -210,6 +210,39 @@ namespace NMib::NCloud::NAppManager
 
 		co_await fg_AllDone(SensorRebootPreventionDestroys).f_Wrap() > LogError.f_Warning("Failed to destroy reboot prevention subscriptions");
 
+		// Pending application file transfers are aborted so their futures resolve
+		// and the coroutines waiting on them unwind; the stage cleanup
+		// subscriptions run here while the distribution layer is still alive so
+		// staged files in the environment are discarded
+		{
+			TCFutureVector<void> Destroys;
+
+			for (auto &pUpdateWeak : mp_RunningUpdates)
+			{
+				auto pUpdate = pUpdateWeak.f_Lock();
+				if (!pUpdate)
+					continue;
+
+				if (!pUpdate->m_fStageFinish.f_IsEmpty())
+					fg_Move(pUpdate->m_fStageFinish).f_Destroy() > Destroys;
+
+				if (pUpdate->m_StageSend)
+					fg_Move(pUpdate->m_StageSend).f_Destroy() > Destroys;
+
+				if (pUpdate->m_AgentStageCleanup)
+					fg_Exchange(pUpdate->m_AgentStageCleanup, nullptr)->f_Destroy() > Destroys;
+			}
+
+			for (auto &StageReceive : mp_ApplicationStageReceives)
+			{
+				if (StageReceive.m_Receive)
+					fg_Move(StageReceive.m_Receive).f_Destroy() > Destroys;
+			}
+			mp_ApplicationStageReceives.f_Clear();
+
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy pending application stage transfers");
+		}
+
 		co_await CDistributedAppActor::fp_Destroy();
 
 		co_return {};

@@ -58,6 +58,7 @@ namespace NMib::NCloud::NAppManager
 			co_return DMibErrorInstance("Invalid client interface");
 
 		auto pThis = m_pThis;
+		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
 
@@ -110,6 +111,15 @@ namespace NMib::NCloud::NAppManager
 						co_return {};
 					}
 				;
+			}
+
+			// A launch id this AppManager instance does not know comes from an
+			// application or agent started by an earlier instance; it is expected
+			// to show up while environments restart and gets replaced shortly
+			if (_RegisterInfo.m_LaunchID)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application from an earlier launch registered: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
+				co_return DErrorInstance("Application not associated with your host");
 			}
 
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application registered: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
@@ -182,6 +192,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<TCActorSubscriptionWithID<>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_RegisterConfigFiles(CConfigFiles _ConfigFiles)
 	{
 		auto pThis = m_pThis;
+		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		if (!pThis->mp_HostMonitor)
 			co_return {};
@@ -204,6 +215,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_GetSensorReporter()
 	{
 		auto pThis = m_pThis;
+		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
 
@@ -213,6 +225,9 @@ namespace NMib::NCloud::NAppManager
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application requested sensor reporter: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
 			co_return DErrorInstance("Application not associated with your host");
 		}
+
+		if (!pThis->mp_SensorReporterInterface.m_pActor)
+			co_return DErrorInstance("Sensor reporter is not available");
 
 		co_return TCDistributedActorInterfaceWithID<CDistributedAppSensorReporter>
 			(
@@ -227,6 +242,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>> CAppManagerActor::CDistributedAppInterfaceServerImplementation::f_GetLogReporter()
 	{
 		auto pThis = m_pThis;
+		auto OnResume = co_await pThis->f_CheckDestroyedOnResume();
 
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
 
@@ -236,6 +252,9 @@ namespace NMib::NCloud::NAppManager
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application requested log reporter: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
 			co_return DErrorInstance("Application not associated with your host");
 		}
+
+		if (!pThis->mp_LogReporterInterface.m_pActor)
+			co_return DErrorInstance("Log reporter is not available");
 
 		co_return TCDistributedActorInterfaceWithID<CDistributedAppLogReporter>
 			(

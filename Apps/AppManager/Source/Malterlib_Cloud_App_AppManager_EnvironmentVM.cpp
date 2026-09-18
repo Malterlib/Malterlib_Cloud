@@ -415,6 +415,43 @@ namespace NMib::NCloud::NAppManager
 					co_return {};
 
 				mp_State = EVirtualMachineState_Starting;
+				mp_bHostExited = false;
+
+				// A window host that survived an earlier AppManager instance keeps the
+				// machine's auxiliary storage locked, so any stale host for this
+				// configuration is stopped before a new one launches
+				{
+					auto BlockingActorCheckout = fg_BlockingActor();
+
+					co_await
+						(
+							g_Dispatch(BlockingActorCheckout) / [ConfigPath = mp_ConfigPath]()
+							{
+								CStr ProgramPath = CFile::fs_GetProgramPath();
+
+								CProcessLaunch::fs_KillProcesses
+									(
+										[&](NProcess::CProcessInfo const &_ProcessInfo) -> bool
+										{
+											if (_ProcessInfo.m_FullPath != ProgramPath)
+												return false;
+
+											for (auto const &Arg : _ProcessInfo.m_Args)
+											{
+												if (Arg == ConfigPath)
+													return true;
+											}
+
+											return false;
+										}
+										, NProcess::EProcessInfoFlag_FullPath | NProcess::EProcessInfoFlag_Args
+									)
+								;
+							}
+						)
+						.f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop a stale virtual machine window host")
+					;
+				}
 
 				TCPromiseFuturePair<void> RunningPromise;
 				TCPromiseFuturePair<void> ExitPromise;
@@ -429,7 +466,7 @@ namespace NMib::NCloud::NAppManager
 						CFile::fs_GetProgramPath()
 						, fg_CreateVector<CStr>("--vm-window-run", "--config", mp_ConfigPath)
 						, mp_WorkingDirectory
-						, [Promise, HostExitPromise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
+						, [this, Promise, HostExitPromise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 						{
 							switch (_State.f_GetTypeID())
 							{
@@ -438,6 +475,7 @@ namespace NMib::NCloud::NAppManager
 							case NProcess::EProcessLaunchState_LaunchFailed:
 								{
 									auto &LaunchError = _State.f_Get<NProcess::EProcessLaunchState_LaunchFailed>();
+									mp_bHostExited = true;
 									if (!Promise.f_IsSet())
 										Promise.f_SetException(DMibErrorInstance("Failed to launch the window host: {}"_f << LaunchError).f_ExceptionPointer());
 									if (!HostExitPromise.f_IsSet())
@@ -447,6 +485,7 @@ namespace NMib::NCloud::NAppManager
 							case NProcess::EProcessLaunchState_Exited:
 								{
 									auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
+									mp_bHostExited = true;
 									if (!Promise.f_IsSet())
 										Promise.f_SetException(DMibErrorInstance("The window host exited with '{}' before the machine started"_f << ExitStatus).f_ExceptionPointer());
 									if (!HostExitPromise.f_IsSet())
@@ -497,11 +536,16 @@ namespace NMib::NCloud::NAppManager
 
 				mp_State = EVirtualMachineState_Stopping;
 
-				// The termination signal asks the guest to shut down; the stop
-				// escalates through the process launch when the guest does not
-				co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_StopProcess).f_Wrap()
-					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop the virtual machine window host")
-				;
+				// A window host that already exited by itself, for example after the
+				// guest shut down from inside, has nothing left to stop
+				if (!mp_bHostExited)
+				{
+					// The termination signal asks the guest to shut down; the stop
+					// escalates through the process launch when the guest does not
+					co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_StopProcess).f_Wrap()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop the virtual machine window host")
+					;
+				}
 
 				co_await fg_Move(mp_Launch).f_Destroy().f_Wrap()
 					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the virtual machine window host launch")
@@ -541,14 +585,18 @@ namespace NMib::NCloud::NAppManager
 
 				mp_State = EVirtualMachineState_Stopping;
 
-				// Killing the host kills the machine with it
-				co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_Signal, int32(SIGKILL)).f_Wrap()
-					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to kill the virtual machine window host")
-				;
+				// A window host that already exited by itself has nothing left to kill
+				if (!mp_bHostExited)
+				{
+					// Killing the host kills the machine with it
+					co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_Signal, int32(SIGKILL)).f_Wrap()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to kill the virtual machine window host")
+					;
 
-				co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_StopProcess).f_Wrap()
-					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop the virtual machine window host")
-				;
+					co_await fg_TempCopy(mp_Launch)(&CProcessLaunchActor::f_StopProcess).f_Wrap()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop the virtual machine window host")
+					;
+				}
 
 				co_await fg_Move(mp_Launch).f_Destroy().f_Wrap()
 					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the virtual machine window host launch")
@@ -593,6 +641,7 @@ namespace NMib::NCloud::NAppManager
 			CActorSubscription mp_LaunchSubscription;
 			TCFuture<void> mp_ExitFuture; /// Resolved when the window host process exits, which happens when its machine stops
 			NVirtualization::EVirtualMachineState mp_State = NVirtualization::EVirtualMachineState_Stopped;
+			bool mp_bHostExited = false; /// The window host process exited by itself; a finished host is not signalled at stop
 		};
 	}
 
@@ -712,7 +761,14 @@ namespace NMib::NCloud::NAppManager
 			co_return DMibErrorInstance(*pError);
 		}
 
-		_pEnvironment->m_LaunchID = fg_RandomID();
+		// The agent installed in the guest keeps the launch id from its connect
+		// settings, so reusing the persisted id lets a running correct agent
+		// re-associate across environment and AppManager restarts instead of
+		// being rejected and reinstalled
+		if (!_pEnvironment->m_VMAgentLaunchID.f_IsEmpty())
+			_pEnvironment->m_LaunchID = _pEnvironment->m_VMAgentLaunchID;
+		else
+			_pEnvironment->m_LaunchID = fg_RandomID();
 
 		// A fresh connection ticket lets the guest agent connect without the
 		// standard stream handshake container agents use; the connect settings are
@@ -1158,26 +1214,60 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
+		CStr AgentFileList;
+		for (auto &File : AgentFiles)
+		{
+			if (!AgentFileList.f_IsEmpty())
+				AgentFileList += " ";
+			AgentFileList += fg_Format("'{}'", File);
+		}
+
+		// The setup is idempotent: when the uploaded files match the installed
+		// agent and its daemon is loaded, the running agent is kept and only the
+		// connect settings are refreshed, so environment restarts do not tear
+		// down a correct agent
 		CStr BootstrapScript = fg_Format
 			(
 				"set -e\n"
 				"AgentDir='{}'\n"
+				"NewDir=\"$AgentDir.bootstrap\"\n"
+				"rm -rf \"$NewDir\"\n"
+				"mkdir -p \"$NewDir\"\n"
+				"tar -xf /tmp/malterlib-agent-files.tar -C \"$NewDir\"\n"
+				"rm -f /tmp/malterlib-agent-files.tar\n"
+				"MalterlibSame=1\n"
+				"for MalterlibFile in {}; do\n"
+				"\tif ! cmp -s \"$NewDir/$MalterlibFile\" \"$AgentDir/$MalterlibFile\"; then\n"
+				"\t\tMalterlibSame=0\n"
+				"\tfi\n"
+				"done\n"
+				"if [ \"$MalterlibSame\" = \"1\" ] && launchctl print system/com.malterlib.appmanager.agent >/dev/null 2>&1; then\n"
+				"\trm -rf \"$NewDir\"\n"
+				"\tumask 077\n"
+				"\tcat > \"$AgentDir/AppManagerAgentConnect.json\"\n"
+				"\techo MalterlibAgentKept\n"
+				"\texit 0\n"
+				"fi\n"
 				"if [ -x \"$AgentDir/{}\" ]; then\n"
 				"\t\"$AgentDir/{}\" --daemon-stop --mode global '{}' >/dev/null 2>&1 || true\n"
 				"fi\n"
 				"launchctl bootout system/com.malterlib.appmanager.agent 2>/dev/null || true\n"
 				"rm -f /Library/LaunchDaemons/com.malterlib.appmanager.agent.plist /usr/local/libexec/malterlib-appmanager-agent.sh /usr/local/libexec/malterlib-appmanager-agent-user.sh\n"
 				"mkdir -p \"$AgentDir\"\n"
-				"tar -xf /tmp/malterlib-agent-files.tar -C \"$AgentDir\"\n"
-				"rm -f /tmp/malterlib-agent-files.tar\n"
+				"for MalterlibFile in {}; do\n"
+				"\tmv -f \"$NewDir/$MalterlibFile\" \"$AgentDir/$MalterlibFile\"\n"
+				"done\n"
+				"rm -rf \"$NewDir\"\n"
 				"umask 077\n"
 				"cat > \"$AgentDir/AppManagerAgentConnect.json\"\n"
 				"cd \"$AgentDir\"\n"
 				"\"./{}\" --daemon-add --mode global --run-as-user root --run-as-group wheel --no-fail-if-added '{}'\n"
 				, gc_pVMAgentGuestDirectory
+				, AgentFileList
 				, ExecutableName
 				, ExecutableName
 				, gc_pVMAgentDaemonName
+				, AgentFileList
 				, ExecutableName
 				, gc_pVMAgentDaemonName
 			)
@@ -1349,11 +1439,23 @@ namespace NMib::NCloud::NAppManager
 					Error = fg_Format("SSH exited with status {}: {}", RunResult->m_ExitCode, CStr(RunResult->m_Output.f_Trim()));
 				else
 				{
+					if (_pEnvironment->m_VMAgentLaunchID != _pEnvironment->m_LaunchID)
+					{
+						_pEnvironment->m_VMAgentLaunchID = _pEnvironment->m_LaunchID;
+
+						co_await fp_UpdateEnvironmentJson(_pEnvironment).f_Wrap()
+							> fg_LogWarning("Malterlib/Cloud/AppManager", "Failed to persist the environment agent launch id")
+						;
+					}
+
+					bool bKept = RunResult->m_Output.f_Find("MalterlibAgentKept") >= 0;
+
 					DMibLogWithCategory
 						(
 							Malterlib/Cloud/AppManager
 							, Info
-							, "Installed the agent for environment '{}' in the guest at {}"
+							, "{} the agent for environment '{}' in the guest at {}"
+							, bKept ? "Kept" : "Installed"
 							, _pEnvironment->m_Name
 							, GuestIP
 						)
