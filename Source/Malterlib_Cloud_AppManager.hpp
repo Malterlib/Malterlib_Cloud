@@ -91,6 +91,12 @@ namespace NMib::NCloud
 	}
 
 	template <typename tf_CStream>
+	void CAppManagerInterface::CApplicationRemoveSettings::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_bDeleteApplicationData;
+	}
+
+	template <typename tf_CStream>
 	void CAppManagerInterface::CApplicationInfo::f_Stream(tf_CStream &_Stream)
 	{
 		_Stream % m_Status;
@@ -202,6 +208,8 @@ namespace NMib::NCloud
 		_Stream % m_VersionInfo;
 	}
 
+	// Only the environment calls stream the environment structs, which peers before EProtocolVersion_AddLaunchEnvironment don't have, so the fields
+	// of that version stream without a check
 	template <typename tf_CStream>
 	void CAppManagerInterface::CEnvironmentSettings::f_Stream(tf_CStream &_Stream)
 	{
@@ -210,10 +218,19 @@ namespace NMib::NCloud
 		_Stream % m_ParentApplication;
 		_Stream % m_AutoStart;
 
+		_Stream % m_VMImage;
+		_Stream % m_VMBackend;
+		_Stream % m_VMCPUCount;
+		_Stream % m_VMMemoryMB;
+
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentOSDependencies)
 			_Stream % m_OSDependencies;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentVMDataDisk)
+			_Stream % m_VMDataDiskGB;
 	}
 
+	// See CEnvironmentSettings::f_Stream
 	template <typename tf_CStream>
 	void CAppManagerInterface::CEnvironmentInfo::f_Stream(tf_CStream &_Stream)
 	{
@@ -226,10 +243,18 @@ namespace NMib::NCloud
 		_Stream % m_ParentApplication;
 		_Stream % m_bAutoStart;
 
+		_Stream % m_VMImage;
+		_Stream % m_VMBackend;
+		_Stream % m_VMCPUCount;
+		_Stream % m_VMMemoryMB;
+
 		_Stream % m_Applications;
 
 		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentOSDependencies)
 			_Stream % m_OSDependencies;
+
+		if (_Stream.f_GetVersion() >= EProtocolVersion_AddEnvironmentVMDataDisk)
+			_Stream % m_VMDataDiskGB;
 	}
 
 	template <typename tf_CStream>

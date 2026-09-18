@@ -19,6 +19,7 @@
 #include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Concurrency/DistributedAppSensorStoreLocal>
 #include <Mib/Concurrency/DistributedAppLogStoreLocal>
+#include <Mib/Virtualization/VirtualMachine>
 
 #include "Malterlib_Cloud_App_AppManagerApp.h"
 #include "Malterlib_Cloud_App_AppManager_CoordinationInterface.h"
@@ -166,6 +167,11 @@ namespace NMib::NCloud::NAppManager
 			, EEnvironmentSetting_AutoStart         = DBit(2)
 			, EEnvironmentSetting_ParentApplication = DBit(3)
 			, EEnvironmentSetting_OSDependencies    = DBit(4)
+			, EEnvironmentSetting_VMImage           = DBit(5)
+			, EEnvironmentSetting_VMBackend         = DBit(6)
+			, EEnvironmentSetting_VMCPUCount        = DBit(7)
+			, EEnvironmentSetting_VMMemoryMB        = DBit(8)
+			, EEnvironmentSetting_VMDataDiskGB      = DBit(9)
 		};
 
 		struct CEnvironmentSettings
@@ -176,10 +182,17 @@ namespace NMib::NCloud::NAppManager
 			void f_ApplySettings(EEnvironmentSetting _ChangedSettings, CEnvironmentSettings const &_Source);
 			void f_FromInterfaceSettings(CAppManagerInterface::CEnvironmentSettings const &_Settings, EEnvironmentSetting &o_ChangedSettings);
 			EEnvironmentSetting f_ChangedSettings(CEnvironmentSettings const &_Other) const;
+			bool f_Validate(CStr &o_Error) const;
 
 			EEnvironmentType m_Type = CAppManagerInterface::EEnvironmentType_Local;
 			CStr m_AgentApplication;
 			CStr m_ParentApplication; /// Application whose storage confines the environment storage, supporting encrypted storage
+
+			CStr m_VMImage;
+			CStr m_VMBackend;
+			uint32 m_VMCPUCount = 0;
+			uint64 m_VMMemoryMB = 0;
+			uint64 m_VMDataDiskGB = 0; /// Initial size of the VM data disk; 0 selects the default
 
 			bool m_bAutoStart = true;
 
@@ -209,11 +222,22 @@ namespace NMib::NCloud::NAppManager
 			bool m_bDeleted = false;
 			bool m_bStoppedManually = false; /// Persisted; while set, only an explicit start or restart, which clear it, storage removal and the VM window boot the environment
 
+			CStr m_VMMACAddress; /// Persisted so the guest keeps its network identity across restarts
+
+			CStr m_VMAgentLaunchID;           /// Saved after an install so a guest agent that keeps running can reconnect with the same id
+			CStr m_VMAgentFingerprint;        /// Fingerprint of the agent files installed in the guest with m_VMAgentLaunchID
+			CStr m_VMAgentDesiredFingerprint; /// Not persisted
+
 			// Runtime state
 			CStr m_LaunchID;
 			CStr m_AgentHostID;
 			TCActor<CDistributedAppInterfaceLaunchActor> m_AgentLaunch;
 			CActorSubscription m_AgentLaunchSubscription;
+			CActorSubscription m_AgentTicketSubscription;
+			TCActor<NVirtualization::CVirtualMachineActor> m_VMActor;
+			umint m_nStorageRemovals = 0;                /// Application storage removals that need the agent; the last one stops a manually stopped environment
+			bool m_bWindowOpen = false;                  /// Set while a window session is prepared or runs; it reserves the guest image bundle
+			umint m_nPendingInstalls = 0;                /// Adds of applications assigned to the environment that have reached unpacking
 			TCDistributedActorInterface<CDistributedAppInterfaceClient> m_AgentAppInterface;
 			TCDistributedActorInterface<CAppManagerEnvironmentInterface> m_AgentInterface;
 			umint m_AgentAppInterfaceAssignSequence = 0; /// Lets a lost registration of m_AgentAppInterface tell whether a newer one replaced it
@@ -225,6 +249,7 @@ namespace NMib::NCloud::NAppManager
 			TCVector<TCPromise<void>> m_OnAgentConfigured;
 			CStr m_AgentConfigurationError;              /// Failure of the newest agent configuration; launches retry the configuration
 			bool m_bStarting = false;
+			bool m_bStartAbortRequested = false;         /// A stop waits for the start, which gives up its retries and its wait for the agent
 			bool m_bStarted = false;
 			bool m_bStopping = false;
 			bool m_bRemoving = false;
@@ -238,7 +263,12 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<CStr> f_LaunchApplication(CEnvironmentLaunch _Launch) override;
 			TCFuture<uint32> f_StopApplication(CStr _Name) override;
 			TCFuture<void> f_RunScript(CEnvironmentScript _Script) override;
+			TCFuture<CApplicationStageResult> f_StageApplicationFiles(CApplicationStage _Stage) override;
+			TCFuture<void> f_ApplyApplicationFiles(CApplicationApply _Apply) override;
+			TCFuture<void> f_DiscardApplicationStage(CStr _Name, CStr _StageID) override;
+			TCFuture<void> f_RemoveApplicationStorage(CStr _Name) override;
 			TCFuture<void> f_ConfigureAgent(CAgentConfig _Config) override;
+			TCFuture<void> f_ShutdownEnvironment() override;
 
 			DMibDelegatedActorImplementation(CAppManagerActor);
 		};
@@ -488,7 +518,8 @@ namespace NMib::NCloud::NAppManager
 
 			TCFuture<void> f_Add(CStr _Name, CApplicationAdd _Add, CApplicationSettings _Settings) override;
 			TCFuture<void> f_Remove(CStr _Name) override;
-			TCFuture<void> f_RemoveInternal(CStr _Name, bool _bForce);
+			TCFuture<void> f_RemoveWithSettings(CStr _Name, CApplicationRemoveSettings _Settings) override;
+			TCFuture<void> f_RemoveInternal(CStr _Name, bool _bForce, bool _bDeleteApplicationData);
 
 			TCFuture<void> f_Update(CStr _Name, CApplicationUpdate _Update) override;
 
@@ -634,8 +665,14 @@ namespace NMib::NCloud::NAppManager
 			TCFunction<void ()> m_fUpdateVersionInfo;
 			CActorSubscription m_DownloadDirectoryCleanup;
 			CActorSubscription m_TemporaryDirectoryCleanup;
+			CActorSubscription m_AgentStageCleanup;
 			CStr m_SourcePath;
 			CStr m_TempraryPath;
+
+			TCSharedPointer<CEnvironment> m_pRemoteStorageEnvironment; /// Null when the host manages the application files
+			CStr m_AgentStageID;
+			TCActor<CFileTransferSend> m_StageSend;                    /// Sends the staged files into the environment; destroyed to abort an in-flight transfer
+			TCActorFunctorWithID<TCFuture<void> ()> m_fStageFinish;    /// Dropping this uncalled aborts an in-flight receive
 			TCSharedPointer<CApplicationSettings> m_pNewSettings;
 			TCSet<CStr> m_AllowSourceExist;
 			CAppManagerInterface::CVersionIDAndPlatform m_VersionID;
@@ -722,11 +759,24 @@ namespace NMib::NCloud::NAppManager
 			, mc_AlreadyScheduled
 		};
 
+		enum class EEnvironmentStart : uint8
+		{
+			mc_UnlessStoppedManually
+			, mc_EvenIfStoppedManually
+		};
+
 		struct CPackageVersionInfo
 		{
 			CVersionManager::CVersionIDAndPlatform m_VersionID;
 			CVersionManager::CVersionInformation m_VersionInfo;
 			CStr m_Application;
+		};
+
+		struct CApplicationStageReceive
+		{
+			TCActor<CFileTransferReceive> m_Receive;
+			CStr m_Name;
+			CStr m_StageDirectory;
 		};
 
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
@@ -785,6 +835,15 @@ namespace NMib::NCloud::NAppManager
 				, TCFunction<void (CStr const &_Info)> const &_fLogInfo
 			)
 			-> TCMap<CStr, CStr>
+		;
+		static void fsp_ReassignApplicationFileOwnership(CStr const &_Directory, CStr const &_User, CStr const &_Group);
+		static void fsp_SetDirectoryOwnerSkippingLinks(CStr const &_Directory, CStr const &_User, CStr const &_Group);
+		static void fsp_ApplyStagedApplicationFiles
+			(
+				CAppManagerEnvironmentInterface::CApplicationApply const &_Apply
+				, CStr const &_Directory
+				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+			)
 		;
 		TCFuture<void> fp_UpdateAppManagerApplicationVersion(TCSharedPointer<CApplication> _pApplication, uint32 _OldVersion);
 
@@ -862,9 +921,29 @@ namespace NMib::NCloud::NAppManager
 		void fp_AutoStartEnvironments();
 		bool fp_EnvironmentAcceptsApplications(CStr const &_Name);
 		TCFuture<void> fp_CheckEnvironmentAccess(CStr _Name, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_CheckEnvironmentRestartAccess(TCVector<CStr> _Names, CStr _Description, CCallingHostInfo _CallingHostInfo);
+		auto fp_RestartEnvironmentsForSettings(TCVector<TCSharedPointer<CEnvironment>> _Environments, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine, bool _bConnected)
+			-> TCFuture<uint32>
+		;
+		TCFuture<bool> fp_CommandLineProgress(NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine, bool _bConnected, CStr _Output, bool _bError);
 		TCFuture<void> fp_EnsureOSDependencies(TCSharedPointer<CApplication> _pApplication);
-		TCFuture<void> fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment);
-		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_EnsureEnvironmentStarted(TCSharedPointer<CEnvironment> _pEnvironment, EEnvironmentStart _Start = EEnvironmentStart::mc_UnlessStoppedManually);
+		bool fp_EnvironmentUsesAgentSocket(TCSharedPointer<CEnvironment> const &_pEnvironment);
+		CAppManagerEnvironmentSocketDirectory fp_GetEnvironmentAgentSocketDirectory(CEnvironment const &_Environment);
+		CStr fp_GetEnvironmentAgentSocketPath(CEnvironment const &_Environment);
+		void fp_StartAgentHostSocketForwarder();
+		TCFuture<NWeb::NHTTP::CURL> fp_EnsureEnvironmentListen(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_RemoveEnvironmentListen(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_StartEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment, EEnvironmentStart _Start);
+		TCFuture<void> fp_StartEnvironmentVM(TCSharedPointer<CEnvironment> _pEnvironment);
+		CStr fp_GetEnvironmentVMBundleDirectory(CEnvironment const &_Environment);
+		NVirtualization::CVirtualMachineConfig fp_BuildEnvironmentVMConfig(CEnvironment &_Environment);
+		TCFuture<NVirtualization::CMacOSGuestProvisioning> fp_LoadVMImageProvisioning(CStr _BundleDirectory);
+		CStr fp_GetVMBootstrapAskPassPath(CEnvironment const &_Environment);
+		auto fp_BootstrapVMAgentOverSSH(TCSharedPointer<CEnvironment> _pEnvironment, NVirtualization::CMacOSGuestProvisioning _Provisioning, CStr _AgentExecutable, CStr _ConnectSettings)
+			-> TCFuture<void>
+		;
+		TCFuture<CStr> fp_FetchVMAgentGuestLog(TCSharedPointer<CEnvironment> _pEnvironment, NVirtualization::CMacOSGuestProvisioning _Provisioning);
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
 		TCFuture<void> fp_WaitForEnvironmentIdle(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_RestartEnvironmentWhenIdle(TCSharedPointer<CEnvironment> _pEnvironment);
@@ -882,6 +961,20 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_AbortEnvironmentLaunch(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 
+		// Application storage managed inside environments (host side)
+		bool fp_EnvironmentUsesRemoteStorage(CEnvironment const &_Environment);
+		TCSharedPointer<CEnvironment> fp_ApplicationRemoteStorageEnvironment(CApplication const &_Application);
+		CStr fp_CheckParentApplicationStorage(CApplicationSettings const &_Settings);
+		CStr fp_FindEnvironmentSharingVMImage(CStr const &_Name, CEnvironmentSettings const &_Settings);
+		CStr fp_FindApplicationSharingEnvironmentStorage(CStr const &_Name, CApplicationSettings const &_Settings);
+		TCSharedPointer<CEnvironment> fp_LaunchEnvironmentRemoteStorage(CStr const &_LaunchEnvironment);
+		TCFuture<void> fp_StageApplicationInEnvironment(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState, TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_RemoveApplicationEnvironmentStorage(TCSharedPointer<CApplication> _pApplication);
+
+		// Application storage managed inside environments (agent side)
+		TCFuture<void> fp_EnsureEnvironmentDataRoot();
+		CStr fp_GetAgentApplicationDirectory(CStr const &_Name);
+
 		// Environment agent handling (agent side)
 		TCFuture<void> fp_RegisterWithEnvironmentHost();
 		void fp_ForwardApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange _Change);
@@ -893,6 +986,12 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_StartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_StopEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_RestartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_CreateVMImage(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+#ifdef DPlatformFamily_macOS
+		TCFuture<void> fp_EndEnvironmentWindowSession(TCSharedPointer<CEnvironment> _pEnvironment, bool _bWasStarted);
+		TCFuture<uint32> fp_CommandLine_EnvironmentWindow(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_VMSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+#endif
 
 		TCFuture<uint32> fp_CommandLine_ListAvailableVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_VersionManagerList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
@@ -975,6 +1074,7 @@ namespace NMib::NCloud::NAppManager
 				, TCVector<CStr> &o_Files
 				, TCSet<CStr> const &_AllowExist
 				, bool _bForceInstall
+				, bool _bEnvironmentManagedStorage
 				, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 			)
 			-> CStr
@@ -1108,6 +1208,7 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_ClearPreventLaunch(TCSharedPointer<CApplication> _pApplication);
 
 		void fp_ApplicationStartBackup(TCSharedPointer<CApplication> const &_pApplication);
+		TCFuture<void> fp_RestartApplicationBackup(TCSharedPointer<CApplication> _pApplication);
 
 		CStr fp_GetRunAsUser(CApplicationSettings const &_Settings) const;
 		CStr fp_GetRunAsGroup(CApplicationSettings const &_Settings) const;
@@ -1142,6 +1243,10 @@ namespace NMib::NCloud::NAppManager
 		static constexpr ch8 const *mcp_pEnvironmentStorageDirectory = ".Environment";
 		static constexpr ch8 const *mcp_pVMImagesDirectory = ".VMImages";
 
+		static constexpr ch8 const *mcp_pEnvironmentDataVolumeName = "MalterlibData";
+		static constexpr ch8 const *mcp_pEnvironmentDataRootVM = "/Volumes/MalterlibData";
+		static constexpr uint32 mcp_VMAgentHostPort = 19788; /// Virtio socket port of the host that VM guests reach the environment listen through
+
 #ifdef DPlatformFamily_Windows
 		TCSharedPointer<CUniqueUserGroup> mp_pUniqueUserGroup = fg_Construct("C:/M", CDistributedAppActor::mp_State.m_RootDirectory);
 #else
@@ -1149,11 +1254,14 @@ namespace NMib::NCloud::NAppManager
 #endif
 
 		TCMap<CStr, TCSharedPointer<CApplication>> mp_Applications;
+		TCSet<CStr> mp_AddingApplicationNames;                                     /// Names of the applications being added
+		TCMap<CStr, TCSharedPointer<CApplication>> mp_AddingApplicationsInStorage; /// Applications being added that use the environment storage they checked
 		TCMap<CStr, TCSharedPointer<CEnvironment>> mp_Environments;
 		TCTrustedActorSubscription<CKeyManager> mp_KeyManagerSubscription;
 		TCTrustedActorSubscription<CVersionManager> mp_VersionManagerSubscription;
 		TCTrustedActorSubscription<CCloudManager> mp_CloudManagerSubscription;
 		TCSet<CStr> mp_KnownPlatforms;
+		TCSet<CStr> mp_CreatingVMImageBundles;                                     /// Lower case bundle directories of the VM images being created, which environments don't boot yet
 
 		fp32 mp_PauseReportingForSecondsAtShutdown = 60.0;
 
@@ -1162,6 +1270,8 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bPendingSelfUpdateInProgress = false;
 		bool mp_bEnableApplicationStatusSensors = true;
 		bool mp_bEnableEncryptionStatusSensors = true;
+
+		bool mp_bVMWindow = false; /// Applies at VM start: hosts the VM in a window showing the guest display when a graphical session is available
 
 		fp64 mp_AutoUpdateDelay = mc_DefaultAutoUpdateDelay;
 
@@ -1191,6 +1301,14 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bEnvironmentAgent = false;
 		bool mp_bStoppingApp = false; /// The shutdown waits for environment starts, so long start retries give up
 		CStr mp_EnvironmentHostID;    /// Agent side: host id of the launching AppManager, from the deployment settings
+		CStr mp_EnvironmentDataRoot;  /// Agent side: root of the environment-managed application storage, from the deployment settings
+		bool mp_bEnvironmentDataRootReady = false;
+		bool mp_bEnvironmentDataRootPreparing = false;
+		TCVector<TCPromise<void>> mp_OnEnvironmentDataRootReady;
+
+		NStorage::TCUniquePointer<NVirtualization::CGuestHostSocketForwarder> mp_pAgentHostSocketForwarder; /// Agent side in a VM guest: its way to the environment listen
+
+		TCMap<CStr, CApplicationStageReceive> mp_ApplicationStageReceives; /// Agent side, by stage id; dropping the finish functor aborts an in-flight receive
 
 		CTrustedPermissionSubscription mp_Permissions;
 
@@ -1250,6 +1368,14 @@ namespace NMib::NCloud::NAppManager
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);
+
+#ifdef DPlatformFamily_macOS
+	CEJsonSorted fg_AppManager_BuildVMWindowConfig(NVirtualization::CVirtualMachineConfig const &_Config, CStr const &_Backend, CStr const &_Title);
+	NVirtualization::CVirtualMachineConfig fg_AppManager_ParseVMWindowConfig(CEJsonSorted const &_Params, NVirtualization::EVirtualizationBackend &o_Backend, CStr &o_Title);
+	TCFuture<CEJsonSorted> fg_AppManager_HandleEnvironmentWindowRequest(CEJsonSorted _Params, CEJsonSorted _Request, NStorage::TCSharedPointer<CRunLoop> _pRunLoop);
+
+	uint32 fg_AppManager_RunVMWindowHost(CStr const &_ConfigPath);
+#endif
 }
 
 #include "Malterlib_Cloud_App_AppManager.hpp"

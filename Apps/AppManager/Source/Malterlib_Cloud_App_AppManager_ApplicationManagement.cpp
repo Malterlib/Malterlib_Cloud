@@ -61,6 +61,7 @@ namespace NMib::NCloud::NAppManager
 			, TCVector<CStr> &o_Files
 			, TCSet<CStr> const &_AllowExist
 			, bool _bForceInstall
+			, bool _bEnvironmentManagedStorage
 			, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
 		)
 		-> CStr
@@ -126,11 +127,9 @@ namespace NMib::NCloud::NAppManager
 		{
 			CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable);
 
-			// A linked executable of an application in a launch environment can point to a file that only exists inside the environment,
-			// which checks it when it launches the application. On the host the link must resolve to an executable here
-			bool bLink
-				= !Settings.m_LaunchEnvironment.f_IsEmpty() && CFile::fs_FileExists(ExcutableFile, EFileAttrib_Link) && (CFile::fs_GetAttributesOnLink(ExcutableFile) & EFileAttrib_Link)
-			;
+			// A linked executable of an application in environment-managed storage can point to a file that only exists inside the
+			// environment, which checks it when it launches the application. In host storage the link must resolve to an executable here
+			bool bLink = _bEnvironmentManagedStorage && CFile::fs_FileExists(ExcutableFile, EFileAttrib_Link) && (CFile::fs_GetAttributesOnLink(ExcutableFile) & EFileAttrib_Link);
 			if
 			(
 				!bLink

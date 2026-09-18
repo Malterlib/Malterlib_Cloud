@@ -493,6 +493,27 @@ void CAppManager_Environment_Tests::f_DoTests()
 
 			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
 			DMibExpectTrue(Installed.f_FindEqual("LinkedNonExecutable") == nullptr);
+
+			// A Local environment uses host storage, so the link must resolve to an executable on the host as well
+			CAppManagerInterface::CEnvironmentSettings LocalSettings;
+			LocalSettings.m_Type = CAppManagerInterface::EEnvironmentType_Local;
+			LocalSettings.m_AutoStart = false;
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("LinkedLocalEnv", LocalSettings).f_Timeout(g_Timeout, "Timed out adding environment");
+
+			auto LocalResult = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-add", "--from-file", PackageDirectory, "--name", "LinkedNonExecutableLocal", "--executable", "Executable", "--launch-environment", "LinkedLocalEnv"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out adding application")
+			;
+
+			DMibExpect(LocalResult.m_ExitCode, !=, 0u);
+			DMibExpectTrue(LocalResult.f_GetCombinedOut().f_Find("does not exist or does not have the executable flag set") >= 0);
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentRemove)("LinkedLocalEnv").f_Timeout(g_Timeout, "Timed out removing environment");
 		}
 #endif
 
@@ -678,6 +699,127 @@ void CAppManager_Environment_Tests::f_DoTests()
 				.f_Timeout(g_Timeout, "Timed out removing application")
 			;
 			DMibExpect(RemoveResult.m_ExitCode, ==, 0u);
+		}
+
+		{
+			DMibTestPath("VM Image Differing In Case");
+
+			CAppManagerInterface::CEnvironmentSettings Settings;
+			Settings.m_Type = CAppManagerInterface::EEnvironmentType_VM;
+			Settings.m_VMImage = CStr("SharedImage");
+			Settings.m_AutoStart = false;
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("VMEnv", Settings).f_Timeout(g_Timeout, "Timed out adding environment");
+
+			Settings.m_VMImage = CStr("sharedimage");
+			auto Result = co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("VMEnvCase", Settings).f_Timeout(g_Timeout, "Timed out adding environment").f_Wrap();
+			DMibExpectFalse(Result);
+			if (!Result)
+				DMibExpectTrue(Result.f_GetExceptionStr().f_Find("is used by environment 'VMEnv'") >= 0);
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentRemove)("VMEnv").f_Timeout(g_Timeout, "Timed out removing environment");
+		}
+
+		// Deleting the files of an application in environment-managed storage needs the environment running, which this one cannot
+		{
+			DMibTestPath("Application Name Differing In Case In Environment Storage");
+
+			CAppManagerInterface::CEnvironmentSettings EnvironmentSettings;
+			EnvironmentSettings.m_Type = CAppManagerInterface::EEnvironmentType_VM;
+			EnvironmentSettings.m_VMImage = CStr("CaseImage");
+			EnvironmentSettings.m_AutoStart = false;
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("CaseVMEnv", EnvironmentSettings).f_Timeout(g_Timeout, "Timed out adding environment");
+
+			CAppManagerInterface::CApplicationAdd Add;
+			CAppManagerInterface::CApplicationSettings Settings;
+			Settings.m_LaunchEnvironment = CStr("CaseVMEnv");
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_Add)("CaseApp", Add, Settings).f_Timeout(g_Timeout, "Timed out adding application");
+
+			auto Result = co_await Interface.f_CallActor(&CAppManagerInterface::f_Add)("caseapp", Add, Settings).f_Timeout(g_Timeout, "Timed out adding application").f_Wrap();
+			DMibExpectFalse(Result);
+			if (!Result)
+				DMibExpectTrue(Result.f_GetExceptionStr().f_Find("would share the environment storage of application 'CaseApp'") >= 0);
+		}
+
+		{
+			DMibTestPath("Remove Deleting Application Data");
+
+			auto Result = co_await AppManagerTestHelper.f_LaunchSimple
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-remove", "--delete-application-data", "CaseApp"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out removing application")
+			;
+
+			DMibExpect(Result.m_ExitCode, !=, 0u);
+			DMibExpectTrue(Result.f_GetCombinedOut().f_Find("Failed to remove the application storage in the environment") >= 0);
+
+			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+			DMibExpectTrue(Installed.f_FindEqual("CaseApp") != nullptr);
+		}
+
+		{
+			DMibTestPath("Remove Keeping Application Data");
+
+			CStr Output = co_await AppManagerTestHelper.f_LaunchTool(AppManagerInfo.m_RootDirectory / "AppManager", {"--application-remove", "CaseApp"}, AppManagerInfo.m_RootDirectory)
+				.f_Timeout(g_Timeout, "Timed out removing application")
+			;
+
+			DMibExpectTrue(Output.f_Find("Kept the files of application 'CaseApp' in environment 'CaseVMEnv'") >= 0);
+
+			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+			DMibExpectTrue(Installed.f_FindEqual("CaseApp") == nullptr);
+		}
+
+		{
+			DMibTestPath("Remove With Settings Keeping Application Data");
+
+			CAppManagerInterface::CApplicationAdd Add;
+			CAppManagerInterface::CApplicationSettings Settings;
+			Settings.m_LaunchEnvironment = CStr("CaseVMEnv");
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_Add)("KeptApp", Add, Settings).f_Timeout(g_Timeout, "Timed out adding application");
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_RemoveWithSettings)
+				("KeptApp", CAppManagerInterface::CApplicationRemoveSettings())
+				.f_Timeout(g_Timeout, "Timed out removing application")
+			;
+
+			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+			DMibExpectTrue(Installed.f_FindEqual("KeptApp") == nullptr);
+		}
+
+		{
+			DMibTestPath("Concurrent Adds Sharing Environment Storage");
+
+			CAppManagerInterface::CApplicationAdd Add;
+			CAppManagerInterface::CApplicationSettings Settings;
+			Settings.m_LaunchEnvironment = CStr("CaseVMEnv");
+
+			auto [SameNameFirst, SameNameSecond, OtherCase] = co_await
+				(
+					Interface.f_CallActor(&CAppManagerInterface::f_Add)("RaceApp", Add, Settings).f_Timeout(g_Timeout, "Timed out adding application")
+					+ Interface.f_CallActor(&CAppManagerInterface::f_Add)("RaceApp", Add, Settings).f_Timeout(g_Timeout, "Timed out adding application")
+					+ Interface.f_CallActor(&CAppManagerInterface::f_Add)("raceapp", Add, Settings).f_Timeout(g_Timeout, "Timed out adding application")
+				)
+				.f_Wrap()
+			;
+
+			umint nAdded = 0;
+			for (auto *pResult : {&SameNameFirst, &SameNameSecond, &OtherCase})
+			{
+				if (*pResult)
+					++nAdded;
+			}
+
+			DMibExpect(nAdded, ==, 1u);
+
+			auto Installed = co_await Interface.f_CallActor(&CAppManagerInterface::f_GetInstalled)().f_Timeout(g_Timeout, "Timed out enumerating applications");
+			DMibExpect(umint(Installed.f_FindEqual("RaceApp") != nullptr) + umint(Installed.f_FindEqual("raceapp") != nullptr), ==, 1u);
 		}
 
 		co_return {};
@@ -981,6 +1123,291 @@ void CAppManager_Environment_Tests::f_DoTests()
 
 			co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentRemove)("ConfinedEnv").f_Timeout(g_Timeout, "Timed out removing environment");
 		}
+
+		co_return {};
+	};
+
+#ifndef DPlatformFamily_Windows
+	DMibTestSuite("Application Files Below Links")
+	{
+		CStr RootDirectory = CFile::fs_GetProgramDirectory() / "AppManagerEnvironmentFiles";
+		CStr ApplicationDirectory = RootDirectory / "App";
+		CStr OutsideDirectory = RootDirectory / "Outside";
+
+		fg_TestAddCleanupPath(RootDirectory);
+
+		if (CFile::fs_FileExists(RootDirectory))
+			CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+
+		CFile::fs_CreateDirectory(ApplicationDirectory);
+		CFile::fs_CreateDirectory(OutsideDirectory);
+		CFile::fs_WriteStringToFile(OutsideDirectory / "Data.txt", "Outside", false);
+		CFile::fs_CreateSymbolicLink(OutsideDirectory, ApplicationDirectory / "Linked", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+		{
+			DMibTestPath("Delete Below Link");
+
+			fg_AppManager_DeleteApplicationFile(ApplicationDirectory, "Linked/Data.txt");
+			DMibExpectTrue(CFile::fs_FileExists(OutsideDirectory / "Data.txt", EFileAttrib_File));
+		}
+
+		{
+			DMibTestPath("Delete Directory Link");
+
+			fg_AppManager_DeleteApplicationFile(ApplicationDirectory, "Linked");
+			DMibExpectFalse(CFile::fs_FileExists(ApplicationDirectory / "Linked", EFileAttrib_Link));
+			DMibExpectTrue(CFile::fs_FileExists(OutsideDirectory / "Data.txt", EFileAttrib_File));
+		}
+
+		{
+			DMibTestPath("Create Replaces Link");
+
+			CFile::fs_CreateSymbolicLink(OutsideDirectory, ApplicationDirectory / "Linked", EFileAttrib_Directory, ESymbolicLinkFlag_None);
+
+			fg_AppManager_CreateApplicationDirectory(ApplicationDirectory, "Linked/Sub");
+			DMibExpectFalse(CFile::fs_FileExists(ApplicationDirectory / "Linked", EFileAttrib_Link));
+			DMibExpectTrue(CFile::fs_FileExists(ApplicationDirectory / "Linked/Sub", EFileAttrib_Directory));
+			DMibExpectFalse(CFile::fs_FileExists(OutsideDirectory / "Sub"));
+			DMibExpectTrue(CFile::fs_FileExists(OutsideDirectory / "Data.txt", EFileAttrib_File));
+		}
+	};
+#endif
+
+#ifndef DPlatformFamily_Windows
+	DMibTestSuite("Environment Socket Directory")
+	{
+		{
+			DMibTestPath("Root Directory");
+
+			auto Directory = fg_AppManager_EnvironmentSocketDirectory("/opt/AppManager", "Env", false);
+			DMibExpect(Directory.m_SharedDirectory, ==, "/opt/AppManager/Sockets");
+			DMibExpect(CFile::fs_GetPath(Directory.m_SocketDirectory), ==, Directory.m_SharedDirectory);
+			DMibExpect(Directory.m_SocketPath, ==, Directory.m_SocketDirectory / "Agent.socket");
+
+			auto Other = fg_AppManager_EnvironmentSocketDirectory("/opt/AppManager", "OtherEnv", false);
+			DMibExpect(Other.m_SocketDirectory, !=, Directory.m_SocketDirectory);
+		}
+
+		{
+			DMibTestPath("Long Root Directory");
+
+			CStr RootDirectory = "/opt";
+			for (umint iComponent = 0; iComponent < 10; ++iComponent)
+				RootDirectory = RootDirectory / "LongDirectoryName";
+
+			auto AsRoot = fg_AppManager_EnvironmentSocketDirectory(RootDirectory, "Env", true);
+			DMibExpect(AsRoot.m_SharedDirectory, ==, "/var/run/MalterlibAppManager");
+			DMibExpect(CFile::fs_GetPath(AsRoot.m_SocketDirectory), ==, AsRoot.m_SharedDirectory);
+
+			auto AsOtherUser = fg_AppManager_EnvironmentSocketDirectory(RootDirectory, "Env", false);
+			DMibExpect(AsOtherUser.m_SharedDirectory, ==, "");
+			DMibExpect(CFile::fs_GetPath(AsOtherUser.m_SocketDirectory), ==, CFile::fs_GetRawTemporaryDirectory());
+			DMibExpect(AsOtherUser.m_SocketDirectory, !=, fg_AppManager_EnvironmentSocketDirectory(RootDirectory + "B", "Env", false).m_SocketDirectory);
+		}
+
+		{
+			DMibTestPath("Prepare");
+
+			CStr RootDirectory = CFile::fs_GetProgramDirectory() / "AppManagerEnvironmentSocketDirectory";
+
+			fg_TestAddCleanupPath(RootDirectory);
+
+			if (CFile::fs_FileExists(RootDirectory))
+				CFile::fs_DeleteDirectoryRecursive(RootDirectory);
+
+			CAppManagerEnvironmentSocketDirectory Directory;
+			Directory.m_SharedDirectory = RootDirectory / "Shared";
+			Directory.m_SocketDirectory = Directory.m_SharedDirectory / "Env";
+
+			constexpr EFileAttrib c_Traversable = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UserExecute | EFileAttrib_GroupExecute | EFileAttrib_EveryoneExecute;
+
+			fg_AppManager_PrepareEnvironmentSocketDirectory(Directory);
+			DMibExpect(CFile::fs_GetAttributes(Directory.m_SharedDirectory) & EFileAttrib_AllUnixPermissions, ==, c_Traversable);
+			DMibExpect(CFile::fs_GetAttributes(Directory.m_SocketDirectory) & EFileAttrib_AllUnixPermissions, ==, c_Traversable);
+		}
+	};
+#endif
+
+	DMibTestSuite("VM Launch") -> TCFuture<void>
+	{
+		DMibTestCategory("Provision Username")
+		{
+			DMibExpectTrue(fg_AppManager_IsValidVMProvisionUsername("admin"));
+			DMibExpectTrue(fg_AppManager_IsValidVMProvisionUsername("_build-agent.2"));
+			DMibExpectFalse(fg_AppManager_IsValidVMProvisionUsername(""));
+			DMibExpectFalse(fg_AppManager_IsValidVMProvisionUsername("-oProxyCommand=touch /tmp/Owned;"));
+			DMibExpectFalse(fg_AppManager_IsValidVMProvisionUsername("2admin"));
+			DMibExpectFalse(fg_AppManager_IsValidVMProvisionUsername("admin@host"));
+			DMibExpectFalse(fg_AppManager_IsValidVMProvisionUsername("ad min"));
+			DMibExpectFalse(fg_AppManager_IsValidVMProvisionUsername("abcdefghijklmnopqrstuvwxyzabcdefg"));
+		};
+
+		// A provisioned macOS guest, with Remote Login for the given account, which the AppManager sets the agent up through
+		CStr GuestBundle = fg_GetSys()->f_GetEnvironmentVariable("MalterlibTestMacOSVMGuestBundle");
+		CStr GuestUser = fg_GetSys()->f_GetEnvironmentVariable("MalterlibTestMacOSVMGuestUser");
+		CStr GuestPassword = fg_GetSys()->f_GetEnvironmentVariable("MalterlibTestMacOSVMGuestPassword");
+		if (GuestBundle.f_IsEmpty() || GuestUser.f_IsEmpty() || GuestPassword.f_IsEmpty())
+		{
+			DMibConOut
+				(
+					"VM Launch skipped: MalterlibTestMacOSVMGuestBundle, MalterlibTestMacOSVMGuestUser and MalterlibTestMacOSVMGuestPassword do not name "
+					"a provisioned macOS guest\n"
+				)
+			;
+			co_return {};
+		}
+
+#ifdef DPlatformFamily_macOS
+		CAppManagerTestHelper::EOption Options
+			= CAppManagerTestHelper::EOption_EnableVersionManager
+			| CAppManagerTestHelper::EOption_DisablePatchMonitoring
+			| CAppManagerTestHelper::EOption_DisableDiskMonitoring
+			| CAppManagerTestHelper::EOption_DisableApplicationStatusSensors
+			| CAppManagerTestHelper::EOption_DisableEncryptionStatusSensors
+		;
+
+		if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+			Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
+
+		CAppManagerTestHelper AppManagerTestHelper("AppManagerEnvironmentVMTests", Options, g_Timeout);
+
+		auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
+
+		co_await AppManagerTestHelper.f_Setup(1);
+
+		auto &AppManagerInfo = *AppManagerTestHelper.m_pState->m_AppManagerInfos.f_FindAny();
+		auto &Interface = AppManagerInfo.m_Interface;
+
+		auto fGetEnvironments = [&]() -> TCUnsafeFuture<TCMap<CStr, CAppManagerInterface::CEnvironmentInfo>>
+			{
+				co_return co_await Interface.f_CallActor(&CAppManagerInterface::f_GetEnvironments)().f_Timeout(g_Timeout, "Timed out enumerating environments");
+			}
+		;
+
+		{
+			DMibTestPath("Install Agent Application");
+
+			CStr AgentSourceDirectory = AppManagerTestHelper.f_RootDirectory() / "AgentSource";
+			CStr AgentExecutable = AppManagerInfo.m_RootDirectory / "AppManager";
+
+			co_await
+				(
+					g_Dispatch / [AgentSourceDirectory, AgentExecutable]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						CFile::fs_CreateDirectory(AgentSourceDirectory);
+						CFile::fs_CopyFile(AgentExecutable, AgentSourceDirectory / "AppManager");
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating agent source directory")
+			;
+
+			co_await AppManagerTestHelper.f_LaunchTool
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--application-add", "--from-file", AgentSourceDirectory, "--name", "Agent"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out adding agent application")
+			;
+		}
+
+		{
+			DMibTestPath("Place Image");
+
+			// A clone shares the blocks of the guest disk, so the guest can change it without changing the source bundle
+			CStr ImageDirectory = AppManagerInfo.m_RootDirectory / ".VMImages/TestImage";
+
+			co_await
+				(
+					g_Dispatch / [ImageDirectory]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						CFile::fs_CreateDirectory(CFile::fs_GetPath(ImageDirectory));
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out creating the image directory")
+			;
+
+			CProcessLaunchParams Params = CProcessLaunchParams::fs_LaunchExecutable("/bin/cp", {"-c", "-R", GuestBundle, ImageDirectory}, CStr(), {});
+			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(CProcessLaunchActor::CSimpleLaunch(Params, CProcessLaunchActor::ESimpleLaunchFlag_None))
+				.f_Timeout(600.0, "Timed out cloning the guest bundle")
+			;
+			DMibAssert(CStr(Result.f_GetCombinedOut().f_Trim()), ==, "");
+			DMibAssert(Result.m_ExitCode, ==, 0u);
+
+			CEJsonSorted Provisioning;
+			Provisioning["Username"] = GuestUser;
+			Provisioning["Password"] = GuestPassword;
+			Provisioning["FullName"] = GuestUser;
+			Provisioning["AutoLogin"] = true;
+			Provisioning["EnableRemoteLogin"] = true;
+
+			co_await
+				(
+					g_Dispatch / [ImageDirectory, Contents = Provisioning.f_ToString()]() -> TCFuture<void>
+					{
+						co_await ECoroutineFlag_CaptureExceptions;
+
+						CFile::fs_WriteStringToFile(ImageDirectory / "Provisioning.json", Contents, false);
+						co_return {};
+					}
+				)
+				.f_Timeout(g_Timeout, "Timed out writing the image provisioning")
+			;
+		}
+
+		{
+			DMibTestPath("Start Environment");
+
+			CAppManagerInterface::CEnvironmentSettings Settings;
+			Settings.m_Type = CAppManagerInterface::EEnvironmentType_VM;
+			Settings.m_VMImage = CStr("TestImage");
+			Settings.m_AgentApplication = CStr("Agent");
+			Settings.m_AutoStart = false;
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("VMEnv", Settings).f_Timeout(g_Timeout, "Timed out adding environment");
+
+			// The guest boots, the host installs the agent through SSH and the agent connects through its virtio socket
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentStart)("VMEnv").f_Timeout(900.0, "Timed out starting VM environment");
+
+			auto Environments = co_await fGetEnvironments();
+			auto pEnvironment = Environments.f_FindEqual("VMEnv");
+			DMibAssertTrue(pEnvironment != nullptr);
+			DMibExpect(pEnvironment->m_Status, ==, "Running");
+		}
+
+		{
+			DMibTestPath("Stop Environment");
+
+			co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentStop)("VMEnv").f_Timeout(300.0, "Timed out stopping environment");
+
+			auto Environments = co_await fGetEnvironments();
+			auto pEnvironment = Environments.f_FindEqual("VMEnv");
+			DMibAssertTrue(pEnvironment != nullptr);
+			DMibExpect(pEnvironment->m_Status, ==, "Stopped");
+		}
+
+		{
+			DMibTestPath("Remove Deleting Environment Data");
+
+			co_await AppManagerTestHelper.f_LaunchTool
+				(
+					AppManagerInfo.m_RootDirectory / "AppManager"
+					, {"--environment-remove", "--name", "VMEnv", "--delete-application-data"}
+					, AppManagerInfo.m_RootDirectory
+				)
+				.f_Timeout(g_Timeout, "Timed out removing environment")
+			;
+
+			auto Environments = co_await fGetEnvironments();
+			DMibExpectTrue(Environments.f_FindEqual("VMEnv") == nullptr);
+		}
+#endif
 
 		co_return {};
 	};

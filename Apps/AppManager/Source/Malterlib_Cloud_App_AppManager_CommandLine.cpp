@@ -161,7 +161,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--launch-environment"]
 				, "Type"_o= ""
-				, "Description"_o= "Launch the application inside the named environment managed by this AppManager.\n"
+				, "Description"_o= "Launch the application inside the named environment (a virtual machine managed by this AppManager).\n"
 				"Set to an empty string to launch directly on the host (the default). See --environment-add."
 			}
 		;
@@ -773,6 +773,14 @@ namespace NMib::NCloud::NAppManager
 							, "Description"_o= "Remove the application without waiting for an operation in progress.\n"
 							"Pending launches are aborted and the stuck operation unwinds against the\n"
 							"removed application. Use when the application is stuck launching or updating."
+						}
+						, "DeleteApplicationData?"_o=
+						{
+							"Names"_o= _o["--delete-application-data"]
+							, "Default"_o= false
+							, "Description"_o= "Delete the files of the application in the storage its launch environment manages.\n"
+							"Without it the environment keeps them, and an application added later with the same name\n"
+							"needs --force-install, which reuses them. Files in host storage are always kept."
 						}
 					}
 				}

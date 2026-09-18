@@ -4,6 +4,12 @@
 #include <Mib/Cryptography/RandomID>
 
 #include <Mib/Concurrency/LogError>
+#include <Mib/Cloud/FileTransfer>
+
+#ifdef DPlatformFamily_macOS
+#	include <sys/param.h>
+#	include <sys/mount.h>
+#endif
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
@@ -15,7 +21,12 @@ namespace NMib::NCloud::NAppManager
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_LaunchApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_StopApplication);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_RunScript);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_StageApplicationFiles);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ApplyApplicationFiles);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_DiscardApplicationStage);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_RemoveApplicationStorage);
 		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ConfigureAgent);
+		DPublishActorFunction(CAppManagerEnvironmentInterface::f_ShutdownEnvironment);
 	}
 
 	CAppManagerEnvironmentInterface::~CAppManagerEnvironmentInterface()
@@ -64,6 +75,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		_Stream % m_Description;
 		_Stream % m_Script;
+		_Stream % m_Application;
 		_Stream % m_Directory;
 		_Stream % m_Parameter;
 		_Stream % m_Environment;
@@ -72,6 +84,68 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_RunAsUserPassword;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CEnvironmentScript);
+
+	template <typename tf_CStream>
+	void CAppManagerEnvironmentInterface::CStageFileContents::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % fg_Move(m_DataGenerator);
+		_Stream % fg_Move(m_Subscription);
+		_Stream % m_StartPosition;
+	}
+
+	// Always streams the symlink target: the version manager file type only streams it in its own protocol versions
+	template <typename tf_CStream>
+	void CAppManagerEnvironmentInterface::CStageFile::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_FilePath;
+		_Stream % m_FileAttributes;
+		_Stream % m_WriteTime;
+		_Stream % m_FileSize;
+		_Stream % m_SymlinkContents;
+		_Stream % fg_Move(m_fGetDataGenerator);
+	}
+	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CStageFile);
+
+	template <typename tf_CStream>
+	void CAppManagerEnvironmentInterface::CApplicationStage::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Name;
+		_Stream % m_QueueSize;
+
+		if constexpr (tf_CStream::mc_Direction == NStream::EStreamDirection_Consume)
+			m_FilesGenerator = fg_Construct();
+
+		_Stream % fg_Move(*m_FilesGenerator);
+		_Stream % m_RunAsUser;
+		_Stream % m_RunAsGroup;
+		_Stream % m_bRunAsUserHasShell;
+	}
+	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CApplicationStage);
+
+	template <typename tf_CStream>
+	void CAppManagerEnvironmentInterface::CApplicationStageResult::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_StageID;
+		_Stream % m_Directory;
+		_Stream % m_StageDirectory;
+		_Stream % fg_Move(m_fFinish);
+	}
+	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CApplicationStageResult);
+
+	template <typename tf_CStream>
+	void CAppManagerEnvironmentInterface::CApplicationApply::f_Stream(tf_CStream &_Stream)
+	{
+		_Stream % m_Name;
+		_Stream % m_StageID;
+		_Stream % m_Files;
+		_Stream % m_OldFiles;
+		_Stream % m_RunAsUser;
+		_Stream % m_RunAsGroup;
+		_Stream % m_bRunAsUserHasShell;
+		_Stream % m_bFailOnExisting;
+		_Stream % m_VersionExtraInfo;
+	}
+	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CApplicationApply);
 
 	template <typename tf_CStream>
 	void CAppManagerEnvironmentInterface::CApplicationStateChange::f_Stream(tf_CStream &_Stream)
@@ -98,6 +172,181 @@ namespace NMib::NCloud::NAppManager
 		co_return fg_Move(Info);
 	}
 
+#ifdef DPlatformFamily_macOS
+	namespace
+	{
+		// Blocking. Accepts any volume already mounted at _DataRoot; otherwise mounts the volume of that name or, on first use, formats the guest's data disk as APFS
+		void fg_PrepareEnvironmentDataVolume(CStr const &_DataRoot)
+		{
+			CStr VolumeName = CFile::fs_GetFile(_DataRoot);
+
+			auto fIsMounted = [&]() -> bool
+				{
+					struct statfs FileSystemInfo = {};
+					return statfs(_DataRoot.f_GetStr(), &FileSystemInfo) == 0 && _DataRoot == FileSystemInfo.f_mntonname;
+				}
+			;
+
+			auto fRunDiskUtil = [](TCVector<CStr> &&_Arguments, CStr &o_Output) -> bool
+				{
+					CStr StdOut;
+					CStr StdErr;
+					uint32 ExitCode = 0;
+					if (!CProcessLaunch::fs_LaunchBlock("/usr/sbin/diskutil", fg_Move(_Arguments), StdOut, StdErr, ExitCode))
+						DMibError(fg_Format("Failed to launch diskutil: {}", StdErr));
+
+					o_Output = fg_ConcatOutput(StdOut, StdErr);
+					return ExitCode == 0;
+				}
+			;
+
+			auto fEnableOwnership = [&]
+				{
+					CStr Output;
+					if (!fRunDiskUtil(fg_CreateVector<CStr>("enableOwnership", _DataRoot), Output))
+						DMibError(fg_Format("Failed to enable ownership on the data volume '{}': {}", _DataRoot, Output));
+				}
+			;
+
+			if (fIsMounted())
+				return;
+
+			// The volume can already exist unmounted, for example after a manual
+			// unmount; ownership must be honored so the per application users work
+			{
+				CStr Output;
+				if (fRunDiskUtil(fg_CreateVector<CStr>("mount", VolumeName), Output) && fIsMounted())
+				{
+					fEnableOwnership();
+					return;
+				}
+			}
+
+			// Find the attached data disk: the only whole physical disk without any
+			// content. The main guest disk always carries a partition scheme
+			CStr Candidate;
+			{
+				CStr StdOut;
+				CStr StdErr;
+				uint32 ExitCode = 0;
+				if
+				(
+					!CProcessLaunch::fs_LaunchBlock("/bin/sh", fg_CreateVector<CStr>("-c", "diskutil list -plist physical | plutil -convert json -o - -"), StdOut, StdErr, ExitCode)
+					|| ExitCode != 0
+				)
+				{
+					DMibError(fg_Format("Failed to list the guest disks: {}", fg_ConcatOutput(StdOut, StdErr)));
+				}
+
+				CJsonOrdered Json = CJsonOrdered::fs_FromString(StdOut);
+
+				umint nCandidates = 0;
+				if (auto *pDisks = Json.f_GetMember("AllDisksAndPartitions"))
+				{
+					for (auto &Disk : pDisks->f_Array())
+					{
+						CStr Content;
+						if (auto *pContent = Disk.f_GetMember("Content"))
+							Content = pContent->f_AsString();
+
+						bool bHasPartitions = false;
+						if (auto *pPartitions = Disk.f_GetMember("Partitions"))
+							bHasPartitions = !pPartitions->f_Array().f_IsEmpty();
+						if (Disk.f_GetMember("APFSVolumes"))
+							bHasPartitions = true;
+
+						if (!Content.f_IsEmpty() || bHasPartitions)
+							continue;
+
+						++nCandidates;
+						if (auto *pIdentifier = Disk.f_GetMember("DeviceIdentifier"))
+							Candidate = pIdentifier->f_AsString();
+					}
+				}
+
+				if (Candidate.f_IsEmpty())
+					DMibError("Found no unformatted data disk to create the data volume on");
+
+				if (nCandidates > 1)
+					DMibError("Found more than one unformatted disk; cannot decide which one is the data disk");
+			}
+
+			{
+				CStr Output;
+				if (!fRunDiskUtil(fg_CreateVector<CStr>("eraseDisk", "APFS", VolumeName, Candidate), Output))
+					DMibError(fg_Format("Failed to format the data disk '{}': {}", Candidate, Output));
+
+				fEnableOwnership();
+			}
+
+			if (!fIsMounted())
+				DMibError(fg_Format("The data volume did not mount at '{}'", _DataRoot));
+		}
+	}
+#endif
+
+	TCFuture<void> CAppManagerActor::fp_EnsureEnvironmentDataRoot()
+	{
+		if (mp_EnvironmentDataRoot.f_IsEmpty())
+			co_return DMibErrorInstance("The environment has no managed application storage");
+
+		if (mp_bEnvironmentDataRootReady)
+			co_return {};
+
+		if (mp_bEnvironmentDataRootPreparing)
+			co_return co_await mp_OnEnvironmentDataRootReady.f_Insert().f_Future();
+
+		mp_bEnvironmentDataRootPreparing = true;
+
+		bool bReady = false;
+		auto Cleanup = g_OnScopeExit / [&, this]
+			{
+				mp_bEnvironmentDataRootPreparing = false;
+				mp_bEnvironmentDataRootReady = bReady;
+				auto Waiters = fg_Move(mp_OnEnvironmentDataRootReady);
+				for (auto &Promise : Waiters)
+				{
+					if (bReady)
+						Promise.f_SetResult();
+					else
+						Promise.f_SetException(DMibErrorInstance("Failed to prepare the environment application storage"));
+				}
+			}
+		;
+
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) / [DataRoot = mp_EnvironmentDataRoot]()
+						{
+							// In a macOS guest the data root is the data disk volume
+							// prepared on first use
+#ifdef DPlatformFamily_macOS
+							fg_PrepareEnvironmentDataVolume(DataRoot);
+#else
+							if (!CFile::fs_FileExists(DataRoot, EFileAttrib_Directory))
+								CFile::fs_CreateDirectory(DataRoot);
+#endif
+						}
+					)
+					% "Failed to prepare the environment application storage"
+				)
+			;
+		}
+
+		bReady = true;
+
+		co_return {};
+	}
+
+	CStr CAppManagerActor::fp_GetAgentApplicationDirectory(CStr const &_Name)
+	{
+		return mp_EnvironmentDataRoot / "App" / _Name;
+	}
+
 	// Returns the launch id of a matching application that is already launched or launching instead of _Launch's
 	TCFuture<CStr> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_LaunchApplication(CEnvironmentLaunch _Launch)
 	{
@@ -106,8 +355,37 @@ namespace NMib::NCloud::NAppManager
 		if (!pThis->mp_bEnvironmentAgent)
 			co_return DMibErrorInstance("Not running as an environment agent");
 
-		if (_Launch.m_Name.f_IsEmpty() || _Launch.m_Directory.f_IsEmpty() || _Launch.m_Executable.f_IsEmpty())
-			co_return DMibErrorInstance("Invalid launch of application in environment: name, directory and executable are required");
+		if (_Launch.m_Name.f_IsEmpty() || _Launch.m_Executable.f_IsEmpty())
+			co_return DMibErrorInstance("Invalid launch of application in environment: name and executable are required");
+
+		bool bManagedStorage = _Launch.m_Directory.f_IsEmpty();
+
+		if (bManagedStorage)
+		{
+			if (!CVersionManager::fs_IsValidApplicationName(_Launch.m_Name))
+				co_return DMibErrorInstance("'{}' is not a valid application name"_f << _Launch.m_Name);
+
+			co_await pThis->fp_EnsureEnvironmentDataRoot();
+
+			_Launch.m_Directory = pThis->fp_GetAgentApplicationDirectory(_Launch.m_Name);
+
+			bool bHasDirectory;
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				bHasDirectory = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [Directory = _Launch.m_Directory]()
+						{
+							return CFile::fs_FileExists(Directory, EFileAttrib_Directory);
+						}
+					)
+				;
+			}
+
+			if (!bHasDirectory)
+				co_return DMibErrorInstance("Application '{}' has no files in the environment storage; update the application to install them"_f << _Launch.m_Name);
+		}
 
 		// A process that is stopping is not adopted: a successful stop removes the application
 		while (true)
@@ -196,7 +474,31 @@ namespace NMib::NCloud::NAppManager
 							;
 						}
 					)
-					% "Failed to create user and group for application in environment"
+					% "Failed to prepare the user and group for application in environment"
+				)
+			;
+		}
+
+		// Only the agent reaches the environment storage to change file owners for a new run as identity
+		if (bManagedStorage)
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) /
+						[
+							Directory = _Launch.m_Directory
+							, User = pThis->mp_pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser)
+							, Group = pThis->mp_pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup)
+						]
+						()
+						{
+							fsp_ReassignApplicationFileOwnership(Directory, User, Group);
+						}
+					)
+					% "Failed to change the owners of the application files in the environment storage"
 				)
 			;
 		}
@@ -265,11 +567,582 @@ namespace NMib::NCloud::NAppManager
 		if (!pThis->mp_bEnvironmentAgent)
 			co_return DMibErrorInstance("Not running as an environment agent");
 
+		if (_Script.m_Directory.f_IsEmpty() && !_Script.m_Application.f_IsEmpty())
+		{
+			if (!CVersionManager::fs_IsValidApplicationName(_Script.m_Application))
+				co_return DMibErrorInstance("'{}' is not a valid application name"_f << _Script.m_Application);
+
+			co_await pThis->fp_EnsureEnvironmentDataRoot();
+
+			_Script.m_Directory = pThis->fp_GetAgentApplicationDirectory(_Script.m_Application);
+
+			if (!_Script.m_Environment.f_FindEqual("HOME"))
+				_Script.m_Environment["HOME"] = _Script.m_Directory + "/.home";
+			if (!_Script.m_Environment.f_FindEqual("TMPDIR"))
+				_Script.m_Environment["TMPDIR"] = _Script.m_Directory + "/.tmp";
+		}
+
 		_Script.m_RunAsUser = pThis->mp_pUniqueUserGroup->f_GetUser(_Script.m_RunAsUser);
 		_Script.m_RunAsGroup = pThis->mp_pUniqueUserGroup->f_GetGroup(_Script.m_RunAsGroup);
 
 		CStrSecure RunAsUserPassword = fg_Move(_Script.m_RunAsUserPassword);
 		co_return co_await pThis->fp_RunBashScript(fg_Move(_Script), fg_Move(RunAsUserPassword));
+	}
+
+	namespace
+	{
+		struct COptionalFuture
+		{
+			COptionalFuture(TCFuture<void> &&_Future);
+			COptionalFuture(COptionalFuture &&_Other) = default;
+			~COptionalFuture();
+
+			TCFuture<void> m_Future;
+		};
+
+		COptionalFuture::COptionalFuture(TCFuture<void> &&_Future)
+			: m_Future(fg_Move(_Future))
+		{
+		}
+
+		COptionalFuture::~COptionalFuture()
+		{
+			if (m_Future.f_IsValid())
+				m_Future.f_DiscardResult();
+		}
+	}
+
+	// Returns once the receive is submitted; m_fFinish of the result awaits it and the ownership of the staged files
+	auto CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_StageApplicationFiles(CApplicationStage _Stage) -> TCFuture<CApplicationStageResult>
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_bEnvironmentAgent)
+			co_return DMibErrorInstance("Not running as an environment agent");
+
+		if (!CVersionManager::fs_IsValidApplicationName(_Stage.m_Name))
+			co_return DMibErrorInstance("'{}' is not a valid application name"_f << _Stage.m_Name);
+
+		if (!_Stage.m_FilesGenerator || !_Stage.m_FilesGenerator->f_IsValid())
+			co_return DMibErrorInstance("The application stage carries no files generator");
+
+		co_await pThis->fp_EnsureEnvironmentDataRoot();
+
+		CApplicationStageResult Result;
+		Result.m_StageID = fg_FastRandomID();
+		Result.m_Directory = pThis->fp_GetAgentApplicationDirectory(_Stage.m_Name);
+		Result.m_StageDirectory = Result.m_Directory / "TempVersion" / Result.m_StageID;
+
+		// The host can disappear after a receive finishes, leaving a stage behind
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) / [Directory = Result.m_Directory, StageDirectory = Result.m_StageDirectory]()
+						{
+							CStr StageRoot = Directory / "TempVersion";
+							if (CFile::fs_FileExists(StageRoot))
+								CFile::fs_DeleteDirectoryRecursive(StageRoot);
+
+							CFile::fs_CreateDirectory(StageDirectory);
+						}
+					)
+					% "Failed to prepare the application stage directory"
+				)
+			;
+		}
+
+		auto &StageReceive = pThis->mp_ApplicationStageReceives[Result.m_StageID];
+		StageReceive.m_Name = _Stage.m_Name;
+		StageReceive.m_StageDirectory = Result.m_StageDirectory;
+		StageReceive.m_Receive = fg_ConstructActor<CFileTransferReceive>
+			(
+				Result.m_StageDirectory
+				, EFileAttrib_UnixAttributesValid
+				| EFileAttrib_UserRead
+				| EFileAttrib_UserWrite
+				| EFileAttrib_UserExecute
+				| EFileAttrib_GroupRead
+				| EFileAttrib_GroupExecute
+				| EFileAttrib_EveryoneRead
+				| EFileAttrib_EveryoneExecute
+				, EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid
+			)
+		;
+
+		auto ReceiveFilesFuture = StageReceive.m_Receive
+			(
+				&CFileTransferReceive::f_ReceiveFiles
+				, CFileTransferSendDownloadFile::fs_TranslateGenerator<CFileTransferSendDownloadFile>(fg_Move(*_Stage.m_FilesGenerator))
+				, _Stage.m_QueueSize
+				, CFileTransferReceive::EReceiveFlag_DeleteExisting
+			)
+			.f_Call()
+		;
+
+		CApplicationSettings StageSettings;
+		StageSettings.m_RunAsUser = _Stage.m_RunAsUser;
+		StageSettings.m_RunAsGroup = _Stage.m_RunAsGroup;
+		StageSettings.m_bRunAsUserHasShell = _Stage.m_bRunAsUserHasShell;
+
+		auto fFinishStage = [pThis, StageID = Result.m_StageID, StageSettings, Directory = Result.m_Directory](TCFuture<CFileTransferResult> _ReceiveFilesFuture) mutable -> TCFuture<void>
+			{
+				auto ReceiveResult = co_await fg_Move(_ReceiveFilesFuture).f_Wrap();
+
+				auto *pStageReceive = pThis->mp_ApplicationStageReceives.f_FindEqual(StageID);
+				if (!pStageReceive)
+					co_return DMibErrorInstance("The application staging was aborted");
+
+				auto Receive = fg_Move(pStageReceive->m_Receive);
+				CStr StageDirectory = fg_Move(pStageReceive->m_StageDirectory);
+				pThis->mp_ApplicationStageReceives.f_Remove(StageID);
+
+				if (Receive)
+					co_await fg_Move(Receive).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage receive");
+
+				CExceptionPointer pStageException;
+				if (!ReceiveResult)
+					pStageException = DMibErrorInstance("Failed to receive the staged application files: {}"_f << ReceiveResult.f_GetExceptionStr()).f_ExceptionPointer();
+				else
+				{
+					// The staged files belong to the account of the stage, which the new version runs as
+					auto BlockingActorCheckout = fg_BlockingActor();
+
+					auto OwnerResult = co_await
+						(
+							g_Dispatch(BlockingActorCheckout) / [StageDirectory, StageSettings, Directory, pUniqueUserGroup = pThis->mp_pUniqueUserGroup]()
+							{
+								fsp_CreateApplicationUserGroup
+									(
+										StageSettings
+										, [](CStr const &_Info)
+										{
+											DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Environment agent stage: {}", _Info);
+										}
+										, Directory / ".home"
+										, pUniqueUserGroup
+									)
+								;
+
+								CStr User = pUniqueUserGroup->f_GetUser(StageSettings.m_RunAsUser);
+								CStr Group = pUniqueUserGroup->f_GetGroup(StageSettings.m_RunAsGroup);
+								fsp_SetDirectoryOwnerSkippingLinks(StageDirectory, User, Group);
+							}
+						)
+						.f_Wrap()
+					;
+
+					if (!OwnerResult)
+					{
+						pStageException = DMibErrorInstance("Failed to give the staged application files to the application user: {}"_f << OwnerResult.f_GetExceptionStr())
+							.f_ExceptionPointer()
+						;
+					}
+				}
+
+				if (!pStageException)
+					co_return {};
+
+				// The stage was removed from the receives, so the abort subscription no longer deletes its directory
+				{
+					auto BlockingActorCheckout = fg_BlockingActor();
+
+					co_await
+						(
+							g_Dispatch(BlockingActorCheckout) / [StageDirectory]()
+							{
+								if (CFile::fs_FileExists(StageDirectory))
+									CFile::fs_DeleteDirectoryRecursive(StageDirectory);
+							}
+						)
+						.f_Wrap()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to delete the failed application stage")
+					;
+				}
+
+				co_return fg_Move(pStageException);
+			}
+		;
+
+		TCFuture<void> FinishedFuture = pThis->self.f_Invoke(fg_Move(fFinishStage), fg_Move(ReceiveFilesFuture));
+
+		Result.m_fFinish = g_ActorFunctor
+			(
+				g_ActorSubscription / [pThis, StageID = Result.m_StageID]() -> TCFuture<void>
+				{
+					auto *pStageReceive = pThis->mp_ApplicationStageReceives.f_FindEqual(StageID);
+					if (!pStageReceive)
+						co_return {};
+
+					auto Receive = fg_Move(pStageReceive->m_Receive);
+					CStr Name = fg_Move(pStageReceive->m_Name);
+					CStr StageDirectory = fg_Move(pStageReceive->m_StageDirectory);
+					pThis->mp_ApplicationStageReceives.f_Remove(StageID);
+
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Aborted staging of application '{}'", Name);
+
+					if (Receive)
+						co_await fg_Move(Receive).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage receive");
+
+					{
+						auto BlockingActorCheckout = fg_BlockingActor();
+
+						co_await
+							(
+								g_Dispatch(BlockingActorCheckout) / [StageDirectory]()
+								{
+									if (CFile::fs_FileExists(StageDirectory))
+										CFile::fs_DeleteDirectoryRecursive(StageDirectory);
+								}
+							)
+							.f_Wrap()
+							> fg_LogError("Malterlib/Cloud/AppManager", "Failed to delete the aborted application stage")
+						;
+					}
+
+					co_return {};
+				}
+			)
+			/ [Future = COptionalFuture{fg_Move(FinishedFuture)}, AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
+			{
+				return fg_Move(Future.m_Future);
+			}
+		;
+
+		co_return fg_Move(Result);
+	}
+
+	// Reassigns the entries that have the directory's current owner or group
+	void CAppManagerActor::fsp_ReassignApplicationFileOwnership(CStr const &_Directory, CStr const &_User, CStr const &_Group)
+	{
+		CStr OldUser = CFile::fs_GetOwner(_Directory);
+		CStr OldGroup = CFile::fs_GetGroup(_Directory);
+
+		bool bChangeUser = !_User.f_IsEmpty() && _User != OldUser;
+		bool bChangeGroup = !_Group.f_IsEmpty() && _Group != OldGroup;
+
+		if (!bChangeUser && !bChangeGroup)
+			return;
+
+		auto Paths = CFile::fs_FindFiles(_Directory / "*", EFileAttrib_Directory | EFileAttrib_File, true, false);
+		Paths.f_Insert(_Directory);
+		for (auto &Path : Paths)
+		{
+			// Setting the owner follows links, which can point outside the directory
+			if (CFile::fs_GetAttributesOnLink(Path) & EFileAttrib_Link)
+				continue;
+
+			if (bChangeUser && CFile::fs_GetOwner(Path) == OldUser)
+				CFile::fs_SetOwner(Path, _User);
+			if (bChangeGroup && CFile::fs_GetGroup(Path) == OldGroup)
+				CFile::fs_SetGroup(Path, _Group);
+		}
+	}
+
+	void CAppManagerActor::fsp_SetDirectoryOwnerSkippingLinks(CStr const &_Directory, CStr const &_User, CStr const &_Group)
+	{
+		auto Paths = CFile::fs_FindFiles(_Directory / "*", EFileAttrib_Directory | EFileAttrib_File, true, false);
+		Paths.f_Insert(_Directory);
+		for (auto &Path : Paths)
+		{
+			// Setting the owner follows links, which can point outside the directory
+			if (CFile::fs_GetAttributesOnLink(Path) & EFileAttrib_Link)
+				continue;
+
+			if (!_User.f_IsEmpty())
+				CFile::fs_SetOwner(Path, _User);
+			if (!_Group.f_IsEmpty())
+				CFile::fs_SetGroup(Path, _Group);
+		}
+	}
+
+	void CAppManagerActor::fsp_ApplyStagedApplicationFiles
+		(
+			CAppManagerEnvironmentInterface::CApplicationApply const &_Apply
+			, CStr const &_Directory
+			, TCSharedPointer<CUniqueUserGroup> const &_pUniqueUserGroup
+		)
+	{
+		CStr StageRoot = _Directory / "TempVersion";
+		CStr StageDirectory = StageRoot / _Apply.m_StageID;
+
+		if (!CFile::fs_FileExists(StageDirectory, EFileAttrib_Directory))
+			DMibError(fg_Format("The application stage '{}' does not exist", _Apply.m_StageID));
+
+		if (_Apply.m_bFailOnExisting && CFile::fs_FileExists(_Directory, EFileAttrib_Directory))
+		{
+			TCSet<CStr> AllowExist;
+			AllowExist[_Directory + "/lost+found"];
+			AllowExist[_Directory + "/.home"];
+			AllowExist[_Directory + "/.tmp"];
+			AllowExist[StageRoot];
+
+			auto FoundFiles = CFile::fs_FindFiles(_Directory + "/*");
+			for (auto &File : FoundFiles)
+			{
+				if (!AllowExist.f_FindEqual(File))
+				{
+					DMibError
+						(
+							"Files of an earlier application with this name exist at: '{}'. Add with --force-install to reuse them, or to delete them add with "
+							"--force-install and remove with --delete-application-data"_f
+							<< _Directory
+						)
+					;
+				}
+			}
+		}
+
+		// The stage belongs to the application account, whose update scripts can replace its directories with links to files of other accounts,
+		// which the move would bring into the application directory
+		for (auto &File : _Apply.m_Files)
+		{
+			if (fg_AppManager_HasLinkedParent(_Directory, "TempVersion/{}/{}"_f << _Apply.m_StageID << File))
+				DMibError(fg_Format("The staged application file '{}' is below a link", File));
+		}
+
+		CApplicationSettings Settings;
+		Settings.m_RunAsUser = _Apply.m_RunAsUser;
+		Settings.m_RunAsGroup = _Apply.m_RunAsGroup;
+		Settings.m_bRunAsUserHasShell = _Apply.m_bRunAsUserHasShell;
+
+		fsp_CreateApplicationUserGroup
+			(
+				Settings
+				, [](CStr const &_Info)
+				{
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Environment agent apply: {}", _Info);
+				}
+				, _Directory / ".home"
+				, _pUniqueUserGroup
+			)
+		;
+
+		for (auto &File : _Apply.m_OldFiles)
+			fg_AppManager_DeleteApplicationFile(_Directory, File);
+
+		CStr User = _pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser);
+		CStr Group = _pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup);
+
+		// The files the previous version left with the directory's owner or group, like databases, pass to a configured run as user or group
+		// before the new files take over the directory
+		if (CFile::fs_FileExists(_Directory, EFileAttrib_Directory))
+			fsp_ReassignApplicationFileOwnership(_Directory, User, Group);
+
+		auto fSetOwners = [&](CStr const &_Path)
+			{
+				CStr Path = _Path;
+				while (Path.f_GetLen() >= _Directory.f_GetLen())
+				{
+					if (!Settings.m_RunAsUser.f_IsEmpty())
+						CFile::fs_SetOwner(Path, User);
+					if (!Settings.m_RunAsGroup.f_IsEmpty())
+						CFile::fs_SetGroup(Path, Group);
+					Path = CFile::fs_GetPath(Path);
+				}
+			}
+		;
+
+		TCVector<CStr> MovedFiles;
+		for (auto &File : _Apply.m_Files)
+		{
+			CStr SourcePath = fg_Format("{}/{}", StageDirectory, File);
+			CStr DestinationPath = fg_Format("{}/{}", _Directory, File);
+			if (CFile::fs_FileExists(SourcePath, EFileAttrib_File | EFileAttrib_Link))
+			{
+				// The rename replaces a link at the destination itself
+				fg_AppManager_CreateApplicationDirectory(_Directory, CFile::fs_GetPath(File));
+				CFile::fs_AtomicReplaceFile(SourcePath, DestinationPath);
+				MovedFiles.f_Insert(DestinationPath);
+			}
+			else if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
+			{
+				// Moving files only creates their parent directories, so each packaged directory, empty ones included, is created here with its normalized permissions
+				fg_AppManager_CreateApplicationDirectory(_Directory, File);
+				CFile::fs_SetAttributes(DestinationPath, CFile::fs_GetAttributes(SourcePath) & ~EFileAttrib_Directory);
+				fsp_UpdateAttributes(DestinationPath);
+				fSetOwners(DestinationPath);
+			}
+		}
+
+		for (auto &DestinationPath : MovedFiles)
+		{
+			// The owner and mode changes follow links, whose targets can be outside the application or come with the OS
+			// dependencies installed at launch
+			if (!(CFile::fs_GetAttributesOnLink(DestinationPath) & EFileAttrib_Link))
+			{
+				if (!Settings.m_RunAsUser.f_IsEmpty())
+					CFile::fs_SetOwner(DestinationPath, User);
+				if (!Settings.m_RunAsGroup.f_IsEmpty())
+					CFile::fs_SetGroup(DestinationPath, Group);
+
+				fsp_UpdateAttributes(DestinationPath);
+			}
+
+			fSetOwners(CFile::fs_GetPath(DestinationPath));
+		}
+
+#ifdef DPlatformFamily_Linux
+		if (!_Apply.m_VersionExtraInfo.f_IsEmpty())
+		{
+			try
+			{
+				CEJsonSorted ExtraInfo = CEJsonSorted::fs_FromString(_Apply.m_VersionExtraInfo);
+				if (auto pLowPortExecutables = ExtraInfo.f_GetMember("LowPortExecutables", EJsonType_Array))
+				{
+					for (auto &Executable : pLowPortExecutables->f_Array())
+					{
+						if (!Executable.f_IsString())
+							continue;
+
+						CStr ExecutablePath = _Directory / Executable.f_String();
+						if (CFile::fs_FileExists(ExecutablePath))
+							CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+					}
+				}
+			}
+			catch (CException const &_Exception)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to set up low port executables: {}", _Exception);
+			}
+		}
+#endif
+
+		// The previous version can have replaced them with links to directories of other accounts
+		fg_AppManager_CreateApplicationDirectory(_Directory, ".home");
+		fg_AppManager_CreateApplicationDirectory(_Directory, ".tmp");
+		fSetOwners(_Directory + "/.home");
+		fSetOwners(_Directory + "/.tmp");
+
+		CFile::fs_SetAttributes
+			(
+				_Directory
+				, EFileAttrib_UnixAttributesValid
+				| EFileAttrib_UserRead
+				| EFileAttrib_UserWrite
+				| EFileAttrib_UserExecute
+				| EFileAttrib_GroupRead
+				| EFileAttrib_GroupExecute
+				| EFileAttrib_EveryoneRead
+				| EFileAttrib_EveryoneExecute
+			)
+		;
+
+		CFile::fs_DeleteDirectoryRecursive(StageRoot);
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_ApplyApplicationFiles(CApplicationApply _Apply)
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_bEnvironmentAgent)
+			co_return DMibErrorInstance("Not running as an environment agent");
+
+		if (!CVersionManager::fs_IsValidApplicationName(_Apply.m_Name))
+			co_return DMibErrorInstance("'{}' is not a valid application name"_f << _Apply.m_Name);
+
+		co_await pThis->fp_EnsureEnvironmentDataRoot();
+
+		CStr Directory = pThis->fp_GetAgentApplicationDirectory(_Apply.m_Name);
+
+		auto BlockingActorCheckout = fg_BlockingActor();
+
+		co_await
+			(
+				(
+					g_Dispatch(BlockingActorCheckout) / [Apply = fg_Move(_Apply), Directory, pUniqueUserGroup = pThis->mp_pUniqueUserGroup]()
+					{
+						fsp_ApplyStagedApplicationFiles(Apply, Directory, pUniqueUserGroup);
+					}
+				)
+				% "Failed to apply the staged application files"
+			)
+		;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_DiscardApplicationStage(CStr _Name, CStr _StageID)
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_bEnvironmentAgent)
+			co_return DMibErrorInstance("Not running as an environment agent");
+
+		if (!CVersionManager::fs_IsValidApplicationName(_Name))
+			co_return DMibErrorInstance("'{}' is not a valid application name"_f << _Name);
+
+		if (pThis->mp_EnvironmentDataRoot.f_IsEmpty())
+			co_return DMibErrorInstance("The environment has no managed application storage");
+
+		bool bValidStageID = !_StageID.f_IsEmpty();
+		for (ch8 const *pChar = _StageID.f_GetStr(); *pChar; ++pChar)
+		{
+			ch8 Char = *pChar;
+			if (!((Char >= 'a' && Char <= 'z') || (Char >= 'A' && Char <= 'Z') || (Char >= '0' && Char <= '9')))
+				bValidStageID = false;
+		}
+
+		if (!bValidStageID)
+			co_return DMibErrorInstance("'{}' is not a valid application stage id"_f << _StageID);
+
+		CStr StageRoot = pThis->fp_GetAgentApplicationDirectory(_Name) / "TempVersion";
+
+		auto BlockingActorCheckout = fg_BlockingActor();
+
+		// A later update can already have staged its files next to the discarded stage. The agent runs inside the environment, so the deletion
+		// only reaches files of the environment, and the update scripts that could replace TempVersion with a link are trusted
+		co_await
+			(
+				(
+					g_Dispatch(BlockingActorCheckout) / [StageRoot, StageDirectory = StageRoot / _StageID]()
+					{
+						if (CFile::fs_FileExists(StageDirectory))
+							CFile::fs_DeleteDirectoryRecursive(StageDirectory);
+
+						if (CFile::fs_FileExists(StageRoot) && CFile::fs_FindFiles(StageRoot / "*").f_IsEmpty())
+							CFile::fs_DeleteDirectory(StageRoot);
+					}
+				)
+				% "Failed to discard the application stage"
+			)
+		;
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_RemoveApplicationStorage(CStr _Name)
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_bEnvironmentAgent)
+			co_return DMibErrorInstance("Not running as an environment agent");
+
+		if (!CVersionManager::fs_IsValidApplicationName(_Name))
+			co_return DMibErrorInstance("'{}' is not a valid application name"_f << _Name);
+
+		co_await pThis->fp_EnsureEnvironmentDataRoot();
+
+		CStr Directory = pThis->fp_GetAgentApplicationDirectory(_Name);
+
+		auto BlockingActorCheckout = fg_BlockingActor();
+
+		co_await
+			(
+				(
+					g_Dispatch(BlockingActorCheckout) / [Directory]()
+					{
+						if (CFile::fs_FileExists(Directory))
+							CFile::fs_DeleteDirectoryRecursive(Directory);
+					}
+				)
+				% "Failed to remove the application storage"
+			)
+		;
+
+		co_return {};
 	}
 
 	void CAppManagerActor::fp_ForwardApplicationStateChange(CAppManagerEnvironmentInterface::CApplicationStateChange _Change)
@@ -431,6 +1304,14 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication || pApplication->m_pLaunchedEnvironment != pEnvironment)
 			co_return DErrorInstance("No application with the launch id is launched in your environment");
 
+		auto Address = co_await pThis->fp_EnsureEnvironmentListen(pEnvironment);
+
+		if (pApplication->m_bDeleted)
+			co_return DErrorInstance("Application deleted");
+
+		if (pApplication->m_pLaunchedEnvironment != pEnvironment || pApplication->m_LaunchID != _LaunchID)
+			co_return DErrorInstance("The application stopped while its connection ticket was requested");
+
 		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Generating connection ticket for '{}' in environment '{}'", pApplication->m_Name, pEnvironment->m_Name);
 
 		CStr NotificationID = NCryptography::fg_RandomID();
@@ -438,7 +1319,7 @@ namespace NMib::NCloud::NAppManager
 		auto Ticket = co_await pThis->mp_State.m_TrustManager
 			(
 				&CDistributedActorTrustManager::f_GenerateConnectionTicket
-				, pThis->mp_State.m_LocalAddress
+				, Address
 				, g_ActorFunctor
 				(
 					g_ActorSubscription / [NotificationID, pApplication]
@@ -538,5 +1419,57 @@ namespace NMib::NCloud::NAppManager
 			co_return DMibErrorInstance(DependencyError);
 
 		co_return {};
+	}
+
+#ifndef DPlatformFamily_Windows
+	namespace
+	{
+		// The delay gives the shutdown reply time to reach the host
+		TCFuture<void> fg_ShutdownEnvironmentAfterDelay()
+		{
+			co_await fg_Timeout(2.0);
+
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			auto Result = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) / []()
+					{
+						CStr StdOut;
+						CStr StdErr;
+						uint32 ExitCode = 0;
+						if (!CProcessLaunch::fs_LaunchBlock("/sbin/shutdown", fg_CreateVector<CStr>("-h", "now"), StdOut, StdErr, ExitCode))
+							DMibError(fg_Format("Failed to launch shutdown: {}", StdErr));
+
+						if (ExitCode != 0)
+							DMibError(fg_Format("Shutting down failed with status {}: {}", ExitCode, fg_ConcatOutput(StdOut, StdErr)));
+					}
+				)
+				.f_Wrap()
+			;
+
+			if (!Result)
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to shut down the environment: {}", Result.f_GetExceptionStr());
+
+			co_return {};
+		}
+	}
+#endif
+
+	// Schedules the power-off of the system the agent runs in without waiting for it, so the call can reply; the host calls it only for VMs
+	TCFuture<void> CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_ShutdownEnvironment()
+	{
+		auto pThis = m_pThis;
+
+		if (!pThis->mp_bEnvironmentAgent)
+			co_return DMibErrorInstance("Not running as an environment agent");
+
+#ifdef DPlatformFamily_Windows
+		co_return DMibErrorInstance("Shutting down the environment from inside is not supported on this platform");
+#else
+		fg_ShutdownEnvironmentAfterDelay().f_DiscardResult();
+
+		co_return {};
+#endif
 	}
 }

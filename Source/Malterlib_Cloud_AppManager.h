@@ -32,7 +32,9 @@ namespace NMib::NCloud
 			, EProtocolVersion_ResumableUpdateNotifications      = 0x119
 			, EProtocolVersion_AddLaunchEnvironment              = 0x11a
 			, EProtocolVersion_AddEnvironmentOSDependencies      = 0x11b
-			, EProtocolVersion_Current                           = 0x11b
+			, EProtocolVersion_AddEnvironmentVMDataDisk          = 0x11c
+			, EProtocolVersion_AddRemoveWithSettings             = 0x11c
+			, EProtocolVersion_Current                           = 0x11c
 		};
 
 		enum EUpdateStage : uint32
@@ -70,6 +72,7 @@ namespace NMib::NCloud
 		enum EEnvironmentType : uint32
 		{
 			EEnvironmentType_Local /// Agent runs as a plain child process on the host (no isolation, mainly for tests)
+			, EEnvironmentType_VM  /// Agent runs as a daemon inside a virtual machine
 		};
 
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
@@ -241,6 +244,12 @@ namespace NMib::NCloud
 			NStorage::TCOptional<NStr::CStr> m_ParentApplication;                    /// Application whose storage confines the environment storage, supporting encrypted storage
 			NStorage::TCOptional<bool> m_AutoStart;
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// Packages the agent installs in the environment beyond the agent application's OS dependencies
+
+			NStorage::TCOptional<NStr::CStr> m_VMImage;
+			NStorage::TCOptional<NStr::CStr> m_VMBackend; /// Empty selects the default virtualization backend for the host platform
+			NStorage::TCOptional<uint32> m_VMCPUCount;
+			NStorage::TCOptional<uint64> m_VMMemoryMB;
+			NStorage::TCOptional<uint64> m_VMDataDiskGB;  /// Initial size of the VM data disk; 0 selects the default
 		};
 
 		struct CEnvironmentInfo
@@ -261,6 +270,12 @@ namespace NMib::NCloud
 			NStr::CStr m_ParentApplication;
 			bool m_bAutoStart = true;
 			NContainer::TCVector<NStr::CStr> m_OSDependencies; /// Additional packages installed by the agent inside the environment
+
+			NStr::CStr m_VMImage;
+			NStr::CStr m_VMBackend;
+			uint32 m_VMCPUCount = 0;
+			uint64 m_VMMemoryMB = 0;
+			uint64 m_VMDataDiskGB = 0;
 
 			NContainer::TCSet<NStr::CStr> m_Applications; /// Applications configured to launch in this environment
 		};
@@ -322,6 +337,14 @@ namespace NMib::NCloud
 
 			bool m_bUpdateFromVersionInfo = false; // Update settings from the last installed version manager application info.
 			bool m_bForce = false;                 // Force running the update process even if no settings are changed.
+		};
+
+		struct CApplicationRemoveSettings
+		{
+			template <typename tf_CStream>
+			void f_Stream(tf_CStream &_Stream);
+
+			bool m_bDeleteApplicationData = false; /// Deletes the application storage its launch environment manages, which is kept otherwise
 		};
 
 		using CVersionsAvailableForUpdate = NContainer::TCMap<NStr::CStr, NContainer::TCVector<CApplicationVersion>>;
@@ -414,6 +437,7 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCFuture<void> f_Add(NStr::CStr _Name, CApplicationAdd _Add, CApplicationSettings _Settings) = 0;
 		virtual NConcurrency::TCFuture<void> f_Remove(NStr::CStr _Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_RemoveWithSettings(NStr::CStr _Name, CApplicationRemoveSettings _Settings) = 0;
 
 		virtual NConcurrency::TCFuture<void> f_Update(NStr::CStr _Name, CApplicationUpdate _Update) = 0;
 

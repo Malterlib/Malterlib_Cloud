@@ -115,6 +115,12 @@ namespace NMib::NCloud::NAppManager
 				;
 			}
 
+			if (_RegisterInfo.m_LaunchID)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application from an earlier launch registered: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
+				co_return DErrorInstance("Application not associated with your host");
+			}
+
 			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Unassociated application registered: {}", CallingHostInfo.f_GetHostInfo().f_GetDesc());
 			co_return DErrorInstance("Application not associated with your host");
 		}
@@ -197,6 +203,16 @@ namespace NMib::NCloud::NAppManager
 			co_return {};
 
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
+
+		// The host monitor only reaches host files, so the config files of an application in environment storage are not
+		// monitored
+		auto pApplication = pThis->fp_ApplicationFromHostID(CallingHostInfo.f_GetRealHostID());
+		if (pApplication && pThis->fp_ApplicationRemoteStorageEnvironment(*pApplication))
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' keeps its config files in environment storage, which is not monitored", pApplication->m_Name);
+
+			co_return {};
+		}
 
 		DMibLogWithCategory
 			(

@@ -17,6 +17,19 @@ namespace NMib::NCloud
 		-> COnScopeExitShared
 	;
 
+	bool fg_AppManager_IsValidVMProvisionUsername(NStr::CStr const &_Username);
+
+	/// Where the agent of a VM environment reaches the environment listen of the host
+	struct CAppManagerEnvironmentSocketDirectory
+	{
+		NStr::CStr m_SharedDirectory; /// The AppManager's directory of the environment directories; empty in the temporary directory
+		NStr::CStr m_SocketDirectory;
+		NStr::CStr m_SocketPath;
+	};
+
+	auto fg_AppManager_EnvironmentSocketDirectory(NStr::CStr const &_RootDirectory, NStr::CStr const &_EnvironmentName, bool _bRunningAsRoot) -> CAppManagerEnvironmentSocketDirectory;
+	void fg_AppManager_PrepareEnvironmentSocketDirectory(CAppManagerEnvironmentSocketDirectory const &_Directory);
+
 	/// Identity of the operating system the AppManager runs on, used to select OS dependencies
 	struct CAppManagerOSIdentity
 	{
@@ -36,6 +49,9 @@ namespace NMib::NCloud
 		-> NStr::CStr
 	;
 
+	bool fg_AppManager_HasLinkedParent(NStr::CStr const &_Directory, NStr::CStr const &_File);
+	void fg_AppManager_DeleteApplicationFile(NStr::CStr const &_Directory, NStr::CStr const &_File);
+	void fg_AppManager_CreateApplicationDirectory(NStr::CStr const &_Directory, NStr::CStr const &_RelativeDirectory);
 	NStr::CStr fg_AppManager_LowPortExecutableDigest(NStr::CStr const &_Path);
 	NStr::CStr fg_AppManager_InstalledLowPortExecutablePath(NStr::CStr const &_Directory, NStr::CStr const &_Executable, NStr::CStr const &_InstalledDigest);
 }

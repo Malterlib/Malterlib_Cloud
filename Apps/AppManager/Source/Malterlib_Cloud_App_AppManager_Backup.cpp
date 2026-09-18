@@ -12,6 +12,23 @@ namespace NMib::NCloud::NAppManager
 	void CAppManagerActor::fp_ApplicationStartBackup(TCSharedPointer<CApplication> const &_pApplication)
 	{
 		auto &Application = *_pApplication;
+
+		// The backup client reads the application directory on the host, which
+		// does not exist when the environment manages the application storage
+		if (fp_ApplicationRemoteStorageEnvironment(Application))
+		{
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Warning
+					, "Backups are not supported for application '{}': its storage is managed inside environment '{}'"
+					, Application.m_Name
+					, Application.m_Settings.m_LaunchEnvironment
+				)
+			;
+			return;
+		}
+
 		CBackupManagerClient::CConfig BackupConfig;
 
 		auto &ManifestConfig = BackupConfig.m_ManifestConfig;
@@ -19,6 +36,17 @@ namespace NMib::NCloud::NAppManager
 		ManifestConfig.m_Root = Application.f_GetDirectory();
 		ManifestConfig.m_IncludeWildcards = Application.m_Settings.m_Backup_IncludeWildcards;
 		ManifestConfig.m_ExcludeWildcards = Application.m_Settings.m_Backup_ExcludeWildcards;
+
+		// Environments keep their storage, and VMs their image bundles, in the directory of their parent application, where their guests write,
+		// and what a guest writes never reaches the backups of the host. The AppManager reserves both directories in an application directory, so
+		// they are left out of every backup: an image can exist before an environment uses it, and the storage of a removed environment is kept.
+		// The directories of child applications are inside this one, also those of removed children, which keep their directories, so the
+		// directories are left out at every depth
+		for (auto *pDirectory : {mcp_pEnvironmentStorageDirectory, mcp_pVMImagesDirectory})
+		{
+			ManifestConfig.m_ExcludeWildcards[CStr("{}/*"_f << pDirectory)];
+			ManifestConfig.m_ExcludeWildcards[CStr("*/{}/*"_f << pDirectory)];
+		}
 		ManifestConfig.m_AddSyncFlagsWildcards = Application.m_Settings.m_Backup_AddSyncFlagsWildcards;
 		ManifestConfig.m_RemoveSyncFlagsWildcards = Application.m_Settings.m_Backup_RemoveSyncFlagsWildcards;
 
@@ -63,5 +91,21 @@ namespace NMib::NCloud::NAppManager
 					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to start backup client for '{}' app: {}", ApplicationName, _Result.f_GetExceptionStr());
 			}
 		;
+	}
+
+	// The backup configuration is fixed when the backup client starts
+	TCFuture<void> CAppManagerActor::fp_RestartApplicationBackup(TCSharedPointer<CApplication> _pApplication)
+	{
+		if (!_pApplication->m_BackupClient)
+			co_return {};
+
+		co_await fg_Move(_pApplication->m_BackupClient).f_Destroy();
+
+		if (_pApplication->m_bDeleted || !_pApplication->m_Settings.m_bBackupEnabled || _pApplication->m_BackupClient)
+			co_return {};
+
+		fp_ApplicationStartBackup(_pApplication);
+
+		co_return {};
 	}
 }
