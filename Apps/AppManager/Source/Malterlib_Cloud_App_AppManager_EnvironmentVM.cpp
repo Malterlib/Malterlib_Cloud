@@ -771,7 +771,7 @@ namespace NMib::NCloud::NAppManager
 			_pEnvironment->m_LaunchID = fg_RandomID();
 
 		// A fresh connection ticket lets the guest agent connect without the
-		// standard stream handshake local agents use; the connect settings are
+		// standard stream handshake container agents use; the connect settings are
 		// pushed to the agent directory on the guest disk through SSH
 		CStr ConnectSettings;
 		_pEnvironment->m_AgentTicketSubscription.f_Clear();

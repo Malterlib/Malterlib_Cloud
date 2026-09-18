@@ -95,6 +95,20 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				DMibExpectFalse(Result);
 			}
 
+			// Adding a container environment without an image fails
+			{
+				DMibTestPath("Container Without Image");
+
+				CAppManagerInterface::CEnvironmentSettings Settings;
+				Settings.m_Type = CAppManagerInterface::EEnvironmentType_Container;
+
+				auto Result = co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("ContainerEnv", Settings)
+					.f_Timeout(g_Timeout, "Timed out adding environment")
+					.f_Wrap()
+				;
+				DMibExpectFalse(Result);
+			}
+
 			// Adding an environment with a missing parent application fails
 			{
 				DMibTestPath("Parent Application Missing");
@@ -105,6 +119,55 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 
 				auto Result = co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("ConfinedEnv", Settings)
 					.f_Timeout(g_Timeout, "Timed out adding environment")
+					.f_Wrap()
+				;
+				DMibExpectFalse(Result);
+			}
+
+			// Adding a container environment with an image succeeds
+			{
+				DMibTestPath("Add Container");
+
+				CAppManagerInterface::CEnvironmentSettings Settings;
+				Settings.m_Type = CAppManagerInterface::EEnvironmentType_Container;
+				Settings.m_ContainerRuntime = CStr("Docker");
+				Settings.m_ContainerImage = CStr("ubuntu:24.04");
+
+				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("ContainerEnv", Settings)
+					.f_Timeout(g_Timeout, "Timed out adding environment")
+				;
+			}
+
+			// Change settings
+			{
+				DMibTestPath("Change Settings");
+
+				CAppManagerInterface::CEnvironmentSettings Settings;
+				Settings.m_ContainerNetwork = CStr("host");
+				Settings.m_MemoryLimitMB = 512;
+
+				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentChangeSettings)("ContainerEnv", Settings)
+					.f_Timeout(g_Timeout, "Timed out changing environment settings")
+				;
+
+				auto Environments = co_await fGetEnvironments();
+				auto pEnvironment = Environments.f_FindEqual("ContainerEnv");
+				DMibExpectTrue(pEnvironment != nullptr);
+				DMibExpect(pEnvironment->m_ContainerNetwork, ==, "host");
+				DMibExpect(pEnvironment->m_MemoryLimitMB, ==, 512u);
+				DMibExpect(pEnvironment->m_ContainerImage, ==, "ubuntu:24.04");
+				DMibExpectTrue(pEnvironment->m_AgentApplication.f_StartsWith("SelfUpdate.Linux-"));
+			}
+
+			// Changing settings to an invalid configuration fails
+			{
+				DMibTestPath("Invalid Change Settings");
+
+				CAppManagerInterface::CEnvironmentSettings Settings;
+				Settings.m_ContainerImage = CStr("");
+
+				auto Result = co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentChangeSettings)("ContainerEnv", Settings)
+					.f_Timeout(g_Timeout, "Timed out changing environment settings")
 					.f_Wrap()
 				;
 				DMibExpectFalse(Result);
@@ -164,7 +227,7 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				;
 
 				auto Environments = co_await fGetEnvironments();
-				DMibExpect(Environments.f_GetLen(), ==, 0u);
+				DMibExpect(Environments.f_GetLen(), ==, 1u);
 				DMibExpectTrue(Environments.f_FindEqual("TestEnv") == nullptr);
 			}
 
@@ -446,6 +509,249 @@ struct CAppManager_Environment_Tests : public NMib::NTest::CTest
 				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentRemove)("ConfinedEnv")
 					.f_Timeout(g_Timeout, "Timed out removing environment")
 				;
+			}
+
+			co_return {};
+		};
+
+		DMibTestSuite("Docker Launch") -> TCFuture<void>
+		{
+			// Requires a cross-built Linux agent executable and a running docker daemon
+			CStr LinuxAgentExecutable = fg_GetSys()->f_GetEnvironmentVariable("MalterlibTestLinuxAgentExecutable");
+			if (LinuxAgentExecutable.f_IsEmpty())
+				co_return {};
+
+			{
+				CProcessLaunchParams Params = CProcessLaunchParams::fs_LaunchExecutable("docker", {"version"}, CStr(), {});
+				Params.m_bAllowExecutableLocate = true;
+				Params.m_bMergeEnvironment = true;
+
+				auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(CProcessLaunchActor::CSimpleLaunch(Params, CProcessLaunchActor::ESimpleLaunchFlag_None)).f_Wrap();
+				if (!Result || Result->m_ExitCode != 0)
+					co_return {};
+			}
+
+			// The environment mounts the AppManager root into the container at the same path.
+			// Some macOS docker setups (for example colima with a limited mount config) do not
+			// live-share the root directory, which this test requires. Probe it and skip when
+			// the bind mount is not usable; the E2E still runs on Linux hosts and shared setups.
+			{
+				CStr ProbeDirectory = CFile::fs_GetProgramDirectory() / "AppManagerEnvironmentDockerProbe";
+				CStr ProbeFile = ProbeDirectory / "probe";
+
+				NTest::fg_TestAddCleanupPath(ProbeDirectory);
+
+				co_await
+					(
+						g_Dispatch / [ProbeDirectory, ProbeFile]() -> TCFuture<void>
+						{
+							if (CFile::fs_FileExists(ProbeDirectory, EFileAttrib_Directory))
+								CFile::fs_DeleteDirectoryRecursive(ProbeDirectory, true);
+
+							CFile::fs_CreateDirectory(ProbeDirectory);
+							CFile::fs_WriteStringToFile(ProbeFile, "probe");
+							co_return {};
+						}
+					)
+					.f_Timeout(g_Timeout, "Timed out writing probe")
+				;
+
+				CProcessLaunchParams Params = CProcessLaunchParams::fs_LaunchExecutable
+					(
+						"docker"
+						, {"run", "--rm", "--volume", "{}:{}"_f << ProbeDirectory << ProbeDirectory, "ubuntu:24.04", "cat", ProbeFile}
+						, CStr()
+						, {}
+					)
+				;
+				Params.m_bAllowExecutableLocate = true;
+				Params.m_bMergeEnvironment = true;
+
+				auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(CProcessLaunchActor::CSimpleLaunch(Params, CProcessLaunchActor::ESimpleLaunchFlag_None))
+					.f_Timeout(300.0, "Timed out probing docker bind mount")
+					.f_Wrap()
+				;
+
+				if (!Result || Result->m_ExitCode != 0 || Result->f_GetStdOut().f_Trim() != "probe")
+					co_return {};
+			}
+
+			CAppManagerTestHelper::EOption Options
+				= CAppManagerTestHelper::EOption_EnableVersionManager
+				| CAppManagerTestHelper::EOption_DisablePatchMonitoring
+				| CAppManagerTestHelper::EOption_DisableDiskMonitoring
+				| CAppManagerTestHelper::EOption_DisableApplicationStatusSensors
+				| CAppManagerTestHelper::EOption_DisableEncryptionStatusSensors
+			;
+
+			if (fg_TestReportFlags() & ETestReportFlag_EnableLogs)
+				Options |= CAppManagerTestHelper::EOption_EnableOtherOutput;
+
+			CAppManagerTestHelper AppManagerTestHelper("AppManagerEnvironmentDockerTests", Options, g_Timeout);
+
+			auto AsyncDestroy = co_await fg_AsyncDestroy(AppManagerTestHelper);
+
+			co_await AppManagerTestHelper.f_Setup(1);
+
+			auto &AppManagerInfo = *AppManagerTestHelper.m_pState->m_AppManagerInfos.f_FindAny();
+			auto &Interface = AppManagerInfo.m_Interface;
+
+			auto fGetEnvironments = [&]() -> TCUnsafeFuture<TCMap<CStr, CAppManagerInterface::CEnvironmentInfo>>
+				{
+					co_return co_await Interface.f_CallActor(&CAppManagerInterface::f_GetEnvironments)()
+						.f_Timeout(g_Timeout, "Timed out enumerating environments")
+					;
+				}
+			;
+
+			// Pull the image up front so the environment start is not dominated by the download
+			{
+				DMibTestPath("Pull Image");
+
+				CProcessLaunchParams Params = CProcessLaunchParams::fs_LaunchExecutable("docker", {"pull", "ubuntu:24.04"}, CStr(), {});
+				Params.m_bAllowExecutableLocate = true;
+				Params.m_bMergeEnvironment = true;
+
+				auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(CProcessLaunchActor::CSimpleLaunch(Params, CProcessLaunchActor::ESimpleLaunchFlag_None))
+					.f_Timeout(600.0, "Timed out pulling image")
+				;
+				DMibExpect(Result.m_ExitCode, ==, 0u);
+			}
+
+			// Install an agent application containing the Linux AppManager executable
+			{
+				DMibTestPath("Install Agent Application");
+
+				CStr AgentSourceDirectory = AppManagerTestHelper.f_RootDirectory() / "AgentSource";
+
+				co_await
+					(
+						g_Dispatch / [AgentSourceDirectory, LinuxAgentExecutable]() -> TCFuture<void>
+						{
+							CFile::fs_CreateDirectory(AgentSourceDirectory);
+							CFile::fs_CopyFile(LinuxAgentExecutable, AgentSourceDirectory / "AppManager");
+							co_return {};
+						}
+					)
+					.f_Timeout(g_Timeout, "Timed out creating agent source directory")
+				;
+
+				co_await AppManagerTestHelper.f_LaunchTool
+					(
+						AppManagerInfo.m_RootDirectory / "AppManager"
+						, {"--application-add", "--from-file", AgentSourceDirectory, "--name", "Agent"}
+						, AppManagerInfo.m_RootDirectory
+					)
+					.f_Timeout(g_Timeout, "Timed out adding agent application")
+				;
+			}
+
+			// Add and start a docker environment
+			{
+				DMibTestPath("Start Environment");
+
+				CAppManagerInterface::CEnvironmentSettings Settings;
+				Settings.m_Type = CAppManagerInterface::EEnvironmentType_Container;
+				Settings.m_ContainerRuntime = CStr("Docker");
+				Settings.m_ContainerImage = CStr("ubuntu:24.04");
+				Settings.m_AgentApplication = CStr("Agent");
+				Settings.m_bAutoStart = false;
+
+				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentAdd)("DockerEnv", Settings)
+					.f_Timeout(g_Timeout, "Timed out adding environment")
+				;
+
+				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentStart)("DockerEnv")
+					.f_Timeout(300.0, "Timed out starting docker environment")
+				;
+
+				auto Environments = co_await fGetEnvironments();
+				auto pEnvironment = Environments.f_FindEqual("DockerEnv");
+				DMibExpectTrue(pEnvironment != nullptr);
+				DMibExpect(pEnvironment->m_Status, ==, "Running");
+			}
+
+			// Stop the environment
+			{
+				DMibTestPath("Stop Environment");
+
+				co_await Interface.f_CallActor(&CAppManagerInterface::f_EnvironmentStop)("DockerEnv")
+					.f_Timeout(g_Timeout, "Timed out stopping environment")
+				;
+
+				auto Environments = co_await fGetEnvironments();
+				auto pEnvironment = Environments.f_FindEqual("DockerEnv");
+				DMibExpectTrue(pEnvironment != nullptr);
+				DMibExpect(pEnvironment->m_Status, ==, "Stopped");
+			}
+
+			co_return {};
+		};
+
+		DMibTestSuite("Container Arguments") -> TCFuture<void>
+		{
+			// Minimal launch
+			{
+				DMibTestPath("Minimal");
+
+				CAppManagerContainerLaunch Launch;
+				Launch.m_ContainerName = "mib-env-TestEnv";
+				Launch.m_Image = "ubuntu:24.04";
+				Launch.m_Executable = "/opt/M/App/Agent/AppManager";
+				Launch.m_Parameters = {"--daemon-run-standalone"};
+
+				auto Arguments = fg_AppManager_BuildContainerRunArguments(Launch);
+				TCVector<CStr> Expected =
+					{
+						"run"
+						, "--name", "mib-env-TestEnv"
+						, "--interactive"
+						, "ubuntu:24.04"
+						, "/opt/M/App/Agent/AppManager"
+						, "--daemon-run-standalone"
+					}
+				;
+				DMibExpect(Arguments, ==, Expected);
+			}
+
+			// Full launch
+			{
+				DMibTestPath("Full");
+
+				CAppManagerContainerLaunch Launch;
+				Launch.m_ContainerName = "mib-env-TestEnv";
+				Launch.m_Image = "ubuntu:24.04";
+				Launch.m_Network = "bridge";
+				Launch.m_MemoryLimitMB = 512;
+				Launch.m_CPULimit = 2.0;
+				Launch.m_Mounts["/opt/M"] = "/opt/M";
+				Launch.m_AddHosts["myhost"] = "host-gateway";
+				Launch.m_PassEnvironment = {"MalterlibTestPassVariable"};
+				Launch.m_WorkingDirectory = "/opt/M/Environment/TestEnv";
+				Launch.m_ExtraArguments = {"--pull", "never"};
+				Launch.m_Executable = "/opt/M/App/Agent/AppManager";
+				Launch.m_Parameters = {"--daemon-run-standalone"};
+
+				auto Arguments = fg_AppManager_BuildContainerRunArguments(Launch);
+				TCVector<CStr> Expected =
+					{
+						"run"
+						, "--name", "mib-env-TestEnv"
+						, "--interactive"
+						, "--network", "bridge"
+						, "--memory", "512m"
+						, "--cpus", "2.0"
+						, "--volume", "/opt/M:/opt/M"
+						, "--add-host", "myhost:host-gateway"
+						, "--env", "MalterlibTestPassVariable"
+						, "--workdir", "/opt/M/Environment/TestEnv"
+						, "--pull", "never"
+						, "ubuntu:24.04"
+						, "/opt/M/App/Agent/AppManager"
+						, "--daemon-run-standalone"
+					}
+				;
+				DMibExpect(Arguments, ==, Expected);
 			}
 
 			co_return {};

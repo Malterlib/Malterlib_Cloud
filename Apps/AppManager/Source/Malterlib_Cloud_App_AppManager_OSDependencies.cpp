@@ -310,7 +310,8 @@ namespace NMib::NCloud::NAppManager
 
 		CStr Fingerprint = fsp_GetOSDependenciesFingerprint(Dependencies);
 
-		// Installs run once per AppManager instance and dependency set
+		// Installs run once per AppManager instance and dependency set; a recreated
+		// container starts a fresh agent, so its reset OS is populated again
 		if (Fingerprint == _pApplication->m_InstalledOSDependenciesFingerprint)
 			co_return {};
 

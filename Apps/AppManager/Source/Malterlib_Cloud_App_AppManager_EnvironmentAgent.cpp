@@ -297,16 +297,23 @@ namespace NMib::NCloud::NAppManager
 			co_await
 				(
 					(
-						g_Dispatch(BlockingActorCheckout) / [DataRoot = mp_EnvironmentDataRoot]()
+						g_Dispatch(BlockingActorCheckout) / [DataRoot = mp_EnvironmentDataRoot, bContainer = mp_bEnvironmentContainer]()
 						{
-							// In a macOS guest the data root is the data disk volume
-							// prepared on first use
+							// In a container the data root is a volume mounted by the
+							// container runtime; in a macOS guest it is the data disk
+							// volume prepared on first use
 #ifdef DPlatformFamily_macOS
-							fg_PrepareEnvironmentDataVolume(DataRoot);
+							if (!bContainer)
+							{
+								fg_PrepareEnvironmentDataVolume(DataRoot);
+								return;
+							}
 #else
+							(void)bContainer;
+#endif
+
 							if (!CFile::fs_FileExists(DataRoot, EFileAttrib_Directory))
 								CFile::fs_CreateDirectory(DataRoot);
-#endif
 						}
 					)
 					% "Failed to prepare the environment application storage"

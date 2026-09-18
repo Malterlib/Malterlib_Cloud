@@ -23,6 +23,7 @@ namespace NMib::NCloud
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentRemove);
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentChangeSettings);
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentStart);
+		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentPull);
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentStop);
 		DMibPublishActorFunction(CAppManagerInterface::f_EnvironmentRestart);
 		DMibPublishActorFunction(CAppManagerInterface::f_GetEnvironments);
@@ -74,6 +75,7 @@ namespace NMib::NCloud
 		switch (_Type)
 		{
 		case EEnvironmentType_Local: return NStr::gc_Str<"Local">;
+		case EEnvironmentType_Container: return NStr::gc_Str<"Container">;
 		case EEnvironmentType_VM: return NStr::gc_Str<"VM">;
 		}
 
@@ -85,6 +87,8 @@ namespace NMib::NCloud
 	{
 		if (_Type == "Local")
 			return EEnvironmentType_Local;
+		else if (_Type == "Container")
+			return EEnvironmentType_Container;
 		else if (_Type == "VM")
 			return EEnvironmentType_VM;
 
@@ -175,6 +179,14 @@ namespace NMib::NCloud
 		Return["AgentApplication"] = fg_ToJson(m_AgentApplication);
 		Return["ParentApplication"] = fg_ToJson(m_ParentApplication);
 		Return["bAutoStart"] = fg_ToJson(m_bAutoStart);
+		Return["ContainerRuntime"] = fg_ToJson(m_ContainerRuntime);
+		Return["ContainerImage"] = fg_ToJson(m_ContainerImage);
+		Return["ContainerNetwork"] = fg_ToJson(m_ContainerNetwork);
+		Return["ContainerExtraMounts"] = fg_ToJson(m_ContainerExtraMounts);
+		Return["ContainerExtraArguments"] = fg_ToJson(m_ContainerExtraArguments);
+		Return["bContainerReadOnly"] = fg_ToJson(m_bContainerReadOnly);
+		Return["MemoryLimitMB"] = fg_ToJson(m_MemoryLimitMB);
+		Return["CPULimit"] = fg_ToJson(m_CPULimit);
 		Return["VMImage"] = fg_ToJson(m_VMImage);
 		Return["VMBackend"] = fg_ToJson(m_VMBackend);
 		Return["VMCPUCount"] = fg_ToJson(m_VMCPUCount);

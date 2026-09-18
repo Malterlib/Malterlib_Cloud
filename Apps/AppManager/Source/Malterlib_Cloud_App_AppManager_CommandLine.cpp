@@ -168,7 +168,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				"Names"_o= _o["--launch-environment"]
 				, "Type"_o= ""
-				, "Description"_o= "Launch the application inside the named environment (a virtual machine managed by this AppManager).\n"
+				, "Description"_o= "Launch the application inside the named environment (a container or virtual machine managed by this AppManager).\n"
 				"Set to an empty string to launch directly on the host (the default). See --environment-add."
 			}
 		;
@@ -555,8 +555,8 @@ namespace NMib::NCloud::NAppManager
 							, "Default"_o= _o[]
 							, "Type"_o= _o[""]
 							, "Description"_o= "Additionally install the AppManager distribution for these platforms as applications named SelfUpdate.<Platform>.\n"
-							"These applications provide up to date agent executables for environments whose guests run another platform. "
-							"They are kept current through the normal update pipeline.\n"
+							"These applications provide up to date agent executables for environments whose guests run another platform, "
+							"for example Linux-arm64 for container environments on macOS hosts. They are kept current through the normal update pipeline.\n"
 							"An entry can also be <Platform>=<Path> to install that platform's agent from a local file or directory instead, "
 							"for example Linux-arm64=/opt/Deploy/AppManager_Linux_arm64.\n"
 							"With --from-file the platform of the package is detected from its version info: a package for another platform "

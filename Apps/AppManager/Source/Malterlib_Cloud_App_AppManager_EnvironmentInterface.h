@@ -10,7 +10,7 @@ namespace NMib::NCloud::NAppManager
 {
 	/// Interface published by an AppManager running as an environment agent.
 	/// The host AppManager uses it to launch and control applications inside
-	/// the environment (a virtual machine or a local child process).
+	/// the environment (a container, a virtual machine or a local child process).
 	struct CAppManagerEnvironmentInterface : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/AppManagerEnvironment";
