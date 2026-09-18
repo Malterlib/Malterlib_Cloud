@@ -269,6 +269,10 @@ namespace NMib::NCloud::NAppManager
 						pApplication->m_bLaunched = false;
 						pApplication->m_bStopped = true;
 
+						// Waiting for the pending stop that closes the encryption deadlocks: the environments it stops stop this application again
+						if (pApplication->m_bPendingStop && pApplication->m_bClosingEncryption)
+							co_return 0;
+
 						while (pApplication->m_bPendingStop)
 							co_await pApplication->m_OnStops.f_Insert().f_Future();
 

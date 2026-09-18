@@ -300,6 +300,7 @@ namespace NMib::NCloud::NAppManager
 #ifdef DPlatformFamily_Windows
 			EnvironmentScript.m_RunAsUserPassword = _pApplication->m_Settings.m_RunAsUserPassword;
 #endif
+			EnvironmentScript.m_bRunAsUserHasShell = _pApplication->m_Settings.m_bRunAsUserHasShell;
 
 			// The agent can disconnect while the script waits for the environment
 			if (!pEnvironment->m_AgentInterface)

@@ -218,6 +218,16 @@ namespace NMib::NCloud
 		_Stream % m_ParentApplication;
 		_Stream % m_AutoStart;
 
+		_Stream % m_ContainerRuntime;
+		_Stream % m_ContainerImage;
+		_Stream % m_ContainerNetwork;
+		_Stream % m_ContainerExtraMounts;
+		_Stream % m_ContainerExtraArguments;
+		_Stream % m_ContainerReadOnly;
+
+		_Stream % m_MemoryLimitMB;
+		_Stream % m_CPULimit;
+
 		_Stream % m_VMImage;
 		_Stream % m_VMBackend;
 		_Stream % m_VMCPUCount;
@@ -242,6 +252,16 @@ namespace NMib::NCloud
 		_Stream % m_AgentApplication;
 		_Stream % m_ParentApplication;
 		_Stream % m_bAutoStart;
+
+		_Stream % m_ContainerRuntime;
+		_Stream % m_ContainerImage;
+		_Stream % m_ContainerNetwork;
+		_Stream % m_ContainerExtraMounts;
+		_Stream % m_ContainerExtraArguments;
+		_Stream % m_bContainerReadOnly;
+
+		_Stream % m_MemoryLimitMB;
+		_Stream % m_CPULimit;
 
 		_Stream % m_VMImage;
 		_Stream % m_VMBackend;

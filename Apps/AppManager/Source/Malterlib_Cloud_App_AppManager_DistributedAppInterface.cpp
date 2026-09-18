@@ -204,14 +204,38 @@ namespace NMib::NCloud::NAppManager
 
 		CCallingHostInfo CallingHostInfo = NConcurrency::fg_GetCallingHostInfo();
 
-		// The host monitor only reaches host files, so the config files of an application in environment storage are not
-		// monitored
+		// The host monitor reads the paths on the host, so only applications that run on the host, also in a Local environment, register
+		// them. Agents and applications of container and VM environments are guests, and their files are not on the host. The registration
+		// still succeeds, since the callers register their config files whenever they register
 		auto pApplication = pThis->fp_ApplicationFromHostID(CallingHostInfo.f_GetRealHostID());
-		if (pApplication && pThis->fp_ApplicationRemoteStorageEnvironment(*pApplication))
+		if (!pApplication)
 		{
-			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' keeps its config files in environment storage, which is not monitored", pApplication->m_Name);
-
+			DMibLogWithCategory
+				(
+					Malterlib/Cloud/AppManager
+					, Info
+					, "Host '{}' is not an application on this host, so its config files are not monitored"
+					, CallingHostInfo.f_GetHostInfo().f_GetDesc()
+				)
+			;
 			co_return {};
+		}
+
+		if (auto *pEnvironment = pThis->mp_Environments.f_FindEqual(pApplication->m_Settings.m_LaunchEnvironment))
+		{
+			if ((*pEnvironment)->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
+			{
+				DMibLogWithCategory
+					(
+						Malterlib/Cloud/AppManager
+						, Info
+						, "Application '{}' runs in environment '{}', whose config files are not monitored"
+						, pApplication->m_Name
+						, (*pEnvironment)->m_Name
+					)
+				;
+				co_return {};
+			}
 		}
 
 		DMibLogWithCategory

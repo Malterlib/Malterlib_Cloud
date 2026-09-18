@@ -88,9 +88,11 @@ namespace NMib::NCloud::NAppManager
 		struct CAgentDeploymentSettings
 		{
 			bool m_bEnvironmentAgent = false;
+			bool m_bEnvironmentContainer = false;
 			CStr m_EnvironmentHostID;
 			TCOptional<CStr> m_UserGroupNameTransform;
 			CStr m_EnvironmentDataRoot;
+			CStr m_EnvironmentStateRoot; /// Root of the agent's AppManager state, since the agent directory can be read-only
 		};
 
 		CAgentDeploymentSettings const &fg_GetAgentDeploymentSettings()
@@ -109,12 +111,15 @@ namespace NMib::NCloud::NAppManager
 							CEJsonSorted Json = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile, true));
 
 							Settings.m_bEnvironmentAgent = Json.f_GetMemberValue("EnvironmentAgent", false).f_Boolean();
+							Settings.m_bEnvironmentContainer = Json.f_GetMemberValue("EnvironmentContainer", false).f_Boolean();
 							if (auto *pValue = Json.f_GetMember("EnvironmentHostID", EJsonType_String))
 								Settings.m_EnvironmentHostID = pValue->f_String();
 							if (auto *pValue = Json.f_GetMember("UserGroupNameTransform", EJsonType_String))
 								Settings.m_UserGroupNameTransform = pValue->f_String();
 							if (auto *pValue = Json.f_GetMember("EnvironmentDataRoot", EJsonType_String))
 								Settings.m_EnvironmentDataRoot = pValue->f_String();
+							if (auto *pValue = Json.f_GetMember("EnvironmentStateRoot", EJsonType_String))
+								Settings.m_EnvironmentStateRoot = pValue->f_String();
 						}
 					}
 					catch (CException const &_Exception)
@@ -223,7 +228,7 @@ namespace NMib::NCloud::NAppManager
 					}
 				}
 
-				// The launching AppManager points HOME and TMPDIR into the agent root,
+				// The launching AppManager points HOME and TMPDIR into the state root,
 				// but nothing creates them inside a fresh environment; child processes
 				// like package installs fail without a temporary directory
 				for (auto pVariable : {"HOME", "TMPDIR"})
@@ -242,6 +247,22 @@ namespace NMib::NCloud::NAppManager
 						DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to create '{}' directory '{}': {}", pVariable, Directory, _Exception);
 					}
 				}
+
+				// The trust database, logs, state and local sockets live in the state root, which a container keeps in its data storage
+				if (!Deployment.m_EnvironmentStateRoot.f_IsEmpty())
+				{
+					try
+					{
+						if (!CFile::fs_FileExists(Deployment.m_EnvironmentStateRoot, EFileAttrib_Directory))
+							CFile::fs_CreateDirectory(Deployment.m_EnvironmentStateRoot);
+					}
+					catch (CException const &_Exception)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to create the state root '{}': {}", Deployment.m_EnvironmentStateRoot, _Exception);
+					}
+
+					Settings.m_RootDirectory = Deployment.m_EnvironmentStateRoot;
+				}
 			}
 
 			return Settings;
@@ -253,6 +274,7 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto &Deployment = fg_GetAgentDeploymentSettings();
 		mp_bEnvironmentAgent = Deployment.m_bEnvironmentAgent;
+		mp_bEnvironmentContainer = Deployment.m_bEnvironmentContainer;
 		mp_EnvironmentHostID = Deployment.m_EnvironmentHostID;
 		// The agent names application users like the host does; equal names do not mean equal numeric IDs
 		if (Deployment.m_UserGroupNameTransform)

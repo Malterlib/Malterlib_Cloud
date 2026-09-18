@@ -42,7 +42,7 @@ namespace NMib::NCloud::NAppManager
 			void f_Stream(tf_CStream &_Stream);
 
 			NStr::CStr m_Name;
-			NStr::CStr m_Directory;                                                           /// Same path as on the host; empty for environment-managed storage, derived from the name
+			NStr::CStr m_Directory;                                                           /// Host directory in a Local environment; empty for environment-managed storage
 			NStr::CStr m_Executable;
 			NContainer::TCVector<NStr::CStr> m_Parameters;
 			NStr::CStr m_RunAsUser;
@@ -53,6 +53,7 @@ namespace NMib::NCloud::NAppManager
 			NStr::CStr m_InterfaceAddress;                                                    /// Host AppManager address the application connects its distributed app interface to
 			NStr::CStr m_LaunchID;                                                            /// Launch ID the host assigned to the application, which it registers with
 			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// OS dependencies of the application, installed by the agent inside the environment
+			NContainer::TCVector<NStr::CStr> m_LowPortExecutables;                            /// Executables relative to the directory that may bind low ports
 		};
 
 		struct CEnvironmentScript
@@ -61,7 +62,7 @@ namespace NMib::NCloud::NAppManager
 			void f_Stream(tf_CStream &_Stream);
 
 			NStr::CStr m_Description;
-			NStr::CStr m_Script;                  /// Script path, expanded against the directory inside the environment
+			NStr::CStr m_Script;                  /// Script path as configured; the agent expands it against the directory inside the environment
 			NStr::CStr m_Application;             /// Application the script belongs to; used to derive the directory when m_Directory is empty
 			NStr::CStr m_Directory;               /// Working directory; empty when the environment manages the application storage
 			NStr::CStr m_Parameter;
@@ -69,6 +70,7 @@ namespace NMib::NCloud::NAppManager
 			NStr::CStr m_RunAsUser;               /// Application user name as configured; the agent resolves the account name
 			NStr::CStr m_RunAsGroup;              /// Application group name as configured; the agent resolves the group name
 			NStr::CStrSecure m_RunAsUserPassword; /// Set on Windows, where a local agent logs on with the account the host created
+			bool m_bRunAsUserHasShell = false;
 		};
 
 		struct CStageFileContents
