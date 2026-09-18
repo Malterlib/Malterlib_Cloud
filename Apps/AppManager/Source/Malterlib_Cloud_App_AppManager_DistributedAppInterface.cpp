@@ -223,6 +223,17 @@ namespace NMib::NCloud::NAppManager
 			co_return {};
 		}
 
+		// The paths inside a container only lead to the same files on the host under its bind mounts
+		if (pApplication)
+		{
+			auto *pEnvironment = pThis->mp_Environments.f_FindEqual(pApplication->m_Settings.m_LaunchEnvironment);
+			if (pEnvironment && (*pEnvironment)->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+			{
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Application '{}' runs in a container, whose config files are not monitored", pApplication->m_Name);
+				co_return {};
+			}
+		}
+
 		DMibLogWithCategory
 			(
 				Malterlib/Cloud/AppManager

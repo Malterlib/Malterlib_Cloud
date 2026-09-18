@@ -223,6 +223,20 @@ namespace NMib::NCloud::NAppManager
 		)
 	{
 		CStr Script = _pApplication->m_Settings.m_UpdateScripts.f_GetScript(_Script);
+
+		// Read before the first suspension, since the version information belongs to the caller
+		TCVector<CStr> LowPortExecutables;
+		{
+			auto &ExtraInfo = _pVersionInformation ? _pVersionInformation->m_ExtraInfo : _pApplication->m_LastInstalledVersionInfo.m_ExtraInfo;
+			if (auto pLowPortExecutables = ExtraInfo.f_GetMember("LowPortExecutables", EJsonType_Array))
+			{
+				for (auto &Executable : pLowPortExecutables->f_Array())
+				{
+					if (Executable.f_IsString())
+						LowPortExecutables.f_Insert(Executable.f_String());
+				}
+			}
+		}
 		if (Script.f_IsEmpty())
 			co_return {};
 
@@ -329,10 +343,17 @@ namespace NMib::NCloud::NAppManager
 			if (pEnvironment->m_bStoppedManually)
 				co_return DMibErrorInstance("Cannot run update script: environment '{}' was stopped. Start it with --environment-start."_f << pEnvironment->m_Name);
 
+			// The script runs in the application directory, which an update can have moved into the environment
+			bool bRestartedEnvironment = co_await fp_StopEnvironmentNotCoveringApplication(_pApplication, pEnvironment);
+
 			co_await fp_EnsureEnvironmentStarted(pEnvironment);
 
 			// The agent configuration installs the environment OS dependencies that the script can rely on
 			co_await (fp_WaitForEnvironmentAgentConfiguration(pEnvironment) % "Cannot run update script: failed to configure the environment");
+
+			// Relaunch the applications the environment restart stopped with the auto start flag
+			if (bRestartedEnvironment)
+				fp_UpdateApplicationDependencies();
 
 			// The agent creates the application users and groups, so it resolves their names itself
 			EnvironmentScript.m_RunAsUser = _pApplication->m_Settings.m_RunAsUser;
@@ -340,6 +361,10 @@ namespace NMib::NCloud::NAppManager
 #ifdef DPlatformFamily_Windows
 			EnvironmentScript.m_RunAsUserPassword = _pApplication->m_Settings.m_RunAsUserPassword;
 #endif
+			EnvironmentScript.m_bRunAsUserHasShell = _pApplication->m_Settings.m_bRunAsUserHasShell;
+			for (auto &Child : _pApplication->m_Children)
+				EnvironmentScript.m_ChildDirectories.f_Insert(Child.f_GetDirectory());
+			EnvironmentScript.m_LowPortExecutables = fg_Move(LowPortExecutables);
 
 			co_return co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_RunScript)(fg_Move(EnvironmentScript))
 				.f_Timeout(60.0 * 60.0, "Timed out running update script in environment (1 hour)")

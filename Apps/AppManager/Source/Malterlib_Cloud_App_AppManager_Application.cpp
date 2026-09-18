@@ -240,6 +240,11 @@ namespace NMib::NCloud::NAppManager
 						pApplication->m_bLaunched = false;
 						pApplication->m_bStopped = true;
 
+						// The pending stop closing the encryption has stopped the process, and the environments it stops can
+						// stop the dependencies of the application, which stop it again
+						if (pApplication->m_bPendingStop && pApplication->m_bClosingEncryption)
+							co_return 0;
+
 						while (pApplication->m_bPendingStop)
 							co_await m_OnStops.f_Insert().f_Future();
 

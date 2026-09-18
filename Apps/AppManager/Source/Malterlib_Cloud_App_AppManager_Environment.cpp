@@ -94,7 +94,7 @@ namespace NMib::NCloud::NAppManager
 
 	void CAppManagerActor::fp_BuildCommandLine_Environments(CDistributedAppCommandLineSpecification &o_CommandLine)
 	{
-		auto EnvironmentManagement = o_CommandLine.f_AddSection("Environment Management", "Commands to manage AppManager launch environments (virtual machines).");
+		auto EnvironmentManagement = o_CommandLine.f_AddSection("Environment Management", "Commands to manage AppManager launch environments (containers and virtual machines).");
 
 		auto NameOption = "Name"_o=
 			{
@@ -109,7 +109,7 @@ namespace NMib::NCloud::NAppManager
 				, "Type"_o= ""
 				, "Default"_o= ""
 				, "Description"_o= "Name of the application that provides the AppManager agent executable for the environment.\n"
-				"When empty, VM environments default to the SelfUpdate.<Platform> application\n"
+				"When empty, container and VM environments default to the SelfUpdate.<Platform> application\n"
 				"matching the guest platform, and local environments run the AppManager executable itself.\n"
 				"The SelfUpdate.<Platform> name for the host platform resolves to the self update source\n"
 				"application, since host platform distributions install as the self update application.\n"
@@ -134,6 +134,71 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_o= "Start the environment automatically when the AppManager starts."
 			}
 		;
+		auto SettingsOption_ContainerRuntime = "ContainerRuntime?"_o=
+			{
+				"Names"_o= _o["--container-runtime"]
+#ifdef DPlatformFamily_macOS
+				, "Type"_o= COneOf{"Docker", "AppleContainer", "Colima"}
+				, "Default"_o= "AppleContainer"
+#else
+				, "Type"_o= COneOf{"Docker"}
+				, "Default"_o= "Docker"
+#endif
+				, "Description"_o= "The container runtime to use.\n"
+				"'Colima' runs docker containers in a colima virtual machine owned by the AppManager."
+			}
+		;
+		auto SettingsOption_ContainerImage = "ContainerImage?"_o=
+			{
+				"Names"_o= _o["--container-image"]
+				, "Type"_o= ""
+				, "Default"_o= ""
+				, "Description"_o= "The container image reference to run the environment from."
+			}
+		;
+		auto SettingsOption_ContainerNetwork = "ContainerNetwork?"_o=
+			{
+				"Names"_o= _o["--container-network"]
+				, "Type"_o= ""
+#ifdef DPlatformFamily_Linux
+				, "Default"_o= "host"
+#else
+				, "Default"_o= ""
+#endif
+				, "Description"_o= "The container network mode.\n"
+				"Leave empty to use the container runtime's default network."
+			}
+		;
+		auto SettingsOption_ContainerExtraMounts = "ContainerExtraMounts?"_o=
+			{
+				"Names"_o= _o["--container-extra-mounts"]
+				, "Type"_o=
+				{
+					"*"_o= ""
+				}
+				, "Description"_o= "Additional bind mounts for the environment beyond the application directories.\n"
+				"Maps host paths to paths inside the environment.\n"
+				"Example: '{\"/opt/Data\": \"/opt/Data\"}'\n"
+			}
+		;
+		auto SettingsOption_ContainerReadOnly = "ContainerReadOnly?"_o=
+			{
+				"Names"_o= _o["--container-read-only"]
+				, "Type"_o= true
+				, "Default"_o= false
+				, "Description"_o= "Run the container with a read-only filesystem, so all writes are confined to the\n"
+				"mounted storage. Writes outside the mounted paths would otherwise go to the container\n"
+				"runtime's own storage, which is not confined by --parent-application."
+			}
+		;
+		auto SettingsOption_ContainerExtraArguments = "ContainerExtraArguments?"_o=
+			{
+				"Names"_o= _o["--container-extra-arguments"]
+				, "Default"_o= _o[]
+				, "Type"_o= _o[""]
+				, "Description"_o= "Additional arguments appended to the container run command."
+			}
+		;
 		auto SettingsOption_OSDependencies = "OSDependencies?"_o=
 			{
 				"Names"_o= _o["--os-dependencies"]
@@ -142,6 +207,22 @@ namespace NMib::NCloud::NAppManager
 				, "Description"_o= "Additional OS packages installed inside the environment by the agent, in addition\n"
 				"to the OS dependencies of the agent application.\n"
 				"Example: '[\"htop\", \"strace\"]'\n"
+			}
+		;
+		auto SettingsOption_MemoryLimitMB = "MemoryLimitMB?"_o=
+			{
+				"Names"_o= _o["--memory-limit"]
+				, "Type"_o= 0
+				, "Default"_o= 0
+				, "Description"_o= "Memory limit in megabytes for the environment. Set to 0 for no limit."
+			}
+		;
+		auto SettingsOption_CPULimit = "CPULimit?"_o=
+			{
+				"Names"_o= _o["--cpu-limit"]
+				, "Type"_o= 0.0
+				, "Default"_o= 0.0
+				, "Description"_o= "Number of CPUs the environment may use. Set to 0 for no limit."
 			}
 		;
 		auto SettingsOption_VMImage = "VMImage?"_o=
@@ -213,14 +294,22 @@ namespace NMib::NCloud::NAppManager
 						, "Type?"_o=
 						{
 							"Names"_o= _o["--type"]
-							, "Type"_o= COneOf{"Local", "VM"}
-							, "Default"_o= "Local"
+							, "Type"_o= COneOf{"Local", "Container", "VM"}
+							, "Default"_o= "Container"
 							, "Description"_o= "The environment type."
 						}
 						, SettingsOption_AgentApplication
 						, SettingsOption_ParentApplication
 						, SettingsOption_AutoStart
+						, SettingsOption_ContainerRuntime
+						, SettingsOption_ContainerImage
+						, SettingsOption_ContainerNetwork
+						, SettingsOption_ContainerExtraMounts
+						, SettingsOption_ContainerExtraArguments
+						, SettingsOption_ContainerReadOnly
 						, SettingsOption_OSDependencies
+						, SettingsOption_MemoryLimitMB
+						, SettingsOption_CPULimit
 						, SettingsOption_VMImage
 						, SettingsOption_VMBackend
 						, SettingsOption_VMCPUCount
@@ -246,7 +335,15 @@ namespace NMib::NCloud::NAppManager
 						, fStripDefault(SettingsOption_AgentApplication)
 						, fStripDefault(SettingsOption_ParentApplication)
 						, fStripDefault(SettingsOption_AutoStart)
+						, fStripDefault(SettingsOption_ContainerRuntime)
+						, fStripDefault(SettingsOption_ContainerImage)
+						, fStripDefault(SettingsOption_ContainerNetwork)
+						, fStripDefault(SettingsOption_ContainerExtraMounts)
+						, fStripDefault(SettingsOption_ContainerExtraArguments)
+						, fStripDefault(SettingsOption_ContainerReadOnly)
 						, fStripDefault(SettingsOption_OSDependencies)
+						, fStripDefault(SettingsOption_MemoryLimitMB)
+						, fStripDefault(SettingsOption_CPULimit)
 						, fStripDefault(SettingsOption_VMImage)
 						, fStripDefault(SettingsOption_VMBackend)
 						, fStripDefault(SettingsOption_VMCPUCount)
@@ -292,6 +389,12 @@ namespace NMib::NCloud::NAppManager
 							, "Type"_o= ""
 							, "Default"_o= ""
 							, "Description"_o= "Only list the environment with this name."
+						}
+						, "Verbose?"_o=
+						{
+							"Names"_o= _o["--verbose"]
+							, "Default"_o= false
+							, "Description"_o= "Show more details."
 						}
 						, CTableRenderHelper::fs_OutputTypeOption()
 					}
@@ -351,6 +454,53 @@ namespace NMib::NCloud::NAppManager
 				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
 				{
 					return fp_CommandLine_RestartEnvironment(fg_Move(_Params), fg_Move(_pCommandLine));
+				}
+			)
+		;
+
+		EnvironmentManagement.f_RegisterCommand
+			(
+				{
+					"Names"_o= _o["--environment-pull"]
+					, "Description"_o=
+						"Pulls the newest container image for the environment and recreates the container from it.\n"
+						"This resets changes made inside the container filesystem, including OS updates made by an\n"
+						"agent inside it; data in the mounted storage is unaffected. The environment is restarted\n"
+						"when it was running."
+					, "Options"_o=
+					{
+						NameOption
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_PullEnvironment(fg_Move(_Params), fg_Move(_pCommandLine));
+				}
+			)
+		;
+
+		EnvironmentManagement.f_RegisterCommand
+			(
+				{
+					"Names"_o= _o["--environment-bash"]
+					, "Description"_o=
+						"Prints the command that opens an interactive bash in the environment's container.\n"
+						"Run it directly with: `sudo ./AppManager --environment-bash --name Name`"
+					, "Options"_o=
+					{
+						NameOption
+						, "Shell?"_o=
+						{
+							"Names"_o= _o["--shell"]
+							, "Type"_o= ""
+							, "Default"_o= "/bin/bash"
+							, "Description"_o= "The shell to run inside the environment."
+						}
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_EnvironmentBash(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -427,6 +577,46 @@ namespace NMib::NCloud::NAppManager
 				, [](CEJsonSorted &&_Params, CDistributedAppCommandLineClient &_CommandLineClient) -> uint32
 				{
 					return fg_AppManager_RunVMWindowHost(_Params["Config"].f_String());
+				}
+			)
+		;
+
+		EnvironmentManagement.f_RegisterCommand
+			(
+				{
+					"Names"_o= _o["--colima-settings"]
+					, "Description"_o=
+						"Shows or changes the sizing of the colima virtual machine shared by all Colima environments.\n"
+						"Changing a value restarts the virtual machine and the running Colima environments."
+					, "Options"_o=
+					{
+						"CPUCount?"_o=
+						{
+							"Names"_o= _o["--cpu-count"]
+							, "Type"_o= 0
+							, "Default"_o= -1
+							, "Description"_o= "Number of CPUs for the virtual machine. Set to 0 to use the colima default."
+						}
+						, "MemoryMB?"_o=
+						{
+							"Names"_o= _o["--memory"]
+							, "Type"_o= 0
+							, "Default"_o= -1
+							, "Description"_o= "Memory for the virtual machine in megabytes. Set to 0 to use the colima default."
+						}
+						, "DiskGB?"_o=
+						{
+							"Names"_o= _o["--disk-size"]
+							, "Type"_o= 0
+							, "Default"_o= -1
+							, "Description"_o= "Disk size for the virtual machine in gigabytes. The disk can only grow.\n"
+								"Set to 0 to use the colima default."
+						}
+					}
+				}
+				, [this](CEJsonSorted &&_Params, NStorage::TCSharedPointer<CCommandLineControl> &&_pCommandLine)
+				{
+					return fp_CommandLine_ColimaSettings(fg_Move(_Params), fg_Move(_pCommandLine));
 				}
 			)
 		;
@@ -521,7 +711,7 @@ namespace NMib::NCloud::NAppManager
 			auto Type = CAppManagerInterface::fs_EnvironmentTypeFromStr(pValue->f_String());
 			if (!Type)
 			{
-				o_Error = fg_Format("'{}' is not a valid environment type. Valid types are: Local, VM", pValue->f_String());
+				o_Error = fg_Format("'{}' is not a valid environment type. Valid types are: Local, Container, VM", pValue->f_String());
 				return false;
 			}
 
@@ -547,12 +737,64 @@ namespace NMib::NCloud::NAppManager
 			m_bAutoStart = pValue->f_Boolean();
 		}
 
+		if (auto *pValue = _Params.f_GetMember("ContainerRuntime"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_ContainerRuntime;
+			m_ContainerRuntime = pValue->f_String();
+		}
+
+		if (auto *pValue = _Params.f_GetMember("ContainerImage"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_ContainerImage;
+			m_ContainerImage = pValue->f_String();
+		}
+
+		if (auto *pValue = _Params.f_GetMember("ContainerNetwork"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_ContainerNetwork;
+			m_ContainerNetwork = pValue->f_String();
+		}
+
+		if (auto *pValue = _Params.f_GetMember("ContainerExtraMounts"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_ContainerExtraMounts;
+			m_ContainerExtraMounts.f_Clear();
+			for (auto &Mount : pValue->f_Object())
+				m_ContainerExtraMounts[Mount.f_Name()] = Mount.f_Value().f_String();
+		}
+
+		if (auto *pValue = _Params.f_GetMember("ContainerExtraArguments"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_ContainerExtraArguments;
+			m_ContainerExtraArguments.f_Clear();
+			for (auto &Argument : pValue->f_Array())
+				m_ContainerExtraArguments.f_Insert(Argument.f_String());
+		}
+
+		if (auto *pValue = _Params.f_GetMember("ContainerReadOnly"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_ContainerReadOnly;
+			m_bContainerReadOnly = pValue->f_Boolean();
+		}
+
 		if (auto *pValue = _Params.f_GetMember("OSDependencies"))
 		{
 			o_ChangedSettings |= EEnvironmentSetting_OSDependencies;
 			m_OSDependencies.f_Clear();
 			for (auto &Package : pValue->f_Array())
 				m_OSDependencies.f_Insert(Package.f_String());
+		}
+
+		if (auto *pValue = _Params.f_GetMember("MemoryLimitMB"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_MemoryLimit;
+			m_MemoryLimitMB = (uint64)pValue->f_AsInteger();
+		}
+
+		if (auto *pValue = _Params.f_GetMember("CPULimit"))
+		{
+			o_ChangedSettings |= EEnvironmentSetting_CPULimit;
+			m_CPULimit = pValue->f_AsFloat();
 		}
 
 		if (auto *pValue = _Params.f_GetMember("VMImage"))
@@ -598,8 +840,24 @@ namespace NMib::NCloud::NAppManager
 			m_ParentApplication = _Source.m_ParentApplication;
 		if (_ChangedSettings & EEnvironmentSetting_AutoStart)
 			m_bAutoStart = _Source.m_bAutoStart;
+		if (_ChangedSettings & EEnvironmentSetting_ContainerRuntime)
+			m_ContainerRuntime = _Source.m_ContainerRuntime;
+		if (_ChangedSettings & EEnvironmentSetting_ContainerImage)
+			m_ContainerImage = _Source.m_ContainerImage;
+		if (_ChangedSettings & EEnvironmentSetting_ContainerNetwork)
+			m_ContainerNetwork = _Source.m_ContainerNetwork;
+		if (_ChangedSettings & EEnvironmentSetting_ContainerExtraMounts)
+			m_ContainerExtraMounts = _Source.m_ContainerExtraMounts;
+		if (_ChangedSettings & EEnvironmentSetting_ContainerExtraArguments)
+			m_ContainerExtraArguments = _Source.m_ContainerExtraArguments;
+		if (_ChangedSettings & EEnvironmentSetting_ContainerReadOnly)
+			m_bContainerReadOnly = _Source.m_bContainerReadOnly;
 		if (_ChangedSettings & EEnvironmentSetting_OSDependencies)
 			m_OSDependencies = _Source.m_OSDependencies;
+		if (_ChangedSettings & EEnvironmentSetting_MemoryLimit)
+			m_MemoryLimitMB = _Source.m_MemoryLimitMB;
+		if (_ChangedSettings & EEnvironmentSetting_CPULimit)
+			m_CPULimit = _Source.m_CPULimit;
 		if (_ChangedSettings & EEnvironmentSetting_VMImage)
 			m_VMImage = _Source.m_VMImage;
 		if (_ChangedSettings & EEnvironmentSetting_VMBackend)
@@ -634,10 +892,50 @@ namespace NMib::NCloud::NAppManager
 			m_bAutoStart = *_Settings.m_bAutoStart;
 			o_ChangedSettings |= EEnvironmentSetting_AutoStart;
 		}
+		if (_Settings.m_ContainerRuntime)
+		{
+			m_ContainerRuntime = *_Settings.m_ContainerRuntime;
+			o_ChangedSettings |= EEnvironmentSetting_ContainerRuntime;
+		}
+		if (_Settings.m_ContainerImage)
+		{
+			m_ContainerImage = *_Settings.m_ContainerImage;
+			o_ChangedSettings |= EEnvironmentSetting_ContainerImage;
+		}
+		if (_Settings.m_ContainerNetwork)
+		{
+			m_ContainerNetwork = *_Settings.m_ContainerNetwork;
+			o_ChangedSettings |= EEnvironmentSetting_ContainerNetwork;
+		}
+		if (_Settings.m_ContainerExtraMounts)
+		{
+			m_ContainerExtraMounts = *_Settings.m_ContainerExtraMounts;
+			o_ChangedSettings |= EEnvironmentSetting_ContainerExtraMounts;
+		}
+		if (_Settings.m_ContainerExtraArguments)
+		{
+			m_ContainerExtraArguments = *_Settings.m_ContainerExtraArguments;
+			o_ChangedSettings |= EEnvironmentSetting_ContainerExtraArguments;
+		}
+		if (_Settings.m_bContainerReadOnly)
+		{
+			m_bContainerReadOnly = *_Settings.m_bContainerReadOnly;
+			o_ChangedSettings |= EEnvironmentSetting_ContainerReadOnly;
+		}
 		if (_Settings.m_OSDependencies)
 		{
 			m_OSDependencies = *_Settings.m_OSDependencies;
 			o_ChangedSettings |= EEnvironmentSetting_OSDependencies;
+		}
+		if (_Settings.m_MemoryLimitMB)
+		{
+			m_MemoryLimitMB = *_Settings.m_MemoryLimitMB;
+			o_ChangedSettings |= EEnvironmentSetting_MemoryLimit;
+		}
+		if (_Settings.m_CPULimit)
+		{
+			m_CPULimit = *_Settings.m_CPULimit;
+			o_ChangedSettings |= EEnvironmentSetting_CPULimit;
 		}
 		if (_Settings.m_VMImage)
 		{
@@ -677,8 +975,24 @@ namespace NMib::NCloud::NAppManager
 			ChangedSettings |= EEnvironmentSetting_ParentApplication;
 		if (m_bAutoStart != _Other.m_bAutoStart)
 			ChangedSettings |= EEnvironmentSetting_AutoStart;
+		if (m_ContainerRuntime != _Other.m_ContainerRuntime)
+			ChangedSettings |= EEnvironmentSetting_ContainerRuntime;
+		if (m_ContainerImage != _Other.m_ContainerImage)
+			ChangedSettings |= EEnvironmentSetting_ContainerImage;
+		if (m_ContainerNetwork != _Other.m_ContainerNetwork)
+			ChangedSettings |= EEnvironmentSetting_ContainerNetwork;
+		if (m_ContainerExtraMounts != _Other.m_ContainerExtraMounts)
+			ChangedSettings |= EEnvironmentSetting_ContainerExtraMounts;
+		if (m_ContainerExtraArguments != _Other.m_ContainerExtraArguments)
+			ChangedSettings |= EEnvironmentSetting_ContainerExtraArguments;
+		if (m_bContainerReadOnly != _Other.m_bContainerReadOnly)
+			ChangedSettings |= EEnvironmentSetting_ContainerReadOnly;
 		if (m_OSDependencies != _Other.m_OSDependencies)
 			ChangedSettings |= EEnvironmentSetting_OSDependencies;
+		if (m_MemoryLimitMB != _Other.m_MemoryLimitMB)
+			ChangedSettings |= EEnvironmentSetting_MemoryLimit;
+		if (m_CPULimit != _Other.m_CPULimit)
+			ChangedSettings |= EEnvironmentSetting_CPULimit;
 		if (m_VMImage != _Other.m_VMImage)
 			ChangedSettings |= EEnvironmentSetting_VMImage;
 		if (m_VMBackend != _Other.m_VMBackend)
@@ -701,16 +1015,39 @@ namespace NMib::NCloud::NAppManager
 				return false;
 			}
 		;
-		if (m_Type == CAppManagerInterface::EEnvironmentType_VM)
+
+		// Distributed callers can send any value
+		if (m_Type > CAppManagerInterface::EEnvironmentType_Container)
+			return fError("Unknown environment type");
+
+		if (m_Type == CAppManagerInterface::EEnvironmentType_Container)
+		{
+			if (m_ContainerImage.f_IsEmpty())
+				return fError("For container environments you must specify a container image");
+			else if (!m_VMImage.f_IsEmpty())
+				return fError("For container environments you cannot specify a VM image");
+
+			bool bAppleContainer = m_ContainerRuntime == "AppleContainer";
+#ifdef DPlatformFamily_macOS
+			bAppleContainer = bAppleContainer || m_ContainerRuntime.f_IsEmpty();
+#endif
+			if (bAppleContainer && m_CPULimit.f_Fraction() != 0.0)
+				return fError("The Apple container runtime only allocates a whole number of CPUs");
+		}
+		else if (m_Type == CAppManagerInterface::EEnvironmentType_VM)
 		{
 			if (m_VMImage.f_IsEmpty())
 				return fError("For VM environments you must specify a VM image");
 			else if (!CVersionManager::fs_IsValidApplicationName(m_VMImage))
 				return fError(fg_Format("'{}' is not a valid VM image name", m_VMImage));
+			else if (!m_ContainerImage.f_IsEmpty())
+				return fError("For VM environments you cannot specify a container image");
 		}
 		else if (m_Type == CAppManagerInterface::EEnvironmentType_Local)
 		{
-			if (!m_VMImage.f_IsEmpty())
+			if (!m_ContainerImage.f_IsEmpty())
+				return fError("For local environments you cannot specify a container image");
+			else if (!m_VMImage.f_IsEmpty())
 				return fError("For local environments you cannot specify a VM image");
 		}
 
@@ -719,6 +1056,16 @@ namespace NMib::NCloud::NAppManager
 
 	void CAppManagerActor::fp_ReadEnvironmentsState()
 	{
+		if (auto pColima = mp_State.m_StateDatabase.m_Data.f_GetMember("ColimaSettings"))
+		{
+			if (auto pValue = pColima->f_GetMember("CPUCount", EJsonType_Integer))
+				mp_ColimaCPUCount = (uint32)pValue->f_Integer();
+			if (auto pValue = pColima->f_GetMember("MemoryMB", EJsonType_Integer))
+				mp_ColimaMemoryMB = (uint64)pValue->f_Integer();
+			if (auto pValue = pColima->f_GetMember("DiskGB", EJsonType_Integer))
+				mp_ColimaDiskGB = (uint64)pValue->f_Integer();
+		}
+
 		if (auto pVMSettings = mp_State.m_StateDatabase.m_Data.f_GetMember("VMSettings"))
 		{
 			if (auto pValue = pVMSettings->f_GetMember("Window", EJsonType_Boolean))
@@ -753,10 +1100,42 @@ namespace NMib::NCloud::NAppManager
 			if (auto pValue = EnvironmentJson.f_GetMember("StoppedManually", EJsonType_Boolean))
 				Environment.m_bStoppedManually = pValue->f_Boolean();
 
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerRuntime", EJsonType_String))
+				Settings.m_ContainerRuntime = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerImage", EJsonType_String))
+				Settings.m_ContainerImage = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerNetwork", EJsonType_String))
+				Settings.m_ContainerNetwork = pValue->f_String();
+
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerExtraMounts", EJsonType_Object))
+			{
+				for (auto &Mount : pValue->f_Object())
+					Settings.m_ContainerExtraMounts[Mount.f_Name()] = Mount.f_Value().f_String();
+			}
+
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerExtraArguments", EJsonType_Array))
+			{
+				for (auto &Argument : pValue->f_Array())
+					Settings.m_ContainerExtraArguments.f_Insert(Argument.f_String());
+			}
+
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerReadOnly", EJsonType_Boolean))
+				Settings.m_bContainerReadOnly = pValue->f_Boolean();
+
 			if (auto pValue = EnvironmentJson.f_GetMember("OSDependencies", EJsonType_Array))
 			{
 				for (auto &Package : pValue->f_Array())
 					Settings.m_OSDependencies.f_Insert(Package.f_String());
+			}
+
+			if (auto pValue = EnvironmentJson.f_GetMember("MemoryLimitMB", EJsonType_Integer))
+				Settings.m_MemoryLimitMB = (uint64)pValue->f_Integer();
+			{
+				auto pValue = EnvironmentJson.f_GetMember("CPULimit", EJsonType_Float);
+				if (!pValue)
+					pValue = EnvironmentJson.f_GetMember("CPULimit", EJsonType_Integer);
+				if (pValue)
+					Settings.m_CPULimit = pValue->f_AsFloat();
 			}
 
 			if (auto pValue = EnvironmentJson.f_GetMember("VMImage", EJsonType_String))
@@ -770,6 +1149,22 @@ namespace NMib::NCloud::NAppManager
 			if (auto pValue = EnvironmentJson.f_GetMember("VMDataDiskGB", EJsonType_Integer))
 				Settings.m_VMDataDiskGB = (uint64)pValue->f_Integer();
 
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerFingerprint", EJsonType_String))
+				Environment.m_ContainerFingerprint = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerLaunchID", EJsonType_String))
+				Environment.m_ContainerLaunchID = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerRequestTicketMagic", EJsonType_String))
+				Environment.m_ContainerRequestTicketMagic = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerMounts", EJsonType_Array))
+			{
+				for (auto &Mount : pValue->f_Array())
+					Environment.m_ContainerMounts.f_Insert(fg_TempCopy(Mount.f_String()));
+			}
+			if (auto pValue = EnvironmentJson.f_GetMember("ContainerSamePathMounts", EJsonType_Array))
+			{
+				for (auto &Mount : pValue->f_Array())
+					Environment.m_ContainerSamePathMounts.f_Insert(fg_TempCopy(Mount.f_String()));
+			}
 			if (auto pValue = EnvironmentJson.f_GetMember("ListenPort", EJsonType_Integer))
 				Environment.m_ListenPort = (uint32)pValue->f_Integer();
 			if (auto pValue = EnvironmentJson.f_GetMember("VMMACAddress", EJsonType_String))
@@ -779,9 +1174,15 @@ namespace NMib::NCloud::NAppManager
 			if (auto pValue = EnvironmentJson.f_GetMember("VMAgentFingerprint", EJsonType_String))
 				Environment.m_VMAgentFingerprint = pValue->f_String();
 
-			// A VM agent keeps running across AppManager restarts and reconnects
-			// with the launch id from its installation
-			Environment.m_LaunchID = Environment.m_VMAgentLaunchID;
+			// An agent in a persistent container keeps running across AppManager
+			// restarts and reconnects with the launch id frozen into the container, so
+			// expect that launch id right away
+			Environment.m_LaunchID = Environment.m_ContainerLaunchID;
+
+			// A VM agent likewise keeps running across AppManager restarts and
+			// reconnects with the launch id from its installation
+			if (Environment.m_LaunchID.f_IsEmpty())
+				Environment.m_LaunchID = Environment.m_VMAgentLaunchID;
 		}
 	}
 
@@ -800,12 +1201,31 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentJson["AutoStart"] = Settings.m_bAutoStart;
 		EnvironmentJson["StoppedManually"] = Environment.m_bStoppedManually;
 
+		EnvironmentJson["ContainerRuntime"] = Settings.m_ContainerRuntime;
+		EnvironmentJson["ContainerImage"] = Settings.m_ContainerImage;
+		EnvironmentJson["ContainerNetwork"] = Settings.m_ContainerNetwork;
+		{
+			auto &Mounts = EnvironmentJson["ContainerExtraMounts"] = CEJsonSortedYaml();
+			Mounts.f_Object();
+			for (auto &Mount : Settings.m_ContainerExtraMounts)
+				Mounts[Settings.m_ContainerExtraMounts.fs_GetKey(Mount)] = Mount;
+		}
+		{
+			auto &Arguments = EnvironmentJson["ContainerExtraArguments"].f_Array();
+			Arguments.f_Clear();
+			for (auto &Argument : Settings.m_ContainerExtraArguments)
+				Arguments.f_Insert(Argument);
+		}
+
+		EnvironmentJson["ContainerReadOnly"] = Settings.m_bContainerReadOnly;
 		{
 			auto &DependenciesJson = EnvironmentJson["OSDependencies"].f_Array();
 			DependenciesJson.f_Clear();
 			for (auto &Package : Settings.m_OSDependencies)
 				DependenciesJson.f_Insert(Package);
 		}
+		EnvironmentJson["MemoryLimitMB"] = Settings.m_MemoryLimitMB;
+		EnvironmentJson["CPULimit"] = Settings.m_CPULimit;
 
 		EnvironmentJson["VMImage"] = Settings.m_VMImage;
 		EnvironmentJson["VMBackend"] = Settings.m_VMBackend;
@@ -813,6 +1233,21 @@ namespace NMib::NCloud::NAppManager
 		EnvironmentJson["VMMemoryMB"] = Settings.m_VMMemoryMB;
 		EnvironmentJson["VMDataDiskGB"] = Settings.m_VMDataDiskGB;
 
+		EnvironmentJson["ContainerFingerprint"] = Environment.m_ContainerFingerprint;
+		EnvironmentJson["ContainerLaunchID"] = Environment.m_ContainerLaunchID;
+		EnvironmentJson["ContainerRequestTicketMagic"] = Environment.m_ContainerRequestTicketMagic;
+		{
+			auto &MountsJson = EnvironmentJson["ContainerMounts"].f_Array();
+			MountsJson.f_Clear();
+			for (auto &Mount : Environment.m_ContainerMounts)
+				MountsJson.f_Insert(Mount);
+		}
+		{
+			auto &MountsJson = EnvironmentJson["ContainerSamePathMounts"].f_Array();
+			MountsJson.f_Clear();
+			for (auto &Mount : Environment.m_ContainerSamePathMounts)
+				MountsJson.f_Insert(Mount);
+		}
 		EnvironmentJson["ListenPort"] = Environment.m_ListenPort;
 		EnvironmentJson["VMMACAddress"] = Environment.m_VMMACAddress;
 		EnvironmentJson["VMAgentLaunchID"] = Environment.m_VMAgentLaunchID;
@@ -845,6 +1280,16 @@ namespace NMib::NCloud::NAppManager
 		OutEnvironment.m_AgentApplication = Settings.m_AgentApplication;
 		OutEnvironment.m_ParentApplication = Settings.m_ParentApplication;
 		OutEnvironment.m_bAutoStart = Settings.m_bAutoStart;
+
+		OutEnvironment.m_ContainerRuntime = Settings.m_ContainerRuntime;
+		OutEnvironment.m_ContainerImage = Settings.m_ContainerImage;
+		OutEnvironment.m_ContainerNetwork = Settings.m_ContainerNetwork;
+		OutEnvironment.m_ContainerExtraMounts = Settings.m_ContainerExtraMounts;
+		OutEnvironment.m_ContainerExtraArguments = Settings.m_ContainerExtraArguments;
+		OutEnvironment.m_bContainerReadOnly = Settings.m_bContainerReadOnly;
+
+		OutEnvironment.m_MemoryLimitMB = Settings.m_MemoryLimitMB;
+		OutEnvironment.m_CPULimit = Settings.m_CPULimit;
 
 		OutEnvironment.m_VMImage = Settings.m_VMImage;
 		OutEnvironment.m_VMBackend = Settings.m_VMBackend;
@@ -912,15 +1357,18 @@ namespace NMib::NCloud::NAppManager
 		CEnvironmentSettings NewSettings;
 		NewSettings.f_ApplySettings(_ChangedSettings, _Settings);
 
-		// VM images run macOS guests with the host architecture, so the matching
-		// self-update agent application is the default. Local environments run the
-		// AppManager's own executable when no agent application is set
+		// Containers run Linux guests and VM images run macOS guests, both with the host
+		// architecture, so the matching self-update agent application is the default.
+		// Local environments run the AppManager's own executable when no agent application is set
 		if (NewSettings.m_AgentApplication.f_IsEmpty() && NewSettings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
 		{
 			CStr HostPlatform = DMalterlibCloudPlatform;
 			CStr Architecture = HostPlatform.f_Extract(HostPlatform.f_FindReverse("-") + 1);
 
-			NewSettings.m_AgentApplication = "SelfUpdate.macOS-{}"_f << Architecture;
+			if (NewSettings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+				NewSettings.m_AgentApplication = "SelfUpdate.Linux-{}"_f << Architecture;
+			else
+				NewSettings.m_AgentApplication = "SelfUpdate.macOS-{}"_f << Architecture;
 		}
 
 		{
@@ -1008,6 +1456,16 @@ namespace NMib::NCloud::NAppManager
 
 		co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
 
+		if (pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+		{
+			co_await fp_RemoveEnvironmentContainer(pEnvironment);
+
+			// The environment cannot be removed while applications reference it,
+			// so the data volume holds no application storage anymore
+			if (fp_EnvironmentUsesRemoteStorage(*pEnvironment))
+				co_await fp_RemoveEnvironmentDataVolume(pEnvironment);
+		}
+
 		pEnvironment->m_bDeleted = true;
 		mp_Environments.f_Remove(_Name);
 
@@ -1066,6 +1524,10 @@ namespace NMib::NCloud::NAppManager
 
 		auto NewSettings = pEnvironment->m_Settings;
 		NewSettings.f_ApplySettings(_ChangedSettings, _Settings);
+
+		// An empty agent application selects the default of the guest platform, like when the environment is added
+		if (NewSettings.m_AgentApplication.f_IsEmpty() && NewSettings.m_Type != CAppManagerInterface::EEnvironmentType_Local)
+			NewSettings.m_AgentApplication = "SelfUpdate.{}"_f << fsp_GetEnvironmentGuestPlatform(NewSettings.m_Type);
 
 		{
 			CStr Error;
@@ -1154,6 +1616,30 @@ namespace NMib::NCloud::NAppManager
 		if (ChangedSettings & EEnvironmentSetting_Type)
 			co_return Auditor.f_Exception("Remove and add the environment to change its type");
 
+		// The stop goes through the runtime that started the container
+		if ((ChangedSettings & EEnvironmentSetting_ContainerRuntime) && (pEnvironment->f_IsStarted() || pEnvironment->m_bStarting || pEnvironment->m_bStopping))
+			co_return Auditor.f_Exception("Stop the environment before changing the container runtime");
+
+		// Only the runtime that created the container removes it
+		if ((ChangedSettings & EEnvironmentSetting_ContainerRuntime) && !pEnvironment->m_ContainerFingerprint.f_IsEmpty())
+			co_return Auditor.f_Exception("The container of the environment exists. Remove and add the environment to change its container runtime.");
+
+		// The application files live in storage of the runtime, which the new runtime does not see
+		if ((ChangedSettings & EEnvironmentSetting_ContainerRuntime) && fp_EnvironmentUsesRemoteStorage(*pEnvironment))
+		{
+			for (auto &pApplication : mp_Applications)
+			{
+				if (pApplication->m_Settings.m_LaunchEnvironment == _Name)
+				{
+					co_return Auditor.f_Exception
+						(
+							fg_Format("Application '{}' keeps its files in the storage of the container runtime. Change the application settings first.", pApplication->m_Name)
+						)
+					;
+				}
+			}
+		}
+
 		pEnvironment->m_Settings = NewSettings;
 
 		_fOnInfo("Saving environment state");
@@ -1211,6 +1697,81 @@ namespace NMib::NCloud::NAppManager
 		fp_UpdateApplicationDependencies();
 
 		Auditor.f_Info(fg_Format("Started environment '{}'", _Name));
+
+		co_return {};
+	}
+
+	TCFuture<void> CAppManagerActor::fp_PullEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo)
+	{
+		auto Auditor = f_Auditor({}, _CallingHostInfo);
+
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+
+		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/EnvironmentPull"}};
+		Permissions["Environment"] = {CPermissionQuery{"AppManager/EnvironmentAll", fg_Format("AppManager/Environment/{}", _Name)}.f_Description("Access environment {} in AppManager"_f << _Name)};
+
+		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
+			(
+				mp_Permissions.f_HasPermissions("Pull environment in AppManager", Permissions, _CallingHostInfo) % "Permission denied pulling environment" % Auditor
+			)
+		;
+
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(Environment pull, command)", Permissions["Command"]);
+
+		if (!HasPermissions["Environment"])
+			co_return Auditor.f_AccessDenied("(Environment pull, environment name)", Permissions["Environment"]);
+
+		auto *pFindEnvironment = mp_Environments.f_FindEqual(_Name);
+		if (!pFindEnvironment)
+			co_return Auditor.f_Exception(fg_Format("No such environment '{}'", _Name));
+
+		auto pEnvironment = *pFindEnvironment;
+
+		if (pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Container)
+			co_return Auditor.f_Exception(fg_Format("Environment '{}' is not a container environment", _Name));
+
+		co_await (fp_EnsureContainerSystem(pEnvironment) % "Failed to start the container system" % Auditor);
+
+		// The pull leaves the running container alone, so a failing pull keeps the environment running
+		co_await (fp_PullEnvironmentContainerImage(pEnvironment) % "Failed to pull environment image" % Auditor);
+
+		co_await (fp_WaitForEnvironmentIdle(pEnvironment) % "Failed to wait for the environment applications" % Auditor);
+		if (pEnvironment->m_bDeleted)
+			co_return Auditor.f_Exception(fg_Format("Environment '{}' was removed", _Name));
+
+		// The environment can have started or stopped while the image was pulled
+		bool bWasStarted = pEnvironment->f_IsStarted() || pEnvironment->m_bStarting;
+
+		{
+			pEnvironment->m_bPulling = true;
+			auto ClearPulling = g_OnScopeExit / [pEnvironment]
+				{
+					pEnvironment->m_bPulling = false;
+				}
+			;
+
+			co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment" % Auditor);
+
+			co_await fp_RemoveEnvironmentContainer(pEnvironment);
+
+			// The container is recreated from the pulled image on the next start
+			pEnvironment->m_ContainerFingerprint = {};
+
+			co_await (fp_UpdateEnvironmentJson(pEnvironment) % "Failed to save environment state" % Auditor);
+		}
+
+		// A manual stop during the pull is kept
+		if (bWasStarted && !pEnvironment->m_bStoppedManually)
+		{
+			co_await (fp_EnsureEnvironmentStarted(pEnvironment) % "Failed to start environment" % Auditor);
+
+			// Relaunch the applications the environment stop stopped with the auto
+			// start flag
+			fp_UpdateApplicationDependencies();
+		}
+
+		Auditor.f_Info(fg_Format("Pulled environment '{}'", _Name));
 
 		co_return {};
 	}
@@ -1464,6 +2025,11 @@ namespace NMib::NCloud::NAppManager
 		co_return co_await m_pThis->fp_StartEnvironment(_Name, fg_GetCallingHostInfo());
 	}
 
+	TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_EnvironmentPull(CStr _Name)
+	{
+		co_return co_await m_pThis->fp_PullEnvironment(_Name, fg_GetCallingHostInfo());
+	}
+
 	TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_EnvironmentStop(CStr _Name)
 	{
 		co_return co_await m_pThis->fp_StopEnvironment(_Name, fg_GetCallingHostInfo());
@@ -1620,8 +2186,189 @@ namespace NMib::NCloud::NAppManager
 		co_return _pCommandLine->f_AddAsyncResult(Result);
 	}
 
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_PullEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		auto Result = co_await fp_PullEnvironment(_Params["Name"].f_String(), fg_GetCallingHostInfo()).f_Wrap();
+
+		co_return _pCommandLine->f_AddAsyncResult(Result);
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnvironmentBash(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		CStr Name = _Params["Name"].f_String();
+		CStr Shell = _Params["Shell"].f_String();
+
+		auto *pFindEnvironment = mp_Environments.f_FindEqual(Name);
+		if (!pFindEnvironment)
+		{
+			co_await _pCommandLine->f_StdErr("No such environment '{}'\n"_f << Name);
+			co_return 1;
+		}
+
+		auto pEnvironment = *pFindEnvironment;
+
+		if (pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Container)
+		{
+			co_await _pCommandLine->f_StdErr("Environment '{}' is not a container environment\n"_f << Name);
+			co_return 1;
+		}
+
+		CStr Executable = fp_GetContainerRuntimeExecutable(pEnvironment);
+		bool bOwnAppleContainerSystem = Executable == "container" && fp_UseOwnAppleContainerSystem();
+		bool bOwnColimaSystem = fp_UseOwnColimaSystem(pEnvironment);
+
+		TCVector<CStr> Parts;
+
+		// The AppManager-owned container systems are reached with the data location
+		// their daemons were started with, which needs an elevated client
+		if (bOwnAppleContainerSystem || bOwnColimaSystem)
+		{
+			Parts.f_Insert("sudo");
+			Parts.f_Insert("env");
+			if (bOwnAppleContainerSystem)
+				Parts.f_Insert("CONTAINER_APP_ROOT=" + fp_GetAppleContainerAppRoot());
+			else
+				Parts.f_Insert("DOCKER_HOST=unix://" + (fp_GetColimaAppRoot() / "colima" / "default" / "docker.sock"));
+		}
+
+		Parts.f_Insert(fg_Move(Executable));
+		Parts.f_Insert("exec");
+		Parts.f_Insert("--interactive");
+		Parts.f_Insert("--tty");
+		Parts.f_Insert(fp_GetContainerName(pEnvironment));
+		Parts.f_Insert(fg_Move(Shell));
+
+		// The output is meant to be executed with backticks, where the shell only
+		// splits words and does not interpret quotes, so the parts are printed as
+		// they are. Quoting cannot protect a part with whitespace there, so an
+		// AppManager root containing whitespace is not supported by this form
+		CStr Command;
+		for (auto &Part : Parts)
+		{
+			if (!Command.f_IsEmpty())
+				Command += " ";
+
+			Command += Part;
+		}
+
+		co_await _pCommandLine->f_StdOut("{}\n"_f << Command);
+
+		co_return 0;
+	}
+
+	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ColimaSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
+	{
+		auto CallingHostInfo = fg_GetCallingHostInfo();
+		auto Auditor = f_Auditor({}, CallingHostInfo);
+
+		NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> Permissions;
+
+		Permissions["Command"] = {{"AppManager/CommandAll", "AppManager/Command/ColimaSettings"}};
+
+		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
+			(
+				mp_Permissions.f_HasPermissions("Change colima settings in AppManager", Permissions, CallingHostInfo) % "Permission denied changing colima settings" % Auditor
+			)
+		;
+
+		if (!HasPermissions["Command"])
+			co_return Auditor.f_AccessDenied("(Colima settings, command)", Permissions["Command"]);
+
+		int64 CPUCount = _Params["CPUCount"].f_Integer();
+		int64 MemoryMB = _Params["MemoryMB"].f_Integer();
+		int64 DiskGB = _Params["DiskGB"].f_Integer();
+
+		bool bChanged = false;
+		if (CPUCount >= 0 && uint32(CPUCount) != mp_ColimaCPUCount)
+		{
+			mp_ColimaCPUCount = uint32(CPUCount);
+			bChanged = true;
+		}
+		if (MemoryMB >= 0 && uint64(MemoryMB) != mp_ColimaMemoryMB)
+		{
+			mp_ColimaMemoryMB = uint64(MemoryMB);
+			bChanged = true;
+		}
+		if (DiskGB >= 0 && uint64(DiskGB) != mp_ColimaDiskGB)
+		{
+			mp_ColimaDiskGB = uint64(DiskGB);
+			bChanged = true;
+		}
+
+		auto fFormatValue = [](uint64 _Value) -> CStr
+			{
+				if (!_Value)
+					return "default";
+
+				return CStr::fs_ToStr(_Value);
+			}
+		;
+
+		co_await _pCommandLine->f_StdOut
+			(
+				"CPU count: {}\nMemory MB: {}\nDisk GB: {}\n"_f
+					<< fFormatValue(mp_ColimaCPUCount)
+					<< fFormatValue(mp_ColimaMemoryMB)
+					<< fFormatValue(mp_ColimaDiskGB)
+			)
+		;
+
+		if (!bChanged)
+			co_return 0;
+
+		{
+			auto &ColimaJson = mp_State.m_StateDatabase.m_Data["ColimaSettings"];
+			ColimaJson["CPUCount"] = int64(mp_ColimaCPUCount);
+			ColimaJson["MemoryMB"] = int64(mp_ColimaMemoryMB);
+			ColimaJson["DiskGB"] = int64(mp_ColimaDiskGB);
+		}
+
+		co_await mp_State.m_StateDatabase.f_Save();
+
+		// Restart the running colima environments; the first start after the change
+		// restarts the virtual machine with the new configuration, so every
+		// environment is stopped before the first start
+		TCVector<TCSharedPointer<CEnvironment>> RestartEnvironments;
+		for (auto &pEnvironment : mp_Environments)
+		{
+			if (!fp_UseOwnColimaSystem(pEnvironment))
+				continue;
+
+			if (!pEnvironment->f_IsStarted() && !pEnvironment->m_bStarting)
+				continue;
+
+			RestartEnvironments.f_Insert(fg_TempCopy(pEnvironment));
+		}
+
+		for (auto &pEnvironment : RestartEnvironments)
+		{
+			co_await _pCommandLine->f_StdOut("Stopping environment '{}'\n"_f << pEnvironment->m_Name);
+			co_await fp_WaitForEnvironmentIdle(pEnvironment);
+			co_await fp_StopEnvironmentInternal(pEnvironment);
+		}
+
+		for (auto &pEnvironment : RestartEnvironments)
+		{
+			if (pEnvironment->m_bDeleted)
+				continue;
+
+			co_await _pCommandLine->f_StdOut("Starting environment '{}'\n"_f << pEnvironment->m_Name);
+			co_await fp_EnsureEnvironmentStarted(pEnvironment);
+		}
+
+		if (!RestartEnvironments.f_IsEmpty())
+		{
+			// Relaunch the applications the environment stops stopped with the auto
+			// start flag
+			fp_UpdateApplicationDependencies();
+		}
+
+		co_return 0;
+	}
+
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_EnumEnvironments(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
+		bool bVerbose = _Params["Verbose"].f_Boolean();
 		CStr Name = _Params["Name"].f_String();
 
 		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
@@ -1649,7 +2396,20 @@ namespace NMib::NCloud::NAppManager
 				fAddProperty(Settings, "Parent application", Environment.m_ParentApplication);
 			fAddProperty(Settings, "Auto start", Environment.m_bAutoStart);
 
-			if (Environment.m_Type == CAppManagerInterface::EEnvironmentType_VM)
+			if (Environment.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+			{
+				fAddProperty(Settings, "Image", Environment.m_ContainerImage);
+				fAddProperty(Settings, "Runtime", Environment.m_ContainerRuntime);
+				fAddProperty(Settings, "Network", Environment.m_ContainerNetwork);
+				if (Environment.m_bContainerReadOnly)
+					fAddProperty(Settings, "Read only", Environment.m_bContainerReadOnly);
+				if (bVerbose)
+				{
+					fAddProperty(Settings, "Extra mounts", "{}"_f << Environment.m_ContainerExtraMounts);
+					fAddProperty(Settings, "Extra arguments", "{vs}"_f << Environment.m_ContainerExtraArguments);
+				}
+			}
+			else if (Environment.m_Type == CAppManagerInterface::EEnvironmentType_VM)
 			{
 				fAddProperty(Settings, "Image", Environment.m_VMImage);
 				fAddProperty(Settings, "Backend", Environment.m_VMBackend);
@@ -1657,6 +2417,11 @@ namespace NMib::NCloud::NAppManager
 				fAddProperty(Settings, "Memory MB", Environment.m_VMMemoryMB);
 				fAddProperty(Settings, "Data disk GB", Environment.m_VMDataDiskGB);
 			}
+
+			if (Environment.m_MemoryLimitMB != 0)
+				fAddProperty(Settings, "Memory limit MB", Environment.m_MemoryLimitMB);
+			if (Environment.m_CPULimit != 0.0)
+				fAddProperty(Settings, "CPU limit", Environment.m_CPULimit);
 
 			if (!Environment.m_OSDependencies.f_IsEmpty())
 				fAddProperty(Settings, "OS dependencies", "{vs}"_f << Environment.m_OSDependencies);
@@ -1830,11 +2595,17 @@ namespace NMib::NCloud::NAppManager
 		{
 			CEJsonSorted SettingsJson(EJsonType_Object);
 			SettingsJson["EnvironmentAgent"] = true;
+			SettingsJson["EnvironmentContainer"] = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container;
 			SettingsJson["EnvironmentHostID"] = mp_State.m_HostID;
 			SettingsJson["UserGroupNameTransform"] = mp_pUniqueUserGroup->m_UserGroupNameTransform;
 
 			if (fp_EnvironmentUsesRemoteStorage(*_pEnvironment))
-				SettingsJson["EnvironmentDataRoot"] = mcp_pEnvironmentDataRootVM;
+			{
+				if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
+					SettingsJson["EnvironmentDataRoot"] = mcp_pEnvironmentDataRootVM;
+				else
+					SettingsJson["EnvironmentDataRoot"] = mcp_pEnvironmentDataRootContainer;
+			}
 
 			DeploymentSettings = SettingsJson.f_ToString();
 		}
@@ -1972,8 +2743,18 @@ namespace NMib::NCloud::NAppManager
 	{
 		// The environment manages the application storage itself when host paths
 		// cannot be mounted into it usefully: macOS guests gate virtiofs shares
-		// behind Full Disk Access
-		return _Environment.m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM;
+		// behind Full Disk Access, and the macOS container runtimes cross a
+		// virtual machine boundary with the same class of problems. Containers on
+		// Linux bind mount host paths natively and keep the host-side storage
+		if (_Environment.m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM)
+			return true;
+
+#ifdef DPlatformFamily_macOS
+		if (_Environment.m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+			return true;
+#endif
+
+		return false;
 	}
 
 	// The guest disk in an image bundle is writable, so one environment uses a bundle
@@ -2160,6 +2941,20 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	// Containers run Linux guests and VM images run macOS guests, both with the host architecture
+	CStr CAppManagerActor::fsp_GetEnvironmentGuestPlatform(CAppManagerInterface::EEnvironmentType _Type)
+	{
+		CStr HostPlatform = DMalterlibCloudPlatform;
+		CStr Architecture = HostPlatform.f_Extract(HostPlatform.f_FindReverse("-") + 1);
+
+		if (_Type == CAppManagerInterface::EEnvironmentType_Container)
+			return "Linux-{}"_f << Architecture;
+		else if (_Type == CAppManagerInterface::EEnvironmentType_VM)
+			return "macOS-{}"_f << Architecture;
+
+		return HostPlatform;
+	}
+
 	// An environment that is being removed takes no new applications
 	bool CAppManagerActor::fp_EnvironmentAvailable(CStr const &_Name)
 	{
@@ -2169,33 +2964,133 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<NWeb::NHTTP::CURL> CAppManagerActor::fp_EnsureEnvironmentListen(TCSharedPointer<CEnvironment> _pEnvironment)
 	{
-		if (_pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_VM)
-			co_return mp_State.m_LocalAddress;
-
-		// Unix domain sockets cannot cross the virtiofs shares that VMs use, so
-		// guests connect to a listen address on the host side of the shared network
-		// instead of the primary local address
-		CStr HostAddress;
-
-		// The virtualization framework NAT network is the macOS shared network; its
-		// host address is kept in the vmnet system configuration
-		CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
-			(
-				"/usr/bin/defaults"
-				, fg_CreateVector<CStr>("read", "/Library/Preferences/SystemConfiguration/com.apple.vmnet", "Shared_Net_Address")
-				, mp_State.m_RootDirectory
-				, {}
-			)
+		bool bVM = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM;
+		bool bAppleContainer
+			= _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container
+			&& fp_GetContainerRuntimeExecutable(_pEnvironment) == "container"
+		;
+		bool bColima
+			= _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container
+			&& fp_UseOwnColimaSystem(_pEnvironment)
 		;
 
-		CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
-		SimpleLaunch.m_LogName = "Environment/{}/VMNetAddress"_f << _pEnvironment->m_Name;
+		if (fp_EnvironmentUsesAgentSocket(_pEnvironment))
+		{
+#ifndef DPlatformFamily_Linux
+			// Unix domain sockets cannot cross the virtual machine boundary of docker on other hosts
+			co_return DMibErrorInstance("Docker environments need a Linux host. Use the AppleContainer or Colima container runtime.");
+#else
+			// A docker container only sees its own mounts, so its agent connects through a listen in a directory that
+			// the container mounts
+			CStr SocketDirectory = fp_GetEnvironmentAgentSocketDirectory(*_pEnvironment);
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
 
-		auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
-		if (Result && Result->m_ExitCode == 0)
-			HostAddress = CStr(Result->f_GetStdOut().f_Trim());
-		if (HostAddress.f_IsEmpty())
-			HostAddress = "192.168.64.1";
+				co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [SocketDirectory]()
+						{
+							CDistributedAppActor_Settings::fs_PrepareLocalSocketDirectory(SocketDirectory);
+						}
+						% "Failed to prepare the environment agent socket directory"
+					)
+				;
+			}
+
+			NWeb::NHTTP::CURL ListenUrl;
+			if (!ListenUrl.f_Decode("wss://[UNIX(666):{}]/"_f << (SocketDirectory / "Agent.socket")))
+				co_return DMibErrorInstance("Failed to create the environment agent socket address");
+
+			CDistributedActorTrustManager_Address Address;
+			Address.m_URL = ListenUrl;
+
+			if (!co_await mp_State.m_TrustManager(&CDistributedActorTrustManager::f_HasListen, Address))
+			{
+				co_await (mp_State.m_TrustManager(&CDistributedActorTrustManager::f_AddListen, Address, 0) % "Failed to add the environment agent listen");
+
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Added listen '{}' for environment '{}'", ListenUrl.f_Encode(), _pEnvironment->m_Name);
+			}
+
+			co_return ListenUrl;
+#endif
+		}
+
+		if (!bVM && !bAppleContainer && !bColima)
+			co_return mp_State.m_LocalAddress;
+
+		// Unix domain sockets cannot cross the virtiofs shares that containers and VMs
+		// use, so guests connect to a listen address on the host side of the shared
+		// network instead of the primary local address
+		CStr HostAddress;
+		if (bColima)
+		{
+			// The lima user-mode network places the host at a fixed address, published
+			// to guests as host.lima.internal; containers reach it through the docker
+			// bridge and the virtual machine's outbound network
+			HostAddress = "192.168.5.2";
+		}
+		else if (bAppleContainer)
+		{
+			CStr Network = _pEnvironment->m_Settings.m_ContainerNetwork;
+			if (Network.f_IsEmpty())
+				Network = "default";
+
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch
+				(
+					fp_BuildContainerCommandParams(_pEnvironment, fg_CreateVector<CStr>("network", "inspect", Network))
+					, CProcessLaunchActor::ESimpleLaunchFlag_GenerateExceptionOnNonZeroExitCode
+				)
+			;
+			SimpleLaunch.m_LogName = "AppleContainer/NetworkInspect";
+
+			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
+			if (!Result)
+				co_return DMibErrorInstance("Failed to inspect container network '{}': {}"_f << Network << Result.f_GetExceptionStr());
+
+			{
+				auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the container network inspect output");
+
+				CJsonOrdered Json = CJsonOrdered::fs_FromString(Result->f_GetStdOut());
+				if (Json.f_IsArray())
+				{
+					for (auto &Item : Json.f_Array())
+					{
+						if (auto *pStatus = Item.f_GetMember("status"))
+						{
+							if (auto *pGateway = pStatus->f_GetMember("ipv4Gateway"))
+								HostAddress = pGateway->f_AsString();
+						}
+
+						break;
+					}
+				}
+			}
+
+			if (HostAddress.f_IsEmpty())
+				co_return DMibErrorInstance("Found no gateway address for container network '{}'"_f << Network);
+		}
+		else
+		{
+			// The virtualization framework NAT network is the macOS shared network; its
+			// host address is kept in the vmnet system configuration
+			CProcessLaunchParams LaunchParams = CProcessLaunchParams::fs_LaunchExecutable
+				(
+					"/usr/bin/defaults"
+					, fg_CreateVector<CStr>("read", "/Library/Preferences/SystemConfiguration/com.apple.vmnet", "Shared_Net_Address")
+					, mp_State.m_RootDirectory
+					, {}
+				)
+			;
+
+			CProcessLaunchActor::CSimpleLaunch SimpleLaunch(LaunchParams, CProcessLaunchActor::ESimpleLaunchFlag_None);
+			SimpleLaunch.m_LogName = "Environment/{}/VMNetAddress"_f << _pEnvironment->m_Name;
+
+			auto Result = co_await CProcessLaunchActor::fs_LaunchSimple(SimpleLaunch).f_Wrap();
+			if (Result && Result->m_ExitCode == 0)
+				HostAddress = CStr(Result->f_GetStdOut().f_Trim());
+			if (HostAddress.f_IsEmpty())
+				HostAddress = "192.168.64.1";
+		}
 
 		for (aint Attempt = 0;; ++Attempt)
 		{
@@ -2287,6 +3182,9 @@ namespace NMib::NCloud::NAppManager
 				ListenUrls.f_Insert("wss://0.0.0.0:{}/"_f << _pEnvironment->m_ListenPort);
 		}
 
+		if (fp_EnvironmentUsesAgentSocket(_pEnvironment))
+			ListenUrls.f_Insert("wss://[UNIX(666):{}]/"_f << (fp_GetEnvironmentAgentSocketDirectory(*_pEnvironment) / "Agent.socket"));
+
 		for (auto &ListenUrl : ListenUrls)
 		{
 			CDistributedActorTrustManager_Address Address;
@@ -2333,6 +3231,9 @@ namespace NMib::NCloud::NAppManager
 			if (_pEnvironment->m_bRemoving)
 				co_return DMibErrorInstance("Environment is being removed");
 
+			if (_pEnvironment->m_bPulling)
+				co_return DMibErrorInstance("Environment is being pulled");
+
 			// The shutdown stops the environments once, so a start after it would outlive the AppManager
 			if (mp_bStoppingApp)
 				co_return DMibErrorInstance("The AppManager is stopping");
@@ -2341,7 +3242,7 @@ namespace NMib::NCloud::NAppManager
 				co_return {};
 
 			// The starting flag must be set before the first suspension: a concurrent start
-			// would otherwise slip past the guard and launch the agent twice
+			// would otherwise slip past the guard and attach to the same container twice
 			if (_pEnvironment->m_bStarting)
 			{
 				co_await _pEnvironment->m_OnAgentConnected.f_Insert().f_Future();
@@ -2351,9 +3252,9 @@ namespace NMib::NCloud::NAppManager
 			if (!_pEnvironment->m_bStopping)
 				break;
 
-			// A stop can still be tearing down the previous virtual machine, which
-			// holds the shared machine state like the guest image locks; starting on
-			// top of it would race that teardown
+			// A stop can still be tearing down the previous container or virtual
+			// machine, which holds the shared machine state like the guest image
+			// locks; starting on top of it would race that teardown
 			(void)co_await _pEnvironment->m_OnStopFinished.f_Insert().f_Future().f_Wrap();
 		}
 
@@ -2370,6 +3271,7 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
+		bool bContainer = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container;
 		bool bVM = _pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_VM;
 
 		_pEnvironment->m_bStarting = true;
@@ -2431,10 +3333,135 @@ namespace NMib::NCloud::NAppManager
 
 		TCPromiseFuturePair<void> LaunchedPromise;
 
+		CStr LaunchExecutable = AgentExecutable;
+		TCVector<CStr> LaunchParameters = {"--daemon-run-standalone", "--log-to-stderr"};
+
+		NWeb::NHTTP::CURL AgentAddress = mp_State.m_LocalAddress;
+
+		if (bContainer)
+		{
+			{
+				auto Result = co_await fp_EnsureContainerSystem(_pEnvironment).f_Wrap();
+				if (!Result)
+				{
+					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+					co_return Result.f_GetException();
+				}
+			}
+
+			// Everything a colima environment writes through its mounts is written on
+			// the host by the colima user, so it must own the environment storage before
+			// the data volume image is created in it
+			if (fp_UseOwnColimaSystem(_pEnvironment))
+			{
+				auto Result = co_await fp_EnsureColimaOwnership(AgentRootDirectory).f_Wrap();
+				if (!Result)
+				{
+					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+					co_return Result.f_GetException();
+				}
+			}
+
+			// The data volume carrying the application storage must exist before
+			// the container is created with it
+			if (fp_EnvironmentUsesRemoteStorage(*_pEnvironment))
+			{
+				auto Result = co_await fp_EnsureEnvironmentDataVolume(_pEnvironment).f_Wrap();
+				if (!Result)
+				{
+					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+					co_return Result.f_GetException();
+				}
+			}
+
+			{
+				auto Result = co_await fp_EnsureEnvironmentListen(_pEnvironment).f_Wrap();
+				if (!Result)
+				{
+					_pEnvironment->f_SetStatus(Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
+					co_return Result.f_GetException();
+				}
+
+				AgentAddress = *Result;
+			}
+
+			LaunchExecutable = fp_GetContainerRuntimeExecutable(_pEnvironment);
+			CAppManagerContainerLaunch ContainerLaunch = fp_BuildEnvironmentContainerLaunch(_pEnvironment, AgentExecutable, AgentRootDirectory);
+			TCVector<CStr> RunArguments = fg_AppManager_BuildContainerRunArguments(ContainerLaunch);
+
+			// The container keeps its creation-time process environment, so it can only be
+			// reused while everything that shaped it is unchanged; the fingerprint covers
+			// the full run command plus the values forwarded through the environment
+			CStr FingerprintData = LaunchExecutable;
+			for (auto &Argument : RunArguments)
+				FingerprintData += "\n" + Argument;
+			FingerprintData += "\n" + AgentAddress.f_Encode();
+			FingerprintData += "\n" + mp_State.m_HostID;
+			CStr Fingerprint = NCryptography::CHash_SHA256::fs_DigestFromData(FingerprintData.f_GetStr(), FingerprintData.f_GetLen()).f_GetString();
+
+			bool bReuse
+				= Fingerprint == _pEnvironment->m_ContainerFingerprint
+				&& !_pEnvironment->m_ContainerLaunchID.f_IsEmpty()
+				&& co_await fp_EnvironmentContainerExists(_pEnvironment)
+			;
+
+			if (_pEnvironment->m_bDeleted)
+				co_return DMibErrorInstance("Environment has been deleted");
+
+			if (bReuse)
+			{
+				// Stop a still-running instance left behind by an earlier AppManager, then
+				// restart it with attached standard streams for the ticket handshake. The
+				// container filesystem survives, keeping OS updates made inside it.
+				co_await fp_StopEnvironmentContainer(_pEnvironment);
+
+				LaunchParameters = fg_CreateVector<CStr>("start", "--attach", "--interactive", fp_GetContainerName(_pEnvironment));
+			}
+			else
+			{
+				// Recreating the container resets its filesystem to the image, so take the
+				// chance to pull the newest image for the reference first
+				co_await fp_RemoveEnvironmentContainer(_pEnvironment);
+
+				co_await fp_PullEnvironmentContainerImage(_pEnvironment).f_Wrap()
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to pull environment container image")
+				;
+
+				_pEnvironment->m_ContainerLaunchID = fg_RandomID();
+				_pEnvironment->m_ContainerRequestTicketMagic = fg_RandomID();
+				_pEnvironment->m_ContainerFingerprint = Fingerprint;
+
+				LaunchParameters = fg_Move(RunArguments);
+			}
+
+			// A started container mounts its bind mounts again, so a reused container covers the mounts of this launch
+			// too, including ones forgotten for a replaced directory
+			_pEnvironment->m_ContainerMounts.f_Clear();
+			_pEnvironment->m_ContainerSamePathMounts.f_Clear();
+			for (auto &Mount : ContainerLaunch.m_Mounts)
+			{
+				auto &HostPath = ContainerLaunch.m_Mounts.fs_GetKey(Mount);
+				_pEnvironment->m_ContainerMounts.f_Insert(fg_TempCopy(HostPath));
+				if (Mount == HostPath)
+					_pEnvironment->m_ContainerSamePathMounts.f_Insert(fg_TempCopy(HostPath));
+			}
+
+			co_await fp_UpdateEnvironmentJson(_pEnvironment).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to save environment container state")
+			;
+
+			if (_pEnvironment->m_bDeleted)
+				co_return DMibErrorInstance("Environment has been deleted");
+
+			_pEnvironment->m_LaunchID = _pEnvironment->m_ContainerLaunchID;
+		}
+
+		bool bOwnAppleContainerSystem = bContainer && LaunchExecutable == "container" && fp_UseOwnAppleContainerSystem();
+
 		CProcessLaunchActor::CLaunch Launch = CProcessLaunchParams::fs_LaunchExecutable
 			(
-				AgentExecutable
-				, fg_CreateVector<CStr>("--daemon-run-standalone", "--log-to-stderr")
+				LaunchExecutable
+				, LaunchParameters
 				, AgentRootDirectory
 				, [this, _pEnvironment, LaunchedPromise = LaunchedPromise.m_Promise](CProcessLaunchStateChangeVariant const &_State, fp64 _TimeSinceStart)
 				{
@@ -2453,6 +3480,12 @@ namespace NMib::NCloud::NAppManager
 							if (!LaunchedPromise.f_IsSet())
 								LaunchedPromise.f_SetException(DMibErrorInstance(LaunchError));
 
+							_pEnvironment->m_bAgentLaunchFinished = true;
+
+							auto Waiters = fg_Move(_pEnvironment->m_OnAgentLaunchFinished);
+							for (auto &Promise : Waiters)
+								Promise.f_SetResult();
+
 							fp_OnEnvironmentAgentDisconnected(_pEnvironment);
 						}
 						break;
@@ -2465,6 +3498,12 @@ namespace NMib::NCloud::NAppManager
 
 							if (!LaunchedPromise.f_IsSet())
 								LaunchedPromise.f_SetException(DMibErrorInstance(fg_Format("Environment agent exited with '{}' before connecting", ExitStatus)));
+
+							_pEnvironment->m_bAgentLaunchFinished = true;
+
+							auto Waiters = fg_Move(_pEnvironment->m_OnAgentLaunchFinished);
+							for (auto &Promise : Waiters)
+								Promise.f_SetResult();
 
 							fp_OnEnvironmentAgentDisconnected(_pEnvironment);
 						}
@@ -2480,15 +3519,28 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_LogName = fg_Format("Environment/{}/Agent", _pEnvironment->m_Name);
 
 		auto &LaunchParams = Launch.m_Params;
-		LaunchParams.m_Environment["HOME"] = AgentRootDirectory + "/.home";
-		LaunchParams.m_Environment["TMPDIR"] = AgentRootDirectory + "/.tmp";
+		LaunchParams.m_bAllowExecutableLocate = bContainer;
+
+		// The container runtime client must keep the launching environment (for example
+		// the docker context configuration in HOME); the agent environment inside the
+		// container is set with explicit --env values instead
+		if (!bContainer)
+		{
+			LaunchParams.m_Environment["HOME"] = AgentRootDirectory + "/.home";
+			LaunchParams.m_Environment["TMPDIR"] = AgentRootDirectory + "/.tmp";
+		}
+		if (bOwnAppleContainerSystem)
+			fp_ApplyAppleContainerLaunchEnvironment(LaunchParams);
+		else if (bContainer && fp_UseOwnColimaSystem(_pEnvironment))
+			fp_ApplyColimaLaunchEnvironment(LaunchParams);
 		LaunchParams.m_bMergeEnvironment = true;
 		LaunchParams.m_bCreateNewProcessGroup = true;
 		LaunchParams.m_bShowLaunched = false;
 
+		_pEnvironment->m_bAgentLaunchFinished = false;
 		_pEnvironment->m_AgentLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
 			(
-				mp_State.m_LocalAddress
+				AgentAddress
 				, mp_State.m_TrustManager
 				, g_ActorFunctor / [_pEnvironment](CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _Certificate) -> TCFuture<void>
 				{
@@ -2511,6 +3563,7 @@ namespace NMib::NCloud::NAppManager
 				, fg_Format("Environment/{}", _pEnvironment->m_Name)
 				, _pEnvironment->m_LaunchID
 				, false
+				, bContainer ? _pEnvironment->m_ContainerRequestTicketMagic : CStr()
 			)
 		;
 
@@ -2697,6 +3750,10 @@ namespace NMib::NCloud::NAppManager
 		if (!_pEnvironment->m_bStopping && bWasStarted)
 			_pEnvironment->f_SetStatus("Agent disconnected", CAppManagerInterface::EStatusSeverity_Error);
 
+		// The colima virtual machine can have exited with the agent, so the next start checks it again
+		if (!_pEnvironment->m_bStopping && fp_UseOwnColimaSystem(_pEnvironment))
+			mp_bColimaSystemReady = false;
+
 		TCVector<TCSharedPointer<CApplication>> RelaunchApplications;
 		for (auto &pApplication : mp_Applications)
 		{
@@ -2835,11 +3892,41 @@ namespace NMib::NCloud::NAppManager
 
 		_pEnvironment->m_AgentHostID = {};
 
+		// Stop the container through the runtime first: the attached client then exits by
+		// itself. Signalling the client instead does not stop the container; the Apple
+		// container client cannot even forward the signal, which leaves it running until
+		// the stop escalates to killing it
+		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container && _pEnvironment->m_AgentLaunch)
+		{
+			// The stop below reports a container that does not stop
+			co_await fp_StopEnvironmentContainer(_pEnvironment).f_Wrap()
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to stop environment container")
+			;
+
+			// The runtime stop makes the attached client exit by itself; wait for
+			// that exit, and only fall back to signalling the client below when it
+			// does not exit in time
+			if (!_pEnvironment->m_bAgentLaunchFinished)
+			{
+				auto WaitResult = co_await _pEnvironment->m_OnAgentLaunchFinished.f_Insert().f_Future()
+					.f_Timeout(30.0, "Timed out waiting for the environment agent client to exit")
+					.f_Wrap()
+				;
+
+				if (!WaitResult)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "The agent client for environment '{}' did not exit with the container: {}", _pEnvironment->m_Name, WaitResult.f_GetExceptionStr());
+			}
+		}
+
 		if (_pEnvironment->m_AgentLaunch)
 		{
-			auto StopResult = co_await fg_TempCopy(_pEnvironment->m_AgentLaunch)(&CProcessLaunchActor::f_StopProcess).f_Wrap();
-			if (!StopResult)
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to stop agent for environment '{}': {}", _pEnvironment->m_Name, StopResult.f_GetExceptionStr());
+			// A launch that already exited by itself has nothing left to stop
+			if (!_pEnvironment->m_bAgentLaunchFinished)
+			{
+				auto StopResult = co_await fg_TempCopy(_pEnvironment->m_AgentLaunch)(&CProcessLaunchActor::f_StopProcess).f_Wrap();
+				if (!StopResult)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to stop agent for environment '{}': {}", _pEnvironment->m_Name, StopResult.f_GetExceptionStr());
+			}
 
 			co_await fg_Move(_pEnvironment->m_AgentLaunch).f_Destroy().f_Wrap()
 				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy environment agent launch")
@@ -2865,6 +3952,19 @@ namespace NMib::NCloud::NAppManager
 			co_await fg_Move(_pEnvironment->m_VMActor).f_Destroy().f_Wrap()
 				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy environment virtual machine")
 			;
+		}
+
+		// The container is stopped but kept, so its filesystem (including OS updates
+		// made inside it) survives across environment restarts
+		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container)
+		{
+			auto StopResult = co_await fp_StopEnvironmentContainer(_pEnvironment).f_Wrap();
+			if (!StopResult)
+			{
+				StopError = StopResult.f_GetExceptionStr();
+				_pEnvironment->f_SetStatus(StopError, CAppManagerInterface::EStatusSeverity_Error);
+				co_return StopResult.f_GetException();
+			}
 		}
 
 		_pEnvironment->f_SetStatus("Stopped", CAppManagerInterface::EStatusSeverity_Warning);
@@ -2997,6 +4097,83 @@ namespace NMib::NCloud::NAppManager
 		co_return {};
 	}
 
+	// The container keeps a directory an application no longer uses mounted until it is recreated, and the mount hides a
+	// directory a later application at the same path replaces. Forgetting the mount makes a launch of such an application
+	// recreate the container
+	void CAppManagerActor::fp_ReleaseContainerApplicationMounts(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr const &_Directory)
+	{
+		if (_pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Container)
+			return;
+
+		bool bMounted = false;
+		for (auto *pMounts : {&_pEnvironment->m_ContainerMounts, &_pEnvironment->m_ContainerSamePathMounts})
+		{
+			TCVector<CStr> Released;
+			for (auto &Mount : *pMounts)
+			{
+				if (Mount == _Directory || Mount.f_StartsWith(_Directory + "/"))
+					Released.f_Insert(Mount);
+			}
+
+			for (auto &Mount : Released)
+				pMounts->f_Remove(Mount);
+
+			if (!Released.f_IsEmpty())
+				bMounted = true;
+		}
+
+		if (!bMounted)
+			return;
+
+		fp_UpdateEnvironmentJson(_pEnvironment) > fg_LogError("Malterlib/Cloud/AppManager", "Failed to save environment container state");
+
+		if (!_pEnvironment->m_bDeleted && (_pEnvironment->f_IsStarted() || _pEnvironment->m_bStarting))
+		{
+			fp_RestartEnvironmentWhenIdle(_pEnvironment)
+				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to restart environment '{}' to release an application directory"_f << _pEnvironment->m_Name)
+			;
+		}
+	}
+
+	// Returns true when the environment was stopped, so the caller starts it with the new mount set
+	TCFuture<bool> CAppManagerActor::fp_StopEnvironmentNotCoveringApplication(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		// A container only sees the mounts it was created with, so when the
+		// application directory is not covered the environment is restarted with
+		// the new mount set. Environments that manage the application storage
+		// themselves cover every application through their data volume
+		if (!_pEnvironment->f_IsStarted() || fp_EnvironmentUsesRemoteStorage(*_pEnvironment))
+			co_return false;
+
+		if (_pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Container)
+			co_return false;
+
+		CStr Directory = _pApplication->f_GetDirectory();
+
+		// The application launches at the same path as on the host
+		for (auto &Mount : _pEnvironment->m_ContainerSamePathMounts)
+		{
+			if (Directory == Mount || Directory.f_StartsWith(Mount + "/"))
+				co_return false;
+		}
+
+		// The restart does not wait for operations of other applications, since one of them can be waiting for this
+		// application
+		DMibLogWithCategory
+			(
+				Malterlib/Cloud/AppManager
+				, Info
+				, "Restarting environment '{}' to mount the directory of application '{}'"
+				, _pEnvironment->m_Name
+				, _pApplication->m_Name
+			)
+		;
+
+		co_await fp_StopEnvironmentInternal(_pEnvironment);
+
+		co_return true;
+	}
+
 	auto CAppManagerActor::fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment) -> TCFuture<CAppLaunchResult>
 	{
 		// A manual stop can happen while the launch is on its way here
@@ -3007,6 +4184,12 @@ namespace NMib::NCloud::NAppManager
 
 			co_return DMibErrorInstance(Status);
 		}
+
+		bool bRemoteStorage = fp_EnvironmentUsesRemoteStorage(*_pEnvironment);
+
+		bool bRestartedEnvironment = co_await fp_StopEnvironmentNotCoveringApplication(_pApplication, _pEnvironment);
+		if (_pApplication->m_bDeleted)
+			co_return DMibErrorInstance("Application deleted");
 
 		auto EnsureResult = co_await fp_EnsureEnvironmentStarted(_pEnvironment).f_Wrap();
 
@@ -3053,6 +4236,11 @@ namespace NMib::NCloud::NAppManager
 			}
 		}
 
+		// Relaunch the applications the environment restart stopped with the auto
+		// start flag
+		if (bRestartedEnvironment)
+			fp_UpdateApplicationDependencies();
+
 		auto InterfaceAddress = co_await fp_EnsureEnvironmentListen(_pEnvironment).f_Wrap();
 
 		if (_pApplication->m_bDeleted)
@@ -3074,6 +4262,48 @@ namespace NMib::NCloud::NAppManager
 			co_return InterfaceAddress.f_GetException();
 		}
 
+		// Everything the application writes through the colima mounts is written on
+		// the host by the colima user, so it must own the application directory
+		if (!bRemoteStorage && fp_UseOwnColimaSystem(_pEnvironment))
+		{
+			auto OwnershipResult = co_await fp_EnsureColimaOwnership(_pApplication->f_GetDirectory()).f_Wrap();
+
+			if (_pApplication->m_bDeleted)
+				co_return DMibErrorInstance("Application deleted");
+
+			if (!OwnershipResult)
+			{
+				fp_AppLaunchStateChanged
+					(
+						_pApplication
+						, "Failed to prepare directory for environment '{}': {}"_f << _pEnvironment->m_Name << OwnershipResult.f_GetExceptionStr()
+						, CAppManagerInterface::EStatusSeverity_Error
+					)
+				;
+
+				if (!_pApplication->m_bStopped)
+					fp_ScheduleRelaunchApp(_pApplication);
+
+				co_return OwnershipResult.f_GetException();
+			}
+		}
+
+		// The restart for the mount stops the dependencies, which stop this application too. The dependency processing
+		// launches it when the dependencies run again
+		if (bRestartedEnvironment && _pApplication->m_bStopped && !_pApplication->m_bPreventLaunch_User)
+		{
+			_pApplication->m_bStopped = false;
+
+			CStr Status;
+			CAppManagerInterface::EStatusSeverity Severity;
+			bool bNeedsEncryption = false;
+			if (!_pApplication->f_DependenciesSatisfied(Status, Severity, bNeedsEncryption))
+			{
+				fp_SetAppLaunchStatus(_pApplication, Status, Severity);
+				co_return CAppLaunchResult{};
+			}
+		}
+
 		// A stop finds nothing to stop while the environment is prepared
 		if (_pApplication->m_bStopped)
 			co_return DMibErrorInstance("Application was stopped while its environment was prepared");
@@ -3087,7 +4317,7 @@ namespace NMib::NCloud::NAppManager
 
 		// An environment that manages the application storage derives the
 		// directory from the name itself
-		if (!fp_EnvironmentUsesRemoteStorage(*_pEnvironment))
+		if (!bRemoteStorage)
 			Launch.m_Directory = _pApplication->f_GetDirectory();
 		Launch.m_Executable = _pApplication->m_Settings.m_Executable;
 		Launch.m_Parameters = _pApplication->m_Settings.m_ExecutableParameters;
@@ -3101,6 +4331,17 @@ namespace NMib::NCloud::NAppManager
 		Launch.m_InterfaceAddress = InterfaceAddress->f_Encode();
 		Launch.m_LaunchID = _pApplication->m_LaunchID;
 		Launch.m_OSDependencies = _pApplication->m_Settings.m_OSDependencies;
+		for (auto &Child : _pApplication->m_Children)
+			Launch.m_ChildDirectories.f_Insert(Child.f_GetDirectory());
+
+		if (auto pLowPortExecutables = _pApplication->m_LastInstalledVersionInfo.m_ExtraInfo.f_GetMember("LowPortExecutables", EJsonType_Array))
+		{
+			for (auto &Executable : pLowPortExecutables->f_Array())
+			{
+				if (Executable.f_IsString())
+					Launch.m_LowPortExecutables.f_Insert(Executable.f_String());
+			}
+		}
 
 		// The application can request its connection ticket before the launch call returns, which requires the association
 		_pApplication->m_pLaunchedEnvironment = _pEnvironment;

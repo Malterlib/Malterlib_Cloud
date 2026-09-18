@@ -62,6 +62,13 @@ namespace NMib::NCloud::NAppManager
 				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
 				return false;
 			}
+
+			if (pEnvironment && (*pEnvironment)->m_bPulling)
+			{
+				o_State = fg_Format("Waiting for the pull of environment '{}'", m_Settings.m_LaunchEnvironment);
+				o_Severity = CAppManagerInterface::EStatusSeverity_Warning;
+				return false;
+			}
 		}
 
 		if (f_IsChildApp())

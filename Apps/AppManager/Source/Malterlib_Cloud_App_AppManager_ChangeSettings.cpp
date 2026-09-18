@@ -4,6 +4,7 @@
 #include "Malterlib_Cloud_App_AppManager.h"
 
 #include <Mib/Concurrency/AsyncDestroy>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -256,6 +257,28 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception(Error);
 		}
 
+		// A container takes the bind mounted application directory over for its own accounts, so the host accounts take it
+		// back when the application leaves the container
+		bool bTakeBackOwnership = false;
+		TCSharedPointer<CEnvironment> pOldEnvironment;
+		CStr OldDirectory = Application.f_GetDirectory();
+		if (ChangedSettings & EApplicationSetting_LaunchEnvironment)
+		{
+			if (auto *pFoundEnvironment = mp_Environments.f_FindEqual(Application.m_Settings.m_LaunchEnvironment))
+			{
+				pOldEnvironment = *pFoundEnvironment;
+				bTakeBackOwnership
+					= pOldEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container
+					&& !fp_EnvironmentUsesRemoteStorage(*pOldEnvironment)
+				;
+			}
+		}
+
+		// The child applications inside the directory keep their own owners
+		TCVector<CStr> ChildDirectories;
+		for (auto &Child : Application.m_Children)
+			ChildDirectories.f_Insert(Child.f_GetDirectory());
+
 #ifdef DPlatformFamily_Windows
 		if (!NewSettings.m_RunAsUser.f_IsEmpty() && ((ChangedSettings & EApplicationSetting_RunAsUser) || NewSettings.m_RunAsUserPassword.f_IsEmpty()))
 		{
@@ -361,6 +384,12 @@ namespace NMib::NCloud::NAppManager
 								return;
 
 							fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
+
+							CStr User = pUniqueUserGroup->f_GetUser(NewSettings.m_RunAsUser);
+							CStr Group = pUniqueUserGroup->f_GetGroup(NewSettings.m_RunAsGroup);
+							if (bTakeBackOwnership && (!User.f_IsEmpty() || !Group.f_IsEmpty()))
+								fsp_SetDirectoryOwnerSkippingLinks(Directory, User, Group, ChildDirectories);
+
 							fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 						}
 					)
@@ -381,6 +410,9 @@ namespace NMib::NCloud::NAppManager
 
 		if (pApplication->m_bDeleted)
 			co_return Auditor.f_Exception("Application has been deleted, aborting");
+
+		if (pOldEnvironment)
+			fp_ReleaseContainerApplicationMounts(pOldEnvironment, OldDirectory);
 
 		pApplication->m_bPreventLaunch_DelayAfterFailure = false;
 

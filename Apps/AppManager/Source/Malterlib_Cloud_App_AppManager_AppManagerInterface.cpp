@@ -37,9 +37,11 @@ namespace NMib::NCloud::NAppManager
 		Permissions["AppManager/Command/EnvironmentStart"];
 		Permissions["AppManager/Command/EnvironmentStop"];
 		Permissions["AppManager/Command/EnvironmentRestart"];
+		Permissions["AppManager/Command/EnvironmentPull"];
 		Permissions["AppManager/Command/EnvironmentWindow"];
 		Permissions["AppManager/Command/VMImageCreate"];
 		Permissions["AppManager/Command/VMSettings"];
+		Permissions["AppManager/Command/ColimaSettings"];
 
 		Permissions["AppManager/AppAll"];
 		Permissions["AppManager/EnvironmentAll"];

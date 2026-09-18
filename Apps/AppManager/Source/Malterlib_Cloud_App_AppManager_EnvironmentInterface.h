@@ -10,7 +10,7 @@ namespace NMib::NCloud::NAppManager
 {
 	/// Interface published by an AppManager running as an environment agent.
 	/// The host AppManager uses it to launch and control applications inside
-	/// the environment (a virtual machine or a local child process).
+	/// the environment (a container, a virtual machine or a local child process).
 	struct CAppManagerEnvironmentInterface : public NConcurrency::CActor
 	{
 		static constexpr ch8 const *mc_pDefaultNamespace = "com.malterlib/Cloud/AppManagerEnvironment";
@@ -66,6 +66,8 @@ namespace NMib::NCloud::NAppManager
 			NStr::CStr m_InterfaceAddress; /// Host AppManager address the application connects its distributed app interface to
 			NStr::CStr m_LaunchID; /// Host AppManager launch id the application registers with
 			NContainer::TCMap<NStr::CStr, NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// OS dependencies of the application, installed by the agent inside the environment
+			NContainer::TCVector<NStr::CStr> m_LowPortExecutables; /// Executables relative to the directory that may bind low ports
+			NContainer::TCVector<NStr::CStr> m_ChildDirectories; /// Directories of child applications inside the directory, which keep their own owners
 		};
 
 		struct CEnvironmentScript
@@ -82,6 +84,9 @@ namespace NMib::NCloud::NAppManager
 			NStr::CStr m_RunAsUser; /// Application user name as configured; the agent resolves the account name
 			NStr::CStr m_RunAsGroup; /// Application group name as configured; the agent resolves the group name
 			NStr::CStrSecure m_RunAsUserPassword; /// Set on Windows, where a local agent logs on with the account the host created
+			bool m_bRunAsUserHasShell = false;
+			NContainer::TCVector<NStr::CStr> m_LowPortExecutables; /// Executables relative to the directory that may bind low ports
+			NContainer::TCVector<NStr::CStr> m_ChildDirectories; /// Directories of child applications inside the directory, which keep their own owners
 		};
 
 		struct CStageFileContents

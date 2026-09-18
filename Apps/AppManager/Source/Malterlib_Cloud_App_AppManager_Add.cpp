@@ -311,25 +311,31 @@ namespace NMib::NCloud::NAppManager
 
 		if (_FromLocalFile.f_IsEmpty() && !bNullApplication)
 		{
+			CStr Platform = DMalterlibCloudPlatform;
+			if (auto *pEnvironment = mp_Environments.f_FindEqual(_Settings.m_LaunchEnvironment))
+				Platform = fsp_GetEnvironmentGuestPlatform((*pEnvironment)->m_Settings.m_Type);
+			if (_Version && !_Version->m_Platform.f_IsEmpty())
+				Platform = _Version->m_Platform;
+			if (!CVersionManager::fs_IsValidPlatform(Platform))
+				co_return Auditor.f_Exception("Invalid platform format");
+
+			bool bExplicitVersion = _Version && _Version->m_VersionID.f_IsValid();
+
+			// The version managers only report the applications of known platforms
+			if (!bExplicitVersion && mp_KnownPlatforms(Platform).f_WasCreated())
+				co_await fp_VersionManagerResubscribeAll();
+
 			auto *pVersionManagerApplication = mp_VersionManagerApplications.f_FindEqual(VersionManagerApplication);
 
 			if (pVersionManagerApplication || _Version)
 			{
-				CStr Platform = DMalterlibCloudPlatform;
-				if (_Version && !_Version->m_Platform.f_IsEmpty())
-					Platform = _Version->m_Platform;
-				if (!CVersionManager::fs_IsValidPlatform(Platform))
-					co_return Auditor.f_Exception("Invalid platform format");
-
-				if (_Version && _Version->m_VersionID.f_IsValid())
+				if (bExplicitVersion)
 				{
 					VersionID.m_Platform = Platform;
 					VersionID.m_VersionID = _Version->m_VersionID;
 				}
 				else
 				{
-					if (mp_KnownPlatforms(Platform).f_WasCreated())
-						co_await fp_VersionManagerResubscribeAll();
 					CStr Error;
 					CVersionManager::CVersionInformation VersionInfo;
 					bool bNewestUnconditionalVersionChanged = false;
@@ -511,6 +517,25 @@ namespace NMib::NCloud::NAppManager
 
 		if (!pApplication->m_Settings.m_LaunchEnvironment.f_IsEmpty())
 			co_await fp_CheckEnvironmentAccess(pApplication->m_Settings.m_LaunchEnvironment, _CallingHostInfo);
+
+		// An automatically chosen platform was chosen before the version info set the launch environment
+		if (auto *pEnvironment = mp_Environments.f_FindEqual(pApplication->m_Settings.m_LaunchEnvironment))
+		{
+			bool bAutomaticPlatform = _FromLocalFile.f_IsEmpty() && !bNullApplication && !(_Version && !_Version->m_Platform.f_IsEmpty());
+			CStr const &VersionPlatform = pApplication->m_LastInstalledVersion.m_Platform;
+			CStr GuestPlatform = fsp_GetEnvironmentGuestPlatform((*pEnvironment)->m_Settings.m_Type);
+			if (bAutomaticPlatform && VersionPlatform != GuestPlatform)
+			{
+				co_return Auditor.f_Exception
+					(
+						"Version for platform '{}' cannot launch in environment '{}', which runs '{}'. Specify the launch environment when adding the application."_f
+						<< VersionPlatform
+						<< pApplication->m_Settings.m_LaunchEnvironment
+						<< GuestPlatform
+					)
+				;
+			}
+		}
 
 		pRemoteStorageEnvironment = fp_ApplicationRemoteStorageEnvironment(*pApplication);
 

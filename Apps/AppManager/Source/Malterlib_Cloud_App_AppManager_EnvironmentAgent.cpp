@@ -67,6 +67,8 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_InterfaceAddress;
 		_Stream % m_LaunchID;
 		_Stream % m_OSDependencies;
+		_Stream % m_LowPortExecutables;
+		_Stream % m_ChildDirectories;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CEnvironmentLaunch);
 
@@ -82,6 +84,9 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_RunAsUser;
 		_Stream % m_RunAsGroup;
 		_Stream % m_RunAsUserPassword;
+		_Stream % m_bRunAsUserHasShell;
+		_Stream % m_LowPortExecutables;
+		_Stream % m_ChildDirectories;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CEnvironmentScript);
 
@@ -323,16 +328,23 @@ namespace NMib::NCloud::NAppManager
 			co_await
 				(
 					(
-						g_Dispatch(BlockingActorCheckout) / [DataRoot = mp_EnvironmentDataRoot]()
+						g_Dispatch(BlockingActorCheckout) / [DataRoot = mp_EnvironmentDataRoot, bContainer = mp_bEnvironmentContainer]()
 						{
-							// In a macOS guest the data root is the data disk volume
-							// prepared on first use
+							// In a container the data root is a volume mounted by the
+							// container runtime; in a macOS guest it is the data disk
+							// volume prepared on first use
 #ifdef DPlatformFamily_macOS
-							fg_PrepareEnvironmentDataVolume(DataRoot);
+							if (!bContainer)
+							{
+								fg_PrepareEnvironmentDataVolume(DataRoot);
+								return;
+							}
 #else
+							(void)bContainer;
+#endif
+
 							if (!CFile::fs_FileExists(DataRoot, EFileAttrib_Directory))
 								CFile::fs_CreateDirectory(DataRoot);
-#endif
 						}
 					)
 					% "Failed to prepare the environment application storage"
@@ -465,6 +477,10 @@ namespace NMib::NCloud::NAppManager
 		Settings.m_bBackupEnabled = false;
 		Settings.m_bAutoUpdate = false;
 
+		// The capabilities of the low port executables are set with tools the dependencies can provide
+		if (!_Launch.m_LowPortExecutables.f_IsEmpty())
+			co_await (pThis->fp_EnsureOSDependencies(pApplication) % "Failed to install the OS dependencies of the application");
+
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -472,7 +488,16 @@ namespace NMib::NCloud::NAppManager
 				(
 					(
 						g_Dispatch(BlockingActorCheckout)
-						/ [Settings, Directory = _Launch.m_Directory, pUniqueUserGroup = pThis->mp_pUniqueUserGroup]()
+						/
+						[
+							Settings
+							, Directory = _Launch.m_Directory
+							, pUniqueUserGroup = pThis->mp_pUniqueUserGroup
+							, bTakeOwnership = pThis->mp_bEnvironmentContainer && pThis->mp_EnvironmentDataRoot.f_IsEmpty()
+							, LowPortExecutables = _Launch.m_LowPortExecutables
+							, ChildDirectories = _Launch.m_ChildDirectories
+						]
+						()
 						{
 							fsp_CreateApplicationUserGroup
 								(
@@ -485,6 +510,27 @@ namespace NMib::NCloud::NAppManager
 									, pUniqueUserGroup
 								)
 							;
+
+							// The accounts of a container are its own, so the files the host installed in the bind mounted
+							// directory carry other numeric owners. A runtime that shares numeric IDs with the host, like
+							// rootful Docker without user namespace remapping, can give these IDs to unrelated host accounts;
+							// isolation from host accounts needs user namespace remapping or a rootless runtime
+							CStr User = pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser);
+							CStr Group = pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup);
+							if (bTakeOwnership && (!User.f_IsEmpty() || !Group.f_IsEmpty()))
+							{
+								fsp_SetDirectoryOwnerSkippingLinks(Directory, User, Group, ChildDirectories);
+
+#ifdef DPlatformFamily_Linux
+								// Changing the owner clears the file capabilities
+								for (auto &Executable : LowPortExecutables)
+								{
+									CStr ExecutablePath = Directory / Executable;
+									if (CFile::fs_FileExists(ExecutablePath))
+										CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+								}
+#endif
+							}
 						}
 					)
 					% "Failed to prepare the user and group for application in environment"
@@ -517,6 +563,32 @@ namespace NMib::NCloud::NAppManager
 				)
 			;
 		}
+
+#ifdef DPlatformFamily_Linux
+		// The tools that set the capabilities can come with the OS dependencies the launch installed, after the install of
+		// the files tried to set them, and changing the owners clears them
+		if (bManagedStorage && !_Launch.m_LowPortExecutables.f_IsEmpty())
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) / [Directory = _Launch.m_Directory, LowPortExecutables = _Launch.m_LowPortExecutables]()
+						{
+							for (auto &Executable : LowPortExecutables)
+							{
+								CStr ExecutablePath = Directory / Executable;
+								if (CFile::fs_FileExists(ExecutablePath))
+									CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+							}
+						}
+					)
+					% "Failed to set the capabilities of the low port executables"
+				)
+			;
+		}
+#endif
 
 		if (pApplication->m_bDeleted)
 			co_return DMibErrorInstance("Application was deleted while launching");
@@ -601,6 +673,66 @@ namespace NMib::NCloud::NAppManager
 				_Script.m_Environment["HOME"] = _Script.m_Directory + "/.home";
 			if (!_Script.m_Environment.f_FindEqual("TMPDIR"))
 				_Script.m_Environment["TMPDIR"] = _Script.m_Directory + "/.tmp";
+		}
+
+		// The accounts of a container are its own, so the files the host installed in the bind mounted directory carry other
+		// numeric owners than the account the script runs as
+		if (pThis->mp_bEnvironmentContainer && pThis->mp_EnvironmentDataRoot.f_IsEmpty() && !_Script.m_Directory.f_IsEmpty())
+		{
+			CApplicationSettings Settings;
+			Settings.m_RunAsUser = _Script.m_RunAsUser;
+			Settings.m_RunAsGroup = _Script.m_RunAsGroup;
+			Settings.m_bRunAsUserHasShell = _Script.m_bRunAsUserHasShell;
+
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout)
+						/
+						[
+							Settings
+							, Directory = _Script.m_Directory
+							, pUniqueUserGroup = pThis->mp_pUniqueUserGroup
+							, LowPortExecutables = _Script.m_LowPortExecutables
+							, ChildDirectories = _Script.m_ChildDirectories
+						]
+						()
+						{
+							fsp_CreateApplicationUserGroup
+								(
+									Settings
+									, [](CStr const &_Info)
+									{
+										DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Environment agent script: {}", _Info);
+									}
+									, Directory / ".home"
+									, pUniqueUserGroup
+								)
+							;
+
+							CStr User = pUniqueUserGroup->f_GetUser(Settings.m_RunAsUser);
+							CStr Group = pUniqueUserGroup->f_GetGroup(Settings.m_RunAsGroup);
+							if (User.f_IsEmpty() && Group.f_IsEmpty())
+								return;
+
+							fsp_SetDirectoryOwnerSkippingLinks(Directory, User, Group, ChildDirectories);
+
+#ifdef DPlatformFamily_Linux
+							// Changing the owner clears the file capabilities
+							for (auto &Executable : LowPortExecutables)
+							{
+								CStr ExecutablePath = Directory / Executable;
+								if (CFile::fs_FileExists(ExecutablePath))
+									CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+							}
+#endif
+						}
+					)
+					% "Failed to prepare the user and group for the update script in the environment"
+				)
+			;
 		}
 
 		_Script.m_RunAsUser = pThis->mp_pUniqueUserGroup->f_GetUser(_Script.m_RunAsUser);
@@ -856,7 +988,7 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 
-	void CAppManagerActor::fsp_SetDirectoryOwnerSkippingLinks(CStr const &_Directory, CStr const &_User, CStr const &_Group)
+	void CAppManagerActor::fsp_SetDirectoryOwnerSkippingLinks(CStr const &_Directory, CStr const &_User, CStr const &_Group, TCVector<CStr> const &_ExcludedDirectories)
 	{
 		auto Paths = CFile::fs_FindFiles(_Directory / "*", EFileAttrib_Directory | EFileAttrib_File, true, false);
 		Paths.f_Insert(_Directory);
@@ -864,6 +996,19 @@ namespace NMib::NCloud::NAppManager
 		{
 			// Setting the owner follows links, which can point outside the directory
 			if (CFile::fs_GetAttributesOnLink(Path) & EFileAttrib_Link)
+				continue;
+
+			bool bExcluded = false;
+			for (auto &Excluded : _ExcludedDirectories)
+			{
+				if (Path == Excluded || Path.f_StartsWith(Excluded + "/"))
+				{
+					bExcluded = true;
+					break;
+				}
+			}
+
+			if (bExcluded)
 				continue;
 
 			if (!_User.f_IsEmpty())

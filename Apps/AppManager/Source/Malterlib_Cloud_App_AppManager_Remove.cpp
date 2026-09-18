@@ -103,8 +103,14 @@ namespace NMib::NCloud::NAppManager
 		if (!pApplication || *pApplication != pApplicationPtr)
 			co_return Auditor.f_Exception(fg_Format("Application '{}' was removed while its storage was removed", _Name));
 
+		CStr Directory = pApplicationPtr->f_GetDirectory();
+
 		(*pApplication)->f_Delete();
 		pThis->mp_Applications.f_Remove(_Name);
+
+		for (auto &pEnvironment : pThis->mp_Environments)
+			pThis->fp_ReleaseContainerApplicationMounts(pEnvironment, Directory);
+
 		pThis->fp_SendRemovedAppToRemoteAppManagers(pApplicationPtr);
 		pThis->fp_SendAppChange_Removed(*pApplicationPtr);
 		pThis->fp_UpdateLimits();

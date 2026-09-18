@@ -102,6 +102,34 @@ namespace NMib::NCloud::NAppManager
 				}
 			}
 
+			// A container keeps the bind mounted application directory mounted in its own mount namespace, which keeps the
+			// encrypted device busy
+			{
+				CStr Directory = pEncryptionApplication->f_GetDirectory();
+
+				TCVector<TCSharedPointer<CEnvironment>> MountingEnvironments;
+				for (auto &pEnvironment : mp_Environments)
+				{
+					if (pEnvironment->m_Settings.m_Type != CAppManagerInterface::EEnvironmentType_Container)
+						continue;
+
+					if (!pEnvironment->f_IsStarted() && !pEnvironment->m_bStarting && !pEnvironment->m_bStopping)
+						continue;
+
+					for (auto &Mount : pEnvironment->m_ContainerMounts)
+					{
+						if (Mount == Directory || Directory.f_StartsWith(Mount + "/") || Mount.f_StartsWith(Directory + "/"))
+						{
+							MountingEnvironments.f_Insert(fg_TempCopy(pEnvironment));
+							break;
+						}
+					}
+				}
+
+				for (auto &pEnvironment : MountingEnvironments)
+					co_await (fp_StopEnvironmentInternal(pEnvironment) % "Failed to stop environment before closing encryption");
+			}
+
 			if (pEncryptionApplication->m_DirectoryMonitorSubscription)
 				co_await fg_Exchange(pEncryptionApplication->m_DirectoryMonitorSubscription, nullptr)->f_Destroy();
 		}
