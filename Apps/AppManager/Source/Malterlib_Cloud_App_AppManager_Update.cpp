@@ -44,7 +44,26 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto pUpdate = pUpdateWeak.f_Lock();
 			if (pUpdate)
+			{
 				pUpdate->m_bCancel = true;
+
+				// Destroying the finish functor uncalled aborts the receive in the
+				// environment; aborting the file transfer resolves the future the
+				// update waits on so the cancel takes effect immediately
+				if (!pUpdate->m_fStageFinish.f_IsEmpty())
+				{
+					fg_Move(pUpdate->m_fStageFinish).f_Destroy()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage finish functor")
+					;
+				}
+
+				if (pUpdate->m_StageSend)
+				{
+					fg_Move(pUpdate->m_StageSend).f_Destroy()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send")
+					;
+				}
+			}
 		}
 
 		fp_OnAppUpdateInfoChange();
@@ -384,6 +403,23 @@ namespace NMib::NCloud::NAppManager
 			{
 				pUpdate->m_bCancelOnAppManagerStop = true;
 				bNeedCancel = true;
+
+				// Destroying the finish functor uncalled aborts the receive in the
+				// environment; aborting the file transfer resolves the future the
+				// update waits on so the stop is not held up by the transfer
+				if (!pUpdate->m_fStageFinish.f_IsEmpty())
+				{
+					fg_Move(pUpdate->m_fStageFinish).f_Destroy()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage finish functor")
+					;
+				}
+
+				if (pUpdate->m_StageSend)
+				{
+					fg_Move(pUpdate->m_StageSend).f_Destroy()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send")
+					;
+				}
 			}
 		}
 

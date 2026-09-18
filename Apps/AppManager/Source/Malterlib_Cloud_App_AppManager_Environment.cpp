@@ -1148,11 +1148,18 @@ namespace NMib::NCloud::NAppManager
 				Environment.m_ListenPort = (uint32)pValue->f_Integer();
 			if (auto pValue = EnvironmentJson.f_GetMember("VMMACAddress", EJsonType_String))
 				Environment.m_VMMACAddress = pValue->f_String();
+			if (auto pValue = EnvironmentJson.f_GetMember("VMAgentLaunchID", EJsonType_String))
+				Environment.m_VMAgentLaunchID = pValue->f_String();
 
 			// An agent in a persistent container keeps running across AppManager
 			// restarts and reconnects with the launch id frozen into the container, so
 			// expect that launch id right away
 			Environment.m_LaunchID = Environment.m_ContainerLaunchID;
+
+			// A VM agent likewise keeps running across AppManager restarts and
+			// reconnects with the launch id from its installation
+			if (Environment.m_LaunchID.f_IsEmpty())
+				Environment.m_LaunchID = Environment.m_VMAgentLaunchID;
 		}
 	}
 
@@ -1213,6 +1220,7 @@ namespace NMib::NCloud::NAppManager
 		}
 		EnvironmentJson["ListenPort"] = Environment.m_ListenPort;
 		EnvironmentJson["VMMACAddress"] = Environment.m_VMMACAddress;
+		EnvironmentJson["VMAgentLaunchID"] = Environment.m_VMAgentLaunchID;
 
 		co_return co_await mp_State.m_StateDatabase.f_Save();
 	}
@@ -2823,6 +2831,12 @@ namespace NMib::NCloud::NAppManager
 							if (!LaunchedPromise.f_IsSet())
 								LaunchedPromise.f_SetException(DMibErrorInstance(LaunchError));
 
+							_pEnvironment->m_bAgentLaunchFinished = true;
+
+							auto Waiters = fg_Move(_pEnvironment->m_OnAgentLaunchFinished);
+							for (auto &Promise : Waiters)
+								Promise.f_SetResult();
+
 							fp_OnEnvironmentAgentDisconnected(_pEnvironment);
 						}
 						break;
@@ -2835,6 +2849,12 @@ namespace NMib::NCloud::NAppManager
 
 							if (!LaunchedPromise.f_IsSet())
 								LaunchedPromise.f_SetException(DMibErrorInstance(fg_Format("Environment agent exited with '{}' before connecting", ExitStatus)));
+
+							_pEnvironment->m_bAgentLaunchFinished = true;
+
+							auto Waiters = fg_Move(_pEnvironment->m_OnAgentLaunchFinished);
+							for (auto &Promise : Waiters)
+								Promise.f_SetResult();
 
 							fp_OnEnvironmentAgentDisconnected(_pEnvironment);
 						}
@@ -2868,6 +2888,7 @@ namespace NMib::NCloud::NAppManager
 		LaunchParams.m_bCreateNewProcessGroup = true;
 		LaunchParams.m_bShowLaunched = false;
 
+		_pEnvironment->m_bAgentLaunchFinished = false;
 		_pEnvironment->m_AgentLaunch = fg_ConstructActor<CDistributedAppInterfaceLaunchActor>
 			(
 				AgentAddress
@@ -3211,13 +3232,33 @@ namespace NMib::NCloud::NAppManager
 		// container client cannot even forward the signal, which leaves it running until
 		// the stop escalates to killing it
 		if (_pEnvironment->m_Settings.m_Type == CAppManagerInterface::EEnvironmentType_Container && _pEnvironment->m_AgentLaunch)
+		{
 			co_await fp_StopEnvironmentContainer(_pEnvironment);
+
+			// The runtime stop makes the attached client exit by itself; wait for
+			// that exit, and only fall back to signalling the client below when it
+			// does not exit in time
+			if (!_pEnvironment->m_bAgentLaunchFinished)
+			{
+				auto WaitResult = co_await _pEnvironment->m_OnAgentLaunchFinished.f_Insert().f_Future()
+					.f_Timeout(30.0, "Timed out waiting for the environment agent client to exit")
+					.f_Wrap()
+				;
+
+				if (!WaitResult)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "The agent client for environment '{}' did not exit with the container: {}", _pEnvironment->m_Name, WaitResult.f_GetExceptionStr());
+			}
+		}
 
 		if (_pEnvironment->m_AgentLaunch)
 		{
-			auto StopResult = co_await fg_TempCopy(_pEnvironment->m_AgentLaunch)(&CProcessLaunchActor::f_StopProcess).f_Wrap();
-			if (!StopResult)
-				DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to stop agent for environment '{}': {}", _pEnvironment->m_Name, StopResult.f_GetExceptionStr());
+			// A launch that already exited by itself has nothing left to stop
+			if (!_pEnvironment->m_bAgentLaunchFinished)
+			{
+				auto StopResult = co_await fg_TempCopy(_pEnvironment->m_AgentLaunch)(&CProcessLaunchActor::f_StopProcess).f_Wrap();
+				if (!StopResult)
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to stop agent for environment '{}': {}", _pEnvironment->m_Name, StopResult.f_GetExceptionStr());
+			}
 
 			co_await fg_Move(_pEnvironment->m_AgentLaunch).f_Destroy().f_Wrap()
 				> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy environment agent launch")

@@ -108,6 +108,7 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_StageID;
 		_Stream % m_Directory;
 		_Stream % m_StageDirectory;
+		_Stream % fg_Move(m_fFinish);
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CApplicationStageResult);
 
@@ -359,6 +360,23 @@ namespace NMib::NCloud::NAppManager
 			co_await pThis->fp_EnsureEnvironmentDataRoot();
 
 			_Launch.m_Directory = pThis->fp_GetAgentApplicationDirectory(_Launch.m_Name);
+
+			bool bHasDirectory;
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				bHasDirectory = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [Directory = _Launch.m_Directory]()
+						{
+							return CFile::fs_FileExists(Directory, EFileAttrib_Directory);
+						}
+					)
+				;
+			}
+
+			if (!bHasDirectory)
+				co_return DMibErrorInstance("Application '{}' has no files in the environment storage; update the application to install them"_f << _Launch.m_Name);
 		}
 
 		auto *pFindApplication = pThis->mp_Applications.f_FindEqual(_Launch.m_Name);
@@ -517,6 +535,27 @@ namespace NMib::NCloud::NAppManager
 		co_return co_await pThis->fp_RunBashScript(fg_Move(_Script));
 	}
 
+	namespace
+	{
+		struct COptionalFuture
+		{
+			COptionalFuture(TCFuture<void> &&_Future)
+				: m_Future(fg_Move(_Future))
+			{
+			}
+
+			COptionalFuture(COptionalFuture &&) = default;
+
+			~COptionalFuture()
+			{
+				if (m_Future.f_IsValid())
+					m_Future.f_DiscardResult();
+			}
+
+			TCFuture<void> m_Future;
+		};
+	}
+
 	auto CAppManagerActor::CAppManagerEnvironmentInterfaceImplementation::f_StageApplicationFiles(CApplicationStage _Stage) -> TCFuture<CApplicationStageResult>
 	{
 		auto pThis = m_pThis;
@@ -558,7 +597,10 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
-		TCActor<CFileTransferReceive> Receive = fg_ConstructActor<CFileTransferReceive>
+		auto &StageReceive = pThis->mp_ApplicationStageReceives[Result.m_StageID];
+		StageReceive.m_Name = _Stage.m_Name;
+		StageReceive.m_StageDirectory = Result.m_StageDirectory;
+		StageReceive.m_Receive = fg_ConstructActor<CFileTransferReceive>
 			(
 				Result.m_StageDirectory
 				, EFileAttrib_UnixAttributesValid
@@ -569,22 +611,106 @@ namespace NMib::NCloud::NAppManager
 			)
 		;
 
-		auto ReceiveResult = co_await Receive
+		auto ReceiveFilesFuture = StageReceive.m_Receive
 			(
 				&CFileTransferReceive::f_ReceiveFiles
 				, CFileTransferSendDownloadFile::fs_TranslateGenerator<CFileTransferSendDownloadFile>(fg_Move(*_Stage.m_FilesGenerator))
 				, _Stage.m_QueueSize
 				, CFileTransferReceive::EReceiveFlag_DeleteExisting
 			)
-			.f_Wrap()
+			.f_Call()
 		;
 
-		co_await fg_Move(Receive).f_Destroy().f_Wrap()
-			> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage receive")
+		auto fFinishStage = [pThis, StageID = Result.m_StageID](TCFuture<CFileTransferResult> _ReceiveFilesFuture) mutable -> TCFuture<void>
+			{
+				auto ReceiveResult = co_await fg_Move(_ReceiveFilesFuture).f_Wrap();
+
+				auto *pStageReceive = pThis->mp_ApplicationStageReceives.f_FindEqual(StageID);
+				if (!pStageReceive)
+					co_return DMibErrorInstance("The application staging was aborted");
+
+				auto Receive = fg_Move(pStageReceive->m_Receive);
+				CStr StageDirectory = fg_Move(pStageReceive->m_StageDirectory);
+				pThis->mp_ApplicationStageReceives.f_Remove(StageID);
+
+				if (Receive)
+				{
+					co_await fg_Move(Receive).f_Destroy().f_Wrap()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage receive")
+					;
+				}
+
+				if (!ReceiveResult)
+				{
+					{
+						auto BlockingActorCheckout = fg_BlockingActor();
+
+						co_await
+							(
+								g_Dispatch(BlockingActorCheckout) / [StageDirectory]()
+								{
+									if (CFile::fs_FileExists(StageDirectory))
+										CFile::fs_DeleteDirectoryRecursive(StageDirectory);
+								}
+							)
+							.f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to delete the failed application stage")
+						;
+					}
+
+					co_return DMibErrorInstance("Failed to receive the staged application files: {}"_f << ReceiveResult.f_GetExceptionStr());
+				}
+
+				co_return {};
+			}
 		;
 
-		if (!ReceiveResult)
-			co_return DMibErrorInstance("Failed to receive the staged application files: {}"_f << ReceiveResult.f_GetExceptionStr());
+		TCFuture<void> FinishedFuture = pThis->self.f_Invoke(fg_Move(fFinishStage), fg_Move(ReceiveFilesFuture));
+
+		Result.m_fFinish = g_ActorFunctor
+			(
+				g_ActorSubscription / [pThis, StageID = Result.m_StageID]() -> TCFuture<void>
+				{
+					auto *pStageReceive = pThis->mp_ApplicationStageReceives.f_FindEqual(StageID);
+					if (!pStageReceive)
+						co_return {};
+
+					auto Receive = fg_Move(pStageReceive->m_Receive);
+					CStr Name = fg_Move(pStageReceive->m_Name);
+					CStr StageDirectory = fg_Move(pStageReceive->m_StageDirectory);
+					pThis->mp_ApplicationStageReceives.f_Remove(StageID);
+
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Aborted staging of application '{}'", Name);
+
+					if (Receive)
+					{
+						co_await fg_Move(Receive).f_Destroy().f_Wrap()
+							> fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage receive")
+						;
+					}
+
+					{
+						auto BlockingActorCheckout = fg_BlockingActor();
+
+						co_await
+							(
+								g_Dispatch(BlockingActorCheckout) / [StageDirectory]()
+								{
+									if (CFile::fs_FileExists(StageDirectory))
+										CFile::fs_DeleteDirectoryRecursive(StageDirectory);
+								}
+							)
+							.f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to delete the aborted application stage")
+						;
+					}
+
+					co_return {};
+				}
+			)
+			/ [Future = COptionalFuture{fg_Move(FinishedFuture)}, AllowDestroy = g_AllowWrongThreadDestroy]() mutable -> TCFuture<void>
+			{
+				return fg_Move(Future.m_Future);
+			}
+		;
 
 		co_return fg_Move(Result);
 	}

@@ -262,10 +262,17 @@ namespace NMib::NCloud::NAppManager
 			// the guest can be found in the DHCP leases across restarts
 			CStr m_VMMACAddress;
 
+			// Launch id of the agent installed in the guest, persisted after a
+			// successful install so an agent that keeps running across environment
+			// and AppManager restarts re-associates instead of being reinstalled
+			CStr m_VMAgentLaunchID;
+
 			// Runtime state
 			CStr m_LaunchID;
 			CStr m_AgentHostID;
 			TCActor<CDistributedAppInterfaceLaunchActor> m_AgentLaunch;
+			bool m_bAgentLaunchFinished = false; /// The agent client process exited by itself; a finished launch is not signalled at stop
+			TCVector<TCPromise<void>> m_OnAgentLaunchFinished;
 			CActorSubscription m_AgentLaunchSubscription;
 			CActorSubscription m_AgentTicketSubscription;
 			TCActor<NVirtualization::CVirtualMachineActor> m_VMActor;
@@ -772,6 +779,10 @@ namespace NMib::NCloud::NAppManager
 			// Set when the application storage is managed inside the environment
 			TCSharedPointer<CEnvironment> m_pRemoteStorageEnvironment;
 			CStr m_AgentStageID;
+			TCActor<CFileTransferSend> m_StageSend; /// Sends the staged files into the environment; destroyed to abort an in-flight transfer
+			/// Finish functor of the staging in the environment; its subscription is
+			/// the abort handle, so destroying it uncalled cleanly aborts the receive
+			TCActorFunctorWithID<TCFuture<void> ()> m_fStageFinish;
 			TCSharedPointer<CApplicationSettings> m_pNewSettings;
 			TCSet<CStr> m_AllowSourceExist;
 			CAppManagerInterface::CVersionIDAndPlatform m_VersionID;
@@ -1055,6 +1066,9 @@ namespace NMib::NCloud::NAppManager
 		bool fp_EnvironmentUsesRemoteStorage(CEnvironment const &_Environment);
 		TCSharedPointer<CEnvironment> fp_ApplicationRemoteStorageEnvironment(CApplication const &_Application);
 		CStr fp_GetEnvironmentDataVolumeName(CEnvironment const &_Environment);
+		CStr fp_GetEnvironmentDataVolumeImagePath(CEnvironment const &_Environment);
+		CStr fp_GetEnvironmentDataVolumeMountPath(CEnvironment const &_Environment);
+		TCFuture<CProcessLaunchActor::CSimpleLaunchResult> fp_RunColimaVMScript(CStr _Script, CStr _LogName);
 		TCFuture<void> fp_EnsureEnvironmentDataVolume(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_RemoveEnvironmentDataVolume(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StageApplicationInEnvironment(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState, TCSharedPointer<CEnvironment> _pEnvironment);
@@ -1425,6 +1439,16 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bEnvironmentDataRootReady = false;
 		bool mp_bEnvironmentDataRootPreparing = false;
 		TCVector<TCPromise<void>> mp_OnEnvironmentDataRootReady;
+
+		struct CApplicationStageReceive
+		{
+			TCActor<CFileTransferReceive> m_Receive;
+			CStr m_Name;
+			CStr m_StageDirectory;
+		};
+		/// Agent side: in-flight application file stagings by stage id; the host
+		/// aborts a staging by dropping the finish functor of the stage result
+		TCMap<CStr, CApplicationStageReceive> mp_ApplicationStageReceives;
 		TCMap<CStr, CActorSubscription> mp_EnvironmentTicketNotifications; /// Keeps environment application connection tickets alive until they are used
 
 		CTrustedPermissionSubscription mp_Permissions;

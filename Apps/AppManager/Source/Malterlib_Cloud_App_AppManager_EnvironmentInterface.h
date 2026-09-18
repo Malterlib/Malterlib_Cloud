@@ -104,6 +104,9 @@ namespace NMib::NCloud::NAppManager
 			NStr::CStr m_StageID;
 			NStr::CStr m_Directory; /// Application directory inside the environment
 			NStr::CStr m_StageDirectory; /// Directory holding the staged files inside the environment
+			/// Resolves when the agent finished receiving the staged files; dropping
+			/// it without calling aborts the receive and deletes the stage
+			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()> m_fFinish;
 		};
 
 		/// Applies a staged version to the application directory inside the
