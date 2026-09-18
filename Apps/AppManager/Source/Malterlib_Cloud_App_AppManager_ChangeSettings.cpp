@@ -4,6 +4,7 @@
 #include "Malterlib_Cloud_App_AppManager.h"
 
 #include <Mib/Concurrency/AsyncDestroy>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NCloud::NAppManager
 {
@@ -191,6 +192,13 @@ namespace NMib::NCloud::NAppManager
 
 		auto &Application = *pApplication;
 
+		// The changes and the old launch environment follow from the settings an earlier change of the application leaves
+		auto InProgressScope = co_await (fp_SetInProgressWithWait(pApplication, "ChangeApplicationSettings") % Auditor);
+		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
+
+		if (Application.m_bDeleted)
+			co_return Auditor.f_Exception("Application has been deleted, aborting");
+
 		CApplicationSettings Settings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 
@@ -230,18 +238,39 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception(Error);
 		}
 
-		// The installed files stay where they are, so the new launch environment must keep them in the same storage. The
-		// environment can be removed and added again with another type while the application stops, so this is checked again
-		// before the settings change
+		// The installed files stay where they are, so the new launch environment must keep them in the same storage: the host
+		// directory of an application on the host or in a Local environment, or the storage of one container or VM environment.
+		// Files a guest could write never reach the host or another environment this way. The environment can be removed and added
+		// again with another type while the application stops, so this is checked again before the settings change
 		auto fCheckStorage = [&]() -> CStr
 			{
-				if
-				(
-					(ChangedSettings & EApplicationSetting_LaunchEnvironment)
-					&& fp_LaunchEnvironmentRemoteStorage(NewSettings.m_LaunchEnvironment) != fp_ApplicationRemoteStorageEnvironment(Application)
-				)
+				if (ChangedSettings & EApplicationSetting_LaunchEnvironment)
 				{
-					return fg_Format("Launch environment '{}' keeps the application files in another storage. Remove and add the application instead.", NewSettings.m_LaunchEnvironment);
+					auto pOldStorage = fp_ApplicationRemoteStorageEnvironment(Application);
+					auto pNewStorage = fp_LaunchEnvironmentRemoteStorage(NewSettings.m_LaunchEnvironment);
+					if (pOldStorage != pNewStorage)
+					{
+						if (pOldStorage)
+						{
+							return fg_Format
+								(
+									"Application '{}' keeps its files in the storage of environment '{}', so it cannot move out of it. Remove the application and add it "
+									"again with the new launch environment instead."
+									, Application.m_Name
+									, pOldStorage->m_Name
+								)
+							;
+						}
+
+						return fg_Format
+							(
+								"Environment '{}' keeps application files in storage it manages, so application '{}' cannot move into it from host storage. Remove the "
+								"application and add it again with the new launch environment instead."
+								, NewSettings.m_LaunchEnvironment
+								, Application.m_Name
+							)
+						;
+					}
 				}
 
 				if (ChangedSettings & (EApplicationSetting_LaunchEnvironment | EApplicationSetting_ParentApplication))
@@ -273,9 +302,6 @@ namespace NMib::NCloud::NAppManager
 			_fOnInfo("No settings were changed. To update file permissions run with --force");
 			co_return {};
 		}
-
-		auto InProgressScope = co_await (fp_SetInProgressWithWait(pApplication, "ChangeApplicationSettings") % Auditor);
-		auto DestroyInProgress = co_await fg_AsyncDestroy(fg_Move(InProgressScope));
 
 		if (!(ChangedSettings & EApplicationSetting_NeedUpdateSettings) && !_bForce)
 		{

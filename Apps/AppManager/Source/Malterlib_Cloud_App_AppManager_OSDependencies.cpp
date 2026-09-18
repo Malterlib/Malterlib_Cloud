@@ -402,7 +402,8 @@ namespace NMib::NCloud::NAppManager
 
 		CStr Fingerprint = fsp_GetOSDependenciesFingerprint(Dependencies);
 
-		// The installed sets outlive the entries of applications, which an environment agent creates for each launch
+		// The installed sets outlive the entries of applications, which an environment agent creates for each launch; a recreated container
+		// starts a fresh agent, which installs into its reset OS again
 		if (mp_InstalledOSDependenciesFingerprints.f_FindEqual(Fingerprint))
 			co_return {};
 

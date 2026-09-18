@@ -161,17 +161,25 @@ namespace NMib::NCloud::NAppManager
 
 		enum EEnvironmentSetting
 		{
-			EEnvironmentSetting_None                = 0
-			, EEnvironmentSetting_Type              = DBit(0)
-			, EEnvironmentSetting_AgentApplication  = DBit(1)
-			, EEnvironmentSetting_AutoStart         = DBit(2)
-			, EEnvironmentSetting_ParentApplication = DBit(3)
-			, EEnvironmentSetting_OSDependencies    = DBit(4)
-			, EEnvironmentSetting_VMImage           = DBit(5)
-			, EEnvironmentSetting_VMBackend         = DBit(6)
-			, EEnvironmentSetting_VMCPUCount        = DBit(7)
-			, EEnvironmentSetting_VMMemoryMB        = DBit(8)
-			, EEnvironmentSetting_VMDataDiskGB      = DBit(9)
+			EEnvironmentSetting_None                      = 0
+			, EEnvironmentSetting_Type                    = DBit(0)
+			, EEnvironmentSetting_AgentApplication        = DBit(1)
+			, EEnvironmentSetting_AutoStart               = DBit(2)
+			, EEnvironmentSetting_ParentApplication       = DBit(3)
+			, EEnvironmentSetting_OSDependencies          = DBit(4)
+			, EEnvironmentSetting_VMImage                 = DBit(5)
+			, EEnvironmentSetting_VMBackend               = DBit(6)
+			, EEnvironmentSetting_VMCPUCount              = DBit(7)
+			, EEnvironmentSetting_VMMemoryMB              = DBit(8)
+			, EEnvironmentSetting_VMDataDiskGB            = DBit(9)
+			, EEnvironmentSetting_ContainerRuntime        = DBit(10)
+			, EEnvironmentSetting_ContainerImage          = DBit(11)
+			, EEnvironmentSetting_ContainerNetwork        = DBit(12)
+			, EEnvironmentSetting_ContainerExtraMounts    = DBit(13)
+			, EEnvironmentSetting_ContainerExtraArguments = DBit(14)
+			, EEnvironmentSetting_MemoryLimit             = DBit(15)
+			, EEnvironmentSetting_CPULimit                = DBit(16)
+			, EEnvironmentSetting_ContainerReadOnly       = DBit(17)
 		};
 
 		struct CEnvironmentSettings
@@ -183,16 +191,34 @@ namespace NMib::NCloud::NAppManager
 			void f_FromInterfaceSettings(CAppManagerInterface::CEnvironmentSettings const &_Settings, EEnvironmentSetting &o_ChangedSettings);
 			EEnvironmentSetting f_ChangedSettings(CEnvironmentSettings const &_Other) const;
 			bool f_Validate(CStr &o_Error) const;
+			void f_AddPermissionQueries
+				(
+					NContainer::TCMap<NStr::CStr, NContainer::TCVector<CPermissionQuery>> &o_Permissions
+					, EEnvironmentSetting _ChangedSettings
+					, EEnvironmentType _Type
+				)
+				const
+			;
 
-			EEnvironmentType m_Type = CAppManagerInterface::EEnvironmentType_Local;
+			EEnvironmentType m_Type = CAppManagerInterface::EEnvironmentType_Container;
 			CStr m_AgentApplication;
 			CStr m_ParentApplication; /// Application whose storage confines the environment storage, supporting encrypted storage
+
+			CStr m_ContainerRuntime;
+			CStr m_ContainerImage;
+			CStr m_ContainerNetwork;
+			TCMap<CStr, CStr> m_ContainerExtraMounts;
+			TCVector<CStr> m_ContainerExtraArguments;
+
+			uint64 m_MemoryLimitMB = 0;
+			fp64 m_CPULimit = 0.0;
+			bool m_bContainerReadOnly = false; /// Makes the container root filesystem read-only, with a writable /tmp tmpfs
 
 			CStr m_VMImage;
 			CStr m_VMBackend;
 			uint32 m_VMCPUCount = 0;
 			uint64 m_VMMemoryMB = 0;
-			uint64 m_VMDataDiskGB = 0; /// Initial size of the VM data disk; 0 selects the default
+			uint64 m_VMDataDiskGB = 0; /// Initial size of the VM data disk or Colima application storage image; 0 selects the default
 
 			bool m_bAutoStart = true;
 
@@ -222,6 +248,13 @@ namespace NMib::NCloud::NAppManager
 			bool m_bDeleted = false;
 			bool m_bStoppedManually = false; /// Persisted; while set, only an explicit start or restart, which clear it, storage removal and the VM window boot the environment
 
+			CStr m_ContainerFingerprint;                     /// Run settings of the last recorded container creation attempt, even a failed one; empty means none, a change recreates it
+			CStr m_ContainerLaunchID;                        /// Fixed for the lifetime of the container, which keeps its creation-time process environment
+			CStr m_ContainerRequestTicketMagic;              /// Fixed for the lifetime of the container, which keeps its creation-time process environment
+			NContainer::TCSet<NStr::CStr> m_ContainerMounts; /// Host paths and named volumes of the mount list of the last launch, which keep encrypted storage busy
+
+			uint32 m_ListenPort = 0; /// Host port of the listen address on the shared guest network; persisted to keep the container fingerprint stable
+
 			CStr m_VMMACAddress; /// Persisted so the guest keeps its network identity across restarts
 
 			CStr m_VMAgentLaunchID;           /// Saved after an install so a guest agent that keeps running can reconnect with the same id
@@ -232,6 +265,8 @@ namespace NMib::NCloud::NAppManager
 			CStr m_LaunchID;
 			CStr m_AgentHostID;
 			TCActor<CDistributedAppInterfaceLaunchActor> m_AgentLaunch;
+			bool m_bAgentLaunchFinished = false;         /// The agent client failed to launch or exited; there is no process to signal at stop
+			TCVector<TCPromise<void>> m_OnAgentLaunchFinished;
 			CActorSubscription m_AgentLaunchSubscription;
 			CActorSubscription m_AgentTicketSubscription;
 			TCActor<NVirtualization::CVirtualMachineActor> m_VMActor;
@@ -250,9 +285,11 @@ namespace NMib::NCloud::NAppManager
 			CStr m_AgentConfigurationError;              /// Failure of the newest agent configuration; launches retry the configuration
 			bool m_bStarting = false;
 			bool m_bStartAbortRequested = false;         /// A stop waits for the start, which gives up its retries and its wait for the agent
+			bool m_bStartEnsuredContainerSystem = false; /// Set while a start runs on the container system it ensured; a colima restart waits for that start
 			bool m_bStarted = false;
 			bool m_bStopping = false;
 			bool m_bRemoving = false;
+			bool m_bReplacingContainerAfterPull = false; /// New starts fail and automatic launches are deferred while the container is replaced
 
 			CAppManagerActor *m_pThis;
 		};
@@ -538,6 +575,7 @@ namespace NMib::NCloud::NAppManager
 			TCFuture<void> f_EnvironmentRemove(CStr _Name) override;
 			TCFuture<void> f_EnvironmentChangeSettings(CStr _Name, CEnvironmentSettings _Settings) override;
 			TCFuture<void> f_EnvironmentStart(CStr _Name) override;
+			TCFuture<void> f_EnvironmentPull(CStr _Name) override;
 			TCFuture<void> f_EnvironmentStop(CStr _Name) override;
 			TCFuture<void> f_EnvironmentRestart(CStr _Name) override;
 			TCFuture<TCMap<CStr, CEnvironmentInfo>> f_GetEnvironments() override;
@@ -779,6 +817,13 @@ namespace NMib::NCloud::NAppManager
 			CStr m_StageDirectory;
 		};
 
+		struct CColimaEnvironmentDirectories
+		{
+			CStr m_StorageDirectory;
+			CStr m_AgentDirectory;
+			CStr m_DataDirectory;
+		};
+
 		void fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine) override;
 		void fp_BuildCommandLine_HostMonitor(CDistributedAppCommandLineSpecification &o_CommandLine);
 
@@ -893,7 +938,7 @@ namespace NMib::NCloud::NAppManager
 			)
 			-> TCFuture<void>
 		;
-		TCFuture<void> fp_RemoveEnvironment(CStr _Name, TCFunction<void (CStr const &_Info)> _fOnInfo, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_RemoveEnvironment(CStr _Name, bool _bDeleteApplicationData, TCFunction<void (CStr const &_Info)> _fOnInfo, CCallingHostInfo _CallingHostInfo);
 		auto fp_ChangeEnvironmentSettings
 			(
 				CStr _Name
@@ -914,12 +959,17 @@ namespace NMib::NCloud::NAppManager
 		TCSharedPointer<CApplication> fp_FindEnvironmentAgentApplication(CEnvironment const &_Environment);
 		TCSharedPointer<CApplication> fp_FindAgentApplication(CStr const &_AgentApplication);
 		CStr fp_GetEnvironmentStorageDirectory(CEnvironment const &_Environment);
+		CStr fp_GetEnvironmentAgentDirectory(CEnvironment const &_Environment);
+		CStr fp_GetEnvironmentDataDirectory(CEnvironment const &_Environment);
+		TCFuture<void> fp_DeleteEnvironmentStorage(TCSharedPointer<CEnvironment> _pEnvironment);
 		CStr fp_CheckLocalEnvironmentAccounts(CEnvironmentSettings const &_Settings);
 		CStr fp_CheckLocalEnvironmentApplicationAccount(CStr const &_Application, CApplicationSettings const &_NewSettings);
 		CStr fp_FindEnvironmentStoringDataInApplication(CStr const &_Application);
 		bool fp_EnvironmentStorageReady(CEnvironment const &_Environment, CStr &o_Error, CAppManagerInterface::EStatusSeverity &o_Severity);
+		bool fp_EnvironmentMountsReady(CEnvironment const &_Environment, CStr &o_Error, CAppManagerInterface::EStatusSeverity &o_Severity);
 		void fp_AutoStartEnvironments();
 		bool fp_EnvironmentAcceptsApplications(CStr const &_Name);
+		static CStr fsp_GetEnvironmentGuestPlatform(CAppManagerInterface::EEnvironmentType _Type);
 		TCFuture<void> fp_CheckEnvironmentAccess(CStr _Name, CCallingHostInfo _CallingHostInfo);
 		TCFuture<void> fp_CheckEnvironmentRestartAccess(TCVector<CStr> _Names, CStr _Description, CCallingHostInfo _CallingHostInfo);
 		auto fp_RestartEnvironmentsForSettings(TCVector<TCSharedPointer<CEnvironment>> _Environments, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine, bool _bConnected)
@@ -946,10 +996,16 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<CStr> fp_FetchVMAgentGuestLog(TCSharedPointer<CEnvironment> _pEnvironment, NVirtualization::CMacOSGuestProvisioning _Provisioning);
 		void fp_RestartEnvironmentsForAgentApplication(CStr const &_ApplicationName);
 		TCFuture<void> fp_WaitForEnvironmentIdle(TCSharedPointer<CEnvironment> _pEnvironment);
+		CStr fp_FindApplicationPreventingEnvironmentRestart(CEnvironment const &_Environment);
 		TCFuture<void> fp_RestartEnvironmentWhenIdle(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_SetEnvironmentSensorStatus(TCSharedPointer<CEnvironment> _pEnvironment, CStr _Status, CAppManagerInterface::EStatusSeverity _Severity);
 		TCFuture<void> fp_StopEnvironmentInternal(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_SetEnvironmentStoppedManually(TCSharedPointer<CEnvironment> _pEnvironment, bool _bStoppedManually);
+		TCFuture<void> fp_PullEnvironment(CStr _Name, CCallingHostInfo _CallingHostInfo);
+		TCFuture<void> fp_StopEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<bool> fp_EnvironmentContainerExists(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<bool> fp_OwnContainerSystemStopped(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_PullEnvironmentContainerImage(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_OnEnvironmentAgentConnected(TCSharedPointer<CEnvironment> _pEnvironment, TCDistributedActorInterface<CAppManagerEnvironmentInterface> _Interface);
 		void fp_OnEnvironmentAgentDisconnected(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_AbortPendingDistributedAppWaits(CApplication &_Application, CStr const &_Error);
@@ -958,6 +1014,26 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<void> fp_WaitForEnvironmentAgentConfiguration(TCSharedPointer<CEnvironment> _pEnvironment);
 		void fp_OnEnvironmentApplicationStateChange(TCSharedPointer<CEnvironment> const &_pEnvironment, CAppManagerEnvironmentInterface::CApplicationStateChange const &_Change);
 		TCFuture<CStr> fp_GetEnvironmentAgentExecutable(TCSharedPointer<CEnvironment> _pEnvironment, TCSharedPointer<CStr> _pError);
+		CStr fp_GetContainerRuntimeExecutable(TCSharedPointer<CEnvironment> const &_pEnvironment);
+		CStr fp_GetContainerName(TCSharedPointer<CEnvironment> const &_pEnvironment);
+		CAppManagerContainerLaunch fp_BuildEnvironmentContainerLaunch(TCSharedPointer<CEnvironment> const &_pEnvironment, CStr const &_AgentExecutableName);
+		TCFuture<void> fp_RemoveEnvironmentContainer(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_RemoveEnvironmentContainerByName(TCSharedPointer<CEnvironment> _pEnvironment);
+		bool fp_UseOwnAppleContainerSystem();
+		CStr fp_GetAppleContainerAppRoot();
+		void fp_ApplyAppleContainerLaunchEnvironment(CProcessLaunchParams &_LaunchParams);
+		CProcessLaunchParams fp_BuildContainerCommandParams(TCSharedPointer<CEnvironment> const &_pEnvironment, TCVector<CStr> &&_Arguments);
+		TCFuture<void> fp_EnsureAppleContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment);
+		bool fp_UseOwnColimaSystem(TCSharedPointer<CEnvironment> const &_pEnvironment);
+		bool fp_EnvironmentUsesHostDataDirectory(CEnvironment const &_Environment);
+		CStr fp_GetColimaAppRoot();
+		CStr fp_GetColimaUser();
+		CStr fp_GetColimaGroup();
+		void fp_ApplyColimaLaunchEnvironment(CProcessLaunchParams &_LaunchParams);
+		TCFuture<void> fp_EnsureColimaSystem(TCSharedPointer<CEnvironment> _pEnvironment);
+		static void fsp_PrepareColimaEnvironmentDirectories(CColimaEnvironmentDirectories const &_Directories, CStr const &_User, CStr const &_Group);
+		TCFuture<void> fp_PrepareColimaDataDirectory(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_EnsureContainerSystem(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<CAppLaunchResult> fp_LaunchAppInEnvironment(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_AbortEnvironmentLaunch(TCSharedPointer<CApplication> _pApplication, TCSharedPointer<CEnvironment> _pEnvironment);
 
@@ -968,6 +1044,14 @@ namespace NMib::NCloud::NAppManager
 		CStr fp_FindEnvironmentSharingVMImage(CStr const &_Name, CEnvironmentSettings const &_Settings);
 		CStr fp_FindApplicationSharingEnvironmentStorage(CStr const &_Name, CApplicationSettings const &_Settings);
 		TCSharedPointer<CEnvironment> fp_LaunchEnvironmentRemoteStorage(CStr const &_LaunchEnvironment);
+		CStr fp_GetEnvironmentDataVolumeName(CEnvironment const &_Environment);
+		TCFuture<bool> fp_EnvironmentDataVolumeExists(TCSharedPointer<CEnvironment> _pEnvironment);
+		CStr fp_GetEnvironmentDataVolumeImagePath(CEnvironment const &_Environment);
+		CStr fp_GetEnvironmentDataVolumeMountPath(CEnvironment const &_Environment);
+		TCFuture<CProcessLaunchActor::CSimpleLaunchResult> fp_RunColimaVMScript(CStr _Script, CStr _LogName);
+		TCFuture<CProcessLaunchActor::CSimpleLaunchResult> fp_RunColima(TCVector<CStr> _Arguments, CStr _LogName);
+		TCFuture<void> fp_EnsureEnvironmentDataVolume(TCSharedPointer<CEnvironment> _pEnvironment);
+		TCFuture<void> fp_RemoveEnvironmentDataVolume(TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_StageApplicationInEnvironment(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState, TCSharedPointer<CEnvironment> _pEnvironment);
 		TCFuture<void> fp_RemoveApplicationEnvironmentStorage(TCSharedPointer<CApplication> _pApplication);
 
@@ -986,6 +1070,9 @@ namespace NMib::NCloud::NAppManager
 		TCFuture<uint32> fp_CommandLine_StartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_StopEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_RestartEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_EnvironmentBash(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_ColimaSettings(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
+		TCFuture<uint32> fp_CommandLine_PullEnvironment(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 		TCFuture<uint32> fp_CommandLine_CreateVMImage(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine);
 #ifdef DPlatformFamily_macOS
 		TCFuture<void> fp_EndEnvironmentWindowSession(TCSharedPointer<CEnvironment> _pEnvironment, bool _bWasStarted);
@@ -1245,6 +1332,8 @@ namespace NMib::NCloud::NAppManager
 
 		static constexpr ch8 const *mcp_pEnvironmentDataVolumeName = "MalterlibData";
 		static constexpr ch8 const *mcp_pEnvironmentDataRootVM = "/Volumes/MalterlibData";
+		static constexpr ch8 const *mcp_pEnvironmentDataRootContainer = "/opt/Malterlib/Data";
+		static constexpr ch8 const *mcp_pEnvironmentAgentRootContainer = "/opt/Malterlib/Agent";
 		static constexpr uint32 mcp_VMAgentHostPort = 19788; /// Virtio socket port of the host that VM guests reach the environment listen through
 
 #ifdef DPlatformFamily_Windows
@@ -1270,6 +1359,16 @@ namespace NMib::NCloud::NAppManager
 		bool mp_bPendingSelfUpdateInProgress = false;
 		bool mp_bEnableApplicationStatusSensors = true;
 		bool mp_bEnableEncryptionStatusSensors = true;
+		bool mp_bAppleContainerSystemReady = false;
+		bool mp_bAppleContainerSystemStarting = false;
+		TCVector<TCPromise<void>> mp_OnAppleContainerSystemReady;
+		bool mp_bColimaSystemReady = false;
+		bool mp_bColimaSystemStarting = false;
+		CStr mp_ColimaConfigFingerprint;
+		TCVector<TCPromise<void>> mp_OnColimaSystemReady;
+		uint32 mp_ColimaCPUCount = 0; /// 0 leaves the value to the colima profile
+		uint64 mp_ColimaMemoryMB = 0; /// 0 leaves the value to the colima profile
+		uint64 mp_ColimaDiskGB = 0;   /// 0 leaves the value to the colima profile
 
 		bool mp_bVMWindow = false; /// Applies at VM start: hosts the VM in a window showing the guest display when a graphical session is available
 
@@ -1299,9 +1398,10 @@ namespace NMib::NCloud::NAppManager
 		TCDistributedActor<CAppManagerEnvironmentHostInterface> mp_EnvironmentHostActor;
 		CActorSubscription mp_EnvironmentHostRegistration;
 		bool mp_bEnvironmentAgent = false;
-		bool mp_bStoppingApp = false; /// The shutdown waits for environment starts, so long start retries give up
-		CStr mp_EnvironmentHostID;    /// Agent side: host id of the launching AppManager, from the deployment settings
-		CStr mp_EnvironmentDataRoot;  /// Agent side: root of the environment-managed application storage, from the deployment settings
+		bool mp_bStoppingApp = false;          /// The shutdown waits for environment starts, so long start retries give up
+		bool mp_bEnvironmentContainer = false; /// Agent side: the environment is a container
+		CStr mp_EnvironmentHostID;             /// Agent side: host id of the launching AppManager, from the deployment settings
+		CStr mp_EnvironmentDataRoot;           /// Agent side: root of the environment-managed application storage, from the deployment settings
 		bool mp_bEnvironmentDataRootReady = false;
 		bool mp_bEnvironmentDataRootPreparing = false;
 		TCVector<TCPromise<void>> mp_OnEnvironmentDataRootReady;
@@ -1368,6 +1468,8 @@ namespace NMib::NCloud::NAppManager
 	};
 
 	CStr fg_ConcatOutput(CStr const &_StdOut, CStr const &_StdErr);
+
+	bool fg_AppManager_PathsOverlap(CStr const &_Left, CStr const &_Right);
 
 #ifdef DPlatformFamily_macOS
 	CEJsonSorted fg_AppManager_BuildVMWindowConfig(NVirtualization::CVirtualMachineConfig const &_Config, CStr const &_Backend, CStr const &_Title);

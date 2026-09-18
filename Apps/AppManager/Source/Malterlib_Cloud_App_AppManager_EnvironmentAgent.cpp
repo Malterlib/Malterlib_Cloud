@@ -67,6 +67,7 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_InterfaceAddress;
 		_Stream % m_LaunchID;
 		_Stream % m_OSDependencies;
+		_Stream % m_LowPortExecutables;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CEnvironmentLaunch);
 
@@ -82,6 +83,7 @@ namespace NMib::NCloud::NAppManager
 		_Stream % m_RunAsUser;
 		_Stream % m_RunAsGroup;
 		_Stream % m_RunAsUserPassword;
+		_Stream % m_bRunAsUserHasShell;
 	}
 	DMibDistributedStreamImplement(CAppManagerEnvironmentInterface::CEnvironmentScript);
 
@@ -171,6 +173,40 @@ namespace NMib::NCloud::NAppManager
 
 		co_return fg_Move(Info);
 	}
+
+#ifdef DPlatformFamily_Linux
+	namespace
+	{
+		// Blocking. The capabilities are best effort, like for host applications: a minimal image can lack setcap and a file system can reject
+		// capabilities, and an application can run without them. The agent of a container or VM runs inside the environment, so a link in the
+		// application's files only reaches files of the environment; a Local environment runs on the host, where host applications follow such
+		// links too, and application packages and their scripts are trusted
+		void fg_SetLowPortExecutableCapabilities(CStr const &_Directory, TCVector<CStr> const &_LowPortExecutables)
+		{
+			for (auto &Executable : _LowPortExecutables)
+			{
+				CStr ExecutablePath = _Directory / Executable;
+				try
+				{
+					if (CFile::fs_FileExists(ExecutablePath))
+						CProcessLaunch::fs_LaunchTool("setcap", {"cap_net_bind_service=ep", ExecutablePath});
+				}
+				catch (CException const &_Exception)
+				{
+					DMibLogWithCategory
+						(
+							Malterlib/Cloud/AppManager
+							, Warning
+							, "Failed to set up low port executable support running 'setcap cap_net_bind_service=ep {}': {}"
+							, ExecutablePath
+							, _Exception
+						)
+					;
+				}
+			}
+		}
+	}
+#endif
 
 #ifdef DPlatformFamily_macOS
 	namespace
@@ -320,16 +356,21 @@ namespace NMib::NCloud::NAppManager
 			co_await
 				(
 					(
-						g_Dispatch(BlockingActorCheckout) / [DataRoot = mp_EnvironmentDataRoot]()
+						g_Dispatch(BlockingActorCheckout) / [DataRoot = mp_EnvironmentDataRoot, bContainer = mp_bEnvironmentContainer]()
 						{
-							// In a macOS guest the data root is the data disk volume
-							// prepared on first use
+							// A container runtime mounts the data root volume; a macOS guest prepares its data disk volume itself
 #ifdef DPlatformFamily_macOS
-							fg_PrepareEnvironmentDataVolume(DataRoot);
+							if (!bContainer)
+							{
+								fg_PrepareEnvironmentDataVolume(DataRoot);
+								return;
+							}
 #else
+							(void)bContainer;
+#endif
+
 							if (!CFile::fs_FileExists(DataRoot, EFileAttrib_Directory))
 								CFile::fs_CreateDirectory(DataRoot);
-#endif
 						}
 					)
 					% "Failed to prepare the environment application storage"
@@ -453,6 +494,13 @@ namespace NMib::NCloud::NAppManager
 		Settings.m_bBackupEnabled = false;
 		Settings.m_bAutoUpdate = false;
 
+		// The accounts are created, and the capabilities of the low port executables set, with tools the dependencies can provide
+		co_await (pThis->fp_EnsureOSDependencies(pApplication) % "Failed to install the OS dependencies of the application");
+
+		// A stop deletes the entry while it is prepared, and a new launch of the name can then prepare the files with other settings
+		if (pApplication->m_bDeleted)
+			co_return DMibErrorInstance("Application was deleted while launching");
+
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -479,6 +527,9 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
+		if (pApplication->m_bDeleted)
+			co_return DMibErrorInstance("Application was deleted while launching");
+
 		// Only the agent reaches the environment storage to change file owners for a new run as identity
 		if (bManagedStorage)
 		{
@@ -501,7 +552,31 @@ namespace NMib::NCloud::NAppManager
 					% "Failed to change the owners of the application files in the environment storage"
 				)
 			;
+
+			if (pApplication->m_bDeleted)
+				co_return DMibErrorInstance("Application was deleted while launching");
 		}
+
+#ifdef DPlatformFamily_Linux
+		// The tools that set the capabilities can come with the OS dependencies the launch installed, after the install of
+		// the files tried to set them, also in host storage, and changing the owners clears them
+		if (!_Launch.m_LowPortExecutables.f_IsEmpty())
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
+
+			co_await
+				(
+					(
+						g_Dispatch(BlockingActorCheckout) / [Directory = _Launch.m_Directory, LowPortExecutables = _Launch.m_LowPortExecutables]()
+						{
+							fg_SetLowPortExecutableCapabilities(Directory, LowPortExecutables);
+						}
+					)
+					% "Failed to set the capabilities of the low port executables"
+				)
+			;
+		}
+#endif
 
 		if (pApplication->m_bDeleted)
 			co_return DMibErrorInstance("Application was deleted while launching");
@@ -841,6 +916,8 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 
+	// _Directory itself is trusted not to be a link: the agent created it, and only the application's account, trusted like its package, can
+	// replace it
 	void CAppManagerActor::fsp_SetDirectoryOwnerSkippingLinks(CStr const &_Directory, CStr const &_User, CStr const &_Group)
 	{
 		auto Paths = CFile::fs_FindFiles(_Directory / "*", EFileAttrib_Directory | EFileAttrib_File, true, false);

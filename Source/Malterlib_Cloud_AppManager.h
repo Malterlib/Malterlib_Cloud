@@ -71,8 +71,9 @@ namespace NMib::NCloud
 
 		enum EEnvironmentType : uint32
 		{
-			EEnvironmentType_Local /// Agent runs as a plain child process on the host (no isolation, mainly for tests)
-			, EEnvironmentType_VM  /// Agent runs as a daemon inside a virtual machine
+			EEnvironmentType_Local       /// Agent runs as a plain child process on the host (no isolation, mainly for tests)
+			, EEnvironmentType_VM        /// Agent runs as a daemon inside a virtual machine
+			, EEnvironmentType_Container /// Agent runs under the init process of a Linux container
 		};
 
 		struct CVersionIDAndPlatform : public CVersionManager::CVersionIDAndPlatform
@@ -245,11 +246,21 @@ namespace NMib::NCloud
 			NStorage::TCOptional<bool> m_AutoStart;
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_OSDependencies; /// Packages the agent installs in the environment beyond the agent application's OS dependencies
 
+			NStorage::TCOptional<NStr::CStr> m_ContainerRuntime; /// Empty selects the default runtime for the host platform
+			NStorage::TCOptional<NStr::CStr> m_ContainerImage;
+			NStorage::TCOptional<NStr::CStr> m_ContainerNetwork;
+			NStorage::TCOptional<NContainer::TCMap<NStr::CStr, NStr::CStr>> m_ContainerExtraMounts;
+			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ContainerExtraArguments;
+			NStorage::TCOptional<bool> m_ContainerReadOnly;
+
+			NStorage::TCOptional<uint64> m_MemoryLimitMB;
+			NStorage::TCOptional<fp64> m_CPULimit;
+
 			NStorage::TCOptional<NStr::CStr> m_VMImage;
 			NStorage::TCOptional<NStr::CStr> m_VMBackend; /// Empty selects the default virtualization backend for the host platform
 			NStorage::TCOptional<uint32> m_VMCPUCount;
 			NStorage::TCOptional<uint64> m_VMMemoryMB;
-			NStorage::TCOptional<uint64> m_VMDataDiskGB;  /// Initial size of the VM data disk; 0 selects the default
+			NStorage::TCOptional<uint64> m_VMDataDiskGB;  /// Initial size of the VM data disk or Colima application storage image; 0 selects the default
 		};
 
 		struct CEnvironmentInfo
@@ -265,11 +276,21 @@ namespace NMib::NCloud
 			NStr::CStr m_HostID; /// Host ID of the agent, known once it accepts its connection ticket or registers
 
 			// Settings
-			EEnvironmentType m_Type = EEnvironmentType_Local;
+			EEnvironmentType m_Type = EEnvironmentType_Container;
 			NStr::CStr m_AgentApplication;
 			NStr::CStr m_ParentApplication;
 			bool m_bAutoStart = true;
 			NContainer::TCVector<NStr::CStr> m_OSDependencies; /// Additional packages installed by the agent inside the environment
+
+			NStr::CStr m_ContainerRuntime;
+			NStr::CStr m_ContainerImage;
+			NStr::CStr m_ContainerNetwork;
+			NContainer::TCMap<NStr::CStr, NStr::CStr> m_ContainerExtraMounts;
+			NContainer::TCVector<NStr::CStr> m_ContainerExtraArguments;
+			bool m_bContainerReadOnly = false;
+
+			uint64 m_MemoryLimitMB = 0;
+			fp64 m_CPULimit = 0.0;
 
 			NStr::CStr m_VMImage;
 			NStr::CStr m_VMBackend;
@@ -455,6 +476,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<void> f_EnvironmentRemove(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_EnvironmentChangeSettings(NStr::CStr _Name, CEnvironmentSettings _Settings) = 0;
 		virtual NConcurrency::TCFuture<void> f_EnvironmentStart(NStr::CStr _Name) = 0;
+		virtual NConcurrency::TCFuture<void> f_EnvironmentPull(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_EnvironmentStop(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_EnvironmentRestart(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CEnvironmentInfo>> f_GetEnvironments() = 0;

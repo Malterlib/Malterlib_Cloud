@@ -822,7 +822,7 @@ namespace NMib::NCloud::NAppManager
 		else
 			_pEnvironment->m_LaunchID = fg_RandomID();
 
-		// The guest agent starts as a daemon without the standard stream handshake local agents use, so it connects with a ticket
+		// The guest agent starts as a daemon without the standard stream handshake container agents use, so it connects with a ticket
 		CStr ConnectSettings;
 		_pEnvironment->m_AgentTicketSubscription.f_Clear();
 		{
