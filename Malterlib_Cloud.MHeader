@@ -11,6 +11,13 @@ Repository
 	MalterlibRepoReusePaths =+ [
 		"Apps/DebugManagerClient/DistributionFiles/DebugManagerClientServe/dummy.txt"
 	]
+
+	License #<CommentStyles> =+ {
+		Path: ["Apps/AppManager/Resources/macOS/*.entitlements"]
+		, LinePrefix: "<!-- "
+		, LineSuffix: " -->"
+		, IsXml: true
+	}
 }
 
 %Group "{Malterlib}/{Lib_Malterlib_Cloud}/{TargetInjection}"
@@ -568,6 +575,12 @@ Property
 	Property
 	{
 		TestBinariesRepoDir: string = `../../Binaries/MalterlibTest/Cloud/@(PlatformFamily)/@(Architecture)`->MakeAbsolute()
+
+		// The tests run the AppManager in process, and its VM environments require the com.apple.security.virtualization entitlement
+		MalterlibSignMacOSEntitlements "Apps/AppManager/Resources/macOS/Virtualization.entitlements"->MakeAbsolute()
+		{
+			!!PlatformIsDarwin true
+		}
 	}
 	Compile
 	{

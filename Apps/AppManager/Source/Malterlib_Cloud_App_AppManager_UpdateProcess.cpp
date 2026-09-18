@@ -5,6 +5,7 @@
 #include <Mib/Cryptography/RandomID>
 #include <Mib/Concurrency/LogError>
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Cloud/FileTransfer>
 
 #include "Malterlib_Cloud_App_AppManager.h"
 
@@ -205,7 +206,18 @@ namespace NMib::NCloud::NAppManager
 			if (auto pException = State.f_CheckAbort())
 				co_return pException;
 
-			CStr DownloadDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersionDownload";
+			// An application whose storage the environment manages has no host application directory, so the download stages in the host-side environment storage
+			if (State.m_pRemoteStorageEnvironment)
+			{
+				if (CStr Error = fp_CheckEnvironmentStagingStorage(*State.m_pRemoteStorageEnvironment); !Error.f_IsEmpty())
+					co_return DMibErrorInstance(Error);
+			}
+
+			CStr DownloadDirectoryRoot;
+			if (State.m_pRemoteStorageEnvironment)
+				DownloadDirectoryRoot = fp_GetEnvironmentStorageDirectory(*State.m_pRemoteStorageEnvironment) / ".AppStage" / State.m_pApplication->m_Name / "Download";
+			else
+				DownloadDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersionDownload";
 			CStr DownloadDirectory = DownloadDirectoryRoot / fg_FastRandomID();
 			State.m_SourcePath = DownloadDirectory;
 			State.m_AllowSourceExist[DownloadDirectoryRoot];
@@ -348,7 +360,20 @@ namespace NMib::NCloud::NAppManager
 			;
 		}
 
-		CStr TemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersion";
+		bool bRemoteStorage = (bool)State.m_pRemoteStorageEnvironment;
+
+		if (bRemoteStorage)
+		{
+			if (CStr Error = fp_CheckEnvironmentStagingStorage(*State.m_pRemoteStorageEnvironment); !Error.f_IsEmpty())
+				co_return DMibErrorInstance(Error);
+		}
+
+		CStr TemporaryDirectoryRoot;
+		// The environment storage on the host holds the unpacked files until they are staged into the environment
+		if (bRemoteStorage)
+			TemporaryDirectoryRoot = fp_GetEnvironmentStorageDirectory(*State.m_pRemoteStorageEnvironment) / ".AppStage" / State.m_pApplication->m_Name / "Unpack";
+		else
+			TemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "TempVersion";
 		CStr BuggyTemporaryDirectoryRoot = State.m_pApplication->f_GetDirectory() / "{}";
 		CStr TemporaryDirectory = TemporaryDirectoryRoot / fg_FastRandomID();
 		State.m_TempraryPath = TemporaryDirectory;
@@ -367,55 +392,224 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		auto BlockingActorCheckout = fg_BlockingActor();
+		{
+			auto BlockingActorCheckout = fg_BlockingActor();
 
-		State.m_Files = co_await
-			(
-				g_Dispatch(BlockingActorCheckout) /
-				[
-					=
-					, Settings = State.m_pNewSettings ? *State.m_pNewSettings : State.m_pApplication->m_Settings
-					, OutputDirectory = State.m_pApplication->f_GetDirectory()
-					, ApplicationName = State.m_pApplication->m_Name
-					, fOnInfo = State.m_fOnInfo
-					, AllowSourceExist = State.m_AllowSourceExist
-					, SourcePath = State.m_SourcePath
-					, pUniqueUserGroup = mp_pUniqueUserGroup
-					, RootDirectory = mp_State.m_RootDirectory
-				]
-				() mutable
+			State.m_Files = co_await
+				(
+					g_Dispatch(BlockingActorCheckout) /
+					[
+						=
+						, Settings = State.m_pNewSettings ? *State.m_pNewSettings : State.m_pApplication->m_Settings
+						, OutputDirectory = State.m_pApplication->f_GetDirectory()
+						, ApplicationName = State.m_pApplication->m_Name
+						, fOnInfo = State.m_fOnInfo
+						, AllowSourceExist = State.m_AllowSourceExist
+						, SourcePath = State.m_SourcePath
+						, pUniqueUserGroup = mp_pUniqueUserGroup
+						, RootDirectory = mp_State.m_RootDirectory
+					]
+					() mutable
+					{
+						// The environment agent resolves the guest users and groups and sets the file ownership
+						if (bRemoteStorage)
+						{
+							Settings.m_RunAsUser = {};
+							Settings.m_RunAsGroup = {};
+						}
+						else
+							fsp_CreateApplicationUserGroup(Settings, fOnInfo, OutputDirectory / ".home", pUniqueUserGroup);
+
+						if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
+						{
+							auto Files = CFile::fs_FindFiles(SourcePath + "/*");
+							if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar.zst") || Files[0].f_EndsWith(".tar")))
+								SourcePath = Files[0];
+						}
+
+						// Cleanup any old crash version
+						try
+						{
+							if (CFile::fs_FileExists(TemporaryDirectoryRoot))
+								CFile::fs_DeleteDirectoryRecursive(TemporaryDirectoryRoot);
+							if (!bRemoteStorage && CFile::fs_FileExists(BuggyTemporaryDirectoryRoot))
+								CFile::fs_DeleteDirectoryRecursive(BuggyTemporaryDirectoryRoot);
+						}
+						catch (CExceptionFile const &_Exception)
+						{
+							[[maybe_unused]] auto &Exception = _Exception;
+							DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up old temp unpack: {}", Exception);
+						}
+
+						TCVector<CStr> Files;
+						CStr Output = fsp_UnpackApplication
+							(
+								RootDirectory
+								, SourcePath
+								, TemporaryDirectory
+								, ApplicationName
+								, Settings
+								, Files
+								, AllowSourceExist
+								, false
+								, bRemoteStorage
+								, pUniqueUserGroup
+							)
+						;
+						if (!Output.f_IsEmpty())
+							fOnInfo(Output);
+						return Files;
+					}
+				)
+			;
+		}
+
+		// Staging starts the environment and prepares the guest, which a dry run must not change
+		if (!bRemoteStorage || State.m_bDryRun)
+			co_return {};
+
+		co_return co_await fp_StageApplicationInEnvironment(_pState, State.m_pRemoteStorageEnvironment);
+	}
+
+	TCFuture<void> CAppManagerActor::fp_StageApplicationInEnvironment(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState, TCSharedPointer<CEnvironment> _pEnvironment)
+	{
+		auto &State = *_pState;
+
+		// The transfer below is outside, since a failed transfer destroys the stage send and the stage finish
+		{
+			auto OnResume = co_await fg_OnResume
+				(
+					[&]() -> CExceptionPointer
+					{
+						return State.f_CheckAbort();
+					}
+				)
+			;
+
+			State.m_fOnInfo("Transferring the application files into the environment");
+
+			if (_pEnvironment->m_bStoppedManually)
+				co_return DMibErrorInstance("Environment '{}' was stopped. Start it with --environment-start."_f << _pEnvironment->m_Name);
+
+			co_await fp_EnsureEnvironmentStarted(_pEnvironment);
+
+			// Creating the application accounts when the staging finishes can rely on the environment OS dependencies
+			co_await (fp_WaitForEnvironmentAgentConfiguration(_pEnvironment) % "Failed to configure the environment");
+		}
+
+		if (!_pEnvironment->m_AgentInterface)
+			co_return DMibErrorInstance("The environment agent is not connected");
+
+		State.m_StageSend = fg_ConstructActor<CFileTransferSend>(fg_TempCopy(State.m_TempraryPath));
+
+		auto SendFilesResult = co_await fg_TempCopy(State.m_StageSend)(&CFileTransferSend::f_SendFiles, CFileTransferSend::CSendFilesOptions()).f_Wrap();
+		if (!SendFilesResult)
+		{
+			if (State.m_StageSend)
+				co_await fg_Move(State.m_StageSend).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send");
+
+			co_return SendFilesResult.f_GetException();
+		}
+
+		auto &Settings = State.m_pNewSettings ? *State.m_pNewSettings : State.m_pApplication->m_Settings;
+
+		CAppManagerEnvironmentInterface::CApplicationStage Stage;
+		Stage.m_Name = State.m_pApplication->m_Name;
+		Stage.m_RunAsUser = Settings.m_RunAsUser;
+		Stage.m_RunAsGroup = Settings.m_RunAsGroup;
+		Stage.m_bRunAsUserHasShell = Settings.m_bRunAsUserHasShell;
+		Stage.m_FilesGenerator = CFileTransferSendDownloadFile::fs_TranslateGenerator<CAppManagerEnvironmentInterface::CStageFile>(fg_Move(SendFilesResult->m_FilesGenerator));
+		Stage.m_FilesGenerator->f_SetSubscription(fg_Move(SendFilesResult->m_Subscription));
+
+		auto TransferResultFuture = fg_Move(SendFilesResult->m_Result);
+
+		// The agent can disconnect while the transfer is prepared
+		TCAsyncResult<CAppManagerEnvironmentInterface::CApplicationStageResult> StageResult;
+		if (_pEnvironment->m_AgentInterface)
+		{
+			StageResult = co_await _pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_StageApplicationFiles)
+				(fg_Move(Stage))
+				.f_Timeout(600.0, "Timed out starting to stage the application files in the environment (10 minutes)")
+				.f_Wrap()
+			;
+		}
+		else
+			StageResult.f_SetException(DMibErrorInstance("The environment agent disconnected before the application files were staged"));
+
+		if (!StageResult)
+		{
+			if (State.m_StageSend)
+				co_await fg_Move(State.m_StageSend).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send");
+
+			co_await fg_Move(TransferResultFuture).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "The aborted application file transfer failed");
+
+			co_return StageResult.f_GetException();
+		}
+
+		State.m_fStageFinish = fg_Move(StageResult->m_fFinish);
+
+		auto TransferResult = co_await fg_Move(TransferResultFuture).f_Timeout(60.0 * 60.0, "Timed out transferring the application files into the environment (1 hour)").f_Wrap();
+
+		if (State.m_StageSend)
+			co_await fg_Move(State.m_StageSend).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage send");
+
+		if (!TransferResult || State.f_CheckAbort())
+		{
+			if (!State.m_fStageFinish.f_IsEmpty())
+				co_await fg_Move(State.m_fStageFinish).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage finish functor");
+
+			if (auto pException = State.f_CheckAbort())
+				co_return pException;
+
+			co_return TransferResult.f_GetException();
+		}
+
+		if (State.m_fStageFinish.f_IsEmpty() || !State.m_fStageFinish.f_GetFunctor())
+			co_return DMibErrorInstance("The application staging was aborted");
+
+		// The finish waits for the transfer and for the agent to give the files to the application account. Destroying the functor below aborts a
+		// stage whose transfer still runs when the finish times out
+		auto FinishResult = co_await State.m_fStageFinish().f_Timeout(60.0 * 60.0, "Timed out finishing the application stage in the environment (1 hour)").f_Wrap();
+
+		if (!State.m_fStageFinish.f_IsEmpty())
+			co_await fg_Move(State.m_fStageFinish).f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to destroy the application stage finish functor");
+
+		if (!FinishResult)
+			co_return FinishResult.f_GetException();
+
+		State.m_AgentStageID = StageResult->m_StageID;
+
+		// The pre update script gets the stage directory inside the environment, not the host directory the package was unpacked to
+		State.m_TempraryPath = StageResult->m_StageDirectory;
+
+		// Once staging succeeded, an update that unwinds before the apply discards the stage if the agent is still reachable
+		{
+			auto pEnvironment = _pEnvironment;
+			CStr Name = State.m_pApplication->m_Name;
+			CStr StageID = State.m_AgentStageID;
+			State.m_AgentStageCleanup = g_ActorSubscription / [pEnvironment, Name, StageID]() -> TCFuture<void>
 				{
-					fsp_CreateApplicationUserGroup(Settings, fOnInfo, OutputDirectory / ".home", pUniqueUserGroup);
+					if (pEnvironment->m_bDeleted || !pEnvironment->m_AgentInterface)
+						co_return {};
 
-					if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
-					{
-						auto Files = CFile::fs_FindFiles(SourcePath + "/*");
-						if (Files.f_GetLen() == 1 && (Files[0].f_EndsWith(".tar.gz") || Files[0].f_EndsWith(".tar.zst") || Files[0].f_EndsWith(".tar")))
-							SourcePath = Files[0];
-					}
+					co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_DiscardApplicationStage)
+						(Name, StageID)
+						.f_Timeout(120.0, "Timed out discarding the application stage")
+						.f_Wrap()
+						> fg_LogError("Malterlib/Cloud/AppManager", "Failed to discard the application stage in the environment")
+					;
 
-					// Cleanup any old crash version
-					try
-					{
-						if (CFile::fs_FileExists(TemporaryDirectoryRoot))
-							CFile::fs_DeleteDirectoryRecursive(TemporaryDirectoryRoot);
-						if (CFile::fs_FileExists(BuggyTemporaryDirectoryRoot))
-							CFile::fs_DeleteDirectoryRecursive(BuggyTemporaryDirectoryRoot);
-					}
-					catch (CExceptionFile const &_Exception)
-					{
-						[[maybe_unused]] auto &Exception = _Exception;
-						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to clean up old temp unpack: {}", Exception);
-					}
-
-					TCVector<CStr> Files;
-					CStr Output = fsp_UnpackApplication(RootDirectory, SourcePath, TemporaryDirectory, ApplicationName, Settings, Files, AllowSourceExist, false, pUniqueUserGroup);
-					if (!Output.f_IsEmpty())
-						fOnInfo(Output);
-					return Files;
+					co_return {};
 				}
-			)
-		;
+			;
+		}
+
+		if (State.m_TemporaryDirectoryCleanup)
+			co_await State.m_TemporaryDirectoryCleanup->f_Destroy();
+		if (State.m_DownloadDirectoryCleanup)
+			co_await State.m_DownloadDirectoryCleanup->f_Destroy();
+		State.m_DownloadDirectoryCleanup.f_Clear();
+		State.m_TemporaryDirectoryCleanup.f_Clear();
 
 		co_return {};
 	}
@@ -489,6 +683,49 @@ namespace NMib::NCloud::NAppManager
 
 		if (auto pException = State.f_CheckAbort())
 			co_return pException;
+
+		if (State.m_pRemoteStorageEnvironment)
+		{
+			auto pEnvironment = State.m_pRemoteStorageEnvironment;
+
+			co_await fp_EnsureEnvironmentStarted(pEnvironment);
+
+			if (auto pException = State.f_CheckAbort())
+				co_return pException;
+
+			if (!pEnvironment->m_AgentInterface)
+				co_return DMibErrorInstance("The environment agent is not connected");
+
+			auto &Settings = State.m_pNewSettings ? *State.m_pNewSettings : State.m_pApplication->m_Settings;
+
+			CAppManagerEnvironmentInterface::CApplicationApply Apply;
+			Apply.m_Name = State.m_pApplication->m_Name;
+			Apply.m_StageID = State.m_AgentStageID;
+			Apply.m_Files = State.m_Files;
+			Apply.m_OldFiles = State.m_pApplication->m_Files;
+			Apply.m_RunAsUser = Settings.m_RunAsUser;
+			Apply.m_RunAsGroup = Settings.m_RunAsGroup;
+			Apply.m_bRunAsUserHasShell = Settings.m_bRunAsUserHasShell;
+
+			// Absent extra info doesn't encode as JSON, and the agent skips an empty one; invalid nested values throw
+			if (State.m_pVersionInfo && State.m_pVersionInfo->m_ExtraInfo.f_IsValid())
+			{
+				auto CaptureScope = co_await (g_CaptureExceptions % "Failed to encode the extra info of the version");
+				Apply.m_VersionExtraInfo = State.m_pVersionInfo->m_ExtraInfo.f_ToString(nullptr);
+			}
+
+			co_await pEnvironment->m_AgentInterface.f_CallActor(&CAppManagerEnvironmentInterface::f_ApplyApplicationFiles)
+				(fg_Move(Apply))
+				.f_Timeout(60.0 * 60.0, "Timed out applying the application files in the environment (1 hour)")
+			;
+
+			// The apply moved the staged files and deleted the stage directory, so nothing is left to discard
+			State.m_AgentStageCleanup.f_Clear();
+
+			State.m_pApplication->m_Files = State.m_Files;
+
+			co_return {};
+		}
 
 		{
 			auto BlockingActorCheckout = fg_BlockingActor();

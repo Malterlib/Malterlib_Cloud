@@ -230,6 +230,30 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception(Error);
 		}
 
+		// The installed files stay where they are, so the new launch environment must keep them in the same storage. The
+		// environment can be removed and added again with another type while the application stops, so this is checked again
+		// before the settings change
+		auto fCheckStorage = [&]() -> CStr
+			{
+				if
+				(
+					(ChangedSettings & EApplicationSetting_LaunchEnvironment)
+					&& fp_LaunchEnvironmentRemoteStorage(NewSettings.m_LaunchEnvironment) != fp_ApplicationRemoteStorageEnvironment(Application)
+				)
+				{
+					return fg_Format("Launch environment '{}' keeps the application files in another storage. Remove and add the application instead.", NewSettings.m_LaunchEnvironment);
+				}
+
+				if (ChangedSettings & (EApplicationSetting_LaunchEnvironment | EApplicationSetting_ParentApplication))
+					return fp_CheckParentApplicationStorage(NewSettings);
+
+				return {};
+			}
+		;
+
+		if (CStr Error = fCheckStorage(); !Error.f_IsEmpty())
+			co_return Auditor.f_Exception(Error);
+
 #ifdef DPlatformFamily_Windows
 		if (!NewSettings.m_RunAsUser.f_IsEmpty() && ((ChangedSettings & EApplicationSetting_RunAsUser) || NewSettings.m_RunAsUserPassword.f_IsEmpty()))
 		{
@@ -312,6 +336,9 @@ namespace NMib::NCloud::NAppManager
 				co_return Auditor.f_Exception(AccountError);
 		}
 
+		if (CStr StorageError = fCheckStorage(); !StorageError.f_IsEmpty())
+			co_return Auditor.f_Exception(StorageError);
+
 		pApplication->m_Settings = NewSettings;
 		if (ChangedSettings & (EApplicationSetting_VersionManagerApplication | EApplicationSetting_UpdateGroup | EApplicationSetting_AutoUpdate))
 			fp_OnAppUpdateInfoChange(pApplication);
@@ -326,8 +353,15 @@ namespace NMib::NCloud::NAppManager
 			auto [Result, UpdateJsonResults] = co_await
 				(
 					(
-						g_Dispatch(BlockingActorCheckout) / [=, Directory = pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]()
+						g_Dispatch(BlockingActorCheckout) /
+						[=, Directory = pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup, bRemoteStorage = (bool)fp_ApplicationRemoteStorageEnvironment(*pApplication)]
+						() -> TCOptional<TCMap<CStr, CStr>>
 						{
+							// The agent prepares the accounts and file owners of an application in environment storage
+							// when it launches the application
+							if (bRemoteStorage)
+								return {};
+
 							fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
 							return fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
 						}
@@ -353,9 +387,9 @@ namespace NMib::NCloud::NAppManager
 				_fOnInfo("Application state successfully stored, so any changes will persist");
 
 			// The owner changes clear the capabilities, and the state was saved before it was known which of them couldn't be set again
-			if (pApplication->m_LowPortExecutablesToGrant != *Result)
+			if (*Result && pApplication->m_LowPortExecutablesToGrant != **Result)
 			{
-				pApplication->m_LowPortExecutablesToGrant = fg_Move(*Result);
+				pApplication->m_LowPortExecutablesToGrant = fg_Move(**Result);
 				co_await (fp_UpdateApplicationJson(pApplication) % "Failed to save application state" % Auditor);
 			}
 		}

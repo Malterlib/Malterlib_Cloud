@@ -197,17 +197,22 @@ namespace NMib::NCloud::NAppManager
 		CAppManagerEnvironmentInterface::CEnvironmentScript EnvironmentScript;
 		EnvironmentScript.m_Description = fg_Format("{}/{}", _pApplication->m_Name, _pApplication->m_Settings.m_UpdateScripts.f_GetName(_Script));
 		EnvironmentScript.m_Script = Script;
-		EnvironmentScript.m_Directory = _pApplication->f_GetDirectory();
+		EnvironmentScript.m_Application = _pApplication->m_Name;
 		EnvironmentScript.m_Parameter = _Param;
 
 		auto &Environment = EnvironmentScript.m_Environment;
 
-		Environment["HOME"] = _pApplication->f_GetDirectory() + "/.home";
-		Environment["TMPDIR"] = _pApplication->f_GetDirectory() + "/.tmp";
+		if (!fp_ApplicationRemoteStorageEnvironment(*_pApplication))
+		{
+			EnvironmentScript.m_Directory = _pApplication->f_GetDirectory();
+
+			Environment["HOME"] = _pApplication->f_GetDirectory() + "/.home";
+			Environment["TMPDIR"] = _pApplication->f_GetDirectory() + "/.tmp";
 #ifdef DPlatformFamily_Windows
-		Environment["TMP"] = _pApplication->f_GetDirectory() + "/.tmp";
-		Environment["TEMP"] = _pApplication->f_GetDirectory() + "/.tmp";
+			Environment["TMP"] = _pApplication->f_GetDirectory() + "/.tmp";
+			Environment["TEMP"] = _pApplication->f_GetDirectory() + "/.tmp";
 #endif
+		}
 
 		Environment["MalterlibCloud_TimeSinceStart"] = fg_Format("{fe1}", _TimeSinceUpdateStart);
 		Environment["MalterlibCloud_Application"] = _pApplication->m_Name;

@@ -90,6 +90,7 @@ namespace NMib::NCloud::NAppManager
 			bool m_bEnvironmentAgent = false;
 			CStr m_EnvironmentHostID;
 			TCOptional<CStr> m_UserGroupNameTransform;
+			CStr m_EnvironmentDataRoot;
 		};
 
 		CAgentDeploymentSettings const &fg_GetAgentDeploymentSettings()
@@ -112,6 +113,8 @@ namespace NMib::NCloud::NAppManager
 								Settings.m_EnvironmentHostID = pValue->f_String();
 							if (auto *pValue = Json.f_GetMember("UserGroupNameTransform", EJsonType_String))
 								Settings.m_UserGroupNameTransform = pValue->f_String();
+							if (auto *pValue = Json.f_GetMember("EnvironmentDataRoot", EJsonType_String))
+								Settings.m_EnvironmentDataRoot = pValue->f_String();
 						}
 					}
 					catch (CException const &_Exception)
@@ -127,6 +130,62 @@ namespace NMib::NCloud::NAppManager
 			return s_Settings;
 		}
 
+		// Reads the connection ticket the launching AppManager writes next to the agent executable, fresh on every request, since the AppManager
+		// can replace it while the agent runs
+		TCFuture<CDistributedActorTrustManager::CTrustTicket> fg_ReadAgentConnectTicket()
+		{
+			CStr Contents;
+			{
+				auto BlockingActorCheckout = fg_BlockingActor();
+
+				CStr ConnectFile = CFile::fs_GetProgramDirectory() / "AppManagerAgentConnect.json";
+				Contents = co_await
+					(
+						g_Dispatch(BlockingActorCheckout) / [ConnectFile]() -> CStr
+						{
+							if (!CFile::fs_FileExists(ConnectFile))
+								return {};
+
+							return CFile::fs_ReadStringFromFile(ConnectFile, true);
+						}
+					)
+				;
+			}
+
+			if (Contents.f_IsEmpty())
+				co_return DMibErrorInstance("No agent connect settings with a connection ticket found");
+
+			CDistributedActorTrustManager::CTrustTicket TrustTicket;
+			{
+				auto CaptureScope = co_await (g_CaptureExceptions % "Failed to parse the agent connect settings");
+
+				CEJsonSorted Json = CEJsonSorted::fs_FromString(Contents);
+
+				CStr Ticket = Json["Ticket"].f_AsString();
+				if (Ticket.f_IsEmpty())
+					co_return DMibErrorInstance("The agent connect settings contain no connection ticket");
+
+				TrustTicket = CDistributedActorTrustManager::CTrustTicket::fs_FromStringTicket(CStrSecure(Ticket));
+			}
+
+			co_return TrustTicket;
+		}
+
+		// Commands run with the agent executable in the guest construct the app too, and must leave the socket of the running agent alone
+		bool fg_IsDaemonRun()
+		{
+			NContainer::TCVector<CStr> CommandLine;
+			NSys::fg_Process_GetCommandLineArgs(CommandLine);
+
+			for (auto &Parameter : CommandLine)
+			{
+				if (Parameter == "--daemon-run" || Parameter == "-Service" || Parameter == "--daemon-run-debug" || Parameter == "--daemon-run-standalone")
+					return true;
+			}
+
+			return false;
+		}
+
 		CDistributedAppActor_Settings fg_MakeAppManagerSettings()
 		{
 			auto Settings = CDistributedAppActor_Settings("AppManager").f_AuditCategory("Malterlib/Cloud/AppManager");
@@ -134,6 +193,36 @@ namespace NMib::NCloud::NAppManager
 			auto &Deployment = fg_GetAgentDeploymentSettings();
 			if (Deployment.m_bEnvironmentAgent)
 			{
+				// VM guest agents start as daemons without a launch-provided server address, so they read the connection settings beside the executable
+				if (Settings.m_InterfaceSettings.m_ServerAddress.f_IsEmpty())
+				{
+					try
+					{
+						CStr ConnectFile = CFile::fs_GetProgramDirectory() / "AppManagerAgentConnect.json";
+						if (CFile::fs_FileExists(ConnectFile))
+						{
+							CEJsonSorted Json = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(ConnectFile, true));
+
+							Settings.m_InterfaceSettings.m_ServerAddress = Json["Address"].f_AsString();
+							Settings.m_InterfaceSettings.m_LaunchID = Json["LaunchID"].f_AsString();
+
+							NStorage::TCSharedPointer<TCActorFunctor<TCFuture<CDistributedActorTrustManager::CTrustTicket> ()>> pRequestTicket = fg_Construct
+								(
+									g_ActorFunctor / []
+									{
+										return fg_ReadAgentConnectTicket();
+									}
+								)
+							;
+							Settings.m_InterfaceSettings.m_pRequestTicket = fg_Move(pRequestTicket);
+						}
+					}
+					catch (CException const &_Exception)
+					{
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to read the agent connect settings: {}", _Exception);
+					}
+				}
+
 				// The launching AppManager points HOME and TMPDIR into the agent root,
 				// but nothing creates them inside a fresh environment; child processes
 				// like package installs fail without a temporary directory
@@ -168,7 +257,46 @@ namespace NMib::NCloud::NAppManager
 		// The agent names application users like the host does; equal names do not mean equal numeric IDs
 		if (Deployment.m_UserGroupNameTransform)
 			mp_pUniqueUserGroup->m_UserGroupNameTransform = *Deployment.m_UserGroupNameTransform;
+		mp_EnvironmentDataRoot = Deployment.m_EnvironmentDataRoot;
 		mp_InitialStartupResultFuture = mp_InitialStartupResult.f_Future();
+
+		// The agent connects to the host while it initializes, before its start
+		if (mp_bEnvironmentAgent && fg_IsDaemonRun())
+			fp_StartAgentHostSocketForwarder();
+	}
+
+	// A VM guest agent and the applications of its environment reach the environment listen of the host through a socket of the guest
+	// that the agent forwards to a virtio socket port of the host. The connect settings that name them are written by the host
+	void CAppManagerActor::fp_StartAgentHostSocketForwarder()
+	{
+		try
+		{
+			CStr ConnectFile = CFile::fs_GetProgramDirectory() / "AppManagerAgentConnect.json";
+			if (!CFile::fs_FileExists(ConnectFile))
+				return;
+
+			CEJsonSorted Json = CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(ConnectFile, true), ConnectFile);
+
+			auto *pHostPort = Json.f_GetMember("HostPort", EJsonType_Integer);
+			auto *pSocketPath = Json.f_GetMember("SocketPath", EJsonType_String);
+			if (!pHostPort || !pSocketPath)
+				return;
+
+			int64 HostPort = pHostPort->f_Integer();
+			if (HostPort < 0 || HostPort > int64(TCLimitsInt<uint32>::mc_Max))
+				DMibError("Host port {} is out of range"_f << HostPort);
+
+			CStr SocketPath = pSocketPath->f_String();
+			CDistributedAppActor_Settings::fs_PrepareLocalSocketDirectory(CFile::fs_GetPath(SocketPath));
+
+			mp_AgentHostSocketForwarder = NVirtualization::CGuestHostSocketForwarder::fs_Start(SocketPath, uint32(HostPort));
+
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Forwarding '{}' to port {} of the host", SocketPath, HostPort);
+		}
+		catch (CException const &_Exception)
+		{
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Failed to forward the connection to the host: {}", _Exception);
+		}
 	}
 
 	CAppManagerActor::~CAppManagerActor()
@@ -199,7 +327,41 @@ namespace NMib::NCloud::NAppManager
 
 		co_await fg_AllDone(SensorRebootPreventionDestroys).f_Wrap() > LogError.f_Warning("Failed to destroy reboot prevention subscriptions");
 
+		// Abort the stage transfers of running updates and agent-side receives before distribution shuts down: the update cleanup discards the staged files through the agent connection
+		{
+			TCFutureVector<void> Destroys;
+
+			for (auto &pUpdateWeak : mp_RunningUpdates)
+			{
+				auto pUpdate = pUpdateWeak.f_Lock();
+				if (!pUpdate)
+					continue;
+
+				if (!pUpdate->m_fStageFinish.f_IsEmpty())
+					fg_Move(pUpdate->m_fStageFinish).f_Destroy() > Destroys;
+
+				if (pUpdate->m_StageSend)
+					fg_Move(pUpdate->m_StageSend).f_Destroy() > Destroys;
+
+				if (pUpdate->m_AgentStageCleanup)
+					fg_Exchange(pUpdate->m_AgentStageCleanup, nullptr)->f_Destroy() > Destroys;
+			}
+
+			for (auto &StageReceive : mp_ApplicationStageReceives)
+			{
+				if (StageReceive.m_Receive)
+					fg_Move(StageReceive.m_Receive).f_Destroy() > Destroys;
+			}
+			mp_ApplicationStageReceives.f_Clear();
+
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy pending application stage transfers");
+		}
+
 		co_await CDistributedAppActor::fp_Destroy();
+
+		// The forwarder carries the connection of the distributed app to the host, so it is destroyed after the distributed app
+		if (mp_AgentHostSocketForwarder)
+			co_await fg_Move(mp_AgentHostSocketForwarder).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy the host socket forwarder");
 
 		co_return {};
 	}
@@ -215,7 +377,17 @@ namespace NMib::NCloud::NAppManager
 		fp_SendAppChange_AddedOrChanged(*_pApplication);
 
 		if (_pApplication->f_IsChildApp())
+		{
+			// The backups of the root application leave out the environment storage and VM images in the directories of its children
+			if (auto *pParent = mp_Applications.f_FindEqual(_pApplication->m_Settings.m_ParentApplication); pParent && (*pParent)->m_BackupClient)
+			{
+				fp_RestartApplicationBackup(*pParent)
+					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to restart the backup of application '{}'"_f << _pApplication->m_Settings.m_ParentApplication)
+				;
+			}
+
 			return; // Parent cannot have parents
+		}
 		auto &NewApplication = *_pApplication;
 		for (auto &pApplication : mp_Applications)
 		{

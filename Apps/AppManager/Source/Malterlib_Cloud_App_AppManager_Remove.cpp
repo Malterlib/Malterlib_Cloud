@@ -10,10 +10,15 @@ namespace NMib::NCloud::NAppManager
 {
 	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Remove(NStr::CStr _Name)
 	{
-		co_return co_await f_RemoveInternal(fg_Move(_Name), false);
+		co_return co_await f_RemoveInternal(fg_Move(_Name), false, false);
 	}
 
-	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_RemoveInternal(NStr::CStr _Name, bool _bForce)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_RemoveWithSettings(NStr::CStr _Name, CApplicationRemoveSettings _Settings)
+	{
+		co_return co_await f_RemoveInternal(fg_Move(_Name), false, _Settings.m_bDeleteApplicationData);
+	}
+
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_RemoveInternal(NStr::CStr _Name, bool _bForce, bool _bDeleteApplicationData)
 	{
 		auto pThis = m_pThis;
 		auto Auditor = pThis->f_Auditor();
@@ -69,6 +74,34 @@ namespace NMib::NCloud::NAppManager
 		if (CStr Environment = pThis->fp_FindEnvironmentStoringDataInApplication(_Name); !Environment.f_IsEmpty())
 			co_return Auditor.f_Exception(fg_Format("Cannot remove application '{}' because environment '{}' stores its data inside it", _Name, Environment));
 
+		auto pRemoteStorageEnvironment = pThis->fp_ApplicationRemoteStorageEnvironment(*pApplicationPtr);
+
+		// The process can still run on the files
+		if (_bDeleteApplicationData && !StopResult && pRemoteStorageEnvironment)
+			co_return Auditor.f_Exception(fg_Format("Application '{}' did not stop, so it and its files in the environment storage are kept", _Name));
+
+		// Storage an environment manages for the application is only deleted on request, through its agent. A later add of a package with the same
+		// name fails without --force-install while the kept storage has files other than the staging and reserved directories
+		if (_bDeleteApplicationData)
+		{
+			auto RemoveStorageResult = co_await pThis->fp_RemoveApplicationEnvironmentStorage(pApplicationPtr).f_Wrap();
+			if (!RemoveStorageResult && !_bForce)
+			{
+				co_return Auditor.f_Exception
+					(
+						fg_Format("Failed to remove the application storage in the environment, so application '{}' is kept for a retry: {}", _Name, RemoveStorageResult.f_GetExceptionStr())
+					)
+				;
+			}
+			else if (!RemoveStorageResult)
+				Auditor.f_Warning(fg_Format("Failed to remove the application storage in the environment: {}", RemoveStorageResult.f_GetExceptionStr()));
+		}
+
+		// A concurrent forced remove, or a remove and add, can replace the entry while the storage is removed
+		pApplication = pThis->mp_Applications.f_FindEqual(_Name);
+		if (!pApplication || *pApplication != pApplicationPtr)
+			co_return Auditor.f_Exception(fg_Format("Application '{}' was removed while its storage was removed", _Name));
+
 		(*pApplication)->f_Delete();
 		pThis->mp_Applications.f_Remove(_Name);
 		pThis->fp_SendRemovedAppToRemoteAppManagers(pApplicationPtr);
@@ -84,7 +117,10 @@ namespace NMib::NCloud::NAppManager
 		co_await pThis->fp_RebootPrevention_RemoveApplication(_Name);
 		co_await (pThis->mp_State.m_StateDatabase.f_Save() % "Failed to save state" % Auditor);
 
-		Auditor.f_Info(fg_Format("Removed application '{}'", _Name));
+		if (pRemoteStorageEnvironment && !_bDeleteApplicationData)
+			Auditor.f_Info(fg_Format("Removed application '{}' and kept its storage in environment '{}'", _Name, pRemoteStorageEnvironment->m_Name));
+		else
+			Auditor.f_Info(fg_Format("Removed application '{}'", _Name));
 
 		co_await fg_Move(DestroyInProgress);
 		co_await pThis->fp_SyncNotifications(_Name);
@@ -96,11 +132,31 @@ namespace NMib::NCloud::NAppManager
 	{
 		CStr ApplicationName = _Params["Name"].f_String();
 		bool bForce = _Params["Force"].f_AsBoolean(false);
+		bool bDeleteApplicationData = _Params["DeleteApplicationData"].f_AsBoolean(false);
+
+		CStr KeptStorageEnvironment;
+		if (auto *pApplication = mp_Applications.f_FindEqual(ApplicationName); pApplication && !bDeleteApplicationData)
+		{
+			if (auto pEnvironment = fp_ApplicationRemoteStorageEnvironment(**pApplication))
+				KeptStorageEnvironment = pEnvironment->m_Name;
+		}
 
 		if (!bForce)
 			fp_ReportInProgress(_pCommandLine, ApplicationName);
 
-		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_RemoveInternal, ApplicationName, bForce);
+		co_await mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_RemoveInternal, ApplicationName, bForce, bDeleteApplicationData);
+
+		if (!KeptStorageEnvironment.f_IsEmpty())
+		{
+			co_await _pCommandLine->f_StdOut
+				(
+					"Kept the files of application '{}' in environment '{}'. Adding an application with the same name needs --force-install, which\n"
+					"reuses them. To delete them, add it with --force-install and remove it with --delete-application-data.\n"_f
+					<< ApplicationName
+					<< KeptStorageEnvironment
+				)
+			;
+		}
 
 		co_return 0;
 	}
