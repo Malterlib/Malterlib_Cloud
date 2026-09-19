@@ -37,6 +37,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				CDistributedAppActor_Settings("TestNetworkTunnelServerApp")
 				.f_SeparateDistributionManager(true)
 				.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
+				.f_MinimumCryptoStrength(NCryptography::ECryptoStrength::mc_EquivalentSymmetric128bit)
 				.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
 			)
 			, m_ListenPath(_ListenPath)
@@ -89,6 +90,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				CDistributedAppActor_Settings("TestNetworkTunnelClientApp")
 				.f_SeparateDistributionManager(true)
 				.f_KeySetting(NConcurrency::CDistributedActorTestKeySettings{})
+				.f_MinimumCryptoStrength(NCryptography::ECryptoStrength::mc_EquivalentSymmetric128bit)
 				.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_None)
 			)
 		{
