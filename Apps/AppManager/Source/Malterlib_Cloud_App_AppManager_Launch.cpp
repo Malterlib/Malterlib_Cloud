@@ -167,6 +167,15 @@ namespace NMib::NCloud::NAppManager
 
 		CStr ApplicationDirectory = Application.f_GetDirectory();
 
+		// The registration of a previous launch outlives its process until the host identifies with a new execution ID, which fails the calls
+		// made through it. The new launch waits for its own registration, and the assign sequence keeps the old one's loss from clearing it.
+		if (Application.m_AppInterface)
+		{
+			++Application.m_AppInterfaceAssignSequence;
+			Application.m_AppInterface.f_Destroy().f_DiscardResult();
+			Application.m_AppInterface.f_Clear();
+		}
+
 		if (Application.m_Settings.m_bLaunchInProcess)
 		{
 			auto fFactory = (*g_InProcessRegistry).f_GetFactory(ApplicationDirectory / Application.m_Settings.m_Executable);
