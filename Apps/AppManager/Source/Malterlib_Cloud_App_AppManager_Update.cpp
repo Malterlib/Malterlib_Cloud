@@ -17,7 +17,9 @@ namespace NMib::NCloud::NAppManager
 		case EDistributedAppUpdateType_Independent: return "independent";
 		case EDistributedAppUpdateType_AllAtOnce: return "all at once";
 		case EDistributedAppUpdateType_OneAtATime: return "one at a time";
-		default: DNeverGetHere; return "unknown";
+		default:
+			DNeverGetHere;
+			return "unknown";
 		}
 	}
 
@@ -135,9 +137,7 @@ namespace NMib::NCloud::NAppManager
 
 			auto HasPermissions = co_await
 				(
-					mp_Permissions.f_HasPermissions("Update application in AppManager", Permissions, _CallingHostInfo)
-					% "Permission denied updating application"
-					% Auditor
+					mp_Permissions.f_HasPermissions("Update application in AppManager", Permissions, _CallingHostInfo) % "Permission denied updating application" % Auditor
 				)
 			;
 
@@ -327,33 +327,15 @@ namespace NMib::NCloud::NAppManager
 								.f_Wrap()
 							;
 							if (!ScriptResult)
-							{
-								DMibLogWithCategory
-									(
-										Malterlib/Cloud/AppManager
-										, Warning
-										, "Error script failed: {}"
-										, ScriptResult.f_GetExceptionStr()
-									)
-								;
-							}
+								DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Error script failed: {}", ScriptResult.f_GetExceptionStr());
 						}
 						else
-						{
-							DMibLogWithCategory
-								(
-									Malterlib/Cloud/AppManager
-									, Info
-									, "Skipped error script: bDeleted {}   bUnencrypted {}"
-									, pApplication->m_bDeleted
-									, bUnencrypted
-								)
-							;
-						}
+							DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "Skipped error script: bDeleted {}   bUnencrypted {}", pApplication->m_bDeleted, bUnencrypted);
 
 						co_return {};
 					}
-				).f_Wrap()
+				)
+				.f_Wrap()
 			)
 		;
 
@@ -365,7 +347,6 @@ namespace NMib::NCloud::NAppManager
 
 	TCFuture<void> CAppManagerActor::fp_CancelAllApplicationUpdatesOnStopAppManager()
 	{
-
 		if (mp_RunningUpdates.f_IsEmpty())
 			co_return {};
 

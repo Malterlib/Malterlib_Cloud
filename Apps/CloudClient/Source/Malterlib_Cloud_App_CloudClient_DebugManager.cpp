@@ -13,7 +13,7 @@
 #include "Malterlib_Cloud_App_CloudClient.h"
 
 #ifdef DPlatformFamily_Windows
-#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#	include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #endif
 
 namespace NMib::NCloud::NCloudClient
@@ -154,7 +154,7 @@ namespace NMib::NCloud::NCloudClient
 		;
 		auto fAssetTypeOption = [](bool _bOptional)
 			{
-				return (_bOptional ? "AssetType?"_o : "AssetType"_o)=
+				return (_bOptional ? "AssetType?"_o : "AssetType"_o) =
 					{
 						"Names"_o= _o["--asset-type", "-t"]
 						, "Type"_o= COneOf("Executable", "DebugInfo")
@@ -165,10 +165,10 @@ namespace NMib::NCloud::NCloudClient
 		;
 		auto fBuildIDOption = [](bool _bOptional)
 			{
-				return (_bOptional ? "BuildID?"_o : "BuildID"_o)=
+				return (_bOptional ? "BuildID?"_o : "BuildID"_o) =
 					{
 						"Names"_o= _o["--build-id", "-i"]
-						,"Type"_o= ""
+						, "Type"_o= ""
 						, "Description"_o= "The build ID.\n"
 					}
 				;
@@ -176,10 +176,10 @@ namespace NMib::NCloud::NCloudClient
 		;
 		auto fCrashDumpIDOption = [](bool _bOptional)
 			{
-				return (_bOptional ? "ID?"_o : "ID"_o)=
+				return (_bOptional ? "ID?"_o : "ID"_o) =
 					{
 						"Names"_o= _o["--id", "-i"]
-						,"Type"_o= ""
+						, "Type"_o= ""
 						, "Description"_o= "The crash dump ID.\n"
 					}
 				;
@@ -245,28 +245,28 @@ namespace NMib::NCloud::NCloudClient
 		auto FilterFileNameOption = "FileName?"_o=
 			{
 				"Names"_o= _o["--file-name", "-n"]
-				,"Type"_o= ""
+				, "Type"_o= ""
 				, "Description"_o= "File name pattern to match.\n"
 			}
 		;
 		auto FilterTimestampStartOption = "TimestampStart?"_o=
 			{
 				"Names"_o= _o["--timestamp-start"]
-				,"Type"_o= CTime()
+				, "Type"_o= CTime()
 				, "Description"_o= "The start of the timestamp range to match.\n"
 			}
 		;
 		auto FilterTimestampEndOption = "TimestampEnd?"_o=
 			{
 				"Names"_o= _o["--timestamp-end"]
-				,"Type"_o= CTime()
+				, "Type"_o= CTime()
 				, "Description"_o= "The end of the timestamp range to match.\n"
 			}
 		;
 		auto FilterExceptionInfoOption = "ExceptionInfo?"_o=
 			{
 				"Names"_o= _o["--exception-info"]
-				,"Type"_o= ""
+				, "Type"_o= ""
 				, "Description"_o= "Exception info pattern to match.\n"
 			}
 		;
@@ -283,7 +283,7 @@ namespace NMib::NCloud::NCloudClient
 						, "Verbosity?"_o=
 						{
 							"Names"_o= _o["--verbosity", "-v"]
-							,"Default"_o= 2
+							, "Default"_o= 2
 							, "Description"_o= "Output verbosity.\n"
 						}
 						, fAssetTypeOption(true)
@@ -320,19 +320,19 @@ namespace NMib::NCloud::NCloudClient
 						, "Pretend?"_o=
 						{
 							"Names"_o= _o["--pretend"]
-							,"Default"_o= true
+							, "Default"_o= true
 							, "Description"_o= "Check how much would be deleted without actually deleting anything.\n"
 						}
 						, "AllowMultiDelete?"_o=
 						{
 							"Names"_o= _o["--allow-multi-delete", "-f"]
-							,"Default"_o= false
+							, "Default"_o= false
 							, "Description"_o= "Allow deleting several assets at the same time.\n"
 						}
 						, "MaxDeletes?"_o=
 						{
 							"Names"_o= _o["--max-deletions", "-m"]
-							,"Default"_o= 1
+							, "Default"_o= 1
 							, "Description"_o= "Max number of assets to delete. To avoid mistakes this defaults to 1.\n"
 						}
 						, fAssetTypeOption(true)
@@ -407,7 +407,7 @@ namespace NMib::NCloud::NCloudClient
 						, "AllowMultiDownload?"_o=
 						{
 							"Names"_o= _o["--allow-multi-download", "-f"]
-							,"Default"_o= false
+							, "Default"_o= false
 							, "Description"_o= "Allow downloading several build IDs at the same time.\n"
 						}
 						, fAssetTypeOption(true)
@@ -460,7 +460,7 @@ namespace NMib::NCloud::NCloudClient
 						, "Verbosity?"_o=
 						{
 							"Names"_o= _o["--verbosity", "-v"]
-							,"Default"_o= 2
+							, "Default"_o= 2
 							, "Description"_o= "Output verbosity.\n"
 						}
 						, fCrashDumpIDOption(true)
@@ -497,19 +497,19 @@ namespace NMib::NCloud::NCloudClient
 						, "Pretend?"_o=
 						{
 							"Names"_o= _o["--pretend"]
-							,"Default"_o= true
+							, "Default"_o= true
 							, "Description"_o= "Check how much would be deleted without actually deleting anything.\n"
 						}
 						, "AllowMultiDelete?"_o=
 						{
 							"Names"_o= _o["--allow-multi-delete", "-f"]
-							,"Default"_o= false
+							, "Default"_o= false
 							, "Description"_o= "Allow deleting several crash dumps at the same time.\n"
 						}
 						, "MaxDeletes?"_o=
 						{
 							"Names"_o= _o["--max-deletions", "-m"]
-							,"Default"_o= 1
+							, "Default"_o= 1
 							, "Description"_o= "Max number of crash dumps to delete. To avoid mistakes this defaults to 1.\n"
 						}
 						, fCrashDumpIDOption(true)
@@ -585,7 +585,7 @@ namespace NMib::NCloud::NCloudClient
 						, "AllowMultiDownload?"_o=
 						{
 							"Names"_o= _o["--allow-multi-download", "-f"]
-							,"Default"_o= false
+							, "Default"_o= false
 							, "Description"_o= "Allow downloading several build IDs at the same time.\n"
 						}
 						, fCrashDumpIDOption(true)
@@ -676,7 +676,7 @@ namespace NMib::NCloud::NCloudClient
 		{
 			if (_Bytes >= 1024 * 1024 * 1024)
 				return "{fe2} GiB"_f << (fp64(_Bytes) / fp64(1024 * 1024 * 1024));
-			else if (_Bytes >= 1024*1024)
+			else if (_Bytes >= 1024 * 1024)
 				return "{fe2} MiB"_f << (fp64(_Bytes) / fp64(1024 * 1024));
 			else if (_Bytes >= 1024)
 				return "{fe2} KiB"_f << (fp64(_Bytes) / fp64(1024));
@@ -701,7 +701,8 @@ namespace NMib::NCloud::NCloudClient
 		{
 			if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 				continue;
-			TrustedActor.m_Actor.f_CallActor(&CDebugManager::f_Asset_List)(CDebugManager::CAssetList{.m_Filter = Filter})
+			TrustedActor.m_Actor.f_CallActor(&CDebugManager::f_Asset_List)
+				(CDebugManager::CAssetList{.m_Filter = Filter})
 				.f_Timeout(mp_Timeout, "Timed out waiting for debug manager to reply")
 				> ListResults[TrustedActor.m_TrustInfo.m_HostInfo]
 			;
@@ -743,7 +744,8 @@ namespace NMib::NCloud::NCloudClient
 			CStr HostDescription = HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags);
 			if (!Result)
 			{
-				*_pCommandLine %= "{}Failed getting applications for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting applications for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -839,7 +841,8 @@ namespace NMib::NCloud::NCloudClient
 
 			auto &UploadResult = *Result.f_Value();
 
-			*_pCommandLine += "Upload finished transferring to '{}': {ns } bytes at {fe2} MB/s\n"_f
+			*_pCommandLine
+				+= "Upload finished transferring to '{}': {ns } bytes at {fe2} MB/s\n"_f
 				<< Result.f_Key().f_GetDescColored(FormatFlags)
 				<< UploadResult.m_TransferResult.m_nBytes
 				<< UploadResult.m_TransferResult.f_BytesPerSecond() / 1'000'000.0
@@ -882,16 +885,7 @@ namespace NMib::NCloud::NCloudClient
 
 		for (auto &DebugManager : DebugManagers)
 		{
-			auto Results = co_await mp_DebugManagerHelper.f_Asset_Download
-				(
-					DebugManager.m_Actor
-					, Filter
-					, DestinationDirectory
-					, CFileTransferReceive::EReceiveFlag_None
-					, QueueSize
-				)
-				.f_Wrap()
-			;
+			auto Results = co_await mp_DebugManagerHelper.f_Asset_Download(DebugManager.m_Actor, Filter, DestinationDirectory, CFileTransferReceive::EReceiveFlag_None, QueueSize).f_Wrap();
 
 			if (!Results)
 			{
@@ -907,7 +901,8 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 			}
 
-			*_pCommandLine += "Download finished transferring from '{}': {ns } bytes at {fe2} MB/s\n"_f
+			*_pCommandLine
+				+= "Download finished transferring from '{}': {ns } bytes at {fe2} MB/s\n"_f
 				<< DebugManager.m_TrustInfo.m_HostInfo.f_GetDescColored(FormatFlags)
 				<< Results->m_nBytes
 				<< Results->f_BytesPerSecond() / 1'000'000.0
@@ -939,9 +934,9 @@ namespace NMib::NCloud::NCloudClient
 
 		CDebugManager::CAssetDelete DeleteParams
 			{
-				 .m_Filter = Filter
-				 , .m_nMaxToDelete = nMaxToDelete
-				 , .m_bPretend = bPretend
+				.m_Filter = Filter
+				, .m_nMaxToDelete = nMaxToDelete
+				, .m_bPretend = bPretend
 			}
 		;
 
@@ -952,7 +947,8 @@ namespace NMib::NCloud::NCloudClient
 
 			auto DeleteResult = co_await TrustedActor.m_Actor.f_CallActor(&CDebugManager::f_Asset_Delete)(DeleteParams);
 
-			*_pCommandLine += "{}: {} {} assets, {ns } files and {ns } bytes\n"_f
+			*_pCommandLine
+				+= "{}: {} {} assets, {ns } files and {ns } bytes\n"_f
 				<< TrustedActor.m_TrustInfo.m_HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
 				<< (bPretend ? "Would have deleted" : "Deleted")
 				<< DeleteResult.m_nAssetsDeleted
@@ -981,7 +977,8 @@ namespace NMib::NCloud::NCloudClient
 		{
 			if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 				continue;
-			TrustedActor.m_Actor.f_CallActor(&CDebugManager::f_CrashDump_List)(CDebugManager::CCrashDumpList{.m_Filter = Filter})
+			TrustedActor.m_Actor.f_CallActor(&CDebugManager::f_CrashDump_List)
+				(CDebugManager::CCrashDumpList{.m_Filter = Filter})
 				.f_Timeout(mp_Timeout, "Timed out waiting for debug manager to reply")
 				> ListResults[TrustedActor.m_TrustInfo.m_HostInfo]
 			;
@@ -1022,7 +1019,8 @@ namespace NMib::NCloud::NCloudClient
 			CStr HostDescription = HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags);
 			if (!Result)
 			{
-				*_pCommandLine %= "{}Failed getting applications for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting applications for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -1166,7 +1164,8 @@ namespace NMib::NCloud::NCloudClient
 
 				auto &UploadResult = *Result;
 
-				*_pCommandLine += "Upload finished transferring to '{}': {ns } bytes at {fe2} MB/s\n"_f
+				*_pCommandLine
+					+= "Upload finished transferring to '{}': {ns } bytes at {fe2} MB/s\n"_f
 					<< HostInfo.f_GetDescColored(FormatFlags)
 					<< UploadResult.m_TransferResult.m_nBytes
 					<< UploadResult.m_TransferResult.f_BytesPerSecond() / 1'000'000.0
@@ -1210,14 +1209,7 @@ namespace NMib::NCloud::NCloudClient
 
 		for (auto &DebugManager : DebugManagers)
 		{
-			auto Results = co_await mp_DebugManagerHelper.f_CrashDump_Download
-				(
-					DebugManager.m_Actor
-					, Filter
-					, DestinationDirectory
-					, CFileTransferReceive::EReceiveFlag_None
-					, QueueSize
-				)
+			auto Results = co_await mp_DebugManagerHelper.f_CrashDump_Download(DebugManager.m_Actor, Filter, DestinationDirectory, CFileTransferReceive::EReceiveFlag_None, QueueSize)
 				.f_Wrap()
 			;
 
@@ -1235,7 +1227,8 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 			}
 
-			*_pCommandLine += "Download finished transferring from '{}': {ns } bytes at {fe2} MB/s\n"_f
+			*_pCommandLine
+				+= "Download finished transferring from '{}': {ns } bytes at {fe2} MB/s\n"_f
 				<< DebugManager.m_TrustInfo.m_HostInfo.f_GetDescColored(FormatFlags)
 				<< Results->m_nBytes
 				<< Results->f_BytesPerSecond() / 1'000'000.0
@@ -1267,9 +1260,9 @@ namespace NMib::NCloud::NCloudClient
 
 		CDebugManager::CCrashDumpDelete DeleteParams
 			{
-				 .m_Filter = Filter
-				 , .m_nMaxToDelete = nMaxToDelete
-				 , .m_bPretend = bPretend
+				.m_Filter = Filter
+				, .m_nMaxToDelete = nMaxToDelete
+				, .m_bPretend = bPretend
 			}
 		;
 
@@ -1280,7 +1273,8 @@ namespace NMib::NCloud::NCloudClient
 
 			auto DeleteResult = co_await TrustedActor.m_Actor.f_CallActor(&CDebugManager::f_CrashDump_Delete)(DeleteParams);
 
-			*_pCommandLine += "{}: {} {} crash dumps, {ns } files and {ns } bytes\n"_f
+			*_pCommandLine
+				+= "{}: {} {} crash dumps, {ns } files and {ns } bytes\n"_f
 				<< TrustedActor.m_TrustInfo.m_HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
 				<< (bPretend ? "Would have deleted" : "Deleted")
 				<< DeleteResult.m_nCrashDumpsDeleted

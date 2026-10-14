@@ -39,12 +39,9 @@ namespace NMib::NCloud::NDebugManager
 
 		auto CrashDumpGenerator = co_await
 			(
-				pThis->mp_DebugDatabase
-				(
-					&CDebugDatabase::f_CrashDump_List
-					, fg_ConvertToDebugDatabase<CDebugDatabase::CCrashDumpFilter>(fg_Move(pParams->m_Filter))
-				)
-				% "Failed to list crash dumps when downloading" % Auditor
+				pThis->mp_DebugDatabase(&CDebugDatabase::f_CrashDump_List, fg_ConvertToDebugDatabase<CDebugDatabase::CCrashDumpFilter>(fg_Move(pParams->m_Filter)))
+				% "Failed to list crash dumps when downloading"
+				% Auditor
 			)
 		;
 
@@ -53,7 +50,6 @@ namespace NMib::NCloud::NDebugManager
 			{
 				CFileTransferSend::CBasePath m_BasePath;
 				CStr m_ID;
-
 			};
 
 			struct CUniqueDownload

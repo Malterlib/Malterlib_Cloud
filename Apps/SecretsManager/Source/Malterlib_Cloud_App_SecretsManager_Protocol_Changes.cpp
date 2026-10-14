@@ -38,7 +38,14 @@ namespace NMib::NCloud::NSecretsManager
 
 	bool CSecretsManagerDaemonActor::CServer::fp_SecretMatchesSubscription(CChangeSubscription const &_Subscription, CSecretPropertiesInternal const &_SecretProperties)
 	{
-		return fs_MatchSecret(_SecretProperties, _Subscription.m_SubscriptionParams.m_SemanticID, _Subscription.m_SubscriptionParams.m_Name, _Subscription.m_SubscriptionParams.m_TagsExclusive);
+		return fs_MatchSecret
+			(
+				_SecretProperties
+				, _Subscription.m_SubscriptionParams.m_SemanticID
+				, _Subscription.m_SubscriptionParams.m_Name
+				, _Subscription.m_SubscriptionParams.m_TagsExclusive
+			)
+		;
 	}
 
 	void CSecretsManagerDaemonActor::CServer::fp_SecretUpdated(CSecretPropertiesInternal const &_SecretProperties, bool _bRemoved)
@@ -70,7 +77,8 @@ namespace NMib::NCloud::NSecretsManager
 				;
 
 				auto HasPermissions = co_await mp_Permissions.f_HasPermissions("Send updated secrets in SecretsManager", Permissions, pSubscription->m_CallingHostInfo)
-					.f_Timeout(60.0, "Timed out checking permissions for sending secret changes").f_Wrap()
+					.f_Timeout(60.0, "Timed out checking permissions for sending secret changes")
+					.f_Wrap()
 				;
 
 				if (!HasPermissions)
@@ -159,15 +167,15 @@ namespace NMib::NCloud::NSecretsManager
 		for (auto const &SecretProperties : mp_Database.m_Secrets)
 		{
 			if
+			(
+				!fs_MatchSecret
 				(
-					!fs_MatchSecret
-					(
-						SecretProperties
-						, pSubscription->m_SubscriptionParams.m_SemanticID
-						, pSubscription->m_SubscriptionParams.m_Name
-						, pSubscription->m_SubscriptionParams.m_TagsExclusive
-					)
+					SecretProperties
+					, pSubscription->m_SubscriptionParams.m_SemanticID
+					, pSubscription->m_SubscriptionParams.m_Name
+					, pSubscription->m_SubscriptionParams.m_TagsExclusive
 				)
+			)
 			{
 				continue;
 			}
@@ -211,13 +219,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		Permissions["Command"] = {{"SecretsManager/CommandAll", "SecretsManager/Command/SubscribeToChanges"}};
 
-		auto HasPermissions = co_await
-			(
-				This.mp_Permissions.f_HasPermissions("Subscribe to changes from SecretsManager", Permissions)
-				% "Permission denied subscribing to changes"
-				% Auditor
-			)
-		;
+		auto HasPermissions = co_await (This.mp_Permissions.f_HasPermissions("Subscribe to changes from SecretsManager", Permissions) % "Permission denied subscribing to changes" % Auditor);
 
 		if (!HasPermissions["Command"])
 			co_return Auditor.f_AccessDenied("(SubscribeToChanges, command)", Permissions["Command"]);
@@ -251,9 +253,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		Auditor.f_Info
 			(
-				"Subscribed to secrets matching: SemanticID: {} Tags: {vs}"_f
-				<< pSubscription->m_SubscriptionParams.m_SemanticID
-				<< pSubscription->m_SubscriptionParams.m_TagsExclusive
+				"Subscribed to secrets matching: SemanticID: {} Tags: {vs}"_f << pSubscription->m_SubscriptionParams.m_SemanticID << pSubscription->m_SubscriptionParams.m_TagsExclusive
 			)
 		;
 

@@ -18,18 +18,18 @@ namespace NMib::NCloud::NVersionManager
 	/// Configuration for a single sync source
 	struct CSyncSourceConfig
 	{
-		NStr::CStr m_Name; // User-provided config key
+		NStr::CStr m_Name;                                           // User-provided config key
 		bool m_bEnabled = true;
 		bool m_bPretend = false;
-		NContainer::TCSet<NStr::CStr> m_SyncHosts; // Cryptographic host IDs to sync from
+		NContainer::TCSet<NStr::CStr> m_SyncHosts;                   // Cryptographic host IDs to sync from
 		NContainer::TCVector<NStr::CStr> m_ApplicationFilters;
 		NContainer::TCVector<NStr::CStr> m_PlatformFilters;
 		NContainer::TCVector<NStr::CStr> m_VersionFilters;
 		NContainer::TCVector<NStr::CStr> m_TagFilters;
 		NContainer::TCMap<NStr::CStr, NStr::CStr> m_CopyTagMappings; // SourceTag -> DestTag
-		bool m_bSyncRetrySequence = false; // If true, use max(local, remote)
-		NTime::CTime m_StartSyncDate; // Only sync versions >= this date (invalid = all)
-		uint32 m_nMinSyncVersions = 0; // Minimum versions per app (ignores date)
+		bool m_bSyncRetrySequence = false;                           // If true, use max(local, remote)
+		NTime::CTime m_StartSyncDate;                                // Only sync versions >= this date (invalid = all)
+		uint32 m_nMinSyncVersions = 0;                               // Minimum versions per app (ignores date)
 		uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
 	};
 

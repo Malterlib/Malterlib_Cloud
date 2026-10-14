@@ -222,9 +222,7 @@ namespace NMib::NCloud::NCloudManager
 							Value.m_ApplicationInfo.m_StatusSeverity = ChangeValue.m_StatusSeverity;
 						}
 						else
-						{
 							DMibNeverGetHere;
-						}
 
 						if (Value.m_ApplicationInfo.m_HostID)
 						{
@@ -284,7 +282,10 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		auto [InterfaceDestroyResult, SaveAppManagerDataDestroyResult, SubscriptionDestroyResult] = co_await
-			(Interface.f_Destroy() + _This.fp_SaveAppManagerData(DatabaseKey, fg_Move(Data)) + fg_AllDone(DestroyResults)).f_Wrap()
+			(
+				Interface.f_Destroy() + _This.fp_SaveAppManagerData(DatabaseKey, fg_Move(Data)) + fg_AllDone(DestroyResults)
+			)
+			.f_Wrap()
 		;
 
 		if (!SubscriptionDestroyResult)
@@ -299,11 +300,8 @@ namespace NMib::NCloud::NCloudManager
 		co_return {};
 	}
 
-	TCFuture<CCloudManager::CRegisterAppManagerResult> CCloudManagerServer::CCloudManagerImplementation::f_RegisterAppManager
-		(
-			TCDistributedActorInterfaceWithID<CAppManagerInterface> _AppManager
-			, CAppManagerInfo _AppManagerInfo
-		)
+	auto CCloudManagerServer::CCloudManagerImplementation::f_RegisterAppManager(TCDistributedActorInterfaceWithID<CAppManagerInterface> _AppManager, CAppManagerInfo _AppManagerInfo)
+		-> TCFuture<CCloudManager::CRegisterAppManagerResult>
 	{
 		if (!_AppManager)
 			co_return DMibErrorInstance("Invalid app manager");
@@ -528,14 +526,7 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		if (!AppManagerSeenHosts.f_IsEmpty())
-		{
-			co_await pThis->mp_AppSensorStore
-				(
-					&CDistributedAppSensorStoreLocal::f_SeenHosts
-					, fg_Move(AppManagerSeenHosts)
-				)
-			;
-		}
+			co_await pThis->mp_AppSensorStore(&CDistributedAppSensorStoreLocal::f_SeenHosts, fg_Move(AppManagerSeenHosts));
 
 		auto SaveAppManagerDataResult = co_await pThis->fp_SaveAppManagerData(DatabaseKey, pAppManagerState->m_Data).f_Wrap();
 
@@ -973,11 +964,11 @@ namespace NMib::NCloud::NCloudManager
 			TCFutureVector<void> NotificationResults;
 			CExpectedOsVersionSubscriptionKey Key{.m_OsName = _OsName};
 			for
-				(
-					auto iSubscription = pThis->mp_ExpectedOsVersionSubscriptions.f_GetIterator_SmallestGreaterThanEqual(Key)
-					; iSubscription && iSubscription.f_GetKey().m_OsName == _OsName
-					; ++iSubscription
-				)
+			(
+				auto iSubscription = pThis->mp_ExpectedOsVersionSubscriptions.f_GetIterator_SmallestGreaterThanEqual(Key)
+				; iSubscription && iSubscription.f_GetKey().m_OsName == _OsName
+				; ++iSubscription
+			)
 			{
 				auto &Subscription = *iSubscription;
 				if (Subscription.m_fVersionRangeChanged)

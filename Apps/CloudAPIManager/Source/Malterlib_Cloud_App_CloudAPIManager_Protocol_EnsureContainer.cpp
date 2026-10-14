@@ -24,7 +24,7 @@ namespace NMib::NCloud::NCloudAPIManager
 			co_return Auditor.f_Exception("Container name format not valid");
 
 		// Empty key locks the container
-		if (!_Params.m_TempURLKey.f_IsEmpty() &&  !CCloudAPIManager::fs_IsValidTempURLKey(_Params.m_TempURLKey))
+		if (!_Params.m_TempURLKey.f_IsEmpty() && !CCloudAPIManager::fs_IsValidTempURLKey(_Params.m_TempURLKey))
 			co_return Auditor.f_Exception("Temp URL key format not valid");
 
 		TCVector<CStr> Permissions = {"ObjectStorage/EnsureContainerAll", "ObjectStorage/EnsureContainer/{}"_f << _Params.m_CloudContext};

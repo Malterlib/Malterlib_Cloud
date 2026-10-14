@@ -17,8 +17,8 @@ namespace NMib::NCloud
 {
 	DMibImpErrorClassDefine(CExceptionSecretsManagerUnexpectedValue, NException::CException);
 
-#	define DMibErrorSecretsManagerUnexpectedValue(_Description) DMibImpError(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, _Description)
-#	define DMibErrorInstanceSecretsManagerUnexpectedValue(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, _Description)
+#define DMibErrorSecretsManagerUnexpectedValue(_Description) DMibImpError(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, _Description)
+#define DMibErrorInstanceSecretsManagerUnexpectedValue(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionSecretsManagerUnexpectedValue, _Description)
 
 	struct CSecretsManager : public NConcurrency::CActor
 	{
@@ -28,12 +28,12 @@ namespace NMib::NCloud
 		{
 			EProtocolVersion_Min = 0x101
 
-			, EProtocolVersion_SupportImmutable = 0x106
-			, EProtocolVersion_SupportNameQuery = 0x106
-			, EProtocolVersion_SupportResultFlags = 0x106
-			, EProtocolVersion_SupportMapSecrets = 0x106
+			, EProtocolVersion_SupportImmutable                       = 0x106
+			, EProtocolVersion_SupportNameQuery                       = 0x106
+			, EProtocolVersion_SupportResultFlags                     = 0x106
+			, EProtocolVersion_SupportMapSecrets                      = 0x106
 			, EProtocolVersion_SupportExpectedMetadataAndModifiedTime = 0x106
-			, EProtocolVersion_SupportOptionalDigest = 0x107
+			, EProtocolVersion_SupportOptionalDigest                  = 0x107
 
 			, EProtocolVersion_Current = 0x107
 		};
@@ -50,7 +50,6 @@ namespace NMib::NCloud
 
 		struct CSecretID
 		{
-
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
@@ -61,7 +60,7 @@ namespace NMib::NCloud
 
 			auto operator <=> (CSecretID const &_Right) const noexcept = default;
 
-			operator NStr::CStr() const;
+			operator NStr::CStr () const;
 
 			NStr::CStr m_Folder;
 			NStr::CStr m_Name;
@@ -77,7 +76,8 @@ namespace NMib::NCloud
 			NFile::CDirectoryManifestFile m_Manifest;
 		};
 
-		struct CSecret : public NStorage::TCStreamableVariant
+		struct CSecret
+			: public NStorage::TCStreamableVariant
 			<
 				ESecretType
 				, NStorage::TCMember<void, ESecretType_NotSet>
@@ -117,8 +117,8 @@ namespace NMib::NCloud
 			template <typename tf_CStr>
 			void f_Format(tf_CStr &o_Str) const;
 
-			CSuper &operator *();
-			CSuper const &operator *() const;
+			CSuper &operator * ();
+			CSuper const &operator * () const;
 			bool operator == (CSecret const &_Right) const noexcept;
 		};
 
@@ -199,7 +199,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NStorage::TCOptional<NStr::CStrSecure> m_SemanticID; //< Limit the updates to secrets matching semantic ID wildcard
-			NStorage::TCOptional<NStr::CStrSecure> m_Name; //< Limit the updates to secrets matching name wildcard
+			NStorage::TCOptional<NStr::CStrSecure> m_Name;       //< Limit the updates to secrets matching name wildcard
 			NContainer::TCSet<NStr::CStrSecure> m_TagsExclusive; //< Limit the updates to secrets with all tags specified
 
 			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> (CSecretChanges _Changes)> m_fOnChanges;
@@ -227,7 +227,7 @@ namespace NMib::NCloud
 
 		enum ESetSecretPropertiesResultFlag : uint32
 		{
-			ESetSecretPropertiesResultFlag_None = 0
+			ESetSecretPropertiesResultFlag_None      = 0
 			, ESetSecretPropertiesResultFlag_Created = DMibBit(0)
 			, ESetSecretPropertiesResultFlag_Updated = DMibBit(1)
 		};
@@ -266,35 +266,22 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<CSecretProperties> f_GetSecretProperties(CSecretID _ID) = 0;
 		virtual NConcurrency::TCFuture<CSecret> f_GetSecret(CSecretID _ID) = 0;
 		virtual NConcurrency::TCFuture<CSecret> f_GetSecretBySemanticID(CGetSecretBySemanticID _Options) = 0;
-		virtual NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> f_DownloadFile
-			(
-				CSecretID _ID
-				, NConcurrency::TCActorSubscriptionWithID<> _Subscription
-			) = 0
+		virtual auto f_DownloadFile(CSecretID _ID, NConcurrency::TCActorSubscriptionWithID<> _Subscription)
+			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> = 0
 		;
-		virtual NConcurrency::TCFuture<void> f_ModifyTags
-			(
-				CSecretID _ID
-				, NContainer::TCSet<NStr::CStrSecure> _TagsToRemove
-				, NContainer::TCSet<NStr::CStrSecure> _TagsToAdd
-			) = 0
-		;
+		virtual NConcurrency::TCFuture<void> f_ModifyTags(CSecretID _ID, NContainer::TCSet<NStr::CStrSecure> _TagsToRemove, NContainer::TCSet<NStr::CStrSecure> _TagsToAdd) = 0;
 		virtual NConcurrency::TCFuture<void> f_SetMetadata(CSetMetadata _SetMetadata) = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveMetadata(CSecretID _ID, NStr::CStrSecure _MetadataKey) = 0;
 		virtual NConcurrency::TCFuture<void> f_RemoveSecret(CSecretID _ID) = 0;
-		virtual NConcurrency::TCFuture<NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()>> f_UploadFile
-			(
-				CSecretID _ID
-				, NStr::CStrSecure _FileName
-				, NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> _Uploader
-			) = 0
+		virtual auto f_UploadFile(CSecretID _ID, NStr::CStrSecure _FileName, NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient> _Uploader)
+			-> NConcurrency::TCFuture<NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<void> ()>> = 0
 		;
 		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_SubscribeToChanges(CSubscribeToChanges _Params) = 0;
 	};
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_SecretsManager.hpp"

@@ -44,7 +44,7 @@ namespace NMib::NCloud::NCloudClient
 
 		enum ECloudManagerStatusFlag
 		{
-			ECloudManagerStatusFlag_AppManagers = DBit(0)
+			ECloudManagerStatusFlag_AppManagers    = DBit(0)
 			, ECloudManagerStatusFlag_Applications = DBit(1)
 		};
 
@@ -97,7 +97,7 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 
-		template<typename tf_CType>
+		template <typename tf_CType>
 		TCFuture<uint32> fp_CommandLine_SecretsManager_EnumerateImpl
 		(
 			CEJsonSorted const _Params
@@ -126,7 +126,7 @@ namespace NMib::NCloud::NCloudClient
 			> _fOnResult
 		);
 
-		template<typename tf_CType>
+		template <typename tf_CType>
 		TCFuture<uint32> fp_CommandLine_SecretsManager_GetImpl
 			(
 				CEJsonSorted const _Params

@@ -107,13 +107,7 @@ namespace NMib::NCloud::NSecretsManager
 		Config.m_BasePath = This.mp_AppState.m_RootDirectory + "/SecretsManagerFiles";
 		Config.m_Manifest = fg_Move(Manifest);
 		Config.m_FileOptions.m_fOpenStream = [Key = pSecretProperties->m_Key, IV = pSecretProperties->m_IV, HMACKey = pSecretProperties->m_HMACKey]
-			(
-				CStr const &_FileName
-				, EDirectorySyncStreamType _FileType
-				, EFileOpen _OpenFlags
-				, EFileAttrib _Attributes
-			)
-			-> NStorage::TCUniquePointer<NStream::CBinaryStream>
+			(CStr const &_FileName, EDirectorySyncStreamType _FileType, EFileOpen _OpenFlags, EFileAttrib _Attributes) -> NStorage::TCUniquePointer<NStream::CBinaryStream>
 			{
 				DRequire(_FileType == EDirectorySyncStreamType_Source);
 
@@ -127,12 +121,7 @@ namespace NMib::NCloud::NSecretsManager
 		;
 
 		Config.m_FileOptions.m_fTransformFilePath = [RandomFileName = pSecretProperties->m_RandomFileName, DownloadFile = ManifestFile.m_OriginalPath]
-			(
-				CStr const &_BasePath
-				, CStr const &_FileName
-				, EDirectorySyncStreamType _Type
-			)
-			-> CStr
+			(CStr const &_BasePath, CStr const &_FileName, EDirectorySyncStreamType _Type) -> CStr
 			{
 				if (_FileName != DownloadFile)
 					DMibError("Unexpected file name in file manifest");
@@ -152,7 +141,7 @@ namespace NMib::NCloud::NSecretsManager
 #if DMibConfig_Tests_Enable
 		if (auto *pPromise = This.mp_DownloadInitialized.f_FindEqual(_ID.m_Name))
 		{
-			pPromise->f_SetResult();	// Tell the test that the download has reserved the file
+			pPromise->f_SetResult(); // Tell the test that the download has reserved the file
 			This.mp_DownloadInitialized.f_Remove(pPromise);
 		}
 #endif
@@ -181,7 +170,7 @@ namespace NMib::NCloud::NSecretsManager
 					{
 						pThis->f_SyncFileOperations() > *pPromise / [Promise = *pPromise]
 							{
-								Promise.f_SetResult();	// Tell the test the transfer has completed and any file ops should have completed
+								Promise.f_SetResult(); // Tell the test the transfer has completed and any file ops should have completed
 							}
 						;
 						pThis->mp_DownloadCompleted.f_Remove(pPromise);
@@ -203,9 +192,9 @@ namespace NMib::NCloud::NSecretsManager
 								<< DownloadFile
 								<< _ID
 								<< Result.m_Stats.m_IncomingBytes
-								<< Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+								<< Result.m_Stats.f_IncomingBytesPerSecond() / 1'000'000.0
 								<< Result.m_Stats.m_OutgoingBytes
-								<< Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
+								<< Result.m_Stats.f_OutgoingBytesPerSecond() / 1'000'000.0
 							)
 						;
 					}
@@ -222,7 +211,7 @@ namespace NMib::NCloud::NSecretsManager
 			CSecretID _ID
 			, NStr::CStrSecure _FileName
 			, TCDistributedActorInterfaceWithID<CDirectorySyncClient> _Uploader
-		 )
+		)
 		-> TCFuture<NConcurrency::TCActorFunctorWithID<TCFuture<void> ()>>
 	{
 		if (!_Uploader)
@@ -284,13 +273,7 @@ namespace NMib::NCloud::NSecretsManager
 		;
 
 		Config.m_FileOptions.m_fOpenStream = [IV, Key = pSecretProperties->m_Key, OldIV = pSecretProperties->m_IV, OldHMACKey = pSecretProperties->m_HMACKey, HMACKey]
-			(
-				CStr const &_FileName
-				, EDirectorySyncStreamType _FileType
-				, EFileOpen _OpenFlags
-				, EFileAttrib _Attributes
-			)
-			-> NStorage::TCUniquePointer<NStream::CBinaryStream>
+			(CStr const &_FileName, EDirectorySyncStreamType _FileType, EFileOpen _OpenFlags, EFileAttrib _Attributes) -> NStorage::TCUniquePointer<NStream::CBinaryStream>
 			{
 				if (_FileType & EDirectorySyncStreamType_Manifest)
 				{
@@ -319,12 +302,7 @@ namespace NMib::NCloud::NSecretsManager
 			}
 		;
 		Config.m_FileOptions.m_fTransformFilePath = [UploadFileName = _FileName, OldFileName = pSecretProperties->m_RandomFileName, NewFileName]
-			(
-				CStr const &_BasePath
-				, CStr const &_FileName
-				, EDirectorySyncStreamType _Type
-			)
-			-> CStr
+			(CStr const &_BasePath, CStr const &_FileName, EDirectorySyncStreamType _Type) -> CStr
 			{
 				if (_FileName == UploadFileName)
 				{
@@ -352,8 +330,8 @@ namespace NMib::NCloud::NSecretsManager
 
 		TCPromiseFuturePair<void> CheckResultPromise;
 
-		Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync) >
-			[=, this, OldFileName = _FileName, SavedSecret = pSecretProperties->m_Secret, CheckResultPromise = fg_Move(CheckResultPromise.m_Promise)]
+		Upload.m_DirectorySyncReceive(&CDirectorySyncReceive::f_PerformSync)
+			> [=, this, OldFileName = _FileName, SavedSecret = pSecretProperties->m_Secret, CheckResultPromise = fg_Move(CheckResultPromise.m_Promise)]
 			(TCAsyncResult<CDirectorySyncReceive::CSyncResult> &&_Result) mutable
 			{
 				auto &This = *m_pThis;
@@ -363,7 +341,7 @@ namespace NMib::NCloud::NSecretsManager
 					{
 						if (auto *pPromise = This.mp_UploadCompleted.f_FindEqual(OldFileName))
 						{
-							pPromise->f_SetResult();	// Tell the test the transfer has completed
+							pPromise->f_SetResult(); // Tell the test the transfer has completed
 							This.mp_UploadCompleted.f_Remove(pPromise);
 						}
 					}
@@ -431,9 +409,9 @@ namespace NMib::NCloud::NSecretsManager
 											<< ManifestFile.m_OriginalPath
 											<< _ID
 											<< Result.m_Stats.m_IncomingBytes
-											<< Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+											<< Result.m_Stats.f_IncomingBytesPerSecond() / 1'000'000.0
 											<< Result.m_Stats.m_OutgoingBytes
-											<< Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
+											<< Result.m_Stats.f_OutgoingBytesPerSecond() / 1'000'000.0
 										)
 									;
 								}
@@ -466,7 +444,7 @@ namespace NMib::NCloud::NSecretsManager
 #if DMibConfig_Tests_Enable
 		if (auto *pPromise = This.mp_UploadInitialized.f_FindEqual(_FileName))
 		{
-			pPromise->f_SetResult();	// Tell the test the transfer has been initialized (SaveSecret has been set so we know if it has changed when the transfer completes)
+			pPromise->f_SetResult(); // Tell the test the transfer has been initialized (SaveSecret has been set so we know if it has changed when the transfer completes)
 			This.mp_UploadInitialized.f_Remove(pPromise);
 		}
 #endif
@@ -484,4 +462,4 @@ namespace NMib::NCloud::NSecretsManager
 			}
 		;
 	}
- }
+}

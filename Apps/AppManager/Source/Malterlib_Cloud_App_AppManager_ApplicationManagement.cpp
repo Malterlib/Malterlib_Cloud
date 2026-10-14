@@ -7,7 +7,7 @@
 #include "Malterlib_Cloud_App_AppManager.h"
 
 #ifdef DPlatformFamily_Windows
-#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#	include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #endif
 
 namespace NMib::NCloud::NAppManager
@@ -21,8 +21,8 @@ namespace NMib::NCloud::NAppManager
 		return {};
 	}
 
-	constexpr static EFileAttrib gc_RootAttributes =
-		EFileAttrib_UnixAttributesValid
+	static constexpr EFileAttrib gc_RootAttributes
+		= EFileAttrib_UnixAttributesValid
 		| EFileAttrib_UserRead
 		| EFileAttrib_UserWrite
 		| EFileAttrib_UserExecute
@@ -72,7 +72,6 @@ namespace NMib::NCloud::NAppManager
 				if (!_AllowExist.f_FindEqual(File))
 					DMibError(fg_Format("Application already exists at: '{}'. You have to manually delete it to resue the name", _Destination));
 			}
-
 		}
 		if (CFile::fs_FileExists(_Source, EFileAttrib_Directory))
 		{
@@ -83,15 +82,10 @@ namespace NMib::NCloud::NAppManager
 					, [&](CFile::EDiffCopyChange _Change, NStr::CStr const &_Source, NStr::CStr const &_Destination, NStr::CStr const &_Link) -> CFile::EDiffCopyChangeAction
 					{
 						if
-							(
-								_bForceInstall
-								&&
-								(
-									_Change == CFile::EDiffCopyChange_DirectoryDeleted
-									|| _Change == CFile::EDiffCopyChange_FileDeleted
-									|| _Change == CFile::EDiffCopyChange_LinkDeleted
-								)
-							)
+						(
+							_bForceInstall
+							&& (_Change == CFile::EDiffCopyChange_DirectoryDeleted || _Change == CFile::EDiffCopyChange_FileDeleted || _Change == CFile::EDiffCopyChange_LinkDeleted)
+						)
 						{
 							return CFile::EDiffCopyChangeAction_Skip;
 						}
@@ -118,13 +112,7 @@ namespace NMib::NCloud::NAppManager
 					CStr::CFormat("[{}] Extracting application") << _ApplicationName
 					, _ApplicationRootDirectory / "bin/bsdtar"
 					, _Destination
-					, fg_CreateVector<CStr>
-					(
-						"--no-same-owner"
-						, "--no-xattr"
-						, "-xf"
-						, _Source
-					)
+					, fg_CreateVector<CStr>("--no-same-owner", "--no-xattr", "-xf", _Source)
 				)
 			;
 			Return = Output;
@@ -136,17 +124,17 @@ namespace NMib::NCloud::NAppManager
 		{
 			CStr ExcutableFile = fg_Format("{}/{}", _Destination, Settings.m_Executable);
 			if
+			(
+				!CFile::fs_FileExists
 				(
-					!CFile::fs_FileExists
-					(
-						ExcutableFile
-	#ifdef DPlatformFamily_Windows
-						, EFileAttrib_File
-	#else
-						, EFileAttrib_Executable
-	#endif
-					)
+					ExcutableFile
+#ifdef DPlatformFamily_Windows
+					, EFileAttrib_File
+#else
+					, EFileAttrib_Executable
+#endif
 				)
+			)
 			{
 				DMibError(fg_Format("Executable file '{}' does not exist or does not have the executable flag set", ExcutableFile));
 			}

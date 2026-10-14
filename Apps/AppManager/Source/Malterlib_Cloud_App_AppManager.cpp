@@ -232,22 +232,22 @@ namespace NMib::NCloud::NAppManager
 					Application.m_LastFailedInstalledVersionFailureStage = EUpdateStage::EUpdateStage_Failed;
 
 				if
-					(
-						Application.m_LastTriedInstalledVersion != Application.m_LastInstalledVersionFinished
-						|| Application.m_LastTriedInstalledVersionInfo.m_Time != Application.m_LastInstalledVersionInfoFinished.m_Time
-						|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != Application.m_LastInstalledVersionInfoFinished.m_RetrySequence
-					)
+				(
+					Application.m_LastTriedInstalledVersion != Application.m_LastInstalledVersionFinished
+					|| Application.m_LastTriedInstalledVersionInfo.m_Time != Application.m_LastInstalledVersionInfoFinished.m_Time
+					|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != Application.m_LastInstalledVersionInfoFinished.m_RetrySequence
+				)
 				{
 					if
+					(
 						(
-							(
-								Name != PendingSelfUpdate.m_Name
-								|| Application.m_LastTriedInstalledVersion != PendingSelfUpdate.m_VersionID
-								|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdate.m_VersionTime
-								|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdate.m_VersionRetrySequence
-							)
-							&& (Application.m_LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion)
+							Name != PendingSelfUpdate.m_Name
+							|| Application.m_LastTriedInstalledVersion != PendingSelfUpdate.m_VersionID
+							|| Application.m_LastTriedInstalledVersionInfo.m_Time != PendingSelfUpdate.m_VersionTime
+							|| Application.m_LastTriedInstalledVersionInfo.m_RetrySequence != PendingSelfUpdate.m_VersionRetrySequence
 						)
+						&& (Application.m_LastFailedInstalledVersionFailureStage > EUpdateStage::EUpdateStage_DownloadVersion)
+					)
 					{
 						Application.m_LastFailedInstalledVersion = Application.m_LastTriedInstalledVersion;
 						Application.m_LastFailedInstalledVersionTime = Application.m_LastTriedInstalledVersionInfo.m_Time;
@@ -568,9 +568,7 @@ namespace NMib::NCloud::NAppManager
 			if (!CloudManager.m_AppManagerCloudManagerInterface)
 				continue;
 
-			CloudManager.m_AppManagerCloudManagerInterface.f_CallActor(&CAppManagerCloudManagerInterface::f_PauseReporting)(mp_PauseReportingForSecondsAtShutdown)
-				> Results
-			;
+			CloudManager.m_AppManagerCloudManagerInterface.f_CallActor(&CAppManagerCloudManagerInterface::f_PauseReporting)(mp_PauseReportingForSecondsAtShutdown) > Results;
 		}
 
 		co_await fg_AllDone(Results);
@@ -670,8 +668,11 @@ namespace NMib::NCloud::NAppManager
 		}
 
 		{
-			auto [AppManagerInterfaceDestroyResult, AppManagerCoordinationInterfaceDestroyResult] =
-				co_await (mp_AppManagerInterface.f_Destroy() + mp_AppManagerCoordinationInterface.f_Destroy()).f_Wrap()
+			auto [AppManagerInterfaceDestroyResult, AppManagerCoordinationInterfaceDestroyResult] = co_await
+				(
+					mp_AppManagerInterface.f_Destroy() + mp_AppManagerCoordinationInterface.f_Destroy()
+				)
+				.f_Wrap()
 			;
 			if (!AppManagerInterfaceDestroyResult)
 				AppManagerInterfaceDestroyResult > LogError.f_Warning("Failed to destroy app manager interface");

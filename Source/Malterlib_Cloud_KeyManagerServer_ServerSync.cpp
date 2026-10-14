@@ -119,10 +119,8 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	NConcurrency::TCFuture<void> CKeyManagerServer::CInternal::f_ForwardVerifiedHosts
-		(
-			NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> _KeysVerifiedOnServers
-		)
+	auto CKeyManagerServer::CInternal::f_ForwardVerifiedHosts(NContainer::TCMap<CKeyManagerServerSync::CHostKeyID, NContainer::TCSet<NStr::CStr>> _KeysVerifiedOnServers)
+		-> NConcurrency::TCFuture<void>
 	{
 		if (_KeysVerifiedOnServers.f_IsEmpty())
 			co_return {};
@@ -181,15 +179,7 @@ namespace NMib::NCloud
 		{
 			if (!Result.f_Value())
 			{
-				DMibLogWithCategory
-					(
-						Mib/Cloud/KeyManagerServer
-						, Error
-						, "Failed to use available key in remote key manager '{}': {}"
-						, Result.f_Key()
-						, Result.f_Value().f_GetExceptionStr()
-					)
-				;
+				DMibLogWithCategory(Mib/Cloud/KeyManagerServer, Error, "Failed to use available key in remote key manager '{}': {}", Result.f_Key(), Result.f_Value().f_GetExceptionStr());
 				continue;
 			}
 
@@ -297,7 +287,7 @@ namespace NMib::NCloud
 
 		for (auto &Client : m_Database.m_Clients)
 		{
-			for (auto &Key: Client.m_Keys)
+			for (auto &Key : Client.m_Keys)
 				UsedKeys[Key.m_Key] = {.m_HostID = Client.f_GetID(), .m_KeyID = Key.f_GetID()};
 		}
 
@@ -410,7 +400,13 @@ namespace NMib::NCloud
 					if (_KeyManager->f_InterfaceVersion() < EKeyManagerProtocolVersion_SupportServerSync)
 						co_return {};
 
-					auto ServerSyncInterface = co_await _KeyManager.f_CallActor(&CKeyManager::f_GetServerSyncInterface)(g_ActorSubscription / [] {});
+					auto ServerSyncInterface = co_await _KeyManager.f_CallActor(&CKeyManager::f_GetServerSyncInterface)
+						(
+							g_ActorSubscription / []
+							{
+							}
+						)
+					;
 
 					if (ServerSyncInterface.f_IsEmpty())
 						co_return DMibErrorInstance("Remote KeyManager returned an empty server sync interface");
@@ -587,11 +583,8 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>> CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_RemoveVerifiedHosts
-		(
-			NContainer::TCSet<NStr::CStr> _HostIDs
-			, NContainer::TCSet<NStr::CStr> _CheckedServers
-		)
+	auto CKeyManagerServer::CInternal::CKeyManagerServerSyncImplementation::f_RemoveVerifiedHosts(NContainer::TCSet<NStr::CStr> _HostIDs, NContainer::TCSet<NStr::CStr> _CheckedServers)
+		-> NConcurrency::TCFuture<NContainer::TCSet<NStr::CStr>>
 	{
 		auto CheckDestroy = co_await m_pThis->f_CheckDestroyedOnResume();
 
@@ -706,13 +699,7 @@ namespace NMib::NCloud
 				(*KeyMapping).m_VerifiedOnServers[Internal.m_ThisHostID];
 				ForwardVerified[KeyID][Internal.m_ThisHostID];
 
-				AppAuditor.f_Info
-					(
-						"Created new key for host '{}' with ID '{}'. Received via server sync"_f
-						<< KeyID.m_HostID
-						<< KeyID.m_KeyID
-					)
-				;
+				AppAuditor.f_Info("Created new key for host '{}' with ID '{}'. Received via server sync"_f << KeyID.m_HostID << KeyID.m_KeyID);
 			}
 
 			auto pAvailableKeys = Internal.m_Database.m_AvailableKeys.f_FindEqual(Key.f_GetLen());

@@ -50,20 +50,12 @@ namespace NMib::NCloud
 		return EAssetType::mc_Executable;
 	}
 
-	auto CDebugManager::fs_GatherCrashDumpInfos
-		(
-			TCVector<CStr> _Sources
-			, CMetadata _DefaultMetadata
-			, TCOptional<CStr> _DefaultExceptionInfo
-		)
-		-> TCFuture<CCrashDumpInfos>
+	auto CDebugManager::fs_GatherCrashDumpInfos(TCVector<CStr> _Sources, CMetadata _DefaultMetadata, TCOptional<CStr> _DefaultExceptionInfo) -> TCFuture<CCrashDumpInfos>
 	{
 		auto BlockingActorCheckout = fg_BlockingActor();
 		co_return co_await
 			(
-				g_Dispatch(BlockingActorCheckout)
-				/ [Metadata = _DefaultMetadata, Sources = _Sources, ExceptionInfo = _DefaultExceptionInfo]()
-				-> TCFuture<CCrashDumpInfos>
+				g_Dispatch(BlockingActorCheckout) / [Metadata = _DefaultMetadata, Sources = _Sources, ExceptionInfo = _DefaultExceptionInfo]() -> TCFuture<CCrashDumpInfos>
 				{
 					auto CaptureExceptions = co_await (g_CaptureExceptions % "Failed to gather crash dump info");
 

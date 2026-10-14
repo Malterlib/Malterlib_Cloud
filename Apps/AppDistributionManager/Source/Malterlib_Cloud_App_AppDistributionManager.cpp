@@ -112,7 +112,7 @@ namespace NMib::NCloud::NAppDistributionManager
 	{
 		switch (_Type)
 		{
-			case EDeployDestination_FileSystem: return fg_Construct<CDeployDestination_FileSystem>();
+		case EDeployDestination_FileSystem: return fg_Construct<CDeployDestination_FileSystem>();
 		}
 		DNeverGetHere;
 		return nullptr;

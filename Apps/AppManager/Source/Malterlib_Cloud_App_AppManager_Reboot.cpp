@@ -8,9 +8,9 @@
 namespace NMib::NCloud::NAppManager
 {
 #ifdef DPlatformFamily_Linux
-	constexpr static ch8 const gc_pRebootScript[] =
+	static constexpr ch8 const gc_pRebootScript[] =
 		{
-			#embed "Malterlib_Cloud_App_AppManager_Reboot.sh"
+#	embed "Malterlib_Cloud_App_AppManager_Reboot.sh"
 			, '\0'
 		}
 	;
@@ -96,14 +96,7 @@ namespace NMib::NCloud::NAppManager
 					if (!CFile::fs_FileExists(FileName))
 					{
 						CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
-						CFile::fs_WriteStringToFile
-							(
-								FileName
-								, Script
-								, false
-								, EFileAttrib_UnixAttributesValid | EFileAttrib_UserExecute | EFileAttrib_UserRead | EFileAttrib_UserWrite
-							)
-						;
+						CFile::fs_WriteStringToFile(FileName, Script, false, EFileAttrib_UnixAttributesValid | EFileAttrib_UserExecute | EFileAttrib_UserRead | EFileAttrib_UserWrite);
 					}
 
 					CStr StdOut;
@@ -113,9 +106,7 @@ namespace NMib::NCloud::NAppManager
 					if (CProcessLaunch::fs_LaunchBlock(CProcessLaunch::fs_GetBashPath(), fg_CreateVector(FileName, ProgramPath, Type), StdOut, StdErr, ExitCode, Params))
 					{
 						if (ExitCode)
-						{
 							DMibError(fg_Format("Reboot script failed with exit code {} and reported: {}", ExitCode, fg_ConcatOutput(StdOut, StdErr)));
-						}
 						else if (bDaemonDebug || bDaemonStandalone)
 							CDaemon::fs_QuitDaemon(); // Initiate application quit
 					}

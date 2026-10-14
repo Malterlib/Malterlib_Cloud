@@ -75,16 +75,11 @@ namespace NMib::NCloud::NBackupManager
 
 		struct CBackupManagerImplementation : public CBackupManager
 		{
-			auto f_InitBackup(CBackupManager::CInitBackup _Params)
-				-> TCFuture<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> override
-			;
+			auto f_InitBackup(CBackupManager::CInitBackup _Params) -> TCFuture<TCDistributedActorInterfaceWithID<CBackupManagerBackup>> override;
 
 			TCFuture<TCVector<CStr>> f_ListBackupSources() override;
 			TCFuture<TCMap<CStr, CBackupInfo>> f_ListBackups(CStr _ForBackupSource) override;
-			auto f_DownloadBackup(CDownloadBackup _DownloadBackup)
-				-> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
-				override
-			;
+			auto f_DownloadBackup(CDownloadBackup _DownloadBackup) -> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>> override;
 
 			DMibDelegatedActorImplementation(CBackupManagerServer);
 		};
@@ -104,13 +99,7 @@ namespace NMib::NCloud::NBackupManager
 
 		TCFuture<void> fp_DestroyBackupInstance(CBackupKey _Key, CDistributedAppAuditor _Auditor, bool _bError, CStr _Reason);
 
-		CExceptionPointer fp_CheckBackupKey
-			(
-				CBackupManager::CBackupKey const &_BackupKey
-				, CBackupKey &o_BackupKey
-				, CDistributedAppAuditor const &_Auditor
-			)
-		;
+		CExceptionPointer fp_CheckBackupKey(CBackupManager::CBackupKey const &_BackupKey, CBackupKey &o_BackupKey, CDistributedAppAuditor const &_Auditor);
 
 		TCMap<CStr, TCActor<CBackupSource>> mp_BackupSources;
 		TCMap<CBackupKey, CBackupInstanceManager> mp_BackupInstances;

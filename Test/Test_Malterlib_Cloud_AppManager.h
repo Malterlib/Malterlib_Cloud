@@ -44,14 +44,14 @@ namespace NMib::NCloud
 	{
 		enum EOption
 		{
-			EOption_None = 0
-			, EOption_EnableOtherOutput = DMibBit(0)
-			, EOption_EnableVersionManager = DMibBit(1)
-			, EOption_LaunchTestAppInApp = DMibBit(2)
-			, EOption_DisablePatchMonitoring = DMibBit(3)
-			, EOption_DisableDiskMonitoring = DMibBit(3)
+			EOption_None                              = 0
+			, EOption_EnableOtherOutput               = DMibBit(0)
+			, EOption_EnableVersionManager            = DMibBit(1)
+			, EOption_LaunchTestAppInApp              = DMibBit(2)
+			, EOption_DisablePatchMonitoring          = DMibBit(3)
+			, EOption_DisableDiskMonitoring           = DMibBit(3)
 			, EOption_DisableApplicationStatusSensors = DMibBit(4)
-			, EOption_DisableEncryptionStatusSensors = DMibBit(5)
+			, EOption_DisableEncryptionStatusSensors  = DMibBit(5)
 		};
 
 		struct CAppManagerInfo
@@ -141,21 +141,9 @@ namespace NMib::NCloud
 		TCFuture<void> f_Destroy();
 		CStr f_RootDirectory();
 
-		TCFuture<NStr::CStr> f_LaunchTool
-			(
-				NStr::CStr _Executable
-				, NContainer::TCVector<NStr::CStr> _Params
-				, NStr::CStr _WorkingDir = {}
-			)
-		;
+		TCFuture<NStr::CStr> f_LaunchTool(NStr::CStr _Executable, NContainer::TCVector<NStr::CStr> _Params, NStr::CStr _WorkingDir = {});
 
-		TCFuture<CProcessLaunchActor::CSimpleLaunchResult> f_LaunchSimple
-			(
-				NStr::CStr _Executable
-				, NContainer::TCVector<NStr::CStr> _Params
-				, NStr::CStr _WorkingDir = {}
-			)
-		;
+		TCFuture<CProcessLaunchActor::CSimpleLaunchResult> f_LaunchSimple(NStr::CStr _Executable, NContainer::TCVector<NStr::CStr> _Params, NStr::CStr _WorkingDir = {});
 
 		static auto constexpr mc_WaitForSubscriptions = EDistributedActorTrustManagerOrderingFlag_WaitForSubscriptions;
 

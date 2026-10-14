@@ -31,11 +31,8 @@ namespace NMib::NCloud::NAppManager
 				BackupConfig
 				, mp_State.m_TrustManager
 				, g_ActorFunctor / [_pApplication]
-				(
-					TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
-					, NConcurrency::CActorSubscription _ManifestFinished
-					, NStr::CStr _BackupRoot
-				) -> TCFuture<TCActorSubscriptionWithID<>>
+				(TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface, NConcurrency::CActorSubscription _ManifestFinished, NStr::CStr _BackupRoot)
+				-> TCFuture<TCActorSubscriptionWithID<>>
 				{
 					if (!_BackupInterface)
 						co_return DMibErrorInstance("Invalid backup interface");
@@ -52,13 +49,7 @@ namespace NMib::NCloud::NAppManager
 					if (!_pApplication->m_AppInterface || _pApplication->m_AppInterface->f_InterfaceVersion() < CDistributedAppInterfaceClient::EProtocolVersion_SupportStartBackup)
 						co_return {};
 
-					co_await _pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_StartBackup)
-						(
-							fg_Move(_BackupInterface)
-							, fg_Move(_ManifestFinished)
-							, _BackupRoot
-						)
-					;
+					co_await _pApplication->m_AppInterface.f_CallActor(&CDistributedAppInterfaceClient::f_StartBackup)(fg_Move(_BackupInterface), fg_Move(_ManifestFinished), _BackupRoot);
 
 					co_return {};
 				}

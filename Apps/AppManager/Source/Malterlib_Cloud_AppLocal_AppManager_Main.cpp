@@ -6,7 +6,7 @@
 #include <Mib/Concurrency/DistributedDaemon>
 
 #ifdef DPlatformFamily_Windows
-#include <Windows.h>
+#	include <Windows.h>
 #endif
 
 #include "Malterlib_Cloud_App_AppManager.h"

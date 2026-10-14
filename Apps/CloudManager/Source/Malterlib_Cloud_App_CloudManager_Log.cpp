@@ -71,8 +71,7 @@ namespace NMib::NCloud::NCloudManager
 		return {"CloudManager/ReadLogs", "CloudManager/ReadAll"};
 	}
 
-	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogs(CGetLogs _Params)
-		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>>
+	auto CCloudManagerServer::CDistributedAppLogReaderImplementation::f_GetLogs(CGetLogs _Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppLogReporter::CLogInfo>> Logs;
 		{

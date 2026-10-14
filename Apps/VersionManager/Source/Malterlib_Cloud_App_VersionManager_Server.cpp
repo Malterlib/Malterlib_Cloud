@@ -81,11 +81,9 @@ namespace NMib::NCloud::NVersionManager
 		}
 
 		for (auto &Tag : mp_KnownTags)
-		{
 			Permissions[fg_Format("Application/Tag/{}", Tag)];
-		}
 
-		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);;
+		co_await mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, Permissions);
 
 		TCVector<CStr> SubscribePermissions;
 		SubscribePermissions.f_Insert("Application/*");

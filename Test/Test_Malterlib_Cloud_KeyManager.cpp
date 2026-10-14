@@ -87,11 +87,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 			co_return {};
 		}
 
-		TCFuture<void> f_ConnectTrustManagers
-			(
-				TCActor<CDistributedActorTrustManager> _ServerTrustManager
-				, TCActor<CDistributedActorTrustManager> _ClientTrustManager
-			)
+		TCFuture<void> f_ConnectTrustManagers(TCActor<CDistributedActorTrustManager> _ServerTrustManager, TCActor<CDistributedActorTrustManager> _ClientTrustManager)
 		{
 			CStr ServerHostID = co_await _ServerTrustManager(&CDistributedActorTrustManager::f_GetHostID).f_Timeout(g_Timeout, "Timeout");
 
@@ -221,12 +217,12 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 	enum class EServerSyncTestFlag : uint32
 	{
-		mc_None = 0
-		, mc_InvertInitOrder = DMibBit(0)
-		, mc_InitAfterCreate = DMibBit(1)
+		mc_None                 = 0
+		, mc_InvertInitOrder    = DMibBit(0)
+		, mc_InitAfterCreate    = DMibBit(1)
 		, mc_PreCreateKeysAfter = DMibBit(2)
 		, mc_SimultaneousCreate = DMibBit(3)
-		, mc_NoPermissions = DMibBit(4)
+		, mc_NoPermissions      = DMibBit(4)
 	};
 
 	umint fs_CountAvailableKeys(auto &_Container)
@@ -751,8 +747,7 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 
 					DMibTest
 						(
-							DMibExpr(NMib::NTest::TCThrowsException<NException::CException>())
-							== DMibLExpr(DatabaseActor3(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(g_Timeout))
+							DMibExpr(NMib::NTest::TCThrowsException<NException::CException>()) == DMibLExpr(DatabaseActor3(&ICKeyManagerServerDatabase::f_Initialize).f_CallSync(g_Timeout))
 						)
 					;
 				}
@@ -937,7 +932,6 @@ struct CKeyManager_Tests : public NMib::NTest::CTest
 			co_await f_TestServerSyncMinServers();
 			co_return {};
 		};
-
 	}
 };
 

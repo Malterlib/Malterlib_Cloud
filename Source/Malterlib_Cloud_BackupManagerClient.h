@@ -30,23 +30,23 @@ namespace NMib::NCloud
 
 			NStr::CStr m_BackupIdentifier;
 
-			NFile::CDirectoryManifestConfig m_ManifestConfig;										///< The config to generate the manifest
-			NTime::CTimeSpan m_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1);	///< Interval for creating new full backup snapshots. Set to 0 to disable.
-			NStr::CStr m_LogCategory = "Backup";													///< The category to do logging under.
-			uint32 m_MaxSendQueue = NFile::gc_IdealNetworkQueueSize;								///< The maximum number of bytes to queue on the network
-			fp32 m_ChangeAggregationTime = 1.0;														///< The number of seconds to aggregate changes over
-			bool m_bReportChangesInInitialFinished = false;											///< Include added/removed/updated files in InitialFinished notification
+			NFile::CDirectoryManifestConfig m_ManifestConfig;                                    ///< The config to generate the manifest
+			NTime::CTimeSpan m_NewBackupInterval = NTime::CTimeSpanConvert::fs_CreateDaySpan(1); ///< Interval for creating new full backup snapshots. Set to 0 to disable.
+			NStr::CStr m_LogCategory = "Backup";                                                 ///< The category to do logging under.
+			uint32 m_MaxSendQueue = NFile::gc_IdealNetworkQueueSize;                             ///< The maximum number of bytes to queue on the network
+			fp32 m_ChangeAggregationTime = 1.0;                                                  ///< The number of seconds to aggregate changes over
+			bool m_bReportChangesInInitialFinished = false;                                      ///< Include added/removed/updated files in InitialFinished notification
 		};
 
 		enum ENotification /// Notification from backup manager client
 		{
-			ENotification_None = 0							///< Used to specify no notification when subscribing. \sa f_SubscribeNotifications
-			, ENotification_BackupAborted = DMibBit(0)		///< Backup was aborted remotely. \sa CNotification_BackupAborted
-			, ENotification_BackupError = DMibBit(1)		///< Backup failed. \sa CNotification_BackupError
-			, ENotification_FileFinished = DMibBit(2)		///< A file finished transferring to backup manager. \sa CNotification_FileFinished
-			, ENotification_Quiescent = DMibBit(3)			///< The backup is quiescent. All currently known files have finished transferring. \sa CNotification_Quiescent
-			, ENotification_Unquiescent = DMibBit(4)		///< The backup is no longer quiescent. \sa CNotification_Unquiescent
-			, ENotification_InitialFinished = DMibBit(5)	///< All files in manifest has been backup up at least once. \sa CNotification_InitialFinished
+			ENotification_None              = 0          ///< Used to specify no notification when subscribing. \sa f_SubscribeNotifications
+			, ENotification_BackupAborted   = DMibBit(0) ///< Backup was aborted remotely. \sa CNotification_BackupAborted
+			, ENotification_BackupError     = DMibBit(1) ///< Backup failed. \sa CNotification_BackupError
+			, ENotification_FileFinished    = DMibBit(2) ///< A file finished transferring to backup manager. \sa CNotification_FileFinished
+			, ENotification_Quiescent       = DMibBit(3) ///< The backup is quiescent. All currently known files have finished transferring. \sa CNotification_Quiescent
+			, ENotification_Unquiescent     = DMibBit(4) ///< The backup is no longer quiescent. \sa CNotification_Unquiescent
+			, ENotification_InitialFinished = DMibBit(5) ///< All files in manifest has been backup up at least once. \sa CNotification_InitialFinished
 		};
 
 		enum EFileTransferType
@@ -88,13 +88,13 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_BackupError const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr& o_String) const
+			void f_Format(tf_CStr &o_String) const
 			{
 				o_String += typename tf_CStr::CFormat("Backup Error{}: {}") << (m_bFatal ? " (Fatal)" : "") << m_ErrorMessage;
 			}
 
 			NStr::CStr m_ErrorMessage; ///< The error from exception that caused the backup to fail
-			bool m_bFatal = false; ///< If this is set to true the backup is in a fatal state, and cannot recover automatically.
+			bool m_bFatal = false;     ///< If this is set to true the backup is in a fatal state, and cannot recover automatically.
 		};
 
 		struct CNotification_FileFinished /// \brief Notification info for #ENotification_FileFinished. \headerfile Mib/Cloud/BackupManagerClient
@@ -102,12 +102,12 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_FileFinished const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr& o_String) const
+			void f_Format(tf_CStr &o_String) const
 			{
 				o_String += typename tf_CStr::CFormat("File Finished: {}: {}") << m_FileName << m_TransferStats;
 			}
 
-			NStr::CStr m_FileName; ///< The file that finished backing up. Relative to root.
+			NStr::CStr m_FileName;              ///< The file that finished backing up. Relative to root.
 			CFileTransferStats m_TransferStats; ///< Statistics for the file transfer;
 		};
 
@@ -127,7 +127,7 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_Unquiescent const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr& o_String) const
+			void f_Format(tf_CStr &o_String) const
 			{
 				o_String += "Unquiescent";
 			}
@@ -138,7 +138,7 @@ namespace NMib::NCloud
 			auto operator <=> (CNotification_InitialFinished const &_Right) const noexcept = default;
 
 			template <typename tf_CStr>
-			void f_Format(tf_CStr& o_String) const
+			void f_Format(tf_CStr &o_String) const
 			{
 				o_String += typename tf_CStr::CFormat("Initial Finished: Added: {vs}   Removed: {vs}  Updated: {vs}") << m_AddedFiles << m_RemovedFiles << m_UpdatedFiles;
 			}
@@ -148,8 +148,7 @@ namespace NMib::NCloud
 			NContainer::TCVector<NStr::CStr> m_UpdatedFiles;
 		};
 
-		using CNotification
-			= NStorage::TCStreamableVariant
+		using CNotification = NStorage::TCStreamableVariant
 			<
 				ENotification
 				, NStorage::TCMember<CNotification_BackupAborted, ENotification_BackupAborted>
@@ -185,7 +184,7 @@ namespace NMib::NCloud
 
 		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_SubscribeNotifications /// \brief Subscribe to notification. \sa ENotification
 			(
-				ENotification _ToSubscribeTo	/// Specify the notifications to subscribe to
+				ENotification _ToSubscribeTo /// Specify the notifications to subscribe to
 				, NConcurrency::TCActorFunctor<NConcurrency::TCFuture<void> (NConcurrency::CHostInfo _RemoteHost, CNotification _Notification)> _fOnNotification
 				/// The actor functor to receive notifications
 			)
@@ -207,7 +206,7 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_BackupManagerClient.hpp"

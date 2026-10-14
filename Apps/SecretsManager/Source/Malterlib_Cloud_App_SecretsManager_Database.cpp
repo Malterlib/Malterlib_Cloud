@@ -25,7 +25,7 @@ namespace NMib::NCloud::NSecretsManager
 		if (mp_pPendingWrite)
 			co_await mp_PendingWritePromises.f_Insert().f_Future().f_Wrap() > LogError.f_Warning("Failed to destroy secret manager database write promises");
 
-		co_await fg_Move(mp_Sequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy secret manager database sequencer");;
+		co_await fg_Move(mp_Sequencer).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy secret manager database sequencer");
 
 		co_return {};
 	}
@@ -83,9 +83,9 @@ namespace NMib::NCloud::NSecretsManager
 								{
 									return fsp_WriteDatabase(*pPendingWrite, Path, EncryptionState);
 								}
-							).f_Wrap();
+							)
+							.f_Wrap()
 						;
-
 					}
 
 					if (WriteResult)
@@ -102,7 +102,7 @@ namespace NMib::NCloud::NSecretsManager
 
 					co_return {};
 				}
-				> fg_LogError("Mib/Cloud/SecretsManager", "Failed to write database");
+				> fg_LogError("Mib/Cloud/SecretsManager", "Failed to write database")
 			;
 
 			mp_pPendingWrite = fg_Construct(fg_Move(_Database));
@@ -172,7 +172,7 @@ namespace NMib::NCloud::NSecretsManager
 		CSecretsDatabaseIV SaltIV;
 
 		TCBinaryStreamFile<> BaseStream;
-		BaseStream.f_Open(_Path, EFileOpen_Read|EFileOpen_ShareAll);
+		BaseStream.f_Open(_Path, EFileOpen_Read | EFileOpen_ShareAll);
 		BaseStream >> SaltIV;
 		auto BasePosition = BaseStream.f_GetPosition();
 
@@ -203,7 +203,8 @@ namespace NMib::NCloud::NSecretsManager
 
 	void NSecretsManager::CSecretPropertiesInternal::f_Format(CStr &o_Str) const
 	{
-		o_Str += "Username: {} URL: {} Expires: {} Notes: {} Metadata: {} Created: {} Modified: {} SemanticID: {} Tags: {} Immutable: {}"_f
+		o_Str
+			+= "Username: {} URL: {} Expires: {} Notes: {} Metadata: {} Created: {} Modified: {} SemanticID: {} Tags: {} Immutable: {}"_f
 			<< m_UserName
 			<< m_URL
 			<< m_Expires

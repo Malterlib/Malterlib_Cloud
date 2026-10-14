@@ -117,7 +117,8 @@ namespace NMib::NCloud::NAppManager
 	{
 		auto CheckDestory = co_await f_CheckDestroyedOnResume();
 
-		static auto constexpr c_RebootPreventionFlags = CDistributedAppSensorReporter::ESensorInfoFlag::mc_PreventRebootOnWarning
+		static auto constexpr c_RebootPreventionFlags
+			= CDistributedAppSensorReporter::ESensorInfoFlag::mc_PreventRebootOnWarning
 			| CDistributedAppSensorReporter::ESensorInfoFlag::mc_PreventRebootOnError
 			| CDistributedAppSensorReporter::ESensorInfoFlag::mc_PreventRebootOnOutdated
 		;
@@ -130,11 +131,7 @@ namespace NMib::NCloud::NAppManager
 			DMibFastCheck(pPrevention->m_Application == _Application);
 
 			if (pPrevention->m_SensorSubscription)
-			{
-				co_await fg_Exchange(pPrevention->m_SensorSubscription, nullptr)->f_Destroy().f_Wrap()
-					> fg_LogError("Malterlib/Cloud/AppManager", "Failed to remove sensor subscription")
-				;
-			}
+				co_await fg_Exchange(pPrevention->m_SensorSubscription, nullptr)->f_Destroy().f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed to remove sensor subscription");
 		}
 
 		bool bDoWatch = fg_IsSet(_SensorInfo.m_Flags, c_RebootPreventionFlags);
@@ -201,13 +198,7 @@ namespace NMib::NCloud::NAppManager
 
 			if (Application.f_IsInProgress())
 			{
-				fg_AddStrSep
-					(
-						PreventRebootDescription
-						, "    Operation in progress ({}): {}"_f << Application.m_Name << Application.f_InProgressDescription()
-						, "\n"
-					)
-				;
+				fg_AddStrSep(PreventRebootDescription, "    Operation in progress ({}): {}"_f << Application.m_Name << Application.f_InProgressDescription(), "\n");
 				bPreventReboot = true;
 			}
 

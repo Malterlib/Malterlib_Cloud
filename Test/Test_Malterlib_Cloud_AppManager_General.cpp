@@ -4,14 +4,14 @@
 #include "Test_Malterlib_Cloud_AppManager.h"
 
 #ifdef DPlatformFamily_Windows
-#include <Windows.h>
+#	include <Windows.h>
 #endif
 
 static fp64 g_Timeout = 120.0 * NMib::NTest::gc_TimeoutMultiplier;
 
-constexpr static ch8 const gc_pFailingPreUpdateScript[] =
+static constexpr ch8 const gc_pFailingPreUpdateScript[] =
 	{
-		#embed "Test_Malterlib_Cloud_AppManager_General_FailingPreUpdate.sh"
+#embed "Test_Malterlib_Cloud_AppManager_General_FailingPreUpdate.sh"
 		, '\0'
 	}
 ;
@@ -85,7 +85,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 		{
 			TCFutureVector<void> Destroys;
 			for (auto &Subscription : m_Subscriptions)
-				Subscription->f_Destroy() > Destroys;;
+				Subscription->f_Destroy() > Destroys;
 			fg_AllDoneWrapped(Destroys).f_DiscardResult();
 			f_Clear();
 		}
@@ -172,8 +172,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					PackageInfo.m_VersionInfo.m_Tags = _Tags;
 					co_await
 						(
-							g_Dispatch /
-							[=, VersionManagerHelper = AppManagerTestHelper.m_pState->m_VersionManagerHelper]() -> TCFuture<void>
+							g_Dispatch / [=, VersionManagerHelper = AppManagerTestHelper.m_pState->m_VersionManagerHelper]() -> TCFuture<void>
 							{
 								co_await VersionManagerHelper.f_Upload(VersionManager, "TestApp", PackageInfo.m_VersionID, PackageInfo.m_VersionInfo, TestAppArchive);
 								co_return {};
@@ -197,19 +196,15 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 				}
 			;
 
-			auto fProcessApplicationState = [](CUpdateNotificationsApplicationState &_State, CAppManagerInterface::CUpdateNotification const &_Notification, CApplicationKey const &_ApplicationKey)
+			auto fProcessApplicationState = []
+				(CUpdateNotificationsApplicationState &_State, CAppManagerInterface::CUpdateNotification const &_Notification, CApplicationKey const &_ApplicationKey)
 				{
 					if (!_Notification.m_bCoordinateWait)
 					{
 						if (auto pInStage = _State.m_LastInStage.f_FindEqual(_ApplicationKey))
 							_State.m_InStage[*pInStage].f_Remove(_ApplicationKey);
 						_State.m_InStage[_Notification.m_Stage][_ApplicationKey];
-						_State.m_MaxInStage[_Notification.m_Stage] = fg_Max
-							(
-								_State.m_MaxInStage[_Notification.m_Stage]
-								, _State.m_InStage[_Notification.m_Stage].f_GetLen()
-							)
-						;
+						_State.m_MaxInStage[_Notification.m_Stage] = fg_Max(_State.m_MaxInStage[_Notification.m_Stage], _State.m_InStage[_Notification.m_Stage].f_GetLen());
 						_State.m_LastInStage[_ApplicationKey] = _Notification.m_Stage;
 					}
 
@@ -280,9 +275,12 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 									fProcessApplicationState(WholeState.m_Applications[_Notification.m_Application], _Notification, ApplicationKey);
 									fProcessApplicationState(WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application], _Notification, ApplicationKey);
 									fProcessApplicationState(WholeState.m_AllApplications, _Notification, ApplicationKey);
-									//DMibConOut("{} {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application].m_MaxInStage);
-									//DMibConOut("{} N {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStage);
-									//DMibConOut("{} C {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage, WholeState.m_Applications[_Notification.m_Application].m_MaxInStageCoordination);
+									//DMibConOut("{} {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage,
+									//	WholeState.m_ApplicationsPerAppmanager[iAppManager][_Notification.m_Application].m_MaxInStage);
+									//DMibConOut("{} N {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage,
+									//	WholeState.m_Applications[_Notification.m_Application].m_MaxInStage);
+									//DMibConOut("{} C {a-,sj9} {} {vs}\n", iAppManager, _Notification.m_Application, _Notification.m_Stage,
+									//	WholeState.m_Applications[_Notification.m_Application].m_MaxInStageCoordination);
 									//DMibConOut("{a-,sj9} {} {vs}\n", _Notification.m_Application, CAppManagerInterface::EUpdateStage_StopOldApp, WholeState.m_AllApplications.m_MaxInStage);
 
 									WholeState.m_nAppsInProgress = 0;
@@ -423,7 +421,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 				co_await fWaitForAllUpdated("TestApp");
 
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
-				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >=, 1u);
 			}
 			{
 				DMibTestPath("Update OneAtATime");
@@ -452,7 +450,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 				co_await fWaitForAllUpdated("TestApp");
 
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
-				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >=, 1u);
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 			}
 
@@ -473,16 +471,16 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 				if (UpdateNotificationState.m_Applications["TestApp"].m_Errors.f_GetLen())
 				{
 #if DMibPPtrBits < 64
-					constexpr static smint c_MaxSize = 64 * 1024;
+					static constexpr smint c_MaxSize = 64 * 1024;
 #else
-					constexpr static smint c_MaxSize = 512 * 1024;
+					static constexpr smint c_MaxSize = 512 * 1024;
 #endif
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors[0].f_GetLen(), >=, c_MaxSize - 548);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_Errors[0].f_GetLen(), <=, c_MaxSize);
 				}
 
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers - 1);
-				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >=, 1u);
 				DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
 				co_await fSetPreUpdateScriptApp0("TestApp", "");
@@ -534,11 +532,11 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, ==, 1u);
 
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >=, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >=, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
 					DMibExpect(UpdateNotificationState.m_AllApplications.m_nSuccess.f_Load(), ==, nAppManagers * 2u);
@@ -595,7 +593,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgress, >=, 1u);
 
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >=, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
@@ -626,11 +624,11 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
 
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >=, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStageCoordination[CAppManagerInterface::EUpdateStage_StopOldApp], ==, nAppManagers);
 
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >=, 1u);
 				}
 				{
 					DMibTestPath("OneAtATime Independent");
@@ -655,7 +653,7 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, ==, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_MaxInStage[CAppManagerInterface::EUpdateStage_StopOldApp], ==, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >=, 1u);
 				}
 				{
 					DMibTestPath("Independent Independent");
@@ -680,11 +678,10 @@ struct CAppManager_General_Tests : public NMib::NTest::CTest
 						DMibExpect(UpdateNotificationState.m_nMaxAppsInProgressPerAppManager, ==, 1u);
 
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nSuccess.f_Load(), ==, nAppManagers);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp"].m_nMaxInProgress, >=, 1u);
 					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nSuccess.f_Load(), ==, nAppManagers);
-					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >= , 1u);
+					DMibExpect(UpdateNotificationState.m_Applications["TestApp2"].m_nMaxInProgress, >=, 1u);
 				}
-
 			}
 			co_return {};
 		};

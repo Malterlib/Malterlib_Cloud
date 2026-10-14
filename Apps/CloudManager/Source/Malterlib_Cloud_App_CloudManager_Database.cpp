@@ -172,17 +172,7 @@ namespace NMib::NCloud::NCloudManager
 	{
 		mp_DatabaseActor = fg_Construct();
 		auto MaxDatabaseSize = mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("MaxDatabaseSize", g_MaxDatabaseSize).f_Integer();
-		co_await
-			(
-				mp_DatabaseActor
-				(
-					&CDatabaseActor::f_OpenDatabase
-					, mp_AppState.m_RootDirectory / "CloudManagerDatabase"
-					, MaxDatabaseSize
-				)
-				% "Failed to open database"
-			)
-		;
+		co_await (mp_DatabaseActor(&CDatabaseActor::f_OpenDatabase, mp_AppState.m_RootDirectory / "CloudManagerDatabase", MaxDatabaseSize) % "Failed to open database");
 		auto Stats = co_await (mp_DatabaseActor(&CDatabaseActor::f_GetAggregateStatistics));
 		auto TotalSizeUsed = Stats.f_GetTotalUsedSize();
 		DMibLogWithCategory
@@ -328,8 +318,8 @@ namespace NMib::NCloud::NCloudManager
 		auto Result = co_await mp_DatabaseActor
 			(
 				&CDatabaseActor::f_WriteWithCompaction
-				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), _HostID, pRemovedHostIDs](CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting)
-				-> TCFuture<CDatabaseActor::CTransactionWrite>
+				, g_ActorFunctorWeak / [ThisActor = fg_ThisActor(this), _HostID, pRemovedHostIDs]
+				(CDatabaseActor::CTransactionWrite _Transaction, bool _bCompacting) -> TCFuture<CDatabaseActor::CTransactionWrite>
 				{
 					co_await ECoroutineFlag_CaptureMalterlibExceptions;
 
@@ -403,13 +393,7 @@ namespace NMib::NCloud::NCloudManager
 					auto Key = iState.template f_Key<tf_CKey>();
 					auto Value = iState.template f_Value<tf_CValue>();
 
-					m_TableRenderer.f_AddRow
-						(
-							"{}"_f << tf_CKey::mc_Prefix
-							, Key.f_ToJson().f_ToString().f_Trim()
-							, Value.f_ToJson().f_ToString().f_Trim()
-						)
-					;
+					m_TableRenderer.f_AddRow("{}"_f << tf_CKey::mc_Prefix, Key.f_ToJson().f_ToString().f_Trim(), Value.f_ToJson().f_ToString().f_Trim());
 				}
 			}
 

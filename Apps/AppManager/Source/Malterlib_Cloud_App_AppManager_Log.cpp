@@ -77,16 +77,7 @@ namespace NMib::NCloud::NAppManager
 
 		auto Reporter = co_await pThis->mp_LogStore(&CDistributedAppLogStoreLocal::f_OpenLogReporter, fg_TempCopy(LogInfo));
 
-		DMibLogWithCategory
-			(
-				Malterlib/Cloud/AppManager
-				, Info
-				, "[{}] Application '{}' opened log reporter:\n{}"
-				, CallingHostInfo.f_GetHostInfo().f_GetDesc()
-				, Application.m_Name
-				, LogInfo
-			)
-		;
+		DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "[{}] Application '{}' opened log reporter:\n{}", CallingHostInfo.f_GetHostInfo().f_GetDesc(), Application.m_Name, LogInfo);
 
 		co_return fg_Move(Reporter);
 	}

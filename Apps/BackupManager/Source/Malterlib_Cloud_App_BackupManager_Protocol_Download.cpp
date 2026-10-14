@@ -39,8 +39,7 @@ namespace NMib::NCloud::NBackupManager
 	{
 	}
 
-	auto CBackupManagerServer::CBackupManagerImplementation::f_DownloadBackup(CDownloadBackup _DownloadBackup)
-		-> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
+	auto CBackupManagerServer::CBackupManagerImplementation::f_DownloadBackup(CDownloadBackup _DownloadBackup) -> TCFuture<TCDistributedActorInterfaceWithID<CDirectorySyncClient>>
 	{
 		auto pThis = m_pThis;
 

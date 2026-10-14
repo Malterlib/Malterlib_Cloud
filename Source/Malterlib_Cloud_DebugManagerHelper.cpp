@@ -90,7 +90,7 @@ namespace NMib::NCloud
 			(
 				NConcurrency::TCActorFunctor<TCFuture<t_CResult> (NConcurrency::CActorSubscription _Subscription)> _fDoDownload
 				, CStr _DestinationDirectory
-	 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
+				, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 				, uint64 _QueueSize
 			)
 		;
@@ -103,12 +103,7 @@ namespace NMib::NCloud
 		uint64 m_QueueSize = 0;
 	};
 
-	CDebugManagerHelper::CDebugManagerHelper
-		(
-			CStr const &_RootDirectory
-			, uint64 _QueueSize
-			, fp64 _Timeout
-		)
+	CDebugManagerHelper::CDebugManagerHelper(CStr const &_RootDirectory, uint64 _QueueSize, fp64 _Timeout)
 		: mp_pInternal(fg_Construct(_QueueSize, _Timeout, _RootDirectory))
 	{
 	}
@@ -159,8 +154,10 @@ namespace NMib::NCloud
 			)
 		;
 
-		NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> FilesGenerator
-			= CFileTransferSendDownloadFile::fs_TranslateGenerator<CDebugManager::CDownloadFile>(fg_Move(SendFilesResult.m_FilesGenerator))
+		NConcurrency::TCAsyncGeneratorWithID<CDebugManager::CDownloadFile> FilesGenerator = CFileTransferSendDownloadFile::fs_TranslateGenerator<CDebugManager::CDownloadFile>
+			(
+				fg_Move(SendFilesResult.m_FilesGenerator)
+			)
 		;
 		FilesGenerator.f_SetSubscription(fg_Move(SendFilesResult.m_Subscription));
 		auto TransferResultFuture = fg_Move(SendFilesResult.m_Result);
@@ -265,13 +262,7 @@ namespace NMib::NCloud
 			)
 		;
 
-		auto Result = co_await
-			(
-				_fDoDownload(fg_Move(Subscription))
-				.f_Timeout(m_Timeout, "Timed out waiting for debug manager to reply")
-				% "Failed to start download on remote server"
-			)
-		;
+		auto Result = co_await (_fDoDownload(fg_Move(Subscription)).f_Timeout(m_Timeout, "Timed out waiting for debug manager to reply") % "Failed to start download on remote server");
 
 		if (!Result.m_FilesGenerator.f_IsValid())
 			co_return DMibErrorInstance("Download missing files generator");
@@ -307,7 +298,8 @@ namespace NMib::NCloud
 			, CDebugManager::EUploadFlag _Flags
 			, uint64 _QueueSize
 			, int32 _CompressionLevel
-		) const
+		)
+		const
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -338,7 +330,8 @@ namespace NMib::NCloud
 			, NStr::CStr _DestinationDirectory
 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 			, uint64 _QueueSize
-		) const
+		)
+		const
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -369,7 +362,8 @@ namespace NMib::NCloud
 			, CDebugManager::EUploadFlag _Flags
 			, uint64 _QueueSize
 			, int32 _CompressionLevel
-		) const
+		)
+		const
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -402,7 +396,8 @@ namespace NMib::NCloud
 			, NStr::CStr _DestinationDirectory
 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 			, uint64 _QueueSize
-		) const
+		)
+		const
 	{
 		auto &Internal = *mp_pInternal;
 

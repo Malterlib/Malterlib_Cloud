@@ -76,8 +76,7 @@ namespace NMib::NCloud
 						if (_Options.m_CriticalFreePercent != fp32::fs_Inf())
 							SensorInfo.m_CriticalValue = CDistributedAppSensorReporter::CValueComparison{_Options.m_CriticalFreePercent, c_LessThan};
 						break;
-					case CInternal::ESensorType_Total:
-						break;
+					case CInternal::ESensorType_Total: break;
 					}
 
 					return SensorInfo;
@@ -232,7 +231,8 @@ namespace NMib::NCloud
 
 							return Return;
 						}
-					).f_Timeout(60.0, "Timed out getting disk space").f_Wrap()
+					)
+					.f_Timeout(60.0, "Timed out getting disk space").f_Wrap()
 				)
 			;
 		}

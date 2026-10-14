@@ -9,17 +9,12 @@
 #include "Malterlib_Cloud_App_AppManager.h"
 
 #ifdef DPlatformFamily_Windows
-#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#	include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #endif
 
 namespace NMib::NCloud::NAppManager
 {
-	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Add
-		(
-			NStr::CStr _Name
-			, CApplicationAdd _Add
-			, CApplicationSettings _Settings
-		)
+	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_Add(NStr::CStr _Name, CApplicationAdd _Add, CApplicationSettings _Settings)
 	{
 		CAppManagerActor::CApplicationSettings ApplicationSettings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
@@ -161,7 +156,9 @@ namespace NMib::NCloud::NAppManager
 			Permissions["Version"] = {{"AppManager/VersionAppAll", fg_Format("AppManager/VersionApp/{}", _Settings.m_VersionManagerApplication)}};
 
 		NContainer::TCMap<NStr::CStr, bool> HasPermissions = co_await
-			(mp_Permissions.f_HasPermissions("Add application to AppManager", Permissions, _CallingHostInfo) % "Permission denied adding application" % Auditor)
+			(
+				mp_Permissions.f_HasPermissions("Add application to AppManager", Permissions, _CallingHostInfo) % "Permission denied adding application" % Auditor
+			)
 		;
 
 		if (!HasPermissions["Command"])
@@ -438,9 +435,9 @@ namespace NMib::NCloud::NAppManager
 
 				auto [LaunchResult, LaunchListResult] = co_await
 					(
-						LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch))
-						+ LaunchListActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))
-					).f_Wrap()
+						LaunchActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(Launch)) + LaunchListActor(&CProcessLaunchActor::f_LaunchSimple, fg_Move(LaunchList))
+					)
+					.f_Wrap()
 				;
 
 				if (!LaunchResult)
@@ -536,12 +533,7 @@ namespace NMib::NCloud::NAppManager
 			CStr DownloadDirectoryRoot = Directory / "TempVersionDownload";
 			CStr DownloadDirectory = DownloadDirectoryRoot / fg_FastRandomID();
 			_fOnInfo(fg_Format("Downloading version '{}' from version managers", VersionID));
-			auto VersionInfo = co_await
-				(
-					fp_DownloadApplication(VersionManagerApplication, VersionID, DownloadDirectory)
-					% "Failed to download application from version manager" % Auditor
-				)
-			;
+			auto VersionInfo = co_await (fp_DownloadApplication(VersionManagerApplication, VersionID, DownloadDirectory) % "Failed to download application from version manager" % Auditor);
 			{
 				auto CaptureScope = co_await (g_CaptureExceptions % Auditor);
 				fApplyVersion(VersionID, VersionInfo);

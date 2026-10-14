@@ -219,7 +219,8 @@ namespace NMib::NCloud::NAppDistributionManager
 				CStr SourceFileName = fg_GetStrSep(ParseSourceFile, ".");
 				CStr SourceFileExtension = ParseSourceFile;
 
-				DeployInfo.m_Renamed = CStr::CFormat(RenamedTemplate)
+				DeployInfo.m_Renamed
+					= CStr::CFormat(RenamedTemplate)
 					<< _DistributionName
 					<< VersionManagerApplicationName
 					<< ApplicationVersion.m_VersionID.m_Platform
@@ -237,9 +238,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				;
 			}
 
-			DeployDestinationActor(&CDeployDestination::f_Deploy, DeployInfo)
-				> DeploysResults[DeployDestinationName]
-			;
+			DeployDestinationActor(&CDeployDestination::f_Deploy, DeployInfo) > DeploysResults[DeployDestinationName];
 		}
 
 		auto Results = co_await fg_AllDoneWrapped(DeploysResults);
@@ -268,15 +267,7 @@ namespace NMib::NCloud::NAppDistributionManager
 		else
 		{
 			if (!SuccessFullDeploys.f_IsEmpty())
-			{
-				co_return DMibErrorInstance
-					(
-						"Successfully deployed to {vs}, but failed to deploy to some deploy destinations:\n{}"_f
-						<< SuccessFullDeploys
-						<< DeployFailures
-					)
-				;
-			}
+				co_return DMibErrorInstance("Successfully deployed to {vs}, but failed to deploy to some deploy destinations:\n{}"_f << SuccessFullDeploys << DeployFailures);
 			else
 				co_return DMibErrorInstance("Failed to deploy to all deploy destinations:\n{}"_f << DeployFailures);
 		}
@@ -308,24 +299,16 @@ namespace NMib::NCloud::NAppDistributionManager
 				auto &VersionInfo = Version.m_VersionInfo;
 
 				if
-					(
-						auto *pPreviouslyDistributed = Distribution.m_DeployedVersions.f_FindEqual(VersionID)
-						; pPreviouslyDistributed
-						&& pPreviouslyDistributed->m_RetrySequence == VersionInfo.m_RetrySequence
-						&& pPreviouslyDistributed->m_Time == VersionInfo.m_Time
-					)
+				(
+					auto *pPreviouslyDistributed = Distribution.m_DeployedVersions.f_FindEqual(VersionID)
+					; pPreviouslyDistributed && pPreviouslyDistributed->m_RetrySequence == VersionInfo.m_RetrySequence && pPreviouslyDistributed->m_Time == VersionInfo.m_Time
+				)
 				{
 					continue;
 				}
 
-				if
-					(
-						auto *pPreviouslyDistributed = Distribution.m_TriedDeployVersions.f_FindEqual(VersionID)
-						; pPreviouslyDistributed && *pPreviouslyDistributed == VersionInfo
-					)
-				{
+				if (auto *pPreviouslyDistributed = Distribution.m_TriedDeployVersions.f_FindEqual(VersionID); pPreviouslyDistributed && *pPreviouslyDistributed == VersionInfo)
 					continue;
-				}
 				Distribution.m_TriedDeployVersions[VersionID] = VersionInfo;
 
 				TCSet<EDeployDestination> DeployDestinations = DistributionSettings.m_DeployDestinations;
@@ -369,16 +352,7 @@ namespace NMib::NCloud::NAppDistributionManager
 				if (!Distribution.m_RunningDeploys(VersionID).f_WasCreated())
 					continue;
 
-				DMibLogWithCategory
-					(
-						Malterlib/Cloud/AppDistributionManager
-						, Info
-						, "Downloading '{}' ({}) version '{}'"
-						, DistributionName
-						, VersionManagerApplicationName
-						, VersionID
-					)
-				;
+				DMibLogWithCategory(Malterlib/Cloud/AppDistributionManager, Info, "Downloading '{}' ({}) version '{}'", DistributionName, VersionManagerApplicationName, VersionID);
 
 				fp_AutoUpdate_DeployDistribution(DistributionName, VersionID, VersionInfo, DeployDestinations) > [=](TCAsyncResult<TCSet<CStr>> &&_SuccessFullDeploys)
 					{

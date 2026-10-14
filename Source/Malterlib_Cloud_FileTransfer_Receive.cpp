@@ -160,8 +160,8 @@ namespace NMib::NCloud
 		StartDownload.m_QueueSize = _QueueSize;
 		StartDownload.m_DispatchActor = fg_ThisActor(this);
 
-		StartDownload.m_fStateChange = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContextDeprecated::CInternal::CStateChange _StateChange) mutable
-			-> NConcurrency::TCFuture<CFileTransferContextDeprecated::CInternal::CStateChange::CResult>
+		StartDownload.m_fStateChange = [this, AllowDestroy = g_AllowWrongThreadDestroy]
+			(CFileTransferContextDeprecated::CInternal::CStateChange _StateChange) mutable -> NConcurrency::TCFuture<CFileTransferContextDeprecated::CInternal::CStateChange::CResult>
 			{
 				CFileTransferContextDeprecated::CInternal::CStateChange::CResult Result = _StateChange.f_GetResult();
 				auto &Internal = *mp_pInternal;
@@ -178,8 +178,8 @@ namespace NMib::NCloud
 			}
 		;
 
-		StartDownload.m_fSendPart = [this, AllowDestroy = g_AllowWrongThreadDestroy](CFileTransferContextDeprecated::CInternal::CSendPart _Part) mutable
-			-> NConcurrency::TCFuture<CFileTransferContextDeprecated::CInternal::CSendPart::CResult>
+		StartDownload.m_fSendPart = [this, AllowDestroy = g_AllowWrongThreadDestroy]
+			(CFileTransferContextDeprecated::CInternal::CSendPart _Part) mutable -> NConcurrency::TCFuture<CFileTransferContextDeprecated::CInternal::CSendPart::CResult>
 			{
 				auto &Internal = *mp_pInternal;
 				auto SequenceSubscription = co_await Internal.m_WriteSequencer.f_Sequence();
@@ -289,12 +289,8 @@ namespace NMib::NCloud
 		};
 	}
 
-	NConcurrency::TCFuture<CFileTransferResult> CFileTransferReceive::f_ReceiveFiles
-		(
-			NConcurrency::TCAsyncGenerator<CFileTransferSendDownloadFile> _FilesGenerator
-			, uint64 _QueueSize
-			, EReceiveFlag _Flags
-		)
+	auto CFileTransferReceive::f_ReceiveFiles(NConcurrency::TCAsyncGenerator<CFileTransferSendDownloadFile> _FilesGenerator, uint64 _QueueSize, EReceiveFlag _Flags)
+		-> NConcurrency::TCFuture<CFileTransferResult>
 	{
 		auto CheckDestroy = co_await f_CheckDestroyedOnResume();
 
@@ -450,24 +446,12 @@ namespace NMib::NCloud
 							if ((_Flags & EReceiveFlag_IgnoreExisting) || ExpectedLen == TCLimitsInt<uint64>::mc_Max)
 							{
 								CFile File;
-								File.f_Open
-									(
-										FilePath
-										, EFileOpen_Write | EFileOpen_ShareAll | EFileOpen_NoLocalCache
-										, OpenAttributes
-									)
-								;
+								File.f_Open(FilePath, EFileOpen_Write | EFileOpen_ShareAll | EFileOpen_NoLocalCache, OpenAttributes);
 								co_return CResumeFileInfoParams{.m_File = fg_Move(File)};
 							}
 
 							CFile File;
-							File.f_Open
-								(
-									FilePath
-									, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll | EFileOpen_NoLocalCache
-									, OpenAttributes
-								)
-							;
+							File.f_Open(FilePath, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll | EFileOpen_NoLocalCache, OpenAttributes);
 
 							uint64 CurrentLength = File.f_GetLength();
 							uint64 ResumeLength;
@@ -513,13 +497,7 @@ namespace NMib::NCloud
 					auto &&Data = *iData;
 					auto DataLen = Data.f_GetLen();
 					(
-						g_Dispatch(*BlockingActors) /
-						[
-							pResumeFileInfo
-							, FilePosition
-							, Data = fg_Move(Data)
-						]
-						() mutable
+						g_Dispatch(*BlockingActors) / [pResumeFileInfo, FilePosition, Data = fg_Move(Data)]() mutable
 						{
 							auto &File = pResumeFileInfo->m_File;
 							File.f_WriteNoLocalCache(FilePosition, Data.f_GetArray(), Data.f_GetLen());
@@ -541,14 +519,7 @@ namespace NMib::NCloud
 				auto BlockingActorCheckout = fg_BlockingActor();
 				co_await
 					(
-						g_Dispatch(BlockingActorCheckout) /
-						[
-							pResumeFileInfo
-							, Attributes
-							, WriteTime = RemoteFile.m_WriteTime
-							, FilePosition
-						]
-						() mutable
+						g_Dispatch(BlockingActorCheckout) / [pResumeFileInfo, Attributes, WriteTime = RemoteFile.m_WriteTime, FilePosition]() mutable
 						{
 							auto &File = pResumeFileInfo->m_File;
 							File.f_SetLength(FilePosition);

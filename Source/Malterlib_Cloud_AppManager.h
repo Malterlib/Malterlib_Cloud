@@ -19,38 +19,38 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x107
-			, EProtocolVersion_AddRunAsUserHasShell = 0x108
-			, EProtocolVersion_AddCoordinatedWait = 0x109
-			, EProtocolVersion_AddStatusSeverity = 0x110
-			, EProtocolVersion_AddFiltered = 0x111
-			, EProtocolVersion_AddAccessDenied = 0x112
-			, EProtocolVersion_AddAutoUpdateAndExtendAppInfo = 0x114
-			, EProtocolVersion_AddBypassCoordination = 0x115
-			, EProtocolVersion_AddLaunchInProcess = 0x116
-			, EProtocolVersion_ExtendUpdateNotification = 0x117
-			, EProtocolVersion_HostIDInApplicationInfo = 0x118
+			EProtocolVersion_Min                                 = 0x107
+			, EProtocolVersion_AddRunAsUserHasShell              = 0x108
+			, EProtocolVersion_AddCoordinatedWait                = 0x109
+			, EProtocolVersion_AddStatusSeverity                 = 0x110
+			, EProtocolVersion_AddFiltered                       = 0x111
+			, EProtocolVersion_AddAccessDenied                   = 0x112
+			, EProtocolVersion_AddAutoUpdateAndExtendAppInfo     = 0x114
+			, EProtocolVersion_AddBypassCoordination             = 0x115
+			, EProtocolVersion_AddLaunchInProcess                = 0x116
+			, EProtocolVersion_ExtendUpdateNotification          = 0x117
+			, EProtocolVersion_HostIDInApplicationInfo           = 0x118
 			, EProtocolVersion_OptionalWaitForNotificationResult = 0x119
-			, EProtocolVersion_ResumableUpdateNotifications = 0x119
-			, EProtocolVersion_Current = 0x119
+			, EProtocolVersion_ResumableUpdateNotifications      = 0x119
+			, EProtocolVersion_Current                           = 0x119
 		};
 
 		enum EUpdateStage : uint32
 		{
-			EUpdateStage_Failed						= 0x70000000
-			, EUpdateStage_None						= 0
-			, EUpdateStage_SyncStart				= 0x10000
-			, EUpdateStage_ChangeEncryption			= 0x20000
-			, EUpdateStage_DownloadVersion			= 0x30000
-			, EUpdateStage_Unpack					= 0x40000
-			, EUpdateStage_StopOldApp				= 0x50000
-			, EUpdateStage_PreUpdateScript			= 0x60000
-			, EUpdateStage_UpdateApplicationFiles	= 0x70000
-			, EUpdateStage_SaveApplicationState		= 0x80000
-			, EUpdateStage_PostUpdateScript			= 0x90000
-			, EUpdateStage_StartNewApp				= 0xa0000
-			, EUpdateStage_PostLaunch				= 0xb0000
-			, EUpdateStage_Finished					= 0xc0000
+			EUpdateStage_Failed                   = 0x70000000
+			, EUpdateStage_None                   = 0
+			, EUpdateStage_SyncStart              = 0x10000
+			, EUpdateStage_ChangeEncryption       = 0x20000
+			, EUpdateStage_DownloadVersion        = 0x30000
+			, EUpdateStage_Unpack                 = 0x40000
+			, EUpdateStage_StopOldApp             = 0x50000
+			, EUpdateStage_PreUpdateScript        = 0x60000
+			, EUpdateStage_UpdateApplicationFiles = 0x70000
+			, EUpdateStage_SaveApplicationState   = 0x80000
+			, EUpdateStage_PostUpdateScript       = 0x90000
+			, EUpdateStage_StartNewApp            = 0xa0000
+			, EUpdateStage_PostLaunch             = 0xb0000
+			, EUpdateStage_Finished               = 0xc0000
 		};
 
 		enum EStatusSeverity
@@ -75,8 +75,16 @@ namespace NMib::NCloud
 			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform const &) = default;
 			CVersionIDAndPlatform &operator = (CVersionIDAndPlatform &&) = default;
 
-			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other) : CVersionManager::CVersionIDAndPlatform(_Other) { }
-			CVersionIDAndPlatform &operator = (CVersionManager::CVersionIDAndPlatform const &_Right) { static_cast<CVersionManager::CVersionIDAndPlatform &>(*this) = _Right; return *this; }
+			CVersionIDAndPlatform(CVersionManager::CVersionIDAndPlatform const &_Other)
+				: CVersionManager::CVersionIDAndPlatform(_Other)
+			{
+			}
+
+			CVersionIDAndPlatform &operator = (CVersionManager::CVersionIDAndPlatform const &_Right)
+			{
+				static_cast<CVersionManager::CVersionIDAndPlatform &>(*this) = _Right;
+				return *this;
+			}
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -90,8 +98,16 @@ namespace NMib::NCloud
 			CVersionID &operator = (CVersionID const &) = default;
 			CVersionID &operator = (CVersionID &&) = default;
 
-			CVersionID(CVersionManager::CVersionID const &_Other) : CVersionManager::CVersionID(_Other) { }
-			CVersionID &operator = (CVersionManager::CVersionID const &_Right) { static_cast<CVersionManager::CVersionID &>(*this) = _Right; return *this; }
+			CVersionID(CVersionManager::CVersionID const &_Other)
+				: CVersionManager::CVersionID(_Other)
+			{
+			}
+
+			CVersionID &operator = (CVersionManager::CVersionID const &_Right)
+			{
+				static_cast<CVersionManager::CVersionID &>(*this) = _Right;
+				return *this;
+			}
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -105,8 +121,16 @@ namespace NMib::NCloud
 			CVersionInformation &operator = (CVersionInformation const &) = default;
 			CVersionInformation &operator = (CVersionInformation &&) = default;
 
-			CVersionInformation(CVersionManager::CVersionInformation const &_Other) : CVersionManager::CVersionInformation(_Other) { }
-			CVersionInformation &operator = (CVersionManager::CVersionInformation const &_Right) { static_cast<CVersionManager::CVersionInformation &>(*this) = _Right; return *this; }
+			CVersionInformation(CVersionManager::CVersionInformation const &_Other)
+				: CVersionManager::CVersionInformation(_Other)
+			{
+			}
+
+			CVersionInformation &operator = (CVersionManager::CVersionInformation const &_Right)
+			{
+				static_cast<CVersionManager::CVersionInformation &>(*this) = _Right;
+				return *this;
+			}
 
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
@@ -117,8 +141,8 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NStorage::TCOptional<NStr::CStr> m_VersionManagerApplication;	/// If left empty when adding an application an null application is added.
-																			/// Useful for using as encrypted parent application
+			NStorage::TCOptional<NStr::CStr> m_VersionManagerApplication; /// If left empty when adding an application an null application is added.
+																		  /// Useful for using as encrypted parent application
 			NStorage::TCOptional<NStr::CStr> m_UpdateGroup;
 			NStorage::TCOptional<NStr::CStr> m_Executable;
 			NStorage::TCOptional<NContainer::TCVector<NStr::CStr>> m_ExecutableParameters;
@@ -237,7 +261,7 @@ namespace NMib::NCloud
 
 			NStr::CStr m_UpdateID;
 			NStr::CStr m_Application;
-			NStr::CStr m_Message; // Currently only for EUpdateStage_Failed
+			NStr::CStr m_Message;           // Currently only for EUpdateStage_Failed
 			CVersionIDAndPlatform m_VersionID;
 			NTime::CTime m_VersionTime;
 			NTime::CTime m_StartUpdateTime;
@@ -257,8 +281,8 @@ namespace NMib::NCloud
 			NStorage::TCOptional<CVersionIDAndPlatform> m_Version; // If not specified the latest known version will be used
 
 			bool m_bForceOverwriteEncryption = false; // If an encrypted volume is found to be used already, force it to be overwritten
-			bool m_bForceInstall = false; // Force application install even if application directory already exists
-			bool m_bSettingsFromVersionInfo = true; // Get settings from version downloaded
+			bool m_bForceInstall = false;             // Force application install even if application directory already exists
+			bool m_bSettingsFromVersionInfo = true;   // Get settings from version downloaded
 		};
 
 		struct CApplicationUpdate
@@ -267,11 +291,11 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			NStorage::TCOptional<NContainer::TCSet<NStr::CStr>> m_RequireTags; // Defaults to tags in application settings
-			NStorage::TCOptional<NStr::CStr> m_Platform; // Defaults to same as last installed version
-			NStorage::TCOptional<CVersionID> m_Version; // Defaults to newest version available
+			NStorage::TCOptional<NStr::CStr> m_Platform;                       // Defaults to same as last installed version
+			NStorage::TCOptional<CVersionID> m_Version;                        // Defaults to newest version available
 
-			bool m_bUpdateSettings = true; // Update settings from from downloaded version info
-			bool m_bDryRun = false; // Just download and extract application, don't actually update
+			bool m_bUpdateSettings = true;      // Update settings from from downloaded version info
+			bool m_bDryRun = false;             // Just download and extract application, don't actually update
 			bool m_bBypassCoordination = false; // Behave as if application is has independent update type
 		};
 
@@ -281,7 +305,7 @@ namespace NMib::NCloud
 			void f_Stream(tf_CStream &_Stream);
 
 			bool m_bUpdateFromVersionInfo = false; // Update settings from the last installed version manager application info.
-			bool m_bForce = false; // Force running the update process even if no settings are changed.
+			bool m_bForce = false;                 // Force running the update process even if no settings are changed.
 		};
 
 		using CVersionsAvailableForUpdate = NContainer::TCMap<NStr::CStr, NContainer::TCVector<CApplicationVersion>>;
@@ -364,9 +388,10 @@ namespace NMib::NCloud
 
 		virtual NConcurrency::TCFuture<CVersionsAvailableForUpdate> f_GetAvailableVersions
 			(
-				NStr::CStr _Application	/// Leave empty to list versions for all version manager applications know by the AppManager. By default app manager will only subscribe to
+				NStr::CStr _Application /// Leave empty to list versions for all version manager applications know by the AppManager. By default app manager will only subscribe to
 										/// applications with the same platform as it's running under and all platforms of any application it has installed.
-			) = 0
+			)
+			= 0
 		;
 
 		virtual NConcurrency::TCFuture<void> f_Add(NStr::CStr _Name, CApplicationAdd _Add, CApplicationSettings _Settings) = 0;
@@ -378,13 +403,7 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<void> f_Stop(NStr::CStr _Name) = 0;
 		virtual NConcurrency::TCFuture<void> f_Restart(NStr::CStr _Name) = 0;
 
-		virtual NConcurrency::TCFuture<void> f_ChangeSettings
-			(
-				NStr::CStr _Name
-				, CApplicationChangeSettings _ChangeSettings
-				, CApplicationSettings _Settings
-			) = 0
-		;
+		virtual NConcurrency::TCFuture<void> f_ChangeSettings(NStr::CStr _Name, CApplicationChangeSettings _ChangeSettings, CApplicationSettings _Settings) = 0;
 
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CApplicationInfo>> f_GetInstalled() = 0;
 		virtual auto f_SubscribeUpdateNotifications(CSubscribeUpdateNotifications _Params) -> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0;
@@ -393,7 +412,7 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_AppManager.hpp"

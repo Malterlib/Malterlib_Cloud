@@ -110,19 +110,11 @@ namespace NMib::NCloud::NSecretsManager
 				, _SemanticID
 				, _Name
 				, _TagsExclusive
-				, [&] (CSecretPropertiesInternal const &_SecretProperties)
+				, [&](CSecretPropertiesInternal const &_SecretProperties)
 				{
-					fsp_AddPermissionQueryIndexedBySecretID
-						(
-							_Secrets.fs_GetKey(_SecretProperties)
-							, "Read"
-							, _SecretProperties.m_SemanticID
-							, _SecretProperties.m_Tags
-							, o_Permissions
-						)
-					;
+					fsp_AddPermissionQueryIndexedBySecretID(_Secrets.fs_GetKey(_SecretProperties), "Read", _SecretProperties.m_SemanticID, _SecretProperties.m_Tags, o_Permissions);
 				}
-			 )
+			)
 		;
 	}
 
@@ -159,7 +151,7 @@ namespace NMib::NCloud::NSecretsManager
 				, _Options.m_SemanticID
 				, _Options.m_Name
 				, _Options.m_TagsExclusive
-				, [&] (CSecretPropertiesInternal const &_SecretProperties)
+				, [&](CSecretPropertiesInternal const &_SecretProperties)
 				{
 					// Only enumerate secrets the host is allowed to see
 					auto const &ID = m_pThis->mp_Database.m_Secrets.fs_GetKey(_SecretProperties);
@@ -248,9 +240,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		auto HasPermissions = co_await
 			(
-				This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions)
-				% "Permission denied getting secret properties"
-				% Auditor
+				This.mp_Permissions.f_HasPermissions("Get secret properties from SecretsManager", Permissions) % "Permission denied getting secret properties" % Auditor
 			)
 		;
 
@@ -274,8 +264,7 @@ namespace NMib::NCloud::NSecretsManager
 		co_return pSecretProperties->f_ToSecretProperties();
 	}
 
-	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretBySemanticID(CGetSecretBySemanticID _Options)
-		-> TCFuture<CSecretsManager::CSecret>
+	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_GetSecretBySemanticID(CGetSecretBySemanticID _Options) -> TCFuture<CSecretsManager::CSecret>
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();
@@ -296,9 +285,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		auto HasPermissions = co_await
 			(
-				This.mp_Permissions.f_HasPermissions("Get secret by semantic ID from SecretsManager", Permissions)
-				% "Permission denied getting secret by semantic ID"
-				% Auditor
+				This.mp_Permissions.f_HasPermissions("Get secret by semantic ID from SecretsManager", Permissions) % "Permission denied getting secret by semantic ID" % Auditor
 			)
 		;
 
@@ -314,7 +301,7 @@ namespace NMib::NCloud::NSecretsManager
 				, _Options.m_SemanticID
 				, _Options.m_Name
 				, _Options.m_TagsExclusive
-				, [&] (CSecretPropertiesInternal const &_SecretProperties)
+				, [&](CSecretPropertiesInternal const &_SecretProperties)
 				{
 					// Only count secrets host is allowed to see
 					auto const &ID = m_pThis->mp_Database.m_Secrets.fs_GetKey(_SecretProperties);
@@ -397,9 +384,7 @@ namespace NMib::NCloud::NSecretsManager
 
 		auto HasPermissions = co_await
 			(
-				This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions)
-				% "Permission denied setting secret properties"
-				% Auditor
+				This.mp_Permissions.f_HasPermissions("Set secret properties in SecretsManager", Permissions) % "Permission denied setting secret properties" % Auditor
 			)
 		;
 
@@ -533,12 +518,8 @@ namespace NMib::NCloud::NSecretsManager
 		co_return fg_Move(Result);
 	}
 
-	TCFuture<void> CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_ModifyTags
-		(
-			CSecretsManager::CSecretID _ID
-			, TCSet<CStrSecure> _TagsToRemove
-			, TCSet<CStrSecure> _TagsToAdd
-		)
+	auto CSecretsManagerDaemonActor::CServer::CSecretsManagerImplementation::f_ModifyTags(CSecretsManager::CSecretID _ID, TCSet<CStrSecure> _TagsToRemove, TCSet<CStrSecure> _TagsToAdd)
+		-> TCFuture<void>
 	{
 		auto &This = *m_pThis;
 		auto Auditor = This.mp_AppState.f_Auditor();

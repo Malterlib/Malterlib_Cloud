@@ -60,10 +60,10 @@ namespace NMib::NCloud::NCloudManager
 	{
 		NConcurrency::CLogError LogError("CloudManager");
 
-		co_await mp_LogNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy log notifications");;
-		co_await mp_SensorNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy sensor notifications");;
-		co_await mp_UpdateNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update notifications");;
-		co_await mp_Notifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy notifications");;
+		co_await mp_LogNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy log notifications");
+		co_await mp_SensorNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy sensor notifications");
+		co_await mp_UpdateNotifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy update notifications");
+		co_await mp_Notifications.f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy notifications");
 
 		{
 			TCFutureVector<void> Destroys;
@@ -118,13 +118,13 @@ namespace NMib::NCloud::NCloudManager
 		}
 
 		if (mp_AppSensorStore)
-			co_await fg_Move(mp_AppSensorStore).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app sensor store");;
+			co_await fg_Move(mp_AppSensorStore).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app sensor store");
 
 		if (mp_AppLogStore)
-			co_await fg_Move(mp_AppLogStore).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app log store");;
+			co_await fg_Move(mp_AppLogStore).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy app log store");
 
 		if (mp_DatabaseActor)
-			co_await fg_Move(mp_DatabaseActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");;
+			co_await fg_Move(mp_DatabaseActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy database actor");
 
 		co_return {};
 	}

@@ -8,7 +8,6 @@
 #include <Mib/Concurrency/DistributedActorTrustManagerDatabases/JsonDirectory>
 #include <Mib/Encoding/JsonShortcuts>
 
-
 #include "Malterlib_Cloud_App_CloudAPIManager.h"
 #include "Malterlib_Cloud_App_CloudAPIManager_Server.h"
 
@@ -17,19 +16,11 @@ namespace NMib::NCloud::NCloudAPIManager
 	TCFuture<CCloudAPIManagerDaemonActor::CServer::COpenStackServiceInfo> CCloudAPIManagerDaemonActor::CServer::fp_GetOpenStackServiceInfo(CCloudContext &_CloudContext)
 	{
 		if
-			(
-				!_CloudContext.m_pGetToken
-				||
-				(
-					_CloudContext.m_bLastWasError
-					&& _CloudContext.m_LastErrorStopwatch.f_GetTime() > 5.0
-				)
-				||
-				(
-					_CloudContext.m_TokenExpiresAt.f_IsValid()
-					&& (_CloudContext.m_TokenExpiresAt - CTime::fs_NowUTC()) < CTimeSpanConvert::fs_CreateHourSpan(1)
-				)
-			)
+		(
+			!_CloudContext.m_pGetToken
+			|| (_CloudContext.m_bLastWasError && _CloudContext.m_LastErrorStopwatch.f_GetTime() > 5.0)
+			|| (_CloudContext.m_TokenExpiresAt.f_IsValid() && (_CloudContext.m_TokenExpiresAt - CTime::fs_NowUTC()) < CTimeSpanConvert::fs_CreateHourSpan(1))
+		)
 		{
 			_CloudContext.m_bLastWasError = false;
 			_CloudContext.m_pGetToken = fg_Construct
@@ -96,21 +87,10 @@ namespace NMib::NCloud::NCloudAPIManager
 						auto const Json = CJsonSorted::fs_FromString(Result->m_Body);
 						auto Token = Json["token"];
 
-						CStr ExpiresAt = Token["expires_at"].f_String();	// Example: "2016-09-30T08:36:31.932109Z"
+						CStr ExpiresAt = Token["expires_at"].f_String(); // Example: "2016-09-30T08:36:31.932109Z"
 						int64 Year;
 						aint Month, Day, Hour, Minute, Second, nParsed;
-						(void)
-							(
-								NMib::NStr::CStr::CParse("{}-{}-{}T{}:{}:{}.{}Z")
-								>> Year
-								>> Month
-								>> Day
-								>> Hour
-								>> Minute
-								>> Second
-							)
-							.f_Parse(ExpiresAt, nParsed)
-						;
+						(void)(NMib::NStr::CStr::CParse("{}-{}-{}T{}:{}:{}.{}Z") >> Year >> Month >> Day >> Hour >> Minute >> Second).f_Parse(ExpiresAt, nParsed);
 						ServiceInfo.m_TokenExpiresAt = NTime::CTimeConvert::fs_CreateTime(Year, Month, Day, Hour, Minute, Second);
 
 						auto Catalog = Token["catalog"].f_Array();

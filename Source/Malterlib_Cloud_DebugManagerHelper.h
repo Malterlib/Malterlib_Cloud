@@ -23,13 +23,7 @@ namespace NMib::NCloud
 			CFileTransferResult m_TransferResult;
 		};
 
-		CDebugManagerHelper
-			(
-				NStr::CStr const &_RootDirectory
-				, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize
-				, fp64 _Timeout = 30.0
-			)
-		;
+		CDebugManagerHelper(NStr::CStr const &_RootDirectory, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize, fp64 _Timeout = 30.0);
 		~CDebugManagerHelper();
 
 		CDebugManagerHelper(CDebugManagerHelper const &);
@@ -48,7 +42,8 @@ namespace NMib::NCloud
 				, CDebugManager::EUploadFlag _Flags = CDebugManager::EUploadFlag::mc_None
 				, uint64 _QueueSize = 0
 				, int32 _CompressionLevel = 3
-			) const
+			)
+			const
 		;
 
 		NConcurrency::TCUnsafeFuture<CFileTransferResult> f_Asset_Download
@@ -58,7 +53,8 @@ namespace NMib::NCloud
 				, NStr::CStr _DestinationDirectory
 				, CFileTransferReceive::EReceiveFlag _ReceiveFlags = CFileTransferReceive::EReceiveFlag_IgnoreExisting
 				, uint64 _QueueSize = 0
-			) const
+			)
+			const
 		;
 
 		NConcurrency::TCUnsafeFuture<CUploadResult> f_CrashDump_Upload
@@ -71,7 +67,8 @@ namespace NMib::NCloud
 				, CDebugManager::EUploadFlag _Flags = CDebugManager::EUploadFlag::mc_None
 				, uint64 _QueueSize = 0
 				, int32 _CompressionLevel = 3
-			) const
+			)
+			const
 		;
 
 		NConcurrency::TCUnsafeFuture<CFileTransferResult> f_CrashDump_Download
@@ -81,7 +78,8 @@ namespace NMib::NCloud
 				, NStr::CStr _DestinationDirectory
 				, CFileTransferReceive::EReceiveFlag _ReceiveFlags = CFileTransferReceive::EReceiveFlag_IgnoreExisting
 				, uint64 _QueueSize = 0
-			) const
+			)
+			const
 		;
 
 	private:

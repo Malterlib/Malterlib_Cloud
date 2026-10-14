@@ -14,13 +14,7 @@ namespace
 
 	CEJsonSorted fg_FromString(CStr &&_String)
 	{
-		return CEJsonSorted::fs_FromString
-			(
-				fg_Move(_String)
-				, CStr()
-				, gc_JsonFlags
-			)
-		;
+		return CEJsonSorted::fs_FromString(fg_Move(_String), CStr(), gc_JsonFlags);
 	}
 }
 
@@ -60,7 +54,7 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 					{
 						Reading.f_RemoveMember("Timestamp");
 						if (!fShouldKeepValue(Reading))
-							 Reading.f_RemoveMember("Value");
+							Reading.f_RemoveMember("Value");
 					}
 
 					// We need to sort by sequence because the system clock might change
@@ -199,10 +193,10 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 								"Version"
 								,
 								{
-									"Identifier"_j= "Ident",
-									"Major"_j= 13,
-									"Minor"_j= 3,
-									"Revision"_j= i
+									"Identifier"_j= "Ident"
+									, "Major"_j= 13
+									, "Minor"_j= 3
+									, "Revision"_j= i
 								}
 							}
 							, "OutdatedStatus"_= "Ok"
@@ -246,10 +240,10 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 							"Version"
 							,
 							{
-								"Identifier"_j= "Ident",
-								"Major"_j= 13,
-								"Minor"_j= 3,
-								"Revision"_j= 4
+								"Identifier"_j= "Ident"
+								, "Major"_j= 13
+								, "Minor"_j= 3
+								, "Revision"_j= 4
 							}
 						}
 						, "OutdatedStatus"_= "Ok"
@@ -337,8 +331,7 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 
 			auto TestAppHostID = CStr(co_await AppManagerTestHelper.f_LaunchTool(TestAppDirectory / "TestApp", {"--trust-host-id"}, TestAppDirectory)).f_Trim();
 			auto HostName = CStr("{}@{}/TestApp"_f << NProcess::NPlatform::fg_Process_GetUserName() << NProcess::NPlatform::fg_Process_GetComputerName());
-			auto fSetHostInfo = [&]
-				(CEJsonSorted const &_Json)
+			auto fSetHostInfo = [&](CEJsonSorted const &_Json)
 				{
 					CEJsonSorted Return = _Json;
 
@@ -418,20 +411,8 @@ struct CAppManager_Sensor_Tests : public NMib::NTest::CTest
 				;
 
 				DMibExpect(co_await fReadSensors(), ==, fSortSensors(fSetHostInfo(ExpectedSensors)));
-				DMibExpect
-					(
-						fMakeComparable(co_await fReadSensorReadings())
-						, ==
-						, fSetHostInfo(ExpectedSensorReadings)
-					)
-				;
-				DMibExpect
-					(
-						fSortSensors(fMakeComparable(co_await fReadSensorStatus()))
-						, ==
-						, fSortSensors(fSetHostInfo(ExpectedSensorStatus))
-					)
-				;
+				DMibExpect(fMakeComparable(co_await fReadSensorReadings()), ==, fSetHostInfo(ExpectedSensorReadings));
+				DMibExpect(fSortSensors(fMakeComparable(co_await fReadSensorStatus())), ==, fSortSensors(fSetHostInfo(ExpectedSensorStatus)));
 			}
 
 			co_return {};

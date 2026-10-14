@@ -88,7 +88,6 @@ namespace NMib::NCloud::NCloudClient
 	{
 		mp_Timeout = _Params["Timeout"].f_Float();
 	}
-
 }
 namespace NMib::NCloud
 {
