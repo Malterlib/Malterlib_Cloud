@@ -41,17 +41,7 @@ namespace NMib::NCloud::NVersionManager
 		mp_DatabaseActor = fg_Construct();
 		auto MaxDatabaseSize = mp_AppState.m_ConfigDatabase.m_Data.f_GetMemberValue("MaxDatabaseSize", g_MaxDatabaseSize).f_Integer();
 
-		co_await
-			(
-				mp_DatabaseActor
-				(
-					&CDatabaseActor::f_OpenDatabase
-					, mp_AppState.m_RootDirectory / "VersionManagerDatabase"
-					, MaxDatabaseSize
-				)
-				% "Failed to open database"
-			)
-		;
+		co_await (mp_DatabaseActor(&CDatabaseActor::f_OpenDatabase, mp_AppState.m_RootDirectory / "VersionManagerDatabase", MaxDatabaseSize) % "Failed to open database");
 
 		auto Stats = co_await mp_DatabaseActor(&CDatabaseActor::f_GetAggregateStatistics);
 		auto TotalSizeUsed = Stats.f_GetTotalUsedSize();
@@ -119,20 +109,17 @@ namespace NMib::NCloud::NVersionManager
 
 		mp_KnownTags = fg_Move(Result.m_KnownTags);
 
-		DLogWithCategory
-			(
-				Malterlib/Cloud/VersionManager
-				, Info
-				, "Loaded {ns } applications with {ns } versions from database"
-				, mp_Applications.f_GetLen()
-				, nVersions
-			)
-		;
+		DLogWithCategory(Malterlib/Cloud/VersionManager, Info, "Loaded {ns } applications with {ns } versions from database", mp_Applications.f_GetLen(), nVersions);
 
 		co_return true;
 	}
 
-	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SaveVersionToDatabase(CStr _Application, CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _VersionInfo)
+	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SaveVersionToDatabase
+		(
+			CStr _Application
+			, CVersionManager::CVersionIDAndPlatform _VersionID
+			, CVersionManager::CVersionInformation _VersionInfo
+		)
 	{
 		TCSharedPointer<CCanDestroyTracker> pCanDestroy = mp_pCanDestroyTracker;
 		if (!pCanDestroy)
@@ -409,8 +396,10 @@ namespace NMib::NCloud::NVersionManager
 
 					// === Collect known tags ===
 					for (auto &AppVersions : Result.m_DiskVersions)
+					{
 						for (auto &Version : AppVersions)
 							Result.m_KnownTags += Version.m_Tags;
+					}
 
 					return Result;
 				}

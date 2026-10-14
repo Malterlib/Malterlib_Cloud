@@ -96,14 +96,14 @@ namespace NMib::NCloud::NAppDistributionManager
 		{
 			struct CCompareApplicationByTime
 			{
-				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
+				COrdering_Partial operator () (CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
 			};
 
 			struct CCompareApplication
 			{
-				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
-				COrdering_Partial operator()(CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const;
-				COrdering_Partial operator()(CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const;
+				COrdering_Partial operator () (CVersionManagerVersion const &_Left, CVersionManagerVersion const &_Right) const;
+				COrdering_Partial operator () (CVersionManager::CVersionIDAndPlatform const &_Left, CVersionManagerVersion const &_Right) const;
+				COrdering_Partial operator () (CVersionManagerVersion const &_Left, CVersionManager::CVersionIDAndPlatform const &_Right) const;
 			};
 
 			CVersionManagerVersion(CVersionManagerState *_pVersionManager);
@@ -161,9 +161,9 @@ namespace NMib::NCloud::NAppDistributionManager
 
 		enum EFindVersionFlag
 		{
-			EFindVersionFlag_None = 0
+			EFindVersionFlag_None          = 0
 			, EFindVersionFlag_RetryFailed = DBit(0)
-			, EFindVersionFlag_ForAdd = DBit(1)
+			, EFindVersionFlag_ForAdd      = DBit(1)
 		};
 
 		using CVersionsAvailableForUpdate = NContainer::TCMap<NStr::CStr, NContainer::TCVector<CApplicationVersion>>;
@@ -194,22 +194,11 @@ namespace NMib::NCloud::NAppDistributionManager
 		TCFuture<void> fp_VersionManagerRemoved(TCWeakDistributedActor<CActor> _VersionManager);
 		TCFuture<CVersionsAvailableForUpdate> fp_GetAvailableVersions(CStr _Application);
 
-		TCFuture<CVersionInformation> fp_DownloadApplicationFromManager
-			(
-				TCDistributedActor<CVersionManager> _Manager
-				, CStr _ApplicationName
-				, CVersionManager::CVersionIDAndPlatform _VersionID
-				, CStr _DestinationDir
-			)
+		auto fp_DownloadApplicationFromManager(TCDistributedActor<CVersionManager> _Manager, CStr _ApplicationName, CVersionManager::CVersionIDAndPlatform _VersionID, CStr _DestinationDir)
+			-> TCFuture<CVersionInformation>
 		;
 
-		TCFuture<CVersionInformation> fp_DownloadApplication
-			(
-				CStr _ApplicationName
-				, CVersionManager::CVersionIDAndPlatform _VersionID
-				, CStr _DestinationDir
-			)
-		;
+		TCFuture<CVersionInformation> fp_DownloadApplication(CStr _ApplicationName, CVersionManager::CVersionIDAndPlatform _VersionID, CStr _DestinationDir);
 
 		void fp_AutoUpdate_Update();
 		TCFuture<TCSet<CStr>> fp_AutoUpdate_DeployDistribution

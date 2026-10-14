@@ -21,19 +21,19 @@ namespace NMib::NCloud::NBackupManager
 			try
 			{
 				if
+				(
+					_Context.m_pClient->f_ProcessPacket
 					(
-						_Context.m_pClient->f_ProcessPacket
-						(
-							_ServerPacket
-							, ToSendToServer
-							, bWantOneMoreProcess
-							, [this]
-							{
-								if (m_pThis->f_IsDestroyed())
-									DMibError("Aborted");
-							}
-						)
+						_ServerPacket
+						, ToSendToServer
+						, bWantOneMoreProcess
+						, [this]
+						{
+							if (m_pThis->f_IsDestroyed())
+								DMibError("Aborted");
+						}
 					)
+				)
 				{
 					bDone = true;
 				}
@@ -251,18 +251,7 @@ namespace NMib::NCloud::NBackupManager
 			{
 				RSyncContext.m_File.f_Open(_FileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
 				RSyncContext.m_TempFile.f_Open(_TempFileName, EFileOpen_Read | EFileOpen_Write | EFileOpen_DontTruncate | EFileOpen_ShareAll);
-				RSyncContext.m_pClient = fg_Construct
-					(
-						RSyncContext.m_File
-						, RSyncContext.m_File
-						, 256
-						, 4 * 1024 * 1024
-						, 8 * 1024 * 1024
-						, mc_QueueSize
-						, &RSyncContext.m_TempFile
-						, RSyncFlags
-					)
-				;
+				RSyncContext.m_pClient = fg_Construct(RSyncContext.m_File, RSyncContext.m_File, 256, 4 * 1024 * 1024, 8 * 1024 * 1024, mc_QueueSize, &RSyncContext.m_TempFile, RSyncFlags);
 			}
 			else
 			{
@@ -301,12 +290,7 @@ namespace NMib::NCloud::NBackupManager
 		co_return fg_Move(ActorSubscription);
 	}
 
-	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::f_StartRSync
-		(
-			CStr _FileName
-			, CManifestFile _ManifestFile
-			, FRunRSyncProtocol _fRunProtocol
-		)
+	TCFuture<TCActorSubscriptionWithID<>> CBackupInstance::f_StartRSync(CStr _FileName, CManifestFile _ManifestFile, FRunRSyncProtocol _fRunProtocol)
 	{
 		auto ProtocolVersion = fg_GetCallingHostInfo().f_GetProtocolVersion();
 

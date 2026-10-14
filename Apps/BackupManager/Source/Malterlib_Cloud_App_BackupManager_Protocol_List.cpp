@@ -101,15 +101,7 @@ namespace NMib::NCloud::NBackupManager
 			auto &BackupSource = FilteredBackupInfos.fs_GetKey(BackupInfo);
 			if (!BackupInfo)
 			{
-				DMibLogWithCategory
-					(
-						Mib/Cloud/BackupManager
-						, Error
-						, "Failed to get backup info for backup source '{}': {}"
-						, BackupSource
-						, BackupInfo.f_GetExceptionStr()
-					)
-				;
+				DMibLogWithCategory(Mib/Cloud/BackupManager, Error, "Failed to get backup info for backup source '{}': {}", BackupSource, BackupInfo.f_GetExceptionStr());
 				continue;
 			}
 			Results[BackupSource] = fg_Move(*BackupInfo);

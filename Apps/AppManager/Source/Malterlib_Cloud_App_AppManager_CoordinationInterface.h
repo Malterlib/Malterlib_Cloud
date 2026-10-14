@@ -17,7 +17,7 @@ namespace NMib::NCloud::NAppManager
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x103
+			EProtocolVersion_Min       = 0x103
 			, EProtocolVersion_Current = 0x104
 		};
 
@@ -96,8 +96,6 @@ namespace NMib::NCloud::NAppManager
 		;
 
 		virtual TCFuture<void> f_RemoveKnownHost(CStr _Group, CStr _Application, CStr _HostID) = 0;
-		virtual auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> _Changes, bool _bInitial)> _fOnChange)
-			-> TCFuture<TCActorSubscriptionWithID<>> = 0
-		;
+		virtual auto f_SubscribeToAppChanges(TCActorFunctorWithID<TCFuture<void> (TCVector<CAppChange> _Changes, bool _bInitial)> _fOnChange) -> TCFuture<TCActorSubscriptionWithID<>> = 0;
 	};
 }

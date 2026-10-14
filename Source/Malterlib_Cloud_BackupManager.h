@@ -16,30 +16,30 @@ namespace NMib::NCloud
 {
 	enum
 	{
-		EBackupManagerProtocolVersion_Min = 0x101
-		, EBackupManagerProtocolVersion_UseSHA256 = 0x106
+		EBackupManagerProtocolVersion_Min              = 0x101
+		, EBackupManagerProtocolVersion_UseSHA256      = 0x106
 		, EBackupManagerProtocolVersion_OptionalDigest = 0x107
-		, EBackupManagerProtocolVersion_Current = 0x107
+		, EBackupManagerProtocolVersion_Current        = 0x107
 	};
 
 	DMibImpErrorClassDefine(CExceptionBackupManagerHashMismatch, NException::CException);
 
-#	define DMibErrorBackupManagerHashMismatch(_Description) DMibImpError(NMib::NCloud::CExceptionBackupManagerHashMismatch, _Description)
-#	define DMibErrorInstanceBackupManagerHashMismatch(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionBackupManagerHashMismatch, _Description)
+#define DMibErrorBackupManagerHashMismatch(_Description) DMibImpError(NMib::NCloud::CExceptionBackupManagerHashMismatch, _Description)
+#define DMibErrorInstanceBackupManagerHashMismatch(_Description) DMibImpErrorInstance(NMib::NCloud::CExceptionBackupManagerHashMismatch, _Description)
 
 //#	define DMibCloudBackupManagerDebug
 
-#	if defined(DMibCloudBackupManagerDebug)
-#		define DMibCloudBackupManagerDebugOut DMibConOut
-#	else
-#		define DMibCloudBackupManagerDebugOut(...)  (void)0
-#	endif
+#if defined(DMibCloudBackupManagerDebug)
+#	define DMibCloudBackupManagerDebugOut DMibConOut
+#else
+#	define DMibCloudBackupManagerDebugOut(...)  (void)0
+#endif
 
 	struct CBackupManagerBackup : public NConcurrency::CActor
 	{
 		enum : uint32
 		{
-			EProtocolVersion_Min = EBackupManagerProtocolVersion_Min
+			EProtocolVersion_Min       = EBackupManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EBackupManagerProtocolVersion_Current
 		};
 
@@ -158,24 +158,14 @@ namespace NMib::NCloud
 
 		using FRunRSyncProtocol = NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<NContainer::CIOByteVector> (NContainer::CIOByteVector _Packet)>;
 
-		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_StartManifestRSync
-			(
-				FRunRSyncProtocol _fRunProtocol
-				, uint64 _ManifestSize
-				, NCryptography::CHashDigest_SHA256 _ExpectedDigest
-			) = 0
+		virtual auto f_StartManifestRSync(FRunRSyncProtocol _fRunProtocol, uint64 _ManifestSize, NCryptography::CHashDigest_SHA256 _ExpectedDigest)
+			-> NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> = 0
 		;
 		virtual NConcurrency::TCFuture<CStartBackupResult> f_StartBackup() = 0;
 
 		virtual NConcurrency::TCFuture<void> f_ManifestChange(NStr::CStr _FileName, CManifestChange _Change) = 0;
 
-		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_StartRSync
-			(
-				NStr::CStr _FileName
-				, CManifestFile _ManifestFile
-				, FRunRSyncProtocol _fRunProtocol
-			) = 0
-		;
+		virtual NConcurrency::TCFuture<NConcurrency::TCActorSubscriptionWithID<>> f_StartRSync(NStr::CStr _FileName, CManifestFile _ManifestFile, FRunRSyncProtocol _fRunProtocol) = 0;
 		virtual NConcurrency::TCFuture<void> f_AppendData(NStr::CStr _FileName, CAppendData _Data) = 0;
 
 		virtual NConcurrency::TCFuture<CInitialBackupFinishedResult> f_InitialBackupFinished(EInitialBackupFinishedFlag _FinishedFlags) = 0;
@@ -187,7 +177,7 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = EBackupManagerProtocolVersion_Min
+			EProtocolVersion_Min       = EBackupManagerProtocolVersion_Min
 			, EProtocolVersion_Current = EBackupManagerProtocolVersion_Current
 		};
 
@@ -224,7 +214,7 @@ namespace NMib::NCloud
 
 		enum EInitBackupFlag
 		{
-			EInitBackupFlag_None = 0
+			EInitBackupFlag_None       = 0
 			, EInitBackupFlag_ForceNew = DMibBit(0)
 		};
 
@@ -294,7 +284,7 @@ namespace NMib::NCloud
 
 			enum EFlag
 			{
-				EFlag_None = 0
+				EFlag_None       = 0
 				, EFlag_Finished = DMibBit(0)
 			};
 
@@ -342,6 +332,7 @@ namespace NMib::NCloud
 			CBackupID m_BackupID;
 			NStorage::TCOptional<CFileTransferContextDeprecated> m_TransferContextDeprecated;
 		};
+
 		// Deprecated - End
 
 		// Deprecated - Start
@@ -351,17 +342,12 @@ namespace NMib::NCloud
 		virtual NConcurrency::TCFuture<CStartDownloadBackup::CResult> f_StartDownloadBackup(CStartDownloadBackup _Params);
 		// Deprecated - End
 
-		virtual auto f_InitBackup(CInitBackup _Params)
-			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CBackupManagerBackup>> = 0
-		;
+		virtual auto f_InitBackup(CInitBackup _Params) -> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CBackupManagerBackup>> = 0;
 
 		virtual NConcurrency::TCFuture<NContainer::TCVector<NStr::CStr>> f_ListBackupSources() = 0;
 		virtual NConcurrency::TCFuture<NContainer::TCMap<NStr::CStr, CBackupInfo>> f_ListBackups(NStr::CStr _ForBackupSource) = 0;
 
-		virtual auto f_DownloadBackup(CDownloadBackup _DownloadBackup)
-			-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>>
-			= 0
-		;
+		virtual auto f_DownloadBackup(CDownloadBackup _DownloadBackup) -> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<NFile::CDirectorySyncClient>> = 0;
 	};
 }
 
@@ -370,7 +356,7 @@ DMibConcurrencyRegisterMemberFunctionLowestVersion(NMib::NCloud::CBackupManager:
 DMibConcurrencyRegisterMemberFunctionLowestVersion(NMib::NCloud::CBackupManager::f_ListBackups, 0x103);
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_BackupManager.hpp"

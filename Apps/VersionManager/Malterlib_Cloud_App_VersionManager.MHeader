@@ -16,7 +16,7 @@
 	{
 		%File "Source/Malterlib_Cloud_App_*"
 	}
-	
+
 	%Dependency "Lib_Malterlib_Cloud"
 	{
 		Dependency.Indirect true

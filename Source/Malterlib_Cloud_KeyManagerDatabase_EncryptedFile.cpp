@@ -27,12 +27,10 @@ namespace NMib::NCloud
 			)
 			, m_Path(_Path)
 		{
-
 		}
 
 		~CInternal()
 		{
-
 		}
 
 		NConcurrency::TCFuture<void> f_Initialize()
@@ -52,7 +50,7 @@ namespace NMib::NCloud
 						{
 							NContainer::CByteVector FileData;
 							NFile::CFile File;
-							File.f_Open(Path, NFile::EFileOpen_Read|NFile::EFileOpen_ShareAll);
+							File.f_Open(Path, NFile::EFileOpen_Read | NFile::EFileOpen_ShareAll);
 							FileData.f_SetLen(32);
 							File.f_Read(FileData.f_GetArray(), FileData.f_GetLen());
 
@@ -156,20 +154,13 @@ namespace NMib::NCloud
 		}
 	};
 
-	CKeyManagerServerDatabase_EncryptedFile::CKeyManagerServerDatabase_EncryptedFile
-		(
-			NStr::CStr const &_Path
-			, NStr::CStrSecure const &_Password
-			, NContainer::CSecureByteVector const &_Salt
-		)
+	CKeyManagerServerDatabase_EncryptedFile::CKeyManagerServerDatabase_EncryptedFile(NStr::CStr const &_Path, NStr::CStrSecure const &_Password, NContainer::CSecureByteVector const &_Salt)
 		: mp_pInternal(fg_Construct(_Path, _Password, _Salt))
 	{
-
 	}
 
 	CKeyManagerServerDatabase_EncryptedFile::~CKeyManagerServerDatabase_EncryptedFile()
 	{
-
 	}
 
 	NConcurrency::TCFuture<void> CKeyManagerServerDatabase_EncryptedFile::fp_Destroy()

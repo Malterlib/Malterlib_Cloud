@@ -9,7 +9,7 @@
 #include <Mib/File/File>
 
 #ifdef DPlatformFamily_Windows
-#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#	include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #endif
 
 #include "Malterlib_Cloud_VersionManager.h"
@@ -107,12 +107,7 @@ namespace NMib::NCloud
 		uint64 m_QueueSize = 0;
 	};
 
-	CVersionManagerHelper::CVersionManagerHelper
-		(
-			CStr const &_RootDirectory
-			, uint64 _QueueSize
-			, fp64 _Timeout
-		)
+	CVersionManagerHelper::CVersionManagerHelper(CStr const &_RootDirectory, uint64 _QueueSize, fp64 _Timeout)
 		: mp_pInternal(fg_Construct(_QueueSize, _Timeout, _RootDirectory))
 	{
 	}
@@ -152,7 +147,8 @@ namespace NMib::NCloud
 			, NStr::CStr _SourceTGZFile
 			, CVersionManager::CStartUploadVersion::EFlag _Flags
 			, uint64 _QueueSize
-		) const
+		)
+		const
 	{
 		auto CheckDestroy = co_await fg_CurrentActorCheckDestroyedOnResume();
 
@@ -182,8 +178,8 @@ namespace NMib::NCloud
 			NConcurrency::TCPromiseFuturePair<CFileTransferResult> Promise;
 			TransferResultFuture = fg_Move(Promise.m_Future);
 
-			StartUpload.m_fStartTransferDeprecated = g_ActorFunctor / [pState, Promise = fg_Move(Promise.m_Promise)](CVersionManager::CStartUploadTransferDeprecated _Params) mutable
-				-> TCFuture<CVersionManager::CStartUploadTransferDeprecated::CResult>
+			StartUpload.m_fStartTransferDeprecated = g_ActorFunctor / [pState, Promise = fg_Move(Promise.m_Promise)]
+				(CVersionManager::CStartUploadTransferDeprecated _Params) mutable -> TCFuture<CVersionManager::CStartUploadTransferDeprecated::CResult>
 				{
 					CVersionManager::CStartUploadTransferDeprecated::CResult Result;
 
@@ -227,9 +223,8 @@ namespace NMib::NCloud
 
 		auto Result = co_await
 			(
-				_VersionManager.f_CallActor(&CVersionManager::f_UploadVersion)(fg_Move(StartUpload))
-				.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
-				%"Failed to start upload on remote server"
+				_VersionManager.f_CallActor(&CVersionManager::f_UploadVersion)(fg_Move(StartUpload)).f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
+				% "Failed to start upload on remote server"
 			)
 		;
 
@@ -269,7 +264,8 @@ namespace NMib::NCloud
 			, CStr _DestinationDirectory
 			, CFileTransferReceive::EReceiveFlag _ReceiveFlags
 			, uint64 _QueueSize
-		) const
+		)
+		const
 	{
 		auto CheckDestroy = co_await fg_CurrentActorCheckDestroyedOnResume();
 
@@ -315,8 +311,7 @@ namespace NMib::NCloud
 		{
 			auto Result = co_await
 				(
-					_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
-					.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
+					_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload)).f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
 					% "Failed to start download on remote server"
 				)
 			;
@@ -358,8 +353,7 @@ namespace NMib::NCloud
 
 			auto Result = co_await
 				(
-					_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload))
-					.f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
+					_VersionManager.f_CallActor(&CVersionManager::f_DownloadVersion)(fg_Move(StartDownload)).f_Timeout(Internal.m_Timeout, "Timed out waiting for version manager to reply")
 					% "Failed to start download on remote server"
 				)
 			;

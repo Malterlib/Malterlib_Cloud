@@ -651,9 +651,7 @@ namespace NMib::NCloud::NCloudClient
 			if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 				continue;
 
-			_fGetResult(TrustedActor.m_Actor, SemanticID, Name, Tags).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-				> Secrets[TrustedActor.m_TrustInfo.m_HostInfo]
-			;
+			_fGetResult(TrustedActor.m_Actor, SemanticID, Name, Tags).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply") > Secrets[TrustedActor.m_TrustInfo.m_HostInfo];
 		}
 
 		TCMap<CHostInfo, TCAsyncResult<tf_CType>> Results = co_await fg_AllDoneWrapped(Secrets);
@@ -666,7 +664,8 @@ namespace NMib::NCloud::NCloudClient
 			if (!Result)
 			{
 				auto &HostInfo = Results.fs_GetKey(Result);
-				*_pCommandLine %= "{}Failed getting secrets for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting secrets for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -725,7 +724,8 @@ namespace NMib::NCloud::NCloudClient
 					, CStr const &_ExpectedFormat
 					, TCOptional<CStrSecure> const &_MapKey
 					, bool _bBinaryAsBase64
-				) -> CStr
+				)
+				-> CStr
 				{
 					for (auto &ID : _Result)
 						*_pCommandLine += "{}\n"_f << ID;
@@ -734,7 +734,6 @@ namespace NMib::NCloud::NCloudClient
 				}
 			)
 		;
-
 	}
 
 	NStr::CStr CCloudClientAppActor::fsp_SecretsManager_OutputSecret
@@ -788,11 +787,7 @@ namespace NMib::NCloud::NCloudClient
 		return {};
 	}
 
-	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID
-		(
-			CEJsonSorted const _Params
-			, TCSharedPointer<CCommandLineControl> _pCommandLine
-		)
+	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetSecretBySemanticID(CEJsonSorted const _Params, TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		return fp_CommandLine_SecretsManager_EnumerateImpl<CSecretsManager::CSecret>
 			(
@@ -815,7 +810,8 @@ namespace NMib::NCloud::NCloudClient
 					, CStr const &_ExpectedFormat
 					, TCOptional<CStrSecure> const &_MapKey
 					, bool _bBinaryAsBase64
-				) -> CStr
+				)
+				-> CStr
 				{
 					if (auto Error = fsp_SecretsManager_CheckExpectedFormat(_Secret, _ExpectedFormat, _bBinaryAsBase64, _MapKey))
 						return Error;
@@ -827,10 +823,9 @@ namespace NMib::NCloud::NCloudClient
 				}
 			)
 		;
-
 	}
 
-	template<typename tf_CType>
+	template <typename tf_CType>
 	TCFuture<uint32> CCloudClientAppActor::fp_CommandLine_SecretsManager_GetImpl
 		(
 			CEJsonSorted const _Params
@@ -881,9 +876,7 @@ namespace NMib::NCloud::NCloudClient
 			if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 				continue;
 
-			_fGetResult(TrustedActor.m_Actor, ID).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-				> Secrets[TrustedActor.m_TrustInfo.m_HostInfo]
-			;
+			_fGetResult(TrustedActor.m_Actor, ID).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply") > Secrets[TrustedActor.m_TrustInfo.m_HostInfo];
 		}
 
 		TCMap<CHostInfo, TCAsyncResult<tf_CType>> Results = co_await fg_AllDoneWrapped(Secrets);
@@ -895,7 +888,8 @@ namespace NMib::NCloud::NCloudClient
 			if (!Result)
 			{
 				auto &HostInfo = Results.fs_GetKey(Result);
-				*_pCommandLine %= "{}Failed getting secrets for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting secrets for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -938,7 +932,8 @@ namespace NMib::NCloud::NCloudClient
 					, CStr const &_ExpectedFormat
 					, TCOptional<CStrSecure> const &_MapKey
 					, bool _bBinaryAsBase64
-				) -> CStr
+				)
+				-> CStr
 				{
 					if (auto Error = fsp_SecretsManager_CheckExpectedFormat(_Secret, _ExpectedFormat, _bBinaryAsBase64, _MapKey))
 						return Error;
@@ -969,7 +964,8 @@ namespace NMib::NCloud::NCloudClient
 					, CStr const &_ExpectedFormat
 					, TCOptional<CStrSecure> const &_MapKey
 					, bool _bBinaryAsBase64
-				) -> CStr
+				)
+				-> CStr
 				{
 					if ((*_Result.m_Secret).f_GetTypeID() == CSecretsManager::ESecretType_File)
 						*_pCommandLine += "Secret (file):   {}\n"_f << *_Result.m_Secret;
@@ -1150,7 +1146,8 @@ namespace NMib::NCloud::NCloudClient
 		if (!pSecretsManager)
 			co_return DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error));
 
-		auto Result = co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_SetSecretProperties)(fg_Move(ID), fg_Move(Properties))
+		auto Result = co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_SetSecretProperties)
+			(fg_Move(ID), fg_Move(Properties))
 			.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 		;
 
@@ -1204,7 +1201,8 @@ namespace NMib::NCloud::NCloudClient
 		if (!pSecretsManager)
 			co_return DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error));
 
-		co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_ModifyTags)(fg_Move(ID), fg_Move(RemoveTags), fg_Move(AddTags))
+		co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_ModifyTags)
+			(fg_Move(ID), fg_Move(RemoveTags), fg_Move(AddTags))
 			.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
 		;
 
@@ -1261,9 +1259,7 @@ namespace NMib::NCloud::NCloudClient
 		if (!pSecretsManager)
 			co_return DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error));
 
-		co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_RemoveMetadata)(fg_Move(ID), Key)
-			.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-		;
+		co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_RemoveMetadata)(fg_Move(ID), Key).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply");
 
 		co_return 0;
 	}
@@ -1285,9 +1281,7 @@ namespace NMib::NCloud::NCloudClient
 		if (!pSecretsManager)
 			co_return DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error));
 
-		co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_RemoveSecret)(fg_Move(ID))
-			.f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply")
-		;
+		co_await pSecretsManager->m_Actor.f_CallActor(&CSecretsManager::f_RemoveSecret)(fg_Move(ID)).f_Timeout(mp_Timeout, "Timed out waiting for secrets manager to reply");
 
 		co_return 0;
 	}
@@ -1330,16 +1324,9 @@ namespace NMib::NCloud::NCloudClient
 		if (!pSecretsManager)
 			co_return DMibErrorInstance(fg_Format("Error selecting secrets manager: {}. Connection might have failed. Use --log-to-stderr to see more info.", Error));
 
-		CDirectorySyncSend::CSyncResult	Result = co_await
+		CDirectorySyncSend::CSyncResult Result = co_await
 			(
-				NCloud::fg_UploadSecretFile
-				(
-					pSecretsManager->m_Actor
-					, mp_State.m_DistributionManager
-					, fg_Move(ID)
-					, CDirectorySyncSend::CConfig(Filename)
-					, fg_Reference(mp_UploadSubscription)
-				)
+				NCloud::fg_UploadSecretFile(pSecretsManager->m_Actor, mp_State.m_DistributionManager, fg_Move(ID), CDirectorySyncSend::CConfig(Filename), fg_Reference(mp_UploadSubscription))
 				% "Failed to transfer secret file"
 			)
 		;
@@ -1349,12 +1336,12 @@ namespace NMib::NCloud::NCloudClient
 				*_pCommandLine += "All files were already up to date\n";
 			else
 			{
-				*_pCommandLine +=
-					"Upload finished transferring: {ns } incoming bytes at {fe2} MB/s {ns } outgoing bytes at {fe2} MB/s\n"_f
+				*_pCommandLine
+					+= "Upload finished transferring: {ns } incoming bytes at {fe2} MB/s {ns } outgoing bytes at {fe2} MB/s\n"_f
 					<< Result.m_Stats.m_IncomingBytes
-					<< Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+					<< Result.m_Stats.f_IncomingBytesPerSecond() / 1'000'000.0
 					<< Result.m_Stats.m_OutgoingBytes
-					<< Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
+					<< Result.m_Stats.f_OutgoingBytesPerSecond() / 1'000'000.0
 				;
 			}
 		}
@@ -1404,8 +1391,7 @@ namespace NMib::NCloud::NCloudClient
 
 		NFile::CDirectorySyncReceive::CSyncResult Result = co_await
 			(
-				fg_DownloadSecretFile(pSecretsManager->m_Actor, fg_Move(ID), CDirectorySyncReceive::CConfig(Destination, Flags))
-				% "Failed to transfer secret file"
+				fg_DownloadSecretFile(pSecretsManager->m_Actor, fg_Move(ID), CDirectorySyncReceive::CConfig(Destination, Flags)) % "Failed to transfer secret file"
 			)
 		;
 
@@ -1415,12 +1401,12 @@ namespace NMib::NCloud::NCloudClient
 				*_pCommandLine += "All files were already up to date\n";
 			else
 			{
-				*_pCommandLine +=
-					"Download finished transferring: {ns } incoming bytes at {fe2} MB/s {ns } outgoing bytes at {fe2} MB/s\n"_f
+				*_pCommandLine
+					+= "Download finished transferring: {ns } incoming bytes at {fe2} MB/s {ns } outgoing bytes at {fe2} MB/s\n"_f
 					<< Result.m_Stats.m_IncomingBytes
-					<< Result.m_Stats.f_IncomingBytesPerSecond()/1'000'000.0
+					<< Result.m_Stats.f_IncomingBytesPerSecond() / 1'000'000.0
 					<< Result.m_Stats.m_OutgoingBytes
-					<< Result.m_Stats.f_OutgoingBytesPerSecond()/1'000'000.0
+					<< Result.m_Stats.f_OutgoingBytesPerSecond() / 1'000'000.0
 				;
 			}
 		}

@@ -28,17 +28,17 @@ namespace NMib::NCloud::NAppManager
 		OutApplication.m_VersionInfo = _Application.m_LastInstalledVersionInfo;
 
 		if
+		(
+			fp_VersionIsNewer
 			(
-				fp_VersionIsNewer
-				(
-					_Application.m_LastTriedInstalledVersion
-					, _Application.m_LastTriedInstalledVersionInfo
-					, OutApplication.m_Version
-					, OutApplication.m_VersionInfo
-					, _Application.m_Settings.m_UpdateTags
-					, _Application.m_Settings.m_UpdateBranches
-				)
+				_Application.m_LastTriedInstalledVersion
+				, _Application.m_LastTriedInstalledVersionInfo
+				, OutApplication.m_Version
+				, OutApplication.m_VersionInfo
+				, _Application.m_Settings.m_UpdateTags
+				, _Application.m_Settings.m_UpdateBranches
 			)
+		)
 		{
 			OutApplication.m_FailedVersion = _Application.m_LastTriedInstalledVersion;
 			OutApplication.m_FailedVersionInfo = _Application.m_LastTriedInstalledVersionInfo;
@@ -103,8 +103,10 @@ namespace NMib::NCloud::NAppManager
 		{
 			auto &Application = *pApplication;
 
-			Permissions[Application.m_Name]
-				= {CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", Application.m_Name)}.f_Description("Access application {} in AppManager"_f << Application.m_Name)}
+			Permissions[Application.m_Name] =
+				{
+					CPermissionQuery{"AppManager/AppAll", fg_Format("AppManager/App/{}", Application.m_Name)}.f_Description("Access application {} in AppManager"_f << Application.m_Name)
+				}
 			;
 		}
 
@@ -343,8 +345,11 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_ListAvailableVersions(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		bool bVerbose = _Params["Verbose"].f_Boolean();
-		CAppManagerInterface::CVersionsAvailableForUpdate Results = co_await
-			mp_AppManagerInterface.m_Actor(&CAppManagerInterfaceImplementation::f_GetAvailableVersions, _Params["Application"].f_String())
+		CAppManagerInterface::CVersionsAvailableForUpdate Results = co_await mp_AppManagerInterface.m_Actor
+			(
+				&CAppManagerInterfaceImplementation::f_GetAvailableVersions
+				, _Params["Application"].f_String()
+			)
 		;
 
 		{
@@ -416,7 +421,7 @@ namespace NMib::NCloud::NAppManager
 	TCFuture<uint32> CAppManagerActor::fp_CommandLine_CloudManagerList(CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		CTableRenderHelper TableRenderer = _pCommandLine->f_TableRenderer();
-		auto AnsiEncoding= _pCommandLine->f_AnsiEncoding();
+		auto AnsiEncoding = _pCommandLine->f_AnsiEncoding();
 		TableRenderer.f_AddHeadings("Host");
 		TableRenderer.f_SetOptions(CTableRenderHelper::EOption_Rounded | CTableRenderHelper::EOption_AvoidRowSeparators);
 

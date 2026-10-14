@@ -81,8 +81,8 @@ namespace NMib::NCloud
 	{
 		NConcurrency::TCActor<ICKeyManagerServerDatabase> m_DatabaseActor;
 		NConcurrency::TCActor<NConcurrency::CDistributedActorTrustManager> m_TrustManager;
-		NFunction::TCFunctionMovable<NConcurrency::CDistributedAppAuditor (NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> m_fAuditorFactory
-			= [](NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category) -> NConcurrency::CDistributedAppAuditor
+		NFunction::TCFunctionMovable<NConcurrency::CDistributedAppAuditor (NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category)> m_fAuditorFactory = []
+			(NConcurrency::CCallingHostInfo const &_CallingHostInfo, NStr::CStr const &_Category) -> NConcurrency::CDistributedAppAuditor
 			{
 				return NConcurrency::CDistributedAppAuditor({}, _CallingHostInfo, _Category);
 			}
@@ -127,7 +127,7 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_KeyManagerServer.hpp"

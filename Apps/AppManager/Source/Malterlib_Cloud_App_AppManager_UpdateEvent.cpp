@@ -23,8 +23,7 @@ namespace NMib::NCloud::NAppManager
 
 		bool bHasPermission = co_await
 			(
-				pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", Permissions)
-				% "Permission denied subscribing to update notifications" % Auditor
+				pThis->mp_Permissions.f_HasPermission("Subscribe to update notifications", Permissions) % "Permission denied subscribing to update notifications" % Auditor
 			)
 		;
 		if (!bHasPermission)
@@ -152,15 +151,21 @@ namespace NMib::NCloud::NAppManager
 
 			CStr AppPermission = fg_Format("AppManager/App/{}", _Notification.m_Application);
 
-			bool bHasPermission = co_await mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, pSubscription->m_CallingHostInfo)
-				.f_Timeout(60.0, "Timed out waiting for permission in OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+			bool bHasPermission = co_await mp_Permissions.f_HasPermission("AppManager Update Event", {"AppManager/AppAll", AppPermission}, pSubscription->m_CallingHostInfo).f_Timeout
+				(
+					60.0
+					, "Timed out waiting for permission in OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID()
+				)
 			;
 
 			if (!bHasPermission)
 				co_return {};
 
-			OnUpdateFuture = pSubscription->m_fOnUpdate(fg_Move(_Notification))
-				.f_Timeout(60.0, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID())
+			OnUpdateFuture = pSubscription->m_fOnUpdate(fg_Move(_Notification)).f_Timeout
+				(
+					60.0
+					, "Timed out waiting for OnUpdate callback to {}"_f << pSubscription->m_CallingHostInfo.f_GetRealHostID()
+				)
 			;
 		}
 
@@ -189,27 +194,12 @@ namespace NMib::NCloud::NAppManager
 		auto Result = co_await fg_AllDone(OnUpdateResultsVector).f_Wrap();
 
 		if (!Result)
-		{
-			DMibLogWithCategory
-				(
-					Malterlib/Cloud/AppManager
-					, Warning
-					, "Failed to send update notification: {}"
-					, Result.f_GetExceptionStr()
-				)
-			;
-		}
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Failed to send update notification: {}", Result.f_GetExceptionStr());
 
 		co_return {};
 	}
 
-
-	TCFuture<void> CAppManagerActor::fp_OnUpdateEvent
-		(
-			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
-			, EUpdateStage _Stage
-			, NStr::CStr _Message
-		)
+	TCFuture<void> CAppManagerActor::fp_OnUpdateEvent(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState, EUpdateStage _Stage, NStr::CStr _Message)
 	{
 		auto &Application = *_pState->m_pApplication;
 
@@ -254,7 +244,7 @@ namespace NMib::NCloud::NAppManager
 							(
 								_pState
 								, EUpdateStage::EUpdateStage_None
-								, 10.0*60.0
+								, 10.0 * 60.0
 								, EWaitStageFlag_IgnoreFailed | EWaitStageFlag_DisallowInProgressStates
 								, TCFunctionMutable<bool ()>{}
 							)
@@ -271,7 +261,7 @@ namespace NMib::NCloud::NAppManager
 								(
 									_pState
 									, EUpdateStage::EUpdateStage_StopOldApp
-									, 30.0*60.0
+									, 30.0 * 60.0
 									, EWaitStageFlag_None
 									, TCFunctionMutable<bool ()>{}
 								)
@@ -311,9 +301,7 @@ namespace NMib::NCloud::NAppManager
 			{
 				bUpdatedAppInfo = true;
 				if (Application.m_LastFailedInstalledVersionFailureStage != Application.m_UpdateStage)
-				{
 					Application.m_LastFailedInstalledVersionFailureStage = Application.m_UpdateStage;
-				}
 				if (Application.m_UpdateStage > EUpdateStage::EUpdateStage_DownloadVersion)
 				{
 					Application.m_LastFailedInstalledVersion = _pState->m_VersionID;

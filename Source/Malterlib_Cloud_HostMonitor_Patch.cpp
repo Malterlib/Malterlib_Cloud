@@ -57,7 +57,8 @@ namespace NMib::NCloud
 						co_return fg_Move(WriteTransaction);
 					}
 				)
-				.f_Wrap() > LogError("Error saving patch state to database")
+				.f_Wrap()
+				> LogError("Error saving patch state to database")
 			;
 		}
 

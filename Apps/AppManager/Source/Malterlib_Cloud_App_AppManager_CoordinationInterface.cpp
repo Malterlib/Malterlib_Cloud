@@ -61,7 +61,6 @@ namespace NMib::NCloud::NAppManager
 	}
 	DMibDistributedStreamImplement(CAppManagerCoordinationInterface::CAppChange_Update);
 
-
 	template <typename tf_CStream>
 	void CAppManagerCoordinationInterface::CAppChange_AddKnownHosts::f_Stream(tf_CStream &_Stream)
 	{

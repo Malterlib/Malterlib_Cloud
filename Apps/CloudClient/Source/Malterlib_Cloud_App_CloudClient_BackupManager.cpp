@@ -66,7 +66,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Default"_o= ""
 							, "Description"_o= "The backup source to list backups for.\n"
-								"If left empty backups will be listed for all sources you have access to.\n"
+							"If left empty backups will be listed for all sources you have access to.\n"
 						}
 					}
 				}
@@ -82,7 +82,7 @@ namespace NMib::NCloud::NCloudClient
 				{
 					"Names"_o= _o["--backup-manager-download-backup"]
 					, "Description"_o= "Download a backup from remote backup manager.\n"
-						"If a backup already exists the download will be resumed or ammended with the latest changes. Only appended files such as oplogs are supported.\n"
+					"If a backup already exists the download will be resumed or ammended with the latest changes. Only appended files such as oplogs are supported.\n"
 					, "Options"_o=
 					{
 						"BackupHost?"_o=
@@ -136,7 +136,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Default"_o= NTime::CTime{}
 							, "Description"_o= "The time of the backup to download.\n"
-								"Leave as default to download the latest backup.\n"
+							"Leave as default to download the latest backup.\n"
 						}
 					}
 				}
@@ -190,8 +190,7 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 
 			auto &BackupManager = TrustedBackupManager.m_Actor;
-			BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)()
-				.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
+			BackupManager.f_CallActor(&CBackupManager::f_ListBackupSources)().f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
 				> BackupSources[TrustedBackupManager.m_TrustInfo.m_HostInfo]
 			;
 		}
@@ -207,7 +206,8 @@ namespace NMib::NCloud::NCloudClient
 			auto &HostInfo = Results.fs_GetKey(Result);
 			if (!Result)
 			{
-				*_pCommandLine %= "{}Failed getting backup sources for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting backup sources for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -243,8 +243,7 @@ namespace NMib::NCloud::NCloudClient
 			if (!BackupHost.f_IsEmpty() && TrustedBackupManager.m_TrustInfo.m_HostInfo.m_HostID != BackupHost)
 				continue;
 			auto &BackupManager = TrustedBackupManager.m_Actor;
-			BackupManager.f_CallActor(&CBackupManager::f_ListBackups)(BackupSource)
-				.f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
+			BackupManager.f_CallActor(&CBackupManager::f_ListBackups)(BackupSource).f_Timeout(mp_Timeout, "Timed out waiting for backup manager to reply")
 				> Backups[TrustedBackupManager.m_TrustInfo.m_HostInfo]
 			;
 		}
@@ -260,7 +259,8 @@ namespace NMib::NCloud::NCloudClient
 			auto &HostInfo = Results.fs_GetKey(Result);
 			if (!Result)
 			{
-				*_pCommandLine %= "{}Failed getting backups for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting backups for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -306,8 +306,8 @@ namespace NMib::NCloud::NCloudClient
 		if (auto *pValue = _Params.f_GetMember("Destination"))
 			Destination = CFile::fs_GetExpandedPath(pValue->f_String(), _Params["CurrentDirectory"].f_String());
 		uint64 QueueSize = _Params["BackupQueueSize"].f_Integer();
-		if (QueueSize < 128*1024)
-			QueueSize = 128*1024;
+		if (QueueSize < 128 * 1024)
+			QueueSize = 128 * 1024;
 
 		bool bSetOwner = _Params["SetOwner"].f_Boolean();
 		bool bFindClosestSnapshot = _Params["FindClosestSnapshot"].f_Boolean();
@@ -365,15 +365,7 @@ namespace NMib::NCloud::NCloudClient
 
 		CDirectorySyncReceive::CSyncResult Result = co_await
 			(
-				fg_DownloadBackup
-				(
-					pBackupManager->m_Actor
-					, BackupSource
-					, BackupTime
-					, fg_Move(Config)
-					, fg_Reference(mp_DownloadBackupSubscription)
-				)
-				% "Failed to download backup"
+				fg_DownloadBackup(pBackupManager->m_Actor, BackupSource, BackupTime, fg_Move(Config), fg_Reference(mp_DownloadBackupSubscription)) % "Failed to download backup"
 			)
 		;
 
@@ -381,7 +373,8 @@ namespace NMib::NCloud::NCloudClient
 			*_pCommandLine += "All files were already up to date\n";
 		else
 		{
-			*_pCommandLine += "Download of {} files finished transferring: {ns } incoming bytes at {fe2} MB/s    {ns } outgoing bytes at {fe2} MB/s\n"_f
+			*_pCommandLine
+				+= "Download of {} files finished transferring: {ns } incoming bytes at {fe2} MB/s    {ns } outgoing bytes at {fe2} MB/s\n"_f
 				<< Result.m_Stats.m_nSyncedFiles
 				<< Result.m_Stats.m_IncomingBytes
 				<< Result.m_Stats.f_IncomingBytesPerSecond() / 1'000'000.0

@@ -67,9 +67,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				{
 					CVersionManager::CListVersions Params;
 					Params.m_ForApplication = _Application;
-					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-						.f_Timeout(g_Timeout, "Timed out waiting for ListVersions")
-					;
+					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
 				}
 			;
 
@@ -270,23 +268,13 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				{
 					CVersionManager::CListVersions Params;
 					Params.m_ForApplication = _Application;
-					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-						.f_Timeout(g_Timeout, "Timed out waiting for ListVersions")
-					;
+					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
 				}
 			;
 
 			auto fUploadVersion = [&](CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _VersionInfo) -> TCFuture<CVersionManagerHelper::CUploadResult>
 				{
-					co_return co_await State.m_VersionManagerHelper.f_Upload
-						(
-							State.m_VersionManager
-							, "TestApp"
-							, _VersionID
-							, _VersionInfo
-							, State.m_TestAppArchive
-						)
-					;
+					co_return co_await State.m_VersionManagerHelper.f_Upload(State.m_VersionManager, "TestApp", _VersionID, _VersionInfo, State.m_TestAppArchive);
 				}
 			;
 
@@ -432,15 +420,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 
 			auto fUploadVersion = [&](CVersionManager::CVersionIDAndPlatform _VersionID, CVersionManager::CVersionInformation _VersionInfo) -> TCFuture<CVersionManagerHelper::CUploadResult>
 				{
-					co_return co_await State.m_VersionManagerHelper.f_Upload
-						(
-							State.m_VersionManager
-							, "TestApp"
-							, _VersionID
-							, _VersionInfo
-							, State.m_TestAppArchive
-						)
-					;
+					co_return co_await State.m_VersionManagerHelper.f_Upload(State.m_VersionManager, "TestApp", _VersionID, _VersionInfo, State.m_TestAppArchive);
 				}
 			;
 
@@ -527,9 +507,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				{
 					CVersionManager::CListVersions Params;
 					Params.m_ForApplication = _Application;
-					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-						.f_Timeout(g_Timeout, "Timed out waiting for ListVersions")
-					;
+					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
 				}
 			;
 
@@ -667,9 +645,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 					Params.m_Platform = _VersionID.m_Platform;
 					Params.m_AddTags = _AddTags;
 					Params.m_RemoveTags = _RemoveTags;
-					co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(Params))
-						.f_Timeout(g_Timeout, "Timed out waiting for ChangeTags")
-					;
+					co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(Params)).f_Timeout(g_Timeout, "Timed out waiting for ChangeTags");
 					co_return {};
 				}
 			;
@@ -678,9 +654,7 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				{
 					CVersionManager::CListVersions Params;
 					Params.m_ForApplication = _Application;
-					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-						.f_Timeout(g_Timeout, "Timed out waiting for ListVersions")
-					;
+					co_return co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out waiting for ListVersions");
 				}
 			;
 
@@ -796,7 +770,8 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 				SubscribeParams.m_Application = "TestApp";
 				SubscribeParams.m_nInitial = 0; // Don't send existing versions
 
-				SubscribeParams.m_fOnNewVersions = g_ActorFunctor / [&](CVersionManager::CNewVersionNotifications _Notifications) -> TCFuture<CVersionManager::CNewVersionNotifications::CResult>
+				SubscribeParams.m_fOnNewVersions = g_ActorFunctor / [&]
+					(CVersionManager::CNewVersionNotifications _Notifications) -> TCFuture<CVersionManager::CNewVersionNotifications::CResult>
 					{
 						for (auto &Notification : _Notifications.m_NewVersions)
 							ReceivedNotifications.f_InsertLast(Notification);
@@ -811,7 +786,8 @@ struct CVersionManager_Refresh_Tests : public NMib::NTest::CTest
 					}
 				;
 
-				auto SubscribeResult = co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_SubscribeToUpdates)(fg_Move(SubscribeParams))
+				auto SubscribeResult = co_await State.m_VersionManager.f_CallActor(&CVersionManager::f_SubscribeToUpdates)
+					(fg_Move(SubscribeParams))
 					.f_Timeout(g_Timeout, "Timed out waiting for SubscribeToUpdates")
 				;
 

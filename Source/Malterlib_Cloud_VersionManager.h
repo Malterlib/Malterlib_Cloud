@@ -25,16 +25,16 @@ namespace NMib::NCloud
 
 		enum : uint32
 		{
-			EProtocolVersion_Min = 0x103
-			, EProtocolVersion_SupportSubscribeToTags = 0x104
-			, EProtocolVersion_SupportIncreaseRetrySequence = 0x105
-			, EProtocolVersion_RefactorToActorFunctorsUploadDownload = 0x106
+			EProtocolVersion_Min                                       = 0x103
+			, EProtocolVersion_SupportSubscribeToTags                  = 0x104
+			, EProtocolVersion_SupportIncreaseRetrySequence            = 0x105
+			, EProtocolVersion_RefactorToActorFunctorsUploadDownload   = 0x106
 			, EProtocolVersion_RefactorToActorFunctorsSubscribeChanges = 0x107
-			, EProtocolVersion_RenamePlatforms = 0x108
-			, EProtocolVersion_AsyncGeneratorFileTransfer = 0x109
-			, EProtocolVersion_SupportSymlinks = 0x110
-			, EProtocolVersion_SupportOriginID = 0x111
-			, EProtocolVersion_Current = 0x111
+			, EProtocolVersion_RenamePlatforms                         = 0x108
+			, EProtocolVersion_AsyncGeneratorFileTransfer              = 0x109
+			, EProtocolVersion_SupportSymlinks                         = 0x110
+			, EProtocolVersion_SupportOriginID                         = 0x111
+			, EProtocolVersion_Current                                 = 0x111
 		};
 
 		struct CVersionID : public CCloudVersion
@@ -190,7 +190,7 @@ namespace NMib::NCloud
 
 			enum EFlag
 			{
-				EFlag_None = 0
+				EFlag_None             = 0
 				, EFlag_ForceOverwrite = DMibBit(0)
 			};
 
@@ -202,10 +202,7 @@ namespace NMib::NCloud
 			CVersionInformation m_VersionInfo;
 			uint64 m_QueueSize = NFile::gc_IdealNetworkQueueSize;
 			EFlag m_Flags = EFlag_None;
-			NStorage::TCOptional
-				<
-					NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CStartUploadTransferDeprecated::CResult> (CStartUploadTransferDeprecated _Params)>
-				>
+			NStorage::TCOptional<NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CStartUploadTransferDeprecated::CResult> (CStartUploadTransferDeprecated _Params)>>
 				m_fStartTransferDeprecated
 			;
 			NStorage::TCOptional<NConcurrency::TCAsyncGeneratorWithID<CDownloadFile>> m_FilesGenerator;
@@ -274,9 +271,9 @@ namespace NMib::NCloud
 			template <typename tf_CStream>
 			void f_Stream(tf_CStream &_Stream);
 
-			NStr::CStr m_Application; /// Leave empty to subscribe to all applications
+			NStr::CStr m_Application;                  /// Leave empty to subscribe to all applications
 			NContainer::TCSet<NStr::CStr> m_Platforms; /// Leave empty to subscribe to all platforms
-			NContainer::TCSet<NStr::CStr> m_Tags; /// Leave empty to subscribe to all tags
+			NContainer::TCSet<NStr::CStr> m_Tags;      /// Leave empty to subscribe to all tags
 			NConcurrency::TCActorFunctorWithID<NConcurrency::TCFuture<CNewVersionNotifications::CResult> (CNewVersionNotifications _VersionInfo)> m_fOnNewVersions;
 			uint32 m_nInitial = 10;
 		};
@@ -323,13 +320,7 @@ namespace NMib::NCloud
 
 	struct CVersionManagerHelper
 	{
-		CVersionManagerHelper
-			(
-				NStr::CStr const &_RootDirectory
-				, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize
-				, fp64 _Timeout = 30.0
-			)
-		;
+		CVersionManagerHelper(NStr::CStr const &_RootDirectory, uint64 _QueueSize = NFile::gc_IdealNetworkQueueSize, fp64 _Timeout = 30.0);
 		~CVersionManagerHelper();
 
 		CVersionManagerHelper(CVersionManagerHelper const &);
@@ -358,7 +349,8 @@ namespace NMib::NCloud
 				, NStr::CStr _SourceTGZFile
 				, CVersionManager::CStartUploadVersion::EFlag _Flags = CVersionManager::CStartUploadVersion::EFlag_None
 				, uint64 _QueueSize = 0
-			) const
+			)
+			const
 		;
 
 		NConcurrency::TCUnsafeFuture<CFileTransferResult> f_Download
@@ -369,7 +361,8 @@ namespace NMib::NCloud
 				, NStr::CStr _DestinationDirectory
 				, CFileTransferReceive::EReceiveFlag _ReceiveFlags = CFileTransferReceive::EReceiveFlag_IgnoreExisting
 				, uint64 _QueueSize = 0
-			) const
+			)
+			const
 		;
 
 		NConcurrency::TCUnsafeFuture<CPackageInfo> f_CreatePackage(NStr::CStr _SourceDirectory, NStr::CStr _DestinationFileName, uint32 _CompressionLevel) const;
@@ -382,7 +375,7 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif
 
 #include "Malterlib_Cloud_VersionManager.hpp"

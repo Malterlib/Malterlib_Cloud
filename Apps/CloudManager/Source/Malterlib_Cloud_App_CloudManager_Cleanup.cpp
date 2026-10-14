@@ -13,10 +13,10 @@ namespace NMib::NCloud::NCloudManager
 
 	namespace
 	{
-		constexpr static auto gc_YieldInterval = 50_ms;
-		constexpr static auto gc_MaxRunTime = 10_seconds;
-		constexpr static auto gc_LogStatsInterval = 60_seconds;
-		constexpr static auto gc_FreedPagesLimit = 10000;
+		static constexpr auto gc_YieldInterval = 50_ms;
+		static constexpr auto gc_MaxRunTime = 10_seconds;
+		static constexpr auto gc_LogStatsInterval = 60_seconds;
+		static constexpr auto gc_FreedPagesLimit = 10000;
 	}
 
 	TCFuture<void> CCloudManagerServer::fp_PerformCleanup()
@@ -92,7 +92,7 @@ namespace NMib::NCloud::NCloudManager
 			return;
 
 		mp_bLoggedStart = true;
-		DMibLogWithCategory(CloudManagerDatabase, Info, "Starting database cleanup{}",  m_bForcedCompaction ? " (Compaction)" : "");
+		DMibLogWithCategory(CloudManagerDatabase, Info, "Starting database cleanup{}", m_bForcedCompaction ? " (Compaction)" : "");
 	}
 
 	void CCloudManagerServer::CCleanupState::f_Log(bool _bProgress)
@@ -124,7 +124,6 @@ namespace NMib::NCloud::NCloudManager
 				, mp_nDatabaseYields
 			)
 		;
-
 	}
 
 	void CCloudManagerServer::CCleanupState::f_Initialize(NDatabase::CDatabaseActor::CTransactionWrite &_WriteTransaction)
@@ -150,15 +149,8 @@ namespace NMib::NCloud::NCloudManager
 	{
 		co_return co_await
 			(
-				g_Dispatch(_WriteTransaction.f_Checkout())
-				/
-				[
-					AppLogStore = mp_AppLogStore
-					, AppSensorStore = mp_AppSensorStore
-					, pState = fg_Move(_pState)
-					, WriteTransaction = fg_Move(_WriteTransaction)
-					, RetentionDays = mp_RetentionDays
-				]
+				g_Dispatch(_WriteTransaction.f_Checkout()) /
+				[AppLogStore = mp_AppLogStore, AppSensorStore = mp_AppSensorStore, pState = fg_Move(_pState), WriteTransaction = fg_Move(_WriteTransaction), RetentionDays = mp_RetentionDays]
 				() mutable -> TCFuture<CCleanupDatabaseResult>
 				{
 					auto &State = *pState;

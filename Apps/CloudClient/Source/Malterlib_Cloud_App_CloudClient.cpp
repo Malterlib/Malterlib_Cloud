@@ -13,8 +13,7 @@ namespace NMib::NCloud::NCloudClient
 	CCloudClientAppActor::CCloudClientAppActor()
 		: CDistributedAppActor
 		{
-			CDistributedAppActor_Settings{"MalterlibCloud"}
-			.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_All & ~EDefaultCommandLineFunctionality_Sensor)
+			CDistributedAppActor_Settings{"MalterlibCloud"}.f_DefaultCommandLineFunctionalies(EDefaultCommandLineFunctionality_All & ~EDefaultCommandLineFunctionality_Sensor)
 		}
 		, mp_VersionManagerHelper(mp_State.m_RootDirectory)
 		, mp_DebugManagerHelper(mp_State.m_RootDirectory)
@@ -88,7 +87,6 @@ namespace NMib::NCloud::NCloudClient
 	{
 		mp_Timeout = _Params["Timeout"].f_Float();
 	}
-
 }
 namespace NMib::NCloud
 {

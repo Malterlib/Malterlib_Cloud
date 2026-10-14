@@ -107,7 +107,8 @@ namespace NMib::NCloud::NDebugManager
 		{
 			return tf_CTo
 				{
-					.m_AssetType = _Value.m_AssetType
+					.m_AssetType
+					= _Value.m_AssetType
 					? NStorage::TCOptional<CDebugDatabase::EAssetType>(fg_ConvertToDebugDatabase<CDebugDatabase::EAssetType>(*_Value.m_AssetType))
 					: NStorage::TCOptional<CDebugDatabase::EAssetType>()
 					, .m_BuildID = fg_Move(_Value.m_BuildID)

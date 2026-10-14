@@ -16,8 +16,8 @@ namespace NMib::NCloud
 		{
 			NConcurrency::TCFuture<CSymmetricKey> f_RequestKey(NStr::CStr _Identifier, uint32 _KeySize) override;
 			auto f_GetServerSyncInterface(NConcurrency::TCActorSubscriptionWithID<> _Subscription)
-				-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>>
-			override;
+				-> NConcurrency::TCFuture<NConcurrency::TCDistributedActorInterfaceWithID<CKeyManagerServerSync>> override
+			;
 
 			DMibDelegatedActorImplementation(CKeyManagerServer);
 		};

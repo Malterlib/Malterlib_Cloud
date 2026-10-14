@@ -168,7 +168,7 @@ namespace NMib::NCloud
 	{
 		_Stream % m_ID;
 		_Stream % m_QueueSize;
-		_Stream % m_Flags ;
+		_Stream % m_Flags;
 		_Stream % fg_Move(m_FilesGenerator);
 		_Stream % m_Metadata;
 		_Stream % m_ExceptionInfo;

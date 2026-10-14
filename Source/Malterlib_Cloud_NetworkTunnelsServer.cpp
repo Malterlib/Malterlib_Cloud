@@ -206,8 +206,7 @@ namespace NMib::NCloud
 					}
 				;
 
-				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy]
-					(CSharedByteVector _Message) -> TCFuture<void>
+				SocketCallbacks.m_fOnReceiveData = g_ActorFunctor / [pThis = m_pThis, ConnectionID, AllowDestroy = g_AllowWrongThreadDestroy](CSharedByteVector _Message) -> TCFuture<void>
 					{
 						auto &Internal = *pThis->mp_pInternal;
 
@@ -390,13 +389,7 @@ namespace NMib::NCloud
 		co_return {};
 	}
 
-	TCFuture<CActorSubscription> CNetworkTunnelsServer::f_PublishNetworkTunnel
-		(
-			ICNetworkTunnels::CNetworkTunnelName _Name
-			, CStr _Host
-			, uint16 _Port
-			, CEJsonSorted _Metadata
-		)
+	TCFuture<CActorSubscription> CNetworkTunnelsServer::f_PublishNetworkTunnel(ICNetworkTunnels::CNetworkTunnelName _Name, CStr _Host, uint16 _Port, CEJsonSorted _Metadata)
 	{
 		auto &Internal = *mp_pInternal;
 
@@ -424,7 +417,7 @@ namespace NMib::NCloud
 				{
 					auto &Internal = *mp_pInternal;
 					co_await Internal.m_TrustManager(&CDistributedActorTrustManager::f_UnregisterPermissions, fg_Move(Permissions)).f_Wrap()
-						> fg_LogWarning("NetworkTunnelsServer", "Failed to desroy network tunnel publication");
+						> fg_LogWarning("NetworkTunnelsServer", "Failed to desroy network tunnel publication")
 					;
 					Internal.m_NetworkTunnels.f_Remove(_Name);
 

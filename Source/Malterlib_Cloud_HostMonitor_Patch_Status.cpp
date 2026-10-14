@@ -17,7 +17,7 @@ namespace NMib::NCloud
 #ifndef DPlatformFamily_Linux
 		co_return false;
 #else
-		constexpr static CStr c_NeedRestartExecutable = gc_Str<"/usr/sbin/needrestart">;
+		static constexpr CStr c_NeedRestartExecutable = gc_Str<"/usr/sbin/needrestart">;
 
 		auto BlockingActorCheckout = fg_BlockingActor();
 		auto [bHasCheckNeedRestart, bReebootRequired] = co_await
@@ -26,7 +26,7 @@ namespace NMib::NCloud
 				{
 					auto CaptureExceptions = co_await (g_CaptureExceptions.f_Specific<NFile::CExceptionFile>() % "Failed to read the patch status from file");
 
-					constexpr static CStr c_RebootRequiredFile = gc_Str<"/var/run/reboot-required">;
+					static constexpr CStr c_RebootRequiredFile = gc_Str<"/var/run/reboot-required">;
 
 					co_return
 						{
@@ -140,10 +140,10 @@ namespace NMib::NCloud
 		auto PatchesNeeded = co_await f_Patch_PatchesNeeded();
 
 		if
-			(
-				(PatchesNeeded.m_nSecurityPatches && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_SecurityUpdates))
-				|| (PatchesNeeded.m_nNormalPatches && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_NormalUpdates))
-			)
+		(
+			(PatchesNeeded.m_nSecurityPatches && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_SecurityUpdates))
+			|| (PatchesNeeded.m_nNormalPatches && fg_IsSet(m_Config.m_AutomaticUpdateFlags, EAutomaticUpdatesFlag::mc_NormalUpdates))
+		)
 		{
 			co_await f_Patch_InstallPatches().f_Wrap() > LogError("Failed to install patches automatically (OS patch status)");
 

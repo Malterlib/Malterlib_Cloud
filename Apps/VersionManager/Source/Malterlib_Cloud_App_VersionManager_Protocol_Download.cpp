@@ -49,13 +49,7 @@ namespace NMib::NCloud::NVersionManager
 
 		NContainer::TCVector<NStr::CStr> Permissions = {"Application/ReadAll", "Application/Read/{}"_f << pParams->m_Application};
 
-		bool bHasPermission = co_await
-			(
-				pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", Permissions)
-				% "Permission denied downloading version"
-				% Auditor
-			)
-		;
+		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Download version from VersionManager", Permissions) % "Permission denied downloading version" % Auditor);
 
 		if (!bHasPermission)
 			co_return Auditor.f_AccessDenied("(Start download version)", Permissions);
@@ -120,16 +114,7 @@ namespace NMib::NCloud::NVersionManager
 						CStr Message;
 						Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
 
-						Auditor.f_Info
-							(
-								fg_Format
-								(
-									"'{}' Version download finished transferring: {}"
-									, Desc
-									, Message
-								)
-							)
-						;
+						Auditor.f_Info(fg_Format("'{}' Version download finished transferring: {}", Desc, Message));
 					}
 
 					auto *pDownload = pThis->mp_VersionDownloads.f_FindEqual(DownloadID);
@@ -179,16 +164,7 @@ namespace NMib::NCloud::NVersionManager
 						CStr Message;
 						Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
 
-						Auditor.f_Info
-							(
-								fg_Format
-								(
-									"'{}' Version download finished transferring: {}"
-									, Desc
-									, Message
-								)
-							)
-						;
+						Auditor.f_Info(fg_Format("'{}' Version download finished transferring: {}", Desc, Message));
 					}
 
 					auto *pDownload = pThis->mp_VersionDownloads.f_FindEqual(DownloadID);

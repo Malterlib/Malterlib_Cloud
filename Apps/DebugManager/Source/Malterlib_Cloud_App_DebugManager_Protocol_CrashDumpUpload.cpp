@@ -233,13 +233,7 @@ namespace NMib::NCloud::NDebugManager
 					CrashDumpAdd.m_FileName = RootFile.m_FileName;
 					CrashDumpAdd.m_Path = RootFile.m_Path;
 
-					auto CrashDumpWasAdded = co_await pThis->mp_DebugDatabase
-						(
-							&CDebugDatabase::f_CrashDump_Add
-							, CrashDumpAdd
-						)
-						.f_Wrap()
-					;
+					auto CrashDumpWasAdded = co_await pThis->mp_DebugDatabase(&CDebugDatabase::f_CrashDump_Add, CrashDumpAdd).f_Wrap();
 
 					if (!CrashDumpWasAdded)
 					{
@@ -258,7 +252,7 @@ namespace NMib::NCloud::NDebugManager
 
 				co_return {};
 			}
-			> fg_LogError("CrashDumpUpload", "Failed to transfer crash dump (upload)");
+			> fg_LogError("CrashDumpUpload", "Failed to transfer crash dump (upload)")
 		;
 
 		Auditor.f_Info("Starting upload of crash dump");

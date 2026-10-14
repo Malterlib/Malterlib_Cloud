@@ -12,7 +12,7 @@
 #include "Malterlib_Cloud_App_CloudClient.h"
 
 #ifdef DPlatformFamily_Windows
-#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#	include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #endif
 
 namespace NMib::NCloud::NCloudClient
@@ -84,7 +84,7 @@ namespace NMib::NCloud::NCloudClient
 						{
 							"Default"_o= ""
 							, "Description"_o= "The application to list versions for.\n"
-								"If left empty versions will be listed for all applications you have access to.\n"
+							"If left empty versions will be listed for all applications you have access to.\n"
 						}
 					}
 				}
@@ -128,8 +128,8 @@ namespace NMib::NCloud::NCloudClient
 							, "Default"_o= ""
 							, "Description"_o= "The JSON file to read settings from.\n"
 							"Settings in the settings file is overridden by settings specified on the command line.\n"
-							"The format template for the settings file is:\n" +
-							CEJsonOrdered
+							"The format template for the settings file is:\n"
+							+ CEJsonOrdered
 							{
 								"Application"_o= "AppName"
 								, "Version"_o= "Branch/1.0.1"
@@ -158,7 +158,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_o= _o["--version"]
 							, "Type"_o= ""
 							, "Description"_o= "The version to upload.\n"
-								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
+							"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
 						}
 						, "Platform?"_o=
 						{
@@ -190,7 +190,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_o= _o["--time"]
 							, "Default"_o= CTime()
 							, "Description"_o= "The time for this version.\n"
-								"By default the time will be deduced from the modification time of the directory or file uploaded.\n"
+							"By default the time will be deduced from the modification time of the directory or file uploaded.\n"
 						}
 						, "Force?"_o=
 						{
@@ -246,7 +246,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_o= _o["--version"]
 							, "Type"_o= ""
 							, "Description"_o= "Change tags for this version.\n"
-								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
+							"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
 						}
 						, "Platform?"_o=
 						{
@@ -307,7 +307,7 @@ namespace NMib::NCloud::NCloudClient
 							"Names"_o= _o["--version"]
 							, "Type"_o= ""
 							, "Description"_o= "The version to download.\n"
-								"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
+							"This is in the format 'Branch/Major.Minor.Patch' as displayed in the output from --version-manager-list-versions.\n"
 						}
 						, "Platform?"_o=
 						{
@@ -469,8 +469,7 @@ namespace NMib::NCloud::NCloudClient
 			if (!Host.f_IsEmpty() && TrustedActor.m_TrustInfo.m_HostInfo.m_HostID != Host)
 				continue;
 			CVersionManager::CListApplications Command;
-			TrustedActor.m_Actor.f_CallActor(&CVersionManager::f_ListApplications)(fg_Move(Command))
-				.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
+			TrustedActor.m_Actor.f_CallActor(&CVersionManager::f_ListApplications)(fg_Move(Command)).f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
 				> Applications[TrustedActor.m_TrustInfo.m_HostInfo]
 			;
 		}
@@ -486,7 +485,8 @@ namespace NMib::NCloud::NCloudClient
 			CStr HostDescription = HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags);
 			if (!Result)
 			{
-				*_pCommandLine %= "{}Failed getting applications for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting applications for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -524,8 +524,7 @@ namespace NMib::NCloud::NCloudClient
 				continue;
 			CVersionManager::CListVersions Options;
 			Options.m_ForApplication = Application;
-			TrustedVersionManager.m_Actor.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(Options))
-				.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
+			TrustedVersionManager.m_Actor.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(Options)).f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
 				> Versions[TrustedVersionManager.m_TrustInfo.m_HostInfo]
 			;
 		}
@@ -577,7 +576,8 @@ namespace NMib::NCloud::NCloudClient
 			auto &HostInfo = Results.fs_GetKey(Result);
 			if (!Result)
 			{
-				*_pCommandLine %= "{}Failed getting versions for host{} '{}': {}\n"_f
+				*_pCommandLine
+					%= "{}Failed getting versions for host{} '{}': {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< HostInfo.f_GetDescColored(_pCommandLine->m_AnsiFlags)
@@ -734,7 +734,7 @@ namespace NMib::NCloud::NCloudClient
 							return CEJsonSorted::fs_FromString(CFile::fs_ReadStringFromFile(SettingsFile), SettingsFile);
 						}
 					)
-					.f_Wrap();
+					.f_Wrap()
 				;
 
 				if (!SettingsResult)
@@ -786,8 +786,8 @@ namespace NMib::NCloud::NCloudClient
 		CTime Time = _Params["Time"].f_Date();
 		uint64 QueueSize = _Params["TransferQueueSize"].f_Integer();
 		bool bForce = _Params["Force"].f_Boolean();
-		if (QueueSize < 128*1024)
-			QueueSize = 128*1024;
+		if (QueueSize < 128 * 1024)
+			QueueSize = 128 * 1024;
 
 		TCSet<CStr> Tags;
 		for (auto &TagJson : _Params["Tags"].f_Array())
@@ -881,7 +881,8 @@ namespace NMib::NCloud::NCloudClient
 						if (!UploadResult.m_DeniedTags.f_IsEmpty())
 							*_pCommandLine %= "{}: The following tags were denied: {vs,vb}\n"_f << HostInfo.f_GetDescColored(AnsiFlags) << UploadResult.m_DeniedTags;
 
-						*_pCommandLine += "{}: Upload finished transferring in {}: {ns } bytes at {fe2} MB/s\n"_f
+						*_pCommandLine
+							+= "{}: Upload finished transferring in {}: {ns } bytes at {fe2} MB/s\n"_f
 							<< HostInfo.f_GetDescColored(AnsiFlags)
 							<< fg_SecondsDurationToHumanReadable(UploadResult.m_TransferResult.m_nSeconds)
 							<< UploadResult.m_TransferResult.m_nBytes
@@ -901,17 +902,7 @@ namespace NMib::NCloud::NCloudClient
 		co_await fg_AllDone(fg_Move(Results));
 
 		if (!HostsToFind.f_IsEmpty())
-		{
-			co_return DMibErrorInstance
-				(
-					fg_Format
-					(
-						"Did not find these hosts: {vs}. Connection might have failed. Use --log-to-stderr to see more info."
-						, HostsToFind
-					)
-				)
-			;
-		}
+			co_return DMibErrorInstance(fg_Format("Did not find these hosts: {vs}. Connection might have failed. Use --log-to-stderr to see more info.", HostsToFind));
 
 		co_return 0;
 	}
@@ -925,8 +916,8 @@ namespace NMib::NCloud::NCloudClient
 		CStr Version = _Params["Version"].f_String();
 		CStr Platform = _Params["Platform"].f_String();
 		uint64 QueueSize = _Params["TransferQueueSize"].f_Integer();
-		if (QueueSize < 128*1024)
-			QueueSize = 128*1024;
+		if (QueueSize < 128 * 1024)
+			QueueSize = 128 * 1024;
 
 		if (Application.f_IsEmpty())
 			co_return DMibErrorInstance("Application must be specified");
@@ -969,10 +960,7 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 
-		*_pCommandLine += "Download finished transferring: {ns } bytes at {fe2} MB/s\n"_f
-			<< Results.m_nBytes
-			<< Results.f_BytesPerSecond()/1'000'000.0
-		;
+		*_pCommandLine += "Download finished transferring: {ns } bytes at {fe2} MB/s\n"_f << Results.m_nBytes << Results.f_BytesPerSecond() / 1'000'000.0;
 
 		co_return 0;
 	}
@@ -1047,8 +1035,7 @@ namespace NMib::NCloud::NCloudClient
 
 		CVersionManager::CChangeTags::CResult Result = co_await
 			(
-				pVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags))
-				.f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
+				pVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ChangeTags)(fg_Move(ChangeTags)).f_Timeout(mp_Timeout, "Timed out waiting for version manager to reply")
 				% "Failed to change tags"
 			)
 		;
@@ -1178,10 +1165,12 @@ namespace NMib::NCloud::NCloudClient
 			DestQuery.m_ForApplication = ApplicationFilters[0];
 		}
 
-		auto SourceVersionsFuture = pSourceVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(SourceQuery))
+		auto SourceVersionsFuture = pSourceVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ListVersions)
+			(fg_Move(SourceQuery))
 			.f_Timeout(mp_Timeout, "Timed out waiting for source version manager to reply")
 		;
-		auto DestVersionsFuture = pDestVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ListVersions)(fg_Move(DestQuery))
+		auto DestVersionsFuture = pDestVersionManager->m_Actor.f_CallActor(&CVersionManager::f_ListVersions)
+			(fg_Move(DestQuery))
 			.f_Timeout(mp_Timeout, "Timed out waiting for destination version manager to reply")
 		;
 
@@ -1202,6 +1191,7 @@ namespace NMib::NCloud::NCloudClient
 			CVersionManager::CVersionIDAndPlatform m_VersionIDAndPlatform;
 			CVersionManager::CVersionInformation m_VersionInfo;
 		};
+
 		TCVector<CVersionToCopy> VersionsToCopy;
 
 		auto fFormatVersionID = [](CVersionManager::CVersionID const &_VersionID) -> CStr
@@ -1292,14 +1282,17 @@ namespace NMib::NCloud::NCloudClient
 
 		// Sort versions in descending order (newest first) so that when tags are applied,
 		// AppManager upgrades to the newest version directly
-		VersionsToCopy.f_Sort([](CVersionToCopy const &_Left, CVersionToCopy const &_Right)
-			{
-				if (auto Result = _Left.m_Application <=> _Right.m_Application; Result != 0)
-					return Result;
+		VersionsToCopy.f_Sort
+			(
+				[](CVersionToCopy const &_Left, CVersionToCopy const &_Right)
+				{
+					if (auto Result = _Left.m_Application <=> _Right.m_Application; Result != 0)
+						return Result;
 
-				return _Right.m_VersionIDAndPlatform <=> _Left.m_VersionIDAndPlatform;
-			}
-		);
+					return _Right.m_VersionIDAndPlatform <=> _Left.m_VersionIDAndPlatform;
+				}
+			)
+		;
 
 		if (VersionsToCopy.f_IsEmpty())
 		{
@@ -1334,11 +1327,8 @@ namespace NMib::NCloud::NCloudClient
 
 			TableRenderer.f_Output(_Params);
 
-			*_pCommandLine += "{}Dry run:{} Would copy {} version(s), total size: {ns }\n\n"_f
-				<< AnsiEncoding.f_StatusNormal()
-				<< AnsiEncoding.f_Default()
-				<< VersionsToCopy.f_GetLen()
-				<< nTotalBytes
+			*_pCommandLine
+				+= "{}Dry run:{} Would copy {} version(s), total size: {ns }\n\n"_f << AnsiEncoding.f_StatusNormal() << AnsiEncoding.f_Default() << VersionsToCopy.f_GetLen() << nTotalBytes
 			;
 
 			co_return 0;
@@ -1355,11 +1345,7 @@ namespace NMib::NCloud::NCloudClient
 		{
 			co_await g_AsyncDestroy;
 
-			*_pCommandLine += "Copying {} {} ({})...\n"_f
-				<< Version.m_Application
-				<< Version.m_VersionIDAndPlatform.m_VersionID
-				<< Version.m_VersionIDAndPlatform.m_Platform
-			;
+			*_pCommandLine += "Copying {} {} ({})...\n"_f << Version.m_Application << Version.m_VersionIDAndPlatform.m_VersionID << Version.m_VersionIDAndPlatform.m_Platform;
 
 			CStr TempDir = CFile::fs_GetTemporaryDirectory() / ("CloudClient_CopyVersion_{}"_f << fg_RandomID());
 			{
@@ -1414,7 +1400,8 @@ namespace NMib::NCloud::NCloudClient
 
 			if (!DownloadResult)
 			{
-				*_pCommandLine %= "{}Failed{} to download {} {} ({}): {}\n"_f
+				*_pCommandLine
+					%= "{}Failed{} to download {} {} ({}): {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< Version.m_Application
@@ -1427,7 +1414,8 @@ namespace NMib::NCloud::NCloudClient
 			}
 			nBytesDownloaded += DownloadResult->m_nBytes;
 
-			*_pCommandLine += "Downloaded {} {} ({}): {ns } bytes in {} at {fe2} MB/s\n"_f
+			*_pCommandLine
+				+= "Downloaded {} {} ({}): {ns } bytes in {} at {fe2} MB/s\n"_f
 				<< Version.m_Application
 				<< Version.m_VersionIDAndPlatform.m_VersionID
 				<< Version.m_VersionIDAndPlatform.m_Platform
@@ -1451,7 +1439,8 @@ namespace NMib::NCloud::NCloudClient
 
 			if (PackageFiles.f_IsEmpty())
 			{
-				*_pCommandLine %= "{}Failed{} to find package file for {} {} ({}): No package file found in download\n"_f
+				*_pCommandLine
+					%= "{}Failed{} to find package file for {} {} ({}): No package file found in download\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< Version.m_Application
@@ -1464,7 +1453,8 @@ namespace NMib::NCloud::NCloudClient
 
 			if (PackageFiles.f_GetLen() > 1)
 			{
-				*_pCommandLine %= "{}Failed{} to find package file for {} {} ({}): Multiple package files found in download: {}\n"_f
+				*_pCommandLine
+					%= "{}Failed{} to find package file for {} {} ({}): Multiple package files found in download: {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< Version.m_Application
@@ -1496,7 +1486,8 @@ namespace NMib::NCloud::NCloudClient
 
 			if (!UploadResult)
 			{
-				*_pCommandLine %= "{}Failed{} to upload {} {} ({}): {}\n"_f
+				*_pCommandLine
+					%= "{}Failed{} to upload {} {} ({}): {}\n"_f
 					<< AnsiEncoding.f_StatusError()
 					<< AnsiEncoding.f_Default()
 					<< Version.m_Application
@@ -1510,7 +1501,8 @@ namespace NMib::NCloud::NCloudClient
 
 			if (!UploadResult->m_DeniedTags.f_IsEmpty())
 			{
-				*_pCommandLine %= "Tags denied for {} {} ({}): {vs,vb}\n"_f
+				*_pCommandLine
+					%= "Tags denied for {} {} ({}): {vs,vb}\n"_f
 					<< Version.m_Application
 					<< Version.m_VersionIDAndPlatform.m_VersionID
 					<< Version.m_VersionIDAndPlatform.m_Platform
@@ -1518,7 +1510,8 @@ namespace NMib::NCloud::NCloudClient
 				;
 			}
 
-			*_pCommandLine += "{}Uploaded{} {} {} ({}): {ns } bytes in {} at {fe2} MB/s\n"_f
+			*_pCommandLine
+				+= "{}Uploaded{} {} {} ({}): {ns } bytes in {} at {fe2} MB/s\n"_f
 				<< AnsiEncoding.f_StatusNormal()
 				<< AnsiEncoding.f_Default()
 				<< Version.m_Application
@@ -1533,12 +1526,7 @@ namespace NMib::NCloud::NCloudClient
 			++nSuccessful;
 		}
 
-		*_pCommandLine += "\nCopy complete: {} succeeded, {} failed, {ns } bytes downloaded, {ns } bytes uploaded\n"_f
-			<< nSuccessful
-			<< nFailed
-			<< nBytesDownloaded
-			<< nBytesUploaded
-		;
+		*_pCommandLine += "\nCopy complete: {} succeeded, {} failed, {ns } bytes downloaded, {ns } bytes uploaded\n"_f << nSuccessful << nFailed << nBytesDownloaded << nBytesUploaded;
 
 		if (nFailed > 0)
 			co_return 1;

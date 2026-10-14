@@ -24,12 +24,7 @@ namespace NMib::NCloud::NDebugManager
 		if (!bHasPermissions)
 			co_return Auditor.f_AccessDenied("(Upload crash dump)", Permissions);
 
-		auto CrashDumpGenerator = co_await pThis->mp_DebugDatabase
-			(
-				&CDebugDatabase::f_CrashDump_List
-				, fg_ConvertToDebugDatabase<CDebugDatabase::CCrashDumpFilter>(fg_Move(_Params.m_Filter))
-			)
-		;
+		auto CrashDumpGenerator = co_await pThis->mp_DebugDatabase(&CDebugDatabase::f_CrashDump_List, fg_ConvertToDebugDatabase<CDebugDatabase::CCrashDumpFilter>(fg_Move(_Params.m_Filter)));
 
 		co_return CCrashDumpList::CResult
 			{

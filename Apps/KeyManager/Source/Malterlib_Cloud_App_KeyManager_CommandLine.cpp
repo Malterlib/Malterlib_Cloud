@@ -28,12 +28,7 @@ namespace NMib::NCloud::NKeyManager
 	void CKeyManagerDaemonActor::fp_BuildCommandLine(CDistributedAppCommandLineSpecification &o_CommandLine)
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
-		o_CommandLine.f_SetProgramDescription
-			(
-				"Malterlib Cloud Key Manager"
-				, "Manages encryption keys for Malterlib cloud apps."
-			)
-		;
+		o_CommandLine.f_SetProgramDescription("Malterlib Cloud Key Manager", "Manages encryption keys for Malterlib cloud apps.");
 
 		auto DefaultSection = o_CommandLine.f_GetDefaultSection();
 
@@ -285,7 +280,7 @@ namespace NMib::NCloud::NKeyManager
 
 		auto RemovedHostIDs = co_await mp_ServerActor(&CKeyManagerServer::f_RemoveVerifiedHosts, _HostIDs);
 
-		*_pCommandLine %= "Removed {} hosts: {vs}\n"_f  << RemovedHostIDs.f_GetLen() << RemovedHostIDs;
+		*_pCommandLine %= "Removed {} hosts: {vs}\n"_f << RemovedHostIDs.f_GetLen() << RemovedHostIDs;
 
 		co_return 0;
 	}

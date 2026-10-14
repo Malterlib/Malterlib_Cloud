@@ -24,13 +24,8 @@ namespace NMib::NCloud
 		;
 		~CNetworkTunnelsServer();
 
-		NConcurrency::TCFuture<NConcurrency::CActorSubscription> f_PublishNetworkTunnel
-			(
-				ICNetworkTunnels::CNetworkTunnelName _Name
-				, NStr::CStr _Host
-				, uint16 _Port
-				, NEncoding::CEJsonSorted _Metadata
-			)
+		auto f_PublishNetworkTunnel(ICNetworkTunnels::CNetworkTunnelName _Name, NStr::CStr _Host, uint16 _Port, NEncoding::CEJsonSorted _Metadata)
+			-> NConcurrency::TCFuture<NConcurrency::CActorSubscription>
 		;
 
 		NConcurrency::TCFuture<void> f_Start();
@@ -45,5 +40,5 @@ namespace NMib::NCloud
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif

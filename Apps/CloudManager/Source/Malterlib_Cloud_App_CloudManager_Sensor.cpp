@@ -71,8 +71,7 @@ namespace NMib::NCloud::NCloudManager
 		return {"CloudManager/ReadSensors", "CloudManager/ReadAll"};
 	}
 
-	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensors(CGetSensors _Params)
-		-> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>>
+	auto CCloudManagerServer::CDistributedAppSensorReaderImplementation::f_GetSensors(CGetSensors _Params) -> TCFuture<TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>>>
 	{
 		TCAsyncGenerator<TCVector<CDistributedAppSensorReporter::CSensorInfo>> Sensors;
 		{

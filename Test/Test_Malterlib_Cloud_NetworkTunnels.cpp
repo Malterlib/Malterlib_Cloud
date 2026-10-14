@@ -46,15 +46,7 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 
 		TCFuture<void> fp_StartApp(NEncoding::CEJsonSorted const _Params) override
 		{
-			m_TunnelServer = fg_Construct
-				(
-					mp_State.m_DistributionManager
-					, mp_State.m_TrustManager
-					, mp_State.f_AuditorFactory()
-					, "TestNetworkTunnelServerApp"
-					, "TunnelServerApp"
-				)
-			;
+			m_TunnelServer = fg_Construct(mp_State.m_DistributionManager, mp_State.m_TrustManager, mp_State.f_AuditorFactory(), "TestNetworkTunnelServerApp", "TunnelServerApp");
 
 			m_PublishedTunnels.f_Insert(co_await m_TunnelServer(&CNetworkTunnelsServer::f_PublishNetworkTunnel, "TestTunnel", m_ListenPath, 0, CEJsonSorted{}));
 
@@ -200,7 +192,6 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 
 			fg_TestAddCleanupPath(RootDirectory);
 
-
 			for (umint i = 0; i < 5; ++i)
 			{
 				try
@@ -317,7 +308,8 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 			{
 				CDistributedActorTrustManagerInterface::CGenerateConnectionTicket GenerateTicket;
 				GenerateTicket.m_Address = TunnelServerAddress;
-				auto Ticket = TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)(fg_Move(GenerateTicket))
+				auto Ticket = TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
+					(fg_Move(GenerateTicket))
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 				auto HostInfo = TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddClientConnection)
@@ -326,15 +318,11 @@ struct CNetworkTunnel_Tests : public NMib::NTest::CTest
 				;
 
 				TunnelServerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-					(
-						fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll", {}}})
-					)
+					(fPermissions(TunnelClientHostID, TCMap<CStr, CPermissionRequirements>{{"TunnelServerApp/ConnectAll", {}}}))
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 				TunnelClientTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-					(
-						fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID})
-					)
+					(fNamespaceHosts(ICNetworkTunnels::mc_pDefaultNamespace, TCSet<CStr>{TunnelServerHostID}))
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 			}

@@ -239,11 +239,8 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 					m_BackupConfig
 					, _TrustManager
 					, g_ActorFunctor / [pManifestFinished, pBackupInterface, ReceivedManifestFinished]
-					(
-						TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface
-						, CActorSubscription _ManifestFinished
-						, CStr _BackupRoot
-					) -> TCFuture<TCActorSubscriptionWithID<>>
+					(TCDistributedActorInterfaceWithID<CDistributedAppInterfaceBackup> _BackupInterface, CActorSubscription _ManifestFinished, CStr _BackupRoot)
+					-> TCFuture<TCActorSubscriptionWithID<>>
 					{
 						*pManifestFinished = fg_Move(_ManifestFinished);
 						*pBackupInterface = fg_Move(_BackupInterface);
@@ -267,8 +264,8 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 					| CBackupManagerClient::ENotification_Quiescent
 					| CBackupManagerClient::ENotification_Unquiescent
 					| CBackupManagerClient::ENotification_InitialFinished
-					, g_ActorFunctor / [pState = m_pState, ReceivedManifestFinished](NConcurrency::CHostInfo _RemoteHost, CBackupManagerClient::CNotification _Notification)
-					-> NConcurrency::TCFuture<void>
+					, g_ActorFunctor / [pState = m_pState, ReceivedManifestFinished]
+					(NConcurrency::CHostInfo _RemoteHost, CBackupManagerClient::CNotification _Notification) -> NConcurrency::TCFuture<void>
 					{
 #ifdef DMibCloudBackupManagerDebug
 						switch (_Notification.f_GetTypeID())
@@ -313,8 +310,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 								;
 							}
 							break;
-						case CBackupManagerClient::ENotification_None:
-							break;
+						case CBackupManagerClient::ENotification_None: break;
 						}
 #endif
 						DMibLock(pState->m_Lock);
@@ -328,7 +324,8 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 						pState->f_Signal();
 						co_return {};
 					}
-				).f_CallSync(m_pRunLoop, g_Timeout)
+				)
+				.f_CallSync(m_pRunLoop, g_Timeout)
 			;
 			m_BackupClient(&CBackupManagerClient::f_StartBackup).f_CallSync(m_pRunLoop, g_Timeout);
 			ReceivedManifestFinished.f_MoveFuture().f_CallSync(m_pRunLoop, g_Timeout);
@@ -692,17 +689,11 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 			TrustBackupManagers.f_Remove(BackupManagerHostID);
 
 			TrustManager.f_CallActor(&CDistributedActorTrustManager::f_AllowHostsForNamespace)
-				(
-					CBackupManager::mc_pDefaultNamespace
-					, fg_CreateSet<CStr>(BackupManagerHostID)
-					, c_WaitForSubscriptions
-				)
+				(CBackupManager::mc_pDefaultNamespace, fg_CreateSet<CStr>(BackupManagerHostID), c_WaitForSubscriptions)
 				> SetupTrustResults
 			;
 
-			BackupManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)(fPermissions(TestHostID, BackupManagerPermissionsForTest))
-				> SetupTrustResults
-			;
+			BackupManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)(fPermissions(TestHostID, BackupManagerPermissionsForTest)) > SetupTrustResults;
 
 			for (auto &BackupManagerInner : AllBackupManagers)
 			{
@@ -714,9 +705,7 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 
 				TCPromise<void> Promise;
 				BackupManagerTrust.f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{BackupManager.m_Address}
-					)
+					(CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{BackupManager.m_Address})
 					> Promise / [=](CDistributedActorTrustManagerInterface::CTrustGenerateConnectionTicketResult &&_Ticket)
 					{
 						auto &BackupManagerTrustInner = *pBackupManagerTrustInner;
@@ -1691,7 +1680,8 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 				Receive.m_BasePath = TestDownloadDirectory;
 
 				CActorSubscription Subscription;
-				auto DownloadResult = fg_CurrentActor().f_Bind<fg_DownloadBackup>(BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription))
+				auto DownloadResult = fg_CurrentActor()
+					.f_Bind<fg_DownloadBackup>(BackupManager, BackupSources[0], CTime{}, fg_Move(Receive), fg_Reference(Subscription))
 					.f_CallSync(RunLoopHelper.m_pRunLoop, g_Timeout)
 				;
 
@@ -2002,7 +1992,6 @@ struct CBackupManager_Tests : public NMib::NTest::CTest
 				DMibExpect(BackupHelper.f_GetManifestFiles(Manifest, EFileAttrib_None, EFileAttrib_Link | EFileAttrib_Directory), ==, SourceManifestFiles);
 				DMibExpect(BackupHelper.f_GetManifestFiles(Manifest, EFileAttrib_Directory, EFileAttrib_Link), ==, SourceManifestDirectories);
 				DMibExpect(BackupHelper.f_GetManifestFiles(Manifest, EFileAttrib_Link, EFileAttrib_None), ==, SourceManifestLinks);
-
 			}
 		}
 	}

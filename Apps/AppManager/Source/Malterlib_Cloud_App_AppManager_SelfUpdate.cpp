@@ -7,9 +7,9 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	constexpr static ch8 gc_pSelfUpdateScript[] =
+	static constexpr ch8 gc_pSelfUpdateScript[] =
 		{
-			#embed "Malterlib_Cloud_App_AppManager_SelfUpdate.sh"
+#embed "Malterlib_Cloud_App_AppManager_SelfUpdate.sh"
 			, '\0'
 		}
 	;
@@ -61,14 +61,7 @@ namespace NMib::NCloud::NAppManager
 					if (!CFile::fs_FileExists(FileName))
 					{
 						CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
-						CFile::fs_WriteStringToFile
-							(
-								FileName
-								, Script
-								, false
-								, EFileAttrib_UnixAttributesValid | EFileAttrib_UserExecute | EFileAttrib_UserRead | EFileAttrib_UserWrite
-							)
-						;
+						CFile::fs_WriteStringToFile(FileName, Script, false, EFileAttrib_UnixAttributesValid | EFileAttrib_UserExecute | EFileAttrib_UserRead | EFileAttrib_UserWrite);
 					}
 
 					CProcessLaunchParams Params;
@@ -126,9 +119,7 @@ namespace NMib::NCloud::NAppManager
 					else if (CProcessLaunch::fs_LaunchBlock(CProcessLaunch::fs_GetBashPath(), fg_CreateVector(FileName, ProgramPath, Type), StdOut, StdErr, ExitCode, Params))
 					{
 						if (ExitCode)
-						{
 							DMibError(fg_Format("Self update script failed with exit code {} and reported: {}", ExitCode, fg_ConcatOutput(StdOut, StdErr)));
-						}
 						else if (bDaemonDebug || bDaemonStandalone)
 							CDaemon::fs_QuitDaemon(); // Initiate application quit
 					}

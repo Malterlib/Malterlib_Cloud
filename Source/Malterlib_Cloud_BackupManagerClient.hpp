@@ -33,16 +33,17 @@ namespace NMib::NCloud
 		case EFileTransferType_Rename: pType = "Rename"; break;
 		}
 
-		o_Str += typename tf_CStr::CFormat("{} Incoming: {ns } B ({fe2} MB/s) Outgoing: {ns } ({fe2} MB/s)")
+		o_Str
+			+= typename tf_CStr::CFormat("{} Incoming: {ns } B ({fe2} MB/s) Outgoing: {ns } ({fe2} MB/s)")
 			<< pType
 			<< m_IncomingBytes
-			<< f_IncomingBytesPerSecond()/1'000'000.0
+			<< f_IncomingBytesPerSecond() / 1'000'000.0
 			<< m_OutgoingBytes
-			<< f_OutgoingBytesPerSecond()/1'000'000.0
+			<< f_OutgoingBytesPerSecond() / 1'000'000.0
 		;
 	}
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NCloud;
+using namespace NMib::NCloud;
 #endif

@@ -229,12 +229,7 @@ namespace NMib::NCloud::NAppManager
 			;
 
 			auto HostID = co_await Application.m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInProcessActor>>()
-				(
-					&CDistributedAppInProcessActor::f_Launch
-					, ApplicationDirectory
-					, fg_Move(fFactory)
-					, fg_TempCopy(Application.m_Settings.m_ExecutableParameters)
-				)
+				(&CDistributedAppInProcessActor::f_Launch, ApplicationDirectory, fg_Move(fFactory), fg_TempCopy(Application.m_Settings.m_ExecutableParameters))
 				.f_Wrap()
 			;
 
@@ -253,8 +248,10 @@ namespace NMib::NCloud::NAppManager
 
 			if (!_pApplication->m_AppInterface)
 			{
-				auto Result
-					= co_await _pApplication->m_OnRegisterDistributedApp.f_Insert().f_Future().f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)").f_Wrap()
+				auto Result = co_await _pApplication->m_OnRegisterDistributedApp.f_Insert()
+					.f_Future()
+					.f_Timeout(60.0 * 60.0, "Timed out waiting for application to register (1 hour)")
+					.f_Wrap()
 				;
 
 				if (_pApplication->m_bDeleted)
@@ -262,22 +259,8 @@ namespace NMib::NCloud::NAppManager
 
 				if (!Result)
 				{
-					DMibLogWithCategory
-						(
-							Malterlib/Cloud/AppManager
-							, Error
-							, "Launched app '{}' failed to register: {}"
-							, _pApplication->m_Name
-							, Result.f_GetExceptionStr()
-						)
-					;
-					fp_AppLaunchStateChanged
-						(
-							_pApplication
-							, "Launched (app register failed: '{}')"_f << Result.f_GetExceptionStr()
-							, CAppManagerInterface::EStatusSeverity_Error
-						)
-					;
+					DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Launched app '{}' failed to register: {}", _pApplication->m_Name, Result.f_GetExceptionStr());
+					fp_AppLaunchStateChanged(_pApplication, "Launched (app register failed: '{}')"_f << Result.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
 
 					co_return {Result.f_GetExceptionStr()};
 				}
@@ -310,22 +293,8 @@ namespace NMib::NCloud::NAppManager
 			}
 			else
 			{
-				DMibLogWithCategory
-					(
-						Malterlib/Cloud/AppManager
-						, Error
-						, "Launched app '{}' failed to start up: {}"
-						, _pApplication->m_Name
-						, StartResult.f_GetExceptionStr()
-					)
-				;
-				fp_AppLaunchStateChanged
-					(
-						_pApplication
-						, "Launched (app startup failed: '{}')"_f << StartResult.f_GetExceptionStr()
-						, CAppManagerInterface::EStatusSeverity_Error
-					)
-				;
+				DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Launched app '{}' failed to start up: {}", _pApplication->m_Name, StartResult.f_GetExceptionStr());
+				fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << StartResult.f_GetExceptionStr(), CAppManagerInterface::EStatusSeverity_Error);
 
 				co_return {StartResult.f_GetExceptionStr()};
 			}
@@ -475,14 +444,7 @@ namespace NMib::NCloud::NAppManager
 									fp_AppLaunchStateChanged
 										(
 											_pApplication
-											, fg_Format
-											(
-												"{}Exited with {}. {}. {}."
-												, RelaunchInfo
-												, ExitStatus
-												, _pApplication->m_LastStdErr
-												, _pApplication->m_LastError
-											)
+											, fg_Format("{}Exited with {}. {}. {}.", RelaunchInfo, ExitStatus, _pApplication->m_LastStdErr, _pApplication->m_LastError)
 											, _pApplication->m_bStopped ? CAppManagerInterface::EStatusSeverity_Warning : CAppManagerInterface::EStatusSeverity_Error
 										)
 									;
@@ -555,16 +517,16 @@ namespace NMib::NCloud::NAppManager
 			;
 
 			LaunchParams.m_RunAsUser = fp_GetRunAsUser(Application.m_Settings);
-	#ifdef DPlatformFamily_Windows
+#ifdef DPlatformFamily_Windows
 			LaunchParams.m_RunAsUserPassword = Application.m_Settings.m_RunAsUserPassword;
-	#endif
+#endif
 			LaunchParams.m_RunAsGroup = fp_GetRunAsGroup(Application.m_Settings);
 			LaunchParams.m_Environment["HOME"] = ApplicationDirectory + "/.home";
 			LaunchParams.m_Environment["TMPDIR"] = ApplicationDirectory + "/.tmp";
-	#ifdef DPlatformFamily_Windows
+#ifdef DPlatformFamily_Windows
 			LaunchParams.m_Environment["TMP"] = ApplicationDirectory + "/.tmp";
 			LaunchParams.m_Environment["TEMP"] = ApplicationDirectory + "/.tmp";
-	#endif
+#endif
 			LaunchParams.m_bMergeEnvironment = true;
 			LaunchParams.m_bCreateNewProcessGroup = true;
 			LaunchParams.m_bShowLaunched = false;
@@ -574,8 +536,7 @@ namespace NMib::NCloud::NAppManager
 				(
 					mp_State.m_LocalAddress
 					, mp_State.m_TrustManager
-					, g_ActorFunctor / [_pApplication, this]
-					(CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _Certificate) -> TCFuture<void>
+					, g_ActorFunctor / [_pApplication, this](CStr _HostID, CCallingHostInfo _HostInfo, CByteVector _Certificate) -> TCFuture<void>
 					{
 						if (_pApplication->m_bDeleted)
 							co_return DMibErrorInstance("Application deleted");
@@ -611,15 +572,7 @@ namespace NMib::NCloud::NAppManager
 						if (!_pApplication->m_Settings.m_bDistributedApp || _pApplication->m_AppInterface)
 							co_return {};
 
-						DMibLogWithCategory
-							(
-								Malterlib/Cloud/AppManager
-								, Error
-								, "Launched app '{}' failed to start up before registering: {}"
-								, _pApplication->m_Name
-								, _Error
-							)
-						;
+						DMibLogWithCategory(Malterlib/Cloud/AppManager, Error, "Launched app '{}' failed to start up before registering: {}", _pApplication->m_Name, _Error);
 
 						fp_AppLaunchStateChanged(_pApplication, "Launched (app startup failed: '{}')"_f << _Error, CAppManagerInterface::EStatusSeverity_Error);
 
@@ -637,11 +590,7 @@ namespace NMib::NCloud::NAppManager
 			;
 
 			auto LaunchSubscription = co_await Application.m_ProcessLaunch.f_GetAsType<TCActor<CDistributedAppInterfaceLaunchActor>>()
-				(
-					&CProcessLaunchActor::f_Launch
-					, Launch
-					, fg_ThisActor(this)
-				)
+				(&CProcessLaunchActor::f_Launch, Launch, fg_ThisActor(this))
 				.f_Wrap()
 			;
 
@@ -662,8 +611,7 @@ namespace NMib::NCloud::NAppManager
 		}
 	}
 
-	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> _pApplication, bool _bOpenEncryption)
-		-> TCFuture<CAppLaunchResult>
+	auto CAppManagerActor::fp_LaunchApp(TCSharedPointer<CApplication> _pApplication, bool _bOpenEncryption) -> TCFuture<CAppLaunchResult>
 	{
 		if (_pApplication->m_bLaunching)
 		{

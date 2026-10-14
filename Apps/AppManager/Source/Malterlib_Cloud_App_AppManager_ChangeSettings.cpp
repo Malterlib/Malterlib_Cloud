@@ -7,14 +7,9 @@
 
 namespace NMib::NCloud::NAppManager
 {
-	NConcurrency::TCFuture<void> CAppManagerActor::CAppManagerInterfaceImplementation::f_ChangeSettings
-		(
-			NStr::CStr _Name
-			, CApplicationChangeSettings _ChangeSettings
-			, CApplicationSettings _Settings
-		)
+	auto CAppManagerActor::CAppManagerInterfaceImplementation::f_ChangeSettings(NStr::CStr _Name, CApplicationChangeSettings _ChangeSettings, CApplicationSettings _Settings)
+		-> NConcurrency::TCFuture<void>
 	{
-
 		CAppManagerActor::CApplicationSettings ApplicationSettings;
 		EApplicationSetting ChangedSettings = EApplicationSetting_None;
 		ApplicationSettings.f_FromInterfaceSettings(_Settings, ChangedSettings);
@@ -302,8 +297,7 @@ namespace NMib::NCloud::NAppManager
 			auto [Result, UpdateJsonResults] = co_await
 				(
 					(
-						g_Dispatch(BlockingActorCheckout)
-						/ [=, Directory = pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]()
+						g_Dispatch(BlockingActorCheckout) / [=, Directory = pApplication->f_GetDirectory(), pUniqueUserGroup = mp_pUniqueUserGroup]()
 						{
 							fsp_CreateApplicationUserGroup(NewSettings, _fOnInfo, Directory / ".home", pUniqueUserGroup);
 							fsp_UpdateApplicationFilePermissions(Directory, pApplication, pApplication->m_Files, pUniqueUserGroup, _fOnInfo);
@@ -315,7 +309,13 @@ namespace NMib::NCloud::NAppManager
 			;
 
 			if (!Result && !UpdateJsonResults)
-				co_return Auditor.f_Exception("Failed to update application files and save application state: {} {}"_f << Result.f_GetExceptionStr() << UpdateJsonResults.f_GetExceptionStr());
+			{
+				co_return Auditor.f_Exception
+					(
+						"Failed to update application files and save application state: {} {}"_f << Result.f_GetExceptionStr() << UpdateJsonResults.f_GetExceptionStr()
+					)
+				;
+			}
 			else if (!Result)
 				co_return Auditor.f_Exception("Failed to update application files: {}"_f << Result.f_GetExceptionStr());
 			else if (!UpdateJsonResults)

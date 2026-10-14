@@ -63,11 +63,7 @@ namespace NMib::NCloud::NAppManager
 		;
 	}
 
-	TCFuture<void> CAppManagerActor::fp_UpdateApplication_DeferToNextRestart
-		(
-			TCSharedPointerSupportWeak<CUpdateApplicationState> _pState
-			, TCSharedPointer<CCanDestroyTracker> _pCanDestroy
-		)
+	TCFuture<void> CAppManagerActor::fp_UpdateApplication_DeferToNextRestart(TCSharedPointerSupportWeak<CUpdateApplicationState> _pState, TCSharedPointer<CCanDestroyTracker> _pCanDestroy)
 	{
 		auto &Application = *_pState->m_pApplication;
 
@@ -170,8 +166,12 @@ namespace NMib::NCloud::NAppManager
 			}
 		;
 
-		CVersionManager::CVersionInformation VersionInfo = co_await
-			fp_DownloadApplication(State.m_pApplication->m_Settings.m_VersionManagerApplication, State.m_VersionID, DownloadDirectory)
+		CVersionManager::CVersionInformation VersionInfo = co_await fp_DownloadApplication
+			(
+				State.m_pApplication->m_Settings.m_VersionManagerApplication
+				, State.m_VersionID
+				, DownloadDirectory
+			)
 		;
 
 		auto &Application = *State.m_pApplication;
@@ -276,7 +276,6 @@ namespace NMib::NCloud::NAppManager
 				() mutable
 				{
 					fsp_CreateApplicationUserGroup(Settings, fOnInfo, OutputDirectory / ".home", pUniqueUserGroup);
-
 
 					if (CFile::fs_FileExists(SourcePath, EFileAttrib_Directory))
 					{
@@ -416,10 +415,10 @@ namespace NMib::NCloud::NAppManager
 							else if (CFile::fs_FileExists(FullPath, EFileAttrib_File | EFileAttrib_Link))
 								CFile::fs_DeleteFile(FullPath);
 						}
-	#ifdef DPlatformFamily_Windows
+#ifdef DPlatformFamily_Windows
 						if (CSystem::ms_PlatformVersion <= 10'0'017763)
 							NSys::fg_Thread_Sleep(5.0); // Try to work around access denied below when file is renamed
-	#endif
+#endif
 						// 4. Move files from temporary directory to final destination
 						for (auto &File : Files)
 						{
@@ -597,20 +596,12 @@ namespace NMib::NCloud::NAppManager
 				, State.m_LastInstalledVersion
 				, State.m_LastInstalledVersionInfo
 				, State.m_pStopwatch->f_GetTime()
-			).f_Wrap()
+			)
+			.f_Wrap()
 		;
 
 		if (!ScriptResult)
-		{
-			DMibLogWithCategory
-				(
-					Malterlib/Cloud/AppManager
-					, Warning
-					, "Post launch script failed: {}"
-					, ScriptResult.f_GetExceptionStr()
-				)
-			;
-		}
+			DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "Post launch script failed: {}", ScriptResult.f_GetExceptionStr());
 
 		co_await fp_OnUpdateEvent(_pState, EUpdateStage::EUpdateStage_Finished, {}).f_Wrap() > fg_LogError("Malterlib/Cloud/AppManager", "Failed waiting for finished event");
 

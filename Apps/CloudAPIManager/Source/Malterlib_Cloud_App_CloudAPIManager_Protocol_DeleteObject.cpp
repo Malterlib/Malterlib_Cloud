@@ -29,13 +29,7 @@ namespace NMib::NCloud::NCloudAPIManager
 
 		TCVector<CStr> Permissions = {"ObjectStorage/DeleteObjectAll", "ObjectStorage/DeleteObject/{}"_f << _Params.m_CloudContext};
 
-		bool bHasPermission = co_await
-			(
-				pThis->mp_Permissions.f_HasPermission("Delete object from cloud API manager", Permissions)
-				% "Permission denied deleting object"
-				% Auditor
-			)
-		;
+		bool bHasPermission = co_await (pThis->mp_Permissions.f_HasPermission("Delete object from cloud API manager", Permissions) % "Permission denied deleting object" % Auditor);
 
 		if (!bHasPermission)
 			co_return Auditor.f_AccessDenied("(Delete object)", Permissions);

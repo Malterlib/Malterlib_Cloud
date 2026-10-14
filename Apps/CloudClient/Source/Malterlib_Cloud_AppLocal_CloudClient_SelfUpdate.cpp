@@ -9,7 +9,7 @@
 #include <Mib/Process/ProcessLaunch>
 
 #ifdef DPlatformFamily_Windows
-#include <Mib/Core/PlatformSpecific/WindowsFilePath>
+#	include <Mib/Core/PlatformSpecific/WindowsFilePath>
 #endif
 
 #include "Malterlib_Cloud_AppLocal_CloudClient.h"
@@ -65,14 +65,8 @@ namespace NMib::NCloud::NCloudClient
 		if (!BestVersionTime.f_IsValid())
 			co_return DMibErrorInstance("No new version was found");
 
-		if
-			(
-				BestVersion.m_VersionIDAndPlatform.m_VersionID.m_Branch == (*g_CloudVersion).m_Version.m_Branch
-				&& BestVersion.m_VersionIDAndPlatform.m_VersionID <= (*g_CloudVersion).m_Version
-			)
-		{
+		if (BestVersion.m_VersionIDAndPlatform.m_VersionID.m_Branch == (*g_CloudVersion).m_Version.m_Branch && BestVersion.m_VersionIDAndPlatform.m_VersionID <= (*g_CloudVersion).m_Version)
 			co_return DMibErrorInstance("No new version was found");
-		}
 
 		CSelfUpdateVersion SelfUpdateVersion;
 		SelfUpdateVersion.m_VersionID = BestVersion.m_VersionIDAndPlatform.m_VersionID;
@@ -81,12 +75,7 @@ namespace NMib::NCloud::NCloudClient
 		co_return fg_Move(SelfUpdateVersion);
 	}
 
-	TCFuture<void> CCloudClientAppLocalActor::fp_PreRunCommandLine
-		(
-			 CStr _Command
-			 , NEncoding::CEJsonSorted const _Params
-			 , NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine
-		)
+	TCFuture<void> CCloudClientAppLocalActor::fp_PreRunCommandLine(CStr _Command, NEncoding::CEJsonSorted const _Params, NStorage::TCSharedPointer<CCommandLineControl> _pCommandLine)
 	{
 		auto CheckDestroy = co_await fp_CheckStoppedOrDestroyedOnResume();
 
@@ -135,13 +124,7 @@ namespace NMib::NCloud::NCloudClient
 					bool bLaunchSuccess = CProcessLaunch::fs_LaunchBlock
 						(
 							CFile::fs_GetProgramDirectory() / "bin/bsdtar"
-							, fg_CreateVector<CStr>
-							(
-								"--no-same-owner"
-								, "--no-xattr"
-								, "-xf"
-								, PackageFile
-							)
+							, fg_CreateVector<CStr>("--no-same-owner", "--no-xattr", "-xf", PackageFile)
 							, StdOut
 							, StdErr
 							, ExitCode
@@ -150,9 +133,7 @@ namespace NMib::NCloud::NCloudClient
 					;
 
 					if (!bLaunchSuccess || ExitCode != 0)
-					{
 						DMibError(fg_Format("tar ({}) failed to extract new version: {}", ExitCode, StdErr));
-					}
 
 					CFile::fs_DeleteFile(PackageFile);
 
@@ -170,7 +151,7 @@ namespace NMib::NCloud::NCloudClient
 			)
 		;
 
-		*_pCommandLine %= "Downloaded {ns } bytes at {fe2} MB/s\n"_f << TransferResult.m_nBytes << TransferResult.f_BytesPerSecond()/1'000'000.0;
+		*_pCommandLine %= "Downloaded {ns } bytes at {fe2} MB/s\n"_f << TransferResult.m_nBytes << TransferResult.f_BytesPerSecond() / 1'000'000.0;
 		*_pCommandLine %= "Updated to version {}\n"_f << Version.m_VersionID;
 
 		co_return 0;

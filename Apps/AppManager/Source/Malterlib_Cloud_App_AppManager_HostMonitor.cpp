@@ -73,10 +73,8 @@ namespace NMib::NCloud::NAppManager
 
 			auto const &ConfigFileName = mp_State.m_ConfigDatabase.f_GetFileName();
 			bool bYamlConfig = ConfigFileName.f_EndsWith(".yaml") || ConfigFileName.f_EndsWith(".yml");
-			ConfigFiles.m_Files[ConfigFileName].m_Type =
-				bYamlConfig
-				? NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Yaml
-				: NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Json
+			ConfigFiles.m_Files[ConfigFileName].m_Type
+				= bYamlConfig ? NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Yaml : NConcurrency::CDistributedAppInterfaceServer::EMonitorConfigType_Json
 			;
 
 			auto ConfigResult = co_await mp_HostMonitor(&CHostMonitor::f_MonitorConfigs, fg_Move(ConfigFiles)).f_Wrap();

@@ -165,9 +165,7 @@ namespace NVersionManagerSyncTests
 			// Destination needs to be able to connect to source
 			{
 				auto SourceTicket = co_await SourceState.m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SourceState.m_VersionManagerServerAddress}
-					)
+					(CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{SourceState.m_VersionManagerServerAddress})
 					.f_Timeout(g_Timeout, "Timed out generating source connection ticket")
 				;
 
@@ -180,18 +178,14 @@ namespace NVersionManagerSyncTests
 				// Grant destination read and list permissions on source BEFORE allowing namespace access
 				// This ensures permissions are in place when destination subscribes to source
 				co_await SourceState.m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-					(
-						CAppManagerTestHelper::fs_Permissions(m_DestHostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}, {"Application/ListAll", {}}})
-					)
+					(CAppManagerTestHelper::fs_Permissions(m_DestHostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}, {"Application/ListAll", {}}}))
 					.f_Timeout(g_Timeout, "Timed out adding permissions on source for destination")
 				;
 
 				// Allow destination to access source's VersionManager namespace
 				// Now that permissions are granted, the subscription will receive versions immediately
 				co_await m_DestLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-					(
-						CAppManagerTestHelper::fs_NamespaceHosts(CVersionManager::mc_pDefaultNamespace, TCSet<CStr>{SourceState.m_VersionManagerHostID})
-					)
+					(CAppManagerTestHelper::fs_NamespaceHosts(CVersionManager::mc_pDefaultNamespace, TCSet<CStr>{SourceState.m_VersionManagerHostID}))
 					.f_Timeout(g_Timeout, "Timed out allowing namespace for source")
 				;
 			}
@@ -199,29 +193,18 @@ namespace NVersionManagerSyncTests
 			// Setup trust between test and destination
 			{
 				co_await m_DestLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-					(
-						CAppManagerTestHelper::fs_Permissions(SourceState.m_TestHostID, SourceState.m_VersionManagerPermissionsForTest)
-					)
+					(CAppManagerTestHelper::fs_Permissions(SourceState.m_TestHostID, SourceState.m_VersionManagerPermissionsForTest))
 					.f_Timeout(g_Timeout, "Timed out adding test permissions on destination")
 				;
 
 				// Generate connection ticket from destination for test to connect
 				auto DestTicket = co_await m_DestLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{m_DestServerAddress}
-					)
+					(CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{m_DestServerAddress})
 					.f_Timeout(g_Timeout, "Timed out generating destination connection ticket")
 				;
 
 				// Connect test to destination
-				co_await SourceState.m_TrustManager
-					(
-						&CDistributedActorTrustManager::f_AddClientConnection
-						, DestTicket.m_Ticket
-						, g_Timeout
-						, -1
-						, 0
-					)
+				co_await SourceState.m_TrustManager(&CDistributedActorTrustManager::f_AddClientConnection, DestTicket.m_Ticket, g_Timeout, -1, 0)
 					.f_Timeout(g_Timeout, "Timed out adding test connection to destination")
 				;
 
@@ -260,9 +243,7 @@ namespace NVersionManagerSyncTests
 		{
 			CVersionManager::CListVersions Params;
 			Params.m_ForApplication = _Application;
-			auto Result = co_await m_DestVersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-				.f_Timeout(g_Timeout, "Timed out on ListVersions")
-			;
+			auto Result = co_await m_DestVersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out on ListVersions");
 
 			co_return Result.m_Versions[_Application].f_Exists(_VersionID);
 		}
@@ -272,9 +253,7 @@ namespace NVersionManagerSyncTests
 		{
 			CVersionManager::CListVersions Params;
 			Params.m_ForApplication = _Application;
-			auto Result = co_await m_DestVersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-				.f_Timeout(g_Timeout, "Timed out on ListVersions")
-			;
+			auto Result = co_await m_DestVersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out on ListVersions");
 
 			auto *pVersion = Result.m_Versions[_Application].f_FindEqual(_VersionID);
 			co_return pVersion ? pVersion->m_Tags : TCSet<CStr>();
@@ -285,9 +264,7 @@ namespace NVersionManagerSyncTests
 		{
 			CVersionManager::CListVersions Params;
 			Params.m_ForApplication = _Application;
-			auto Result = co_await m_DestVersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-				.f_Timeout(g_Timeout, "Timed out on ListVersions")
-			;
+			auto Result = co_await m_DestVersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out on ListVersions");
 
 			co_return !Result.m_Versions[_Application].f_Exists(_VersionID);
 		}
@@ -297,9 +274,7 @@ namespace NVersionManagerSyncTests
 		{
 			CVersionManager::CListVersions Params;
 			Params.m_ForApplication = _Application;
-			auto Result = co_await m_DestVersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-				.f_Timeout(g_Timeout, "Timed out on ListVersions")
-			;
+			auto Result = co_await m_DestVersionManager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out on ListVersions");
 
 			auto *pVersion = Result.m_Versions[_Application].f_FindEqual(_VersionID);
 			if (!pVersion)
@@ -435,27 +410,16 @@ namespace NVersionManagerSyncTests
 			// Setup trust between test and this manager
 			{
 				co_await Result.m_Launch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-					(
-						CAppManagerTestHelper::fs_Permissions(StateA.m_TestHostID, StateA.m_VersionManagerPermissionsForTest)
-					)
+					(CAppManagerTestHelper::fs_Permissions(StateA.m_TestHostID, StateA.m_VersionManagerPermissionsForTest))
 					.f_Timeout(g_Timeout, "Timed out adding test permissions on manager")
 				;
 
 				auto Ticket = co_await Result.m_Launch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{Result.m_ServerAddress}
-					)
+					(CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{Result.m_ServerAddress})
 					.f_Timeout(g_Timeout, "Timed out generating connection ticket")
 				;
 
-				co_await StateA.m_TrustManager
-					(
-						&CDistributedActorTrustManager::f_AddClientConnection
-						, Ticket.m_Ticket
-						, g_Timeout
-						, -1
-						, 0
-					)
+				co_await StateA.m_TrustManager(&CDistributedActorTrustManager::f_AddClientConnection, Ticket.m_Ticket, g_Timeout, -1, 0)
 					.f_Timeout(g_Timeout, "Timed out adding test connection to manager")
 				;
 
@@ -490,9 +454,7 @@ namespace NVersionManagerSyncTests
 			// X connects to Y and gets permissions
 			{
 				auto TicketFromY = co_await _InfoY.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{_InfoY.m_ServerAddress}
-					)
+					(CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{_InfoY.m_ServerAddress})
 					.f_Timeout(g_Timeout, "Timed out generating Y ticket for X")
 				;
 
@@ -502,16 +464,12 @@ namespace NVersionManagerSyncTests
 				;
 
 				co_await _InfoY.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-					(
-						CAppManagerTestHelper::fs_Permissions(_InfoX.m_HostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}, {"Application/ListAll", {}}})
-					)
+					(CAppManagerTestHelper::fs_Permissions(_InfoX.m_HostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}, {"Application/ListAll", {}}}))
 					.f_Timeout(g_Timeout, "Timed out granting Y permissions to X")
 				;
 
 				co_await _InfoX.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-					(
-						CAppManagerTestHelper::fs_NamespaceHosts(CVersionManager::mc_pDefaultNamespace, TCSet<CStr>{_InfoY.m_HostID})
-					)
+					(CAppManagerTestHelper::fs_NamespaceHosts(CVersionManager::mc_pDefaultNamespace, TCSet<CStr>{_InfoY.m_HostID}))
 					.f_Timeout(g_Timeout, "Timed out X allowing Y namespace")
 				;
 			}
@@ -519,9 +477,7 @@ namespace NVersionManagerSyncTests
 			// Y connects to X and gets permissions
 			{
 				auto TicketFromX = co_await _InfoX.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_GenerateConnectionTicket)
-					(
-						CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{_InfoX.m_ServerAddress}
-					)
+					(CDistributedActorTrustManagerInterface::CGenerateConnectionTicket{_InfoX.m_ServerAddress})
 					.f_Timeout(g_Timeout, "Timed out generating X ticket for Y")
 				;
 
@@ -531,16 +487,12 @@ namespace NVersionManagerSyncTests
 				;
 
 				co_await _InfoX.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-					(
-						CAppManagerTestHelper::fs_Permissions(_InfoY.m_HostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}, {"Application/ListAll", {}}})
-					)
+					(CAppManagerTestHelper::fs_Permissions(_InfoY.m_HostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}, {"Application/ListAll", {}}}))
 					.f_Timeout(g_Timeout, "Timed out granting X permissions to Y")
 				;
 
 				co_await _InfoY.m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AllowHostsForNamespace)
-					(
-						CAppManagerTestHelper::fs_NamespaceHosts(CVersionManager::mc_pDefaultNamespace, TCSet<CStr>{_InfoX.m_HostID})
-					)
+					(CAppManagerTestHelper::fs_NamespaceHosts(CVersionManager::mc_pDefaultNamespace, TCSet<CStr>{_InfoX.m_HostID}))
 					.f_Timeout(g_Timeout, "Timed out Y allowing X namespace")
 				;
 			}
@@ -705,9 +657,7 @@ namespace NVersionManagerSyncTests
 		{
 			CVersionManager::CListVersions Params;
 			Params.m_ForApplication = _Application;
-			auto Result = co_await _Manager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-				.f_Timeout(g_Timeout, "Timed out on ListVersions")
-			;
+			auto Result = co_await _Manager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out on ListVersions");
 
 			co_return Result.m_Versions[_Application].f_Exists(_VersionID);
 		}
@@ -717,9 +667,7 @@ namespace NVersionManagerSyncTests
 		{
 			CVersionManager::CListVersions Params;
 			Params.m_ForApplication = _Application;
-			auto Result = co_await _Manager.f_CallActor(&CVersionManager::f_ListVersions)(Params)
-				.f_Timeout(g_Timeout, "Timed out on ListVersions")
-			;
+			auto Result = co_await _Manager.f_CallActor(&CVersionManager::f_ListVersions)(Params).f_Timeout(g_Timeout, "Timed out on ListVersions");
 
 			auto *pVersion = Result.m_Versions[_Application].f_FindEqual(_VersionID);
 			co_return pVersion ? pVersion->m_Tags : TCSet<CStr>();
@@ -814,13 +762,7 @@ namespace NVersionManagerSyncTests
 
 				// Create sync config pointing to source
 				// Explicitly specify CopyTags for the tag verified in SyncExistingVersionUpdatesTagsOnly test
-				auto SyncConfig = fg_CreateSyncConfig
-					(
-						"TestSync"
-						, {SourceState.m_VersionManagerHostID}
-						, {.m_CopyTags = {"source-tag"}}
-					)
-				;
+				auto SyncConfig = fg_CreateSyncConfig("TestSync", {SourceState.m_VersionManagerHostID}, {.m_CopyTags = {"source-tag"}});
 
 				// Setup destination with sync config
 				co_await SyncHelper.f_SetupDestination(SyncConfig);
@@ -841,14 +783,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Configuration = "Release";
 					VersionInfo.m_Tags["SyncTestTag"];
 
-					auto UploadResult = co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, SourceState.m_TestAppArchive
-						)
+					auto UploadResult = co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive)
 						.f_Wrap()
 					;
 					DMibExpectNoException(UploadResult.f_Access());
@@ -877,15 +812,7 @@ namespace NVersionManagerSyncTests
 						VersionInfo.m_Configuration = "Release";
 						VersionInfo.m_Tags["MultiSync"];
 
-						co_await SourceState.m_VersionManagerHelper.f_Upload
-							(
-								SourceState.m_VersionManager
-								, "TestApp"
-								, VersionID
-								, VersionInfo
-								, SourceState.m_TestAppArchive
-							)
-						;
+						co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive);
 
 						bool bSynced = co_await SyncHelper.f_VerifyVersionInDest("TestApp", VersionID);
 						DMibExpectTrue(bSynced);
@@ -911,15 +838,7 @@ namespace NVersionManagerSyncTests
 					DestVersionInfo.m_Configuration = "Release";
 					DestVersionInfo.m_Tags["local-tag"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SyncHelper.m_DestVersionManager
-							, "TestApp"
-							, VersionID
-							, DestVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SyncHelper.m_DestVersionManager, "TestApp", VersionID, DestVersionInfo, SourceState.m_TestAppArchive);
 
 					// Verify version exists in destination with local tag
 					TCSet<CStr> LocalTags{"local-tag"};
@@ -932,15 +851,7 @@ namespace NVersionManagerSyncTests
 					SourceVersionInfo.m_Configuration = "Release";
 					SourceVersionInfo.m_Tags["source-tag"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, SourceVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, SourceVersionInfo, SourceState.m_TestAppArchive);
 
 					// After sync, destination should have the source tag added and local tag preserved
 					TCSet<CStr> ExpectedTags{"source-tag", "local-tag"};
@@ -975,7 +886,7 @@ namespace NVersionManagerSyncTests
 					(
 						"TestSync"
 						, {SourceState.m_VersionManagerHostID}
-						, {.m_CopyTags = {"release=synced-release", "beta"}}  // CopyTags: transform release->synced-release, copy beta as-is
+						, {.m_CopyTags = {"release=synced-release", "beta"}} // CopyTags: transform release->synced-release, copy beta as-is
 					)
 				;
 
@@ -996,15 +907,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Configuration = "Release";
 					VersionInfo.m_Tags["release"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive);
 
 					// Verify version synced with transformed tag, original "release" tag should NOT be present
 					TCSet<CStr> ExpectedTags{"synced-release"};
@@ -1029,15 +932,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Configuration = "Release";
 					VersionInfo.m_Tags["beta"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive);
 
 					// Verify version synced with same tag (identity mapping)
 					TCSet<CStr> ExpectedTags{"beta"};
@@ -1059,18 +954,10 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation VersionInfo;
 					VersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					VersionInfo.m_Configuration = "Release";
-					VersionInfo.m_Tags["release"];  // Will be mapped to synced-release
-					VersionInfo.m_Tags["beta"];     // Will be copied as-is
+					VersionInfo.m_Tags["release"]; // Will be mapped to synced-release
+					VersionInfo.m_Tags["beta"]; // Will be copied as-is
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive);
 
 					// Verify both mapped tags are present
 					TCSet<CStr> ExpectedTags{"synced-release", "beta"};
@@ -1095,31 +982,15 @@ namespace NVersionManagerSyncTests
 					DestVersionInfo.m_Configuration = "Release";
 					DestVersionInfo.m_Tags["local-only-tag"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SyncHelper.m_DestVersionManager
-							, "TestApp"
-							, VersionID
-							, DestVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SyncHelper.m_DestVersionManager, "TestApp", VersionID, DestVersionInfo, SourceState.m_TestAppArchive);
 
 					// Now upload same version to source with a tag that will be synced
 					CVersionManager::CVersionInformation SourceVersionInfo;
 					SourceVersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					SourceVersionInfo.m_Configuration = "Release";
-					SourceVersionInfo.m_Tags["release"];  // Will be mapped to synced-release
+					SourceVersionInfo.m_Tags["release"]; // Will be mapped to synced-release
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, SourceVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, SourceVersionInfo, SourceState.m_TestAppArchive);
 
 					// Verify both local and synced tags are present
 					TCSet<CStr> ExpectedTags{"local-only-tag", "synced-release"};
@@ -1142,17 +1013,9 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation VersionInfo1;
 					VersionInfo1.m_Time = NTime::CTime::fs_NowUTC();
 					VersionInfo1.m_Configuration = "Release";
-					VersionInfo1.m_Tags["release"];  // Will be mapped to synced-release
+					VersionInfo1.m_Tags["release"]; // Will be mapped to synced-release
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo1
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo1, SourceState.m_TestAppArchive);
 
 					// Verify initial synced tag is present
 					TCSet<CStr> InitialTags{"synced-release"};
@@ -1164,11 +1027,9 @@ namespace NVersionManagerSyncTests
 					ChangeTagsParams.m_Application = "TestApp";
 					ChangeTagsParams.m_VersionID = VersionID.m_VersionID;
 					ChangeTagsParams.m_Platform = VersionID.m_Platform;
-					ChangeTagsParams.m_AddTags["beta"];  // Add new tag
+					ChangeTagsParams.m_AddTags["beta"]; // Add new tag
 
-					co_await SourceState.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams)
-						.f_Timeout(g_Timeout, "Timed out changing tags")
-					;
+					co_await SourceState.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams).f_Timeout(g_Timeout, "Timed out changing tags");
 
 					// Verify both tags are now present in destination
 					TCSet<CStr> UpdatedTags{"synced-release", "beta"};
@@ -1203,7 +1064,7 @@ namespace NVersionManagerSyncTests
 					(
 						"TestSync"
 						, {SourceState.m_VersionManagerHostID}
-						, {.m_Applications = {"TestApp*"}, .m_Tags = {"release*"}}  // Application and tag filters
+						, {.m_Applications = {"TestApp*"}, .m_Tags = {"release*"}} // Application and tag filters
 					)
 				;
 
@@ -1225,15 +1086,7 @@ namespace NVersionManagerSyncTests
 					MatchingVersionInfo.m_Configuration = "Release";
 					MatchingVersionInfo.m_Tags["release"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, MatchingVersionID
-							, MatchingVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", MatchingVersionID, MatchingVersionInfo, SourceState.m_TestAppArchive);
 
 					// Upload version with non-matching tag
 					CVersionManager::CVersionIDAndPlatform NonMatchingVersionID;
@@ -1246,17 +1099,9 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation NonMatchingVersionInfo;
 					NonMatchingVersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					NonMatchingVersionInfo.m_Configuration = "Release";
-					NonMatchingVersionInfo.m_Tags["beta"];  // Should NOT sync
+					NonMatchingVersionInfo.m_Tags["beta"]; // Should NOT sync
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, NonMatchingVersionID
-							, NonMatchingVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", NonMatchingVersionID, NonMatchingVersionInfo, SourceState.m_TestAppArchive);
 
 					// Matching version should sync (sync completes when upload returns)
 					bool bMatchingSynced = co_await SyncHelper.f_VerifyVersionInDest("TestApp", MatchingVersionID);
@@ -1282,12 +1127,12 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation MatchingAppVersionInfo;
 					MatchingAppVersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					MatchingAppVersionInfo.m_Configuration = "Release";
-					MatchingAppVersionInfo.m_Tags["release"];  // Matches tag filter too
+					MatchingAppVersionInfo.m_Tags["release"]; // Matches tag filter too
 
 					co_await SourceState.m_VersionManagerHelper.f_Upload
 						(
 							SourceState.m_VersionManager
-							, "TestAppVariant"  // Matches "TestApp*" pattern
+							, "TestAppVariant" // Matches "TestApp*" pattern
 							, MatchingAppVersionID
 							, MatchingAppVersionInfo
 							, SourceState.m_TestAppArchive
@@ -1305,12 +1150,12 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation NonMatchingAppVersionInfo;
 					NonMatchingAppVersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					NonMatchingAppVersionInfo.m_Configuration = "Release";
-					NonMatchingAppVersionInfo.m_Tags["release"];  // Has matching tag, but wrong app
+					NonMatchingAppVersionInfo.m_Tags["release"]; // Has matching tag, but wrong app
 
 					co_await SourceState.m_VersionManagerHelper.f_Upload
 						(
 							SourceState.m_VersionManager
-							, "OtherApp"  // Does NOT match "TestApp*" pattern
+							, "OtherApp" // Does NOT match "TestApp*" pattern
 							, NonMatchingAppVersionID
 							, NonMatchingAppVersionInfo
 							, SourceState.m_TestAppArchive
@@ -1353,7 +1198,7 @@ namespace NVersionManagerSyncTests
 					(
 						"TestSync"
 						, {SourceState.m_VersionManagerHostID}
-						, {.m_Platforms = {"macOS*"}}  // Platforms - only sync macOS* platforms
+						, {.m_Platforms = {"macOS*"}} // Platforms - only sync macOS* platforms
 					)
 				;
 
@@ -1368,7 +1213,7 @@ namespace NVersionManagerSyncTests
 					MatchingPlatformVersionID.m_VersionID.m_Major = 11;
 					MatchingPlatformVersionID.m_VersionID.m_Minor = 0;
 					MatchingPlatformVersionID.m_VersionID.m_Revision = 0;
-					MatchingPlatformVersionID.m_Platform = "macOS-x86-64";  // Matches "macOS*"
+					MatchingPlatformVersionID.m_Platform = "macOS-x86-64"; // Matches "macOS*"
 
 					CVersionManager::CVersionInformation MatchingPlatformVersionInfo;
 					MatchingPlatformVersionInfo.m_Time = NTime::CTime::fs_NowUTC();
@@ -1391,7 +1236,7 @@ namespace NVersionManagerSyncTests
 					NonMatchingPlatformVersionID.m_VersionID.m_Major = 11;
 					NonMatchingPlatformVersionID.m_VersionID.m_Minor = 1;
 					NonMatchingPlatformVersionID.m_VersionID.m_Revision = 0;
-					NonMatchingPlatformVersionID.m_Platform = "Windows-x86-64";  // Does NOT match "macOS*"
+					NonMatchingPlatformVersionID.m_Platform = "Windows-x86-64"; // Does NOT match "macOS*"
 
 					CVersionManager::CVersionInformation NonMatchingPlatformVersionInfo;
 					NonMatchingPlatformVersionInfo.m_Time = NTime::CTime::fs_NowUTC();
@@ -1440,13 +1285,7 @@ namespace NVersionManagerSyncTests
 				co_await SyncHelper.f_SetupSource();
 
 				// Create sync config with pretend mode enabled
-				auto SyncConfig = fg_CreateSyncConfig
-					(
-						"TestSync"
-						, {SourceState.m_VersionManagerHostID}
-						, {.m_bPretend = true}
-					)
-				;
+				auto SyncConfig = fg_CreateSyncConfig("TestSync", {SourceState.m_VersionManagerHostID}, {.m_bPretend = true});
 
 				co_await SyncHelper.f_SetupDestination(SyncConfig);
 
@@ -1466,15 +1305,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Configuration = "Release";
 					VersionInfo.m_Tags["PretendTag"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive);
 
 					// In pretend mode, version should NOT actually sync
 					bool bNotSynced = co_await SyncHelper.f_VerifyVersionNotInDest("TestApp", VersionID);
@@ -1505,16 +1336,11 @@ namespace NVersionManagerSyncTests
 
 				// Create two sync configs: one pretend (for pretend* tags), one real (for real* tags)
 				CEJsonSorted SyncSources = EJsonType_Object;
-				SyncSources["PretendSync"] = fg_CreateSyncSource
-					(
-						{SourceState.m_VersionManagerHostID}
-						, {.m_Tags = {"pretend*"}, .m_bPretend = true}
-					)
-				;
+				SyncSources["PretendSync"] = fg_CreateSyncSource({SourceState.m_VersionManagerHostID}, {.m_Tags = {"pretend*"}, .m_bPretend = true});
 				SyncSources["RealSync"] = fg_CreateSyncSource
 					(
 						{SourceState.m_VersionManagerHostID}
-						, {.m_Tags = {"real*"}}  // Pretend = false (default)
+						, {.m_Tags = {"real*"}} // Pretend = false (default)
 					)
 				;
 
@@ -1538,15 +1364,7 @@ namespace NVersionManagerSyncTests
 					PretendVersionInfo.m_Configuration = "Release";
 					PretendVersionInfo.m_Tags["pretend-test"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, PretendVersionID
-							, PretendVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", PretendVersionID, PretendVersionInfo, SourceState.m_TestAppArchive);
 
 					// Upload version with real tag - should sync (real mode)
 					CVersionManager::CVersionIDAndPlatform RealVersionID;
@@ -1561,15 +1379,7 @@ namespace NVersionManagerSyncTests
 					RealVersionInfo.m_Configuration = "Release";
 					RealVersionInfo.m_Tags["real-test"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, RealVersionID
-							, RealVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", RealVersionID, RealVersionInfo, SourceState.m_TestAppArchive);
 
 					// Pretend version should NOT sync (pretend mode is enabled for this config)
 					bool bPretendNotSynced = co_await SyncHelper.f_VerifyVersionNotInDest("TestApp", PretendVersionID);
@@ -1610,7 +1420,7 @@ namespace NVersionManagerSyncTests
 					(
 						"TestSync"
 						, {SourceState.m_VersionManagerHostID}
-						, {.m_StartSyncDate = StartDateStr}  // MinSyncVersions = 0 (default) so date filtering is strictly applied
+						, {.m_StartSyncDate = StartDateStr} // MinSyncVersions = 0 (default) so date filtering is strictly applied
 					)
 				;
 
@@ -1632,15 +1442,7 @@ namespace NVersionManagerSyncTests
 					OldVersionInfo.m_Configuration = "Release";
 					OldVersionInfo.m_Tags["OldVersion"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, OldVersionID
-							, OldVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", OldVersionID, OldVersionInfo, SourceState.m_TestAppArchive);
 
 					// Upload new version (today - after StartSyncDate)
 					CVersionManager::CVersionIDAndPlatform NewVersionID;
@@ -1655,15 +1457,7 @@ namespace NVersionManagerSyncTests
 					NewVersionInfo.m_Configuration = "Release";
 					NewVersionInfo.m_Tags["NewVersion"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, NewVersionID
-							, NewVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", NewVersionID, NewVersionInfo, SourceState.m_TestAppArchive);
 
 					// New version should sync (sync completes when upload returns)
 					bool bNewSynced = co_await SyncHelper.f_VerifyVersionInDest("TestApp", NewVersionID);
@@ -1715,15 +1509,7 @@ namespace NVersionManagerSyncTests
 					OldestVersionInfo.m_Configuration = "Release";
 					OldestVersionInfo.m_Tags["oldest"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, OldestVersionID
-							, OldestVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", OldestVersionID, OldestVersionInfo, SourceState.m_TestAppArchive);
 
 					CVersionManager::CVersionIDAndPlatform MiddleVersionID;
 					MiddleVersionID.m_VersionID.m_Branch = SourceState.m_PackageInfo.m_VersionID.m_VersionID.m_Branch;
@@ -1737,15 +1523,7 @@ namespace NVersionManagerSyncTests
 					MiddleVersionInfo.m_Configuration = "Release";
 					MiddleVersionInfo.m_Tags["middle"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, MiddleVersionID
-							, MiddleVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", MiddleVersionID, MiddleVersionInfo, SourceState.m_TestAppArchive);
 
 					CVersionManager::CVersionIDAndPlatform NewestVersionID;
 					NewestVersionID.m_VersionID.m_Branch = SourceState.m_PackageInfo.m_VersionID.m_VersionID.m_Branch;
@@ -1759,15 +1537,7 @@ namespace NVersionManagerSyncTests
 					NewestVersionInfo.m_Configuration = "Release";
 					NewestVersionInfo.m_Tags["newest"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, NewestVersionID
-							, NewestVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", NewestVersionID, NewestVersionInfo, SourceState.m_TestAppArchive);
 
 					// Now set up destination - the initial subscription triggers a full resend
 					// MinSyncVersions only works during full resend when all versions are present
@@ -1781,7 +1551,7 @@ namespace NVersionManagerSyncTests
 						(
 							"TestSync"
 							, {SourceState.m_VersionManagerHostID}
-							, {.m_StartSyncDate = StartDateStr, .m_nMinSyncVersions = 3}  // 3 newest versions bypass date filter
+							, {.m_StartSyncDate = StartDateStr, .m_nMinSyncVersions = 3} // 3 newest versions bypass date filter
 						)
 					;
 
@@ -1821,12 +1591,7 @@ namespace NVersionManagerSyncTests
 
 				co_await SyncHelper.f_SetupSource();
 
-				auto SyncConfig = fg_CreateSyncConfig
-					(
-						"TestSync"
-						, {SourceState.m_VersionManagerHostID}
-					)
-				;
+				auto SyncConfig = fg_CreateSyncConfig("TestSync", {SourceState.m_VersionManagerHostID});
 
 				co_await SyncHelper.f_SetupDestination(SyncConfig);
 
@@ -1850,16 +1615,7 @@ namespace NVersionManagerSyncTests
 						VersionInfo.m_Configuration = "Release";
 						VersionInfo.m_Tags["ConcurrentSync"];
 
-						SourceState.m_VersionManagerHelper.f_Upload
-							(
-								SourceState.m_VersionManager
-								, "TestApp"
-								, VersionID
-								, VersionInfo
-								, SourceState.m_TestAppArchive
-							)
-							> UploadFutures
-						;
+						SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive) > UploadFutures;
 					}
 
 					// Wait for all uploads to complete
@@ -1934,15 +1690,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Tags["multi-source"];
 
 					// Upload the version (both sources will be notified)
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive);
 
 					// Verify the version synced exactly once (no errors, correct result)
 					bool bSynced = co_await SyncHelper.f_VerifyVersionInDest("TestApp", VersionID);
@@ -1983,13 +1731,13 @@ namespace NVersionManagerSyncTests
 				SyncSources["Source1"] = fg_CreateSyncSource
 					(
 						{SourceState.m_VersionManagerHostID}
-						, {.m_Tags = {"alpha*"}, .m_CopyTags = {"alpha"}}  // Copy alpha tag as-is
+						, {.m_Tags = {"alpha*"}, .m_CopyTags = {"alpha"}} // Copy alpha tag as-is
 					)
 				;
 				SyncSources["Source2"] = fg_CreateSyncSource
 					(
 						{SourceState.m_VersionManagerHostID}
-						, {.m_Tags = {"beta*"}, .m_CopyTags = {"beta=synced-beta"}}  // Transform beta to synced-beta
+						, {.m_Tags = {"beta*"}, .m_CopyTags = {"beta=synced-beta"}} // Transform beta to synced-beta
 					)
 				;
 
@@ -2013,15 +1761,7 @@ namespace NVersionManagerSyncTests
 					AlphaVersionInfo.m_Configuration = "Release";
 					AlphaVersionInfo.m_Tags["alpha"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, AlphaVersionID
-							, AlphaVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", AlphaVersionID, AlphaVersionInfo, SourceState.m_TestAppArchive);
 
 					// Upload version with beta tag - should sync with transformed tag
 					CVersionManager::CVersionIDAndPlatform BetaVersionID;
@@ -2036,15 +1776,7 @@ namespace NVersionManagerSyncTests
 					BetaVersionInfo.m_Configuration = "Release";
 					BetaVersionInfo.m_Tags["beta"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, BetaVersionID
-							, BetaVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", BetaVersionID, BetaVersionInfo, SourceState.m_TestAppArchive);
 
 					// Verify alpha version synced with "alpha" tag
 					{
@@ -2079,17 +1811,9 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation GammaVersionInfo;
 					GammaVersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					GammaVersionInfo.m_Configuration = "Release";
-					GammaVersionInfo.m_Tags["gamma"];  // Neither alpha* nor beta*
+					GammaVersionInfo.m_Tags["gamma"]; // Neither alpha* nor beta*
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, GammaVersionID
-							, GammaVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", GammaVersionID, GammaVersionInfo, SourceState.m_TestAppArchive);
 
 					// Gamma version should NOT sync (matches neither filter)
 					bool bGammaNotSynced = co_await SyncHelper.f_VerifyVersionNotInDest("TestApp", GammaVersionID);
@@ -2119,13 +1843,7 @@ namespace NVersionManagerSyncTests
 				co_await SyncHelper.f_SetupSource();
 
 				// Create sync config with SyncRetrySequence enabled
-				auto SyncConfig = fg_CreateSyncConfig
-					(
-						"TestSync"
-						, {SourceState.m_VersionManagerHostID}
-						, {.m_bSyncRetrySequence = true}
-					)
-				;
+				auto SyncConfig = fg_CreateSyncConfig("TestSync", {SourceState.m_VersionManagerHostID}, {.m_bSyncRetrySequence = true});
 
 				co_await SyncHelper.f_SetupDestination(SyncConfig);
 
@@ -2143,18 +1861,10 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation VersionInfo;
 					VersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					VersionInfo.m_Configuration = "Release";
-					VersionInfo.m_RetrySequence = 5;  // Set RetrySequence
+					VersionInfo.m_RetrySequence = 5; // Set RetrySequence
 					VersionInfo.m_Tags["retry-test"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive);
 
 					// Verify version synced
 					bool bSynced = co_await SyncHelper.f_VerifyVersionInDest("TestApp", VersionID);
@@ -2188,12 +1898,7 @@ namespace NVersionManagerSyncTests
 				co_await SyncHelper.f_SetupSource();
 
 				// Create sync config with SyncRetrySequence disabled (default)
-				auto SyncConfig = fg_CreateSyncConfig
-					(
-						"TestSync"
-						, {SourceState.m_VersionManagerHostID}
-					)
-				;
+				auto SyncConfig = fg_CreateSyncConfig("TestSync", {SourceState.m_VersionManagerHostID});
 
 				co_await SyncHelper.f_SetupDestination(SyncConfig);
 
@@ -2211,18 +1916,10 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation VersionInfo;
 					VersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					VersionInfo.m_Configuration = "Release";
-					VersionInfo.m_RetrySequence = 5;  // Set RetrySequence
+					VersionInfo.m_RetrySequence = 5; // Set RetrySequence
 					VersionInfo.m_Tags["retry-disabled-test"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", VersionID, VersionInfo, SourceState.m_TestAppArchive);
 
 					// Verify version synced
 					bool bSynced = co_await SyncHelper.f_VerifyVersionInDest("TestApp", VersionID);
@@ -2255,12 +1952,7 @@ namespace NVersionManagerSyncTests
 
 				co_await SyncHelper.f_SetupSource();
 
-				auto SyncConfig = fg_CreateSyncConfig
-					(
-						"TestSync"
-						, {SourceState.m_VersionManagerHostID}
-					)
-				;
+				auto SyncConfig = fg_CreateSyncConfig("TestSync", {SourceState.m_VersionManagerHostID});
 
 				co_await SyncHelper.f_SetupDestination(SyncConfig);
 
@@ -2280,15 +1972,7 @@ namespace NVersionManagerSyncTests
 					FirstVersionInfo.m_Configuration = "Release";
 					FirstVersionInfo.m_Tags["First"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, FirstVersionID
-							, FirstVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", FirstVersionID, FirstVersionInfo, SourceState.m_TestAppArchive);
 
 					// First version should sync successfully
 					bool bFirstSynced = co_await SyncHelper.f_VerifyVersionInDest("TestApp", FirstVersionID);
@@ -2309,7 +1993,8 @@ namespace NVersionManagerSyncTests
 								, .m_OrderingFlags = CAppManagerTestHelper::mc_WaitForSubscriptions
 							}
 						;
-						co_await SourceState.m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_RemovePermissions)(RemoveCmd)
+						co_await SourceState.m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_RemovePermissions)
+							(RemoveCmd)
 							.f_Timeout(g_Timeout, "Timed out removing permissions")
 						;
 					}
@@ -2327,15 +2012,7 @@ namespace NVersionManagerSyncTests
 					SecondVersionInfo.m_Configuration = "Release";
 					SecondVersionInfo.m_Tags["Second"];
 
-					co_await SourceState.m_VersionManagerHelper.f_Upload
-						(
-							SourceState.m_VersionManager
-							, "TestApp"
-							, SecondVersionID
-							, SecondVersionInfo
-							, SourceState.m_TestAppArchive
-						)
-					;
+					co_await SourceState.m_VersionManagerHelper.f_Upload(SourceState.m_VersionManager, "TestApp", SecondVersionID, SecondVersionInfo, SourceState.m_TestAppArchive);
 
 					// Second version should NOT have synced (permission denied)
 					bool bSecondNotSynced = co_await SyncHelper.f_VerifyVersionNotInDest("TestApp", SecondVersionID);
@@ -2348,9 +2025,7 @@ namespace NVersionManagerSyncTests
 
 					// Restore the permission
 					co_await SourceState.m_VersionManagerLaunch->m_pTrustInterface->f_CallActor(&CDistributedActorTrustManagerInterface::f_AddPermissions)
-						(
-							CAppManagerTestHelper::fs_Permissions(SyncHelper.m_DestHostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}})
-						)
+						(CAppManagerTestHelper::fs_Permissions(SyncHelper.m_DestHostID, TCMap<CStr, CPermissionRequirements>{{"Application/ReadAll", {}}}))
 						.f_Timeout(g_Timeout, "Timed out restoring permissions")
 					;
 
@@ -2434,15 +2109,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Configuration = "Release";
 					VersionInfo.m_Tags["a-release"];
 
-					co_await StateA.m_VersionManagerHelper.f_Upload
-						(
-							StateA.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, StateA.m_TestAppArchive
-						)
-					;
+					co_await StateA.m_VersionManagerHelper.f_Upload(StateA.m_VersionManager, "TestApp", VersionID, VersionInfo, StateA.m_TestAppArchive);
 
 					// Verify version synced to B and C
 					bool bInB = co_await Helper.f_VerifyVersionInManager(Helper.m_VersionManagerB, "TestApp", VersionID);
@@ -2467,15 +2134,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Configuration = "Release";
 					VersionInfo.m_Tags["b-release"];
 
-					co_await StateA.m_VersionManagerHelper.f_Upload
-						(
-							Helper.m_VersionManagerB
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, StateA.m_TestAppArchive
-						)
-					;
+					co_await StateA.m_VersionManagerHelper.f_Upload(Helper.m_VersionManagerB, "TestApp", VersionID, VersionInfo, StateA.m_TestAppArchive);
 
 					// Verify version synced to A and C
 					bool bInA = co_await Helper.f_VerifyVersionInManager(StateA.m_VersionManager, "TestApp", VersionID);
@@ -2500,15 +2159,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Configuration = "Release";
 					VersionInfo.m_Tags["c-release"];
 
-					co_await StateA.m_VersionManagerHelper.f_Upload
-						(
-							Helper.m_VersionManagerC
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, StateA.m_TestAppArchive
-						)
-					;
+					co_await StateA.m_VersionManagerHelper.f_Upload(Helper.m_VersionManagerC, "TestApp", VersionID, VersionInfo, StateA.m_TestAppArchive);
 
 					// Verify version synced to A and B
 					bool bInA = co_await Helper.f_VerifyVersionInManager(StateA.m_VersionManager, "TestApp", VersionID);
@@ -2536,9 +2187,7 @@ namespace NVersionManagerSyncTests
 					ChangeTagsParams.m_Platform = VersionID.m_Platform;
 					ChangeTagsParams.m_AddTags["new-tag-from-a"];
 
-					co_await StateA.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams)
-						.f_Timeout(g_Timeout, "Timed out changing tags on A")
-					;
+					co_await StateA.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams).f_Timeout(g_Timeout, "Timed out changing tags on A");
 
 					// Verify tag propagated to B and C
 					TCSet<CStr> ExpectedTags{"new-tag-from-a"};
@@ -2567,9 +2216,7 @@ namespace NVersionManagerSyncTests
 					ChangeTagsParams.m_Platform = VersionID.m_Platform;
 					ChangeTagsParams.m_AddTags["new-tag-from-b"];
 
-					co_await Helper.m_VersionManagerB.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams)
-						.f_Timeout(g_Timeout, "Timed out changing tags on B")
-					;
+					co_await Helper.m_VersionManagerB.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams).f_Timeout(g_Timeout, "Timed out changing tags on B");
 
 					// Verify tag propagated to A and C
 					TCSet<CStr> ExpectedTags{"new-tag-from-b"};
@@ -2598,9 +2245,7 @@ namespace NVersionManagerSyncTests
 					ChangeTagsParams.m_Platform = VersionID.m_Platform;
 					ChangeTagsParams.m_AddTags["new-tag-from-c"];
 
-					co_await Helper.m_VersionManagerC.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams)
-						.f_Timeout(g_Timeout, "Timed out changing tags on C")
-					;
+					co_await Helper.m_VersionManagerC.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams).f_Timeout(g_Timeout, "Timed out changing tags on C");
 
 					// Verify tag propagated to A and B
 					TCSet<CStr> ExpectedTags{"new-tag-from-c"};
@@ -2673,7 +2318,7 @@ namespace NVersionManagerSyncTests
 
 					// Setup notification counter
 					CNotificationCounter Counter;
-					Counter.m_nExpectedMax = 5;  // A upload + B sync = 2 notifications expected, allow buffer
+					Counter.m_nExpectedMax = 5; // A upload + B sync = 2 notifications expected, allow buffer
 
 					// Upload version to A with "release" tag
 					// If there's a loop: A uploads -> B syncs -> A syncs from B -> B syncs again -> ...
@@ -2690,14 +2335,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Tags["release"];
 
 					// Race: upload should complete vs loop detected
-					auto UploadFuture = StateA.m_VersionManagerHelper.f_Upload
-						(
-							StateA.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, StateA.m_TestAppArchive
-						)
+					auto UploadFuture = StateA.m_VersionManagerHelper.f_Upload(StateA.m_VersionManager, "TestApp", VersionID, VersionInfo, StateA.m_TestAppArchive)
 						.f_Timeout(g_Timeout, "Upload timed out - possible deadlock")
 					;
 
@@ -2731,16 +2369,9 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation VersionInfo;
 					VersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					VersionInfo.m_Configuration = "Release";
-					VersionInfo.m_Tags["other-tag"];  // Not "release", won't trigger identity sync
+					VersionInfo.m_Tags["other-tag"]; // Not "release", won't trigger identity sync
 
-					co_await StateA.m_VersionManagerHelper.f_Upload
-						(
-							StateA.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, StateA.m_TestAppArchive
-						)
+					co_await StateA.m_VersionManagerHelper.f_Upload(StateA.m_VersionManager, "TestApp", VersionID, VersionInfo, StateA.m_TestAppArchive)
 						.f_Timeout(g_Timeout, "Upload timed out")
 					;
 
@@ -2750,7 +2381,7 @@ namespace NVersionManagerSyncTests
 
 					// Setup notification counter for tag change
 					CNotificationCounter Counter;
-					Counter.m_nExpectedMax = 5;  // Tag change + sync notifications, allow buffer
+					Counter.m_nExpectedMax = 5; // Tag change + sync notifications, allow buffer
 
 					// Now add "release" tag - this should trigger identity mapping sync
 					// If there's a loop: A adds tag -> B syncs tag -> A syncs from B -> B syncs again -> ...
@@ -2760,9 +2391,7 @@ namespace NVersionManagerSyncTests
 					ChangeTagsParams.m_Platform = VersionID.m_Platform;
 					ChangeTagsParams.m_AddTags["release"];
 
-					auto ChangeFuture = StateA.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams)
-						.f_Timeout(g_Timeout, "Tag change timed out - deadlock")
-					;
+					auto ChangeFuture = StateA.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams).f_Timeout(g_Timeout, "Tag change timed out - deadlock");
 
 					auto LoopFuture = Counter.f_GetLoopFuture();
 
@@ -2840,7 +2469,7 @@ namespace NVersionManagerSyncTests
 
 					// Setup notification counter
 					CNotificationCounter Counter;
-					Counter.m_nExpectedMax = 10;  // A->B->C = 3 notifications, allow buffer
+					Counter.m_nExpectedMax = 10; // A->B->C = 3 notifications, allow buffer
 
 					// Upload version to A with "a-tag"
 					// If loop not prevented: A->B(b-tag)->C(c-tag)->A(a-tag)->B->C->A->...
@@ -2857,14 +2486,7 @@ namespace NVersionManagerSyncTests
 					VersionInfo.m_Tags["a-tag"];
 
 					// Race: upload should complete vs loop detected
-					auto UploadFuture = StateA.m_VersionManagerHelper.f_Upload
-						(
-							StateA.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, StateA.m_TestAppArchive
-						)
+					auto UploadFuture = StateA.m_VersionManagerHelper.f_Upload(StateA.m_VersionManager, "TestApp", VersionID, VersionInfo, StateA.m_TestAppArchive)
 						.f_Timeout(g_Timeout, "Upload timed out - possible deadlock")
 					;
 
@@ -2901,16 +2523,9 @@ namespace NVersionManagerSyncTests
 					CVersionManager::CVersionInformation VersionInfo;
 					VersionInfo.m_Time = NTime::CTime::fs_NowUTC();
 					VersionInfo.m_Configuration = "Release";
-					VersionInfo.m_Tags["other-tag"];  // Not "a-tag", won't trigger chain transformation
+					VersionInfo.m_Tags["other-tag"]; // Not "a-tag", won't trigger chain transformation
 
-					co_await StateA.m_VersionManagerHelper.f_Upload
-						(
-							StateA.m_VersionManager
-							, "TestApp"
-							, VersionID
-							, VersionInfo
-							, StateA.m_TestAppArchive
-						)
+					co_await StateA.m_VersionManagerHelper.f_Upload(StateA.m_VersionManager, "TestApp", VersionID, VersionInfo, StateA.m_TestAppArchive)
 						.f_Timeout(g_Timeout, "Upload timed out")
 					;
 
@@ -2923,7 +2538,7 @@ namespace NVersionManagerSyncTests
 
 					// Setup notification counter for tag change
 					CNotificationCounter Counter;
-					Counter.m_nExpectedMax = 10;  // Tag change + chain propagation, allow buffer
+					Counter.m_nExpectedMax = 10; // Tag change + chain propagation, allow buffer
 
 					// Now add "a-tag" - this should trigger the circular chain transformation
 					// If loop not prevented: A adds a-tag -> B gets b-tag -> C gets c-tag -> A gets a-tag again -> ...
@@ -2933,7 +2548,8 @@ namespace NVersionManagerSyncTests
 					ChangeTagsParams.m_Platform = VersionID.m_Platform;
 					ChangeTagsParams.m_AddTags["a-tag"];
 
-					auto ChangeFuture = StateA.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)(ChangeTagsParams)
+					auto ChangeFuture = StateA.m_VersionManager.f_CallActor(&CVersionManager::f_ChangeTags)
+						(ChangeTagsParams)
 						.f_Timeout(g_Timeout, "Tag change timed out - possible deadlock")
 					;
 

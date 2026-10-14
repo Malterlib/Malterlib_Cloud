@@ -87,7 +87,7 @@ namespace NMib::NCloud::NDebugManager
 		TCFuture<void> fp_Notify_CrashDumpAdded(CDebugDatabase::CCrashDumpAdd _CrashDumpAdd);
 		TCFuture<void> fp_Notify_Process(bool _bForce);
 
-		constexpr static uint32 mcp_MaxQueueSize = NFile::gc_IdealNetworkQueueSize;
+		static constexpr uint32 mcp_MaxQueueSize = NFile::gc_IdealNetworkQueueSize;
 
 		TCDistributedActorInstance<CDebugManagerImplementation> mp_DebugManagerInterface;
 

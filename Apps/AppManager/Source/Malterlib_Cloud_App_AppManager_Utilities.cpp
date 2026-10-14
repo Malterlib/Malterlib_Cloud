@@ -49,13 +49,7 @@ namespace NMib::NCloud::NAppManager
 		return CStr::fs_Join(fg_Move(OutLines).f_Reverse(), "\n");
 	}
 
-	CStr CAppManagerActor::fsp_RunTool
-		(
-			CStr const &_Description
-			, CStr const &_Tool
-			, CStr const &_WorkingDir
-			, TCVector<CStr> const &_Arguments
-		)
+	CStr CAppManagerActor::fsp_RunTool(CStr const &_Description, CStr const &_Tool, CStr const &_WorkingDir, TCVector<CStr> const &_Arguments)
 	{
 		CProcessLaunchParams Params;
 		Params.m_bAllowExecutableLocate = true;
@@ -126,14 +120,7 @@ namespace NMib::NCloud::NAppManager
 					if (!CFile::fs_FileExists(FileName))
 					{
 						CFile::fs_CreateDirectory(CFile::fs_GetPath(FileName));
-						CFile::fs_WriteStringToFile
-							(
-								FileName
-								, _Script
-								, false
-								, EFileAttrib_UnixAttributesValid | EFileAttrib_UserExecute | EFileAttrib_UserRead | EFileAttrib_UserWrite
-							)
-						;
+						CFile::fs_WriteStringToFile(FileName, _Script, false, EFileAttrib_UnixAttributesValid | EFileAttrib_UserExecute | EFileAttrib_UserRead | EFileAttrib_UserWrite);
 					}
 				}
 			)
@@ -178,16 +165,7 @@ namespace NMib::NCloud::NAppManager
 									auto ExitStatus = _State.f_Get<NProcess::EProcessLaunchState_Exited>();
 									pState->m_Output.m_Status = ExitStatus;
 									if (ExitStatus == _WarningErrorStatus)
-									{
-										DMibLogWithCategory
-											(
-												Malterlib/Cloud/AppManager
-												, Warning
-												, "[{}] Bash script exited with warning"
-												, _Description
-											)
-										;
-									}
+										DMibLogWithCategory(Malterlib/Cloud/AppManager, Warning, "[{}] Bash script exited with warning", _Description);
 									else if (ExitStatus != 0)
 									{
 										auto ErrorOutput = pState->m_ErrorOutput.f_Trim();
@@ -199,16 +177,7 @@ namespace NMib::NCloud::NAppManager
 										break;
 									}
 									else
-									{
-										DMibLogWithCategory
-											(
-												Malterlib/Cloud/AppManager
-												, Info
-												, "[{}] Bash script exited with success"
-												, _Description
-											)
-										;
-									}
+										DMibLogWithCategory(Malterlib/Cloud/AppManager, Info, "[{}] Bash script exited with success", _Description);
 
 									if (!pState->m_bReplied)
 									{
@@ -256,13 +225,8 @@ namespace NMib::NCloud::NAppManager
 
 				LaunchParams.m_bAllowExecutableLocate = true;
 
-				pState->m_LaunchActor
-					(
-						&CProcessLaunchActor::f_Launch
-						, LaunchParams
-						, fg_ThisActor(this)
-					)
-					> [pState, _Description, fReportError](TCAsyncResult<CActorSubscription> &&_Subscription)
+				pState->m_LaunchActor(&CProcessLaunchActor::f_Launch, LaunchParams, fg_ThisActor(this)) > [pState, _Description, fReportError]
+					(TCAsyncResult<CActorSubscription> &&_Subscription)
 					{
 						if (!pState->m_LaunchActor)
 							return;

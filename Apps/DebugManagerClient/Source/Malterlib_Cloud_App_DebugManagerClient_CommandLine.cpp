@@ -14,11 +14,6 @@ namespace NMib::NCloud::NDebugManagerClient
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
 
-		o_CommandLine.f_SetProgramDescription
-			(
-				"Malterlib Debug Manager Client"
-				, "Servers symbols locally."
-			)
-		;
+		o_CommandLine.f_SetProgramDescription("Malterlib Debug Manager Client", "Servers symbols locally.");
 	}
 }

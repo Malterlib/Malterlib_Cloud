@@ -79,7 +79,8 @@ namespace NMib::NCloud::NVersionManager
 			{
 				auto SubscriptionID = _SubscriptionID;
 				auto PermissionResult = co_await mp_Permissions.f_HasPermission("Receive VersionManager version update notification", Permissions, _CallingHostInfo)
-					.f_Timeout(60.0, "Timed out checking permissions for sending version update subscription").f_Wrap()
+					.f_Timeout(60.0, "Timed out checking permissions for sending version update subscription")
+					.f_Wrap()
 				;
 
 				CSubscription const *pSubscription = fp_GetSubscription(_SubscriptionApplication, SubscriptionID);
@@ -156,7 +157,12 @@ namespace NMib::NCloud::NVersionManager
 	TCFuture<void> CVersionManagerDaemonActor::CServer::fp_SendSubscriptionInitial(CStr _ApplicationName, CSubscription const *_pSubscription)
 	{
 		auto fSendInitialForApplication =
-			[this, CallingHostInfo = _pSubscription->m_CallingHostInfo, SubscriptionID = _pSubscription->f_GetSubscriptionID(), ApplicationName = _ApplicationName]
+			[
+				this
+				, CallingHostInfo = _pSubscription->m_CallingHostInfo
+				, SubscriptionID = _pSubscription->f_GetSubscriptionID()
+				, ApplicationName = _ApplicationName
+			]
 			(CStr _Application) -> TCFuture<TCVector<CVersionManager::CNewVersionNotification>>
 			{
 				auto bHasPermissions = co_await mp_Permissions.f_HasPermission

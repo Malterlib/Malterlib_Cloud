@@ -113,13 +113,7 @@ namespace NMib::NCloud
 
 		auto SequenceSubscription = co_await m_UpdatePeriodicSequencer.f_Sequence();
 
-		co_await
-			(
-				f_PeriodicUpdate_Diskspace(true)
-				+ f_PeriodicUpdate_Patch(true)
-				+ f_PeriodicUpdate_Memory(true)
-			)
-		;
+		co_await (f_PeriodicUpdate_Diskspace(true) + f_PeriodicUpdate_Patch(true) + f_PeriodicUpdate_Memory(true));
 
 		co_return {};
 	}

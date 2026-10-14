@@ -25,12 +25,7 @@ namespace NMib::NCloud::NVersionManager
 			mp_AppState.m_TrustManager(&CDistributedActorTrustManager::f_RegisterPermissions, NewPermissions).f_DiscardResult();
 	}
 
-	TCFuture<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> CVersionManagerDaemonActor::CServer::fp_FilterTags
-		(
-			CStr _Description
-			, TCSet<CStr> _TagsAdded
-			, TCSet<CStr> _TagsRemoved
-		)
+	TCFuture<CVersionManagerDaemonActor::CServer::CFilteredTagsResult> CVersionManagerDaemonActor::CServer::fp_FilterTags(CStr _Description, TCSet<CStr> _TagsAdded, TCSet<CStr> _TagsRemoved)
 	{
 		TCMap<CStr, TCVector<CPermissionQuery>> Permissions;
 
@@ -102,9 +97,7 @@ namespace NMib::NCloud::NVersionManager
 
 		auto FilteredTags = co_await
 			(
-				pThis->fp_FilterTags("Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags)
-				% "Access denied filtering tags by permission"
-				% Auditor
+				pThis->fp_FilterTags("Change tags in the version manager", _Params.m_AddTags, _Params.m_RemoveTags) % "Access denied filtering tags by permission" % Auditor
 			)
 		;
 

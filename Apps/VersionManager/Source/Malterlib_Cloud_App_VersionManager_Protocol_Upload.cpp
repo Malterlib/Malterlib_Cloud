@@ -29,8 +29,7 @@ namespace NMib::NCloud::NVersionManager
 
 	static constexpr EFileAttrib gc_FilePermissions = EFileAttrib_UserRead | EFileAttrib_UserWrite | EFileAttrib_UnixAttributesValid;
 
-	auto CVersionManagerDaemonActor::CServer::fp_SaveVersionInfo(CStr _VersionPath, CVersionManager::CVersionInformation _VersionInfo)
-		-> TCFuture<CSizeInfo>
+	auto CVersionManagerDaemonActor::CServer::fp_SaveVersionInfo(CStr _VersionPath, CVersionManager::CVersionInformation _VersionInfo) -> TCFuture<CSizeInfo>
 	{
 		auto BlockingActorCheckout = fg_BlockingActor();
 
@@ -194,7 +193,6 @@ namespace NMib::NCloud::NVersionManager
 			}
 		;
 
-
 		CStr ApplicationDirectory = fg_Format("{}/Applications", pThis->mp_AppState.m_RootDirectory);
 		CStr VersionPath = fg_Format("{}/{}/{}", ApplicationDirectory, pParams->m_Application, pParams->m_VersionIDAndPlatform.f_EncodeFileName());
 
@@ -235,16 +233,7 @@ namespace NMib::NCloud::NVersionManager
 					CStr Message;
 					Message = fg_Format("{ns } bytes at {fe2} MB/s", Result.m_nBytes, Result.f_BytesPerSecond() / 1'000'000.0);
 
-					Auditor.f_Info
-						(
-							fg_Format
-							(
-								"'{}' Version upload finished transferring: {}"
-								, Desc
-								, Message
-							)
-						)
-					;
+					Auditor.f_Info(fg_Format("'{}' Version upload finished transferring: {}", Desc, Message));
 				}
 
 				auto *pUpload = pThis->mp_VersionUploads.f_FindEqual(UploadID);
@@ -293,7 +282,7 @@ namespace NMib::NCloud::NVersionManager
 					;
 				}
 
-				VersionInfo.m_nFiles  = InfoWriteResult->m_nFiles;
+				VersionInfo.m_nFiles = InfoWriteResult->m_nFiles;
 				VersionInfo.m_nBytes = InfoWriteResult->m_nBytes;
 
 				auto &Version = Application.m_Versions[VersionID];

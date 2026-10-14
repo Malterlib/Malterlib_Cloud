@@ -15,12 +15,7 @@ namespace NMib::NCloud::NDebugManager
 	{
 		CDistributedAppActor::fp_BuildCommandLine(o_CommandLine);
 
-		o_CommandLine.f_SetProgramDescription
-			(
-				"Malterlib Debug Manager"
-				, "Manages debug information and crash dumps."
-			)
-		;
+		o_CommandLine.f_SetProgramDescription("Malterlib Debug Manager", "Manages debug information and crash dumps.");
 
 		auto Section = o_CommandLine.f_GetDefaultSection();
 

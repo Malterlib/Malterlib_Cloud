@@ -20,11 +20,10 @@ namespace NMib::NCloud
 		o_Str += typename tf_CStr::CFormat("{}/{}") << m_Folder << m_Name;
 	}
 
-	inline CSecretsManager::CSecretID::operator NStr::CStr() const
+	inline CSecretsManager::CSecretID::operator NStr::CStr () const
 	{
 		return NStr::CStr::CFormat("{}/{}") << m_Folder << m_Name;
 	}
-
 
 	template <typename tf_CStream>
 	void CSecretsManager::CSecretProperties::f_Stream(tf_CStream &_Stream)
@@ -59,12 +58,12 @@ namespace NMib::NCloud
 		return m_Manifest == _Right.m_Manifest;
 	}
 
-	inline auto CSecretsManager::CSecret::operator *() -> CSuper &
+	inline auto CSecretsManager::CSecret::operator * () -> CSuper &
 	{
 		return *this;
 	}
 
-	inline auto CSecretsManager::CSecret::operator *() const -> CSuper const &
+	inline auto CSecretsManager::CSecret::operator * () const -> CSuper const &
 	{
 		return *this;
 	}
@@ -80,21 +79,13 @@ namespace NMib::NCloud
 	{
 		switch (f_GetTypeID())
 		{
-		case CSecretsManager::ESecretType_NotSet:
-			o_Str += "<Empty Secret>";
-			break;
+		case CSecretsManager::ESecretType_NotSet: o_Str += "<Empty Secret>"; break;
 
-		case CSecretsManager::ESecretType_String:
-			o_Str += f_Get<CSecretsManager::ESecretType_String>();
-			break;
+		case CSecretsManager::ESecretType_String: o_Str += f_Get<CSecretsManager::ESecretType_String>(); break;
 
-		case CSecretsManager::ESecretType_Binary:
-			o_Str += NEncoding::fg_Base64Encode(f_Get<CSecretsManager::ESecretType_Binary>());
-			break;
+		case CSecretsManager::ESecretType_Binary: o_Str += NEncoding::fg_Base64Encode(f_Get<CSecretsManager::ESecretType_Binary>()); break;
 
-		case CSecretsManager::ESecretType_File:
-			o_Str += f_Get<CSecretsManager::ESecretType_File>().m_Manifest.m_OriginalPath;
-			break;
+		case CSecretsManager::ESecretType_File: o_Str += f_Get<CSecretsManager::ESecretType_File>().m_Manifest.m_OriginalPath; break;
 
 		case CSecretsManager::ESecretType_StringMap:
 			{
